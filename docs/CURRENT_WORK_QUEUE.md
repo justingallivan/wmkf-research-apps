@@ -6,7 +6,7 @@ status: canonical
 summary: Canonical priority queue separating current commitments, evidence windows, optional work, external dependencies, and parked programs.
 canonical: true
 cataloged: 2026-07-22
-last_verified: 2026-08-28
+last_verified: 2026-08-29
 owner: product-engineering
 related:
   - docs/SYSTEM_MODEL.md
@@ -34,27 +34,10 @@ sequence.
 
 | Order | Work | Current boundary | Completion decision |
 | --- | --- | --- | --- |
-| 1 | Close the remaining Initial Assessment pilot gates | **[VERIFIED IN SOURCE 2026-08-16]** Initial Assessment and Field Primer now require the exact active `AI Materials/ProposalNarrative_{Request#}.pdf`; a read-only live Request `1002788` extraction returned non-empty text. No governed artifact was generated from that new source in this change. Earlier Requests `1002788` and `1003109` remain production evidence for artifact mechanics, lineage, exact-input reuse, interrupted-finalization recovery, and attributed editing, but their older Phase I/Reviewer Materials inputs are superseded. Both artifact consumers still resolve the same stable item. Graph-current metadata display is live; a disposable production-library probe also proved previous-version inspection/restore and signed-in first-stage recycle recovery. Before declaring the pilot gate complete, obtain administrator evidence for version limits, second-stage recovery, Purview retention, and editor least privilege, then implement Workbench administrator restore and milestone snapshots. **IT screenshots 2026-08-20 (S448) closed most administrator evidence:** version policy fully read (major-only, keep 500, no age limit); the second-stage recycle bin exists and held both 2026-07-30 probe files, refuting the 2026-08-10 "no second-stage bin" report; Members hold the built-in **Edit** level ("limited control" was a pane caption) and the connected M365 group is **Public**, so any internal user presumptively can edit/delete. Purview retention and the Edit level's exact Delete flags remain open and owner-accepted-open absent a pressing need. See `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` audit section and `docs/INITIAL_ASSESSMENT_CONTROLLED_PILOT_2026-07-30.md` item 5. | Current metadata, native version restore, and first-stage recovery are proven; administrator policy/access evidence and product history/milestone controls are recorded or completed. |
-| 2 | First deadline-bound writeup slice | **[VERIFIED IN PRODUCTION 2026-08-17]** Request `1002379` proved the exact Proposal Narrative, authoritative Dataverse metadata, governed generation, durable Ready row, stable Word upload, current pointer, and exact no-duplicate retry; the bibliography remains excluded. **[DEPLOYED TO PRODUCTION 2026-08-18; SIGNED-IN GENERATION + NO-DUPLICATE SMOKES PASSED 2026-08-27]** Application commit `46903bc4` and Ready deployment `dpl_HGogbJnprevoYKLaxevamxdajtC4` add the resilience contract, durable edit-check warnings, guarded unchanged retry, typed support references, and render contract v5. Owner-approved smoke on Request `1002852` (2026-08-27): a fresh governed generation under sole-current prompt v5 (unattributed content-identical republish of v4, verified by the runtime exact-match preflight) returned Ready with both durable warnings and a valid Word file, and an unchanged second retry returned the identical artifact/run/file (exact no-duplicate). The hard-failure smoke was skipped by owner decision and remains proven by negative service/route tests. Evidence and IDs: `docs/PRE_SITE_VISIT_GENERATION_RESILIENCE_PLAN.md` §Status. | Controlled partial-failure recovery and the full Editor Dashboard remain later proof/reuse. |
+| 1 | Persist Executor output budgets as admin-editable settings | **[VERIFIED IN SOURCE 2026-08-29]** `shared/config/executorBudgets.js` still owns the Pre-Site standing budget (`32 768` tokens / `240s`) and review-synthesis retry range (`16 000`–`32 000`) as tracked literals. `PromptTemplatesSection` displays them but cannot edit them. Owner directive S467: mutable operational parameters must not live in code. | Choose and implement the durable contract; Admin can edit it; the Executor and both callers read it server-side; reviewed model ceilings, superuser-only writes, auditability, and bounded code fallback/seed behavior remain enforced. Tier 1 feature branch. |
+| 2 | Close the remaining Initial Assessment pilot controls | **[VERIFIED IN SOURCE 2026-08-29]** Canonical artifact mechanics, exact-input reuse, interrupted-finalization recovery, substantive attributed editing, Graph-current metadata, native version restore, first-stage recovery, version limits, and second-stage recovery are proved. Purview retention and the Edit level's exact Delete flags remain owner-accepted-open absent a pressing need. Workbench administrator restore and milestone snapshots remain unbuilt. See `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` and `docs/INITIAL_ASSESSMENT_CONTROLLED_PILOT_2026-07-30.md`. | Workbench administrator restore and milestone snapshot controls are implemented and verified against the existing stable-item/version contract. |
 
 ## Audit follow-ups — verified open, not silently prioritized
-
-- **Move Executor output budgets out of code into persisted, admin-editable
-  settings.** **[OWNER DIRECTIVE 2026-08-28 (S467): "we can't be setting
-  mutable parameters in code."]** The S467 admin surface made the budgets
-  visible, but `maxTokensOverride` / `timeoutMsOverride` still live in the
-  tracked registry `shared/config/executorBudgets.js`, and the prompt row's
-  `wmkf_ai_maxtokens` is not exposed by the Admin publish form. Target: the
-  Prompt templates panel edits the per-prompt output budget and timeout, the
-  Executor reads them from durable state (the existing
-  `wmkf_appsystemsettings` pattern behind `/api/admin/models`, or the prompt
-  row itself), and the registry shrinks to a fallback/seed. Guards to keep:
-  server-side bound against the resolved model's reviewed `maxOutputTokens`
-  (the Executor already rejects over-ceiling budgets), superuser-only writes,
-  and the same audit trail the model-override setting has. Model capability
-  facts (`lib/services/model-capabilities.js`: ceilings, `reviewedAt`, docs
-  URL) are a reviewed snapshot of Anthropic's published limits and stay in
-  code; the panel's "registry reviewed" date is the freshness signal.
 - **Post-reviewer-cycle: promote the reviewer cron-reminders ledger slice.**
   **[OWNER-PARKED 2026-08-27 — merge only after the current reviewer cycle
   ends.]** Built and held on `feature/reviewer-cron-reminders-ledger`
@@ -126,6 +109,28 @@ sequence.
   queued in `docs/PUBLIC_GIT_HISTORY_REMEDIATION_PLAN.md`).
 
 ## Completed in this execution
+
+- Curated Site Visit materials-recipient directory: **[PRODUCTION-LIVE AND
+  OWNER-VERIFIED 2026-08-29]** superusers curate a maximum of 50 active staff
+  and existing Dataverse Contact references (Consultant/Board) for the
+  distribution-composer menu. The setting stores references/categories only;
+  source records own names/email. Name search is read-only, uses one bounded
+  51-row Dataverse probe, returns at most 50 candidates, and explicitly signals when
+  more matches exist. Configured people are menu choices only and are never
+  auto-added to drafts. Merge `c5efa770`; Ready Production deployment
+  `dpl_dKmm19nMyX3w6RRjkLNJowiFqFU1`; owner verified the broad `smith` warning.
+
+- Error-message and operational-event reliability: **[PRODUCTION-LIVE
+  2026-08-29]** Graph document search now honors `Retry-After`, retries the
+  transient 408/5xx/429 class, serializes same-round search scopes, and carries
+  cooldown/breaker state. Admin Operational Events groups repeats and supports
+  ABA-safe single/group resolution with truthful partial-success/current-filter
+  feedback. PR #137 merge `1c153a35`; Vercel status succeeded.
+
+- Staff Deliberations distribution-history UX: **[PRODUCTION-LIVE
+  2026-08-29]** history groups by calendar day and marks self-addressed sends
+  as `Test send`. Merge `90d0f10e`; Vercel status succeeded. The accompanying
+  Final Writeup Review document is plan-only and remains owner-gated.
 
 - Site Visit workspace handoff: **[PRODUCTION-PROVED 2026-08-21]** after the
   owner's exact approval, signed-in Request `1002379` transitioned its current

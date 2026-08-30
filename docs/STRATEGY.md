@@ -6,7 +6,7 @@ status: active
 summary: "Long-term product direction; current execution priority is owned by CURRENT_WORK_QUEUE.md."
 canonical: false
 cataloged: 2026-07-02
-last_verified: 2026-08-21
+last_verified: 2026-08-29
 owner: product-engineering
 related:
   - docs/SYSTEM_MODEL.md
@@ -18,7 +18,7 @@ related:
 
 # Where We're Headed
 
-**Last verified: 2026-08-21.** This document owns long-term direction and principles. The
+**Last verified: 2026-08-29.** This document owns long-term direction and principles. The
 ordered, current delivery agenda lives in `docs/CURRENT_WORK_QUEUE.md`; this document is not a
 backlog.
 
@@ -133,86 +133,30 @@ index and workflow surface, not a second editor or document store.
 
 ## Current execution
 
-The ordered agenda is maintained in `docs/CURRENT_WORK_QUEUE.md`. The near-term sequence is:
+The ordered agenda is maintained in `docs/CURRENT_WORK_QUEUE.md`. As of
+2026-08-29, the immediate owner-directed task is to move Executor output budgets
+and timeouts from tracked literals into persisted, superuser-editable settings.
+The current Admin panel displays those values but cannot edit them. The next
+older approved product-control slice is Initial Assessment administrator restore
+plus milestone snapshots.
 
-**Production proof completed 2026-08-21:** after explicit owner approval, the
-controlled signed-in Request `1002379` smoke promoted the current Pre-Site Word
-workspace from Draft to Review, retained the exact SharePoint Edit/Download
-identity, recorded the handoff milestone, and locked Pre-Site regeneration.
-The later Site Visit dossier, materials/logistics, and Final transaction remain
-separate slices.
+The Final Writeup Review design is reviewed plan-only. Implementation requires a
+new owner go, expanded file-surface approval, explicit transition actor/time
+storage, a read-only `systemuser` coverage probe, and a defined PC/leadership
+persona contract. It is not implied by the near-term sequence.
 
-1. close the partially successful human-in-the-loop Initial Assessment pilot.
-   Its 2026-08-10 target was a deliberately early **internal buffer, not an
-   external commitment** (owner, 2026-08-10 / S412); it passed unmet because the
-   administrator evidence is still outstanding with Connor, and that is expected
-   rather than slippage. Proposal intake around 2026-08-18 is the unchanged
-   external date. The controlled
-   Request `1002788` rehearsal generated and registered the canonical
-   SharePoint artifact, exposed that same item in Workbench and the cycle
-   locator, created native version history, and proved exact-input no-duplicate
-   retry. It also exposed whole-package SharePoint hash drift in
-   interrupted-finalization recovery and a missing AI-run request lookup. The
-   deployed runtime now uses normalized governed-DOCX hashing and supplies the
-   request GUID to the Executor; tests include the actual pilot packages.
-   Request `1003109` production-proved the canonical proposal, exact-input
-   reuse, a new linked run, and interrupted-finalization recovery using the
-   same registry row, AI run, SharePoint item, and version. An attributed
-   substantive edit then passed on that same stable item through both
-   consumers. Response-only Graph-current refresh by stable identity is
-   deployed and live-verified in both consumers on Request `1003109` via
-   production deployment `dpl_HhiYXVFAtsGMwjU9UDcKz22AfvR2`. A disposable
-   production-library audit also proved previous-version inspection/restore
-   and signed-in first-stage recycle recovery. Administrator evidence closed
-   version limits and second-stage recovery (2026-08-10 / 2026-08-20);
-   retention and editor Delete flags stay owner-accepted-open. Next build
-   Workbench history/admin restore plus milestone snapshots;
-2. complete the signed-in smoke of the deployed Pre-Site client recovery path. Request
-   `1002379` created one Ready/Draft row, completed governed v3 AI run, current
-   request pointer, and stable Word item from the exact narrative-only source;
-   an exact Ready retry reused all four. The first long browser request lost its
-   response after durable server completion. **[DEPLOYED TO PRODUCTION
-   2026-08-17; SIGNED-IN FEATURE SMOKE OPEN]** the tab discovers current/pending
-   status and performs bounded
-   GET polling without a blind POST retry. Production template v2 fixed
-   Recommendation-cell spacing under a new generation identity and produced a
-   Ready artifact, but Word Online exposed a width-sensitive
-   Recommendation-label alignment defect. **[INFERRED FROM SCREENSHOT + OOXML
-   WIDTH]** implicit wrapping was the remaining layout variable. **[DEPLOYED TO
-   PRODUCTION 2026-08-17; SIGNED-IN FEATURE SMOKE OPEN]** template v3 uses an
-   explicit no-wrap label, and the Production compact panel exposes Edit,
-   Download, and confirmation-guarded Regenerate actions for Ready drafts;
-   their signed-in smoke remains open. **[DEPLOYED TO PRODUCTION AND SIGNED-IN
-   RECEIPT SMOKE PASSED 2026-08-21]** commit `b3bb0ef6` first reached Production in
-   Ready deployment `dpl_FkWu55fyBqSEo8q4DBcdcA3xvigi` and makes promoted Pre-Site work a read-only
-   handoff receipt, routes Edit/Download through Site Visit, keeps warnings
-   actionable, and fails closed for every non-Draft lifecycle. Signed-in Request
-   `1002379` confirmed the receipt has no work controls and its one continuation
-   action reaches Site Visit's same-file Edit/Download workspace without a write.
-
-The deployed Site Visit handoff's controlled signed-in proof is complete on
-Request `1002379`: the same SharePoint item remains the working document,
-Review is current, the complete milestone is enforced by post-write readback,
-and regeneration is locked. The broader Site Visit dossier, narrow
-applicant-material upload, Final transaction, and full Editor Dashboard remain
-later slices.
-
-The owner-authorized 2026-07-27 Request `1002788` smoke closed as a bounded
-v2 failure with no partial memo write. On 2026-07-28, governed prompt v3 became
-the sole current row and the controlled post-fix smoke persisted valid
-synthesis on the first semantic attempt with complete audit evidence; its
-synthetic review was then restored exactly.
-
-The 2026-07-26 evidence-first audit found six live Workbench tabs and four placeholders,
-retired the contradictory forward roadmap, and separated shipped behavior from proposed
-writeup fields/prompts. See `docs/audits/AUDIT_REQUEST_WORKBENCH_TRUTH_2026-07-26.md`
-and `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md`.
+**Recently completed:** the Staff Deliberations workspace/history UX, curated
+Site Visit materials-recipient menu, and Graph-search/Operational Events error
+reliability are Production-live. The recipient directory is capped at 50 active
+staff/existing Contact references, never creates or edits Contacts, never
+auto-adds anyone to an email draft, and signals when a one-request search has
+more than 50 matches. See `SESSION_PROMPT.md` Session 468 and
+`DEVELOPMENT_LOG.md` for the release record.
 
 Power Automate automation, the general applicant-intake product, automated BILL
-onboarding, and broader reviewer cleanup have separate dependency or owner
-gates. The planned narrow Site Visit Materials Upload is part of the Workbench
-lifecycle contract and does not reopen general intake. None of the other parked
-programs are implied next steps.
+onboarding, the post-cycle reviewer-reminders ledger, invitation-link
+strictness, and broader reviewer cleanup retain their dependency, cycle, or
+owner gates. None is an implied next step.
 
 ---
 

@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-08-25
+last_verified: 2026-08-29
 stale_after_days: 90
 owner: product-strategy
 source_files:
@@ -233,6 +233,13 @@ document inventory, and individual implementation plans do not establish priorit
   caution applies; high-risk automation stays review-only until the representative
   benchmark exists.
 - Current priorities: `docs/CURRENT_WORK_QUEUE.md`.
+- **Immediate owner-directed work (S468 close, 2026-08-29):** persist the
+  Executor's output-budget and timeout parameters as superuser-editable durable
+  settings. `shared/config/executorBudgets.js` remains the verified interim
+  source and the Admin Prompt templates panel is display-only. Initial
+  Assessment administrator restore/milestone snapshots follow as the next older
+  approved product-control slice. Final Writeup Review remains plan-only and
+  owner-gated.
 - **Staff Deliberations tab (S466, 2026-08-28, production):** the Pre Site
   Visit Writeup + Site Visit tabs are merged into one stage-aware workspace
   (`shared/components/workbench/StaffDeliberationsTab.js`, rail
@@ -244,6 +251,14 @@ document inventory, and individual implementation plans do not establish priorit
   entries below describe the pre-merge two-tab UI; their document-lifecycle
   guarantees are unchanged. Design record: the Site Visit Workspace
   proposal artifact (link in `SESSION_PROMPT.md`).
+- **Curated Site Visit recipient directory (S468, 2026-08-29, production):**
+  superusers curate at most 50 active app-staff/existing-Contact references for
+  the materials composer's Consultant/Board menu. The Dataverse setting stores
+  references/categories only; names/email resolve live; search never writes a
+  Contact. Configured people are choices, never automatic draft recipients.
+  Name search performs one bounded 51-row probe, returns at most 50, and tells
+  the UI when more matches exist. Owner verified the broad `smith` warning in
+  Production after merge `c5efa770`.
 - **Institutional Funding History filled from Dataverse (S467, 2026-08-28,
   production):** `lib/services/pre-site-visit/funding-history.js` renders the
   `AI:InstitutionalFundingHistory` placeholder sentence from the account rollups
@@ -271,14 +286,9 @@ document inventory, and individual implementation plans do not establish priorit
   No document or write action was invoked; the request showed no warning panel.
 - Current Workbench truth and contradictions:
   `docs/audits/AUDIT_REQUEST_WORKBENCH_TRUTH_2026-07-26.md`.
-- Current near-term sequence: synthesis lifecycle closure → governed artifact
-  foundation plus the Initial Assessment pilot (its August 10 target was an
-  internal buffer, now passed — not a live deadline) → remaining-tab
-  design freeze and dependent lifecycle slices. The 2026-07-27 Request
-  `1002788` v2 smoke closed by its bounded-failure alternative; governed v3
-  then became sole-current and the 2026-07-28 post-fix smoke persisted valid
-  synthesis with complete audit evidence and exact synthetic-review cleanup. See
-  `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md`.
+- Historical Workbench execution details remain in
+  `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md`; they do not override the
+  current sequence in `docs/CURRENT_WORK_QUEUE.md`.
 - Writeup artifact direction (owner-decided 2026-07-28): SharePoint Word is the
   canonical editable narrative; Dataverse is the typed document
   registry/workflow/structured-decision authority; Microsoft Search supplies

@@ -82,7 +82,12 @@ fallback.
   The setting stores only profile IDs, Contact GUIDs, and external category;
   active staff/systemusers and active Contacts supply current display names and
   primary email addresses. Admin can search existing Contacts but cannot create
-  or edit them. Unavailable configured identities are omitted from Workbench.
+  or edit them. Name search performs one bounded 51-row Dataverse probe, returns
+  at most 50 candidates, and explicitly signals when additional matches exist;
+  exact-email search retains its exact-candidate path. Admin edits remain a
+  local draft until the explicit full-replacement save. Configured identities
+  are choices in each email composer, never automatic recipients. Unavailable
+  configured identities are omitted from Workbench.
 - `pre-site-visit/distribution-service.js` can bind the Activity ID/ETag and a
   bounded event snapshot into an informational `METHOD:PUBLISH` calendar
   attachment. For a calendar-enabled preview it requires the ActivityParty

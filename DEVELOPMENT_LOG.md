@@ -10,6 +10,25 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## August 2026 — Curated Site Visit recipients and operational-error reliability reached Production (Session 468)
+
+**Milestone:** Staff can maintain a bounded, source-owned Site Visit
+materials-recipient menu from active app staff and existing Dataverse Contacts;
+Dynamics Explorer and Admin Operational Events now fail visibly and recover
+correctly under throttling, repetition, concurrency, and partial batch success.
+**Sessions:** 468 (Claude/Codex implementation handoffs, Opus adversarial
+reviews, owner Production verification).
+**Ship state:** recipient references/categories only, 50-entry cap, one-request
+51-row Contact-name probe with explicit truncation, no Contact writes or automatic
+draft recipients; Graph `Retry-After`/transient cooldown and grouped ABA-safe
+event resolution live. Owner verified the broad `smith` warning in Production.
+**Why it matters:** staff get a practical curated addressee menu without a stale
+parallel address book, while previously misleading “no documents”/resolve
+feedback now preserves operational truth.
+**Pointers:** `docs/atlas/dataverse-wmkf-sitevisit.md`;
+`docs/API_ROUTE_SECURITY_MATRIX.md`; PR #137 merge `1c153a35`; recipient merge
+`c5efa770`; Ready deployment `dpl_dKmm19nMyX3w6RRjkLNJowiFqFU1`.
+
 ## August 2026 — Institutional Funding History filled from Dataverse; Executor budgets made visible (Session 467)
 
 **Milestone:** The Pre-Site writeup's `[[AI:InstitutionalFundingHistory]]`
