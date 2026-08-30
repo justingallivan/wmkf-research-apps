@@ -16,10 +16,14 @@ jest.mock('../../lib/dataverse/adapters/ai-prompt', () => ({
   setIsCurrent: jest.fn(),
 }));
 jest.mock('@vercel/postgres', () => ({ sql: jest.fn(async () => ({ rows: [] })) }));
+jest.mock('../../lib/services/executor-budget-service', () => ({
+  assertExecutorBudgetForPromptModel: jest.fn(async () => null),
+}));
 
 import * as aiPrompt from '../../lib/dataverse/adapters/ai-prompt';
 import { sql } from '@vercel/postgres';
 import { ServiceHttpError } from '../../lib/services/service-http-error';
+import { assertExecutorBudgetForPromptModel } from '../../lib/services/executor-budget-service';
 import { getPrompt, publishPrompt } from '../../lib/services/admin/prompts-publish-service';
 import { ANALYZE_USER_PROMPT_TEMPLATE } from '../../shared/config/prompts/reviewer-finder-dynamics';
 import {
@@ -81,6 +85,7 @@ beforeEach(() => {
   aiPrompt.getIdOnly.mockResolvedValue({ wmkf_ai_promptid: 'prior', _etag: 'W/"1"' });
   aiPrompt.create.mockResolvedValue({ wmkf_ai_promptid: 'new-row' });
   aiPrompt.setIsCurrent.mockResolvedValue({});
+  assertExecutorBudgetForPromptModel.mockResolvedValue(null);
 });
 
 describe('getPrompt', () => {
@@ -237,6 +242,7 @@ describe('publishPrompt', () => {
     aiPrompt.getIdOnly.mockResolvedValue({ wmkf_ai_promptid: 'old', _etag: 'W/"9"' });
     const r = await publishPrompt(args({ body: editedBody }));
     expect(r).toMatchObject({ status: 'completed', newPromptId: 'newer', targetVersion: 4, resumed: true });
+    expect(assertExecutorBudgetForPromptModel).not.toHaveBeenCalled();
     expect(aiPrompt.setIsCurrent).toHaveBeenCalledWith('old', false, { ifMatch: 'W/"9"' });
     expect(aiPrompt.create).not.toHaveBeenCalled();
   });
@@ -318,6 +324,25 @@ describe('publishPrompt', () => {
       httpStatus: 400,
       body: expect.objectContaining({ status: 'invalid_model', code: 'model_output_limit_exceeded' }),
     });
+  });
+
+  it('refuses a governed prompt model that conflicts with the durable Executor budget', async () => {
+    aiPrompt.queryCurrentRows.mockResolvedValue({ records: [preSiteRow()] });
+    assertExecutorBudgetForPromptModel.mockRejectedValueOnce(new ServiceHttpError(
+      'Current Executor budget exceeds the model ceiling.',
+      { httpStatus: 409, code: 'executor_budget_model_conflict' },
+    ));
+    await expect(publishPrompt({
+      name: PRE_SITE_NAME,
+      body: PRE_SITE_BODY,
+      model: 'claude-sonnet-4-6',
+      profileId: 7,
+    })).rejects.toMatchObject({ httpStatus: 409, code: 'executor_budget_model_conflict' });
+    expect(assertExecutorBudgetForPromptModel).toHaveBeenCalledWith(
+      PRE_SITE_NAME,
+      'claude-sonnet-4-6',
+    );
+    expect(aiPrompt.create).not.toHaveBeenCalled();
   });
 
   it('rejects a malformed native structured-output contract before audit', async () => {

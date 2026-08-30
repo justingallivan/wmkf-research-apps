@@ -233,13 +233,15 @@ document inventory, and individual implementation plans do not establish priorit
   caution applies; high-risk automation stays review-only until the representative
   benchmark exists.
 - Current priorities: `docs/CURRENT_WORK_QUEUE.md`.
-- **Immediate owner-directed work (S468 close, 2026-08-29):** persist the
-  Executor's output-budget and timeout parameters as superuser-editable durable
-  settings. `shared/config/executorBudgets.js` remains the verified interim
-  source and the Admin Prompt templates panel is display-only. Initial
-  Assessment administrator restore/milestone snapshots follow as the next older
-  approved product-control slice. Final Writeup Review remains plan-only and
-  owner-gated.
+- **Immediate owner-directed work (S469, 2026-08-29):** the durable Executor
+  budget contract is source-built on `codex/executor-budget-settings` and now
+  needs adversarial review, gates, and deliberate Tier 1 promotion. The
+  superuser Admin editor publishes immutable `executor.budgets.vNNNNNN`
+  Dataverse settings; both callers read the latest valid revision server-side;
+  tracked values are strict bounds/fallback only. Production deployment and a
+  first durable Admin publication are not yet claimed. Initial Assessment
+  administrator restore/milestone snapshots follow as the next older approved
+  product-control slice. Final Writeup Review remains plan-only and owner-gated.
 - **Staff Deliberations tab (S466, 2026-08-28, production):** the Pre Site
   Visit Writeup + Site Visit tabs are merged into one stage-aware workspace
   (`shared/components/workbench/StaffDeliberationsTab.js`, rail

@@ -8,21 +8,25 @@
  * unencoded, so the doubled literal survives in the captured request path.
  */
 const get = jest.fn();
+const post = jest.fn();
 jest.mock('../../lib/dataverse/client', () => ({
   getAccessToken: jest.fn().mockResolvedValue('tok'),
-  createClient: jest.fn(() => ({ get })),
+  createClient: jest.fn(() => ({ get, post })),
 }));
 
 const {
+  createSettingStrict,
   getSetting,
   listSettings,
   listSettingsWithMeta,
+  listSettingsWithMetaStrict,
 } = require('../../lib/services/dataverse-settings-service');
 
 beforeEach(() => {
   jest.clearAllMocks();
   process.env.DYNAMICS_URL = 'https://example.crm.dynamics.com';
   get.mockResolvedValue({ ok: true, body: { value: [] } });
+  post.mockResolvedValue({ ok: true, body: {} });
 });
 
 // encodeURIComponent %20/%2C-encodes spaces and commas but leaves apostrophes
@@ -40,4 +44,69 @@ test("listSettings doubles single quotes in the startswith prefix", async () => 
 test("listSettingsWithMeta doubles single quotes in the startswith prefix", async () => {
   await listSettingsWithMeta("pre'fix");
   expect(get.mock.calls[0][0]).toContain("'pre''fix')");
+});
+
+test('strict metadata reads preserve immutable revision provenance', async () => {
+  get.mockResolvedValueOnce({
+    ok: true,
+    body: { value: [{
+      wmkf_appsystemsettingid: 'row-1',
+      wmkf_settingkey: 'executor.budgets.v000001',
+      wmkf_settingvalue: '{}',
+      createdon: '2026-08-29T00:00:00Z',
+      modifiedon: '2026-08-29T00:00:00Z',
+      _wmkf_updatedby_value: 'actor-1',
+      _wmkf_updatedby_value_formatted: 'Admin User',
+    }] },
+  });
+  await expect(listSettingsWithMetaStrict('executor.budgets.v')).resolves.toEqual({
+    'executor.budgets.v000001': expect.objectContaining({
+      id: 'row-1',
+      value: '{}',
+      updatedById: 'actor-1',
+      updatedByName: 'Admin User',
+    }),
+  });
+});
+
+test('strict metadata reads follow every Dataverse page', async () => {
+  get
+    .mockResolvedValueOnce({
+      ok: true,
+      body: {
+        value: [{ wmkf_settingkey: 'executor.budgets.v000001', wmkf_settingvalue: '{}' }],
+        '@odata.nextLink': 'https://example.crm.dynamics.com/api/data/v9.2/next-page',
+      },
+    })
+    .mockResolvedValueOnce({
+      ok: true,
+      body: { value: [{ wmkf_settingkey: 'executor.budgets.v000002', wmkf_settingvalue: '{}' }] },
+    });
+  await expect(listSettingsWithMetaStrict('executor.budgets.v')).resolves.toEqual({
+    'executor.budgets.v000001': expect.objectContaining({ value: '{}' }),
+    'executor.budgets.v000002': expect.objectContaining({ value: '{}' }),
+  });
+  expect(get.mock.calls[1][0]).toBe('https://example.crm.dynamics.com/api/data/v9.2/next-page');
+});
+
+test('createSettingStrict is create-only and surfaces alternate-key conflicts', async () => {
+  await expect(createSettingStrict('executor.budgets.v000001', '{}')).resolves.toBe(true);
+  expect(post).toHaveBeenCalledWith('/wmkf_appsystemsettings', {
+    wmkf_settingkey: 'executor.budgets.v000001',
+    wmkf_settingvalue: '{}',
+  });
+
+  get.mockResolvedValueOnce({
+    ok: true,
+    body: { value: [{ wmkf_appsystemsettingid: 'existing', wmkf_settingvalue: '{}' }] },
+  });
+  await expect(createSettingStrict('executor.budgets.v000001', '{}'))
+    .rejects.toMatchObject({ code: 'setting_exists', status: 409 });
+  expect(post).toHaveBeenCalledTimes(1);
+});
+
+test('createSettingStrict normalizes a Dataverse alternate-key 412 to setting_exists', async () => {
+  post.mockResolvedValueOnce({ ok: false, status: 412, text: 'duplicate alternate key' });
+  await expect(createSettingStrict('executor.budgets.v000001', '{}'))
+    .rejects.toMatchObject({ code: 'setting_exists', status: 409 });
 });

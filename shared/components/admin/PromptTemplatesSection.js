@@ -11,7 +11,6 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { validatePromptForSave } from '../../../lib/utils/prompt-validators';
-import { lookupExecutorBudget } from '../../config/executorBudgets';
 import DataverseFieldInfoButton from './DataverseFieldInfoButton';
 
 const STATUS_COPY = {
@@ -38,7 +37,10 @@ const TONE = {
 
 function newRequestId() {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
-  return `req-${Date.now()}-${Math.floor(Math.random() * 1e9)}`;
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (char) => {
+    const value = Math.floor(Math.random() * 16);
+    return (char === 'x' ? value : (value & 0x3) | 0x8).toString(16);
+  });
 }
 
 // Short timestamp; '—' when absent. Guards an unparseable value.
@@ -51,6 +53,7 @@ function fmtTs(ts) {
 export default function PromptTemplatesSection() {
   const [prompts, setPrompts] = useState(null);
   const [modelCatalog, setModelCatalog] = useState(null);
+  const [executorBudgetConfig, setExecutorBudgetConfig] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const loadGeneration = useRef(0);
@@ -62,17 +65,22 @@ export default function PromptTemplatesSection() {
     Promise.all([
       fetch('/api/admin/prompts'),
       fetch('/api/admin/models'),
+      fetch('/api/admin/executor-budgets'),
     ])
-      .then(async ([promptResponse, modelResponse]) => {
-        if (promptResponse.status === 403 || modelResponse.status === 403) throw new Error('Admin access required');
+      .then(async ([promptResponse, modelResponse, budgetResponse]) => {
+        if ([promptResponse, modelResponse, budgetResponse].some((response) => response.status === 403)) {
+          throw new Error('Admin access required');
+        }
         if (!promptResponse.ok) throw new Error('Failed to load prompts');
         if (!modelResponse.ok) throw new Error('Failed to load the reviewed model catalog');
-        return Promise.all([promptResponse.json(), modelResponse.json()]);
+        if (!budgetResponse.ok) throw new Error('Failed to load Executor budgets');
+        return Promise.all([promptResponse.json(), modelResponse.json(), budgetResponse.json()]);
       })
-      .then(([promptData, modelData]) => {
+      .then(([promptData, modelData, budgetData]) => {
         if (generation !== loadGeneration.current) return;
         setPrompts(promptData.prompts || []);
         setModelCatalog(modelData);
+        setExecutorBudgetConfig(budgetData);
       })
       .catch((err) => {
         if (generation === loadGeneration.current) setError(err.message);
@@ -93,15 +101,25 @@ export default function PromptTemplatesSection() {
         Edit and publish a new version of a stored prompt. Publishing creates a new immutable version and makes it current. Reviewer-finder prompts are validated against their output parse contract before save.
       </p>
       <div className="space-y-6">
+        <ExecutorBudgetEditor
+          config={executorBudgetConfig}
+          onPublished={setExecutorBudgetConfig}
+        />
         {prompts.map((p) => (
-          <PromptPanel key={p.name} prompt={p} modelCatalog={modelCatalog} onPublished={load} />
+          <PromptPanel
+            key={p.name}
+            prompt={p}
+            modelCatalog={modelCatalog}
+            executorBudgetConfig={executorBudgetConfig}
+            onPublished={load}
+          />
         ))}
       </div>
     </>
   );
 }
 
-function PromptPanel({ prompt, modelCatalog, onPublished }) {
+function PromptPanel({ prompt, modelCatalog, executorBudgetConfig, onPublished }) {
   const [expanded, setExpanded] = useState(false);
   const [outcome, setOutcome] = useState(null);
   const dataverseFields = buildPromptDataverseFields(prompt);
@@ -124,7 +142,11 @@ function PromptPanel({ prompt, modelCatalog, onPublished }) {
             published {fmtTs(prompt.publishedAt || prompt.createdOn)} · last touched {fmtTs(prompt.modifiedOn)}
             {prompt.modifiedByName ? <> by {prompt.modifiedByName}</> : null}
           </div>
-          <OutputBudgetLine prompt={prompt} modelCatalog={modelCatalog} />
+          <OutputBudgetLine
+            prompt={prompt}
+            modelCatalog={modelCatalog}
+            executorBudgetConfig={executorBudgetConfig}
+          />
         </div>
         <div className="flex items-center gap-2">
           <DataverseFieldInfoButton items={dataverseFields} />
@@ -272,37 +294,51 @@ const ROW_DEFAULT_MAX_TOKENS = 16384; // BASE_CONFIG.MODEL_PARAMS.DEFAULT_MAX_TO
 const fmtInt = (n) => (Number.isFinite(Number(n)) ? Number(n).toLocaleString('en-US') : '—');
 
 /**
- * The max_tokens budget this prompt actually runs with, next to the model's
- * reviewed output ceiling and the Anthropic page that ceiling was read from.
- * Server-owned overrides come from shared/config/executorBudgets.js — the same
- * object the callers use — so the panel cannot drift from the code.
+ * The configured and effective max_tokens budget, next to the model's reviewed
+ * output ceiling and the Anthropic page that ceiling was read from.
+ * Server-owned overrides come from the same resolved durable revision that
+ * runtime callers read, so the panel cannot drift from execution.
  */
-function OutputBudgetLine({ prompt, modelCatalog }) {
-  const budget = lookupExecutorBudget(prompt.name);
+export function OutputBudgetLine({ prompt, modelCatalog, executorBudgetConfig }) {
+  const budget = executorBudgetConfig?.budgets?.[prompt.name] || null;
+  const description = executorBudgetConfig?.descriptions?.[prompt.name] || null;
   const rowMax = Number.isInteger(prompt.maxTokens) && prompt.maxTokens > 0 ? prompt.maxTokens : null;
   const base = rowMax ?? ROW_DEFAULT_MAX_TOKENS;
   const effective = budget?.kind === 'standing' ? budget.maxTokensOverride : base;
   const model = resolvePromptModel(prompt, modelCatalog);
   const capability = model.id ? modelCatalog?.modelStatuses?.[model.id]?.capability : null;
   const ceiling = capability?.maxOutputTokens ?? null;
-  const overCeiling = Number.isFinite(ceiling) && effective > ceiling;
-  const tone = overCeiling ? 'text-red-700' : budget ? 'text-gray-600' : 'text-gray-400';
+  const rowOverCeiling = Number.isFinite(ceiling) && base > ceiling;
+  const overrideRequested = budget?.kind === 'standing'
+    ? budget.maxTokensOverride
+    : budget?.kind === 'retry' ? budget.ceiling : null;
+  const overrideOverCeiling = Number.isFinite(ceiling)
+    && Number.isFinite(overrideRequested)
+    && overrideRequested > ceiling;
+  const standingEffective = budget?.kind === 'standing' && Number.isFinite(ceiling)
+    ? Math.min(effective, ceiling)
+    : effective;
+  const tone = rowOverCeiling
+    ? 'text-red-700'
+    : overrideOverCeiling ? 'text-amber-700' : budget ? 'text-gray-600' : 'text-gray-400';
   return (
     <div className={`text-[11px] mt-0.5 ${tone}`} data-testid="output-budget">
       <span className="font-medium">Output budget</span>{' '}
-      <span title="max_tokens the Executor sends on this prompt's calls">{fmtInt(effective)} tokens</span>
+      <span title="max_tokens the Executor sends on this prompt's calls">{fmtInt(standingEffective)} tokens</span>
       {budget?.kind === 'standing' ? (
-        <> (server override, {budget.since}; prompt row {rowMax ? fmtInt(rowMax) : `default ${fmtInt(ROW_DEFAULT_MAX_TOKENS)}`}
+        <> ({fmtInt(budget.maxTokensOverride)} configured by {executorBudgetConfig?.source === 'dataverse' ? `published revision ${executorBudgetConfig.version}` : 'reviewed code fallback'}{overrideOverCeiling ? '; capped to the model ceiling at execution' : ''}; prompt row {rowMax ? fmtInt(rowMax) : `default ${fmtInt(ROW_DEFAULT_MAX_TOKENS)}`}
           {budget.timeoutMsOverride ? <>; timeout {Math.round(budget.timeoutMsOverride / 1000)}s</> : null})</>
       ) : budget?.kind === 'retry' ? (
-        <> (prompt row{rowMax ? '' : ' default'}; retried once at {fmtInt(budget.floor)}–{fmtInt(budget.ceiling)} on max_tokens truncation, {budget.since})</>
+        <> (prompt row{rowMax ? '' : ' default'}; configured retry {fmtInt(budget.floor)}–{fmtInt(budget.ceiling)} on max_tokens truncation{overrideOverCeiling ? `, effective retry ceiling ${fmtInt(ceiling)}` : ''}; {executorBudgetConfig?.source === 'dataverse' ? `published revision ${executorBudgetConfig.version}` : 'reviewed code fallback'})</>
       ) : (
         <> (prompt row{rowMax ? '' : ' default'})</>
       )}
       {' · '}model {model.label}
       {capability?.status === 'reviewed' ? (
         <>
-          {' · '}ceiling {fmtInt(ceiling)}{overCeiling ? ' — OVER CEILING; the Executor will reject this call' : ''}
+          {' · '}ceiling {fmtInt(ceiling)}{rowOverCeiling
+            ? ' — PROMPT ROW OVER CEILING; the Executor will reject this call'
+            : overrideOverCeiling ? ' — configured override is capped at this ceiling' : ''}
           {capability.thinkingMode ? <> · thinking {capability.thinkingMode.replace(/_/g, ' ')}{capability.defaultEffort ? ` (effort ${capability.defaultEffort})` : ''}, counted inside the budget</> : null}
           {capability.source ? (
             <>
@@ -317,8 +353,215 @@ function OutputBudgetLine({ prompt, modelCatalog }) {
       ) : model.id ? (
         <span className="text-amber-700"> · model not in the capability registry — ceiling unknown</span>
       ) : null}
-      {budget?.reason ? <div className="text-gray-400">{budget.reason}</div> : null}
+      {description?.reason ? <div className="text-gray-400">{description.reason}</div> : null}
     </div>
+  );
+}
+
+export function ExecutorBudgetEditor({ config, onPublished }) {
+  const standingName = 'pre-site-visit.proposal-core.generate';
+  const retryName = 'review-synthesis.generate';
+  const [values, setValues] = useState(() => config?.budgets || {});
+  const [baseBudgets, setBaseBudgets] = useState(() => config?.budgets || {});
+  const [baseVersion, setBaseVersion] = useState(() => config?.version || 0);
+  const [submitting, setSubmitting] = useState(false);
+  const [outcome, setOutcome] = useState(null);
+  const requestRef = useRef({ payloadKey: null, requestId: null });
+
+  if (!config?.budgets) return null;
+  const standing = values[standingName] || {};
+  const retry = values[retryName] || {};
+  const limits = config.limits || {};
+  const integers = [
+    standing.maxTokensOverride,
+    standing.timeoutMsOverride,
+    retry.floor,
+    retry.ceiling,
+  ].every(Number.isInteger);
+  const within = (value, range) => Number.isInteger(value)
+    && value >= range?.min && value <= range?.max;
+  const valid = integers
+    && within(standing.maxTokensOverride, limits[standingName]?.maxTokensOverride)
+    && within(standing.timeoutMsOverride, limits[standingName]?.timeoutMsOverride)
+    && within(retry.floor, limits[retryName]?.floor)
+    && within(retry.ceiling, limits[retryName]?.ceiling)
+    && retry.floor <= retry.ceiling;
+  const unchanged = JSON.stringify(values) === JSON.stringify(baseBudgets);
+
+  const setBudgetValue = (promptName, field, rawValue) => {
+    const nextValue = rawValue === '' ? null : Number(rawValue);
+    setValues((current) => ({
+      ...current,
+      [promptName]: { ...current[promptName], [field]: nextValue },
+    }));
+  };
+
+  const submit = async () => {
+    setSubmitting(true);
+    setOutcome(null);
+    try {
+    const payloadKey = JSON.stringify({ budgets: values, expectedVersion: baseVersion });
+      if (requestRef.current.payloadKey !== payloadKey) {
+        requestRef.current = { payloadKey, requestId: newRequestId() };
+      }
+      const response = await fetch('/api/admin/executor-budgets', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          budgets: values,
+          expectedVersion: baseVersion,
+          requestId: requestRef.current.requestId,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        if (response.status === 409 && data.current?.budgets) {
+          setValues(data.current.budgets);
+          setBaseBudgets(data.current.budgets);
+          setBaseVersion(data.current.version);
+          requestRef.current = { payloadKey: null, requestId: null };
+          onPublished(data.current);
+        }
+        throw new Error(data.error || 'Executor budget publication failed.');
+      }
+      setValues(data.config.budgets);
+      setBaseBudgets(data.config.budgets);
+      setBaseVersion(data.config.version);
+      requestRef.current = { payloadKey: null, requestId: null };
+      const publishedVersion = data.publishedConfig?.version ?? data.config.version;
+      const advanced = data.config.version !== publishedVersion
+        ? ` Current revision is v${data.config.version}.`
+        : '';
+      setOutcome({ tone: 'green', text: data.status === 'already_published'
+        ? `That budget revision was already published.${advanced}`
+        : `Published Executor budget revision ${publishedVersion}.${advanced}` });
+      onPublished(data.config);
+    } catch (error) {
+      setOutcome({ tone: 'red', text: error.message });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const settingRow = config.settingKey
+    ? `wmkf_settingkey = "${config.settingKey}"`
+    : `wmkf_settingkey starts with "executor.budgets.v"`;
+  const reset = () => {
+    setValues(config.budgets);
+    setBaseBudgets(config.budgets);
+    setBaseVersion(config.version);
+    requestRef.current = { payloadKey: null, requestId: null };
+    setOutcome(null);
+  };
+  const staleDraft = baseVersion !== config.version;
+  return (
+    <div className="border border-gray-300 rounded-lg overflow-hidden">
+      <div className="p-4 bg-gray-50 border-b flex items-start justify-between gap-3">
+        <div>
+          <div className="font-medium text-gray-900">Executor output budgets</div>
+          <div className="text-xs text-gray-500 mt-0.5">
+            {config.source === 'dataverse'
+              ? <>Current immutable revision <strong>v{config.version}</strong> · published {fmtTs(config.publishedAt)}{config.updatedByName ? <> by {config.updatedByName}</> : null}</>
+              : <>No published revision · using reviewed code fallback</>}
+          </div>
+        </div>
+        <DataverseFieldInfoButton items={[{
+          label: 'Versioned Executor budgets',
+          entity: 'wmkf_appsystemsetting',
+          entitySet: 'wmkf_appsystemsettings',
+          field: 'wmkf_settingvalue',
+          row: settingRow,
+          note: 'Each publication creates a new row; existing revisions are never updated.',
+        }]} />
+      </div>
+      <div className="p-4 space-y-4">
+        <div>
+          <div className="text-sm font-medium text-gray-800"><code>{standingName}</code></div>
+          <div className="grid sm:grid-cols-2 gap-3 mt-2">
+            <BudgetNumberField
+              label="Maximum output tokens"
+              value={standing.maxTokensOverride}
+              limits={limits[standingName]?.maxTokensOverride}
+              onChange={(value) => setBudgetValue(standingName, 'maxTokensOverride', value)}
+            />
+            <BudgetNumberField
+              label="Timeout (milliseconds)"
+              value={standing.timeoutMsOverride}
+              limits={limits[standingName]?.timeoutMsOverride}
+              onChange={(value) => setBudgetValue(standingName, 'timeoutMsOverride', value)}
+            />
+          </div>
+        </div>
+        <div>
+          <div className="text-sm font-medium text-gray-800"><code>{retryName}</code></div>
+          <div className="grid sm:grid-cols-2 gap-3 mt-2">
+            <BudgetNumberField
+              label="Retry floor (tokens)"
+              value={retry.floor}
+              limits={limits[retryName]?.floor}
+              onChange={(value) => setBudgetValue(retryName, 'floor', value)}
+            />
+            <BudgetNumberField
+              label="Retry ceiling (tokens)"
+              value={retry.ceiling}
+              limits={limits[retryName]?.ceiling}
+              onChange={(value) => setBudgetValue(retryName, 'ceiling', value)}
+            />
+          </div>
+        </div>
+        {!valid && (
+          <div className={`text-xs px-3 py-2 rounded border ${TONE.red}`}>
+            Use whole numbers inside each displayed safety range; the retry floor cannot exceed its ceiling.
+          </div>
+        )}
+        {staleDraft && (
+          <div className={`text-xs px-3 py-2 rounded border ${TONE.amber}`}>
+            Executor budgets changed after this draft was loaded. Publishing will still use the draft's original revision check; reset to adopt the current values.
+          </div>
+        )}
+        {outcome && (
+          <div className={`text-xs px-3 py-2 rounded border ${TONE[outcome.tone]}`}>{outcome.text}</div>
+        )}
+        <div className="flex justify-end gap-3">
+          <button
+            type="button"
+            onClick={reset}
+            disabled={(!staleDraft && unchanged) || submitting}
+            className="text-xs text-gray-600 hover:text-gray-900 disabled:opacity-40"
+          >
+            Reset
+          </button>
+          <button
+            type="button"
+            onClick={submit}
+            disabled={submitting || unchanged || !valid}
+            className="px-4 py-1.5 bg-gray-900 text-white text-sm font-medium rounded hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {submitting ? 'Publishing…' : `Publish v${baseVersion + 1}`}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BudgetNumberField({ label, value, limits, onChange }) {
+  return (
+    <label className="block text-xs text-gray-700">
+      {label}
+      <input
+        type="number"
+        step="1"
+        min={limits?.min}
+        max={limits?.max}
+        value={value ?? ''}
+        onChange={(event) => onChange(event.target.value)}
+        className="mt-1 w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
+      />
+      <div className="mt-1 text-[10px] text-gray-400">
+        Safety range: {fmtInt(limits?.min)}–{fmtInt(limits?.max)}
+      </div>
+    </label>
   );
 }
 

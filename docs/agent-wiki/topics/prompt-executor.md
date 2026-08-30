@@ -1,12 +1,13 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-07-27
+last_verified: 2026-08-29
 stale_after_days: 90
 owner: ai-platform
 source_files:
   - lib/services/llm-client.js
   - lib/services/execute-prompt.js
+  - lib/services/executor-budget-service.js
   - lib/services/reviewer-prompt-resolver.js
   - lib/services/reviewer-prompt-composer.js
   - lib/services/prompt-store.js
@@ -17,6 +18,7 @@ canonical_docs:
 watch_paths:
   - lib/services/llm-client.js
   - lib/services/execute-prompt.js
+  - lib/services/executor-budget-service.js
   - lib/services/*prompt*.js
   - shared/config/prompts/**
   - docs/EXECUTOR_CONTRACT.md
@@ -71,17 +73,27 @@ reviewer-finder prompt migration.
   post-parse write boundary. The Executor does not semantically retry; review
   synthesis is the current caller-owned exception, re-invoking once only for
   typed `claude_output_truncated`, with a separate AI-run audit attempt.
-- **Server-owned output budgets (S467, 2026-08-28):** `maxTokensOverride` /
-  `timeoutMsOverride` values live in `shared/config/executorBudgets.js`, keyed
-  by prompt name and imported by BOTH callers (pre-site writeup standing
-  32 768 / 240 s; review-synthesis retry floor 16 000 / ceiling 32 000) and by
-  the Admin Prompt templates "Output budget" line — so what the panel shows is
-  what the Executor sends. Sonnet 5 adaptive thinking counts against
-  `max_tokens` (production run `f8bb1326` exhausted the row's 16 384), and the
-  Admin editor does not expose `wmkf_ai_maxtokens`. Hazard: this is an
-  interim home — owner directive S467 says mutable parameters must not live
-  in code; the queued replacement is a persisted admin-editable setting
-  (`docs/CURRENT_WORK_QUEUE.md`).
+- **Server-owned output budgets (source-built S469, 2026-08-29; production
+  publication open):** `lib/services/executor-budget-service.js` resolves the
+  latest append-only Dataverse `wmkf_appsystemsettings` revision named
+  `executor.budgets.vNNNNNN`. The Pre-Site caller reads its standing token /
+  timeout pair; review synthesis reads its retry floor/ceiling only after a
+  typed truncation. `/api/admin/executor-budgets` is superuser-only and
+  publishes one complete immutable revision with expected-version,
+  payload-bound UUID idempotency, resolved-model ceiling checks, and post-create
+  verification of the exact created row. Settings reads page to completion;
+  create races reread current state, and replay responses return current state
+  plus the matching publication receipt. Governed prompt-model publication also
+  checks the current durable budget before writing, including seed/recovery
+  writers; the final Executor seam caps server-owned overrides to the resolved
+  model ceiling to close cross-publication races. Review synthesis also supplies
+  the first attempt's budget as a strict lower bound, so a capped retry aborts
+  before the provider call unless its effective budget is larger.
+  `shared/config/executorBudgets.js` now owns only the closed
+  schema, code safety bounds, descriptions, and S466/S467 outage fallback
+  (32 768 / 240 s and 16 000–32 000). Runtime request bodies never carry
+  budget authority. Admin reads fail closed; runtime reads use the bounded
+  fallback when settings are absent, unavailable, or malformed.
 
 ## Durable Memory
 

@@ -76,10 +76,41 @@ The contract covers **Pattern A + dual-caller prompts and Pattern B/C Vercel-onl
 | `actingUserSystemId` | GUID | no | Dataverse system-user identity used to attribute supported writes. Callers must derive it from authenticated/server context, never request input. |
 | `assertSystemIncludes` | string \| string[] | no | Fail-closed assertion that each required substring survived composition in the actual system prompt. Used when a mutable prompt row must retain a security-critical block. |
 | `requireNoPersistence` | bool | no | Default `false`. When `true`, the Executor rejects any current prompt row whose output schema declares a target other than `kind: none`, before the model call or target write. Use for producers that need request-linked audit lineage but must remain pass-through-only even if the mutable prompt row drifts. |
-| `maxTokensOverride` | positive integer | no | Server-owned, per-invocation output-budget override. Must not exceed the resolved model's reviewed `maxOutputTokens`. Values live in the tracked registry `shared/config/executorBudgets.js`, keyed by prompt name; callers import them from there and the Admin **Prompt templates** panel renders the same registry as an "Output budget" line (effective `max_tokens`, model ceiling, Anthropic docs link + registry review date), so the displayed budget is the used budget by construction. Entries: the review-synthesis caller's one bounded `max_tokens` recovery attempt (retry floor/ceiling), and the pre-site writeup caller's standing 32 768 budget (S467, after production run `f8bb1326` exhausted the prompt row's 16 384 through Sonnet 5 adaptive thinking; the Admin editor does not expose `wmkf_ai_maxtokens`); never accept it from client input. |
-| `timeoutMsOverride` | positive integer | no | Server-owned, per-invocation LLM transport timeout override (milliseconds), passed to `LLMClient` in place of its 120s default. For known-long generations only (the pre-site writeup caller uses 240 000 within its route's 300s budget, added S466 after a production timeout; value registered in `shared/config/executorBudgets.js`); never accept it from client input. Non-integer/non-positive values are ignored. |
+| `maxTokensOverride` | positive integer | no | Server-owned, per-invocation output-budget override, capped at the final resolved model's reviewed `maxOutputTokens`. The Pre-Site standing value and review-synthesis retry floor/ceiling resolve through `lib/services/executor-budget-service.js` from the latest append-only `executor.budgets.vNNNNNN` Dataverse setting; `shared/config/executorBudgets.js` owns only the closed schema, safety bounds, and outage fallback. The superuser Admin panel reads the same resolved revision. Never accept this value from client input. |
+| `timeoutMsOverride` | positive integer | no | Server-owned, per-invocation LLM transport timeout override (milliseconds), passed to `LLMClient` in place of its 120s default. The Pre-Site value resolves through the same durable budget revision and remains bounded to the reviewed 60 000–240 000 ms range; never accept it from client input. Non-integer/non-positive values are ignored. |
+| `minimumEffectiveMaxTokensExclusive` | non-negative integer | no | Server-owned retry guard. After applying the resolved model ceiling, the final token budget must exceed this value or the Executor aborts before the provider call. Review synthesis uses the first attempt's budget here so a concurrent model change cannot trigger a retry with no larger effective budget. |
 | `semanticAttempt` | positive integer | no | Default `1`. Server-owned audit metadata for caller-level semantic retries. |
 | `retryOfRunId` | GUID | no | Prior failed `wmkf_ai_run` id when the caller re-invokes. Included in notes for deterministic audit pairing; null is allowed when the prior audit write failed. |
+
+### Durable Executor-budget publication
+
+**[SOURCE-VERIFIED 2026-08-29; production publication not yet claimed.]**
+`GET/PUT /api/admin/executor-budgets` is superuser-only and publishes one
+complete budget document as a new `wmkf_appsystemsettings` row named
+`executor.budgets.vNNNNNN`. Existing revision rows are never updated. PUT
+requires the editor's `expectedVersion` plus a UUID `requestId`; stale editors
+and payload-changing request-id reuse fail with 409. Request ids are
+canonicalized, prefix reads follow all Dataverse pages, and a create race is
+reread so a matching replay succeeds while a different winner returns the new
+current state with 409. Post-create verification checks the exact created row,
+even if a later valid revision has already overtaken it. The closed schema contains only:
+
+- `pre-site-visit.proposal-core.generate`: standing `maxTokensOverride` and
+  `timeoutMsOverride`;
+- `review-synthesis.generate`: retry `floor` and `ceiling`.
+
+Publication validates code-owned numeric ranges and both prompts' currently
+resolved reviewed-model output ceilings before the create. Admin and seed
+publication of a governed prompt model perform the inverse strict check against
+the current durable budget. Because these are separate Dataverse publications,
+the final Executor call seam also caps a server-owned override to the resolved
+model ceiling; this closes the concurrent-publication interleaving without
+weakening the fail-closed check for an invalid prompt-row budget. Runtime consumers
+perform a lenient read and use the reviewed code fallback when Dataverse is
+unavailable or malformed; Admin reads fail closed so an outage or corrupt row
+cannot appear editable or successfully published. The fallback preserves the
+S466/S467 values (32 768 tokens / 240 seconds; 16 000–32 000 retry range) but is
+not the normal mutable source of truth. Runtime routes accept no budget fields.
 
 **Deferred (Phase 1+):** `overridePromptBody: { system?: string, body?: string }` — body-level override for per-session prompt editing (PROMPT_STORAGE_DESIGN §17). Not needed for May 1.
 

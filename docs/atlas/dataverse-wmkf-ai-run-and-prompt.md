@@ -220,6 +220,32 @@ Migration plans touching either entity must preserve these foreign keys.
   audit records. The post-cleanup census returned to zero eligible requests,
   and a post-PR-#99 production drain again scanned 25 requests with zero
   eligible, claimed, completed, cancelled, or failed jobs.
+- **Executor budget settings (source-built 2026-08-29; no production revision
+  claimed):** `lib/services/executor-budget-service.js` resolves the Pre-Site
+  standing output/transport budget and review-synthesis retry range from the
+  highest valid append-only `wmkf_appsystemsettings` row keyed
+  `executor.budgets.vNNNNNN`. The superuser-only
+  `/api/admin/executor-budgets` publisher accepts one complete closed schema,
+  requires `expectedVersion` plus a UUID request id, checks code-owned numeric
+  bounds and both current prompts' resolved model output ceilings, creates the
+  next alternate-key row, and verifies that exact row before success. Prefix
+  reads page to completion; alternate-key create races reread current state;
+  canonical request-id replay is idempotent only for the same payload and returns
+  the actual current revision alongside its publication receipt. Prompt
+  publication performs the inverse strict budget/model check before changing a
+  governed prompt's model, including seed/recovery writes. The final Executor
+  seam caps server-owned overrides to the resolved model ceiling, covering the
+  remaining concurrent-publication interleaving; review synthesis additionally
+  requires the final capped retry budget to exceed its first attempt before the
+  provider call. Existing revisions are immutable. Runtime
+  reads are server-owned and fall back to the reviewed S466/S467 code values on
+  a settings outage or malformed revision; strict Admin reads fail closed.
+  `pre-site-visit/proposal-core-service.js` reads the standing pair before its
+  Executor call, and `review-manager/synthesize-reviews-service.js` reads the
+  retry pair only after a typed `claude_output_truncated` first attempt. No
+  runtime request body accepts budget authority. The Dataverse entity's own
+  table-level audit remains disabled, so history is supplied by the immutable
+  revision rows themselves rather than claimed platform audit events.
 - Production prompt writes occur through controlled admin publication or seed
   operations; ordinary prompt execution remains read-only on this entity.
 

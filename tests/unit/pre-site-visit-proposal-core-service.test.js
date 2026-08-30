@@ -81,6 +81,11 @@ function dependencies(overrides = {}) {
       versionId: 'narrative-v1',
       contentHash: 'a'.repeat(64),
     }),
+    getExecutorBudget: jest.fn().mockResolvedValue({
+      kind: 'standing',
+      maxTokensOverride: 32_768,
+      timeoutMsOverride: 240_000,
+    }),
     runPrompt: jest.fn().mockResolvedValue({
       parsed: { proposalCore },
       runId: '33333333-3333-4333-8333-333333333333',
@@ -353,6 +358,7 @@ test('calls the governed prompt with ordered personnel and fail-closed safeguard
   ]);
   expect(result.runId).toBe('33333333-3333-4333-8333-333333333333');
   expect(deps.runPrompt).toHaveBeenCalledTimes(1);
+  expect(deps.getExecutorBudget).toHaveBeenCalledWith('pre-site-visit.proposal-core.generate');
   const call = deps.runPrompt.mock.calls[0][0];
   expect(call).toMatchObject({
     promptName: 'pre-site-visit.proposal-core.generate',

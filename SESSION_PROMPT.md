@@ -68,24 +68,23 @@ cutoff to a one-request, explicitly bounded 50-result flow.
 
 ### Verified Open
 
-1. **Persist Executor output budgets as admin-editable settings — next work.**
-   **[VERIFIED IN SOURCE 2026-08-29]**
-   `shared/config/executorBudgets.js` still owns the Pre-Site standing budget
-   (`32 768` tokens / `240s`) and review-synthesis retry range
-   (`16 000`–`32 000`) as tracked literals. `PromptTemplatesSection` displays
-   those values but cannot edit them. Owner directive S467: mutable operational
-   parameters must not live in code.
+1. **Review, gate, and deliberately promote durable Executor budgets.**
+   **[SOURCE-BUILT 2026-08-29 on `codex/executor-budget-settings`; production
+   deployment/publication not claimed.]**
+   The selected contract is append-only `wmkf_appsystemsettings` revisions
+   (`executor.budgets.vNNNNNN`). `/api/admin/executor-budgets` is
+   superuser-only; publication requires the complete closed schema,
+   `expectedVersion`, and a UUID request id, validates code-owned ranges plus
+   both current prompts' resolved model ceilings, creates one new revision, and
+   rereads it. The Admin Prompt templates panel edits that atomic document.
+   Pre-Site and review synthesis read the latest valid revision server-side;
+   `shared/config/executorBudgets.js` now owns only strict bounds, descriptions,
+   and the reviewed outage fallback. No runtime request accepts budget values.
 
-   Start with `/contract-reconcile` and read
-   `docs/CLAUDE_REMEDIATION_PLAN.md`, `docs/EXECUTOR_CONTRACT.md`, the prompt
-   Atlas page, `execute-prompt.js`, both callers, and the Admin prompt/model
-   routes. Decide the durable home before implementation: existing prompt-row
-   `wmkf_ai_maxtokens`, a versioned `wmkf_appsystemsettings` contract, or an
-   explicitly justified split for timeout versus output budget. Required
-   invariants: superuser-only writes, immutable/auditable publication semantics,
-   resolved-model output ceiling enforcement, server-owned reads, no client
-   override injection, and code values only as bounded seed/fallback. Tier 1 —
-   use a feature branch.
+   Remaining: fresh-agent adversarial review, relevant gates/self-tests, branch
+   commit, and deliberate Tier 1 promotion. After deployment, verify the Admin
+   read surface. The first production budget publication is an explicit owner
+   action; absence safely preserves S466/S467 behavior through fallback.
 
 2. **Initial Assessment library/history controls.**
    `docs/CURRENT_WORK_QUEUE.md` retains Workbench administrator restore and
@@ -176,8 +175,10 @@ cutoff to a one-request, explicitly bounded 50-result flow.
 
 | File | Purpose |
 |------|---------|
-| `shared/config/executorBudgets.js` | Current hard-coded standing/retry budget registry — next replacement target |
-| `shared/components/admin/PromptTemplatesSection.js` | Read-only output-budget display and prompt publication UI |
+| `shared/config/executorBudgets.js` | Closed budget schema, safety ranges, descriptions, and reviewed outage fallback |
+| `lib/services/executor-budget-service.js` | Append-only read/publish, concurrency/idempotency, validation, and model-ceiling contract |
+| `pages/api/admin/executor-budgets.js` | Superuser-only budget read/publication route |
+| `shared/components/admin/PromptTemplatesSection.js` | Atomic budget editor plus prompt publication UI |
 | `lib/services/execute-prompt.js` | Enforces runtime token/timeout overrides and model ceilings |
 | `lib/services/site-visit/curated-recipient-service.js` | Curated directory validation, Contact search cap/truncation, and live resolution |
 | `shared/components/admin/SiteVisitRecipientsSection.js` | Admin draft/save/search UX |

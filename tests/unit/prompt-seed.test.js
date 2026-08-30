@@ -9,9 +9,13 @@
 jest.mock('../../lib/services/dynamics-service', () => ({
   DynamicsService: { queryRecords: jest.fn(), createRecord: jest.fn(), getRecord: jest.fn(), updateRecord: jest.fn() },
 }));
+jest.mock('../../lib/services/executor-budget-service', () => ({
+  assertExecutorBudgetForPromptModel: jest.fn(async () => null),
+}));
 
 import { seedPromptRow, planSeed, SeedRefused } from '../../lib/services/prompt-seed';
 import { DynamicsService } from '../../lib/services/dynamics-service';
+import { assertExecutorBudgetForPromptModel } from '../../lib/services/executor-budget-service';
 
 const NAME = 'grantee-title.generate';
 const NOW = '2026-01-01T00:00:00Z';
@@ -23,6 +27,7 @@ beforeEach(() => {
   DynamicsService.createRecord.mockResolvedValue({ wmkf_ai_promptid: 'new-id' });
   DynamicsService.getRecord.mockResolvedValue({ _etag: 'etag-x' });
   DynamicsService.updateRecord.mockResolvedValue({});
+  assertExecutorBudgetForPromptModel.mockResolvedValue(null);
 });
 
 // ── planSeed ───────────────────────────────────────────────────────────────
@@ -103,4 +108,16 @@ test('post-create verification fails loud if not exactly one current', async () 
     .mockResolvedValueOnce({ records: [row('new-id', 1, true), row('other', 1, true)] }); // verify → 2 current
   await expect(seedPromptRow({ promptName: NAME, recordData: RECORD, now: NOW }))
     .rejects.toThrow(/post-write verification failed/);
+});
+
+test('governed seeds validate their model against the current Executor budget before writing', async () => {
+  const promptName = 'review-synthesis.generate';
+  DynamicsService.queryRecords.mockResolvedValueOnce({ records: [] });
+  assertExecutorBudgetForPromptModel.mockRejectedValueOnce(new Error('budget/model conflict'));
+  await expect(seedPromptRow({
+    promptName,
+    recordData: { ...RECORD, wmkf_ai_promptname: promptName, wmkf_ai_model: 'claude-limited' },
+  })).rejects.toThrow('budget/model conflict');
+  expect(assertExecutorBudgetForPromptModel).toHaveBeenCalledWith(promptName, 'claude-limited');
+  expect(DynamicsService.createRecord).not.toHaveBeenCalled();
 });

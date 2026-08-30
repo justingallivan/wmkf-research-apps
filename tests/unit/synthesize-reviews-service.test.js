@@ -45,6 +45,10 @@ const executePrompt = jest.fn();
 jest.mock('../../lib/services/execute-prompt', () => ({
   executePrompt: (...a) => executePrompt(...a),
 }));
+const getExecutorBudget = jest.fn();
+jest.mock('../../lib/services/executor-budget-service', () => ({
+  getExecutorBudget: (...a) => getExecutorBudget(...a),
+}));
 const startManualReviewSynthesisJob = jest.fn();
 const completeReviewSynthesisJob = jest.fn();
 const recordReviewSynthesisJobFailure = jest.fn();
@@ -93,6 +97,7 @@ beforeEach(() => {
     parsed: { synthesis: { summary: 'good' } },
     writeResults: { results: [{ output: 'synthesis', ok: true }] },
   });
+  getExecutorBudget.mockResolvedValue({ kind: 'retry', floor: 16000, ceiling: 32000 });
   startManualReviewSynthesisJob.mockResolvedValue({
     id: 1,
     lease_token: '44444444-4444-4444-8444-444444444444',
@@ -141,10 +146,33 @@ test('confirmed max_tokens truncation retries once with a larger bounded budget'
   expect(executePrompt).toHaveBeenCalledTimes(2);
   expect(executePrompt.mock.calls[0][0].maxTokensOverride).toBeUndefined();
   expect(executePrompt.mock.calls[1][0].maxTokensOverride).toBe(16000);
+  expect(executePrompt.mock.calls[1][0].minimumEffectiveMaxTokensExclusive).toBe(8000);
   expect(executePrompt.mock.calls[1][0].semanticAttempt).toBe(2);
   expect(executePrompt.mock.calls[1][0].retryOfRunId).toBe(firstRunId);
   expect(executePrompt.mock.calls[1][0].overrideVariables)
     .toEqual(executePrompt.mock.calls[0][0].overrideVariables);
+  expect(getExecutorBudget).toHaveBeenCalledWith('review-synthesis.generate');
+});
+
+test('confirmed truncation respects the current published retry range', async () => {
+  getExecutorBudget.mockResolvedValueOnce({ kind: 'retry', floor: 20000, ceiling: 28000 });
+  executePrompt
+    .mockRejectedValueOnce(Object.assign(new Error('truncated'), {
+      code: 'claude_output_truncated',
+      maxTokens: 12000,
+      runId: 'failed-run',
+    }))
+    .mockResolvedValueOnce({
+      runId: 'run-2',
+      blocked: false,
+      parsed: { synthesis: { summary: 'recovered' } },
+      writeResults: { results: [{ output: 'synthesis', ok: true }] },
+    });
+
+  await synthesizeReviews({ requestId: REQ, overwrite: false, actingUserSystemId: ACTOR });
+
+  expect(executePrompt.mock.calls[1][0].maxTokensOverride).toBe(24000);
+  expect(executePrompt.mock.calls[1][0].minimumEffectiveMaxTokensExclusive).toBe(12000);
 });
 
 test('retry budget increases to the 32000 cap, then truncation at/above the cap is terminal', async () => {

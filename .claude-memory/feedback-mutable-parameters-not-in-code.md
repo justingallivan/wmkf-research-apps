@@ -5,7 +5,7 @@ metadata:
   type: feedback
   status: active
   scope: executor-config
-  last_verified: 2026-08-28 (S467) — owner directive after the admin output-budget surface shipped
+  last_verified: 2026-08-29 (S469) — source-built durable Executor-budget implementation
 ---
 
 Owner directive, S467 (2026-08-28), on seeing the pre-site writeup's
@@ -23,5 +23,9 @@ audit trail, not a commit + deploy. Code-resident literals also invite the
 Dataverse row) with a superuser-gated editor, and keep in code only the
 server-side bounds (e.g. the model's reviewed `maxOutputTokens`) and a seed
 default. Reviewed snapshots of external facts (model capability registry) stay
-in code. Open action item: `docs/CURRENT_WORK_QUEUE.md` audit follow-ups.
+in code. **[SOURCE-BUILT 2026-08-29]** Executor standing/retry budgets now use
+append-only `executor.budgets.vNNNNNN` Dataverse settings through
+`lib/services/executor-budget-service.js` and the superuser Admin editor; the
+tracked registry owns only bounds and fallback. Promotion and the first durable
+Admin publication remain deployment/operational verification, not source gaps.
 See [[feedback-no-fabricated-placeholder-values]].

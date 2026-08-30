@@ -34,7 +34,7 @@ sequence.
 
 | Order | Work | Current boundary | Completion decision |
 | --- | --- | --- | --- |
-| 1 | Persist Executor output budgets as admin-editable settings | **[VERIFIED IN SOURCE 2026-08-29]** `shared/config/executorBudgets.js` still owns the Pre-Site standing budget (`32 768` tokens / `240s`) and review-synthesis retry range (`16 000`–`32 000`) as tracked literals. `PromptTemplatesSection` displays them but cannot edit them. Owner directive S467: mutable operational parameters must not live in code. | Choose and implement the durable contract; Admin can edit it; the Executor and both callers read it server-side; reviewed model ceilings, superuser-only writes, auditability, and bounded code fallback/seed behavior remain enforced. Tier 1 feature branch. |
+| 1 | Promote and verify durable Executor output budgets | **[SOURCE-BUILT 2026-08-29 on `codex/executor-budget-settings`; not yet Production-claimed.]** The superuser Admin editor publishes append-only `executor.budgets.vNNNNNN` Dataverse rows with optimistic versioning, UUID idempotency, model-ceiling checks, and reread verification. Pre-Site and review synthesis resolve the latest valid revision server-side; tracked values are bounds/fallback only. | Fresh adversarial review and all relevant gates pass; deliberately promote the Tier 1 branch; verify the Admin read surface after deployment. The first production publication is an explicit owner action, not required to prove fallback-safe deployment. |
 | 2 | Close the remaining Initial Assessment pilot controls | **[VERIFIED IN SOURCE 2026-08-29]** Canonical artifact mechanics, exact-input reuse, interrupted-finalization recovery, substantive attributed editing, Graph-current metadata, native version restore, first-stage recovery, version limits, and second-stage recovery are proved. Purview retention and the Edit level's exact Delete flags remain owner-accepted-open absent a pressing need. Workbench administrator restore and milestone snapshots remain unbuilt. See `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` and `docs/INITIAL_ASSESSMENT_CONTROLLED_PILOT_2026-07-30.md`. | Workbench administrator restore and milestone snapshot controls are implemented and verified against the existing stable-item/version contract. |
 
 ## Audit follow-ups — verified open, not silently prioritized
@@ -109,6 +109,16 @@ sequence.
   queued in `docs/PUBLIC_GIT_HISTORY_REMEDIATION_PLAN.md`).
 
 ## Completed in this execution
+
+- Durable Executor-budget implementation: **[SOURCE-BUILT 2026-08-29;
+  PROMOTION OPEN]** the former tracked-literal ownership is replaced by an
+  append-only Dataverse `wmkf_appsystemsettings` publication contract and a
+  superuser editor. The two runtime callers read the same resolved revision;
+  code retains strict schema/ranges and the reviewed outage fallback. Focused
+  service, route, caller, persistence, and UI tests cover invalid schemas,
+  stale editors, idempotency, duplicate-key races, model ceilings, and both
+  consumer behaviors. Production deployment and the first Admin-published
+  revision are deliberately not claimed from source evidence.
 
 - Curated Site Visit materials-recipient directory: **[PRODUCTION-LIVE AND
   OWNER-VERIFIED 2026-08-29]** superusers curate a maximum of 50 active staff

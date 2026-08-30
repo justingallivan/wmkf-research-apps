@@ -134,11 +134,13 @@ index and workflow surface, not a second editor or document store.
 ## Current execution
 
 The ordered agenda is maintained in `docs/CURRENT_WORK_QUEUE.md`. As of
-2026-08-29, the immediate owner-directed task is to move Executor output budgets
-and timeouts from tracked literals into persisted, superuser-editable settings.
-The current Admin panel displays those values but cannot edit them. The next
-older approved product-control slice is Initial Assessment administrator restore
-plus milestone snapshots.
+2026-08-29, durable Executor output budgets are source-built on the Tier 1
+`codex/executor-budget-settings` branch: a superuser editor publishes immutable
+Dataverse revisions, both callers read them server-side, and tracked values are
+strict bounds/fallback only. The immediate task is adversarial review, gates,
+and deliberate promotion; production deployment and a first durable Admin
+publication are not yet claimed. Initial Assessment administrator restore plus
+milestone snapshots remains the next older approved product-control slice.
 
 The Final Writeup Review design is reviewed plan-only. Implementation requires a
 new owner go, expanded file-surface approval, explicit transition actor/time
