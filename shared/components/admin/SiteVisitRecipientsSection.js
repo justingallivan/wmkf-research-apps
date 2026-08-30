@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter } from 'next/router';
 
 const VERSION = 1;
 const UNSAVED_CHANGES_WARNING = 'You have unsaved Site Visit recipient changes. Leave without saving?';
@@ -21,6 +22,7 @@ function configFromEntries(entries) {
 }
 
 export default function SiteVisitRecipientsSection() {
+  const router = useRouter();
   const [staff, setStaff] = useState([]);
   const [resolvedEntries, setResolvedEntries] = useState([]);
   const [draftEntries, setDraftEntries] = useState([]);
@@ -137,11 +139,13 @@ export default function SiteVisitRecipientsSection() {
 
     window.addEventListener('beforeunload', handleBeforeUnload);
     document.addEventListener('click', handleLinkClick, true);
+    router.beforePopState(() => window.confirm(UNSAVED_CHANGES_WARNING));
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
       document.removeEventListener('click', handleLinkClick, true);
+      router.beforePopState(() => true);
     };
-  }, [changed]);
+  }, [changed, router]);
 
   const toggleStaff = (profileId) => {
     const key = `staff:${profileId}`;

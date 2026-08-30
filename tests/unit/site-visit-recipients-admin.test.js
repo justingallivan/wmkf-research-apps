@@ -5,6 +5,11 @@ import Link from 'next/link';
 import SiteVisitRecipientsSection from '../../shared/components/admin/SiteVisitRecipientsSection';
 
 const CONTACT_ID = '11111111-1111-4111-8111-111111111111';
+const mockRouter = { beforePopState: jest.fn() };
+
+jest.mock('next/router', () => ({
+  useRouter: () => mockRouter,
+}));
 
 function response(body, status = 200) {
   return {
@@ -14,6 +19,7 @@ function response(body, status = 200) {
   };
 }
 
+beforeEach(() => mockRouter.beforePopState.mockClear());
 afterEach(() => jest.restoreAllMocks());
 
 test('selects active staff, searches existing Contacts, and saves reference-only config', async () => {
@@ -95,6 +101,8 @@ test('selects active staff, searches existing Contacts, and saves reference-only
   const linkClick = new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 });
   expect(screen.getByRole('link', { name: 'Leave page' }).dispatchEvent(linkClick)).toBe(false);
   expect(confirmSpy).toHaveBeenCalledWith('You have unsaved Site Visit recipient changes. Leave without saving?');
+  const dirtyHistoryGuard = mockRouter.beforePopState.mock.calls.at(-1)[0];
+  expect(dirtyHistoryGuard()).toBe(false);
 
   const dirtyUnload = new Event('beforeunload', { cancelable: true });
   window.dispatchEvent(dirtyUnload);
@@ -107,6 +115,8 @@ test('selects active staff, searches existing Contacts, and saves reference-only
   const cleanUnload = new Event('beforeunload', { cancelable: true });
   window.dispatchEvent(cleanUnload);
   expect(cleanUnload.defaultPrevented).toBe(false);
+  const cleanHistoryGuard = mockRouter.beforePopState.mock.calls.at(-1)[0];
+  expect(cleanHistoryGuard()).toBe(true);
   expect(screen.getByText('Included in recipient menu')).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Already saved' })).toBeDisabled();
   const saveCall = global.fetch.mock.calls.find(([, options]) => options?.method === 'PUT');
