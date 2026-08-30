@@ -2,7 +2,8 @@
  * Superuser editor for the curated Site Visit materials-recipient directory.
  *
  * GET returns current configuration + eligible staff. GET with `search`
- * returns Dataverse Contact candidates. PUT replaces the reference-only config.
+ * returns up to 50 Dataverse Contact candidates plus an explicit truncation
+ * signal. PUT replaces the reference-only config.
  */
 
 import { requireSuperuser } from '../../../lib/utils/auth';
@@ -45,8 +46,8 @@ export default async function handler(req, res) {
           if (Array.isArray(req.query.search)) {
             return res.status(400).json({ error: 'Contact search must be a single value.' });
           }
-          const contacts = await searchCuratedRecipientContacts(req.query.search);
-          return res.status(200).json({ success: true, contacts });
+          const result = await searchCuratedRecipientContacts(req.query.search);
+          return res.status(200).json({ success: true, ...result });
         }
         const state = await getCuratedRecipientAdminState();
         return res.status(200).json({ success: true, ...state });

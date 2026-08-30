@@ -47,7 +47,7 @@ beforeEach(() => {
     staff: [],
   });
   getCuratedRecipientOptions.mockResolvedValue([]);
-  searchCuratedRecipientContacts.mockResolvedValue([]);
+  searchCuratedRecipientContacts.mockResolvedValue({ contacts: [], truncated: false, limit: 50 });
   writeCuratedRecipientConfig.mockResolvedValue({ config: { version: 1, entries: [] }, entries: [] });
 });
 
@@ -70,7 +70,7 @@ test('Admin Contact search uses the bounded search seam rather than creating Con
   await adminHandler({ method: 'GET', query: { search: 'Casey' } }, res);
   expect(searchCuratedRecipientContacts).toHaveBeenCalledWith('Casey');
   expect(writeCuratedRecipientConfig).not.toHaveBeenCalled();
-  expect(res.body).toEqual({ success: true, contacts: [] });
+  expect(res.body).toEqual({ success: true, contacts: [], truncated: false, limit: 50 });
 });
 
 test('Admin Contact search rejects duplicate or unsupported query parameters', async () => {
