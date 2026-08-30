@@ -147,6 +147,18 @@ test('the single-row Resolve button asserts status_changed_at too', async () => 
   });
 });
 
+test('a rejected single-row action is visible instead of failing silently', async () => {
+  global.fetch = jest.fn(async (_url, init) => {
+    if (init?.method === 'PATCH') return response({ error: 'stale bundle' }, 400);
+    return response(listBody);
+  });
+  render(<OperationalEventsSection />);
+  await screen.findByText('×3');
+  const prefsCard = screen.getByText(prefs.summary).closest('div.rounded-lg');
+  fireEvent.click(within(prefsCard).getByRole('button', { name: 'Resolve' }));
+  await screen.findByText('Update failed (400). Reload the admin page and retry.');
+});
+
 test('a partially committed batch reports both the successful and failed row counts', async () => {
   global.fetch = jest.fn(async (_url, init) => {
     if (init?.method === 'PATCH') {

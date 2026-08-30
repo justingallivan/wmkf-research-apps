@@ -37,6 +37,7 @@ export default function OperationalEventsSection() {
   const [summary, setSummary] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actionInProgress, setActionInProgress] = useState(null);
+  const [actionResult, setActionResult] = useState(null);
   const [bulkInProgress, setBulkInProgress] = useState(false);
   const [bulkResult, setBulkResult] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
@@ -83,6 +84,7 @@ export default function OperationalEventsSection() {
 
   const handleAction = async (event, action) => {
     setActionInProgress(event.id);
+    setActionResult(null);
     try {
       const res = await fetch('/api/admin/operational-events', {
         method: 'PATCH',
@@ -95,8 +97,15 @@ export default function OperationalEventsSection() {
           ...freshness(event),
         }),
       });
-      if (res.ok || res.status === 409) fetchEvents();
-    } catch {}
+      if (res.ok || res.status === 409) {
+        if (res.status === 409) setActionResult('Event changed since load; refreshed without applying the action.');
+        fetchEvents();
+      } else {
+        setActionResult(`Update failed (${res.status}). Reload the admin page and retry.`);
+      }
+    } catch {
+      setActionResult('Update failed. Check the connection and retry.');
+    }
     setActionInProgress(null);
   };
 
@@ -343,6 +352,9 @@ export default function OperationalEventsSection() {
       </div>
       {bulkResult && (
         <p className="text-xs text-gray-600 mb-3" role="status">{bulkResult}</p>
+      )}
+      {actionResult && (
+        <p className="text-xs text-gray-600 mb-3" role="status">{actionResult}</p>
       )}
 
       {loading ? (

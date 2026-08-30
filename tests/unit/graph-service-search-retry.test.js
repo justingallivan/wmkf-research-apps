@@ -201,7 +201,7 @@ describe('process-level search cooldown', () => {
     });
     expect(calls).toHaveLength(1);
     await expect(GraphService.searchFiles('narrative')).rejects.toMatchObject({
-      status: 429,
+      status: 500,
       isTransient: true,
       cooldown: true,
     });

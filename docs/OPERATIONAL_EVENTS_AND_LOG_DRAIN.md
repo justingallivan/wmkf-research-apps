@@ -163,8 +163,11 @@ test (`tests/unit/operational-events-section.test.js`). Rows sharing a signature
 subsystem, summary with ids/numbers/hex normalized —
 `shared/utils/operational-event-grouping.js`) are **folded in the view** as
 "message × N"; the group must be expanded before **Resolve group** is
-offered, so an operator sees what a coarse signature folded. HTTP status
-codes and `stage` stay in the signature (a 403 and a 500 never fold).
+offered, so an operator sees what a coarse signature folded. Recognized HTTP
+status tokens — `(429)`, `status=500`, `status 503`, and `httpCode":429`
+shapes — and `stage` stay in the signature; bare unrecognized status wording
+is normalized like other digits. `severity` is intentionally absent from the
+signature, so a severity-only change can fold into the same view group.
 Storage is untouched, so the `vercel:<log id>` idempotency contract above is
 unchanged (a stored fold would over-count on redelivery).
 
