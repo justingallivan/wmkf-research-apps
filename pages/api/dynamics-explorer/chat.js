@@ -206,6 +206,13 @@ export default async function handler(req, res) {
     // ─── Agentic loop ───
     let round = 0;
     let currentMessages = [...claudeMessages];
+    // Per-request tool context. `searchThrottle` is a server-side circuit
+    // breaker: once a document search hits a transient Graph failure
+    // (tenant throttle / 5xx / no response), every later search_documents call
+    // in THIS request short-circuits without touching Graph. Tool-result text
+    // is untrusted content to the model by design (A7), so it cannot be the
+    // control that stops a retry loop — this is (Codex adversarial S468).
+    const toolContext = { searchThrottle: null };
     const model = getModelForApp('dynamics-explorer');
     const fallbackModel = getFallbackModelForApp('dynamics-explorer');
     lastModel = model;
@@ -290,7 +297,7 @@ export default async function handler(req, res) {
         const startTime = Date.now();
         let result;
         try {
-          result = await executeTool(name, input, sendEvent, userProfileId, restrictions);
+          result = await executeTool(name, input, sendEvent, userProfileId, restrictions, toolContext);
         } catch (err) {
           const errMsg = err.message || 'Unknown error';
           console.log(`[DynExp] Round ${round} ${name} ERROR:`, errMsg.substring(0, 200));
@@ -660,7 +667,7 @@ function isOperationalLogTable(tableName) {
   return OPERATIONAL_LOG_TABLES.has(String(tableName || '').trim().toLowerCase());
 }
 
-async function executeTool(name, input, sendEvent, userProfileId, restrictions = []) {
+async function executeTool(name, input, sendEvent, userProfileId, restrictions = [], toolContext = {}) {
   switch (name) {
     case 'search':
       return await searchRecords(input);
@@ -751,7 +758,7 @@ async function executeTool(name, input, sendEvent, userProfileId, restrictions =
     }
 
     case 'search_documents': {
-      const searchResult = await searchDocuments(input);
+      const searchResult = await searchDocuments(input, toolContext);
       if (searchResult._files?.length > 0) {
         sendEvent('document_links', { files: searchResult._files });
         delete searchResult._files;
@@ -2043,22 +2050,85 @@ async function listDocuments({ request_number, request_id }) {
 // ─── search_documents ───
 
 /**
+ * Describe scoped-search failures for the model — factually. The text is
+ * delivered inside the untrusted-content boundary, so it must not rely on
+ * being obeyed; the per-request circuit breaker (`toolContext.searchThrottle`)
+ * is what actually stops a retry loop. Transient (throttle / timeout) and
+ * permanent (bad request) failures get distinct wording so the model does not
+ * tell the user to "try again in a minute" for a 400.
+ */
+function buildSearchFailureWarning(failedScopes, totalScopes, retryAfterMs = null) {
+  const transient = failedScopes.some(sr => sr.transient);
+  const detail = failedScopes
+    .map(sr => `${sr.label}: ${String(sr.error || '').substring(0, 120)}`)
+    .join('; ');
+  const scopes = `${failedScopes.length} of ${totalScopes} search scope(s)`;
+  if (transient) {
+    return `The SharePoint search service throttled or timed out for ${scopes} (${detail}). `
+      + 'Results are incomplete, not a confirmed "no documents". Document search is paused for the '
+      + `rest of this request; the user can ask again in ${describeRetryWait(retryAfterMs)}.`;
+  }
+  return `The SharePoint search service returned an error for ${scopes} (${detail}). `
+    + 'Results are incomplete, not a confirmed "no documents". This is not a throttle; '
+    + 'the search request itself was rejected.';
+}
+
+/** Human wait for retry guidance: never shorter than a minute, rounded up. */
+function describeRetryWait(retryAfterMs) {
+  const ms = Math.max(Number(retryAfterMs) || 0, 60_000);
+  const minutes = Math.ceil(ms / 60_000);
+  return minutes <= 1 ? 'about a minute' : `about ${minutes} minutes`;
+}
+
+/** Short-circuit result while the per-request search circuit breaker is open. */
+function searchPausedResult(query, scopeLabel, throttle) {
+  return {
+    searchCount: 0,
+    query,
+    scope: scopeLabel,
+    incomplete: true,
+    retryAfterMs: throttle.retryAfterMs ?? null,
+    error: 'Document search is paused for the rest of this request because the SharePoint '
+      + `search service throttled or timed out earlier (${throttle.reason}). No search was run. `
+      + `The user can ask again in ${describeRetryWait(throttle.retryAfterMs)}.`,
+  };
+}
+
+/**
+ * Same-round tool calls start concurrently, so two search_documents blocks
+ * would both read the breaker as closed before either could trip it. Serialize
+ * document searches per request: the second waits for the first and then sees
+ * the tripped breaker (Codex adversarial S468, re-review).
+ */
+function enqueueSearch(toolContext, run) {
+  if (!toolContext || typeof toolContext !== 'object') return run();
+  const previous = toolContext.searchQueue || Promise.resolve();
+  const next = previous.then(run, run);
+  toolContext.searchQueue = next.catch(() => {});
+  return next;
+}
+
+/**
  * Search within SharePoint document contents for keywords or phrases.
  * Optionally scoped to a specific library or request folder.
  */
-async function searchDocuments({ query, library, request_number }) {
-  if (!query) {
-    return { error: 'A search query is required.' };
+export function searchDocuments(input, toolContext = {}) {
+  if (!input?.query) {
+    return Promise.resolve({ error: 'A search query is required.' });
   }
+  return enqueueSearch(toolContext, () => searchDocumentsSerialized(input, toolContext));
+}
+
+async function searchDocumentsSerialized({ query, library, request_number }, toolContext) {
 
   // ── Resolve the search scope ─────────────────────────────────────────────
   // When a request_number is supplied, we can't trust a single (library,
   // folder) pair — older grants migrated from the previous grants management
   // system have files in `RequestArchive1/2/3` libraries on top of (or instead
   // of) the active `akoya_request` library. We discover every plausible bucket
-  // up front and run the KQL search once per bucket in parallel, then merge
-  // results. This fans out 4× per request-scoped search but is bounded and
-  // parallel, and request-scoped searches are rare relative to broad ones.
+  // up front, search the tracked folder wave first, then probe archives
+  // serially, and finally merge the results. This keeps archive recall without
+  // recreating the former 4× tenant-throttling burst.
   // The simpler alternative — one unscoped search post-filtered by webUrl —
   // loses too much KQL precision when scoring across the whole site.
   let scopes = []; // Array<{ libraryName: string|null, folderPath: string|null, label: string }>
@@ -2080,29 +2150,58 @@ async function searchDocuments({ query, library, request_number }) {
       libraryName: b.library,
       folderPath: b.folder,
       label: `${b.library}/${b.folder}`,
+      source: b.source,
     }));
     scopeLabel = `request ${requestNum} (${buckets.length} folder${buckets.length !== 1 ? 's' : ''})`;
   } else {
-    scopes = [{ libraryName: library || null, folderPath: null, label: library || 'all libraries' }];
+    scopes = [{ libraryName: library || null, folderPath: null, label: library || 'all libraries', source: 'dynamics' }];
     scopeLabel = library || 'all libraries';
   }
 
+  if (toolContext.searchThrottle) {
+    return searchPausedResult(query, scopeLabel, toolContext.searchThrottle);
+  }
+
   try {
-    // Run all scopes in parallel; tolerate per-scope failures (archive probes
-    // 404 for non-migrated grants, which is expected).
-    const scopeResults = await Promise.all(
-      scopes.map(async s => {
-        try {
-          const found = await GraphService.searchFiles(query, {
-            libraryName: s.libraryName,
-            folderPath: s.folderPath,
-          });
-          return { ...s, found, error: null };
-        } catch (err) {
-          return { ...s, found: [], error: err.message };
-        }
-      }),
-    );
+    const runScope = async s => {
+      try {
+        const found = await GraphService.searchFiles(query, {
+          libraryName: s.libraryName,
+          folderPath: s.folderPath,
+        });
+        return { ...s, found, error: null };
+      } catch (err) {
+        return {
+          ...s,
+          found: [],
+          error: err.message,
+          transient: err.isTransient === true || err.noResponse === true,
+          retryAfterMs: Number.isFinite(err.retryAfterMs) ? err.retryAfterMs : null,
+        };
+      }
+    };
+
+    // Two waves, not one burst. Graph search is throttled per TENANT, so
+    // firing the Dynamics-tracked folder and all three speculative archive
+    // probes at once (4 simultaneous calls per question, more with parallel
+    // tool calls) is what tripped the 2026-08-27 storm. Wave 1: the tracked
+    // folder(s) in parallel (normally one). Wave 2: archive probes one at a
+    // time — they are still searched (migrated grants keep files there, so
+    // recall is unchanged) but stop at the first transient failure and are
+    // skipped entirely if wave 1 already hit one.
+    const primaryScopes = scopes.filter(s => s.source !== 'archive');
+    const archiveScopes = scopes.filter(s => s.source === 'archive');
+    const scopeResults = await Promise.all(primaryScopes.map(runScope));
+    let paused = scopeResults.some(sr => sr.transient);
+    for (const s of archiveScopes) {
+      if (paused) {
+        scopeResults.push({ ...s, found: [], error: 'skipped after a transient search failure', transient: true, skipped: true });
+        continue;
+      }
+      const result = await runScope(s);
+      scopeResults.push(result);
+      if (result.transient) paused = true;
+    }
 
     // De-dupe by file id / webUrl / (library + folder + name)
     const seen = new Set();
@@ -2116,7 +2215,37 @@ async function searchDocuments({ query, library, request_number }) {
       }
     }
 
+    // A scope that FAILED (Graph throttled us, or the search service errored)
+    // is not a scope that returned zero hits. Reporting the two the same way
+    // ("No documents found") is a false negative the model then retries,
+    // which — with the per-request fan-out — is exactly what produced the
+    // 2026-08-27 throttle storm on the Operational Events card. Name the
+    // failure instead, and tell the model not to loop on it.
+    const failedScopes = scopeResults.filter(sr => sr.error);
+    const transientFailure = failedScopes.find(sr => sr.transient);
+    // The tenant's requested wait is the LONGEST Retry-After any scope saw;
+    // retry guidance is derived from it rather than a fixed "a minute".
+    const retryAfterMs = failedScopes.reduce(
+      (max, sr) => (sr.retryAfterMs != null && sr.retryAfterMs > max ? sr.retryAfterMs : max),
+      0,
+    ) || null;
+    const searchWarning = failedScopes.length
+      ? buildSearchFailureWarning(failedScopes, scopeResults.length, retryAfterMs)
+      : null;
+    if (transientFailure && toolContext && typeof toolContext === 'object') {
+      // Trip the per-request breaker: later search_documents calls in this
+      // request return searchPausedResult without touching Graph.
+      toolContext.searchThrottle = {
+        at: Date.now(),
+        reason: String(transientFailure.error || 'transient failure').substring(0, 120),
+        retryAfterMs,
+      };
+    }
+
     if (!merged.length) {
+      if (searchWarning) {
+        return { searchCount: 0, query, scope: scopeLabel, incomplete: true, retryAfterMs, error: searchWarning };
+      }
       return {
         searchCount: 0,
         query,
@@ -2138,6 +2267,7 @@ async function searchDocuments({ query, library, request_number }) {
       searchCount: merged.length,
       query,
       scope: scopeLabel,
+      ...(searchWarning ? { incomplete: true, retryAfterMs, warning: searchWarning } : {}),
       header: 'Filename | Size | Modified | Location',
       documents: lines.join('\n'),
       // Structured file data for frontend download links (not sent to Claude)

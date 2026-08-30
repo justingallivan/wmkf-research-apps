@@ -353,3 +353,131 @@ describe('queryEvents', () => {
     expect(sqlMock.query.mock.calls[0][1]).toHaveLength(2);
   });
 });
+
+describe('setEventStatuses (bulk)', () => {
+  const full = (id, at, changed = null, count = 1) => ({
+    id,
+    expectedStatus: 'open',
+    expectedLastOccurredAt: at,
+    expectedStatusChangedAt: changed,
+    expectedOccurrenceCount: count,
+  });
+
+  test('applies each row with its own precondition and buckets the outcomes', async () => {
+    // Row 5: updated. Row 6: precondition miss → current row exists → stale.
+    // Row 7: no such row → notFound. Row 8: incomplete triple → invalid, never queried.
+    // Row 'x': invalid id → invalid, never queried.
+    sqlMock
+      .mockResolvedValueOnce({ rows: [{ id: 5, status: 'resolved' }] }) // UPDATE 5
+      .mockResolvedValueOnce({ rows: [] })                               // UPDATE 6 (miss)
+      .mockResolvedValueOnce({ rows: [{ id: 6, status: 'open', last_occurred_at: 'later', status_changed_at: null, occurrence_count: 2 }] }) // SELECT 6
+      .mockResolvedValueOnce({ rows: [] })                               // UPDATE 7 (miss)
+      .mockResolvedValueOnce({ rows: [] });                              // SELECT 7 (gone)
+    const outcome = await OperationalEventService.setEventStatuses([
+      full(5, '2026-08-27T19:00:00.000Z'),
+      full(6, '2026-08-27T19:00:01.000Z'),
+      full(7, '2026-08-27T19:00:02.000Z'),
+      { id: 8, expectedStatus: 'open' },
+      full('x', '2026-08-27T19:00:03.000Z'),
+    ], 'resolve', { profileId: 9, note: 'bulk' });
+    expect(outcome).toEqual({ updated: [5], stale: [6], notFound: [7], invalid: [8, NaN], failed: [] });
+    expect(sqlMock).toHaveBeenCalledTimes(5);
+  });
+
+  test('every batch item asserts status_changed_at and occurrence_count, closing ABA and same-ms fold gaps', async () => {
+    // The UPDATE misses because status_changed_at moved; the row still exists and is open → stale.
+    sqlMock
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ id: 5, status: 'open', last_occurred_at: '2026-08-27T19:00:00.000Z', status_changed_at: '2026-08-28T10:00:00.000Z', occurrence_count: 1 }] });
+    const outcome = await OperationalEventService.setEventStatuses(
+      [full(5, '2026-08-27T19:00:00.000Z', null)], 'resolve', { profileId: 9 },
+    );
+    expect(outcome).toEqual({ updated: [], stale: [5], notFound: [], invalid: [], failed: [] });
+    const [strings, ...values] = sqlMock.mock.calls[0];
+    expect(strings.join(' ')).toMatch(/date_trunc\('milliseconds', status_changed_at\)\s+IS NOT DISTINCT FROM/);
+    expect(strings.join(' ')).toMatch(/occurrence_count =/);
+    expect(values).toContain(true); // the assertStatusChanged flag is ON for batch items
+    expect(values).toContain(1); // exact occurrence generation is asserted too
+  });
+
+  test('a batch item missing any precondition is refused without a query, not applied unguarded', async () => {
+    const outcome = await OperationalEventService.setEventStatuses([
+      { id: 1, expectedLastOccurredAt: 'x', expectedStatusChangedAt: null, expectedOccurrenceCount: 1 }, // no expectedStatus
+      { id: 2, expectedStatus: 'open', expectedStatusChangedAt: null, expectedOccurrenceCount: 1 }, // no expectedLastOccurredAt
+      { id: 3, expectedStatus: 'open', expectedLastOccurredAt: '2026-08-27T19:00:00.000Z', expectedOccurrenceCount: 1 }, // status-changed key absent
+      { id: 4, expectedStatus: 'open', expectedLastOccurredAt: '2026-08-27T19:00:00.000Z', expectedStatusChangedAt: null }, // no count
+    ], 'resolve');
+    expect(outcome).toEqual({ updated: [], stale: [], notFound: [], invalid: [1, 2, 3, 4], failed: [] });
+    expect(sqlMock).not.toHaveBeenCalled();
+  });
+
+  test('rejects an invalid action before touching the database', async () => {
+    await expect(OperationalEventService.setEventStatuses([{ id: 1 }], 'nuke')).rejects.toMatchObject({ code: 'invalid_action' });
+    expect(sqlMock).not.toHaveBeenCalled();
+  });
+
+  test('rejects a batch over the admin list cap', async () => {
+    await expect(OperationalEventService.setEventStatuses(new Array(501).fill({ id: 1 }), 'resolve'))
+      .rejects.toMatchObject({ code: 'batch_too_large' });
+    expect(sqlMock).not.toHaveBeenCalled();
+  });
+
+  test('a later database error is reported after earlier rows commit, preserving honest partial success', async () => {
+    sqlMock
+      .mockResolvedValueOnce({ rows: [{ id: 1, status: 'resolved' }] })
+      .mockRejectedValueOnce(new Error('connection reset'));
+    const outcome = await OperationalEventService.setEventStatuses([
+      full(1, '2026-08-27T19:00:00.000Z'),
+      full(2, '2026-08-27T19:00:01.000Z'),
+    ], 'resolve');
+    expect(outcome).toEqual({ updated: [1], stale: [], notFound: [], invalid: [], failed: [2] });
+  });
+});
+
+describe('setEventStatus status_changed_at precondition', () => {
+  test('both freshness predicates compare at millisecond precision: NOW() stores microseconds, the client only ever sees milliseconds (Codex confirm-pass)', async () => {
+    // What the client holds: the GET row's Date serialized by res.json → ms only.
+    const rowFromDb = { last_occurred_at: new Date('2026-08-28T10:00:00.123Z'), status_changed_at: new Date('2026-08-28T11:00:00.456Z') };
+    const asSeenByClient = JSON.parse(JSON.stringify(rowFromDb));
+    expect(asSeenByClient.status_changed_at).toBe('2026-08-28T11:00:00.456Z'); // .456789 in the column is unrepresentable here
+
+    sqlMock.mockResolvedValueOnce({ rows: [{ id: 5, status: 'resolved' }] });
+    await OperationalEventService.setEventStatus(5, 'resolve', {
+      expectedStatus: 'open',
+      expectedLastOccurredAt: asSeenByClient.last_occurred_at,
+      expectedStatusChangedAt: asSeenByClient.status_changed_at,
+      expectedOccurrenceCount: 4,
+    });
+    const text = lastQueryText();
+    // Exact equality against a microsecond column would make every unchanged
+    // row look stale; the column must be truncated to what the client can echo.
+    expect(text).toMatch(/date_trunc\('milliseconds', last_occurred_at\) = /);
+    expect(text).toMatch(/date_trunc\('milliseconds', status_changed_at\)\s+IS NOT DISTINCT FROM/);
+    expect(text).not.toMatch(/\blast_occurred_at = /);
+    expect(text).not.toMatch(/\bstatus_changed_at IS NOT DISTINCT FROM/);
+    expect(text).toMatch(/occurrence_count =/);
+    const [, ...values] = sqlMock.mock.calls[0];
+    expect(values).toContain('2026-08-28T10:00:00.123Z');
+    expect(values).toContain('2026-08-28T11:00:00.456Z');
+    expect(values).toContain(4);
+  });
+
+  test('is not asserted when an in-process caller omits it (the admin route itself requires it)', async () => {
+    sqlMock.mockResolvedValueOnce({ rows: [{ id: 5, status: 'resolved' }] });
+    await OperationalEventService.setEventStatus(5, 'resolve', { expectedStatus: 'open' });
+    const [, ...values] = sqlMock.mock.calls[0];
+    expect(values).toContain(false); // assertStatusChanged flag OFF
+  });
+
+  test('a malformed expectedStatusChangedAt is a 400-class caller error', async () => {
+    await expect(OperationalEventService.setEventStatus(5, 'resolve', { expectedStatusChangedAt: 'not-a-date' }))
+      .rejects.toMatchObject({ code: 'invalid_action' });
+    expect(sqlMock).not.toHaveBeenCalled();
+  });
+
+  test('a malformed expectedOccurrenceCount is a 400-class caller error', async () => {
+    await expect(OperationalEventService.setEventStatus(5, 'resolve', { expectedOccurrenceCount: 0 }))
+      .rejects.toMatchObject({ code: 'invalid_action' });
+    expect(sqlMock).not.toHaveBeenCalled();
+  });
+});

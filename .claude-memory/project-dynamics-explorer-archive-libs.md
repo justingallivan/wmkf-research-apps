@@ -13,7 +13,7 @@ last_verified: unknown via memory-content (not re-probed 2026-06-04)
 Read this when: listing a request's SharePoint files from any caller, or building a file picker that spans archive libraries / nested subfolders.
 
 Do:
-- Import `getRequestSharePointBuckets` from `lib/utils/sharepoint-buckets.js` and walk buckets in parallel — don't reinvent bucket discovery.
+- Import `getRequestSharePointBuckets` from `lib/utils/sharepoint-buckets.js` rather than reinventing bucket discovery. Listing callers may walk independent buckets in parallel; Graph-search callers must preserve the two-wave throttle contract below (tracked folders first, then archive probes serially).
 - Carry per-file `library`/`folder`/`subfolder` so download URLs route to the right drive and users can disambiguate (e.g. `Year 1/Report.docx`).
 
 Do not:
@@ -33,7 +33,9 @@ Ground truth: `lib/utils/sharepoint-buckets.js`, `pages/api/dynamics-explorer/ch
 - Carry per-file `library`, `folder`, and `subfolder` so download URLs route to the right drive.
 - Drop the top-level `library`/`folder` fields from the tool result (they were always a half-truth) and replace them with a `libraries[]` per-bucket summary array.
 
-`searchDocuments()` fans out 4× per request-scoped search (one parallel KQL call per bucket) and merges/dedupes by file id or webUrl. Unscoped searches are unchanged.
+`searchDocuments()` searches every bucket of a request-scoped search and merges/dedupes by file id or webUrl — since S468 in **two waves**, not one 4-wide burst: the Dynamics-tracked folder(s) in parallel, then the archive probes one at a time, stopping at the first transient failure (archives are skipped entirely if wave 1 throttled). Recall is unchanged **when every scope executes**; a search degraded by a transient failure skips the remaining archive probes, so archive-only matches are unavailable for that search — the result carries `incomplete: true` and names the skipped scopes. Unscoped searches are unchanged. Same-round `search_documents` calls are serialized per request (`toolContext.searchQueue`) so the breaker cannot be bypassed by parallel tool calls; `retryAfterMs` flows from GraphService through scope results into the breaker and the retry guidance, and GraphService keeps a per-process search cooldown after a long Retry-After.
+
+**S468 (2026-08-29) — throttle handling.** `GraphService.searchFiles` retries HTTP 408, 429, and every 5xx (3 attempts), matching the shared service-error transient contract, because Graph `/search/query` is tenant-throttled and concurrent callers can burst. A tenant `Retry-After` is honoured as sent, never shortened: if it exceeds the 10 s retry budget the call is NOT retried and the error carries `retryAfterMs`; the no-header fallback is exponential with ±50 % jitter so independent callers do not retry as one burst. `searchDocuments()` no longer reports a FAILED scope as "No documents found": all scopes failed → `error` + `incomplete: true`; partial → hits + `warning` + `incomplete: true`. Because tool-result text is untrusted content to the model (A7), the wording is factual only; the control is a **per-request circuit breaker** (`toolContext.searchThrottle` in `chat.js`): after one transient scope failure, later `search_documents` calls in that request short-circuit without touching Graph. The old false negative made the model re-run the search and produced the 86-row 429 storm on the Operational Events card (2026-08-27). Tests: `tests/unit/graph-service-search-retry.test.js`, `tests/unit/dynamics-explorer-search-documents.test.js`.
 
 ## Verified
 
@@ -44,4 +46,4 @@ Ground truth: `lib/utils/sharepoint-buckets.js`, `pages/api/dynamics-explorer/ch
 
 ## How to apply
 
-If you ever need to list a request's SharePoint files from a new caller, import `getRequestSharePointBuckets` from `lib/utils/sharepoint-buckets.js` and walk the buckets in parallel — don't reinvent the bucket discovery. The frontend `DocumentLinks` component in `pages/dynamics-explorer.js` reads `file.subfolder` and shows the location next to the file name; if you build a similar picker elsewhere, do the same so users can disambiguate `Year 1/Report.docx` from `Year 2/Report.docx`.
+If you ever need to list or search a request's SharePoint files from a new caller, import `getRequestSharePointBuckets` from `lib/utils/sharepoint-buckets.js` rather than reinventing bucket discovery. Parallel bucket reads are appropriate for ordinary listings; Graph search is tenant-throttled, so use the two-wave tracked-then-serial-archive contract above. The frontend `DocumentLinks` component in `pages/dynamics-explorer.js` reads `file.subfolder` and shows the location next to the file name; if you build a similar picker elsewhere, do the same so users can disambiguate `Year 1/Report.docx` from `Year 2/Report.docx`.

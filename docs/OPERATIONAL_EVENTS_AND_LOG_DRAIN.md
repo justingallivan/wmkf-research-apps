@@ -138,8 +138,38 @@ stay `open` until staff resolve them — that absence is explicit, not implied.
 `/admin` → **Operational Events** (superuser-only API
 `/api/admin/operational-events`): status/severity/source filters, free-text
 search over request number / entity refs / correlation id / summary,
-expandable sanitized metadata, occurrence counts, transient badges, and
-Resolve/Reopen actions.
+expandable sanitized metadata, occurrence counts, transient badges,
+Resolve/Reopen actions, and **Resolve all N shown** (S468): one PATCH with
+`events[]` (≤500, the list cap) where every row MUST carry its full freshness
+snapshot — `expectedStatus`, `expectedLastOccurredAt`,
+`expectedStatusChangedAt`, and `expectedOccurrenceCount`.
+`status_changed_at` closes the open→resolved→open ABA hole; the monotonic
+occurrence count closes the remaining same-millisecond fold gap after JSON
+timestamp serialization. Rows that changed since the list rendered are
+skipped and counted as `stale`; rows missing any precondition are counted
+`invalid` and never applied; unexpected per-row database errors are counted
+`failed`, so earlier committed rows remain reported honestly and failed rows
+remain retryable. The response reports `updated/stale/notFound/invalid/failed`
+and the card refetches. The single-row PATCH requires the same snapshot and
+answers 400 when any part is missing (a stale pre-deployment bundle is a
+visible version-skew error, never a blind write). Both timestamp predicates
+compare the column truncated to milliseconds: `status_changed_at = NOW()`
+stores microseconds but the row reaches the client through JSON with
+millisecond precision, so exact equality would mark every unchanged row
+stale. The exact occurrence count preserves the generation check despite that
+truncation. The section lives in
+`shared/components/admin/OperationalEventsSection.js` with a render/action
+test (`tests/unit/operational-events-section.test.js`). Rows sharing a signature (source, environment, event type,
+subsystem, summary with ids/numbers/hex normalized —
+`shared/utils/operational-event-grouping.js`) are **folded in the view** as
+"message × N"; the group must be expanded before **Resolve group** is
+offered, so an operator sees what a coarse signature folded. Recognized HTTP
+status tokens — `(429)`, `status=500`, `status 503`, and `httpCode":429`
+shapes — and `stage` stay in the signature; bare unrecognized status wording
+is normalized like other digits. `severity` is intentionally absent from the
+signature, so a severity-only change can fold into the same view group.
+Storage is untouched, so the `vercel:<log id>` idempotency contract above is
+unchanged (a stored fold would over-count on redelivery).
 
 ### Retention
 
