@@ -22,14 +22,20 @@ function formatTimestamp(value) {
  * 6 settled that SharePoint native version history is the human-edit audit
  * record, so the editor's name is shown at the same weight as the version.
  *
- * Read-only by design. There is no restore control here — that is the
- * administrator half, blocked on outstanding SharePoint permission evidence.
+ * History is read-only for ordinary staff. Superusers may promote a historical
+ * version to a new current version through the guarded server restore route.
  */
-export default function ArtifactVersionHistory({ requestId, expectedArtifactId }) {
+export default function ArtifactVersionHistory({
+  requestId,
+  expectedArtifactId,
+  isSuperuser = false,
+  onRestored = null,
+}) {
   const [open, setOpen] = useState(false);
   const [state, setState] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [restoringVersion, setRestoringVersion] = useState(null);
   const loadSequence = useRef(0);
 
   // The parent currently remounts this component per request
@@ -45,7 +51,25 @@ export default function ArtifactVersionHistory({ requestId, expectedArtifactId }
     setState(null);
     setError(null);
     setLoading(false);
+    setRestoringVersion(null);
   }, [expectedArtifactId, requestId]);
+
+  const loadHistory = async (sequence) => {
+    const response = await fetch(
+      `/api/workbench/initial-assessment/versions?requestId=${encodeURIComponent(requestId)}`
+        + `&expectedArtifactId=${encodeURIComponent(expectedArtifactId)}`,
+    );
+    const body = await response.json().catch(() => ({}));
+    if (loadSequence.current !== sequence) return null;
+    if (!response.ok) {
+      if (response.status === 409) {
+        throw new Error('This document was replaced. Refresh the page before viewing version history.');
+      }
+      throw new Error(body.error || `Failed to load version history (${response.status})`);
+    }
+    setState(body);
+    return body;
+  };
 
   const toggle = async () => {
     if (open) {
@@ -58,23 +82,47 @@ export default function ArtifactVersionHistory({ requestId, expectedArtifactId }
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(
-        `/api/workbench/initial-assessment/versions?requestId=${encodeURIComponent(requestId)}`
-          + `&expectedArtifactId=${encodeURIComponent(expectedArtifactId)}`,
-      );
-      const body = await response.json().catch(() => ({}));
-      if (loadSequence.current !== sequence) return;
-      if (!response.ok) {
-        if (response.status === 409) {
-          throw new Error('This document was replaced. Refresh the page before viewing version history.');
-        }
-        throw new Error(body.error || `Failed to load version history (${response.status})`);
-      }
-      setState(body);
+      await loadHistory(sequence);
     } catch (loadError) {
       if (loadSequence.current === sequence) setError(loadError.message);
     } finally {
       if (loadSequence.current === sequence) setLoading(false);
+    }
+  };
+
+  const restore = async (targetVersionId) => {
+    if (!isSuperuser || restoringVersion) return;
+    const current = state?.versions?.find((version) => version.isCurrent);
+    if (!current?.versionId) {
+      setError('SharePoint did not identify the current version. Refresh before restoring.');
+      return;
+    }
+    if (!window.confirm(
+      `Restore version ${targetVersionId} as a new current version? Existing versions will be preserved.`,
+    )) return;
+    const sequence = ++loadSequence.current;
+    setRestoringVersion(targetVersionId);
+    setError(null);
+    try {
+      const response = await fetch('/api/workbench/initial-assessment/restore-version', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requestId,
+          expectedArtifactId,
+          targetVersionId,
+          expectedCurrentVersionId: current.versionId,
+        }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (loadSequence.current !== sequence) return;
+      if (!response.ok) throw new Error(body.error || `Version restore failed (${response.status})`);
+      if (body.artifact && typeof onRestored === 'function') onRestored(body.artifact);
+      await loadHistory(sequence);
+    } catch (restoreError) {
+      if (loadSequence.current === sequence) setError(restoreError.message);
+    } finally {
+      if (loadSequence.current === sequence) setRestoringVersion(null);
     }
   };
 
@@ -103,7 +151,7 @@ export default function ArtifactVersionHistory({ requestId, expectedArtifactId }
               <>
                 <ul className="space-y-1">
                   {state.versions.map((version) => (
-                    <li key={version.versionId} className="text-xs text-gray-700">
+                    <li key={version.versionId} className="flex flex-wrap items-center gap-x-2 text-xs text-gray-700">
                       <span className="font-medium text-gray-900">
                         Version {version.versionId}
                       </span>
@@ -114,9 +162,19 @@ export default function ArtifactVersionHistory({ requestId, expectedArtifactId }
                         <span className="ml-2 text-gray-900">{version.lastModifiedBy}</span>
                       )}
                       {formatTimestamp(version.lastModified) && (
-                        <span className="ml-2 text-gray-500">
+                        <span className="text-gray-500">
                           {formatTimestamp(version.lastModified)}
                         </span>
+                      )}
+                      {isSuperuser && !version.isCurrent && (
+                        <button
+                          type="button"
+                          onClick={() => restore(version.versionId)}
+                          disabled={Boolean(restoringVersion)}
+                          className="text-blue-700 hover:underline disabled:text-gray-400"
+                        >
+                          {restoringVersion === version.versionId ? 'Restoring…' : 'Restore'}
+                        </button>
                       )}
                     </li>
                   ))}

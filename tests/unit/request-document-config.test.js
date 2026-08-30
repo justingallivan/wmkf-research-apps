@@ -1,5 +1,7 @@
 import schema from '../../lib/dataverse/schema/wave16-request-document-registry/wmkf_requestdocument.json';
 import {
+  INITIAL_ASSESSMENT_BOARD_SNAPSHOT_CONTRACT,
+  isInitialAssessmentBoardSnapshot,
   isPreSiteDistributionSnapshot,
   PRE_SITE_DISTRIBUTION_CONTRACT,
   REQUEST_DOCUMENT_ARTIFACT_LABEL,
@@ -53,6 +55,23 @@ it('recognizes only the exact frozen-distribution producer namespace', () => {
   expect(isPreSiteDistributionSnapshot({ wmkf_producer: `x-${PRE_SITE_DISTRIBUTION_CONTRACT.producerPrefix}-docx` }))
     .toBe(false);
   expect(isPreSiteDistributionSnapshot({})).toBe(false);
+});
+
+it('recognizes only the exact Initial Assessment Board-snapshot contract', () => {
+  const exact = {
+    wmkf_artifacttype: REQUEST_DOCUMENT_ARTIFACT_TYPE.INITIAL_ASSESSMENT,
+    wmkf_producer: INITIAL_ASSESSMENT_BOARD_SNAPSHOT_CONTRACT.producer,
+  };
+  expect(isInitialAssessmentBoardSnapshot(exact)).toBe(true);
+  expect(isInitialAssessmentBoardSnapshot({
+    ...exact,
+    wmkf_producer: `${INITIAL_ASSESSMENT_BOARD_SNAPSHOT_CONTRACT.producer}-lookalike`,
+  })).toBe(false);
+  expect(isInitialAssessmentBoardSnapshot({
+    ...exact,
+    wmkf_artifacttype: REQUEST_DOCUMENT_ARTIFACT_TYPE.PRE_SITE_VISIT,
+  })).toBe(false);
+  expect(isInitialAssessmentBoardSnapshot({})).toBe(false);
 });
 
 it('pins the Initial Assessment proposal text as a bounded untrusted override', () => {

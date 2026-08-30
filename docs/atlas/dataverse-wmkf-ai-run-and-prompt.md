@@ -222,8 +222,10 @@ Migration plans touching either entity must preserve these foreign keys.
   audit records. The post-cleanup census returned to zero eligible requests,
   and a post-PR-#99 production drain again scanned 25 requests with zero
   eligible, claimed, completed, cancelled, or failed jobs.
-- **Executor budget settings (source-built 2026-08-29; no production revision
-  claimed):** `lib/services/executor-budget-service.js` resolves the Pre-Site
+- **Executor budget settings (Production-deployed / owner-viewed 2026-08-30;
+  first publication open):** the Production Admin panel reported no published
+  revision and the reviewed code fallback, without performing a write.
+  `lib/services/executor-budget-service.js` resolves the Pre-Site
   standing output/transport budget and review-synthesis retry range from the
   highest valid append-only `wmkf_appsystemsettings` row keyed
   `executor.budgets.vNNNNNN`. The superuser-only

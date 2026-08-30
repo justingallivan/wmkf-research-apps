@@ -6,7 +6,7 @@ status: active
 summary: "Long-term product direction; current execution priority is owned by CURRENT_WORK_QUEUE.md."
 canonical: false
 cataloged: 2026-07-02
-last_verified: 2026-08-29
+last_verified: 2026-08-30
 owner: product-engineering
 related:
   - docs/SYSTEM_MODEL.md
@@ -18,7 +18,7 @@ related:
 
 # Where We're Headed
 
-**Last verified: 2026-08-29.** This document owns long-term direction and principles. The
+**Last verified: 2026-08-30.** This document owns long-term direction and principles. The
 ordered, current delivery agenda lives in `docs/CURRENT_WORK_QUEUE.md`; this document is not a
 backlog.
 
@@ -134,13 +134,14 @@ index and workflow surface, not a second editor or document store.
 ## Current execution
 
 The ordered agenda is maintained in `docs/CURRENT_WORK_QUEUE.md`. As of
-2026-08-29, durable Executor output budgets are source-built on the Tier 1
-`codex/executor-budget-settings` branch: a superuser editor publishes immutable
-Dataverse revisions, both callers read them server-side, and tracked values are
-strict bounds/fallback only. The immediate task is adversarial review, gates,
-and deliberate promotion; production deployment and a first durable Admin
-publication are not yet claimed. Initial Assessment administrator restore plus
-milestone snapshots remains the next older approved product-control slice.
+2026-08-30, durable Executor output budgets are Production-deployed and the
+owner has verified the Admin read surface in its safe no-revision/fallback
+state; the first durable Admin publication remains a separate explicit action.
+Initial Assessment administrator restore and exact byte-copy Board snapshots
+are source-built on the Tier 1 `codex/initial-assessment-controls` branch. The
+relevant gates, full 9,198-test suite, and webpack production build passed on
+2026-08-30. The immediate task is fresh adversarial review, deliberate
+promotion, and then owner-authorized Production write proof.
 
 The Final Writeup Review design is reviewed plan-only. Implementation requires a
 new owner go, expanded file-surface approval, explicit transition actor/time

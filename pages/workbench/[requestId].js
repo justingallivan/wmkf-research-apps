@@ -175,6 +175,7 @@ function WorkbenchRequest() {
         <InitialAssessmentTab
           key={typeof requestId === 'string' ? requestId : ''}
           requestId={typeof requestId === 'string' ? requestId : ''}
+          isSuperuser={isSuperuser}
         />
       ) : activeTab === 'reviews' ? (
         <ReviewsTab requestId={typeof requestId === 'string' ? requestId : ''} />

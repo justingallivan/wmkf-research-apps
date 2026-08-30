@@ -4,7 +4,7 @@ description: The D26 Proposal tab displays its Phase I bridge plus files from Ph
 type: project
 status: active
 scope: strategy
-last_verified: 2026-08-17 via owner direction, integration source/tests, and prior live read-only Request 1002788 narrative extraction; historical artifact mechanics via production readback
+last_verified: 2026-08-30 via owner direction, source-built Initial Assessment restore/snapshot controls, and prior production evidence
 ---
 
 ## Recall Rule
@@ -101,8 +101,10 @@ are controlled follow-up work. A disposable production-library audit subsequentl
 proved native previous-version inspection/restore and signed-in first-stage
 recycle recovery. Administrator evidence closed configured version limits and
 second-stage recovery (2026-08-10 / 2026-08-20); Purview retention and the
-Members Edit level's Delete flags remain owner-accepted-open, as do Workbench
-history/admin restore and immutable milestone snapshots.
+Members Edit level's Delete flags remain owner-accepted-open. Workbench history
+is Production-live; administrator restore and the owner-decided exact byte-copy
+Board snapshot are source-built on `codex/initial-assessment-controls` and await
+adversarial review, promotion, and explicitly authorized Production write proof.
 
 **Hold step already RETIRED (S279) — this contingency resolved early, for a different reason.** The reviewer "hold step" ([[project-reviewer-hold-step-decouple]]) was removed in S279 (commit `a8676af1`) when the direction shifted to onboarding at a single final Accept — independent of J27. So the earlier "single-submission may un-scaffold the hold step" note is now moot: there is no hold step left to un-scaffold. (Kept here only so the J27 doc-capture planning doesn't re-raise it.)
 

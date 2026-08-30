@@ -233,15 +233,14 @@ document inventory, and individual implementation plans do not establish priorit
   caution applies; high-risk automation stays review-only until the representative
   benchmark exists.
 - Current priorities: `docs/CURRENT_WORK_QUEUE.md`.
-- **Immediate owner-directed work (S469, 2026-08-29):** the durable Executor
-  budget contract is source-built on `codex/executor-budget-settings` and now
-  needs adversarial review, gates, and deliberate Tier 1 promotion. The
-  superuser Admin editor publishes immutable `executor.budgets.vNNNNNN`
-  Dataverse settings; both callers read the latest valid revision server-side;
-  tracked values are strict bounds/fallback only. Production deployment and a
-  first durable Admin publication are not yet claimed. Initial Assessment
-  administrator restore/milestone snapshots follow as the next older approved
-  product-control slice. Final Writeup Review remains plan-only and owner-gated.
+- **Immediate owner-directed work (S469 onward, 2026-08-30):** durable Executor
+  budgets are Production-deployed and owner-viewed in the safe no-revision/code-
+  fallback state; first publication remains an explicit administrator action.
+  Initial Assessment superuser restore and exact byte-copy Board snapshots are
+  source-built on `codex/initial-assessment-controls`; the relevant gates, full
+  9,198-test suite, and webpack production build passed. Fresh adversarial
+  review, deliberate Tier 1 promotion, and owner-authorized Production write
+  proof remain. Final Writeup Review remains plan-only and owner-gated.
 - **Staff Deliberations tab (S466, 2026-08-28, production):** the Pre Site
   Visit Writeup + Site Visit tabs are merged into one stage-aware workspace
   (`shared/components/workbench/StaffDeliberationsTab.js`, rail
@@ -321,9 +320,15 @@ document inventory, and individual implementation plans do not establish priorit
   recycle recovery also passed in the production Request library.
   Administrator evidence closed version limits and second-stage recovery
   (2026-08-10 / 2026-08-20; Members hold Edit on a Public M365 group site);
-  retention and the Edit level's Delete flags stay owner-accepted-open, and
-  Workbench history/admin restore and milestone snapshots remain open. See
-  `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` and the near-term plan.
+  retention and the Edit level's Delete flags stay owner-accepted-open.
+  **[SOURCE-VERIFIED 2026-08-30; not yet Production-proved]** Workbench history,
+  superuser native-version restore, and immutable Board milestone snapshots are
+  now built on `codex/initial-assessment-controls`. Board snapshots copy the
+  exact canonical version bytes into a distinct Request Document / SharePoint
+  item and never move the request's editable pointer. Relevant gates,
+  adversarial review, deliberate promotion, and signed-in Production proof
+  remain open. See `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` and the near-term
+  plan.
 - Pre-Site persistence schema (owner-approved and Production-live 2026-08-17):
   Wave 19 adds 12 `wmkf_requestdocument` fields and the optional
   `akoya_request.wmkf_CurrentPreSiteVisit` / `wmkf_CurrentFinalWriteup`
