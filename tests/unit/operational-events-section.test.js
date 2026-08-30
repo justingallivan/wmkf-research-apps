@@ -94,7 +94,7 @@ test('renders without throwing, folds the storm into one ×3 group, and keeps th
   expect(screen.getByRole('button', { name: 'Resolve all 4 shown' })).toBeInTheDocument();
 });
 
-test('Resolve group is only offered once the group is expanded, and sends every member with its full freshness triple', async () => {
+test('Resolve group is only offered once expanded, and sends every member with its full freshness snapshot', async () => {
   render(<OperationalEventsSection />);
   await screen.findByText('×3');
   expect(screen.queryByRole('button', { name: /Resolve group/ })).not.toBeInTheDocument();
@@ -108,9 +108,9 @@ test('Resolve group is only offered once the group is expanded, and sends every 
   expect(patchBodies[0]).toEqual({
     action: 'resolve',
     events: [
-      { id: 3, expectedStatus: 'open', expectedLastOccurredAt: '2026-08-27T19:05:49.354Z', expectedStatusChangedAt: null },
-      { id: 2, expectedStatus: 'open', expectedLastOccurredAt: '2026-08-27T19:00:52.707Z', expectedStatusChangedAt: null },
-      { id: 1, expectedStatus: 'open', expectedLastOccurredAt: '2026-08-27T18:57:37.486Z', expectedStatusChangedAt: null },
+      { id: 3, expectedStatus: 'open', expectedLastOccurredAt: '2026-08-27T19:05:49.354Z', expectedStatusChangedAt: null, expectedOccurrenceCount: 1 },
+      { id: 2, expectedStatus: 'open', expectedLastOccurredAt: '2026-08-27T19:00:52.707Z', expectedStatusChangedAt: null, expectedOccurrenceCount: 1 },
+      { id: 1, expectedStatus: 'open', expectedLastOccurredAt: '2026-08-27T18:57:37.486Z', expectedStatusChangedAt: null, expectedOccurrenceCount: 1 },
     ],
   });
   await screen.findByText('Resolved 3 of 3');
@@ -123,7 +123,7 @@ test('Resolve all shown sends every open row, including a previously-changed row
   await waitFor(() => expect(patchBodies).toHaveLength(1));
   expect(patchBodies[0].events).toHaveLength(4);
   expect(patchBodies[0].events[0]).toEqual({
-    id: 50, expectedStatus: 'open', expectedLastOccurredAt: prefs.last_occurred_at, expectedStatusChangedAt: '2026-08-28T00:00:00.000Z',
+    id: 50, expectedStatus: 'open', expectedLastOccurredAt: prefs.last_occurred_at, expectedStatusChangedAt: '2026-08-28T00:00:00.000Z', expectedOccurrenceCount: 1,
   });
 });
 
@@ -143,8 +143,21 @@ test('the single-row Resolve button asserts status_changed_at too', async () => 
   await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/admin/operational-events', expect.objectContaining({ method: 'PATCH' })));
   const single = JSON.parse(global.fetch.mock.calls.find(([, init]) => init?.method === 'PATCH')[1].body);
   expect(single).toEqual({
-    action: 'resolve', id: 50, expectedStatus: 'open', expectedLastOccurredAt: prefs.last_occurred_at, expectedStatusChangedAt: '2026-08-28T00:00:00.000Z',
+    action: 'resolve', id: 50, expectedStatus: 'open', expectedLastOccurredAt: prefs.last_occurred_at, expectedStatusChangedAt: '2026-08-28T00:00:00.000Z', expectedOccurrenceCount: 1,
   });
+});
+
+test('a partially committed batch reports both the successful and failed row counts', async () => {
+  global.fetch = jest.fn(async (_url, init) => {
+    if (init?.method === 'PATCH') {
+      return response({ ok: false, partial: true, action: 'resolve', requested: 4, updated: 1, stale: 0, notFound: 0, invalid: 0, failed: 1 });
+    }
+    return response(listBody);
+  });
+  render(<OperationalEventsSection />);
+  await screen.findByText('×3');
+  fireEvent.click(screen.getByRole('button', { name: 'Resolve all 4 shown' }));
+  await screen.findByText(/Resolved 1 of 4.*1 failed \(retryable\)/);
 });
 
 test('a batch completion refetches the current filters, not the filters captured when the PATCH began', async () => {

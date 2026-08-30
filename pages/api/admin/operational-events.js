@@ -7,10 +7,12 @@
  *
  * PATCH — Staff resolution
  *   Body: { id, action: 'resolve' | 'reopen', note?,
- *           expectedStatus, expectedLastOccurredAt, expectedStatusChangedAt }
+ *           expectedStatus, expectedLastOccurredAt, expectedStatusChangedAt,
+ *           expectedOccurrenceCount }
  *   or    { action, events: [{ id, expectedStatus, expectedLastOccurredAt,
- *           expectedStatusChangedAt }], note? }   (≤500, "Resolve all shown")
- *   The freshness triple is REQUIRED on every mutation (400 when absent): a
+ *           expectedStatusChangedAt, expectedOccurrenceCount }], note? }
+ *           (≤500, "Resolve all shown")
+ *   The freshness snapshot is REQUIRED on every mutation (400 when absent): a
  *   status write is only ever applied against the row state the client saw.
  *
  * Superuser only.
@@ -45,7 +47,10 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { id, action, note, expectedStatus, expectedLastOccurredAt, expectedStatusChangedAt, events } = req.body || {};
+    const {
+      id, action, note, expectedStatus, expectedLastOccurredAt,
+      expectedStatusChangedAt, expectedOccurrenceCount, events,
+    } = req.body || {};
 
     // Bulk form ("Resolve all shown"): every row carries its own freshness
     // precondition; per-row outcomes come back as counts and the client
@@ -56,24 +61,27 @@ export default async function handler(req, res) {
         note: note || null,
       });
       return res.json({
-        ok: true,
+        ok: outcome.failed.length === 0,
+        partial: outcome.updated.length > 0 && outcome.failed.length > 0,
         action,
         requested: events.length,
         updated: outcome.updated.length,
         stale: outcome.stale.length,
         notFound: outcome.notFound.length,
         invalid: outcome.invalid.length,
+        failed: outcome.failed.length,
       });
     }
 
     // Fail loud rather than blind-write: a payload without the full freshness
-    // triple (a pre-deployment admin bundle, or a hand-built call) could close
+    // snapshot (a pre-deployment admin bundle, or a hand-built call) could close
     // an open→resolved→open row whose recurrence it never saw. Version skew is
     // a 400 the operator sees, not a silent unguarded update.
     if (typeof expectedStatus !== 'string' || expectedLastOccurredAt == null
-        || !Object.prototype.hasOwnProperty.call(req.body || {}, 'expectedStatusChangedAt')) {
+        || !Object.prototype.hasOwnProperty.call(req.body || {}, 'expectedStatusChangedAt')
+        || !Number.isInteger(expectedOccurrenceCount) || expectedOccurrenceCount < 1) {
       return res.status(400).json({
-        error: 'expectedStatus, expectedLastOccurredAt and expectedStatusChangedAt are required — reload the admin page and retry',
+        error: 'expectedStatus, expectedLastOccurredAt, expectedStatusChangedAt and expectedOccurrenceCount are required — reload the admin page and retry',
       });
     }
 
@@ -83,6 +91,7 @@ export default async function handler(req, res) {
       expectedStatus,
       expectedLastOccurredAt,
       expectedStatusChangedAt,
+      expectedOccurrenceCount,
     });
     if (!updated) {
       return res.status(404).json({ error: 'Event not found or not resolvable' });

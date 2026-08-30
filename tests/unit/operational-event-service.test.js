@@ -355,7 +355,13 @@ describe('queryEvents', () => {
 });
 
 describe('setEventStatuses (bulk)', () => {
-  const full = (id, at, changed = null) => ({ id, expectedStatus: 'open', expectedLastOccurredAt: at, expectedStatusChangedAt: changed });
+  const full = (id, at, changed = null, count = 1) => ({
+    id,
+    expectedStatus: 'open',
+    expectedLastOccurredAt: at,
+    expectedStatusChangedAt: changed,
+    expectedOccurrenceCount: count,
+  });
 
   test('applies each row with its own precondition and buckets the outcomes', async () => {
     // Row 5: updated. Row 6: precondition miss → current row exists → stale.
@@ -374,11 +380,11 @@ describe('setEventStatuses (bulk)', () => {
       { id: 8, expectedStatus: 'open' },
       full('x', '2026-08-27T19:00:03.000Z'),
     ], 'resolve', { profileId: 9, note: 'bulk' });
-    expect(outcome).toEqual({ updated: [5], stale: [6], notFound: [7], invalid: [8, NaN] });
+    expect(outcome).toEqual({ updated: [5], stale: [6], notFound: [7], invalid: [8, NaN], failed: [] });
     expect(sqlMock).toHaveBeenCalledTimes(5);
   });
 
-  test('every batch item asserts status_changed_at, which closes the open→resolved→open (ABA) hole', async () => {
+  test('every batch item asserts status_changed_at and occurrence_count, closing ABA and same-ms fold gaps', async () => {
     // The UPDATE misses because status_changed_at moved; the row still exists and is open → stale.
     sqlMock
       .mockResolvedValueOnce({ rows: [] })
@@ -386,19 +392,22 @@ describe('setEventStatuses (bulk)', () => {
     const outcome = await OperationalEventService.setEventStatuses(
       [full(5, '2026-08-27T19:00:00.000Z', null)], 'resolve', { profileId: 9 },
     );
-    expect(outcome).toEqual({ updated: [], stale: [5], notFound: [], invalid: [] });
+    expect(outcome).toEqual({ updated: [], stale: [5], notFound: [], invalid: [], failed: [] });
     const [strings, ...values] = sqlMock.mock.calls[0];
     expect(strings.join(' ')).toMatch(/date_trunc\('milliseconds', status_changed_at\)\s+IS NOT DISTINCT FROM/);
+    expect(strings.join(' ')).toMatch(/occurrence_count =/);
     expect(values).toContain(true); // the assertStatusChanged flag is ON for batch items
+    expect(values).toContain(1); // exact occurrence generation is asserted too
   });
 
   test('a batch item missing any precondition is refused without a query, not applied unguarded', async () => {
     const outcome = await OperationalEventService.setEventStatuses([
-      { id: 1, expectedLastOccurredAt: 'x', expectedStatusChangedAt: null },   // no expectedStatus
-      { id: 2, expectedStatus: 'open', expectedStatusChangedAt: null },         // no expectedLastOccurredAt
-      { id: 3, expectedStatus: 'open', expectedLastOccurredAt: '2026-08-27T19:00:00.000Z' }, // key absent
+      { id: 1, expectedLastOccurredAt: 'x', expectedStatusChangedAt: null, expectedOccurrenceCount: 1 }, // no expectedStatus
+      { id: 2, expectedStatus: 'open', expectedStatusChangedAt: null, expectedOccurrenceCount: 1 }, // no expectedLastOccurredAt
+      { id: 3, expectedStatus: 'open', expectedLastOccurredAt: '2026-08-27T19:00:00.000Z', expectedOccurrenceCount: 1 }, // status-changed key absent
+      { id: 4, expectedStatus: 'open', expectedLastOccurredAt: '2026-08-27T19:00:00.000Z', expectedStatusChangedAt: null }, // no count
     ], 'resolve');
-    expect(outcome).toEqual({ updated: [], stale: [], notFound: [], invalid: [1, 2, 3] });
+    expect(outcome).toEqual({ updated: [], stale: [], notFound: [], invalid: [1, 2, 3, 4], failed: [] });
     expect(sqlMock).not.toHaveBeenCalled();
   });
 
@@ -413,9 +422,15 @@ describe('setEventStatuses (bulk)', () => {
     expect(sqlMock).not.toHaveBeenCalled();
   });
 
-  test('an unexpected database error still propagates (not swallowed into a bucket)', async () => {
-    sqlMock.mockRejectedValueOnce(new Error('connection reset'));
-    await expect(OperationalEventService.setEventStatuses([full(1, '2026-08-27T19:00:00.000Z')], 'resolve')).rejects.toThrow('connection reset');
+  test('a later database error is reported after earlier rows commit, preserving honest partial success', async () => {
+    sqlMock
+      .mockResolvedValueOnce({ rows: [{ id: 1, status: 'resolved' }] })
+      .mockRejectedValueOnce(new Error('connection reset'));
+    const outcome = await OperationalEventService.setEventStatuses([
+      full(1, '2026-08-27T19:00:00.000Z'),
+      full(2, '2026-08-27T19:00:01.000Z'),
+    ], 'resolve');
+    expect(outcome).toEqual({ updated: [1], stale: [], notFound: [], invalid: [], failed: [2] });
   });
 });
 
@@ -431,6 +446,7 @@ describe('setEventStatus status_changed_at precondition', () => {
       expectedStatus: 'open',
       expectedLastOccurredAt: asSeenByClient.last_occurred_at,
       expectedStatusChangedAt: asSeenByClient.status_changed_at,
+      expectedOccurrenceCount: 4,
     });
     const text = lastQueryText();
     // Exact equality against a microsecond column would make every unchanged
@@ -439,9 +455,11 @@ describe('setEventStatus status_changed_at precondition', () => {
     expect(text).toMatch(/date_trunc\('milliseconds', status_changed_at\)\s+IS NOT DISTINCT FROM/);
     expect(text).not.toMatch(/\blast_occurred_at = /);
     expect(text).not.toMatch(/\bstatus_changed_at IS NOT DISTINCT FROM/);
+    expect(text).toMatch(/occurrence_count =/);
     const [, ...values] = sqlMock.mock.calls[0];
     expect(values).toContain('2026-08-28T10:00:00.123Z');
     expect(values).toContain('2026-08-28T11:00:00.456Z');
+    expect(values).toContain(4);
   });
 
   test('is not asserted when an in-process caller omits it (the admin route itself requires it)', async () => {
@@ -453,6 +471,12 @@ describe('setEventStatus status_changed_at precondition', () => {
 
   test('a malformed expectedStatusChangedAt is a 400-class caller error', async () => {
     await expect(OperationalEventService.setEventStatus(5, 'resolve', { expectedStatusChangedAt: 'not-a-date' }))
+      .rejects.toMatchObject({ code: 'invalid_action' });
+    expect(sqlMock).not.toHaveBeenCalled();
+  });
+
+  test('a malformed expectedOccurrenceCount is a 400-class caller error', async () => {
+    await expect(OperationalEventService.setEventStatus(5, 'resolve', { expectedOccurrenceCount: 0 }))
       .rejects.toMatchObject({ code: 'invalid_action' });
     expect(sqlMock).not.toHaveBeenCalled();
   });

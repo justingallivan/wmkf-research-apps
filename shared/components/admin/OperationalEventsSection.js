@@ -10,7 +10,8 @@
  * - GET /api/admin/operational-events → { events, summary } (newest first).
  * - PATCH single { id, action, expected* } or batch { action, events: [...] }.
  *   Every row sent for resolution carries expectedStatus,
- *   expectedLastOccurredAt AND expectedStatusChangedAt; the server refuses
+ *   expectedLastOccurredAt, expectedStatusChangedAt, AND
+ *   expectedOccurrenceCount; the server refuses
  *   (single: 409; batch: counted `stale`) a row that changed since render —
  *   including an open→resolved→open reopen (status_changed_at differs).
  * - Grouping is a VIEW aid (shared/utils/operational-event-grouping.js):
@@ -28,6 +29,7 @@ const freshness = (event) => ({
   expectedStatus: event.status,
   expectedLastOccurredAt: event.last_occurred_at,
   expectedStatusChangedAt: event.status_changed_at ?? null,
+  expectedOccurrenceCount: event.occurrence_count,
 });
 
 export default function OperationalEventsSection() {
@@ -114,7 +116,7 @@ export default function OperationalEventsSection() {
       });
       const data = res.ok ? await res.json() : null;
       setBulkResult(data
-        ? `Resolved ${data.updated} of ${data.requested}${data.stale ? ` · ${data.stale} changed since load (left open)` : ''}${data.notFound ? ` · ${data.notFound} not found` : ''}${data.invalid ? ` · ${data.invalid} invalid` : ''}`
+        ? `Resolved ${data.updated} of ${data.requested}${data.stale ? ` · ${data.stale} changed since load (left open)` : ''}${data.notFound ? ` · ${data.notFound} not found` : ''}${data.invalid ? ` · ${data.invalid} invalid` : ''}${data.failed ? ` · ${data.failed} failed (retryable)` : ''}`
         : 'Bulk resolve failed');
     } catch {
       setBulkResult('Bulk resolve failed');

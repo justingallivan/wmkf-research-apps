@@ -6,8 +6,8 @@
  * GraphService.searchFiles 429 handling (S468).
  *
  * Graph `/search/query` throttles at the tenant level and the Explorer fans
- * several scoped searches out per question, so 429 is the routine failure
- * shape. These cases pin: transient statuses are retried with a
+ * several scoped searches per question, while independent requests can still
+ * overlap. These cases pin: transient statuses are retried with a
  * Retry-After-aware backoff, non-transient statuses are not, and the final
  * failure still logs once and throws a structured error.
  */
@@ -170,8 +170,8 @@ describe('GraphService.searchFiles throttle handling', () => {
     await expect(promise).resolves.toHaveLength(4);
   });
 
-  test('a transient 503 is retried like a 429', async () => {
-    const calls = routeFetch([response(503, { error: 'busy' }), searchOk()]);
+  test.each([408, 500, 502, 503, 504])('transient HTTP %i is retried like a 429', async (status) => {
+    const calls = routeFetch([response(status, { error: 'busy' }), searchOk()]);
     await expect(runWithTimers(GraphService.searchFiles('budget'))).resolves.toHaveLength(1);
     expect(calls).toHaveLength(2);
   });
@@ -192,6 +192,22 @@ describe('GraphService.searchFiles throttle handling', () => {
 });
 
 describe('process-level search cooldown', () => {
+  test('a 500 with a long Retry-After is transient, establishes cooldown, and prevents an immediate second fetch', async () => {
+    const calls = routeFetch([response(500, { error: 'busy' }, { 'retry-after': '60' })]);
+    await expect(runWithTimers(GraphService.searchFiles('budget'))).rejects.toMatchObject({
+      status: 500,
+      isTransient: true,
+      retryAfterMs: 60_000,
+    });
+    expect(calls).toHaveLength(1);
+    await expect(GraphService.searchFiles('narrative')).rejects.toMatchObject({
+      status: 429,
+      isTransient: true,
+      cooldown: true,
+    });
+    expect(calls).toHaveLength(1);
+  });
+
   test('after a long Retry-After, later searches in this process fail fast with the remaining wait and no fetch', async () => {
     const calls = routeFetch([throttled(60)]);
     await expect(runWithTimers(GraphService.searchFiles('budget'))).rejects.toMatchObject({ retryAfterMs: 60_000 });
