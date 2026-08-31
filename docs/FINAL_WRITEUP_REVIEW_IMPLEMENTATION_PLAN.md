@@ -46,6 +46,17 @@ privilege grant is pending: the owner selected service-principal writes with
 explicit actor tracking, a separate attribution effort that does not block the
 working acknowledgement role or this milestone.
 
+**[OWNER-DECIDED; SOURCE-BUILT + UNIT-TESTED 2026-08-31; NOT DEPLOYED; NO
+CONFIGURATION PUBLISHED]** Matrix assignment is program-specific rather than
+identical to the global acknowledgement-role roster. Anneli Stone and Saskia
+Pallais are Southern California staff and should not appear on Research
+requests. The source-built Admin editor stores separate broad Grant Program
+GUID → reviewer `systemuser` GUID audiences in `wmkf_appsystemsettings`, using
+the request's existing `wmkf_grantprogram` lookup. Missing configuration keeps
+the deployed role-backed matrix; after first publication, unconfigured request
+programs are called out explicitly and stale saved programs/reviewers fail
+closed. Names remain Dataverse-owned and resolve live.
+
 **[PRODUCTION-LIVE + SIGNED-IN READ SMOKE PASSED 2026-08-31]** commit
 `52575761` and Ready deployment `dpl_Frc6fAonyFFYwiWyFJCzzE3UNune` ship the
 superuser index with the complete
@@ -95,7 +106,9 @@ access are verified.
 
 The board-package handoff remains excluded until the PCs describe their downstream process.
 
-The approved audience is all PDs, PCs, the CSO, and the President. The dashboard
+The approved role-eligible audience is all PDs, PCs, the CSO, and the President.
+The staff expected to review a particular request is the separately configured
+audience for that request's broad Grant Program. The dashboard
 must include a full coordinator matrix showing who has reviewed each writeup,
 subject to the same caveats as individual acknowledgements: it is tracking, not
 approval; blanks are not failures; there is no required count, due date, or
@@ -420,7 +433,8 @@ Until provisioning and file-access proof are complete:
 - Do not organize by Science and Engineering / Medical Research terminology.
 - Provide the full coordinator matrix for superusers now and positively
   identified PCs only after persona rollout. It shows every in-scope writeup
-  against the intended reviewer set
+  against the intended reviewer set for that request's configured broad Grant
+  Program
   with neutral blank / Reviewed / Updated since review states. It is a tracking
   view, not an approval, completion, or performance report.
 
@@ -540,6 +554,13 @@ were independently verified.
   Signed-in Production proof showed the exact 11-person roster and correct
   Request `1002788` cell/action states with zero browser-console errors.
   Ordinary/focused responses do not receive the matrix.
+- **Source-built + unit-tested; not deployed; no setting published:** the
+  superuser matrix can be configured independently for Research and Southern
+  California through Admin. The stored contract uses stable broad Grant Program
+  and reviewer GUIDs, resolves names live, keeps the deployed role-wide fallback
+  until first publication, and then surfaces unconfigured programs explicitly.
+  Anneli Stone and Saskia Pallais are owner-confirmed Southern California staff
+  and should not appear in the Research matrix.
 - **Deliberately deferred:** persona-specific queues and non-superuser matrix
   access until exact team IDs and representative Word access are proved.
 

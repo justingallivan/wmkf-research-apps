@@ -6,6 +6,7 @@ import ReviewQuestionsSection from '../shared/components/admin/ReviewQuestionsSe
 import PromptTemplatesSection from '../shared/components/admin/PromptTemplatesSection';
 import EmailDefaultsSection from '../shared/components/admin/EmailDefaultsSection';
 import SiteVisitRecipientsSection from '../shared/components/admin/SiteVisitRecipientsSection';
+import FinalWriteupMatrixAudiencesSection from '../shared/components/admin/FinalWriteupMatrixAudiencesSection';
 import ReviewerRepairAlertDetails from '../shared/components/admin/ReviewerRepairAlertDetails';
 import DataverseFieldInfoButton, {
   appSystemSettingField,
@@ -80,6 +81,14 @@ const SITE_VISIT_RECIPIENT_DATAVERSE_FIELDS = [
     'Curated recipient identity references',
     'site_visit.distribution_recipient_directory',
     'Stores only active staff profile IDs and Dataverse Contact GUIDs; names and emails are resolved live.',
+  ),
+];
+
+const FINAL_WRITEUP_MATRIX_AUDIENCE_DATAVERSE_FIELDS = [
+  appSystemSettingField(
+    'Program-specific matrix audiences',
+    'final_writeup.matrix_audiences',
+    'Stores stable broad Grant Program GUIDs and enabled Final Writeup reviewer systemuser GUIDs; names resolve live.',
   ),
 ];
 
@@ -2977,6 +2986,16 @@ export default function AdminDashboard() {
         >
           <SiteVisitRecipientsSection />
         </CollapsibleCard>
+        <div id="final-writeup-matrix-audiences" className="scroll-mt-6">
+          <CollapsibleCard
+            title="Final Writeup Matrix Audiences"
+            subtitle="Choose the expected reviewers separately for each Dataverse Grant Program"
+            defaultOpen
+            dataverseFields={FINAL_WRITEUP_MATRIX_AUDIENCE_DATAVERSE_FIELDS}
+          >
+            <FinalWriteupMatrixAudiencesSection />
+          </CollapsibleCard>
+        </div>
         <UsageSection />
         <CollapsibleCard title="Model Configuration" dataverseFields={MODEL_CONFIG_DATAVERSE_FIELDS}>
           <ModelConfigSection />

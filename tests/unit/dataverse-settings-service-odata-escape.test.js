@@ -9,17 +9,20 @@
  */
 const get = jest.fn();
 const post = jest.fn();
+const patch = jest.fn();
 jest.mock('../../lib/dataverse/client', () => ({
   getAccessToken: jest.fn().mockResolvedValue('tok'),
-  createClient: jest.fn(() => ({ get, post })),
+  createClient: jest.fn(() => ({ get, post, patch })),
 }));
 
 const {
   createSettingStrict,
   getSetting,
+  getSettingStrict,
   listSettings,
   listSettingsWithMeta,
   listSettingsWithMetaStrict,
+  setSettingIfUnchanged,
 } = require('../../lib/services/dataverse-settings-service');
 
 beforeEach(() => {
@@ -27,6 +30,7 @@ beforeEach(() => {
   process.env.DYNAMICS_URL = 'https://example.crm.dynamics.com';
   get.mockResolvedValue({ ok: true, body: { value: [] } });
   post.mockResolvedValue({ ok: true, body: {} });
+  patch.mockResolvedValue({ ok: true, body: {} });
 });
 
 // encodeURIComponent %20/%2C-encodes spaces and commas but leaves apostrophes
@@ -137,3 +141,86 @@ test('createSettingStrict normalizes a Dataverse alternate-key 412 to setting_ex
   await expect(createSettingStrict('executor.budgets.v000001', '{}'))
     .rejects.toMatchObject({ code: 'setting_exists', status: 409 });
 });
+
+test('strict setting reads return the Dataverse row revision', async () => {
+  get.mockResolvedValueOnce({
+    ok: true,
+    body: { value: [{
+      wmkf_appsystemsettingid: 'row-1',
+      wmkf_settingvalue: '{}',
+      '@odata.etag': 'W/"17"',
+    }] },
+  });
+  await expect(getSettingStrict('final_writeup.matrix_audiences')).resolves.toEqual({
+    found: true,
+    value: '{}',
+    revision: 'W/"17"',
+  });
+});
+
+test('conditional setting writes carry the loaded revision as If-Match', async () => {
+  get.mockResolvedValueOnce({
+    ok: true,
+    body: { value: [{
+      wmkf_appsystemsettingid: 'row-1',
+      wmkf_settingvalue: '{}',
+      '@odata.etag': 'W/"17"',
+    }] },
+  });
+  await expect(setSettingIfUnchanged(
+    'final_writeup.matrix_audiences',
+    '{"version":1}',
+    'W/"17"',
+  )).resolves.toBe(true);
+  expect(patch).toHaveBeenCalledWith(
+    '/wmkf_appsystemsettings(row-1)',
+    { wmkf_settingvalue: '{"version":1}' },
+    { 'If-Match': 'W/"17"' },
+  );
+});
+
+test('conditional setting writes reject stale reads before PATCH', async () => {
+  get.mockResolvedValueOnce({
+    ok: true,
+    body: { value: [{
+      wmkf_appsystemsettingid: 'row-1',
+      wmkf_settingvalue: '{}',
+      '@odata.etag': 'W/"18"',
+    }] },
+  });
+  await expect(setSettingIfUnchanged(
+    'final_writeup.matrix_audiences',
+    '{"version":1}',
+    'W/"17"',
+  )).rejects.toMatchObject({ code: 'setting_conflict', status: 409 });
+  expect(patch).not.toHaveBeenCalled();
+});
+
+test('conditional setting writes fail closed when an existing row has no revision', async () => {
+  get.mockResolvedValueOnce({
+    ok: true,
+    body: { value: [{
+      wmkf_appsystemsettingid: 'row-1',
+      wmkf_settingvalue: '{}',
+    }] },
+  });
+  await expect(setSettingIfUnchanged(
+    'final_writeup.matrix_audiences',
+    '{"version":1}',
+    null,
+  )).rejects.toMatchObject({ code: 'setting_revision_unavailable', status: 503 });
+  expect(patch).not.toHaveBeenCalled();
+});
+
+test.each([409, 412])(
+  'conditional setting create normalizes a concurrent alternate-key %s to setting_conflict',
+  async (status) => {
+    post.mockResolvedValueOnce({ ok: false, status, text: 'duplicate alternate key' });
+    await expect(setSettingIfUnchanged(
+      'final_writeup.matrix_audiences',
+      '{"version":1}',
+      null,
+    )).rejects.toMatchObject({ code: 'setting_conflict', status: 409 });
+    expect(patch).not.toHaveBeenCalled();
+  },
+);

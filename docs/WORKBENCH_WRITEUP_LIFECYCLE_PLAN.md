@@ -580,7 +580,8 @@ non-superseded lifecycle.
    later leadership slice.
 4. Add Editor Dashboard Reviewed acknowledgements as a separate child entity.
    They are version-aware tracking, not document lifecycle or approval fields.
-   The full coordinator matrix is a read model over those rows, with no required
+   The full coordinator matrix is a read model over those rows and each
+   request's configured broad Grant Program reviewer audience, with no required
    count, due date, compliance semantics, or enforced reviewer order.
 5. **Selected and Production-proved 2026-08-23; actor correction
    Pre-Site creation Production-proved 2026-08-31:** successor-row audit fields in Wave 20, client UUID dedupe/cycle
@@ -888,7 +889,11 @@ silently extend its paths or names to writeup publications.
    The full neutral superuser matrix is Production-live in Ready deployment
    `dpl_Frc6fAonyFFYwiWyFJCzzE3UNune`; signed-in DOM proof showed the exact
    11-person roster and correct Request `1002788` states/actions with zero
-   browser-console errors. Personal lenses
+   browser-console errors. **[SOURCE-BUILT + UNIT-TESTED 2026-08-31; NOT
+   DEPLOYED; NO SETTING PUBLISHED]** Admin can configure separate broad Grant
+   Program audiences; Anneli Stone and Saskia Pallais are Southern California
+   staff and should not appear on Research requests. Production retains the
+   role-wide fallback until first publication. Personal lenses
    remain disabled pending no-privilege-team provisioning and representative
    Word-access proof. Keep acknowledgement distinct from document lifecycle,
    external distribution, and the AkoyaGo publication projection.

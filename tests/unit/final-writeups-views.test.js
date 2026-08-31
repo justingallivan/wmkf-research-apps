@@ -123,28 +123,35 @@ test('superuser dashboard renders a complete neutral coordinator matrix with dir
   const row = writeup();
   global.fetch.mockResolvedValueOnce(response(dashboard({
     coordinatorMatrix: {
-      reviewers: [
-        { reviewerId: 'reviewer-1', name: 'Ada Reviewer', initials: 'AR' },
-        { reviewerId: 'pd-1', name: 'Program Director A', initials: 'PA' },
-      ],
-      rows: [{
-        requestId: row.requestId,
-        requestNumber: row.requestNumber,
-        title: row.title,
-        institution: row.institution,
-        responsibleProgramDirector: row.responsibleProgramDirector,
-        stage: row.stage,
-        documentUrl: row.document.url,
-        cells: [
-          { reviewerId: 'reviewer-1', state: 'updated', acknowledgedAt: '2026-08-30T12:00:00.000Z' },
-          { reviewerId: 'pd-1', state: 'not-applicable', acknowledgedAt: null },
+      mode: 'configured',
+      groups: [{
+        grantProgramId: 'program-1',
+        grantProgramName: 'Research',
+        reviewers: [
+          { reviewerId: 'reviewer-1', name: 'Ada Reviewer', initials: 'AR' },
+          { reviewerId: 'pd-1', name: 'Program Director A', initials: 'PA' },
         ],
+        rows: [{
+          requestId: row.requestId,
+          requestNumber: row.requestNumber,
+          title: row.title,
+          institution: row.institution,
+          responsibleProgramDirector: row.responsibleProgramDirector,
+          stage: row.stage,
+          documentUrl: row.document.url,
+          cells: [
+            { reviewerId: 'reviewer-1', state: 'updated', acknowledgedAt: '2026-08-30T12:00:00.000Z' },
+            { reviewerId: 'pd-1', state: 'not-applicable', acknowledgedAt: null },
+          ],
+        }],
       }],
+      unconfiguredRows: [],
     },
   })));
   render(<FinalWriteupsDashboardView />);
 
   expect(await screen.findByRole('heading', { name: 'Coordinator matrix' })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Research' })).toBeInTheDocument();
   expect(screen.getByText(/not approval or compliance tracking/i)).toBeInTheDocument();
   expect(screen.getByLabelText('Ada Reviewer: Updated for request 1002788')).toBeInTheDocument();
   expect(screen.getByLabelText('Program Director A: Responsible PD for request 1002788')).toBeInTheDocument();

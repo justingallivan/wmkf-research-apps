@@ -233,18 +233,17 @@ function MatrixState({ state, reviewerName, requestNumber }) {
   );
 }
 
-function CoordinatorMatrix({ matrix, search }) {
-  if (!matrix) return null;
-  const rows = (matrix.rows || []).filter((row) => matchesSearch(row, search));
+function MatrixTable({ group, search }) {
+  const rows = (group.rows || []).filter((row) => matchesSearch(row, search));
   return (
-    <section aria-labelledby="coordinator-matrix-heading">
-      <div className="mb-3">
-        <h2 id="coordinator-matrix-heading" className="text-xl font-semibold tracking-[-0.02em] text-gray-900">
-          Coordinator matrix
-        </h2>
-        <p className="mt-1 max-w-3xl text-sm leading-6 text-gray-600">
-          Every current Final Writeup and expected reviewer. This records review activity only; it is not approval or compliance tracking.
-        </p>
+    <section aria-labelledby={`coordinator-matrix-${group.grantProgramId || 'default'}`}>
+      <div className="mb-3 flex flex-wrap items-baseline justify-between gap-3">
+        <h3 id={`coordinator-matrix-${group.grantProgramId || 'default'}`} className="text-base font-semibold text-gray-900">
+          {group.grantProgramName || 'Grant Program'}
+        </h3>
+        <span className="text-xs tabular-nums text-gray-500">
+          {group.reviewers?.length || 0} reviewer{group.reviewers?.length === 1 ? '' : 's'} · {group.rows?.length || 0} writeup{group.rows?.length === 1 ? '' : 's'}
+        </span>
       </div>
       <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
         <table className="min-w-max border-collapse text-left">
@@ -253,7 +252,7 @@ function CoordinatorMatrix({ matrix, search }) {
               <th scope="col" className="sticky left-0 z-20 w-56 min-w-56 max-w-56 bg-gray-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-gray-600 sm:w-72 sm:min-w-72 sm:max-w-72 sm:px-5">
                 Final Writeup
               </th>
-              {(matrix.reviewers || []).map((reviewer) => (
+              {(group.reviewers || []).map((reviewer) => (
                 <th key={reviewer.reviewerId} scope="col" className="min-w-36 px-3 py-3 text-sm font-semibold text-gray-900">
                   <span className="block">{reviewer.name}</span>
                   {reviewer.initials && <span className="mt-0.5 block text-xs font-normal text-gray-500">{reviewer.initials}</span>}
@@ -289,7 +288,7 @@ function CoordinatorMatrix({ matrix, search }) {
                   <td key={cell.reviewerId} className="px-3 py-4">
                     <MatrixState
                       state={cell.state}
-                      reviewerName={matrix.reviewers?.[index]?.name || 'Reviewer'}
+                      reviewerName={group.reviewers?.[index]?.name || 'Reviewer'}
                       requestNumber={row.requestNumber}
                     />
                   </td>
@@ -298,7 +297,7 @@ function CoordinatorMatrix({ matrix, search }) {
             ))}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={(matrix.reviewers?.length || 0) + 1} className="px-6 py-10 text-center text-sm text-gray-500">
+                <td colSpan={(group.reviewers?.length || 0) + 1} className="px-6 py-10 text-center text-sm text-gray-500">
                   No matrix rows match your search.
                 </td>
               </tr>
@@ -306,6 +305,65 @@ function CoordinatorMatrix({ matrix, search }) {
           </tbody>
         </table>
       </div>
+    </section>
+  );
+}
+
+function CoordinatorMatrix({ matrix, search }) {
+  if (!matrix) return null;
+  const unconfiguredRows = (matrix.unconfiguredRows || [])
+    .filter((row) => matchesSearch(row, search));
+  return (
+    <section aria-labelledby="coordinator-matrix-heading" className="space-y-5">
+      <div>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 id="coordinator-matrix-heading" className="text-xl font-semibold tracking-[-0.02em] text-gray-900">
+              Coordinator matrix
+            </h2>
+            <p className="mt-1 max-w-3xl text-sm leading-6 text-gray-600">
+              Each Grant Program uses its configured reviewer audience. This records review activity only; it is not approval or compliance tracking.
+            </p>
+          </div>
+          <Link
+            href="/admin#final-writeup-matrix-audiences"
+            className="text-sm font-semibold text-gray-700 underline underline-offset-4 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-500"
+          >
+            Edit audiences
+          </Link>
+        </div>
+        {matrix.mode === 'role-default' && (
+          <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900" role="status">
+            Program-specific audiences have not been published yet. This matrix is temporarily using every enabled member of the Final Writeup reviewer role.
+          </p>
+        )}
+      </div>
+
+      {(matrix.groups || []).map((group) => (
+        <MatrixTable key={group.grantProgramId || 'role-default'} group={group} search={search} />
+      ))}
+
+      {unconfiguredRows.length > 0 && (
+        <div className="rounded-xl border border-amber-300 bg-amber-50 p-4" role="status">
+          <h3 className="font-semibold text-amber-950">Audience configuration needed</h3>
+          <p className="mt-1 text-sm text-amber-900">
+            These Final Writeups are not placed in a matrix because their Grant Program has no saved audience.
+          </p>
+          <ul className="mt-3 space-y-2 text-sm text-amber-950">
+            {unconfiguredRows.map((row) => (
+              <li key={row.requestId} className="flex flex-wrap items-baseline gap-x-2">
+                <Link
+                  href={`/workbench/final-writeups/${encodeURIComponent(row.requestId)}`}
+                  className="font-semibold underline underline-offset-4 focus:outline-none focus:ring-2 focus:ring-amber-700"
+                >
+                  #{row.requestNumber || '—'} {row.title || 'Untitled request'}
+                </Link>
+                <span className="text-amber-800">{row.grantProgramName || 'No Grant Program'}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </section>
   );
 }

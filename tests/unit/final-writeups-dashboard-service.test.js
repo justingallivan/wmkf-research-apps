@@ -20,8 +20,10 @@ const FINAL_A_ID = '40000000-0000-4000-8000-000000000001';
 const FINAL_B_ID = '40000000-0000-4000-8000-000000000002';
 const FINAL_C_ID = '40000000-0000-4000-8000-000000000003';
 const ACK_B_ID = '50000000-0000-4000-8000-000000000002';
+const RESEARCH_PROGRAM_ID = '60000000-0000-4000-8000-000000000001';
+const SOCAL_PROGRAM_ID = '60000000-0000-4000-8000-000000000002';
 
-function requestRow({ requestId, requestNumber, finalId, pdId, pdName }) {
+function requestRow({ requestId, requestNumber, finalId, pdId, pdName, programId = RESEARCH_PROGRAM_ID, programName = 'Research' }) {
   return {
     akoya_requestid: requestId,
     akoya_requestnum: requestNumber,
@@ -31,6 +33,8 @@ function requestRow({ requestId, requestNumber, finalId, pdId, pdName }) {
     _wmkf_projectleader_value_formatted: `PI ${requestNumber}`,
     _wmkf_programdirector_value: pdId,
     _wmkf_programdirector_value_formatted: pdName,
+    _wmkf_grantprogram_value: programId,
+    _wmkf_grantprogram_value_formatted: programName,
     _wmkf_currentfinalwriteup_value: finalId,
   };
 }
@@ -107,14 +111,14 @@ function harness() {
       isdisabled: false,
     })),
     resolvePersonas: jest.fn(async () => ({ enabled: false, personas: [] })),
-    listExpectedReviewers: jest.fn(async () => ({
-      records: [
-        { systemuserid: ACTOR_ID, fullname: 'Ada Reviewer', isdisabled: false },
-        { systemuserid: PD_A_ID, fullname: 'Program Director A', isdisabled: false },
-        { systemuserid: PD_B_ID, fullname: 'Program Director B', isdisabled: false },
+    resolveMatrixAudiences: jest.fn(async () => ({
+      mode: 'role-default',
+      fallbackReviewers: [
+        { reviewerId: ACTOR_ID, name: 'Ada Reviewer', initials: 'AR' },
+        { reviewerId: PD_A_ID, name: 'Program Director A', initials: 'PA' },
+        { reviewerId: PD_B_ID, name: 'Program Director B', initials: 'PB' },
       ],
-      totalCount: 3,
-      hasMore: false,
+      programs: [],
     })),
     queryRequests: jest.fn(async () => ({
       records: requests,
@@ -184,18 +188,20 @@ test('superuser index includes the complete neutral coordinator matrix', async (
   }, dependencies);
 
   expect(result.viewer).toMatchObject({ isSuperuser: true, personas: [], personaLensesEnabled: false });
-  expect(result.coordinatorMatrix.reviewers.map((reviewer) => reviewer.name)).toEqual([
+  expect(result.coordinatorMatrix.mode).toBe('role-default');
+  expect(result.coordinatorMatrix.groups).toHaveLength(1);
+  expect(result.coordinatorMatrix.groups[0].reviewers.map((reviewer) => reviewer.name)).toEqual([
     'Ada Reviewer',
     'Program Director A',
     'Program Director B',
   ]);
-  expect(result.coordinatorMatrix.rows).toHaveLength(3);
-  expect(result.coordinatorMatrix.rows[0].cells).toEqual([
+  expect(result.coordinatorMatrix.groups[0].rows).toHaveLength(3);
+  expect(result.coordinatorMatrix.groups[0].rows[0].cells).toEqual([
     { reviewerId: ACTOR_ID, state: 'unreviewed', acknowledgedAt: null },
     { reviewerId: PD_A_ID, state: 'not-applicable', acknowledgedAt: null },
     { reviewerId: PD_B_ID, state: 'unreviewed', acknowledgedAt: null },
   ]);
-  expect(result.coordinatorMatrix.rows[1].cells[0]).toMatchObject({
+  expect(result.coordinatorMatrix.groups[0].rows[1].cells[0]).toMatchObject({
     reviewerId: ACTOR_ID,
     state: 'updated',
     acknowledgedAt: '2026-08-30T12:05:00.000Z',
@@ -206,7 +212,7 @@ test('ordinary and focused responses do not load or expose the coordinator matri
   const ordinary = harness();
   const ordinaryResult = await loadFinalWriteupsDashboard({ actingUserSystemId: ACTOR_ID }, ordinary.dependencies);
   expect(ordinaryResult.coordinatorMatrix).toBeNull();
-  expect(ordinary.dependencies.listExpectedReviewers).not.toHaveBeenCalled();
+  expect(ordinary.dependencies.resolveMatrixAudiences).not.toHaveBeenCalled();
 
   const focused = harness();
   const focusedResult = await loadFinalWriteupsDashboard({
@@ -215,23 +221,63 @@ test('ordinary and focused responses do not load or expose the coordinator matri
     isSuperuser: true,
   }, focused.dependencies);
   expect(focusedResult.coordinatorMatrix).toBeNull();
-  expect(focused.dependencies.listExpectedReviewers).not.toHaveBeenCalled();
+  expect(focused.dependencies.resolveMatrixAudiences).not.toHaveBeenCalled();
 });
 
-test('superuser matrix fails closed on a contradictory disabled reviewer row', async () => {
+test('superuser matrix propagates a stale configured-audience failure', async () => {
   const { dependencies } = harness();
-  dependencies.listExpectedReviewers.mockResolvedValue({
-    records: [{ systemuserid: PD_A_ID, fullname: 'Disabled Reviewer', isdisabled: true }],
-    totalCount: 1,
-    hasMore: false,
-  });
+  dependencies.resolveMatrixAudiences.mockRejectedValue(Object.assign(new Error('stale audience'), {
+    httpStatus: 503,
+    body: { code: 'final_writeup_matrix_audience_reviewer_stale' },
+  }));
   await expect(loadFinalWriteupsDashboard({
     actingUserSystemId: ACTOR_ID,
     isSuperuser: true,
   }, dependencies)).rejects.toMatchObject({
-    httpStatus: 500,
-    body: { code: 'final_writeups_dashboard_reviewer_roster_invalid' },
+    httpStatus: 503,
+    body: { code: 'final_writeup_matrix_audience_reviewer_stale' },
   });
+});
+
+test('configured audiences create separate program matrices and call out unconfigured rows', async () => {
+  const { dependencies, requests } = harness();
+  requests[1]._wmkf_grantprogram_value = SOCAL_PROGRAM_ID;
+  requests[1]._wmkf_grantprogram_value_formatted = 'Southern California';
+  dependencies.resolveMatrixAudiences.mockResolvedValue({
+    mode: 'configured',
+    fallbackReviewers: null,
+    programs: [{
+      grantProgramId: RESEARCH_PROGRAM_ID,
+      reviewers: [
+        { reviewerId: ACTOR_ID, name: 'Ada Reviewer', initials: 'AR' },
+        { reviewerId: PD_A_ID, name: 'Program Director A', initials: 'PA' },
+      ],
+    }],
+  });
+
+  const result = await loadFinalWriteupsDashboard({
+    actingUserSystemId: ACTOR_ID,
+    isSuperuser: true,
+  }, dependencies);
+
+  expect(result.coordinatorMatrix.mode).toBe('configured');
+  expect(result.coordinatorMatrix.groups).toHaveLength(1);
+  expect(result.coordinatorMatrix.groups[0]).toMatchObject({
+    grantProgramId: RESEARCH_PROGRAM_ID,
+    grantProgramName: 'Research',
+  });
+  expect(result.coordinatorMatrix.groups[0].reviewers.map((reviewer) => reviewer.name)).toEqual([
+    'Ada Reviewer',
+    'Program Director A',
+  ]);
+  expect(result.coordinatorMatrix.groups[0].rows.map((row) => row.requestNumber)).toEqual(['1001', '1003']);
+  expect(result.coordinatorMatrix.unconfiguredRows).toEqual([
+    expect.objectContaining({
+      requestNumber: '1002',
+      grantProgramId: SOCAL_PROGRAM_ID,
+      grantProgramName: 'Southern California',
+    }),
+  ]);
 });
 
 test('keeps a later Word version in reviewed history and labels freshness separately', async () => {

@@ -66,7 +66,17 @@ Workbench redesign.
    other cells Not reviewed, both direct actions present, and zero browser-console
    errors. Prior local desktop and 390px browser QA also passed against Production
    read data. The matrix has no approval, compliance, deadline, count, or order meaning.
-3. **[ROLLOUT DISABLED] Staff/executive lenses.** The approved persona contract
+3. **[SOURCE-BUILT + UNIT-TESTED 2026-08-31; NOT DEPLOYED; NO SETTING
+   PUBLISHED] Program-specific matrix audiences.** Role eligibility and matrix
+   assignment are now explicitly separate. Anneli Stone and Saskia Pallais are
+   Southern California staff and should not appear on Research requests. The
+   Admin editor supports independent Research and Southern California audiences
+   keyed by stable broad Grant Program and reviewer GUIDs. Publishes round-trip
+   the loaded Dataverse ETag and reject stale Admin drafts with `409`. Until the first
+   setting publication, Production retains the existing role-wide matrix; after
+   publication, unconfigured programs remain explicit and stale references fail
+   closed.
+4. **[ROLLOUT DISABLED] Staff/executive lenses.** The approved persona contract
    uses three no-privilege Dataverse teams (PD, PC, leadership), permits overlap,
    and matches pinned GUIDs only. The teams are not yet provisioned, IDs are
    null, and the source flag is false. Provision/verify them and prove
@@ -112,6 +122,7 @@ Workbench redesign.
 | `docs/API_ROUTE_SECURITY_MATRIX.md` | Current route/auth/write contracts |
 | `docs/APPLICATION_STATE_ATLAS.md` | Current live state and ownership routing |
 | `docs/atlas/dataverse-wmkf-requestdocument.md` | Request Document schema/producer truth |
+| `lib/services/final-writeup/matrix-audience-service.js` | Source-built program-audience settings contract |
 
 ## Verification Receipt
 

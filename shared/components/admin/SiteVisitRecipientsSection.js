@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useRouter } from 'next/router';
+import useAdminUnsavedChangesGuard from './useAdminUnsavedChangesGuard';
 
 const VERSION = 1;
 const UNSAVED_CHANGES_WARNING = 'You have unsaved Site Visit recipient changes. Leave without saving?';
@@ -22,7 +22,6 @@ function configFromEntries(entries) {
 }
 
 export default function SiteVisitRecipientsSection() {
-  const router = useRouter();
   const [staff, setStaff] = useState([]);
   const [resolvedEntries, setResolvedEntries] = useState([]);
   const [draftEntries, setDraftEntries] = useState([]);
@@ -98,54 +97,7 @@ export default function SiteVisitRecipientsSection() {
   const changed = baseline !== '' && baseline !== JSON.stringify(configFromEntries(draftEntries));
   const atCapacity = draftEntries.length >= maxEntries;
 
-  useEffect(() => {
-    if (!changed) return undefined;
-
-    let confirmedLinkNavigation = false;
-    const handleBeforeUnload = (event) => {
-      if (confirmedLinkNavigation) return;
-      event.preventDefault();
-      event.returnValue = '';
-    };
-    const handleLinkClick = (event) => {
-      if (
-        event.defaultPrevented
-        || event.button !== 0
-        || event.metaKey
-        || event.ctrlKey
-        || event.shiftKey
-        || event.altKey
-      ) return;
-
-      const link = event.target?.closest?.('a[href]');
-      if (!link || link.hasAttribute('download')) return;
-      const target = link.getAttribute('target');
-      const href = link.getAttribute('href');
-      if ((target && target !== '_self') || !href || href.startsWith('#')) return;
-
-      if (!window.confirm(UNSAVED_CHANGES_WARNING)) {
-        event.preventDefault();
-        event.stopPropagation();
-        return;
-      }
-
-      // A full-page link would otherwise show the browser's native warning too.
-      // Reset immediately for client-side routes that keep this component mounted.
-      confirmedLinkNavigation = true;
-      window.setTimeout(() => {
-        confirmedLinkNavigation = false;
-      }, 0);
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    document.addEventListener('click', handleLinkClick, true);
-    router.beforePopState(() => window.confirm(UNSAVED_CHANGES_WARNING));
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-      document.removeEventListener('click', handleLinkClick, true);
-      router.beforePopState(() => true);
-    };
-  }, [changed, router]);
+  useAdminUnsavedChangesGuard(changed, UNSAVED_CHANGES_WARNING);
 
   const toggleStaff = (profileId) => {
     const key = `staff:${profileId}`;

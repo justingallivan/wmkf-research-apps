@@ -37,9 +37,11 @@ tracking. A narrower pilot locator with a cycle list and direct Word entry is
 implemented in source under the existing `reviewers` app grant. All PDs are expected eventually to
 evaluate the materials, and designated staff proofreaders also need access.
 Final acknowledgements key to the Final artifact and observed SharePoint
-publication version. The approved audience is all PDs, PCs, CSO, and President,
-and a full coordinator matrix is required with neutral blank/Reviewed/Updated
-since review states and no compliance semantics. SharePoint file-permission
+publication version. The global role-eligible audience is all PDs, PCs, CSO,
+and President; the intended reviewer set for a request is configured by its
+broad Grant Program. A full coordinator matrix is required with neutral
+blank/Reviewed/Updated since review states and no compliance semantics.
+SharePoint file-permission
 verification and persona rollout remain open. The owner-approved persona
 contract is three no-privilege Dataverse teams keyed only by pinned GUID, with
 multi-membership allowed; Allison Keller is President and Beth Pruitt is CSO
@@ -277,6 +279,15 @@ planned. Current authority is
   complete acknowledgement row for Request `1002788`. Persona lenses remain
   disabled until the approved teams are provisioned and representative PC and
   leadership Word access is proved.
+  **[OWNER-DECIDED; SOURCE-BUILT + UNIT-TESTED 2026-08-31; NOT DEPLOYED; NO
+  SETTING PUBLISHED]** Role eligibility is not the same as per-program matrix
+  assignment. Anneli Stone and Saskia Pallais are Southern California staff and
+  should not appear on Research requests. The source-built Admin editor stores
+  separate broad Grant Program GUID → reviewer GUID audiences, resolves names
+  live, rejects stale Admin publishes through Dataverse ETag/`If-Match`, retains
+  the deployed role-wide fallback until first publication, and
+  thereafter makes unconfigured programs explicit while stale references fail
+  closed.
   Initial Assessment production
   registry/pointer schema, governed prompt v1, and application are live and
   verified; Request `1002788` preserves mechanics-only historical evidence,

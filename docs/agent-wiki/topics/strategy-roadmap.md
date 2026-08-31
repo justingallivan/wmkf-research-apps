@@ -510,8 +510,11 @@ document inventory, and individual implementation plans do not establish priorit
   tracker. The pilot cycle list/direct Word entry uses the existing `reviewers`
   app grant; live SharePoint permission verification remains pending. All PDs
   are expected eventually to evaluate the materials and designated staff
-  proofreaders also need access. The approved audience is all PDs, PCs, CSO,
-  and President. It reuses the typed registry and canonical SharePoint file;
+  proofreaders also need access. The global role-eligible audience is all PDs,
+  PCs, CSO, and President; per-request matrix assignment is configured by the
+  request's broad Grant Program. Anneli Stone and Saskia Pallais are
+  owner-confirmed Southern California staff and should not appear on Research
+  requests. It reuses the typed registry and canonical SharePoint file;
   every edit/review action opens Word in a separate window/tab and it is not a
   second editor. Acknowledgements key to Final artifact + observed publication
   version. The full coordinator matrix is required, with neutral blank,
@@ -524,8 +527,13 @@ document inventory, and individual implementation plans do not establish priorit
   partial row. The dedicated role is now assigned/effective for all 11 confirmed
   audience members; the post-role retry succeeded and its review-history state
   and complete acknowledgement row passed independent readback. The services derive
-  ownership/actions server-side, cap and batch reads, and do not infer
-  PC/leadership personas or expose the full matrix.
+  ownership/actions server-side and cap and batch reads. Ordinary/focused and
+  persona-specific responses do not infer PC/leadership personas or expose the
+  full matrix; the fresh-superuser index does. **Source-built + unit-tested
+  2026-08-31, not deployed, no setting published:** a superuser Admin editor now
+  supports independent Research and Southern California reviewer audiences
+  through stable Grant Program/reviewer GUID references, with role-wide fallback
+  before first publication and explicit unconfigured-program handling after it.
 - Calendar direction (owner-confirmed 2026-07-28): the first gate is a
   human-in-the-loop, end-to-end Initial Assessment pilot, originally targeted at
   2026-08-10, before proposals begin arriving around 2026-08-18. **The 2026-08-10

@@ -222,13 +222,17 @@ all PDs, PCs, the CSO, and the President. Its minimum contract is:
   changes needed” from “not yet reviewed”; and
 - personal review state and reviewed history; and
 - a full coordinator matrix for positively identified PCs and superusers,
-  showing every in-scope writeup × intended reviewer with neutral blank,
+  showing every in-scope writeup × intended reviewer for that request's
+  configured broad Grant Program with neutral blank,
   Reviewed, and Updated since review states.
 
 “Reviewed” is a progress signal, not an approval gate, denominator, due-date,
 or compliance score. SharePoint revisions or
 tracked changes may provide a secondary “has edits” hint, but they cannot
-replace the explicit marker. The audience is all PDs, PCs, CSO, and President;
+replace the explicit marker. The global role-eligible audience is all PDs, PCs,
+CSO, and President; Anneli Stone and Saskia Pallais are Southern California
+staff and should not appear in the Research matrix. Exact per-request matrix
+assignment is configured from the request's broad Grant Program;
 exact app/file authorization still must be enforced rather than inferred from
 employment. Acknowledgements key to the Final artifact and observed publication
 version; later edits show Updated since review without erasing the row. The
@@ -1110,8 +1114,10 @@ Owner-decided:
     action time—including site observations entered there—records that source
     row/version/hash in a Final row over the same stable SharePoint item, and
     exposes no first-release regeneration or backward-stage action;
-39. the Final Writeups Dashboard audience is all PDs, PCs, the CSO, and the
-    President, subject to explicit app/persona and SharePoint authorization;
+39. the Final Writeups Dashboard role-eligible audience is all PDs, PCs, the
+    CSO, and the President, subject to explicit app/persona and SharePoint
+    authorization; each request's matrix reviewers come from its configured
+    broad Grant Program audience;
     it includes a full coordinator matrix with neutral version-aware review
     states and no compliance, denominator, due-date, or sequence semantics; and
 40. the first fixed gate is a human-in-the-loop, end-to-end Initial Assessment
