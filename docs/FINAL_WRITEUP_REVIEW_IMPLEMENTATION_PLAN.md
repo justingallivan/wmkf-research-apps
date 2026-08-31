@@ -34,8 +34,7 @@ related:
 
 **Verdict: OWNER-APPROVED FOR STAGED IMPLEMENTATION WITH NAMED PREREQUISITES.**
 
-This plan translates the approved Final Writeup and group-review experience into the current Request Workbench architecture. Runtime remains unstarted. Slice 0
-reconciles the durable contract before code changes.
+This plan translates the approved Final Writeup and group-review experience into the current Request Workbench architecture. Slice 0 is complete. **[BUILT IN SOURCE 2026-08-30; NOT DEPLOYED OR LIVE-PROVED]** Slice 1 now exists on the isolated `codex/final-writeup-slice1` branch. Wave 22 remains unapplied, `FINAL_WRITEUP_SCHEMA_READY` remains unset, and no Production mutation or probe has been authorized.
 
 The 2026-09-04 milestone means the underlying handoff, identity, acknowledgement,
 dashboard-data, and superuser test path are in place. It does not promise broad
@@ -47,7 +46,7 @@ The named prerequisites are deliberately attached to the slices that need them:
 
 1. **Resolved 2026-08-30:** the owner approved the expanded implementation
    surface and code-first delivery after durable reconciliation.
-2. Before Slice 1, add an explicit, durable actor-and-time contract for each stage transition. Dataverse `modifiedby` is not sufficient because impersonation may fall back to the service principal and later writes overwrite it.
+2. **Resolved in source 2026-08-30; deployment pending:** Wave 22 defines explicit group-review and leadership-review actor/time fields. Dataverse `modifiedby` remains non-authoritative.
 3. Before Slice 2, verify with an owner-authorized read-only probe that every intended PD, PC, CSO, and President resolves to an enabled Dataverse `systemuser`. If any intended reviewer does not, settle the acknowledgement identity key before creating its entity.
 4. Before Slice 4, settle how the application positively identifies a Program Coordinator or leadership user. Current app access proves access to an application, and each Request identifies its responsible PD and assigned PC, but there is no verified Workbench persona contract for “any PC” or “leadership.” The implementation must not infer those roles from names, email addresses, job titles, or the changing program taxonomy.
 
@@ -84,20 +83,20 @@ An OAuth-authenticated, read-only Claude Fable review on 2026-08-28 independentl
 - **Entry points:** Staff Deliberations, the responsible-PD Final Writeup tab, a cross-request Final Writeups dashboard, and a dedicated reviewer page. Every edit/review action launches the SharePoint Word document outside the Workbench in a separate browser window/tab, with desktop Word available only through Microsoft's own supported affordance.
 - **Persistence:** the existing Dataverse Request Document registry and Request current-Final pointer; SharePoint for the single collaborative Word item and its native versions; one new Dataverse child entity for personal review acknowledgements.
 - **Consumers:** responsible PDs, other PDs, PCs, CSO, President, Workbench UI, dashboard UI, supporting-material read surface, tests, Atlas, route-security matrix, and service catalogue.
-- **Prior findings being verified:** Final is still a placeholder; the Final artifact type and current pointer exist; no review-acknowledgement store exists; current Workbench access does not distinguish PC and leadership personas; the former plan calls for a second editable Final file.
+- **Slice 0 baseline findings:** Final was still a placeholder; the Final artifact type and current pointer existed; no review-acknowledgement store existed; current Workbench access did not distinguish PC and leadership personas; and the former plan called for a second editable Final file. The source-built Slice 1 status is recorded below.
 
 ## Verified current state
 
-- **[VERIFIED]** Final Writeup is the only remaining placeholder in the request shell. The tab is declared, but it falls through to the generic “coming later” panel (`pages/workbench/[requestId].js:38-50`, `175-200`).
-- **[VERIFIED]** Staff Deliberations deliberately stops before a Final handoff (`shared/components/workbench/StaffDeliberationsTab.js:1-12`). Its existing state derivation already removes active controls for any lifecycle beyond Draft or Review (`StaffDeliberationsTab.js:372-393`, `767-779`).
+- **[SUPERSEDED BY SOURCE IMPLEMENTATION 2026-08-30; NOT DEPLOYED]** Final Writeup no longer falls through to the placeholder on the feature branch. `FinalWriteupTab` reads the readiness-gated status, offers the responsible-PD/superuser group-review transition, and opens Word separately after success.
+- **[BUILT IN SOURCE 2026-08-30; NOT DEPLOYED]** Staff Deliberations retains its fail-closed controls and now renders lifecycle `FINAL` as a read-only receipt pointing staff to the Final Writeup tab; other unknown/beyond states remain generic read-only failures.
 - **[VERIFIED]** The Request Document registry already defines the Final Writeup artifact type and the generic source-version, source-hash, milestone-version, milestone-hash, and milestone-time fields (`shared/config/requestDocument.js:10-58`; `lib/dataverse/adapters/request-document.js:12-68`).
-- **[VERIFIED]** `akoya_request.wmkf_CurrentFinalWriteup` is live, but no writer populates it (`docs/atlas/dataverse-wmkf-requestdocument.md:221-223`).
+- **[VERIFIED PRODUCTION STATE; SOURCE IMPLEMENTATION NOT DEPLOYED]** `akoya_request.wmkf_CurrentFinalWriteup` is live and still has no deployed writer. Slice 1 now includes the readiness-gated writer on the feature branch, but Wave 22 is unapplied and `FINAL_WRITEUP_SCHEMA_READY` remains off (`docs/atlas/dataverse-wmkf-requestdocument.md:221-223`).
 - **[VERIFIED]** The registry’s durable file identity is the stable Graph drive/item identity, and its only alternate key is the generation key. The schema does not require a different SharePoint item for each Request Document row (`lib/dataverse/schema/wave16-request-document-registry/wmkf_requestdocument.json:136-160`, `315-330`).
 - **[VERIFIED]** The current Graph metadata helper returns stable identity, URL, eTag, publication version, and last-modified time, but not the modifying user (`lib/services/graph-service.js:400-442`).
 - **[VERIFIED]** A Request already exposes the lead PD and assigned Program Coordinator as separate system-user lookups (`docs/atlas/dataverse-akoya-request.md:38-47`).
 - **[VERIFIED]** The current dashboard is PD/reviewer-lifecycle-specific and derives its “my” scope from the lead-PD relationship (`lib/services/workbench/dashboard-service.js:42-79`, `126-176`). It should not be stretched into the Final Writeups dashboard.
 - **[VERIFIED]** The existing `reviewers` app grant opens the whole Request Workbench (`shared/config/appRegistry.js:41-49`). A dedicated occasional-user dashboard needs its own access contract rather than granting leadership the full reviewer-management experience.
-- **[VERIFIED]** No repository schema, adapter, route, or service currently stores a Final Writeup review acknowledgement keyed to a staff member and document version.
+- **[VERIFIED]** No repository schema, adapter, route, or service currently stores a Final Writeup review acknowledgement keyed to a staff member and document version. Slice 1 adds transition attribution only; acknowledgement remains Slice 2.
 - **[VERIFIED]** A Pre-Site row in `SUPERSEDED` is excluded from the current artifact read model. Clearing its pointer can re-enable draft generation, while retaining the pointer and moving the row to `FINAL` preserves the existing read-only receipt and regeneration lock (`lib/services/pre-site-visit/artifact-service.js:545-577`, `838-859`; `tests/unit/staff-deliberations-tab.test.js:446-464`).
 - **[VERIFIED]** Dataverse writes only apply `MSCRMCallerID` when impersonation is enabled and may retry a 403 as the service principal; changesets do not currently expose a no-fallback actor guarantee (`lib/services/dynamics/write-core.js:76-115`; `lib/services/dynamics/changeset.js:85`, `113-125`).
 - **[VERIFIED]** Session `dynamicsSystemuserId` depends on exact-email reconciliation to an enabled Dataverse `systemuser`; this has not yet been proven for every intended PC or leadership reviewer (`pages/api/auth/[...nextauth].js:274-286`, `331-335`; `lib/services/dynamics-identity-service.js:59-100`).
@@ -108,7 +107,7 @@ The older lifecycle plan says Final creation copies the Pre-Site/Site Visit docu
 
 The implementation should instead create a new **Final lineage row** that references the **same stable SharePoint drive/item** as the current Staff Deliberations document:
 
-1. The responsible PD selects **Ready for group review** in Staff Deliberations.
+1. The responsible PD opens Final Writeup and selects **Ready for group review**. Staff Deliberations owns the source workspace before handoff and becomes the receipt afterward; the transition action is not duplicated across tabs.
 2. The server independently resolves the current Pre-Site pointer and verifies the exact current SharePoint item, publication version, eTag, and governed content hash before and after reading it.
 3. The server claims or reuses a deterministic Final Request Document row whose source is the current Pre-Site row/version/hash.
 4. The Final row records the same stable SharePoint file identity. No second editable file is uploaded or copied.
@@ -164,7 +163,7 @@ The existing schema carries the file and lineage contract:
 - the Request current-Final lookup selects the canonical row;
 - the generation key makes exact retry converge.
 
-Add explicit transition-attribution fields to the Final row for the actor and time that entered group review and the actor and time that entered leadership review. Exact Dataverse logical names are selected during schema review rather than invented here. Both actor lookups are resolved from the authenticated session and written in the same activation/stage changeset; Dataverse `modifiedby` is informational only.
+Wave 22 defines `wmkf_GroupReviewStartedBy`, `wmkf_GroupReviewStartedAt`, `wmkf_LeadershipReviewStartedBy`, and `wmkf_LeadershipReviewStartedAt`. Runtime selects them only when `FINAL_WRITEUP_SCHEMA_READY=on`. The group-review actor lookup is resolved from the authenticated session and written with its timestamp in the same activation changeset; Dataverse `modifiedby` is informational only. Leadership fields remain schema-only until Slice 4.
 
 For **Ready for leadership review**, move the Final row lifecycle from `REVIEW` to `FINAL` and reuse its existing milestone version/hash/time fields for the exact leadership-ready checkpoint. The lifecycle is the stage discriminator; milestone presence alone never changes stage. Review acknowledgements live elsewhere and therefore do not rewrite the Final row after this transition.
 
@@ -341,10 +340,12 @@ Before runtime code, run `/sweep` and update every live restatement of the old �
 
 ### Slice 1 — Final handoff and responsible-PD tab
 
+**[BUILT IN SOURCE 2026-08-30; NOT DEPLOYED OR LIVE-PROVED.]** The branch includes the Wave 22 spec/readiness guard/preflight, conditional Request Document projection, deterministic same-item claim/activation service, request-scoped GET/POST route, Final tab, Staff Deliberations receipt, and focused tests. Remaining before promotion: full gates, rendered desktop/mobile inspection, schema preflight/apply/readback under separate explicit authorization, environment flag, controlled non-Production or owner-approved rehearsal, and deliberate merge.
+
 - Add the Final contract constants and request/current-Final read model.
 - Add and readiness-gate explicit group-review transition actor/time fields.
 - Build the deterministic same-item Final-lineage service and request-scoped route.
-- Add **Ready for group review** to Staff Deliberations with a hard responsible-PD gate.
+- Add **Ready for group review** to the Final Writeup tab with a hard responsible-PD gate; do not duplicate the transition action in Staff Deliberations.
 - Implement the Final Writeup tab for group review.
 - Retain the current Pre-Site pointer, move its source row to `FINAL`, preserve the original source milestone, and make Staff Deliberations a filename-safe read-only receipt with history after success.
 - Specify Final-claim cardinality, lease expiry/recovery, create-before-activation, and all three `If-Match` fences.

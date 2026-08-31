@@ -418,7 +418,7 @@ test('a transport-accepted send for the current document promotes the rail to Wr
   expect(screen.getByText(/starting draft for the final writeup/i)).toBeInTheDocument();
   expect(screen.getByTestId('stage-rail')).toHaveTextContent('✓ Share');
   expect(screen.getByTestId('stage-rail')).toHaveTextContent('● Wrap Up');
-  // The hand-off into Final Writeup is deliberately not built yet (open question 4b).
+  // The Final Writeup tab owns the handoff; Staff Deliberations never duplicates it.
   expect(screen.queryByRole('button', { name: /Move to Final Writeup/ })).not.toBeInTheDocument();
   // After a send, composing another send is secondary: the composer collapses.
   expect(screen.getByText('Frozen distribution panel (collapsed)')).toBeInTheDocument();
@@ -446,7 +446,6 @@ test('sends for a superseded source document do not promote the current document
 test.each([
   ['Board Ready', 100000002],
   ['Superseded', 100000003],
-  ['Final', 100000004],
   ['unknown', 999999999],
 ])('a Ready %s artifact fails closed as read-only', async (_label, lifecycleState) => {
   global.fetch.mockResolvedValueOnce(statusResponse({
@@ -461,6 +460,19 @@ test.each([
   expect(screen.queryByRole('button', { name: 'Regenerate Word Draft' })).not.toBeInTheDocument();
   expect(screen.getByText(/cannot be edited, downloaded, or regenerated from this tab/i))
     .toBeInTheDocument();
+});
+
+test('a Final artifact becomes a read-only receipt that points staff to Final Writeup', async () => {
+  global.fetch.mockResolvedValueOnce(statusResponse({
+    currentArtifact: { ...readyArtifact(), lifecycleState: 100000004 },
+  }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+
+  expect(await screen.findByRole('heading', { name: 'Moved to Final Writeup' }))
+    .toBeInTheDocument();
+  expect(screen.getByText(/Open the Final Writeup tab to continue in Word/i)).toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: 'Edit' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: 'Download' })).not.toBeInTheDocument();
 });
 
 test('a shared artifact without a current Word URL fails closed with an explanation', async () => {

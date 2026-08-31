@@ -1,0 +1,44 @@
+{
+  "name": "wmkf_requestdocument-final-writeup-transition",
+  "kind": "extensions-on-existing",
+  "entityLogicalName": "wmkf_requestdocument",
+  "_comment": "Additive, explicit transition audit fields for Final Writeup group and leadership review. Runtime must not select or write these fields until the target passes exact preflight, this wave is explicitly applied, and FINAL_WRITEUP_SCHEMA_READY is set to literal on.",
+  "attributes": [
+    {
+      "type": "DateTime",
+      "schemaName": "wmkf_GroupReviewStartedAt",
+      "displayName": "Group Review Started At",
+      "description": "UTC date/time when the governed Final Writeup entered group review.",
+      "format": "DateAndTime",
+      "behavior": "UserLocal"
+    },
+    {
+      "type": "DateTime",
+      "schemaName": "wmkf_LeadershipReviewStartedAt",
+      "displayName": "Leadership Review Started At",
+      "description": "UTC date/time when the governed Final Writeup entered leadership review.",
+      "format": "DateAndTime",
+      "behavior": "UserLocal"
+    }
+  ],
+  "relationships": [
+    {
+      "kind": "N:1",
+      "schemaName": "wmkf_requestdocument_groupreviewstartedby",
+      "referencedEntity": "systemuser",
+      "lookupSchemaName": "wmkf_GroupReviewStartedBy",
+      "lookupDisplayName": "Group Review Started By",
+      "lookupDescription": "Staff systemuser who moved the governed Final Writeup into group review.",
+      "required": "None"
+    },
+    {
+      "kind": "N:1",
+      "schemaName": "wmkf_requestdocument_leadershipreviewstartedby",
+      "referencedEntity": "systemuser",
+      "lookupSchemaName": "wmkf_LeadershipReviewStartedBy",
+      "lookupDisplayName": "Leadership Review Started By",
+      "lookupDescription": "Staff systemuser who moved the governed Final Writeup into leadership review.",
+      "required": "None"
+    }
+  ]
+}

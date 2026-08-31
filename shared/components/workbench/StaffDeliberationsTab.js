@@ -7,9 +7,8 @@
  * Stage backing: Draft/Share map to the document lifecycle (DRAFT / REVIEW via
  * the guarded start-site-visit lock). Wrap Up is DERIVED — the first
  * transport-accepted materials send promotes the rail (owner decision
- * 2026-08-27); no new document state exists. The "Move to Final Writeup"
- * hand-off is deliberately NOT built until its receiving end is defined
- * (open question 4b in the workspace proposal).
+ * 2026-08-27); no new document state exists. Final lifecycle is a receipt here;
+ * the Final Writeup tab owns its separate Word launch.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -379,6 +378,7 @@ export default function StaffDeliberationsTab({ requestId, requestNumber = '', i
     && pendingArtifact.retryable === false;
   const shared = artifact?.lifecycleState === REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW;
   const draftReady = artifact?.lifecycleState === REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT;
+  const movedToFinal = artifact?.lifecycleState === REQUEST_DOCUMENT_LIFECYCLE_STATE.FINAL;
   const beyondDeliberations = Boolean(artifact) && !draftReady && !shared;
   // Server-derived (uncapped EXISTS, scoped to the current source document) so
   // a superseded document's sends never promote its reopen successor and the
@@ -766,11 +766,17 @@ export default function StaffDeliberationsTab({ requestId, requestNumber = '', i
             </div>
           )}
           {beyondDeliberations && (
-            <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
-              <h3 className="font-semibold">Site visit writeup is read-only</h3>
+            <div className={movedToFinal
+              ? 'mt-4 rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-950'
+              : 'mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950'}
+            >
+              <h3 className="font-semibold">
+                {movedToFinal ? 'Moved to Final Writeup' : 'Site visit writeup is read-only'}
+              </h3>
               <p className="mt-1">
-                This document has moved beyond the deliberation stages. It cannot be edited,
-                downloaded, or regenerated from this tab.
+                {movedToFinal
+                  ? 'This tab now preserves the Staff Deliberations record. Open the Final Writeup tab to continue in Word.'
+                  : 'This document has moved beyond the deliberation stages. It cannot be edited, downloaded, or regenerated from this tab.'}
               </p>
               {artifact?.file?.name && (
                 <p className="mt-2 text-xs">

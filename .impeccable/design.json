@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-08-31T01:23:56Z",
+  "generatedAt": "2026-08-31T03:10:18Z",
   "title": "Design System: WMKF Document Processing Suite",
   "extensions": {
     "colorMeta": {
@@ -157,9 +157,9 @@
     {
       "name": "Workbench Tab",
       "kind": "nav",
-      "description": "An overflow-safe task tab with a restrained active marker.",
-      "html": "<nav class=\"ds-tabs\"><button class=\"ds-tab ds-tab-active\">OVERVIEW</button><button class=\"ds-tab\">PROPOSAL</button></nav>",
-      "css": ".ds-tabs { display: flex; gap: 4px; overflow-x: auto; border-bottom: 1px solid #e5e7eb; font-family: Inter, system-ui, sans-serif; } .ds-tab { background: transparent; color: #6b7280; padding: 8px 12px; border: 0; border-bottom: 2px solid transparent; white-space: nowrap; font: 500 14px/20px Inter, system-ui, sans-serif; transition: color 200ms ease, border-color 200ms ease; } .ds-tab:hover { color: #374151; } .ds-tab:focus-visible { outline: 2px solid #6b7280; outline-offset: -2px; } .ds-tab-active { color: #111827; border-bottom-color: #111827; }"
+      "description": "An overflow-safe task tab with a restrained active marker and programmatic current-page state.",
+      "html": "<nav class=\"ds-tabs\" aria-label=\"Request sections\"><button type=\"button\" class=\"ds-tab\">OVERVIEW</button><button type=\"button\" class=\"ds-tab\" aria-current=\"page\">FINAL WRITEUP</button></nav>",
+      "css": ".ds-tabs { display: flex; gap: 4px; overflow-x: auto; border-bottom: 1px solid #e5e7eb; font-family: Inter, system-ui, sans-serif; } .ds-tab { background: transparent; color: #6b7280; padding: 8px 12px; border: 0; border-bottom: 2px solid transparent; white-space: nowrap; font: 500 14px/20px Inter, system-ui, sans-serif; transition: color 200ms ease, border-color 200ms ease; } .ds-tab:hover { color: #374151; } .ds-tab:focus-visible { outline: 2px solid #6b7280; outline-offset: -2px; } .ds-tab[aria-current=\"page\"] { color: #111827; border-bottom-color: #111827; }"
     },
     {
       "name": "Overlay Dialog",

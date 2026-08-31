@@ -11,12 +11,12 @@
  * (governed DOCX producer/read model), and Staff Deliberations (S466 merge of
  * the former Pre Site Visit Writeup + Site Visit tabs: durable Word producer,
  * guarded share hand-off, logistics, materials distribution, guarded reopen —
- * old tab keys alias in). Final Writeup remains the one placeholder. The
+ * old tab keys alias in), plus Final Writeup group-review handoff and Word launch. The
  * default landing is Overview. Tab + sub-tab selection is query-string driven
  * (?tab=reviewers&sub=track) for deep-links.
  */
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
@@ -33,11 +33,12 @@ import StatusTab from '../../shared/components/workbench/StatusTab';
 import AwardeeTab from '../../shared/components/workbench/AwardeeTab';
 import InitialAssessmentTab from '../../shared/components/workbench/InitialAssessmentTab';
 import StaffDeliberationsTab from '../../shared/components/workbench/StaffDeliberationsTab';
+import FinalWriteupTab from '../../shared/components/workbench/FinalWriteupTab';
 import { computeCanManage } from '../../shared/components/reviewers/reviewer-modes';
 
 // Implemented tabs: Overview, Proposal, Initial Assessment, Reviewers, Reviews,
 // Staff Deliberations (the merged site-visit writeup workspace, S466), Status,
-// and Awardee. Final Writeup remains the one placeholder in the lifecycle.
+// Final Writeup now supplies the governed group-review handoff and Word launch.
 const TABS = [
   { key: 'overview', label: 'Overview' },
   { key: 'proposal', label: 'Proposal' },
@@ -69,6 +70,14 @@ function WorkbenchRequest() {
 
   const [ctx, setCtx] = useState(null);
   const [error, setError] = useState(null);
+  const activeTabButtonRef = useRef(null);
+
+  useEffect(() => {
+    activeTabButtonRef.current?.scrollIntoView?.({
+      block: 'nearest',
+      inline: 'center',
+    });
+  }, [activeTab]);
 
   // Request context (header, PD for the canManage gate, title for the panel).
   // Resolved by GUID — which the route always has — so it loads on direct/
@@ -132,12 +141,14 @@ function WorkbenchRequest() {
 
       {/* Tab strip */}
       <div className="border-b border-gray-200 mb-6 overflow-x-auto">
-        <nav className="flex gap-1 min-w-max">
+        <nav className="flex gap-1 min-w-max" aria-label="Request sections">
           {TABS.map((t) => (
             <button
               key={t.key}
+              ref={activeTab === t.key ? activeTabButtonRef : null}
               type="button"
               onClick={() => selectTab(t.key)}
+              aria-current={activeTab === t.key ? 'page' : undefined}
               className={`px-3 py-2 text-sm font-medium border-b-2 whitespace-nowrap ${
                 activeTab === t.key
                   ? 'border-gray-900 text-gray-900'
@@ -185,6 +196,11 @@ function WorkbenchRequest() {
           requestId={typeof requestId === 'string' ? requestId : ''}
           requestNumber={ctx?.requestNumber || requestNumber || ''}
           isSuperuser={isSuperuser}
+        />
+      ) : activeTab === 'final-writeup' ? (
+        <FinalWriteupTab
+          key={typeof requestId === 'string' ? requestId : ''}
+          requestId={typeof requestId === 'string' ? requestId : ''}
         />
       ) : activeTab === 'status' ? (
         <StatusTab context={ctx} />

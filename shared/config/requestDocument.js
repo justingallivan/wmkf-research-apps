@@ -118,6 +118,12 @@ export const PRE_SITE_REOPEN_CONTRACT = Object.freeze({
   maximumReasonNoteLength: 2000,
 });
 
+export const FINAL_WRITEUP_CONTRACT = Object.freeze({
+  version: '1',
+  producer: 'request-workbench-final-writeup',
+  contentType: PRE_SITE_VISIT_CONTRACT.contentType,
+});
+
 export function requestDocumentLabel(map, value) {
   if (value === null || value === undefined || value === '') return null;
   const numeric = Number(value);

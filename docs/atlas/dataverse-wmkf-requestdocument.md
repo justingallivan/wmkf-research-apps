@@ -3,7 +3,7 @@ title: Dataverse wmkf_requestdocument
 domain: application-state
 kind: atlas
 status: active
-summary: Governed request-artifact registry; Initial Assessment controls are deployed, while the owner-approved same-item Final lineage remains planned.
+summary: Governed request-artifact registry; same-item Final lineage is built in source behind an unapplied Wave 22 readiness gate.
 canonical: false
 owner: product-engineering
 last_verified: 2026-08-30
@@ -11,10 +11,12 @@ related:
   - lib/dataverse/schema/wave16-request-document-registry/wmkf_requestdocument.json
   - lib/dataverse/schema/wave19-pre-site-draft/01_wmkf_requestdocument_pre_site_draft.json
   - lib/dataverse/schema/wave20-guarded-reopen/wmkf_requestdocument_guarded_reopen.json
+  - lib/dataverse/schema/wave22-final-writeup-transition/wmkf_requestdocument_final_writeup_transition.json
   - lib/dataverse/adapters/request-document.js
   - lib/services/initial-assessment/artifact-service.js
   - lib/services/initial-assessment/controls-service.js
   - lib/services/pre-site-visit/distribution-service.js
+  - lib/services/final-writeup/transition-service.js
   - lib/db/migrations/034_pre_site_distribution_attempts.sql
   - docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md
   - docs/PRE_SITE_VISIT_DATAVERSE_SCHEMA_DESIGN.md
@@ -27,6 +29,8 @@ related:
 **[VERIFIED 2026-07-29 via repository source]** Schema-as-code, adapter, producer,
 read API, Workbench panel, and cycle-wide pilot locator are implemented on the
 Initial Assessment pilot branch. The full Editor Dashboard remains planned.
+
+**[BUILT IN SOURCE 2026-08-30; NOT DEPLOYED OR LIVE-PROVED]** Wave 22 defines explicit group/leadership transition actor/time fields, and `FINAL_WRITEUP_SCHEMA_READY` conditionally extends the adapter projection. The Slice 1 service and route create/reclaim one deterministic Final row over the exact same SharePoint drive/item, then atomically move the source lifecycle to Final, ready the Final row in Review, store the explicit group-review actor/time, retain `wmkf_CurrentPreSiteVisit`, and set `wmkf_CurrentFinalWriteup`. The wave is unapplied and the flag is off; Production row counts and the no-Final-pointer observation below remain unchanged.
 
 **[VERIFIED 2026-07-30 via production Wave 16 apply and idempotent read-only
 rerun]** The entity, attributes, five relationships, generation-key alternate
@@ -232,9 +236,10 @@ Production Request Document row was created by this release smoke.
   successor `888982b6-0a9f-f111-b8dc-7ced8d3d15a6`; the prior Ready/Review row
   is preserved as Superseded.
 - `akoya_request.wmkf_CurrentFinalWriteup` is a live optional lookup for the
-  Final lineage row. The planned writer records the exact source Pre-Site
-  row/version/hash while reusing the same stable SharePoint drive/item identity;
-  no writer populates this lookup yet.
+  Final lineage row. **[BUILT IN SOURCE 2026-08-30; NOT DEPLOYED]** the Slice 1
+  writer records the exact source Pre-Site row/version/hash while reusing the
+  same stable SharePoint drive/item identity. No Production writer has populated
+  this lookup; Wave 22 and its readiness flag remain unapplied/off.
 - Site Visit has no current writeup pointer. The current Pre-Site Word item
   remains the workspace during that stage and SharePoint versions preserve PD
   observations.
@@ -424,6 +429,8 @@ preserved.
    service post-write reread required the exact version/hash/time milestone.
 
 No live command in this sequence is authorized merely by this page.
+
+Wave 22's pending sequence is read-only preflight, explicit owner-approved additive apply, exact readback, per-environment literal-on readiness, deployed preview, and a separately authorized controlled transition proof. No step in that sequence is authorized by the source implementation or this Atlas entry.
 
 Wave 20's Production sequence completed 2026-08-23: clean absent-only
 preflight, approved additive apply, exact typed readback, literal-on readiness
