@@ -445,6 +445,6 @@ related:
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
-| [FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md](FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md) | plan | active |  | Production-proved Final handoff; Wave 23 is exact/Active and its backend acknowledgement service is source-built. Route/UI/dashboard remain pending. | 2026-08-28 |
+| [FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md](FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md) | plan | active |  | Final handoff is Production-proved; acknowledgement route/UI are source-built; dashboard and focused-review foundation remain pending. | 2026-08-28 |
 | [WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md](WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md) | plan | active |  | Pre-Site/Site Visit lifecycle with Production-proved same-item Final lineage; acknowledgement and dashboard follow-ons remain pending. | 2026-08-17 |
 

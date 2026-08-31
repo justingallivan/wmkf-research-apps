@@ -34,7 +34,7 @@ sequence.
 
 | Order | Work | Current boundary | Completion decision |
 | --- | --- | --- | --- |
-| 1 | Final Writeup acknowledgement infrastructure and dashboard data foundation | **[IN PROGRESS 2026-08-31.]** Slice 1 is Production-proved. Wave 23 is live in Production at 11 exact / 0 absent / 0 divergent / 0 pending with an Active Final-document + reviewer alternate key and zero rows. The complete intended roster is owner-confirmed. The typed adapter, distinct readiness contract, mark/read service, and 26 focused tests are source-built but not deployed; no route/UI/live readiness value exists. Next is authenticated route/Final-tab wiring, then the Slice 3 dashboard/focused-review foundation. Word remains external to the Workbench. | By **2026-09-04**, acknowledgement persistence and the superuser-testable dashboard data path are in place with exact identity/version keys and focused tests. |
+| 1 | Final Writeup acknowledgement infrastructure and dashboard data foundation | **[IN PROGRESS 2026-08-31.]** Slice 1 is Production-proved. Wave 23 is live in Production at 11 exact / 0 absent / 0 divergent / 0 pending with an Active Final-document + reviewer alternate key and zero rows. The complete intended roster is owner-confirmed. The typed adapter, distinct readiness contract, mark/read service, authenticated route, and Final-tab consumer are source-built but not deployed; the Production readiness value remains unset. Next is the Slice 3 dashboard/focused-review data foundation. Word remains external to the Workbench. | By **2026-09-04**, acknowledgement persistence and the superuser-testable dashboard data path are in place with exact identity/version keys and focused tests. |
 | 2 | Final Writeup role rollout and dashboards | **[PLANNED.]** Ordinary PD review can precede the global persona model. PC backup, complete matrix visibility, and leadership-specific queues remain disabled until those roles are positively identified. | Verified PD/PC/CSO/President identity and SharePoint access; acknowledgement alternate key active; no role inference from names, titles, email, or program taxonomy. The external `wmkf_requestdocument` staff-role grant remains expected around 2026-09-10. |
 
 ## Audit follow-ups — verified open, not silently prioritized
@@ -119,7 +119,7 @@ sequence.
 ## Completed in this execution
 
 - Final Writeup acknowledgement Wave 23: **[PRODUCTION SCHEMA LIVE AND EXACT;
-  BACKEND SERVICE SOURCE-BUILT, NOT DEPLOYED 2026-08-31]** schema-as-code defines the
+  ROUTE/UI SOURCE-BUILT, NOT DEPLOYED 2026-08-31]** schema-as-code defines the
   organization-owned entity, six fields, two required lookups, and the
   Final-document + reviewer alternate key. The identity census proved exact,
   enabled Dataverse links for all 11 existing active sign-in profiles; the
@@ -131,8 +131,12 @@ sequence.
   now enforce exact relationship/cascade/type checks, terminal failed-key
   handling, and discriminating self-tests. The acknowledgement identity and
   schema gates are cleared. The typed adapter, separate literal-on readiness
-  interlock, mark/read service, and 26 focused tests now exist in source. No
-  route, UI, deployment, live flag, or Production runtime write exists.
+  interlock, mark/read service, authenticated route, and Final-tab consumer now
+  exist in source with focused service/route/component tests. Reviewer identity
+  remains session-derived; the responsible PD has no self-review action; other
+  users see positive initials plus unreviewed/reviewed/updated state; and a
+  tracking failure never blocks the separate Word action. No deployment, live
+  flag, or Production runtime write exists.
 
 - Final Writeup Slice 1 release: **[PRODUCTION-PROVED 2026-08-30 PT /
   2026-08-31 UTC]** four approved local commits reached public GitHub and

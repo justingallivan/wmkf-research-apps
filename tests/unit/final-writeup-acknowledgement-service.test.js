@@ -291,6 +291,7 @@ test('read state derives updated only from publication-version mismatch and keep
   }, dependencies)).resolves.toMatchObject({
     mayAcknowledge: true,
     personalState: 'reviewed',
+    publicationLastModified: '2026-08-31T12:00:00.000Z',
     reviewers: [{ reviewerId: REVIEWER_ID, initials: 'AR', state: 'reviewed' }],
   });
 

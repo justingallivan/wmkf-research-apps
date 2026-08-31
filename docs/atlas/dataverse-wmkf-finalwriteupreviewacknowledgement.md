@@ -18,11 +18,11 @@ legal audit trail.
 
 **[PRODUCTION SCHEMA LIVE 2026-08-31]** The hardened metadata readback reports
 11 exact / 0 absent / 0 divergent / 0 pending. The alternate-key index is
-Active. **[SOURCE-BUILT, NOT DEPLOYED 2026-08-31]** A typed adapter, distinct
-literal-on readiness interlock, and backend mark/read service now exist. Schema
-availability still does not mean the acknowledgement runtime is enabled: no
-API route, UI consumer, deployment, live readiness value, or Production write
-exists yet.
+Active. **[ROUTE/UI SOURCE-BUILT, NOT DEPLOYED 2026-08-31]** A typed adapter,
+distinct literal-on readiness interlock, backend mark/read service,
+authenticated API route, and Final-tab consumer now exist. Schema availability
+still does not mean the acknowledgement runtime is enabled: the Production
+readiness value remains unset and no Production acknowledgement write exists.
 
 ## Identity and Key
 
@@ -58,26 +58,32 @@ Unshare use `NoCascade`.
 
 ## Read Paths
 
-**[SOURCE-BUILT, NOT DEPLOYED 2026-08-31]**
+**[ROUTE/UI SOURCE-BUILT, NOT DEPLOYED 2026-08-31]**
 `lib/dataverse/adapters/final-writeup-review-acknowledgement.js` exposes named
 reads for one Final artifact and one Final-artifact + reviewer pair.
 `lib/services/final-writeup/acknowledgement-service.js` resolves the current
 Final pointer, validates the enabled session-derived `systemuser`, reads one
 stable-ID Graph publication observation, and derives `unreviewed`, `reviewed`,
 or `updated` from publication-version identity. eTag and last-modified remain
-diagnostic and do not override an equal publication version. There is no API or
-UI consumer yet.
+diagnostic and do not override an equal publication version.
+`pages/api/workbench/final-writeup/acknowledgement.js` supplies only the
+session-derived reviewer identity and exact request/current-Final fences.
+`shared/components/workbench/FinalWriteupTab.js` consumes the route during
+group review, shows positive reviewer initials and the non-PD caller's personal
+state, and treats expected schema-not-ready as an unavailable optional panel so
+the Word action remains independent.
 
 ## Write Paths
 
-**[SOURCE-BUILT, NOT DEPLOYED 2026-08-31]** The service accepts a trusted
-session-derived system-user ID from its future route boundary, never a reviewer
-in the write payload. It rejects responsible-PD self-acknowledgement, observes
+**[ROUTE/UI SOURCE-BUILT, NOT DEPLOYED 2026-08-31]** The service accepts a
+trusted session-derived system-user ID from the authenticated route boundary,
+never a reviewer in the write payload. It rejects responsible-PD self-acknowledgement, observes
 one current Graph publication version, creates the composite-key row or
 conditionally replaces it with `If-Match`, preserves the timestamp on an exact
 version no-op, and rereads after ambiguous failures so a committed write is not
-reported as failed. Writes request `noFallback` impersonation. No route invokes
-this path and the live flag remains unset.
+reported as failed. Writes request `noFallback` impersonation. The route invokes
+this path only after app access and exact-body validation; the live flag remains
+unset, so Production still refuses the operation before runtime Dataverse work.
 
 ## Cross-System Contract
 
@@ -99,7 +105,7 @@ this path and the live flag remains unset.
 - The apply created the entity, six custom attributes, two relationships, and
   alternate key. Readback progressed through metadata propagation and finished
   at 11 exact / 0 absent / 0 divergent / 0 pending with the key Active.
-- The typed adapter, distinct readiness contract, backend service, and 26
-  focused tests are source-built. Next work is the authenticated route/Final-tab
-  wiring and then the dashboard/focused-review consumers. No runtime should be
-  enabled merely because the table exists.
+- The typed adapter, distinct readiness contract, backend service,
+  authenticated route, Final-tab consumer, and focused service/route/component
+  tests are source-built. Next work is the dashboard/focused-review foundation.
+  No runtime should be enabled merely because the table exists.
