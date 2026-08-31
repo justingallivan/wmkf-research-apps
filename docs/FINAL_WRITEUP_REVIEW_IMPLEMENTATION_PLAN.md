@@ -46,16 +46,20 @@ privilege grant is pending: the owner selected service-principal writes with
 explicit actor tracking, a separate attribution effort that does not block the
 working acknowledgement role or this milestone.
 
-**[OWNER-DECIDED; SOURCE-BUILT + UNIT-TESTED 2026-08-31; NOT DEPLOYED; NO
-CONFIGURATION PUBLISHED]** Matrix assignment is program-specific rather than
-identical to the global acknowledgement-role roster. Anneli Stone and Saskia
-Pallais are Southern California staff and should not appear on Research
-requests. The source-built Admin editor stores separate broad Grant Program
-GUID → reviewer `systemuser` GUID audiences in `wmkf_appsystemsettings`, using
-the request's existing `wmkf_grantprogram` lookup. Missing configuration keeps
-the deployed role-backed matrix; after first publication, unconfigured request
-programs are called out explicitly and stale saved programs/reviewers fail
-closed. Names remain Dataverse-owned and resolve live.
+**[PRODUCTION-LIVE + SIGNED-IN READ/WRITE PROVED 2026-08-31]** Matrix
+assignment is program-specific rather than identical to the global
+acknowledgement-role roster. Commit `5573bca3` is live in Ready Production
+deployment `dpl_5DNuc2BV76RihwuWu8ZFYBgxBXE7`. The published Research audience
+contains nine current reviewer-role members and excludes owner-confirmed
+Southern California staff Anneli Stone and Saskia Pallais. Signed-in Admin
+publication/readback survived a full reload; the coordinator dashboard then
+rendered Request `1002788` under Research with exactly those nine reviewer
+columns and zero browser-console errors. Southern California remains explicitly
+unconfigured pending confirmation of its complete audience. The Admin editor
+stores separate broad Grant Program GUID → reviewer `systemuser` GUID audiences
+in `wmkf_appsystemsettings`, using the request's existing `wmkf_grantprogram`
+lookup. Unconfigured request programs are called out explicitly and stale saved
+programs/reviewers fail closed. Names remain Dataverse-owned and resolve live.
 
 **[PRODUCTION-LIVE + SIGNED-IN READ SMOKE PASSED 2026-08-31]** commit
 `52575761` and Ready deployment `dpl_Frc6fAonyFFYwiWyFJCzzE3UNune` ship the
@@ -554,13 +558,14 @@ were independently verified.
   Signed-in Production proof showed the exact 11-person roster and correct
   Request `1002788` cell/action states with zero browser-console errors.
   Ordinary/focused responses do not receive the matrix.
-- **Source-built + unit-tested; not deployed; no setting published:** the
-  superuser matrix can be configured independently for Research and Southern
-  California through Admin. The stored contract uses stable broad Grant Program
-  and reviewer GUIDs, resolves names live, keeps the deployed role-wide fallback
-  until first publication, and then surfaces unconfigured programs explicitly.
-  Anneli Stone and Saskia Pallais are owner-confirmed Southern California staff
-  and should not appear in the Research matrix.
+- **Production-live + signed-in read/write proved:** commit `5573bca3` and Ready
+  deployment `dpl_5DNuc2BV76RihwuWu8ZFYBgxBXE7` ship independent broad Grant
+  Program audiences. The published Research configuration contains nine current
+  reviewer-role members and excludes owner-confirmed Southern California staff
+  Anneli Stone and Saskia Pallais. Admin publish/readback survived reload, and
+  Request `1002788` rendered under Research with exactly those nine columns and
+  zero browser-console errors. Southern California remains explicitly
+  unconfigured pending its complete audience.
 - **Deliberately deferred:** persona-specific queues and non-superuser matrix
   access until exact team IDs and representative Word access are proved.
 

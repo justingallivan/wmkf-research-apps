@@ -889,11 +889,15 @@ silently extend its paths or names to writeup publications.
    The full neutral superuser matrix is Production-live in Ready deployment
    `dpl_Frc6fAonyFFYwiWyFJCzzE3UNune`; signed-in DOM proof showed the exact
    11-person roster and correct Request `1002788` states/actions with zero
-   browser-console errors. **[SOURCE-BUILT + UNIT-TESTED 2026-08-31; NOT
-   DEPLOYED; NO SETTING PUBLISHED]** Admin can configure separate broad Grant
-   Program audiences; Anneli Stone and Saskia Pallais are Southern California
-   staff and should not appear on Research requests. Production retains the
-   role-wide fallback until first publication. Personal lenses
+   browser-console errors. **[PRODUCTION-LIVE + SIGNED-IN READ/WRITE PROVED
+   2026-08-31]** Commit `5573bca3` is live in Ready deployment
+   `dpl_5DNuc2BV76RihwuWu8ZFYBgxBXE7`. Admin publication/readback survived a
+   full reload. The published Research audience contains nine current
+   reviewer-role members, excludes owner-confirmed Southern California staff
+   Anneli Stone and Saskia Pallais, and rendered Request `1002788` with exactly
+   those nine reviewer columns and zero browser-console errors. Southern
+   California remains explicitly unconfigured pending its complete audience.
+   Personal lenses
    remain disabled pending no-privilege-team provisioning and representative
    Word-access proof. Keep acknowledgement distinct from document lifecycle,
    external distribution, and the AkoyaGo publication projection.

@@ -66,15 +66,18 @@ Workbench redesign.
    other cells Not reviewed, both direct actions present, and zero browser-console
    errors. Prior local desktop and 390px browser QA also passed against Production
    read data. The matrix has no approval, compliance, deadline, count, or order meaning.
-3. **[SOURCE-BUILT + UNIT-TESTED 2026-08-31; NOT DEPLOYED; NO SETTING
-   PUBLISHED] Program-specific matrix audiences.** Role eligibility and matrix
-   assignment are now explicitly separate. Anneli Stone and Saskia Pallais are
-   Southern California staff and should not appear on Research requests. The
-   Admin editor supports independent Research and Southern California audiences
-   keyed by stable broad Grant Program and reviewer GUIDs. Publishes round-trip
-   the loaded Dataverse ETag and reject stale Admin drafts with `409`. Until the first
-   setting publication, Production retains the existing role-wide matrix; after
-   publication, unconfigured programs remain explicit and stale references fail
+3. **[PRODUCTION-LIVE + SIGNED-IN READ/WRITE PROVED 2026-08-31]
+   Program-specific matrix audiences.** Commit `5573bca3` is live in Ready
+   Production deployment `dpl_5DNuc2BV76RihwuWu8ZFYBgxBXE7`. Role eligibility
+   and matrix assignment are explicitly separate. The published Research
+   audience contains nine current reviewer-role members and excludes
+   owner-confirmed Southern California staff Anneli Stone and Saskia Pallais.
+   Signed-in Admin publication/readback survived a full reload; the coordinator
+   dashboard then rendered Request `1002788` under Research with exactly those
+   nine reviewer columns and zero browser-console errors. Southern California is
+   deliberately unconfigured pending confirmation of its complete audience.
+   Publishes round-trip the loaded Dataverse ETag and reject stale Admin drafts
+   with `409`; unconfigured programs remain explicit and stale references fail
    closed.
 4. **[ROLLOUT DISABLED] Staff/executive lenses.** The approved persona contract
    uses three no-privilege Dataverse teams (PD, PC, leadership), permits overlap,
@@ -122,7 +125,7 @@ Workbench redesign.
 | `docs/API_ROUTE_SECURITY_MATRIX.md` | Current route/auth/write contracts |
 | `docs/APPLICATION_STATE_ATLAS.md` | Current live state and ownership routing |
 | `docs/atlas/dataverse-wmkf-requestdocument.md` | Request Document schema/producer truth |
-| `lib/services/final-writeup/matrix-audience-service.js` | Source-built program-audience settings contract |
+| `lib/services/final-writeup/matrix-audience-service.js` | Production-live program-audience settings contract |
 
 ## Verification Receipt
 

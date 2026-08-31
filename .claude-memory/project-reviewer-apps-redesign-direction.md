@@ -279,15 +279,19 @@ planned. Current authority is
   complete acknowledgement row for Request `1002788`. Persona lenses remain
   disabled until the approved teams are provisioned and representative PC and
   leadership Word access is proved.
-  **[OWNER-DECIDED; SOURCE-BUILT + UNIT-TESTED 2026-08-31; NOT DEPLOYED; NO
-  SETTING PUBLISHED]** Role eligibility is not the same as per-program matrix
-  assignment. Anneli Stone and Saskia Pallais are Southern California staff and
-  should not appear on Research requests. The source-built Admin editor stores
-  separate broad Grant Program GUID → reviewer GUID audiences, resolves names
-  live, rejects stale Admin publishes through Dataverse ETag/`If-Match`, retains
-  the deployed role-wide fallback until first publication, and
-  thereafter makes unconfigured programs explicit while stale references fail
-  closed.
+  **[PRODUCTION-LIVE + SIGNED-IN READ/WRITE PROVED 2026-08-31]** Role
+  eligibility is not the same as per-program matrix assignment. Commit
+  `5573bca3` is live in Ready Production deployment
+  `dpl_5DNuc2BV76RihwuWu8ZFYBgxBXE7`. The published Research audience contains
+  nine current reviewer-role members and excludes owner-confirmed Southern
+  California staff Anneli Stone and Saskia Pallais. Signed-in Admin
+  publication/readback survived a full reload; Request `1002788` then rendered
+  under Research with exactly those nine reviewer columns and zero
+  browser-console errors. Southern California remains explicitly unconfigured
+  pending its complete audience. The Admin editor stores stable broad Grant
+  Program GUID → reviewer GUID audiences, resolves names live, rejects stale
+  publishes through Dataverse ETag/`If-Match`, and makes unconfigured programs
+  explicit while stale references fail closed.
   Initial Assessment production
   registry/pointer schema, governed prompt v1, and application are live and
   verified; Request `1002788` preserves mechanics-only historical evidence,

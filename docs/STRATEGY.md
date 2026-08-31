@@ -148,7 +148,8 @@ no row. The dedicated `WMKF Final Writeup Reviewer` role is now directly
 assigned and its six requested Global privileges are effective for all 11
 confirmed audience members. The colleague's post-role retry succeeded, appeared
 in review history, and independent Production readback proved exactly one
-complete acknowledgement row. Program-audience configuration and persona-specific work are next.
+complete acknowledgement row. Program-audience configuration is now
+Production-live; persona-specific work is next.
 Every edit/review action opens the canonical SharePoint Word document in its
 own browser window/tab (or desktop Word through Microsoft's supported option);
 the application will not embed or recreate Word editing.
@@ -166,12 +167,16 @@ confirmed 11-person audience. **[PRODUCTION-LIVE + SIGNED-IN READ SMOKE PASSED
 the complete matrix from that exact role roster. Signed-in Production DOM proof
 showed the exact 11-person roster and correct Request `1002788` states/actions
 with zero browser-console errors. It provides direct review/Word links and
-neutral Responsible PD / Not reviewed / Reviewed / Updated states. The
-source-built program-audience Admin editor stores stable broad Grant Program
-GUID → reviewer GUID configuration. Anneli Stone and Saskia Pallais are
-owner-confirmed Southern California staff and should not appear on Research
-requests. This extension is unit-tested but not deployed, and no setting has
-been published; Production therefore still uses the role-wide fallback. The approved
+neutral Responsible PD / Not reviewed / Reviewed / Updated states.
+**[PRODUCTION-LIVE + SIGNED-IN READ/WRITE PROVED 2026-08-31]** Commit
+`5573bca3` is live in Ready deployment `dpl_5DNuc2BV76RihwuWu8ZFYBgxBXE7`.
+The program-audience Admin editor stores stable broad Grant Program GUID →
+reviewer GUID configuration. The published Research audience contains nine
+current reviewer-role members and excludes owner-confirmed Southern California
+staff Anneli Stone and Saskia Pallais. Signed-in Admin publication/readback
+survived reload; Request `1002788` rendered under Research with exactly those
+nine columns and zero browser-console errors. Southern California remains
+explicitly unconfigured pending its complete audience. The approved
 persona mechanism is three no-privilege Dataverse teams with GUID-only,
 multi-valued membership: Allison Keller is President; Beth Pruitt is CSO and
 also a responsible PD on some requests. Team provisioning, representative

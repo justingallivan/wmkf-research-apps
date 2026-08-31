@@ -529,11 +529,14 @@ document inventory, and individual implementation plans do not establish priorit
   and complete acknowledgement row passed independent readback. The services derive
   ownership/actions server-side and cap and batch reads. Ordinary/focused and
   persona-specific responses do not infer PC/leadership personas or expose the
-  full matrix; the fresh-superuser index does. **Source-built + unit-tested
-  2026-08-31, not deployed, no setting published:** a superuser Admin editor now
-  supports independent Research and Southern California reviewer audiences
-  through stable Grant Program/reviewer GUID references, with role-wide fallback
-  before first publication and explicit unconfigured-program handling after it.
+  full matrix; the fresh-superuser index does. **Production-live + signed-in
+  read/write proved 2026-08-31:** commit `5573bca3` is live in Ready deployment
+  `dpl_5DNuc2BV76RihwuWu8ZFYBgxBXE7`. The published Research audience contains
+  nine current reviewer-role members and excludes owner-confirmed Southern
+  California staff Anneli Stone and Saskia Pallais. Admin publication/readback
+  survived reload; Request `1002788` rendered under Research with exactly those
+  nine columns and zero browser-console errors. Southern California remains
+  explicitly unconfigured pending its complete audience.
 - Calendar direction (owner-confirmed 2026-07-28): the first gate is a
   human-in-the-loop, end-to-end Initial Assessment pilot, originally targeted at
   2026-08-10, before proposals begin arriving around 2026-08-18. **The 2026-08-10
