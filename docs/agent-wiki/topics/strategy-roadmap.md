@@ -250,8 +250,9 @@ document inventory, and individual implementation plans do not establish priorit
   persisting a row. Commit `6659bba2` tracks the dedicated reviewer role; its
   approved Production apply and independent readback proved direct assignment
   and all six requested Global privileges effective for the full 11-person
-  audience. The colleague retry/readback, broader persona rollout, and complete
-  matrix remain open.
+  audience. The colleague's post-role retry succeeded, appeared in review
+  history, and produced the independently verified first complete row. Broader
+  persona rollout and the complete matrix remain open.
 - **Prior owner-directed release (S469, 2026-08-30):** durable Executor
   budgets are Production-deployed and owner-viewed in the safe no-revision/code-
   fallback state; first publication remains an explicit administrator action.
@@ -515,8 +516,8 @@ document inventory, and individual implementation plans do not establish priorit
   reviews, external Word access, and correct responsible-PD exclusion. The
   first eligible POST then failed on missing acknowledgement Create and left no
   partial row. The dedicated role is now assigned/effective for all 11 confirmed
-  audience members; the colleague reload/retry and exact first-row readback
-  remain open. The services derive
+  audience members; the post-role retry succeeded and its review-history state
+  and complete acknowledgement row passed independent readback. The services derive
   ownership/actions server-side, cap and batch reads, and do not infer
   PC/leadership personas or expose the full matrix.
 - Calendar direction (owner-confirmed 2026-07-28): the first gate is a

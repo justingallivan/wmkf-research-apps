@@ -3,8 +3,8 @@
 **Last verified:** 2026-08-31 via
 `scripts/preflight-final-writeup-review-acknowledgement-schema.mjs --target=prod`
 after the owner-approved Wave 23 Production apply.
-**Live row count:** 0, verified by an exact Production entity-set count on
-2026-08-31.
+**Live row count:** 1, verified by an exact Production entity-set count and
+complete-row readback on 2026-08-31.
 **Entity set:** `wmkf_finalwriteupreviewacknowledgements`
 **Schema spec:**
 `lib/dataverse/schema/wave23-final-writeup-review-acknowledgement/wmkf_finalwriteupreviewacknowledgement.json`
@@ -18,7 +18,7 @@ legal audit trail.
 
 **[PRODUCTION SCHEMA LIVE 2026-08-31]** The hardened metadata readback reports
 11 exact / 0 absent / 0 divergent / 0 pending. The alternate-key index is
-Active. **[PRODUCTION RUNTIME LIVE; FIRST-ROW RETRY OPEN 2026-08-31]** PR #140 /
+Active. **[PRODUCTION RUNTIME AND FIRST ACKNOWLEDGEMENT PROVED 2026-08-31]** PR #140 /
 merge `ce229778` shipped the typed adapter, distinct literal-on readiness
 interlock, backend mark/read service, authenticated routes, Final-tab consumer,
 and ordinary-staff dashboard. Production readiness is exact `on` in Ready
@@ -27,8 +27,10 @@ dashboard and Request `1002788` Final reads showed zero reviews, retained Word
 access, and correctly omitted responsible-PD self-review. An eligible colleague
 then reached the Production create boundary but received Dataverse `0x80040220`
 for missing `prvCreatewmkf_FinalWriteupReviewAcknowledgement`; the service reread
-and confirmed no partial row. The permission gap is remediated, but the colleague
-retry/readback has not happened and no Production acknowledgement row exists.
+and confirmed no partial row. After the permission gap was remediated, the
+colleague retry succeeded and appeared in review history. Independent readback
+proved exactly one complete row for Request `1002788`, an enabled reviewer, and
+all required stable file/version observation fields populated.
 
 ## Identity and Key
 
@@ -111,7 +113,7 @@ matrix is present.
 
 ## Write Paths
 
-**[PRODUCTION-LIVE; FIRST-ROW RETRY OPEN 2026-08-31]** The service accepts a
+**[PRODUCTION-PROVED 2026-08-31]** The service accepts a
 trusted session-derived system-user ID from the authenticated route boundary,
 never a reviewer in the write payload. It rejects responsible-PD self-acknowledgement, observes
 one current Graph publication version, creates the composite-key row or
@@ -120,9 +122,10 @@ version no-op, and rereads after ambiguous failures so a committed write is not
 reported as failed. Writes request `noFallback` impersonation. The route invokes
 this path only after app access and exact-body validation. The live flag is
 exact `on`. The first eligible non-PD POST reached Dataverse but lacked Create;
-the subsequent reread found no row. The dedicated role is now effective for all
-11 audience members; the colleague must reload and retry before the first-row
-proof can close.
+the subsequent reread found no row. The dedicated role then became effective
+for all 11 audience members, and the colleague retry created the exact row and
+returned the reviewed-history state. The stored acknowledgement time is
+`2026-08-31T19:05:31Z`.
 
 ## Cross-System Contract
 
@@ -162,9 +165,10 @@ proof can close.
   persisted no acknowledgement. The tracked dedicated role was then created,
   solution-bound, and assigned to all 11 audience members under explicit owner
   approval. Direct assignment and effective coverage of all six requested
-  Global privileges passed 11/11; the acknowledgement row count remained zero.
-  The colleague reload/retry and exact first-row readback remain. Do not bypass
-  session identity or create an unapproved Final merely to manufacture proof.
+  Global privileges passed 11/11. The colleague's post-role retry succeeded and
+  review history displayed the completed state; independent readback proved one
+  complete acknowledgement row for Request `1002788`. No session-identity bypass
+  or manufactured Final was used.
   Dedicated supporting-material data routes, the positively identified
-  PC/leadership persona lenses, and the complete coordinator matrix remain. No
-  runtime should be enabled merely because the table exists.
+  PC/leadership persona lenses, and the complete coordinator matrix remain;
+  their rollout still requires the separate persona/access proofs.

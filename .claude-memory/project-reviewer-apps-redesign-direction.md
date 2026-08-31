@@ -247,7 +247,7 @@ planned. Current authority is
   `1002788` created one current Ready/Review Final row while retaining the
   current Pre-Site pointer and exact SharePoint item/version/hash/size; explicit
   group-review actor/time was read back and no new file was created.
-  **[PRODUCTION-LIVE, FIRST-ROW RETRY OPEN 2026-08-31]** The ordinary-staff Final Writeups
+  **[PRODUCTION-PROVED, FIRST ACKNOWLEDGEMENT READ BACK 2026-08-31]** The ordinary-staff Final Writeups
   dashboard and focused-review foundation now provide a bounded cross-request
   queue, responsible-PD stewardship rows, reviewed history/freshness state,
   positive initials, and separate **Open review** / **Open in Word** actions.
@@ -261,8 +261,9 @@ planned. Current authority is
   reached Dataverse but failed on missing acknowledgement Create; the no-fallback
   reread confirmed no partial row. The tracked dedicated reviewer role is now
   directly assigned and its six requested Global privileges are effective for
-  all 11 confirmed audience members. The colleague reload/retry and exact
-  first-row readback remain open.
+  all 11 confirmed audience members. The colleague's post-role retry succeeded,
+  appeared in review history, and independent readback proved exactly one
+  complete acknowledgement row for Request `1002788`.
   Initial Assessment production
   registry/pointer schema, governed prompt v1, and application are live and
   verified; Request `1002788` preserves mechanics-only historical evidence,

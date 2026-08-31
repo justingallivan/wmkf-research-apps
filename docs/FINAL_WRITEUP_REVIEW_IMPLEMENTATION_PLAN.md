@@ -3,7 +3,7 @@ title: Final Writeup Review — Implementation Plan
 domain: workbench
 kind: plan
 status: active
-summary: "Final handoff and acknowledgement/dashboard runtime are Production-live; the 11-person permission role is effective; first-row retry remains open."
+summary: "Final handoff and acknowledgement/dashboard runtime are Production-live; the first cross-user acknowledgement is verified; persona/matrix work remains."
 canonical: false
 cataloged: 2026-08-28
 last_verified: 2026-08-31
@@ -115,15 +115,17 @@ An OAuth-authenticated, read-only Claude Fable review on 2026-08-28 independentl
   the acknowledgement entity, six custom fields, two required lookups, and the
   Final-document + reviewer alternate key. Hardened readback reports 11 exact /
   0 absent / 0 divergent / 0 pending; the key index is Active and the entity set
-  is `wmkf_finalwriteupreviewacknowledgements`. The live row count is zero.
-  **[ROUTE/UI PRODUCTION-LIVE; FIRST-ROW RETRY OPEN 2026-08-31]** A typed adapter,
+  is `wmkf_finalwriteupreviewacknowledgements`. The live row count is one after
+  the successful colleague proof below.
+  **[ROUTE/UI PRODUCTION-LIVE; FIRST ACKNOWLEDGEMENT PROVED 2026-08-31]** A typed adapter,
   separate literal-on readiness interlock, mark/read service, authenticated API
   route, and Final-tab consumer now exist with focused tests. The Production
   readiness value is exact `on`. Signed-in Request `1002788` reads passed with
   zero reviews and responsible-PD exclusion. An eligible colleague's first POST
   then failed at Dataverse with missing acknowledgement Create and left no row.
   The dedicated role is now assigned/effective for all 11 confirmed audience
-  members; the colleague retry and first-row readback remain open
+  members; the colleague's post-role retry succeeded, appeared in review
+  history, and independent readback proved one complete acknowledgement row
   (`docs/atlas/dataverse-wmkf-finalwriteupreviewacknowledgement.md`).
 - **[DASHBOARD/FOCUSED REVIEW PRODUCTION-LIVE 2026-08-31]** The
   ordinary-staff Slice 3 foundation now has a separate bounded dashboard
@@ -425,20 +427,21 @@ This slice proves the document-continuity contract end to end before adding coll
 
 ### Slice 2 — acknowledgement schema, service, route, and Final tab
 
-**[PRODUCTION-LIVE; FIRST-ROW RETRY OPEN 2026-08-31.]** Wave 23 schema source, hardened
+**[PRODUCTION-LIVE; FIRST ACKNOWLEDGEMENT PROVED 2026-08-31.]** Wave 23 schema source, hardened
 preflight, Production schema apply, typed adapter, separate readiness interlock,
 backend mark/read service, authenticated route, and Final-tab consumer are
 complete in source. Exact readback reports 11 exact / 0
 absent / 0 divergent / 0 pending, entity set
-`wmkf_finalwriteupreviewacknowledgements`, Active alternate key, and zero rows.
+`wmkf_finalwriteupreviewacknowledgements` and an Active alternate key.
 An OAuth-authenticated Claude Fable adversarial review's accepted classifier
 and proof-boundary findings are fixed. The owner confirmed the 11-person roster
 is the complete intended PD/PC/CSO/President audience. Production readiness is
 exact `on`; signed-in read and responsible-PD exclusion proof passed. An
 eligible colleague's first write reached Dataverse but failed on missing
 acknowledgement Create and left no row. The dedicated reviewer role is now
-assigned/effective for all 11 audience members; reload/retry and exact first-row
-readback remain.
+assigned/effective for all 11 audience members; the post-role retry succeeded,
+the UI showed the item in review history, and independent readback proved one
+complete row for Request `1002788`.
 
 - **Complete:** record owner attestation that the 11-person sign-in roster
   contains every intended PD, PC, CSO, and President; use `systemuser` as the
@@ -449,7 +452,7 @@ readback remain.
 - **Production-live:** add a distinct readiness gate whose
   literal-on rollout requires the alternate-key index to be Active, plus a
   typed adapter registered under the metadata-confirmed entity-set name.
-- **Production-live; first-row retry pending:** implement single-observation
+- **Production-proved:** implement single-observation
   current-version acknowledgement, responsible-PD rejection, enabled
   `systemuser` validation, same-version no-restamp, `If-Match` replacement,
   ambiguous-write reread, publication-version-based personal states, and
@@ -479,8 +482,9 @@ visual checks cover desktop and narrow widths. Production readiness is exact
 `on`; signed-in dashboard and focused Final reads passed on Request `1002788`.
 The original signed-in smoke wrote no acknowledgement because its user is the
 responsible PD. A later eligible colleague attempt exposed the missing role
-privilege without partial persistence; the remediated role is now effective and
-the colleague retry remains open.
+privilege without partial persistence; after remediation, the colleague retry
+succeeded and the resulting review-history state and complete Dataverse row
+were independently verified.
 
 - **Production-live; signed-in read-smoked:** Final Writeups dashboard for ordinary
   existing Workbench users and focused review page.
@@ -571,8 +575,8 @@ Run each gate and its self-test sequentially where applicable:
   separate Wave 23 runtime flag is exact `on` in Production. The signed-in read
   path and responsible-PD exclusion are proved. The dedicated reviewer role is
   assigned/effective for all 11 audience members; an eligible colleague's
-  pre-role failure left no partial row, and their post-role retry/readback is
-  the remaining first-write proof.
+  pre-role failure left no partial row, and their post-role retry/readback
+  proved the first exact cross-user acknowledgement.
 - **Async/stale state:** material in all pages; every load/write needs abort or monotonic request guards before success and failure state updates.
 - **Helper extraction:** do not reuse the guarded-reopen service as the Final service. Reuse only lower-level Graph/hash/adapter primitives because reopen and Final have different source eligibility, lifecycle effects, and retry semantics.
 - **Durable surface:** new acknowledgement entity requires schema-as-code, exact metadata/alternate-key verification, Atlas, service catalogue, tests, readiness flag, and applicable gates.
@@ -591,16 +595,16 @@ Run each gate and its self-test sequentially where applicable:
 
 ## Final recommendation
 
-Proceed with the colleague's bounded acknowledgement retry/readback proof of the
-Production-live Slices 2–3 foundation next. The 2026-09-04 same-item
+Proceed with the persona-specific access and complete neutral coordinator matrix
+on top of the Production-proved Slices 2–3 foundation next. The 2026-09-04 same-item
 handoff is already Production-proved; Wave 23 is exact and Active in Production,
 with the identity and schema prerequisites cleared. The acknowledgement
 adapter/service, authenticated route, Final-tab consumer, ordinary-staff
 dashboard data path, and focused-review surface are Production-live behind the
 exact `on` flag. Signed-in dashboard/Final reads and responsible-PD exclusion
 passed, and the dedicated six-privilege reviewer role is effective for all 11
-confirmed audience members. The remaining milestone work is one successful
-acknowledgement/readback after the colleague reloads. All edit/review actions open
+confirmed audience members. The first colleague acknowledgement succeeded,
+appeared in review history, and passed exact independent readback. All edit/review actions open
 the canonical Word document outside the Workbench. PC backup, broad matrix
 visibility, leadership-specific lenses, and general rollout follow only after
 the explicit persona/access contracts are verified. This sequence advances the

@@ -196,7 +196,7 @@ against launching metered review tools without explicit owner authorization.
      sequence after visible current/earlier-version review counts removed the
      color-only state.
 
-6. **Slices 2–3 runtime is enabled in Production; the first-row proof remains open.**
+6. **Slices 2–3 runtime is enabled in Production; the first cross-user acknowledgement is proved.**
    - PR #140 merged as `ce229778b05178bf4aabafe630e46de4843f5e81` after
      Jest, Claude review, Semgrep, Gitleaks, Trivy, and Vercel checks passed.
    - Preview deployment `dpl_9YMZvQFWLoRNrDzuKKugyj1DTkv2` and Production
@@ -210,12 +210,10 @@ against launching metered review tools without explicit owner authorization.
      Request `1002788` Final tab, confirmed the current Word action and zero
      recorded reviews, and produced no Production errors. Because Justin is
      the request's responsible PD and the only current Final belongs to him,
-     the UI correctly exposed no self-review action. No acknowledgement row
-     was written; the first cross-user acknowledgement still requires a
-     different signed-in staff member or a separately authorized eligible
-     Final.
+     the UI correctly exposed no self-review action. That initial smoke wrote
+     no acknowledgement; the later eligible-colleague proof is recorded below.
 
-7. **The Final Writeup acknowledgement role gap is closed; colleague retry remains.**
+7. **The Final Writeup acknowledgement role gap is closed and the first acknowledgement is proved.**
    - An eligible colleague opened Request `1002788`, edited the current Word
      file, and received `Final Writeup review tracking failed.` when selecting
      **Mark reviewed**. Production evidence isolated the failure to Dataverse
@@ -233,9 +231,12 @@ against launching metered review tools without explicit owner authorization.
    - Dataverse also attached nine standard App Opener baseline privileges when
      it created the role (SharePoint-data and plug-in/SDK-message reads/writes).
      The live role has 15 privileges total; none grants Delete, Assign, Share,
-     or Request Document write. The acknowledgement table still has zero rows.
-     The next step is for the colleague to reload and retry **Mark reviewed**,
-     followed by exact acknowledgement/readback verification.
+     or Request Document write.
+   - The colleague reloaded, selected **Mark reviewed**, and confirmed the item
+     appeared in review history. Independent Production readback then proved
+     exactly one acknowledgement row for Request `1002788`, an enabled reviewer,
+     and all required stable file/version observation fields populated. The
+     recorded acknowledgement time is `2026-08-31T19:05:31Z`.
 
 ## Next Items
 
@@ -251,11 +252,11 @@ against launching metered review tools without explicit owner authorization.
    focused-review page, and focused tests are Production-live behind the exact
    `on` readiness interlock. Signed-in dashboard and responsible-PD exclusion
    proof passed. The first eligible colleague attempt exposed a missing
-   Dataverse Create privilege without persisting a row. The dedicated Final
-   Writeup Reviewer role is now assigned to all 11 confirmed audience members
-   with all six required privileges effective. The bounded cross-user
-   acknowledgement/readback remains open only until the colleague reloads and
-   retries the action.
+   Dataverse Create privilege without persisting a row; after the dedicated
+   role reached all 11 audience members, the colleague retry succeeded and the
+   exact first acknowledgement/readback passed. The remaining milestone work is
+   persona-specific access, the complete coordinator matrix, and leadership
+   views rather than acknowledgement persistence.
    Editing stays in Word in a separate
    browser window/tab (or desktop Word when Microsoft permits); do not embed an
    editor in the Workbench.
@@ -275,20 +276,15 @@ against launching metered review tools without explicit owner authorization.
 
 ### Verified Open
 
-1. **Release and prove the bounded Final Writeup Slices 2–3 foundation.**
-   `docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md` is owner-approved for
-   staged implementation with named identity/persona prerequisites. Slice 1 is
-   Production-proved; Wave 23 is exact and Active in Production with zero rows.
-   The owner roster attestation is complete. The typed adapter, separate
+1. **Build the persona-specific Final Writeup views and complete matrix.**
+   The Slices 2–3 foundation is Production-proved: the typed adapter, separate
    readiness contract, acknowledgement persistence/service, authenticated
    routes, Final-tab consumption, bounded ordinary-staff dashboard, focused
-   review page, and focused tests are Production-live. The signed-in read path,
-   Word link, empty acknowledgement state, and responsible-PD exclusion passed
-   on Request `1002788`. An eligible non-PD attempt then proved the route reached
-   Dataverse but lacked acknowledgement Create; no row persisted. The dedicated
-   reviewer role is now assigned and effective for all 11 audience members.
-   Have the colleague reload and retry, then verify the first row/readback rather
-   than bypassing session identity or manufacturing another Final.
+   review page, and first exact cross-user acknowledgement/readback all passed
+   on Request `1002788`. The neutral reviewer role is effective for all 11
+   audience members. Remaining work is the positively identified PC/leadership
+   lenses, complete neutral coordinator matrix, and representative SharePoint
+   access proof; do not infer personas from names, titles, or program taxonomy.
 
 2. **Positive-path funding-history observation.**
    The zero-program-grant branch is Production-proved; the positive sentence is
@@ -420,7 +416,8 @@ harness, which was removed afterward. PR #140 / merge `ce229778` subsequently
 reached Ready Production deployment `dpl_P7xay61LHnxohad9FEtSniBAosuY`.
 Production readiness is exact `on`. The first eligible colleague POST reached
 Dataverse and failed before persistence on the now-remediated role privilege;
-the colleague retry and first successful row/readback remain open.
+the post-role retry then succeeded, appeared in review history, and independent
+readback proved the one complete acknowledgement row for Request `1002788`.
 
 Release verification completed before and after PR #138 merge:
 

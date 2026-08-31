@@ -142,13 +142,13 @@ the ordinary-staff dashboard/focused-review foundation is Production-deployed
 through PR #140 (`ce229778`) with bounded reads and external-Word actions. Its
 separate acknowledgement readiness value is exact `on` in Production. The
 signed-in dashboard/Final read path and responsible-PD exclusion passed on
-Request `1002788`; the next step is one bounded acknowledgement/readback by an
-eligible non-PD staff session. That colleague's first POST reached Dataverse but
+Request `1002788`. An eligible colleague's first POST reached Dataverse but
 failed on the previously missing acknowledgement Create privilege and persisted
 no row. The dedicated `WMKF Final Writeup Reviewer` role is now directly
 assigned and its six requested Global privileges are effective for all 11
-confirmed audience members; the immediate next step is the colleague's reload,
-retry, and exact first-row readback.
+confirmed audience members. The colleague's post-role retry succeeded, appeared
+in review history, and independent Production readback proved exactly one
+complete acknowledgement row. Persona-specific and complete-matrix work is next.
 Every edit/review action opens the canonical SharePoint Word document in its
 own browser window/tab (or desktop Word through Microsoft's supported option);
 the application will not embed or recreate Word editing.
