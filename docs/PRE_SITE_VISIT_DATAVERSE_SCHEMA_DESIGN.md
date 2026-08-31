@@ -186,15 +186,19 @@ Dataverse audit columns do not already provide:
 | `wmkf_reopenreasonnote` | Memo / 2,000 | Required bounded staff explanation. |
 
 Existing `wmkf_SourceDocument`, `wmkf_sourceversionid`, and
-`wmkf_sourcecontenthash` bind the exact preserved handoff. Standard
-`createdby`/`createdon`, written under the session's Dynamics impersonation,
-bind actor and time. The generation-key alternate key remains the uniqueness
-fence; the cycle ID alone is not treated as a new database key. No separate
-audit entity is needed for this bounded operation. Dataverse formatted lookup
-annotation `_createdby_value_formatted` supplies the actor display name.
-Actor/time attribution is projected only when the row carries a reopen reason,
-so later regenerated descendants may inherit the correction cycle without
-misidentifying their generator as the actor who authorized the reopen.
+`wmkf_sourcecontenthash` bind the exact preserved handoff. The generation-key
+alternate key remains the uniqueness fence; the cycle ID alone is not treated
+as a new database key.
+
+**[CORRECTED 2026-08-31.]** The original design expected session
+impersonation to make standard `createdby` the staff actor. The owner-run
+Request Document census instead found service-principal fallback on every row,
+including the guarded-reopen path. The current projection therefore exposes
+the application identity, not a reliable human reopen actor. Option B in
+`docs/REQUEST_DOCUMENT_EXPLICIT_ACTOR_PLAN.md` will add immutable explicit
+row-origin actor/time fields and make those fields authoritative for reopen
+history. Until that implementation is promoted, `createdby` is diagnostic only
+and must not be described as proof of the staff member who authorized reopen.
 
 Failed successor rows remain immutable attempt evidence but are excluded from
 the downstream blocker for a later client operation. The dialog mints one UUID;

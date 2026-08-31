@@ -318,7 +318,10 @@ against launching metered review tools without explicit owner authorization.
    `createdby`/`modifiedby` staff attribution. If not, Connor has no action;
    if so, obtain the exact consumer and requirement before reconsidering the
    owner-selected explicit-actor design. A 9:00 AM Pacific task reminder is
-   scheduled in this Codex thread.
+   scheduled in this Codex thread. The non-blocking implementation plan is now
+   `docs/REQUEST_DOCUMENT_EXPLICIT_ACTOR_PLAN.md`; it remains behind the
+   September 4 Final Writeup/dashboard deadline and authorizes no schema apply
+   or deployment.
 
 ### Parked
 
@@ -365,6 +368,7 @@ against launching metered review tools without explicit owner authorization.
 | File | Purpose |
 |------|---------|
 | `docs/CURRENT_WORK_QUEUE.md` | Canonical delivery priority and owner-deferred write proof |
+| `docs/REQUEST_DOCUMENT_EXPLICIT_ACTOR_PLAN.md` | Owner-selected Option B schema/writer/retry plan; planning complete, implementation deferred |
 | `shared/config/executorBudgets.js` | Budget bounds, descriptions, and reviewed outage fallback |
 | `lib/services/executor-budget-service.js` | Append-only read/publication contract |
 | `pages/api/admin/executor-budgets.js` | Superuser budget read/publication route |

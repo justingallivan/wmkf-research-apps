@@ -103,6 +103,7 @@ related:
 | [PRE_SITE_VISIT_DATAVERSE_SCHEMA_DESIGN.md](PRE_SITE_VISIT_DATAVERSE_SCHEMA_DESIGN.md) | spec | active |  | Production-live Wave 19, Site Visit handoff/correction, and Production-proved frozen distribution. | 2026-08-17 |
 | [REQUEST_DOCUMENT_ATTRIBUTION_ROLE_CLAUDE_REVIEW_PROMPT.md](REQUEST_DOCUMENT_ATTRIBUTION_ROLE_CLAUDE_REVIEW_PROMPT.md) | audit | historical |  | Executed read-only Claude review brief retained for provenance; the review returned NEEDS REWORK and the owner selected Option B. | 2026-08-31 |
 | [REQUEST_DOCUMENT_ATTRIBUTION_ROLE_PLAN.md](REQUEST_DOCUMENT_ATTRIBUTION_ROLE_PLAN.md) | plan | superseded |  | Rejected Option A role plan retained for review provenance; the owner selected service-principal writes with explicit actor tracking on 2026-08-31. | 2026-08-31 |
+| [REQUEST_DOCUMENT_EXPLICIT_ACTOR_PLAN.md](REQUEST_DOCUMENT_EXPLICIT_ACTOR_PLAN.md) | plan | active |  | Keep Request Document writes under the service principal while recording authenticated staff actors on the business events that need attribution. | 2026-08-31 |
 | [W4_ANOMALY_TRIAGE.md](W4_ANOMALY_TRIAGE.md) | history | active |  | Parity script: scripts/backfill-reviewer-suggestions-parity.js Rerun timestamp: 2026-05-12T22:02:01Z (this session). | 2026-07-02 |
 | [W4_RECONCILE_CONTRACT.md](W4_RECONCILE_CONTRACT.md) | source-of-truth | canonical | yes | Designed-on-paper before building (Codex S147 pre-W4 review Q1 BLOCKER: the identity contract must be unambiguous before code lands). | 2026-07-02 |
 

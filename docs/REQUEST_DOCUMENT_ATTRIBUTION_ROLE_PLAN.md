@@ -45,10 +45,12 @@ name the individual staff member. A "yes" requires the exact consumer and
 requirement before architecture is reconsidered; a "no" requires no Connor
 action.
 
-The replacement implementation plan is not yet written. It must trace every
-Request Document writer and consumer, define the actor/event persistence
-contract, derive identity only from authenticated server context, and preserve
-the existing availability and Final Writeup acknowledgement behavior.
+The replacement implementation plan is now tracked in
+`docs/REQUEST_DOCUMENT_EXPLICIT_ACTOR_PLAN.md`. It traces every Request
+Document writer, distinguishes business events from registry mechanics,
+derives identity only from authenticated server context, and preserves the
+existing availability and Final Writeup acknowledgement behavior. It is a
+plan, not an authorization to apply schema or deploy runtime changes.
 
 ## Historical rejected Option A design
 

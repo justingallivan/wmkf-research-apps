@@ -39,14 +39,19 @@ sequence.
 
 ## Audit follow-ups — verified open, not silently prioritized
 - **Request Document explicit actor tracking (Option B).**
-  **[OWNER-SELECTED 2026-08-31; PLAN NOT YET BUILT.]** Keep Request Document
+  **[OWNER-SELECTED 2026-08-31; PLAN BUILT, IMPLEMENTATION DEFERRED.]** Keep Request Document
   CRUD off staff roles and retain service-principal writes while designing
-  explicit, authenticated actor/time persistence. The 2026-08-27 Connor broad
+  explicit, authenticated actor/time persistence. The focused plan is
+  `docs/REQUEST_DOCUMENT_EXPLICIT_ACTOR_PLAN.md`: it proposes immutable
+  row-origin actor/time fields, an explicit Site Visit milestone actor, reuse
+  of the existing Final fields and distribution ledger, and no invented
+  historical backfill. The 2026-08-27 Connor broad
   staff-role brief was never sent and is withdrawn. A confirmation-only
   question is scheduled for Monday 2026-09-07 to identify any compliance,
   audit, report, view, flow, business rule, or plug-in that specifically
   depends on built-in `createdby`/`modifiedby`; absent such a consumer, Connor
-  has no action. Do not modify the existing Final Writeup Reviewer role.
+  has no action. Do not modify the existing Final Writeup Reviewer role. This
+  hardening remains behind the September 4 Final Writeup/dashboard deadline.
 - **Pre-J27 scale: Initial Assessment Production write proof.**
   **[OWNER-DEFERRED 2026-08-30.]** Restore and exact byte-copy Board snapshot
   controls are deployed and the signed-in Request `1003109` read surface passed.

@@ -312,8 +312,8 @@ The minimum reopen transaction is a preserve-and-succeed operation:
 
 The selected bounded representation is the successor Request Document row
 itself: `wmkf_ReopenCycleId`, `wmkf_ReopenReasonCode`, and
-`wmkf_ReopenReasonNote`, plus its existing source/version/hash lineage and
-standard created-by/created-on attribution. The client operation UUID is both
+`wmkf_ReopenReasonNote`, plus its existing source/version/hash lineage. The
+client operation UUID is both
 the durable correction-cycle identity and the exact-operation dedupe input;
 the existing generation-key alternate key remains the uniqueness fence. Only
 superusers may invoke the route or receive the reopen-attempt history or nested
@@ -582,10 +582,12 @@ non-superseded lifecycle.
    They are version-aware tracking, not document lifecycle or approval fields.
    The full coordinator matrix is a read model over those rows, with no required
    count, due date, compliance semantics, or enforced reviewer order.
-5. **Selected and source-built 2026-08-22; target provisioning/deployment
-   pending:** successor-row audit fields in Wave 20, client UUID dedupe/cycle
-   identity, existing source/version/hash lineage, standard actor/time, and a
-   superuser-only route.
+5. **Selected and Production-proved 2026-08-23; actor correction planned
+   2026-08-31:** successor-row audit fields in Wave 20, client UUID dedupe/cycle
+   identity, existing source/version/hash lineage, and a superuser-only route.
+   The standard `createdby` projection currently names the service principal
+   after fallback; explicit human actor/time is planned in
+   `docs/REQUEST_DOCUMENT_EXPLICIT_ACTOR_PLAN.md` and is not yet implemented.
 6. **Selected and Production-proved 2026-08-24 on Request `1002379`:** Postgres
    `pre_site_distribution_attempts` is the exact-preview and
    recovery ledger; retained file identities remain in SharePoint plus Request

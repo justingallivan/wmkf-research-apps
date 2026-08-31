@@ -171,9 +171,9 @@ Exact design and deployment boundary:
 **[PRODUCTION-PROVED 2026-08-23.]** Guarded reopen
 adds the Production-live Wave 20 fields `wmkf_ReopenCycleId` (String
 36), `wmkf_ReopenReasonCode` (String 50), and `wmkf_ReopenReasonNote` (Memo
-2000). The successor row itself is the append-only reopen event when combined
-with its existing source lookup/version/hash and standard created-by/created-on
-fields. Source service, superuser route, status/history projection, Site Visit
+2000). The successor row itself is the append-only correction event when
+combined with its existing source lookup/version/hash. Source service,
+superuser route, status/history projection, Site Visit
 dialog, exact-operation dedupe, post-upload recovery, ETag changeset, and
 correction-cycle generation salting are focused-test covered. The approved
 Production apply created exactly those three attributes; delayed typed-metadata
@@ -200,8 +200,16 @@ history, nested correction details, and actor attribution are returned only to
 superusers on GET, generation, and Site Visit handoff responses; a pending reason-bearing reopen
 attempt is omitted entirely for other roles. A Failed row remains available to
 its exact operation retry, but a later distinct operation records any resolvable
-retained copy as cleanup work. Actor/time is attributed only to reason-bearing
-reopen events, never to later generated descendants that inherit only the cycle.
+retained copy as cleanup work.
+
+**[CORRECTED 2026-08-31 via the owner-run Request Document attribution
+census.]** Standard `createdby` on the reason-bearing successor names the
+service principal after the impersonated write falls back; the current
+superuser-only projection therefore does not prove the human reopen actor.
+`docs/REQUEST_DOCUMENT_EXPLICIT_ACTOR_PLAN.md` proposes immutable explicit
+row-origin actor/time fields and replacement of that projection. Until it is
+implemented, source/reason/time remain durable but human actor attribution is
+not captured reliably.
 
 **[PRODUCTION-DEPLOYED 2026-08-23 via merge `76a93a41` / Ready deployment
 `dpl_A8naatyxM3vcXaG4vgt79GcL5TpR`; SOURCE/TEST VERIFIED; FULL DISTRIBUTION

@@ -139,6 +139,15 @@ does not duplicate every method signature.
 
 The high-leverage services for data-layer work — full source remains authoritative.
 
+**Request Document actor correction (2026-08-31):** services pass the
+session-derived Dynamics actor into Request Document writes, but the owner-run
+census proved those writes fall back and standard `createdby`/`modifiedby`
+name the service principal. References below to actor passthrough, redaction,
+or validation do not establish correct human attribution on the Request
+Document row. Final group-review fields, Final acknowledgement rows, and the
+Pre-Site distribution ledger are explicit exceptions. The remaining repair is
+planned—not implemented—in `docs/REQUEST_DOCUMENT_EXPLICIT_ACTOR_PLAN.md`.
+
 | Service | Postgres tables touched | Dataverse access | Notes |
 |---|---|---|---|
 | `database-service.js` | `search_cache`, `user_profiles`, `api_usage_log`, etc. — researcher/publication/suggestion methods gutted W5 (commit `0c58da4`) | none | central Postgres gateway for the surviving tables; the Wave 1 `user_preferences` branch was removed after the table dropped |
