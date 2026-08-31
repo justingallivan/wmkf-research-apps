@@ -3,7 +3,7 @@ title: Final Writeup Review — Implementation Plan
 domain: workbench
 kind: plan
 status: active
-summary: "Approved direction: same-item Final handoff, external Word editing, acknowledgements, coordinator matrix, and role dashboards; runtime not started."
+summary: "Same-item Final handoff and external Word editing; Slice 1 is source-built, Wave 22 is exact in Production, and runtime/dashboard work remains pending."
 canonical: false
 cataloged: 2026-08-28
 last_verified: 2026-08-30
@@ -21,8 +21,8 @@ related:
 > accepted findings of the independent Claude Fable review recorded in
 > `docs/audits/final-writeup-review-fable-review-2026-08-28.md`. Copied into the
 > repository verbatim at branch closeout so it survives the untracked Codex
-> session directory. **Not started**: no runtime, schema, route, or Atlas change
-> exists for it as of this commit. **Owner approval 2026-08-30:** proceed
+> session directory. **Original plan-authorship state:** no runtime, schema,
+> route, or Atlas change existed yet. **Owner approval 2026-08-30:** proceed
 > code-first after Slice 0 reconciliation, target a superuser-testable
 > infrastructure path by 2026-09-04, open Word in its own browser window/tab or
 > desktop Word when Microsoft permits, and include the full coordinator review
@@ -34,7 +34,7 @@ related:
 
 **Verdict: OWNER-APPROVED FOR STAGED IMPLEMENTATION WITH NAMED PREREQUISITES.**
 
-This plan translates the approved Final Writeup and group-review experience into the current Request Workbench architecture. Slice 0 is complete. **[BUILT IN SOURCE 2026-08-30; NOT DEPLOYED OR LIVE-PROVED]** Slice 1 now exists on the isolated `codex/final-writeup-slice1` branch. Wave 22 remains unapplied, `FINAL_WRITEUP_SCHEMA_READY` remains unset, and no Production mutation or probe has been authorized.
+This plan translates the approved Final Writeup and group-review experience into the current Request Workbench architecture. Slice 0 is complete. **[BUILT IN SOURCE 2026-08-30; NOT DEPLOYED OR RUNTIME-PROVED]** Slice 1 exists on the isolated `codex/final-writeup-slice1` branch. **[PRODUCTION SCHEMA VERIFIED 2026-08-30]** Wave 22 was owner-authorized, applied through the date-bounded operator acknowledgement, and read back as 4 exact / 0 absent / 0 divergent. `FINAL_WRITEUP_SCHEMA_READY` was not enabled, and the runtime branch was not deployed or exercised.
 
 The 2026-09-04 milestone means the underlying handoff, identity, acknowledgement,
 dashboard-data, and superuser test path are in place. It does not promise broad
@@ -46,7 +46,7 @@ The named prerequisites are deliberately attached to the slices that need them:
 
 1. **Resolved 2026-08-30:** the owner approved the expanded implementation
    surface and code-first delivery after durable reconciliation.
-2. **Resolved in source 2026-08-30; deployment pending:** Wave 22 defines explicit group-review and leadership-review actor/time fields. Dataverse `modifiedby` remains non-authoritative.
+2. **Resolved in Production schema 2026-08-30; runtime promotion pending:** Wave 22's explicit group-review and leadership-review actor/time fields are 4 exact / 0 divergent in Production. Dataverse `modifiedby` remains non-authoritative.
 3. Before Slice 2, verify with an owner-authorized read-only probe that every intended PD, PC, CSO, and President resolves to an enabled Dataverse `systemuser`. If any intended reviewer does not, settle the acknowledgement identity key before creating its entity.
 4. Before Slice 4, settle how the application positively identifies a Program Coordinator or leadership user. Current app access proves access to an application, and each Request identifies its responsible PD and assigned PC, but there is no verified Workbench persona contract for “any PC” or “leadership.” The implementation must not infer those roles from names, email addresses, job titles, or the changing program taxonomy.
 
@@ -90,7 +90,7 @@ An OAuth-authenticated, read-only Claude Fable review on 2026-08-28 independentl
 - **[SUPERSEDED BY SOURCE IMPLEMENTATION 2026-08-30; NOT DEPLOYED]** Final Writeup no longer falls through to the placeholder on the feature branch. `FinalWriteupTab` reads the readiness-gated status, offers the responsible-PD/superuser group-review transition, and opens Word separately after success.
 - **[BUILT IN SOURCE 2026-08-30; NOT DEPLOYED]** Staff Deliberations retains its fail-closed controls and now renders lifecycle `FINAL` as a read-only receipt pointing staff to the Final Writeup tab; other unknown/beyond states remain generic read-only failures.
 - **[VERIFIED]** The Request Document registry already defines the Final Writeup artifact type and the generic source-version, source-hash, milestone-version, milestone-hash, and milestone-time fields (`shared/config/requestDocument.js:10-58`; `lib/dataverse/adapters/request-document.js:12-68`).
-- **[VERIFIED PRODUCTION STATE; SOURCE IMPLEMENTATION NOT DEPLOYED]** `akoya_request.wmkf_CurrentFinalWriteup` is live and still has no deployed writer. Slice 1 now includes the readiness-gated writer on the feature branch, but Wave 22 is unapplied and `FINAL_WRITEUP_SCHEMA_READY` remains off (`docs/atlas/dataverse-wmkf-requestdocument.md:221-223`).
+- **[VERIFIED PRODUCTION STATE; SOURCE IMPLEMENTATION NOT DEPLOYED]** `akoya_request.wmkf_CurrentFinalWriteup` is live and still has no deployed writer. Slice 1 includes the readiness-gated writer on the feature branch, and Wave 22 is exact in Production; `FINAL_WRITEUP_SCHEMA_READY` was not enabled by the schema apply (`docs/atlas/dataverse-wmkf-requestdocument.md`).
 - **[VERIFIED]** The registry’s durable file identity is the stable Graph drive/item identity, and its only alternate key is the generation key. The schema does not require a different SharePoint item for each Request Document row (`lib/dataverse/schema/wave16-request-document-registry/wmkf_requestdocument.json:136-160`, `315-330`).
 - **[VERIFIED]** The current Graph metadata helper returns stable identity, URL, eTag, publication version, and last-modified time, but not the modifying user (`lib/services/graph-service.js:400-442`).
 - **[VERIFIED]** A Request already exposes the lead PD and assigned Program Coordinator as separate system-user lookups (`docs/atlas/dataverse-akoya-request.md:38-47`).
@@ -336,11 +336,19 @@ Until that exists:
 
 ### Slice 0 — reconcile the durable plan
 
-Before runtime code, run `/sweep` and update every live restatement of the old “copy to a new editable file” model, including the lifecycle plan, Request Document Atlas, Pre-Site schema design, near-term execution plan, strategy wiki, project memory, and source headers. Replace “Create Final Writeup” with the same-item Final-lineage handoff and **Ready for group review** action. Record the staged persona prerequisite, explicit transition attribution, external-Word-only editing, the full coordinator matrix, the 2026-09-04 superuser-testable infrastructure milestone, continued board-package deferral, and first-release no-backward-stage decision. Run `check:doc-currency`, `check:fact-consistency`, and `check:memory-drift` before calling reconciliation complete.
+**[COMPLETE 2026-08-30.]** `/sweep` reconciled the live restatements of the old
+“copy to a new editable file” model across the lifecycle plan, Request Document
+Atlas, Pre-Site schema design, near-term execution plan, strategy wiki, project
+memory, and source headers. The durable contract now records the same-item Final
+lineage, **Ready for group review**, staged persona prerequisite, explicit
+transition attribution, external-Word-only editing, full coordinator matrix,
+2026-09-04 superuser-testable infrastructure milestone, continued board-package
+deferral, and first-release no-backward-stage decision. The required documentation
+and memory gates passed before Slice 1 implementation began.
 
 ### Slice 1 — Final handoff and responsible-PD tab
 
-**[BUILT IN SOURCE 2026-08-30; NOT DEPLOYED OR LIVE-PROVED.]** The branch includes the Wave 22 spec/readiness guard/preflight, conditional Request Document projection, deterministic same-item claim/activation service, request-scoped GET/POST route, Final tab, Staff Deliberations receipt, and focused tests. Remaining before promotion: full gates, rendered desktop/mobile inspection, schema preflight/apply/readback under separate explicit authorization, environment flag, controlled non-Production or owner-approved rehearsal, and deliberate merge.
+**[BUILT IN SOURCE 2026-08-30; WAVE 22 PRODUCTION-APPLIED; RUNTIME NOT DEPLOYED OR LIVE-PROVED.]** The branch includes the Wave 22 spec/readiness guard/preflight, conditional Request Document projection, deterministic same-item claim/activation service, request-scoped GET/POST route, Final tab, Staff Deliberations receipt, and focused tests. Full gates, rendered desktop/mobile inspection, and the owner-authorized Production schema preflight/apply/exact readback are complete. Remaining before runtime proof: deliberate branch promotion, per-environment literal-on readiness, and a separately authorized controlled transition rehearsal.
 
 - Add the Final contract constants and request/current-Final read model.
 - Add and readiness-gate explicit group-review transition actor/time fields.

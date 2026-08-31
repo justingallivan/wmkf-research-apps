@@ -91,10 +91,12 @@ against launching metered review tools without explicit owner authorization.
 ### Current Owner-Selected Delivery
 
 1. **Final Writeup infrastructure by 2026-09-04.**
-   The owner approved the reviewed design and expanded file surface. Reconcile
-   the obsolete new-file Final model first, then implement a superuser-testable
-   same-item handoff, explicit transition actor/time, acknowledgement storage,
-   and matrix-ready dashboard data. Editing stays in Word in a separate
+   Slice 0 reconciliation is complete. Slice 1 is source-built on
+   `codex/final-writeup-slice1`, and the owner-authorized Production Wave 22
+   apply/readback is 4 exact / 0 absent / 0 divergent. Runtime promotion,
+   literal-on readiness, and a controlled superuser transition proof remain
+   separately gated; acknowledgement storage and matrix-ready dashboard data
+   remain later slices. Editing stays in Word in a separate
    browser window/tab (or desktop Word when Microsoft permits); do not embed an
    editor in the Workbench.
 2. **Audience and matrix.**
@@ -114,8 +116,10 @@ against launching metered review tools without explicit owner authorization.
 ### Verified Open
 
 1. **Execute the Final Writeup plan in bounded slices.**
-   `docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md` is now owner-approved for
-   staged implementation with named identity/persona prerequisites.
+   `docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md` is owner-approved for
+   staged implementation with named identity/persona prerequisites. Slice 1 is
+   source-built and its additive Production schema is exact; next is deliberate
+   runtime promotion/readiness and a separately authorized controlled proof.
 
 2. **Positive-path funding-history observation.**
    The zero-program-grant branch is Production-proved; the positive sentence is

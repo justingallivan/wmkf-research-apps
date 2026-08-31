@@ -3,7 +3,7 @@ title: Dataverse wmkf_requestdocument
 domain: application-state
 kind: atlas
 status: active
-summary: Governed request-artifact registry; same-item Final lineage is built in source behind an unapplied Wave 22 readiness gate.
+summary: Governed request-artifact registry; same-item Final lineage is built in source, Wave 22 is exact in Production, and runtime remains disabled pending promotion/readiness.
 canonical: false
 owner: product-engineering
 last_verified: 2026-08-30
@@ -30,7 +30,7 @@ related:
 read API, Workbench panel, and cycle-wide pilot locator are implemented on the
 Initial Assessment pilot branch. The full Editor Dashboard remains planned.
 
-**[BUILT IN SOURCE 2026-08-30; NOT DEPLOYED OR LIVE-PROVED]** Wave 22 defines explicit group/leadership transition actor/time fields, and `FINAL_WRITEUP_SCHEMA_READY` conditionally extends the adapter projection. The Slice 1 service and route create/reclaim one deterministic Final row over the exact same SharePoint drive/item, then atomically move the source lifecycle to Final, ready the Final row in Review, store the explicit group-review actor/time, retain `wmkf_CurrentPreSiteVisit`, and set `wmkf_CurrentFinalWriteup`. The wave is unapplied and the flag is off; Production row counts and the no-Final-pointer observation below remain unchanged.
+**[BUILT IN SOURCE 2026-08-30; RUNTIME NOT DEPLOYED OR LIVE-PROVED]** Wave 22 defines explicit group/leadership transition actor/time fields, and `FINAL_WRITEUP_SCHEMA_READY` conditionally extends the adapter projection. The Slice 1 service and route create/reclaim one deterministic Final row over the exact same SharePoint drive/item, then atomically move the source lifecycle to Final, ready the Final row in Review, store the explicit group-review actor/time, retain `wmkf_CurrentPreSiteVisit`, and set `wmkf_CurrentFinalWriteup`. **[PRODUCTION SCHEMA VERIFIED 2026-08-30]** The owner-authorized apply created the two DateTime fields and two `systemuser` relationships; propagation-aware readback reported 4 exact / 0 absent / 0 divergent. The readiness flag was not enabled, and no Final transition or Request Document row write ran; Production row counts and the no-Final-pointer observation below remain unchanged.
 
 **[VERIFIED 2026-07-30 via production Wave 16 apply and idempotent read-only
 rerun]** The entity, attributes, five relationships, generation-key alternate
@@ -239,7 +239,8 @@ Production Request Document row was created by this release smoke.
   Final lineage row. **[BUILT IN SOURCE 2026-08-30; NOT DEPLOYED]** the Slice 1
   writer records the exact source Pre-Site row/version/hash while reusing the
   same stable SharePoint drive/item identity. No Production writer has populated
-  this lookup; Wave 22 and its readiness flag remain unapplied/off.
+  this lookup; Wave 22 is exact in Production, while runtime deployment and its
+  literal-on readiness flag remain pending/off.
 - Site Visit has no current writeup pointer. The current Pre-Site Word item
   remains the workspace during that stage and SharePoint versions preserve PD
   observations.
@@ -430,7 +431,7 @@ preserved.
 
 No live command in this sequence is authorized merely by this page.
 
-Wave 22's pending sequence is read-only preflight, explicit owner-approved additive apply, exact readback, per-environment literal-on readiness, deployed preview, and a separately authorized controlled transition proof. No step in that sequence is authorized by the source implementation or this Atlas entry.
+Wave 22's read-only preflight, explicit owner-approved additive apply, and exact Production readback completed 2026-08-30. The remaining sequence is per-environment literal-on readiness, deliberate runtime promotion, and a separately authorized controlled transition proof. No remaining step is authorized merely by the source implementation or this Atlas entry.
 
 Wave 20's Production sequence completed 2026-08-23: clean absent-only
 preflight, approved additive apply, exact typed readback, literal-on readiness

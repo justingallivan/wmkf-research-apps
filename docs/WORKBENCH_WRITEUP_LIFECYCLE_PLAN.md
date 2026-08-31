@@ -3,7 +3,7 @@ title: Workbench Writeup Lifecycle Plan
 domain: workbench
 kind: plan
 status: active
-summary: "Cross-tab design for the Pre-Site Word workspace, Site Visit handoff and correction, external distribution, dossier, and Final Writeup lineage."
+summary: "Pre-Site/Site Visit lifecycle and source-built same-item Final lineage; Wave 22 is exact in Production and runtime promotion remains pending."
 canonical: false
 cataloged: 2026-08-17
 last_verified: 2026-08-30
@@ -34,7 +34,7 @@ plan describe the pre-merge UI accurately as history.
 **[OWNER DECISION 2026-08-17; PRE-SITE WRITER PRODUCTION-PROVED; SITE VISIT
 HANDOFF PRODUCTION-PROVED 2026-08-21; GUARDED REOPEN PRODUCTION-PROVED
 2026-08-23; SITE VISIT LOGISTICS/CALENDAR PRODUCTION-PROVED 2026-08-25; FINAL
-PLANNED.]** The three Workbench
+SOURCE-BUILT, WAVE 22 PRODUCTION-VERIFIED, RUNTIME NOT DEPLOYED.]** The three Workbench
 tabs (as originally built; see the merge note above) form one document
 lifecycle, not three independent data-entry systems:
 
@@ -54,9 +54,14 @@ There is no separate Site Visit Writeup, no Dataverse staff-observations text
 field in this design, and no attempt to synchronize arbitrary staff edits from
 Word back into the eight generated Dataverse narrative fields.
 
-Final remains a placeholder. **[OWNER-APPROVED FOR STAGED IMPLEMENTATION
-2026-08-30; RUNTIME NOT STARTED.]** The underlying handoff and dashboard data
-path target superuser testing by 2026-09-04. Word editing stays outside the
+**[BUILT IN SOURCE 2026-08-30; WAVE 22 PRODUCTION-VERIFIED; RUNTIME NOT
+DEPLOYED OR LIVE-PROVED.]** Final remains a placeholder only in the deployed
+Production UI. The feature branch implements the same-item group-review handoff
+and separate-Word Final tab; Production metadata readback is 4 exact / 0 absent /
+0 divergent. `FINAL_WRITEUP_SCHEMA_READY` remains off, no Final transition or
+Request Document row write ran, and acknowledgement/dashboard data remain later
+slices. The underlying handoff and dashboard data path target superuser testing
+by 2026-09-04. Word editing stays outside the
 Workbench in a separate browser window/tab or desktop Word when Microsoft
 permits. **[DEPLOYED TO PRODUCTION 2026-08-17]**
 the Site Visit tab and authenticated transition route implement the guarded
@@ -103,7 +108,7 @@ Evidence: `docs/PRE_SITE_VISIT_GENERATION_RESILIENCE_PLAN.md` §Status.
 
 | Claim | Evidence | Status |
 |---|---|---|
-| The Workbench exposes Pre-Site, Site Visit, and Final tabs; Pre-Site generation, the Site Visit handoff, clearer handoff modal, and promoted-state receipt hardening are Production-deployed, while Final remains a placeholder | Workbench source; Ready deployments `dpl_85CjVsicns1rA6VxJzsJdkXigoTw`, `dpl_EdePQkYdFz7amhStsWaAX1uk6qWm`, and `dpl_FkWu55fyBqSEo8q4DBcdcA3xvigi`; focused service/route/component tests; signed-in Request `1002379` Draft→Review handoff and post-release receipt→Site Visit navigation with same-item status/readback on 2026-08-21 | PRODUCTION-PROVED |
+| The deployed Workbench exposes Staff Deliberations and a placeholder Final tab; the feature branch replaces that placeholder with the readiness-gated same-item group-review handoff and separate-Word Final workspace | Production Workbench deployment evidence; Slice 1 source, focused tests, rendered desktop/mobile inspection; Wave 22 Production preflight/apply/readback at 4 exact / 0 absent / 0 divergent on 2026-08-30 | MIXED: CURRENT PRODUCTION UI + SOURCE-BUILT FINAL |
 | `wmkf_requestdocument` already has artifact types for Pre Site Visit, Final Writeup, Applicant Slides, Other Applicant Materials, Recording, Transcript, and Transcript Summary | Wave 16 tracked schema plus read-only Production metadata inventory | VERIFIED |
 | The registry already carries request ownership, stable Graph identity, lifecycle, exact source version/hash, prompt/run/template lineage, and retry fields | Request Document adapter, schema, and Atlas | VERIFIED |
 | Request `1002379` had one current Ready/Review Pre-Site workspace after the controlled handoff | Signed-in Production transition plus fresh authenticated same-item status readback on 2026-08-21; superseded by the approved 2026-08-23 guarded reopen | VERIFIED HISTORICAL STATE |

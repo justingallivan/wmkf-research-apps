@@ -242,9 +242,13 @@ document inventory, and individual implementation plans do not establish priorit
   Request `1003109` passed the artifact/control/version-history read smoke.
   Restore and first-snapshot writes remain unexercised and deferred to an
   explicitly authorized pre-J27-scale checkpoint. **The next owner-selected
-  slice is Final Writeup infrastructure:** target a superuser-testable same-item
-  handoff, acknowledgement store, and matrix-ready dashboard path by 2026-09-04;
-  broad role rollout remains persona/access-gated.
+  slice is Final Writeup infrastructure:** Slice 1's same-item group-review
+  handoff is source-built on `codex/final-writeup-slice1`, and its owner-approved
+  Production Wave 22 apply/readback is 4 exact / 0 absent / 0 divergent.
+  Runtime promotion, literal-on readiness, and a controlled transition proof
+  remain separately gated; acknowledgement and matrix-ready dashboard storage
+  are later slices toward the 2026-09-04 superuser-testable milestone. Broad
+  role rollout remains persona/access-gated.
 - **Staff Deliberations tab (S466, 2026-08-28, production):** the Pre Site
   Visit Writeup + Site Visit tabs are merged into one stage-aware workspace
   (`shared/components/workbench/StaffDeliberationsTab.js`, rail

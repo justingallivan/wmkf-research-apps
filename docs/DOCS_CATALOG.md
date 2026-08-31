@@ -445,6 +445,6 @@ related:
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
-| [FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md](FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md) | plan | active |  | Approved direction: same-item Final handoff, external Word editing, acknowledgements, coordinator matrix, and role dashboards; runtime not started. | 2026-08-28 |
-| [WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md](WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md) | plan | active |  | Cross-tab design for the Pre-Site Word workspace, Site Visit handoff and correction, external distribution, dossier, and Final Writeup lineage. | 2026-08-17 |
+| [FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md](FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md) | plan | active |  | Same-item Final handoff and external Word editing; Slice 1 is source-built, Wave 22 is exact in Production, and runtime/dashboard work remains pending. | 2026-08-28 |
+| [WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md](WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md) | plan | active |  | Pre-Site/Site Visit lifecycle and source-built same-item Final lineage; Wave 22 is exact in Production and runtime promotion remains pending. | 2026-08-17 |
 
