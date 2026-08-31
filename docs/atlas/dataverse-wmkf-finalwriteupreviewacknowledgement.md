@@ -60,7 +60,8 @@ Unshare use `NoCascade`.
 
 **[ROUTE/UI SOURCE-BUILT, NOT DEPLOYED 2026-08-31]**
 `lib/dataverse/adapters/final-writeup-review-acknowledgement.js` exposes named
-reads for one Final artifact and one Final-artifact + reviewer pair.
+reads for one Final artifact, one Final-artifact + reviewer pair, and a bounded
+batch of at most 25 server-derived Final identities.
 `lib/services/final-writeup/acknowledgement-service.js` resolves the current
 Final pointer, validates the enabled session-derived `systemuser`, reads one
 stable-ID Graph publication observation, and derives `unreviewed`, `reviewed`,
@@ -72,6 +73,15 @@ session-derived reviewer identity and exact request/current-Final fences.
 group review, shows positive reviewer initials and the non-PD caller's personal
 state, and treats expected schema-not-ready as an unavailable optional panel so
 the Word action remains independent.
+
+`lib/services/final-writeup/dashboard-service.js` and
+`pages/api/workbench/final-writeups.js` are also source-built. They batch-read
+acknowledgements for at most 100 requests with current-Final pointers, derive
+ordinary staff open/history/stewardship queues plus an optional focused row,
+and keep a reviewed row in history after a later Word edit while labeling its
+freshness Updated. The route accepts only an optional Request GUID and derives
+the reviewer from the session. No persona inference or complete coordinator
+matrix is present.
 
 ## Write Paths
 
@@ -105,7 +115,10 @@ unset, so Production still refuses the operation before runtime Dataverse work.
 - The apply created the entity, six custom attributes, two relationships, and
   alternate key. Readback progressed through metadata propagation and finished
   at 11 exact / 0 absent / 0 divergent / 0 pending with the key Active.
-- The typed adapter, distinct readiness contract, backend service,
-  authenticated route, Final-tab consumer, and focused service/route/component
-  tests are source-built. Next work is the dashboard/focused-review foundation.
-  No runtime should be enabled merely because the table exists.
+- The typed adapter, distinct readiness contract, backend mark/read service,
+  acknowledgement route, Final-tab consumer, bounded dashboard projection,
+  dashboard route, and ordinary staff dashboard/focused-review pages are
+  source-built with focused adapter/service/route/component tests. Dedicated
+  supporting-material data routes, the positively identified PC/leadership
+  persona lenses, and the complete coordinator matrix remain. No runtime should
+  be enabled merely because the table exists.

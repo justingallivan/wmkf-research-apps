@@ -240,9 +240,11 @@ document inventory, and individual implementation plans do not establish priorit
   retained its current Pre-Site pointer, moved that row to lifecycle Final,
   created one current Ready/Review Final row, recorded Justin Gallivan at the
   transition time, and retained the exact same SharePoint item/version/hash/
-  size. File cardinality did not change. The next owner-selected slice is
-  version-aware acknowledgements and the matrix-ready dashboard data
-  foundation; broad role rollout remains persona/access-gated.
+  size. File cardinality did not change. Version-aware acknowledgements and the
+  bounded ordinary-staff dashboard/focused-review foundation are now
+  source-built but not deployed; the acknowledgement readiness value remains
+  unset. Deliberate release/runtime enablement and a bounded superuser test are
+  next. Broad role rollout and the complete matrix remain persona/access-gated.
 - **Prior owner-directed release (S469, 2026-08-30):** durable Executor
   budgets are Production-deployed and owner-viewed in the safe no-revision/code-
   fallback state; first publication remains an explicit administrator action.
@@ -500,6 +502,10 @@ document inventory, and individual implementation plans do not establish priorit
   second editor. Acknowledgements key to Final artifact + observed publication
   version. The full coordinator matrix is required, with neutral blank,
   Reviewed, and Updated since review states and no compliance semantics.
+  **Source status 2026-08-31:** the ordinary-staff queue and focused review
+  foundation are built behind the unset acknowledgement-readiness gate. They
+  derive ownership/actions server-side, cap and batch reads, and do not infer
+  PC/leadership personas or expose the full matrix.
 - Calendar direction (owner-confirmed 2026-07-28): the first gate is a
   human-in-the-loop, end-to-end Initial Assessment pilot, originally targeted at
   2026-08-10, before proposals begin arriving around 2026-08-18. **The 2026-08-10

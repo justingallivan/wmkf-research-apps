@@ -3,6 +3,7 @@ import {
   ACKNOWLEDGEMENT_SELECT_FIELDS,
   create,
   ENTITY_SET_NAME,
+  findByFinalDocuments,
   findByFinalDocument,
   findByFinalDocumentAndReviewer,
   update,
@@ -52,6 +53,17 @@ test('reads at most two rows for the composite alternate-key identity', async ()
     expect.objectContaining({
       filter: `_wmkf_finaldocument_value eq ${FINAL_ID} and _wmkf_reviewer_value eq ${REVIEWER_ID}`,
       top: 2,
+    }),
+  );
+});
+
+test('batch-reads acknowledgements for server-derived Final identities', async () => {
+  await findByFinalDocuments([FINAL_ID]);
+  expect(DynamicsService.queryAllRecords).toHaveBeenCalledWith(
+    ENTITY_SET_NAME,
+    expect.objectContaining({
+      filter: `(_wmkf_finaldocument_value eq ${FINAL_ID})`,
+      orderby: 'wmkf_acknowledgedat asc',
     }),
   );
 });

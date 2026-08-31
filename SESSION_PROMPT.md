@@ -178,6 +178,25 @@ against launching metered review tools without explicit owner authorization.
      initials were raised to the 44px interaction floor. There is no deployment,
      live readiness value, or Production acknowledgement write yet.
 
+5. **Ordinary-staff dashboard and focused-review foundation are source-built.**
+   - A separate dashboard service caps the current-Final census at 100, batches
+     exact document and acknowledgement reads at 25 IDs, deduplicates stable
+     SharePoint identities, and limits Graph metadata work to four concurrent
+     calls. Ambiguous current artifacts, capped source results, and inconsistent
+     acknowledgement state fail closed.
+   - The authenticated GET route derives the enabled session `systemuser`,
+     responsible-PD ownership, open/history/stewardship queues, allowed actions,
+     positive initials, selected row, and queue navigation server-side.
+   - `/workbench/final-writeups` and its focused request page provide one search,
+     calm task-first queues, reviewed history/freshness, **Open review** followed
+     by external **Open in Word**, personal acknowledgement, and early next-item
+     navigation. The responsible PD sees **Edit in Word** and cannot self-review.
+   - Existing Workbench supporting-material links retain their existing access;
+     no leadership-safe projection, persona inference, or complete matrix was
+     added. Impeccable desktop/mobile review accepted the hierarchy and CTA
+     sequence after visible current/earlier-version review counts removed the
+     color-only state. This work is not deployed; readiness remains unset.
+
 ## Next Items
 
 ### Current Owner-Selected Delivery
@@ -188,9 +207,10 @@ against launching metered review tools without explicit owner authorization.
    are complete, and the owner confirmed the 11-person roster is the complete
    intended PD/PC/CSO/President audience. Wave 23 is now exact and Active in
    Production. The typed adapter, readiness contract, acknowledgement service,
-   authenticated route, Final-tab consumer, and focused tests are source-built
-   but not deployed. Next, build the matrix-ready dashboard data/focused-review
-   foundation. Editing stays in Word in a separate
+   authenticated route, Final-tab consumer, capped ordinary-staff dashboard,
+   focused-review page, and focused tests are source-built but not deployed.
+   Next is deliberate release/runtime enablement and a bounded superuser test.
+   Editing stays in Word in a separate
    browser window/tab (or desktop Word when Microsoft permits); do not embed an
    editor in the Workbench.
 2. **Audience and matrix.**
@@ -209,14 +229,15 @@ against launching metered review tools without explicit owner authorization.
 
 ### Verified Open
 
-1. **Execute Final Writeup Slices 2–3 in bounded increments.**
+1. **Release and prove the bounded Final Writeup Slices 2–3 foundation.**
    `docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md` is owner-approved for
    staged implementation with named identity/persona prerequisites. Slice 1 is
    Production-proved; Wave 23 is exact and Active in Production with zero rows.
    The owner roster attestation is complete. The typed adapter, separate
    readiness contract, acknowledgement persistence/service, authenticated
-   route, Final-tab consumption, and focused tests are source-built but not
-   deployed. Next is the ordinary-PD dashboard and focused review page foundation.
+   routes, Final-tab consumption, bounded ordinary-staff dashboard, focused
+   review page, and focused tests are source-built but not deployed. Next is
+   deliberate deployment, runtime enablement, and a bounded superuser test.
 
 2. **Positive-path funding-history observation.**
    The zero-program-grant branch is Production-proved; the positive sentence is
@@ -302,10 +323,31 @@ against launching metered review tools without explicit owner authorization.
 | `lib/services/final-writeup/acknowledgement-service.js` | Source-built Wave 23 mark/read, identity, version, and ambiguous-write contract |
 | `pages/api/workbench/final-writeup/acknowledgement.js` | Source-built app-authenticated GET/POST acknowledgement boundary with session-only reviewer identity |
 | `shared/components/workbench/FinalWriteupTab.js` | Source-built external-Word action, positive initials, and version-aware personal acknowledgement UI |
+| `lib/services/final-writeup/dashboard-service.js` | Source-built capped/batched ordinary-staff queue, ownership/action, freshness, and navigation projection |
+| `pages/api/workbench/final-writeups.js` | Source-built app-authenticated GET boundary for the ordinary-staff dashboard/focused page |
+| `shared/components/final-writeups/FinalWriteupsViews.js` | Source-built dashboard/focused-review UI with external Word and visible current/earlier review state |
 | `docs/audits/final-writeup-acknowledgement-wave23-adversarial-review-2026-08-31.md` | Accepted Wave 23 review findings, authorized Production apply, and exact Active readback |
 | `docs/atlas/dataverse-wmkf-finalwriteupreviewacknowledgement.md` | Live Wave 23 schema, identity/key/version contract, zero-row state, and remaining runtime boundary |
 
 ## Testing
+
+Current Slice 3 ordinary-staff dashboard/focused-review foundation:
+
+```bash
+npm test -- --runInBand tests/unit/final-writeups-dashboard-service.test.js tests/unit/final-writeups-views.test.js tests/unit/workbench-final-writeups-route.test.js tests/unit/request-document-batch-adapter.test.js tests/unit/final-writeup-review-acknowledgement-adapter.test.js tests/unit/final-writeup-acknowledgement-service.test.js tests/unit/workbench-final-writeup-acknowledgement-route.test.js
+# 7 suites / 47 tests passed
+npm run lint
+# 0 errors; repository baseline warnings remain
+npm run check:types
+npx next build --webpack
+# production build passed; route manifest includes dashboard/focused pages and /api/workbench/final-writeups
+```
+
+API-route, Atlas, lifecycle-auth, route/service, GUID, Dataverse DAL/context,
+OData, fact, doc-symbol, doc-currency, wiki, memory-router, docs-catalog,
+agent-invariant, build-claim, canonical-pointer, and scaffolding-token gates
+passed with their applicable self-tests. Impeccable screenshots are retained in
+`.impeccable/review/`; the temporary fixture and local server were removed.
 
 Current Wave 23 route/UI slice:
 

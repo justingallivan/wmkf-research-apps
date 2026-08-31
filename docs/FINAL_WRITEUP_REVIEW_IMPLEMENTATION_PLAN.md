@@ -115,6 +115,17 @@ An OAuth-authenticated, read-only Claude Fable review on 2026-08-28 independentl
   readiness value remains unset, so no Production acknowledgement runtime read,
   write, or row exists
   (`docs/atlas/dataverse-wmkf-finalwriteupreviewacknowledgement.md`).
+- **[DASHBOARD/FOCUSED REVIEW SOURCE-BUILT, NOT DEPLOYED 2026-08-31]** The
+  ordinary-staff Slice 3 foundation now has a separate bounded dashboard
+  service, authenticated read route, cross-request queue, focused review page,
+  reviewed history, updated-since-review state, positive initials, and
+  external-Word actions. The service caps the current-Final census at 100,
+  batches exact document/acknowledgement reads in groups of 25, and limits
+  Graph metadata reads to four concurrent calls. It derives responsible-PD
+  ownership and every queue/action server-side. It does not infer a PC or
+  leadership persona, expose the complete coordinator matrix, or broaden
+  supporting-material authorization. Production acknowledgement readiness
+  remains unset, so this source-built surface is not live.
 - **[VERIFIED]** A Pre-Site row in `SUPERSEDED` is excluded from the current artifact read model. Clearing its pointer can re-enable draft generation, while retaining the pointer and moving the row to `FINAL` preserves the existing read-only receipt and regeneration lock (`lib/services/pre-site-visit/artifact-service.js:545-577`, `838-859`; `tests/unit/staff-deliberations-tab.test.js:446-464`).
 - **[VERIFIED]** Dataverse writes only apply `MSCRMCallerID` when impersonation is enabled and may retry a 403 as the service principal; changesets do not currently expose a no-fallback actor guarantee (`lib/services/dynamics/write-core.js:76-115`; `lib/services/dynamics/changeset.js:85`, `113-125`).
 - **[VERIFIED 2026-08-31]** Session `dynamicsSystemuserId` depends on exact-email
@@ -169,7 +180,7 @@ The frozen distribution snapshot already preserves what colleagues received. Sha
 | Supporting materials are read-only and do not expose reviewer-management controls | Focused review page and supporting-material service | Purpose-built projection; route tests prove only allowlisted request/document data is returned |
 | The coordinator matrix is complete without becoming a compliance scorecard | Dashboard service and PC/superuser lens | Every in-scope writeup × intended reviewer cell is present; blank, Reviewed, and Updated since review are neutral states; no denominator, overdue flag, required count, or enforced order |
 | Editing remains in Microsoft Word, outside the Workbench | Final tab, dashboard, focused page | Actions open the canonical SharePoint link in a separate browser window/tab; no iframe, embedded editor, or app-native document editor is introduced |
-| Action labels describe intent, not the application | Workbench panels, dashboard, focused page | Responsible PD: **Edit writeup**; non-owner: **Review writeup**; no routine “in Word” button copy |
+| Action labels distinguish the queue step from the external editor | Workbench panels, dashboard, focused page | Dashboard non-owner: **Open review**; focused document: **Open in Word**; responsible PD: **Edit in Word** |
 | Program taxonomy does not control access or primary grouping | Dashboard/persona service | No grant-program/program-area branch in authorization or default lists |
 | An early group-review handoff does not lose or freeze work | Final tab and recovery contract | The same file remains editable; there is no first-release backward-stage UI; genuine pointer corruption has a documented operator recovery path |
 
@@ -257,6 +268,12 @@ An edit that lands after the observation is simply a later edit: the next read d
 ### 3. Cross-request dashboard
 
 Build a new service rather than adding Final logic to the reviewer-finding dashboard. It queries current Final pointer rows for the selected cycle, batches Request context, batches the caller’s acknowledgement rows, and refreshes file metadata with bounded concurrency.
+
+**[SOURCE-BUILT, NOT DEPLOYED 2026-08-31]** The ordinary-staff subset now
+implements that separate service and its read route with a 100-row fail-closed
+census cap, 25-ID exact read batches, four-way Graph concurrency, stable item
+deduplication, and server-derived open/history/stewardship queues. PC and
+leadership lenses remain disabled pending positive persona resolution.
 
 Every returned row includes:
 
@@ -347,8 +364,8 @@ Until that exists:
 - New route and navigation entry for the approved audience.
 - One search field; no filter forest.
 - Primary and secondary lists derive from the server-resolved persona.
-- Row default for every non-owner: **Review writeup**.
-- Responsible-PD rows, if shown in a stewardship context, use **Edit writeup**.
+- Row default for every non-owner: **Open review**.
+- Responsible-PD rows, if shown in a stewardship context, use **Edit in Word**.
 - Do not organize by Science and Engineering / Medical Research terminology.
 - Provide the full coordinator matrix for positively identified PCs and
   superusers. It shows every in-scope writeup against the intended reviewer set
@@ -357,12 +374,12 @@ Until that exists:
 
 ### Focused reviewer page
 
-- Task first: document card, **Review writeup**, personal state, Mark reviewed/Mark latest version reviewed.
+- Task first: document card, **Open in Word**, personal state, Mark reviewed/Mark latest version reviewed.
 - Positive review initials remain visible.
 - Supporting materials are collapsed and read-only.
 - No full Request Workbench tab strip.
 - Next-writeup navigation is derived from the caller’s current queue.
-- **Review writeup** opens the canonical document in a separate browser
+- **Open in Word** opens the canonical document in a separate browser
   window/tab. The page does not embed Word or provide an in-Workbench editor.
 
 ## Delivery slices
@@ -439,12 +456,24 @@ or write exists there.
 
 ### Slice 3 — focused review page and PD dashboard
 
-- Build the Final Writeups dashboard for ordinary PD reviewers.
-- Build the focused review page.
-- Add new bounded supporting-material read routes and projection under the Final Writeups capability; update their route-matrix rows and canonical counts.
-- Add reviewed history and updated-since-review behavior.
-- Add the matrix-ready dashboard projection; show the complete matrix only to
-  positively identified PCs and superusers until the persona contract lands.
+**[ORDINARY-STAFF FOUNDATION SOURCE-COMPLETE, NOT DEPLOYED 2026-08-31.]** The
+separate dashboard service/read route, ordinary-review queue, responsible-PD
+stewardship queue, focused review page, reviewed history, updated-since-review
+state, positive initials, search, and current-queue navigation are built. The
+read model is explicitly capped, batched, concurrency-limited, and fail-closed
+on ambiguous current artifacts or acknowledgement state. Focused unit and
+visual checks cover desktop and narrow widths. Production readiness remains
+unset, so there is no live dashboard read or acknowledgement write.
+
+- **Complete in source, not deployed:** Final Writeups dashboard for ordinary
+  existing Workbench users and focused review page.
+- **Complete in source, not deployed:** reviewed history,
+  updated-since-review behavior, positive initials, and external Word actions.
+- **Deliberately deferred:** new leadership-safe supporting-material
+  projections. The ordinary-staff page links only to existing Workbench read
+  surfaces under their existing authorization; it does not broaden access.
+- **Deliberately deferred:** complete coordinator matrix and persona-specific
+  queues until PC/leadership identity is positively resolved.
 
 This slice can ship before the PC/leadership persona model because responsible-PD versus other-PD is already server-verifiable.
 
@@ -542,13 +571,14 @@ Run each gate and its self-test sequentially where applicable:
 
 ## Final recommendation
 
-Proceed with Slice 3 next. The 2026-09-04 superuser-testable same-item
+Proceed with deliberate deployment and runtime enablement of the source-built
+Slices 2–3 foundation next. The 2026-09-04 superuser-testable same-item
 handoff is already Production-proved; Wave 23 is exact and Active in Production,
 with the identity and schema prerequisites cleared. The acknowledgement
-adapter/service, authenticated route, and Final-tab consumer are source-built
-behind an unset fail-closed flag. The remaining milestone work is the dashboard
-data/focused-review foundation, followed by deliberate deployment and runtime
-enablement. All edit/review actions open
+adapter/service, authenticated route, Final-tab consumer, ordinary-staff
+dashboard data path, and focused-review surface are source-built behind an
+unset fail-closed flag. The remaining milestone work is deliberate deployment,
+runtime enablement, and a bounded superuser test. All edit/review actions open
 the canonical Word document outside the Workbench. PC backup, broad matrix
 visibility, leadership-specific lenses, and general rollout follow only after
 the explicit persona/access contracts are verified. This sequence advances the
