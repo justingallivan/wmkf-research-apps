@@ -53,8 +53,9 @@ Workbench redesign.
    enabled `WMKF Final Writeup Reviewer` roster is the intended 11-person
    audience. Request relationships positively identify the active PD/PC
    assignments. Owner confirmation establishes Allison Keller as President and
-   Beth Pruitt as CSO; Beth also has responsible-PD requests. John Charbonneau
-   remains in the acknowledgement audience but is not assigned a persona.
+   Beth Pruitt as CSO; Beth also has responsible-PD requests. John Sader is
+   owner-confirmed as a Program Director. All three owner-confirmed persona
+   facts remain rollout intent until the exact Dataverse teams are provisioned.
 2. **[SOURCE-BUILT + LOCAL SIGNED-IN VERIFIED 2026-08-31; NOT DEPLOYED]
    Superuser coordinator matrix.** The index projects every current Final row ×
    exact enabled reviewer-role member with neutral Reviewed, Updated, Not
