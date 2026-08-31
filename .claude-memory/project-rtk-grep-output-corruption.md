@@ -1,28 +1,30 @@
 ---
 name: project-rtk-grep-output-corruption
-description: "rtk UNINSTALLED + its Claude Code hook removed (S220, 2026-06-04). Do NOT call rtk; global RTK.md instructions are stale. History below — rtk's grep filter once fabricated tool output."
+description: "rtk UNINSTALLED; stale global/repo instructions and hooks removed again 2026-08-30. Do NOT call rtk. History below — rtk's grep filter once fabricated tool output."
 metadata: 
   node_type: memory
   type: project
   status: active
   scope: dev-env
-  last_verified: "S221 (2026-06-04) — home-machine local allowlist + settings.bak also cleaned (per-machine; see S221 note)"
+  last_verified: "2026-08-30 — owner confirmation + command-not-found probe + global/repo hook and instruction sweep"
   originSessionId: c44e6faf-38c5-4788-a087-45be4643bd6d
 ---
 
 ## Recall Rule
 
-Read this when: about to run `rtk` (don't — it's gone), the global `RTK.md` instructions tell you to use rtk, or grep/cat/Bash output looks fabricated.
+Read this when: about to run `rtk` (don't — it's gone), an old transcript or fixture mentions it, or grep/cat/Bash output looks fabricated.
 
 Do:
 - Run plain commands directly (`git`, `npm`, `grep`, `node`). There is NO rtk proxy/hook anymore — do not prefix anything with `rtk`.
-- Treat the global `~/.claude/RTK.md` "always use rtk" instructions as STALE (rtk is uninstalled). If a command errors with "rtk: command not found", that's expected — run the bare command.
+- Treat any old "always use rtk" instruction as stale. If a command errors with "rtk: command not found", that's expected — run the bare command.
 
 Do not:
 - Call `rtk <anything>` — it's uninstalled.
-- Re-add the rtk hook to `~/.claude/settings.json`.
+- Re-add an RTK hook to global or project settings.
 
-Ground truth: live dev-env state as of S221. `~/.claude/settings.json` no longer has a `PreToolUse`/`Bash` → `rtk hook claude` hook (S221: its `~/.claude/settings.json.bak` was also refreshed so a restore can't reintroduce the hook). `.claude/settings.local.json` is **gitignored / per-machine**, so its `Bash(rtk *)` allowlist entries do NOT sync — they must be cleared on EACH machine separately (office S220, home S221). Related: [[feedback-grep-general-codebase-terms]], [[feedback-real-fix-not-design-note]].
+Ground truth: live dev-env state as of 2026-08-30. RTK is absent. The active global Codex import/hook and the tracked repository instruction/hook/filter were removed; the per-machine `.claude/settings.local.json` RTK allowlist entries were also cleared. Historical audit prose and parser fixtures may still name RTK but do not execute it. Related: [[feedback-grep-general-codebase-terms]], [[feedback-real-fix-not-design-note]].
+
+**2026-08-30 recurrence cleanup:** despite the S220/S221 removal, later tracked and global configuration again required RTK: `~/.codex/AGENTS.md` imported `~/.codex/RTK.md`, `~/.codex/hooks.json` ran `rtk hook claude`, root `CLAUDE.md` required RTK, `.claude/settings.json` registered the hook, `.rtk/filters.toml` remained tracked, and current docs described RTK as installed. The owner confirmed it was uninstalled; a live command failed with `rtk: command not found`. All active dependencies were removed or corrected in one sweep.
 
 **S220 (2026-06-04): Justin uninstalled rtk** and asked me to remove its Claude Code hook. Removed the `hooks` block (`PreToolUse` matcher `Bash` running `rtk hook claude`) from `~/.claude/settings.json`, and the 9 dead `Bash(rtk ...)` permission entries from this repo's `.claude/settings.local.json`. The trigger: rtk's wrapper was summarizing `npx jest` stdout down to `PASS (1) FAIL (0)`, hiding the console output of a diagnostic harness. The global `RTK.md` agent-instructions still describe rtk as present — that doc is now outdated (out of repo scope to edit here; ignore its "always use rtk" guidance).
 

@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-07-29
+last_verified: 2026-08-30
 stale_after_days: 90
 owner: dev-ops
 source_files:
@@ -62,9 +62,11 @@ Claude config sync, and environment-specific operating notes.
   `/usr/bin` is macOS-shipped and belongs to neither. Confirm with
   `npm -g ls --depth=0` / `brew list --versions <tool>`, which name the package rather
   than merely containing the binary. As of 2026-07-26: `vercel`, `codegraph`, `codex`,
-  and `gemini` are npm; `rtk`, `gh`, and `node`/`npm` are brew
+  and `gemini` were npm; `gh` and `node`/`npm` were brew
   [VERIFIED 2026-07-26 via `readlink` on each binary, cross-checked against
   `npm -g ls --depth=0` and `brew list --versions`; re-run those three to refresh].
+  RTK appeared in that dated Homebrew snapshot but is now uninstalled
+  [VERIFIED 2026-08-30 via owner confirmation and `rtk: command not found`].
   Hazard this guards:
   S377 asserted "Homebrew-installed" for `vercel` from the path prefix and recorded it
   as `[VERIFIED]`, contradicting Codex, which had been correctly saying npm. Policy
@@ -166,12 +168,10 @@ Claude config sync, and environment-specific operating notes.
   [VERIFIED via 2026-08-03 `az login` output]. Treat any tenant-level write as
   confirm-first and remove temporary callbacks after use (see
   `project-vercel-cli-deploy-preview-auth`).
-- **Never run `rtk init` in this repo.** It replaces the condensed RTK block in
-  root `CLAUDE.md` (between the `<!-- rtk-instructions v2 -->` markers) with a
-  ~139-line command reference, pushing the file past the 200-line
-  `check:instruction-architecture` gate. [VERIFIED 2026-07-04 via scratchpad
-  replay of `rtk init` against the marker block.] The rtk Bash hook in
-  `.claude/settings.json` and `.rtk/filters.toml` are the tracked setup.
+- **RTK is not installed; run shell commands directly.** The stale RTK block in
+  root `CLAUDE.md`, its Bash hook in `.claude/settings.json`, and the orphaned
+  `.rtk/filters.toml` were removed 2026-08-30 after the missing binary exposed
+  that the tracked instructions had drifted back from the durable memory.
 
 ## Commit Guards & Triggers
 

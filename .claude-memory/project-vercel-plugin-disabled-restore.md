@@ -84,7 +84,8 @@ version, never carry it forward.)
 > | Tool | Installer | Update with |
 > |---|---|---|
 > | `vercel`, `codegraph` (`@colbymchenry/codegraph`), `codex` (`@openai/codex`), `gemini` | **npm-global** | `npm i -g <pkg>` |
-> | `rtk` (0.43.0), `gh`, `node`/`npm` | **Homebrew** | `brew upgrade <formula>` |
+> | `gh`, `node`/`npm` | **Homebrew** | `brew upgrade <formula>` |
+> | `rtk` | **Uninstalled as of 2026-08-30** | Do not invoke or reinstall without an owner decision |
 > | `jq`, `git` | macOS system (`/usr/bin`) | neither |
 >
 > Diagnostic, for a tool inside `/opt/homebrew/bin`:

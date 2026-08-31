@@ -220,10 +220,10 @@ than proof or enforcement.
 Focused verification command:
 
 ```bash
-rtk node .claude/hooks/lib/claim-evidence-observations.test.js
-rtk node .claude/hooks/hook-enforcement.test.js
-rtk node .claude/hooks/lib/document-guards.test.js
-rtk npm run report:claim-evidence-pilot -- --current
+node .claude/hooks/lib/claim-evidence-observations.test.js
+node .claude/hooks/hook-enforcement.test.js
+node .claude/hooks/lib/document-guards.test.js
+npm run report:claim-evidence-pilot -- --current
 ```
 
 The previously suggested Jest path is not included by this repository's Jest
@@ -273,7 +273,7 @@ requests.
 
 Observe the next three to five normal Claude Code documentation sessions without
 adding mid-session owner check-ins. At `/stop`, the session-closing agent runs
-`rtk npm run report:claim-evidence-pilot -- --current`; the exact hashed session key
+`npm run report:claim-evidence-pilot -- --current`; the exact hashed session key
 prevents a concurrent session from being selected. The agent classifies the
 advisories it actually received and appends one bounded row, including a
 zero-advisory row, when the eligible session key is not already present. A

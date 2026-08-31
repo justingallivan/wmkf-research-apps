@@ -66,13 +66,4 @@ Mutable catalogues do not belong in this root file. Inspect their authoritative 
 
 ## Development
 
-Run `npm run check:agent-invariants` after instruction, skill, or symlink work. Do not place the repository or `.git` in a cloud-synced folder.
-
-<!-- Do NOT run `rtk init` in this repo: it overwrites the condensed block below
-     with a ~139-line reference, pushing this file past the 200-line
-     check:instruction-architecture gate. [VERIFIED 2026-07-04 via scratchpad test] -->
-<!-- rtk-instructions v2 -->
-## RTK (Rust Token Killer)
-
-Prefix every shell command with `rtk`, including each command inside `&&` chains (`rtk git add . && rtk git commit …`). Commands without a dedicated filter pass through unchanged, so `rtk` is always safe; the Claude Code Bash hook also rewrites commands automatically. Meta commands: `rtk gain [--history]` (savings stats), `rtk discover` (missed opportunities), `rtk proxy <cmd>` (run unfiltered for debugging). Full per-command filter reference: `rtk --help`.
-<!-- /rtk-instructions -->
+Run `npm run check:agent-invariants` after instruction, skill, or symlink work. Do not place the repository or `.git` in a cloud-synced folder. RTK is not installed; run shell commands directly.

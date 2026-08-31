@@ -1,7 +1,7 @@
 ---
 name: stop
 description: End session by updating SESSION_PROMPT.md and relevant project documentation
-allowed-tools: Read, Edit, Write, Bash(git log:*, git status, git diff:*, git add:*, git commit:*, git push:*, git rev-parse:*), Bash(rtk npm run report\:claim-evidence-pilot*)
+allowed-tools: Read, Edit, Write, Bash(git log:*, git status, git diff:*, git add:*, git commit:*, git push:*, git rev-parse:*), Bash(npm run report\:claim-evidence-pilot*)
 ---
 
 # Session End
@@ -23,7 +23,7 @@ a feature branch and needed a cherry-pick rescue; see
 Then check `git log --oneline -10` and `git status` to see what this session produced.
 
 If the `report:claim-evidence-pilot` package script exists, run
-`rtk npm run report:claim-evidence-pilot -- --current`. SessionStart exports a
+`npm run report:claim-evidence-pilot -- --current`. SessionStart exports a
 hashed current-session key, so this report cannot select another concurrent
 session. The report reads local,
 metadata-only advisory observations; it does not read the Claude transcript. If
