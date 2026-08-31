@@ -18,14 +18,17 @@ legal audit trail.
 
 **[PRODUCTION SCHEMA LIVE 2026-08-31]** The hardened metadata readback reports
 11 exact / 0 absent / 0 divergent / 0 pending. The alternate-key index is
-Active. **[PRODUCTION RUNTIME LIVE; CROSS-USER WRITE PROOF OPEN 2026-08-31]** PR #140 /
+Active. **[PRODUCTION RUNTIME LIVE; FIRST-ROW RETRY OPEN 2026-08-31]** PR #140 /
 merge `ce229778` shipped the typed adapter, distinct literal-on readiness
 interlock, backend mark/read service, authenticated routes, Final-tab consumer,
 and ordinary-staff dashboard. Production readiness is exact `on` in Ready
 deployment `dpl_B9k3AprnYp5ExpkqpT3dUxCUZqWo`; Preview remains unset. Signed-in
 dashboard and Request `1002788` Final reads showed zero reviews, retained Word
-access, and correctly omitted responsible-PD self-review. No Production
-acknowledgement write exists.
+access, and correctly omitted responsible-PD self-review. An eligible colleague
+then reached the Production create boundary but received Dataverse `0x80040220`
+for missing `prvCreatewmkf_FinalWriteupReviewAcknowledgement`; the service reread
+and confirmed no partial row. The permission gap is remediated, but the colleague
+retry/readback has not happened and no Production acknowledgement row exists.
 
 ## Identity and Key
 
@@ -46,6 +49,26 @@ Relationship schema names are pinned:
 
 Both relationships use `Delete: Restrict`; Assign, Merge, Reparent, Share, and
 Unshare use `NoCascade`.
+
+## Security Role
+
+**[PRODUCTION VERIFIED 2026-08-31]** Commit `6659bba2` tracks
+`lib/dataverse/schema/roles/wave23-final-writeup-reviewer.json`. The
+owner-approved apply created `WMKF Final Writeup Reviewer`, added it to
+`wmkfResearchReviewAppSuite`, and assigned it directly to all 11 confirmed
+audience members. Read-only Dataverse verification proved 11/11 assignments and
+11/11 effective Global coverage for:
+
+- acknowledgement Create, Read, Write, and Append;
+- Request Document Append To; and
+- User Append To.
+
+The declarative specification contains only those six grants and explicitly
+contains no Delete, Assign, Share, or Request Document write. Dataverse added
+nine standard App Opener baseline privileges during role creation (SharePoint
+data and plug-in/SDK-message access), so the live role contains 15 privileges.
+All nine also appear in the built-in App Opener role; none crosses the prohibited
+operations above.
 
 ## Version Observation Fields
 
@@ -88,7 +111,7 @@ matrix is present.
 
 ## Write Paths
 
-**[PRODUCTION-LIVE; CROSS-USER WRITE PROOF OPEN 2026-08-31]** The service accepts a
+**[PRODUCTION-LIVE; FIRST-ROW RETRY OPEN 2026-08-31]** The service accepts a
 trusted session-derived system-user ID from the authenticated route boundary,
 never a reviewer in the write payload. It rejects responsible-PD self-acknowledgement, observes
 one current Graph publication version, creates the composite-key row or
@@ -96,8 +119,10 @@ conditionally replaces it with `If-Match`, preserves the timestamp on an exact
 version no-op, and rereads after ambiguous failures so a committed write is not
 reported as failed. Writes request `noFallback` impersonation. The route invokes
 this path only after app access and exact-body validation. The live flag is
-exact `on`; no POST was attempted because the signed-in user is the responsible
-PD of the only current Final.
+exact `on`. The first eligible non-PD POST reached Dataverse but lacked Create;
+the subsequent reread found no row. The dedicated role is now effective for all
+11 audience members; the colleague must reload and retry before the first-row
+proof can close.
 
 ## Cross-System Contract
 
@@ -132,9 +157,14 @@ PD of the only current Final.
   acknowledgement route, Final-tab consumer, bounded dashboard projection,
   dashboard route, and ordinary staff dashboard/focused-review pages are
   Production-live with focused adapter/service/route/component tests.
-  Preview readiness remains unset. The first acknowledgement/readback requires
-  an eligible non-PD staff session; do not bypass session identity or create an
-  unapproved Final merely to manufacture the proof.
+  Preview readiness remains unset.
+- The first eligible colleague POST isolated a missing Create privilege and
+  persisted no acknowledgement. The tracked dedicated role was then created,
+  solution-bound, and assigned to all 11 audience members under explicit owner
+  approval. Direct assignment and effective coverage of all six requested
+  Global privileges passed 11/11; the acknowledgement row count remained zero.
+  The colleague reload/retry and exact first-row readback remain. Do not bypass
+  session identity or create an unapproved Final merely to manufacture proof.
   Dedicated supporting-material data routes, the positively identified
   PC/leadership persona lenses, and the complete coordinator matrix remain. No
   runtime should be enabled merely because the table exists.

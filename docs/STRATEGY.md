@@ -18,7 +18,7 @@ related:
 
 # Where We're Headed
 
-**Last verified: 2026-08-30.** This document owns long-term direction and principles. The
+**Last verified: 2026-08-31.** This document owns long-term direction and principles. The
 ordered, current delivery agenda lives in `docs/CURRENT_WORK_QUEUE.md`; this document is not a
 backlog.
 
@@ -143,7 +143,12 @@ through PR #140 (`ce229778`) with bounded reads and external-Word actions. Its
 separate acknowledgement readiness value is exact `on` in Production. The
 signed-in dashboard/Final read path and responsible-PD exclusion passed on
 Request `1002788`; the next step is one bounded acknowledgement/readback by an
-eligible non-PD staff session.
+eligible non-PD staff session. That colleague's first POST reached Dataverse but
+failed on the previously missing acknowledgement Create privilege and persisted
+no row. The dedicated `WMKF Final Writeup Reviewer` role is now directly
+assigned and its six requested Global privileges are effective for all 11
+confirmed audience members; the immediate next step is the colleague's reload,
+retry, and exact first-row readback.
 Every edit/review action opens the canonical SharePoint Word document in its
 own browser window/tab (or desktop Word through Microsoft's supported option);
 the application will not embed or recreate Word editing.
@@ -152,9 +157,11 @@ The approved audience is all PDs, PCs, the CSO, and the President. The full
 coordinator matrix is included as neutral tracking: blank does not mean failure,
 there is no required count, due date, compliance score, or leadership order,
 and later edits produce **Updated since review** without erasing the recorded
-acknowledgement. General-role rollout remains gated by verified identities,
-persona assignments, SharePoint access, and the external staff-role privilege
-grant. Initial Assessment restore/Board writes remain separately owner-gated.
+acknowledgement. The neutral acknowledgement-role rollout is complete for the
+confirmed 11-person audience. Persona-specific queues, complete-matrix access,
+SharePoint access proof, and the separate external Request Document attribution
+grant remain gated. Initial Assessment restore/Board writes remain separately
+owner-gated.
 
 **Recently completed:** the Staff Deliberations workspace/history UX, curated
 Site Visit materials-recipient menu, and Graph-search/Operational Events error

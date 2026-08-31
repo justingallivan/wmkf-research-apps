@@ -244,9 +244,14 @@ document inventory, and individual implementation plans do not establish priorit
   bounded ordinary-staff dashboard/focused-review foundation are now
   Production-deployed through PR #140 merge `ce229778` / Ready deployment
   `dpl_P7xay61LHnxohad9FEtSniBAosuY`; the acknowledgement readiness value
-  remains unset, so runtime access fails closed. Deliberate runtime enablement
-  and a bounded superuser test are next. Broad role rollout and the complete
-  matrix remain persona/access-gated.
+  is exact `on` in Ready deployment `dpl_B9k3AprnYp5ExpkqpT3dUxCUZqWo`.
+  Signed-in reads and responsible-PD exclusion passed. An eligible colleague's
+  first POST then isolated a missing acknowledgement Create privilege without
+  persisting a row. Commit `6659bba2` tracks the dedicated reviewer role; its
+  approved Production apply and independent readback proved direct assignment
+  and all six requested Global privileges effective for the full 11-person
+  audience. The colleague retry/readback, broader persona rollout, and complete
+  matrix remain open.
 - **Prior owner-directed release (S469, 2026-08-30):** durable Executor
   budgets are Production-deployed and owner-viewed in the safe no-revision/code-
   fallback state; first publication remains an explicit administrator action.
@@ -508,7 +513,10 @@ document inventory, and individual implementation plans do not establish priorit
   foundation are Production-live behind the exact `on` acknowledgement gate.
   Signed-in dashboard and Request `1002788` Final reads passed with zero
   reviews, external Word access, and correct responsible-PD exclusion. The
-  first cross-user acknowledgement remains open. The services derive
+  first eligible POST then failed on missing acknowledgement Create and left no
+  partial row. The dedicated role is now assigned/effective for all 11 confirmed
+  audience members; the colleague reload/retry and exact first-row readback
+  remain open. The services derive
   ownership/actions server-side, cap and batch reads, and do not infer
   PC/leadership personas or expose the full matrix.
 - Calendar direction (owner-confirmed 2026-07-28): the first gate is a

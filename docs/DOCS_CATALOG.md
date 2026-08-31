@@ -445,6 +445,6 @@ related:
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
-| [FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md](FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md) | plan | active |  | Final handoff is Production-proved; acknowledgement and ordinary-staff dashboard code is Production-deployed behind an unset readiness gate. | 2026-08-28 |
+| [FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md](FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md) | plan | active |  | Final handoff and acknowledgement/dashboard runtime are Production-live; the 11-person permission role is effective; first-row retry remains open. | 2026-08-28 |
 | [WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md](WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md) | plan | active |  | Pre-Site/Site Visit lifecycle with Production-proved same-item Final lineage; acknowledgement and dashboard follow-ons remain pending. | 2026-08-17 |
 

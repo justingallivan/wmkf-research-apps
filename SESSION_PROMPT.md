@@ -196,7 +196,7 @@ against launching metered review tools without explicit owner authorization.
      sequence after visible current/earlier-version review counts removed the
      color-only state.
 
-6. **Slices 2–3 runtime is enabled in Production; the cross-user write proof remains open.**
+6. **Slices 2–3 runtime is enabled in Production; the first-row proof remains open.**
    - PR #140 merged as `ce229778b05178bf4aabafe630e46de4843f5e81` after
      Jest, Claude review, Semgrep, Gitleaks, Trivy, and Vercel checks passed.
    - Preview deployment `dpl_9YMZvQFWLoRNrDzuKKugyj1DTkv2` and Production
@@ -215,6 +215,28 @@ against launching metered review tools without explicit owner authorization.
      different signed-in staff member or a separately authorized eligible
      Final.
 
+7. **The Final Writeup acknowledgement role gap is closed; colleague retry remains.**
+   - An eligible colleague opened Request `1002788`, edited the current Word
+     file, and received `Final Writeup review tracking failed.` when selecting
+     **Mark reviewed**. Production evidence isolated the failure to Dataverse
+     `0x80040220`: the signed-in user lacked
+     `prvCreatewmkf_FinalWriteupReviewAcknowledgement`. Graph/document reads
+     succeeded, the service reread after the failed create, and no partial
+     acknowledgement row persisted.
+   - Commit `6659bba2` tracks the dedicated `WMKF Final Writeup Reviewer` role
+     specification. Under explicit owner approval, the Production role was
+     created, added to `wmkfResearchReviewAppSuite`, and assigned directly to
+     all 11 confirmed audience members. Read-only verification proved 11/11
+     assignments and 11/11 effective coverage for the six requested Global
+     privileges: acknowledgement Create/Read/Write/Append plus Append To on
+     Request Document and User.
+   - Dataverse also attached nine standard App Opener baseline privileges when
+     it created the role (SharePoint-data and plug-in/SDK-message reads/writes).
+     The live role has 15 privileges total; none grants Delete, Assign, Share,
+     or Request Document write. The acknowledgement table still has zero rows.
+     The next step is for the colleague to reload and retry **Mark reviewed**,
+     followed by exact acknowledgement/readback verification.
+
 ## Next Items
 
 ### Current Owner-Selected Delivery
@@ -228,8 +250,12 @@ against launching metered review tools without explicit owner authorization.
    authenticated route, Final-tab consumer, capped ordinary-staff dashboard,
    focused-review page, and focused tests are Production-live behind the exact
    `on` readiness interlock. Signed-in dashboard and responsible-PD exclusion
-   proof passed. The bounded cross-user acknowledgement/readback remains open
-   because the signed-in owner is the responsible PD of the only current Final.
+   proof passed. The first eligible colleague attempt exposed a missing
+   Dataverse Create privilege without persisting a row. The dedicated Final
+   Writeup Reviewer role is now assigned to all 11 confirmed audience members
+   with all six required privileges effective. The bounded cross-user
+   acknowledgement/readback remains open only until the colleague reloads and
+   retries the action.
    Editing stays in Word in a separate
    browser window/tab (or desktop Word when Microsoft permits); do not embed an
    editor in the Workbench.
@@ -258,9 +284,11 @@ against launching metered review tools without explicit owner authorization.
    routes, Final-tab consumption, bounded ordinary-staff dashboard, focused
    review page, and focused tests are Production-live. The signed-in read path,
    Word link, empty acknowledgement state, and responsible-PD exclusion passed
-   on Request `1002788`; complete the first acknowledgement/readback with an
-   eligible non-PD staff session rather than bypassing session identity or
-   manufacturing an unauthorized Final.
+   on Request `1002788`. An eligible non-PD attempt then proved the route reached
+   Dataverse but lacked acknowledgement Create; no row persisted. The dedicated
+   reviewer role is now assigned and effective for all 11 audience members.
+   Have the colleague reload and retry, then verify the first row/readback rather
+   than bypassing session identity or manufacturing another Final.
 
 2. **Positive-path funding-history observation.**
    The zero-program-grant branch is Production-proved; the positive sentence is
@@ -343,12 +371,13 @@ against launching metered review tools without explicit owner authorization.
 | `pages/api/workbench/initial-assessment/board-snapshot.js` | Superuser retained Board snapshot route |
 | `docs/INITIAL_ASSESSMENT_CONTROLLED_PILOT_2026-07-30.md` | Pilot evidence and remaining write-proof boundary |
 | `docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md` | Production-proved Slice 1 and approved Slices 2–5 design |
-| `lib/services/final-writeup/acknowledgement-service.js` | Production-deployed, runtime-disabled Wave 23 mark/read, identity, version, and ambiguous-write contract |
-| `pages/api/workbench/final-writeup/acknowledgement.js` | Production-deployed, runtime-disabled app-authenticated GET/POST acknowledgement boundary with session-only reviewer identity |
+| `lib/services/final-writeup/acknowledgement-service.js` | Production-live Wave 23 mark/read, identity, version, no-fallback attribution, and ambiguous-write contract |
+| `pages/api/workbench/final-writeup/acknowledgement.js` | Production-live app-authenticated GET/POST acknowledgement boundary with session-only reviewer identity |
 | `shared/components/workbench/FinalWriteupTab.js` | Production-deployed external-Word action, positive initials, and version-aware personal acknowledgement UI |
-| `lib/services/final-writeup/dashboard-service.js` | Production-deployed, runtime-disabled capped/batched ordinary-staff queue, ownership/action, freshness, and navigation projection |
-| `pages/api/workbench/final-writeups.js` | Production-deployed, runtime-disabled app-authenticated GET boundary for the ordinary-staff dashboard/focused page |
+| `lib/services/final-writeup/dashboard-service.js` | Production-live capped/batched ordinary-staff queue, ownership/action, freshness, and navigation projection |
+| `pages/api/workbench/final-writeups.js` | Production-live app-authenticated GET boundary for the ordinary-staff dashboard/focused page |
 | `shared/components/final-writeups/FinalWriteupsViews.js` | Production-deployed dashboard/focused-review UI with external Word and visible current/earlier review state |
+| `lib/dataverse/schema/roles/wave23-final-writeup-reviewer.json` | Tracked six-privilege Final Writeup reviewer role specification; assigned to the confirmed 11-person Production audience |
 | `docs/audits/final-writeup-acknowledgement-wave23-adversarial-review-2026-08-31.md` | Accepted Wave 23 review findings, authorized Production apply, and exact Active readback |
 | `docs/atlas/dataverse-wmkf-finalwriteupreviewacknowledgement.md` | Live Wave 23 schema, identity/key/version contract, zero-row state, and remaining runtime boundary |
 
@@ -389,7 +418,9 @@ npx next build --webpack
 Desktop and narrow-width visual inspection passed through the temporary local
 harness, which was removed afterward. PR #140 / merge `ce229778` subsequently
 reached Ready Production deployment `dpl_P7xay61LHnxohad9FEtSniBAosuY`.
-Live-flag enablement and Production-write verification do not apply yet.
+Production readiness is exact `on`. The first eligible colleague POST reached
+Dataverse and failed before persistence on the now-remediated role privilege;
+the colleague retry and first successful row/readback remain open.
 
 Release verification completed before and after PR #138 merge:
 

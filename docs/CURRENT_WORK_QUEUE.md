@@ -34,8 +34,8 @@ sequence.
 
 | Order | Work | Current boundary | Completion decision |
 | --- | --- | --- | --- |
-| 1 | Final Writeup acknowledgement infrastructure and dashboard data foundation | **[IN PROGRESS 2026-08-31.]** Slice 1 is Production-proved. Wave 23 is exact/Active with zero rows, and Production acknowledgement readiness is exact `on` in Ready deployment `dpl_B9k3AprnYp5ExpkqpT3dUxCUZqWo` (Preview remains unset). The signed-in ordinary-staff dashboard and Request `1002788` Final tab loaded, retained the external Word action, showed zero reviews, correctly omitted responsible-PD self-review, and produced no Production errors. No PC/leadership persona, full matrix, or broader supporting-material projection is inferred. The first acknowledgement/readback remains open because the signed-in owner is the responsible PD of the only current Final; use an eligible non-PD staff session rather than bypassing session identity or creating unapproved lifecycle data. | By **2026-09-04**, acknowledgement persistence and the superuser-testable dashboard data path are in place with exact identity/version keys and focused tests. |
-| 2 | Final Writeup role rollout and dashboards | **[PLANNED.]** Ordinary PD review can precede the global persona model. PC backup, complete matrix visibility, and leadership-specific queues remain disabled until those roles are positively identified. | Verified PD/PC/CSO/President identity and SharePoint access; acknowledgement alternate key active; no role inference from names, titles, email, or program taxonomy. The external `wmkf_requestdocument` staff-role grant remains expected around 2026-09-10. |
+| 1 | Final Writeup acknowledgement infrastructure and dashboard data foundation | **[IN PROGRESS 2026-08-31.]** Slice 1 is Production-proved. Wave 23 is exact/Active with zero rows, and Production acknowledgement readiness is exact `on` in Ready deployment `dpl_B9k3AprnYp5ExpkqpT3dUxCUZqWo` (Preview remains unset). The signed-in ordinary-staff dashboard and Request `1002788` Final tab loaded, retained the external Word action, showed zero reviews, correctly omitted responsible-PD self-review, and produced no Production errors. An eligible colleague's first POST then reached Dataverse and failed with missing acknowledgement Create; the service reread and persisted no partial row. The dedicated reviewer role is now assigned to all 11 confirmed audience members, with all six required privileges effective. No PC/leadership persona, full matrix, or broader supporting-material projection is inferred. The immediate next step is the colleague's reload/retry and exact first-row readback. | By **2026-09-04**, acknowledgement persistence and the superuser-testable dashboard data path are in place with exact identity/version keys and focused tests. |
+| 2 | Final Writeup persona rollout and complete dashboards | **[PARTIAL.]** The neutral acknowledgement permission role is live for all 11 confirmed audience members. Ordinary PD review no longer waits on that role grant. PC backup, complete matrix visibility, leadership-specific queues, and representative SharePoint-access proof remain disabled/open until the broader personas are positively identified. | Verified PD/PC/CSO/President identity and SharePoint access; acknowledgement alternate key active; no persona inference from names, titles, email, or program taxonomy. The separate external `wmkf_requestdocument` staff-role attribution grant remains expected around 2026-09-10. |
 
 ## Audit follow-ups — verified open, not silently prioritized
 - **Pre-J27 scale: Initial Assessment Production write proof.**
@@ -119,7 +119,7 @@ sequence.
 ## Completed in this execution
 
 - Final Writeup acknowledgement Wave 23: **[PRODUCTION RUNTIME LIVE;
-  CROSS-USER WRITE PROOF OPEN 2026-08-31]** schema-as-code defines the
+  FIRST-ROW RETRY OPEN 2026-08-31]** schema-as-code defines the
   organization-owned entity, six fields, two required lookups, and the
   Final-document + reviewer alternate key. The identity census proved exact,
   enabled Dataverse links for all 11 existing active sign-in profiles; the
@@ -141,8 +141,17 @@ sequence.
   Ready deployment `dpl_B9k3AprnYp5ExpkqpT3dUxCUZqWo`; Preview remains unset.
   Signed-in dashboard and Final-tab reads passed on Request `1002788`, including
   external Word launch state, zero reviews, and responsible-PD exclusion. No
-  Production acknowledgement write exists because the signed-in user is the
-  responsible PD of the only current Final.
+  Production acknowledgement row exists. An eligible colleague's first POST
+  reached Dataverse but failed with `0x80040220` because their roles lacked
+  `prvCreatewmkf_FinalWriteupReviewAcknowledgement`; the no-fallback service
+  reread confirmed no partial persistence. Commit `6659bba2` now tracks the
+  dedicated `WMKF Final Writeup Reviewer` role. The approved Production apply
+  assigned it to all 11 confirmed audience members. Independent readback proved
+  11/11 assignments and effective Global acknowledgement Create/Read/Write/
+  Append plus Request Document/User Append To. Dataverse added nine standard
+  App Opener baseline privileges when it created the role, for 15 total; none
+  grants Delete, Assign, Share, or Request Document write. Colleague retry and
+  first-row readback remain open.
 
 - Final Writeup Slice 1 release: **[PRODUCTION-PROVED 2026-08-30 PT /
   2026-08-31 UTC]** four approved local commits reached public GitHub and

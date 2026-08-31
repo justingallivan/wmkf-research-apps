@@ -1,6 +1,6 @@
 ---
 name: project-reviewer-apps-redesign-direction
-description: The unified Request Workbench has proven Pre-Site/Initial/Site Visit and same-item Final paths; acknowledgement/dashboard infrastructure is next for 2026-09-04.
+description: The unified Request Workbench has proven Pre-Site/Initial/Site Visit and same-item Final paths; acknowledgement/dashboard runtime and the 11-person permission role are live for the 2026-09-04 milestone.
 metadata:
   type: project
   status: active
@@ -247,7 +247,7 @@ planned. Current authority is
   `1002788` created one current Ready/Review Final row while retaining the
   current Pre-Site pointer and exact SharePoint item/version/hash/size; explicit
   group-review actor/time was read back and no new file was created.
-  **[PRODUCTION-LIVE, CROSS-USER WRITE PROOF OPEN 2026-08-31]** The ordinary-staff Final Writeups
+  **[PRODUCTION-LIVE, FIRST-ROW RETRY OPEN 2026-08-31]** The ordinary-staff Final Writeups
   dashboard and focused-review foundation now provide a bounded cross-request
   queue, responsible-PD stewardship rows, reviewed history/freshness state,
   positive initials, and separate **Open review** / **Open in Word** actions.
@@ -257,8 +257,12 @@ planned. Current authority is
   `dpl_P7xay61LHnxohad9FEtSniBAosuY`; Wave 23 Production readiness is exact
   `on` in Ready deployment `dpl_B9k3AprnYp5ExpkqpT3dUxCUZqWo`. Signed-in
   dashboard and Request `1002788` Final reads passed with zero reviews and
-  correct responsible-PD exclusion; the first acknowledgement still requires
-  an eligible non-PD staff session.
+  correct responsible-PD exclusion. An eligible colleague's first POST then
+  reached Dataverse but failed on missing acknowledgement Create; the no-fallback
+  reread confirmed no partial row. The tracked dedicated reviewer role is now
+  directly assigned and its six requested Global privileges are effective for
+  all 11 confirmed audience members. The colleague reload/retry and exact
+  first-row readback remain open.
   Initial Assessment production
   registry/pointer schema, governed prompt v1, and application are live and
   verified; Request `1002788` preserves mechanics-only historical evidence,
