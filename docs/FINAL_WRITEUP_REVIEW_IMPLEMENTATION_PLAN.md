@@ -3,10 +3,10 @@ title: Final Writeup Review — Implementation Plan
 domain: workbench
 kind: plan
 status: active
-summary: "Plan only, not started: same-document Final Writeup handoff, group/leadership review, acknowledgements, dashboard; Fable READY WITH PREREQUISITES."
+summary: "Approved direction: same-item Final handoff, external Word editing, acknowledgements, coordinator matrix, and role dashboards; runtime not started."
 canonical: false
 cataloged: 2026-08-28
-last_verified: 2026-08-28
+last_verified: 2026-08-30
 owner: product-engineering
 related:
   - docs/audits/final-writeup-review-fable-review-2026-08-28.md
@@ -22,21 +22,31 @@ related:
 > `docs/audits/final-writeup-review-fable-review-2026-08-28.md`. Copied into the
 > repository verbatim at branch closeout so it survives the untracked Codex
 > session directory. **Not started**: no runtime, schema, route, or Atlas change
-> exists for it as of this commit; the lifecycle plan's older "copy Final Writeup
-> into a new SharePoint file" direction still stands in the durable docs until
-> Slice 0 reconciles it.
+> exists for it as of this commit. **Owner approval 2026-08-30:** proceed
+> code-first after Slice 0 reconciliation, target a superuser-testable
+> infrastructure path by 2026-09-04, open Word in its own browser window/tab or
+> desktop Word when Microsoft permits, and include the full coordinator review
+> matrix under the non-compliance semantics in this plan.
 
 # Final Writeup Review — Implementation Plan
 
 ## Plan status
 
-**Verdict: READY WITH NAMED PREREQUISITES.**
+**Verdict: OWNER-APPROVED FOR STAGED IMPLEMENTATION WITH NAMED PREREQUISITES.**
 
-This plan translates the approved Final Writeup and group-review experience into the current Request Workbench architecture. It is a plan only; no application source, schema, route, or documentation has been changed.
+This plan translates the approved Final Writeup and group-review experience into the current Request Workbench architecture. Runtime remains unstarted. Slice 0
+reconciles the durable contract before code changes.
+
+The 2026-09-04 milestone means the underlying handoff, identity, acknowledgement,
+dashboard-data, and superuser test path are in place. It does not promise broad
+staff rollout by that date. General-role enablement remains gated by verified
+identity/persona and SharePoint access; the expected staff-role privilege grant
+is currently external and later than the milestone.
 
 The named prerequisites are deliberately attached to the slices that need them:
 
-1. Approve an expanded file surface. The original task authorized edits only to the distribution-history component and its unit test; this feature necessarily spans new services, routes, schema, pages, tests, and durable documentation.
+1. **Resolved 2026-08-30:** the owner approved the expanded implementation
+   surface and code-first delivery after durable reconciliation.
 2. Before Slice 1, add an explicit, durable actor-and-time contract for each stage transition. Dataverse `modifiedby` is not sufficient because impersonation may fall back to the service principal and later writes overwrite it.
 3. Before Slice 2, verify with an owner-authorized read-only probe that every intended PD, PC, CSO, and President resolves to an enabled Dataverse `systemuser`. If any intended reviewer does not, settle the acknowledgement identity key before creating its entity.
 4. Before Slice 4, settle how the application positively identifies a Program Coordinator or leadership user. Current app access proves access to an application, and each Request identifies its responsible PD and assigned PC, but there is no verified Workbench persona contract for “any PC” or “leadership.” The implementation must not infer those roles from names, email addresses, job titles, or the changing program taxonomy.
@@ -44,6 +54,15 @@ The named prerequisites are deliberately attached to the slices that need them:
 Prerequisite 4 does **not** block the responsible-PD handoff or ordinary-PD review slices. Those relationships are already server-verifiable; PC backup actions and leadership-specific queues remain disabled until the broader persona contract exists.
 
 The board-package handoff remains excluded until the PCs describe their downstream process.
+
+The approved audience is all PDs, PCs, the CSO, and the President. The dashboard
+must include a full coordinator matrix showing who has reviewed each writeup,
+subject to the same caveats as individual acknowledgements: it is tracking, not
+approval; blanks are not failures; there is no required count, due date, or
+leadership sequence; and a later Word version yields **Updated since review**
+rather than erasing the acknowledgement. The responsible PD does not
+self-acknowledge their own writeup. Until the broader persona contract exists,
+the complete matrix is limited to positively identified PCs and superusers.
 
 ## Independent review disposition
 
@@ -62,7 +81,7 @@ An OAuth-authenticated, read-only Claude Fable review on 2026-08-28 independentl
 ## Contract surface
 
 - **Change surface:** Final Writeup handoff, current-document projection, group/leadership review, personal review acknowledgement, role-specific dashboard, and focused review page.
-- **Entry points:** Staff Deliberations, the responsible-PD Final Writeup tab, a cross-request Final Writeups dashboard, and a dedicated reviewer page.
+- **Entry points:** Staff Deliberations, the responsible-PD Final Writeup tab, a cross-request Final Writeups dashboard, and a dedicated reviewer page. Every edit/review action launches the SharePoint Word document outside the Workbench in a separate browser window/tab, with desktop Word available only through Microsoft's own supported affordance.
 - **Persistence:** the existing Dataverse Request Document registry and Request current-Final pointer; SharePoint for the single collaborative Word item and its native versions; one new Dataverse child entity for personal review acknowledgements.
 - **Consumers:** responsible PDs, other PDs, PCs, CSO, President, Workbench UI, dashboard UI, supporting-material read surface, tests, Atlas, route-security matrix, and service catalogue.
 - **Prior findings being verified:** Final is still a placeholder; the Final artifact type and current pointer exist; no review-acknowledgement store exists; current Workbench access does not distinguish PC and leadership personas; the former plan calls for a second editable Final file.
@@ -125,6 +144,8 @@ The frozen distribution snapshot already preserves what colleagues received. Sha
 | A materially new Final successor has no inherited acknowledgement | Final successor + acknowledgement read model | Acknowledgements key to Final artifact identity; new current artifact begins without rows |
 | Other reviewers cannot advance stages | Final transition route/service | Hard server-side owner/approved-PC gate; UI hiding is not treated as authorization |
 | Supporting materials are read-only and do not expose reviewer-management controls | Focused review page and supporting-material service | Purpose-built projection; route tests prove only allowlisted request/document data is returned |
+| The coordinator matrix is complete without becoming a compliance scorecard | Dashboard service and PC/superuser lens | Every in-scope writeup × intended reviewer cell is present; blank, Reviewed, and Updated since review are neutral states; no denominator, overdue flag, required count, or enforced order |
+| Editing remains in Microsoft Word, outside the Workbench | Final tab, dashboard, focused page | Actions open the canonical SharePoint link in a separate browser window/tab; no iframe, embedded editor, or app-native document editor is introduced |
 | Action labels describe intent, not the application | Workbench panels, dashboard, focused page | Responsible PD: **Edit writeup**; non-owner: **Review writeup**; no routine “in Word” button copy |
 | Program taxonomy does not control access or primary grouping | Dashboard/persona service | No grant-program/program-area branch in authorization or default lists |
 | An early group-review handoff does not lose or freeze work | Final tab and recovery contract | The same file remains editable; there is no first-release backward-stage UI; genuine pointer corruption has a documented operator recovery path |
@@ -297,6 +318,10 @@ Until that exists:
 - Row default for every non-owner: **Review writeup**.
 - Responsible-PD rows, if shown in a stewardship context, use **Edit writeup**.
 - Do not organize by Science and Engineering / Medical Research terminology.
+- Provide the full coordinator matrix for positively identified PCs and
+  superusers. It shows every in-scope writeup against the intended reviewer set
+  with neutral blank / Reviewed / Updated since review states. It is a tracking
+  view, not an approval, completion, or performance report.
 
 ### Focused reviewer page
 
@@ -305,12 +330,14 @@ Until that exists:
 - Supporting materials are collapsed and read-only.
 - No full Request Workbench tab strip.
 - Next-writeup navigation is derived from the caller’s current queue.
+- **Review writeup** opens the canonical document in a separate browser
+  window/tab. The page does not embed Word or provide an in-Workbench editor.
 
 ## Delivery slices
 
 ### Slice 0 — reconcile the durable plan
 
-Before runtime code, run `/sweep` and update every live restatement of the old “copy to a new editable file” model, including the lifecycle plan, Request Document Atlas, Pre-Site schema design, near-term execution plan, strategy wiki, project memory, and source headers. Replace “Create Final Writeup” with the same-item Final-lineage handoff and **Ready for group review** action. Record the staged persona prerequisite, explicit transition attribution, continued board-package deferral, and first-release no-backward-stage decision. Run `check:doc-currency`, `check:fact-consistency`, and `check:memory-drift` before calling reconciliation complete.
+Before runtime code, run `/sweep` and update every live restatement of the old “copy to a new editable file” model, including the lifecycle plan, Request Document Atlas, Pre-Site schema design, near-term execution plan, strategy wiki, project memory, and source headers. Replace “Create Final Writeup” with the same-item Final-lineage handoff and **Ready for group review** action. Record the staged persona prerequisite, explicit transition attribution, external-Word-only editing, the full coordinator matrix, the 2026-09-04 superuser-testable infrastructure milestone, continued board-package deferral, and first-release no-backward-stage decision. Run `check:doc-currency`, `check:fact-consistency`, and `check:memory-drift` before calling reconciliation complete.
 
 ### Slice 1 — Final handoff and responsible-PD tab
 
@@ -341,6 +368,8 @@ This slice proves the document-continuity contract end to end before adding coll
 - Build the focused review page.
 - Add new bounded supporting-material read routes and projection under the Final Writeups capability; update their route-matrix rows and canonical counts.
 - Add reviewed history and updated-since-review behavior.
+- Add the matrix-ready dashboard projection; show the complete matrix only to
+  positively identified PCs and superusers until the persona contract lands.
 
 This slice can ship before the PC/leadership persona model because responsible-PD versus other-PD is already server-verifiable.
 
@@ -351,6 +380,8 @@ This slice can ship before the PC/leadership persona model because responsible-P
 - Enable PC all-active view and exceptional backup transition.
 - Enable CSO/President leadership-stage queues.
 - Verify the President’s reviewed-history behavior and the no-sequence rule.
+- Enable the full coordinator matrix for confirmed PC users and preserve its
+  non-compliance semantics for all audiences.
 
 ### Slice 5 — production proof and rollout
 
@@ -430,4 +461,13 @@ Run each gate and its self-test sequentially where applicable:
 
 ## Final recommendation
 
-Proceed in slices 0–3 first: reconcile the lifecycle contract, prove the same-item Final handoff with retained Pre-Site pointer and explicit actor attribution, verify reviewer identity coverage, add durable review acknowledgements, then ship the ordinary-PD dashboard and focused review page. PC backup and leadership-specific lenses should follow after the explicit persona contract is settled. This sequence advances the approved experience without making the global persona model a blocker for responsible-PD work, guessing role identity, or inventing the still-unknown board-package workflow.
+Proceed in slices 0–3 first, with a 2026-09-04 target for the underlying
+superuser-testable path: reconcile the lifecycle contract, prove the same-item
+Final handoff with retained Pre-Site pointer and explicit actor attribution,
+verify reviewer identity coverage, add durable review acknowledgements, and
+land the dashboard data/focused review foundation. All edit/review actions open
+the canonical Word document outside the Workbench. PC backup, broad matrix
+visibility, leadership-specific lenses, and general rollout follow only after
+the explicit persona/access contracts are verified. This sequence advances the
+approved experience without guessing role identity or inventing the still-unknown
+board-package workflow.

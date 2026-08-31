@@ -134,23 +134,21 @@ index and workflow surface, not a second editor or document store.
 ## Current execution
 
 The ordered agenda is maintained in `docs/CURRENT_WORK_QUEUE.md`. As of
-2026-08-30, durable Executor output budgets are Production-deployed and the
-owner has verified the Admin read surface in its safe no-revision/fallback
-state; the first durable Admin publication remains a separate explicit action.
-Initial Assessment administrator restore and exact byte-copy Board snapshots
-are Production-deployed through PR #138 (`c519daf6`), and signed-in Request
-`1003109` passed the read-only artifact/control/version-history smoke. The
-relevant gates, full 9,205-test suite, webpack production build, and post-merge
-checks passed on 2026-08-30. Neither restore nor the first Board-snapshot write
-has been Production-exercised; either requires a separate explicit owner
-authorization and durable readback. The owner chose to stop at this point and
-defer that proof to a pre-J27-scale checkpoint; no next implementation slice is
-automatically selected.
+2026-08-30, the owner selected Final Writeup infrastructure as the next delivery
+priority. The target is an underlying, superuser-testable path by 2026-09-04,
+not broad staff rollout: same-item Final lineage, explicit transition
+attribution, acknowledgement persistence, and matrix-ready dashboard data.
+Every edit/review action opens the canonical SharePoint Word document in its
+own browser window/tab (or desktop Word through Microsoft's supported option);
+the application will not embed or recreate Word editing.
 
-The Final Writeup Review design is reviewed plan-only. Implementation requires a
-new owner go, expanded file-surface approval, explicit transition actor/time
-storage, a read-only `systemuser` coverage probe, and a defined PC/leadership
-persona contract. It is not implied by the near-term sequence.
+The approved audience is all PDs, PCs, the CSO, and the President. The full
+coordinator matrix is included as neutral tracking: blank does not mean failure,
+there is no required count, due date, compliance score, or leadership order,
+and later edits produce **Updated since review** without erasing the recorded
+acknowledgement. General-role rollout remains gated by verified identities,
+persona assignments, SharePoint access, and the external staff-role privilege
+grant. Initial Assessment restore/Board writes remain separately owner-gated.
 
 **Recently completed:** the Staff Deliberations workspace/history UX, curated
 Site Visit materials-recipient menu, and Graph-search/Operational Events error

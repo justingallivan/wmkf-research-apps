@@ -6,7 +6,7 @@ status: active
 summary: "Cross-tab design for the Pre-Site Word workspace, Site Visit handoff and correction, external distribution, dossier, and Final Writeup lineage."
 canonical: false
 cataloged: 2026-08-17
-last_verified: 2026-08-29
+last_verified: 2026-08-30
 owner: product-engineering
 related:
   - docs/PRE_SITE_VISIT_DATAVERSE_SCHEMA_DESIGN.md
@@ -45,15 +45,20 @@ lifecycle, not three independent data-entry systems:
    records visit observations directly in Word while SharePoint preserves the
    native version history. The tab separately manages logistics and supporting
    files such as slides, recordings, transcripts, and summaries.
-3. **Final Writeup** creates a new governed Word document by copying the exact
-   Site Visit-stage version of the Pre-Site Word workspace selected at action
-   time. The new Final document then becomes the PD's working document.
+3. **Final Writeup** creates a new governed registry lineage row over the same
+   stable SharePoint Word item. The transition pins the exact Site Visit-stage
+   Pre-Site row/version/hash selected at action time, but does not copy or
+   upload a second editable file.
 
 There is no separate Site Visit Writeup, no Dataverse staff-observations text
 field in this design, and no attempt to synchronize arbitrary staff edits from
 Word back into the eight generated Dataverse narrative fields.
 
-Final remains a placeholder. **[DEPLOYED TO PRODUCTION 2026-08-17]**
+Final remains a placeholder. **[OWNER-APPROVED FOR STAGED IMPLEMENTATION
+2026-08-30; RUNTIME NOT STARTED.]** The underlying handoff and dashboard data
+path target superuser testing by 2026-09-04. Word editing stays outside the
+Workbench in a separate browser window/tab or desktop Word when Microsoft
+permits. **[DEPLOYED TO PRODUCTION 2026-08-17]**
 the Site Visit tab and authenticated transition route implement the guarded
 handoff of the current Ready/Draft Pre-Site item into the Site Visit workspace.
 The Pre-Site tab also adds a
@@ -143,14 +148,16 @@ Dataverse facts + AI Materials narrative + review evidence
                exact row + item version + hash
                          │
                          ▼
-         Final Request Document row ───── new SharePoint DOCX copy
+         Final Request Document row ───── same stable SharePoint DOCX
                                               │
-                                              └─ PD continues editing in Word
+                                              └─ staff continue editing in Word
 ```
 
 The source of a Final Writeup is never “whatever file currently has this
 name.” It is the exact Pre-Site Request Document row and exact SharePoint
-version/hash captured when the action runs.
+version/hash captured when the action runs. The source and Final rows point to
+the same stable drive/item identity; the two rows describe lifecycle lineage,
+not two editable files.
 
 ## Pre-Site Visit Writeup tab
 
@@ -497,35 +504,37 @@ recovery decisions remain governed by the near-term execution plan.
 
 ### Minimum interface
 
-- Show the current Pre-Site Word workspace and latest available SharePoint
-  version that would be copied.
-- Require a deliberate Create Final Writeup action.
-- After creation, show and open the independent current Final Word document.
-- Offer regeneration only as an explicit rare action that creates a new Final
-  row/file and preserves the existing Final and its staff edits.
+- From Staff Deliberations, require a deliberate **Ready for group review**
+  action against the current Word workspace.
+- After handoff, show group-review state and open the same canonical Word item
+  through **Edit writeup** or **Review writeup**.
+- Open Word in its own browser window/tab; do not embed it or build an
+  in-Workbench editor. Desktop Word remains Microsoft's own supported option.
+- Do not offer Final regeneration or backward-stage UI in the first release.
+  Native Word version history and operator recovery cover the approved cases.
 
-### Copy transaction
+### Same-item lineage transaction
 
 1. Read `wmkf_CurrentPreSiteVisit` and verify that it targets a Ready,
    non-superseded Pre Site Visit Word row owned by the same Request.
 2. Resolve and freeze the exact current SharePoint item version and content
    hash at action time.
 3. Build a Final generation key from Request ID, Final artifact type, source
-   row ID, source item version/hash, and copy/producer contract version.
+   row ID, source item version/hash, and lineage/producer contract version.
 4. Claim or reuse the matching Final Request Document operation.
-5. Copy the exact source bytes to a new stable Final DOCX item; do not rename or
-   mutate the Pre-Site item.
+5. Set the Final row's stable site/drive/item identity to the exact current
+   Pre-Site Word item. Make no Graph upload, copy, rename, or move call.
 6. Set `wmkf_SourceDocument` to the Pre-Site row and persist the exact source
    version/hash on the Final row.
-7. After upload/readback agreement, transition Final to Ready and atomically
-   supersede the prior current Final row while setting
-   `akoya_request.wmkf_CurrentFinalWriteup`.
-8. Open the new Final Word item as the PD's continuing workspace.
+7. In one ETag-fenced Dataverse transition, make Final Ready/Review, move the
+   source Pre-Site row to `FINAL`, retain `wmkf_CurrentPreSiteVisit`, set
+   `akoya_request.wmkf_CurrentFinalWriteup`, and persist the explicit actor/time.
+8. Open that same Word item as the continuing collaborative workspace.
 
-The copy deliberately includes the visit observations already entered in Word.
-It also preserves the selected reviewer roster and review narrative. Any later
-review refresh is an explicit operation on a new preserved version, never a
-silent rewrite.
+The pinned source version already contains the visit observations, reviewer
+roster, and review narrative present at handoff. Later edits remain native
+SharePoint versions of the same item; they do not rewrite the pinned source
+checkpoint or create an editable sibling.
 
 ## Dataverse schema impact
 
@@ -556,10 +565,12 @@ non-superseded lifecycle.
    derived deterministically from Dataverse at generation time and travels in
    the v3 input snapshot (so it participates in the generation key — a changed
    award history yields a new draft on the next generation, never a silent edit).
-3. Decide whether Final needs any additional generated/structured fields. The
-   minimum design copies Word and lineage only.
-4. Define Editor Dashboard Reviewed acknowledgements separately. They are not
-   document lifecycle or approval fields.
+3. Add explicit group-review and leadership-review transition actor/time fields
+   on the Final row; `modifiedby` is not authoritative.
+4. Add Editor Dashboard Reviewed acknowledgements as a separate child entity.
+   They are version-aware tracking, not document lifecycle or approval fields.
+   The full coordinator matrix is a read model over those rows, with no required
+   count, due date, compliance semantics, or enforced reviewer order.
 5. **Selected and source-built 2026-08-22; target provisioning/deployment
    pending:** successor-row audit fields in Wave 20, client UUID dedupe/cycle
    identity, existing source/version/hash lineage, standard actor/time, and a
@@ -847,11 +858,12 @@ silently extend its paths or names to writeup publications.
    above. Decide paths, filenames, representations, permissions, triggers, and
    persistence only from that evidence; this slice performs no business-file
    publication or schema write.
-11. **Final copy operation and tab.** Freeze exact source version/hash, create a
-   new Final row/item, transition the current pointer, and verify safe retry and
-   deliberate regeneration.
-12. **Editor Dashboard follow-on.** Add after the Word lifecycle is proven end
-   to end. Keep its review acknowledgement distinct from document lifecycle,
+11. **Final same-item handoff and tab.** Freeze exact source version/hash,
+   create/reuse the Final lineage row over the same stable item, transition both
+   current pointers/lifecycles with explicit actor/time, and verify safe retry.
+12. **Final Writeups dashboard and acknowledgement follow-on.** Add the focused
+   review page, version-aware acknowledgement store, personal lenses, and full
+   coordinator matrix. Keep acknowledgement distinct from document lifecycle,
    external distribution, and the AkoyaGo publication projection.
 
 Each slice must trace caller → restriction context → registry persistence →
@@ -880,11 +892,12 @@ strategy; this plan itself performs no deployment.
   shown in preview.
 - Every Site Visit supporting file appears in the correct governed category and
   has one registry row with stable Graph identity.
-- Creating Final copies the exact latest/selected Site Visit-stage Pre-Site Word
-  version into a new file and records the source row/version/hash.
+- Creating Final records the exact latest/selected Site Visit-stage Pre-Site
+  row/version/hash while retaining the same stable SharePoint drive/item; no
+  Graph upload/copy/rename/move occurs.
 - Retrying an identical operation creates no duplicate current artifact.
-- Regenerating after changed inputs never destroys staff edits in a Ready
-  Pre-Site or Final file.
+- Later edits and recovery use the same Ready Word item and native SharePoint
+  version history; first-release Final regeneration is not exposed.
 - Overview and the future Editor Dashboard can derive the current Pre-Site and
   Final documents from Request lookups without filename or folder joins.
 - Staff who rely on AkoyaGo and approved Power Automate consumers can resolve

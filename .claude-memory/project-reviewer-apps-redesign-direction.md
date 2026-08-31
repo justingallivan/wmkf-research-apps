@@ -1,11 +1,11 @@
 ---
 name: project-reviewer-apps-redesign-direction
-description: The unified Request Workbench has Production-proved Pre-Site and Initial Assessment writers plus a Production-proved Site Visit handoff; Final remains planned.
+description: The unified Request Workbench has proven Pre-Site/Initial/Site Visit paths; same-item Final infrastructure is owner-selected for 2026-09-04 superuser testing.
 metadata:
   type: project
   status: active
   scope: reviewer
-  last_verified: 2026-08-30 via Production-deployed Initial Assessment controls, signed-in read smoke, and prior Production handoff evidence
+  last_verified: 2026-08-30 via source, owner-approved Final direction, and prior Production handoff evidence
 ---
 
 ## Recall Rule
@@ -36,8 +36,11 @@ to the canonical SharePoint Word files and explicit per-editor Reviewed
 tracking. A narrower pilot locator with a cycle list and direct Word entry is
 implemented in source under the existing `reviewers` app grant. All PDs are expected eventually to
 evaluate the materials, and designated staff proofreaders also need access.
-Request-versus-artifact-stage marker granularity, coordinator matrix, and
-SharePoint file-permission verification remain open. The
+Final acknowledgements key to the Final artifact and observed SharePoint
+publication version. The approved audience is all PDs, PCs, CSO, and President,
+and a full coordinator matrix is required with neutral blank/Reviewed/Updated
+since review states and no compliance semantics. SharePoint file-permission
+verification and the broader persona key remain open. The
 first fixed gate is a human-in-the-loop, end-to-end Initial Assessment pilot by
 2026-08-10, ahead of proposal intake around 2026-08-18. Authorized staff use a
 dedicated representative dummy production request to generate, inspect, and edit the canonical
@@ -166,14 +169,17 @@ its terminal Graph drive-item read returned 2xx. PDFs expose View and Download,
 while the three DOCX files correctly expose Download only. Request `1002788`
 had no Phase II files and was not the populated display fixture.
 
-**2026-08-17 Site Visit/writeup reconciliation (supersedes the 2026-07-28
-notes-area detail):** Initial Assessment,
-Pre-Site, and Final are three separate governed Word documents. During the Site
+**2026-08-30 Final/writeup reconciliation (supersedes the 2026-08-17
+new-file detail):** Initial Assessment is a separate governed Word document.
+Pre-Site, Site Visit, and Final use one stable SharePoint Word item across
+distinct registry/lifecycle rows. During the Site
 Visit stage, the same Pre-Site Word item is the PD workspace and observations
-are entered directly into it with native SharePoint version history. Final is
-created from the exact current Pre-Site row/version/hash at action time, with a
-rare deliberate regeneration option that creates a new Final row/file and
-preserves prior Final content; Site Visit is a dossier, not a fourth writeup.
+are entered directly into it with native SharePoint version history. **Ready
+for group review** creates/reuses a Final lineage row over that same item and
+pins the exact current Pre-Site row/version/hash; no second editable file,
+first-release regeneration, or backward-stage UI is created. Word opens in its
+own browser window/tab or desktop Word through Microsoft's affordance; there is
+no Workbench-native editor. Site Visit is a dossier, not a fourth writeup.
 Its logistics are date, time/time zone, format,
 location/link, lead PD, WMKF staff, applicant participants, and
 Board/consultant participants; no separate visit-status field is needed. Its

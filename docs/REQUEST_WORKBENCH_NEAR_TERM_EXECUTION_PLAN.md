@@ -3,7 +3,7 @@ title: "Request Workbench — near-term execution plan"
 domain: architecture
 kind: plan
 status: canonical
-summary: "Initial Assessment core flow is proven; administrator restore and byte-copy Board controls are Production-deployed/read-smoked, with write proof owner-gated."
+summary: "Canonical Workbench sequence; Final same-item infrastructure is owner-selected for a 2026-09-04 superuser-testable milestone."
 canonical: true
 cataloged: 2026-07-26
 last_verified: 2026-08-30
@@ -209,10 +209,9 @@ Allison historically reviewed and edited writeups from one designated
 SharePoint folder. Removing that folder-browsing workflow must not force her to
 open each request separately in the Workbench.
 
-The planned replacement is a staff-wide **Editor Dashboard**, not the broader
-historical “Executive Dashboard” proposal. Allison remains a primary user, but
-all PDs are expected eventually to evaluate the materials and designated staff
-proofreaders also need access. Its minimum contract is:
+The planned replacement is a staff-wide **Final Writeups Dashboard**, not the
+broader historical “Executive Dashboard” proposal. The approved audience is
+all PDs, PCs, the CSO, and the President. Its minimum contract is:
 
 - one cycle-scoped list of registered writeup artifacts, with request,
   institution, program/PD, artifact stage, lifecycle state, and last-modified
@@ -221,27 +220,32 @@ proofreaders also need access. Its minimum contract is:
 - filters for cycle, program/PD, artifact stage, and editing/review state;
 - an explicit per-editor **Reviewed** marker to distinguish “reviewed; no
   changes needed” from “not yet reviewed”; and
-- personal progress such as “reviewed N of M.” A coordinator matrix may be
-  added only if Sarah or another coordinator needs it.
+- personal review state and reviewed history; and
+- a full coordinator matrix for positively identified PCs and superusers,
+  showing every in-scope writeup × intended reviewer with neutral blank,
+  Reviewed, and Updated since review states.
 
-“Reviewed” is a progress signal, not an approval gate. SharePoint revisions or
+“Reviewed” is a progress signal, not an approval gate, denominator, due-date,
+or compliance score. SharePoint revisions or
 tracked changes may provide a secondary “has edits” hint, but they cannot
-replace the explicit marker. The audience direction is staff-wide, including
-all PDs and designated staff proofreaders; exact app/file authorization still
-must be enforced rather than inferred from employment. Marker granularity
-(request versus artifact stage), coordinator view, and app-access key remain
-open. The first draft-functional delivery gate was the August 10 internal
-buffer (see the Calendar gate status note — passed, not a live deadline). App
-visibility and SharePoint file permission are separate controls and both must
-be enforced.
+replace the explicit marker. The audience is all PDs, PCs, CSO, and President;
+exact app/file authorization still must be enforced rather than inferred from
+employment. Acknowledgements key to the Final artifact and observed publication
+version; later edits show Updated since review without erasing the row. The
+responsible PD does not self-acknowledge. App visibility and SharePoint file
+permission are separate controls and both must be enforced. Edit/review actions
+open Word outside the Workbench in a separate browser window/tab; no embedded
+editor is planned.
 
 The detailed target contract and current-vs-planned boundary live in
 `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`.
 
 ### Document lineage and Site Visit dossier
 
-**[VERIFIED via owner decisions 2026-07-28; implementation PLANNED.]**
-The three writeup stages are three distinct governed Word documents:
+**[OWNER DECISION UPDATED 2026-08-30; implementation PLANNED.]**
+The three writeup stages have distinct governed registry lineage. Initial
+Assessment is one Word item; Pre-Site, Site Visit, and Final continue through a
+second shared Word item:
 
 1. **Initial Assessment** — the J27 proposal-level assessment used for staff
    deliberation and the Board advancement decision. The D26 Initial Writeup
@@ -252,24 +256,22 @@ The three writeup stages are three distinct governed Word documents:
    Every distribution version must state its review coverage and as-of time,
    and the Workbench must mark the working document stale when later review
    evidence arrives.
-3. **Final Writeup** — a separate Word document created from the exact latest
-   Pre Site Visit version available when staff invokes creation, after the PD
-   has entered Site Visit observations directly into that Pre-Site workspace.
-   The registry
-   must preserve the source artifact and exact source version used for that
-   copy. The Final then evolves independently as the PD incorporates the visit,
-   late reviews, transcript evidence, and staff edits. A rare, explicit
-   regenerate-from-latest action is required, but it must preserve the prior
-   Final version and must never silently overwrite staff edits.
+3. **Final Writeup** — a new Final lineage row created from the exact latest
+   Pre Site Visit version available when staff invokes **Ready for group
+   review**, after the PD has entered Site Visit observations directly into
+   that Pre-Site workspace. The registry preserves the source artifact and
+   exact source version/hash while both rows reference the same stable
+   SharePoint Word item. Final editing continues in that file; first-release
+   regeneration and backward-stage UI are excluded.
 
 There is no fourth “Site Visit Writeup.” The Site Visit tab links to the same
 Pre-Site Word workspace, where staff enter observations, and brings together a
 separate dossier of structured visit metadata, applicant slides and other
 applicant materials, recordings, transcripts, and derived summaries. Pre-Site
 distribution snapshots and the Final Writeup remain linked lifecycle documents
-rather than Site Visit material categories. “Create Final Writeup” copies the
-exact current Pre-Site row and SharePoint version/hash at action time into a
-new Final row/file; it does not rename or overwrite the Pre-Site document.
+rather than Site Visit material categories. **Ready for group review** records
+the exact current Pre-Site row and SharePoint version/hash in a Final row that
+reuses the same stable drive/item; it performs no file copy, rename, or upload.
 
 Staff continue to edit through the canonical Word link. **[PRODUCTION-PROVED
 2026-08-24 on Request `1002379`, PDF-only operation
@@ -869,9 +871,10 @@ Decision order:
    lead-PD copy behavior after the owner's staff discussion, plus the exact
    automated-notification audience and digest window, the large-file scanner
    contract, recording/transcript/summary contracts, and persistence/access.
-3. **Final Writeup** — freeze the latest-Pre-Site copy/lineage contract, safe
-   explicit regeneration behavior, and the visit, late-review, and editorial
-   inputs.
+3. **Final Writeup** — implement the owner-approved same-item lineage,
+   explicit transition attribution, acknowledgement persistence, and
+   matrix-ready dashboard data for a superuser-testable path by 2026-09-04.
+   Role-specific rollout remains gated by persona and file-access verification.
 4. **Initial Assessment** — the pilot and administrator controls are
    Production-deployed and the signed-in read surface has passed. Decide
    whether to authorize exact restore and/or first Board-snapshot write proof,
@@ -976,11 +979,11 @@ independently of later working edits.
   including the narrow applicant-material request/upload flow, only after the
   exact metadata, token, validation, persistence, and recovery contracts are
   approved.
-- **Final Writeup:** create a distinct artifact from the exact current Pre-Site
-  row/version/hash at action time, including observations already entered in
-  Word, and preserve that lineage. A deliberate rare regeneration creates a
-  new Final row/file, preserves the prior Final, and never silently overwrites
-  staff edits.
+- **Final Writeup:** create a distinct Final registry row from the exact current
+  Pre-Site row/version/hash at action time, including observations already
+  entered in Word, while retaining the same stable SharePoint item. Preserve
+  the source row and pointer as a locked receipt; do not expose first-release
+  regeneration or create an editable sibling.
 - **Initial Assessment scale-out:** after the designated pilot, extend the
   proven path to every in-scope J27 proposal before staff/Board advancement.
 - **Editor Dashboard:** reuse the typed registry and artifact read contract to
@@ -1016,8 +1019,9 @@ Owner-decided:
    milestones as required parts of the artifact contract;
 6. preserving Allison's cycle-wide review/edit workflow through a planned
    Editor Dashboard rather than requiring per-request Workbench navigation;
-7. three distinct writeup documents, with Final copied from the exact current
-   Pre-Site row/version/hash at action time and no separate Site Visit Writeup;
+7. distinct writeup-stage lineage, with Final created over the same stable
+   SharePoint item from the exact current Pre-Site row/version/hash at action
+   time and no separate Site Visit Writeup;
 8. the Site Visit tab as a dossier for metadata and supporting files plus a
    link to the same Pre-Site Word workspace, where staff enter observations;
 9. explicit frozen DOCX, PDF, or both attachments as the sufficient
@@ -1098,13 +1102,14 @@ Owner-decided:
 37. no standalone applicant-upload-link revocation action is needed in the
     minimum product; normal access ends at 60 days and Reissue revokes the
     superseded link;
-38. Final Writeup creation uses the exact latest Pre-Site version available at
+38. Final Writeup handoff uses the exact latest Pre-Site version available at
     action time—including site observations entered there—records that source
-    row/version/hash, and offers a rare deliberate regeneration path that
-    creates a new Final row/file and preserves prior Final content;
-39. the Editor Dashboard audience is staff-wide, including all PDs and
-    designated staff proofreaders, subject to explicit app and SharePoint file
-    authorization; and
+    row/version/hash in a Final row over the same stable SharePoint item, and
+    exposes no first-release regeneration or backward-stage action;
+39. the Final Writeups Dashboard audience is all PDs, PCs, the CSO, and the
+    President, subject to explicit app/persona and SharePoint authorization;
+    it includes a full coordinator matrix with neutral version-aware review
+    states and no compliance, denominator, due-date, or sequence semantics; and
 40. the first fixed gate is a human-in-the-loop, end-to-end Initial Assessment
     pilot by 2026-08-10, before proposal intake begins around 2026-08-18. It
     covers real proposal/metadata inputs, governed generation, SharePoint Word
@@ -1193,7 +1198,8 @@ Still required:
 7. approved transcription provider/output contract, summary quality fallback,
    and transcript/summary refresh behavior after coordination with a program
    coordinator;
-8. exact safe regeneration behavior and any additional Final Writeup inputs
-   beyond copying the latest Pre-Site version; and
-9. Editor Dashboard Reviewed-marker granularity, coordinator view, SharePoint
-   file-access verification, and restore authority.
+8. any additional Final Writeup inputs beyond the selected latest Pre-Site
+   version; first-release regeneration is intentionally excluded; and
+9. exact PC/leadership persona storage, SharePoint file-access verification,
+   and restore authority. Acknowledgement granularity and the full coordinator
+   matrix direction are settled in the Final implementation plan.

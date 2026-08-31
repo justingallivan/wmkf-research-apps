@@ -3,7 +3,7 @@ title: Dataverse wmkf_requestdocument
 domain: application-state
 kind: atlas
 status: active
-summary: Governed request-artifact registry; Initial Assessment restore and exact byte-copy Board controls are Production-deployed/read-smoked, with write proof owner-gated.
+summary: Governed request-artifact registry; Initial Assessment controls are deployed, while the owner-approved same-item Final lineage remains planned.
 canonical: false
 owner: product-engineering
 last_verified: 2026-08-30
@@ -232,8 +232,9 @@ Production Request Document row was created by this release smoke.
   successor `888982b6-0a9f-f111-b8dc-7ced8d3d15a6`; the prior Ready/Review row
   is preserved as Superseded.
 - `akoya_request.wmkf_CurrentFinalWriteup` is a live optional lookup for the
-  independent Final Word row. Final will record the exact source Pre-Site
-  row/version/hash; no writer populates this lookup yet.
+  Final lineage row. The planned writer records the exact source Pre-Site
+  row/version/hash while reusing the same stable SharePoint drive/item identity;
+  no writer populates this lookup yet.
 - Site Visit has no current writeup pointer. The current Pre-Site Word item
   remains the workspace during that stage and SharePoint versions preserve PD
   observations.
@@ -295,9 +296,10 @@ Production Request Document row was created by this release smoke.
 - The Site Visit tab reuses that stable Word item for staff observations while
   registering supporting files separately. The built handoff changes Draft to
   Review, records the exact current version/hash/time, and locks Pre-Site
-  regeneration before any AI or write side effects. Final creation copies an exact
-  Pre-Site item version to a new Final row/file and sets the separate planned
-  current-Final pointer.
+  regeneration before any AI or write side effects. The owner-approved Final
+  handoff creates/reuses a Final lineage row over that same item, pins the exact
+  Pre-Site row/version/hash, retains the Pre-Site pointer, and sets the separate
+  current-Final pointer. This contract is planned; no Final writer exists yet.
 
 The persistence schema and writer are live in Production. **[VERIFIED IN
 PRODUCTION 2026-08-17]** the runtime writer required the exact narrative,

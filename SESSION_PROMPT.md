@@ -1,4 +1,4 @@
-# Session 470 Prompt: Select the Next Owner-Directed Work
+# Session 470 Prompt: Final Writeup Infrastructure
 
 ## Session 469 Summary
 
@@ -88,11 +88,34 @@ against launching metered review tools without explicit owner authorization.
 
 ## Next Items
 
+### Current Owner-Selected Delivery
+
+1. **Final Writeup infrastructure by 2026-09-04.**
+   The owner approved the reviewed design and expanded file surface. Reconcile
+   the obsolete new-file Final model first, then implement a superuser-testable
+   same-item handoff, explicit transition actor/time, acknowledgement storage,
+   and matrix-ready dashboard data. Editing stays in Word in a separate
+   browser window/tab (or desktop Word when Microsoft permits); do not embed an
+   editor in the Workbench.
+2. **Audience and matrix.**
+   The audience is all PDs, PCs, CSO, and President. Include the full
+   coordinator matrix, but keep it neutral: no denominator, required count,
+   due date, compliance language, or CSO/President sequence. Acknowledgements
+   are version-aware; later edits show Updated since review. The responsible PD
+   does not self-acknowledge.
+3. **Milestone boundary.**
+   September 4 means underlying infrastructure and a superuser test path, not
+   broad rollout. Ordinary PD review may precede the global persona contract;
+   PC backup, broad matrix visibility, and leadership queues stay off until
+   role identity and SharePoint access are positively verified. The expected
+   `wmkf_requestdocument` staff-role privilege grant remains external around
+   2026-09-10.
+
 ### Verified Open
 
-1. **Select the next owner-directed delivery priority.**
-   `docs/CURRENT_WORK_QUEUE.md` now intentionally has no automatically selected
-   implementation slice. Open plans and audits below do not imply approval.
+1. **Execute the Final Writeup plan in bounded slices.**
+   `docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md` is now owner-approved for
+   staged implementation with named identity/persona prerequisites.
 
 2. **Positive-path funding-history observation.**
    The zero-program-grant branch is Production-proved; the positive sentence is
@@ -107,22 +130,11 @@ against launching metered review tools without explicit owner authorization.
 
 ### Owner Decision Needed
 
-1. **Choose the next delivery item.**
-   The Initial Assessment release is at a deliberate stopping point. Reasonable
-   candidates must be selected from current evidence rather than inferred from
-   document order.
-
-2. **First durable Executor-budget publication.**
+1. **First durable Executor-budget publication.**
    Production safely uses the reviewed code fallback. Publishing revision v1
    is optional and requires an explicit owner action.
 
-3. **Final Writeup Review implementation and file-surface approval.**
-   `docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md` is reviewed plan-only.
-   Before build: settle transition actor/time storage, authorize the read-only
-   `systemuser` coverage probe, define the PC/leadership persona contract, and
-   sweep the obsolete “copy to a new Final file” direction.
-
-4. **Share → Wrap Up no-send fallback and zero-program-grant wording.**
+2. **Share → Wrap Up no-send fallback and zero-program-grant wording.**
    Decide whether off-app distribution gets a manual transition, and whether
    the zero-program sentence should mention discretionary history.
 

@@ -549,12 +549,13 @@ and SharePoint item/version behavior. The bounded discovery and implementation
 gates live in `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md`.
 
 There is no separate Site Visit Writeup. The PD adds site observations and
-other visit-stage prose directly to the Pre-Site Word workspace. Creating the
-Final then copies the selected exact Pre-Site version—including those edits—
-and lets the PD continue incorporating late reviews, transcript evidence, and
-editorial changes into the independent Final artifact. The copied review roster
-and anonymous narrative retain the selected Pre-Site evidence snapshot. Any
-deliberate late-review refresh in the Final updates roster, coverage/as-of
+other visit-stage prose directly to the Pre-Site Word workspace. The planned
+Final handoff pins the selected exact Pre-Site version—including those edits—
+in a new Final lineage row while retaining the same stable SharePoint Word item.
+The PD and other reviewers continue incorporating late reviews, transcript
+evidence, and editorial changes in that one collaborative file. The pinned
+review roster and anonymous narrative retain the selected Pre-Site evidence
+snapshot. Any deliberate late-review refresh in the Final updates roster, coverage/as-of
 metadata, and anonymous synthesis together while preserving the prior Final
 version.
 
@@ -782,9 +783,13 @@ That marker is tracking, not approval; SharePoint “has edits” evidence is on
 a secondary hint because no edits can mean either “reviewed; no changes” or
 “not reviewed.”
 
-The Reviewed marker requires durable per-editor state, likely a child row keyed
-to the editor and registered artifact. Its exact granularity (request versus
-artifact stage), coordinator matrix, and access key remain design decisions.
+The Reviewed marker requires durable per-editor state in a child row keyed to
+the reviewer and Final artifact, with the observed SharePoint publication
+version. The approved dashboard includes a full coordinator matrix for
+positively identified PCs and superusers. It shows neutral blank, Reviewed, and
+Updated since review states and is not an approval, required count, due-date,
+or compliance surface. The access/persona key remains a prerequisite before
+broad role rollout.
 The first draft-functional delivery gate was targeted at 2026-08-10, before
 proposal intake begins around 2026-08-18. That date was a deliberately early
 **internal buffer, not an external commitment** (owner, 2026-08-10 / S412) and

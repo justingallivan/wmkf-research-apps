@@ -63,7 +63,7 @@ related:
 | [PDF_EXPORT.md](PDF_EXPORT.md) | history | active |  | This document describes the PDF export system and how to add it to other apps in the suite. | 2026-07-02 |
 | [PDF_INPUT_FOR_BACKEND.md](PDF_INPUT_FOR_BACKEND.md) | history | historical |  | 2. PDF prompt-caching cuts subsequent calls by 90% and is verified working. The staged 3-pass pipeline drops from $0.39 → $0.20 per proposal and... | 2026-07-02 |
 | [REQUEST_WORKBENCH_BUILD_PLAN.md](REQUEST_WORKBENCH_BUILD_PLAN.md) | plan | historical |  | Historical implementation chronology for the D26 reviewer dashboard and early Workbench build; no longer owns forward lifecycle scope. | 2026-07-02 |
-| [REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md](REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md) | plan | canonical | yes | Initial Assessment core flow is proven; administrator restore and byte-copy Board controls are Production-deployed/read-smoked, with write proof owner-gated. | 2026-07-26 |
+| [REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md](REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md) | plan | canonical | yes | Canonical Workbench sequence; Final same-item infrastructure is owner-selected for a 2026-09-04 superuser-testable milestone. | 2026-07-26 |
 | [REQUEST_WORKBENCH_SCOPING.md](REQUEST_WORKBENCH_SCOPING.md) | plan | historical |  | Historical 2026-05 scoping record for the per-PD Workbench navigation model. | 2026-07-02 |
 | [REVIEW_FORM_MULTISELECT_BUILD_PLAN.md](REVIEW_FORM_MULTISELECT_BUILD_PLAN.md) | plan | active |  | Add multiselect end to end and publish the owner's reworked review question set, with rollback rehearsal before reviewer exposure. | 2026-07-25 |
 | [ROUTE_SERVICE_CONSOLIDATION_PLAN.md](ROUTE_SERVICE_CONSOLIDATION_PLAN.md) | plan | active | yes | COMPLETE (S331): route-to-service boundary census fell from 49 to 0; check:route-service-boundary is permanent law. | 2026-07-04 |
@@ -445,6 +445,6 @@ related:
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
-| [FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md](FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md) | plan | active |  | Plan only, not started: same-document Final Writeup handoff, group/leadership review, acknowledgements, dashboard; Fable READY WITH PREREQUISITES. | 2026-08-28 |
+| [FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md](FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md) | plan | active |  | Approved direction: same-item Final handoff, external Word editing, acknowledgements, coordinator matrix, and role dashboards; runtime not started. | 2026-08-28 |
 | [WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md](WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md) | plan | active |  | Cross-tab design for the Pre-Site Word workspace, Site Visit handoff and correction, external distribution, dossier, and Final Writeup lineage. | 2026-08-17 |
 

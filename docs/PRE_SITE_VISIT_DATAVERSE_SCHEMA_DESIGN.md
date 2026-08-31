@@ -217,9 +217,10 @@ non-superseded Pre-Site Word row for that Request.
 
 The optional N:1 lookup `wmkf_CurrentFinalWriteup` is live through relationship
 `wmkf_request_currentfinalwriteup`. It points only to the canonical Ready,
-non-superseded Final Writeup Word row for that Request. Final creation copies
-the exact current Pre-Site Word version at action time and records the source
-row/version/hash. There is intentionally no Site Visit writeup relationship.
+non-superseded Final Writeup row for that Request. The Final row records the
+exact current Pre-Site row/version/hash at action time and references the same
+stable SharePoint Word item; it does not create a second editable file. There
+is intentionally no Site Visit writeup relationship.
 
 Dataverse relationship metadata cannot enforce the target row's owning
 Request, artifact type, operation status, lifecycle, or content type. The
@@ -503,5 +504,5 @@ other target; Production also completed the durable mutation proof:
   (2026-08-28) it is derived deterministically from Dataverse at generation
   and stored only in the v3 input snapshot (`docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md`).
 
-The cross-tab lifecycle, Site Visit file paths, and Final copy transaction are
+The cross-tab lifecycle, Site Visit file paths, and Final same-item lineage transaction are
 specified in `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md`.

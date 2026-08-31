@@ -1,8 +1,10 @@
-# Final Writeup Group Review — Initial UX Design Brief
+# Final Writeup Group Review — Approved UX Direction
 
 ## Review purpose
 
-This is a proposed product design, not an implementation specification. Review it read-only and challenge whether the workflow will be understandable to occasional users. Do not edit repository files.
+This is the owner-approved product direction as of 2026-08-30. Runtime remains
+unstarted. The implementation contract and prerequisites live in
+`docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md`.
 
 The design should answer one question for every participant: **What deserves my attention, and how do I open it?**
 
@@ -20,7 +22,8 @@ Program Coordinators (PCs) see all writeups. They edit and proofread, may move d
    - The responsible PD edits the post-visit document in Word.
    - The deliberate transition is labeled **Ready for group review**.
    - The system preserves an exact checkpoint transparently while maintaining one clear, current working document for the user.
-   - The transition must not leave the PD with an older editable document that can silently diverge from the Final Writeup. Whether the underlying implementation retains the same file or creates a successor is not part of the user's mental model.
+   - The transition creates Final lineage over the same stable SharePoint Word
+     item. It must not leave an older editable sibling that can silently diverge.
 
 2. **Final Writeup — Group review**
    - All PDs and all PCs can open and collaboratively edit the same Word document.
@@ -98,6 +101,12 @@ The application quietly changes the starting view:
 - PC: all active writeups
 - CSO/President: writeups ready for leadership review
 
+PCs and superusers also receive the full coordinator matrix: every in-scope
+writeup against the intended reviewer set, with neutral blank, Reviewed, and
+Updated since review states. The matrix is not an approval record, completion
+score, or compliance report; no blank is treated as a failure and no reviewer
+count or review order is required.
+
 The President's starting view is a fixed **Open for review** list with search and one prominent **Review writeup** action per row. Already-reviewed documents live behind a secondary **View reviewed writeups** link. A later edit may show **Updated since your review** within that reviewed history, but it does not return the document to the primary list or generate an alert.
 
 The unsettled board-package workflow does not appear in this dashboard yet. Older writeups may eventually live behind a modest secondary link, but their terminal state is not defined. Program taxonomy is not used for permissions or primary organization: PCs see everything, and the existing Science and Engineering / Medical Research nomenclature is being phased out without a settled Dataverse replacement.
@@ -112,13 +121,18 @@ Routine Word edits do not generate alerts. If notifications are later desired, t
 - Enforced PD participation
 - Enforced CSO/President order
 - Rebuilding Word collaboration inside the application
+- Embedding Word or providing an in-Workbench document editor; Edit/Review
+  actions open the canonical document in a separate browser window/tab, with
+  desktop Word available only through Microsoft's supported option
 - Exposing SharePoint filenames or copy/snapshot mechanics
 - Organizing the new experience around the changing program taxonomy
 - Integrating the separate board-package assembly software
 
-## Open question pending leadership input
+## Later leadership refinement
 
-Leadership will be asked what information helps them prioritize, whether they prefer a shared or explicitly assigned queue, whether the Reviewed acknowledgement is useful to them, and whether they want an intentional notification when a writeup first becomes ready. The underlying lifecycle should remain neutral until that feedback arrives.
+Leadership input may refine prioritization and notification preferences, but it
+does not reopen the approved audience, same-document contract, acknowledgement
+semantics, or no-sequence rule.
 
 ## Visual reference
 

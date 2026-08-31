@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-08-29
+last_verified: 2026-08-30
 stale_after_days: 90
 owner: product-strategy
 source_files:
@@ -240,10 +240,11 @@ document inventory, and individual implementation plans do not establish priorit
   Production-deployed through PR #138 (`c519daf6`); the relevant gates, full
   9,205-test suite, webpack build, and post-merge checks passed. Signed-in
   Request `1003109` passed the artifact/control/version-history read smoke.
-  Restore and first-snapshot writes remain unexercised. The owner chose to stop
-  before manufacturing that evidence and defer it to an explicitly authorized
-  pre-J27-scale checkpoint. No next implementation slice is automatically
-  selected. Final Writeup Review remains plan-only and owner-gated.
+  Restore and first-snapshot writes remain unexercised and deferred to an
+  explicitly authorized pre-J27-scale checkpoint. **The next owner-selected
+  slice is Final Writeup infrastructure:** target a superuser-testable same-item
+  handoff, acknowledgement store, and matrix-ready dashboard path by 2026-09-04;
+  broad role rollout remains persona/access-gated.
 - **Staff Deliberations tab (S466, 2026-08-28, production):** the Pre Site
   Visit Writeup + Site Visit tabs are merged into one stage-aware workspace
   (`shared/components/workbench/StaffDeliberationsTab.js`, rail
@@ -297,13 +298,14 @@ document inventory, and individual implementation plans do not establish priorit
   canonical editable narrative; Dataverse is the typed document
   registry/workflow/structured-decision authority; Microsoft Search supplies
   body search; version recovery, retention, least-privilege editing, and frozen
-  Board milestones are required parts of the design. Initial Assessment,
-  Pre-Site, and Final are three distinct documents. The Pre-Site Word item
+  Board milestones are required parts of the design. Initial Assessment is
+  distinct; Pre-Site, Site Visit, and Final share one
+  stable Word item across distinct registry/lifecycle rows. The Pre-Site Word item
   remains the PD workspace during the Site Visit stage, with observations
-  preserved through native SharePoint versions. Final is copied from the exact
-  current Pre-Site row/version/hash at action time, with a rare explicit
-  regeneration option that creates a new Final row/file and preserves prior
-  Final content. The Initial Assessment registry
+  preserved through native SharePoint versions. **Ready for group review**
+  records the exact current Pre-Site row/version/hash in a Final lineage row
+  that references the same drive/item; it creates no editable sibling and the
+  first release has no regeneration or backward-stage UI. The Initial Assessment registry
   and request pointer are live in Production, governed prompt v1 is
   provisioned, and the application is deployed as of 2026-07-30.
   The controlled Request `1002788` rehearsal proved generation, registry and
@@ -477,16 +479,19 @@ document inventory, and individual implementation plans do not establish priorit
   coordination with a program coordinator.
   Exact token, schema/read model, validation, folder, retention,
   summary-quality, and partial-failure contracts remain planned.
-- Editor Dashboard direction (owner-confirmed 2026-07-28; pilot list implemented
+- Final Writeups Dashboard direction (owner-confirmed 2026-08-30; pilot list implemented
   in source 2026-07-29): preserve Allison's
   former single-folder editing workflow with a staff-wide cycle list of
   governed writeups, direct Open in Word, and an explicit per-editor Reviewed
   tracker. The pilot cycle list/direct Word entry uses the existing `reviewers`
   app grant; live SharePoint permission verification remains pending. All PDs
   are expected eventually to evaluate the materials and designated staff
-  proofreaders also need access. It reuses the typed registry and canonical
-  SharePoint file; it is not a second editor. Marker granularity and coordinator
-  view remain open.
+  proofreaders also need access. The approved audience is all PDs, PCs, CSO,
+  and President. It reuses the typed registry and canonical SharePoint file;
+  every edit/review action opens Word in a separate window/tab and it is not a
+  second editor. Acknowledgements key to Final artifact + observed publication
+  version. The full coordinator matrix is required, with neutral blank,
+  Reviewed, and Updated since review states and no compliance semantics.
 - Calendar direction (owner-confirmed 2026-07-28): the first gate is a
   human-in-the-loop, end-to-end Initial Assessment pilot, originally targeted at
   2026-08-10, before proposals begin arriving around 2026-08-18. **The 2026-08-10
