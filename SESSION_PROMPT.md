@@ -322,9 +322,9 @@ against launching metered review tools without explicit owner authorization.
    if so, obtain the exact consumer and requirement before reconsidering the
    owner-selected explicit-actor design. A 9:00 AM Pacific task reminder is
    scheduled in this Codex thread. The non-blocking implementation plan is now
-   `docs/REQUEST_DOCUMENT_EXPLICIT_ACTOR_PLAN.md`; it remains behind the
-   September 4 Final Writeup/dashboard deadline and authorizes no schema apply
-   or deployment.
+   `docs/REQUEST_DOCUMENT_EXPLICIT_ACTOR_PLAN.md`. The owner reprioritized Stage
+   1 source implementation on 2026-08-31; Wave 24 remains unapplied and
+   undeployed, and the Monday question remains non-blocking.
 
 ### Parked
 
@@ -371,7 +371,7 @@ against launching metered review tools without explicit owner authorization.
 | File | Purpose |
 |------|---------|
 | `docs/CURRENT_WORK_QUEUE.md` | Canonical delivery priority and owner-deferred write proof |
-| `docs/REQUEST_DOCUMENT_EXPLICIT_ACTOR_PLAN.md` | Owner-approved and adversarially reviewed Option B schema/writer/retry plan; planning complete, implementation deferred |
+| `docs/REQUEST_DOCUMENT_EXPLICIT_ACTOR_PLAN.md` | Owner-approved Option B schema/writer/retry plan; Stage 1 source-built on `codex/request-document-explicit-actors`, Stage 2 review/verification in progress, no schema apply or deployment |
 | `shared/config/executorBudgets.js` | Budget bounds, descriptions, and reviewed outage fallback |
 | `lib/services/executor-budget-service.js` | Append-only read/publication contract |
 | `pages/api/admin/executor-budgets.js` | Superuser budget read/publication route |

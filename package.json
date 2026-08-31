@@ -89,6 +89,7 @@
     "check:route-service-boundary:self-test": "node scripts/check-route-service-boundary-self-test.js",
     "check:request-document-writers": "node scripts/check-request-document-writers.js",
     "check:request-document-writers:self-test": "node scripts/check-request-document-writers.js --self-test",
+    "probe:request-document-explicit-actor-census:self-test": "node scripts/probe-request-document-explicit-actor-census.js --self-test",
     "check:secret-scan": "node scripts/check-secret-scan.js",
     "check:secret-scan:self-test": "node scripts/check-secret-scan-self-test.js",
     "check:scaffolding-tokens": "node scripts/check-scaffolding-tokens.js",

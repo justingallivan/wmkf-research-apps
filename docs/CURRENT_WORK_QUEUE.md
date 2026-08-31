@@ -39,9 +39,9 @@ sequence.
 
 ## Audit follow-ups — verified open, not silently prioritized
 - **Request Document explicit actor tracking (Option B).**
-  **[OWNER-APPROVED 2026-08-31; ADVERSARIAL REVIEWED, PLANNING COMPLETE,
-  IMPLEMENTATION DEFERRED.]** Keep Request Document CRUD off staff roles and
-  retain service-principal writes while designing explicit, authenticated
+  **[OWNER-APPROVED 2026-08-31; PLAN ADVERSARIAL REVIEWED; STAGE 1
+  SOURCE-BUILT, NOT APPLIED OR DEPLOYED.]** Keep Request Document CRUD off staff roles and
+  retain service-principal writes while adding explicit, authenticated
   actor/time persistence. The focused plan is
   `docs/REQUEST_DOCUMENT_EXPLICIT_ACTOR_PLAN.md`: it proposes immutable
   row-origin actor/time fields, an explicit Site Visit milestone actor, reuse
@@ -57,7 +57,8 @@ sequence.
   audit, report, view, flow, business rule, or plug-in that specifically
   depends on built-in `createdby`/`modifiedby`; absent such a consumer, Connor
   has no action. Do not modify the existing Final Writeup Reviewer role. This
-  hardening remains behind the September 4 Final Writeup/dashboard deadline.
+  The owner reprioritized source implementation on 2026-08-31; target apply and
+  deployment remain separately gated and unauthorized.
 - **Pre-J27 scale: Initial Assessment Production write proof.**
   **[OWNER-DEFERRED 2026-08-30.]** Restore and exact byte-copy Board snapshot
   controls are deployed and the signed-in Request `1003109` read surface passed.

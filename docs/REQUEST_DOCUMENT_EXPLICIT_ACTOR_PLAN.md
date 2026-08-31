@@ -29,8 +29,9 @@ related:
 
 ## Decision and status
 
-**[OWNER-APPROVED 2026-08-31; ADVERSARIAL REVIEWED, PLANNING COMPLETE,
-NOT IMPLEMENTED.]** Keep
+**[OWNER-APPROVED 2026-08-31; PLAN ADVERSARIAL REVIEWED; STAGE 1
+SOURCE-BUILT ON `codex/request-document-explicit-actors`, NOT APPLIED OR
+DEPLOYED.]** Keep
 `wmkf_requestdocument` Create/Write/Append privileges off the broad staff role
 and do not create a replacement writer role. Runtime writes continue under the
 application service principal after the existing impersonated-write 403
@@ -38,8 +39,8 @@ fallback. Human attribution is stored in explicit, server-controlled actor/time
 fields only for meaningful business events.
 
 This plan authorizes no schema apply, Production write, role change, deployment,
-or historical backfill. Implementation remains behind the September 4, 2026
-Final Writeup/dashboard deadline unless the owner explicitly reprioritizes it.
+or historical backfill. The owner explicitly reprioritized source implementation
+on 2026-08-31; that decision did not authorize target promotion.
 The confirmation-only Connor question scheduled for September 7 is not a
 blocking dependency unless it identifies a concrete consumer of built-in
 `createdby`/`modifiedby`.
@@ -271,7 +272,7 @@ and must not expand Wave 24 by default.
   reliable human actor.
 - Keep the Connor question confirmation-only and non-blocking.
 
-### Stage 1 — schema and focused implementation (after the deadline)
+### Stage 1 — schema and focused implementation — source-built 2026-08-31
 
 - Add Wave 24 schema-as-code and exact read-only preflight.
 - Add the readiness helper, adapter projection, writer fields, and guarded-
@@ -281,8 +282,17 @@ and must not expand Wave 24 by default.
 - Add a focused writer-inventory/immutability gate: no raw Request Document
   create may bypass the adapter, and no update/changeset PATCH may carry the
   immutable origin fields.
-- Update the API security matrix and Atlas with planned—not live—status.
+- Update the API security matrix and Atlas with source-built—not live—status.
 - Do not apply schema or set any environment flag in this stage.
+
+Local receipt: commit `b5eeda7b` adds the Wave 24 schema-as-code, exact
+read-only preflight, literal-on readiness and Production health status, fresh
+actor resolver, single adapter origin-stamping seam, six classified create
+callers, Site Visit milestone actor, honest historical-null projections, and
+the writer/immutability gate. The read-only post-promotion census lives at
+`scripts/probe-request-document-explicit-actor-census.js`; it requires an exact
+promotion timestamp and fails on partial pairs or unattributed gaps without an
+allowed matching operational event.
 
 ### Stage 2 — adversarial review and local verification
 
@@ -292,6 +302,11 @@ and must not expand Wave 24 by default.
 - Reconcile accepted findings before any target apply.
 - Run focused tests and the applicable schema/route/doc gates sequentially
   with their self-tests.
+
+In progress 2026-08-31: 12 focused suites pass (227 tests); the writer gate,
+its negative-fixture self-test, Wave 24 preflight self-test, and census
+classifier self-test pass. Fresh implementation review and the broader
+applicable gate/build battery remain before target promotion.
 
 ### Stage 3 — target promotion
 

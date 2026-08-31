@@ -203,13 +203,15 @@ its exact operation retry, but a later distinct operation records any resolvable
 retained copy as cleanup work.
 
 **[CORRECTED 2026-08-31 via the owner-run Request Document attribution
-census.]** Standard `createdby` on the reason-bearing successor names the
+census; WAVE 24 SOURCE-BUILT, NOT LIVE.]** Standard `createdby` on the reason-bearing successor names the
 service principal after the impersonated write falls back; the current
 superuser-only projection therefore does not prove the human reopen actor.
-`docs/REQUEST_DOCUMENT_EXPLICIT_ACTOR_PLAN.md` proposes immutable explicit
-row-origin actor/time fields and replacement of that projection. Until it is
-implemented, source/reason/time remain durable but human actor attribution is
-not captured reliably.
+Commit `b5eeda7b` source-builds immutable explicit row-origin actor/time fields,
+replacement of that projection, and a Site Visit milestone actor behind
+`REQUEST_DOCUMENT_EXPLICIT_ACTOR_SCHEMA_READY`. The schema has not been applied,
+the flag is not set, and the runtime has not been deployed; therefore live
+source/reason/time remain durable but human actor attribution is not captured
+reliably. See `docs/REQUEST_DOCUMENT_EXPLICIT_ACTOR_PLAN.md`.
 
 **[PRODUCTION-DEPLOYED 2026-08-23 via merge `76a93a41` / Ready deployment
 `dpl_A8naatyxM3vcXaG4vgt79GcL5TpR`; SOURCE/TEST VERIFIED; FULL DISTRIBUTION

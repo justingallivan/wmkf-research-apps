@@ -145,8 +145,12 @@ census proved those writes fall back and standard `createdby`/`modifiedby`
 name the service principal. References below to actor passthrough, redaction,
 or validation do not establish correct human attribution on the Request
 Document row. Final group-review fields, Final acknowledgement rows, and the
-Pre-Site distribution ledger are explicit exceptions. The remaining repair is
-planned—not implemented—in `docs/REQUEST_DOCUMENT_EXPLICIT_ACTOR_PLAN.md`.
+Pre-Site distribution ledger are explicit exceptions. Wave 24 is now
+**source-built on `codex/request-document-explicit-actors` but not applied or
+deployed**: it adds server-controlled row-origin actor/time and a Site Visit
+milestone actor behind a literal-on readiness boundary. Live behavior remains
+unchanged until separately approved schema and runtime promotion. See
+`docs/REQUEST_DOCUMENT_EXPLICIT_ACTOR_PLAN.md`.
 
 | Service | Postgres tables touched | Dataverse access | Notes |
 |---|---|---|---|

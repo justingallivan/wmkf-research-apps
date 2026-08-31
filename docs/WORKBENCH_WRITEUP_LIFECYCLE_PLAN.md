@@ -582,12 +582,12 @@ non-superseded lifecycle.
    They are version-aware tracking, not document lifecycle or approval fields.
    The full coordinator matrix is a read model over those rows, with no required
    count, due date, compliance semantics, or enforced reviewer order.
-5. **Selected and Production-proved 2026-08-23; actor correction planned
-   2026-08-31:** successor-row audit fields in Wave 20, client UUID dedupe/cycle
+5. **Selected and Production-proved 2026-08-23; actor correction source-built
+   2026-08-31 but not applied/deployed:** successor-row audit fields in Wave 20, client UUID dedupe/cycle
    identity, existing source/version/hash lineage, and a superuser-only route.
    The standard `createdby` projection currently names the service principal
-   after fallback; explicit human actor/time is planned in
-   `docs/REQUEST_DOCUMENT_EXPLICIT_ACTOR_PLAN.md` and is not yet implemented.
+   after fallback; explicit human actor/time is source-built behind Wave 24 in
+   `docs/REQUEST_DOCUMENT_EXPLICIT_ACTOR_PLAN.md`. Production remains unchanged.
 6. **Selected and Production-proved 2026-08-24 on Request `1002379`:** Postgres
    `pre_site_distribution_attempts` is the exact-preview and
    recovery ledger; retained file identities remain in SharePoint plus Request
