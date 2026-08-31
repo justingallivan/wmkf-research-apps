@@ -1,6 +1,9 @@
 /** @jest-environment node */
 
-jest.mock('../../lib/utils/auth', () => ({ requireAppAccess: jest.fn() }));
+jest.mock('../../lib/utils/auth', () => ({
+  getUserRole: jest.fn(),
+  requireAppAccess: jest.fn(),
+}));
 jest.mock('../../lib/dataverse/core/context', () => ({
   withDalContext: jest.fn((_label, fn) => fn()),
 }));
@@ -11,7 +14,7 @@ jest.mock('../../lib/services/final-writeup/dashboard-service', () => ({
 import { withDalContext } from '../../lib/dataverse/core/context';
 import { loadFinalWriteupsDashboard } from '../../lib/services/final-writeup/dashboard-service';
 import { ServiceHttpError } from '../../lib/services/service-http-error';
-import { requireAppAccess } from '../../lib/utils/auth';
+import { getUserRole, requireAppAccess } from '../../lib/utils/auth';
 import handler from '../../pages/api/workbench/final-writeups';
 
 const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
@@ -31,6 +34,7 @@ beforeEach(() => {
     profileId: 7,
     session: { user: { dynamicsSystemuserId: USER_ID } },
   });
+  getUserRole.mockResolvedValue('superuser');
   loadFinalWriteupsDashboard.mockResolvedValue({
     success: true,
     counts: { total: 0, open: 0, history: 0, stewardship: 0 },
@@ -53,6 +57,7 @@ test('GET derives viewer identity from the session and accepts only optional req
   expect(loadFinalWriteupsDashboard).toHaveBeenCalledWith({
     actingUserSystemId: USER_ID,
     selectedRequestId: REQUEST_ID,
+    isSuperuser: true,
   });
   expect(res.statusCode).toBe(200);
 
@@ -60,6 +65,17 @@ test('GET derives viewer identity from the session and accepts only optional req
   await handler({ method: 'GET', query: { scope: 'all' } }, invalidKey);
   expect(invalidKey.statusCode).toBe(400);
   expect(loadFinalWriteupsDashboard).toHaveBeenCalledTimes(1);
+});
+
+test('ordinary users cannot request the superuser matrix branch', async () => {
+  getUserRole.mockResolvedValueOnce('user');
+  const res = mockRes();
+  await handler({ method: 'GET', query: {} }, res);
+  expect(loadFinalWriteupsDashboard).toHaveBeenCalledWith({
+    actingUserSystemId: USER_ID,
+    selectedRequestId: null,
+    isSuperuser: false,
+  });
 });
 
 test('rejects malformed request identities and unsupported methods before service work', async () => {

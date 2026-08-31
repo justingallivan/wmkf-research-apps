@@ -3,7 +3,7 @@ title: Final Writeup Review — Implementation Plan
 domain: workbench
 kind: plan
 status: active
-summary: "Final handoff and acknowledgement/dashboard runtime are Production-live; the first cross-user acknowledgement is verified; persona/matrix work remains."
+summary: "Final runtime is Production-live; the superuser matrix and disabled no-privilege-team persona contract are source-built; persona rollout remains."
 canonical: false
 cataloged: 2026-08-28
 last_verified: 2026-08-31
@@ -46,6 +46,14 @@ privilege grant is pending: the owner selected service-principal writes with
 explicit actor tracking, a separate attribution effort that does not block the
 working acknowledgement role or this milestone.
 
+**[SOURCE-BUILT + LOCAL SIGNED-IN VERIFIED AGAINST PRODUCTION READS
+2026-08-31; NOT DEPLOYED]** the superuser index now renders the complete
+current-Final × expected-reviewer matrix from the exact enabled `WMKF Final
+Writeup Reviewer` role roster. Desktop and 390px browser QA passed with Request
+`1002788` and the 11-person audience. The source also contains the approved
+GUID-only, multi-valued persona-team resolver, but its three no-privilege team
+IDs are null and its rollout flag is false.
+
 The named prerequisites are deliberately attached to the slices that need them:
 
 1. **Resolved 2026-08-30:** the owner approved the expanded implementation
@@ -65,9 +73,21 @@ The named prerequisites are deliberately attached to the slices that need them:
    six requested Global privileges. Dataverse automatically attached nine App
    Opener baseline privileges when it created the role; none is Delete, Assign,
    Share, or Request Document write.
-5. Before Slice 4, settle how the application positively identifies a Program Coordinator or leadership user. Current app access proves access to an application, and each Request identifies its responsible PD and assigned PC, but there is no verified Workbench persona contract for “any PC” or “leadership.” The implementation must not infer those roles from names, email addresses, job titles, or the changing program taxonomy.
+5. **Architecture resolved 2026-08-31; rollout proof open.** The application
+   will identify global Final Writeup personas through three no-privilege
+   Dataverse owner teams: Program Directors, Program Coordinators, and
+   Leadership. Runtime matching uses pinned team GUIDs only and permits
+   multiple memberships. Allison Keller is owner-confirmed President; Beth
+   Pruitt is owner-confirmed CSO and also has responsible-PD requests. The
+   teams are not yet provisioned, their GUIDs remain null, and representative
+   PC/leadership SharePoint access is not yet proved, so persona lenses remain
+   disabled. No name, email, job-title, or program-taxonomy inference is used.
 
-Prerequisite 5 does **not** block the responsible-PD handoff or ordinary-PD review slices. Those relationships are already server-verifiable; PC backup actions and leadership-specific queues remain disabled until the broader persona contract exists.
+Prerequisite 5 does **not** block the responsible-PD handoff, ordinary-PD
+review slices, or the superuser matrix. Those relationships and the exact
+reviewer-role roster are already server-verifiable; PC backup actions and
+leadership-specific queues remain disabled until the exact teams and file
+access are verified.
 
 The board-package handoff remains excluded until the PCs describe their downstream process.
 
@@ -77,8 +97,8 @@ subject to the same caveats as individual acknowledgements: it is tracking, not
 approval; blanks are not failures; there is no required count, due date, or
 leadership sequence; and a later Word version yields **Updated since review**
 rather than erasing the acknowledgement. The responsible PD does not
-self-acknowledge their own writeup. Until the broader persona contract exists,
-the complete matrix is limited to positively identified PCs and superusers.
+self-acknowledge their own writeup. The complete matrix is currently limited to
+freshly identified superusers; persona-specific access remains disabled.
 
 ## Independent review disposition
 
@@ -136,10 +156,12 @@ An OAuth-authenticated, read-only Claude Fable review on 2026-08-28 independentl
   external-Word actions. The service caps the current-Final census at 100,
   batches exact document/acknowledgement reads in groups of 25, and limits
   Graph metadata reads to four concurrent calls. It derives responsible-PD
-  ownership and every queue/action server-side. It does not infer a PC or
-  leadership persona, expose the complete coordinator matrix, or broaden
-  supporting-material authorization. Production acknowledgement readiness is
-  exact `on`; Preview remains unset.
+  ownership and every queue/action server-side. The deployed foundation does
+  not infer a PC or leadership persona or broaden supporting-material
+  authorization. **[SOURCE-BUILT + LOCAL SIGNED-IN VERIFIED AGAINST PRODUCTION
+  READS 2026-08-31; NOT DEPLOYED]** the superuser index now exposes the complete
+  neutral matrix; ordinary and focused responses do not. Production
+  acknowledgement readiness is exact `on`; Preview remains unset.
 - **[VERIFIED]** A Pre-Site row in `SUPERSEDED` is excluded from the current artifact read model. Clearing its pointer can re-enable draft generation, while retaining the pointer and moving the row to `FINAL` preserves the existing read-only receipt and regeneration lock (`lib/services/pre-site-visit/artifact-service.js:545-577`, `838-859`; `tests/unit/staff-deliberations-tab.test.js:446-464`).
 - **[VERIFIED]** Dataverse writes only apply `MSCRMCallerID` when impersonation is enabled and may retry a 403 as the service principal; changesets do not currently expose a no-fallback actor guarantee (`lib/services/dynamics/write-core.js:76-115`; `lib/services/dynamics/changeset.js:85`, `113-125`).
 - **[VERIFIED 2026-08-31]** Session `dynamicsSystemuserId` depends on exact-email
@@ -339,13 +361,23 @@ File access must be re-derived server-side from the Request and allowlisted docu
 
 ### Persona prerequisite
 
-Add a small, explicit Workbench-persona contract before enabling PC or leadership behavior. It should be administered, reviewable, and server-resolved. Do not overload the Dynamics Explorer `dynamics_user_roles` table, infer role from a job title, or hardcode people.
+Use the approved explicit Workbench-persona contract before enabling PC or
+leadership behavior: three no-privilege Dataverse owner teams, resolved from
+the session-linked staff system-user and matched against pinned team GUIDs.
+Membership is multi-valued because leadership and PD responsibility can
+overlap. Do not overload the Dynamics Explorer `dynamics_user_roles` table,
+infer role from a job title, or hardcode people.
 
 Before choosing storage, verify whether the assigned Program Coordinator lookup is populated reliably enough to authorize request-scoped backup actions. That lookup may solve the narrow assigned-PC case, but it cannot provide the global “all active writeups” PC dashboard or identify leadership.
 
-The likely implementation is a dedicated Final Writeups app-access capability plus an explicit persona assignment associated with the staff system-user identity. The exact storage mechanism needs one focused design decision because current app-access grants are boolean and do not encode PD/PC/leadership subroles.
+The storage decision is complete. `shared/config/finalWriteupPersonas.js`
+defines the three exact team names and keeps every team GUID null until
+provisioning/readback. `lib/services/final-writeup/persona-service.js` performs
+no Dataverse read while rollout is disabled and, when enabled, fails closed on
+an incomplete/duplicate configuration or ambiguous viewer. Team display names
+are diagnostic only and never authorize a persona.
 
-Until that exists:
+Until provisioning and file-access proof are complete:
 
 - responsible-PD ownership can be enforced now;
 - ordinary PD review can be enabled for existing Workbench users;
@@ -381,8 +413,9 @@ Until that exists:
 - Row default for every non-owner: **Open review**.
 - Responsible-PD rows, if shown in a stewardship context, use **Edit in Word**.
 - Do not organize by Science and Engineering / Medical Research terminology.
-- Provide the full coordinator matrix for positively identified PCs and
-  superusers. It shows every in-scope writeup against the intended reviewer set
+- Provide the full coordinator matrix for superusers now and positively
+  identified PCs only after persona rollout. It shows every in-scope writeup
+  against the intended reviewer set
   with neutral blank / Reviewed / Updated since review states. It is a tracking
   view, not an approval, completion, or performance report.
 
@@ -495,20 +528,26 @@ were independently verified.
 - **Deliberately deferred:** new leadership-safe supporting-material
   projections. The ordinary-staff page links only to existing Workbench read
   surfaces under their existing authorization; it does not broaden access.
-- **Deliberately deferred:** complete coordinator matrix and persona-specific
-  queues until PC/leadership identity is positively resolved.
+- **Source-built and locally signed-in verified; not deployed:** the complete
+  neutral matrix is present on the superuser index only, deriving the expected
+  audience from exact enabled membership in `WMKF Final Writeup Reviewer`.
+  Ordinary/focused responses do not receive it.
+- **Deliberately deferred:** persona-specific queues and non-superuser matrix
+  access until exact team IDs and representative Word access are proved.
 
 This slice can ship before the PC/leadership persona model because responsible-PD versus other-PD is already server-verifiable.
 
 ### Slice 4 — leadership readiness and persona lenses
 
-- Land the explicit PC/leadership persona contract.
+- **Source contract complete; rollout disabled:** provision and independently
+  verify the exact no-privilege PD/PC/leadership teams, pin their GUIDs, and
+  prove representative PC/leadership Word access before enabling the resolver.
 - Add **Ready for leadership review**, moving the Final lifecycle from `REVIEW` to `FINAL` and storing the exact milestone version/hash/time plus explicit actor/time.
 - Enable PC all-active view and exceptional backup transition.
 - Enable CSO/President leadership-stage queues.
 - Verify the President’s reviewed-history behavior and the no-sequence rule.
-- Enable the full coordinator matrix for confirmed PC users and preserve its
-  non-compliance semantics for all audiences.
+- Extend the already-built complete coordinator matrix to confirmed PC users
+  and preserve its non-compliance semantics for all audiences.
 
 ### Slice 5 — production proof and rollout
 
@@ -597,8 +636,9 @@ Run each gate and its self-test sequentially where applicable:
 
 ## Final recommendation
 
-Proceed with the persona-specific access and complete neutral coordinator matrix
-on top of the Production-proved Slices 2–3 foundation next. The 2026-09-04 same-item
+Proceed with persona-team provisioning/access proof on top of the
+Production-proved Slices 2–3 foundation and the source-built complete neutral
+superuser matrix. The 2026-09-04 same-item
 handoff is already Production-proved; Wave 23 is exact and Active in Production,
 with the identity and schema prerequisites cleared. The acknowledgement
 adapter/service, authenticated route, Final-tab consumer, ordinary-staff
@@ -606,9 +646,11 @@ dashboard data path, and focused-review surface are Production-live behind the
 exact `on` flag. Signed-in dashboard/Final reads and responsible-PD exclusion
 passed, and the dedicated six-privilege reviewer role is effective for all 11
 confirmed audience members. The first colleague acknowledgement succeeded,
-appeared in review history, and passed exact independent readback. All edit/review actions open
-the canonical Word document outside the Workbench. PC backup, broad matrix
-visibility, leadership-specific lenses, and general rollout follow only after
-the explicit persona/access contracts are verified. This sequence advances the
+appeared in review history, and passed exact independent readback. All
+edit/review actions open the canonical Word document outside the Workbench.
+The superuser matrix is locally signed-in verified against Production read data
+but not deployed. PC backup, non-superuser matrix visibility,
+leadership-specific lenses, and general rollout follow only after the exact
+no-privilege teams and representative Word access are verified. This sequence advances the
 approved experience without guessing role identity or inventing the still-unknown
 board-package workflow.

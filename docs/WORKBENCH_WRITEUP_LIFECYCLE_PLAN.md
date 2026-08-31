@@ -3,7 +3,7 @@ title: Workbench Writeup Lifecycle Plan
 domain: workbench
 kind: plan
 status: active
-summary: "Pre-Site/Site Visit lifecycle with Production-proved same-item Final lineage; acknowledgement and dashboard follow-ons remain pending."
+summary: "Pre-Site/Site Visit lifecycle and Final acknowledgement/dashboard foundation are live; the superuser matrix is source-built; persona rollout remains."
 canonical: false
 cataloged: 2026-08-17
 last_verified: 2026-08-31
@@ -883,9 +883,12 @@ silently extend its paths or names to writeup publications.
    both pointers/lifecycles with explicit actor/time, and preserved file
    cardinality. Exact-retry behavior remains focused-test covered; no redundant
    Production write was run solely to restate the proof.
-12. **Final Writeups dashboard and acknowledgement follow-on.** Add the focused
-   review page, version-aware acknowledgement store, personal lenses, and full
-   coordinator matrix. Keep acknowledgement distinct from document lifecycle,
+12. **Final Writeups dashboard and acknowledgement follow-on.** The focused
+   review page and version-aware acknowledgement store are Production-live.
+   The full neutral superuser matrix is source-built and locally signed-in
+   verified against Production read data but is not deployed. Personal lenses
+   remain disabled pending no-privilege-team provisioning and representative
+   Word-access proof. Keep acknowledgement distinct from document lifecycle,
    external distribution, and the AkoyaGo publication projection.
 
 Each slice must trace caller → restriction context → registry persistence →

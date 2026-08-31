@@ -6,7 +6,7 @@ status: active
 summary: "Long-term product direction; current execution priority is owned by CURRENT_WORK_QUEUE.md."
 canonical: false
 cataloged: 2026-07-02
-last_verified: 2026-08-30
+last_verified: 2026-08-31
 owner: product-engineering
 related:
   - docs/SYSTEM_MODEL.md
@@ -158,10 +158,16 @@ coordinator matrix is included as neutral tracking: blank does not mean failure,
 there is no required count, due date, compliance score, or leadership order,
 and later edits produce **Updated since review** without erasing the recorded
 acknowledgement. The neutral acknowledgement-role rollout is complete for the
-confirmed 11-person audience. Persona-specific queues, complete-matrix access,
-SharePoint access proof, and the separate external Request Document attribution
-grant remain gated. Initial Assessment restore/Board writes remain separately
-owner-gated.
+confirmed 11-person audience. **[SOURCE-BUILT + LOCAL SIGNED-IN VERIFIED
+2026-08-31; NOT DEPLOYED]** the superuser Final Writeups index now renders the
+complete matrix from that exact role roster, with direct review/Word links and
+neutral Responsible PD / Not reviewed / Reviewed / Updated states. The approved
+persona mechanism is three no-privilege Dataverse teams with GUID-only,
+multi-valued membership: Allison Keller is President; Beth Pruitt is CSO and
+also a responsible PD on some requests. Team provisioning, representative
+PC/leadership Word-access proof, and persona-specific queues remain gated; the
+source rollout flag is false and the team IDs are null. Initial Assessment
+restore/Board writes remain separately owner-gated.
 
 **Recently completed:** the Staff Deliberations workspace/history UX, curated
 Site Visit materials-recipient menu, and Graph-search/Operational Events error

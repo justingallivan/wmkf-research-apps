@@ -80,6 +80,7 @@ function dashboard(overrides = {}) {
     success: true,
     counts: { total: 3, open: 1, history: 1, stewardship: 1 },
     queues: { open: [open], history: [history], stewardship: [stewardship] },
+    coordinatorMatrix: null,
     selected: null,
     navigation: null,
     ...overrides,
@@ -116,6 +117,38 @@ test('dashboard search filters all queues without adding filter controls', async
   expect(screen.queryByText('Cellular repair after tissue injury')).not.toBeInTheDocument();
   expect(screen.getByText('A second proposal')).toBeInTheDocument();
   expect(screen.getByText('1 matching writeup')).toBeInTheDocument();
+});
+
+test('superuser dashboard renders a complete neutral coordinator matrix with direct Word links', async () => {
+  const row = writeup();
+  global.fetch.mockResolvedValueOnce(response(dashboard({
+    coordinatorMatrix: {
+      reviewers: [
+        { reviewerId: 'reviewer-1', name: 'Ada Reviewer', initials: 'AR' },
+        { reviewerId: 'pd-1', name: 'Program Director A', initials: 'PA' },
+      ],
+      rows: [{
+        requestId: row.requestId,
+        requestNumber: row.requestNumber,
+        title: row.title,
+        institution: row.institution,
+        responsibleProgramDirector: row.responsibleProgramDirector,
+        stage: row.stage,
+        documentUrl: row.document.url,
+        cells: [
+          { reviewerId: 'reviewer-1', state: 'updated', acknowledgedAt: '2026-08-30T12:00:00.000Z' },
+          { reviewerId: 'pd-1', state: 'not-applicable', acknowledgedAt: null },
+        ],
+      }],
+    },
+  })));
+  render(<FinalWriteupsDashboardView />);
+
+  expect(await screen.findByRole('heading', { name: 'Coordinator matrix' })).toBeInTheDocument();
+  expect(screen.getByText(/not approval or compliance tracking/i)).toBeInTheDocument();
+  expect(screen.getByLabelText('Ada Reviewer: Updated for request 1002788')).toBeInTheDocument();
+  expect(screen.getByLabelText('Program Director A: Responsible PD for request 1002788')).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Open in Word' })).toHaveAttribute('href', row.document.url);
 });
 
 test('reviewer initials expose current and earlier-version meaning without color alone', async () => {

@@ -103,13 +103,18 @@ state, and treats expected schema-not-ready as an unavailable optional panel so
 the Word action remains independent.
 
 `lib/services/final-writeup/dashboard-service.js` and
-`pages/api/workbench/final-writeups.js` are also Production-deployed. They batch-read
-acknowledgements for at most 100 requests with current-Final pointers, derive
-ordinary staff open/history/stewardship queues plus an optional focused row,
-and keep a reviewed row in history after a later Word edit while labeling its
-freshness Updated. The route accepts only an optional Request GUID and derives
-the reviewer from the session. No persona inference or complete coordinator
-matrix is present.
+`pages/api/workbench/final-writeups.js` are also Production-deployed for the
+ordinary/focused foundation. They batch-read acknowledgements for at most 100
+requests with current-Final pointers, derive ordinary staff
+open/history/stewardship queues plus an optional focused row, and keep a
+reviewed row in history after a later Word edit while labeling its freshness
+Updated. The route accepts only an optional Request GUID and derives the
+reviewer from the session. **[SOURCE-BUILT + LOCAL SIGNED-IN VERIFIED AGAINST
+PRODUCTION READS 2026-08-31; NOT DEPLOYED]** the index response now adds a
+superuser-only complete matrix. Its expected-reviewer axis is the exact enabled
+membership of `WMKF Final Writeup Reviewer`, capped at 50; each cell is
+Reviewed, Updated, Not reviewed, or Responsible PD. Persona teams do not
+control this matrix.
 
 ## Write Paths
 
@@ -169,6 +174,10 @@ returned the reviewed-history state. The stored acknowledgement time is
   review history displayed the completed state; independent readback proved one
   complete acknowledgement row for Request `1002788`. No session-identity bypass
   or manufactured Final was used.
-  Dedicated supporting-material data routes, the positively identified
-  PC/leadership persona lenses, and the complete coordinator matrix remain;
-  their rollout still requires the separate persona/access proofs.
+  Dedicated supporting-material data routes and the PC/leadership persona
+  lenses remain. The complete neutral matrix is source-built for superusers and
+  locally verified against Production read data, but is not deployed. The
+  approved persona contract uses three no-privilege Dataverse teams with
+  multi-membership support; exact team GUIDs remain null and the rollout flag
+  remains false until the teams are provisioned and representative PC and
+  leadership Word access is proved.

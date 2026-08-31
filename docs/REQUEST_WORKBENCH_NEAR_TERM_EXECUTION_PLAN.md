@@ -871,10 +871,12 @@ Decision order:
    lead-PD copy behavior after the owner's staff discussion, plus the exact
    automated-notification audience and digest window, the large-file scanner
    contract, recording/transcript/summary contracts, and persistence/access.
-3. **Final Writeup** — implement the owner-approved same-item lineage,
-   explicit transition attribution, acknowledgement persistence, and
-   matrix-ready dashboard data for a superuser-testable path by 2026-09-04.
-   Role-specific rollout remains gated by persona and file-access verification.
+3. **Final Writeup** — same-item lineage, explicit transition attribution, and
+   acknowledgement persistence are Production-proved. The complete neutral
+   superuser matrix is source-built and locally signed-in verified against
+   Production read data, but is not deployed. Role-specific rollout remains
+   gated by no-privilege-team provisioning and representative file-access
+   verification.
 4. **Initial Assessment** — the pilot and administrator controls are
    Production-deployed and the signed-in read surface has passed. Decide
    whether to authorize exact restore and/or first Board-snapshot write proof,
@@ -1200,6 +1202,8 @@ Still required:
    coordinator;
 8. any additional Final Writeup inputs beyond the selected latest Pre-Site
    version; first-release regeneration is intentionally excluded; and
-9. exact PC/leadership persona storage, SharePoint file-access verification,
-   and restore authority. Acknowledgement granularity and the full coordinator
-   matrix direction are settled in the Final implementation plan.
+9. provisioning/readback of the settled no-privilege PD/PC/leadership team
+   contract, representative SharePoint file-access verification, and restore
+   authority. Acknowledgement granularity and the full coordinator matrix
+   direction are settled in the Final implementation plan; the superuser
+   matrix is source-built but not deployed.

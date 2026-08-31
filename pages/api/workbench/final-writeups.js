@@ -3,14 +3,15 @@
  *
  * GET returns the ordinary Workbench-user Final Writeups queue. Optional
  * `requestId` returns the same bounded projection plus one focused row and its
- * server-derived previous/next navigation. Persona-specific leadership/PC
- * lenses and the complete coordinator matrix remain intentionally absent.
+ * server-derived previous/next navigation. The index response adds a complete
+ * coordinator matrix for superusers. Persona-specific leadership/PC lenses
+ * remain rollout-disabled pending their separate access proof.
  */
 
 import { withDalContext } from '../../../lib/dataverse/core/context';
 import { loadFinalWriteupsDashboard } from '../../../lib/services/final-writeup/dashboard-service';
 import { ServiceHttpError } from '../../../lib/services/service-http-error';
-import { requireAppAccess } from '../../../lib/utils/auth';
+import { getUserRole, requireAppAccess } from '../../../lib/utils/auth';
 import { isGuid } from '../../../lib/utils/guid';
 
 export const config = { maxDuration: 300 };
@@ -24,6 +25,8 @@ export default async function handler(req, res) {
   const access = await requireAppAccess(req, res, 'reviewers');
   if (!access) return;
   const actingUserSystemId = access.session?.user?.dynamicsSystemuserId || null;
+  const role = access.profileId === null ? 'superuser' : await getUserRole(access.profileId);
+  const isSuperuser = role === 'superuser';
   const queryKeys = Object.keys(req.query || {});
   if (queryKeys.some((key) => key !== 'requestId')) {
     return res.status(400).json({ error: 'Only the optional requestId query parameter is supported' });
@@ -43,6 +46,7 @@ export default async function handler(req, res) {
       const body = await loadFinalWriteupsDashboard({
         actingUserSystemId,
         selectedRequestId,
+        isSuperuser,
       });
       return res.status(200).json(body);
     } catch (error) {

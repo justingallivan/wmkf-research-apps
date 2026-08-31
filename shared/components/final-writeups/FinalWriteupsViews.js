@@ -210,6 +210,106 @@ function QueueSection({ title, description, rows, emptyCopy, secondary = false }
   );
 }
 
+function MatrixState({ state, reviewerName, requestNumber }) {
+  const copy = {
+    reviewed: 'Reviewed',
+    updated: 'Updated',
+    unreviewed: 'Not reviewed',
+    'not-applicable': 'Responsible PD',
+  }[state] || 'Unavailable';
+  const classes = {
+    reviewed: 'border-green-200 bg-green-50 text-green-800',
+    updated: 'border-amber-200 bg-amber-50 text-amber-900',
+    unreviewed: 'border-gray-200 bg-white text-gray-600',
+    'not-applicable': 'border-gray-200 bg-gray-100 text-gray-600',
+  }[state] || 'border-red-200 bg-red-50 text-red-800';
+  return (
+    <span
+      aria-label={`${reviewerName}: ${copy} for request ${requestNumber || 'without a number'}`}
+      className={`inline-flex min-h-9 w-full min-w-28 items-center justify-center rounded-lg border px-2 py-1.5 text-center text-xs font-semibold leading-4 ${classes}`}
+    >
+      {copy}
+    </span>
+  );
+}
+
+function CoordinatorMatrix({ matrix, search }) {
+  if (!matrix) return null;
+  const rows = (matrix.rows || []).filter((row) => matchesSearch(row, search));
+  return (
+    <section aria-labelledby="coordinator-matrix-heading">
+      <div className="mb-3">
+        <h2 id="coordinator-matrix-heading" className="text-xl font-semibold tracking-[-0.02em] text-gray-900">
+          Coordinator matrix
+        </h2>
+        <p className="mt-1 max-w-3xl text-sm leading-6 text-gray-600">
+          Every current Final Writeup and expected reviewer. This records review activity only; it is not approval or compliance tracking.
+        </p>
+      </div>
+      <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
+        <table className="min-w-max border-collapse text-left">
+          <thead>
+            <tr className="border-b border-gray-200 bg-gray-50">
+              <th scope="col" className="sticky left-0 z-20 w-56 min-w-56 max-w-56 bg-gray-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-gray-600 sm:w-72 sm:min-w-72 sm:max-w-72 sm:px-5">
+                Final Writeup
+              </th>
+              {(matrix.reviewers || []).map((reviewer) => (
+                <th key={reviewer.reviewerId} scope="col" className="min-w-36 px-3 py-3 text-sm font-semibold text-gray-900">
+                  <span className="block">{reviewer.name}</span>
+                  {reviewer.initials && <span className="mt-0.5 block text-xs font-normal text-gray-500">{reviewer.initials}</span>}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-200">
+            {rows.map((row) => (
+              <tr key={row.requestId} className="align-top hover:bg-gray-50/70">
+                <th scope="row" className="sticky left-0 z-10 w-56 min-w-56 max-w-56 bg-white px-4 py-4 shadow-[1px_0_0_0_rgb(229_231_235)] sm:w-72 sm:min-w-72 sm:max-w-72 sm:px-5">
+                  <Link
+                    href={`/workbench/final-writeups/${encodeURIComponent(row.requestId)}`}
+                    className="block whitespace-normal font-semibold text-gray-900 underline-offset-4 hover:underline focus:outline-none focus:ring-2 focus:ring-gray-500"
+                  >
+                    <span className="tabular-nums">#{row.requestNumber || '—'}</span> {row.title || 'Untitled request'}
+                  </Link>
+                  <span className="mt-1 block text-xs font-normal leading-5 text-gray-500">
+                    {[row.responsibleProgramDirector?.name && `PD: ${row.responsibleProgramDirector.name}`, row.stage?.label]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </span>
+                  <a
+                    href={row.documentUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-2 inline-block text-xs font-semibold text-gray-700 underline underline-offset-4 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-500"
+                  >
+                    Open in Word
+                  </a>
+                </th>
+                {(row.cells || []).map((cell, index) => (
+                  <td key={cell.reviewerId} className="px-3 py-4">
+                    <MatrixState
+                      state={cell.state}
+                      reviewerName={matrix.reviewers?.[index]?.name || 'Reviewer'}
+                      requestNumber={row.requestNumber}
+                    />
+                  </td>
+                ))}
+              </tr>
+            ))}
+            {rows.length === 0 && (
+              <tr>
+                <td colSpan={(matrix.reviewers?.length || 0) + 1} className="px-6 py-10 text-center text-sm text-gray-500">
+                  No matrix rows match your search.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
 function LoadingSurface({ message = 'Loading Final Writeups…' }) {
   return (
     <div className="rounded-xl border border-gray-200 bg-white px-6 py-16 text-center shadow-sm" aria-live="polite">
@@ -336,6 +436,7 @@ export function FinalWriteupsDashboardView() {
           <ErrorSurface message={error} onRetry={load} />
         ) : (
           <div className="space-y-6">
+            <CoordinatorMatrix matrix={data.coordinatorMatrix} search={search} />
             <QueueSection
               title="Awaiting your review"
               description="Open a writeup, read it in Word, then record that you reviewed the current version."

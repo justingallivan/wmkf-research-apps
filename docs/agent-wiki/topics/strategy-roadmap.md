@@ -251,8 +251,12 @@ document inventory, and individual implementation plans do not establish priorit
   approved Production apply and independent readback proved direct assignment
   and all six requested Global privileges effective for the full 11-person
   audience. The colleague's post-role retry succeeded, appeared in review
-  history, and produced the independently verified first complete row. Broader
-  persona rollout and the complete matrix remain open.
+  history, and produced the independently verified first complete row.
+  **[SOURCE-BUILT + LOCAL SIGNED-IN VERIFIED AGAINST PRODUCTION READS
+  2026-08-31; NOT DEPLOYED]** the superuser index now exposes the complete
+  neutral current-Final × exact reviewer-role matrix. Broader persona rollout
+  remains open behind the approved no-privilege-team contract and
+  representative Word-access proof.
 - **Prior owner-directed release (S469, 2026-08-30):** durable Executor
   budgets are Production-deployed and owner-viewed in the safe no-revision/code-
   fallback state; first publication remains an explicit administrator action.

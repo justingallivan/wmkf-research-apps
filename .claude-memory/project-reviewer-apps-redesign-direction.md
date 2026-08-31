@@ -40,7 +40,11 @@ Final acknowledgements key to the Final artifact and observed SharePoint
 publication version. The approved audience is all PDs, PCs, CSO, and President,
 and a full coordinator matrix is required with neutral blank/Reviewed/Updated
 since review states and no compliance semantics. SharePoint file-permission
-verification and the broader persona key remain open. The
+verification and persona rollout remain open. The owner-approved persona
+contract is three no-privilege Dataverse teams keyed only by pinned GUID, with
+multi-membership allowed; Allison Keller is President and Beth Pruitt is CSO
+plus a responsible PD on some requests. The source team IDs remain null and the
+rollout flag remains false. The
 first fixed gate is a human-in-the-loop, end-to-end Initial Assessment pilot by
 2026-08-10, ahead of proposal intake around 2026-08-18. Authorized staff use a
 dedicated representative dummy production request to generate, inspect, and edit the canonical
@@ -252,8 +256,11 @@ planned. Current authority is
   queue, responsible-PD stewardship rows, reviewed history/freshness state,
   positive initials, and separate **Open review** / **Open in Word** actions.
   The server caps and batches its reads and derives relationships/actions; it
-  does not infer PC/leadership personas, expose the full matrix, or broaden
-  supporting-material access. PR #140 merge `ce229778` is Ready in deployment
+  does not infer PC/leadership personas or broaden supporting-material access.
+  **[SOURCE-BUILT + LOCAL SIGNED-IN VERIFIED AGAINST PRODUCTION READS
+  2026-08-31; NOT DEPLOYED]** the superuser index now adds the full neutral
+  current-Final × exact reviewer-role matrix with direct review/Word links.
+  Ordinary and focused responses receive no matrix. PR #140 merge `ce229778` is Ready in deployment
   `dpl_P7xay61LHnxohad9FEtSniBAosuY`; Wave 23 Production readiness is exact
   `on` in Ready deployment `dpl_B9k3AprnYp5ExpkqpT3dUxCUZqWo`. Signed-in
   dashboard and Request `1002788` Final reads passed with zero reviews and
@@ -263,7 +270,9 @@ planned. Current authority is
   directly assigned and its six requested Global privileges are effective for
   all 11 confirmed audience members. The colleague's post-role retry succeeded,
   appeared in review history, and independent readback proved exactly one
-  complete acknowledgement row for Request `1002788`.
+  complete acknowledgement row for Request `1002788`. Persona lenses remain
+  disabled until the approved teams are provisioned and representative PC and
+  leadership Word access is proved.
   Initial Assessment production
   registry/pointer schema, governed prompt v1, and application are live and
   verified; Request `1002788` preserves mechanics-only historical evidence,

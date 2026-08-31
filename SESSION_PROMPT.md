@@ -47,20 +47,26 @@ Workbench redesign.
 - `8ff4205a` — Clean Wave 24 review receipt / first active runtime commit
 - `b4615362` — Record Wave 24 Production activation
 
-## Next Session — Deadline-Critical Order
+## Current Deadline-Critical Order
 
-1. **Run a read-only persona/access preflight.** Resolve the intended 11-person
-   Final Writeup audience from authoritative profile/Dataverse data. Identify
-   PD, PC, CSO, and President relationships without inferring authority from
-   display names, job titles, or program taxonomy. Verify representative
-   SharePoint/Word access before changing UI or routes.
-2. **Build the superuser coordinator matrix after that proof.** Project current
-   Final rows × expected reviewers and show neutral states such as Reviewed,
-   Updated, and Not reviewed, with direct Word links. Do not imply approval,
-   compliance, deadlines, required counts, or reviewer order.
-3. **Add staff/executive lenses only after identity and access are proved.** Keep
-   the current ordinary-staff dashboard usable and avoid a global Workbench
-   refresh during the deadline window.
+1. **[COMPLETE 2026-08-31] Read-only persona/access preflight.** The exact
+   enabled `WMKF Final Writeup Reviewer` roster is the intended 11-person
+   audience. Request relationships positively identify the active PD/PC
+   assignments. Owner confirmation establishes Allison Keller as President and
+   Beth Pruitt as CSO; Beth also has responsible-PD requests. John Charbonneau
+   remains in the acknowledgement audience but is not assigned a persona.
+2. **[SOURCE-BUILT + LOCAL SIGNED-IN VERIFIED 2026-08-31; NOT DEPLOYED]
+   Superuser coordinator matrix.** The index projects every current Final row ×
+   exact enabled reviewer-role member with neutral Reviewed, Updated, Not
+   reviewed, and Responsible PD states plus direct focused-review/Word links.
+   It passed signed-in local desktop and 390px browser QA against Production
+   read data. It has no approval, compliance, deadline, count, or order meaning.
+3. **[ROLLOUT DISABLED] Staff/executive lenses.** The approved persona contract
+   uses three no-privilege Dataverse teams (PD, PC, leadership), permits overlap,
+   and matches pinned GUIDs only. The teams are not yet provisioned, IDs are
+   null, and the source flag is false. Provision/verify them and prove
+   representative PC and leadership Word access before enabling lenses. Keep
+   the ordinary-staff dashboard unchanged in the meantime.
 
 ## Opportunistic Production Proof — Do Not Block the Deadline
 

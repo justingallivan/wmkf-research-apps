@@ -106,6 +106,16 @@ function harness() {
       fullname: 'Ada Reviewer',
       isdisabled: false,
     })),
+    resolvePersonas: jest.fn(async () => ({ enabled: false, personas: [] })),
+    listExpectedReviewers: jest.fn(async () => ({
+      records: [
+        { systemuserid: ACTOR_ID, fullname: 'Ada Reviewer', isdisabled: false },
+        { systemuserid: PD_A_ID, fullname: 'Program Director A', isdisabled: false },
+        { systemuserid: PD_B_ID, fullname: 'Program Director B', isdisabled: false },
+      ],
+      totalCount: 3,
+      hasMore: false,
+    })),
     queryRequests: jest.fn(async () => ({
       records: requests,
       totalCount: requests.length,
@@ -164,6 +174,64 @@ test('derives open, reviewed-history, and responsible-PD stewardship queues serv
   expect(dependencies.findDocumentsByIds).toHaveBeenCalledTimes(1);
   expect(dependencies.findAcknowledgementsByFinalDocuments).toHaveBeenCalledTimes(1);
   expect(dependencies.getFileMetadataById).toHaveBeenCalledTimes(3);
+});
+
+test('superuser index includes the complete neutral coordinator matrix', async () => {
+  const { dependencies } = harness();
+  const result = await loadFinalWriteupsDashboard({
+    actingUserSystemId: ACTOR_ID,
+    isSuperuser: true,
+  }, dependencies);
+
+  expect(result.viewer).toMatchObject({ isSuperuser: true, personas: [], personaLensesEnabled: false });
+  expect(result.coordinatorMatrix.reviewers.map((reviewer) => reviewer.name)).toEqual([
+    'Ada Reviewer',
+    'Program Director A',
+    'Program Director B',
+  ]);
+  expect(result.coordinatorMatrix.rows).toHaveLength(3);
+  expect(result.coordinatorMatrix.rows[0].cells).toEqual([
+    { reviewerId: ACTOR_ID, state: 'unreviewed', acknowledgedAt: null },
+    { reviewerId: PD_A_ID, state: 'not-applicable', acknowledgedAt: null },
+    { reviewerId: PD_B_ID, state: 'unreviewed', acknowledgedAt: null },
+  ]);
+  expect(result.coordinatorMatrix.rows[1].cells[0]).toMatchObject({
+    reviewerId: ACTOR_ID,
+    state: 'updated',
+    acknowledgedAt: '2026-08-30T12:05:00.000Z',
+  });
+});
+
+test('ordinary and focused responses do not load or expose the coordinator matrix', async () => {
+  const ordinary = harness();
+  const ordinaryResult = await loadFinalWriteupsDashboard({ actingUserSystemId: ACTOR_ID }, ordinary.dependencies);
+  expect(ordinaryResult.coordinatorMatrix).toBeNull();
+  expect(ordinary.dependencies.listExpectedReviewers).not.toHaveBeenCalled();
+
+  const focused = harness();
+  const focusedResult = await loadFinalWriteupsDashboard({
+    actingUserSystemId: ACTOR_ID,
+    selectedRequestId: REQUEST_A_ID,
+    isSuperuser: true,
+  }, focused.dependencies);
+  expect(focusedResult.coordinatorMatrix).toBeNull();
+  expect(focused.dependencies.listExpectedReviewers).not.toHaveBeenCalled();
+});
+
+test('superuser matrix fails closed on a contradictory disabled reviewer row', async () => {
+  const { dependencies } = harness();
+  dependencies.listExpectedReviewers.mockResolvedValue({
+    records: [{ systemuserid: PD_A_ID, fullname: 'Disabled Reviewer', isdisabled: true }],
+    totalCount: 1,
+    hasMore: false,
+  });
+  await expect(loadFinalWriteupsDashboard({
+    actingUserSystemId: ACTOR_ID,
+    isSuperuser: true,
+  }, dependencies)).rejects.toMatchObject({
+    httpStatus: 500,
+    body: { code: 'final_writeups_dashboard_reviewer_roster_invalid' },
+  });
 });
 
 test('keeps a later Word version in reviewed history and labels freshness separately', async () => {
