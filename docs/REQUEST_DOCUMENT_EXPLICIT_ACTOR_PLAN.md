@@ -8,6 +8,7 @@ canonical: false
 cataloged: 2026-08-31
 owner: product-engineering
 related:
+  - docs/audits/request-document-explicit-actor-adversarial-review-reconciliation-2026-08-31.md
   - docs/DYNAMICS_IDENTITY_RECONCILIATION_PLAN.md
   - docs/REQUEST_DOCUMENT_ATTRIBUTION_ROLE_PLAN.md
   - docs/APPLICATION_STATE_ATLAS.md
@@ -28,7 +29,8 @@ related:
 
 ## Decision and status
 
-**[OWNER-SELECTED 2026-08-31; PLANNING COMPLETE, NOT IMPLEMENTED.]** Keep
+**[OWNER-SELECTED 2026-08-31; ADVERSARIAL REVIEWED, ONE OWNER POLICY GATE,
+NOT IMPLEMENTED.]** Keep
 `wmkf_requestdocument` Create/Write/Append privileges off the broad staff role
 and do not create a replacement writer role. Runtime writes continue under the
 application service principal after the existing impersonated-write 403
@@ -41,6 +43,17 @@ Final Writeup/dashboard deadline unless the owner explicitly reprioritizes it.
 The confirmation-only Connor question scheduled for September 7 is not a
 blocking dependency unless it identifies a concrete consumer of built-in
 `createdby`/`modifiedby`.
+
+The read-only Claude adversarial review returned **APPROVE WITH CONDITIONS**.
+Source verification accepted the Site Visit legacy-retry, missing-identity,
+Board-snapshot display, immutability, create-bind-evidence, and DateTime
+findings. The distribution finding was accepted only as a display-semantic
+rule: a second user cannot resume the same operation because the actor is part
+of the immutable draft hash and the send path checks exact actor ownership.
+The remaining owner gate is the missing-identity availability policy described
+under Readiness Boundary; the recommendation is to preserve each flow's
+current availability posture while recording an honest missing-attribution
+event.
 
 ## Why Option B
 
@@ -112,7 +125,7 @@ Add these fields to `wmkf_requestdocument`:
 | Field | Type | Meaning |
 |---|---|---|
 | `wmkf_InitiatedBy` | optional N:1 to `systemuser` | Authenticated staff member who caused this Request Document row to be created. Null means unattended, legacy, or not captured; it must never be inferred from `createdby`. |
-| `wmkf_InitiatedAt` | DateTime | Server UTC time when that row-creating business operation was accepted. It is immutable after create. |
+| `wmkf_InitiatedAt` | DateTime, `UserLocal` behavior | Server UTC time when that row-creating business operation was accepted. Dataverse stores UTC and renders in the viewer's local zone. It is immutable after create. |
 | `wmkf_MilestoneCreatedBy` | optional N:1 to `systemuser` | Authenticated staff member who completed the Pre-Site → Site Visit handoff represented by the existing `wmkf_milestone*` fields. |
 
 The existing `wmkf_milestonecreatedat` remains the matching handoff time. The
@@ -128,21 +141,55 @@ review; `InitiatedBy` and `GroupReviewStartedBy` can legitimately differ.
 
 Introduce `REQUEST_DOCUMENT_EXPLICIT_ACTOR_SCHEMA_READY`, enabled only by the
 literal value `on`. While off, the adapter must not select the new fields and
-the writers must not include them. Promotion order is schema preflight →
+the writers must not include them. Existing writes continue without the new
+fields; reads remain schema-compatible. Promotion order is schema preflight →
 owner-approved additive apply → exact readback → environment flag → runtime.
 
-After Production promotion, authenticated business actions in scope require a
-valid session-derived Dynamics system-user ID. The runtime must not substitute
-the service principal into the explicit lookup or manufacture a display name.
-Read models must label absent legacy values as “Not captured,” not “System” and
-not the current viewer.
+**Owner policy gate — recommended availability posture.** Preserve the
+current per-flow identity policy rather than silently making every writer more
+restrictive:
+
+- Final transition, Final acknowledgement, distribution, and the ordinary
+  profile-backed Board-snapshot/reopen routes already require a resolved actor;
+  they continue to fail closed with their existing actionable 403 behavior.
+- Initial Assessment generation, Pre-Site generation, and Site Visit handoff
+  currently permit a missing mapped actor. The recommendation is to preserve
+  availability: perform the business action, leave both explicit origin fields
+  null, render “Not captured,” and write a bounded durable operational event
+  `request_document_actor_not_captured`. Do not manufacture the service
+  principal or current viewer as the actor.
+- Before any explicit bind, freshly read the proposed `systemuser` and require
+  the exact GUID with `isdisabled === false`. A missing/disabled/stale mapping
+  follows that flow's policy above rather than sending a lookup bind that can
+  fail after side effects begin.
+
+This recommendation reflects the absence of a known compliance dependency and
+the existing availability-first fallback, but it is a product choice and must
+be explicitly accepted before Stage 1. Choosing universal fail-closed instead
+requires an actionable 403 plus Admin “Reconcile identities” recovery and an
+explicit acceptance of the new-hire/relicensed-user availability edge.
+
+The implemented runtime must add a Production health check named
+`request_document_explicit_actor_readiness`: once Wave 24 code is deployed, a
+non-`on` Production flag is unhealthy even though writes remain available.
+Post-promotion read-only census verifies that new rows either have a complete
+actor/time pair or a matching missing-attribution event carrying enough request,
+document, generation, and operation identity to reconcile it to the attempted
+write. Preview may remain off only when that limitation is named in the
+deployment receipt.
+
+Read models must label absent legacy or deliberately uncaptured values as “Not
+captured,” not “System,” “Administrator,” or the current viewer.
 
 ## Writer changes
 
-1. Add a small server-only payload helper that accepts a validated
-   `actingUserSystemId` and server time and returns the two row-origin fields.
-   It must not read request bodies or client timestamps.
-2. Apply that payload at the first create attempt in:
+1. Add a server-only actor resolver that accepts only the session-derived GUID,
+   rereads the exact `systemuser`, and returns an enabled actor or the flow's
+   defined missing-actor result. It must not read request bodies, client names,
+   or client timestamps.
+2. Make `requestDocumentAdapter.create` the single origin-stamping seam. When
+   readiness is on and the resolver returned an actor, it adds the lookup and
+   server time to the first create payload. The six current callers are:
    - Initial Assessment generation;
    - Initial Assessment Board snapshot;
    - Pre-Site generation;
@@ -151,19 +198,25 @@ not the current viewer.
    - Final Writeup claim creation.
 3. Never overwrite the origin fields when reclaiming or recovering an existing
    generation-key row. A later recovery actor remains visible only on a later
-   action-specific transition field when one exists.
+   action-specific transition field when one exists. The adapter update seam
+   rejects either origin field in a PATCH, and a focused source gate rejects
+   those fields in Request Document changeset PATCH bodies.
 4. Add `wmkf_MilestoneCreatedBy@odata.bind` to the same ETag-conditional PATCH
    that writes the Site Visit milestone version/hash/time.
-5. Replace guarded-reopen projection of `_createdby`/`createdon` with the new
-   explicit origin fields. Built-in actor columns may remain available as
-   diagnostics but must not be labeled as the human reopen actor.
+5. Replace both misleading `_createdby` consumers with the new explicit origin
+   fields: guarded-reopen history and Initial Assessment Board-snapshot
+   provenance/rendering. Remove the Board UI's manufactured “Administrator”
+   fallback. Built-in actor columns may remain available as diagnostics but
+   must not be labeled as the human reopen/snapshot actor.
 6. Keep Final group/leadership fields and Final acknowledgement behavior
    unchanged.
 
 The explicit system-user binds will be executed by the service principal after
 the existing 403 fallback, so they do not grant the staff member new Dataverse
-authority. Wave 22's proved group-review bind establishes that the application
-identity can write this relationship shape.
+authority. **[VERIFIED for PATCH / DERIVED for create.]** Wave 22 proves the
+application identity can write a system-user lookup bind inside the Final
+activation PATCH changeset. It does not prove the same bind on create; Stage 4's
+first natural row creation must close that evidence gap.
 
 ## Retry, concurrency, and partial-success rules
 
@@ -171,15 +224,25 @@ identity can write this relationship shape.
   successful create owns `InitiatedBy/At`; duplicate-key recovery rereads it.
 - A lost create response must never cause the retrying user to replace the
   original initiator.
-- Site Visit handoff success requires lifecycle, milestone version/hash/time,
-  and milestone actor to match on post-write reread. A matching lifecycle
-  without the explicit actor is incomplete, not a reconciled success.
+- Site Visit handoff's existing already-Review entry path remains backward
+  compatible: a complete legacy version/hash/time milestone returns reused even
+  when its actor is null and displays “Not captured.” For a readiness-era
+  attempt that entered as Draft, both the catch-path reread and ordinary
+  post-write confirmation require a non-null milestone actor in addition to
+  matching lifecycle/version/hash/time. Presence—not equality with the current
+  caller—is the invariant, because a concurrent identical attempt may have
+  committed atomically under a different authenticated actor.
 - Actor fields travel inside the same Dataverse create/PATCH/changeset as the
   described event. No fire-and-forget audit write is permitted.
 - Technical retries may update `modifiedon`/`modifiedby`; consumers ignore
   those built-in fields for human business attribution.
 - Historical rows remain untouched. No actor is inferred from logs, approvals,
   document authors, current assignment, or the person running a later retry.
+- `InitiatedBy` on a retained distribution snapshot means “created this
+  retained registry row,” never “sent this distribution.” The actor-bound
+  Postgres ledger plus Dynamics email activity remain sender authority. A later
+  operation may legitimately reuse a snapshot created by someone else; the
+  snapshot origin does not change.
 
 ## Initial Assessment restore boundary
 
@@ -212,7 +275,12 @@ and must not expand Wave 24 by default.
 
 - Add Wave 24 schema-as-code and exact read-only preflight.
 - Add the readiness helper, adapter projection, writer fields, and guarded-
-  reopen/Site Visit read-model changes.
+  reopen/Site Visit/Initial Assessment read-model changes.
+- Add the Production readiness health check and bounded durable
+  missing-attribution event before allowing fail-open actor gaps.
+- Add a focused writer-inventory/immutability gate: no raw Request Document
+  create may bypass the adapter, and no update/changeset PATCH may carry the
+  immutable origin fields.
 - Update the API security matrix and Atlas with planned—not live—status.
 - Do not apply schema or set any environment flag in this stage.
 
@@ -249,20 +317,34 @@ and must not expand Wave 24 by default.
   `InitiatedBy` is the staff actor; the projection must show the staff actor.
 - A guarded-reopen fixture with a service-principal `createdby`; deleting the
   new explicit field must make actor display “Not captured,” not fall back.
+- An Initial Assessment Board-snapshot fixture with service-principal
+  `createdby` and no explicit actor; the UI must show “Not captured,” never
+  “Administrator.”
 - Duplicate-key/lost-response recovery by a different actor; origin fields must
   remain the first actor/time.
-- Site Visit response-loss reconciliation with lifecycle/time present but
-  milestone actor absent; it must not report success.
+- Every reclaim/failure/metadata PATCH across the six writers is captured and
+  asserted not to contain either immutable origin field. A source gate fails if
+  a seventh create bypasses the adapter or a raw Request Document create is
+  introduced.
+- A legacy already-Review Site Visit row with version/hash/time and no actor
+  remains an idempotent success. A readiness-era response-loss reread with
+  matching lifecycle/version/hash/time but no actor is unconfirmed; the same
+  row with a non-null different actor is accepted as a concurrent commit.
 - Legacy rows with all new fields null; reads remain successful and honest.
-- Unauthenticated or unmapped write actor; no client value can fill the field.
+- Missing, disabled, and stale mapped actors exercise each flow's chosen policy;
+  no client value can fill the field, and an allowed null-actor write emits the
+  durable missing-attribution event.
 - Readiness off against a schema without Wave 24; no new field is selected or
-  written.
+  written, existing writes remain available, and Production health is red.
+- A later distribution operation reuses a snapshot created by another actor;
+  the snapshot keeps its origin while the new ledger/email retain sender truth.
 
 ## Acceptance criteria
 
 - No Request Document privilege is added to a broad or dedicated staff role.
-- Every current row-create path stamps immutable, session-derived origin actor
-  and server time when the feature is ready.
+- Every current row-create path passes through the enforced origin-stamping
+  seam. A valid actor produces an immutable actor/time pair; an allowed missing
+  actor produces two nulls plus durable operational evidence.
 - Guarded-reopen history no longer presents service-principal `createdby` as
   the staff actor.
 - Site Visit handoff stores its actor with the existing milestone evidence.
@@ -272,6 +354,8 @@ and must not expand Wave 24 by default.
 - Historical unknowns remain explicit unknowns; no backfill is invented.
 - Exact schema/readiness/runtime status is reconciled across the Atlas, queue,
   session handoff, and API matrix after each promotion stage.
+- The owner has accepted either the recommended current-posture availability
+  policy or a universal fail-closed replacement before Stage 1 begins.
 
 ## Residual risks
 
@@ -281,8 +365,8 @@ and must not expand Wave 24 by default.
 2. The explicit actor proves which authenticated identity initiated the app
    action, not that the person authored every later Word edit. SharePoint
    version history remains authoritative for document editing.
-3. A future Request Document producer can omit the fields unless a writer-
-   inventory gate or focused source test is maintained.
+3. A future raw writer could bypass the fields; the adapter-only writer gate
+   and immutable-field PATCH gate are required permanent controls.
 4. Repeatable cross-system actions such as native version restore require an
    append-only operation ledger if WMKF later needs complete app-side actor
    history.

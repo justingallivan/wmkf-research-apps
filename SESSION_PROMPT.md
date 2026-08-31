@@ -308,6 +308,14 @@ against launching metered review tools without explicit owner authorization.
    Decide whether off-app distribution gets a manual transition, and whether
    the zero-program sentence should mention discretionary history.
 
+3. **Request Document missing-actor availability policy.**
+   The Option B plan passed read-only Claude adversarial review with conditions.
+   Before implementation, choose either the recommended current-posture policy
+   (existing strict flows stay strict; Initial Assessment, Pre-Site, and Site
+   Visit remain available with null attribution plus durable operational
+   evidence) or universal fail-closed identity handling. No runtime or schema
+   work is authorized while this gate is open.
+
 ### Scheduled Follow-up
 
 1. **TO DO Monday 2026-09-07: send Connor the confirmation-only Request
@@ -368,7 +376,7 @@ against launching metered review tools without explicit owner authorization.
 | File | Purpose |
 |------|---------|
 | `docs/CURRENT_WORK_QUEUE.md` | Canonical delivery priority and owner-deferred write proof |
-| `docs/REQUEST_DOCUMENT_EXPLICIT_ACTOR_PLAN.md` | Owner-selected Option B schema/writer/retry plan; planning complete, implementation deferred |
+| `docs/REQUEST_DOCUMENT_EXPLICIT_ACTOR_PLAN.md` | Adversarially reviewed Option B schema/writer/retry plan; one owner policy gate, implementation deferred |
 | `shared/config/executorBudgets.js` | Budget bounds, descriptions, and reviewed outage fallback |
 | `lib/services/executor-budget-service.js` | Append-only read/publication contract |
 | `pages/api/admin/executor-budgets.js` | Superuser budget read/publication route |
