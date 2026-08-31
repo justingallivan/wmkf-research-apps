@@ -37,5 +37,10 @@ Production schema apply completed and independent readback reported 3 exact /
 0 absent / 0 divergent. A subsequent separately approved promotion set the
 Production-only readiness flag, deployed exact commit
 `8ff4205a0ad43337cd987a4fc76639f936bab4bc`, and passed signed-in health plus a
-zero-violation deployment-boundary census. The first natural business-flow
-write/readback remains pending.
+zero-violation deployment-boundary census. Later that day, naturally generated
+Request `1002874` supplied the first business-flow proof: one Ready/Draft
+Pre-Site row carried explicit Justin Gallivan origin actor/time while the
+built-in creator remained the application, the current pointer matched, no
+missing-attribution event existed, and the deployment-boundary census advanced
+to 1 attributed / 0 event-backed unattributed / 0 violations. Site Visit
+milestone and other producer-specific first-write proofs remain opportunistic.

@@ -203,7 +203,7 @@ its exact operation retry, but a later distinct operation records any resolvable
 retained copy as cleanup work.
 
 **[CORRECTED 2026-08-31 via the owner-run Request Document attribution
-census; WAVE 24 PRODUCTION-LIVE, CONTROLLED BUSINESS PROOF PENDING.]** Standard `createdby` on the reason-bearing successor names the
+census; WAVE 24 PRE-SITE CREATION PROVED, GUARDED-REOPEN PROOF PENDING.]** Standard `createdby` on the reason-bearing successor names the
 service principal after the impersonated write falls back; the current
 superuser-only projection therefore does not prove the human reopen actor.
 Commit `b5eeda7b` source-builds immutable explicit row-origin actor/time fields,
@@ -213,10 +213,13 @@ creation-only Production apply created all three artifacts; independent
 readback reported 3 exact / 0 absent / 0 divergent. The Production-only
 readiness flag is exact `on`, and commit
 `8ff4205a0ad43337cd987a4fc76639f936bab4bc` first reached Ready deployment
-`dpl_D94J9aRcfLfK81iBDsVYARVhZFPb`. Signed-in health passed and the
-deployment-boundary census reported zero violations and no new business rows.
-The next natural Request Document action must receive exact write/readback
-verification. See `docs/REQUEST_DOCUMENT_EXPLICIT_ACTOR_PLAN.md`.
+`dpl_D94J9aRcfLfK81iBDsVYARVhZFPb`. Signed-in health passed. Naturally
+generated Request `1002874` then proved one Ready/Draft Pre-Site row with
+explicit Justin Gallivan origin actor/time, application built-in creator, exact
+current pointer, no missing-attribution event, and a deployment-boundary census
+of 1 attributed / 0 event-backed unattributed / 0 violations. The next natural
+guarded reopen should receive its path-specific readback; do not manufacture a
+row. See `docs/REQUEST_DOCUMENT_EXPLICIT_ACTOR_PLAN.md`.
 
 **[PRODUCTION-DEPLOYED 2026-08-23 via merge `76a93a41` / Ready deployment
 `dpl_A8naatyxM3vcXaG4vgt79GcL5TpR`; SOURCE/TEST VERIFIED; FULL DISTRIBUTION

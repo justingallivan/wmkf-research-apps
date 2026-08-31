@@ -97,8 +97,11 @@ Request Document write census proved that these writes fall back and standard
 `createdby`/`modifiedby` name the service principal. The former guarded-reopen
 projection was therefore not reliable human attribution. The owner-selected
 repair is Production-live: Wave 24 schema is exact,
-Production readiness is literal `on`, signed-in health passed, and the first
-natural business-flow attribution proof remains pending:
+Production readiness is literal `on`, and signed-in health passed. Naturally
+generated Request `1002874` proved the first business-flow attribution on a
+Ready/Draft Pre-Site row, with explicit Justin Gallivan origin actor/time,
+application built-in creator, exact current pointer, no missing-attribution
+event, and census 1 attributed / 0 event-backed unattributed / 0 violations:
 `docs/REQUEST_DOCUMENT_EXPLICIT_ACTOR_PLAN.md` adds explicit row-origin
 actor/time and a Site Visit milestone actor, with no staff-role expansion and
 no new route or request-body identity field. Existing route guards and

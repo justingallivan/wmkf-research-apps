@@ -10,6 +10,25 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## August 2026 — Explicit Request Document actors reached Production (Session 471)
+
+**Milestone:** Request Document writes remain application-owned while immutable,
+server-controlled human origin actor/time and Site Visit milestone actor fields
+provide business attribution without broad staff CRUD privileges.
+**Sessions:** 471 (Option B decision, OAuth Claude adversarial review,
+implementation, schema apply, promotion, natural-flow proof, and durable sweep).
+**Ship state:** Wave 24 is exact 3/3 and Production readiness is literal `on`;
+commit `8ff4205a` first reached Ready deployment
+`dpl_D94J9aRcfLfK81iBDsVYARVhZFPb`. Naturally generated Request `1002874`
+proved explicit Justin Gallivan origin attribution with application built-in
+creator and census 1 attributed / 0 event-backed unattributed / 0 violations.
+**Why it matters:** attributable human actions no longer depend on widening an
+organization-wide master-table role; the unsent Connor privilege request is
+withdrawn and only a confirmation question remains.
+**Pointers:** `docs/REQUEST_DOCUMENT_EXPLICIT_ACTOR_PLAN.md`;
+`docs/atlas/dataverse-wmkf-requestdocument.md`; commits `b5eeda7b`, `c9e915c1`,
+and `8ff4205a`.
+
 ## August 2026 — Final Writeup acknowledgements and staff dashboard code reached Production (Session 471)
 
 **Milestone:** The Workbench now carries version-aware Final Writeup review
@@ -20,8 +39,10 @@ preflight/apply, promotion, Production verification, and durable sweep).
 **Ship state:** PR #140 merge `ce229778` is Production Ready; acknowledgement
 readiness is exact `on` in activation deployment
 `dpl_B9k3AprnYp5ExpkqpT3dUxCUZqWo`. Signed-in dashboard/Final reads passed with
-zero reviews and correct responsible-PD exclusion. The first cross-user
-acknowledgement/readback remains open; no row was written.
+correct responsible-PD exclusion. After the dedicated acknowledgement role
+became effective for all 11 audience members, an eligible colleague recorded a
+review for Request `1002788`; independent readback proved exactly one complete
+acknowledgement row and review-history projection.
 **Why it matters:** the deadline-critical review infrastructure is deployed
 without prematurely exposing unfinished persona/matrix behavior or allowing a
 responsible PD to self-acknowledge.

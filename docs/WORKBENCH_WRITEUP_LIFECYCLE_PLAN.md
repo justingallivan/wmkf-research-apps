@@ -583,15 +583,17 @@ non-superseded lifecycle.
    The full coordinator matrix is a read model over those rows, with no required
    count, due date, compliance semantics, or enforced reviewer order.
 5. **Selected and Production-proved 2026-08-23; actor correction
-   Production-live 2026-08-31, controlled business proof pending:** successor-row audit fields in Wave 20, client UUID dedupe/cycle
+   Pre-Site creation Production-proved 2026-08-31:** successor-row audit fields in Wave 20, client UUID dedupe/cycle
    identity, existing source/version/hash lineage, and a superuser-only route.
    The standard `createdby` projection currently names the service principal
    after fallback; explicit human actor/time is live behind the Production-only
    Wave 24 readiness flag described in
-   `docs/REQUEST_DOCUMENT_EXPLICIT_ACTOR_PLAN.md`. Signed-in health and the
-   zero-violation deployment-boundary census passed. No reopen or other Request
-   Document was manufactured; the first natural business action remains the
-   controlled proof.
+   `docs/REQUEST_DOCUMENT_EXPLICIT_ACTOR_PLAN.md`. Signed-in health passed.
+   Naturally generated Request `1002874` then proved a Ready/Draft Pre-Site row
+   with explicit Justin Gallivan origin actor/time, application built-in
+   creator, exact current pointer, no missing-attribution event, and census 1
+   attributed / 0 event-backed unattributed / 0 violations. Guarded reopen and
+   Site Visit milestone proofs remain opportunistic; do not manufacture rows.
 6. **Selected and Production-proved 2026-08-24 on Request `1002379`:** Postgres
    `pre_site_distribution_attempts` is the exact-preview and
    recovery ledger; retained file identities remain in SharePoint plus Request

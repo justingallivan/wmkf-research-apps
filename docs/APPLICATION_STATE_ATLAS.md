@@ -151,9 +151,12 @@ exact / 0 absent / 0 divergent, the Production-only readiness flag is exact
 `on`, and commit `8ff4205a0ad43337cd987a4fc76639f936bab4bc`
 first reached Ready deployment `dpl_D94J9aRcfLfK81iBDsVYARVhZFPb`. The
 additive fields are server-controlled row-origin actor/time and a Site Visit
-milestone actor. Signed-in health passed; the initial deployment-boundary
-census reported zero violations and no post-promotion business rows. The first
-natural business-flow write/readback remains pending. See
+milestone actor. Signed-in health passed. Naturally generated Request `1002874`
+then created one Ready/Draft Pre-Site row with explicit Justin Gallivan
+`InitiatedBy`/`InitiatedAt`, application built-in creator, exact current pointer,
+and no missing-attribution event. The deployment-boundary census is now 1
+attributed / 0 event-backed unattributed / 0 violations. Site Visit milestone
+attribution remains opportunistic proof on the next natural handoff. See
 `docs/REQUEST_DOCUMENT_EXPLICIT_ACTOR_PLAN.md`.
 
 | Service | Postgres tables touched | Dataverse access | Notes |

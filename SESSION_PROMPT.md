@@ -1,460 +1,113 @@
-# Session 471 Prompt: Final Writeup Acknowledgements and Dashboard Foundation
+# Session 472 Prompt: Final Writeup Persona and Coordinator Matrix
 
-## Session 469 Summary
+## Session 471 Summary
 
-Session 469 (2026-08-30) shipped durable Executor budget publication and
-Initial Assessment restore/Board-snapshot controls, closed their review and
-release work, and deliberately stopped before either owner-gated Production
-write. The session also hardened the Site Visit recipient-directory unsaved
-state, remediated Gitleaks test-token findings, and added a durable prohibition
-against launching metered review tools without explicit owner authorization.
+Session 471 (2026-08-31) shipped and Production-proved the Final Writeup
+acknowledgement foundation and Request Document explicit-actor architecture.
+The September 4, 2026 deadline remains the governing priority: finish the
+staff/executive Final Writeup visibility needed for real use without a dramatic
+Workbench redesign.
 
-### What Was Completed
+### Completed
 
-1. **Site Visit recipient-directory unsaved state hardened.**
-   - Newly added unsaved people use warning semantics, the page exposes
-     unsaved changes clearly, and browser navigation/history is guarded.
-   - Commits `07f350c2` and `df44b3e9`.
+1. **Final Writeup acknowledgement and dashboard foundation.** Wave 23 is exact
+   and Production readiness is `on`. Signed-in reads proved responsible-PD
+   exclusion. After the dedicated role reached all 11 audience members, an
+   eligible colleague successfully marked Request `1002788` reviewed; it
+   appeared in review history and independent readback found exactly one
+   complete acknowledgement row.
+2. **Request Document attribution decision.** The owner selected Option B:
+   retain service-principal writes and add explicit, server-controlled business
+   actors. No broad staff Request Document role is needed. The earlier Connor
+   privilege brief was never sent and is withdrawn.
+3. **Wave 24 implementation and promotion.** OAuth Claude adversarial review
+   found no Blocker/High issue after reconciliation. Production schema is 3
+   exact / 0 absent / 0 divergent, the Production-only readiness flag is `on`,
+   signed-in health passed, and commit
+   `8ff4205a0ad43337cd987a4fc76639f936bab4bc` first reached Ready deployment
+   `dpl_D94J9aRcfLfK81iBDsVYARVhZFPb`.
+4. **First natural Wave 24 proof.** Request `1002874` created Ready/Draft
+   Pre-Site row `103b9a0f-86a5-f111-b8dd-6045bd03ed63`. Explicit
+   `InitiatedBy`/`InitiatedAt` identified enabled user Justin Gallivan and the
+   exact create time; built-in creator/modifier remained the application. The
+   request pointer matched, no missing-attribution event existed, and the
+   deployment-boundary census was 1 attributed / 0 event-backed unattributed /
+   0 violations.
+5. **Release reconciliation.** Current Atlas, route/security, credential,
+   lifecycle, queue, service-catalog, audit, identity, milestone, and handoff
+   surfaces now distinguish the proved Pre-Site path from still-opportunistic
+   producer-specific proof.
 
-2. **Executor budgets moved from tracked literals to durable publication.**
-   - Append-only `wmkf_appsystemsettings` revisions
-     (`executor.budgets.vNNNNNN`) now own the complete atomic budget document.
-   - The superuser Admin editor uses expected-version concurrency and UUID
-     request idempotency, validates code-owned ranges and resolved model
-     ceilings, and rereads the published revision.
-   - Pre-Site and review synthesis consume the latest valid revision; strict
-     bounds and the reviewed outage fallback remain in code.
-   - Production read proof passed in the safe **No published revision · using
-     reviewed code fallback** state. The first publication remains an explicit
-     owner action, not required for current behavior.
-   - Commits `00b1ed83`, `c465b0fd`, and `f083220d`.
+### Commits already on `main`
 
-3. **Gitleaks findings investigated and remediated.**
-   - Reported values were synthetic unit-test fixtures, not live credentials.
-   - Fixtures and narrowly scoped allowlisting now prevent false positives
-     without weakening scanning of runtime secrets.
-   - Commit `b7863922`; Gitleaks passed on the release PR.
+- `b5eeda7b` — Add explicit Request Document actor tracking
+- `a543a45b` — Document Wave 24 source implementation
+- `c9e915c1` — Harden Wave 24 after adversarial review
+- `0396b187` — Record exact Wave 24 Production schema
+- `8ff4205a` — Clean Wave 24 review receipt / first active runtime commit
+- `b4615362` — Record Wave 24 Production activation
 
-4. **Initial Assessment restore and Board snapshots shipped.**
-   - Superusers can restore one exact historical native SharePoint version as a
-     new current version. Server-owned pointer/item identity and stale-view
-     fences are rechecked; governed bytes and Dataverse metadata are reread.
-   - Board freeze creates/reuses a distinct Ready/Board Ready Request Document
-     and SharePoint item from the exact selected current buffer. Normalized
-     governed Word verification accepts SharePoint repackaging while rejecting
-     changed/invalid content. Snapshot rows never move the editable pointer or
-     participate in editable activation/supersession/cycle discovery.
-   - Claude's adversarial findings around stable-ID verification, `cTag`,
-     cleanup ownership, lost-response recovery, and package validation were
-     fixed before promotion.
-   - Feature/hardening commits `8bd8331c`, `70c1f988`, and `65be41a9`; PR #138
-     merged as `c519daf6`. Production deployment
-     `dpl_9RVF7gdGtXrFAyLxcG16M1Fa86gK` reached Ready.
+## Next Session — Deadline-Critical Order
 
-5. **Production read smoke and durable sweep closed.**
-   - Signed-in Request `1003109` loaded the canonical Initial Assessment,
-     Board-snapshot control, and native versions `2.0` / `1.0` with no browser
-     warnings or errors.
-   - No restore, snapshot, refresh, or external-document action was invoked.
-   - Fourteen queue, Atlas, route, strategy, pilot, catalog, memory, and wiki
-     surfaces were reconciled to **Production-deployed + signed-in
-     read-smoked; writes not Production-exercised**.
-   - The owner chose to stop here. Production restore/snapshot proof is deferred
-     to an explicitly authorized pre-J27-scale checkpoint rather than being
-     manufactured now.
-   - Sweep commit on `main`: `b5024ad4`.
+1. **Run a read-only persona/access preflight.** Resolve the intended 11-person
+   Final Writeup audience from authoritative profile/Dataverse data. Identify
+   PD, PC, CSO, and President relationships without inferring authority from
+   display names, job titles, or program taxonomy. Verify representative
+   SharePoint/Word access before changing UI or routes.
+2. **Build the superuser coordinator matrix after that proof.** Project current
+   Final rows × expected reviewers and show neutral states such as Reviewed,
+   Updated, and Not reviewed, with direct Word links. Do not imply approval,
+   compliance, deadlines, required counts, or reviewer order.
+3. **Add staff/executive lenses only after identity and access are proved.** Keep
+   the current ordinary-staff dashboard usable and avoid a global Workbench
+   refresh during the deadline window.
 
-6. **Metered-tool authorization made durable.**
-   - The complimentary UltraReview run exposed that a metered external review
-     could be launched without the owner's request. Repository instructions now
-     require explicit authorization before any metered tool/session is started.
-   - Commit `cbbb45a9`. Do not reinterpret access or a complimentary credit as
-     permission.
+## Opportunistic Production Proof — Do Not Block the Deadline
 
-### Commits
+- On the next naturally needed Site Visit handoff, verify
+  `MilestoneCreatedBy`. Other producer-specific first writes, guarded reopen,
+  and Board snapshot remain their own approval-gated checks.
+- Do not manufacture Request Documents merely to test attribution.
 
-- `07f350c2` — Warn before leaving unsaved recipient changes
-- `df44b3e9` — Cover history navigation in recipient warning
-- `00b1ed83` — Add durable Executor budget settings
-- `c465b0fd` — Harden Executor budget publication
-- `f083220d` — Initialize delayed Executor budgets
-- `b7863922` — Allowlist public Executor revision keys in Gitleaks
-- `8bd8331c` — Add Initial Assessment recovery controls
-- `cbbb45a9` — Require authorization for metered tools
-- `70c1f988` — Verify Board snapshots by governed content
-- `65be41a9` — Harden Board snapshot recovery
-- `c519daf6` — Merge PR #138 to `main`
-- `b5024ad4` — Reconcile Initial Assessment Production status
+## Scheduled Follow-up
 
-## Session 470 Production Release
+- Monday, September 7, 2026: send Connor only the confirmation question asking
+  whether compliance, audit, or a CRM consumer specifically requires staff in
+  built-in Dataverse `createdby`/`modifiedby`. If the answer is no, no privilege
+  work is requested. The reminder is already scheduled.
 
-1. **Final Writeup Slice 1 shipped and was Production-proved.**
-   - The four owner-approved commits, including retained hook configuration,
-     Impeccable assets, Final Writeup code, and documentation, reached public
-     GitHub and `main` at `ebb147bb`.
-   - Preview deployment `dpl_GbBujyKP4smoNbkm5k8mtpN6qaCz` and Production
-     deployment `dpl_7kzQ1v7XGtyNx4Fady2JxMrTxQEJ` reached Ready on the exact
-     commit. `applications.wmkeck.org` resolves to the latter.
-   - Wave 22 was already 4 exact / 0 absent / 0 divergent. The non-sensitive
-     Production `FINAL_WRITEUP_SCHEMA_READY` value is now literal `on`.
-   - Focused Final Writeup/Staff Deliberations tests passed 48/48 and the webpack
-     production build passed. The local Turbopack build's only failure was the
-     sandbox's inability to bind an internal port; Preview supplied the
-     authoritative Turbopack candidate build.
+## Owner Decisions Still Open
 
-2. **Authorized same-item Production transition passed.**
-   - Signed-in test Request `1002788` created Ready/Review Final row
-     `b6d6220b-f0a4-f111-b8dd-70a8a59cded0` and set it as current Final.
-   - Current Pre-Site row `7b059a2f-19a3-f111-b8dd-000d3a5bbe46` remained the
-     current Pre-Site pointer and moved from Review to Final.
-   - Both rows reference the exact same SharePoint drive/item, publication
-     version `1.0`, 38,273-byte file, filename, and governed hash. The Request's
-     distinct SharePoint-file count remained four; no upload or copy occurred.
-   - The Final row records Justin Gallivan at `2026-08-31T03:57:20Z` and points
-     to the exact Pre-Site source row. The UI returned **Final Writeup is ready**
-     with the original Word link.
-   - The paged Production census is now 12 Request Documents: three Initial
-     Assessments, eight Pre Site Visits, and one Final Writeup; 11 Ready and one
-     Failed. A bounded 30-minute Production scan found no error logs or 5xx.
+- First Executor budget publication remains an explicit owner action; current
+  Production behavior safely uses the reviewed code fallback.
+- Initial Assessment restore and Board-snapshot Production writes remain
+  owner-deferred until the pre-J27-scale checkpoint.
 
-## Session 471 Wave 23 Preflight and Production Apply
+## Do Not Reopen
 
-1. **Acknowledgement schema is live and exact in Production.**
-   - Commit `be40b7d4` added the Wave 23 schema specification, Production-safe
-     metadata preflight, and access/identity census.
-   - The proposed organization-owned entity has six fields, required Final
-     Document and Reviewer lookups, and an alternate key across those lookups.
-   - The hardened preflight first reported 11 absent / 0 divergent / 0 pending /
-     0 exact, and the non-writing apply dry-run passed. Sandbox could not be
-     assessed because `DYNAMICS_SANDBOX_URL` is unset.
-   - After explicit owner approval, the first execute attempt was blocked before
-     its first POST by the local→Production interlock and readback remained 11
-     absent. The sanctioned date-bounded `DATAVERSE_PROD_WRITE_ACK` operator
-     exception then allowed the same scoped Wave 23 apply without changing
-     interlock mode.
-   - Final readback reports 11 exact / 0 absent / 0 divergent / 0 pending,
-     entity set `wmkf_finalwriteupreviewacknowledgements`, Active alternate key,
-     and zero rows. No runtime/readiness flag was enabled.
+- In-Workbench document editing; Word remains in its own browser or desktop
+  window.
+- A broad staff Request Document role or the unsent Connor privilege request.
+- Metered or credit-consuming review products without explicit authorization.
+- A global Workbench redesign before the September 4 deadline.
 
-2. **Identity link integrity and roster completeness are resolved.**
-   - Eleven active, sign-in-capable profiles map by exact email to existing,
-     enabled Dataverse `systemuser` records.
-   - One active synthetic Test User without Azure sign-in and one inactive Tom
-     Rieker profile are excluded.
-   - The probe proves the link contract for existing profiles. The owner then
-     confirmed on 2026-08-30 PT / 2026-08-31 UTC that the 11-person roster is
-     the complete intended PD/PC/CSO/President audience. The identity key is
-     cleared; this does not authorize the separate Production schema apply.
+## Key Files
 
-3. **Accepted adversarial findings are fixed.**
-   - The OAuth delegated review disclosed `claude-fable-5`; the owner accepted
-     that review. No API-key authentication, metered substitute, file edit, or
-     Production write was used by the reviewer.
-   - The preflight now pins relationship names and complete cascade behavior,
-     treats wrong-type relationships and failed key indexes as divergent, and
-     includes discriminating negative self-tests. Its operator output leads
-     with non-writing dry-run guidance.
+| File | Current purpose |
+|---|---|
+| `docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md` | Final acknowledgement/dashboard contract and rollout status |
+| `docs/REQUEST_DOCUMENT_EXPLICIT_ACTOR_PLAN.md` | Wave 24 Option B architecture, promotion, and proof |
+| `docs/CURRENT_WORK_QUEUE.md` | Deadline order and verified open work |
+| `docs/API_ROUTE_SECURITY_MATRIX.md` | Current route/auth/write contracts |
+| `docs/APPLICATION_STATE_ATLAS.md` | Current live state and ownership routing |
+| `docs/atlas/dataverse-wmkf-requestdocument.md` | Request Document schema/producer truth |
 
-4. **Wave 23 backend service, route, and Final-tab consumer are Production-live.**
-   - A typed Dataverse adapter uses the metadata-confirmed entity set and named
-     Final-document/reviewer reads.
-   - A distinct `FINAL_WRITEUP_ACKNOWLEDGEMENT_SCHEMA_READY` literal-on
-     interlock prevents the already-live Wave 22 flag from enabling Wave 23.
-   - The mark/read service resolves the current Final and lead PD server-side,
-     validates the enabled session `systemuser`, rejects responsible-PD
-     self-review, takes one Graph publication observation, preserves an exact
-     version's original acknowledgement time, conditionally updates later
-     versions, and reconciles a response lost after persistence.
-   - The authenticated GET/POST route accepts only the request/current-Final
-     fences and derives reviewer identity from the session. The Final tab shows
-     positive reviewer initials, version-aware personal state/action for
-     non-PDs, no responsible-PD self-review section, and keeps Word available
-     when tracking is disabled or fails.
-   - The service/route/component subset passes 36/36; the full bounded Final
-     transition + acknowledgement set passes 58/58. Lint and type checking
-     pass. The webpack production build includes the new route; native local
-     Turbopack remains blocked by its known internal-port sandbox restriction.
-     The Impeccable desktop/mobile audit found no layout defect; reviewer
-     initials were raised to the 44px interaction floor.
+## Verification Receipt
 
-5. **Ordinary-staff dashboard and focused-review foundation are Production-live.**
-   - A separate dashboard service caps the current-Final census at 100, batches
-     exact document and acknowledgement reads at 25 IDs, deduplicates stable
-     SharePoint identities, and limits Graph metadata work to four concurrent
-     calls. Ambiguous current artifacts, capped source results, and inconsistent
-     acknowledgement state fail closed.
-   - The authenticated GET route derives the enabled session `systemuser`,
-     responsible-PD ownership, open/history/stewardship queues, allowed actions,
-     positive initials, selected row, and queue navigation server-side.
-   - `/workbench/final-writeups` and its focused request page provide one search,
-     calm task-first queues, reviewed history/freshness, **Open review** followed
-     by external **Open in Word**, personal acknowledgement, and early next-item
-     navigation. The responsible PD sees **Edit in Word** and cannot self-review.
-   - Existing Workbench supporting-material links retain their existing access;
-     no leadership-safe projection, persona inference, or complete matrix was
-     added. Impeccable desktop/mobile review accepted the hierarchy and CTA
-     sequence after visible current/earlier-version review counts removed the
-     color-only state.
-
-6. **Slices 2–3 runtime is enabled in Production; the first cross-user acknowledgement is proved.**
-   - PR #140 merged as `ce229778b05178bf4aabafe630e46de4843f5e81` after
-     Jest, Claude review, Semgrep, Gitleaks, Trivy, and Vercel checks passed.
-   - Preview deployment `dpl_9YMZvQFWLoRNrDzuKKugyj1DTkv2` and Production
-     deployment `dpl_P7xay61LHnxohad9FEtSniBAosuY` both reached Ready.
-   - The unauthenticated custom-domain route smoke redirected to sign-in as
-     expected, and the bounded post-deploy Production error-log scan was empty.
-   - `FINAL_WRITEUP_ACKNOWLEDGEMENT_SCHEMA_READY` is exact `on` in Production
-     and remains unset in Preview. Activation deployment
-     `dpl_B9k3AprnYp5ExpkqpT3dUxCUZqWo` reached Ready.
-   - A signed-in Justin Gallivan smoke loaded the ordinary-staff dashboard and
-     Request `1002788` Final tab, confirmed the current Word action and zero
-     recorded reviews, and produced no Production errors. Because Justin is
-     the request's responsible PD and the only current Final belongs to him,
-     the UI correctly exposed no self-review action. That initial smoke wrote
-     no acknowledgement; the later eligible-colleague proof is recorded below.
-
-7. **The Final Writeup acknowledgement role gap is closed and the first acknowledgement is proved.**
-   - An eligible colleague opened Request `1002788`, edited the current Word
-     file, and received `Final Writeup review tracking failed.` when selecting
-     **Mark reviewed**. Production evidence isolated the failure to Dataverse
-     `0x80040220`: the signed-in user lacked
-     `prvCreatewmkf_FinalWriteupReviewAcknowledgement`. Graph/document reads
-     succeeded, the service reread after the failed create, and no partial
-     acknowledgement row persisted.
-   - Commit `6659bba2` tracks the dedicated `WMKF Final Writeup Reviewer` role
-     specification. Under explicit owner approval, the Production role was
-     created, added to `wmkfResearchReviewAppSuite`, and assigned directly to
-     all 11 confirmed audience members. Read-only verification proved 11/11
-     assignments and 11/11 effective coverage for the six requested Global
-     privileges: acknowledgement Create/Read/Write/Append plus Append To on
-     Request Document and User.
-   - Dataverse also attached nine standard App Opener baseline privileges when
-     it created the role (SharePoint-data and plug-in/SDK-message reads/writes).
-     The live role has 15 privileges total; none grants Delete, Assign, Share,
-     or Request Document write.
-   - The colleague reloaded, selected **Mark reviewed**, and confirmed the item
-     appeared in review history. Independent Production readback then proved
-     exactly one acknowledgement row for Request `1002788`, an enabled reviewer,
-     and all required stable file/version observation fields populated. The
-     recorded acknowledgement time is `2026-08-31T19:05:31Z`.
-
-## Next Items
-
-### Current Owner-Selected Delivery
-
-1. **Final Writeup acknowledgements and dashboard data by 2026-09-04.**
-   Slices 0–1 are complete and Slice 1 is Production-proved on Request
-   `1002788`. Wave 23 source/preflight and the existing-profile identity probe
-   are complete, and the owner confirmed the 11-person roster is the complete
-   intended PD/PC/CSO/President audience. Wave 23 is now exact and Active in
-   Production. The typed adapter, readiness contract, acknowledgement service,
-   authenticated route, Final-tab consumer, capped ordinary-staff dashboard,
-   focused-review page, and focused tests are Production-live behind the exact
-   `on` readiness interlock. Signed-in dashboard and responsible-PD exclusion
-   proof passed. The first eligible colleague attempt exposed a missing
-   Dataverse Create privilege without persisting a row; after the dedicated
-   role reached all 11 audience members, the colleague retry succeeded and the
-   exact first acknowledgement/readback passed. The remaining milestone work is
-   persona-specific access, the complete coordinator matrix, and leadership
-   views rather than acknowledgement persistence.
-   Editing stays in Word in a separate
-   browser window/tab (or desktop Word when Microsoft permits); do not embed an
-   editor in the Workbench.
-2. **Audience and matrix.**
-   The audience is all PDs, PCs, CSO, and President. Include the full
-   coordinator matrix, but keep it neutral: no denominator, required count,
-   due date, compliance language, or CSO/President sequence. Acknowledgements
-   are version-aware; later edits show Updated since review. The responsible PD
-   does not self-acknowledge.
-3. **Milestone boundary.**
-   September 4 means underlying infrastructure and a superuser test path, not
-   broad rollout. Ordinary PD review may precede the global persona contract;
-   PC backup, broad matrix visibility, and leadership queues stay off until
-   role identity and SharePoint access are positively verified. Request
-   Document writes intentionally remain service-principal-attributed in the
-   built-in fields while the owner-approved explicit business-actor fields are
-   now Production-live; no broad staff-role grant is pending. The exact schema,
-   Production-only readiness flag, signed-in health, and zero-violation baseline
-   census passed. The first natural business-flow write/readback remains
-   pending. Its current-posture identity policy is settled:
-   existing strict flows stay strict, while Initial Assessment, Pre-Site, and
-   Site Visit preserve availability with honest null attribution and durable
-   operational evidence.
-
-### Verified Open
-
-1. **Build the persona-specific Final Writeup views and complete matrix.**
-   The Slices 2–3 foundation is Production-proved: the typed adapter, separate
-   readiness contract, acknowledgement persistence/service, authenticated
-   routes, Final-tab consumption, bounded ordinary-staff dashboard, focused
-   review page, and first exact cross-user acknowledgement/readback all passed
-   on Request `1002788`. The neutral reviewer role is effective for all 11
-   audience members. Remaining work is the positively identified PC/leadership
-   lenses, complete neutral coordinator matrix, and representative SharePoint
-   access proof; do not infer personas from names, titles, or program taxonomy.
-
-2. **Positive-path funding-history observation.**
-   The zero-program-grant branch is Production-proved; the positive sentence is
-   probe/test-proven only. Observe the first real generated institution with
-   program grants rather than manufacturing another Production smoke.
-
-3. **PD onboarding/posture seeding before the next solicitation cycle.**
-   Evidence and checklist: `docs/SCHEDULED_EMAIL_VIP_DIGEST_PLAN.md`.
-
-4. **Async PD approval for staff-triggered “sent as me” mail.**
-   Evidence: `docs/OUTBOUND_EMAIL_INVENTORY_2026-08-26.md`.
-
-### Owner Decision Needed
-
-1. **First durable Executor-budget publication.**
-   Production safely uses the reviewed code fallback. Publishing revision v1
-   is optional and requires an explicit owner action.
-
-2. **Share → Wrap Up no-send fallback and zero-program-grant wording.**
-   Decide whether off-app distribution gets a manual transition, and whether
-   the zero-program sentence should mention discretionary history.
-
-### Scheduled Follow-up
-
-1. **TO DO Monday 2026-09-07: send Connor the confirmation-only Request
-   Document attribution question.** The broad staff-role brief created
-   2026-08-27 was never sent and is withdrawn. Do not request or apply Request
-   Document Create/Write/Append privileges. Ask only whether a compliance,
-   audit, report, view, flow, business rule, or plug-in requires built-in
-   `createdby`/`modifiedby` staff attribution. If not, Connor has no action;
-   if so, obtain the exact consumer and requirement before reconsidering the
-   owner-selected explicit-actor design. A 9:00 AM Pacific task reminder is
-   scheduled in this Codex thread. The non-blocking implementation plan is now
-   `docs/REQUEST_DOCUMENT_EXPLICIT_ACTOR_PLAN.md`. The owner reprioritized Stage
-   1 source implementation and separately approved the Production schema apply
-   on 2026-08-31; independent readback reported 3 exact / 0 absent / 0
-   divergent. Readiness/runtime promotion remains gated, and the Monday
-   question remains non-blocking.
-
-### Parked
-
-1. **Initial Assessment Production write proof.**
-   Owner-deferred 2026-08-30. Reopen before J27 scale or under a new explicit
-   authorization. Prefer Board snapshot first if only one proof is needed;
-   use an agreed dummy request and capture exact cross-store readback/cleanup.
-   Native Graph restore retains the documented final-call concurrency race.
-2. **Reviewer cron-reminders ledger slice.** Merge only after the current
-   reviewer cycle ends; migration 038 remains unapplied everywhere.
-3. **Preference-matrix slice and PD tutorial refresh.** Reopen only after the
-   reminders-ledger promotion.
-4. **Invitation-link strictness.** Deliberate post-cycle decision; current
-   duplicate-identical-token and trailing-punctuation tolerance remains pinned.
-5. **Public git history rewrite and reviewer cleanup.** Both remain owner-gated.
-
-### Verify Before Acting
-
-1. **Phantom co-PI residual cleanup.** Production writes require owner
-   confirmation and a fresh read-only preflight; importer prevention remains
-   Connor-owned.
-2. **Logistics PATCH retirement.** There is no in-app write caller, but the
-   service/validation remain intentionally live. Re-grep before retirement.
-3. **Request `1002379` as a future smoke vehicle.** Re-run the exact inventory
-   before and after any authorized mutation; do not request Activity delete
-   privileges.
-
-### Do Not Reopen Without New Decision
-
-1. Do not run Initial Assessment restore or first Board snapshot merely to
-   close a proof checkbox; the owner explicitly selected the current stopping
-   point.
-2. Do not launch UltraReview or any other metered tool/session without explicit
-   owner authorization, regardless of available access or credits.
-3. Recipient-directory members remain menu choices only; they are never
-   automatically added to email drafts.
-4. Do not merge the parked reminder slice mid-cycle or tighten invitation-link
-   behavior during the current reviewer cycle.
-5. Do not rerun the Request `1002852` hard-failure smoke or resurrect removed
-   Site Visit logistics/calendar UI without a new owner decision.
-
-## Key Files Reference
-
-| File | Purpose |
-|------|---------|
-| `docs/CURRENT_WORK_QUEUE.md` | Canonical delivery priority and owner-deferred write proof |
-| `docs/REQUEST_DOCUMENT_EXPLICIT_ACTOR_PLAN.md` | Owner-approved Option B schema/writer/retry plan; adversarial review complete; Production Wave 24 schema exact 3/3, readiness on, runtime live; natural business-flow proof pending |
-| `shared/config/executorBudgets.js` | Budget bounds, descriptions, and reviewed outage fallback |
-| `lib/services/executor-budget-service.js` | Append-only read/publication contract |
-| `pages/api/admin/executor-budgets.js` | Superuser budget read/publication route |
-| `lib/services/initial-assessment/controls-service.js` | Restore and exact byte-copy Board snapshot orchestration |
-| `pages/api/workbench/initial-assessment/restore-version.js` | Superuser native-version restore route |
-| `pages/api/workbench/initial-assessment/board-snapshot.js` | Superuser retained Board snapshot route |
-| `docs/INITIAL_ASSESSMENT_CONTROLLED_PILOT_2026-07-30.md` | Pilot evidence and remaining write-proof boundary |
-| `docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md` | Production-proved Slice 1 and approved Slices 2–5 design |
-| `lib/services/final-writeup/acknowledgement-service.js` | Production-live Wave 23 mark/read, identity, version, no-fallback attribution, and ambiguous-write contract |
-| `pages/api/workbench/final-writeup/acknowledgement.js` | Production-live app-authenticated GET/POST acknowledgement boundary with session-only reviewer identity |
-| `shared/components/workbench/FinalWriteupTab.js` | Production-deployed external-Word action, positive initials, and version-aware personal acknowledgement UI |
-| `lib/services/final-writeup/dashboard-service.js` | Production-live capped/batched ordinary-staff queue, ownership/action, freshness, and navigation projection |
-| `pages/api/workbench/final-writeups.js` | Production-live app-authenticated GET boundary for the ordinary-staff dashboard/focused page |
-| `shared/components/final-writeups/FinalWriteupsViews.js` | Production-deployed dashboard/focused-review UI with external Word and visible current/earlier review state |
-| `lib/dataverse/schema/roles/wave23-final-writeup-reviewer.json` | Tracked six-privilege Final Writeup reviewer role specification; assigned to the confirmed 11-person Production audience |
-| `docs/audits/final-writeup-acknowledgement-wave23-adversarial-review-2026-08-31.md` | Accepted Wave 23 review findings, authorized Production apply, and exact Active readback |
-| `docs/atlas/dataverse-wmkf-finalwriteupreviewacknowledgement.md` | Live Wave 23 schema, identity/key/version contract, zero-row state, and remaining runtime boundary |
-
-## Testing
-
-Current Slice 3 ordinary-staff dashboard/focused-review foundation:
-
-```bash
-npm test -- --runInBand tests/unit/final-writeups-dashboard-service.test.js tests/unit/final-writeups-views.test.js tests/unit/workbench-final-writeups-route.test.js tests/unit/request-document-batch-adapter.test.js tests/unit/final-writeup-review-acknowledgement-adapter.test.js tests/unit/final-writeup-acknowledgement-service.test.js tests/unit/workbench-final-writeup-acknowledgement-route.test.js
-# 7 suites / 47 tests passed
-npm run lint
-# 0 errors; repository baseline warnings remain
-npm run check:types
-npx next build --webpack
-# production build passed; route manifest includes dashboard/focused pages and /api/workbench/final-writeups
-```
-
-API-route, Atlas, lifecycle-auth, route/service, GUID, Dataverse DAL/context,
-OData, fact, doc-symbol, doc-currency, wiki, memory-router, docs-catalog,
-agent-invariant, build-claim, canonical-pointer, and scaffolding-token gates
-passed with their applicable self-tests. Impeccable screenshots are retained in
-`.impeccable/review/`; the temporary fixture and local server were removed.
-
-Current Wave 23 route/UI slice:
-
-```bash
-npm test -- --runInBand tests/unit/final-writeup-tab.test.js tests/unit/workbench-final-writeup-acknowledgement-route.test.js tests/unit/final-writeup-acknowledgement-service.test.js
-# 3 suites / 36 tests passed
-npm test -- --runInBand tests/unit/final-writeup-tab.test.js tests/unit/workbench-final-writeup-route.test.js tests/unit/workbench-final-writeup-acknowledgement-route.test.js tests/unit/final-writeup-acknowledgement-readiness.test.js tests/unit/final-writeup-review-acknowledgement-adapter.test.js tests/unit/final-writeup-acknowledgement-service.test.js tests/unit/final-writeup-transition-service.test.js
-# 7 suites / 58 tests passed
-npm run lint
-# 0 errors (repository baseline warnings remain)
-npm run check:types
-npx next build --webpack
-# production build passed; route manifest includes /api/workbench/final-writeup/acknowledgement
-```
-
-Desktop and narrow-width visual inspection passed through the temporary local
-harness, which was removed afterward. PR #140 / merge `ce229778` subsequently
-reached Ready Production deployment `dpl_P7xay61LHnxohad9FEtSniBAosuY`.
-Production readiness is exact `on`. The first eligible colleague POST reached
-Dataverse and failed before persistence on the now-remediated role privilege;
-the post-role retry then succeeded, appeared in review history, and independent
-readback proved the one complete acknowledgement row for Request `1002788`.
-
-Release verification completed before and after PR #138 merge:
-
-```bash
-npm test -- --runInBand
-# 716 suites / 9,205 tests passed
-npm run build
-# webpack production build passed
-npm run check:api-routes && npm run check:api-routes:self-test
-npm run check:route-service-boundary && npm run check:route-service-boundary:self-test
-npm run check:atlas && npm run check:atlas:self-test
-npm run check:doc-currency && npm run check:doc-currency:self-test
-npm run check:fact-consistency && npm run check:fact-consistency:self-test
-npm run check:canonical-pointers && npm run check:canonical-pointers:self-test
-npm run check:doc-symbol-refs && npm run check:doc-symbol-refs:self-test
-npm run check:build-claim-freshness && npm run check:build-claim-freshness:self-test
-npm run check:docs-catalog
-```
-
-All PR/post-merge checks passed, including Claude review, Gitleaks, Jest,
-Semgrep, Trivy, Vercel, and Playwright. The stop-time claim-evidence report was
-unavailable from local metadata, so no pilot observation row was added.
+- Wave 24 focused implementation receipt: 12 suites / 229 tests plus relevant
+  route/data/doc gates and canonical Next.js build passed before promotion.
+- Production schema readback: 3 exact / 0 absent / 0 divergent.
+- Request `1002874` read-only proof and census: 1 attributed / 0 event-backed
+  unattributed / 0 violations.
+- Claim-evidence pilot report was unavailable because local observation state
+  could not be read; no pilot row was added.

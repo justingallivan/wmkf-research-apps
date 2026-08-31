@@ -30,8 +30,8 @@ related:
 
 ## Decision and status
 
-**[OWNER-APPROVED 2026-08-31; ADVERSARIAL REVIEWED; PRODUCTION-LIVE; WAVE 24
-SCHEMA EXACT; READINESS ON; CONTROLLED BUSINESS PROOF PENDING.]** Keep
+**[OWNER-APPROVED 2026-08-31; ADVERSARIAL REVIEWED; PRODUCTION-PROVED FOR
+PRE-SITE CREATION; WAVE 24 SCHEMA EXACT; READINESS ON.]** Keep
 `wmkf_requestdocument` Create/Write/Append privileges off the broad staff role
 and do not create a replacement writer role. Runtime writes continue under the
 application service principal after the existing impersonated-write 403
@@ -336,7 +336,21 @@ of caller-supplied origin fields. See the implementation-review reconciliation.
   violations. This is an expected pre-business-action baseline, not write proof.
 - Do not change any staff role or the Final Writeup Reviewer role.
 
-### Stage 4 — controlled proof
+### Stage 4 — controlled proof — Pre-Site creation completed 2026-08-31
+
+- **Completed:** the naturally needed Pre-Site generation for Request `1002874`
+  created Ready/Draft Request Document
+  `103b9a0f-86a5-f111-b8dd-6045bd03ed63` at
+  `2026-08-31T21:51:12Z`. Its current Pre-Site pointer matched the row;
+  `InitiatedBy` resolved to enabled user Justin Gallivan and `InitiatedAt`
+  exactly matched `createdon`, while built-in `createdby`/`modifiedby` still
+  named the application service principal.
+- **Completed:** no matching `request_document_actor_not_captured` event existed,
+  and the deployment-boundary census advanced to 1 attributed / 0 event-backed
+  unattributed / 0 violations.
+- **Still opportunistic, not a release blocker:** verify `MilestoneCreatedBy`
+  on the next naturally needed Site Visit handoff. Other producer-specific
+  paths retain their own first-write gates; do not manufacture records.
 
 - Use the next naturally needed, separately approved business action; do not
   manufacture a document merely to test attribution.
