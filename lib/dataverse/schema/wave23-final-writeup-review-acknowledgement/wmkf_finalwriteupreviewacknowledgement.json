@@ -1,0 +1,95 @@
+{
+  "name": "wmkf_finalwriteupreviewacknowledgement",
+  "kind": "new-entity",
+  "schemaName": "wmkf_FinalWriteupReviewAcknowledgement",
+  "displayName": "Final Writeup Review Acknowledgement",
+  "displayCollectionName": "Final Writeup Review Acknowledgements",
+  "description": "Latest version-aware review acknowledgement by one staff reviewer for one Final Writeup Request Document. This is neutral tracking, not approval, compliance, or document lifecycle state.",
+  "ownershipType": "OrganizationOwned",
+  "primaryNameAttribute": {
+    "schemaName": "wmkf_Name",
+    "displayName": "Name",
+    "description": "Synthetic display name for the Final Writeup and reviewer acknowledgement pair.",
+    "maxLength": 200,
+    "requiredLevel": "ApplicationRequired"
+  },
+  "attributes": [
+    {
+      "type": "String",
+      "schemaName": "wmkf_SharePointDriveId",
+      "displayName": "SharePoint Drive ID",
+      "description": "Stable Microsoft Graph drive identity observed when the reviewer acknowledged the Final Writeup.",
+      "maxLength": 300,
+      "requiredLevel": "ApplicationRequired"
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_SharePointItemId",
+      "displayName": "SharePoint Item ID",
+      "description": "Stable Microsoft Graph item identity observed when the reviewer acknowledged the Final Writeup.",
+      "maxLength": 300,
+      "requiredLevel": "ApplicationRequired"
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_PublicationVersionId",
+      "displayName": "Publication Version ID",
+      "description": "SharePoint publication version observed once when the reviewer acknowledged the Final Writeup.",
+      "maxLength": 300,
+      "requiredLevel": "ApplicationRequired"
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_AcknowledgedETag",
+      "displayName": "Acknowledged ETag",
+      "description": "Diagnostic Microsoft Graph eTag observed with the acknowledged version. ETag alone never marks an acknowledgement stale.",
+      "maxLength": 300,
+      "requiredLevel": "ApplicationRequired"
+    },
+    {
+      "type": "DateTime",
+      "schemaName": "wmkf_SharePointLastModified",
+      "displayName": "SharePoint Last Modified",
+      "description": "SharePoint last-modified time observed with the acknowledged publication version.",
+      "format": "DateAndTime",
+      "behavior": "UserLocal",
+      "requiredLevel": "ApplicationRequired"
+    },
+    {
+      "type": "DateTime",
+      "schemaName": "wmkf_AcknowledgedAt",
+      "displayName": "Acknowledged At",
+      "description": "UTC date/time when the signed-in reviewer recorded this acknowledgement.",
+      "format": "DateAndTime",
+      "behavior": "UserLocal",
+      "requiredLevel": "ApplicationRequired"
+    }
+  ],
+  "relationships": [
+    {
+      "kind": "N:1",
+      "schemaName": "wmkf_finalwriteupreview_finaldocument",
+      "referencedEntity": "wmkf_requestdocument",
+      "lookupSchemaName": "wmkf_FinalDocument",
+      "lookupDisplayName": "Final Document",
+      "lookupDescription": "The Final Writeup Request Document whose current publication was reviewed.",
+      "required": "ApplicationRequired"
+    },
+    {
+      "kind": "N:1",
+      "schemaName": "wmkf_finalwriteupreview_reviewer",
+      "referencedEntity": "systemuser",
+      "lookupSchemaName": "wmkf_Reviewer",
+      "lookupDisplayName": "Reviewer",
+      "lookupDescription": "Enabled Dataverse system user derived from the authenticated application session.",
+      "required": "ApplicationRequired"
+    }
+  ],
+  "alternateKeys": [
+    {
+      "schemaName": "wmkf_finalwriteupreview_document_reviewer_key",
+      "displayName": "Final Document + Reviewer",
+      "keyAttributes": ["wmkf_finaldocument", "wmkf_reviewer"]
+    }
+  ]
+}

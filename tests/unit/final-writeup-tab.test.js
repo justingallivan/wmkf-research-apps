@@ -42,6 +42,32 @@ function finalArtifact() {
   };
 }
 
+function groupReviewStatus() {
+  return {
+    success: true,
+    available: true,
+    phase: 'group-review',
+    canStart: false,
+    sourceArtifactId: SOURCE_ID,
+    artifact: finalArtifact(),
+  };
+}
+
+function acknowledgementState(overrides = {}) {
+  return {
+    success: true,
+    available: true,
+    finalArtifactId: FINAL_ID,
+    mayAcknowledge: true,
+    personalState: 'unreviewed',
+    acknowledgedAt: null,
+    publicationVersionId: '1.0',
+    publicationLastModified: '2026-08-31T12:00:00.000Z',
+    reviewers: [],
+    ...overrides,
+  };
+}
+
 beforeEach(() => {
   jest.clearAllMocks();
   global.fetch = jest.fn().mockResolvedValue(response(readyStatus()));
@@ -91,7 +117,11 @@ test('confirms the irreversible handoff and then exposes only the separate Word 
       artifact: finalArtifact(),
       reused: false,
       inProgress: false,
-    }));
+    }))
+    .mockResolvedValueOnce(response({
+      error: 'Review tracking is not ready.',
+      code: 'final_writeup_acknowledgement_schema_not_ready',
+    }, 503));
   render(<FinalWriteupTab requestId={REQUEST_ID} />);
 
   fireEvent.click(await screen.findByRole('button', { name: 'Ready for group review' }));
@@ -111,6 +141,134 @@ test('confirms the irreversible handoff and then exposes only the separate Word 
   expect(open).toHaveAttribute('href', 'https://sharepoint.test/site-visit.docx');
   expect(open).toHaveAttribute('target', '_blank');
   expect(screen.queryByRole('button', { name: 'Ready for group review' })).not.toBeInTheDocument();
+});
+
+test('shows positive reviewer initials without a personal action for the responsible PD', async () => {
+  global.fetch
+    .mockResolvedValueOnce(response(groupReviewStatus()))
+    .mockResolvedValueOnce(response(acknowledgementState({
+      mayAcknowledge: false,
+      personalState: 'not-applicable',
+      reviewers: [{
+        reviewerId: '44444444-4444-4444-8444-444444444444',
+        name: 'Ada Reviewer',
+        initials: 'AR',
+        state: 'reviewed',
+        acknowledgedAt: '2026-08-31T11:05:00.000Z',
+      }],
+    })));
+  render(<FinalWriteupTab requestId={REQUEST_ID} />);
+
+  expect(await screen.findByRole('heading', { name: 'Final Writeup is ready' })).toBeInTheDocument();
+  expect(await screen.findByLabelText(/Ada Reviewer.*Reviewed/i)).toHaveTextContent('AR');
+  expect(screen.getByText('Reviewed by')).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /Mark reviewed/i })).not.toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Edit writeup' })).toHaveAttribute('target', '_blank');
+});
+
+test('lets a non-owner record review with only request and current-Final fences', async () => {
+  global.fetch
+    .mockResolvedValueOnce(response(groupReviewStatus()))
+    .mockResolvedValueOnce(response(acknowledgementState()))
+    .mockResolvedValueOnce(response(acknowledgementState({
+      personalState: 'reviewed',
+      acknowledgedAt: '2026-08-31T12:05:00.000Z',
+      reviewers: [{
+        reviewerId: '44444444-4444-4444-8444-444444444444',
+        name: 'Ada Reviewer',
+        initials: 'AR',
+        state: 'reviewed',
+        acknowledgedAt: '2026-08-31T12:05:00.000Z',
+      }],
+    })));
+  render(<FinalWriteupTab requestId={REQUEST_ID} />);
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Mark reviewed' }));
+
+  await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
+    '/api/workbench/final-writeup/acknowledgement',
+    expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({
+        requestId: REQUEST_ID,
+        expectedFinalArtifactId: FINAL_ID,
+      }),
+      signal: expect.any(AbortSignal),
+    }),
+  ));
+  expect(await screen.findByText('Reviewed')).toBeInTheDocument();
+  expect(screen.getByText(/You reviewed the current version/i)).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Mark reviewed' })).not.toBeInTheDocument();
+});
+
+test('offers an explicit latest-version action when the writeup changed after review', async () => {
+  global.fetch
+    .mockResolvedValueOnce(response(groupReviewStatus()))
+    .mockResolvedValueOnce(response(acknowledgementState({
+      personalState: 'updated',
+      acknowledgedAt: '2026-08-30T12:05:00.000Z',
+      reviewers: [{
+        reviewerId: '44444444-4444-4444-8444-444444444444',
+        name: 'Ada Reviewer',
+        initials: 'AR',
+        state: 'updated',
+        acknowledgedAt: '2026-08-30T12:05:00.000Z',
+      }],
+    })));
+  render(<FinalWriteupTab requestId={REQUEST_ID} />);
+
+  expect(await screen.findByText('Updated since your review')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Mark latest version reviewed' })).toBeEnabled();
+  expect(screen.getByLabelText(/Ada Reviewer.*changed since this review/i)).toBeInTheDocument();
+});
+
+test('keeps the Word action available when acknowledgement schema is off', async () => {
+  global.fetch
+    .mockResolvedValueOnce(response(groupReviewStatus()))
+    .mockResolvedValueOnce(response({
+      error: 'Review tracking is not ready.',
+      code: 'final_writeup_acknowledgement_schema_not_ready',
+    }, 503));
+  render(<FinalWriteupTab requestId={REQUEST_ID} />);
+
+  expect(await screen.findByRole('link', { name: 'Edit writeup' })).toBeInTheDocument();
+  await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2));
+  expect(screen.queryByText('Reviewed by')).not.toBeInTheDocument();
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+});
+
+test('isolates acknowledgement errors and provides a bounded retry', async () => {
+  global.fetch
+    .mockResolvedValueOnce(response(groupReviewStatus()))
+    .mockResolvedValueOnce(response({ error: 'Temporary review service failure.' }, 500))
+    .mockResolvedValueOnce(response(acknowledgementState()));
+  render(<FinalWriteupTab requestId={REQUEST_ID} />);
+
+  expect(await screen.findByText(/Review tracking could not be loaded/i)).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Edit writeup' })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Try review tracking again' }));
+  expect(await screen.findByText('Needs review')).toBeInTheDocument();
+  expect(global.fetch).toHaveBeenCalledTimes(3);
+});
+
+test('ignores a late status response after the request changes', async () => {
+  let resolveFirst;
+  global.fetch
+    .mockImplementationOnce(() => new Promise((resolve) => { resolveFirst = resolve; }))
+    .mockResolvedValueOnce(response({
+      ...readyStatus(),
+      sourceFile: { name: 'New request writeup.docx' },
+    }));
+  const { rerender } = render(<FinalWriteupTab requestId={REQUEST_ID} />);
+  const nextRequestId = '99999999-9999-4999-8999-999999999999';
+  rerender(<FinalWriteupTab requestId={nextRequestId} />);
+
+  expect(await screen.findByText('New request writeup.docx')).toBeInTheDocument();
+  resolveFirst(response({
+    ...readyStatus(),
+    sourceFile: { name: 'Old request writeup.docx' },
+  }));
+  await waitFor(() => expect(screen.queryByText('Old request writeup.docx')).not.toBeInTheDocument());
 });
 
 test('shows schema-off state without offering an action', async () => {

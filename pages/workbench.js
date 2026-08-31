@@ -253,6 +253,14 @@ export function WorkbenchDashboard() {
       </div>
       <div className="mb-4">
         <Link
+          href="/workbench/final-writeups"
+          className="text-sm font-medium text-gray-900 underline underline-offset-4 hover:text-gray-600"
+        >
+          Review Final Writeups →
+        </Link>
+      </div>
+      <div className="mb-4">
+        <Link
           href="/workbench/artifacts"
           className="text-sm text-blue-700 hover:underline"
         >

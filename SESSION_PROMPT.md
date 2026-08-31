@@ -117,15 +117,100 @@ against launching metered review tools without explicit owner authorization.
      Assessments, eight Pre Site Visits, and one Final Writeup; 11 Ready and one
      Failed. A bounded 30-minute Production scan found no error logs or 5xx.
 
+## Session 471 Wave 23 Preflight and Production Apply
+
+1. **Acknowledgement schema is live and exact in Production.**
+   - Commit `be40b7d4` added the Wave 23 schema specification, Production-safe
+     metadata preflight, and access/identity census.
+   - The proposed organization-owned entity has six fields, required Final
+     Document and Reviewer lookups, and an alternate key across those lookups.
+   - The hardened preflight first reported 11 absent / 0 divergent / 0 pending /
+     0 exact, and the non-writing apply dry-run passed. Sandbox could not be
+     assessed because `DYNAMICS_SANDBOX_URL` is unset.
+   - After explicit owner approval, the first execute attempt was blocked before
+     its first POST by the local→Production interlock and readback remained 11
+     absent. The sanctioned date-bounded `DATAVERSE_PROD_WRITE_ACK` operator
+     exception then allowed the same scoped Wave 23 apply without changing
+     interlock mode.
+   - Final readback reports 11 exact / 0 absent / 0 divergent / 0 pending,
+     entity set `wmkf_finalwriteupreviewacknowledgements`, Active alternate key,
+     and zero rows. No runtime/readiness flag was enabled.
+
+2. **Identity link integrity and roster completeness are resolved.**
+   - Eleven active, sign-in-capable profiles map by exact email to existing,
+     enabled Dataverse `systemuser` records.
+   - One active synthetic Test User without Azure sign-in and one inactive Tom
+     Rieker profile are excluded.
+   - The probe proves the link contract for existing profiles. The owner then
+     confirmed on 2026-08-30 PT / 2026-08-31 UTC that the 11-person roster is
+     the complete intended PD/PC/CSO/President audience. The identity key is
+     cleared; this does not authorize the separate Production schema apply.
+
+3. **Accepted adversarial findings are fixed.**
+   - The OAuth delegated review disclosed `claude-fable-5`; the owner accepted
+     that review. No API-key authentication, metered substitute, file edit, or
+     Production write was used by the reviewer.
+   - The preflight now pins relationship names and complete cascade behavior,
+     treats wrong-type relationships and failed key indexes as divergent, and
+     includes discriminating negative self-tests. Its operator output leads
+     with non-writing dry-run guidance.
+
+4. **Wave 23 backend service, route, and Final-tab consumer are source-built.**
+   - A typed Dataverse adapter uses the metadata-confirmed entity set and named
+     Final-document/reviewer reads.
+   - A distinct `FINAL_WRITEUP_ACKNOWLEDGEMENT_SCHEMA_READY` literal-on
+     interlock prevents the already-live Wave 22 flag from enabling Wave 23.
+   - The mark/read service resolves the current Final and lead PD server-side,
+     validates the enabled session `systemuser`, rejects responsible-PD
+     self-review, takes one Graph publication observation, preserves an exact
+     version's original acknowledgement time, conditionally updates later
+     versions, and reconciles a response lost after persistence.
+   - The authenticated GET/POST route accepts only the request/current-Final
+     fences and derives reviewer identity from the session. The Final tab shows
+     positive reviewer initials, version-aware personal state/action for
+     non-PDs, no responsible-PD self-review section, and keeps Word available
+     when tracking is disabled or fails.
+   - The service/route/component subset passes 36/36; the full bounded Final
+     transition + acknowledgement set passes 58/58. Lint and type checking
+     pass. The webpack production build includes the new route; native local
+     Turbopack remains blocked by its known internal-port sandbox restriction.
+     The Impeccable desktop/mobile audit found no layout defect; reviewer
+     initials were raised to the 44px interaction floor. There is no deployment,
+     live readiness value, or Production acknowledgement write yet.
+
+5. **Ordinary-staff dashboard and focused-review foundation are source-built.**
+   - A separate dashboard service caps the current-Final census at 100, batches
+     exact document and acknowledgement reads at 25 IDs, deduplicates stable
+     SharePoint identities, and limits Graph metadata work to four concurrent
+     calls. Ambiguous current artifacts, capped source results, and inconsistent
+     acknowledgement state fail closed.
+   - The authenticated GET route derives the enabled session `systemuser`,
+     responsible-PD ownership, open/history/stewardship queues, allowed actions,
+     positive initials, selected row, and queue navigation server-side.
+   - `/workbench/final-writeups` and its focused request page provide one search,
+     calm task-first queues, reviewed history/freshness, **Open review** followed
+     by external **Open in Word**, personal acknowledgement, and early next-item
+     navigation. The responsible PD sees **Edit in Word** and cannot self-review.
+   - Existing Workbench supporting-material links retain their existing access;
+     no leadership-safe projection, persona inference, or complete matrix was
+     added. Impeccable desktop/mobile review accepted the hierarchy and CTA
+     sequence after visible current/earlier-version review counts removed the
+     color-only state. This work is not deployed; readiness remains unset.
+
 ## Next Items
 
 ### Current Owner-Selected Delivery
 
 1. **Final Writeup acknowledgements and dashboard data by 2026-09-04.**
    Slices 0–1 are complete and Slice 1 is Production-proved on Request
-   `1002788`. Next, run the intended-reviewer enabled-`systemuser` coverage
-   probe, then design/apply the version-aware acknowledgement entity and build
-   the matrix-ready dashboard data/focused-review foundation. Editing stays in Word in a separate
+   `1002788`. Wave 23 source/preflight and the existing-profile identity probe
+   are complete, and the owner confirmed the 11-person roster is the complete
+   intended PD/PC/CSO/President audience. Wave 23 is now exact and Active in
+   Production. The typed adapter, readiness contract, acknowledgement service,
+   authenticated route, Final-tab consumer, capped ordinary-staff dashboard,
+   focused-review page, and focused tests are source-built but not deployed.
+   Next is deliberate release/runtime enablement and a bounded superuser test.
+   Editing stays in Word in a separate
    browser window/tab (or desktop Word when Microsoft permits); do not embed an
    editor in the Workbench.
 2. **Audience and matrix.**
@@ -144,12 +229,15 @@ against launching metered review tools without explicit owner authorization.
 
 ### Verified Open
 
-1. **Execute Final Writeup Slices 2–3 in bounded increments.**
+1. **Release and prove the bounded Final Writeup Slices 2–3 foundation.**
    `docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md` is owner-approved for
    staged implementation with named identity/persona prerequisites. Slice 1 is
-   Production-proved; next is the reviewer-identity coverage probe,
-   acknowledgement persistence/service, then the ordinary-PD dashboard and
-   focused review page foundation.
+   Production-proved; Wave 23 is exact and Active in Production with zero rows.
+   The owner roster attestation is complete. The typed adapter, separate
+   readiness contract, acknowledgement persistence/service, authenticated
+   routes, Final-tab consumption, bounded ordinary-staff dashboard, focused
+   review page, and focused tests are source-built but not deployed. Next is
+   deliberate deployment, runtime enablement, and a bounded superuser test.
 
 2. **Positive-path funding-history observation.**
    The zero-program-grant branch is Production-proved; the positive sentence is
@@ -232,8 +320,52 @@ against launching metered review tools without explicit owner authorization.
 | `pages/api/workbench/initial-assessment/board-snapshot.js` | Superuser retained Board snapshot route |
 | `docs/INITIAL_ASSESSMENT_CONTROLLED_PILOT_2026-07-30.md` | Pilot evidence and remaining write-proof boundary |
 | `docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md` | Production-proved Slice 1 and approved Slices 2–5 design |
+| `lib/services/final-writeup/acknowledgement-service.js` | Source-built Wave 23 mark/read, identity, version, and ambiguous-write contract |
+| `pages/api/workbench/final-writeup/acknowledgement.js` | Source-built app-authenticated GET/POST acknowledgement boundary with session-only reviewer identity |
+| `shared/components/workbench/FinalWriteupTab.js` | Source-built external-Word action, positive initials, and version-aware personal acknowledgement UI |
+| `lib/services/final-writeup/dashboard-service.js` | Source-built capped/batched ordinary-staff queue, ownership/action, freshness, and navigation projection |
+| `pages/api/workbench/final-writeups.js` | Source-built app-authenticated GET boundary for the ordinary-staff dashboard/focused page |
+| `shared/components/final-writeups/FinalWriteupsViews.js` | Source-built dashboard/focused-review UI with external Word and visible current/earlier review state |
+| `docs/audits/final-writeup-acknowledgement-wave23-adversarial-review-2026-08-31.md` | Accepted Wave 23 review findings, authorized Production apply, and exact Active readback |
+| `docs/atlas/dataverse-wmkf-finalwriteupreviewacknowledgement.md` | Live Wave 23 schema, identity/key/version contract, zero-row state, and remaining runtime boundary |
 
 ## Testing
+
+Current Slice 3 ordinary-staff dashboard/focused-review foundation:
+
+```bash
+npm test -- --runInBand tests/unit/final-writeups-dashboard-service.test.js tests/unit/final-writeups-views.test.js tests/unit/workbench-final-writeups-route.test.js tests/unit/request-document-batch-adapter.test.js tests/unit/final-writeup-review-acknowledgement-adapter.test.js tests/unit/final-writeup-acknowledgement-service.test.js tests/unit/workbench-final-writeup-acknowledgement-route.test.js
+# 7 suites / 47 tests passed
+npm run lint
+# 0 errors; repository baseline warnings remain
+npm run check:types
+npx next build --webpack
+# production build passed; route manifest includes dashboard/focused pages and /api/workbench/final-writeups
+```
+
+API-route, Atlas, lifecycle-auth, route/service, GUID, Dataverse DAL/context,
+OData, fact, doc-symbol, doc-currency, wiki, memory-router, docs-catalog,
+agent-invariant, build-claim, canonical-pointer, and scaffolding-token gates
+passed with their applicable self-tests. Impeccable screenshots are retained in
+`.impeccable/review/`; the temporary fixture and local server were removed.
+
+Current Wave 23 route/UI slice:
+
+```bash
+npm test -- --runInBand tests/unit/final-writeup-tab.test.js tests/unit/workbench-final-writeup-acknowledgement-route.test.js tests/unit/final-writeup-acknowledgement-service.test.js
+# 3 suites / 36 tests passed
+npm test -- --runInBand tests/unit/final-writeup-tab.test.js tests/unit/workbench-final-writeup-route.test.js tests/unit/workbench-final-writeup-acknowledgement-route.test.js tests/unit/final-writeup-acknowledgement-readiness.test.js tests/unit/final-writeup-review-acknowledgement-adapter.test.js tests/unit/final-writeup-acknowledgement-service.test.js tests/unit/final-writeup-transition-service.test.js
+# 7 suites / 58 tests passed
+npm run lint
+# 0 errors (repository baseline warnings remain)
+npm run check:types
+npx next build --webpack
+# production build passed; route manifest includes /api/workbench/final-writeup/acknowledgement
+```
+
+Desktop and narrow-width visual inspection passed through the temporary local
+harness, which was removed afterward. No deployment, live-flag enablement, or
+Production-write verification applies yet.
 
 Release verification completed before and after PR #138 merge:
 

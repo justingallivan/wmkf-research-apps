@@ -6,7 +6,7 @@ status: canonical
 summary: Canonical priority queue separating current commitments, evidence windows, optional work, external dependencies, and parked programs.
 canonical: true
 cataloged: 2026-07-22
-last_verified: 2026-08-30
+last_verified: 2026-08-31
 owner: product-engineering
 related:
   - docs/SYSTEM_MODEL.md
@@ -34,7 +34,7 @@ sequence.
 
 | Order | Work | Current boundary | Completion decision |
 | --- | --- | --- | --- |
-| 1 | Final Writeup acknowledgement infrastructure and dashboard data foundation | **[NEXT 2026-08-30.]** Slice 1 is Production-proved on `main` at `ebb147bb`: Wave 22 is exact, readiness is literal `on`, and authorized Request `1002788` proved the same-item Final handoff, explicit actor/time, retained Pre-Site pointer, current Final pointer, and no SharePoint copy. Slice 2 now owns intended-reviewer identity coverage plus the version-aware acknowledgement entity/service; Slice 3 owns the ordinary-PD dashboard/focused-review foundation and matrix-ready projection. Word remains external to the Workbench. | By **2026-09-04**, acknowledgement persistence and the superuser-testable dashboard data path are in place with exact identity/version keys and focused tests. |
+| 1 | Final Writeup acknowledgement infrastructure and dashboard data foundation | **[IN PROGRESS 2026-08-31.]** Slice 1 is Production-proved. Wave 23 is live in Production at 11 exact / 0 absent / 0 divergent / 0 pending with an Active Final-document + reviewer alternate key and zero rows. The complete intended roster is owner-confirmed. Slices 2–3 are source-built but not deployed: typed acknowledgement adapter/service/route/Final-tab consumer plus a capped, batched ordinary-staff dashboard read model, authenticated route, queue, focused review page, history/freshness state, and external-Word actions. No PC/leadership persona, full matrix, or broader supporting-material projection is inferred. Production readiness remains unset. Next is deliberate release/runtime enablement and a bounded superuser test. | By **2026-09-04**, acknowledgement persistence and the superuser-testable dashboard data path are in place with exact identity/version keys and focused tests. |
 | 2 | Final Writeup role rollout and dashboards | **[PLANNED.]** Ordinary PD review can precede the global persona model. PC backup, complete matrix visibility, and leadership-specific queues remain disabled until those roles are positively identified. | Verified PD/PC/CSO/President identity and SharePoint access; acknowledgement alternate key active; no role inference from names, titles, email, or program taxonomy. The external `wmkf_requestdocument` staff-role grant remains expected around 2026-09-10. |
 
 ## Audit follow-ups — verified open, not silently prioritized
@@ -117,6 +117,26 @@ sequence.
   queued in `docs/PUBLIC_GIT_HISTORY_REMEDIATION_PLAN.md`).
 
 ## Completed in this execution
+
+- Final Writeup acknowledgement Wave 23: **[PRODUCTION SCHEMA LIVE AND EXACT;
+  ROUTE/UI SOURCE-BUILT, NOT DEPLOYED 2026-08-31]** schema-as-code defines the
+  organization-owned entity, six fields, two required lookups, and the
+  Final-document + reviewer alternate key. The identity census proved exact,
+  enabled Dataverse links for all 11 existing active sign-in profiles; the
+  owner subsequently confirmed that this is the complete intended audience.
+  The hardened Production preflight first reported 11 absent / 0 divergent / 0
+  pending / 0 exact. After explicit owner approval, the date-bounded interlock
+  acknowledgement allowed the scoped apply; final readback reports 11 exact / 0
+  absent / 0 divergent / 0 pending, Active key index, and zero rows. Accepted OAuth Claude Fable review findings
+  now enforce exact relationship/cascade/type checks, terminal failed-key
+  handling, and discriminating self-tests. The acknowledgement identity and
+  schema gates are cleared. The typed adapter, separate literal-on readiness
+  interlock, mark/read service, authenticated route, and Final-tab consumer now
+  exist in source with focused service/route/component tests. Reviewer identity
+  remains session-derived; the responsible PD has no self-review action; other
+  users see positive initials plus unreviewed/reviewed/updated state; and a
+  tracking failure never blocks the separate Word action. No deployment, live
+  flag, or Production runtime write exists.
 
 - Final Writeup Slice 1 release: **[PRODUCTION-PROVED 2026-08-30 PT /
   2026-08-31 UTC]** four approved local commits reached public GitHub and

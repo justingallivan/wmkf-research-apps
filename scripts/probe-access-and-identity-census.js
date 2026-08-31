@@ -7,6 +7,8 @@
  *      (superuser gates the guarded actions).
  *   3. Dataverse `wmkf_appuserappaccess` — per-app access grants, keyed on
  *      the Dataverse systemuser (so access requires a linked identity).
+ *   4. Dataverse `systemuser` — the stored link still exists, is enabled, and
+ *      retains the exact Azure sign-in email used to establish the mapping.
  *
  * Together these answer, per person: can they sign in, which apps can they
  * open (and therefore which writes can they trigger), and will an
@@ -14,11 +16,16 @@
  * privileges are the separate CRM-side question — see
  * docs/DYNAMICS_IDENTITY_RECONCILIATION_PLAN.md §Status).
  *
- * SAFETY: no write path — Postgres SELECTs and one Dataverse GET.
+ * SAFETY: no write path — Postgres SELECTs plus Dataverse GETs for app access
+ * and each unique linked systemuser.
  * Production Dataverse reads are owner-run behind the interlock override.
  *
  * Usage:
  *   DATAVERSE_ALLOW_PROD_READS=yes node scripts/probe-access-and-identity-census.js
+ *
+ * Exit codes:
+ *   0 — every active sign-in-capable profile satisfies the identity contract
+ *   2 — one or more such profiles has a missing, disabled, or mismatched link
  */
 
 require('./../lib/dataverse/client').loadEnvLocal();
@@ -27,6 +34,7 @@ require('./../lib/dataverse/client').loadEnvLocal();
   const { sql } = require('@vercel/postgres');
   const { DynamicsService } = await import('../lib/services/dynamics-service.js');
   const { bypassDynamicsRestrictions } = await import('../lib/services/dynamics-context.js');
+  const systemUserAdapter = await import('../lib/dataverse/adapters/system-user.js');
 
   const profiles = (await sql`
     SELECT id, name, display_name, azure_email, is_active,
@@ -41,6 +49,7 @@ require('./../lib/dataverse/client').loadEnvLocal();
   const roleByProfile = new Map(roles.map((r) => [r.user_profile_id, r.role]));
 
   const accessBySystemuser = new Map();
+  const systemuserById = new Map();
   await bypassDynamicsRestrictions('probe-access-and-identity-census', async () => {
     // queryAllRecords refuses unfiltered dumps; access rows without a linked
     // systemuser are meaningless for this census, so this filter loses nothing.
@@ -56,6 +65,23 @@ require('./../lib/dataverse/client').loadEnvLocal();
       if (!sid) continue;
       if (!accessBySystemuser.has(sid)) accessBySystemuser.set(sid, []);
       accessBySystemuser.get(sid).push(row.wmkf_appkey);
+    }
+
+    // Re-read every persisted identity link from Dataverse. This is deliberately
+    // stricter than trusting the reconciliation timestamp: a user can be disabled,
+    // deleted, or have their sign-in email changed after the Postgres link is stored.
+    for (const profile of profiles) {
+      const sid = (profile.dynamics_systemuser_id || '').toLowerCase();
+      if (!sid || systemuserById.has(sid)) continue;
+      try {
+        const user = await systemUserAdapter.getByIdWithSelect(
+          sid,
+          'systemuserid,fullname,isdisabled,internalemailaddress',
+        );
+        systemuserById.set(sid, { user, error: null });
+      } catch (error) {
+        systemuserById.set(sid, { user: null, error: error.message });
+      }
     }
   });
 
@@ -85,7 +111,54 @@ require('./../lib/dataverse/client').loadEnvLocal();
     }
   }
 
-  process.exit(0);
+  // Every real staff member who can sign in is a conservative superset of the
+  // planned PD/PC/CSO/President acknowledgement audience. Proving this whole
+  // set avoids guessing personas before that separate contract exists.
+  const signInCapableActiveProfiles = profiles.filter((p) => p.is_active && p.azure_email);
+  const identityGaps = [];
+  for (const profile of signInCapableActiveProfiles) {
+    const sid = (profile.dynamics_systemuser_id || '').toLowerCase();
+    if (!sid) {
+      identityGaps.push({ profile, reason: 'no linked systemuser' });
+      continue;
+    }
+    const readback = systemuserById.get(sid);
+    if (!readback?.user) {
+      identityGaps.push({ profile, reason: `linked systemuser unreadable${readback?.error ? ` (${readback.error})` : ''}` });
+      continue;
+    }
+    if (readback.user.isdisabled) {
+      identityGaps.push({ profile, reason: 'linked systemuser is disabled' });
+      continue;
+    }
+    const profileEmail = String(profile.azure_email).trim().toLowerCase();
+    const systemuserEmail = String(readback.user.internalemailaddress || '').trim().toLowerCase();
+    if (!systemuserEmail || systemuserEmail !== profileEmail) {
+      identityGaps.push({ profile, reason: 'linked systemuser email no longer matches Azure sign-in email' });
+    }
+  }
+
+  console.log(`\nAcknowledgement identity-key prerequisite — ${signInCapableActiveProfiles.length} active sign-in-capable staff profile(s)`);
+  if (identityGaps.length === 0) {
+    console.log('  PASS: every profile maps to an existing enabled systemuser with the exact Azure sign-in email.');
+  } else {
+    console.log(`  FAIL: ${identityGaps.length} profile(s) do not satisfy the systemuser identity contract:`);
+    for (const gap of identityGaps) {
+      console.log(`  - ${gap.profile.display_name || gap.profile.name}: ${gap.reason}`);
+    }
+  }
+
+  const excludedActiveProfiles = profiles.filter((p) => p.is_active && !p.azure_email);
+  if (excludedActiveProfiles.length > 0) {
+    console.log(`  Note: ${excludedActiveProfiles.length} active profile(s) without an Azure email cannot sign in and are outside this reviewer-audience superset.`);
+  }
+  const excludedInactiveProfiles = profiles.filter((p) => !p.is_active);
+  if (excludedInactiveProfiles.length > 0) {
+    console.log(`  Note: ${excludedInactiveProfiles.length} inactive profile(s) are excluded; confirm no intended reviewer is inactive or missing from user_profiles.`);
+  }
+  console.log('  Owner attestation still required: this roster must contain every intended PD, PC, CSO, and President.');
+
+  process.exit(identityGaps.length === 0 ? 0 : 2);
 })().catch((error) => {
   console.error('Probe failed:', error.message);
   process.exit(1);

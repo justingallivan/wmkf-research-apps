@@ -137,7 +137,11 @@ The ordered agenda is maintained in `docs/CURRENT_WORK_QUEUE.md`. As of
 2026-08-30, the owner selected Final Writeup infrastructure as the next delivery
 priority. The target is an underlying, superuser-testable path by 2026-09-04,
 not broad staff rollout: same-item Final lineage, explicit transition
-attribution, acknowledgement persistence, and matrix-ready dashboard data.
+attribution, acknowledgement persistence, and dashboard data. As of 2026-08-31,
+the ordinary-staff dashboard/focused-review foundation is source-built with
+bounded reads and external-Word actions, but is not deployed and its separate
+acknowledgement readiness value remains unset. The next step is deliberate
+release/runtime enablement and a bounded superuser test.
 Every edit/review action opens the canonical SharePoint Word document in its
 own browser window/tab (or desktop Word through Microsoft's supported option);
 the application will not embed or recreate Word editing.

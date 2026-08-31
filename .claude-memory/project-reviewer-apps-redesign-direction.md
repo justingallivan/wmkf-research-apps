@@ -247,6 +247,13 @@ planned. Current authority is
   `1002788` created one current Ready/Review Final row while retaining the
   current Pre-Site pointer and exact SharePoint item/version/hash/size; explicit
   group-review actor/time was read back and no new file was created.
+  **[SOURCE-BUILT, NOT DEPLOYED 2026-08-31]** The ordinary-staff Final Writeups
+  dashboard and focused-review foundation now provide a bounded cross-request
+  queue, responsible-PD stewardship rows, reviewed history/freshness state,
+  positive initials, and separate **Open review** / **Open in Word** actions.
+  The server caps and batches its reads and derives relationships/actions; it
+  does not infer PC/leadership personas, expose the full matrix, or broaden
+  supporting-material access. Wave 23 runtime readiness remains unset.
   Initial Assessment production
   registry/pointer schema, governed prompt v1, and application are live and
   verified; Request `1002788` preserves mechanics-only historical evidence,
