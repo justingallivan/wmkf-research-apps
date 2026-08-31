@@ -3,7 +3,7 @@ title: Final Writeup Review — Implementation Plan
 domain: workbench
 kind: plan
 status: active
-summary: "Same-item Final handoff is Production-proved; Slice 2 schema is preflighted with identity cleared and awaits explicit Production apply approval."
+summary: "Same-item Final handoff is Production-proved; Slice 2 acknowledgement schema is exact and Active in Production, while runtime and dashboards remain pending."
 canonical: false
 cataloged: 2026-08-28
 last_verified: 2026-08-31
@@ -12,6 +12,7 @@ related:
   - docs/audits/final-writeup-review-fable-review-2026-08-28.md
   - docs/audits/final-writeup-acknowledgement-wave23-adversarial-review-2026-08-31.md
   - docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md
+  - docs/atlas/dataverse-wmkf-finalwriteupreviewacknowledgement.md
   - docs/atlas/dataverse-wmkf-requestdocument.md
   - outputs/final-writeup-review-2026-08-28/final-writeup-review-design-brief.md
 ---
@@ -103,12 +104,13 @@ An OAuth-authenticated, read-only Claude Fable review on 2026-08-28 independentl
 - **[VERIFIED]** A Request already exposes the lead PD and assigned Program Coordinator as separate system-user lookups (`docs/atlas/dataverse-akoya-request.md:38-47`).
 - **[VERIFIED]** The current dashboard is PD/reviewer-lifecycle-specific and derives its “my” scope from the lead-PD relationship (`lib/services/workbench/dashboard-service.js:42-79`, `126-176`). It should not be stretched into the Final Writeups dashboard.
 - **[VERIFIED]** The existing `reviewers` app grant opens the whole Request Workbench (`shared/config/appRegistry.js:41-49`). A dedicated occasional-user dashboard needs its own access contract rather than granting leadership the full reviewer-management experience.
-- **[VERIFIED 2026-08-31]** Wave 23 schema-as-code and its hardened metadata
-  preflight now define the proposed acknowledgement entity, six fields, two
-  required lookups, and the Final-document + reviewer alternate key. Production
-  metadata remains absent and creation-compatible: 11 absent / 0 divergent / 0
-  pending / 0 exact in the read-only preflight, and the non-writing apply dry-run
-  passed. No adapter, route, service, readiness flag, or live entity exists yet.
+- **[PRODUCTION SCHEMA LIVE 2026-08-31]** Wave 23 defines and has provisioned
+  the acknowledgement entity, six custom fields, two required lookups, and the
+  Final-document + reviewer alternate key. Hardened readback reports 11 exact /
+  0 absent / 0 divergent / 0 pending; the key index is Active and the entity set
+  is `wmkf_finalwriteupreviewacknowledgements`. The live row count is zero. No
+  adapter, route, service, readiness flag, or UI consumer exists yet
+  (`docs/atlas/dataverse-wmkf-finalwriteupreviewacknowledgement.md`).
 - **[VERIFIED]** A Pre-Site row in `SUPERSEDED` is excluded from the current artifact read model. Clearing its pointer can re-enable draft generation, while retaining the pointer and moving the row to `FINAL` preserves the existing read-only receipt and regeneration lock (`lib/services/pre-site-visit/artifact-service.js:545-577`, `838-859`; `tests/unit/staff-deliberations-tab.test.js:446-464`).
 - **[VERIFIED]** Dataverse writes only apply `MSCRMCallerID` when impersonation is enabled and may retry a 403 as the service principal; changesets do not currently expose a no-fallback actor guarantee (`lib/services/dynamics/write-core.js:76-115`; `lib/services/dynamics/changeset.js:85`, `113-125`).
 - **[VERIFIED 2026-08-31]** Session `dynamicsSystemuserId` depends on exact-email
@@ -187,7 +189,7 @@ For **Ready for leadership review**, move the Final row lifecycle from `REVIEW` 
 
 ### Personal review acknowledgement — new additive entity
 
-Wave 23 proposes one organization-owned Dataverse child entity,
+Wave 23 has provisioned one organization-owned Dataverse child entity,
 `wmkf_FinalWriteupReviewAcknowledgement`, with pinned relationship schema names
 `wmkf_finalwriteupreview_finaldocument` and
 `wmkf_finalwriteupreview_reviewer`. Its minimum contract is:
@@ -205,9 +207,12 @@ The row represents the reviewer’s latest acknowledgement for that Final artifa
 The read-only staff-identity probe passed for every existing active,
 sign-in-capable profile, and the owner confirmed that the 11-person roster is
 the complete intended audience. Wave 23 therefore uses the `systemuser` lookup.
-Production schema creation still requires separate explicit authorization.
+The separately authorized Production schema creation completed on 2026-08-31.
 
-The schema must be readiness-gated until metadata readback is exact and the alternate key reports `EntityKeyIndexStatus === 'Active'`. The new adapter must expose only named reads/upserts; UI code never talks to Dataverse directly.
+Production metadata readback is exact and the alternate key reports
+`EntityKeyIndexStatus === 'Active'`. Runtime must still be readiness-gated when
+the adapter/service is introduced; the new adapter must expose only named
+reads/upserts, and UI code never talks to Dataverse directly.
 
 ## Server contracts
 
@@ -389,19 +394,20 @@ This slice proves the document-continuity contract end to end before adding coll
 
 ### Slice 2 — acknowledgement schema and service
 
-**[IN PROGRESS 2026-08-31.]** Wave 23 schema source and the read-only metadata
-preflight are built. Production reports 11 absent / 0 divergent / 0 pending / 0
-exact, and the non-writing apply dry-run passed. An OAuth-authenticated Claude
-Fable adversarial review's accepted classifier and proof-boundary findings are
-fixed. The owner confirmed the 11-person roster is the complete intended
-PD/PC/CSO/President audience, clearing the identity-key prerequisite. No live
-schema write has occurred.
+**[IN PROGRESS 2026-08-31.]** Wave 23 schema source, hardened preflight, and
+Production schema apply are complete. Exact readback reports 11 exact / 0
+absent / 0 divergent / 0 pending, entity set
+`wmkf_finalwriteupreviewacknowledgements`, Active alternate key, and zero rows.
+An OAuth-authenticated Claude Fable adversarial review's accepted classifier
+and proof-boundary findings are fixed. The owner confirmed the 11-person roster
+is the complete intended PD/PC/CSO/President audience. Runtime remains unbuilt
+and disabled.
 
 - **Complete:** record owner attestation that the 11-person sign-in roster
   contains every intended PD, PC, CSO, and President; use `systemuser` as the
   reviewer identity key.
-- After separate explicit Production authorization, apply the additive
-  Dataverse entity and alternate key; reread exact metadata and require the key
+- **Complete:** apply the additive Dataverse entity and alternate key under
+  explicit Production authorization; reread exact metadata and require the key
   index to report Active.
 - Add readiness gating that requires the alternate key index to be Active, plus a typed adapter.
 - Implement single-observation current-version acknowledgement, `If-Match` replacement, and publication-version-based personal states.
@@ -512,9 +518,8 @@ Run each gate and its self-test sequentially where applicable:
 ## Final recommendation
 
 Proceed with slices 2–3 next. The 2026-09-04 superuser-testable same-item
-handoff is already Production-proved; Wave 23 source and preflight are ready,
-with the identity prerequisite cleared and explicit Production-apply
-authorization still required. The remaining milestone work is to deploy and consume durable review
+handoff is already Production-proved; Wave 23 is exact and Active in Production,
+with the identity and schema prerequisites cleared. The remaining milestone work is to build and consume durable review
 acknowledgements and land the dashboard data/focused review foundation. All edit/review actions open
 the canonical Word document outside the Workbench. PC backup, broad matrix
 visibility, leadership-specific lenses, and general rollout follow only after

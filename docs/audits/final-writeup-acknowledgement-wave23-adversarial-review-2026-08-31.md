@@ -3,7 +3,7 @@ title: Final Writeup acknowledgement Wave 23 — Claude Fable adversarial review
 domain: workbench
 kind: audit
 status: active
-summary: Read-only OAuth review of the Wave 23 acknowledgement preflight; accepted findings were fixed and roster completeness was owner-attested, while Production apply still needs explicit approval.
+summary: Read-only OAuth Wave 23 review with accepted fixes, followed by owner-attested identity and exact Active Production schema deployment; runtime remains disabled.
 canonical: false
 cataloged: 2026-08-31
 last_verified: 2026-08-31
@@ -24,7 +24,8 @@ related:
 - **Mode:** read-only adversarial review; the reviewer made no file or live-state changes.
 - **Authentication:** Claude Code's Keychain-backed `claude.ai` OAuth session, with `ANTHROPIC_API_KEY` and `CLAUDE_API_KEY` removed from the delegated process environment.
 - **Model disclosure:** the requested review was described as Opus, but the delegated CLI identified the completed review as `claude-fable-5`. The owner explicitly accepted that disclosed review and authorized fixing findings that Codex agreed with.
-- **Production safety:** no Wave 23 Production schema write occurred.
+- **Production safety at review time:** no Wave 23 Production schema write had
+  occurred. The later owner-approved apply is recorded below.
 
 ## Verdict
 
@@ -60,25 +61,34 @@ person intended to serve as a PD, PC, CSO, or President. That completeness claim
 was subsequently **[OWNER-ATTESTED 2026-08-30 PT / 2026-08-31 UTC]** for the
 complete intended PD/PC/CSO/President audience.
 
-### Wave 23 metadata
+### Wave 23 metadata and authorized apply
 
-The hardened Production metadata preflight reported **11 absent, 0 divergent,
-0 pending, and 0 exact**. The ordinary Production apply command also completed
-in non-writing dry-run mode and described the expected create operations. This
-is **[VERIFIED via Production metadata reads and apply dry-run]** as
-creation-compatible, not deployed. The sandbox dry-run could not start because
+The hardened Production metadata preflight initially reported **11 absent, 0
+divergent, 0 pending, and 0 exact**. The ordinary Production apply command also
+completed in non-writing dry-run mode and described the expected create
+operations. The sandbox dry-run could not start because
 `DYNAMICS_SANDBOX_URL` is not configured; this is an environment limitation,
 not evidence about Sandbox metadata.
 
-## Remaining gates
+After explicit owner authorization, the first local execute attempt was denied
+by `DATAVERSE_TARGET_INTERLOCK` before its first POST; immediate readback stayed
+11 absent. The approved rerun used the repository's date-bounded, auditable
+`DATAVERSE_PROD_WRITE_ACK` exception without weakening the interlock. It created
+the entity, six custom fields, two relationships, and alternate key. Metadata
+propagation briefly reported the key absent and then Pending. Final hardened
+readback reported **11 exact, 0 absent, 0 divergent, and 0 pending**, entity set
+`wmkf_finalwriteupreviewacknowledgements`, and an Active key index. A separate
+live count returned zero rows.
+
+## Gate disposition
 
 The identity condition is now satisfied:
 
 - **[RESOLVED]** The owner attested that the probed 11-person roster contains
   every intended PD, PC, CSO, and President.
-- **[OPEN]** The owner gives explicit authorization for the Production schema
-  apply.
+- **[RESOLVED]** The owner explicitly authorized the Production schema apply;
+  final metadata readback is exact and the alternate key is Active.
 
-After any authorized apply, exact metadata readback and
-`EntityKeyIndexStatus === 'Active'` remain required before a readiness flag or
-runtime acknowledgement path can be enabled.
+No runtime acknowledgement path or readiness flag was enabled. The next slice
+must add the typed adapter, readiness contract, service, and focused tests before
+any UI consumer is introduced.

@@ -445,6 +445,6 @@ related:
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
-| [FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md](FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md) | plan | active |  | Same-item Final handoff is Production-proved; Slice 2 schema is preflighted with identity cleared and awaits explicit Production apply approval. | 2026-08-28 |
+| [FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md](FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md) | plan | active |  | Same-item Final handoff is Production-proved; Slice 2 acknowledgement schema is exact and Active in Production, while runtime and dashboards remain pending. | 2026-08-28 |
 | [WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md](WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md) | plan | active |  | Pre-Site/Site Visit lifecycle with Production-proved same-item Final lineage; acknowledgement and dashboard follow-ons remain pending. | 2026-08-17 |
 

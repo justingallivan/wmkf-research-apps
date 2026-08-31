@@ -117,16 +117,24 @@ against launching metered review tools without explicit owner authorization.
      Assessments, eight Pre Site Visits, and one Final Writeup; 11 Ready and one
      Failed. A bounded 30-minute Production scan found no error logs or 5xx.
 
-## Session 471 Wave 23 Preflight
+## Session 471 Wave 23 Preflight and Production Apply
 
-1. **Acknowledgement schema source and read-only preflight are built.**
+1. **Acknowledgement schema is live and exact in Production.**
    - Commit `be40b7d4` added the Wave 23 schema specification, Production-safe
      metadata preflight, and access/identity census.
    - The proposed organization-owned entity has six fields, required Final
      Document and Reviewer lookups, and an alternate key across those lookups.
-   - Production remains unchanged. The hardened preflight reports 11 absent / 0
-     divergent / 0 pending / 0 exact, and the non-writing apply dry-run passed.
-     Sandbox could not be assessed because `DYNAMICS_SANDBOX_URL` is unset.
+   - The hardened preflight first reported 11 absent / 0 divergent / 0 pending /
+     0 exact, and the non-writing apply dry-run passed. Sandbox could not be
+     assessed because `DYNAMICS_SANDBOX_URL` is unset.
+   - After explicit owner approval, the first execute attempt was blocked before
+     its first POST by the local→Production interlock and readback remained 11
+     absent. The sanctioned date-bounded `DATAVERSE_PROD_WRITE_ACK` operator
+     exception then allowed the same scoped Wave 23 apply without changing
+     interlock mode.
+   - Final readback reports 11 exact / 0 absent / 0 divergent / 0 pending,
+     entity set `wmkf_finalwriteupreviewacknowledgements`, Active alternate key,
+     and zero rows. No runtime/readiness flag was enabled.
 
 2. **Identity link integrity and roster completeness are resolved.**
    - Eleven active, sign-in-capable profiles map by exact email to existing,
@@ -155,10 +163,10 @@ against launching metered review tools without explicit owner authorization.
    Slices 0–1 are complete and Slice 1 is Production-proved on Request
    `1002788`. Wave 23 source/preflight and the existing-profile identity probe
    are complete, and the owner confirmed the 11-person roster is the complete
-   intended PD/PC/CSO/President audience. Next, under separate explicit
-   Production authorization, apply/read back the version-aware acknowledgement
-   entity and require its key index to become Active. Build the matrix-ready
-   dashboard data/focused-review foundation afterward. Editing stays in Word in a separate
+   intended PD/PC/CSO/President audience. Wave 23 is now exact and Active in
+   Production. Next, build the typed adapter, readiness contract,
+   acknowledgement service, and focused tests, then the matrix-ready dashboard
+   data/focused-review foundation. Editing stays in Word in a separate
    browser window/tab (or desktop Word when Microsoft permits); do not embed an
    editor in the Workbench.
 2. **Audience and matrix.**
@@ -180,10 +188,9 @@ against launching metered review tools without explicit owner authorization.
 1. **Execute Final Writeup Slices 2–3 in bounded increments.**
    `docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md` is owner-approved for
    staged implementation with named identity/persona prerequisites. Slice 1 is
-   Production-proved; Wave 23 is source-built and Production-preflighted but not
-   applied. The owner roster attestation is complete. Next is separately
-   authorized schema apply/readback with an Active key index, acknowledgement
-   persistence/service,
+   Production-proved; Wave 23 is exact and Active in Production with zero rows.
+   The owner roster attestation is complete. Next is the typed adapter,
+   readiness contract, acknowledgement persistence/service and focused tests,
    then the ordinary-PD dashboard and focused review page foundation.
 
 2. **Positive-path funding-history observation.**
@@ -267,7 +274,8 @@ against launching metered review tools without explicit owner authorization.
 | `pages/api/workbench/initial-assessment/board-snapshot.js` | Superuser retained Board snapshot route |
 | `docs/INITIAL_ASSESSMENT_CONTROLLED_PILOT_2026-07-30.md` | Pilot evidence and remaining write-proof boundary |
 | `docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md` | Production-proved Slice 1 and approved Slices 2–5 design |
-| `docs/audits/final-writeup-acknowledgement-wave23-adversarial-review-2026-08-31.md` | Accepted Wave 23 review findings, read-only evidence, and remaining pre-apply gates |
+| `docs/audits/final-writeup-acknowledgement-wave23-adversarial-review-2026-08-31.md` | Accepted Wave 23 review findings, authorized Production apply, and exact Active readback |
+| `docs/atlas/dataverse-wmkf-finalwriteupreviewacknowledgement.md` | Live Wave 23 schema, identity/key/version contract, zero-row state, and remaining runtime boundary |
 
 ## Testing
 

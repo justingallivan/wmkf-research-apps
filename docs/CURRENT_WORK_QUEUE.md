@@ -34,7 +34,7 @@ sequence.
 
 | Order | Work | Current boundary | Completion decision |
 | --- | --- | --- | --- |
-| 1 | Final Writeup acknowledgement infrastructure and dashboard data foundation | **[IN PROGRESS 2026-08-31.]** Slice 1 is Production-proved. Wave 23 schema source and hardened preflight are built; Production is creation-compatible at 11 absent / 0 divergent / 0 pending / 0 exact, and the non-writing apply dry-run passed. The identity census proved exact enabled-`systemuser` links for all 11 active sign-in profiles, and the owner confirmed this is the complete intended PD/PC/CSO/President roster. The acknowledgement identity-key gate is cleared; a separate explicit Production apply remains required. Slice 3 then owns the ordinary-PD dashboard/focused-review foundation and matrix-ready projection. Word remains external to the Workbench. | By **2026-09-04**, acknowledgement persistence and the superuser-testable dashboard data path are in place with exact identity/version keys and focused tests. |
+| 1 | Final Writeup acknowledgement infrastructure and dashboard data foundation | **[IN PROGRESS 2026-08-31.]** Slice 1 is Production-proved. Wave 23 is live in Production at 11 exact / 0 absent / 0 divergent / 0 pending with an Active Final-document + reviewer alternate key and zero rows. The identity census proved exact enabled-`systemuser` links for all 11 active sign-in profiles, and the owner confirmed this is the complete intended PD/PC/CSO/President roster. The acknowledgement identity and schema gates are cleared; the typed adapter, readiness contract, service, focused tests, and Slice 3 dashboard/focused-review foundation remain. Word remains external to the Workbench. | By **2026-09-04**, acknowledgement persistence and the superuser-testable dashboard data path are in place with exact identity/version keys and focused tests. |
 | 2 | Final Writeup role rollout and dashboards | **[PLANNED.]** Ordinary PD review can precede the global persona model. PC backup, complete matrix visibility, and leadership-specific queues remain disabled until those roles are positively identified. | Verified PD/PC/CSO/President identity and SharePoint access; acknowledgement alternate key active; no role inference from names, titles, email, or program taxonomy. The external `wmkf_requestdocument` staff-role grant remains expected around 2026-09-10. |
 
 ## Audit follow-ups — verified open, not silently prioritized
@@ -118,19 +118,19 @@ sequence.
 
 ## Completed in this execution
 
-- Final Writeup acknowledgement Wave 23 preflight: **[READ-ONLY PRODUCTION
-  VERIFIED 2026-08-31; NOT APPLIED]** schema-as-code now defines the proposed
+- Final Writeup acknowledgement Wave 23: **[PRODUCTION SCHEMA LIVE AND EXACT
+  2026-08-31; RUNTIME NOT YET BUILT]** schema-as-code defines the
   organization-owned entity, six fields, two required lookups, and the
   Final-document + reviewer alternate key. The identity census proved exact,
   enabled Dataverse links for all 11 existing active sign-in profiles; the
   owner subsequently confirmed that this is the complete intended audience.
-  The hardened Production
-  preflight reported 11 absent / 0 divergent / 0 pending / 0 exact, and the
-  non-writing apply dry-run passed. Accepted OAuth Claude Fable review findings
+  The hardened Production preflight first reported 11 absent / 0 divergent / 0
+  pending / 0 exact. After explicit owner approval, the date-bounded interlock
+  acknowledgement allowed the scoped apply; final readback reports 11 exact / 0
+  absent / 0 divergent / 0 pending, Active key index, and zero rows. Accepted OAuth Claude Fable review findings
   now enforce exact relationship/cascade/type checks, terminal failed-key
-  handling, and discriminating self-tests. The acknowledgement identity-key
-  gate is cleared; a separate explicit Production-apply approval remains
-  required.
+  handling, and discriminating self-tests. The acknowledgement identity and
+  schema gates are cleared; runtime remains unbuilt and disabled.
 
 - Final Writeup Slice 1 release: **[PRODUCTION-PROVED 2026-08-30 PT /
   2026-08-31 UTC]** four approved local commits reached public GitHub and
