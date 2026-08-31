@@ -1,0 +1,202 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-31T01:23:56Z",
+  "title": "Design System: WMKF Document Processing Suite",
+  "extensions": {
+    "colorMeta": {
+      "foundation-ink": {
+        "role": "primary",
+        "displayName": "Foundation Ink",
+        "canonical": "#111827",
+        "tonalRamp": ["#111827", "#1f2937", "#374151", "#4b5563", "#6b7280", "#9ca3af", "#d1d5db", "#f3f4f6"]
+      },
+      "body-graphite": {
+        "role": "neutral",
+        "displayName": "Body Graphite",
+        "canonical": "#374151",
+        "tonalRamp": ["#111827", "#1f2937", "#374151", "#4b5563", "#6b7280", "#9ca3af", "#d1d5db", "#f3f4f6"]
+      },
+      "muted-graphite": {
+        "role": "neutral",
+        "displayName": "Muted Graphite",
+        "canonical": "#6b7280",
+        "tonalRamp": ["#111827", "#1f2937", "#374151", "#4b5563", "#6b7280", "#9ca3af", "#d1d5db", "#f3f4f6"]
+      },
+      "border-gray": {
+        "role": "neutral",
+        "displayName": "Border Gray",
+        "canonical": "#e5e7eb",
+        "tonalRamp": ["#111827", "#1f2937", "#374151", "#4b5563", "#6b7280", "#9ca3af", "#d1d5db", "#f3f4f6"]
+      },
+      "canvas-gray": {
+        "role": "neutral",
+        "displayName": "Canvas Gray",
+        "canonical": "#f9fafb",
+        "tonalRamp": ["#111827", "#1f2937", "#374151", "#4b5563", "#6b7280", "#9ca3af", "#e5e7eb", "#f9fafb"]
+      },
+      "surface-white": {
+        "role": "neutral",
+        "displayName": "Surface White",
+        "canonical": "#ffffff",
+        "tonalRamp": ["#111827", "#1f2937", "#374151", "#4b5563", "#9ca3af", "#d1d5db", "#f3f4f6", "#ffffff"]
+      },
+      "working-blue": {
+        "role": "primary",
+        "displayName": "Working Blue",
+        "canonical": "#2563eb",
+        "tonalRamp": ["#1e3a8a", "#1e40af", "#1d4ed8", "#2563eb", "#3b82f6", "#60a5fa", "#93c5fd", "#dbeafe"]
+      },
+      "confirmed-green": {
+        "role": "secondary",
+        "displayName": "Confirmed Green",
+        "canonical": "#16a34a",
+        "tonalRamp": ["#14532d", "#166534", "#15803d", "#16a34a", "#22c55e", "#4ade80", "#86efac", "#dcfce7"]
+      },
+      "warning-amber": {
+        "role": "tertiary",
+        "displayName": "Warning Amber",
+        "canonical": "#d97706",
+        "tonalRamp": ["#78350f", "#92400e", "#b45309", "#d97706", "#f59e0b", "#fbbf24", "#fcd34d", "#fef3c7"]
+      },
+      "danger-red": {
+        "role": "tertiary",
+        "displayName": "Danger Red",
+        "canonical": "#dc2626",
+        "tonalRamp": ["#7f1d1d", "#991b1b", "#b91c1c", "#dc2626", "#ef4444", "#f87171", "#fca5a5", "#fee2e2"]
+      },
+      "analytical-violet": {
+        "role": "tertiary",
+        "displayName": "Analytical Violet",
+        "canonical": "#9333ea",
+        "tonalRamp": ["#581c87", "#6b21a8", "#7e22ce", "#9333ea", "#a855f7", "#c084fc", "#d8b4fe", "#f3e8ff"]
+      }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Suite landing title and rare page-level moments." },
+      "headline": { "displayName": "Headline", "purpose": "Major page or section headings with room to breathe." },
+      "title": { "displayName": "Title", "purpose": "Request titles, card titles, and primary panel headings." },
+      "body": { "displayName": "Body", "purpose": "Reading copy and normal control content." },
+      "label": { "displayName": "Label", "purpose": "Navigation, fields, badges, actions, and compact metadata." }
+    },
+    "shadows": [
+      { "name": "surface-rest", "value": "0 1px 2px 0 rgb(0 0 0 / 0.05)", "purpose": "Default cards and page bands." },
+      { "name": "surface-response", "value": "0 4px 6px -1px rgb(0 0 0 / 0.10), 0 2px 4px -2px rgb(0 0 0 / 0.10)", "purpose": "Hovered cards and compact popovers." },
+      { "name": "overlay", "value": "0 20px 25px -5px rgb(0 0 0 / 0.10), 0 8px 10px -6px rgb(0 0 0 / 0.10)", "purpose": "Dialogs, drawers, and menus." }
+    ],
+    "motion": [
+      { "name": "state-feedback", "value": "200ms ease", "purpose": "Default hover, focus, color, and transform feedback." },
+      { "name": "slide-up", "value": "300ms ease-out", "purpose": "Dialog and panel entrance." },
+      { "name": "slide-in-right", "value": "250ms ease-out", "purpose": "Drawer entrance." },
+      { "name": "fade-in", "value": "500ms ease-in-out", "purpose": "Occasional low-priority content reveal." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" },
+      { "name": "xl", "value": "1280px" },
+      { "name": "2xl", "value": "1536px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The decisive action for an operational choice.",
+      "html": "<button class=\"ds-btn-primary\">SAVE CHANGES</button>",
+      "css": ".ds-btn-primary { background: #111827; color: #fff; padding: 12px 24px; border: 0; border-radius: 8px; font: 600 14px/20px Inter, system-ui, sans-serif; transition: background 200ms ease, transform 200ms ease; } .ds-btn-primary:hover { background: #1f2937; } .ds-btn-primary:active { transform: scale(0.98); } .ds-btn-primary:focus-visible { outline: none; box-shadow: 0 0 0 2px #fff, 0 0 0 4px #6b7280; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "A clear alternative that stays subordinate to the primary action.",
+      "html": "<button class=\"ds-btn-secondary\">CANCEL</button>",
+      "css": ".ds-btn-secondary { background: #f3f4f6; color: #111827; padding: 12px 24px; border: 0; border-radius: 8px; font: 600 14px/20px Inter, system-ui, sans-serif; transition: background 200ms ease; } .ds-btn-secondary:hover { background: #e5e7eb; } .ds-btn-secondary:focus-visible { outline: none; box-shadow: 0 0 0 2px #fff, 0 0 0 4px #d1d5db; }"
+    },
+    {
+      "name": "Outline Button",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "A quiet supporting action on white or neutral surfaces.",
+      "html": "<button class=\"ds-btn-outline\">VIEW DETAILS</button>",
+      "css": ".ds-btn-outline { background: #fff; color: #374151; padding: 12px 24px; border: 1px solid #d1d5db; border-radius: 8px; font: 600 14px/20px Inter, system-ui, sans-serif; transition: background 200ms ease, border-color 200ms ease; } .ds-btn-outline:hover { background: #f9fafb; border-color: #9ca3af; } .ds-btn-outline:focus-visible { outline: none; box-shadow: 0 0 0 2px #fff, 0 0 0 4px #d1d5db; }"
+    },
+    {
+      "name": "Danger Button",
+      "kind": "button",
+      "refersTo": "button-danger",
+      "description": "Reserved for destructive or critical actions.",
+      "html": "<button class=\"ds-btn-danger\">REMOVE</button>",
+      "css": ".ds-btn-danger { background: #dc2626; color: #fff; padding: 12px 24px; border: 0; border-radius: 8px; font: 600 14px/20px Inter, system-ui, sans-serif; transition: background 200ms ease; } .ds-btn-danger:hover { background: #b91c1c; } .ds-btn-danger:focus-visible { outline: none; box-shadow: 0 0 0 2px #fff, 0 0 0 4px #ef4444; }"
+    },
+    {
+      "name": "Operational Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "A bordered working surface with a shallow resting shadow.",
+      "html": "<section class=\"ds-card\"><h3>Request overview</h3><p>Current information and the next available action.</p></section>",
+      "css": ".ds-card { background: #fff; color: #111827; padding: 24px; border: 1px solid #e5e7eb; border-radius: 12px; box-shadow: 0 1px 2px rgb(0 0 0 / 0.05); font-family: Inter, system-ui, sans-serif; transition: border-color 200ms ease, box-shadow 200ms ease; } .ds-card:hover { border-color: #d1d5db; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.10), 0 2px 4px -2px rgb(0 0 0 / 0.10); } .ds-card h3 { margin: 0 0 8px; font-size: 20px; line-height: 28px; } .ds-card p { margin: 0; color: #4b5563; font-size: 14px; line-height: 20px; }"
+    },
+    {
+      "name": "Text Field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "A white field with a clear boundary and explicit focus state.",
+      "html": "<label class=\"ds-field-label\">Request title<input class=\"ds-input\" value=\"Research program\"></label>",
+      "css": ".ds-field-label { display: grid; gap: 6px; color: #374151; font: 600 14px/20px Inter, system-ui, sans-serif; } .ds-input { width: 100%; box-sizing: border-box; background: #fff; color: #111827; padding: 8px 16px; border: 1px solid #d1d5db; border-radius: 8px; font: 400 16px/24px Inter, system-ui, sans-serif; transition: border-color 200ms ease, box-shadow 200ms ease; } .ds-input:hover { border-color: #9ca3af; } .ds-input:focus { outline: none; border-color: transparent; box-shadow: 0 0 0 2px #3b82f6; }"
+    },
+    {
+      "name": "Confirmed Status Chip",
+      "kind": "chip",
+      "refersTo": "status-chip",
+      "description": "A compact state label pairing semantic color with explicit text.",
+      "html": "<span class=\"ds-chip-confirmed\">✓ CONFIRMED</span>",
+      "css": ".ds-chip-confirmed { display: inline-flex; align-items: center; background: #f0fdf4; color: #15803d; padding: 4px 12px; border: 1px solid #bbf7d0; border-radius: 9999px; font: 600 12px/16px Inter, system-ui, sans-serif; }"
+    },
+    {
+      "name": "Workbench Tab",
+      "kind": "nav",
+      "description": "An overflow-safe task tab with a restrained active marker.",
+      "html": "<nav class=\"ds-tabs\"><button class=\"ds-tab ds-tab-active\">OVERVIEW</button><button class=\"ds-tab\">PROPOSAL</button></nav>",
+      "css": ".ds-tabs { display: flex; gap: 4px; overflow-x: auto; border-bottom: 1px solid #e5e7eb; font-family: Inter, system-ui, sans-serif; } .ds-tab { background: transparent; color: #6b7280; padding: 8px 12px; border: 0; border-bottom: 2px solid transparent; white-space: nowrap; font: 500 14px/20px Inter, system-ui, sans-serif; transition: color 200ms ease, border-color 200ms ease; } .ds-tab:hover { color: #374151; } .ds-tab:focus-visible { outline: 2px solid #6b7280; outline-offset: -2px; } .ds-tab-active { color: #111827; border-bottom-color: #111827; }"
+    },
+    {
+      "name": "Overlay Dialog",
+      "kind": "custom",
+      "description": "A clearly elevated transient layer for consequential choices.",
+      "html": "<section class=\"ds-dialog\"><h3>Confirm action</h3><p>Review the effect before continuing.</p></section>",
+      "css": ".ds-dialog { width: min(100%, 32rem); background: #fff; color: #111827; padding: 24px; border: 1px solid #e5e7eb; border-radius: 12px; box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.10), 0 8px 10px -6px rgb(0 0 0 / 0.10); font-family: Inter, system-ui, sans-serif; } .ds-dialog h3 { margin: 0 0 12px; font-size: 20px; line-height: 28px; } .ds-dialog p { margin: 0; color: #4b5563; font-size: 14px; line-height: 20px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Clear Workbench",
+    "overview": "The suite should feel like a well-prepared working surface: calm, precise, and trustworthy, with the record, the evidence, and the next action easy to locate. It is an internal operational environment rather than a consumer product, so clarity and confidence outrank visual novelty, marketing gloss, or theatrical effects.\n\nThe incumbent system is quietly tactile and decisive. Neutral surfaces and fine borders organize dense grant work; restrained elevation marks interaction and overlays; dark primary actions make commitments unambiguous. Color appears when it conveys action, status, or risk, not as decoration.",
+    "keyCharacteristics": [
+      "Neutral-first, information-dense, and task-focused.",
+      "White working surfaces on a cool gray canvas.",
+      "Dark, decisive primary actions with explicit secondary choices.",
+      "Semantic color used sparingly and consistently.",
+      "Rounded, lightly layered components with brief feedback."
+    ],
+    "rules": [
+      { "name": "The Meaningful Color Rule", "body": "Neutral surfaces carry structure. Blue is for action, green for confirmed success, amber for attention, red for danger or failure, and violet only where an analytical/review distinction already exists.", "section": "colors" },
+      { "name": "The Scan-First Type Rule", "body": "Hierarchy comes from size, weight, and spacing—not decorative font changes.", "section": "typography" },
+      { "name": "The Border-Before-Shadow Rule", "body": "Use borders and tonal contrast to establish structure; increase shadow only for interaction or true overlay depth.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do use Foundation Ink for the primary operational action and active state.",
+      "Do let white surfaces, gray borders, and spacing carry most structural hierarchy.",
+      "Do reserve semantic color for action, status, risk, and established analytical meaning.",
+      "Do use 0.5rem controls, 0.75rem cards, and full rounding for compact status.",
+      "Do keep state feedback brief, explicit, and paired with text or iconography."
+    ],
+    "donts": [
+      "Don't turn the configured blue, green, and violet ramps into competing brand fields.",
+      "Don't elevate every container; use stronger shadows only for interaction and overlays.",
+      "Don't introduce consumer-SaaS gloss, theatrical effects, or decorative branding into operational surfaces.",
+      "Don't introduce a suite-wide logo treatment without a new explicit brand decision.",
+      "Don't communicate consequential state through color alone."
+    ]
+  }
+}
