@@ -853,7 +853,7 @@ export default function StaffDeliberationsTab({ requestId, requestNumber = '', i
                           </p>
                         )}
                         <p className="mt-1 text-xs text-gray-500">
-                          {entry.correction?.actorName || 'Recorded staff actor'}
+                          {entry.correction?.actorName || 'Not captured'}
                           {entry.correction?.createdAt
                             ? ` · ${new Date(entry.correction.createdAt).toLocaleString()}`
                             : ''}

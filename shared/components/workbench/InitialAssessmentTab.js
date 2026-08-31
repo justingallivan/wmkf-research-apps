@@ -305,10 +305,14 @@ export default function InitialAssessmentTab({ requestId, isSuperuser = false })
                       {' · '}Snapshot link unavailable
                     </span>
                   )}
-                  {(milestone.provenance?.createdBy || milestone.createdAt) && (
+                  {(milestone.provenance?.initiatedAt || milestone.createdAt) && (
                     <span className="ml-2 text-xs text-emerald-700">
-                      {milestone.provenance?.createdBy || 'Administrator'}
-                      {milestone.createdAt ? ` · ${new Date(milestone.createdAt).toLocaleString()}` : ''}
+                      {milestone.provenance?.createdBy || 'Not captured'}
+                      {milestone.provenance?.initiatedAt
+                        ? ` · ${new Date(milestone.provenance.initiatedAt).toLocaleString()}`
+                        : milestone.createdAt
+                          ? ` · ${new Date(milestone.createdAt).toLocaleString()}`
+                          : ''}
                     </span>
                   )}
                 </li>

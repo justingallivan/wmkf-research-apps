@@ -147,6 +147,32 @@ it('sends exact current-version fences when a superuser creates a Board snapshot
   expect(await screen.findByText(/Source version 2\.0/)).toBeInTheDocument();
 });
 
+it('labels a legacy Board snapshot actor as Not captured, never Administrator', async () => {
+  const snapshot = {
+    ...readyArtifact(),
+    artifactId: '55555555-5555-4555-8555-555555555555',
+    isBoardSnapshot: true,
+    createdAt: '2026-08-30T18:00:00Z',
+    provenance: {
+      sourceDocumentId: readyArtifact().artifactId,
+      sourceVersionId: '2.0',
+      initiatedAt: null,
+      createdBy: null,
+    },
+  };
+  global.fetch.mockResolvedValueOnce({
+    ok: true,
+    json: async () => ({
+      artifacts: [readyArtifact()],
+      latestAttempts: [],
+      milestones: [snapshot],
+    }),
+  });
+  render(<InitialAssessmentTab requestId={REQUEST_ID} isSuperuser />);
+  expect(await screen.findByText(/Not captured/)).toBeInTheDocument();
+  expect(screen.queryByText('Administrator')).not.toBeInTheDocument();
+});
+
 it('lets a superuser restore only a non-current displayed version', async () => {
   jest.spyOn(window, 'confirm').mockReturnValue(true);
   let historyReads = 0;

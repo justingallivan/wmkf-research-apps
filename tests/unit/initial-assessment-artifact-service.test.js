@@ -141,6 +141,22 @@ function registryRow(overrides = {}) {
   };
 }
 
+it('projects only the explicit initiator and never relabels built-in createdby as staff', () => {
+  const projected = projectArtifact(registryRow({
+    _createdby_value: '99999999-9999-4999-8999-999999999999',
+    _createdby_value_formatted: 'Application Service Principal',
+    _wmkf_initiatedby_value: null,
+    _wmkf_initiatedby_value_formatted: null,
+    wmkf_initiatedat: null,
+  }));
+  expect(projected.provenance).toMatchObject({
+    createdBySystemUserId: null,
+    createdBy: null,
+    initiatedAt: null,
+  });
+  expect(JSON.stringify(projected.provenance)).not.toContain('Application Service Principal');
+});
+
 const generated = {
   summary: 'A concise proposal summary.',
   significance_impact: 'The proposal identifies an important scientific problem.',

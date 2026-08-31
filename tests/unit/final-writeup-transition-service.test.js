@@ -108,9 +108,35 @@ function createHarness({ actorId = LEAD_PD_ID, schemaReady = true } = {}) {
     hashDocx: jest.fn().mockResolvedValue('gdc1:final-source-hash'),
     newClaimToken: jest.fn().mockReturnValue('claim-token'),
     now: jest.fn().mockReturnValue(new Date('2026-08-30T19:05:00Z')),
+    resolveActor: jest.fn().mockResolvedValue({
+      schemaReady: false,
+      actorId: null,
+      reason: 'schema-not-ready',
+    }),
   };
   return { request, source, rows, metadata, dependencies, actorId };
 }
+
+test('Wave 24 strict mode rejects an unverified actor before Graph or Dataverse writes', async () => {
+  const harness = createHarness();
+  harness.dependencies.resolveActor.mockRejectedValue(Object.assign(
+    new Error('identity unavailable'),
+    { httpStatus: 403, code: 'request_document_actor_unavailable' },
+  ));
+
+  await expect(startFinalWriteup({
+    requestId: REQUEST_ID,
+    expectedArtifactId: SOURCE_ID,
+    isSuperuser: false,
+    actingUserSystemId: LEAD_PD_ID,
+  }, harness.dependencies)).rejects.toMatchObject({
+    httpStatus: 403,
+    code: 'request_document_actor_unavailable',
+  });
+  expect(harness.dependencies.getFileMetadataById).not.toHaveBeenCalled();
+  expect(harness.dependencies.createDocument).not.toHaveBeenCalled();
+  expect(harness.dependencies.commitChangeset).not.toHaveBeenCalled();
+});
 
 test('moves the same stable Word item into one Ready/Review Final row atomically', async () => {
   const harness = createHarness();
@@ -145,7 +171,14 @@ test('moves the same stable Word item into one Ready/Review Final row atomically
       wmkf_sharepointitemid: 'item-id',
       'wmkf_SourceDocument@odata.bind': `/wmkf_requestdocuments(${SOURCE_ID})`,
     }),
-    { actingUserSystemId: LEAD_PD_ID },
+    expect.objectContaining({
+      actingUserSystemId: LEAD_PD_ID,
+      actorPolicy: 'required',
+      actorContext: expect.objectContaining({
+        operation: 'final-writeup-claim',
+        requestId: REQUEST_ID,
+      }),
+    }),
   );
   expect(harness.dependencies.commitChangeset).toHaveBeenCalledWith(
     expect.arrayContaining([

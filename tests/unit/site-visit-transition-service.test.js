@@ -9,6 +9,8 @@ import {
 const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
 const ARTIFACT_ID = '22222222-2222-4222-8222-222222222222';
 const OTHER_ARTIFACT_ID = '33333333-3333-4333-8333-333333333333';
+const ACTOR_ID = '44444444-4444-4444-8444-444444444444';
+const OTHER_ACTOR_ID = '55555555-5555-4555-8555-555555555555';
 
 function createHarness({ lifecycle = REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT } = {}) {
   const request = {
@@ -53,11 +55,19 @@ function createHarness({ lifecycle = REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT } = 
       expect(id).toBe(ARTIFACT_ID);
       expect(options.ifMatch).toBe('row-etag-1');
       Object.assign(row, patch, { _etag: 'row-etag-2' });
+      const actorBind = patch['wmkf_MilestoneCreatedBy@odata.bind'];
+      if (actorBind) row._wmkf_milestonecreatedby_value = actorBind.match(/\(([^)]+)\)/)?.[1];
     }),
     getFileMetadataById: jest.fn().mockImplementation(async () => ({ ...metadata })),
     downloadFile: jest.fn().mockResolvedValue({ buffer: Buffer.from('valid-docx') }),
     hashDocx: jest.fn().mockResolvedValue('gdc1:handoff-hash'),
     now: jest.fn().mockReturnValue(new Date('2026-08-17T21:05:00Z')),
+    resolveActor: jest.fn().mockResolvedValue({
+      schemaReady: false,
+      actorId: null,
+      reason: 'schema-not-ready',
+    }),
+    recordActorNotCaptured: jest.fn().mockResolvedValue({ id: 1 }),
   };
   return { row, metadata, dependencies };
 }
@@ -67,7 +77,7 @@ test('promotes the current Ready draft and records one stable SharePoint milesto
   const result = await startSiteVisitStage({
     requestId: REQUEST_ID,
     expectedArtifactId: ARTIFACT_ID,
-    actingUserSystemId: '44444444-4444-4444-8444-444444444444',
+    actingUserSystemId: ACTOR_ID,
   }, harness.dependencies);
 
   expect(result).toMatchObject({
@@ -96,7 +106,7 @@ test('promotes the current Ready draft and records one stable SharePoint milesto
     }),
     {
       ifMatch: 'row-etag-1',
-      actingUserSystemId: '44444444-4444-4444-8444-444444444444',
+      actingUserSystemId: ACTOR_ID,
     },
   );
 });
@@ -118,6 +128,101 @@ test('treats an exact completed Review milestone as an idempotent success', asyn
   expect(harness.dependencies.getFileMetadataById).not.toHaveBeenCalled();
   expect(harness.dependencies.downloadFile).not.toHaveBeenCalled();
   expect(harness.dependencies.updateDocument).not.toHaveBeenCalled();
+  expect(harness.dependencies.resolveActor).not.toHaveBeenCalled();
+});
+
+test('readiness-era handoff binds a freshly resolved actor and requires actor presence', async () => {
+  const harness = createHarness();
+  harness.dependencies.resolveActor.mockResolvedValue({
+    schemaReady: true,
+    actorId: ACTOR_ID,
+    reason: null,
+  });
+
+  await startSiteVisitStage({
+    requestId: REQUEST_ID,
+    expectedArtifactId: ARTIFACT_ID,
+    actingUserSystemId: ACTOR_ID,
+  }, harness.dependencies);
+
+  expect(harness.dependencies.updateDocument).toHaveBeenCalledWith(
+    ARTIFACT_ID,
+    expect.objectContaining({
+      'wmkf_MilestoneCreatedBy@odata.bind': `/systemusers(${ACTOR_ID})`,
+    }),
+    { ifMatch: 'row-etag-1', actingUserSystemId: ACTOR_ID },
+  );
+  expect(harness.dependencies.recordActorNotCaptured).not.toHaveBeenCalled();
+});
+
+test('a concurrent matching readiness-era commit may carry a different non-null actor', async () => {
+  const harness = createHarness();
+  harness.dependencies.resolveActor.mockResolvedValue({
+    schemaReady: true,
+    actorId: ACTOR_ID,
+    reason: null,
+  });
+  harness.dependencies.updateDocument.mockImplementationOnce(async (_id, patch) => {
+    Object.assign(harness.row, patch, {
+      _wmkf_milestonecreatedby_value: OTHER_ACTOR_ID,
+      _etag: 'row-etag-2',
+    });
+    throw new Error('connection closed after a concurrent commit');
+  });
+
+  await expect(startSiteVisitStage({
+    requestId: REQUEST_ID,
+    expectedArtifactId: ARTIFACT_ID,
+    actingUserSystemId: ACTOR_ID,
+  }, harness.dependencies)).resolves.toMatchObject({ reused: true });
+});
+
+test('a readiness-era attributed attempt does not reconcile a matching milestone with no actor', async () => {
+  const harness = createHarness();
+  harness.dependencies.resolveActor.mockResolvedValue({
+    schemaReady: true,
+    actorId: ACTOR_ID,
+    reason: null,
+  });
+  harness.dependencies.updateDocument.mockImplementationOnce(async (_id, patch) => {
+    Object.assign(harness.row, patch, { _etag: 'row-etag-2' });
+    delete harness.row['wmkf_MilestoneCreatedBy@odata.bind'];
+    delete harness.row._wmkf_milestonecreatedby_value;
+    throw new Error('connection closed after an incomplete commit');
+  });
+
+  await expect(startSiteVisitStage({
+    requestId: REQUEST_ID,
+    expectedArtifactId: ARTIFACT_ID,
+    actingUserSystemId: ACTOR_ID,
+  }, harness.dependencies)).rejects.toThrow('connection closed after an incomplete commit');
+});
+
+test('approved availability-first handoff omits an invalid actor and records durable evidence', async () => {
+  const harness = createHarness();
+  harness.dependencies.resolveActor.mockResolvedValue({
+    schemaReady: true,
+    actorId: null,
+    reason: 'disabled',
+  });
+
+  await startSiteVisitStage({
+    requestId: REQUEST_ID,
+    expectedArtifactId: ARTIFACT_ID,
+    actingUserSystemId: ACTOR_ID,
+  }, harness.dependencies);
+
+  const [, patch, options] = harness.dependencies.updateDocument.mock.calls[0];
+  expect(patch).not.toHaveProperty('wmkf_MilestoneCreatedBy@odata.bind');
+  expect(options).toEqual({ ifMatch: 'row-etag-1' });
+  expect(harness.dependencies.recordActorNotCaptured).toHaveBeenCalledWith(expect.objectContaining({
+    reason: 'disabled',
+    context: expect.objectContaining({
+      operation: 'site-visit-handoff',
+      requestId: REQUEST_ID,
+      requestDocumentId: ARTIFACT_ID,
+    }),
+  }));
 });
 
 test('rejects a stale browser artifact before reading or writing SharePoint', async () => {

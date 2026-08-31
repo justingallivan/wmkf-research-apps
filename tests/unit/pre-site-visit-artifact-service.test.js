@@ -171,9 +171,9 @@ test('reopen history projects durable actor, reason, source, and milestone evide
     wmkf_reopencycleid: '66666666-6666-4666-8666-666666666666',
     wmkf_reopenreasoncode: 'accidental_handoff',
     wmkf_reopenreasonnote: 'The handoff happened too early.',
-    _createdby_value: '88888888-8888-4888-8888-888888888888',
-    _createdby_value_formatted: 'Test Admin',
-    createdon: '2026-08-22T12:00:00Z',
+    _wmkf_initiatedby_value: '88888888-8888-4888-8888-888888888888',
+    _wmkf_initiatedby_value_formatted: 'Test Admin',
+    wmkf_initiatedat: '2026-08-22T12:00:00Z',
   };
 
   expect(projectReopenHistory([source, successor])).toEqual([expect.objectContaining({

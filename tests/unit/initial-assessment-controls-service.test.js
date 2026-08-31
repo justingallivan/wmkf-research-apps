@@ -300,7 +300,14 @@ it('creates a distinct retained Board snapshot and ignores the upload response c
       wmkf_sourcecontenthash: 'hash:governed-source',
       wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.BOARD_READY,
     }),
-    { actingUserSystemId: ACTOR_ID },
+    expect.objectContaining({
+      actingUserSystemId: ACTOR_ID,
+      actorPolicy: 'required',
+      actorContext: expect.objectContaining({
+        operation: 'initial-assessment-board-snapshot',
+        requestId: REQUEST_ID,
+      }),
+    }),
   );
   expect(h.getSnapshot()).toMatchObject({
     wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,

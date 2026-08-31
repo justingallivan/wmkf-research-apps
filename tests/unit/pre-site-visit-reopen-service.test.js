@@ -130,8 +130,9 @@ function createHarness() {
     createDocument: jest.fn().mockImplementation(async (payload) => {
       const row = {
         wmkf_requestdocumentid: SUCCESSOR_ID,
-        _createdby_value: ACTOR_ID,
-        _createdby_value_formatted: 'Test Admin',
+        _wmkf_initiatedby_value: ACTOR_ID,
+        _wmkf_initiatedby_value_formatted: 'Test Admin',
+        wmkf_initiatedat: '2026-08-22T11:00:00Z',
         createdon: '2026-08-22T11:00:00Z',
         modifiedon: '2026-08-22T11:00:00Z',
         _etag: `row-${++etag}`,

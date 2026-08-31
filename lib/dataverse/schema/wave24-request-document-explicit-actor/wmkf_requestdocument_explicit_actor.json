@@ -1,0 +1,36 @@
+{
+  "name": "wmkf_requestdocument-explicit-actor",
+  "kind": "extensions-on-existing",
+  "entityLogicalName": "wmkf_requestdocument",
+  "_comment": "Additive, immutable Request Document origin actor/time plus Site Visit milestone actor. Runtime must not select or write these fields until exact preflight, explicit apply approval, and REQUEST_DOCUMENT_EXPLICIT_ACTOR_SCHEMA_READY=on.",
+  "attributes": [
+    {
+      "type": "DateTime",
+      "schemaName": "wmkf_InitiatedAt",
+      "displayName": "Initiated At",
+      "description": "UTC date/time when the authenticated application business operation created this Request Document row.",
+      "format": "DateAndTime",
+      "behavior": "UserLocal"
+    }
+  ],
+  "relationships": [
+    {
+      "kind": "N:1",
+      "schemaName": "wmkf_requestdocument_initiatedby",
+      "referencedEntity": "systemuser",
+      "lookupSchemaName": "wmkf_InitiatedBy",
+      "lookupDisplayName": "Initiated By",
+      "lookupDescription": "Authenticated staff systemuser who caused this Request Document row to be created.",
+      "required": "None"
+    },
+    {
+      "kind": "N:1",
+      "schemaName": "wmkf_requestdocument_milestonecreatedby",
+      "referencedEntity": "systemuser",
+      "lookupSchemaName": "wmkf_MilestoneCreatedBy",
+      "lookupDisplayName": "Milestone Created By",
+      "lookupDescription": "Authenticated staff systemuser who completed the Site Visit handoff milestone.",
+      "required": "None"
+    }
+  ]
+}

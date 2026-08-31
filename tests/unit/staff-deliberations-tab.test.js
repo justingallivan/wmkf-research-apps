@@ -658,3 +658,28 @@ test('renders append-only guarded reopen history from the status contract', asyn
   expect(screen.getByText(/source version 2.0/)).toBeInTheDocument();
   expect(screen.getByText('A retained SharePoint copy requires reconciliation.')).toBeInTheDocument();
 });
+
+test('labels a guarded reopen without an explicit actor as Not captured', async () => {
+  global.fetch.mockResolvedValueOnce(statusResponse({
+    currentArtifact: readyArtifact(100000001),
+    reopenHistory: [{
+      artifactId: '77777777-7777-4777-8777-777777777777',
+      outcome: 'completed',
+      correction: {
+        cycleId: '88888888-8888-4888-8888-888888888888',
+        reasonCode: PRE_SITE_REOPEN_REASON.WRONG_GOVERNED_INPUTS,
+        reasonNote: 'The governed inputs were corrected after handoff.',
+        actorName: null,
+        createdAt: null,
+      },
+      source: { milestone: { versionId: '2.0' } },
+      cleanupRequired: [],
+    }],
+  }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} requestNumber="1002379" isSuperuser />);
+
+  await screen.findByText('Working document:');
+  fireEvent.click(screen.getByText(/Administration — guarded reopen/));
+  expect(screen.getByText(/Not captured/)).toBeInTheDocument();
+  expect(screen.queryByText('Recorded staff actor')).not.toBeInTheDocument();
+});
