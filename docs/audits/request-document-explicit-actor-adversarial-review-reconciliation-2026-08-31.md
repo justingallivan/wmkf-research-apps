@@ -28,5 +28,16 @@ until the owner chooses between:
 2. universal fail-closed behavior, which blocks those actions until Admin
    identity reconciliation succeeds.
 
+## Subsequent owner resolution
+
+**[OWNER-APPROVED 2026-08-31.]** The owner selected the recommended
+current-posture policy. Existing strict flows remain strict. Initial Assessment,
+Pre-Site, and Site Visit remain available when actor mapping is missing,
+disabled, or stale; the explicit actor/time pair stays null, consumers render
+“Not captured,” and the runtime must emit the bounded durable operational
+evidence specified in the plan. The named policy gate is closed; the plan is
+ready for later implementation but remains unscheduled behind the September 4
+Final Writeup/dashboard work.
+
 No schema, role, environment, deployment, Production, or historical-data change
 is authorized by this review or reconciliation.

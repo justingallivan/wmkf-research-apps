@@ -272,8 +272,11 @@ against launching metered review tools without explicit owner authorization.
    PC backup, broad matrix visibility, and leadership queues stay off until
    role identity and SharePoint access are positively verified. Request
    Document writes intentionally remain service-principal-attributed while the
-   owner-selected explicit-actor design is planned; no broad staff-role grant
-   is pending.
+   owner-approved explicit-actor design awaits later implementation; no broad
+   staff-role grant is pending. Its current-posture identity policy is settled:
+   existing strict flows stay strict, while Initial Assessment, Pre-Site, and
+   Site Visit preserve availability with honest null attribution and durable
+   operational evidence.
 
 ### Verified Open
 
@@ -307,14 +310,6 @@ against launching metered review tools without explicit owner authorization.
 2. **Share → Wrap Up no-send fallback and zero-program-grant wording.**
    Decide whether off-app distribution gets a manual transition, and whether
    the zero-program sentence should mention discretionary history.
-
-3. **Request Document missing-actor availability policy.**
-   The Option B plan passed read-only Claude adversarial review with conditions.
-   Before implementation, choose either the recommended current-posture policy
-   (existing strict flows stay strict; Initial Assessment, Pre-Site, and Site
-   Visit remain available with null attribution plus durable operational
-   evidence) or universal fail-closed identity handling. No runtime or schema
-   work is authorized while this gate is open.
 
 ### Scheduled Follow-up
 
@@ -376,7 +371,7 @@ against launching metered review tools without explicit owner authorization.
 | File | Purpose |
 |------|---------|
 | `docs/CURRENT_WORK_QUEUE.md` | Canonical delivery priority and owner-deferred write proof |
-| `docs/REQUEST_DOCUMENT_EXPLICIT_ACTOR_PLAN.md` | Adversarially reviewed Option B schema/writer/retry plan; one owner policy gate, implementation deferred |
+| `docs/REQUEST_DOCUMENT_EXPLICIT_ACTOR_PLAN.md` | Owner-approved and adversarially reviewed Option B schema/writer/retry plan; planning complete, implementation deferred |
 | `shared/config/executorBudgets.js` | Budget bounds, descriptions, and reviewed outage fallback |
 | `lib/services/executor-budget-service.js` | Append-only read/publication contract |
 | `pages/api/admin/executor-budgets.js` | Superuser budget read/publication route |

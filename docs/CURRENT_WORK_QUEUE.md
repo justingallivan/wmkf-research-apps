@@ -39,7 +39,7 @@ sequence.
 
 ## Audit follow-ups — verified open, not silently prioritized
 - **Request Document explicit actor tracking (Option B).**
-  **[OWNER-SELECTED 2026-08-31; ADVERSARIAL REVIEWED, ONE OWNER POLICY GATE,
+  **[OWNER-APPROVED 2026-08-31; ADVERSARIAL REVIEWED, PLANNING COMPLETE,
   IMPLEMENTATION DEFERRED.]** Keep Request Document CRUD off staff roles and
   retain service-principal writes while designing explicit, authenticated
   actor/time persistence. The focused plan is
@@ -47,11 +47,12 @@ sequence.
   row-origin actor/time fields, an explicit Site Visit milestone actor, reuse
   of the existing Final fields and distribution ledger, and no invented
   historical backfill. The read-only Claude review returned APPROVE WITH
-  CONDITIONS; source reconciliation accepted its corrections and left one
-  owner gate: preserve the current per-flow missing-identity availability
-  posture with durable null-attribution evidence (recommended), or make every
-  flow fail closed. The 2026-08-27 Connor broad staff-role brief was never sent
-  and is withdrawn. A confirmation-only question is scheduled for Monday
+  CONDITIONS; source reconciliation accepted its corrections. The owner
+  selected the current-posture missing-identity policy: existing strict flows
+  stay strict, while Initial Assessment, Pre-Site, and Site Visit retain
+  availability with honest null attribution plus durable operational evidence.
+  The 2026-08-27 Connor broad staff-role brief was never sent and is withdrawn.
+  A confirmation-only question is scheduled for Monday
   2026-09-07 to identify any compliance,
   audit, report, view, flow, business rule, or plug-in that specifically
   depends on built-in `createdby`/`modifiedby`; absent such a consumer, Connor

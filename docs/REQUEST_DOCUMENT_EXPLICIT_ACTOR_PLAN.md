@@ -29,7 +29,7 @@ related:
 
 ## Decision and status
 
-**[OWNER-SELECTED 2026-08-31; ADVERSARIAL REVIEWED, ONE OWNER POLICY GATE,
+**[OWNER-APPROVED 2026-08-31; ADVERSARIAL REVIEWED, PLANNING COMPLETE,
 NOT IMPLEMENTED.]** Keep
 `wmkf_requestdocument` Create/Write/Append privileges off the broad staff role
 and do not create a replacement writer role. Runtime writes continue under the
@@ -50,10 +50,9 @@ Board-snapshot display, immutability, create-bind-evidence, and DateTime
 findings. The distribution finding was accepted only as a display-semantic
 rule: a second user cannot resume the same operation because the actor is part
 of the immutable draft hash and the send path checks exact actor ownership.
-The remaining owner gate is the missing-identity availability policy described
-under Readiness Boundary; the recommendation is to preserve each flow's
-current availability posture while recording an honest missing-attribution
-event.
+The owner approved the missing-identity availability policy described under
+Readiness Boundary: preserve each flow's current availability posture while
+recording an honest missing-attribution event.
 
 ## Why Option B
 
@@ -145,8 +144,8 @@ the writers must not include them. Existing writes continue without the new
 fields; reads remain schema-compatible. Promotion order is schema preflight →
 owner-approved additive apply → exact readback → environment flag → runtime.
 
-**Owner policy gate — recommended availability posture.** Preserve the
-current per-flow identity policy rather than silently making every writer more
+**Owner-approved availability posture, 2026-08-31.** Preserve the current
+per-flow identity policy rather than silently making every writer more
 restrictive:
 
 - Final transition, Final acknowledgement, distribution, and the ordinary
@@ -163,11 +162,11 @@ restrictive:
   follows that flow's policy above rather than sending a lookup bind that can
   fail after side effects begin.
 
-This recommendation reflects the absence of a known compliance dependency and
-the existing availability-first fallback, but it is a product choice and must
-be explicitly accepted before Stage 1. Choosing universal fail-closed instead
-requires an actionable 403 plus Admin “Reconcile identities” recovery and an
-explicit acceptance of the new-hire/relicensed-user availability edge.
+This decision reflects the absence of a known compliance dependency and the
+existing availability-first fallback. Universal fail-closed was considered and
+not selected; changing to it later would require an actionable 403 plus Admin
+“Reconcile identities” recovery and explicit acceptance of the
+new-hire/relicensed-user availability edge.
 
 The implemented runtime must add a Production health check named
 `request_document_explicit_actor_readiness`: once Wave 24 code is deployed, a
@@ -267,6 +266,7 @@ and must not expand Wave 24 by default.
 ### Stage 0 — plan/reconciliation (this document)
 
 - Record Option B and withdraw the role path.
+- Record the owner-approved current-posture missing-identity policy.
 - Correct current documentation that treats Request Document `createdby` as a
   reliable human actor.
 - Keep the Connor question confirmation-only and non-blocking.
@@ -354,8 +354,8 @@ and must not expand Wave 24 by default.
 - Historical unknowns remain explicit unknowns; no backfill is invented.
 - Exact schema/readiness/runtime status is reconciled across the Atlas, queue,
   session handoff, and API matrix after each promotion stage.
-- The owner has accepted either the recommended current-posture availability
-  policy or a universal fail-closed replacement before Stage 1 begins.
+- The owner-approved current-posture availability policy is implemented and
+  discriminated from universal fail-closed behavior in focused tests.
 
 ## Residual risks
 
