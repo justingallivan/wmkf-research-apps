@@ -242,9 +242,11 @@ document inventory, and individual implementation plans do not establish priorit
   transition time, and retained the exact same SharePoint item/version/hash/
   size. File cardinality did not change. Version-aware acknowledgements and the
   bounded ordinary-staff dashboard/focused-review foundation are now
-  source-built but not deployed; the acknowledgement readiness value remains
-  unset. Deliberate release/runtime enablement and a bounded superuser test are
-  next. Broad role rollout and the complete matrix remain persona/access-gated.
+  Production-deployed through PR #140 merge `ce229778` / Ready deployment
+  `dpl_P7xay61LHnxohad9FEtSniBAosuY`; the acknowledgement readiness value
+  remains unset, so runtime access fails closed. Deliberate runtime enablement
+  and a bounded superuser test are next. Broad role rollout and the complete
+  matrix remain persona/access-gated.
 - **Prior owner-directed release (S469, 2026-08-30):** durable Executor
   budgets are Production-deployed and owner-viewed in the safe no-revision/code-
   fallback state; first publication remains an explicit administrator action.

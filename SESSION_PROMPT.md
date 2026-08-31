@@ -155,7 +155,7 @@ against launching metered review tools without explicit owner authorization.
      includes discriminating negative self-tests. Its operator output leads
      with non-writing dry-run guidance.
 
-4. **Wave 23 backend service, route, and Final-tab consumer are source-built.**
+4. **Wave 23 backend service, route, and Final-tab consumer are Production-deployed with runtime disabled.**
    - A typed Dataverse adapter uses the metadata-confirmed entity set and named
      Final-document/reviewer reads.
    - A distinct `FINAL_WRITEUP_ACKNOWLEDGEMENT_SCHEMA_READY` literal-on
@@ -175,10 +175,9 @@ against launching metered review tools without explicit owner authorization.
      pass. The webpack production build includes the new route; native local
      Turbopack remains blocked by its known internal-port sandbox restriction.
      The Impeccable desktop/mobile audit found no layout defect; reviewer
-     initials were raised to the 44px interaction floor. There is no deployment,
-     live readiness value, or Production acknowledgement write yet.
+     initials were raised to the 44px interaction floor.
 
-5. **Ordinary-staff dashboard and focused-review foundation are source-built.**
+5. **Ordinary-staff dashboard and focused-review foundation are Production-deployed with runtime disabled.**
    - A separate dashboard service caps the current-Final census at 100, batches
      exact document and acknowledgement reads at 25 IDs, deduplicates stable
      SharePoint identities, and limits Graph metadata work to four concurrent
@@ -195,7 +194,19 @@ against launching metered review tools without explicit owner authorization.
      no leadership-safe projection, persona inference, or complete matrix was
      added. Impeccable desktop/mobile review accepted the hierarchy and CTA
      sequence after visible current/earlier-version review counts removed the
-     color-only state. This work is not deployed; readiness remains unset.
+     color-only state.
+
+6. **Slices 2–3 code reached Production; acknowledgement runtime remains fail-closed.**
+   - PR #140 merged as `ce229778b05178bf4aabafe630e46de4843f5e81` after
+     Jest, Claude review, Semgrep, Gitleaks, Trivy, and Vercel checks passed.
+   - Preview deployment `dpl_9YMZvQFWLoRNrDzuKKugyj1DTkv2` and Production
+     deployment `dpl_P7xay61LHnxohad9FEtSniBAosuY` both reached Ready.
+   - The unauthenticated custom-domain route smoke redirected to sign-in as
+     expected, and the bounded post-deploy Production error-log scan was empty.
+   - `FINAL_WRITEUP_ACKNOWLEDGEMENT_SCHEMA_READY` remains unset in Preview and
+     Production. Therefore the deployed acknowledgement/dashboard routes still
+     return their typed schema-not-ready response before runtime Dataverse work;
+     no Production acknowledgement read or write has been enabled or performed.
 
 ## Next Items
 
@@ -208,8 +219,9 @@ against launching metered review tools without explicit owner authorization.
    intended PD/PC/CSO/President audience. Wave 23 is now exact and Active in
    Production. The typed adapter, readiness contract, acknowledgement service,
    authenticated route, Final-tab consumer, capped ordinary-staff dashboard,
-   focused-review page, and focused tests are source-built but not deployed.
-   Next is deliberate release/runtime enablement and a bounded superuser test.
+   focused-review page, and focused tests are Production-deployed behind the
+   unset readiness interlock. Next is deliberate runtime enablement and a
+   bounded superuser test.
    Editing stays in Word in a separate
    browser window/tab (or desktop Word when Microsoft permits); do not embed an
    editor in the Workbench.
@@ -236,8 +248,9 @@ against launching metered review tools without explicit owner authorization.
    The owner roster attestation is complete. The typed adapter, separate
    readiness contract, acknowledgement persistence/service, authenticated
    routes, Final-tab consumption, bounded ordinary-staff dashboard, focused
-   review page, and focused tests are source-built but not deployed. Next is
-   deliberate deployment, runtime enablement, and a bounded superuser test.
+   review page, and focused tests are Production-deployed behind the unset
+   readiness interlock. Next is deliberate runtime enablement and a bounded
+   superuser test.
 
 2. **Positive-path funding-history observation.**
    The zero-program-grant branch is Production-proved; the positive sentence is
@@ -320,12 +333,12 @@ against launching metered review tools without explicit owner authorization.
 | `pages/api/workbench/initial-assessment/board-snapshot.js` | Superuser retained Board snapshot route |
 | `docs/INITIAL_ASSESSMENT_CONTROLLED_PILOT_2026-07-30.md` | Pilot evidence and remaining write-proof boundary |
 | `docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md` | Production-proved Slice 1 and approved Slices 2–5 design |
-| `lib/services/final-writeup/acknowledgement-service.js` | Source-built Wave 23 mark/read, identity, version, and ambiguous-write contract |
-| `pages/api/workbench/final-writeup/acknowledgement.js` | Source-built app-authenticated GET/POST acknowledgement boundary with session-only reviewer identity |
-| `shared/components/workbench/FinalWriteupTab.js` | Source-built external-Word action, positive initials, and version-aware personal acknowledgement UI |
-| `lib/services/final-writeup/dashboard-service.js` | Source-built capped/batched ordinary-staff queue, ownership/action, freshness, and navigation projection |
-| `pages/api/workbench/final-writeups.js` | Source-built app-authenticated GET boundary for the ordinary-staff dashboard/focused page |
-| `shared/components/final-writeups/FinalWriteupsViews.js` | Source-built dashboard/focused-review UI with external Word and visible current/earlier review state |
+| `lib/services/final-writeup/acknowledgement-service.js` | Production-deployed, runtime-disabled Wave 23 mark/read, identity, version, and ambiguous-write contract |
+| `pages/api/workbench/final-writeup/acknowledgement.js` | Production-deployed, runtime-disabled app-authenticated GET/POST acknowledgement boundary with session-only reviewer identity |
+| `shared/components/workbench/FinalWriteupTab.js` | Production-deployed external-Word action, positive initials, and version-aware personal acknowledgement UI |
+| `lib/services/final-writeup/dashboard-service.js` | Production-deployed, runtime-disabled capped/batched ordinary-staff queue, ownership/action, freshness, and navigation projection |
+| `pages/api/workbench/final-writeups.js` | Production-deployed, runtime-disabled app-authenticated GET boundary for the ordinary-staff dashboard/focused page |
+| `shared/components/final-writeups/FinalWriteupsViews.js` | Production-deployed dashboard/focused-review UI with external Word and visible current/earlier review state |
 | `docs/audits/final-writeup-acknowledgement-wave23-adversarial-review-2026-08-31.md` | Accepted Wave 23 review findings, authorized Production apply, and exact Active readback |
 | `docs/atlas/dataverse-wmkf-finalwriteupreviewacknowledgement.md` | Live Wave 23 schema, identity/key/version contract, zero-row state, and remaining runtime boundary |
 
@@ -364,8 +377,9 @@ npx next build --webpack
 ```
 
 Desktop and narrow-width visual inspection passed through the temporary local
-harness, which was removed afterward. No deployment, live-flag enablement, or
-Production-write verification applies yet.
+harness, which was removed afterward. PR #140 / merge `ce229778` subsequently
+reached Ready Production deployment `dpl_P7xay61LHnxohad9FEtSniBAosuY`.
+Live-flag enablement and Production-write verification do not apply yet.
 
 Release verification completed before and after PR #138 merge:
 

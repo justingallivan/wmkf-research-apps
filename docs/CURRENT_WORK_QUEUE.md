@@ -34,7 +34,7 @@ sequence.
 
 | Order | Work | Current boundary | Completion decision |
 | --- | --- | --- | --- |
-| 1 | Final Writeup acknowledgement infrastructure and dashboard data foundation | **[IN PROGRESS 2026-08-31.]** Slice 1 is Production-proved. Wave 23 is live in Production at 11 exact / 0 absent / 0 divergent / 0 pending with an Active Final-document + reviewer alternate key and zero rows. The complete intended roster is owner-confirmed. Slices 2–3 are source-built but not deployed: typed acknowledgement adapter/service/route/Final-tab consumer plus a capped, batched ordinary-staff dashboard read model, authenticated route, queue, focused review page, history/freshness state, and external-Word actions. No PC/leadership persona, full matrix, or broader supporting-material projection is inferred. Production readiness remains unset. Next is deliberate release/runtime enablement and a bounded superuser test. | By **2026-09-04**, acknowledgement persistence and the superuser-testable dashboard data path are in place with exact identity/version keys and focused tests. |
+| 1 | Final Writeup acknowledgement infrastructure and dashboard data foundation | **[IN PROGRESS 2026-08-31.]** Slice 1 is Production-proved. Wave 23 is live in Production at 11 exact / 0 absent / 0 divergent / 0 pending with an Active Final-document + reviewer alternate key and zero rows. PR #140 merge `ce229778` is Production Ready in deployment `dpl_P7xay61LHnxohad9FEtSniBAosuY`: typed acknowledgement adapter/service/route/Final-tab consumer plus the capped, batched ordinary-staff dashboard, focused review page, history/freshness state, and external-Word actions are deployed. No PC/leadership persona, full matrix, or broader supporting-material projection is inferred. Production acknowledgement readiness remains unset, so runtime reads/writes fail closed. Next is deliberate runtime enablement and a bounded superuser test. | By **2026-09-04**, acknowledgement persistence and the superuser-testable dashboard data path are in place with exact identity/version keys and focused tests. |
 | 2 | Final Writeup role rollout and dashboards | **[PLANNED.]** Ordinary PD review can precede the global persona model. PC backup, complete matrix visibility, and leadership-specific queues remain disabled until those roles are positively identified. | Verified PD/PC/CSO/President identity and SharePoint access; acknowledgement alternate key active; no role inference from names, titles, email, or program taxonomy. The external `wmkf_requestdocument` staff-role grant remains expected around 2026-09-10. |
 
 ## Audit follow-ups — verified open, not silently prioritized
@@ -118,8 +118,8 @@ sequence.
 
 ## Completed in this execution
 
-- Final Writeup acknowledgement Wave 23: **[PRODUCTION SCHEMA LIVE AND EXACT;
-  ROUTE/UI SOURCE-BUILT, NOT DEPLOYED 2026-08-31]** schema-as-code defines the
+- Final Writeup acknowledgement Wave 23: **[PRODUCTION SCHEMA AND CODE LIVE;
+  RUNTIME DISABLED 2026-08-31]** schema-as-code defines the
   organization-owned entity, six fields, two required lookups, and the
   Final-document + reviewer alternate key. The identity census proved exact,
   enabled Dataverse links for all 11 existing active sign-in profiles; the
@@ -131,12 +131,14 @@ sequence.
   now enforce exact relationship/cascade/type checks, terminal failed-key
   handling, and discriminating self-tests. The acknowledgement identity and
   schema gates are cleared. The typed adapter, separate literal-on readiness
-  interlock, mark/read service, authenticated route, and Final-tab consumer now
-  exist in source with focused service/route/component tests. Reviewer identity
+  interlock, mark/read service, authenticated route, and Final-tab consumer are
+  Production-deployed with focused service/route/component tests. Reviewer identity
   remains session-derived; the responsible PD has no self-review action; other
   users see positive initials plus unreviewed/reviewed/updated state; and a
-  tracking failure never blocks the separate Word action. No deployment, live
-  flag, or Production runtime write exists.
+  tracking failure never blocks the separate Word action. PR #140 / merge
+  `ce229778` reached Ready Production deployment
+  `dpl_P7xay61LHnxohad9FEtSniBAosuY`. The live readiness flag remains unset,
+  and no Production acknowledgement runtime write exists.
 
 - Final Writeup Slice 1 release: **[PRODUCTION-PROVED 2026-08-30 PT /
   2026-08-31 UTC]** four approved local commits reached public GitHub and

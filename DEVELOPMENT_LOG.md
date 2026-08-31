@@ -10,6 +10,22 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## August 2026 — Final Writeup acknowledgements and staff dashboard code reached Production (Session 471)
+
+**Milestone:** The Workbench now carries version-aware Final Writeup review
+acknowledgements and an ordinary-staff cross-request dashboard/focused-review
+foundation, while document editing remains in Word.
+**Sessions:** 471 (implementation, OAuth Claude adversarial review, schema
+preflight/apply, promotion, Production verification, and durable sweep).
+**Ship state:** PR #140 merge `ce229778` is Production Ready in deployment
+`dpl_P7xay61LHnxohad9FEtSniBAosuY`; the separate acknowledgement readiness
+flag remains unset, so runtime acknowledgement reads/writes are still disabled.
+**Why it matters:** the deadline-critical review infrastructure is deployed
+without prematurely exposing unfinished persona/matrix behavior or allowing a
+responsible PD to self-acknowledge.
+**Pointers:** `docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md`;
+`docs/atlas/dataverse-wmkf-finalwriteupreviewacknowledgement.md`; PR #140.
+
 ## August 2026 — Durable Executor budgets and Initial Assessment recovery controls reached Production (Session 469)
 
 **Milestone:** Admin-editable Executor output budgets now use append-only

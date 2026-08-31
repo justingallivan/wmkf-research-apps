@@ -18,11 +18,12 @@ legal audit trail.
 
 **[PRODUCTION SCHEMA LIVE 2026-08-31]** The hardened metadata readback reports
 11 exact / 0 absent / 0 divergent / 0 pending. The alternate-key index is
-Active. **[ROUTE/UI SOURCE-BUILT, NOT DEPLOYED 2026-08-31]** A typed adapter,
-distinct literal-on readiness interlock, backend mark/read service,
-authenticated API route, and Final-tab consumer now exist. Schema availability
-still does not mean the acknowledgement runtime is enabled: the Production
-readiness value remains unset and no Production acknowledgement write exists.
+Active. **[PRODUCTION-DEPLOYED, RUNTIME DISABLED 2026-08-31]** PR #140 /
+merge `ce229778` shipped the typed adapter, distinct literal-on readiness
+interlock, backend mark/read service, authenticated routes, Final-tab consumer,
+and ordinary-staff dashboard. Schema and code availability still do not mean
+the acknowledgement runtime is enabled: the Production readiness value remains
+unset and no Production acknowledgement write exists.
 
 ## Identity and Key
 
@@ -58,7 +59,7 @@ Unshare use `NoCascade`.
 
 ## Read Paths
 
-**[ROUTE/UI SOURCE-BUILT, NOT DEPLOYED 2026-08-31]**
+**[PRODUCTION-DEPLOYED, RUNTIME DISABLED 2026-08-31]**
 `lib/dataverse/adapters/final-writeup-review-acknowledgement.js` exposes named
 reads for one Final artifact, one Final-artifact + reviewer pair, and a bounded
 batch of at most 25 server-derived Final identities.
@@ -75,7 +76,7 @@ state, and treats expected schema-not-ready as an unavailable optional panel so
 the Word action remains independent.
 
 `lib/services/final-writeup/dashboard-service.js` and
-`pages/api/workbench/final-writeups.js` are also source-built. They batch-read
+`pages/api/workbench/final-writeups.js` are also Production-deployed. They batch-read
 acknowledgements for at most 100 requests with current-Final pointers, derive
 ordinary staff open/history/stewardship queues plus an optional focused row,
 and keep a reviewed row in history after a later Word edit while labeling its
@@ -85,7 +86,7 @@ matrix is present.
 
 ## Write Paths
 
-**[ROUTE/UI SOURCE-BUILT, NOT DEPLOYED 2026-08-31]** The service accepts a
+**[PRODUCTION-DEPLOYED, RUNTIME DISABLED 2026-08-31]** The service accepts a
 trusted session-derived system-user ID from the authenticated route boundary,
 never a reviewer in the write payload. It rejects responsible-PD self-acknowledgement, observes
 one current Graph publication version, creates the composite-key row or
@@ -115,10 +116,17 @@ unset, so Production still refuses the operation before runtime Dataverse work.
 - The apply created the entity, six custom attributes, two relationships, and
   alternate key. Readback progressed through metadata propagation and finished
   at 11 exact / 0 absent / 0 divergent / 0 pending with the key Active.
+- PR #140 merged as `ce229778b05178bf4aabafe630e46de4843f5e81`; Preview
+  deployment `dpl_9YMZvQFWLoRNrDzuKKugyj1DTkv2` and Production deployment
+  `dpl_P7xay61LHnxohad9FEtSniBAosuY` both reached Ready. The custom-domain
+  unauthenticated route redirected to sign-in as expected, and a bounded
+  Production error-log scan returned no entries.
 - The typed adapter, distinct readiness contract, backend mark/read service,
   acknowledgement route, Final-tab consumer, bounded dashboard projection,
   dashboard route, and ordinary staff dashboard/focused-review pages are
-  source-built with focused adapter/service/route/component tests. Dedicated
-  supporting-material data routes, the positively identified PC/leadership
-  persona lenses, and the complete coordinator matrix remain. No runtime should
-  be enabled merely because the table exists.
+  Production-deployed with focused adapter/service/route/component tests.
+  The Preview and Production readiness values remain unset, so these deployed
+  paths still fail closed before runtime acknowledgement reads or writes.
+  Dedicated supporting-material data routes, the positively identified
+  PC/leadership persona lenses, and the complete coordinator matrix remain. No
+  runtime should be enabled merely because the table exists.
