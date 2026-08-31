@@ -155,6 +155,19 @@ against launching metered review tools without explicit owner authorization.
      includes discriminating negative self-tests. Its operator output leads
      with non-writing dry-run guidance.
 
+4. **Wave 23 backend service is source-built and still unexposed.**
+   - A typed Dataverse adapter uses the metadata-confirmed entity set and named
+     Final-document/reviewer reads.
+   - A distinct `FINAL_WRITEUP_ACKNOWLEDGEMENT_SCHEMA_READY` literal-on
+     interlock prevents the already-live Wave 22 flag from enabling Wave 23.
+   - The mark/read service resolves the current Final and lead PD server-side,
+     validates the enabled session `systemuser`, rejects responsible-PD
+     self-review, takes one Graph publication observation, preserves an exact
+     version's original acknowledgement time, conditionally updates later
+     versions, and reconciles a response lost after persistence.
+   - Three focused suites pass 26/26. There is no route, UI, deployment, live
+     readiness value, or Production acknowledgement write yet.
+
 ## Next Items
 
 ### Current Owner-Selected Delivery
@@ -164,9 +177,10 @@ against launching metered review tools without explicit owner authorization.
    `1002788`. Wave 23 source/preflight and the existing-profile identity probe
    are complete, and the owner confirmed the 11-person roster is the complete
    intended PD/PC/CSO/President audience. Wave 23 is now exact and Active in
-   Production. Next, build the typed adapter, readiness contract,
-   acknowledgement service, and focused tests, then the matrix-ready dashboard
-   data/focused-review foundation. Editing stays in Word in a separate
+   Production. The typed adapter, readiness contract, acknowledgement service,
+   and focused tests are source-built but unexposed. Next, wire the authenticated
+   route and Final tab, then build the matrix-ready dashboard data/focused-review
+   foundation. Editing stays in Word in a separate
    browser window/tab (or desktop Word when Microsoft permits); do not embed an
    editor in the Workbench.
 2. **Audience and matrix.**
@@ -189,9 +203,10 @@ against launching metered review tools without explicit owner authorization.
    `docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md` is owner-approved for
    staged implementation with named identity/persona prerequisites. Slice 1 is
    Production-proved; Wave 23 is exact and Active in Production with zero rows.
-   The owner roster attestation is complete. Next is the typed adapter,
-   readiness contract, acknowledgement persistence/service and focused tests,
-   then the ordinary-PD dashboard and focused review page foundation.
+   The owner roster attestation is complete. The typed adapter, separate
+   readiness contract, acknowledgement persistence/service, and focused tests
+   are source-built but not deployed. Next is authenticated route/Final-tab
+   consumption, then the ordinary-PD dashboard and focused review page foundation.
 
 2. **Positive-path funding-history observation.**
    The zero-program-grant branch is Production-proved; the positive sentence is
@@ -274,10 +289,20 @@ against launching metered review tools without explicit owner authorization.
 | `pages/api/workbench/initial-assessment/board-snapshot.js` | Superuser retained Board snapshot route |
 | `docs/INITIAL_ASSESSMENT_CONTROLLED_PILOT_2026-07-30.md` | Pilot evidence and remaining write-proof boundary |
 | `docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md` | Production-proved Slice 1 and approved Slices 2–5 design |
+| `lib/services/final-writeup/acknowledgement-service.js` | Source-built Wave 23 mark/read, identity, version, and ambiguous-write contract |
 | `docs/audits/final-writeup-acknowledgement-wave23-adversarial-review-2026-08-31.md` | Accepted Wave 23 review findings, authorized Production apply, and exact Active readback |
 | `docs/atlas/dataverse-wmkf-finalwriteupreviewacknowledgement.md` | Live Wave 23 schema, identity/key/version contract, zero-row state, and remaining runtime boundary |
 
 ## Testing
+
+Current Wave 23 backend slice:
+
+```bash
+npm test -- --runInBand tests/unit/final-writeup-acknowledgement-readiness.test.js tests/unit/final-writeup-review-acknowledgement-adapter.test.js tests/unit/final-writeup-acknowledgement-service.test.js
+# 3 suites / 26 tests passed
+```
+
+No route, browser, deployment, or Production-write verification applies yet.
 
 Release verification completed before and after PR #138 merge:
 

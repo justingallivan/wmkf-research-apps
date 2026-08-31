@@ -3,7 +3,7 @@ title: Final Writeup Review — Implementation Plan
 domain: workbench
 kind: plan
 status: active
-summary: "Same-item Final handoff is Production-proved; Slice 2 acknowledgement schema is exact and Active in Production, while runtime and dashboards remain pending."
+summary: "Production-proved Final handoff; Wave 23 is exact/Active and its backend acknowledgement service is source-built. Route/UI/dashboard remain pending."
 canonical: false
 cataloged: 2026-08-28
 last_verified: 2026-08-31
@@ -108,8 +108,11 @@ An OAuth-authenticated, read-only Claude Fable review on 2026-08-28 independentl
   the acknowledgement entity, six custom fields, two required lookups, and the
   Final-document + reviewer alternate key. Hardened readback reports 11 exact /
   0 absent / 0 divergent / 0 pending; the key index is Active and the entity set
-  is `wmkf_finalwriteupreviewacknowledgements`. The live row count is zero. No
-  adapter, route, service, readiness flag, or UI consumer exists yet
+  is `wmkf_finalwriteupreviewacknowledgements`. The live row count is zero.
+  **[SOURCE-BUILT, NOT DEPLOYED 2026-08-31]** A typed adapter, separate
+  literal-on readiness interlock, and mark/read service now exist with focused
+  tests. No acknowledgement API route, UI consumer, deployment, live readiness
+  value, or Production runtime write exists yet
   (`docs/atlas/dataverse-wmkf-finalwriteupreviewacknowledgement.md`).
 - **[VERIFIED]** A Pre-Site row in `SUPERSEDED` is excluded from the current artifact read model. Clearing its pointer can re-enable draft generation, while retaining the pointer and moving the row to `FINAL` preserves the existing read-only receipt and regeneration lock (`lib/services/pre-site-visit/artifact-service.js:545-577`, `838-859`; `tests/unit/staff-deliberations-tab.test.js:446-464`).
 - **[VERIFIED]** Dataverse writes only apply `MSCRMCallerID` when impersonation is enabled and may retry a 403 as the service principal; changesets do not currently expose a no-fallback actor guarantee (`lib/services/dynamics/write-core.js:76-115`; `lib/services/dynamics/changeset.js:85`, `113-125`).
@@ -394,14 +397,16 @@ This slice proves the document-continuity contract end to end before adding coll
 
 ### Slice 2 — acknowledgement schema and service
 
-**[IN PROGRESS 2026-08-31.]** Wave 23 schema source, hardened preflight, and
-Production schema apply are complete. Exact readback reports 11 exact / 0
+**[IN PROGRESS 2026-08-31.]** Wave 23 schema source, hardened preflight,
+Production schema apply, typed adapter, separate readiness interlock, and
+backend mark/read service are complete. The new service is source-built and
+unit-tested only: no route, UI, deployment, live readiness value, or Production
+acknowledgement write exists. Exact readback reports 11 exact / 0
 absent / 0 divergent / 0 pending, entity set
 `wmkf_finalwriteupreviewacknowledgements`, Active alternate key, and zero rows.
 An OAuth-authenticated Claude Fable adversarial review's accepted classifier
 and proof-boundary findings are fixed. The owner confirmed the 11-person roster
-is the complete intended PD/PC/CSO/President audience. Runtime remains unbuilt
-and disabled.
+is the complete intended PD/PC/CSO/President audience.
 
 - **Complete:** record owner attestation that the 11-person sign-in roster
   contains every intended PD, PC, CSO, and President; use `systemuser` as the
@@ -409,8 +414,14 @@ and disabled.
 - **Complete:** apply the additive Dataverse entity and alternate key under
   explicit Production authorization; reread exact metadata and require the key
   index to report Active.
-- Add readiness gating that requires the alternate key index to be Active, plus a typed adapter.
-- Implement single-observation current-version acknowledgement, `If-Match` replacement, and publication-version-based personal states.
+- **Complete in source, not deployed:** add a distinct readiness gate whose
+  literal-on rollout requires the alternate-key index to be Active, plus a
+  typed adapter registered under the metadata-confirmed entity-set name.
+- **Complete in source, not deployed:** implement single-observation
+  current-version acknowledgement, responsible-PD rejection, enabled
+  `systemuser` validation, same-version no-restamp, `If-Match` replacement,
+  ambiguous-write reread, publication-version-based personal states, and
+  positive reviewer projection. Focused suites pass 26/26.
 - Add positive reviewer initials to the Final tab.
 
 ### Slice 3 — focused review page and PD dashboard
@@ -497,8 +508,8 @@ Run each gate and its self-test sequentially where applicable:
   acknowledgements; transition actor fields fail closed when the session
   identity is unavailable. Link integrity is Production-proved for the 11
   existing active sign-in profiles, and the owner confirmed that they comprise
-  the complete intended audience. The separate Production schema apply remains
-  explicitly gated.
+  the complete intended audience. The Production schema apply is complete; the
+  separate Wave 23 runtime flag remains unset and no route exposes the service.
 - **Async/stale state:** material in all pages; every load/write needs abort or monotonic request guards before success and failure state updates.
 - **Helper extraction:** do not reuse the guarded-reopen service as the Final service. Reuse only lower-level Graph/hash/adapter primitives because reopen and Final have different source eligibility, lifecycle effects, and retry semantics.
 - **Durable surface:** new acknowledgement entity requires schema-as-code, exact metadata/alternate-key verification, Atlas, service catalogue, tests, readiness flag, and applicable gates.
@@ -517,10 +528,12 @@ Run each gate and its self-test sequentially where applicable:
 
 ## Final recommendation
 
-Proceed with slices 2–3 next. The 2026-09-04 superuser-testable same-item
+Proceed with the remaining Slice 2 wiring and Slice 3 next. The 2026-09-04 superuser-testable same-item
 handoff is already Production-proved; Wave 23 is exact and Active in Production,
-with the identity and schema prerequisites cleared. The remaining milestone work is to build and consume durable review
-acknowledgements and land the dashboard data/focused review foundation. All edit/review actions open
+with the identity and schema prerequisites cleared. The backend acknowledgement
+adapter/service is source-built behind an unset fail-closed flag. The remaining
+milestone work is to expose and consume it safely, then land the dashboard
+data/focused review foundation. All edit/review actions open
 the canonical Word document outside the Workbench. PC backup, broad matrix
 visibility, leadership-specific lenses, and general rollout follow only after
 the explicit persona/access contracts are verified. This sequence advances the

@@ -18,9 +18,11 @@ legal audit trail.
 
 **[PRODUCTION SCHEMA LIVE 2026-08-31]** The hardened metadata readback reports
 11 exact / 0 absent / 0 divergent / 0 pending. The alternate-key index is
-Active. Schema availability does not mean the acknowledgement runtime is
-enabled: no adapter, service, API route, readiness flag, or UI consumer exists
-yet.
+Active. **[SOURCE-BUILT, NOT DEPLOYED 2026-08-31]** A typed adapter, distinct
+literal-on readiness interlock, and backend mark/read service now exist. Schema
+availability still does not mean the acknowledgement runtime is enabled: no
+API route, UI consumer, deployment, live readiness value, or Production write
+exists yet.
 
 ## Identity and Key
 
@@ -56,16 +58,26 @@ Unshare use `NoCascade`.
 
 ## Read Paths
 
-None yet. Wave 23 provisioned schema only. The planned Slice 2 adapter/service
-will read by Final-document + reviewer identity and will derive personal state
-from the current SharePoint publication version.
+**[SOURCE-BUILT, NOT DEPLOYED 2026-08-31]**
+`lib/dataverse/adapters/final-writeup-review-acknowledgement.js` exposes named
+reads for one Final artifact and one Final-artifact + reviewer pair.
+`lib/services/final-writeup/acknowledgement-service.js` resolves the current
+Final pointer, validates the enabled session-derived `systemuser`, reads one
+stable-ID Graph publication observation, and derives `unreviewed`, `reviewed`,
+or `updated` from publication-version identity. eTag and last-modified remain
+diagnostic and do not override an equal publication version. There is no API or
+UI consumer yet.
 
 ## Write Paths
 
-None yet. The approved service contract will derive reviewer identity from the
-authenticated session, reject responsible-PD self-acknowledgement, observe one
-current Graph publication version, and conditionally update the caller's row.
-No client-supplied reviewer, version, eTag, or timestamp will be authoritative.
+**[SOURCE-BUILT, NOT DEPLOYED 2026-08-31]** The service accepts a trusted
+session-derived system-user ID from its future route boundary, never a reviewer
+in the write payload. It rejects responsible-PD self-acknowledgement, observes
+one current Graph publication version, creates the composite-key row or
+conditionally replaces it with `If-Match`, preserves the timestamp on an exact
+version no-op, and rereads after ambiguous failures so a committed write is not
+reported as failed. Writes request `noFallback` impersonation. No route invokes
+this path and the live flag remains unset.
 
 ## Cross-System Contract
 
@@ -87,6 +99,7 @@ No client-supplied reviewer, version, eTag, or timestamp will be authoritative.
 - The apply created the entity, six custom attributes, two relationships, and
   alternate key. Readback progressed through metadata propagation and finished
   at 11 exact / 0 absent / 0 divergent / 0 pending with the key Active.
-- Next work is the typed adapter, readiness contract, service, focused tests,
-  and then the dashboard/focused-review consumers. No runtime should be enabled
-  merely because the table exists.
+- The typed adapter, distinct readiness contract, backend service, and 26
+  focused tests are source-built. Next work is the authenticated route/Final-tab
+  wiring and then the dashboard/focused-review consumers. No runtime should be
+  enabled merely because the table exists.
