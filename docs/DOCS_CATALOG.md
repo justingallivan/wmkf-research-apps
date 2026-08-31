@@ -448,6 +448,6 @@ related:
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
-| [FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md](FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md) | plan | active |  | Final runtime is Production-live; the superuser matrix and disabled no-privilege-team persona contract are source-built; persona rollout remains. | 2026-08-28 |
-| [WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md](WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md) | plan | active |  | Pre-Site/Site Visit lifecycle and Final acknowledgement/dashboard foundation are live; the superuser matrix is source-built; persona rollout remains. | 2026-08-17 |
+| [FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md](FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md) | plan | active |  | Final runtime and superuser matrix are Production-live; the disabled no-privilege-team persona contract is source-built; persona rollout remains. | 2026-08-28 |
+| [WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md](WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md) | plan | active |  | Pre-Site/Site Visit lifecycle, Final acknowledgement/dashboard, and the superuser matrix are live; persona-team rollout remains. | 2026-08-17 |
 

@@ -158,9 +158,12 @@ coordinator matrix is included as neutral tracking: blank does not mean failure,
 there is no required count, due date, compliance score, or leadership order,
 and later edits produce **Updated since review** without erasing the recorded
 acknowledgement. The neutral acknowledgement-role rollout is complete for the
-confirmed 11-person audience. **[SOURCE-BUILT + LOCAL SIGNED-IN VERIFIED
-2026-08-31; NOT DEPLOYED]** the superuser Final Writeups index now renders the
-complete matrix from that exact role roster, with direct review/Word links and
+confirmed 11-person audience. **[PRODUCTION-LIVE + SIGNED-IN READ SMOKE PASSED
+2026-08-31]** commit `52575761` and Ready deployment
+`dpl_Frc6fAonyFFYwiWyFJCzzE3UNune` ship the superuser Final Writeups index with
+the complete matrix from that exact role roster. Signed-in Production DOM proof
+showed the exact 11-person roster and correct Request `1002788` states/actions
+with zero browser-console errors. It provides direct review/Word links and
 neutral Responsible PD / Not reviewed / Reviewed / Updated states. The approved
 persona mechanism is three no-privilege Dataverse teams with GUID-only,
 multi-valued membership: Allison Keller is President; Beth Pruitt is CSO and

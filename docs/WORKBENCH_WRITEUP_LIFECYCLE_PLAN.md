@@ -3,7 +3,7 @@ title: Workbench Writeup Lifecycle Plan
 domain: workbench
 kind: plan
 status: active
-summary: "Pre-Site/Site Visit lifecycle and Final acknowledgement/dashboard foundation are live; the superuser matrix is source-built; persona rollout remains."
+summary: "Pre-Site/Site Visit lifecycle, Final acknowledgement/dashboard, and the superuser matrix are live; persona-team rollout remains."
 canonical: false
 cataloged: 2026-08-17
 last_verified: 2026-08-31
@@ -885,8 +885,10 @@ silently extend its paths or names to writeup publications.
    Production write was run solely to restate the proof.
 12. **Final Writeups dashboard and acknowledgement follow-on.** The focused
    review page and version-aware acknowledgement store are Production-live.
-   The full neutral superuser matrix is source-built and locally signed-in
-   verified against Production read data but is not deployed. Personal lenses
+   The full neutral superuser matrix is Production-live in Ready deployment
+   `dpl_Frc6fAonyFFYwiWyFJCzzE3UNune`; signed-in DOM proof showed the exact
+   11-person roster and correct Request `1002788` states/actions with zero
+   browser-console errors. Personal lenses
    remain disabled pending no-privilege-team provisioning and representative
    Word-access proof. Keep acknowledgement distinct from document lifecycle,
    external distribution, and the AkoyaGo publication projection.

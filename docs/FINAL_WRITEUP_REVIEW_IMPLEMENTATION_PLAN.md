@@ -3,7 +3,7 @@ title: Final Writeup Review — Implementation Plan
 domain: workbench
 kind: plan
 status: active
-summary: "Final runtime is Production-live; the superuser matrix and disabled no-privilege-team persona contract are source-built; persona rollout remains."
+summary: "Final runtime and superuser matrix are Production-live; the disabled no-privilege-team persona contract is source-built; persona rollout remains."
 canonical: false
 cataloged: 2026-08-28
 last_verified: 2026-08-31
@@ -46,11 +46,15 @@ privilege grant is pending: the owner selected service-principal writes with
 explicit actor tracking, a separate attribution effort that does not block the
 working acknowledgement role or this milestone.
 
-**[SOURCE-BUILT + LOCAL SIGNED-IN VERIFIED AGAINST PRODUCTION READS
-2026-08-31; NOT DEPLOYED]** the superuser index now renders the complete
+**[PRODUCTION-LIVE + SIGNED-IN READ SMOKE PASSED 2026-08-31]** commit
+`52575761` and Ready deployment `dpl_Frc6fAonyFFYwiWyFJCzzE3UNune` ship the
+superuser index with the complete
 current-Final × expected-reviewer matrix from the exact enabled `WMKF Final
-Writeup Reviewer` role roster. Desktop and 390px browser QA passed with Request
-`1002788` and the 11-person audience. The source also contains the approved
+Writeup Reviewer` role roster. Signed-in Production DOM proof showed the exact
+11-person audience and Request `1002788`, with Duncan Spore Reviewed, Justin
+Gallivan Responsible PD, every other cell Not reviewed, both direct actions,
+and zero browser-console errors. Prior local desktop and 390px browser QA also
+passed against Production reads. The source also contains the approved
 GUID-only, multi-valued persona-team resolver, but its three no-privilege team
 IDs are null and its rollout flag is false.
 
@@ -158,9 +162,10 @@ An OAuth-authenticated, read-only Claude Fable review on 2026-08-28 independentl
   Graph metadata reads to four concurrent calls. It derives responsible-PD
   ownership and every queue/action server-side. The deployed foundation does
   not infer a PC or leadership persona or broaden supporting-material
-  authorization. **[SOURCE-BUILT + LOCAL SIGNED-IN VERIFIED AGAINST PRODUCTION
-  READS 2026-08-31; NOT DEPLOYED]** the superuser index now exposes the complete
-  neutral matrix; ordinary and focused responses do not. Production
+  authorization. **[PRODUCTION-LIVE + SIGNED-IN READ SMOKE PASSED 2026-08-31]**
+  commit `52575761` and Ready deployment `dpl_Frc6fAonyFFYwiWyFJCzzE3UNune`
+  ship the complete neutral superuser matrix; ordinary and focused responses
+  do not receive it. Production
   acknowledgement readiness is exact `on`; Preview remains unset.
 - **[VERIFIED]** A Pre-Site row in `SUPERSEDED` is excluded from the current artifact read model. Clearing its pointer can re-enable draft generation, while retaining the pointer and moving the row to `FINAL` preserves the existing read-only receipt and regeneration lock (`lib/services/pre-site-visit/artifact-service.js:545-577`, `838-859`; `tests/unit/staff-deliberations-tab.test.js:446-464`).
 - **[VERIFIED]** Dataverse writes only apply `MSCRMCallerID` when impersonation is enabled and may retry a 403 as the service principal; changesets do not currently expose a no-fallback actor guarantee (`lib/services/dynamics/write-core.js:76-115`; `lib/services/dynamics/changeset.js:85`, `113-125`).
@@ -528,10 +533,13 @@ were independently verified.
 - **Deliberately deferred:** new leadership-safe supporting-material
   projections. The ordinary-staff page links only to existing Workbench read
   surfaces under their existing authorization; it does not broaden access.
-- **Source-built and locally signed-in verified; not deployed:** the complete
-  neutral matrix is present on the superuser index only, deriving the expected
+- **Production-live; signed-in read-smoked:** the complete neutral matrix ships
+  on the superuser index only in Ready deployment
+  `dpl_Frc6fAonyFFYwiWyFJCzzE3UNune`, deriving the expected
   audience from exact enabled membership in `WMKF Final Writeup Reviewer`.
-  Ordinary/focused responses do not receive it.
+  Signed-in Production proof showed the exact 11-person roster and correct
+  Request `1002788` cell/action states with zero browser-console errors.
+  Ordinary/focused responses do not receive the matrix.
 - **Deliberately deferred:** persona-specific queues and non-superuser matrix
   access until exact team IDs and representative Word access are proved.
 
@@ -637,8 +645,8 @@ Run each gate and its self-test sequentially where applicable:
 ## Final recommendation
 
 Proceed with persona-team provisioning/access proof on top of the
-Production-proved Slices 2–3 foundation and the source-built complete neutral
-superuser matrix. The 2026-09-04 same-item
+Production-proved Slices 2–3 foundation and the Production-live complete
+neutral superuser matrix. The 2026-09-04 same-item
 handoff is already Production-proved; Wave 23 is exact and Active in Production,
 with the identity and schema prerequisites cleared. The acknowledgement
 adapter/service, authenticated route, Final-tab consumer, ordinary-staff
@@ -648,8 +656,10 @@ passed, and the dedicated six-privilege reviewer role is effective for all 11
 confirmed audience members. The first colleague acknowledgement succeeded,
 appeared in review history, and passed exact independent readback. All
 edit/review actions open the canonical Word document outside the Workbench.
-The superuser matrix is locally signed-in verified against Production read data
-but not deployed. PC backup, non-superuser matrix visibility,
+The superuser matrix is live in Ready deployment
+`dpl_Frc6fAonyFFYwiWyFJCzzE3UNune`; signed-in Production DOM proof showed the
+exact 11-person roster and correct Request `1002788` states/actions with zero
+browser-console errors. PC backup, non-superuser matrix visibility,
 leadership-specific lenses, and general rollout follow only after the exact
 no-privilege teams and representative Word access are verified. This sequence advances the
 approved experience without guessing role identity or inventing the still-unknown

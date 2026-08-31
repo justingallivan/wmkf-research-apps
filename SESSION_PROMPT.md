@@ -56,12 +56,16 @@ Workbench redesign.
    Beth Pruitt as CSO; Beth also has responsible-PD requests. John Sader is
    owner-confirmed as a Program Director. All three owner-confirmed persona
    facts remain rollout intent until the exact Dataverse teams are provisioned.
-2. **[SOURCE-BUILT + LOCAL SIGNED-IN VERIFIED 2026-08-31; NOT DEPLOYED]
-   Superuser coordinator matrix.** The index projects every current Final row ×
+2. **[PRODUCTION-LIVE + SIGNED-IN READ SMOKE PASSED 2026-08-31]
+   Superuser coordinator matrix.** Commit `52575761` is live in Ready Production
+   deployment `dpl_Frc6fAonyFFYwiWyFJCzzE3UNune`. The index projects every current Final row ×
    exact enabled reviewer-role member with neutral Reviewed, Updated, Not
    reviewed, and Responsible PD states plus direct focused-review/Word links.
-   It passed signed-in local desktop and 390px browser QA against Production
-   read data. It has no approval, compliance, deadline, count, or order meaning.
+   Signed-in Production DOM proof showed the exact 11-person roster and Request
+   `1002788`, with Duncan Spore Reviewed, Justin Gallivan Responsible PD, all
+   other cells Not reviewed, both direct actions present, and zero browser-console
+   errors. Prior local desktop and 390px browser QA also passed against Production
+   read data. The matrix has no approval, compliance, deadline, count, or order meaning.
 3. **[ROLLOUT DISABLED] Staff/executive lenses.** The approved persona contract
    uses three no-privilege Dataverse teams (PD, PC, leadership), permits overlap,
    and matches pinned GUIDs only. The teams are not yet provisioned, IDs are

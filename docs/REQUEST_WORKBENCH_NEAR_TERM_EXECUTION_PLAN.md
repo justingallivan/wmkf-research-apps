@@ -873,8 +873,10 @@ Decision order:
    contract, recording/transcript/summary contracts, and persistence/access.
 3. **Final Writeup** — same-item lineage, explicit transition attribution, and
    acknowledgement persistence are Production-proved. The complete neutral
-   superuser matrix is source-built and locally signed-in verified against
-   Production read data, but is not deployed. Role-specific rollout remains
+   superuser matrix is Production-live in Ready deployment
+   `dpl_Frc6fAonyFFYwiWyFJCzzE3UNune`. Signed-in Production DOM proof showed
+   the exact 11-person roster and correct Request `1002788` states/actions with
+   zero browser-console errors. Role-specific rollout remains
    gated by no-privilege-team provisioning and representative file-access
    verification.
 4. **Initial Assessment** — the pilot and administrator controls are
@@ -1206,4 +1208,5 @@ Still required:
    contract, representative SharePoint file-access verification, and restore
    authority. Acknowledgement granularity and the full coordinator matrix
    direction are settled in the Final implementation plan; the superuser
-   matrix is source-built but not deployed.
+   matrix is Production-live and signed-in read-smoked in Ready deployment
+   `dpl_Frc6fAonyFFYwiWyFJCzzE3UNune`.

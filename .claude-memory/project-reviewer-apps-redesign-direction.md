@@ -257,9 +257,13 @@ planned. Current authority is
   positive initials, and separate **Open review** / **Open in Word** actions.
   The server caps and batches its reads and derives relationships/actions; it
   does not infer PC/leadership personas or broaden supporting-material access.
-  **[SOURCE-BUILT + LOCAL SIGNED-IN VERIFIED AGAINST PRODUCTION READS
-  2026-08-31; NOT DEPLOYED]** the superuser index now adds the full neutral
-  current-Final × exact reviewer-role matrix with direct review/Word links.
+  **[PRODUCTION-LIVE + SIGNED-IN READ SMOKE PASSED 2026-08-31]** commit
+  `52575761` and Ready deployment `dpl_Frc6fAonyFFYwiWyFJCzzE3UNune` ship the
+  full neutral current-Final × exact reviewer-role matrix with direct
+  review/Word links. Signed-in Production DOM proof showed the exact 11-person
+  roster and Request `1002788`, with Duncan Spore Reviewed, Justin Gallivan
+  Responsible PD, all other cells Not reviewed, both direct actions, and zero
+  browser-console errors.
   Ordinary and focused responses receive no matrix. PR #140 merge `ce229778` is Ready in deployment
   `dpl_P7xay61LHnxohad9FEtSniBAosuY`; Wave 23 Production readiness is exact
   `on` in Ready deployment `dpl_B9k3AprnYp5ExpkqpT3dUxCUZqWo`. Signed-in

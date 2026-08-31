@@ -109,9 +109,13 @@ requests with current-Final pointers, derive ordinary staff
 open/history/stewardship queues plus an optional focused row, and keep a
 reviewed row in history after a later Word edit while labeling its freshness
 Updated. The route accepts only an optional Request GUID and derives the
-reviewer from the session. **[SOURCE-BUILT + LOCAL SIGNED-IN VERIFIED AGAINST
-PRODUCTION READS 2026-08-31; NOT DEPLOYED]** the index response now adds a
-superuser-only complete matrix. Its expected-reviewer axis is the exact enabled
+reviewer from the session. **[PRODUCTION-LIVE + SIGNED-IN READ SMOKE PASSED
+2026-08-31]** commit `52575761` and Ready deployment
+`dpl_Frc6fAonyFFYwiWyFJCzzE3UNune` ship the superuser-only complete matrix.
+Signed-in Production DOM proof showed the exact 11-person roster and Request
+`1002788`, with Duncan Spore Reviewed, Justin Gallivan Responsible PD, every
+other cell Not reviewed, both direct actions, and zero browser-console errors.
+Its expected-reviewer axis is the exact enabled
 membership of `WMKF Final Writeup Reviewer`, capped at 50; each cell is
 Reviewed, Updated, Not reviewed, or Responsible PD. Persona teams do not
 control this matrix.
@@ -175,8 +179,9 @@ returned the reviewed-history state. The stored acknowledgement time is
   complete acknowledgement row for Request `1002788`. No session-identity bypass
   or manufactured Final was used.
   Dedicated supporting-material data routes and the PC/leadership persona
-  lenses remain. The complete neutral matrix is source-built for superusers and
-  locally verified against Production read data, but is not deployed. The
+  lenses remain. The complete neutral matrix is Production-live for superusers
+  in Ready deployment `dpl_Frc6fAonyFFYwiWyFJCzzE3UNune`, with signed-in DOM
+  proof of the exact roster and correct Request `1002788` states/actions. The
   approved persona contract uses three no-privilege Dataverse teams with
   multi-membership support; exact team GUIDs remain null and the rollout flag
   remains false until the teams are provisioned and representative PC and
