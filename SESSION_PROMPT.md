@@ -155,7 +155,7 @@ against launching metered review tools without explicit owner authorization.
      includes discriminating negative self-tests. Its operator output leads
      with non-writing dry-run guidance.
 
-4. **Wave 23 backend service, route, and Final-tab consumer are Production-deployed with runtime disabled.**
+4. **Wave 23 backend service, route, and Final-tab consumer are Production-live.**
    - A typed Dataverse adapter uses the metadata-confirmed entity set and named
      Final-document/reviewer reads.
    - A distinct `FINAL_WRITEUP_ACKNOWLEDGEMENT_SCHEMA_READY` literal-on
@@ -177,7 +177,7 @@ against launching metered review tools without explicit owner authorization.
      The Impeccable desktop/mobile audit found no layout defect; reviewer
      initials were raised to the 44px interaction floor.
 
-5. **Ordinary-staff dashboard and focused-review foundation are Production-deployed with runtime disabled.**
+5. **Ordinary-staff dashboard and focused-review foundation are Production-live.**
    - A separate dashboard service caps the current-Final census at 100, batches
      exact document and acknowledgement reads at 25 IDs, deduplicates stable
      SharePoint identities, and limits Graph metadata work to four concurrent
@@ -196,17 +196,24 @@ against launching metered review tools without explicit owner authorization.
      sequence after visible current/earlier-version review counts removed the
      color-only state.
 
-6. **Slices 2–3 code reached Production; acknowledgement runtime remains fail-closed.**
+6. **Slices 2–3 runtime is enabled in Production; the cross-user write proof remains open.**
    - PR #140 merged as `ce229778b05178bf4aabafe630e46de4843f5e81` after
      Jest, Claude review, Semgrep, Gitleaks, Trivy, and Vercel checks passed.
    - Preview deployment `dpl_9YMZvQFWLoRNrDzuKKugyj1DTkv2` and Production
      deployment `dpl_P7xay61LHnxohad9FEtSniBAosuY` both reached Ready.
    - The unauthenticated custom-domain route smoke redirected to sign-in as
      expected, and the bounded post-deploy Production error-log scan was empty.
-   - `FINAL_WRITEUP_ACKNOWLEDGEMENT_SCHEMA_READY` remains unset in Preview and
-     Production. Therefore the deployed acknowledgement/dashboard routes still
-     return their typed schema-not-ready response before runtime Dataverse work;
-     no Production acknowledgement read or write has been enabled or performed.
+   - `FINAL_WRITEUP_ACKNOWLEDGEMENT_SCHEMA_READY` is exact `on` in Production
+     and remains unset in Preview. Activation deployment
+     `dpl_B9k3AprnYp5ExpkqpT3dUxCUZqWo` reached Ready.
+   - A signed-in Justin Gallivan smoke loaded the ordinary-staff dashboard and
+     Request `1002788` Final tab, confirmed the current Word action and zero
+     recorded reviews, and produced no Production errors. Because Justin is
+     the request's responsible PD and the only current Final belongs to him,
+     the UI correctly exposed no self-review action. No acknowledgement row
+     was written; the first cross-user acknowledgement still requires a
+     different signed-in staff member or a separately authorized eligible
+     Final.
 
 ## Next Items
 
@@ -219,9 +226,10 @@ against launching metered review tools without explicit owner authorization.
    intended PD/PC/CSO/President audience. Wave 23 is now exact and Active in
    Production. The typed adapter, readiness contract, acknowledgement service,
    authenticated route, Final-tab consumer, capped ordinary-staff dashboard,
-   focused-review page, and focused tests are Production-deployed behind the
-   unset readiness interlock. Next is deliberate runtime enablement and a
-   bounded superuser test.
+   focused-review page, and focused tests are Production-live behind the exact
+   `on` readiness interlock. Signed-in dashboard and responsible-PD exclusion
+   proof passed. The bounded cross-user acknowledgement/readback remains open
+   because the signed-in owner is the responsible PD of the only current Final.
    Editing stays in Word in a separate
    browser window/tab (or desktop Word when Microsoft permits); do not embed an
    editor in the Workbench.
@@ -248,9 +256,11 @@ against launching metered review tools without explicit owner authorization.
    The owner roster attestation is complete. The typed adapter, separate
    readiness contract, acknowledgement persistence/service, authenticated
    routes, Final-tab consumption, bounded ordinary-staff dashboard, focused
-   review page, and focused tests are Production-deployed behind the unset
-   readiness interlock. Next is deliberate runtime enablement and a bounded
-   superuser test.
+   review page, and focused tests are Production-live. The signed-in read path,
+   Word link, empty acknowledgement state, and responsible-PD exclusion passed
+   on Request `1002788`; complete the first acknowledgement/readback with an
+   eligible non-PD staff session rather than bypassing session identity or
+   manufacturing an unauthorized Final.
 
 2. **Positive-path funding-history observation.**
    The zero-program-grant branch is Production-proved; the positive sentence is

@@ -109,13 +109,13 @@ An OAuth-authenticated, read-only Claude Fable review on 2026-08-28 independentl
   Final-document + reviewer alternate key. Hardened readback reports 11 exact /
   0 absent / 0 divergent / 0 pending; the key index is Active and the entity set
   is `wmkf_finalwriteupreviewacknowledgements`. The live row count is zero.
-  **[ROUTE/UI PRODUCTION-DEPLOYED, RUNTIME DISABLED 2026-08-31]** A typed adapter,
+  **[ROUTE/UI PRODUCTION-LIVE; CROSS-USER WRITE PROOF OPEN 2026-08-31]** A typed adapter,
   separate literal-on readiness interlock, mark/read service, authenticated API
   route, and Final-tab consumer now exist with focused tests. The Production
-  readiness value remains unset, so no Production acknowledgement runtime read,
-  write, or row exists
+  readiness value is exact `on`. Signed-in Request `1002788` reads passed with
+  zero reviews and responsible-PD exclusion; no acknowledgement row exists
   (`docs/atlas/dataverse-wmkf-finalwriteupreviewacknowledgement.md`).
-- **[DASHBOARD/FOCUSED REVIEW PRODUCTION-DEPLOYED, RUNTIME DISABLED 2026-08-31]** The
+- **[DASHBOARD/FOCUSED REVIEW PRODUCTION-LIVE 2026-08-31]** The
   ordinary-staff Slice 3 foundation now has a separate bounded dashboard
   service, authenticated read route, cross-request queue, focused review page,
   reviewed history, updated-since-review state, positive initials, and
@@ -269,7 +269,7 @@ An edit that lands after the observation is simply a later edit: the next read d
 
 Build a new service rather than adding Final logic to the reviewer-finding dashboard. It queries current Final pointer rows for the selected cycle, batches Request context, batches the caller’s acknowledgement rows, and refreshes file metadata with bounded concurrency.
 
-**[PRODUCTION-DEPLOYED, RUNTIME DISABLED 2026-08-31]** The ordinary-staff subset now
+**[PRODUCTION-LIVE; SIGNED-IN READ SMOKE PASSED 2026-08-31]** The ordinary-staff subset now
 implements that separate service and its read route with a 100-row fail-closed
 census cap, 25-ID exact read batches, four-way Graph concurrency, stable item
 deduplication, and server-derived open/history/stewardship queues. PC and
@@ -415,7 +415,7 @@ This slice proves the document-continuity contract end to end before adding coll
 
 ### Slice 2 — acknowledgement schema, service, route, and Final tab
 
-**[PRODUCTION-DEPLOYED, RUNTIME DISABLED 2026-08-31.]** Wave 23 schema source, hardened
+**[PRODUCTION-LIVE; CROSS-USER WRITE PROOF OPEN 2026-08-31.]** Wave 23 schema source, hardened
 preflight, Production schema apply, typed adapter, separate readiness interlock,
 backend mark/read service, authenticated route, and Final-tab consumer are
 complete in source. Exact readback reports 11 exact / 0
@@ -424,8 +424,8 @@ absent / 0 divergent / 0 pending, entity set
 An OAuth-authenticated Claude Fable adversarial review's accepted classifier
 and proof-boundary findings are fixed. The owner confirmed the 11-person roster
 is the complete intended PD/PC/CSO/President audience. Production readiness is
-still unset, so the deployed route performs no runtime acknowledgement read or
-write.
+exact `on`; signed-in read and responsible-PD exclusion proof passed. The first
+acknowledgement/readback requires an eligible non-PD staff session.
 
 - **Complete:** record owner attestation that the 11-person sign-in roster
   contains every intended PD, PC, CSO, and President; use `systemuser` as the
@@ -433,17 +433,17 @@ write.
 - **Complete:** apply the additive Dataverse entity and alternate key under
   explicit Production authorization; reread exact metadata and require the key
   index to report Active.
-- **Production-deployed, runtime disabled:** add a distinct readiness gate whose
+- **Production-live:** add a distinct readiness gate whose
   literal-on rollout requires the alternate-key index to be Active, plus a
   typed adapter registered under the metadata-confirmed entity-set name.
-- **Production-deployed, runtime disabled:** implement single-observation
+- **Production-live; cross-user write proof pending:** implement single-observation
   current-version acknowledgement, responsible-PD rejection, enabled
   `systemuser` validation, same-version no-restamp, `If-Match` replacement,
   ambiguous-write reread, publication-version-based personal states, and
   positive reviewer projection. Focused suites pass 26/26.
-- **Production-deployed, runtime disabled:** add the app-authenticated GET/POST route
+- **Production-live; GET smoke passed:** add the app-authenticated GET/POST route
   with session-only reviewer identity and exact current-Final fencing.
-- **Production-deployed, runtime disabled:** consume the projection in the Final tab,
+- **Production-live; responsible-PD smoke passed:** consume the projection in the Final tab,
   show positive reviewer initials and non-PD personal state/action, keep the PD
   self-review section absent, isolate tracking failures from Word launch, and
   suppress the expected schema-off response. Desktop and narrow-width visual
@@ -456,18 +456,20 @@ write.
 
 ### Slice 3 — focused review page and PD dashboard
 
-**[ORDINARY-STAFF FOUNDATION PRODUCTION-DEPLOYED, RUNTIME DISABLED 2026-08-31.]** The
+**[ORDINARY-STAFF FOUNDATION PRODUCTION-LIVE 2026-08-31.]** The
 separate dashboard service/read route, ordinary-review queue, responsible-PD
 stewardship queue, focused review page, reviewed history, updated-since-review
 state, positive initials, search, and current-queue navigation are built. The
 read model is explicitly capped, batched, concurrency-limited, and fail-closed
 on ambiguous current artifacts or acknowledgement state. Focused unit and
-visual checks cover desktop and narrow widths. Production readiness remains
-unset, so there is no live dashboard read or acknowledgement write.
+visual checks cover desktop and narrow widths. Production readiness is exact
+`on`; signed-in dashboard and focused Final reads passed on Request `1002788`.
+No acknowledgement was written because the signed-in user is its responsible
+PD and the only current Final is theirs.
 
-- **Production-deployed, runtime disabled:** Final Writeups dashboard for ordinary
+- **Production-live; signed-in read-smoked:** Final Writeups dashboard for ordinary
   existing Workbench users and focused review page.
-- **Production-deployed, runtime disabled:** reviewed history,
+- **Production-live; empty-state/Word-action smoke passed:** reviewed history,
   updated-since-review behavior, positive initials, and external Word actions.
 - **Deliberately deferred:** new leadership-safe supporting-material
   projections. The ordinary-staff page links only to existing Workbench read
@@ -551,8 +553,9 @@ Run each gate and its self-test sequentially where applicable:
   identity is unavailable. Link integrity is Production-proved for the 11
   existing active sign-in profiles, and the owner confirmed that they comprise
   the complete intended audience. The Production schema apply is complete; the
-  separate Wave 23 runtime flag remains unset, so the deployed route cannot
-  reach its runtime Dataverse read/write path in Production.
+  separate Wave 23 runtime flag is exact `on` in Production. The signed-in read
+  path and responsible-PD exclusion are proved; a first cross-user write still
+  requires an eligible non-PD staff session.
 - **Async/stale state:** material in all pages; every load/write needs abort or monotonic request guards before success and failure state updates.
 - **Helper extraction:** do not reuse the guarded-reopen service as the Final service. Reuse only lower-level Graph/hash/adapter primitives because reopen and Final have different source eligibility, lifecycle effects, and retry semantics.
 - **Durable surface:** new acknowledgement entity requires schema-as-code, exact metadata/alternate-key verification, Atlas, service catalogue, tests, readiness flag, and applicable gates.
@@ -571,14 +574,15 @@ Run each gate and its self-test sequentially where applicable:
 
 ## Final recommendation
 
-Proceed with deliberate runtime enablement and bounded superuser proof of the
-Production-deployed Slices 2–3 foundation next. The 2026-09-04 same-item
+Proceed with the bounded cross-user acknowledgement/readback proof of the
+Production-live Slices 2–3 foundation next. The 2026-09-04 same-item
 handoff is already Production-proved; Wave 23 is exact and Active in Production,
 with the identity and schema prerequisites cleared. The acknowledgement
 adapter/service, authenticated route, Final-tab consumer, ordinary-staff
-dashboard data path, and focused-review surface are Production-deployed behind
-an unset fail-closed flag. The remaining milestone work is runtime enablement
-and a bounded superuser test. All edit/review actions open
+dashboard data path, and focused-review surface are Production-live behind the
+exact `on` flag. Signed-in dashboard/Final reads and responsible-PD exclusion
+passed; the remaining milestone work is one acknowledgement/readback by an
+eligible non-PD staff session. All edit/review actions open
 the canonical Word document outside the Workbench. PC backup, broad matrix
 visibility, leadership-specific lenses, and general rollout follow only after
 the explicit persona/access contracts are verified. This sequence advances the

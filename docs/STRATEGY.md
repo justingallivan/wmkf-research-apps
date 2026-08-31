@@ -140,9 +140,10 @@ not broad staff rollout: same-item Final lineage, explicit transition
 attribution, acknowledgement persistence, and dashboard data. As of 2026-08-31,
 the ordinary-staff dashboard/focused-review foundation is Production-deployed
 through PR #140 (`ce229778`) with bounded reads and external-Word actions. Its
-separate acknowledgement readiness value remains unset, so runtime access fails
-closed. The next step is deliberate runtime enablement and a bounded superuser
-test.
+separate acknowledgement readiness value is exact `on` in Production. The
+signed-in dashboard/Final read path and responsible-PD exclusion passed on
+Request `1002788`; the next step is one bounded acknowledgement/readback by an
+eligible non-PD staff session.
 Every edit/review action opens the canonical SharePoint Word document in its
 own browser window/tab (or desktop Word through Microsoft's supported option);
 the application will not embed or recreate Word editing.

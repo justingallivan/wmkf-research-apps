@@ -34,7 +34,7 @@ sequence.
 
 | Order | Work | Current boundary | Completion decision |
 | --- | --- | --- | --- |
-| 1 | Final Writeup acknowledgement infrastructure and dashboard data foundation | **[IN PROGRESS 2026-08-31.]** Slice 1 is Production-proved. Wave 23 is live in Production at 11 exact / 0 absent / 0 divergent / 0 pending with an Active Final-document + reviewer alternate key and zero rows. PR #140 merge `ce229778` is Production Ready in deployment `dpl_P7xay61LHnxohad9FEtSniBAosuY`: typed acknowledgement adapter/service/route/Final-tab consumer plus the capped, batched ordinary-staff dashboard, focused review page, history/freshness state, and external-Word actions are deployed. No PC/leadership persona, full matrix, or broader supporting-material projection is inferred. Production acknowledgement readiness remains unset, so runtime reads/writes fail closed. Next is deliberate runtime enablement and a bounded superuser test. | By **2026-09-04**, acknowledgement persistence and the superuser-testable dashboard data path are in place with exact identity/version keys and focused tests. |
+| 1 | Final Writeup acknowledgement infrastructure and dashboard data foundation | **[IN PROGRESS 2026-08-31.]** Slice 1 is Production-proved. Wave 23 is exact/Active with zero rows, and Production acknowledgement readiness is exact `on` in Ready deployment `dpl_B9k3AprnYp5ExpkqpT3dUxCUZqWo` (Preview remains unset). The signed-in ordinary-staff dashboard and Request `1002788` Final tab loaded, retained the external Word action, showed zero reviews, correctly omitted responsible-PD self-review, and produced no Production errors. No PC/leadership persona, full matrix, or broader supporting-material projection is inferred. The first acknowledgement/readback remains open because the signed-in owner is the responsible PD of the only current Final; use an eligible non-PD staff session rather than bypassing session identity or creating unapproved lifecycle data. | By **2026-09-04**, acknowledgement persistence and the superuser-testable dashboard data path are in place with exact identity/version keys and focused tests. |
 | 2 | Final Writeup role rollout and dashboards | **[PLANNED.]** Ordinary PD review can precede the global persona model. PC backup, complete matrix visibility, and leadership-specific queues remain disabled until those roles are positively identified. | Verified PD/PC/CSO/President identity and SharePoint access; acknowledgement alternate key active; no role inference from names, titles, email, or program taxonomy. The external `wmkf_requestdocument` staff-role grant remains expected around 2026-09-10. |
 
 ## Audit follow-ups — verified open, not silently prioritized
@@ -118,8 +118,8 @@ sequence.
 
 ## Completed in this execution
 
-- Final Writeup acknowledgement Wave 23: **[PRODUCTION SCHEMA AND CODE LIVE;
-  RUNTIME DISABLED 2026-08-31]** schema-as-code defines the
+- Final Writeup acknowledgement Wave 23: **[PRODUCTION RUNTIME LIVE;
+  CROSS-USER WRITE PROOF OPEN 2026-08-31]** schema-as-code defines the
   organization-owned entity, six fields, two required lookups, and the
   Final-document + reviewer alternate key. The identity census proved exact,
   enabled Dataverse links for all 11 existing active sign-in profiles; the
@@ -137,8 +137,12 @@ sequence.
   users see positive initials plus unreviewed/reviewed/updated state; and a
   tracking failure never blocks the separate Word action. PR #140 / merge
   `ce229778` reached Ready Production deployment
-  `dpl_P7xay61LHnxohad9FEtSniBAosuY`. The live readiness flag remains unset,
-  and no Production acknowledgement runtime write exists.
+  `dpl_P7xay61LHnxohad9FEtSniBAosuY`. Production readiness is now exact `on` in
+  Ready deployment `dpl_B9k3AprnYp5ExpkqpT3dUxCUZqWo`; Preview remains unset.
+  Signed-in dashboard and Final-tab reads passed on Request `1002788`, including
+  external Word launch state, zero reviews, and responsible-PD exclusion. No
+  Production acknowledgement write exists because the signed-in user is the
+  responsible PD of the only current Final.
 
 - Final Writeup Slice 1 release: **[PRODUCTION-PROVED 2026-08-30 PT /
   2026-08-31 UTC]** four approved local commits reached public GitHub and

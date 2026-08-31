@@ -505,8 +505,11 @@ document inventory, and individual implementation plans do not establish priorit
   version. The full coordinator matrix is required, with neutral blank,
   Reviewed, and Updated since review states and no compliance semantics.
   **Source status 2026-08-31:** the ordinary-staff queue and focused review
-  foundation are built behind the unset acknowledgement-readiness gate. They
-  derive ownership/actions server-side, cap and batch reads, and do not infer
+  foundation are Production-live behind the exact `on` acknowledgement gate.
+  Signed-in dashboard and Request `1002788` Final reads passed with zero
+  reviews, external Word access, and correct responsible-PD exclusion. The
+  first cross-user acknowledgement remains open. The services derive
+  ownership/actions server-side, cap and batch reads, and do not infer
   PC/leadership personas or expose the full matrix.
 - Calendar direction (owner-confirmed 2026-07-28): the first gate is a
   human-in-the-loop, end-to-end Initial Assessment pilot, originally targeted at

@@ -17,9 +17,11 @@ acknowledgements and an ordinary-staff cross-request dashboard/focused-review
 foundation, while document editing remains in Word.
 **Sessions:** 471 (implementation, OAuth Claude adversarial review, schema
 preflight/apply, promotion, Production verification, and durable sweep).
-**Ship state:** PR #140 merge `ce229778` is Production Ready in deployment
-`dpl_P7xay61LHnxohad9FEtSniBAosuY`; the separate acknowledgement readiness
-flag remains unset, so runtime acknowledgement reads/writes are still disabled.
+**Ship state:** PR #140 merge `ce229778` is Production Ready; acknowledgement
+readiness is exact `on` in activation deployment
+`dpl_B9k3AprnYp5ExpkqpT3dUxCUZqWo`. Signed-in dashboard/Final reads passed with
+zero reviews and correct responsible-PD exclusion. The first cross-user
+acknowledgement/readback remains open; no row was written.
 **Why it matters:** the deadline-critical review infrastructure is deployed
 without prematurely exposing unfinished persona/matrix behavior or allowing a
 responsible PD to self-acknowledge.

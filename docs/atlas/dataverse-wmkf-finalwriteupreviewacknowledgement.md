@@ -18,12 +18,14 @@ legal audit trail.
 
 **[PRODUCTION SCHEMA LIVE 2026-08-31]** The hardened metadata readback reports
 11 exact / 0 absent / 0 divergent / 0 pending. The alternate-key index is
-Active. **[PRODUCTION-DEPLOYED, RUNTIME DISABLED 2026-08-31]** PR #140 /
+Active. **[PRODUCTION RUNTIME LIVE; CROSS-USER WRITE PROOF OPEN 2026-08-31]** PR #140 /
 merge `ce229778` shipped the typed adapter, distinct literal-on readiness
 interlock, backend mark/read service, authenticated routes, Final-tab consumer,
-and ordinary-staff dashboard. Schema and code availability still do not mean
-the acknowledgement runtime is enabled: the Production readiness value remains
-unset and no Production acknowledgement write exists.
+and ordinary-staff dashboard. Production readiness is exact `on` in Ready
+deployment `dpl_B9k3AprnYp5ExpkqpT3dUxCUZqWo`; Preview remains unset. Signed-in
+dashboard and Request `1002788` Final reads showed zero reviews, retained Word
+access, and correctly omitted responsible-PD self-review. No Production
+acknowledgement write exists.
 
 ## Identity and Key
 
@@ -59,7 +61,7 @@ Unshare use `NoCascade`.
 
 ## Read Paths
 
-**[PRODUCTION-DEPLOYED, RUNTIME DISABLED 2026-08-31]**
+**[PRODUCTION-LIVE; SIGNED-IN READ SMOKE PASSED 2026-08-31]**
 `lib/dataverse/adapters/final-writeup-review-acknowledgement.js` exposes named
 reads for one Final artifact, one Final-artifact + reviewer pair, and a bounded
 batch of at most 25 server-derived Final identities.
@@ -86,15 +88,16 @@ matrix is present.
 
 ## Write Paths
 
-**[PRODUCTION-DEPLOYED, RUNTIME DISABLED 2026-08-31]** The service accepts a
+**[PRODUCTION-LIVE; CROSS-USER WRITE PROOF OPEN 2026-08-31]** The service accepts a
 trusted session-derived system-user ID from the authenticated route boundary,
 never a reviewer in the write payload. It rejects responsible-PD self-acknowledgement, observes
 one current Graph publication version, creates the composite-key row or
 conditionally replaces it with `If-Match`, preserves the timestamp on an exact
 version no-op, and rereads after ambiguous failures so a committed write is not
 reported as failed. Writes request `noFallback` impersonation. The route invokes
-this path only after app access and exact-body validation; the live flag remains
-unset, so Production still refuses the operation before runtime Dataverse work.
+this path only after app access and exact-body validation. The live flag is
+exact `on`; no POST was attempted because the signed-in user is the responsible
+PD of the only current Final.
 
 ## Cross-System Contract
 
@@ -121,12 +124,17 @@ unset, so Production still refuses the operation before runtime Dataverse work.
   `dpl_P7xay61LHnxohad9FEtSniBAosuY` both reached Ready. The custom-domain
   unauthenticated route redirected to sign-in as expected, and a bounded
   Production error-log scan returned no entries.
+- Production activation deployment `dpl_B9k3AprnYp5ExpkqpT3dUxCUZqWo` reached
+  Ready with the readiness value exact `on`. A signed-in dashboard/Final smoke
+  on Request `1002788` confirmed zero reviews, the independent Word action, and
+  responsible-PD exclusion; the post-smoke error scan was empty.
 - The typed adapter, distinct readiness contract, backend mark/read service,
   acknowledgement route, Final-tab consumer, bounded dashboard projection,
   dashboard route, and ordinary staff dashboard/focused-review pages are
-  Production-deployed with focused adapter/service/route/component tests.
-  The Preview and Production readiness values remain unset, so these deployed
-  paths still fail closed before runtime acknowledgement reads or writes.
+  Production-live with focused adapter/service/route/component tests.
+  Preview readiness remains unset. The first acknowledgement/readback requires
+  an eligible non-PD staff session; do not bypass session identity or create an
+  unapproved Final merely to manufacture the proof.
   Dedicated supporting-material data routes, the positively identified
   PC/leadership persona lenses, and the complete coordinator matrix remain. No
   runtime should be enabled merely because the table exists.
