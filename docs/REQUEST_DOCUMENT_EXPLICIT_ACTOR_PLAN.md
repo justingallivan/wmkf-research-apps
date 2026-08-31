@@ -30,19 +30,24 @@ related:
 
 ## Decision and status
 
-**[OWNER-APPROVED 2026-08-31; ADVERSARIAL REVIEWED; SOURCE-BUILT; WAVE 24
-PRODUCTION SCHEMA EXACT; READINESS/RUNTIME NOT PROMOTED.]** Keep
+**[OWNER-APPROVED 2026-08-31; ADVERSARIAL REVIEWED; PRODUCTION-LIVE; WAVE 24
+SCHEMA EXACT; READINESS ON; CONTROLLED BUSINESS PROOF PENDING.]** Keep
 `wmkf_requestdocument` Create/Write/Append privileges off the broad staff role
 and do not create a replacement writer role. Runtime writes continue under the
 application service principal after the existing impersonated-write 403
 fallback. Human attribution is stored in explicit, server-controlled actor/time
 fields only for meaningful business events.
 
-The owner separately approved the additive Production schema apply on
-2026-08-31. The creation-only deployer created one DateTime field and two
-optional lookups, and independent metadata readback reported 3 exact / 0 absent
-/ 0 divergent. No role change, readiness-flag change, runtime deployment,
-business-record write, or historical backfill is authorized by that apply.
+The owner separately approved the additive Production schema apply and runtime
+promotion on 2026-08-31. The creation-only deployer created one DateTime field
+and two optional lookups, and independent metadata readback reported 3 exact /
+0 absent / 0 divergent. `REQUEST_DOCUMENT_EXPLICIT_ACTOR_SCHEMA_READY=on` is
+scoped to Vercel Production, and commit
+`8ff4205a0ad43337cd987a4fc76639f936bab4bc` first reached Ready Production in
+deployment `dpl_D94J9aRcfLfK81iBDsVYARVhZFPb`. Signed-in Admin health reported
+all eight services healthy, including the enabled Wave 24 readiness check. No
+role change, business-record write, or historical backfill was part of the
+promotion.
 The confirmation-only Connor question scheduled for September 7 is not a
 blocking dependency unless it identifies a concrete consumer of built-in
 `createdby`/`modifiedby`.
@@ -314,7 +319,7 @@ Blocker/High finding; all three Medium conditions were accepted and fixed:
 lost-response event repair, CI enforcement, and create-time runtime rejection
 of caller-supplied origin fields. See the implementation-review reconciliation.
 
-### Stage 3 — target promotion
+### Stage 3 — target promotion — completed 2026-08-31
 
 - **Completed 2026-08-31:** Production preflight reported 3 absent / 0
   divergent; the owner separately approved the additive apply.
@@ -322,8 +327,13 @@ of caller-supplied origin fields. See the implementation-review reconciliation.
   artifacts through the sanctioned date-bounded Production write
   acknowledgement; independent readback reported 3 exact / 0 absent / 0
   divergent.
-- **Still gated:** set the literal-on readiness flag and deliberately promote
-  runtime following the campaign release strategy.
+- **Completed 2026-08-31:** set the Production-only literal-on readiness flag,
+  promoted exact commit `8ff4205a0ad43337cd987a4fc76639f936bab4bc`,
+  and verified Ready deployment `dpl_D94J9aRcfLfK81iBDsVYARVhZFPb` through
+  signed-in Admin health. Deployment-scoped error and 500 scans were empty.
+- **Completed baseline census:** from the deployment boundary
+  `2026-08-31T21:28:03.774Z`, 0 attributed, 0 event-backed unattributed, and 0
+  violations. This is an expected pre-business-action baseline, not write proof.
 - Do not change any staff role or the Final Writeup Reviewer role.
 
 ### Stage 4 — controlled proof

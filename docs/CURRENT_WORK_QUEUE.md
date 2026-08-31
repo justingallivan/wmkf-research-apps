@@ -39,8 +39,8 @@ sequence.
 
 ## Audit follow-ups — verified open, not silently prioritized
 - **Request Document explicit actor tracking (Option B).**
-  **[OWNER-APPROVED 2026-08-31; ADVERSARIAL REVIEWED; SOURCE-BUILT;
-  PRODUCTION SCHEMA EXACT; RUNTIME NOT PROMOTED.]** Keep Request Document CRUD off staff roles and
+  **[OWNER-APPROVED 2026-08-31; ADVERSARIAL REVIEWED; PRODUCTION-LIVE;
+  CONTROLLED BUSINESS PROOF PENDING.]** Keep Request Document CRUD off staff roles and
   retain service-principal writes while adding explicit, authenticated
   actor/time persistence. The focused plan is
   `docs/REQUEST_DOCUMENT_EXPLICIT_ACTOR_PLAN.md`: it proposes immutable
@@ -58,8 +58,12 @@ sequence.
   depends on built-in `createdby`/`modifiedby`; absent such a consumer, Connor
   has no action. Do not modify the existing Final Writeup Reviewer role. The
   approved creation-only Production apply completed 2026-08-31 with independent
-  readback at 3 exact / 0 absent / 0 divergent. Readiness activation and runtime
-  deployment remain separately gated and unauthorized.
+  readback at 3 exact / 0 absent / 0 divergent. The Production-only readiness
+  flag is exact `on`; commit `8ff4205a0ad43337cd987a4fc76639f936bab4bc`
+  first reached Ready deployment `dpl_D94J9aRcfLfK81iBDsVYARVhZFPb`, signed-in
+  health passed, and the deployment-boundary census reported 0 attributed / 0
+  event-backed unattributed / 0 violations. Await the next natural business
+  action for exact write/readback proof; do not manufacture a document.
 - **Pre-J27 scale: Initial Assessment Production write proof.**
   **[OWNER-DEFERRED 2026-08-30.]** Restore and exact byte-copy Board snapshot
   controls are deployed and the signed-in Request `1003109` read surface passed.

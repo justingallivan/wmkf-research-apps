@@ -34,4 +34,8 @@ No finding requires Request Document privileges on a staff role. Option B
 remains the approved architecture. At the reviewed HEAD, Wave 24 was
 source-only. Later on 2026-08-31, the separately approved creation-only
 Production schema apply completed and independent readback reported 3 exact /
-0 absent / 0 divergent; readiness and runtime promotion remained separate.
+0 absent / 0 divergent. A subsequent separately approved promotion set the
+Production-only readiness flag, deployed exact commit
+`8ff4205a0ad43337cd987a4fc76639f936bab4bc`, and passed signed-in health plus a
+zero-violation deployment-boundary census. The first natural business-flow
+write/readback remains pending.

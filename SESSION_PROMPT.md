@@ -271,9 +271,12 @@ against launching metered review tools without explicit owner authorization.
    broad rollout. Ordinary PD review may precede the global persona contract;
    PC backup, broad matrix visibility, and leadership queues stay off until
    role identity and SharePoint access are positively verified. Request
-   Document writes intentionally remain service-principal-attributed while the
-   owner-approved explicit-actor design awaits later implementation; no broad
-   staff-role grant is pending. Its current-posture identity policy is settled:
+   Document writes intentionally remain service-principal-attributed in the
+   built-in fields while the owner-approved explicit business-actor fields are
+   now Production-live; no broad staff-role grant is pending. The exact schema,
+   Production-only readiness flag, signed-in health, and zero-violation baseline
+   census passed. The first natural business-flow write/readback remains
+   pending. Its current-posture identity policy is settled:
    existing strict flows stay strict, while Initial Assessment, Pre-Site, and
    Site Visit preserve availability with honest null attribution and durable
    operational evidence.
@@ -373,7 +376,7 @@ against launching metered review tools without explicit owner authorization.
 | File | Purpose |
 |------|---------|
 | `docs/CURRENT_WORK_QUEUE.md` | Canonical delivery priority and owner-deferred write proof |
-| `docs/REQUEST_DOCUMENT_EXPLICIT_ACTOR_PLAN.md` | Owner-approved Option B schema/writer/retry plan; source build and adversarial review complete; Production Wave 24 schema exact 3/3; readiness/runtime promotion pending |
+| `docs/REQUEST_DOCUMENT_EXPLICIT_ACTOR_PLAN.md` | Owner-approved Option B schema/writer/retry plan; adversarial review complete; Production Wave 24 schema exact 3/3, readiness on, runtime live; natural business-flow proof pending |
 | `shared/config/executorBudgets.js` | Budget bounds, descriptions, and reviewed outage fallback |
 | `lib/services/executor-budget-service.js` | Append-only read/publication contract |
 | `pages/api/admin/executor-budgets.js` | Superuser budget read/publication route |

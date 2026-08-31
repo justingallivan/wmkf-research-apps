@@ -146,12 +146,14 @@ name the service principal. References below to actor passthrough, redaction,
 or validation do not establish correct human attribution on the Request
 Document row. Final group-review fields, Final acknowledgement rows, and the
 Pre-Site distribution ledger are explicit exceptions. Wave 24 is now
-**source-built and Production-provisioned exactly, but its readiness flag and
-runtime are not promoted**: independent metadata readback on 2026-08-31
-reported 3 exact / 0 absent / 0 divergent. The additive fields are
-server-controlled row-origin actor/time and a Site Visit milestone actor behind
-a literal-on readiness boundary. Live application behavior remains unchanged
-until separately approved readiness and runtime promotion. See
+**Production-live**: independent metadata readback on 2026-08-31 reported 3
+exact / 0 absent / 0 divergent, the Production-only readiness flag is exact
+`on`, and commit `8ff4205a0ad43337cd987a4fc76639f936bab4bc`
+first reached Ready deployment `dpl_D94J9aRcfLfK81iBDsVYARVhZFPb`. The
+additive fields are server-controlled row-origin actor/time and a Site Visit
+milestone actor. Signed-in health passed; the initial deployment-boundary
+census reported zero violations and no post-promotion business rows. The first
+natural business-flow write/readback remains pending. See
 `docs/REQUEST_DOCUMENT_EXPLICIT_ACTOR_PLAN.md`.
 
 | Service | Postgres tables touched | Dataverse access | Notes |
