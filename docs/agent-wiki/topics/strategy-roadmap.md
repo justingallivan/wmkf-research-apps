@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-08-30
+last_verified: 2026-08-31
 stale_after_days: 90
 owner: product-strategy
 source_files:
@@ -233,7 +233,17 @@ document inventory, and individual implementation plans do not establish priorit
   caution applies; high-risk automation stays review-only until the representative
   benchmark exists.
 - Current priorities: `docs/CURRENT_WORK_QUEUE.md`.
-- **Most recent owner-directed release (S469, 2026-08-30):** durable Executor
+- **Most recent owner-directed release (S470, 2026-08-30 PT / 2026-08-31 UTC):**
+  Final Writeup Slice 1 is Production-proved on `main` at `ebb147bb` in Ready
+  deployment `dpl_7kzQ1v7XGtyNx4Fady2JxMrTxQEJ`; Wave 22 is exact and
+  `FINAL_WRITEUP_SCHEMA_READY` is literal `on`. Signed-in Request `1002788`
+  retained its current Pre-Site pointer, moved that row to lifecycle Final,
+  created one current Ready/Review Final row, recorded Justin Gallivan at the
+  transition time, and retained the exact same SharePoint item/version/hash/
+  size. File cardinality did not change. The next owner-selected slice is
+  version-aware acknowledgements and the matrix-ready dashboard data
+  foundation; broad role rollout remains persona/access-gated.
+- **Prior owner-directed release (S469, 2026-08-30):** durable Executor
   budgets are Production-deployed and owner-viewed in the safe no-revision/code-
   fallback state; first publication remains an explicit administrator action.
   Initial Assessment superuser restore and exact byte-copy Board snapshots are
@@ -241,14 +251,7 @@ document inventory, and individual implementation plans do not establish priorit
   9,205-test suite, webpack build, and post-merge checks passed. Signed-in
   Request `1003109` passed the artifact/control/version-history read smoke.
   Restore and first-snapshot writes remain unexercised and deferred to an
-  explicitly authorized pre-J27-scale checkpoint. **The next owner-selected
-  slice is Final Writeup infrastructure:** Slice 1's same-item group-review
-  handoff is source-built on `codex/final-writeup-slice1`, and its owner-approved
-  Production Wave 22 apply/readback is 4 exact / 0 absent / 0 divergent.
-  Runtime promotion, literal-on readiness, and a controlled transition proof
-  remain separately gated; acknowledgement and matrix-ready dashboard storage
-  are later slices toward the 2026-09-04 superuser-testable milestone. Broad
-  role rollout remains persona/access-gated.
+  explicitly authorized pre-J27-scale checkpoint.
 - **Staff Deliberations tab (S466, 2026-08-28, production):** the Pre Site
   Visit Writeup + Site Visit tabs are merged into one stage-aware workspace
   (`shared/components/workbench/StaffDeliberationsTab.js`, rail
@@ -284,8 +287,9 @@ document inventory, and individual implementation plans do not establish priorit
   approval, signed-in Request `1002379` moved the current Pre-Site Word
   workspace Draft→Review, kept the same SharePoint Edit/Download identity,
   recorded the complete milestone under the service's post-write readback, and
-  locked Pre-Site regeneration. The later Site Visit dossier/logistics and
-  Final transaction remain separate.
+  locked Pre-Site regeneration. The later Site Visit dossier remains separate;
+  the same-item Final transaction was subsequently Production-proved on Request
+  `1002788` on 2026-08-30 PT / 2026-08-31 UTC.
 - **Production-proved post-handoff receipt (2026-08-21):** commit `b3bb0ef6` first reached Production in Ready deployment
   `dpl_FkWu55fyBqSEo8q4DBcdcA3xvigi` and makes Pre-Site controls Draft-only.
   Review displays a read-only receipt with one Site Visit continuation action;

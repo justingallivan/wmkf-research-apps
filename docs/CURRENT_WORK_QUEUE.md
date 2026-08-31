@@ -34,8 +34,8 @@ sequence.
 
 | Order | Work | Current boundary | Completion decision |
 | --- | --- | --- | --- |
-| 1 | Final Writeup infrastructure and superuser test path | **[IN PROGRESS 2026-08-30.]** Slice 1 is source-built on `codex/final-writeup-slice1`; its same-item lineage, explicit group-transition attribution, Final status/handoff route, separate-Word UI, focused tests, and Impeccable review are complete. Wave 22 is 4 exact / 0 divergent in Production. Runtime promotion/readiness and the controlled superuser transition proof remain pending; acknowledgement persistence and matrix-ready dashboard data are later slices. Word opens in its own window/tab; there is no embedded or Workbench-native editor. The approved audience is all PDs, PCs, CSO, and President, with a full coordinator matrix under non-compliance semantics. | By **2026-09-04**, the underlying path is superuser-testable with exact same-item lineage and focused tests. Broad staff rollout is not required by the milestone and remains gated by identity/persona, SharePoint access, and the external `wmkf_requestdocument` staff-role grant expected around 2026-09-10. |
-| 2 | Final Writeup role rollout and dashboards | **[PLANNED.]** Ordinary PD review can precede the global persona model. PC backup, complete matrix visibility, and leadership-specific queues remain disabled until those roles are positively identified. | Verified PD/PC/CSO/President identity and SharePoint access; acknowledgement alternate key active; no role inference from names, titles, email, or program taxonomy. |
+| 1 | Final Writeup acknowledgement infrastructure and dashboard data foundation | **[NEXT 2026-08-30.]** Slice 1 is Production-proved on `main` at `ebb147bb`: Wave 22 is exact, readiness is literal `on`, and authorized Request `1002788` proved the same-item Final handoff, explicit actor/time, retained Pre-Site pointer, current Final pointer, and no SharePoint copy. Slice 2 now owns intended-reviewer identity coverage plus the version-aware acknowledgement entity/service; Slice 3 owns the ordinary-PD dashboard/focused-review foundation and matrix-ready projection. Word remains external to the Workbench. | By **2026-09-04**, acknowledgement persistence and the superuser-testable dashboard data path are in place with exact identity/version keys and focused tests. |
+| 2 | Final Writeup role rollout and dashboards | **[PLANNED.]** Ordinary PD review can precede the global persona model. PC backup, complete matrix visibility, and leadership-specific queues remain disabled until those roles are positively identified. | Verified PD/PC/CSO/President identity and SharePoint access; acknowledgement alternate key active; no role inference from names, titles, email, or program taxonomy. The external `wmkf_requestdocument` staff-role grant remains expected around 2026-09-10. |
 
 ## Audit follow-ups — verified open, not silently prioritized
 - **Pre-J27 scale: Initial Assessment Production write proof.**
@@ -117,6 +117,20 @@ sequence.
   queued in `docs/PUBLIC_GIT_HISTORY_REMEDIATION_PLAN.md`).
 
 ## Completed in this execution
+
+- Final Writeup Slice 1 release: **[PRODUCTION-PROVED 2026-08-30 PT /
+  2026-08-31 UTC]** four approved local commits reached public GitHub and
+  `main` at `ebb147bb`; Ready Production deployment
+  `dpl_7kzQ1v7XGtyNx4Fady2JxMrTxQEJ` carries literal-on Wave 22 readiness.
+  Signed-in test Request `1002788` created Final row
+  `b6d6220b-f0a4-f111-b8dd-70a8a59cded0`, retained source/current Pre-Site row
+  `7b059a2f-19a3-f111-b8dd-000d3a5bbe46`, recorded Justin Gallivan at
+  `2026-08-31T03:57:20Z`, and preserved the exact SharePoint drive/item,
+  version `1.0`, 38,273-byte size, and governed hash. The global Request
+  Document census is now 12, including one Ready/Review Final Writeup; the
+  distinct SharePoint-file count for the test request remained four. Focused
+  tests passed 48/48, webpack build passed, and the bounded Production
+  error/5xx scan was clean.
 
 - Durable Executor-budget implementation: **[PRODUCTION-DEPLOYED AND
   OWNER-VIEWED 2026-08-30]** the former tracked-literal ownership is replaced by an

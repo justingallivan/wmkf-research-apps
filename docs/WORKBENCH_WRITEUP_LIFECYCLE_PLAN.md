@@ -3,10 +3,10 @@ title: Workbench Writeup Lifecycle Plan
 domain: workbench
 kind: plan
 status: active
-summary: "Pre-Site/Site Visit lifecycle and source-built same-item Final lineage; Wave 22 is exact in Production and runtime promotion remains pending."
+summary: "Pre-Site/Site Visit lifecycle with Production-proved same-item Final lineage; acknowledgement and dashboard follow-ons remain pending."
 canonical: false
 cataloged: 2026-08-17
-last_verified: 2026-08-30
+last_verified: 2026-08-31
 owner: product-engineering
 related:
   - docs/PRE_SITE_VISIT_DATAVERSE_SCHEMA_DESIGN.md
@@ -34,7 +34,7 @@ plan describe the pre-merge UI accurately as history.
 **[OWNER DECISION 2026-08-17; PRE-SITE WRITER PRODUCTION-PROVED; SITE VISIT
 HANDOFF PRODUCTION-PROVED 2026-08-21; GUARDED REOPEN PRODUCTION-PROVED
 2026-08-23; SITE VISIT LOGISTICS/CALENDAR PRODUCTION-PROVED 2026-08-25; FINAL
-SOURCE-BUILT, WAVE 22 PRODUCTION-VERIFIED, RUNTIME NOT DEPLOYED.]** The three Workbench
+SAME-ITEM HANDOFF PRODUCTION-PROVED 2026-08-30 PT / 2026-08-31 UTC.]** The three Workbench
 tabs (as originally built; see the merge note above) form one document
 lifecycle, not three independent data-entry systems:
 
@@ -54,14 +54,17 @@ There is no separate Site Visit Writeup, no Dataverse staff-observations text
 field in this design, and no attempt to synchronize arbitrary staff edits from
 Word back into the eight generated Dataverse narrative fields.
 
-**[BUILT IN SOURCE 2026-08-30; WAVE 22 PRODUCTION-VERIFIED; RUNTIME NOT
-DEPLOYED OR LIVE-PROVED.]** Final remains a placeholder only in the deployed
-Production UI. The feature branch implements the same-item group-review handoff
-and separate-Word Final tab; Production metadata readback is 4 exact / 0 absent /
-0 divergent. `FINAL_WRITEUP_SCHEMA_READY` remains off, no Final transition or
-Request Document row write ran, and acknowledgement/dashboard data remain later
-slices. The underlying handoff and dashboard data path target superuser testing
-by 2026-09-04. Word editing stays outside the
+**[PRODUCTION-PROVED 2026-08-30 PT / 2026-08-31 UTC.]** Final no longer falls
+through to a placeholder in Production. Commit `ebb147bb` is live in Ready
+deployment `dpl_7kzQ1v7XGtyNx4Fady2JxMrTxQEJ`; Wave 22 readback is 4 exact /
+0 absent / 0 divergent and `FINAL_WRITEUP_SCHEMA_READY` is literal `on`.
+Authorized Request `1002788` proved the same-item group-review handoff and
+separate-Word Final tab: one Final Ready/Review row and current-Final pointer,
+the retained current Pre-Site row moved to lifecycle Final, Justin Gallivan was
+recorded at `2026-08-31T03:57:20Z`, and both rows retained the exact same
+SharePoint item, version `1.0`, 38,273-byte size, and governed hash. The
+distinct file count remained four, so no copy/upload occurred.
+Acknowledgement/dashboard data remain later slices. Word editing stays outside the
 Workbench in a separate browser window/tab or desktop Word when Microsoft
 permits. **[DEPLOYED TO PRODUCTION 2026-08-17]**
 the Site Visit tab and authenticated transition route implement the guarded
@@ -108,7 +111,7 @@ Evidence: `docs/PRE_SITE_VISIT_GENERATION_RESILIENCE_PLAN.md` §Status.
 
 | Claim | Evidence | Status |
 |---|---|---|
-| The deployed Workbench exposes Staff Deliberations and a placeholder Final tab; the feature branch replaces that placeholder with the readiness-gated same-item group-review handoff and separate-Word Final workspace | Production Workbench deployment evidence; Slice 1 source, focused tests, rendered desktop/mobile inspection; Wave 22 Production preflight/apply/readback at 4 exact / 0 absent / 0 divergent on 2026-08-30 | MIXED: CURRENT PRODUCTION UI + SOURCE-BUILT FINAL |
+| The deployed Workbench exposes Staff Deliberations and a readiness-gated same-item group-review handoff plus separate-Word Final workspace | Production deployment `dpl_7kzQ1v7XGtyNx4Fady2JxMrTxQEJ`; Wave 22 4 exact / 0 absent / 0 divergent; signed-in Request `1002788` transition and Dataverse/SharePoint postcheck on 2026-08-30 PT / 2026-08-31 UTC | PRODUCTION-PROVED |
 | `wmkf_requestdocument` already has artifact types for Pre Site Visit, Final Writeup, Applicant Slides, Other Applicant Materials, Recording, Transcript, and Transcript Summary | Wave 16 tracked schema plus read-only Production metadata inventory | VERIFIED |
 | The registry already carries request ownership, stable Graph identity, lifecycle, exact source version/hash, prompt/run/template lineage, and retry fields | Request Document adapter, schema, and Atlas | VERIFIED |
 | Request `1002379` had one current Ready/Review Pre-Site workspace after the controlled handoff | Signed-in Production transition plus fresh authenticated same-item status readback on 2026-08-21; superseded by the approved 2026-08-23 guarded reopen | VERIFIED HISTORICAL STATE |
@@ -570,8 +573,11 @@ non-superseded lifecycle.
    derived deterministically from Dataverse at generation time and travels in
    the v3 input snapshot (so it participates in the generation key — a changed
    award history yields a new draft on the next generation, never a silent edit).
-3. Add explicit group-review and leadership-review transition actor/time fields
-   on the Final row; `modifiedby` is not authoritative.
+3. **Completed for group-review handoff 2026-08-30 PT / 2026-08-31 UTC:**
+   Wave 22 adds explicit group-review and leadership-review transition actor/time
+   fields on the Final row; `modifiedby` is not authoritative. Group-review
+   attribution is Production-proved; leadership fields remain reserved for the
+   later leadership slice.
 4. Add Editor Dashboard Reviewed acknowledgements as a separate child entity.
    They are version-aware tracking, not document lifecycle or approval fields.
    The full coordinator matrix is a read model over those rows, with no required
@@ -863,9 +869,12 @@ silently extend its paths or names to writeup publications.
    above. Decide paths, filenames, representations, permissions, triggers, and
    persistence only from that evidence; this slice performs no business-file
    publication or schema write.
-11. **Final same-item handoff and tab.** Freeze exact source version/hash,
-   create/reuse the Final lineage row over the same stable item, transition both
-   current pointers/lifecycles with explicit actor/time, and verify safe retry.
+11. **Final same-item handoff and tab — Production-proved 2026-08-30 PT /
+   2026-08-31 UTC.** Request `1002788` froze the exact source version/hash,
+   created/reused one Final lineage row over the same stable item, transitioned
+   both pointers/lifecycles with explicit actor/time, and preserved file
+   cardinality. Exact-retry behavior remains focused-test covered; no redundant
+   Production write was run solely to restate the proof.
 12. **Final Writeups dashboard and acknowledgement follow-on.** Add the focused
    review page, version-aware acknowledgement store, personal lenses, and full
    coordinator matrix. Keep acknowledgement distinct from document lifecycle,

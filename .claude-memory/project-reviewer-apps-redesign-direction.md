@@ -1,11 +1,11 @@
 ---
 name: project-reviewer-apps-redesign-direction
-description: The unified Request Workbench has proven Pre-Site/Initial/Site Visit paths; same-item Final infrastructure is owner-selected for 2026-09-04 superuser testing.
+description: The unified Request Workbench has proven Pre-Site/Initial/Site Visit and same-item Final paths; acknowledgement/dashboard infrastructure is next for 2026-09-04.
 metadata:
   type: project
   status: active
   scope: reviewer
-  last_verified: 2026-08-30 via source, owner-approved Final direction, and prior Production handoff evidence
+  last_verified: 2026-08-31 via source, Production Final handoff proof, and exact Dataverse/SharePoint readback
 ---
 
 ## Recall Rule
@@ -142,8 +142,9 @@ completed Draft→Review on 2026-08-21, retained the same SharePoint
 Edit/Download identity, returned **Site Visit in progress** and the handoff
 timestamp on a fresh authenticated load, and locked Pre-Site regeneration. The
 service's post-write reread requires the exact publication version, governed
-hash, and non-null milestone time. Logistics/supporting files and Final remain
-later slices.
+hash, and non-null milestone time. Logistics/supporting files remained later
+slices at this historical checkpoint; the Final transaction was subsequently
+Production-proved on Request `1002788` on 2026-08-30 PT / 2026-08-31 UTC.
 
 **2026-08-21 post-handoff receipt (Production-proved):** commit `b3bb0ef6` first reached Production in Ready deployment
 `dpl_FkWu55fyBqSEo8q4DBcdcA3xvigi` and removes Pre-Site Edit, Download, filename,
@@ -234,16 +235,18 @@ planned. Current authority is
 `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md` and
 `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`.
 
-## Current source-backed state (2026-07-29)
+## Current source-backed state (verified 2026-08-31)
 
-- Ten top-level tabs; nine implemented in current feature-branch source (Overview, Proposal,
-  Initial Assessment, Pre Site Visit Writeup, Reviewers, Reviews, Status,
-  Awardee, and Site Visit) and one placeholder (Final Writeup). **[PRODUCTION-LIVE 2026-08-17]** Pre
-  Site Visit Writeup has a durable registry-backed route/UI and controlled
-  Request `1002379` proof. **[PRODUCTION-PROVED 2026-08-21]** Site Visit has the
-  guarded same-item handoff/workspace UI and Request `1002379` completed the
-  Draft→Review transition with fresh same-item status readback; Final remains a
-  placeholder.
+- Nine top-level tabs are implemented in Production, with zero placeholders.
+  The former Pre-Site/Site
+  Visit pair now presents as the unified Staff Deliberations workspace, and
+  Final Writeup is a readiness-gated same-item handoff/workspace rather than a
+  placeholder. **[PRODUCTION-LIVE 2026-08-17 / PROVED 2026-08-21]** Pre-Site
+  and Site Visit have durable registry-backed route/UI evidence on Request
+  `1002379`. **[PRODUCTION-PROVED 2026-08-30 PT / 2026-08-31 UTC]** Request
+  `1002788` created one current Ready/Review Final row while retaining the
+  current Pre-Site pointer and exact SharePoint item/version/hash/size; explicit
+  group-review actor/time was read back and no new file was created.
   Initial Assessment production
   registry/pointer schema, governed prompt v1, and application are live and
   verified; Request `1002788` preserves mechanics-only historical evidence,

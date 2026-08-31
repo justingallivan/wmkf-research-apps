@@ -1,4 +1,4 @@
-# Session 470 Prompt: Final Writeup Infrastructure
+# Session 471 Prompt: Final Writeup Acknowledgements and Dashboard Foundation
 
 ## Session 469 Summary
 
@@ -86,17 +86,46 @@ against launching metered review tools without explicit owner authorization.
 - `c519daf6` — Merge PR #138 to `main`
 - `b5024ad4` — Reconcile Initial Assessment Production status
 
+## Session 470 Production Release
+
+1. **Final Writeup Slice 1 shipped and was Production-proved.**
+   - The four owner-approved commits, including retained hook configuration,
+     Impeccable assets, Final Writeup code, and documentation, reached public
+     GitHub and `main` at `ebb147bb`.
+   - Preview deployment `dpl_GbBujyKP4smoNbkm5k8mtpN6qaCz` and Production
+     deployment `dpl_7kzQ1v7XGtyNx4Fady2JxMrTxQEJ` reached Ready on the exact
+     commit. `applications.wmkeck.org` resolves to the latter.
+   - Wave 22 was already 4 exact / 0 absent / 0 divergent. The non-sensitive
+     Production `FINAL_WRITEUP_SCHEMA_READY` value is now literal `on`.
+   - Focused Final Writeup/Staff Deliberations tests passed 48/48 and the webpack
+     production build passed. The local Turbopack build's only failure was the
+     sandbox's inability to bind an internal port; Preview supplied the
+     authoritative Turbopack candidate build.
+
+2. **Authorized same-item Production transition passed.**
+   - Signed-in test Request `1002788` created Ready/Review Final row
+     `b6d6220b-f0a4-f111-b8dd-70a8a59cded0` and set it as current Final.
+   - Current Pre-Site row `7b059a2f-19a3-f111-b8dd-000d3a5bbe46` remained the
+     current Pre-Site pointer and moved from Review to Final.
+   - Both rows reference the exact same SharePoint drive/item, publication
+     version `1.0`, 38,273-byte file, filename, and governed hash. The Request's
+     distinct SharePoint-file count remained four; no upload or copy occurred.
+   - The Final row records Justin Gallivan at `2026-08-31T03:57:20Z` and points
+     to the exact Pre-Site source row. The UI returned **Final Writeup is ready**
+     with the original Word link.
+   - The paged Production census is now 12 Request Documents: three Initial
+     Assessments, eight Pre Site Visits, and one Final Writeup; 11 Ready and one
+     Failed. A bounded 30-minute Production scan found no error logs or 5xx.
+
 ## Next Items
 
 ### Current Owner-Selected Delivery
 
-1. **Final Writeup infrastructure by 2026-09-04.**
-   Slice 0 reconciliation is complete. Slice 1 is source-built on
-   `codex/final-writeup-slice1`, and the owner-authorized Production Wave 22
-   apply/readback is 4 exact / 0 absent / 0 divergent. Runtime promotion,
-   literal-on readiness, and a controlled superuser transition proof remain
-   separately gated; acknowledgement storage and matrix-ready dashboard data
-   remain later slices. Editing stays in Word in a separate
+1. **Final Writeup acknowledgements and dashboard data by 2026-09-04.**
+   Slices 0–1 are complete and Slice 1 is Production-proved on Request
+   `1002788`. Next, run the intended-reviewer enabled-`systemuser` coverage
+   probe, then design/apply the version-aware acknowledgement entity and build
+   the matrix-ready dashboard data/focused-review foundation. Editing stays in Word in a separate
    browser window/tab (or desktop Word when Microsoft permits); do not embed an
    editor in the Workbench.
 2. **Audience and matrix.**
@@ -115,11 +144,12 @@ against launching metered review tools without explicit owner authorization.
 
 ### Verified Open
 
-1. **Execute the Final Writeup plan in bounded slices.**
+1. **Execute Final Writeup Slices 2–3 in bounded increments.**
    `docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md` is owner-approved for
    staged implementation with named identity/persona prerequisites. Slice 1 is
-   source-built and its additive Production schema is exact; next is deliberate
-   runtime promotion/readiness and a separately authorized controlled proof.
+   Production-proved; next is the reviewer-identity coverage probe,
+   acknowledgement persistence/service, then the ordinary-PD dashboard and
+   focused review page foundation.
 
 2. **Positive-path funding-history observation.**
    The zero-program-grant branch is Production-proved; the positive sentence is
@@ -201,7 +231,7 @@ against launching metered review tools without explicit owner authorization.
 | `pages/api/workbench/initial-assessment/restore-version.js` | Superuser native-version restore route |
 | `pages/api/workbench/initial-assessment/board-snapshot.js` | Superuser retained Board snapshot route |
 | `docs/INITIAL_ASSESSMENT_CONTROLLED_PILOT_2026-07-30.md` | Pilot evidence and remaining write-proof boundary |
-| `docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md` | Reviewed, owner-gated Final design |
+| `docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md` | Production-proved Slice 1 and approved Slices 2–5 design |
 
 ## Testing
 

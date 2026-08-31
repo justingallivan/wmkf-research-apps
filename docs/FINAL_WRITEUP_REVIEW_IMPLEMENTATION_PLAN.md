@@ -3,10 +3,10 @@ title: Final Writeup Review — Implementation Plan
 domain: workbench
 kind: plan
 status: active
-summary: "Same-item Final handoff and external Word editing; Slice 1 is source-built, Wave 22 is exact in Production, and runtime/dashboard work remains pending."
+summary: "Same-item Final handoff and external Word editing; Slice 1 is Production-proved, while acknowledgements and dashboards remain pending."
 canonical: false
 cataloged: 2026-08-28
-last_verified: 2026-08-30
+last_verified: 2026-08-31
 owner: product-engineering
 related:
   - docs/audits/final-writeup-review-fable-review-2026-08-28.md
@@ -34,7 +34,7 @@ related:
 
 **Verdict: OWNER-APPROVED FOR STAGED IMPLEMENTATION WITH NAMED PREREQUISITES.**
 
-This plan translates the approved Final Writeup and group-review experience into the current Request Workbench architecture. Slice 0 is complete. **[BUILT IN SOURCE 2026-08-30; NOT DEPLOYED OR RUNTIME-PROVED]** Slice 1 exists on the isolated `codex/final-writeup-slice1` branch. **[PRODUCTION SCHEMA VERIFIED 2026-08-30]** Wave 22 was owner-authorized, applied through the date-bounded operator acknowledgement, and read back as 4 exact / 0 absent / 0 divergent. `FINAL_WRITEUP_SCHEMA_READY` was not enabled, and the runtime branch was not deployed or exercised.
+This plan translates the approved Final Writeup and group-review experience into the current Request Workbench architecture. Slice 0 is complete. **[PRODUCTION-PROVED 2026-08-30 PT / 2026-08-31 UTC]** Slice 1 shipped on `main` at `ebb147bb` in Ready Production deployment `dpl_7kzQ1v7XGtyNx4Fady2JxMrTxQEJ`; Wave 22 is 4 exact / 0 absent / 0 divergent and the non-sensitive `FINAL_WRITEUP_SCHEMA_READY` value is literal `on` in Production. The authorized Request `1002788` transition created one Ready/Review Final row, moved the retained current Pre-Site source to lifecycle Final, set the current-Final pointer, recorded Justin Gallivan and `2026-08-31T03:57:20Z`, and reused the exact same SharePoint drive/item, version `1.0`, 38,273-byte file, and governed hash. The distinct SharePoint-file count remained four, proving that no copy or upload occurred. A bounded 30-minute scan found no Production error logs or 5xx responses.
 
 The 2026-09-04 milestone means the underlying handoff, identity, acknowledgement,
 dashboard-data, and superuser test path are in place. It does not promise broad
@@ -46,7 +46,7 @@ The named prerequisites are deliberately attached to the slices that need them:
 
 1. **Resolved 2026-08-30:** the owner approved the expanded implementation
    surface and code-first delivery after durable reconciliation.
-2. **Resolved in Production schema 2026-08-30; runtime promotion pending:** Wave 22's explicit group-review and leadership-review actor/time fields are 4 exact / 0 divergent in Production. Dataverse `modifiedby` remains non-authoritative.
+2. **Resolved and Production-proved 2026-08-30 PT / 2026-08-31 UTC:** Wave 22's explicit group-review and leadership-review actor/time fields are 4 exact / 0 divergent, the readiness flag is literal `on`, and the group-review transition recorded the authenticated actor/time explicitly. Dataverse `modifiedby` remains non-authoritative.
 3. Before Slice 2, verify with an owner-authorized read-only probe that every intended PD, PC, CSO, and President resolves to an enabled Dataverse `systemuser`. If any intended reviewer does not, settle the acknowledgement identity key before creating its entity.
 4. Before Slice 4, settle how the application positively identifies a Program Coordinator or leadership user. Current app access proves access to an application, and each Request identifies its responsible PD and assigned PC, but there is no verified Workbench persona contract for “any PC” or “leadership.” The implementation must not infer those roles from names, email addresses, job titles, or the changing program taxonomy.
 
@@ -83,14 +83,14 @@ An OAuth-authenticated, read-only Claude Fable review on 2026-08-28 independentl
 - **Entry points:** Staff Deliberations, the responsible-PD Final Writeup tab, a cross-request Final Writeups dashboard, and a dedicated reviewer page. Every edit/review action launches the SharePoint Word document outside the Workbench in a separate browser window/tab, with desktop Word available only through Microsoft's own supported affordance.
 - **Persistence:** the existing Dataverse Request Document registry and Request current-Final pointer; SharePoint for the single collaborative Word item and its native versions; one new Dataverse child entity for personal review acknowledgements.
 - **Consumers:** responsible PDs, other PDs, PCs, CSO, President, Workbench UI, dashboard UI, supporting-material read surface, tests, Atlas, route-security matrix, and service catalogue.
-- **Slice 0 baseline findings:** Final was still a placeholder; the Final artifact type and current pointer existed; no review-acknowledgement store existed; current Workbench access did not distinguish PC and leadership personas; and the former plan called for a second editable Final file. The source-built Slice 1 status is recorded below.
+- **Slice 0 baseline findings:** Final was still a placeholder; the Final artifact type and current pointer existed; no review-acknowledgement store existed; current Workbench access did not distinguish PC and leadership personas; and the former plan called for a second editable Final file. The subsequent Slice 1 Production status is recorded below.
 
 ## Verified current state
 
-- **[SUPERSEDED BY SOURCE IMPLEMENTATION 2026-08-30; NOT DEPLOYED]** Final Writeup no longer falls through to the placeholder on the feature branch. `FinalWriteupTab` reads the readiness-gated status, offers the responsible-PD/superuser group-review transition, and opens Word separately after success.
-- **[BUILT IN SOURCE 2026-08-30; NOT DEPLOYED]** Staff Deliberations retains its fail-closed controls and now renders lifecycle `FINAL` as a read-only receipt pointing staff to the Final Writeup tab; other unknown/beyond states remain generic read-only failures.
+- **[PRODUCTION-PROVED 2026-08-30 PT / 2026-08-31 UTC]** `FinalWriteupTab` replaces the former placeholder, reads readiness-gated status, offers the responsible-PD/superuser group-review transition, and opens Word separately after success. Request `1002788` rendered the resulting **Final Writeup is ready** state and the original SharePoint document link.
+- **[PRODUCTION-PROVED 2026-08-30 PT / 2026-08-31 UTC]** Staff Deliberations retains its fail-closed controls and renders lifecycle `FINAL` as a read-only receipt pointing staff to the Final Writeup tab; other unknown/beyond states remain generic read-only failures.
 - **[VERIFIED]** The Request Document registry already defines the Final Writeup artifact type and the generic source-version, source-hash, milestone-version, milestone-hash, and milestone-time fields (`shared/config/requestDocument.js:10-58`; `lib/dataverse/adapters/request-document.js:12-68`).
-- **[VERIFIED PRODUCTION STATE; SOURCE IMPLEMENTATION NOT DEPLOYED]** `akoya_request.wmkf_CurrentFinalWriteup` is live and still has no deployed writer. Slice 1 includes the readiness-gated writer on the feature branch, and Wave 22 is exact in Production; `FINAL_WRITEUP_SCHEMA_READY` was not enabled by the schema apply (`docs/atlas/dataverse-wmkf-requestdocument.md`).
+- **[VERIFIED PRODUCTION STATE 2026-08-31]** `akoya_request.wmkf_CurrentFinalWriteup` has a deployed readiness-gated writer. Request `1002788` points to Final row `b6d6220b-f0a4-f111-b8dd-70a8a59cded0`, whose source lookup is the retained Pre-Site row `7b059a2f-19a3-f111-b8dd-000d3a5bbe46`; both rows reference the same stable SharePoint item and governed content hash (`docs/atlas/dataverse-wmkf-requestdocument.md`).
 - **[VERIFIED]** The registry’s durable file identity is the stable Graph drive/item identity, and its only alternate key is the generation key. The schema does not require a different SharePoint item for each Request Document row (`lib/dataverse/schema/wave16-request-document-registry/wmkf_requestdocument.json:136-160`, `315-330`).
 - **[VERIFIED]** The current Graph metadata helper returns stable identity, URL, eTag, publication version, and last-modified time, but not the modifying user (`lib/services/graph-service.js:400-442`).
 - **[VERIFIED]** A Request already exposes the lead PD and assigned Program Coordinator as separate system-user lookups (`docs/atlas/dataverse-akoya-request.md:38-47`).
@@ -348,7 +348,7 @@ and memory gates passed before Slice 1 implementation began.
 
 ### Slice 1 — Final handoff and responsible-PD tab
 
-**[BUILT IN SOURCE 2026-08-30; WAVE 22 PRODUCTION-APPLIED; RUNTIME NOT DEPLOYED OR LIVE-PROVED.]** The branch includes the Wave 22 spec/readiness guard/preflight, conditional Request Document projection, deterministic same-item claim/activation service, request-scoped GET/POST route, Final tab, Staff Deliberations receipt, and focused tests. Full gates, rendered desktop/mobile inspection, and the owner-authorized Production schema preflight/apply/exact readback are complete. Remaining before runtime proof: deliberate branch promotion, per-environment literal-on readiness, and a separately authorized controlled transition rehearsal.
+**[COMPLETE AND PRODUCTION-PROVED 2026-08-30 PT / 2026-08-31 UTC.]** Commit `ebb147bb` is on `main`; Production deployment `dpl_7kzQ1v7XGtyNx4Fady2JxMrTxQEJ` is Ready with literal-on schema readiness. The owner-authorized Request `1002788` transition proved the deterministic same-item claim/activation service, request-scoped GET/POST route, Final tab, Staff Deliberations receipt, explicit actor/time attribution, retained current Pre-Site pointer, one current Final pointer, and unchanged SharePoint item/version/hash/file cardinality. Focused tests passed 48/48 and the bounded post-transition Production error/5xx scan was clean.
 
 - Add the Final contract constants and request/current-Final read model.
 - Add and readiness-gate explicit group-review transition actor/time fields.
@@ -470,9 +470,8 @@ Run each gate and its self-test sequentially where applicable:
 
 ## Final recommendation
 
-Proceed in slices 0–3 first, with a 2026-09-04 target for the underlying
-superuser-testable path: reconcile the lifecycle contract, prove the same-item
-Final handoff with retained Pre-Site pointer and explicit actor attribution,
+Proceed with slices 2–3 next. The 2026-09-04 superuser-testable same-item
+handoff is already Production-proved; the remaining milestone work is to
 verify reviewer identity coverage, add durable review acknowledgements, and
 land the dashboard data/focused review foundation. All edit/review actions open
 the canonical Word document outside the Workbench. PC backup, broad matrix
