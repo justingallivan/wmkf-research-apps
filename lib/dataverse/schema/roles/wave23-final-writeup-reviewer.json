@@ -1,0 +1,32 @@
+{
+  "name": "WMKF Final Writeup Reviewer",
+  "description": "Least-privilege role for version-aware Final Writeup acknowledgements. Staff may create, read, and refresh neutral acknowledgement rows and bind them to the current Request Document and their Dataverse user identity. The role grants no delete, assign, share, or Request Document write authority.",
+  "businessUnit": "root",
+  "addToSolution": "wmkfResearchReviewAppSuite",
+  "_depthLegend": {
+    "Basic": "User — rows owned by the calling user only",
+    "Local": "Business Unit — rows owned within the user's BU",
+    "Deep": "Parent:Child BU — user's BU and descendants",
+    "Global": "Organization — all rows in the org"
+  },
+  "privileges": [
+    {
+      "table": "wmkf_FinalWriteupReviewAcknowledgement",
+      "_note": "Organization-owned acknowledgement rows. Create and Append support the initial review; Write supports a later publication-version refresh; Read supports confirmation. Delete, AppendTo, Assign, and Share are deliberately omitted.",
+      "depth": "Global",
+      "ops": ["Create", "Read", "Write", "Append"]
+    },
+    {
+      "table": "wmkf_RequestDocument",
+      "_note": "Allows an acknowledgement to reference the exact current Final Request Document. No Request Document Create, Write, Delete, Append, Assign, or Share authority is granted.",
+      "depth": "Global",
+      "ops": ["AppendTo"]
+    },
+    {
+      "table": "User",
+      "_note": "Allows an acknowledgement to reference the authenticated reviewer's Dataverse systemuser row. No User CRUD, Append, Assign, or Share authority is granted.",
+      "depth": "Global",
+      "ops": ["AppendTo"]
+    }
+  ]
+}
