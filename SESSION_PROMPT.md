@@ -128,14 +128,15 @@ against launching metered review tools without explicit owner authorization.
      divergent / 0 pending / 0 exact, and the non-writing apply dry-run passed.
      Sandbox could not be assessed because `DYNAMICS_SANDBOX_URL` is unset.
 
-2. **Identity link integrity passed; roster completeness remains owner-gated.**
+2. **Identity link integrity and roster completeness are resolved.**
    - Eleven active, sign-in-capable profiles map by exact email to existing,
      enabled Dataverse `systemuser` records.
    - One active synthetic Test User without Azure sign-in and one inactive Tom
      Rieker profile are excluded.
-   - This proves the link contract for existing profiles, not that
-     `user_profiles` contains every intended PD, PC, CSO, and President. Obtain
-     owner roster attestation before any Wave 23 Production apply.
+   - The probe proves the link contract for existing profiles. The owner then
+     confirmed on 2026-08-30 PT / 2026-08-31 UTC that the 11-person roster is
+     the complete intended PD/PC/CSO/President audience. The identity key is
+     cleared; this does not authorize the separate Production schema apply.
 
 3. **Accepted adversarial findings are fixed.**
    - The OAuth delegated review disclosed `claude-fable-5`; the owner accepted
@@ -153,8 +154,8 @@ against launching metered review tools without explicit owner authorization.
 1. **Final Writeup acknowledgements and dashboard data by 2026-09-04.**
    Slices 0–1 are complete and Slice 1 is Production-proved on Request
    `1002788`. Wave 23 source/preflight and the existing-profile identity probe
-   are complete. Next, obtain owner attestation that the 11-person roster is the
-   complete intended PD/PC/CSO/President audience; then, under separate explicit
+   are complete, and the owner confirmed the 11-person roster is the complete
+   intended PD/PC/CSO/President audience. Next, under separate explicit
    Production authorization, apply/read back the version-aware acknowledgement
    entity and require its key index to become Active. Build the matrix-ready
    dashboard data/focused-review foundation afterward. Editing stays in Word in a separate
@@ -180,8 +181,9 @@ against launching metered review tools without explicit owner authorization.
    `docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md` is owner-approved for
    staged implementation with named identity/persona prerequisites. Slice 1 is
    Production-proved; Wave 23 is source-built and Production-preflighted but not
-   applied. Next is owner roster attestation, separately authorized schema
-   apply/readback with an Active key index, acknowledgement persistence/service,
+   applied. The owner roster attestation is complete. Next is separately
+   authorized schema apply/readback with an Active key index, acknowledgement
+   persistence/service,
    then the ordinary-PD dashboard and focused review page foundation.
 
 2. **Positive-path funding-history observation.**

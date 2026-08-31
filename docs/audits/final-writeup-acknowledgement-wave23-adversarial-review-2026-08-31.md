@@ -3,7 +3,7 @@ title: Final Writeup acknowledgement Wave 23 — Claude Fable adversarial review
 domain: workbench
 kind: audit
 status: active
-summary: Read-only OAuth review of the Wave 23 acknowledgement schema preflight; accepted metadata-classification and identity-proof findings were fixed, while Production apply remains gated on owner roster attestation and explicit approval.
+summary: Read-only OAuth review of the Wave 23 acknowledgement preflight; accepted findings were fixed and roster completeness was owner-attested, while Production apply still needs explicit approval.
 canonical: false
 cataloged: 2026-08-31
 last_verified: 2026-08-31
@@ -37,7 +37,7 @@ statement of what the identity census proves.
 
 | Priority | Finding | Disposition |
 | --- | --- | --- |
-| P1 | The access/identity census proves link integrity for profiles it sees, not that `user_profiles` contains every intended PD, PC, CSO, and President. | Fixed probe output and durable status language. Owner roster-completeness attestation is a hard pre-apply gate. |
+| P1 | The access/identity census proves link integrity for profiles it sees, not that `user_profiles` contains every intended PD, PC, CSO, and President. | Fixed probe output and durable status language. **Resolved:** the owner confirmed on 2026-08-30 PT / 2026-08-31 UTC that the verified 11-person roster is the complete intended audience. |
 | P2 | Relationship metadata must verify the exact schema name, lookup/navigation binding, and cascade behavior, especially `Delete: Restrict`. | Fixed. Both relationship schema names are pinned and the preflight checks the complete cascade contract. |
 | P2 | A failed alternate-key index is terminally divergent, not merely pending. | Fixed. Only `Pending` and `InProgress` classify pending; `Failed` and unknown states classify divergent. |
 | P2 | An existing relationship with the intended schema name but the wrong metadata type must classify divergent, not absent. | Fixed with an untyped existence probe followed by the typed cast. |
@@ -57,7 +57,8 @@ sign in; one inactive Tom Rieker profile also has no Azure email and is excluded
 This is **[VERIFIED via the 2026-08-31 read-only Production census]** for the 11
 profiles in the probe. It does **not** establish that the roster contains every
 person intended to serve as a PD, PC, CSO, or President. That completeness claim
-is **[PENDING OWNER ATTESTATION]**.
+was subsequently **[OWNER-ATTESTED 2026-08-30 PT / 2026-08-31 UTC]** for the
+complete intended PD/PC/CSO/President audience.
 
 ### Wave 23 metadata
 
@@ -71,12 +72,12 @@ not evidence about Sandbox metadata.
 
 ## Remaining gates
 
-Wave 23 must not be applied to Production until both conditions are true:
+The identity condition is now satisfied:
 
-1. The owner attests that the probed roster contains every intended PD, PC,
-   CSO, and President, or identifies missing people so the identity contract can
-   be reconsidered before schema creation.
-2. The owner gives explicit authorization for the Production schema apply.
+- **[RESOLVED]** The owner attested that the probed 11-person roster contains
+  every intended PD, PC, CSO, and President.
+- **[OPEN]** The owner gives explicit authorization for the Production schema
+  apply.
 
 After any authorized apply, exact metadata readback and
 `EntityKeyIndexStatus === 'Active'` remain required before a readiness flag or
