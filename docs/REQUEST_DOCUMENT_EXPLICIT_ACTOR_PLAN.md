@@ -9,6 +9,7 @@ cataloged: 2026-08-31
 owner: product-engineering
 related:
   - docs/audits/request-document-explicit-actor-adversarial-review-reconciliation-2026-08-31.md
+  - docs/audits/request-document-explicit-actor-implementation-review-reconciliation-2026-08-31.md
   - docs/DYNAMICS_IDENTITY_RECONCILIATION_PLAN.md
   - docs/REQUEST_DOCUMENT_ATTRIBUTION_ROLE_PLAN.md
   - docs/APPLICATION_STATE_ATLAS.md
@@ -303,10 +304,14 @@ allowed matching operational event.
 - Run focused tests and the applicable schema/route/doc gates sequentially
   with their self-tests.
 
-In progress 2026-08-31: 12 focused suites pass (227 tests); the writer gate,
-its negative-fixture self-test, Wave 24 preflight self-test, and census
-classifier self-test pass. Fresh implementation review and the broader
-applicable gate/build battery remain before target promotion.
+Completed locally 2026-08-31: 12 focused suites pass (229 tests); the writer
+gate, its negative-fixture self-test, Wave 24 preflight self-test, and census
+classifier self-test pass. The canonical Next.js/Turbopack build and applicable
+data-access, identity-context, OData, Atlas, route, type, and documentation
+gates pass. OAuth Claude Opus returned **APPROVE WITH CONDITIONS** with no
+Blocker/High finding; all three Medium conditions were accepted and fixed:
+lost-response event repair, CI enforcement, and create-time runtime rejection
+of caller-supplied origin fields. See the implementation-review reconciliation.
 
 ### Stage 3 — target promotion
 
@@ -347,8 +352,10 @@ applicable gate/build battery remain before target promotion.
   row with a non-null different actor is accepted as a concurrent commit.
 - Legacy rows with all new fields null; reads remain successful and honest.
 - Missing, disabled, and stale mapped actors exercise each flow's chosen policy;
-  no client value can fill the field, and an allowed null-actor write emits the
-  durable missing-attribution event.
+  no client value can fill the field, and an allowed null-actor write attempts
+  the awaited durable missing-attribution event. Lost-response create recovery
+  repairs the event from the exact generation-key row; the post-promotion
+  census fails loudly if best-effort event storage still leaves a gap.
 - Readiness off against a schema without Wave 24; no new field is selected or
   written, existing writes remain available, and Production health is red.
 - A later distribution operation reuses a snapshot created by another actor;
@@ -359,7 +366,9 @@ applicable gate/build battery remain before target promotion.
 - No Request Document privilege is added to a broad or dedicated staff role.
 - Every current row-create path passes through the enforced origin-stamping
   seam. A valid actor produces an immutable actor/time pair; an allowed missing
-  actor produces two nulls plus durable operational evidence.
+  actor produces two nulls plus awaited operational evidence. The event store
+  remains best-effort by design; missing evidence is a census violation, not a
+  silently accepted outcome.
 - Guarded-reopen history no longer presents service-principal `createdby` as
   the staff actor.
 - Site Visit handoff stores its actor with the existing milestone evidence.
@@ -381,7 +390,8 @@ applicable gate/build battery remain before target promotion.
    action, not that the person authored every later Word edit. SharePoint
    version history remains authoritative for document editing.
 3. A future raw writer could bypass the fields; the adapter-only writer gate
-   and immutable-field PATCH gate are required permanent controls.
+   and immutable-field PATCH gate are permanent GitHub Actions controls. The
+   adapter also rejects caller-supplied origin fields on both create and update.
 4. Repeatable cross-system actions such as native version restore require an
    append-only operation ledger if WMKF later needs complete app-side actor
    history.

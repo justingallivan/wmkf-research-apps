@@ -3,6 +3,7 @@
 jest.mock('../../lib/services/dynamics-service.js', () => ({
   DynamicsService: {
     createRecord: jest.fn(),
+    queryRecords: jest.fn(),
     updateRecord: jest.fn(),
     getRecord: jest.fn(),
   },
@@ -87,6 +88,41 @@ test('readiness off writes the legacy payload and skips actor resolution require
     { wmkf_generationkey: 'generation-key' },
     {},
   );
+});
+
+test('rejects caller-supplied origin fields on create before actor resolution or transport', async () => {
+  await expect(create({
+    wmkf_generationkey: 'generation-key',
+    'wmkf_InitiatedBy@odata.bind': `/systemusers(${ACTOR_ID})`,
+  }, {
+    actorPolicy: REQUEST_DOCUMENT_ACTOR_POLICY.REQUIRED,
+  })).rejects.toThrow(/server-owned and immutable/);
+  expect(DynamicsService.getRecord).not.toHaveBeenCalled();
+  expect(DynamicsService.createRecord).not.toHaveBeenCalled();
+});
+
+test('repairs missing-actor evidence when a create response is lost but the row committed', async () => {
+  const committed = {
+    wmkf_requestdocumentid: '22222222-2222-4222-8222-222222222222',
+    wmkf_initiatedat: null,
+    _wmkf_initiatedby_value: null,
+  };
+  DynamicsService.createRecord.mockRejectedValueOnce(new Error('response lost'));
+  DynamicsService.queryRecords.mockResolvedValueOnce({ records: [committed] });
+  await expect(create({
+    wmkf_generationkey: 'generation-key',
+    wmkf_producer: 'test-producer',
+  }, {
+    actorPolicy: REQUEST_DOCUMENT_ACTOR_POLICY.ALLOW_UNATTRIBUTED,
+    actorContext: { operation: 'pre-site-generation' },
+  })).rejects.toThrow('response lost');
+  expect(OperationalEventService.recordEvent).toHaveBeenCalledWith(expect.objectContaining({
+    eventType: 'request_document_actor_not_captured',
+    entityRefs: expect.objectContaining({
+      requestDocumentId: committed.wmkf_requestdocumentid,
+      generationKey: 'generation-key',
+    }),
+  }));
 });
 
 test('update rejects immutable explicit origin fields before transport', async () => {

@@ -27,13 +27,15 @@ const ALLOWED_ORIGIN_FIELD_FILES = new Set([
   'lib/services/request-document-actor-service.js',
 ]);
 
-function walkJs(relativeDir) {
+const RUNTIME_EXTENSIONS = new Set(['.js', '.mjs', '.cjs', '.ts', '.tsx']);
+
+function walkRuntime(relativeDir) {
   const absolute = path.join(ROOT, relativeDir);
   const out = [];
   for (const entry of fs.readdirSync(absolute, { withFileTypes: true })) {
     const relative = path.join(relativeDir, entry.name);
-    if (entry.isDirectory()) out.push(...walkJs(relative));
-    else if (entry.isFile() && entry.name.endsWith('.js')) out.push(relative);
+    if (entry.isDirectory()) out.push(...walkRuntime(relative));
+    else if (entry.isFile() && RUNTIME_EXTENSIONS.has(path.extname(entry.name))) out.push(relative);
   }
   return out;
 }
@@ -90,7 +92,7 @@ function validateSources(sources) {
       errors.push(`${relative}: raw Request Document createRecord bypasses the adapter`);
     }
     if (!ALLOWED_ORIGIN_FIELD_FILES.has(relative)
-        && /(?:['"]wmkf_InitiatedBy@odata\.bind['"]|\bwmkf_initiatedat\s*:)/i.test(source)) {
+        && /(?:['"]wmkf_InitiatedBy@odata\.bind['"]|(?:['"])?wmkf_initiatedat(?:['"])?\s*:)/i.test(source)) {
       errors.push(`${relative}: immutable origin fields are written outside the actor/adapter seam`);
     }
   }
@@ -98,7 +100,9 @@ function validateSources(sources) {
 }
 
 function liveSources() {
-  const files = [...walkJs('lib'), ...walkJs('pages')];
+  const files = ['lib', 'pages', 'shared', 'modules']
+    .filter((relative) => fs.existsSync(path.join(ROOT, relative)))
+    .flatMap((relative) => walkRuntime(relative));
   return new Map(files.map((relative) => [
     relative,
     fs.readFileSync(path.join(ROOT, relative), 'utf8'),
@@ -133,7 +137,7 @@ function runSelfTest() {
   }
 
   const immutablePatch = new Map(base);
-  immutablePatch.set('lib/services/bypass.js', "const patch = { wmkf_initiatedat: 'x' };");
+  immutablePatch.set('lib/services/bypass.js', "const patch = { 'wmkf_initiatedat': 'x' };");
   errors = validateSources(immutablePatch);
   if (!errors.some((error) => error.includes('immutable origin fields'))) {
     throw new Error('immutable-field fixture was not rejected');

@@ -36,6 +36,8 @@ jobs:
       - run: npm run check:model-override-warming:self-test
       - run: npm run check:dataverse-access-layer
       - run: npm run check:dataverse-access-layer:self-test
+      - run: npm run check:request-document-writers
+      - run: npm run check:request-document-writers:self-test
       - run: npm run check:odata-escape
       - run: npm run check:odata-escape:self-test
       - run: npm run check:dynamics-context-boundary
