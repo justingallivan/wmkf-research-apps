@@ -16,7 +16,7 @@ related:
 
 # Dynamics Identity Reconciliation Plan
 
-**Status:** **SHIPPED S127–S129; PROD FLAG LIVE (verified S271 and re-verified 2026-08-27/S466).** DB bridge live, `MSCRMCallerID` impersonation contract implemented with privilege intersection, adapter chain in place, token lifecycle wired. Preview flag flipped + smoked 2026-05-05. Connor granted Delegate role to app user 2026-05-06; impersonation re-smoke PASS for Justin and cnoda (`scripts/probe-impersonation-resmoke.js`, `scripts/probe-impersonation-as-user.js`). The prod flip was deferred in S207, then landed by the S271 era — `DYNAMICS_IMPERSONATION_ENABLED=true` in Production `[VERIFIED S271 via env pull, per docs/GRANTEE_DELIVERABLE_PACKAGE_MIGRATION_PLAN.md; re-verified 2026-08-27 by owner env pull]`. **Live behavior [DERIVED-FROM: owner-run `scripts/probe-write-attribution-census.js` output, 2026-08-27/S466, 90-day window; independent of TBD count]:** impersonation works where the staff role has privileges — `wmkf_ai_run` rows split 22 staff-attributed / 36 service-principal (unattended writes) — but **every `wmkf_requestdocument` row (13/13) fell back to service-principal attribution** despite the acting user being sent on those write paths (`pages/api/workbench/pre-site-visit.js:96`, the reopen route, adapter passthrough — all read S466). The consistent fallback matches the privilege-intersection signature (impersonated write 403s; `_writeFetch` retries as the app); the inferred cause is a missing staff-role privilege on this post-audit table — confirm against the role in the Power Platform admin center, or via `Impersonated write rejected` warnings in Vercel runtime logs, before treating that cause as established. **Remaining: add create/write/append privileges on `wmkf_requestdocument` to the staff security role (CRM admin action, no code change); re-run the census to confirm.** [RECHECKED after scripts/probe-write-attribution-census.js change: the later edit was header-comment-only (S466 findings note); the census behavior and output cited here are unchanged] This doc remains as the architectural reference; treat the implementation sections below as historical.
+**Status:** **SHIPPED S127–S129; PROD FLAG LIVE (verified S271 and re-verified 2026-08-27/S466).** DB bridge live, `MSCRMCallerID` impersonation contract implemented with privilege intersection, adapter chain in place, token lifecycle wired. Preview flag flipped + smoked 2026-05-05. Connor granted Delegate role to app user 2026-05-06; impersonation re-smoke PASS for Justin and cnoda (`scripts/probe-impersonation-resmoke.js`, `scripts/probe-impersonation-as-user.js`). The prod flip was deferred in S207, then landed by the S271 era — `DYNAMICS_IMPERSONATION_ENABLED=true` in Production `[VERIFIED S271 via env pull, per docs/GRANTEE_DELIVERABLE_PACKAGE_MIGRATION_PLAN.md; re-verified 2026-08-27 by owner env pull]`. **Live behavior [DERIVED-FROM: owner-run `scripts/probe-write-attribution-census.js` output, 2026-08-27/S466, 90-day window; independent of TBD count]:** impersonation works where the staff role has privileges — `wmkf_ai_run` rows split 22 staff-attributed / 36 service-principal (unattended writes) — but **every `wmkf_requestdocument` row (13/13) fell back to service-principal attribution** despite the acting user being sent on those write paths (`pages/api/workbench/pre-site-visit.js:96`, the reopen route, adapter passthrough — all read S466). The consistent fallback matches the privilege-intersection signature (impersonated write 403s; `_writeFetch` retries as the app). **Owner decision 2026-08-31:** retain service-principal Request Document writes and add explicit, server-controlled actor tracking (Option B). The 2026-08-27 Connor staff-role brief was never sent and is withdrawn; no Request Document privilege change is requested. A confirmation-only question scheduled for 2026-09-07 asks whether any compliance, audit, or CRM consumer specifically requires built-in `createdby`/`modifiedby` staff attribution. This doc remains as the architectural reference; treat the implementation sections below as historical.
 **Owner:** Justin (app side), Connor (Dynamics side — Delegate role granted)
 **Last updated:** 2026-05-12 (status banner refresh; original plan dated 2026-04-13)
 
@@ -135,7 +135,12 @@ Add one line to `/admin` user management: each row shows "Dynamics: ✓ linked" 
 
 **For (1)–(4):** none. Read access is already granted.
 
-**For (5):** requires the write permission grant we're already waiting on. Impersonation header works with any write-capable security role.
+**For Request Document attribution:** no permission grant is requested. The
+former Connor brief was never sent and is superseded by the owner-selected
+explicit-actor design. Connor's only scheduled question is whether a specific
+compliance, audit, report, view, flow, business rule, or plug-in requires the
+built-in Request Document actor columns; absent such a requirement, no Connor
+action is needed.
 
 **For (3) to fully replace hardcoded PD prompts:** ~~Connor would need to add a custom field to `systemuser` for PD expertise description.~~ **Done 2026-05-07** — Connor added `wmkf_expertise` (Memo) on `systemuser`. Out of scope for this plan; the swap-out of hardcoded PD lists is a separate downstream task.
 
@@ -145,7 +150,7 @@ Add one line to `/admin` user management: each row shows "Dynamics: ✓ linked" 
 - **Non-staff profiles.** Reviewers, external collaborators, etc. don't live in Dynamics as systemusers. Nothing to reconcile.
 - **Historical backfill of existing records.** Things already written by the service principal stay as-is; this only affects writes going forward.
 
-## Effort
+## Original effort estimate (historical)
 
 ~½ day of focused work once Justin picks it up:
 - Migration + index: 15 min
@@ -154,7 +159,8 @@ Add one line to `/admin` user management: each row shows "Dynamics: ✓ linked" 
 - Cron endpoint: 30 min
 - Admin dashboard line: 30 min
 - Tests + manual verification against real profile: 1 h
-- Impersonation helper (Step 5): 45 min, deferred until write permissions land
+- Impersonation helper (Step 5): shipped; the later Request Document privilege
+  grant direction was withdrawn on 2026-08-31
 
 ## References
 

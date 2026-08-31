@@ -35,9 +35,18 @@ sequence.
 | Order | Work | Current boundary | Completion decision |
 | --- | --- | --- | --- |
 | 1 | Final Writeup acknowledgement infrastructure and dashboard data foundation | **[FOUNDATION COMPLETE 2026-08-31.]** Slice 1 is Production-proved. Wave 23 is exact/Active, and Production acknowledgement readiness is exact `on` in Ready deployment `dpl_B9k3AprnYp5ExpkqpT3dUxCUZqWo` (Preview remains unset). The signed-in ordinary-staff dashboard and Request `1002788` Final tab loaded, retained the external Word action, and correctly omitted responsible-PD self-review. After the dedicated reviewer role became effective for all 11 audience members, an eligible colleague successfully marked the Final reviewed and saw it in review history; independent readback proved exactly one complete acknowledgement row. No PC/leadership persona, full matrix, or broader supporting-material projection is inferred. | **Met:** acknowledgement persistence and the superuser-testable dashboard data path are in place with exact identity/version keys, focused tests, and one successful cross-user Production acknowledgement/readback. |
-| 2 | Final Writeup persona rollout and complete dashboards | **[PARTIAL.]** The neutral acknowledgement permission role is live for all 11 confirmed audience members. Ordinary PD review no longer waits on that role grant. PC backup, complete matrix visibility, leadership-specific queues, and representative SharePoint-access proof remain disabled/open until the broader personas are positively identified. | Verified PD/PC/CSO/President identity and SharePoint access; acknowledgement alternate key active; no persona inference from names, titles, email, or program taxonomy. The separate external `wmkf_requestdocument` staff-role attribution grant remains expected around 2026-09-10. |
+| 2 | Final Writeup persona rollout and complete dashboards | **[PARTIAL.]** The neutral acknowledgement permission role is live for all 11 confirmed audience members. Ordinary PD review no longer waits on that role grant. PC backup, complete matrix visibility, leadership-specific queues, and representative SharePoint-access proof remain disabled/open until the broader personas are positively identified. Request Document writes intentionally remain service-principal-attributed; the owner selected explicit actor tracking rather than a broad staff-role grant. | Verified PD/PC/CSO/President identity and SharePoint access; acknowledgement alternate key active; no persona inference from names, titles, email, or program taxonomy. The attribution design is separate from the working acknowledgement role and does not block this dashboard work. |
 
 ## Audit follow-ups — verified open, not silently prioritized
+- **Request Document explicit actor tracking (Option B).**
+  **[OWNER-SELECTED 2026-08-31; PLAN NOT YET BUILT.]** Keep Request Document
+  CRUD off staff roles and retain service-principal writes while designing
+  explicit, authenticated actor/time persistence. The 2026-08-27 Connor broad
+  staff-role brief was never sent and is withdrawn. A confirmation-only
+  question is scheduled for Monday 2026-09-07 to identify any compliance,
+  audit, report, view, flow, business rule, or plug-in that specifically
+  depends on built-in `createdby`/`modifiedby`; absent such a consumer, Connor
+  has no action. Do not modify the existing Final Writeup Reviewer role.
 - **Pre-J27 scale: Initial Assessment Production write proof.**
   **[OWNER-DEFERRED 2026-08-30.]** Restore and exact byte-copy Board snapshot
   controls are deployed and the signed-in Request `1003109` read surface passed.

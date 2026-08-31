@@ -2,8 +2,8 @@
 title: Request Document Attribution Role — Claude Adversarial Review Prompt
 domain: dataverse
 kind: audit
-status: draft
-summary: "Read-only Claude CLI brief for adversarial review of the proposed least-privilege Request Document attribution role and pilot rollout."
+status: historical
+summary: "Executed read-only Claude review brief retained for provenance; the review returned NEEDS REWORK and the owner selected Option B."
 canonical: false
 cataloged: 2026-08-31
 owner: product-engineering
@@ -18,6 +18,13 @@ related:
 ---
 
 # Claude prompt: adversarial review of the Request Document attribution role plan
+
+> **Historical execution record (2026-08-31).** This prompt was run through an
+> ordinary OAuth-authenticated Claude CLI session. The resulting review at
+> `outputs/request-document-attribution-role-adversarial-review-2026-08-31.md`
+> returned `NEEDS REWORK`. The owner accepted its direction and selected
+> service-principal writes with explicit actor tracking. Do not rerun or use
+> this prompt as authorization for role or Production changes.
 
 Copy everything below the separator into a fresh Claude Code CLI session at the
 repository root.

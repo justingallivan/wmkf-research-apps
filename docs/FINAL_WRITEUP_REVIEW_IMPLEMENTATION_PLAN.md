@@ -41,8 +41,10 @@ This plan translates the approved Final Writeup and group-review experience into
 The 2026-09-04 milestone means the underlying handoff, identity, acknowledgement,
 dashboard-data, and superuser test path are in place. It does not promise broad
 staff rollout by that date. General-role enablement remains gated by verified
-identity/persona and SharePoint access; the expected staff-role privilege grant
-is currently external and later than the milestone.
+identity/persona and SharePoint access. No broad Request Document staff-role
+privilege grant is pending: the owner selected service-principal writes with
+explicit actor tracking, a separate attribution effort that does not block the
+working acknowledgement role or this milestone.
 
 The named prerequisites are deliberately attached to the slices that need them:
 

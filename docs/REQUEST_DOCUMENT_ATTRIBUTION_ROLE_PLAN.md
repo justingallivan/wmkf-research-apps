@@ -1,9 +1,9 @@
 ---
-title: Request Document Attribution Role Plan
+title: Request Document Attribution Role Plan — Superseded
 domain: dataverse
 kind: plan
-status: draft
-summary: "Least-privilege, pilot-first plan for staff-attributed wmkf_requestdocument writes without broadening the existing staff or Final Writeup reviewer roles."
+status: superseded
+summary: "Rejected Option A role plan retained for review provenance; the owner selected service-principal writes with explicit actor tracking on 2026-08-31."
 canonical: false
 cataloged: 2026-08-31
 owner: product-engineering
@@ -22,15 +22,39 @@ related:
 
 ## Status and authority
 
-**Draft for owner decision and fresh Claude adversarial review.** This plan does
-not authorize a Production role change, role assignment, Dataverse test write,
-or cleanup delete. Each Production mutation below requires a separate, explicit
-owner approval at the named gate.
+**SUPERSEDED 2026-08-31 — DO NOT EXECUTE.** The OAuth-authenticated Claude
+adversarial review returned `NEEDS REWORK`: the proposed three-privilege role
+could not support the real relationship binds and request-pointer changes, and
+the in-flight broad staff-role grant would have invalidated the containment
+proof. The owner selected **Option B**: retain service-principal Request
+Document writes and design explicit, server-controlled actor tracking.
 
-The objective is to make eligible application-initiated writes to
-`wmkf_requestdocument` record the actual staff member in Dataverse
-`createdby`/`modifiedby`, while avoiding unnecessary read access, deletion,
-sharing, reassignment, and broad modification of the existing staff role.
+The earlier Connor brief was created on 2026-08-27 but never sent. It is
+withdrawn. No Request Document Create/Write/Append grant is requested for the
+staff role, no replacement writer role is authorized, and the existing Final
+Writeup Reviewer role remains unchanged.
+
+## Accepted direction
+
+The replacement design will keep Request Document CRUD off staff roles and
+persist the authenticated actor and action time explicitly in app-controlled
+state. Before implementation, a confirmation-only question asks Connor whether
+any compliance, audit, report, view, flow, business rule, or plug-in requires
+the built-in Dataverse `createdby`/`modifiedby` values on Request Documents to
+name the individual staff member. A "yes" requires the exact consumer and
+requirement before architecture is reconsidered; a "no" requires no Connor
+action.
+
+The replacement implementation plan is not yet written. It must trace every
+Request Document writer and consumer, define the actor/event persistence
+contract, derive identity only from authenticated server context, and preserve
+the existing availability and Final Writeup acknowledgement behavior.
+
+## Historical rejected Option A design
+
+Everything below this heading preserves the rejected role proposal and its
+review inputs for provenance only. Its stages, gates, commands, privileges, and
+acceptance criteria are not current instructions or authorized work.
 
 ## Deadline posture and time-box
 

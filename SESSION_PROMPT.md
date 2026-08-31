@@ -270,9 +270,10 @@ against launching metered review tools without explicit owner authorization.
    September 4 means underlying infrastructure and a superuser test path, not
    broad rollout. Ordinary PD review may precede the global persona contract;
    PC backup, broad matrix visibility, and leadership queues stay off until
-   role identity and SharePoint access are positively verified. The expected
-   `wmkf_requestdocument` staff-role privilege grant remains external around
-   2026-09-10.
+   role identity and SharePoint access are positively verified. Request
+   Document writes intentionally remain service-principal-attributed while the
+   owner-selected explicit-actor design is planned; no broad staff-role grant
+   is pending.
 
 ### Verified Open
 
@@ -307,12 +308,17 @@ against launching metered review tools without explicit owner authorization.
    Decide whether off-app distribution gets a manual transition, and whether
    the zero-program sentence should mention discretionary history.
 
-### External Dependency
+### Scheduled Follow-up
 
-1. **WAITING on Connor (~2026-09-10): `wmkf_requestdocument` staff-role
-   privilege grant.** After the grant, rerun
-   `scripts/probe-write-attribution-census.js`; do not infer success from
-   `modifiedby` alone.
+1. **TO DO Monday 2026-09-07: send Connor the confirmation-only Request
+   Document attribution question.** The broad staff-role brief created
+   2026-08-27 was never sent and is withdrawn. Do not request or apply Request
+   Document Create/Write/Append privileges. Ask only whether a compliance,
+   audit, report, view, flow, business rule, or plug-in requires built-in
+   `createdby`/`modifiedby` staff attribution. If not, Connor has no action;
+   if so, obtain the exact consumer and requirement before reconsidering the
+   owner-selected explicit-actor design. A 9:00 AM Pacific task reminder is
+   scheduled in this Codex thread.
 
 ### Parked
 
