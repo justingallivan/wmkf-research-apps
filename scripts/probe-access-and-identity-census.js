@@ -16,11 +16,16 @@
  * privileges are the separate CRM-side question — see
  * docs/DYNAMICS_IDENTITY_RECONCILIATION_PLAN.md §Status).
  *
- * SAFETY: no write path — Postgres SELECTs and one Dataverse GET.
+ * SAFETY: no write path — Postgres SELECTs plus Dataverse GETs for app access
+ * and each unique linked systemuser.
  * Production Dataverse reads are owner-run behind the interlock override.
  *
  * Usage:
  *   DATAVERSE_ALLOW_PROD_READS=yes node scripts/probe-access-and-identity-census.js
+ *
+ * Exit codes:
+ *   0 — every active sign-in-capable profile satisfies the identity contract
+ *   2 — one or more such profiles has a missing, disabled, or mismatched link
  */
 
 require('./../lib/dataverse/client').loadEnvLocal();
@@ -147,6 +152,11 @@ require('./../lib/dataverse/client').loadEnvLocal();
   if (excludedActiveProfiles.length > 0) {
     console.log(`  Note: ${excludedActiveProfiles.length} active profile(s) without an Azure email cannot sign in and are outside this reviewer-audience superset.`);
   }
+  const excludedInactiveProfiles = profiles.filter((p) => !p.is_active);
+  if (excludedInactiveProfiles.length > 0) {
+    console.log(`  Note: ${excludedInactiveProfiles.length} inactive profile(s) are excluded; confirm no intended reviewer is inactive or missing from user_profiles.`);
+  }
+  console.log('  Owner attestation still required: this roster must contain every intended PD, PC, CSO, and President.');
 
   process.exit(identityGaps.length === 0 ? 0 : 2);
 })().catch((error) => {

@@ -56,8 +56,8 @@ const spec = JSON.parse(readFileSync(resolve(process.cwd(), SPEC_PATH), 'utf8'))
 const entityLogicalName = spec.schemaName.toLowerCase();
 const primaryNameLogicalName = spec.primaryNameAttribute.schemaName.toLowerCase();
 
-function result(state, notes = []) {
-  return { state, notes };
+function result(state, notes = [], details = {}) {
+  return { state, notes, ...details };
 }
 
 function sameSet(actual = [], expected = []) {
@@ -104,13 +104,21 @@ function validateSpec() {
   if (expectedAttributes.size) throw new Error('Wave 23 attributes are incomplete.');
 
   const expectedRelationships = new Map([
-    ['wmkf_FinalDocument', 'wmkf_requestdocument'],
-    ['wmkf_Reviewer', 'systemuser'],
+    ['wmkf_FinalDocument', {
+      referencedEntity: 'wmkf_requestdocument',
+      schemaName: 'wmkf_finalwriteupreview_finaldocument',
+    }],
+    ['wmkf_Reviewer', {
+      referencedEntity: 'systemuser',
+      schemaName: 'wmkf_finalwriteupreview_reviewer',
+    }],
   ]);
   for (const relationship of spec.relationships || []) {
+    const expected = expectedRelationships.get(relationship.lookupSchemaName);
     if (relationship.kind !== 'N:1'
         || relationship.required !== 'ApplicationRequired'
-        || expectedRelationships.get(relationship.lookupSchemaName) !== relationship.referencedEntity) {
+        || expected?.referencedEntity !== relationship.referencedEntity
+        || expected?.schemaName !== relationship.schemaName) {
       throw new Error(`Unexpected Wave 23 relationship: ${relationship.schemaName}.`);
     }
     expectedRelationships.delete(relationship.lookupSchemaName);
@@ -178,7 +186,9 @@ async function probeEntity(token, readMetadata = getJson) {
   if (response.body?.PrimaryNameAttribute !== primaryNameLogicalName) {
     notes.push(`PrimaryNameAttribute ${response.body?.PrimaryNameAttribute} != ${primaryNameLogicalName}`);
   }
-  return result(notes.length ? 'divergent' : 'exact', notes);
+  return result(notes.length ? 'divergent' : 'exact', notes, {
+    entitySetName: response.body?.EntitySetName || null,
+  });
 }
 
 async function probeAttribute(token, attribute, readMetadata = getJson) {
@@ -220,14 +230,22 @@ async function probeAttribute(token, attribute, readMetadata = getJson) {
 }
 
 async function probeRelationship(token, relationship, readMetadata = getJson) {
+  const uncast = await readMetadata(
+    token,
+    `/RelationshipDefinitions(SchemaName='${relationship.schemaName}')?`
+      + '$select=SchemaName,RelationshipType',
+  );
+  if (uncast.status === 404) return result('absent');
   const response = await readMetadata(
     token,
     `/RelationshipDefinitions(SchemaName='${relationship.schemaName}')/`
       + 'Microsoft.Dynamics.CRM.OneToManyRelationshipMetadata?'
       + '$select=SchemaName,ReferencedEntity,ReferencingEntity,ReferencingAttribute,'
-      + 'ReferencingEntityNavigationPropertyName',
+      + 'ReferencingEntityNavigationPropertyName,CascadeConfiguration',
   );
-  if (response.status === 404) return result('absent');
+  if (response.status === 404) {
+    return result('divergent', ['Relationship exists but is not one-to-many metadata']);
+  }
   const expectedAttribute = relationship.lookupSchemaName.toLowerCase();
   const notes = [];
   if (response.body?.ReferencedEntity !== relationship.referencedEntity) {
@@ -238,6 +256,28 @@ async function probeRelationship(token, relationship, readMetadata = getJson) {
   }
   if (response.body?.ReferencingAttribute !== expectedAttribute) {
     notes.push(`ReferencingAttribute ${response.body?.ReferencingAttribute} != ${expectedAttribute}`);
+  }
+  if (response.body?.ReferencingEntityNavigationPropertyName !== relationship.lookupSchemaName) {
+    notes.push(
+      `NavigationProperty ${response.body?.ReferencingEntityNavigationPropertyName} `
+        + `!= ${relationship.lookupSchemaName}`,
+    );
+  }
+  const expectedCascade = relationship.cascade || {
+    Assign: 'NoCascade',
+    Delete: 'Restrict',
+    Merge: 'NoCascade',
+    Reparent: 'NoCascade',
+    Share: 'NoCascade',
+    Unshare: 'NoCascade',
+  };
+  for (const [operation, expected] of Object.entries(expectedCascade)) {
+    if (response.body?.CascadeConfiguration?.[operation] !== expected) {
+      notes.push(
+        `CascadeConfiguration.${operation} `
+          + `${response.body?.CascadeConfiguration?.[operation]} != ${expected}`,
+      );
+    }
   }
   const lookup = await readMetadata(
     token,
@@ -266,10 +306,13 @@ async function probeKey(token, key, readMetadata = getJson) {
     notes.push(`KeyAttributes ${JSON.stringify(found.KeyAttributes)} != ${JSON.stringify(key.keyAttributes)}`);
   }
   if (notes.length) return result('divergent', notes);
-  if (found.EntityKeyIndexStatus !== 'Active') {
+  if (['Pending', 'InProgress'].includes(found.EntityKeyIndexStatus)) {
     return result('pending', [`EntityKeyIndexStatus ${found.EntityKeyIndexStatus} != Active`]);
   }
-  return result('exact');
+  if (found.EntityKeyIndexStatus === 'Active') return result('exact');
+  return result('divergent', [
+    `EntityKeyIndexStatus ${found.EntityKeyIndexStatus || '(missing)'} is terminal or unknown`,
+  ]);
 }
 
 async function runSelfTest() {
@@ -288,6 +331,103 @@ async function runSelfTest() {
   if (wrongOwnership.state !== 'divergent') {
     throw new Error('Wrong entity ownership must classify divergent.');
   }
+
+  const stringAttribute = spec.attributes.find((attribute) => attribute.type === 'String');
+  let stringReads = 0;
+  const wrongLength = await probeAttribute(null, stringAttribute, async () => {
+    stringReads += 1;
+    if (stringReads === 1) {
+      return { status: 200, body: { AttributeType: 'String' } };
+    }
+    return {
+      status: 200,
+      body: {
+        RequiredLevel: { Value: stringAttribute.requiredLevel },
+        MaxLength: stringAttribute.maxLength - 1,
+      },
+    };
+  });
+  if (wrongLength.state !== 'divergent' || stringReads !== 2) {
+    throw new Error('Wrong String MaxLength must classify divergent after the typed cast.');
+  }
+
+  const dateAttribute = spec.attributes.find((attribute) => attribute.type === 'DateTime');
+  let dateReads = 0;
+  const wrongBehavior = await probeAttribute(null, dateAttribute, async () => {
+    dateReads += 1;
+    if (dateReads === 1) {
+      return { status: 200, body: { AttributeType: 'DateTime' } };
+    }
+    return {
+      status: 200,
+      body: {
+        RequiredLevel: { Value: dateAttribute.requiredLevel },
+        Format: dateAttribute.format,
+        DateTimeBehavior: { Value: 'TimeZoneIndependent' },
+      },
+    };
+  });
+  if (wrongBehavior.state !== 'divergent' || dateReads !== 2) {
+    throw new Error('Wrong DateTime behavior must classify divergent after the typed cast.');
+  }
+
+  const relationship = spec.relationships[0];
+  let relationshipReads = 0;
+  const wrongRelationship = await probeRelationship(null, relationship, async () => {
+    relationshipReads += 1;
+    if (relationshipReads === 1) {
+      return { status: 200, body: { RelationshipType: 'OneToManyRelationship' } };
+    }
+    if (relationshipReads === 2) {
+      return {
+        status: 200,
+        body: {
+          ReferencedEntity: relationship.referencedEntity,
+          ReferencingEntity: entityLogicalName,
+          ReferencingAttribute: 'wmkf_wronglookup',
+          ReferencingEntityNavigationPropertyName: relationship.lookupSchemaName,
+          CascadeConfiguration: {
+            Assign: 'NoCascade',
+            Delete: 'Cascade',
+            Merge: 'NoCascade',
+            Reparent: 'NoCascade',
+            Share: 'NoCascade',
+            Unshare: 'NoCascade',
+          },
+        },
+      };
+    }
+    return {
+      status: 200,
+      body: { RequiredLevel: { Value: relationship.required } },
+    };
+  });
+  if (wrongRelationship.state !== 'divergent' || relationshipReads !== 3) {
+    throw new Error('Wrong relationship attribute/cascade must classify divergent.');
+  }
+
+  let wrongTypeReads = 0;
+  const wrongRelationshipType = await probeRelationship(null, relationship, async () => {
+    wrongTypeReads += 1;
+    return wrongTypeReads === 1
+      ? { status: 200, body: { RelationshipType: 'ManyToManyRelationship' } }
+      : { status: 404, body: null };
+  });
+  if (wrongRelationshipType.state !== 'divergent' || wrongTypeReads !== 2) {
+    throw new Error('Existing wrong-type relationship must classify divergent.');
+  }
+
+  const wrongKeyAttributes = await probeKey(null, spec.alternateKeys[0], async () => ({
+    status: 200,
+    body: { value: [{
+      SchemaName: spec.alternateKeys[0].schemaName,
+      KeyAttributes: ['wmkf_finaldocument'],
+      EntityKeyIndexStatus: 'Active',
+    }] },
+  }));
+  if (wrongKeyAttributes.state !== 'divergent') {
+    throw new Error('Wrong key attributes must classify divergent.');
+  }
   const pendingKey = await probeKey(null, spec.alternateKeys[0], async () => ({
     status: 200,
     body: { value: [{
@@ -297,6 +437,17 @@ async function runSelfTest() {
     }] },
   }));
   if (pendingKey.state !== 'pending') throw new Error('Pending key must block readiness.');
+  const failedKey = await probeKey(null, spec.alternateKeys[0], async () => ({
+    status: 200,
+    body: { value: [{
+      SchemaName: spec.alternateKeys[0].schemaName,
+      KeyAttributes: spec.alternateKeys[0].keyAttributes,
+      EntityKeyIndexStatus: 'Failed',
+    }] },
+  }));
+  if (failedKey.state !== 'divergent') {
+    throw new Error('Failed key index must classify terminally divergent.');
+  }
   console.log('PASS: Wave 23 acknowledgement spec and metadata classifiers are valid.');
 }
 
@@ -332,6 +483,9 @@ async function main() {
     console.log(`${check.value.state.toUpperCase().padEnd(10)} ${check.name}`);
     for (const note of check.value.notes) console.log(`           - ${note}`);
   }
+  if (checks[0].value.entitySetName) {
+    console.log(`Entity set: ${checks[0].value.entitySetName}`);
+  }
   const counts = Object.fromEntries(
     ['absent', 'divergent', 'pending', 'exact'].map((state) => [
       state,
@@ -353,7 +507,11 @@ async function main() {
   }
   if (counts.absent) {
     console.log(
-      'CREATION-COMPATIBLE: after explicit approval, the apply command would be '
+      'CREATION-COMPATIBLE: validate again with the non-writing dry-run: '
+        + `node scripts/apply-dataverse-schema.js --target=${target} --wave=${WAVE}`,
+    );
+    console.log(
+      'PRODUCTION APPLY REQUIRES EXPLICIT APPROVAL: '
         + `node scripts/apply-dataverse-schema.js --target=${target} --wave=${WAVE} --execute`,
     );
   } else {
