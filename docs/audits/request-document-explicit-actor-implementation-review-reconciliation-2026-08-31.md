@@ -1,9 +1,9 @@
 # Request Document Explicit Actor Implementation — Adversarial Review Reconciliation
 
-Date: 2026-08-31  
-Reviewer: Claude Opus through the local Keychain-backed `claude.ai` OAuth session  
-Reviewed HEAD: `a543a45bd61a3e28d5a7c1fe0b9a58e9df832e10`  
-Prompt SHA-256: `cce8ba8deab38de22ceaa75929d7f02eea7a029d1e61cf95087287944cbbd565`  
+Date: 2026-08-31
+Reviewer: Claude Opus through the local Keychain-backed `claude.ai` OAuth session
+Reviewed HEAD: `a543a45bd61a3e28d5a7c1fe0b9a58e9df832e10`
+Prompt SHA-256: `cce8ba8deab38de22ceaa75929d7f02eea7a029d1e61cf95087287944cbbd565`
 Verdict: **APPROVE WITH CONDITIONS**; no Blocker or High finding
 
 The review was read-only. It ran no live probe, schema apply, environment
