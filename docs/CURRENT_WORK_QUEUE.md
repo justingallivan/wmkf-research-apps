@@ -34,9 +34,17 @@ sequence.
 
 | Order | Work | Current boundary | Completion decision |
 | --- | --- | --- | --- |
-| 1 | Decide and, only if explicitly authorized, run Production write proof for the Initial Assessment controls | **[PRODUCTION-DEPLOYED + SIGNED-IN READ-SMOKED 2026-08-30; RESTORE AND SNAPSHOT WRITES NOT PRODUCTION-EXERCISED.]** PR #138 merged as `c519daf6`; Ready deployment `dpl_9RVF7gdGtXrFAyLxcG16M1Fa86gK` serves the controls. A signed-in read-only smoke on Request `1003109` loaded the canonical artifact, the Board-snapshot control, and native versions `2.0` / `1.0` with no browser warnings or errors. Superusers can restore one historical native SharePoint version as a new current version and submit the exact selected source buffer as a distinct Ready/Board Ready Request Document row/item. Both writes resolve server-owned identity, use stale-view fences, reread durable state, and keep snapshots outside editable-artifact cardinality/supersession. | **OWNER ACTION REQUIRED — this row does not authorize a Production mutation.** If the owner chooses to proceed, separately authorize an exact restore and/or first Board snapshot, capture post-write SharePoint/Dataverse readback, and verify no cleanup work. Native Graph restore has no conditional-write header: the service narrows the race with an immediate metadata recheck and preserves every concurrent version, but an edit in the final API-call interval can become an intermediate retained version. |
+| 1 | Select the next owner-directed delivery item | **[NO IMPLEMENTATION SLICE AUTOMATICALLY QUEUED 2026-08-30.]** Initial Assessment restore and Board snapshots are Production-deployed and signed-in read-smoked; the owner chose to stop before either Production write and retain that proof as a pre-J27-scale gate. Durable Executor budgets are also safely deployed in fallback mode with no published revision. | Owner names the next delivery priority. Do not infer that an open audit, plan, or publication is selected merely because it appears below. |
 
 ## Audit follow-ups — verified open, not silently prioritized
+- **Pre-J27 scale: Initial Assessment Production write proof.**
+  **[OWNER-DEFERRED 2026-08-30.]** Restore and exact byte-copy Board snapshot
+  controls are deployed and the signed-in Request `1003109` read surface passed.
+  The owner explicitly chose a good stopping point rather than manufacturing
+  Production evidence. Before J27 scale—or earlier only under a new explicit
+  authorization—choose an agreed dummy request, run Board snapshot first if
+  only one proof is needed, and capture SharePoint/Dataverse readback plus
+  cleanup state. Restore retains the documented final-call concurrency race.
 - **Post-reviewer-cycle: promote the reviewer cron-reminders ledger slice.**
   **[OWNER-PARKED 2026-08-27 — merge only after the current reviewer cycle
   ends.]** Built and held on `feature/reviewer-cron-reminders-ledger`

@@ -233,16 +233,17 @@ document inventory, and individual implementation plans do not establish priorit
   caution applies; high-risk automation stays review-only until the representative
   benchmark exists.
 - Current priorities: `docs/CURRENT_WORK_QUEUE.md`.
-- **Immediate owner-directed work (S469 onward, 2026-08-30):** durable Executor
+- **Most recent owner-directed release (S469, 2026-08-30):** durable Executor
   budgets are Production-deployed and owner-viewed in the safe no-revision/code-
   fallback state; first publication remains an explicit administrator action.
   Initial Assessment superuser restore and exact byte-copy Board snapshots are
   Production-deployed through PR #138 (`c519daf6`); the relevant gates, full
   9,205-test suite, webpack build, and post-merge checks passed. Signed-in
   Request `1003109` passed the artifact/control/version-history read smoke.
-  Restore and first-snapshot writes remain unexercised and require separate
-  explicit owner authorization. Final Writeup Review remains plan-only and
-  owner-gated.
+  Restore and first-snapshot writes remain unexercised. The owner chose to stop
+  before manufacturing that evidence and defer it to an explicitly authorized
+  pre-J27-scale checkpoint. No next implementation slice is automatically
+  selected. Final Writeup Review remains plan-only and owner-gated.
 - **Staff Deliberations tab (S466, 2026-08-28, production):** the Pre Site
   Visit Writeup + Site Visit tabs are merged into one stage-aware workspace
   (`shared/components/workbench/StaffDeliberationsTab.js`, rail

@@ -1,220 +1,201 @@
-# Session 469 Prompt: Initial Assessment Restore and Board Snapshots
+# Session 470 Prompt: Select the Next Owner-Directed Work
 
-## Session 468 Summary
+## Session 469 Summary
 
-Session 468 (2026-08-29) promoted three completed workstreams: the Staff
-Deliberations distribution-history UX, a curated Site Visit materials-recipient
-directory, and the error-message/operational-event reliability branch. The
-recipient directory then received an owner-tested Production follow-up that
-makes save semantics explicit and expands Contact name search from a silent ten-row
-cutoff to a one-request, explicitly bounded 50-result flow.
+Session 469 (2026-08-30) shipped durable Executor budget publication and
+Initial Assessment restore/Board-snapshot controls, closed their review and
+release work, and deliberately stopped before either owner-gated Production
+write. The session also hardened the Site Visit recipient-directory unsaved
+state, remediated Gitleaks test-token findings, and added a durable prohibition
+against launching metered review tools without explicit owner authorization.
 
 ### What Was Completed
 
-1. **Staff Deliberations history UX merged and deployed.**
-   - Distribution history groups by calendar day with Today/Yesterday/date
-     headers and marks self-addressed sends as neutral `Test send` entries.
-   - Commit `90d0f10e`; GitHub/Vercel status succeeded at deployment
-     `dpl_87JFB8EWD2nzwTiibVX4akKXm1rR`.
-   - The same branch added the reviewed Final Writeup Review plan. It remains
-     plan-only and owner-gated; see Owner Decision Needed below.
+1. **Site Visit recipient-directory unsaved state hardened.**
+   - Newly added unsaved people use warning semantics, the page exposes
+     unsaved changes clearly, and browser navigation/history is guarded.
+   - Commits `07f350c2` and `df44b3e9`.
 
-2. **Curated Site Visit recipient directory shipped to Production.**
-   - Superusers curate a maximum of 50 recipient-menu entries from active app
-     staff plus existing Dataverse Contacts categorized as Consultant or Board.
-     The Dataverse setting stores references/categories only; names and email
-     addresses resolve live. Search never creates or edits a Contact.
-   - Workbench senders choose from that menu per email; configured recipients
-     are not added to drafts automatically. Free-form composer behavior remains
-     unchanged and the directory is an affordance, not an authorization gate.
-   - Initial implementation/hardening: `7d27ac47`, `0e1d7de5`, `11923c4a`,
-     `88ebdaee`, `e6859356`.
-   - Production follow-up `5792df71` + `07a7f50e` makes the local draft state
-     explicit (`Added — unsaved`, `Unsaved changes`, `Save changes`, `Already
-     saved`) and performs one bounded 51-row Dataverse name probe to return at most
-     50 matches plus an explicit truncation signal. The owner verified a broad
-     `smith` search displays the over-50 warning correctly.
-   - Merge `c5efa770`; Production deployment
-     `dpl_dKmm19nMyX3w6RRjkLNJowiFqFU1` reached Ready and GitHub recorded
-     success.
+2. **Executor budgets moved from tracked literals to durable publication.**
+   - Append-only `wmkf_appsystemsettings` revisions
+     (`executor.budgets.vNNNNNN`) now own the complete atomic budget document.
+   - The superuser Admin editor uses expected-version concurrency and UUID
+     request idempotency, validates code-owned ranges and resolved model
+     ceilings, and rereads the published revision.
+   - Pre-Site and review synthesis consume the latest valid revision; strict
+     bounds and the reviewed outage fallback remain in code.
+   - Production read proof passed in the safe **No published revision · using
+     reviewed code fallback** state. The first publication remains an explicit
+     owner action, not required for current behavior.
+   - Commits `00b1ed83`, `c465b0fd`, and `f083220d`.
 
-3. **Error-message diagnosis branch merged and deployed.**
-   - Dynamics Explorer Graph document search now honors `Retry-After`, retries
-     transient failures, serializes same-round scopes into bounded waves, and
-     carries cooldown/breaker state rather than misreporting throttled scopes as
-     no documents.
-   - Admin Operational Events gained grouped repeating incidents, resolve-group
-     controls, ABA-safe freshness checks, current-filter refetch after slow
-     mutations, and corrected action feedback.
-   - Claude Opus findings on transient 408/5xx handling, partial batch success,
-     and freshness tokens were fixed before release.
-   - PR #137 merge `1c153a35`; GitHub/Vercel status succeeded at deployment
-     `dpl_C3Y1w1ubjDjtuwtFWs58RBhkQu5H`.
+3. **Gitleaks findings investigated and remediated.**
+   - Reported values were synthetic unit-test fixtures, not live credentials.
+   - Fixtures and narrowly scoped allowlisting now prevent false positives
+     without weakening scanning of runtime secrets.
+   - Commit `b7863922`; Gitleaks passed on the release PR.
+
+4. **Initial Assessment restore and Board snapshots shipped.**
+   - Superusers can restore one exact historical native SharePoint version as a
+     new current version. Server-owned pointer/item identity and stale-view
+     fences are rechecked; governed bytes and Dataverse metadata are reread.
+   - Board freeze creates/reuses a distinct Ready/Board Ready Request Document
+     and SharePoint item from the exact selected current buffer. Normalized
+     governed Word verification accepts SharePoint repackaging while rejecting
+     changed/invalid content. Snapshot rows never move the editable pointer or
+     participate in editable activation/supersession/cycle discovery.
+   - Claude's adversarial findings around stable-ID verification, `cTag`,
+     cleanup ownership, lost-response recovery, and package validation were
+     fixed before promotion.
+   - Feature/hardening commits `8bd8331c`, `70c1f988`, and `65be41a9`; PR #138
+     merged as `c519daf6`. Production deployment
+     `dpl_9RVF7gdGtXrFAyLxcG16M1Fa86gK` reached Ready.
+
+5. **Production read smoke and durable sweep closed.**
+   - Signed-in Request `1003109` loaded the canonical Initial Assessment,
+     Board-snapshot control, and native versions `2.0` / `1.0` with no browser
+     warnings or errors.
+   - No restore, snapshot, refresh, or external-document action was invoked.
+   - Fourteen queue, Atlas, route, strategy, pilot, catalog, memory, and wiki
+     surfaces were reconciled to **Production-deployed + signed-in
+     read-smoked; writes not Production-exercised**.
+   - The owner chose to stop here. Production restore/snapshot proof is deferred
+     to an explicitly authorized pre-J27-scale checkpoint rather than being
+     manufactured now.
+   - Sweep commit on `main`: `b5024ad4`.
+
+6. **Metered-tool authorization made durable.**
+   - The complimentary UltraReview run exposed that a metered external review
+     could be launched without the owner's request. Repository instructions now
+     require explicit authorization before any metered tool/session is started.
+   - Commit `cbbb45a9`. Do not reinterpret access or a complimentary credit as
+     permission.
 
 ### Commits
 
-- `90d0f10e` — Merge staff deliberations history UX
-- `7d27ac47` — Add curated Site Visit recipient directory
-- `0e1d7de5` — Harden Site Visit recipient directory
-- `11923c4a` — Address recipient directory review findings
-- `88ebdaee` — Fix Site Visit recipient surname search
-- `e6859356` — Clarify recipient directory selection UI
-- `1c153a35` — Merge PR #137 error-message diagnosis
-- `5792df71` — Fix Site Visit recipient directory UX
-- `07a7f50e` — Harden recipient directory feedback
-- `c5efa770` — Merge recipient-directory UX follow-up to `main`
+- `07f350c2` — Warn before leaving unsaved recipient changes
+- `df44b3e9` — Cover history navigation in recipient warning
+- `00b1ed83` — Add durable Executor budget settings
+- `c465b0fd` — Harden Executor budget publication
+- `f083220d` — Initialize delayed Executor budgets
+- `b7863922` — Allowlist public Executor revision keys in Gitleaks
+- `8bd8331c` — Add Initial Assessment recovery controls
+- `cbbb45a9` — Require authorization for metered tools
+- `70c1f988` — Verify Board snapshots by governed content
+- `65be41a9` — Harden Board snapshot recovery
+- `c519daf6` — Merge PR #138 to `main`
+- `b5024ad4` — Reconcile Initial Assessment Production status
 
 ## Next Items
 
 ### Verified Open
 
-1. **Owner-authorized Production write proof for Initial Assessment controls.**
-   **[PRODUCTION-DEPLOYED + SIGNED-IN READ-SMOKED 2026-08-30; RESTORE AND
-   SNAPSHOT WRITES NOT PRODUCTION-EXERCISED.]**
-   Superusers can restore an exact historical SharePoint version as a new
-   current version and create a distinct retained Ready/Board Ready Request
-   Document row/item from the exact current bytes. The request pointer and
-   Graph identity remain server-owned; client IDs are stale-view fences. Board
-   snapshots are excluded from editable-artifact activation, supersession, and
-   cycle discovery and follow the 2026-08-10 owner decision to copy bytes.
+1. **Select the next owner-directed delivery priority.**
+   `docs/CURRENT_WORK_QUEUE.md` now intentionally has no automatically selected
+   implementation slice. Open plans and audits below do not imply approval.
 
-   Claude's adversarial findings were fixed, the relevant gates/self-tests,
-   full 9,205-test suite, and webpack production build passed, and PR #138
-   merged as `c519daf6`. Production deployment
-   `dpl_9RVF7gdGtXrFAyLxcG16M1Fa86gK` reached Ready. A signed-in read-only smoke
-   on Request `1003109` loaded the canonical artifact, Board-snapshot control,
-   and native versions `2.0` / `1.0` with no browser warnings or errors. No
-   restore, snapshot, refresh, or external-document action was invoked. Any
-   Production restore or first snapshot write requires separate explicit owner
-   authorization; this queue entry does not grant it. Graph's native restore
-   API has no conditional-write header; the implementation rechecks metadata
-   immediately before restore and preserves all versions, but the final-call
-   race must remain disclosed.
-
-2. **Durable Executor budgets — deployed read proof closed; publication open.**
-   **[PRODUCTION-DEPLOYED AND OWNER-VIEWED 2026-08-30.]**
-   The selected contract is append-only `wmkf_appsystemsettings` revisions
-   (`executor.budgets.vNNNNNN`). `/api/admin/executor-budgets` is
-   superuser-only; publication requires the complete closed schema,
-   `expectedVersion`, and a UUID request id, validates code-owned ranges plus
-   both current prompts' resolved model ceilings, creates one new revision, and
-   rereads it. The Admin Prompt templates panel edits that atomic document.
-   Pre-Site and review synthesis read the latest valid revision server-side;
-   `shared/config/executorBudgets.js` now owns only strict bounds, descriptions,
-   and the reviewed outage fallback. No runtime request accepts budget values.
-
-   The owner-provided Production screenshot showed **No published revision ·
-   using reviewed code fallback** with the editor loaded. The first Production
-   budget publication remains an explicit owner action; absence safely
-   preserves S466/S467 behavior through fallback.
-
-3. **Positive-path funding-history observation.**
+2. **Positive-path funding-history observation.**
    The zero-program-grant branch is Production-proved; the positive sentence is
-   probe/test-proven only. Inspect the first real generated institution with
+   probe/test-proven only. Observe the first real generated institution with
    program grants rather than manufacturing another Production smoke.
 
-4. **PD onboarding/posture seeding before the next solicitation cycle.**
+3. **PD onboarding/posture seeding before the next solicitation cycle.**
    Evidence and checklist: `docs/SCHEDULED_EMAIL_VIP_DIGEST_PLAN.md`.
 
-5. **Async PD approval for staff-triggered “sent as me” mail.**
-   Evidence: `docs/OUTBOUND_EMAIL_INVENTORY_2026-08-26.md` broader effort.
+4. **Async PD approval for staff-triggered “sent as me” mail.**
+   Evidence: `docs/OUTBOUND_EMAIL_INVENTORY_2026-08-26.md`.
 
 ### Owner Decision Needed
 
-1. **Final Writeup Review plan — implementation go and file-surface approval.**
+1. **Choose the next delivery item.**
+   The Initial Assessment release is at a deliberate stopping point. Reasonable
+   candidates must be selected from current evidence rather than inferred from
+   document order.
+
+2. **First durable Executor-budget publication.**
+   Production safely uses the reviewed code fallback. Publishing revision v1
+   is optional and requires an explicit owner action.
+
+3. **Final Writeup Review implementation and file-surface approval.**
    `docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md` is reviewed plan-only.
-   Before build: settle explicit transition actor/time storage, run the
-   owner-authorized read-only `systemuser` coverage probe, define the
-   PC/leadership persona contract, and sweep the obsolete “copy to a new Final
-   file” direction.
+   Before build: settle transition actor/time storage, authorize the read-only
+   `systemuser` coverage probe, define the PC/leadership persona contract, and
+   sweep the obsolete “copy to a new Final file” direction.
 
-2. **Share → Wrap Up no-send fallback.**
-   Decide whether visits whose materials are distributed off-app get a manual
-   “Move to wrap-up” control or remain on Share.
-
-3. **Zero-program-grant wording.**
-   Current sentence mentions no prior WMKF program grant and intentionally does
-   not mention discretionary history.
+4. **Share → Wrap Up no-send fallback and zero-program-grant wording.**
+   Decide whether off-app distribution gets a manual transition, and whether
+   the zero-program sentence should mention discretionary history.
 
 ### External Dependency
 
 1. **WAITING on Connor (~2026-09-10): `wmkf_requestdocument` staff-role
-   privilege grant.** After the grant, re-run
+   privilege grant.** After the grant, rerun
    `scripts/probe-write-attribution-census.js`; do not infer success from
    `modifiedby` alone.
 
 ### Parked
 
-1. **Reviewer cron-reminders ledger slice.** Built on
-   `feature/reviewer-cron-reminders-ledger`; migration 038 remains unapplied
-   everywhere. Merge only after the current reviewer cycle ends, following
-   `docs/SCHEDULED_EMAIL_VIP_DIGEST_PLAN.md` items 7–10.
-2. **Preference-matrix slice and PD tutorial refresh.** Re-open only after the
+1. **Initial Assessment Production write proof.**
+   Owner-deferred 2026-08-30. Reopen before J27 scale or under a new explicit
+   authorization. Prefer Board snapshot first if only one proof is needed;
+   use an agreed dummy request and capture exact cross-store readback/cleanup.
+   Native Graph restore retains the documented final-call concurrency race.
+2. **Reviewer cron-reminders ledger slice.** Merge only after the current
+   reviewer cycle ends; migration 038 remains unapplied everywhere.
+3. **Preference-matrix slice and PD tutorial refresh.** Reopen only after the
    reminders-ledger promotion.
-3. **Invitation-link strictness.** Deliberate post-cycle decision; current
-   duplicate-identical-token and trailing-punctuation tolerance stays pinned.
-4. **Public git history rewrite.** Owner-gated under
-   `docs/PUBLIC_GIT_HISTORY_REMEDIATION_PLAN.md`.
-5. **Reviewer matching/resolver tuning and destructive reviewer cleanup.**
-   Remain owner-gated behind measured promotion decisions.
+4. **Invitation-link strictness.** Deliberate post-cycle decision; current
+   duplicate-identical-token and trailing-punctuation tolerance remains pinned.
+5. **Public git history rewrite and reviewer cleanup.** Both remain owner-gated.
 
 ### Verify Before Acting
 
 1. **Phantom co-PI residual cleanup.** Production writes require owner
-   confirmation and a fresh read-only preflight; the importer fix remains
+   confirmation and a fresh read-only preflight; importer prevention remains
    Connor-owned.
 2. **Logistics PATCH retirement.** There is no in-app write caller, but the
-   service and validation remain intentionally live. Re-grep callers before
-   proposing retirement.
-3. **Request `1002379` as a future smoke vehicle.** It has no writeup state but
-   retains the proposal narrative. Re-run the exact inventory probe before and
-   after any authorized mutation; do not request Activity delete privileges.
-4. **Queue/docs freshness.** This stop pass reconciled the recipient feature,
-   immediate Executor-budget priority, and Session 468 production milestones.
-   Detailed older implementation plans remain historical/current-reference
-   documents, not implied backlog.
+   service/validation remain intentionally live. Re-grep before retirement.
+3. **Request `1002379` as a future smoke vehicle.** Re-run the exact inventory
+   before and after any authorized mutation; do not request Activity delete
+   privileges.
 
 ### Do Not Reopen Without New Decision
 
-1. Recipient-directory members are menu choices only; they are never
-   auto-added to email drafts.
-2. Contact name search uses one bounded Dataverse request and returns at most 50
-   rows with an explicit “refine search” warning when more exist.
-3. Most-recent funding-history citation remains the newest Research program
-   grant; count/sum remain all-program rollups.
-4. Do not merge the parked reminder slice mid-cycle.
-5. Do not re-run the 1002852 hard-failure smoke or resurrect removed Site Visit
-   logistics/calendar UI without a new owner decision.
+1. Do not run Initial Assessment restore or first Board snapshot merely to
+   close a proof checkbox; the owner explicitly selected the current stopping
+   point.
+2. Do not launch UltraReview or any other metered tool/session without explicit
+   owner authorization, regardless of available access or credits.
+3. Recipient-directory members remain menu choices only; they are never
+   automatically added to email drafts.
+4. Do not merge the parked reminder slice mid-cycle or tighten invitation-link
+   behavior during the current reviewer cycle.
+5. Do not rerun the Request `1002852` hard-failure smoke or resurrect removed
+   Site Visit logistics/calendar UI without a new owner decision.
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `shared/config/executorBudgets.js` | Closed budget schema, safety ranges, descriptions, and reviewed outage fallback |
-| `lib/services/executor-budget-service.js` | Append-only read/publish, concurrency/idempotency, validation, and model-ceiling contract |
-| `pages/api/admin/executor-budgets.js` | Superuser-only budget read/publication route |
-| `shared/components/admin/PromptTemplatesSection.js` | Atomic budget editor plus prompt publication UI |
-| `lib/services/execute-prompt.js` | Enforces runtime token/timeout overrides and model ceilings |
-| `lib/services/initial-assessment/controls-service.js` | Superuser restore and exact byte-copy Board snapshot orchestration |
-| `pages/api/workbench/initial-assessment/restore-version.js` | Superuser-only native version restore route |
-| `pages/api/workbench/initial-assessment/board-snapshot.js` | Superuser-only retained Board snapshot route |
-| `lib/services/site-visit/curated-recipient-service.js` | Curated directory validation, Contact search cap/truncation, and live resolution |
-| `shared/components/admin/SiteVisitRecipientsSection.js` | Admin draft/save/search UX |
-| `pages/api/admin/site-visit-recipients.js` | Superuser directory state/search/write route |
-| `lib/services/graph-service.js` | Graph search retry/cooldown behavior |
-| `lib/services/operational-event-service.js` | Grouped event resolution and freshness contracts |
-| `docs/CURRENT_WORK_QUEUE.md` | Canonical delivery priority |
+| `docs/CURRENT_WORK_QUEUE.md` | Canonical delivery priority and owner-deferred write proof |
+| `shared/config/executorBudgets.js` | Budget bounds, descriptions, and reviewed outage fallback |
+| `lib/services/executor-budget-service.js` | Append-only read/publication contract |
+| `pages/api/admin/executor-budgets.js` | Superuser budget read/publication route |
+| `lib/services/initial-assessment/controls-service.js` | Restore and exact byte-copy Board snapshot orchestration |
+| `pages/api/workbench/initial-assessment/restore-version.js` | Superuser native-version restore route |
+| `pages/api/workbench/initial-assessment/board-snapshot.js` | Superuser retained Board snapshot route |
+| `docs/INITIAL_ASSESSMENT_CONTROLLED_PILOT_2026-07-30.md` | Pilot evidence and remaining write-proof boundary |
 | `docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md` | Reviewed, owner-gated Final design |
 
 ## Testing
 
-Recipient-directory follow-up verification completed before merge:
+Release verification completed before and after PR #138 merge:
 
 ```bash
 npm test -- --runInBand
-# 711 suites / 9,119 tests passed
-npm run lint
-# 0 errors; 75 existing warnings
+# 716 suites / 9,205 tests passed
+npm run build
+# webpack production build passed
 npm run check:api-routes && npm run check:api-routes:self-test
 npm run check:route-service-boundary && npm run check:route-service-boundary:self-test
 npm run check:atlas && npm run check:atlas:self-test
@@ -223,9 +204,9 @@ npm run check:fact-consistency && npm run check:fact-consistency:self-test
 npm run check:canonical-pointers && npm run check:canonical-pointers:self-test
 npm run check:doc-symbol-refs && npm run check:doc-symbol-refs:self-test
 npm run check:build-claim-freshness && npm run check:build-claim-freshness:self-test
-npx next build --webpack
+npm run check:docs-catalog
 ```
 
-The canonical local Turbopack build was blocked by the Codex sandbox's local
-port restriction; the webpack production build passed, and Vercel built the
-exact merged commit successfully to a Ready Production deployment.
+All PR/post-merge checks passed, including Claude review, Gitleaks, Jest,
+Semgrep, Trivy, Vercel, and Playwright. The stop-time claim-evidence report was
+unavailable from local metadata, so no pilot observation row was added.

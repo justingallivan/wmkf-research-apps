@@ -106,7 +106,8 @@ is Production-live; administrator restore and the owner-decided exact byte-copy
 Board snapshot are Production-deployed through PR #138 (`c519daf6`). Signed-in
 Request `1003109` passed the artifact/control/version-history read smoke. The
 restore and first-snapshot writes remain unexercised and require separate
-explicit owner authorization.
+explicit owner authorization. The owner deferred that proof on 2026-08-30 to
+a pre-J27-scale checkpoint rather than manufacturing Production evidence now.
 
 **Hold step already RETIRED (S279) — this contingency resolved early, for a different reason.** The reviewer "hold step" ([[project-reviewer-hold-step-decouple]]) was removed in S279 (commit `a8676af1`) when the direction shifted to onboarding at a single final Accept — independent of J27. So the earlier "single-submission may un-scaffold the hold step" note is now moot: there is no hold step left to un-scaffold. (Kept here only so the J27 doc-capture planning doesn't re-raise it.)
 

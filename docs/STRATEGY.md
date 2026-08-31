@@ -143,7 +143,9 @@ are Production-deployed through PR #138 (`c519daf6`), and signed-in Request
 relevant gates, full 9,205-test suite, webpack production build, and post-merge
 checks passed on 2026-08-30. Neither restore nor the first Board-snapshot write
 has been Production-exercised; either requires a separate explicit owner
-authorization and durable readback.
+authorization and durable readback. The owner chose to stop at this point and
+defer that proof to a pre-J27-scale checkpoint; no next implementation slice is
+automatically selected.
 
 The Final Writeup Review design is reviewed plan-only. Implementation requires a
 new owner go, expanded file-surface approval, explicit transition actor/time

@@ -10,6 +10,24 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## August 2026 — Durable Executor budgets and Initial Assessment recovery controls reached Production (Session 469)
+
+**Milestone:** Admin-editable Executor output budgets now use append-only
+Dataverse revisions, while the Workbench gained governed native-version restore
+and exact byte-copy Board milestone snapshots.
+**Sessions:** 469 (implementation, Claude adversarial review, Gitleaks
+remediation, promotion, signed-in read smoke, and durable sweep).
+**Ship state:** PR #138 merge `c519daf6` is Production Ready; the budget editor
+is owner-viewed in safe no-revision/fallback state; Request `1003109` passed the
+artifact/control/version-history read smoke. No budget publication, restore, or
+Board-snapshot write was performed; all remain explicit owner actions.
+**Why it matters:** mutable model budgets no longer require code releases, and
+the J27 governed-document spine now has reviewed recovery and Board-retention
+controls without weakening canonical SharePoint/Dataverse ownership.
+**Pointers:** `docs/EXECUTOR_CONTRACT.md`;
+`docs/INITIAL_ASSESSMENT_CONTROLLED_PILOT_2026-07-30.md`;
+`docs/CURRENT_WORK_QUEUE.md`; commits `00b1ed83`, `65be41a9`, `b5024ad4`.
+
 ## August 2026 — Curated Site Visit recipients and operational-error reliability reached Production (Session 468)
 
 **Milestone:** Staff can maintain a bounded, source-owned Site Visit
