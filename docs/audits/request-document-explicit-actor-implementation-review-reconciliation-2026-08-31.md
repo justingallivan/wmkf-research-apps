@@ -31,5 +31,7 @@ change, deployment, or metered review product. The full prompt is retained at
   data/route/doc gates, and canonical Next.js/Turbopack build passed.
 
 No finding requires Request Document privileges on a staff role. Option B
-remains the approved architecture. Wave 24 is still source-only: no schema,
-environment, runtime, or Production state changed.
+remains the approved architecture. At the reviewed HEAD, Wave 24 was
+source-only. Later on 2026-08-31, the separately approved creation-only
+Production schema apply completed and independent readback reported 3 exact /
+0 absent / 0 divergent; readiness and runtime promotion remained separate.

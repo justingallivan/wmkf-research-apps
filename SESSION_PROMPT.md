@@ -323,8 +323,10 @@ against launching metered review tools without explicit owner authorization.
    owner-selected explicit-actor design. A 9:00 AM Pacific task reminder is
    scheduled in this Codex thread. The non-blocking implementation plan is now
    `docs/REQUEST_DOCUMENT_EXPLICIT_ACTOR_PLAN.md`. The owner reprioritized Stage
-   1 source implementation on 2026-08-31; Wave 24 remains unapplied and
-   undeployed, and the Monday question remains non-blocking.
+   1 source implementation and separately approved the Production schema apply
+   on 2026-08-31; independent readback reported 3 exact / 0 absent / 0
+   divergent. Readiness/runtime promotion remains gated, and the Monday
+   question remains non-blocking.
 
 ### Parked
 
@@ -371,7 +373,7 @@ against launching metered review tools without explicit owner authorization.
 | File | Purpose |
 |------|---------|
 | `docs/CURRENT_WORK_QUEUE.md` | Canonical delivery priority and owner-deferred write proof |
-| `docs/REQUEST_DOCUMENT_EXPLICIT_ACTOR_PLAN.md` | Owner-approved Option B schema/writer/retry plan; Stage 1 source-built on `codex/request-document-explicit-actors`, Stage 2 review/verification in progress, no schema apply or deployment |
+| `docs/REQUEST_DOCUMENT_EXPLICIT_ACTOR_PLAN.md` | Owner-approved Option B schema/writer/retry plan; source build and adversarial review complete; Production Wave 24 schema exact 3/3; readiness/runtime promotion pending |
 | `shared/config/executorBudgets.js` | Budget bounds, descriptions, and reviewed outage fallback |
 | `lib/services/executor-budget-service.js` | Append-only read/publication contract |
 | `pages/api/admin/executor-budgets.js` | Superuser budget read/publication route |

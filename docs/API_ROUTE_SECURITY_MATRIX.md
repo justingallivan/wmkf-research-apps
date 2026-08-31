@@ -96,7 +96,8 @@ Dynamics actor being passed to the write service. That remains true, but the
 Request Document write census proved that these writes fall back and standard
 `createdby`/`modifiedby` name the service principal. The guarded-reopen
 projection is therefore not reliable human attribution in Production today.
-The owner-selected repair is source-built but not applied or deployed:
+The owner-selected repair is source-built and its Wave 24 Production schema is
+exact, but readiness and runtime are not promoted:
 `docs/REQUEST_DOCUMENT_EXPLICIT_ACTOR_PLAN.md` adds explicit row-origin
 actor/time and a Site Visit milestone actor, with no staff-role expansion and
 no new route or request-body identity field. Existing route guards and

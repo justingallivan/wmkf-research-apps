@@ -30,18 +30,19 @@ related:
 
 ## Decision and status
 
-**[OWNER-APPROVED 2026-08-31; PLAN ADVERSARIAL REVIEWED; STAGE 1
-SOURCE-BUILT ON `codex/request-document-explicit-actors`, NOT APPLIED OR
-DEPLOYED.]** Keep
+**[OWNER-APPROVED 2026-08-31; ADVERSARIAL REVIEWED; SOURCE-BUILT; WAVE 24
+PRODUCTION SCHEMA EXACT; READINESS/RUNTIME NOT PROMOTED.]** Keep
 `wmkf_requestdocument` Create/Write/Append privileges off the broad staff role
 and do not create a replacement writer role. Runtime writes continue under the
 application service principal after the existing impersonated-write 403
 fallback. Human attribution is stored in explicit, server-controlled actor/time
 fields only for meaningful business events.
 
-This plan authorizes no schema apply, Production write, role change, deployment,
-or historical backfill. The owner explicitly reprioritized source implementation
-on 2026-08-31; that decision did not authorize target promotion.
+The owner separately approved the additive Production schema apply on
+2026-08-31. The creation-only deployer created one DateTime field and two
+optional lookups, and independent metadata readback reported 3 exact / 0 absent
+/ 0 divergent. No role change, readiness-flag change, runtime deployment,
+business-record write, or historical backfill is authorized by that apply.
 The confirmation-only Connor question scheduled for September 7 is not a
 blocking dependency unless it identifies a concrete consumer of built-in
 `createdby`/`modifiedby`.
@@ -119,7 +120,7 @@ the larger workflow.
 | Personal Final review acknowledgement | Separate acknowledgement row with session-derived reviewer | Keep unchanged; do not merge its audience or role into Request Document writing |
 | Initial Assessment native version restore | SharePoint owns version history; app-side repeatable human actor history is not modeled | Do not pretend a mutable “last restored by” field is an audit trail. Resolve separately before the first Production restore write if full app-side actor history is required |
 
-## Additive schema: proposed Wave 24
+## Additive schema: Production-provisioned Wave 24
 
 Add these fields to `wmkf_requestdocument`:
 
@@ -315,10 +316,14 @@ of caller-supplied origin fields. See the implementation-review reconciliation.
 
 ### Stage 3 — target promotion
 
-- Preflight the named target and require every Wave 24 artifact absent or exact.
-- Obtain separate owner approval for the additive schema apply.
-- Apply, rerun exact readback, set the literal-on readiness flag, and deliberately
-  promote runtime following the campaign release strategy.
+- **Completed 2026-08-31:** Production preflight reported 3 absent / 0
+  divergent; the owner separately approved the additive apply.
+- **Completed 2026-08-31:** the creation-only deployer created all three
+  artifacts through the sanctioned date-bounded Production write
+  acknowledgement; independent readback reported 3 exact / 0 absent / 0
+  divergent.
+- **Still gated:** set the literal-on readiness flag and deliberately promote
+  runtime following the campaign release strategy.
 - Do not change any staff role or the Final Writeup Reviewer role.
 
 ### Stage 4 — controlled proof
