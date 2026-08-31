@@ -101,6 +101,8 @@ related:
 | [DYNAMICS_SCHEMA_ANNOTATION.md](DYNAMICS_SCHEMA_ANNOTATION.md) | source-of-truth | active |  | Scope (clarified 2026-05-08). This doc records the field annotations baked into the Dynamics Explorer chat tool's TABLE_ANNOTATIONS — what the... | 2026-07-02 |
 | [POSTGRES_TO_DATAVERSE_MIGRATION.md](POSTGRES_TO_DATAVERSE_MIGRATION.md) | plan | historical |  | Target: prod wmkf.crm.dynamics.com (the akoyaGO org). Sandbox used for Wave 1 staging; cutover to prod 2026-04-24, drop 2026-05-12. | 2026-07-02 |
 | [PRE_SITE_VISIT_DATAVERSE_SCHEMA_DESIGN.md](PRE_SITE_VISIT_DATAVERSE_SCHEMA_DESIGN.md) | spec | active |  | Production-live Wave 19, Site Visit handoff/correction, and Production-proved frozen distribution. | 2026-08-17 |
+| [REQUEST_DOCUMENT_ATTRIBUTION_ROLE_CLAUDE_REVIEW_PROMPT.md](REQUEST_DOCUMENT_ATTRIBUTION_ROLE_CLAUDE_REVIEW_PROMPT.md) | audit | draft |  | Read-only Claude CLI brief for adversarial review of the proposed least-privilege Request Document attribution role and pilot rollout. | 2026-08-31 |
+| [REQUEST_DOCUMENT_ATTRIBUTION_ROLE_PLAN.md](REQUEST_DOCUMENT_ATTRIBUTION_ROLE_PLAN.md) | plan | draft |  | Least-privilege, pilot-first plan for staff-attributed wmkf_requestdocument writes without broadening the existing staff or Final Writeup reviewer roles. | 2026-08-31 |
 | [W4_ANOMALY_TRIAGE.md](W4_ANOMALY_TRIAGE.md) | history | active |  | Parity script: scripts/backfill-reviewer-suggestions-parity.js Rerun timestamp: 2026-05-12T22:02:01Z (this session). | 2026-07-02 |
 | [W4_RECONCILE_CONTRACT.md](W4_RECONCILE_CONTRACT.md) | source-of-truth | canonical | yes | Designed-on-paper before building (Codex S147 pre-W4 review Q1 BLOCKER: the identity contract must be unambiguous before code lands). | 2026-07-02 |
 
