@@ -1,0 +1,36 @@
+{
+  "description": "No-privilege owner teams used only for GUID-pinned Final Writeup persona resolution.",
+  "reviewerRoleName": "WMKF Final Writeup Reviewer",
+  "teams": [
+    {
+      "persona": "program-director",
+      "name": "WMKF Final Writeup Program Directors",
+      "members": [
+        { "systemUserId": "10b0de0d-4ff7-ee11-a1fd-000d3a3621c7", "name": "Anneli Stone" },
+        { "systemUserId": "b6f1cd38-0973-f011-bec3-6045bd0510d4", "name": "Beth Pruitt" },
+        { "systemUserId": "b53a3bf8-507f-ee11-8179-000d3a341e8f", "name": "Jean Kim" },
+        { "systemUserId": "73d32260-aa8b-f111-ab0f-70a8a59cded0", "name": "John Sader" },
+        { "systemUserId": "29b0de0d-4ff7-ee11-a1fd-000d3a3621c7", "name": "Justin Gallivan" },
+        { "systemUserId": "79dd1e0e-4ff7-ee11-a1fd-000d3a341fd9", "name": "Kevin Moses" },
+        { "systemUserId": "4ff27133-2316-f011-998a-6045bd02b4cc", "name": "Saskia Pallais" }
+      ]
+    },
+    {
+      "persona": "program-coordinator",
+      "name": "WMKF Final Writeup Program Coordinators",
+      "members": [
+        { "systemUserId": "e642f92d-3d99-ee11-be37-000d3a341fd9", "name": "Connor Noda" },
+        { "systemUserId": "700b842b-e769-f111-a826-000d3a3065b8", "name": "Duncan Spore" },
+        { "systemUserId": "d6f510f5-507f-ee11-8179-000d3a341fd9", "name": "Sarah Hibler" }
+      ]
+    },
+    {
+      "persona": "leadership",
+      "name": "WMKF Final Writeup Leadership",
+      "members": [
+        { "systemUserId": "975a6b00-4ff7-ee11-a1fd-000d3a341fd9", "name": "Allison Keller" },
+        { "systemUserId": "b6f1cd38-0973-f011-bec3-6045bd0510d4", "name": "Beth Pruitt" }
+      ]
+    }
+  ]
+}
