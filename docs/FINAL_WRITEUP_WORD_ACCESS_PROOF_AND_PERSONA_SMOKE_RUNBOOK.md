@@ -66,31 +66,41 @@ the proof now with zero configuration or code change.
 Each representative, independently, in their own signed-in Production session:
 
 1. Sign into the Production Workbench with their ordinary account.
-2. Open the **Final Writeups** dashboard.
-3. Locate Request `1002788` and open its focused review page (**Open
-   review**).
-4. Click **Open in Word**. The document opens in a separate browser tab (or
-   desktop Word via Microsoft's own affordance).
-5. Confirm the Word document actually loads its content, and note whether
+2. Reach the document by either path — both open the same canonical item:
+   - **Dashboard path:** open the **Final Writeups** dashboard, locate
+     Request `1002788`, click **Open review**, then **Open in Word**; or
+   - **Request path:** open Request `1002788`'s **Final Writeup** tab and
+     click **Edit writeup**.
+   **[VERIFIED via `shared/components/workbench/FinalWriteupTab.js` and
+   `shared/components/final-writeups/FinalWriteupsViews.js`]** the button
+   label varies by surface (**Edit writeup** on the request tab; **Open
+   review** → **Open in Word** on the dashboard; the responsible PD sees
+   **Edit in Word**), but every action targets the same SharePoint document.
+3. The document opens in a separate browser tab (or desktop Word via
+   Microsoft's own affordance).
+4. Confirm the Word document actually loads its content, and note whether
    SharePoint granted edit or view access.
-6. Report the result (or the exact SharePoint error text on denial) to
+5. Report the result (or the exact SharePoint error text on denial) to
    Justin. No screenshot or transcription of document content — page chrome
    or error text only.
 
 ### Draft coordination messages for Justin to send
 
 > **To the PC representative (Duncan or Connor):** "Quick 2-minute check for
-> the Final Writeup rollout: sign into the Workbench as usual, open the Final
-> Writeups dashboard, open the review page for request 1002788, and click
-> *Open in Word*. Let me know whether the Word document itself opens for you
-> (and whether you can edit or only view), or send me the exact error message
-> if it doesn't. Please don't forward the document."
+> the Final Writeup rollout: sign into the Workbench as usual, open request
+> 1002788, go to its Final Writeup tab, and click the button that opens the
+> document in Word (depending on where you are it's labeled *Edit writeup*,
+> *Open review* then *Open in Word* — any of them is fine). Let me know
+> whether the Word document itself opens for you (and whether you can edit or
+> only view), or send me the exact error message if it doesn't. Please don't
+> forward the document."
 
 > **To Beth:** "Before we turn on the leadership view of Final Writeups, I
 > need to confirm SharePoint access works for you. Could you sign into the
-> Workbench, open the Final Writeups dashboard, open request 1002788, and
-> click *Open in Word*? I just need to know whether the document opens (edit
-> or view), or the exact error if it doesn't."
+> Workbench, open request 1002788, go to its Final Writeup tab, and click the
+> button that opens the document in Word (labeled *Edit writeup* there)? I
+> just need to know whether the document opens (edit or view), or the exact
+> error if it doesn't."
 
 Allison is not part of the access proof; she gets a separate two-minute ask
 for smoke leg 3 after enablement, the next time she is available.
@@ -105,7 +115,7 @@ Fill in when each proof completes. Record no document contents.
 | User | _pending_ | _pending_ |
 | Request number | `1002788` | `1002788` |
 | Entry path (dashboard → focused page) reached | _pending_ | _pending_ |
-| Action clicked | Open review → Open in Word | Open review → Open in Word |
+| Action clicked (path + exact label) | _pending_ | _pending_ |
 | Word document opened with content (yes/no) | _pending_ | _pending_ |
 | Access level observed (edit/view) | _pending_ | _pending_ |
 | Exact SharePoint error text, if denied | _pending_ | _pending_ |
