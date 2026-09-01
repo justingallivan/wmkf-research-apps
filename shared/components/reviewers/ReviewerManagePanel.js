@@ -84,7 +84,7 @@ export function TokenStateBadge({ state, expiresAt, firstAccessedAt }) {
     >
       {info.label}
       {state === 'active' && firstAccessedAt && (
-        <span className="ml-1 text-[10px] opacity-75">opened</span>
+        <span className="ml-1 text-xs opacity-75">opened</span>
       )}
     </span>
   );
@@ -205,14 +205,14 @@ export function TokenActionsMenu({
                   ))}
                 </select>
               </label>
-              <p className="mt-1.5 text-[11px] leading-4 text-gray-500">
+              <p className="mt-1.5 text-xs leading-4 text-gray-500">
                 Use only to fix the recorded stage. No email is sent.
               </p>
             </div>
           )}
           {canEndEngagement && (
             <div className="py-1 border-b border-gray-100">
-              <p className="px-3 pt-1 pb-0.5 text-[11px] font-medium uppercase tracking-wide text-gray-400">
+              <p className="px-3 pt-1 pb-0.5 text-xs font-medium uppercase tracking-wide text-gray-400">
                 End engagement
               </p>
               <button
@@ -231,7 +231,7 @@ export function TokenActionsMenu({
               </button>
             </div>
           )}
-          <p className="px-3 pt-2 pb-0.5 text-[11px] font-medium uppercase tracking-wide text-gray-400">
+          <p className="px-3 pt-2 pb-0.5 text-xs font-medium uppercase tracking-wide text-gray-400">
             Reviewer link
           </p>
           <button
@@ -1309,7 +1309,7 @@ function ReferralAction({ referral, state, canManage, onAdd, onDismiss, onGoToIn
           </button>
         )}
         {state.invitable === false && (
-          <p className="text-[11px] text-gray-500 mt-0.5">Add an email there to invite.</p>
+          <p className="text-xs text-gray-500 mt-0.5">Add an email there to invite.</p>
         )}
       </div>
     );
@@ -1346,7 +1346,7 @@ function ReferralAction({ referral, state, canManage, onAdd, onDismiss, onGoToIn
     return (
       <div className="shrink-0 text-right max-w-[18rem]">
         <p className="text-xs font-medium text-amber-800">Already known to this request</p>
-        <p className="text-[11px] text-amber-700">{state.remedy}</p>
+        <p className="text-xs text-amber-700">{state.remedy}</p>
         {onNavigate && (
           <button type="button" onClick={() => onNavigate(target)} className="text-xs text-amber-900 underline">
             {targetLabel}
@@ -1711,12 +1711,12 @@ export default function ReviewerManagePanel({
                         suggested by {r.reviewerName || 'a declining reviewer'}
                       </p>
                       {r.legacy && r.dismissible && (
-                        <p className="text-[11px] text-amber-700 mt-1">
+                        <p className="text-xs text-amber-700 mt-1">
                           Older free-text note. If everyone listed has already been handled, dismiss the resolved note.
                         </p>
                       )}
                       {r.legacy && !r.dismissible && (
-                        <p className="text-[11px] text-red-700 mt-1">
+                        <p className="text-xs text-red-700 mt-1">
                           This saved referral cannot be dismissed safely. Ask an administrator to repair it.
                         </p>
                       )}
@@ -1750,7 +1750,7 @@ export default function ReviewerManagePanel({
       {/* Actions bar. Counts use selectedList (visible + selected), not the raw
           selectedReviewers set, which can retain IDs no longer visible after a
           refresh removes a reviewer — that would overcount (Codex S209). */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <span className="text-sm text-gray-600">
             {selectedList.length > 0 ? `${selectedList.length} selected` : `${reviewers.length} reviewer${reviewers.length !== 1 ? 's' : ''}`}
@@ -1796,7 +1796,7 @@ export default function ReviewerManagePanel({
           <p className="text-sm text-gray-500 text-center py-6">{emptyLabel}</p>
         </Card>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>

@@ -3,10 +3,10 @@ title: "Request Workbench — near-term execution plan"
 domain: architecture
 kind: plan
 status: canonical
-summary: "Canonical Workbench sequence; Final same-item infrastructure is owner-selected for a 2026-09-04 superuser-testable milestone."
+summary: "Canonical Workbench sequence; current cross-request lifecycle navigation and reviewer follow-up work are tracked here."
 canonical: true
 cataloged: 2026-07-26
-last_verified: 2026-08-30
+last_verified: 2026-09-01
 owner: product-engineering
 related:
   - docs/audits/AUDIT_REQUEST_WORKBENCH_TRUTH_2026-07-26.md
@@ -26,6 +26,19 @@ related:
 > describe the pre-merge UI; the dossier concerns (logistics, materials,
 > distribution) now live as sections of the merged tab. Document-lifecycle
 > decisions and route contracts in this plan are unchanged.
+
+> **Preview branch update (2026-09-01):** `[BUILT ON BRANCH — NOT PRODUCTION]`
+> `codex/workbench-reviewer-follow-up` adds a shared lifecycle-ordered tier-2
+> navigation (`Request list → Initial assessments → Reviewer follow-up → Final
+> writeups → Awardees`) and `/workbench/reviewer-follow-up`. The consolidated
+> page combines the existing `/api/workbench/dashboard` assignment feed with
+> the existing `/api/review-manager/reviewers` aggregate DTO, and renders the
+> existing `ReviewerManagePanel` per request. It adds no route, schema, table,
+> or write contract. A Vercel Preview pointed at the tracked production
+> Dataverse target is explicitly read-only and hides mutation controls; the
+> branch therefore supports realistic layout/filter/navigation UAT before an
+> owner promotion decision, while production retains the established reviewer
+> actions after promotion.
 
 ## Outcome
 

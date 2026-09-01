@@ -10,10 +10,10 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/router';
-import Link from 'next/link';
 import Layout, { PageHeader, Card } from '../shared/components/Layout';
 import RequireAppAccess from '../shared/components/RequireAppAccess';
 import ReviewerStatusIndicator from '../shared/components/workbench/ReviewerStatusIndicator';
+import WorkbenchViewsNav from '../shared/components/workbench/WorkbenchViewsNav';
 import { TRIAGE_STATUS } from '../shared/config/triageStatus';
 
 const STAGE_META = {
@@ -120,8 +120,15 @@ export function WorkbenchDashboard() {
         const body = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(body.error || `Failed to load cycles (${res.status})`);
         if (cancelled) return;
-        setCycles(body.cycles || []);
-        setCycleCode(body.defaultCycleCode || body.cycles?.[0]?.code || null);
+        const availableCycles = body.cycles || [];
+        const requestedCycle = new URLSearchParams(window.location.search)
+          .get('cycleCode')?.trim().toUpperCase();
+        setCycles(availableCycles);
+        setCycleCode(
+          availableCycles.some((cycle) => cycle.code === requestedCycle)
+            ? requestedCycle
+            : body.defaultCycleCode || availableCycles[0]?.code || null,
+        );
       } catch (e) {
         if (!cancelled) setError(e.message);
       } finally {
@@ -162,7 +169,11 @@ export function WorkbenchDashboard() {
   }, [cycleCode, scope, includeSetAside]);
 
   useEffect(() => {
-    if (cycleCode) loadProposals(cycleCode, scope, includeSetAside);
+    if (!cycleCode) return undefined;
+    const timer = window.setTimeout(() => {
+      void loadProposals(cycleCode, scope, includeSetAside);
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [cycleCode, scope, includeSetAside, loadProposals]);
 
   // Flip a request's triage status, then refetch (a row may drop out of the
@@ -203,6 +214,7 @@ export function WorkbenchDashboard() {
         subtitle="Find and manage peer reviewers for your grant requests, one cycle at a time."
         icon="🗂️"
       />
+      <WorkbenchViewsNav activeKey="requests" cycleCode={cycleCode} />
 
       <Card hover={false} className="mb-4">
         <form onSubmit={openRequestByNumber} className="flex flex-wrap items-end gap-3">
@@ -238,35 +250,6 @@ export function WorkbenchDashboard() {
           <p className="mt-2 text-sm text-red-700" role="alert">{requestLookupError}</p>
         )}
       </Card>
-
-      {/* Awardees shortcut — the reviewer-finding list below only shows
-          Phase-II-Pending/Advancing rows, so decided/awarded grants don't appear
-          here. The Awardees page lists this cycle's research awardees (status
-          Active) and links each to its Awardee tab for the grantee deliverables flow. */}
-      <div className="mb-4">
-        <Link
-          href={`/workbench/awardees${cycleCode ? `?cycleCode=${encodeURIComponent(cycleCode)}` : ''}`}
-          className="text-sm text-blue-700 hover:underline"
-        >
-          🏆 View awardees &amp; grantee deliverables{cycleCode ? ` (${cycleCode})` : ''} →
-        </Link>
-      </div>
-      <div className="mb-4">
-        <Link
-          href="/workbench/final-writeups"
-          className="text-sm font-medium text-gray-900 underline underline-offset-4 hover:text-gray-600"
-        >
-          Review Final Writeups →
-        </Link>
-      </div>
-      <div className="mb-4">
-        <Link
-          href="/workbench/artifacts"
-          className="text-sm text-blue-700 hover:underline"
-        >
-          📝 View Initial Assessment Pilot Locator →
-        </Link>
-      </div>
 
       {/* Controls */}
       <div className="flex flex-wrap items-center gap-4 mb-6">
@@ -357,12 +340,12 @@ export function WorkbenchDashboard() {
                         {p.cycleLabel && <span className="text-xs text-gray-500">{p.cycleLabel}</span>}
                         {p.grantProgram && <span className="text-xs text-gray-500">· {p.grantProgram}</span>}
                         {p.advancing && (
-                          <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold bg-purple-100 text-purple-800">
+                          <span className="inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-800">
                             going-forward
                           </span>
                         )}
                         {p.setAside && (
-                          <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gray-200 text-gray-600">
+                          <span className="inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-200 text-gray-600">
                             set aside
                           </span>
                         )}

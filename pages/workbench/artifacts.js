@@ -10,6 +10,7 @@ import Link from 'next/link';
 import Layout, { Card, PageHeader } from '../../shared/components/Layout';
 import RequireAppAccess from '../../shared/components/RequireAppAccess';
 import ArtifactFileMetadata from '../../shared/components/workbench/ArtifactFileMetadata';
+import WorkbenchViewsNav from '../../shared/components/workbench/WorkbenchViewsNav';
 
 function ArtifactDashboard() {
   const [cycles, setCycles] = useState([]);
@@ -27,9 +28,15 @@ function ArtifactDashboard() {
         const body = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(body.error || 'Failed to load cycles');
         if (!active) return;
-        setCycles(body.cycles || []);
-        setCycleCode(body.defaultCycleCode || body.cycles?.[0]?.code || '');
-        if (!body.defaultCycleCode && !body.cycles?.[0]?.code) setLoading(false);
+        const availableCycles = body.cycles || [];
+        const requestedCycle = new URLSearchParams(window.location.search)
+          .get('cycleCode')?.trim().toUpperCase();
+        const selectedCycle = availableCycles.some((cycle) => cycle.code === requestedCycle)
+          ? requestedCycle
+          : body.defaultCycleCode || availableCycles[0]?.code || '';
+        setCycles(availableCycles);
+        setCycleCode(selectedCycle);
+        if (!selectedCycle) setLoading(false);
       } catch (loadError) {
         if (active) {
           setError(loadError.message);
@@ -66,16 +73,12 @@ function ArtifactDashboard() {
 
   return (
     <Layout title="Initial Assessment Pilot Locator">
-      <div className="mb-4">
-        <Link href="/workbench" className="text-sm text-gray-500 hover:text-gray-700">
-          ← Back to Request Workbench
-        </Link>
-      </div>
       <PageHeader
         title="Initial Assessment Pilot Locator"
         subtitle="Pilot cycle list for finding governed drafts and opening their canonical SharePoint files."
         icon="📝"
       />
+      <WorkbenchViewsNav activeKey="initial-assessments" cycleCode={cycleCode} />
       <div className="mb-6">
         <label className="text-sm font-medium text-gray-700">
           Cycle{' '}

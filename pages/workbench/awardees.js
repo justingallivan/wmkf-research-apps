@@ -8,8 +8,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
-import Layout, { Card } from '../../shared/components/Layout';
+import Layout, { Card, PageHeader } from '../../shared/components/Layout';
 import RequireAppAccess from '../../shared/components/RequireAppAccess';
+import WorkbenchViewsNav from '../../shared/components/workbench/WorkbenchViewsNav';
 
 // Board meets June (J) and December (D); default to the most recent meeting.
 function currentCycleCode() {
@@ -35,7 +36,9 @@ function AwardeesList() {
   useEffect(() => {
     if (!router.isReady) return;
     const q = typeof router.query.cycleCode === 'string' ? router.query.cycleCode.trim().toUpperCase() : '';
-    if (q && /^[JD]\d{2}$/.test(q)) { setCycleCode(q); setInput(q); }
+    if (!q || !/^[JD]\d{2}$/.test(q)) return;
+    const timer = window.setTimeout(() => { setCycleCode(q); setInput(q); }, 0);
+    return () => window.clearTimeout(timer);
   }, [router.isReady, router.query.cycleCode]);
 
   const load = useCallback(async (code, all) => {
@@ -50,10 +53,18 @@ function AwardeesList() {
     setLoading(false);
   }, []);
 
-  useEffect(() => { load(cycleCode, showAll); }, [cycleCode, showAll, load]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => { void load(cycleCode, showAll); }, 0);
+    return () => window.clearTimeout(timer);
+  }, [cycleCode, showAll, load]);
 
   return (
-    <Layout>
+    <Layout title="Awardees">
+      <PageHeader
+        title="Awardees"
+        subtitle="Open awarded grants and manage their grantee deliverables by cycle."
+      />
+      <WorkbenchViewsNav activeKey="awardees" cycleCode={cycleCode} />
       <Card hover={false}>
         <div className="flex items-center gap-2 mb-4">
           <h1 className="text-lg font-semibold text-gray-900">Grant deliverables — awardees</h1>

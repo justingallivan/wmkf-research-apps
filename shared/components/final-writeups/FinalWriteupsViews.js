@@ -10,6 +10,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import Layout from '../Layout';
+import WorkbenchViewsNav from '../workbench/WorkbenchViewsNav';
 
 const DATE_FORMATTER = new Intl.DateTimeFormat('en-US', {
   month: 'short',
@@ -462,10 +463,7 @@ export function FinalWriteupsDashboardView() {
   return (
     <Layout title="Final Writeups" description="Review current grant writeups and return to completed work.">
       <div className="pb-16 pt-6 sm:pt-8">
-        <Link href="/workbench" className="text-sm font-medium text-gray-500 underline-offset-4 hover:text-gray-900 hover:underline">
-          ← Request Workbench
-        </Link>
-        <header className="mt-6 border-b border-gray-200 pb-6">
+        <header className="border-b border-gray-200 pb-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
               {personaViewLabel(data?.viewer) && (
@@ -485,6 +483,9 @@ export function FinalWriteupsDashboardView() {
             )}
           </div>
         </header>
+        <div className="mt-6">
+          <WorkbenchViewsNav activeKey="final-writeups" />
+        </div>
 
         <div className="my-6">
           <label htmlFor="final-writeup-search" className="sr-only">Search Final Writeups</label>

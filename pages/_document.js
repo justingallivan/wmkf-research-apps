@@ -10,7 +10,7 @@ import NextDocument, { Html, Head, Main, NextScript } from 'next/document';
  */
 export default function Document({ nonce }) {
   return (
-    <Html lang="en">
+    <Html lang="en" data-scroll-behavior="smooth">
       <Head nonce={nonce} />
       <body>
         <Main />
