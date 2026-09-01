@@ -58,7 +58,7 @@ the proof now with zero configuration or code change.
 
 | Persona | Representative | Rationale |
 |---|---|---|
-| Program Coordinator | Duncan Spore (default; Connor Noda is equally representative) | Owner-confirmed PC responsibility. Duncan's 2026-08-31 acknowledgement of `1002788` does not count as Word-access proof unless the record below confirms the document actually opened for him. |
+| Program Coordinator | Sarah Hibler (actual, 2026-09-01) | PC-assigned in the published v2 staffing. She acknowledged `1002788` on 2026-09-01; the owner-authorized backend readback below confirms the complete acknowledgement row. |
 | Leadership | Beth Pruitt (CSO) — owner decision 2026-09-01 | Executive account, available now. Caveat: her PD overlap means a PASS proves her account only, not leadership-only provisioning. Allison Keller's account remains unproven; prove it at the latest before Slice 4 leadership queues. |
 
 ## Access proof procedure (flag remains false)
@@ -86,14 +86,7 @@ Each representative, independently, in their own signed-in Production session:
 
 ### Draft coordination messages for Justin to send
 
-> **To the PC representative (Duncan or Connor):** "Quick 2-minute check for
-> the Final Writeup rollout: sign into the Workbench as usual, open request
-> 1002788, go to its Final Writeup tab, and click the button that opens the
-> document in Word (depending on where you are it's labeled *Edit writeup*,
-> *Open review* then *Open in Word* — any of them is fine). Let me know
-> whether the Word document itself opens for you (and whether you can edit or
-> only view), or send me the exact error message if it doesn't. Please don't
-> forward the document."
+The PC proof is complete; no PC message is needed.
 
 > **To Beth:** "Before we turn on the leadership view of Final Writeups, I
 > need to confirm SharePoint access works for you. Could you sign into the
@@ -111,15 +104,16 @@ Fill in when each proof completes. Record no document contents.
 
 | Field | PC proof | Leadership proof |
 |---|---|---|
-| Date/time (UTC) | _pending_ | _pending_ |
-| User | _pending_ | _pending_ |
+| Date/time (UTC) | 2026-09-01T19:06:37Z (acknowledgement timestamp) | _pending_ |
+| User | Sarah Hibler | _pending_ |
 | Request number | `1002788` | `1002788` |
-| Entry path (dashboard → focused page) reached | _pending_ | _pending_ |
-| Action clicked (path + exact label) | _pending_ | _pending_ |
-| Word document opened with content (yes/no) | _pending_ | _pending_ |
-| Access level observed (edit/view) | _pending_ | _pending_ |
-| Exact SharePoint error text, if denied | _pending_ | _pending_ |
-| Result | _PENDING_ | _PENDING_ |
+| Entry path (dashboard → focused page) reached | Request Final Writeup tab (owner-observed reviewed state) | _pending_ |
+| Action clicked (path + exact label) | Final Writeup tab **Edit writeup** (owner-witnessed) | _pending_ |
+| Word document opened with content (yes/no) | Yes — owner witnessed the document open, 2026-09-01 | _pending_ |
+| Access level observed (edit/view) | Not separately recorded (document opened; edit-vs-view unstated) | _pending_ |
+| Exact SharePoint error text, if denied | none reported | _pending_ |
+| Backend verification | **[VERIFIED via owner-run read-only probe 2026-09-01]** exactly two complete acknowledgement rows on the current Final document `b6d6220b-f0a4-f111-b8dd-70a8a59cded0`: Duncan Spore (2026-08-31T19:05:31Z) and Sarah Hibler (2026-09-01T19:06:37Z), both publication version `4.0`, responsible PD correctly absent. | _n/a yet_ |
+| Result | **PASS 2026-09-01** — the owner witnessed the Word document open in Sarah's signed-in session, and the backend readback proved her complete acknowledgement row. | _PENDING_ |
 
 **Failure handling:** a SharePoint denial is a permissions problem outside the
 application. Stop, record the exact error, resolve the SharePoint permission
