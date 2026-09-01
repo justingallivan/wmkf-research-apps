@@ -138,17 +138,21 @@
       overflow-x: auto;
     }
 
-    .workbench-nav button {
+    .workbench-nav button, .workbench-nav a {
+      min-height: 42px;
+      display: inline-flex;
+      align-items: center;
       border: 0;
       background: transparent;
       color: var(--muted);
       padding: 10px 14px;
       border-radius: 0.5rem;
       font-weight: 650;
+      text-decoration: none;
       white-space: nowrap;
     }
-    .workbench-nav button.active { color: white; background: var(--ink); }
-    .workbench-nav button:not(.active):hover { color: var(--ink); background: #f3f4f6; }
+    .workbench-nav button.active, .workbench-nav a.active { color: white; background: var(--ink); }
+    .workbench-nav button:not(.active):hover, .workbench-nav a:not(.active):hover { color: var(--ink); background: #f3f4f6; }
     .navigation-help {
       margin: 8px 2px 0;
       color: var(--muted);
@@ -542,7 +546,7 @@
     <section class="view-navigation" aria-labelledby="workbench-views-label">
       <h2 class="workbench-nav-label" id="workbench-views-label">Workbench views — across requests</h2>
       <nav class="workbench-nav" aria-label="Workbench views">
-        <button type="button">Request list</button>
+        <a href="./workbench-request-list.html">Request list</a>
         <button type="button" class="active" aria-current="page">Reviewer follow-up <span class="chip amber" style="margin-left:6px">7</span></button>
         <button type="button">Final writeups</button>
         <button type="button">Initial assessments</button>

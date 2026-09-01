@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Request Workbench — Entry Mockup</title>
+  <style>
+    :root {
+      --ink: #111827;
+      --text: #374151;
+      --muted: #6b7280;
+      --border: #e5e7eb;
+      --canvas: #f7f8fa;
+      --surface: #ffffff;
+      --blue: #2563eb;
+      --green: #15803d;
+      --green-soft: #f0fdf4;
+      --amber: #b45309;
+      --amber-soft: #fffbeb;
+      --violet: #7e22ce;
+      --violet-soft: #f3e8ff;
+      --shadow: 0 1px 2px rgb(17 24 39 / 0.05);
+      --radius: 12px;
+    }
+
+    * { box-sizing: border-box; }
+    html { color-scheme: light; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--canvas);
+      color: var(--text);
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 16px;
+    }
+    button, input, select { font: inherit; }
+    button, select { cursor: pointer; }
+    ::selection { background: #dbeafe; color: var(--ink); }
+    :focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+
+    .app-header {
+      background: white;
+      border-bottom: 1px solid var(--border);
+    }
+    .app-header-inner, .page {
+      width: min(100% - 40px, 1400px);
+      margin-inline: auto;
+    }
+    .app-header-inner {
+      min-height: 68px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; color: var(--ink); font-weight: 750; }
+    .brand-mark {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: var(--ink);
+      color: white;
+      font-size: 0.875rem;
+      letter-spacing: 0.03em;
+    }
+    .utility-nav { display: flex; align-items: center; gap: 5px; }
+    .utility-nav a { color: var(--muted); padding: 8px 10px; text-decoration: none; border-radius: 8px; font-size: 0.875rem; }
+    .utility-nav a:hover { color: var(--ink); background: #f3f4f6; }
+
+    .page { padding: 28px 0 56px; }
+    .page-heading {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 24px;
+      margin-bottom: 20px;
+    }
+    h1 { margin: 0 0 4px; color: var(--ink); font-size: 1.875rem; line-height: 1.2; letter-spacing: -0.03em; }
+    .subtitle { margin: 0; color: var(--muted); }
+    .updated { color: var(--muted); font-size: 0.875rem; padding-top: 8px; white-space: nowrap; }
+
+    .lookup {
+      display: grid;
+      grid-template-columns: minmax(220px, 1fr) auto;
+      align-items: end;
+      gap: 12px;
+      padding: 16px;
+      margin-bottom: 20px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+    .lookup-label { color: var(--text); font-size: 0.875rem; font-weight: 700; }
+    .lookup input {
+      width: 100%;
+      height: 42px;
+      margin-top: 6px;
+      padding: 0 12px;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      color: var(--ink);
+      background: white;
+    }
+    .lookup-help { grid-column: 1 / -1; margin: -2px 0 0; color: var(--muted); font-size: 0.875rem; }
+
+    .primary-button, .secondary-button {
+      min-height: 42px;
+      padding: 0 15px;
+      border-radius: 8px;
+      font-weight: 700;
+    }
+    .primary-button { border: 1px solid var(--ink); background: var(--ink); color: white; }
+    .primary-button:hover { background: #1f2937; }
+    .secondary-button { border: 1px solid #d1d5db; background: white; color: var(--text); }
+    .secondary-button:hover { background: #f9fafb; }
+
+    .view-navigation { margin-bottom: 20px; }
+    .workbench-nav-label { margin: 0 0 7px; color: var(--muted); font-size: 0.875rem; font-weight: 700; }
+    .workbench-nav {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow-x: auto;
+    }
+    .workbench-nav a, .workbench-nav button {
+      min-height: 42px;
+      display: inline-flex;
+      align-items: center;
+      border: 0;
+      border-radius: 8px;
+      padding: 0 14px;
+      background: transparent;
+      color: var(--muted);
+      font-weight: 700;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+    .workbench-nav .active { background: var(--ink); color: white; }
+    .workbench-nav a:not(.active):hover, .workbench-nav button:not(.active):hover { color: var(--ink); background: #f3f4f6; }
+    .nav-count {
+      min-width: 26px;
+      min-height: 26px;
+      display: inline-grid;
+      place-items: center;
+      margin-left: 7px;
+      padding: 2px 7px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--amber-soft);
+      color: var(--amber);
+      font-size: 0.875rem;
+    }
+    .navigation-help { margin: 8px 2px 0; color: var(--muted); font-size: 0.875rem; line-height: 1.45; }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 18px;
+    }
+    .control-label { display: flex; align-items: center; gap: 9px; color: var(--text); font-size: 0.875rem; font-weight: 700; }
+    select { height: 40px; padding: 0 12px; border: 1px solid #d1d5db; border-radius: 8px; background: white; color: var(--ink); }
+    .segmented { display: inline-flex; height: 40px; padding: 3px; border: 1px solid #d1d5db; border-radius: 8px; background: white; }
+    .segmented button { border: 0; border-radius: 6px; padding: 0 15px; background: transparent; color: var(--muted); font-weight: 700; }
+    .segmented button.active { background: var(--ink); color: white; }
+    .check-label { display: flex; align-items: center; gap: 8px; font-size: 0.875rem; font-weight: 650; }
+    .check-label input { width: 17px; height: 17px; }
+    .rollup { margin-left: auto; color: var(--muted); font-size: 0.875rem; }
+    .rollup strong { color: var(--ink); }
+
+    .request-list { display: grid; gap: 12px; }
+    .request-card {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 20px;
+      align-items: center;
+      padding: 18px 20px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      box-shadow: var(--shadow);
+      cursor: pointer;
+    }
+    .request-card:hover { border-color: #cbd5e1; box-shadow: 0 4px 8px rgb(17 24 39 / 0.07); }
+    .request-topline { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+    .request-number { color: var(--ink); font-weight: 750; }
+    .meta { color: var(--muted); font-size: 0.875rem; }
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      padding: 3px 9px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      font-size: 0.875rem;
+      font-weight: 700;
+    }
+    .chip.violet { background: var(--violet-soft); color: var(--violet); }
+    .chip.blue { background: #e0e7ff; color: var(--blue); }
+    .institution { margin-top: 10px; color: var(--text); font-size: 1rem; }
+    .person { margin-top: 3px; color: var(--muted); font-size: 0.875rem; }
+    .card-status { min-width: 210px; text-align: right; }
+    .stage { display: inline-flex; padding: 6px 12px; border-radius: 999px; background: #e0e7ff; color: var(--blue); font-weight: 700; }
+    .reviewer-count { margin-top: 10px; color: var(--muted); }
+    .progress-track { width: 100%; height: 7px; margin-top: 8px; border-radius: 999px; background: #e5e7eb; overflow: hidden; }
+    .progress-track span { display: block; height: 100%; border-radius: inherit; background: #22c55e; }
+    .status-detail { display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px; font-size: 0.875rem; }
+    .pending { color: var(--amber); }
+    .accepted { color: var(--green); }
+    .triage { height: 34px; margin-top: 10px; }
+
+    .toast {
+      position: fixed;
+      right: 20px;
+      bottom: 20px;
+      min-width: 280px;
+      padding: 13px 15px;
+      border-radius: var(--radius);
+      background: var(--ink);
+      color: white;
+      box-shadow: 0 12px 24px rgb(17 24 39 / 0.2);
+      opacity: 0;
+      transform: translateY(8px);
+      pointer-events: none;
+      transition: opacity 160ms ease-out, transform 160ms ease-out;
+    }
+    .toast.visible { opacity: 1; transform: translateY(0); }
+
+    @media (max-width: 760px) {
+      .app-header-inner, .page { width: min(100% - 24px, 1400px); }
+      .app-header-inner { min-height: 58px; }
+      .utility-nav a:not(:last-child) { display: none; }
+      .page { padding-top: 18px; }
+      .page-heading { display: block; margin-bottom: 16px; }
+      h1 { font-size: 1.5rem; }
+      .updated { padding-top: 5px; }
+      .lookup { grid-template-columns: 1fr; }
+      .lookup-help { grid-column: auto; }
+      .workbench-nav { margin-inline: -12px; border-left: 0; border-right: 0; border-radius: 0; }
+      .controls { align-items: stretch; }
+      .control-label { width: 100%; justify-content: space-between; }
+      .control-label select { flex: 1; }
+      .segmented { width: 100%; }
+      .segmented button { flex: 1; }
+      .rollup { width: 100%; margin-left: 0; }
+      .request-card { grid-template-columns: 1fr; gap: 16px; padding: 16px; }
+      .card-status { min-width: 0; text-align: left; }
+      .status-detail { justify-content: flex-start; }
+      .toast { left: 12px; right: 12px; bottom: 12px; min-width: 0; }
+    }
+  </style>
+</head>
+<body>
+  <header class="app-header">
+    <div class="app-header-inner">
+      <div class="brand"><span class="brand-mark">WMK</span><span>W. M. Keck Foundation</span></div>
+      <nav class="utility-nav" aria-label="Global navigation"><a href="#">Tools</a><a href="#">Admin</a><a href="#">Justin Gallivan</a></nav>
+    </div>
+  </header>
+
+  <main class="page">
+    <div class="page-heading">
+      <div><h1>Request Workbench</h1><p class="subtitle">Find and manage peer reviewers for your grant requests, one cycle at a time.</p></div>
+      <div class="updated">Updated just now</div>
+    </div>
+
+    <form class="lookup" id="lookup-form">
+      <label class="lookup-label">Open request by number<input id="request-number" inputmode="numeric" placeholder="For example, 1002379" /></label>
+      <button class="primary-button" type="submit">Open request</button>
+      <p class="lookup-help">Opens active or historical requests without changing their status or adding them to the active-cycle list.</p>
+    </form>
+
+    <section class="view-navigation" aria-labelledby="workbench-views-label">
+      <h2 class="workbench-nav-label" id="workbench-views-label">Workbench views — across requests</h2>
+      <nav class="workbench-nav" aria-label="Workbench views">
+        <a class="active" href="./workbench-request-list.html" aria-current="page">Request list</a>
+        <a href="./reviewer-follow-up.html">Reviewer follow-up <span class="nav-count">7</span></a>
+        <button type="button" data-view="Final writeups">Final writeups</button>
+        <button type="button" data-view="Initial assessments">Initial assessments</button>
+        <button type="button" data-view="Awardees">Awardees</button>
+      </nav>
+      <p class="navigation-help">Use these views for work spanning multiple proposals. Open a request card for Overview, Proposal, Reviewers, Reviews, and the rest of that request’s workspace.</p>
+    </section>
+
+    <section class="controls" aria-label="Request filters">
+      <label class="control-label">Cycle<select><option>December 2026 (10)</option><option>June 2026 (8)</option></select></label>
+      <div class="segmented" aria-label="Request scope"><button class="active" type="button">My requests</button><button type="button">All</button></div>
+      <label class="check-label"><input id="set-aside" type="checkbox" /> Show set aside</label>
+      <div class="rollup"><strong>10</strong> requests <span>· 1 needs reviewers</span></div>
+    </section>
+
+    <section class="request-list" aria-label="Requests">
+      <article class="request-card" tabindex="0" data-request="1002788">
+        <div>
+          <div class="request-topline"><span class="request-number">#1002788</span><span class="meta">December 2026</span><span class="meta">· Research</span><span class="chip violet">going-forward</span></div>
+          <div class="institution">W. M. Keck Foundation</div><div class="person">PI: Paige Kelley</div><div class="person">PD: Justin Gallivan</div>
+        </div>
+        <div class="card-status"><span class="stage">Awaiting replies</span><div class="reviewer-count">0/3 accepted · 5 found</div><div class="progress-track"><span style="width:34%"></span></div><div class="status-detail"><span class="pending">3 pending</span><span>2 not invited</span></div><select class="triage" aria-label="Triage for Request 1002788"><option>Advancing</option><option>Set aside</option></select></div>
+      </article>
+
+      <article class="request-card" tabindex="0" data-request="1002852">
+        <div>
+          <div class="request-topline"><span class="request-number">#1002852</span><span class="meta">December 2026</span><span class="meta">· Research</span><span class="chip violet">going-forward</span></div>
+          <div class="institution">Johns Hopkins University</div><div class="person">PI: Anthony Leung</div><div class="person">PD: Justin Gallivan</div>
+        </div>
+        <div class="card-status"><span class="stage">In review</span><div class="reviewer-count">3/3 accepted · 3 found</div><div class="progress-track"><span style="width:100%"></span></div><div class="status-detail"><span class="accepted">3 accepted</span></div><select class="triage" aria-label="Triage for Request 1002852"><option>Advancing</option><option>Set aside</option></select></div>
+      </article>
+
+      <article class="request-card" tabindex="0" data-request="1002874">
+        <div>
+          <div class="request-topline"><span class="request-number">#1002874</span><span class="meta">December 2026</span><span class="meta">· Research</span><span class="chip violet">going-forward</span></div>
+          <div class="institution">California Institute of Technology</div><div class="person">PI: Elena Rossi</div><div class="person">PD: Justin Gallivan</div>
+        </div>
+        <div class="card-status"><span class="stage">In review</span><div class="reviewer-count">3/3 accepted · 3 found</div><div class="progress-track"><span style="width:100%"></span></div><div class="status-detail"><span class="accepted">2 reviews received</span><span>1 outstanding</span></div><select class="triage" aria-label="Triage for Request 1002874"><option>Advancing</option><option>Set aside</option></select></div>
+      </article>
+    </section>
+  </main>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script>
+    const toast = document.getElementById('toast');
+    let toastTimer;
+    function showToast(message) {
+      toast.textContent = message;
+      toast.classList.add('visible');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toast.classList.remove('visible'), 2400);
+    }
+    document.getElementById('lookup-form').addEventListener('submit', event => {
+      event.preventDefault();
+      const number = document.getElementById('request-number').value.trim() || '1002379';
+      showToast(`Opening Request #${number}.`);
+    });
+    document.querySelectorAll('.segmented button').forEach(button => button.addEventListener('click', () => {
+      button.parentElement.querySelectorAll('button').forEach(item => item.classList.toggle('active', item === button));
+      document.querySelector('.rollup').innerHTML = button.textContent === 'All' ? '<strong>104</strong> requests <span>· 9 need reviewers</span>' : '<strong>10</strong> requests <span>· 1 needs reviewers</span>';
+    }));
+    document.querySelectorAll('.workbench-nav button').forEach(button => button.addEventListener('click', () => showToast(`${button.dataset.view} would open here.`)));
+    document.querySelectorAll('.request-card').forEach(card => {
+      const open = () => showToast(`Opening Request #${card.dataset.request} with all request tabs.`);
+      card.addEventListener('click', event => { if (!event.target.closest('select,button,a,input')) open(); });
+      card.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); open(); } });
+    });
+    document.getElementById('set-aside').addEventListener('change', event => showToast(event.target.checked ? 'Set-aside requests included.' : 'Set-aside requests hidden.'));
+  </script>
+</body>
+</html>
