@@ -19,8 +19,10 @@ related:
 
 ## Decision and status
 
-**Verdict: SLICES A–D ARE COMPLETE; SLICE E ACCESS PROOF AND ENABLEMENT REMAIN.
-DO NOT ENABLE YET.**
+**Verdict: SLICES A–D ARE COMPLETE; SLICE E IS HALF-PROVED. The PC access
+proof PASSED 2026-09-01 (Sarah Hibler, owner-witnessed Word open plus backend
+acknowledgement readback). The leadership proof (Beth Pruitt) and owner
+authorization remain. DO NOT ENABLE YET.**
 
 The owner rejected the operational burden of creating and maintaining three
 Dataverse owner teams solely as persona markers. This plan replaces that
@@ -324,7 +326,10 @@ existing Admin Overview, not as another configuration panel.
 
 Coordination steps, representative users, evidence records, and the exact
 enabled-persona smoke sequence are operationalized in
-`docs/FINAL_WRITEUP_WORD_ACCESS_PROOF_AND_PERSONA_SMOKE_RUNBOOK.md`.
+`docs/FINAL_WRITEUP_WORD_ACCESS_PROOF_AND_PERSONA_SMOKE_RUNBOOK.md`. The PC
+proof passed 2026-09-01 (Sarah Hibler); the leadership proof is assigned to
+Beth Pruitt (owner decision — her overlap makes the proof account-specific,
+so Allison Keller runs the leadership-only smoke leg when next available).
 
 - Have a representative PC and representative Leadership user open the exact
   canonical Word item through the signed-in Final Writeup experience.
@@ -380,7 +385,8 @@ Run the relevant gate and its self-test sequentially:
    canonical Turbopack is blocked by the known sandbox process/port signature;
 9. **Complete through rollout-off regression:** signed-in Admin desktop/narrow
    QA, v2 publication/readback, and matrix regression smoke. Representative
-   Word-access proof and enabled persona smoke remain.
+   Word-access proof (PC half passed 2026-09-01; leadership half pending) and
+   enabled persona smoke remain.
 
 No Postgres migration, Dataverse schema wave, new API route, new environment
 variable, or new security privilege is planned.
