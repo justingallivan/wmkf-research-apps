@@ -1797,7 +1797,21 @@ export default function ReviewerManagePanel({
         </Card>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
-          <table className="min-w-full divide-y divide-gray-200">
+          <table className={`w-full table-fixed divide-y divide-gray-200 ${canManage ? 'min-w-[72rem]' : 'min-w-[64rem]'}`}>
+            {/* Every proposal uses the same column geometry. Without an explicit
+                grid, a long affiliation in one proposal changes that table's
+                auto-sized columns and breaks vertical scanning across the
+                consolidated follow-up page. */}
+            <colgroup>
+              {canManage && <col className="w-[4%]" />}
+              <col className={canManage ? 'w-[27%]' : 'w-[32%]'} />
+              <col className={canManage ? 'w-[13%]' : 'w-[16%]'} />
+              <col className={canManage ? 'w-[11%]' : 'w-[14%]'} />
+              <col className={canManage ? 'w-[12%]' : 'w-[14%]'} />
+              <col className={canManage ? 'w-[13%]' : 'w-[16%]'} />
+              <col className={canManage ? 'w-[13%]' : 'w-[8%]'} />
+              {canManage && <col className="w-[7%]" />}
+            </colgroup>
             <thead className="bg-gray-50">
               <tr>
                 {canManage && (
@@ -1831,7 +1845,7 @@ export default function ReviewerManagePanel({
                 return (
                   <tr key={r.suggestionId} className="hover:bg-gray-50 transition-colors">
                     {canManage && (
-                      <td className="px-3 py-3">
+                      <td className="px-3 py-3 align-top">
                         <input
                           type="checkbox"
                           checked={selectedReviewers.has(r.suggestionId)}
@@ -1840,21 +1854,21 @@ export default function ReviewerManagePanel({
                         />
                       </td>
                     )}
-                    <td className="px-4 py-3">
-                      <p className="text-sm font-medium text-gray-900">{r.name}</p>
-                      <p className="text-xs text-gray-500">{r.affiliation || ''}</p>
-                      {r.email && <p className="text-xs text-gray-400">{r.email}</p>}
+                    <td className="px-4 py-3 align-top">
+                      <p className="line-clamp-2 break-words text-sm font-medium text-gray-900" title={r.name || ''}>{r.name}</p>
+                      <p className="line-clamp-2 break-words text-xs leading-5 text-gray-500" title={r.affiliation || ''}>{r.affiliation || ''}</p>
+                      {r.email && <p className="truncate text-xs leading-5 text-gray-400" title={r.email}>{r.email}</p>}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3 align-top">
                       <StatusBadge status={r.reviewStatus} />
                       {r.reminderCount > 0 && (
                         <span className="text-xs text-gray-400 ml-1">({r.reminderCount} reminder{r.reminderCount !== 1 ? 's' : ''})</span>
                       )}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3 align-top">
                       <TokenStateBadge state={r.tokenState} expiresAt={r.tokenExpiresAt} firstAccessedAt={r.proposalFirstAccessedAt} />
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3 align-top">
                       <ReviewerDueDateEditor
                         suggestionId={r.suggestionId}
                         reviewerName={r.name}
@@ -1868,7 +1882,7 @@ export default function ReviewerManagePanel({
                         onSaved={onRefresh}
                       />
                     </td>
-                    <td className="px-4 py-3 text-xs text-gray-500">
+                    <td className="px-4 py-3 align-top text-xs text-gray-500">
                       {lastEvent ? (
                         <>
                           <p className="text-gray-700">{lastEvent.label}</p>
@@ -1886,7 +1900,7 @@ export default function ReviewerManagePanel({
                         History
                       </button>
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3 align-top">
                       {canManage && isEditing ? (
                         <div className="flex items-center gap-1">
                           <input
@@ -1923,7 +1937,7 @@ export default function ReviewerManagePanel({
                       )}
                     </td>
                     {canManage && (
-                      <td className="px-4 py-3 text-right">
+                      <td className="px-4 py-3 align-top text-right">
                         <div className="flex items-center justify-end gap-1">
                           {/* Download received review from SharePoint via Graph. */}
                           {r.reviewSharePointFolder && (
