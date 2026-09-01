@@ -6,6 +6,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 
 let findPanelProps = null;
 let invitePanelProps = null;
+let managePanelProps = null;
 const existingKey = 'akoya_request::REQ/Phase I::ProjectDescription.pdf';
 const mockReplacementKey = 'akoya_request::REQ/Reviewer Materials::Proposal_1003010.pdf';
 jest.mock('../../shared/components/reviewers/ReviewerFindPanel', () => function FindPanelStub(props) {
@@ -18,7 +19,8 @@ jest.mock('../../shared/components/reviewers/ReviewerFindPanel', () => function 
     >persist</button>
   );
 });
-jest.mock('../../shared/components/reviewers/ReviewerManagePanel', () => function ManagePanelStub() {
+jest.mock('../../shared/components/reviewers/ReviewerManagePanel', () => function ManagePanelStub(props) {
+  managePanelProps = props;
   return null;
 });
 jest.mock('../../shared/components/reviewers/ReviewerInvitePanel', () => function InvitePanelStub(props) {
@@ -54,6 +56,7 @@ const REQ = 'aaaaaaaa-1111-1111-1111-111111111111';
 beforeEach(() => {
   findPanelProps = null;
   invitePanelProps = null;
+  managePanelProps = null;
   mockReplace.mockClear();
   router.query = {
     requestId: REQ,
@@ -144,4 +147,18 @@ test('passes an Invite-origin repair suggestion into the Invite panel', async ()
 
   await waitFor(() => expect(invitePanelProps).not.toBeNull());
   expect(invitePanelProps.repairSuggestionId).toBe('suggestion-guid');
+});
+
+test('makes reviewer follow-up available in Track Reviewers', async () => {
+  router.query = {
+    requestId: REQ,
+    tab: 'reviewers',
+    sub: 'track',
+  };
+
+  render(<ReviewersTab requestId={REQ} />);
+
+  await waitFor(() => expect(managePanelProps).not.toBeNull());
+  expect(managePanelProps.mode).toBe('track');
+  expect(managePanelProps.showReviewReminderAction).toBe(true);
 });

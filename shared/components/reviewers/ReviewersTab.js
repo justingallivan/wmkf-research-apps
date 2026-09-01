@@ -519,6 +519,7 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
           settings={settings}
           mode={current}
           canManage={canManage}
+          showReviewReminderAction={current === 'track'}
           declineReferrals={declineReferrals}
           referralActions={referralActions}
           onAddReferral={addReferralCandidate}
