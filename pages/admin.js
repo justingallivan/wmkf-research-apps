@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, Fragment } from 'react';
-import Layout, { PageHeader, Card } from '../shared/components/Layout';
+import { useRouter } from 'next/router';
+import Layout, { Card } from '../shared/components/Layout';
 import PoliciesSection from '../shared/components/admin/PoliciesSection';
 import OperationalEventsSection from '../shared/components/admin/OperationalEventsSection';
 import ReviewQuestionsSection from '../shared/components/admin/ReviewQuestionsSection';
@@ -12,6 +13,15 @@ import DataverseFieldInfoButton, {
   appSystemSettingField,
   appSystemSettingPattern,
 } from '../shared/components/admin/DataverseFieldInfoButton';
+import AdminOverviewSection from '../shared/components/admin/AdminOverviewSection';
+import {
+  AdminEditorPanel,
+  AdminViewNavigation,
+  AdminWorkspaceHeader,
+  AdminWorkspaceNavigation,
+  adminLocationForHash,
+  resolveAdminLocation,
+} from '../shared/components/admin/AdminWorkspaceNavigation';
 import { APP_REGISTRY } from '../shared/config/appRegistry';
 
 const PERIOD_OPTIONS = [
@@ -214,37 +224,55 @@ function HealthSection() {
           {failingCount > 0 && <span className="ml-2 text-red-600">• {failingCount} not OK</span>}
         </span>
         <button
+          type="button"
           onClick={() => setDetailsOpen(o => !o)}
-          className="text-xs text-gray-600 hover:text-gray-900"
+          aria-expanded={detailsOpen}
+          aria-controls="service-health-details"
+          className="min-h-11 rounded-lg px-3 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500"
         >
-          {detailsOpen ? '▼ Hide details' : '▶ Show details'}
+          {detailsOpen ? 'Hide details' : 'Show details'}
         </button>
       </div>
       {detailsOpen && (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+      <div id="service-health-details" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {services.map(([key, svc]) => {
           const isExpanded = expandedService === key;
           const hasOverflow = svc.message || svc.detail;
           return (
             <div
               key={key}
-              onClick={() => hasOverflow && setExpandedService(isExpanded ? null : key)}
-              className={`p-3 rounded-lg border ${hasOverflow ? 'cursor-pointer' : ''} ${
+              className={`rounded-lg border ${
                 svc.status === 'ok' ? 'border-green-200 bg-green-50' :
                 svc.status === 'error' ? 'border-red-200 bg-red-50' :
                 svc.status === 'warning' ? 'border-yellow-200 bg-yellow-50' :
                 'border-gray-200 bg-gray-50'
               }`}
             >
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-sm font-medium text-gray-900">{SERVICE_LABELS[key] || key}</span>
-                <StatusBadge status={svc.status} />
-              </div>
-              {svc.message && (
-                <p className={`text-xs text-gray-600 ${isExpanded ? 'break-words' : 'truncate'}`} title={svc.message}>{svc.message}</p>
-              )}
-              {svc.detail && (
-                <p className={`text-xs text-gray-500 ${isExpanded ? 'break-words' : 'truncate'}`} title={svc.detail}>{svc.detail}</p>
+              {hasOverflow ? (
+                <button
+                  type="button"
+                  onClick={() => setExpandedService(isExpanded ? null : key)}
+                  aria-expanded={isExpanded}
+                  className="block w-full rounded-lg p-3 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gray-500"
+                >
+                  <div className="mb-1 flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-900">{SERVICE_LABELS[key] || key}</span>
+                    <StatusBadge status={svc.status} />
+                  </div>
+                  {svc.message && (
+                    <p className={`text-xs text-gray-600 ${isExpanded ? 'break-words' : 'truncate'}`} title={svc.message}>{svc.message}</p>
+                  )}
+                  {svc.detail && (
+                    <p className={`text-xs text-gray-500 ${isExpanded ? 'break-words' : 'truncate'}`} title={svc.detail}>{svc.detail}</p>
+                  )}
+                </button>
+              ) : (
+                <div className="p-3">
+                  <div className="mb-1 flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-900">{SERVICE_LABELS[key] || key}</span>
+                    <StatusBadge status={svc.status} />
+                  </div>
+                </div>
               )}
             </div>
           );
@@ -274,7 +302,6 @@ function HealthHistorySection() {
   const [detailsOpen, setDetailsOpen] = useState(false);
 
   useEffect(() => {
-    setLoading(true);
     fetch(`/api/admin/health-history?hours=${hours}`)
       .then(r => r.ok ? r.json() : null)
       .then(setHistory)
@@ -309,8 +336,12 @@ function HealthHistorySection() {
         <div className="flex gap-1">
           {[24, 72, 168].map(h => (
             <button
+              type="button"
               key={h}
-              onClick={() => setHours(h)}
+              onClick={() => {
+                setLoading(true);
+                setHours(h);
+              }}
               className={`px-3 py-1 text-sm rounded-md transition-colors ${
                 hours === h ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
@@ -344,14 +375,17 @@ function HealthHistorySection() {
       {/* Recent checks table */}
       <div className="flex justify-end mb-2">
         <button
+          type="button"
           onClick={() => setDetailsOpen(o => !o)}
-          className="text-xs text-gray-600 hover:text-gray-900"
+          aria-expanded={detailsOpen}
+          aria-controls="health-history-details"
+          className="min-h-11 rounded-lg px-3 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500"
         >
-          {detailsOpen ? '▼ Hide recent checks' : '▶ Show recent checks'}
+          {detailsOpen ? 'Hide recent checks' : 'Show recent checks'}
         </button>
       </div>
       {detailsOpen && (
-      <div className="overflow-x-auto max-h-96 overflow-y-auto">
+      <div id="health-history-details" className="overflow-x-auto max-h-96 overflow-y-auto">
         <table className="w-full text-sm">
           <thead className="sticky top-0 bg-white">
             <tr className="border-b border-gray-200">
@@ -359,6 +393,7 @@ function HealthHistorySection() {
               <th className="text-left py-2 px-2 font-medium text-gray-600">Status</th>
               <th className="text-right py-2 px-2 font-medium text-gray-600">Response</th>
               <th className="text-left py-2 px-2 font-medium text-gray-600">Source</th>
+              <th className="text-right py-2 px-2 font-medium text-gray-600">Details</th>
             </tr>
           </thead>
           <tbody>
@@ -367,10 +402,7 @@ function HealthHistorySection() {
               const isExpanded = expandedCheckId === check.id;
               return (
                 <Fragment key={check.id}>
-                  <tr
-                    className="border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors"
-                    onClick={() => setExpandedCheckId(isExpanded ? null : check.id)}
-                  >
+                  <tr className="border-b border-gray-100">
                     <td className="py-1.5 px-2 text-gray-700 text-xs">{new Date(check.created_at).toLocaleString()}</td>
                     <td className="py-1.5 px-2">
                       <div className="flex items-center gap-1.5 flex-wrap">
@@ -384,10 +416,20 @@ function HealthHistorySection() {
                     </td>
                     <td className="py-1.5 px-2 text-right text-gray-600 text-xs">{check.response_time_ms}ms</td>
                     <td className="py-1.5 px-2 text-gray-500 text-xs">{check.triggered_by}</td>
+                    <td className="py-1.5 px-2 text-right">
+                      <button
+                        type="button"
+                        onClick={() => setExpandedCheckId(isExpanded ? null : check.id)}
+                        aria-expanded={isExpanded}
+                        className="min-h-9 rounded-md px-2 py-1 text-xs font-semibold text-gray-600 hover:bg-gray-100 hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500"
+                      >
+                        {isExpanded ? 'Hide' : 'Show'}
+                      </button>
+                    </td>
                   </tr>
                   {isExpanded && check.services && (
                     <tr className="border-b border-gray-100">
-                      <td colSpan={4} className="p-3 bg-gray-50">
+                      <td colSpan={5} className="p-3 bg-gray-50">
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                           {Object.entries(check.services).map(([key, svc]) => (
                             <div
@@ -504,11 +546,11 @@ function SystemAlertsSection() {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-sm font-medium">{alert.title}</span>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/50 text-gray-600">
+                      <span className="rounded bg-white/50 px-1.5 py-0.5 text-xs text-gray-600">
                         {alert.alert_type.replace(/_/g, ' ')}
                       </span>
                       {alert.status === 'acknowledged' && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/50 text-gray-500">
+                        <span className="rounded bg-white/50 px-1.5 py-0.5 text-xs text-gray-500">
                           ack&apos;d by {alert.acknowledged_by_name}
                         </span>
                       )}
@@ -524,7 +566,7 @@ function SystemAlertsSection() {
                         <div className="mt-2 text-xs text-gray-700 space-y-1">
                           {alert.message && <p>{alert.message}</p>}
                           {alert.metadata && (
-                            <pre className="bg-white/50 p-2 rounded text-[11px] overflow-x-auto max-h-40">
+                            <pre className="max-h-40 overflow-x-auto rounded bg-white/50 p-2 text-xs">
                               {JSON.stringify(alert.metadata, null, 2)}
                             </pre>
                           )}
@@ -572,14 +614,23 @@ function SystemAlertsSection() {
 function MaintenanceSection() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [reloadToken, setReloadToken] = useState(0);
 
   useEffect(() => {
-    fetch('/api/admin/maintenance')
-      .then(r => r.ok ? r.json() : null)
+    const controller = new AbortController();
+    fetch('/api/admin/maintenance', { signal: controller.signal })
+      .then(r => {
+        if (!r.ok) throw new Error('Maintenance status could not be loaded.');
+        return r.json();
+      })
       .then(setData)
-      .catch(() => setData(null))
+      .catch((loadError) => {
+        if (loadError.name !== 'AbortError') setError(loadError.message);
+      })
       .finally(() => setLoading(false));
-  }, []);
+    return () => controller.abort();
+  }, [reloadToken]);
 
   if (loading) {
     return (
@@ -590,7 +641,25 @@ function MaintenanceSection() {
     );
   }
 
-  if (!data) return null;
+  if (error || !data) {
+    return (
+      <Card>
+        <h2 className="mb-2 text-lg font-semibold text-gray-900">Maintenance Jobs</h2>
+        <p className="text-sm text-red-700" role="alert">{error || 'Maintenance status is unavailable.'}</p>
+        <button
+          type="button"
+          onClick={() => {
+            setError(null);
+            setLoading(true);
+            setReloadToken((token) => token + 1);
+          }}
+          className="mt-3 min-h-11 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500"
+        >
+          Try again
+        </button>
+      </Card>
+    );
+  }
 
   const statusColors = {
     completed: 'text-green-700 bg-green-100',
@@ -670,12 +739,19 @@ function SecretExpirationSection() {
   const [editingKey, setEditingKey] = useState(null);
   const [editValues, setEditValues] = useState({ rotationDate: '', expirationDate: '' });
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
 
   const fetchSecrets = () => {
     fetch('/api/admin/secrets')
-      .then(r => r.ok ? r.json() : null)
+      .then(r => {
+        if (!r.ok) throw new Error('Credential expiration data could not be loaded.');
+        return r.json();
+      })
       .then(data => setSecrets(data?.secrets || []))
-      .catch(() => setSecrets([]))
+      .catch((loadError) => {
+        setSecrets([]);
+        setError(loadError.message);
+      })
       .finally(() => setLoading(false));
   };
 
@@ -692,6 +768,7 @@ function SecretExpirationSection() {
   const saveEdit = async () => {
     if (!editValues.rotationDate && !editValues.expirationDate) return;
     setSaving(true);
+    setError(null);
     try {
       const res = await fetch('/api/admin/secrets', {
         method: 'PUT',
@@ -703,10 +780,10 @@ function SecretExpirationSection() {
         fetchSecrets();
       } else {
         const err = await res.json().catch(() => ({}));
-        console.error('Secret save failed:', res.status, err);
+        setError(err.error || 'The credential dates could not be saved.');
       }
     } catch (err) {
-      console.error('Secret save error:', err);
+      setError(err.message || 'The credential dates could not be saved.');
     }
     setSaving(false);
   };
@@ -745,6 +822,22 @@ function SecretExpirationSection() {
       <p className="text-xs text-gray-500 mb-3">
         Set expiration dates to receive automated alerts as secrets approach expiry. Dates are checked daily at 8:00 AM UTC.
       </p>
+      {error && (
+        <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
+          {error}
+          <button
+            type="button"
+            onClick={() => {
+              setError(null);
+              setLoading(true);
+              fetchSecrets();
+            }}
+            className="ml-3 font-semibold underline"
+          >
+            Try again
+          </button>
+        </div>
+      )}
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
@@ -1050,7 +1143,7 @@ function RegistryStatusPills({ status }) {
   if (!status) return null;
   const capabilityOk = status.capability?.status === 'reviewed';
   const pricingOk = status.pricing?.status === 'reviewed';
-  const base = 'inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium border';
+  const base = 'inline-flex items-center rounded border px-1.5 py-0.5 text-xs font-medium';
   const okClass = 'bg-emerald-50 text-emerald-700 border-emerald-200';
   const warnClass = 'bg-amber-50 text-amber-700 border-amber-200';
   const capTitle = capabilityOk
@@ -1309,7 +1402,7 @@ function ModelConfigSection() {
                               </optgroup>
                             )}
                           </select>
-                          <div className="mt-1 flex items-center gap-2 text-[10px] text-gray-500">
+                          <div className="mt-1 flex items-center gap-2 text-xs text-gray-500">
                             <span title="Concrete model id that will be sent to Anthropic">
                               → {shortModelName(effectiveResolved)}
                             </span>
@@ -1835,6 +1928,7 @@ export function AppAccessSection() {
                         <td key={appKey} className="py-2 px-1 text-center">
                           <input
                             type="checkbox"
+                            aria-label={`${appShortNames[appKey]} access for ${grant.user_name}`}
                             checked={checked}
                             disabled={snapshotStale || saving}
                             onChange={() => toggle(uid, appKey)}
@@ -1846,6 +1940,7 @@ export function AppAccessSection() {
                     <td className="py-2 px-2 text-center">
                       <input
                         type="checkbox"
+                        aria-label={`${allChecked ? 'Remove' : 'Grant'} all application access for ${grant.user_name}`}
                         checked={allChecked}
                         disabled={snapshotStale || saving}
                         onChange={() => toggleAll(uid)}
@@ -1892,6 +1987,7 @@ export function DynamicsFeedbackSection() {
   const [filter, setFilter] = useState({ status: 'new', type: '' });
   const [expandedId, setExpandedId] = useState(null);
   const [actionInProgress, setActionInProgress] = useState(null);
+  const [error, setError] = useState(null);
 
   const fetchFeedback = (params = {}) => {
     const qs = new URLSearchParams();
@@ -1904,13 +2000,20 @@ export function DynamicsFeedbackSection() {
     if (status) qs.set('status', status);
     if (type) qs.set('type', type);
     const query = qs.toString();
+    setError(null);
     fetch(`/api/dynamics-explorer/feedback${query ? `?${query}` : ''}`)
-      .then(r => r.ok ? r.json() : null)
+      .then(r => {
+        if (!r.ok) throw new Error('Feedback could not be loaded.');
+        return r.json();
+      })
       .then(data => {
         setFeedback(data?.feedback || []);
         setSummary(data?.summary || null);
       })
-      .catch(() => setFeedback([]))
+      .catch((loadError) => {
+        setFeedback([]);
+        setError(loadError.message);
+      })
       .finally(() => setLoading(false));
   };
 
@@ -1926,8 +2029,11 @@ export function DynamicsFeedbackSection() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, status }),
       });
-      if (res.ok) fetchFeedback();
-    } catch {}
+      if (!res.ok) throw new Error('The feedback status could not be updated.');
+      fetchFeedback();
+    } catch (actionError) {
+      setError(actionError.message);
+    }
     setActionInProgress(null);
   };
 
@@ -1938,7 +2044,7 @@ export function DynamicsFeedbackSection() {
     fetchFeedback(newFilter);
   };
 
-  const typeIcon = (type) => type === 'positive' ? '\u25B2' : '\u25BC';
+  const typeLabel = (type) => type === 'positive' ? 'Positive' : 'Negative';
   const typeColor = (type) => type === 'positive' ? 'text-green-600' : 'text-red-600';
 
   const categoryLabels = {
@@ -1973,6 +2079,7 @@ export function DynamicsFeedbackSection() {
       {/* Filters */}
       <div className="flex gap-2 mb-3">
         <select
+          aria-label="Feedback status"
           value={filter.status}
           onChange={e => applyFilter('status', e.target.value)}
           className="text-xs border border-gray-300 rounded px-2 py-1"
@@ -1983,6 +2090,7 @@ export function DynamicsFeedbackSection() {
           <option value="resolved">Resolved</option>
         </select>
         <select
+          aria-label="Feedback type"
           value={filter.type}
           onChange={e => applyFilter('type', e.target.value)}
           className="text-xs border border-gray-300 rounded px-2 py-1"
@@ -1993,6 +2101,22 @@ export function DynamicsFeedbackSection() {
         </select>
       </div>
 
+      {error && (
+        <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">
+          {error}
+          <button
+            type="button"
+            onClick={() => {
+              setLoading(true);
+              fetchFeedback();
+            }}
+            className="ml-3 font-semibold underline"
+          >
+            Try again
+          </button>
+        </div>
+      )}
+
       {feedback.length === 0 ? (
         <p className="text-gray-500 text-sm">No feedback records found.</p>
       ) : (
@@ -2001,8 +2125,8 @@ export function DynamicsFeedbackSection() {
             <div key={fb.id} className="p-3 rounded-lg border border-gray-200 bg-gray-50">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-start gap-2 flex-1 min-w-0">
-                  <span className={`text-lg flex-shrink-0 ${typeColor(fb.feedback_type)}`}>
-                    {typeIcon(fb.feedback_type)}
+                  <span className={`flex-shrink-0 text-xs font-semibold ${typeColor(fb.feedback_type)}`}>
+                    {typeLabel(fb.feedback_type)}
                   </span>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -2010,16 +2134,16 @@ export function DynamicsFeedbackSection() {
                         {fb.query_text ? `"${fb.query_text.slice(0, 80)}${fb.query_text.length > 80 ? '...' : ''}"` : '(no query)'}
                       </span>
                       {fb.category && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-700">
+                        <span className="rounded bg-red-100 px-1.5 py-0.5 text-xs text-red-700">
                           {categoryLabels[fb.category] || fb.category}
                         </span>
                       )}
                       {fb.auto_detected && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">
+                        <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-700">
                           auto-detected
                         </span>
                       )}
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-200 text-gray-600">
+                      <span className="rounded bg-gray-200 px-1.5 py-0.5 text-xs text-gray-600">
                         {fb.status}
                       </span>
                     </div>
@@ -2051,11 +2175,12 @@ export function DynamicsFeedbackSection() {
                 </div>
                 <div className="flex items-center gap-1 flex-shrink-0">
                   <button
+                    type="button"
                     onClick={() => setExpandedId(expandedId === fb.id ? null : fb.id)}
-                    className="p-1 text-xs text-gray-500 hover:text-gray-700 rounded"
-                    title={expandedId === fb.id ? 'Collapse' : 'Show conversation'}
+                    aria-expanded={expandedId === fb.id}
+                    className="min-h-9 rounded px-2 py-1 text-xs font-semibold text-gray-500 hover:bg-gray-100 hover:text-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500"
                   >
-                    {expandedId === fb.id ? '\u25B2' : '\u25BC'}
+                    {expandedId === fb.id ? 'Hide conversation' : 'Show conversation'}
                   </button>
                   {fb.status === 'new' && (
                     <button
@@ -2201,35 +2326,6 @@ function DynamicsIdentitySection() {
         </table>
       </div>
     </>
-  );
-}
-
-// --- Section E: Quick Links ---
-function QuickLinksSection() {
-  const links = [
-    { name: 'Vercel Dashboard', url: 'https://vercel.com/dashboard', description: 'Deployments, logs, environment' },
-    { name: 'Anthropic Console', url: 'https://console.anthropic.com', description: 'API billing and usage' },
-    { name: 'Credentials Runbook', url: '/docs/CREDENTIALS_RUNBOOK.md', description: 'Secret rotation, diagnostics', internal: true },
-  ];
-
-  return (
-    <Card>
-      <h2 className="text-lg font-semibold text-gray-900 mb-3">Quick Links</h2>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        {links.map(link => (
-          <a
-            key={link.name}
-            href={link.url}
-            target={link.internal ? undefined : '_blank'}
-            rel={link.internal ? undefined : 'noopener noreferrer'}
-            className="block p-3 rounded-lg border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-colors"
-          >
-            <div className="text-sm font-medium text-gray-900">{link.name}</div>
-            <div className="text-xs text-gray-500 mt-1">{link.description}</div>
-          </a>
-        ))}
-      </div>
-    </Card>
   );
 }
 
@@ -2461,49 +2557,6 @@ function AlertRecipientsSection() {
         </button>
       </div>
     </div>
-  );
-}
-
-// Collapsible Card wrapper. Renders a Card with an always-visible header
-// + chevron toggle; children lazy-mount on first open and stay mounted
-// after. Used for heavyweight admin sections whose data fetches are
-// expensive or rarely consulted. Pass `bare`-styled children (i.e.
-// children that DON'T render their own outer Card).
-function CollapsibleCard({ title, subtitle, defaultOpen = false, dataverseFields = [], children }) {
-  const [open, setOpen] = useState(defaultOpen);
-  const [everOpened, setEverOpened] = useState(defaultOpen);
-  const toggle = () => {
-    setOpen(o => {
-      const next = !o;
-      if (next) setEverOpened(true);
-      return next;
-    });
-  };
-  return (
-    <Card>
-      <div className="flex items-start justify-between gap-3">
-        <button
-          type="button"
-          onClick={toggle}
-          className="flex-1 text-left"
-        >
-          <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
-          {subtitle && <p className="text-xs text-gray-500 mt-1">{subtitle}</p>}
-        </button>
-        <div className="flex items-center gap-2">
-          <DataverseFieldInfoButton items={dataverseFields} />
-          <button
-            type="button"
-            onClick={toggle}
-            className="text-xs text-gray-500"
-            aria-label={open ? `Collapse ${title}` : `Expand ${title}`}
-          >
-            {open ? '▼' : '▶'}
-          </button>
-        </div>
-      </div>
-      {everOpened && <div className={`mt-4 ${open ? '' : 'hidden'}`}>{children}</div>}
-    </Card>
   );
 }
 
@@ -2818,7 +2871,7 @@ function ReviewerCampaignTimelineSection() {
             onChange={(e) => update('desiredCount', normalizeOffsetInput(e.target.value))}
             className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
           />
-          <span className="block text-[11px] text-gray-400 mt-1">
+          <span className="mt-1 block text-xs text-gray-400">
             Default number of committed reviewers before the PD is notified. Seeds new campaigns&apos; settings.
           </span>
         </label>
@@ -2956,113 +3009,366 @@ function ReviewerTimeBudgetSection() {
   );
 }
 
-// --- Main Page ---
-export default function AdminDashboard() {
-  return (
-    <Layout title="Admin Dashboard" description="System administration and usage analytics">
-      <PageHeader
-        title="Admin Dashboard"
-        subtitle="Service health, API usage analytics, and system administration"
-      />
-
-      <div className="py-8 space-y-6">
-        <HealthSection />
-        <HealthHistorySection />
-        <SystemAlertsSection />
-        <OperationalEventsSection />
-        <MaintenanceSection />
-        <SecretExpirationSection />
-        <CollapsibleCard
-          title="Alert Recipients"
-          subtitle="Route system alerts to per-category email addresses"
+function OperationsWorkspace({ view }) {
+  switch (view) {
+    case 'incidents':
+      return (
+        <div className="space-y-6">
+          <SystemAlertsSection />
+          <OperationalEventsSection />
+        </div>
+      );
+    case 'jobs':
+      return <MaintenanceSection />;
+    case 'credentials':
+      return (
+        <div className="space-y-6">
+          <SecretExpirationSection />
+          <ResourceLinks
+            title="Credential resources"
+            links={[
+              { name: 'Credentials runbook', href: '/docs/CREDENTIALS_RUNBOOK.md', description: 'Rotation, diagnostics, and recovery procedures.' },
+              { name: 'Vercel dashboard', href: 'https://vercel.com/dashboard', description: 'Deployment settings, logs, and environment configuration.', external: true },
+            ]}
+          />
+        </div>
+      );
+    case 'notifications':
+      return (
+        <AdminEditorPanel
+          id="alert-recipients"
+          title="System alert recipients"
+          description="Route operational alerts to the appropriate internal recipients by category."
+          scope="Global"
           dataverseFields={ALERT_RECIPIENT_DATAVERSE_FIELDS}
         >
           <AlertRecipientsSection />
-        </CollapsibleCard>
-        <CollapsibleCard
-          title="Site Visit Recipients"
-          subtitle="Choose the staff, consultants, and Board members offered by the materials-email recipient menu"
-          dataverseFields={SITE_VISIT_RECIPIENT_DATAVERSE_FIELDS}
-        >
-          <SiteVisitRecipientsSection />
-        </CollapsibleCard>
-        <div id="final-writeup-matrix-audiences" className="scroll-mt-6">
-          <CollapsibleCard
-            title="Final Writeup Matrix Audiences"
-            subtitle="Choose the expected reviewers separately for each Dataverse Grant Program"
-            defaultOpen
-            dataverseFields={FINAL_WRITEUP_MATRIX_AUDIENCE_DATAVERSE_FIELDS}
-          >
-            <FinalWriteupMatrixAudiencesSection />
-          </CollapsibleCard>
+        </AdminEditorPanel>
+      );
+    case 'feedback':
+      return <DynamicsFeedbackSection />;
+    case 'health':
+    default:
+      return (
+        <div className="space-y-6">
+          <HealthSection />
+          <HealthHistorySection />
         </div>
-        <UsageSection />
-        <CollapsibleCard title="Model Configuration" dataverseFields={MODEL_CONFIG_DATAVERSE_FIELDS}>
-          <ModelConfigSection />
-        </CollapsibleCard>
-        <CollapsibleCard
-          title="Reviewer Campaign Timeline"
-          subtitle="Current-cycle defaults for invitation timing"
-          dataverseFields={REVIEWER_CAMPAIGN_TIMELINE_DATAVERSE_FIELDS}
-        >
-          <ReviewerCampaignTimelineSection />
-        </CollapsibleCard>
-        <CollapsibleCard
-          title="Reviewer Honorarium Amount"
-          subtitle="Single ground-truth amount for reviewer honoraria"
-          dataverseFields={HONORARIUM_DATAVERSE_FIELDS}
-        >
-          <HonorariumAmountSection />
-        </CollapsibleCard>
-        <CollapsibleCard
-          title="Reviewer Search Time Budget"
-          subtitle="How long a reviewer search may run before stopping gracefully"
-          dataverseFields={REVIEWER_TIME_BUDGET_DATAVERSE_FIELDS}
-        >
-          <ReviewerTimeBudgetSection />
-        </CollapsibleCard>
-        <CollapsibleCard
-          title="Reviewer Release Attachments"
-          subtitle="Portal-link-only by default; enable to also email the proposal/files"
-          dataverseFields={REVIEWER_RELEASE_ATTACHMENTS_DATAVERSE_FIELDS}
-        >
-          <ReviewerReleaseAttachmentsSection />
-        </CollapsibleCard>
-        <CollapsibleCard title="Policies" dataverseFields={POLICY_SECTION_DATAVERSE_FIELDS}>
-          <PoliciesSection />
-        </CollapsibleCard>
-        <CollapsibleCard
-          title="Review Questions"
-          subtitle="Edit the external-reviewer review form questions (Dataverse wmkf_reviewquestion)"
+      );
+  }
+}
+
+function WorkflowsWorkspace({ view }) {
+  switch (view) {
+    case 'review-form':
+      return (
+        <AdminEditorPanel
+          id="external-review-form"
+          title="External review form"
+          description="Edit the ordered questions shown to external reviewers. Existing answers keep the wording they were authored against."
+          scope="Global external review"
           dataverseFields={REVIEW_QUESTIONS_DATAVERSE_FIELDS}
         >
           <ReviewQuestionsSection />
-        </CollapsibleCard>
-        <CollapsibleCard
-          title="Prompt Templates"
-          subtitle="Edit + publish versioned AI prompt bodies (Dataverse wmkf_ai_prompt)"
+        </AdminEditorPanel>
+      );
+    case 'final-writeups':
+      return (
+        <AdminEditorPanel
+          id="final-writeup-matrix-audiences"
+          title="Final Writeup review matrix"
+          description="Choose the internal Final Writeup reviewers expected for each Dataverse Grant Program."
+          scope="Per Grant Program"
+          dataverseFields={FINAL_WRITEUP_MATRIX_AUDIENCE_DATAVERSE_FIELDS}
+        >
+          <FinalWriteupMatrixAudiencesSection />
+        </AdminEditorPanel>
+      );
+    case 'site-visits':
+      return (
+        <AdminEditorPanel
+          id="site-visit-recipient-directory"
+          title="Site Visit recipient directory"
+          description="Choose the staff, consultants, and Board members available in the materials-email recipient menu."
+          scope="Global directory"
+          dataverseFields={SITE_VISIT_RECIPIENT_DATAVERSE_FIELDS}
+        >
+          <SiteVisitRecipientsSection />
+        </AdminEditorPanel>
+      );
+    case 'governance':
+      return (
+        <div className="space-y-6">
+          <AdminEditorPanel
+            id="workflow-policies"
+            title="Workflow policies"
+            description="Publish immutable versions of reviewer and grantee policy text."
+            scope="Workflow-specific"
+            dataverseFields={POLICY_SECTION_DATAVERSE_FIELDS}
+          >
+            <PoliciesSection />
+          </AdminEditorPanel>
+          <AdminEditorPanel
+            id="workflow-email-defaults"
+            title="Workflow email defaults"
+            description="Edit shared default copy for reviewer and grantee email workflows."
+            scope="Workflow-specific"
+            dataverseFields={EMAIL_DEFAULTS_DATAVERSE_FIELDS}
+          >
+            <EmailDefaultsSection />
+          </AdminEditorPanel>
+        </div>
+      );
+    case 'external-review':
+    default:
+      return (
+        <div className="space-y-6">
+          <div className="max-w-3xl">
+            <h2 className="text-lg font-semibold text-gray-950">External review defaults</h2>
+            <p className="mt-1 text-sm leading-6 text-gray-600">
+              These settings govern new reviewer campaigns unless a request carries its own override.
+              Each editor saves independently so a failure in one setting cannot be mistaken for a complete campaign update.
+            </p>
+          </div>
+          <AdminEditorPanel
+            id="reviewer-campaign-timeline"
+            title="Campaign timeline"
+            description="Current-cycle invitation dates and reviewer quota. Request-level campaign settings take precedence."
+            scope="Global default · Request override"
+            dataverseFields={REVIEWER_CAMPAIGN_TIMELINE_DATAVERSE_FIELDS}
+          >
+            <ReviewerCampaignTimelineSection />
+          </AdminEditorPanel>
+          <AdminEditorPanel
+            id="reviewer-honorarium"
+            title="Reviewer honorarium"
+            description="The amount stamped on future reviewer honorarium records. Existing records keep their original amount."
+            scope="Global"
+            dataverseFields={HONORARIUM_DATAVERSE_FIELDS}
+          >
+            <HonorariumAmountSection />
+          </AdminEditorPanel>
+          <AdminEditorPanel
+            id="reviewer-discovery-budget"
+            title="Reviewer discovery time budget"
+            description="The maximum runtime for reviewer analysis, discovery, enrichment, and email preparation."
+            scope="Global"
+            dataverseFields={REVIEWER_TIME_BUDGET_DATAVERSE_FIELDS}
+          >
+            <ReviewerTimeBudgetSection />
+          </AdminEditorPanel>
+          <AdminEditorPanel
+            id="reviewer-release-behavior"
+            title="Reviewer materials release"
+            description="Choose whether release emails remain portal-link-only or may also include proposal files."
+            scope="Global"
+            dataverseFields={REVIEWER_RELEASE_ATTACHMENTS_DATAVERSE_FIELDS}
+          >
+            <ReviewerReleaseAttachmentsSection />
+          </AdminEditorPanel>
+        </div>
+      );
+  }
+}
+
+function AiWorkspace({ view }) {
+  switch (view) {
+    case 'models':
+      return (
+        <div className="space-y-6">
+          <AdminEditorPanel
+            id="ai-model-routing"
+            title="Model routing"
+            description="Set reviewed model overrides by application and capability. Defaults remain in effect where no override is saved."
+            scope="Per application"
+            dataverseFields={MODEL_CONFIG_DATAVERSE_FIELDS}
+          >
+            <ModelConfigSection />
+          </AdminEditorPanel>
+          <ResourceLinks
+            title="AI resources"
+            links={[
+              { name: 'Anthropic console', href: 'https://console.anthropic.com', description: 'Provider usage and billing.', external: true },
+            ]}
+          />
+        </div>
+      );
+    case 'prompts':
+      return (
+        <AdminEditorPanel
+          id="ai-prompts"
+          title="Prompts and execution budgets"
+          description="Publish versioned prompt bodies and maintain the reviewed token and timeout limits coupled to them."
+          scope="Per prompt"
           dataverseFields={PROMPT_SECTION_DATAVERSE_FIELDS}
         >
           <PromptTemplatesSection />
-        </CollapsibleCard>
-        <CollapsibleCard
-          title="Email Defaults"
-          subtitle="Edit shared default copy for email workflows"
-          dataverseFields={EMAIL_DEFAULTS_DATAVERSE_FIELDS}
+        </AdminEditorPanel>
+      );
+    case 'usage':
+    default:
+      return <UsageSection />;
+  }
+}
+
+function PeopleWorkspace({ view }) {
+  switch (view) {
+    case 'app-access':
+      return (
+        <AdminEditorPanel
+          id="staff-app-access"
+          title="Application access"
+          description="Grant or revoke access by staff member. Changes are saved against the current canonical grant snapshot."
+          scope="Per staff member"
         >
-          <EmailDefaultsSection />
-        </CollapsibleCard>
-        <CollapsibleCard title="Role Management">
-          <RoleManagementSection />
-        </CollapsibleCard>
-        <CollapsibleCard title="App Access Management">
           <AppAccessSection />
-        </CollapsibleCard>
-        <CollapsibleCard title="Dynamics Identity Linkage">
+        </AdminEditorPanel>
+      );
+    case 'identity':
+      return (
+        <AdminEditorPanel
+          id="staff-identity-linkage"
+          title="Dataverse identity linkage"
+          description="Review active staff profiles and reconcile their Dataverse system-user identities."
+          scope="Per staff member"
+        >
           <DynamicsIdentitySection />
-        </CollapsibleCard>
-        <DynamicsFeedbackSection />
-        <QuickLinksSection />
+        </AdminEditorPanel>
+      );
+    case 'roles':
+    default:
+      return (
+        <AdminEditorPanel
+          id="staff-roles"
+          title="Users and Dynamics Explorer roles"
+          description="Assign internal Dynamics Explorer permissions. Removing a role returns the person to read-only access."
+          scope="Per staff member"
+        >
+          <RoleManagementSection />
+        </AdminEditorPanel>
+      );
+  }
+}
+
+function ResourceLinks({ title, links }) {
+  return (
+    <section aria-labelledby={`${title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-title`}>
+      <h2 id={`${title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-title`} className="text-sm font-semibold text-gray-950">{title}</h2>
+      <div className="mt-2 divide-y divide-gray-200 overflow-hidden rounded-xl border border-gray-200 bg-white">
+        {links.map((link) => (
+          <a
+            key={link.href}
+            href={link.href}
+            target={link.external ? '_blank' : undefined}
+            rel={link.external ? 'noopener noreferrer' : undefined}
+            className="block px-4 py-3 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gray-500"
+          >
+            <span className="text-sm font-semibold text-gray-950">{link.name}</span>
+            <span className="mt-0.5 block text-sm text-gray-600">{link.description}</span>
+          </a>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function WorkspaceContent({ workspace, view }) {
+  switch (workspace) {
+    case 'operations':
+      return <OperationsWorkspace view={view} />;
+    case 'workflows':
+      return <WorkflowsWorkspace view={view} />;
+    case 'ai':
+      return <AiWorkspace view={view} />;
+    case 'people':
+      return <PeopleWorkspace view={view} />;
+    case 'overview':
+    default:
+      return <AdminOverviewSection />;
+  }
+}
+
+// --- Main Page ---
+export default function AdminDashboard() {
+  const router = useRouter();
+  const rawWorkspace = typeof router.query.workspace === 'string' ? router.query.workspace : 'overview';
+  const rawView = typeof router.query.view === 'string' ? router.query.view : undefined;
+  const { workspace, view } = resolveAdminLocation(rawWorkspace, rawView);
+  const activeLocationKey = `${workspace.key}:${view}`;
+  const [visitedLocations, setVisitedLocations] = useState(() => [activeLocationKey]);
+
+  useEffect(() => {
+    const rememberAdminLocation = (url) => {
+      const nextUrl = new URL(url, window.location.origin);
+      if (nextUrl.pathname !== router.pathname) return;
+      const nextLocation = resolveAdminLocation(
+        nextUrl.searchParams.get('workspace') || 'overview',
+        nextUrl.searchParams.get('view') || undefined,
+      );
+      const nextKey = `${nextLocation.workspace.key}:${nextLocation.view}`;
+      setVisitedLocations((current) => {
+        const remembered = new Set(current);
+        remembered.add(activeLocationKey);
+        remembered.add(nextKey);
+        return remembered.size === current.length ? current : [...remembered];
+      });
+    };
+    router.events?.on('routeChangeStart', rememberAdminLocation);
+    return () => router.events?.off('routeChangeStart', rememberAdminLocation);
+  }, [activeLocationKey, router.events, router.pathname]);
+
+  const renderedLocations = visitedLocations.includes(activeLocationKey)
+    ? visitedLocations
+    : [...visitedLocations, activeLocationKey];
+
+  useEffect(() => {
+    if (!router.isReady || typeof window === 'undefined') return;
+    const legacyLocation = adminLocationForHash(window.location.hash);
+    if (!legacyLocation) return;
+    const alreadyThere = workspace.key === legacyLocation.workspace && view === legacyLocation.view;
+    if (!alreadyThere) {
+      void router.replace(
+        {
+          pathname: router.pathname,
+          query: { workspace: legacyLocation.workspace, view: legacyLocation.view },
+          hash: window.location.hash.slice(1),
+        },
+        undefined,
+        { shallow: true, scroll: false },
+      );
+      return;
+    }
+    window.requestAnimationFrame(() => {
+      document.getElementById(window.location.hash.slice(1))?.scrollIntoView({ block: 'start' });
+    });
+  }, [router, view, workspace.key]);
+
+  return (
+    <Layout title="Admin Workspace" description="WMKF system operations and configuration">
+      <div className="py-6 sm:py-8">
+        <AdminWorkspaceHeader workspace={workspace} />
+        <div className="mt-6">
+          <AdminWorkspaceNavigation activeWorkspace={workspace.key} />
+        </div>
+        <div className="mt-5">
+          <AdminViewNavigation workspace={workspace} activeView={view} />
+        </div>
+        {renderedLocations.map((locationKey) => {
+          const [visitedWorkspaceKey, visitedViewKey] = locationKey.split(':');
+          const visitedLocation = resolveAdminLocation(visitedWorkspaceKey, visitedViewKey);
+          const active = locationKey === activeLocationKey;
+          const visitedViewLabel = visitedLocation.workspace.views.find((candidate) => candidate.key === visitedLocation.view)?.label;
+          return (
+            <main
+              key={locationKey}
+              hidden={!active}
+              className="mt-6"
+              aria-label={`${visitedLocation.workspace.label}: ${visitedViewLabel}`}
+            >
+              <WorkspaceContent workspace={visitedLocation.workspace.key} view={visitedLocation.view} />
+            </main>
+          );
+        })}
       </div>
     </Layout>
   );

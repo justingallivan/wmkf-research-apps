@@ -175,3 +175,17 @@ test('drag-to-reorder changes the submitted order', async () => {
     expect(body.questions.map((q) => q.key)).toEqual(['q2', 'impact']);
   });
 });
+
+test('move buttons provide a keyboard-operable reorder path', async () => {
+  render(<ReviewQuestionsSection />);
+  await waitFor(() => expect(screen.getAllByTestId('rq-row')).toHaveLength(2));
+
+  fireEvent.click(screen.getByRole('button', { name: 'Move question 1 down' }));
+  fireEvent.click(screen.getByRole('button', { name: /save changes/i }));
+
+  await waitFor(() => {
+    const post = global.fetch.mock.calls.find(([, options]) => options?.method === 'POST');
+    const body = JSON.parse(post[1].body);
+    expect(body.questions.map((question) => question.key)).toEqual(['q2', 'impact']);
+  });
+});

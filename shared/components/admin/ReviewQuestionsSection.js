@@ -170,6 +170,16 @@ export default function ReviewQuestionsSection() {
   };
   const addRow = () => setRows((prev) => [...prev, blankRow()]);
   const removeRow = (index) => setRows((prev) => prev.filter((_, i) => i !== index));
+  const moveRow = (index, direction) => {
+    const destination = index + direction;
+    if (destination < 0 || destination >= rows.length) return;
+    setRows((prev) => {
+      const next = [...prev];
+      const [moved] = next.splice(index, 1);
+      next.splice(destination, 0, moved);
+      return next;
+    });
+  };
 
   // Native HTML5 drag-to-reorder.
   const onDragStart = (index) => { dragIndex.current = index; };
@@ -270,7 +280,7 @@ export default function ReviewQuestionsSection() {
   return (
     <div data-testid="review-questions-editor">
       <p className="text-xs text-gray-500 mb-3">
-        These are the questions the external review form asks. Drag the ⠿ handle to reorder. Editing here
+        These are the questions the external review form asks. Drag a row or use its Move up and Move down buttons to reorder. Editing here
         changes the live form for new reviews; already-submitted reviews keep the wording they were authored
         against. An existing question&apos;s key is locked (it links prior answers).
       </p>
@@ -329,23 +339,23 @@ export default function ReviewQuestionsSection() {
             }`}
           >
             <div className="flex items-start gap-2">
-              <span className="cursor-grab select-none text-gray-400 pt-2" title="Drag to reorder" aria-label="Drag to reorder">⠿</span>
+              <span className="cursor-grab select-none pt-2 text-xs font-semibold text-gray-400" title="Drag to reorder" aria-hidden="true">Drag</span>
               <div className="flex-1 min-w-0 space-y-2">
                 {conflicts && row.id && conflicts.changed.has(row.id) && (
-                  <p className="text-[11px] text-amber-900" data-testid="rq-row-conflict">
+                  <p className="text-xs text-amber-900" data-testid="rq-row-conflict">
                     Someone else edited this question while you were working. Saving keeps your version and overwrites theirs.
                   </p>
                 )}
                 {conflicts && row.id && conflicts.removed.has(row.id) && (
-                  <p className="text-[11px] text-red-800" data-testid="rq-row-removed">
+                  <p className="text-xs text-red-800" data-testid="rq-row-removed">
                     This question was removed on the server. Saving will recreate it under its existing key.
                   </p>
                 )}
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-xs font-semibold text-gray-500">Q{index + 1}</span>
                   {row.id ? (
-                    <span className="text-[11px] px-1.5 py-0.5 rounded bg-gray-200 text-gray-600" title="Key is locked — it links existing reviewer answers">
-                      key: {row.key} 🔒
+                    <span className="rounded bg-gray-200 px-1.5 py-0.5 text-xs text-gray-600" title="Key is locked because it links existing reviewer answers">
+                      key: {row.key} (locked)
                     </span>
                   ) : (
                     <input
@@ -375,6 +385,24 @@ export default function ReviewQuestionsSection() {
                     <input type="checkbox" checked={row.required} onChange={(e) => update(index, { required: e.target.checked })} />
                     Required
                   </label>
+                  <button
+                    type="button"
+                    onClick={() => moveRow(index, -1)}
+                    disabled={index === 0}
+                    aria-label={`Move question ${index + 1} up`}
+                    className="min-h-9 rounded border border-gray-300 bg-white px-2 py-1 text-xs font-semibold text-gray-600 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Move up
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => moveRow(index, 1)}
+                    disabled={index === rows.length - 1}
+                    aria-label={`Move question ${index + 1} down`}
+                    className="min-h-9 rounded border border-gray-300 bg-white px-2 py-1 text-xs font-semibold text-gray-600 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Move down
+                  </button>
                   <button
                     onClick={() => removeRow(index)}
                     className="ml-auto text-xs text-red-600 hover:text-red-800"
@@ -457,7 +485,7 @@ function OptionsEditor({ options, onChange }) {
 
   return (
     <div className="rounded border border-gray-200 bg-white p-2">
-      <p className="text-[11px] uppercase tracking-wide text-gray-400 mb-1">Options</p>
+      <p className="mb-1 text-xs uppercase tracking-wide text-gray-400">Options</p>
       <div className="space-y-1">
         {options.map((o, i) => (
           <div key={i} className="flex items-center gap-2">
