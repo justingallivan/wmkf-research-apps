@@ -3,7 +3,7 @@ title: "Reviewer Engagement Spec — Model B (accept-now) + reminders, quota, to
 domain: reviewer-workbench
 kind: source-of-truth
 status: canonical
-summary: "A PD action that emails the proposal/materials to the ACCEPTED reviewers. It is a clean wrapper over the existing manual Materials send — NOT a..."
+summary: "Reviewer lifecycle, campaign configuration, token TTL, quota, and reminder behavior; automatic reminder scheduling is currently paused."
 canonical: true
 cataloged: 2026-07-02
 owner: product-engineering
@@ -18,7 +18,7 @@ related:
 
 # Reviewer Engagement Spec — Model B (accept-now) + reminders, quota, token TTL
 
-**Status:** IMPLEMENTED — **all four phases LIVE (S275).** [VERIFIED via source] Phase 1 `pages/api/review-manager/campaign-config.js`; Phase 2 `lib/external/reviewer-token-ttl.js` (via `send-emails-service.js`) + `materials_not_sent` guard in `lib/services/review-upload.js`; Phase 3 `pages/api/cron/reviewer-reminders.js` + `lib/services/reviewer-reminder-sweep.js`; Phase 4 `lib/services/reviewer-quota.js` (`maybeNotifyQuotaReached` — originally in `respond.js`, since the S350 accept-fast-response build called from the acceptance drain `lib/services/reviewer-acceptance-drain.js` after it re-verifies the committed accept; since S352 the notify actually EMAILS the lead PD, see `REVIEWER_QUOTA_PD_EMAIL_PLAN.md`) + `pages/api/review-manager/withdraw-sufficient.js`. Schema provisioned in prod (§4, 2026-06-21). The original Codex sanity pass (S275, commit `18933df3`) folded its P1/P2 findings in before build (phase reorder so token cap ships with Release; quota count-after-write + If-Match concurrency; `materials_sent` guard; reminder-marker clear on Re-invite; expired-link copy/UI). S277: the manual "Re-invite already-invited" UI affordance was removed (§3.E). Supersedes the interpretation snapshot in `REVIEWER_ENGAGEMENT_PLAN_INTERPRETATION.md`.
+**Status:** Phases 1, 2, and 4 remain live. Phase 3 reminder code remains implemented, but its Vercel schedule was **paused on 2026-09-01** during the reviewer-token incident response. [VERIFIED via source] Phase 1 `pages/api/review-manager/campaign-config.js`; Phase 2 `lib/external/reviewer-token-ttl.js` (via `send-emails-service.js`) + `materials_not_sent` guard in `lib/services/review-upload.js`; Phase 3 code `pages/api/cron/reviewer-reminders.js` + `lib/services/reviewer-reminder-sweep.js`; Phase 4 `lib/services/reviewer-quota.js` (`maybeNotifyQuotaReached` — originally in `respond.js`, since the S350 accept-fast-response build called from the acceptance drain `lib/services/reviewer-acceptance-drain.js` after it re-verifies the committed accept; since S352 the notify actually EMAILS the lead PD, see `REVIEWER_QUOTA_PD_EMAIL_PLAN.md`) + `pages/api/review-manager/withdraw-sufficient.js`. Schema provisioned in prod (§4, 2026-06-21). The original Codex sanity pass (S275, commit `18933df3`) folded its P1/P2 findings in before build (phase reorder so token cap ships with Release; quota count-after-write + If-Match concurrency; `materials_sent` guard; reminder-marker clear on Re-invite; expired-link copy/UI). S277: the manual "Re-invite already-invited" UI affordance was removed (§3.E). Supersedes the interpretation snapshot in `REVIEWER_ENGAGEMENT_PLAN_INTERPRETATION.md`.
 
 **Citation convention:** current-behavior claims carry `[verified <file>::<symbol>]` (read this session). `[LIVE S275]` marks the four additions that were originally tagged `[BUILD]` (planned) and **shipped in the S275 build** — historical "this was the new work" markers, not pending. `[SCHEMA]` marks a field backed by a custom Dataverse column — **all of which are now provisioned in prod (see §4, 2026-06-21)**; the tag is a type-marker, not a "still to create" flag. Settled design calls are `[DECISION]`.
 
@@ -59,8 +59,11 @@ A PD action that **emails the proposal/materials to the ACCEPTED reviewers**. It
 - **Target:** `wmkf_accepted = true` rows only, enforced **server-side** `[DECISION #10]` (reuse the materials-send recipient gate).
 - **Token effect:** the materials email re-mints a fresh, **long-lived** token (§3.D). This is the link accepted reviewers use to review; it supersedes their invite link `[verified §2.6 latest-link-wins]`.
 
-### 3.B  Two reminders (daily cron in `pages/api/cron/`) `[LIVE S275]` `[DECISION #14]`
-Each reminder is **off by default** with a configurable "days before."
+### 3.B  Two reminders (scheduler paused 2026-09-01) `[IMPLEMENTED S275]` `[DECISION #14]`
+
+**Operational hold:** `/api/cron/reviewer-reminders` remains implemented and cron-secret protected, but it is not registered in the production Vercel cron schedule. Do not restore the schedule until (1) reminder sends no longer invalidate an active reviewer link/session, (2) the per-request enabled and lead-day settings are visible and editable in the staff UI, and (3) new-request defaults fail closed. Manual reminders are also frozen during the incident response.
+
+Runtime eligibility requires each reminder flag to be exactly `true`. The current Dataverse schema defaults both flags to `true` on a bare new request, while the current Campaign settings modal exposes neither flag nor lead-day control. Older rows may be `null`, which the sweep treats as disabled. This schema/UI mismatch is a configuration gap, not an intentional operator-controlled default.
 
 **Respond-by reminder** — nudge invited non-responders.
 - Target: `invited && no response` (not accepted/declined/withdrawn).
@@ -95,10 +98,10 @@ No JWT "extension" (a signed JWT can't be extended in place; the raw token isn't
 ### 3.E  Per-request campaign config + panel change `[LIVE S275]` `[SCHEMA]`
 Persist, on the request, what the cron and quota logic need (today these are throwaway `[verified §2.11]`):
 - `respondOffsetDays` (default 7), `reviewDueDate` (fixed), `respondReminderEnabled` + `respondReminderLeadDays`, `reviewDueReminderEnabled` + `reviewDueReminderLeadDays`, `desiredCount`, `quotaNotifiedAt`.
-- Written on first invite-batch send; **editable later** from the Reviewers tab; read live by the cron. Edits apply going forward, not retroactively. `[DECISION #7]`
+- Timing and quota values are written on first invite-batch send and editable later from the Reviewers tab. The backend campaign-config API can read/write the reminder enabled/lead pairs, but the current Campaign settings modal does **not** expose those controls. The reminder schedule must not be restored until that operator surface and fail-closed defaults are built. `[DECISION #7; operational hold 2026-09-01]`
 - **Panel change:** the respond-by input becomes **"days to respond" (offset)**, not a fixed date `[DECISION — fixes the multi-wave bug where a fixed day-0 date shortchanges later waves]`; review-due stays a fixed date; proposal-delivery stays informational email text only (no reminder — `[DECISION]` dropped). As of 2026-07-06, `/admin` also stores current-cycle defaults (invitation start, response offset, proposal release, review due) in `wmkf_appsystemsettings` key `reviewer.campaign_timeline_defaults`; `InviteEmailModal` uses them before request-level overrides and renders the timeline editor collapsed by default.
 - Multi-wave / Re-invite: a new wave is a normal first-time invite (its own `emailSentAt`); a Re-invite re-mints (review-due cap), re-stamps `emailSentAt`, and **clears `wmkf_respondremindersentat`**; request-level config is untouched. `[DECISION #6]`
-- **No manual "Re-invite already-invited" UI affordance (`[DECISION]` Justin, S277).** The automated respond-by reminder (§3.B, Phase 3 LIVE) is the nudge for invited non-responders, so the Candidates-panel button was removed (`shared/components/reviewers/ReviewerInvitePanel.js`, formerly `CandidatesPanel.js`). The server-side `allowResend` re-mint + marker-clear contract (lines above, §2.5, §4) is **retained** for programmatic re-mint paths (e.g. `regenerate-token`); a new wave still goes out as a normal first-time invite via "Send invitation" on not-invited rows.
+- **No manual "Re-invite already-invited" UI affordance (`[DECISION]` Justin, S277).** It was removed when the automated respond-by reminder was introduced. While the reminder scheduler is paused, there is no built-in automatic nudge for invited non-responders; staff should not substitute a link-bearing resend during the token-incident hold. The server-side `allowResend` re-mint + marker-clear contract (lines above, §2.5, §4) remains implemented but is part of the token-safety remediation surface. A new wave still goes out as a normal first-time invite via "Send invitation" on not-invited rows.
 
 ---
 
@@ -129,7 +132,7 @@ On `wmkf_appreviewersuggestion`:
 
 - **Phase 1 — Persistence + panel:** campaign config (discrete columns, §4) on the request; panel "days to respond" (offset) change. **No token-behavior change yet** — invite keeps minting `now + 90`. Pure foundation.
 - **Phase 2 — Release + token TTL (ship together):** the accepted-only Release action (mints the long-lived materials token) **and** the invite/reminder token cap (review-due + grace), landed in the same release so the long-lived materials link always exists before the cap can bite. **Also here:** add the missing `materials_sent` server-side guard on the upload endpoint (Codex P2 — `pages/api/external/review/[token]/upload.js` → `lib/services/review-upload.js` accept any valid token today without checking `wmkf_reviewstatus`, so an accepted-pre-materials reviewer could upload).
-- **Phase 3 — Reminders:** the two-reminder daily cron + the `wmkf_respondremindersentat` marker (with Re-invite clearing it, §3.B).
+- **Phase 3 — Reminders:** the two-reminder cron code + the `wmkf_respondremindersentat` marker shipped in S275; its Vercel schedule is paused as of 2026-09-01 (§3.B).
 - **Phase 4 — Quota:** count-after-write + conditional null→set notify + the PD selective-decline Workbench action (writes `withdrawn_sufficient`).
 
 **Model-B invitation copy — DONE (S275).** The default invitation template (`shared/components/reviewers/email-template-store.js` `DEFAULT_TEMPLATES.invitation`) now says the COI/AI acknowledgements + honorarium are confirmed *when you accept*, with the full proposal following on release — no longer the Model-A "no commitment today, all comes later." (The `hold`/`finalize` templates were REMOVED in S279 — the template set is now `invitation` + `materials` + `followup` + `thankyou`. A PD who saved a customized invitation template keeps their own wording — only the default changed.)
