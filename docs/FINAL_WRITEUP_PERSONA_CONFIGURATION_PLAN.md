@@ -3,7 +3,7 @@ title: Final Writeup Persona Configuration Consolidation Plan
 domain: workbench
 kind: plan
 status: active
-summary: "Source-built, rollout-disabled replacement for persona teams using one versioned Final Writeup staffing configuration in the existing Admin editor."
+summary: "Production-deployed v2-capable staffing replacement in the existing Admin editor; Production still stores v1 and persona lenses remain disabled."
 canonical: false
 cataloged: 2026-08-31
 last_verified: 2026-08-31
@@ -19,20 +19,22 @@ related:
 
 ## Decision and status
 
-**Verdict: SLICES A, B, AND D ARE SOURCE-BUILT; SLICE C IS NOT EXECUTED.
-DO NOT ENABLE YET.**
+**Verdict: SLICES A, B, AND D ARE PRODUCTION-DEPLOYED; SLICE C PUBLICATION IS
+NOT EXECUTED. DO NOT ENABLE YET.**
 
 The owner rejected the operational burden of creating and maintaining three
 Dataverse owner teams solely as persona markers. This plan replaces that
 unshipped storage choice with an extension of the existing, Production-proved
 Final Writeup configuration and its existing Admin editor.
 
-The role-specific dashboard behavior and version-2 staffing contract are now
-source-built on branch `codex/final-writeup-persona-rollout`. The team resolver,
-team-provisioning specification, and provisioning scripts have been removed as
-a superseded prototype. The persona feature flag remains false, Production
-still stores the proved version-1 Research matrix, no persona team exists in
-Production, and the failed create attempt made zero Dataverse writes.
+The role-specific dashboard behavior and version-2 staffing contract are live
+on `main` at commit `84bf465b` in Ready Production deployment
+`dpl_41SybgPYfJXGarf7UqcMGCLMy4KS`. The team resolver, team-provisioning
+specification, and provisioning scripts have been removed as a superseded
+prototype. The persona feature flag remains false, Production still stores
+version 1 with the proved Research and Southern California audiences, no
+persona team exists in Production, and the failed create attempt made zero
+Dataverse writes.
 
 ## Contract surface
 
@@ -54,10 +56,11 @@ Production, and the failed create attempt made zero Dataverse writes.
 
 ## Verified current state
 
-- **[VERIFIED via Production proof recorded 2026-08-31]**
-  `final_writeup.matrix_audiences` already stores the Research Grant Program
-  audience and has passed signed-in superuser publish, ETag readback, reload,
-  and dashboard consumption.
+- **[VERIFIED via signed-in Production Admin and dashboard readback 2026-08-31]**
+  `final_writeup.matrix_audiences` stores v1 with nine Research reviewers and
+  six Southern California reviewers. The Research audience has passed signed-in
+  superuser publish, ETag readback, reload, and dashboard consumption; the
+  later deployment smoke read both audiences without writing the setting.
 - **[VERIFIED via `matrix-audience-service.js` and focused tests]** the service
   reads strict v1/v2 values, resolves the exact enabled `WMKF Final Writeup
   Reviewer` roster, publishes only complete v2 replacements through
@@ -77,8 +80,9 @@ Production, and the failed create attempt made zero Dataverse writes.
   their confirmed PC responsibility; leadership has no reliable request-field
   source. Names, email, job titles, and program labels therefore remain
   non-authoritative.
-- **[VERIFIED via source and prior Production readback]** the feature flag
-  remains false and Production ordinary-user behavior is unchanged. The v2
+- **[VERIFIED via source, Vercel deployment inspection, and signed-in Production
+  readback]** the v2-capable code is Production-deployed, the feature flag
+  remains false, and ordinary-user behavior is unchanged. The v2
   migration/repair command exists but has not been run against Production.
 
 ## Product and administration decision
@@ -155,8 +159,9 @@ organizational facts.
 
 ## Backward compatibility and promotion
 
-Production currently contains a valid version-1 Research matrix. Deployment of
-version-2-capable code must not disturb it.
+Production currently contains a valid version-1 matrix with Research and
+Southern California audiences. Deployment of version-2-capable code at
+`84bf465b` / `dpl_41SybgPYfJXGarf7UqcMGCLMy4KS` did not disturb it.
 
 1. Readers continue accepting version 1 for matrix resolution exactly as they
    do today. A version-1 value has no persona contract. If the persona flag is
@@ -169,7 +174,7 @@ version-2-capable code must not disturb it.
    one-time draft, but suggestions never authorize runtime behavior before
    publication.
 3. Admin PUT accepts only a complete version-2 replacement and the exact loaded
-   ETag. The existing Research audience must survive the normalized v1→v2
+   ETag. Both existing program audiences must survive the normalized v1→v2
    draft byte-for-byte in membership semantics.
 4. The first publication is either performed through the existing superuser UI
    or through a dry-run-by-default, ETag-guarded upgrade command using the same
@@ -179,7 +184,8 @@ version-2-capable code must not disturb it.
    setting to v2; the explicit **No persona lens** state prevents that rule from
    forcing a false staff assignment.
 5. Post-write readback must prove version 2, exact persona assignments, exact
-   unchanged Research membership, exact configured programs, and a new ETag.
+   unchanged Research and Southern California membership, exact configured
+   programs, and a new ETag.
 6. Persona lenses remain source-disabled until that readback and representative
    PC/Leadership Word-access proof are complete.
 
@@ -270,7 +276,7 @@ existing Admin Overview, not as another configuration panel.
 
 ## Implementation slices
 
-### Slice A — replace the storage contract while disabled — source-built
+### Slice A — replace the storage contract while disabled — Production-deployed
 
 - Add version-2 validation, canonicalization, v1 read compatibility, and v2
   optimistic publication to the existing matrix-audience service.
@@ -282,7 +288,7 @@ existing Admin Overview, not as another configuration panel.
 - Keep the existing Admin route path and superuser guard; update its response
   contract and body-size proof rather than adding a route.
 
-### Slice B — consolidate the existing Admin editor — source-built
+### Slice B — consolidate the existing Admin editor — Production-deployed
 
 - Rename the one panel **Final Writeup staffing**.
 - Add the compact responsibility grid inside the existing component.
@@ -297,17 +303,18 @@ existing Admin Overview, not as another configuration panel.
 - Verify desktop and narrow layouts; responsibility labels remain visible and
   touch targets remain usable without horizontal dependence.
 
-### Slice C — migrate the live setting without enabling personas — not executed
+### Slice C — migrate the live setting without enabling personas — deployment complete; publication not executed
 
 - Dry-run the v1→v2 transformation against Production reads.
-- Prove the Research reviewer GUID set is unchanged.
-- Record the first v2-capable Production deployment as the rollback floor and
-  prove the ETag-guarded v1 projection/repair mode before publication.
+- Prove both program-audience reviewer GUID sets are unchanged.
+- **Complete:** first v2-capable Production deployment
+  `dpl_41SybgPYfJXGarf7UqcMGCLMy4KS` on `84bf465b` is the rollback floor.
+  Prove the ETag-guarded v1 projection/repair mode before publication.
 - Under explicit write authorization, publish once through the existing
   optimistic setting seam and read back the exact stored value and new ETag.
 - Leave the persona feature flag false.
 
-### Slice D — remove the superseded team prototype — source-built
+### Slice D — remove the superseded team prototype — Production-deployed
 
 - Delete the team provisioning/preflight scripts, team schema manifest,
   `FINAL_WRITEUP_PERSONA_TEAMS` constants,

@@ -47,9 +47,11 @@ the existing versioned Final Writeup Admin setting with explicit GUID-only,
 multi-valued PD, PC, Leadership, and no-lens staffing assignments; Allison
 Keller is President and Beth Pruitt is CSO plus a responsible PD on some
 requests. The v2 contract, consolidated Admin editor, and dry-run-first ETag
-tooling are source-built with the rollout flag false; the superseded team
-source is removed and no Production team was created. Deployment,
-migration/readback, and representative Word access remain. The
+tooling are Production-deployed at `84bf465b` in Ready deployment
+`dpl_41SybgPYfJXGarf7UqcMGCLMy4KS` with the rollout flag false; the superseded
+team source is removed and no Production team was created. Signed-in readback
+proved the stored v1 setting contains nine Research and six Southern California
+reviewers. V2 migration/readback and representative Word access remain. The
 first fixed gate is a human-in-the-loop, end-to-end Initial Assessment pilot by
 2026-08-10, ahead of proposal intake around 2026-08-18. Authorized staff use a
 dedicated representative dummy production request to generate, inspect, and edit the canonical
@@ -291,8 +293,9 @@ planned. Current authority is
   California staff Anneli Stone and Saskia Pallais. Signed-in Admin
   publication/readback survived a full reload; Request `1002788` then rendered
   under Research with exactly those nine reviewer columns and zero
-  browser-console errors. Southern California remains explicitly unconfigured
-  pending its complete audience. The Admin editor stores stable broad Grant
+  application-console errors. Later signed-in Production readback from the
+  v2-capable deployment proved the stored v1 setting also contains a six-person
+  Southern California audience. The Admin editor stores stable broad Grant
   Program GUID → reviewer GUID audiences, resolves names live, rejects stale
   publishes through Dataverse ETag/`If-Match`, and makes unconfigured programs
   explicit while stale references fail closed.

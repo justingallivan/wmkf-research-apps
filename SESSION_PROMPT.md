@@ -70,17 +70,18 @@ Workbench redesign.
 3. **[PRODUCTION-LIVE + SIGNED-IN READ/WRITE PROVED 2026-08-31]
    Program-specific matrix audiences.** Commit `5573bca3` is live in Ready
    Production deployment `dpl_5DNuc2BV76RihwuWu8ZFYBgxBXE7`. Role eligibility
-   and matrix assignment are explicitly separate. The published Research
-   audience contains nine current reviewer-role members and excludes
-   owner-confirmed Southern California staff Anneli Stone and Saskia Pallais.
+   and matrix assignment are explicitly separate. Production readback now
+   proves the stored v1 setting contains a nine-person Research audience and a
+   six-person Southern California audience; Anneli Stone and Saskia Pallais are
+   excluded from Research and included in Southern California.
    Signed-in Admin publication/readback survived a full reload; the coordinator
    dashboard then rendered Request `1002788` under Research with exactly those
-   nine reviewer columns and zero browser-console errors. Southern California is
-   deliberately unconfigured pending confirmation of its complete audience.
+   nine reviewer columns and zero application-console errors.
    Publishes round-trip the loaded Dataverse ETag and reject stale Admin drafts
    with `409`; unconfigured programs remain explicit and stale references fail
    closed.
-4. **[SOURCE-BUILT V2 / ROLLOUT DISABLED] Staff/executive lenses.** The owner
+4. **[PRODUCTION-DEPLOYED V2-CAPABLE / STORED V1 / ROLLOUT DISABLED]
+   Staff/executive lenses.** The owner
    rejected a second Dataverse-team onboarding layer. The reviewed replacement
    extends the existing versioned Final Writeup Admin setting and its one
    editor/Publish action with explicit PD, PC, Leadership, overlap, and **No
@@ -89,12 +90,15 @@ Workbench redesign.
    pruning, explicit no-lens rows, rollout-off no-read behavior, a dry-run-first
    ETag upgrade/repair/downgrade command, and the consolidated one-panel editor.
    The superseded team constants, adapter path, schema, and scripts are removed.
-   Production remains on the proved v1 Research setting and ordinary behavior is
-   unchanged because the persona flag is still false. Next: finish review/gates,
-   deploy the v2-capable floor, migrate/read back the unchanged Research audience,
-   prove representative PC/leadership Word access, then enable and smoke the
-   lenses. No elevated Dataverse team privilege or outside administrator is part
-   of the selected path.
+   Commit `84bf465b` is live in Ready Production deployment
+   `dpl_41SybgPYfJXGarf7UqcMGCLMy4KS`, establishing the v2-capable rollback
+   floor. Production still stores v1 with the proved Research and Southern
+   California audiences, and ordinary behavior is unchanged because the
+   persona flag is still false. Next: under explicit write authorization,
+   dry-run and migrate/read back both unchanged audiences as v2, prove
+   representative PC/leadership Word access, then enable and smoke the lenses.
+   No elevated Dataverse team privilege or outside administrator is part of
+   the selected path.
 
 ## Opportunistic Production Proof — Do Not Block the Deadline
 
@@ -135,7 +139,7 @@ Workbench redesign.
 | `docs/API_ROUTE_SECURITY_MATRIX.md` | Current route/auth/write contracts |
 | `docs/APPLICATION_STATE_ATLAS.md` | Current live state and ownership routing |
 | `docs/atlas/dataverse-wmkf-requestdocument.md` | Request Document schema/producer truth |
-| `lib/services/final-writeup/matrix-audience-service.js` | Source-built v1/v2 staffing contract; Production still stores v1 |
+| `lib/services/final-writeup/matrix-audience-service.js` | Production-deployed v1/v2 staffing contract; Production still stores v1 |
 
 ## Verification Receipt
 

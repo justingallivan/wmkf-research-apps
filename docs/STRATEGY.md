@@ -175,16 +175,18 @@ reviewer GUID configuration. The published Research audience contains nine
 current reviewer-role members and excludes owner-confirmed Southern California
 staff Anneli Stone and Saskia Pallais. Signed-in Admin publication/readback
 survived reload; Request `1002788` rendered under Research with exactly those
-nine columns and zero browser-console errors. Southern California remains
-explicitly unconfigured pending its complete audience. The reviewed persona
+nine columns and zero application-console errors. Later signed-in Production
+readback proved the stored v1 setting also contains a six-person Southern
+California audience. The reviewed persona
 plan extends the same versioned Final Writeup setting and existing Admin editor
 with GUID-only, multi-valued PD, PC, Leadership, and explicit no-lens staffing
 assignments: Allison Keller is President; Beth Pruitt is CSO and also a
 responsible PD on some requests. The v2 contract, consolidated editor, and
-ETag upgrade/repair/downgrade tooling are source-built with the rollout flag
-false; the superseded team source is removed and no team exists. Deployment,
-v2 migration/readback, representative PC/leadership Word-access proof, and
-persona enablement remain gated. Initial Assessment
+ETag upgrade/repair/downgrade tooling are Production-deployed at `84bf465b` in
+Ready deployment `dpl_41SybgPYfJXGarf7UqcMGCLMy4KS` with the rollout flag
+false; the superseded team source is removed and no team exists. V2
+migration/readback, representative PC/leadership Word-access proof, and persona
+enablement remain gated. Initial Assessment
 restore/Board writes remain separately owner-gated.
 
 **Recently completed:** the Staff Deliberations workspace/history UX, curated

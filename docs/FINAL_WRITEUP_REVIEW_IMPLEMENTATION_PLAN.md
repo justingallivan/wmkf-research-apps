@@ -54,8 +54,9 @@ contains nine current reviewer-role members and excludes owner-confirmed
 Southern California staff Anneli Stone and Saskia Pallais. Signed-in Admin
 publication/readback survived a full reload; the coordinator dashboard then
 rendered Request `1002788` under Research with exactly those nine reviewer
-columns and zero browser-console errors. Southern California remains explicitly
-unconfigured pending confirmation of its complete audience. The Admin editor
+columns and zero application-console errors. Later signed-in Production
+readback from the v2-capable deployment proved the stored v1 setting also
+contains a six-person Southern California audience. The Admin editor
 stores separate broad Grant Program GUID → reviewer `systemuser` GUID audiences
 in `wmkf_appsystemsettings`, using the request's existing `wmkf_grantprogram`
 lookup. Unconfigured request programs are called out explicitly and stale saved
@@ -106,10 +107,13 @@ The named prerequisites are deliberately attached to the slices that need them:
    Claude reviewed the focused replacement plan as **READY WITH NAMED CHANGES**;
    all findings are incorporated in
    `docs/FINAL_WRITEUP_PERSONA_CONFIGURATION_PLAN.md`. The v2 contract, Admin
-   editor, and dry-run-first ETag migration/repair/downgrade tooling are
-   source-built with the flag false; the superseded team source is removed and
-   its failed apply made zero writes. Deploy the v2-capable rollback floor,
-   migrate/read back the setting while disabled, then prove representative
+   editor, and dry-run-first ETag migration/repair/downgrade tooling are live
+   at commit `84bf465b` in Ready Production deployment
+   `dpl_41SybgPYfJXGarf7UqcMGCLMy4KS` with the flag false; the superseded team
+   source is removed and its failed apply made zero writes. Signed-in readback
+   proved Production still stores v1 with nine Research and six Southern
+   California reviewers. After explicit write authorization, migrate/read back
+   both unchanged audiences while disabled, then prove representative
    PC/leadership SharePoint access before enablement. No name, email, job-title,
    program-taxonomy inference, new team privilege, or outside administrator is
    used.
@@ -579,9 +583,9 @@ were independently verified.
   reviewer-role members and excludes owner-confirmed Southern California staff
   Anneli Stone and Saskia Pallais. Admin publish/readback survived reload, and
   Request `1002788` rendered under Research with exactly those nine columns and
-  zero browser-console errors. Southern California remains explicitly
-  unconfigured pending its complete audience.
-- **Source-built behind the disabled resolver:** PD users receive group-review
+  zero application-console errors. Later signed-in Production readback proved
+  the stored v1 setting also contains a six-person Southern California audience.
+- **Production-deployed behind the disabled resolver:** PD users receive group-review
   rows plus their own writeups, PC users receive all rows plus the complete
   neutral matrix, leadership receives leadership-stage rows, overlapping
   memberships receive the union, and unassigned users fail closed. Rollout and

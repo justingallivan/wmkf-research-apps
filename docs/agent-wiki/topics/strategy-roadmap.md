@@ -257,9 +257,12 @@ document inventory, and individual implementation plans do not establish priorit
   complete neutral current-Final × exact reviewer-role matrix. Signed-in
   Production DOM proof showed the exact 11-person roster and correct Request
   `1002788` states/actions with zero browser-console errors. The version-2 Final
-  Writeup staffing contract and consolidated Admin editor are source-built with
-  the persona flag false; deployment/migration and representative Word-access
-  proof remain open. The unshipped no-privilege-team prototype is removed from
+  Writeup staffing contract and consolidated Admin editor are
+  Production-deployed at `84bf465b` in Ready deployment
+  `dpl_41SybgPYfJXGarf7UqcMGCLMy4KS` with the persona flag false. Signed-in
+  readback proved the stored v1 setting contains nine Research and six Southern
+  California reviewers. V2 migration and representative Word-access proof
+  remain open. The unshipped no-privilege-team prototype is removed from
   current source and created no Production teams.
 - **Prior owner-directed release (S469, 2026-08-30):** durable Executor
   budgets are Production-deployed and owner-viewed in the safe no-revision/code-
@@ -537,8 +540,9 @@ document inventory, and individual implementation plans do not establish priorit
   nine current reviewer-role members and excludes owner-confirmed Southern
   California staff Anneli Stone and Saskia Pallais. Admin publication/readback
   survived reload; Request `1002788` rendered under Research with exactly those
-  nine columns and zero browser-console errors. Southern California remains
-  explicitly unconfigured pending its complete audience.
+  nine columns and zero application-console errors. A later signed-in readback
+  from the v2-capable Production deployment proved the stored v1 setting also
+  contains a six-person Southern California audience.
 - Calendar direction (owner-confirmed 2026-07-28): the first gate is a
   human-in-the-loop, end-to-end Initial Assessment pilot, originally targeted at
   2026-08-10, before proposals begin arriving around 2026-08-18. **The 2026-08-10

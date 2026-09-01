@@ -895,11 +895,13 @@ silently extend its paths or names to writeup publications.
    full reload. The published Research audience contains nine current
    reviewer-role members, excludes owner-confirmed Southern California staff
    Anneli Stone and Saskia Pallais, and rendered Request `1002788` with exactly
-   those nine reviewer columns and zero browser-console errors. Southern
-   California remains explicitly unconfigured pending its complete audience.
-   Personal lenses remain disabled. The reviewed version-2 staffing contract,
-   consolidated Admin editor, and ETag tooling are source-built; deployment,
-   publication/readback, and representative Word-access proof remain. The
+   those nine reviewer columns and zero application-console errors. Later
+   signed-in Production readback proved the stored v1 setting also contains a
+   six-person Southern California audience. Personal lenses remain disabled.
+   The reviewed version-2 staffing contract, consolidated Admin editor, and
+   ETag tooling are Production-deployed at `84bf465b` in Ready deployment
+   `dpl_41SybgPYfJXGarf7UqcMGCLMy4KS`; v2 publication/readback and representative
+   Word-access proof remain. The
    unshipped team prototype is removed and no Dataverse administrator is
    required. Keep acknowledgement distinct from document lifecycle,
    external distribution, and the AkoyaGo publication projection.

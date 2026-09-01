@@ -184,7 +184,9 @@ returned the reviewed-history state. The stored acknowledgement time is
   proof of the exact roster and correct Request `1002788` states/actions. The
   reviewed persona plan uses the existing versioned Final Writeup Admin setting
   for GUID-only, multi-valued PD/PC/Leadership/no-lens assignments. That v2
-  contract, consolidated editor, and ETag tooling are source-built with the
+  contract, consolidated editor, and ETag tooling are Production-deployed at
+  `84bf465b` in Ready deployment `dpl_41SybgPYfJXGarf7UqcMGCLMy4KS` with the
   rollout flag false; the superseded team source is removed and no Production
-  team was created. Deployment, v2 migration/readback, and representative
-  PC/leadership Word access remain before enablement.
+  team was created. Signed-in readback proved the stored v1 setting contains
+  nine Research and six Southern California reviewers. V2 migration/readback
+  and representative PC/leadership Word access remain before enablement.

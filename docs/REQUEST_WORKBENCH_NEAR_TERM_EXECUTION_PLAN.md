@@ -881,10 +881,13 @@ Decision order:
    `dpl_Frc6fAonyFFYwiWyFJCzzE3UNune`. Signed-in Production DOM proof showed
    the exact 11-person roster and correct Request `1002788` states/actions with
    zero browser-console errors. The reviewed version-2 Final Writeup staffing
-   configuration, consolidated Admin editor, and ETag tooling are source-built
-   with the feature flag false; live deployment/migration/readback and
-   representative file-access verification remain gated. The unshipped team
-   mechanism is removed from current source.
+   configuration, consolidated Admin editor, and ETag tooling are
+   Production-deployed at `84bf465b` in Ready deployment
+   `dpl_41SybgPYfJXGarf7UqcMGCLMy4KS` with the feature flag false. Signed-in
+   readback proved the stored v1 setting contains nine Research and six
+   Southern California reviewers. V2 migration/readback and representative
+   file-access verification remain gated. The unshipped team mechanism is
+   removed from current source.
 4. **Initial Assessment** — the pilot and administrator controls are
    Production-deployed and the signed-in read surface has passed. Decide
    whether to authorize exact restore and/or first Board-snapshot write proof,
