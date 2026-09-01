@@ -50,7 +50,23 @@ function reviewerAffiliationOf(reviewer) {
   const personAffiliation = typeof reviewer?.affiliation === 'string'
     ? reviewer.affiliation.trim()
     : '';
-  return acceptedAffiliation || personAffiliation || null;
+  const affiliation = acceptedAffiliation || personAffiliation;
+  const email = typeof reviewer?.email === 'string' ? reviewer.email.trim() : '';
+  if (!affiliation || !email) return affiliation || null;
+
+  // Some accepted-reviewer records carry a legacy free-text affiliation with
+  // the email appended (occasionally as "Electronic address: …"). The shared
+  // reviewer rows already render email separately, so remove only an exact
+  // trailing copy and leave all other affiliation text untouched.
+  const emailIndex = affiliation.toLowerCase().lastIndexOf(email.toLowerCase());
+  if (emailIndex < 0) return affiliation;
+  const suffix = affiliation.slice(emailIndex + email.length);
+  if (suffix.replace(/[\s,.;:]/g, '') !== '') return affiliation;
+  return affiliation
+    .slice(0, emailIndex)
+    .replace(/electronic\s+address\s*:?\s*$/i, '')
+    .replace(/[\s,.;:]+$/g, '')
+    .trim() || null;
 }
 
 // Reviews tab rating order, and the projection field that holds each value.

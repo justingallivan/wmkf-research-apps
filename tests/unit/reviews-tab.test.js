@@ -175,6 +175,32 @@ test.each([
   expect(screen.queryByText(reason, { exact: true })).not.toBeInTheDocument();
 });
 
+test('separates a trailing reviewer email from the affiliation identity line', async () => {
+  fetch.mockResolvedValue({
+    ok: true,
+    json: async () => ({
+      success: true,
+      proposals: [{
+        proposalId: 'req1',
+        reviewers: [{
+          suggestionId: 'g2',
+          name: 'Dr. Pending',
+          reviewerAffiliation: 'Department of Biology, Lund University. Electronic address: pending@lund.se.',
+          email: 'pending@lund.se',
+          reviewStatus: 'materials_sent',
+          materialsSentAt: '2026-08-01T00:00:00Z',
+        }],
+      }],
+    }),
+  });
+
+  render(<ReviewsTab requestId="req1" />);
+
+  expect(await screen.findByText('Department of Biology, Lund University')).toBeInTheDocument();
+  expect(screen.getAllByText('pending@lund.se')).toHaveLength(1);
+  expect(screen.queryByText(/Electronic address/i)).not.toBeInTheDocument();
+});
+
 test('keeps a stored synthesis visible even when there are no accepted reviewer rows', async () => {
   fetch.mockResolvedValue({
     ok: true,
