@@ -38,6 +38,15 @@ sequence.
 | 2 | Final Writeup persona rollout and complete dashboards | **[PRODUCTION-LIVE V2 / PERSONAS DISABLED 2026-09-01 UTC.]** Commit `84bf465b` is live in Ready deployment `dpl_41SybgPYfJXGarf7UqcMGCLMy4KS`, establishing the reviewed v2-capable floor. The dry-run-first operator command then upgraded `final_writeup.matrix_audiences` once under ETag `W/"96930393"`; exact readback proved version 2 at `W/"96944113"`, all 11 complete explicit assignments including Beth Pruitt's PD + Leadership overlap, zero stale/unassigned rows, and unchanged nine-person Research and six-person Southern California audiences. Signed-in Admin reloaded as **Published revision loaded**, and Request `1002788` retained the expected nine-column Research matrix. The superseded team source is removed and persona lenses remain hard-disabled. | **Next gate:** prove representative PC and Leadership Word access, then deliberately enable and smoke-test PD, PC, Leadership, overlap, unassigned/ineligible, and superuser behavior. Coordination steps, evidence records, and the exact smoke sequence live in `docs/FINAL_WRITEUP_WORD_ACCESS_PROOF_AND_PERSONA_SMOKE_RUNBOOK.md`. No elevated team privilege, outside Dataverse administrator, or runtime inference from names, titles, email, or program labels is required. |
 
 ## Audit follow-ups — verified open, not silently prioritized
+- **Final Writeup tab label is not relationship-aware.** **[VERIFIED 2026-09-01
+  via `shared/components/workbench/FinalWriteupTab.js:437`]** the request
+  workbench Final Writeup tab renders **Edit writeup** unconditionally for
+  every viewer, while the dashboard and focused page distinguish non-owner
+  labels (**Open review** / **Open in Word**) from the responsible PD's
+  **Edit in Word** per the implementation plan's label rule. Cosmetic,
+  no access impact — the link targets the same canonical document. Future
+  session: make the tab label relationship-aware to match the dashboard
+  convention (owner-noticed 2026-09-01 during access-proof coordination).
 - **Request Document explicit actor tracking (Option B).**
   **[OWNER-APPROVED 2026-08-31; ADVERSARIAL REVIEWED; PRODUCTION-PROVED FOR
   PRE-SITE CREATION.]** Keep Request Document CRUD off staff roles and
