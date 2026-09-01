@@ -36,9 +36,12 @@ related:
 > existing `ReviewerManagePanel` per request. It adds no route, schema, table,
 > or write contract. A Vercel Preview pointed at the tracked production
 > Dataverse target is explicitly read-only and hides mutation controls; the
-> branch therefore supports realistic layout/filter/navigation UAT before an
-> owner promotion decision, while production retains the established reviewer
-> actions after promotion.
+> branch therefore supports authenticated layout/filter/navigation UAT before
+> an owner promotion decision, while production retains the established reviewer
+> actions after promotion. `[VERIFIED 2026-09-01]` The exact branch callback is
+> registered and Microsoft sign-in succeeds. Populated Preview data remains
+> fail-closed until the owner explicitly authorizes branch-scoped
+> `DATAVERSE_ALLOW_PROD_READS=yes`; no Preview write authorization is present.
 
 ## Outcome
 

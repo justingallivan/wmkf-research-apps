@@ -66,4 +66,14 @@ production reads then failed closed because Preview omitted
 and re-inspected at its exact prior deployment. No Entra URI or application data
 was changed.
 
+**VERIFIED 2026-09-01:** for Workbench reviewer-follow-up UAT, the exact branch
+alias callback
+`https://wmkfresearchapps-git-codex-wor-464bcd-justin-gallivans-projects.vercel.app/api/auth/callback/azure-ad`
+was added to Entra application `a652a292-2574-434c-ae6f-aa01f61d82ad` with Azure
+CLI after preserving and re-reading all four prior redirect URIs. Direct branch
+sign-in then succeeded and the page displayed its Preview read-only gate. The
+production Dataverse read remained fail-closed because this branch does not have
+`DATAVERSE_ALLOW_PROD_READS=yes`; no Preview write authorization was added. Remove
+the branch callback when this UAT branch is retired.
+
 Related: [[project-vercel-sensitive-env-pull-empty]], [[project-dev-environment]], [[project-local-dev-auth-setup]], [[project-branded-domains]].
