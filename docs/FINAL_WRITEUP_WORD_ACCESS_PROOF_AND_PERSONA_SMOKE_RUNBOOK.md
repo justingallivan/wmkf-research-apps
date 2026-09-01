@@ -59,7 +59,7 @@ the proof now with zero configuration or code change.
 | Persona | Representative | Rationale |
 |---|---|---|
 | Program Coordinator | Duncan Spore (default; Connor Noda is equally representative) | Owner-confirmed PC responsibility. Duncan's 2026-08-31 acknowledgement of `1002788` does not count as Word-access proof unless the record below confirms the document actually opened for him. |
-| Leadership | Allison Keller (President) | Leadership-only assignment gives a clean single-lens proof. Beth Pruitt's deliberate PD + Leadership overlap is exercised later in the enabled smoke, not here. |
+| Leadership | Beth Pruitt (CSO) — owner decision 2026-09-01 | Executive account, available now. Caveat: her PD overlap means a PASS proves her account only, not leadership-only provisioning. Allison Keller's account remains unproven; prove it at the latest before Slice 4 leadership queues. |
 
 ## Access proof procedure (flag remains false)
 
@@ -86,11 +86,14 @@ Each representative, independently, in their own signed-in Production session:
 > (and whether you can edit or only view), or send me the exact error message
 > if it doesn't. Please don't forward the document."
 
-> **To Allison:** "Before we turn on the leadership view of Final Writeups, I
+> **To Beth:** "Before we turn on the leadership view of Final Writeups, I
 > need to confirm SharePoint access works for you. Could you sign into the
 > Workbench, open the Final Writeups dashboard, open request 1002788, and
 > click *Open in Word*? I just need to know whether the document opens (edit
 > or view), or the exact error if it doesn't."
+
+Allison is not part of the access proof; she gets a separate two-minute ask
+for smoke leg 3 after enablement, the next time she is available.
 
 ### Access proof evidence record
 
@@ -154,7 +157,7 @@ via this readback]** no empty-role row is currently published.
 |---|---|---|
 | 1. PD-only | A PD-only assignee (e.g., John Sader) | Sees exactly the group-review rows plus any of their own responsible-PD rows from the Step 0 census; `Open review` and Word action present; no error. |
 | 2. PC | Duncan Spore or Connor Noda | Sees all active rows and the complete neutral coordinator matrix (nine-column Research matrix on `1002788`); no approval/compliance semantics. |
-| 3. Leadership-only | Allison Keller | **An empty dashboard with a clean empty state is the PASS criterion** while zero leadership-stage rows exist. Any error, or any visible group-review row, is a FAIL. |
+| 3. Leadership-only | Allison Keller — **run the next time she is available**; Beth cannot substitute (her PD overlap makes her observation identical to leg 4) | **An empty dashboard with a clean empty state is the PASS criterion** while zero leadership-stage rows exist. Any error, or any visible group-review row, is a FAIL. This leg does not block declaring the other legs; record it separately when Allison runs it. |
 | 4. Overlap | Beth Pruitt (PD + Leadership) | Union of lenses: with the assumed census this equals the PD set (group-review + her responsible-PD rows), each row exactly once; viewer personas report both roles. |
 | 5a. Ineligible | An enabled, session-linked Dataverse staff user with app access but no `WMKF Final Writeup Reviewer` role | **[VERIFIED via `lib/services/final-writeup/persona-service.js` (`resolveFinalWriteupPersonas`) and `lib/services/final-writeup/dashboard-service.js` (`resolveViewer`, focused-row 404)]** the viewer resolves (only an enabled Dataverse user is required), receives zero personas with an `final_writeup_persona_viewer_ineligible` warning, and sees a dashboard with zero rows — an empty state, not an error page. A focused-row URL returns the 404-shaped "No current Final Writeup was found" response. A session with no linked enabled systemuser instead gets the 403-shaped viewer error; that is also fail-closed but is a different, acceptable observation — record which one occurred. Note this leg is only meaningful flag-on: flag-off, the same ineligible staff user sees all rows by design. |
 | 5b. Explicit no-lens (conditional) | A published empty-role reviewer | Only if Step 0b found an empty-role row. If none exists, this leg requires a separately Justin-authorized temporary publish of one empty-role row plus an immediate authorized revert — otherwise record it **DEFERRED: no no-lens row published** rather than skipping silently. Expected: roster membership but zero persona rows visible. |
