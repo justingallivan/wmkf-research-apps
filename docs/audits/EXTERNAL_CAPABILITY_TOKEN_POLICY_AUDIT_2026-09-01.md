@@ -1,6 +1,6 @@
 # External capability-token policy audit — 2026-09-01
 
-**Status:** COMPLETE — source and durable-document audit; no runtime changes made  
+**Status:** COMPLETE — source, durable-document, and independent-agent audit reconciliation; no runtime changes made
 **Scope:** every repository surface that issues or consumes a bearer token used as a human-facing magic link, browser upload capability, proof/confirmation receipt, or internal browser-carried authorization receipt  
 **Trigger:** a reviewer reminder replaced the reviewer's original portal token while the reviewer was authoring a review
 
@@ -13,6 +13,14 @@ Routine reviewer communications — invitations, materials messages, follow-ups,
 The authoring client turns that server failure into apparent data loss. A failed draft load is ignored and the page renders an empty form; autosave and submit failures do not explain that the link was replaced; there is no local recovery buffer; and the page promises that work saves automatically. `[VERIFIED via shared/components/external/ReviewAuthoringForm.js:117-168,190-248,343-351,536-545]`
 
 The correct policy is: **ordinary communications must preserve the active access grant and in-progress work. Only an explicit, disclosed revoke or security reissue may retire authority. A replacement must never destroy the prior working grant before the replacement is successfully delivered.** This policy is already written for the planned site-visit applicant link but is not applied to the live reviewer portal. `[VERIFIED via docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md:640-666,1110-1122]`
+
+An independent Claude Fable 5.1 source audit on 2026-09-01 confirmed the central causal chain and found additional lifecycle gaps that matter to the repair: token expiry is refreshed mainly as a side effect of re-minting; reviewer self-accept and due-date extension do not extend the existing token; structured submit does not apply the short post-submission expiry used by the legacy upload path; reviewer self-decline deliberately leaves the link usable for re-acceptance while staff withdrawal revokes it; and staff observability does not distinguish a superseded-link write storm from generic invalid-token traffic. Those additions were rechecked against current source before being merged here. `[VERIFIED via lib/external/token-lifecycle.js:107-200; lib/services/reviewer-due-extension.js; lib/services/external-review/submit-service.js:101-233; lib/dataverse/adapters/reviewer-suggestion.js:1786-1930; lib/external/rate-limit.js]`
+
+## Independent-audit reconciliation
+
+The two audits agree that the current code is internally consistent with the latest-link-wins engagement specification and its tests, but that the specification itself is unsafe for a long-lived human authoring workflow. The independent audit also reconstructed the policy drift: staff link-bearing dispatch began re-minting in commit `2057706a` (2026-05-01), reminder re-minting arrived in `d07d684a` (2026-06-22), and send-time-only minting was consolidated in `d040a7a3` (2026-08-06). `[VERIFIED via git history and current callers]`
+
+The independent audit recommended removing links from reminders. This document adopts that as **immediate containment for post-acceptance review-due reminders and deadline notices**, not as the complete target policy. Pre-acceptance reminders can still interrupt an open accept/decline form, other routine link-bearing messages can still replace an active authoring grant, and a reviewer who cannot find the original email still needs an explicit recovery path. The durable invariant therefore remains stable or overlapping authority across every routine human-workflow communication.
 
 ## Scope and taxonomy
 
@@ -52,14 +60,19 @@ The production recovery investigation found no substantive server-side draft in 
 | Surface | Current behavior | Finding |
 |---|---|---|
 | Accept lifecycle (`ensureToken`) | Keeps an active token; mints if absent/expired/revoked | Reasonable idempotence, but cannot resend the same URL |
+| Reviewer self-accept | Changes engagement state but leaves the presented pre-accept token and expiry untouched | A token minted under the shorter pre-accept rule is not extended when the reviewer accepts |
 | Invitation, materials, follow-up, other templates containing `{{externalLink}}` | Replaces authority immediately before Dynamics dispatch | Routine communication invalidates all prior emails and open tabs |
 | Manual reminder | Uses shared reminder sender and replaces authority | The action named “reminder” is actually an undisclosed reissue |
 | Scheduled reminder | Same replacement behavior | Cron can invalidate links without a staff member seeing the side effect |
+| Due-date extension | Sends a linkless notice and changes the override date, but does not update token expiry | The portal grant can expire before the extended review deadline unless a later message happens to re-mint it |
 | Regenerate link | Replaces authority, then best-effort deletes the draft | Recovery can destroy the work it is intended to recover |
 | Revoke link | Revokes authority, then best-effort deletes the draft | Confirmation warns about link access but not draft deletion |
+| Reviewer self-decline | Leaves the token valid while engagement-state rendering permits a later re-accept | Deliberate product behavior, but it conflicts with the original intake plan and is not stated as current policy |
+| Staff-recorded withdrawal | Revokes the token but does not delete the draft | Access and draft lifetime already have different semantics, but the distinction is undocumented |
+| Structured review submit | Finalizes the review and deletes the draft, but leaves the existing token expiry unchanged | Unlike the legacy upload path, it does not tighten authority to the short post-submission window |
 | Acceptance confirmation | Stores the accepting raw token encrypted in an async job and later embeds it in the withdraw URL | An intervening email can make the just-sent confirmation link stale |
 
-`[VERIFIED via lib/services/review-manager/send-emails-service.js:614-681; lib/services/reviewer-manual-reminder.js; lib/services/reviewer-reminder-sweep.js:258-378; lib/services/review-manager/regenerate-token-service.js:93-100; pages/api/review-manager/revoke-token.js:54-69; lib/services/reviewer-acceptance-job-service.js:27-59; lib/services/reviewer-acceptance-drain.js:408-435]`
+`[VERIFIED via lib/services/review-manager/send-emails-service.js:614-681; lib/services/reviewer-manual-reminder.js; lib/services/reviewer-reminder-sweep.js:258-378; lib/services/reviewer-due-extension.js; lib/services/review-manager/regenerate-token-service.js:93-100; pages/api/review-manager/revoke-token.js:54-69; lib/services/external-review/respond-service.js; lib/services/external-review/submit-service.js:101-233; lib/dataverse/adapters/reviewer-suggestion.js:1786-1930; lib/services/reviewer-acceptance-job-service.js:27-59; lib/services/reviewer-acceptance-drain.js:408-435]`
 
 **Consumer surfaces**
 
@@ -80,6 +93,14 @@ The production recovery investigation found no substantive server-side draft in 
 - The site sends `Referrer-Policy: strict-origin-when-cross-origin`, so cross-origin navigation does not expose the full path, but browser history and request-path observability still contain the credential. `[VERIFIED via next.config.js:18-23]`
 - There is no URL-to-HttpOnly-session exchange, URL cleanup, or local unsent-work recovery.
 - A top-level context failure explains `hash_mismatch`, but draft-load, autosave, and submit errors do not provide equivalent recovery behavior. `[VERIFIED via pages/external/review/[token].js:263-285; shared/components/external/ReviewAuthoringForm.js:130-248]`
+- Superseded-token failures are returned to the browser but are not logged server-side by reason. The rate-limit subsystem records them as generic invalid-token outcomes, so staff have neither a reviewer-lockout signal nor useful rotation history in the application. `[VERIFIED via pages/api/external/review/[token]/draft.js:109-126; pages/api/external/review/[token]/submit.js:57-73; lib/external/rate-limit.js]`
+
+**Policy sources and governance drift**
+
+- The original intake plan says to mint at acceptance and keep the link multi-use until expiry or explicit revoke/regenerate. `[VERIFIED via docs/EXTERNAL_REVIEWER_INTAKE_PLAN.md:136-170]`
+- The later engagement specification requires every dispatched link-bearing email to re-mint and makes the latest link authoritative. That is what the implementation and tests enforce. `[VERIFIED via docs/REVIEWER_ENGAGEMENT_SPEC.md:44,60,87-95,140-148 and current mint callers]`
+- The credentials runbook deliberately preserves existing links during signing-secret rotation so reviewers are not locked out mid-cycle. Operational key rotation therefore protects continuity that routine application messages destroy. `[VERIFIED via docs/CREDENTIALS_RUNBOOK.md:252-275]`
+- None of these documents establishes precedence over the others on grant continuity. The engagement specification is the de facto implementation authority, not a reconciled product-policy authority. `[STALE/CONFLICT]`
 
 ### B. Grantee deliverables portal — long-lived human workflow grant
 
@@ -146,6 +167,26 @@ Long-lived credentials remain in browser history and request URLs throughout the
 
 The canonical reviewer specification, tests, wiki/memory, and onboarding material describe “latest-link-wins.” This is not an untested implementation accident. In contrast, the newer site-visit plan explicitly says resend the same active link and never destroy it during a failed replacement. Durable policy has diverged by feature. `[VERIFIED via docs/REVIEWER_ENGAGEMENT_SPEC.md:44,60,70,86-93; tests/unit/token-lifecycle.test.js; tests/unit/send-emails-service.test.js; tests/unit/reviewer-reminder-sweep.test.js; docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md:640-666,1110-1122]`
 
+### F10 — High latent risk: expiry maintenance is accidentally coupled to routine rotation
+
+`ensureToken` leaves an active token untouched, and token expiry is otherwise recomputed primarily when a new token is minted. Reviewer self-accept and review-due extension do not extend the current grant. The unsafe reminder rotation currently masks this defect by periodically minting a later expiry; removing rotation without adding explicit expiry transitions would expose reviewers to premature expiration. `[VERIFIED via lib/external/token-lifecycle.js:107-200; lib/external/reviewer-token-ttl.js:18-36; lib/services/reviewer-due-extension.js; lib/services/external-review/respond-service.js]`
+
+### F11 — Medium: structured submit leaves an unnecessarily long-lived token
+
+Structured submit records the review and deletes the draft but does not tighten `wmkf_externaltokenexpires`. The legacy upload path is the only caller of `extendForPostSubmissionWindow`, so the two submission mechanisms leave different authority lifetimes. `[VERIFIED via lib/services/external-review/submit-service.js:101-233; lib/services/review-upload.js:348; lib/external/token-lifecycle.js:187-200]`
+
+### F12 — Medium policy gap: decline, withdrawal, revocation, and draft lifetime are inconsistent
+
+Reviewer self-decline leaves the link valid so the reviewer can re-accept; staff-recorded withdrawal revokes the link but leaves the draft; explicit revoke and regenerate revoke/replace access and delete the draft. These may represent legitimate distinct product states, but no canonical policy explains them and staff controls do not disclose the draft consequences. `[VERIFIED via lib/dataverse/adapters/reviewer-suggestion.js:1786-1930; lib/services/review-manager/regenerate-token-service.js:93-100; pages/api/review-manager/revoke-token.js:54-69]`
+
+### F13 — Medium: application observability cannot identify reviewer lockout
+
+Write routes return token failure reasons to the browser but do not record the verifier reason server-side. Staff see only a coarse active/revoked/expired token state and cannot see who rotated a link or whether repeated draft writes are failing because a link was superseded. Generic invalid-token rate-limit accounting is an abuse control, not an incident signal. `[VERIFIED via pages/api/external/review/[token]/draft.js:109-126; pages/api/external/review/[token]/submit.js:57-73; lib/external/rate-limit.js; lib/services/review-manager/reviewers-service.js]`
+
+### F14 — Medium: tests prove rotation but not the user-visible failure it causes
+
+Unit and integration tests encode per-send minting and hash-mismatch rejection, but no test rotates authority while a reviewer is authoring and proves save, submit, and recovery behavior. The authoring component's 401 messages and local-work preservation are likewise untested. `[VERIFIED via tests/unit/send-emails-service.test.js; tests/unit/reviewer-reminder-sweep.test.js; tests/unit/reviewer-manual-reminder.test.js; tests/integration/external-review-draft-route.test.js; tests/integration/external-review-submit-route.test.js; tests/e2e/reviewer-stage2b-authoring.spec.js]`
+
 ## Required policy
 
 ### 1. Human workflow grants
@@ -158,6 +199,8 @@ The canonical reviewer specification, tests, wiki/memory, and onboarding materia
 6. **Open-session protection:** a routine email cannot interrupt an authorized authoring session. Explicit compromise revocation may interrupt it, but the client must preserve unsent work for export/recovery and explain why saving stopped.
 7. **Least authority:** audience, subject, operations, request, stage, and expiry must be enforced consistently. Do not mint decorative claims.
 8. **Scanner safety:** opening a link must remain read-only; do not make the token one-time-on-first-GET because security scanners prefetch email links.
+9. **Explicit expiry transitions:** acceptance, due-date extension, submission, withdrawal, and reissue must each apply their own documented expiry rule. Expiry maintenance must not depend on a later reminder happening to re-mint the token.
+10. **Documented terminal semantics:** reviewer self-decline, staff withdrawal, revoke, reissue, and draft destruction must have distinct, canonical behavior. Re-acceptance may remain supported, but it cannot survive only as an undocumented verifier side effect.
 
 ### 2. Short-lived capabilities and proof receipts
 
@@ -167,6 +210,7 @@ These may be freely re-minted, but must have an explicit audience/type, minimal 
 
 - Never log raw tokens or include them in analytics events.
 - Hash tokens for rate-limit keys and audit correlation.
+- Record safe failure reasons, grant version/issued time, actor, and authority transition without recording raw credentials; route repeated superseded-link writes to an operational reviewer-lockout signal rather than only an abuse counter.
 - Exchange the initial URL credential for a secure, HttpOnly, same-site, narrowly scoped session where feasible, then scrub the token from the browser URL.
 - Preserve current cross-origin referrer protection and no-store/no-index controls.
 - Maintain signing-key rotation overlap independently from grant reissue/revocation.
@@ -180,15 +224,18 @@ The current reviewer single-hash row cannot resend the same URL and cannot safel
 
 A single overwritable hash must not remain the authority model.
 
+**Immediate containment design:** post-acceptance review-due reminders and deadline notices carry no link and do not mint. They direct the reviewer to the materials message and to staff if access must be recovered. This removes the known incident trigger without storing plaintext. It is intentionally temporary: pre-acceptance reminders and other link-bearing sends must still move to stable or overlapping authority, because an open response form and a failed replacement delivery also require continuity.
+
 ## Prioritized action plan
 
 ### P0 — Contain immediately
 
-1. Stop routine reviewer communications from rotating authority. Until the durable fix is deployed, send reminders without a portal link or block link-bearing reminder/resend actions with clear staff copy.
+1. Stop routine reviewer communications from rotating authority. Until the durable fix is deployed, make post-acceptance review-due reminders and deadline notices linkless and block every other link-bearing reminder/resend that would overwrite a live grant.
 2. Remove draft deletion from regenerate/revoke. Preserve and quarantine existing drafts; add explicit destructive recovery only after separate approval.
 3. Change the authoring client so a failed draft load does not render an editable blank form. On 401/hash mismatch, freeze remote writes, retain current text, explain the link transition, and offer copy/download recovery.
 4. Remove the unconditional “saves automatically” promise until failed-save retry and recovery are real.
 5. Add operational detection for reviewer `hash_mismatch`, failed reminder/send after token persistence, and repeated draft-save 401s without logging raw credentials.
+6. Add explicit reviewer-facing handling for `hash_mismatch`, revoked, expired, and network failure on respond, draft, and submit paths; stop retry storms after a terminal authority failure.
 
 ### P1 — Repair reviewer authority
 
@@ -198,6 +245,8 @@ A single overwritable hash must not remain the authority model.
 4. Resolve queued acceptance confirmation links at send time from current authority, or issue a dedicated withdrawal grant that routine reviewer email cannot supersede.
 5. Add a reviewer audience claim and stage-specific operations. Invitation/respond authority must not imply proposal download/upload. Enforce stage on proposal download as well as upload/draft/submit.
 6. Add browser recovery: durable debounced retry, visible last-saved time, local recovery snapshot with expiry, and export-to-file before navigation when remote persistence fails.
+7. Apply explicit expiry transitions: extend the active grant on reviewer acceptance and due-date extension, and tighten it after structured submission according to the final post-submission policy.
+8. Codify self-decline/re-accept, staff withdrawal, revoke, and draft-retention semantics; implement them through separate, disclosed staff actions.
 
 ### P2 — Unify external-link governance
 
@@ -223,6 +272,9 @@ Before promotion, the implementation must prove these complete stories:
 10. Grantee resend preserves older link; explicit revoke blocks it; operation and status checks are both tested according to the final policy.
 11. Email security-scanner GETs cause no accept/decline/revoke/write transition.
 12. Logs, analytics, error reports, and rate-limit storage contain hashes/redacted identifiers, never raw JWTs.
+13. Reviewer self-accept and due-date extension keep the same authorized session usable through the effective deadline without relying on another email.
+14. Structured submit applies the documented post-submission expiry and cannot leave an authoring-duration grant active accidentally.
+15. Reviewer self-decline and later re-accept behave according to the recorded policy; staff withdrawal and revoke preserve or quarantine drafts according to their separately confirmed policy.
 
 Existing unit tests that assert latest-link-wins or persistence-before-failed-send must be replaced, not merely supplemented, because they currently lock the defect in place.
 
@@ -231,7 +283,9 @@ Existing unit tests that assert latest-link-wins or persistence-before-failed-se
 The following sources currently restate the unsafe reviewer behavior and must change in the same implementation series:
 
 - `docs/REVIEWER_ENGAGEMENT_SPEC.md`
+- `docs/EXTERNAL_REVIEWER_INTAKE_PLAN.md`
 - `docs/REVIEWER_INTERACTION_DESIGN.md`
+- `docs/CREDENTIALS_RUNBOOK.md`
 - `docs/API_ROUTE_SECURITY_MATRIX.md`
 - `docs/atlas/dataverse-wmkf-appreviewersuggestion.md`
 - `docs/agent-wiki/topics/external-reviewer-portal.md`
@@ -242,10 +296,21 @@ The following sources currently restate the unsafe reviewer behavior and must ch
 
 The safer resend/reissue rule in `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md` should become the system-wide source policy rather than a future-feature exception.
 
+## Owner decisions required before implementation
+
+1. Confirm the canonical human-workflow grant policy and which document owns it.
+2. Choose stable exact-link reuse or overlapping valid grants as the durable authority model; exact URL reuse requires an approved recoverable-token storage design, while a multiple-active-hash ledger does not.
+3. Confirm draft retention for reissue, revoke, staff withdrawal, manual entry, and candidate removal. This audit recommends preservation/quarantine by default and a separate destructive action.
+4. Confirm whether reviewer self-decline should retain the re-accept path.
+5. Confirm the structured post-submission token lifetime.
+6. Confirm whether grantee concurrent links and lack of grant-level revocation are acceptable.
+7. Decide whether the application needs service-principal access to Dataverse audit summaries or whether a separate application audit ledger will own authority history.
+
 ## Audit boundary and confidence
 
 - `[VERIFIED via repository census]` `/external/*` and `/api/external/*` expose the live reviewer and grantee human portals; no other live public magic-link portal was found.
 - `[VERIFIED via source]` all identified mint, persistence, send, verify, authoring, upload, proof, and internal receipt paths were traced to their consumers.
 - `[VERIFIED via tests/docs]` reviewer latest-link-wins is intentional current behavior and grantee overlapping-link behavior is intentional current behavior.
+- `[VERIFIED via independent review reconciliation]` the Claude Fable 5.1 audit's additional expiry, decline/withdrawal, observability, and test-gap findings were rechecked against current source and incorporated structurally above.
 - `[ASSUMED pending owner decision]` exact same-string URL reuse is preferred over merely overlapping valid URLs. Both satisfy continuity, but exact reuse matches the stated staff/reviewer expectation and simplifies support.
 - This was a source-of-truth and durable-policy audit. It did not mutate production, inspect raw credentials, or attempt to enumerate infrastructure-managed OAuth/session tokens.
