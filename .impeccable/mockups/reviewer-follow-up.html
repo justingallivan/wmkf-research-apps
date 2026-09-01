@@ -1,0 +1,822 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Reviewer Follow-up — Workbench Mockup</title>
+  <style>
+    :root {
+      --ink: #111827;
+      --text: #374151;
+      --muted: #6b7280;
+      --border: #e5e7eb;
+      --canvas: #f7f8fa;
+      --surface: #ffffff;
+      --blue: #2563eb;
+      --blue-soft: #eff6ff;
+      --green: #15803d;
+      --green-soft: #f0fdf4;
+      --amber: #b45309;
+      --amber-soft: #fffbeb;
+      --red: #b91c1c;
+      --red-soft: #fef2f2;
+      --violet: #6d28d9;
+      --violet-soft: #f5f3ff;
+      --shadow: 0 1px 2px rgb(17 24 39 / 0.06);
+      --radius: 0.75rem;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--canvas);
+      color: var(--ink);
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 1rem;
+      line-height: 1.45;
+    }
+
+    button, input, select { font: inherit; }
+    button, select, input[type="checkbox"] { cursor: pointer; }
+    button:focus-visible, input:focus-visible, select:focus-visible {
+      outline: 2px solid var(--blue);
+      outline-offset: 2px;
+    }
+
+    .app-header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .app-header-inner, .page {
+      width: min(1440px, calc(100% - 40px));
+      margin: 0 auto;
+    }
+
+    .app-header-inner {
+      min-height: 68px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 750;
+      letter-spacing: -0.02em;
+    }
+
+    .brand-mark {
+      width: 32px;
+      height: 32px;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: var(--ink);
+      color: white;
+      font-size: 0.875rem;
+      letter-spacing: 0.02em;
+    }
+
+    .utility-nav { display: flex; gap: 8px; align-items: center; }
+    .utility-nav a {
+      color: var(--muted);
+      text-decoration: none;
+      padding: 8px 10px;
+      border-radius: 8px;
+      font-size: 14px;
+    }
+    .utility-nav a:hover { color: var(--ink); background: #f3f4f6; }
+
+    .page { padding: 28px 0 56px; }
+
+    .page-heading {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 24px;
+      margin-bottom: 22px;
+    }
+
+    h1 { margin: 0 0 4px; font-size: 1.875rem; line-height: 1.2; letter-spacing: -0.03em; }
+    .subtitle { margin: 0; color: var(--muted); }
+    .updated { color: var(--muted); font-size: 0.875rem; padding-top: 8px; white-space: nowrap; }
+
+    .workbench-nav {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px;
+      margin-bottom: 20px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      border-radius: 0.75rem;
+      box-shadow: var(--shadow);
+      overflow-x: auto;
+    }
+
+    .workbench-nav button {
+      border: 0;
+      background: transparent;
+      color: var(--muted);
+      padding: 10px 14px;
+      border-radius: 0.5rem;
+      font-weight: 650;
+      white-space: nowrap;
+    }
+    .workbench-nav button.active { color: white; background: var(--ink); }
+    .workbench-nav button:not(.active):hover { color: var(--ink); background: #f3f4f6; }
+
+    .filters {
+      display: grid;
+      grid-template-columns: auto auto auto minmax(230px, 1fr) auto;
+      align-items: end;
+      gap: 12px;
+      padding: 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+
+    .field-label {
+      display: block;
+      margin-bottom: 6px;
+      color: var(--muted);
+      font-size: 0.875rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    select, .search {
+      height: 42px;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      background: white;
+      color: var(--ink);
+      padding: 0 12px;
+    }
+    .search { width: 100%; cursor: text; }
+
+    .segmented {
+      height: 42px;
+      display: inline-flex;
+      padding: 3px;
+      border: 1px solid #d1d5db;
+      border-radius: 0.5rem;
+      background: #f9fafb;
+    }
+    .segmented button {
+      border: 0;
+      background: transparent;
+      color: var(--muted);
+      padding: 0 13px;
+      border-radius: 6px;
+      font-weight: 650;
+      white-space: nowrap;
+    }
+    .segmented button.active { background: var(--ink); color: white; box-shadow: var(--shadow); }
+
+    .checkbox-label {
+      height: 42px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--text);
+      white-space: nowrap;
+    }
+    .checkbox-label input { width: 17px; height: 17px; }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 10px;
+      margin: 14px 0 22px;
+    }
+
+    .summary-card {
+      min-height: 86px;
+      padding: 14px 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 0.75rem;
+      box-shadow: var(--shadow);
+    }
+    .summary-card.attention { background: #fffdf8; }
+    .summary-value { font-size: 24px; line-height: 1; font-weight: 760; letter-spacing: -0.03em; }
+    .summary-label { margin-top: 7px; color: var(--muted); font-size: 0.875rem; }
+    .summary-card.attention .summary-value { color: var(--amber); }
+
+    .queue-heading {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin: 0 0 12px;
+    }
+    .queue-heading h2 { margin: 0; font-size: 1.5rem; letter-spacing: -0.02em; }
+    .queue-count { color: var(--muted); font-size: 0.875rem; }
+
+    .request-group {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      margin-bottom: 14px;
+      overflow: hidden;
+    }
+
+    .request-header {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      gap: 18px;
+      align-items: center;
+      padding: 16px 18px;
+      background: #fbfbfc;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .request-title-line { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+    .request-number { font-size: 1rem; font-weight: 760; }
+    .request-title { margin-top: 3px; color: var(--text); font-weight: 620; }
+    .request-meta { margin-top: 3px; color: var(--muted); font-size: 0.875rem; }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      min-height: 26px;
+      padding: 3px 9px;
+      border-radius: 999px;
+      font-size: 0.875rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .chip.amber { color: var(--amber); background: var(--amber-soft); border: 1px solid var(--border); }
+    .chip.red { color: var(--red); background: var(--red-soft); border: 1px solid var(--border); }
+    .chip.green { color: var(--green); background: var(--green-soft); border: 1px solid var(--border); }
+    .chip.blue { color: #1d4ed8; background: var(--blue-soft); border: 1px solid var(--border); }
+    .chip.violet { color: var(--violet); background: var(--violet-soft); border: 1px solid var(--border); }
+    .chip.gray { color: var(--text); background: #f3f4f6; border: 1px solid var(--border); }
+
+    .request-progress { min-width: 154px; text-align: right; }
+    .progress-strong { font-weight: 720; }
+    .progress-detail { color: var(--muted); font-size: 0.875rem; margin-top: 2px; }
+
+    .request-tools { display: flex; gap: 7px; align-items: center; }
+    .icon-button, .secondary-button, .primary-button, .text-button {
+      min-height: 38px;
+      border-radius: 8px;
+      font-weight: 680;
+    }
+    .icon-button {
+      min-width: 38px;
+      border: 1px solid var(--border);
+      background: white;
+      color: var(--text);
+    }
+    .secondary-button { border: 1px solid #d1d5db; background: white; color: var(--text); padding: 0 12px; }
+    .primary-button { border: 1px solid var(--ink); background: var(--ink); color: white; padding: 0 13px; }
+    .text-button { border: 0; background: transparent; color: var(--blue); padding: 0 6px; }
+    .icon-button:hover, .secondary-button:hover { background: #f9fafb; border-color: #9ca3af; }
+    .primary-button:hover { background: #1f2937; }
+
+    .group-actions {
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      min-height: 48px;
+      padding: 8px 18px;
+      background: var(--blue-soft);
+      border-bottom: 1px solid var(--border);
+      color: #1e3a8a;
+    }
+    .group-actions.visible { display: flex; }
+
+    .reviewer-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    .reviewer-table th {
+      padding: 10px 12px;
+      background: #f9fafb;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+      font-size: 0.875rem;
+      letter-spacing: 0.045em;
+      text-align: left;
+      text-transform: uppercase;
+    }
+    .reviewer-table td {
+      padding: 13px 12px;
+      border-bottom: 1px solid #eef0f2;
+      vertical-align: middle;
+    }
+    .reviewer-table tr:last-child td { border-bottom: 0; }
+    .reviewer-table tbody tr:hover { background: #fcfcfd; }
+    .reviewer-table .check-col { width: 44px; text-align: center; }
+    .reviewer-table .reviewer-col { width: 25%; }
+    .reviewer-table .status-col { width: 13%; }
+    .reviewer-table .link-col { width: 10%; }
+    .reviewer-table .due-col { width: 12%; }
+    .reviewer-table .action-col { width: 16%; }
+    .reviewer-table .notes-col { width: 12%; }
+    .reviewer-table .tools-col { width: 132px; text-align: right; }
+
+    .reviewer-name { font-weight: 720; color: var(--ink); }
+    .reviewer-detail { margin-top: 2px; color: var(--muted); font-size: 0.875rem; line-height: 1.35; }
+    .cell-label { display: none; color: var(--muted); font-size: 0.875rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+    .date-strong { font-weight: 650; color: var(--text); }
+    .date-overdue { color: var(--red); }
+    .date-detail { color: var(--muted); font-size: 0.875rem; margin-top: 2px; }
+    .notes-button { border: 0; background: transparent; color: var(--muted); padding: 4px 0; text-align: left; }
+    .notes-button:hover { color: var(--blue); }
+
+    .row-tools { display: flex; justify-content: flex-end; align-items: center; gap: 6px; }
+    .row-action {
+      min-height: 36px;
+      border: 1px solid #d1d5db;
+      background: white;
+      color: var(--text);
+      padding: 0 10px;
+      border-radius: 8px;
+      font-size: 0.875rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .row-action.alert { border-color: #f59e0b; color: #92400e; background: var(--amber-soft); }
+    .row-action.download { border-color: #86efac; color: #166534; background: var(--green-soft); }
+
+    .menu-wrap { position: relative; }
+    .menu {
+      display: none;
+      position: absolute;
+      right: 0;
+      top: 42px;
+      z-index: 20;
+      width: 210px;
+      padding: 6px;
+      border: 1px solid var(--border);
+      border-radius: 0.75rem;
+      background: white;
+      box-shadow: 0 14px 30px rgb(17 24 39 / 0.15);
+      text-align: left;
+    }
+    .menu.open { display: block; }
+    .menu button {
+      width: 100%;
+      min-height: 38px;
+      padding: 7px 9px;
+      border: 0;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--text);
+      text-align: left;
+      font-size: 0.875rem;
+    }
+    .menu button:hover { background: #f3f4f6; color: var(--ink); }
+
+    .complete-group { display: none; }
+    body.show-all .complete-group { display: block; }
+    body.show-all .attention-only { display: table-row; }
+    .attention-only.completed-row { display: none; }
+
+    .toast {
+      position: fixed;
+      right: 22px;
+      bottom: 22px;
+      z-index: 50;
+      min-width: 280px;
+      max-width: 430px;
+      padding: 13px 15px;
+      border-radius: 0.75rem;
+      background: var(--ink);
+      color: white;
+      box-shadow: 0 18px 42px rgb(17 24 39 / 0.24);
+      transform: translateY(130%);
+      opacity: 0;
+      transition: 180ms ease;
+    }
+    .toast.visible { transform: translateY(0); opacity: 1; }
+
+    .empty-search {
+      display: none;
+      padding: 38px 18px;
+      border: 1px dashed #cbd5e1;
+      border-radius: var(--radius);
+      background: white;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    @media (max-width: 1080px) {
+      .filters { grid-template-columns: repeat(3, auto) minmax(220px, 1fr); }
+      .filters .set-aside { grid-column: 1 / -1; }
+      .summary-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .reviewer-table .notes-col { display: none; }
+      .reviewer-table .reviewer-col { width: 28%; }
+    }
+
+    @media (max-width: 760px) {
+      .app-header-inner, .page { width: min(100% - 24px, 1440px); }
+      .app-header-inner { min-height: 58px; }
+      .utility-nav a:not(:last-child) { display: none; }
+      .page { padding-top: 18px; }
+      .page-heading { display: block; margin-bottom: 16px; }
+      h1 { font-size: 1.5rem; }
+      .updated { padding-top: 5px; }
+      .workbench-nav { margin-inline: -12px; border-radius: 0; border-left: 0; border-right: 0; }
+      .filters { grid-template-columns: 1fr; align-items: stretch; }
+      .filters > div, .segmented, select { width: 100%; }
+      .segmented button { flex: 1; }
+      .filters .set-aside { grid-column: auto; }
+      .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .summary-card { min-height: 80px; }
+      .queue-heading { align-items: flex-end; }
+      .request-header { grid-template-columns: 1fr auto; padding: 14px; }
+      .request-progress { grid-column: 1 / -1; text-align: left; min-width: 0; display: flex; gap: 7px; align-items: baseline; }
+      .request-tools .secondary-button { display: none; }
+      .group-actions { align-items: flex-start; padding-inline: 14px; }
+
+      .reviewer-table, .reviewer-table tbody { display: block; }
+      .reviewer-table thead { display: none; }
+      .reviewer-table tr {
+        display: grid;
+        grid-template-columns: 34px minmax(0, 1fr);
+        gap: 10px 12px;
+        padding: 14px;
+        border-bottom: 1px solid var(--border);
+      }
+      .reviewer-table tr:last-child { border-bottom: 0; }
+      .reviewer-table td {
+        display: block;
+        width: auto !important;
+        padding: 0;
+        border: 0;
+      }
+      .reviewer-table .check-col { grid-column: 1; grid-row: 1; align-self: start; padding-top: 2px; }
+      .reviewer-table .reviewer-col { grid-column: 2; }
+      .reviewer-table .status-col {
+        grid-column: 2;
+        grid-row: auto;
+        display: grid;
+        grid-template-columns: 92px minmax(0, 1fr);
+        align-items: baseline;
+        gap: 8px;
+        text-align: left;
+      }
+      .reviewer-table .link-col,
+      .reviewer-table .due-col,
+      .reviewer-table .action-col,
+      .reviewer-table .notes-col {
+        grid-column: 2 / -1;
+        display: grid;
+        grid-template-columns: 92px 1fr;
+        align-items: baseline;
+        gap: 8px;
+      }
+      .reviewer-table .notes-col { display: grid; }
+      .reviewer-table .tools-col { grid-column: 2 / -1; text-align: left; padding-top: 4px; }
+      .reviewer-detail { overflow-wrap: anywhere; }
+      .chip { justify-self: start; }
+      .cell-label { display: inline; }
+      .row-tools { justify-content: flex-start; }
+      .menu { left: 0; right: auto; }
+      .toast { left: 12px; right: 12px; bottom: 12px; min-width: 0; }
+    }
+  </style>
+</head>
+<body>
+  <header class="app-header">
+    <div class="app-header-inner">
+      <div class="brand"><span class="brand-mark">WMK</span><span>W. M. Keck Foundation</span></div>
+      <nav class="utility-nav" aria-label="Global navigation">
+        <a href="#">Tools</a><a href="#">Admin</a><a href="#">Justin Gallivan</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="page">
+    <div class="page-heading">
+      <div>
+        <h1>Request Workbench</h1>
+        <p class="subtitle">Monitor reviewer progress and handle follow-up across the cycle.</p>
+      </div>
+      <div class="updated">Updated just now</div>
+    </div>
+
+    <nav class="workbench-nav" aria-label="Workbench sections">
+      <button type="button">Requests</button>
+      <button type="button" class="active" aria-current="page">Reviewer follow-up <span class="chip amber" style="margin-left:6px">7</span></button>
+      <button type="button">Final writeups</button>
+      <button type="button">Initial assessments</button>
+      <button type="button">Awardees</button>
+    </nav>
+
+    <section class="filters" aria-label="Reviewer follow-up filters">
+      <div>
+        <label class="field-label" for="cycle">Cycle</label>
+        <select id="cycle"><option>December 2026 (10)</option><option>June 2026 (8)</option></select>
+      </div>
+      <div>
+        <span class="field-label">Scope</span>
+        <div class="segmented" data-segment="scope">
+          <button type="button" class="active">My requests</button><button type="button">All</button>
+        </div>
+      </div>
+      <div>
+        <span class="field-label">View</span>
+        <div class="segmented" data-segment="view">
+          <button type="button" class="active" data-view="attention">Needs attention</button><button type="button" data-view="all">All reviewers</button>
+        </div>
+      </div>
+      <div>
+        <label class="field-label" for="search">Search</label>
+        <input class="search" id="search" type="search" placeholder="Request, proposal, institution, or reviewer" />
+      </div>
+      <label class="checkbox-label set-aside"><input type="checkbox" /> Show set aside</label>
+    </section>
+
+    <section class="summary-grid" aria-label="Cycle attention summary">
+      <div class="summary-card"><div class="summary-value">6</div><div class="summary-label">assigned requests</div></div>
+      <div class="summary-card"><div class="summary-value">16</div><div class="summary-label">active reviewers</div></div>
+      <div class="summary-card attention"><div class="summary-value">3</div><div class="summary-label">overdue</div></div>
+      <div class="summary-card attention"><div class="summary-value">4</div><div class="summary-label">awaiting response</div></div>
+      <div class="summary-card"><div class="summary-value" style="color:var(--green)">5</div><div class="summary-label">reviews received</div></div>
+    </section>
+
+    <div class="queue-heading">
+      <h2>Needs attention</h2>
+      <div class="queue-count">7 reviewers across 3 requests</div>
+    </div>
+
+    <div id="groups">
+      <section class="request-group urgent" data-search="1002852 solving structure poly adp ribose biology johns hopkins herwig schuler tanmay bharat lee kraus">
+        <header class="request-header">
+          <div>
+            <div class="request-title-line"><span class="request-number">#1002852</span><span class="chip red">3 overdue</span><span class="chip violet">Research</span></div>
+            <div class="request-title">Solving the Structure of Poly (ADP-Ribose): A Missing Structural Framework in Biology</div>
+            <div class="request-meta">Johns Hopkins University · PI Anthony Leung · PD Justin Gallivan</div>
+          </div>
+          <div class="request-progress"><div class="progress-strong">0 of 3 received</div><div class="progress-detail">Review due Sep 9, 2026</div></div>
+          <div class="request-tools"><button class="secondary-button" type="button">Campaign settings</button><button class="icon-button collapse" type="button" aria-label="Collapse request" aria-expanded="true">⌃</button></div>
+        </header>
+        <div class="group-actions"><span><strong class="selected-count">0</strong> selected in Request #1002852</span><div><button class="secondary-button group-email" type="button">Send email</button></div></div>
+        <div class="request-content">
+          <table class="reviewer-table">
+            <thead><tr><th class="check-col"><input class="select-all" type="checkbox" aria-label="Select all reviewers for Request 1002852" /></th><th class="reviewer-col">Reviewer</th><th class="status-col">Status</th><th class="link-col">Link</th><th class="due-col">Due date</th><th class="action-col">Last action</th><th class="notes-col">Notes</th><th class="tools-col">Actions</th></tr></thead>
+            <tbody>
+              <tr>
+                <td class="check-col"><input class="row-check" type="checkbox" aria-label="Select Herwig Schüler for Request 1002852" /></td>
+                <td class="reviewer-col"><div class="reviewer-name">Herwig Schüler</div><div class="reviewer-detail">Lund University · herwig.schuler@biochemistry.lu.se</div></td>
+                <td class="status-col"><span class="cell-label">Status</span><span class="chip blue">Materials sent</span></td>
+                <td class="link-col"><span class="cell-label">Link</span><span class="chip blue">Active · opened</span></td>
+                <td class="due-col"><span class="cell-label">Due date</span><div><div class="date-strong date-overdue">Sep 9</div><button class="text-button" type="button">Grant extension</button></div></td>
+                <td class="action-col"><span class="cell-label">Last action</span><div><div class="date-strong">Materials recorded</div><div class="date-detail">Aug 18 · no reminder sent</div></div></td>
+                <td class="notes-col"><span class="cell-label">Notes</span><button class="notes-button" type="button">Add notes</button></td>
+                <td class="tools-col"><div class="row-tools"><button class="row-action alert chase" type="button" data-name="Herwig Schüler">Send reminder</button><div class="menu-wrap"><button class="icon-button menu-button" type="button" aria-label="More actions for Herwig Schüler">⋮</button><div class="menu"><button>Send custom email</button><button>View activity history</button><button>Enter review manually</button><button>Correct recorded status</button><button>Manage reviewer link</button></div></div></div></td>
+              </tr>
+              <tr>
+                <td class="check-col"><input class="row-check" type="checkbox" aria-label="Select Tanmay Bharat for Request 1002852" /></td>
+                <td class="reviewer-col"><div class="reviewer-name">Tanmay Bharat</div><div class="reviewer-detail">MRC Laboratory of Molecular Biology · tbharat@mrc-lmb.cam.ac.uk</div></td>
+                <td class="status-col"><span class="cell-label">Status</span><span class="chip blue">Materials sent</span></td>
+                <td class="link-col"><span class="cell-label">Link</span><span class="chip gray">Active · unopened</span></td>
+                <td class="due-col"><span class="cell-label">Due date</span><div><div class="date-strong date-overdue">Sep 9</div><button class="text-button" type="button">Grant extension</button></div></td>
+                <td class="action-col"><span class="cell-label">Last action</span><div><div class="date-strong">Materials recorded</div><div class="date-detail">Aug 18 · 1 reminder</div></div></td>
+                <td class="notes-col"><span class="cell-label">Notes</span><button class="notes-button" type="button">Traveling until Sep 14</button></td>
+                <td class="tools-col"><div class="row-tools"><button class="row-action alert chase" type="button" data-name="Tanmay Bharat">Send reminder</button><div class="menu-wrap"><button class="icon-button menu-button" type="button" aria-label="More actions for Tanmay Bharat">⋮</button><div class="menu"><button>Send custom email</button><button>View activity history</button><button>Enter review manually</button><button>Correct recorded status</button><button>Manage reviewer link</button></div></div></div></td>
+              </tr>
+              <tr>
+                <td class="check-col"><input class="row-check" type="checkbox" aria-label="Select W. Lee Kraus for Request 1002852" /></td>
+                <td class="reviewer-col"><div class="reviewer-name">W. Lee Kraus</div><div class="reviewer-detail">UT Southwestern Medical Center · lee.kraus@utsouthwestern.edu</div></td>
+                <td class="status-col"><span class="cell-label">Status</span><span class="chip blue">Materials sent</span></td>
+                <td class="link-col"><span class="cell-label">Link</span><span class="chip blue">Active · opened</span></td>
+                <td class="due-col"><span class="cell-label">Due date</span><div><div class="date-strong date-overdue">Sep 9</div><button class="text-button" type="button">Grant extension</button></div></td>
+                <td class="action-col"><span class="cell-label">Last action</span><div><div class="date-strong">Reminder sent</div><div class="date-detail">Sep 11 · 1 reminder</div></div></td>
+                <td class="notes-col"><span class="cell-label">Notes</span><button class="notes-button" type="button">Add notes</button></td>
+                <td class="tools-col"><div class="row-tools"><button class="row-action alert chase" type="button" data-name="W. Lee Kraus">Follow up</button><div class="menu-wrap"><button class="icon-button menu-button" type="button" aria-label="More actions for W. Lee Kraus">⋮</button><div class="menu"><button>Send custom email</button><button>View activity history</button><button>Enter review manually</button><button>Correct recorded status</button><button>Manage reviewer link</button></div></div></div></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="request-group urgent" data-search="1002788 foundation paige kelley maria chen jonathan weiss alicia morgan">
+        <header class="request-header">
+          <div>
+            <div class="request-title-line"><span class="request-number">#1002788</span><span class="chip amber">3 awaiting response</span><span class="chip violet">Research</span></div>
+            <div class="request-title">Advanced imaging for dynamic cellular systems</div>
+            <div class="request-meta">W. M. Keck Foundation · PI Paige Kelley · PD Justin Gallivan</div>
+          </div>
+          <div class="request-progress"><div class="progress-strong">0 of 3 accepted</div><div class="progress-detail">Respond by Sep 5, 2026</div></div>
+          <div class="request-tools"><button class="secondary-button" type="button">Campaign settings</button><button class="icon-button collapse" type="button" aria-label="Collapse request" aria-expanded="true">⌃</button></div>
+        </header>
+        <div class="group-actions"><span><strong class="selected-count">0</strong> selected in Request #1002788</span><div><button class="secondary-button group-email" type="button">Send email</button></div></div>
+        <div class="request-content">
+          <table class="reviewer-table">
+            <thead><tr><th class="check-col"><input class="select-all" type="checkbox" aria-label="Select all reviewers for Request 1002788" /></th><th class="reviewer-col">Reviewer</th><th class="status-col">Status</th><th class="link-col">Link</th><th class="due-col">Respond by</th><th class="action-col">Last action</th><th class="notes-col">Notes</th><th class="tools-col">Actions</th></tr></thead>
+            <tbody>
+              <tr>
+                <td class="check-col"><input class="row-check" type="checkbox" aria-label="Select Maria Chen for Request 1002788" /></td>
+                <td class="reviewer-col"><div class="reviewer-name">Maria Chen</div><div class="reviewer-detail">University of California, San Diego · mchen@ucsd.edu</div></td>
+                <td class="status-col"><span class="cell-label">Status</span><span class="chip amber">Invited</span></td>
+                <td class="link-col"><span class="cell-label">Link</span><span class="chip gray">Active · unopened</span></td>
+                <td class="due-col"><span class="cell-label">Respond by</span><div class="date-strong date-overdue">Sep 5</div></td>
+                <td class="action-col"><span class="cell-label">Last action</span><div><div class="date-strong">Invitation sent</div><div class="date-detail">Aug 29 · no reminder sent</div></div></td>
+                <td class="notes-col"><span class="cell-label">Notes</span><button class="notes-button" type="button">Add notes</button></td>
+                <td class="tools-col"><div class="row-tools"><button class="row-action alert chase" type="button" data-name="Maria Chen">Send reminder</button><div class="menu-wrap"><button class="icon-button menu-button" type="button" aria-label="More actions for Maria Chen">⋮</button><div class="menu"><button>Send custom email</button><button>View activity history</button><button>Regenerate reviewer link</button><button>Release invitation</button></div></div></div></td>
+              </tr>
+              <tr>
+                <td class="check-col"><input class="row-check" type="checkbox" aria-label="Select Jonathan Weiss for Request 1002788" /></td>
+                <td class="reviewer-col"><div class="reviewer-name">Jonathan Weiss</div><div class="reviewer-detail">Stanford University · jweiss@stanford.edu</div></td>
+                <td class="status-col"><span class="cell-label">Status</span><span class="chip amber">Invited</span></td>
+                <td class="link-col"><span class="cell-label">Link</span><span class="chip blue">Active · opened</span></td>
+                <td class="due-col"><span class="cell-label">Respond by</span><div class="date-strong date-overdue">Sep 5</div></td>
+                <td class="action-col"><span class="cell-label">Last action</span><div><div class="date-strong">Portal opened</div><div class="date-detail">Sep 2 · no response</div></div></td>
+                <td class="notes-col"><span class="cell-label">Notes</span><button class="notes-button" type="button">Add notes</button></td>
+                <td class="tools-col"><div class="row-tools"><button class="row-action alert chase" type="button" data-name="Jonathan Weiss">Send reminder</button><div class="menu-wrap"><button class="icon-button menu-button" type="button" aria-label="More actions for Jonathan Weiss">⋮</button><div class="menu"><button>Send custom email</button><button>View activity history</button><button>Regenerate reviewer link</button><button>Release invitation</button></div></div></div></td>
+              </tr>
+              <tr>
+                <td class="check-col"><input class="row-check" type="checkbox" aria-label="Select Alicia Morgan for Request 1002788" /></td>
+                <td class="reviewer-col"><div class="reviewer-name">Alicia Morgan</div><div class="reviewer-detail">University of Washington · amorgan@uw.edu</div></td>
+                <td class="status-col"><span class="cell-label">Status</span><span class="chip amber">Invited</span></td>
+                <td class="link-col"><span class="cell-label">Link</span><span class="chip gray">Active · unopened</span></td>
+                <td class="due-col"><span class="cell-label">Respond by</span><div class="date-strong date-overdue">Sep 5</div></td>
+                <td class="action-col"><span class="cell-label">Last action</span><div><div class="date-strong">Invitation sent</div><div class="date-detail">Aug 29 · 1 reminder</div></div></td>
+                <td class="notes-col"><span class="cell-label">Notes</span><button class="notes-button" type="button">Recommended by applicant</button></td>
+                <td class="tools-col"><div class="row-tools"><button class="row-action alert chase" type="button" data-name="Alicia Morgan">Follow up</button><div class="menu-wrap"><button class="icon-button menu-button" type="button" aria-label="More actions for Alicia Morgan">⋮</button><div class="menu"><button>Send custom email</button><button>View activity history</button><button>Regenerate reviewer link</button><button>Release invitation</button></div></div></div></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="request-group received" data-search="1002874 precision neuroscience caltech elena rossi david park sofia alvarez">
+        <header class="request-header">
+          <div>
+            <div class="request-title-line"><span class="request-number">#1002874</span><span class="chip green">2 newly received</span><span class="chip violet">Research</span></div>
+            <div class="request-title">Precision neuromodulation across distributed brain networks</div>
+            <div class="request-meta">California Institute of Technology · PI Elena Rossi · PD Justin Gallivan</div>
+          </div>
+          <div class="request-progress"><div class="progress-strong">2 of 3 received</div><div class="progress-detail">1 review still outstanding</div></div>
+          <div class="request-tools"><button class="secondary-button" type="button">Campaign settings</button><button class="icon-button collapse" type="button" aria-label="Collapse request" aria-expanded="true">⌃</button></div>
+        </header>
+        <div class="group-actions"><span><strong class="selected-count">0</strong> selected in Request #1002874</span><div><button class="secondary-button group-email" type="button">Send email</button></div></div>
+        <div class="request-content">
+          <table class="reviewer-table">
+            <thead><tr><th class="check-col"><input class="select-all" type="checkbox" aria-label="Select all reviewers for Request 1002874" /></th><th class="reviewer-col">Reviewer</th><th class="status-col">Status</th><th class="link-col">Link</th><th class="due-col">Due date</th><th class="action-col">Last action</th><th class="notes-col">Notes</th><th class="tools-col">Actions</th></tr></thead>
+            <tbody>
+              <tr>
+                <td class="check-col"><input class="row-check" type="checkbox" aria-label="Select David Park for Request 1002874" /></td>
+                <td class="reviewer-col"><div class="reviewer-name">David Park</div><div class="reviewer-detail">University of Pennsylvania · dpark@upenn.edu</div></td>
+                <td class="status-col"><span class="cell-label">Status</span><span class="chip green">Review received</span></td>
+                <td class="link-col"><span class="cell-label">Link</span><span class="chip gray">Closed</span></td>
+                <td class="due-col"><span class="cell-label">Due date</span><div class="date-strong">Sep 16</div></td>
+                <td class="action-col"><span class="cell-label">Last action</span><div><div class="date-strong">Review submitted</div><div class="date-detail">Today at 8:42 AM</div></div></td>
+                <td class="notes-col"><span class="cell-label">Notes</span><button class="notes-button" type="button">Add notes</button></td>
+                <td class="tools-col"><div class="row-tools"><button class="row-action download" type="button">Download review</button><div class="menu-wrap"><button class="icon-button menu-button" type="button" aria-label="More actions for David Park">⋮</button><div class="menu"><button>View submitted review</button><button>View activity history</button><button>Add staff note</button></div></div></div></td>
+              </tr>
+              <tr>
+                <td class="check-col"><input class="row-check" type="checkbox" aria-label="Select Sofia Alvarez for Request 1002874" /></td>
+                <td class="reviewer-col"><div class="reviewer-name">Sofia Alvarez</div><div class="reviewer-detail">Columbia University · salvarez@columbia.edu</div></td>
+                <td class="status-col"><span class="cell-label">Status</span><span class="chip green">Review received</span></td>
+                <td class="link-col"><span class="cell-label">Link</span><span class="chip gray">Closed</span></td>
+                <td class="due-col"><span class="cell-label">Due date</span><div class="date-strong">Sep 16</div></td>
+                <td class="action-col"><span class="cell-label">Last action</span><div><div class="date-strong">Review recorded</div><div class="date-detail">Yesterday at 4:18 PM</div></div></td>
+                <td class="notes-col"><span class="cell-label">Notes</span><button class="notes-button" type="button">Review arrived by email</button></td>
+                <td class="tools-col"><div class="row-tools"><button class="row-action download" type="button">Download review</button><div class="menu-wrap"><button class="icon-button menu-button" type="button" aria-label="More actions for Sofia Alvarez">⋮</button><div class="menu"><button>View submitted review</button><button>View activity history</button><button>Add staff note</button></div></div></div></td>
+              </tr>
+              <tr>
+                <td class="check-col"><input class="row-check" type="checkbox" aria-label="Select Priya Raman for Request 1002874" /></td>
+                <td class="reviewer-col"><div class="reviewer-name">Priya Raman</div><div class="reviewer-detail">Massachusetts Institute of Technology · praman@mit.edu</div></td>
+                <td class="status-col"><span class="cell-label">Status</span><span class="chip blue">Under review</span></td>
+                <td class="link-col"><span class="cell-label">Link</span><span class="chip blue">Active · opened</span></td>
+                <td class="due-col"><span class="cell-label">Due date</span><div><div class="date-strong">Sep 16</div><button class="text-button" type="button">Grant extension</button></div></td>
+                <td class="action-col"><span class="cell-label">Last action</span><div><div class="date-strong">Portal opened</div><div class="date-detail">Sep 10 · due in 2 days</div></div></td>
+                <td class="notes-col"><span class="cell-label">Notes</span><button class="notes-button" type="button">Add notes</button></td>
+                <td class="tools-col"><div class="row-tools"><button class="row-action chase" type="button" data-name="Priya Raman">Send reminder</button><div class="menu-wrap"><button class="icon-button menu-button" type="button" aria-label="More actions for Priya Raman">⋮</button><div class="menu"><button>Send custom email</button><button>View activity history</button><button>Enter review manually</button><button>Manage reviewer link</button></div></div></div></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="request-group complete-group" data-search="1002911 materials energy northwestern complete">
+        <header class="request-header">
+          <div><div class="request-title-line"><span class="request-number">#1002911</span><span class="chip green">Complete</span><span class="chip violet">Research</span></div><div class="request-title">Adaptive materials for low-energy manufacturing</div><div class="request-meta">Northwestern University · PI Samuel Ortiz · PD Justin Gallivan</div></div>
+          <div class="request-progress"><div class="progress-strong">3 of 3 received</div><div class="progress-detail">No follow-up needed</div></div>
+          <div class="request-tools"><button class="secondary-button" type="button">Open request</button><button class="icon-button collapse" type="button" aria-label="Expand request" aria-expanded="false">⌄</button></div>
+        </header>
+        <div class="request-content" hidden></div>
+      </section>
+    </div>
+
+    <div class="empty-search" id="empty-search"><strong>No matching reviewer work</strong><br />Try a reviewer name, request number, institution, or proposal title.</div>
+  </main>
+
+  <div class="toast" role="status" aria-live="polite" id="toast"></div>
+
+  <script>
+    const toast = document.getElementById('toast');
+    let toastTimer;
+    function showToast(message) {
+      toast.textContent = message;
+      toast.classList.add('visible');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toast.classList.remove('visible'), 2600);
+    }
+
+    document.querySelectorAll('.segmented').forEach(group => {
+      group.addEventListener('click', event => {
+        const button = event.target.closest('button');
+        if (!button) return;
+        group.querySelectorAll('button').forEach(item => item.classList.toggle('active', item === button));
+        if (group.dataset.segment === 'view') {
+          document.body.classList.toggle('show-all', button.dataset.view === 'all');
+          document.querySelector('.queue-heading h2').textContent = button.dataset.view === 'all' ? 'All reviewers' : 'Needs attention';
+          document.querySelector('.queue-count').textContent = button.dataset.view === 'all' ? '16 reviewers across 6 requests' : '7 reviewers across 3 requests';
+        }
+      });
+    });
+
+    document.querySelectorAll('.collapse').forEach(button => {
+      button.addEventListener('click', () => {
+        const group = button.closest('.request-group');
+        const content = group.querySelector('.request-content');
+        const expanded = button.getAttribute('aria-expanded') === 'true';
+        button.setAttribute('aria-expanded', String(!expanded));
+        button.textContent = expanded ? '⌄' : '⌃';
+        if (content) content.hidden = expanded;
+      });
+    });
+
+    function syncGroup(group) {
+      const checks = [...group.querySelectorAll('.row-check')];
+      const selected = checks.filter(check => check.checked).length;
+      const bar = group.querySelector('.group-actions');
+      if (!bar) return;
+      bar.classList.toggle('visible', selected > 0);
+      bar.querySelector('.selected-count').textContent = selected;
+      const all = group.querySelector('.select-all');
+      if (all) {
+        all.checked = checks.length > 0 && selected === checks.length;
+        all.indeterminate = selected > 0 && selected < checks.length;
+      }
+    }
+
+    document.querySelectorAll('.request-group').forEach(group => {
+      group.querySelectorAll('.row-check').forEach(check => check.addEventListener('change', () => syncGroup(group)));
+      const all = group.querySelector('.select-all');
+      if (all) all.addEventListener('change', () => {
+        group.querySelectorAll('.row-check').forEach(check => { check.checked = all.checked; });
+        syncGroup(group);
+      });
+      const email = group.querySelector('.group-email');
+      if (email) email.addEventListener('click', () => showToast('Email preview opened for the selected reviewers in this request.'));
+    });
+
+    document.querySelectorAll('.menu-button').forEach(button => {
+      button.addEventListener('click', event => {
+        event.stopPropagation();
+        const menu = button.nextElementSibling;
+        document.querySelectorAll('.menu.open').forEach(open => { if (open !== menu) open.classList.remove('open'); });
+        menu.classList.toggle('open');
+      });
+    });
+    document.addEventListener('click', () => document.querySelectorAll('.menu.open').forEach(menu => menu.classList.remove('open')));
+    document.querySelectorAll('.menu').forEach(menu => menu.addEventListener('click', event => {
+      event.stopPropagation();
+      const action = event.target.closest('button');
+      if (action) { showToast(`${action.textContent.trim()} opened.`); menu.classList.remove('open'); }
+    }));
+
+    document.querySelectorAll('.chase').forEach(button => button.addEventListener('click', () => {
+      button.textContent = 'Reminder sent';
+      button.classList.remove('alert');
+      button.disabled = true;
+      showToast(`Reminder recorded for ${button.dataset.name}.`);
+    }));
+
+    document.querySelectorAll('.notes-button').forEach(button => button.addEventListener('click', () => {
+      const current = button.textContent.trim() === 'Add notes' ? '' : button.textContent.trim();
+      const note = window.prompt('Reviewer note', current);
+      if (note !== null) { button.textContent = note.trim() || 'Add notes'; showToast('Note saved in this request.'); }
+    }));
+
+    document.getElementById('search').addEventListener('input', event => {
+      const query = event.target.value.trim().toLowerCase();
+      let visible = 0;
+      document.querySelectorAll('.request-group').forEach(group => {
+        const matches = !query || group.dataset.search.includes(query);
+        group.style.display = matches ? '' : 'none';
+        if (matches && (!group.classList.contains('complete-group') || document.body.classList.contains('show-all'))) visible += 1;
+      });
+      document.getElementById('empty-search').style.display = visible ? 'none' : 'block';
+    });
+
+    document.querySelectorAll('.workbench-nav button:not(.active)').forEach(button => button.addEventListener('click', () => showToast(`${button.textContent.trim()} would open as a sibling Workbench page.`)));
+  </script>
+</body>
+</html>
