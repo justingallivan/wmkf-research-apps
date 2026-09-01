@@ -3027,7 +3027,6 @@ function OperationsWorkspace({ view }) {
           <ResourceLinks
             title="Credential resources"
             links={[
-              { name: 'Credentials runbook', href: '/docs/CREDENTIALS_RUNBOOK.md', description: 'Rotation, diagnostics, and recovery procedures.' },
               { name: 'Vercel dashboard', href: 'https://vercel.com/dashboard', description: 'Deployment settings, logs, and environment configuration.', external: true },
             ]}
           />
