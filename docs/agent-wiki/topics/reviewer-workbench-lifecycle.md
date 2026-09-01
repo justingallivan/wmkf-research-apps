@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-08-21
+last_verified: 2026-09-01
 stale_after_days: 90
 owner: reviewers
 source_files:
@@ -357,7 +357,7 @@ legacy free-text values visible, so no existing referral is lost. Until S349
     duplicates to the latest request rather than starting a second
     overlapping render. `rendering` state
     disables Preview/Retry while a render is queued or in flight.
-  - **`ReviewerManagePanel` modal-session epoch:** `EmailModal` keeps a
+  - **`ReviewerManagePanel` modal-session epoch:** `ReleaseMaterialsModal` keeps a
     monotonic `modalSessionRef`, bumped on every open/close transition (never
     reset). `handlePreview` and `handleSend` capture the epoch at entry and
     check it after every `await` before touching state — a response from an
@@ -981,9 +981,10 @@ in `shared/utils/review-report-docx.js`), over the answer snapshot read through
 the hoisted `lib/services/review-answers.js#fetchAnswersBySuggestion` (shared with
 the Reviews-tab GET). The attachment is NON-FATAL — a compose/render failure
 still sends the thank-you without the DOCX and counts `attachmentFailed`. The
-`wmkf_thankyousentat` marker is shared with the manual `thankyou` send
-(`send-emails.js`), so a manually-thanked reviewer is naturally skipped and the
-manual modal's deliberate re-send is unchanged. Knobs: `?maxBatch=N`, `?dryRun=1`.
+`wmkf_thankyousentat` marker remains shared with the legacy `thankyou` branch
+in `send-emails.js`, so compatibility callers cannot cause the sweep to
+double-send. `ReviewerManagePanel` no longer exposes a manual thank-you
+composer. Knobs: `?maxBatch=N`, `?dryRun=1`.
 
 **Phase 2 DEPLOYED (S326; unit-tested; populated Compare view NOT browser-verifiable until the first portal submission — zero exist, portal built ahead of the D26 cycle; correct zero-submission absence drive-verified):** schema-free
 comparison matrix. `shared/utils/review-matrix.js#deriveReviewMatrix(reviewers,
@@ -1135,11 +1136,15 @@ returned zero eligible/enqueued/claimed/failed.** Plan doc:
 
 ## Email templates (admin org default + per-PD override)
 
-- **Two layers (S297).** The four reviewer templates (`invitation`, `materials`,
-  `followup`, `thankyou`) now resolve as **per-PD override → admin org default**,
-  with no runtime code fallback (a blank/unavailable admin value renders blank in
-  the PD's preview-before-send, by design — all four are interactive
-  preview-then-send only, no headless path).
+- **Two-layer interactive template store (S297; UI narrowed 2026-09-01).** The
+  four stored reviewer template records (`invitation`, `materials`, `followup`,
+  `thankyou`) resolve as **per-PD override → admin org default** for the shared
+  render/send compatibility contract. The current interactive UI consumes
+  `invitation` in `InviteEmailModal` and `materials` in
+  `ReviewerManagePanel`'s `ReleaseMaterialsModal`; the generic post-acceptance
+  type selector and batch **Send Email** action are retired. Review-due follow-up
+  uses the dedicated row-level reminder service, and thank-you uses the daily
+  fire-once sweep, each with its own server-side renderer.
   - **Admin org default:** edited in `/admin` → **Email Defaults**
     (`EmailDefaultsSection`), stored in Dataverse `wmkf_appsystemsetting` under
     `email.reviewer_<type>.{subject,body}`, read by PDs via
@@ -1172,7 +1177,7 @@ returned zero eligible/enqueued/claimed/failed.** Plan doc:
     `program_director_sender_unavailable`. The footer renders the PD name and clickable
     email plus the generic secure-link fallback.
   - **Other secure-link button labels remain stage-aware (S311).** Materials and
-    follow-up use the admin settings `email.reviewer_<type>.button_label`
+    the legacy follow-up compatibility branch use the admin settings `email.reviewer_<type>.button_label`
     (`materials`→"Start Review", `followup`→"Go to Review") with non-empty
     stage fallbacks. A type with no fallback (`thankyou`) keeps a review URL as a
     plain link. The former invitation button-label setting may remain in existing
@@ -1266,9 +1271,11 @@ returned zero eligible/enqueued/claimed/failed.** Plan doc:
   `wmkf_abstractapproved`, consumed by grantee/board exports via `grantee-document-assembly.js`),
   which live behind their own approval-status gates. The reflow remains the send-time safety net for
   un-edited flagged abstracts.
-- All four templates are sendable: `invitation` (first contact, via ReviewerInvitePanel →
-  `InviteEmailModal`, hardcoded `templateType:'invitation'`) and
-  `materials`/`followup`/`thankyou` (via `ReviewerManagePanel`). The reviewer onboards
+- The shared route/service recognizes all four stored template types for compatibility.
+  The current UI sends `invitation` (first contact, via ReviewerInvitePanel →
+  `InviteEmailModal`, hardcoded `templateType:'invitation'`) and `materials` (via
+  `ReviewerManagePanel`, hardcoded `templateType:'materials'`). Follow-up is a
+  dedicated row-level reminder action; thank-you is the daily sweep. The reviewer onboards
   (COI/AI acks + honorarium/address; honorarium request creation is config-gated
   and BILL remains deferred this cycle) at the single Accept on the portal;
   an acceptance-confirmation email with a review-due `.ics` ships from `respond.js` on

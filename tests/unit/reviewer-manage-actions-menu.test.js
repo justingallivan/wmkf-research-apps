@@ -93,7 +93,7 @@ describe('reviewer table geometry', () => {
     expect(screen.getByText(reviewer.email)).toHaveClass('truncate');
   });
 
-  test('uses the corresponding eight-column grid when management controls are present', async () => {
+  test('uses the corresponding seven-column grid when management controls are present without a release selection', async () => {
     let container;
     await act(async () => {
       ({ container } = render(
@@ -109,7 +109,7 @@ describe('reviewer table geometry', () => {
 
     const table = container.querySelector('table');
     expect(table).toHaveClass('table-fixed', 'min-w-[76rem]');
-    expect(table.querySelectorAll('colgroup col')).toHaveLength(8);
+    expect(table.querySelectorAll('colgroup col')).toHaveLength(7);
   });
 
   test('separates follow-up and action controls into aligned labeled columns', async () => {
@@ -129,7 +129,7 @@ describe('reviewer table geometry', () => {
 
     const table = container.querySelector('table');
     expect(table).toHaveClass('table-fixed', 'min-w-[80rem]');
-    expect(table.querySelectorAll('colgroup col')).toHaveLength(9);
+    expect(table.querySelectorAll('colgroup col')).toHaveLength(8);
     expect(screen.getByRole('columnheader', { name: 'Follow up' })).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: 'Actions' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Send reminder to Joshua Rosenthal' })).toBeInTheDocument();

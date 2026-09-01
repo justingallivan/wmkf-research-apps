@@ -400,8 +400,13 @@ const emptyProposalDoc = () => ({
   pickedKey: null,
 });
 
-function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, settings, onEmailsSent }) {
-  const [templateType, setTemplateType] = useState('materials');
+function ReleaseMaterialsModal({ isOpen, onClose, reviewers, proposalTitle, requestId, settings, onEmailsSent }) {
+  // This request-scoped entry point is intentionally materials-only. Review-due
+  // nudges use ReviewReminderAction's fresh eligibility + atomic-claim path, and
+  // thank-yous are handled by the dedicated sweep. Keeping those choices out of
+  // the release modal prevents one generic composer from competing with the
+  // lifecycle-specific actions.
+  const templateType = 'materials';
   const [templates, setTemplates] = useState(EMPTY_TEMPLATES);
   const [step, setStep] = useState('compose'); // compose | preview | sending | sent
   const [progress, setProgress] = useState({ current: 0, total: 0, message: '' });
@@ -466,7 +471,7 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
   // outstanding (if any), so close/reopen can abort it immediately instead of
   // leaving it to the PREVIEW_RENDER_TIMEOUT_MS ceiling. Aborting settles that
   // fetch's promise, which is what actually releases renderTailRef for the
-  // next session — without this, EmailModal staying mounted across close
+  // next session — without this, ReleaseMaterialsModal staying mounted across close
   // means a hung render's tail blocks every later session until it times out.
   const activeRenderAbortRef = useRef(null);
 
@@ -603,10 +608,6 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
   useEffect(() => {
     resetProposalDoc();
   }, [requestId, resetProposalDoc]);
-
-  useEffect(() => {
-    if (templateType !== 'materials') resetProposalDoc();
-  }, [templateType, resetProposalDoc]);
 
   useEffect(() => {
     // Attach-proposal-email OFF (default): never auto-load/Blob-upload the
@@ -747,7 +748,7 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
       setProgress({ current: 0, total: 0, message: 'Rendering previews...' });
 
       // Bound this fetch so a hung request can't wedge renderTailRef forever —
-      // EmailModal stays mounted when closed, so without this a stuck render
+      // ReleaseMaterialsModal stays mounted when closed, so without this a stuck render
       // would block every later session's preview too (only close/reopen abort,
       // above, gets there sooner). Preview renders are read-only server-side
       // since d040a7a3, so aborting here never strands a durable write.
@@ -833,8 +834,8 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
     }
 
     const ok = window.confirm(
-      `Send ${sendable.length} email${sendable.length !== 1 ? 's' : ''} now via Dynamics? `
-        + 'This will create email activities on the linked requests and cannot be undone.'
+      `Release the proposal to ${sendable.length} reviewer${sendable.length !== 1 ? 's' : ''} now? `
+        + 'This will send the materials email through Dynamics and cannot be undone.'
     );
     if (!ok) return;
 
@@ -935,7 +936,7 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
           <h2 className="text-lg font-semibold text-gray-900">
-            {step === 'download' ? 'Emails Ready' : `Generate ${templateType.charAt(0).toUpperCase() + templateType.slice(1)} Emails`}
+            {step === 'download' ? 'Emails Ready' : 'Release proposal to reviewers'}
           </h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
         </div>
@@ -960,34 +961,14 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
                 </div>
               )}
 
-              {/* Template Type Selector */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Email Type</label>
-                <div className="flex gap-2">
-                  {['materials', 'followup', 'thankyou'].map(type => (
-                    <button
-                      key={type}
-                      onClick={() => setTemplateType(type)}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                        templateType === type
-                          ? 'bg-gray-900 text-white'
-                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      }`}
-                    >
-                      {type === 'materials' ? 'Materials' : type === 'followup' ? 'Follow-up' : 'Thank You'}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {templateType === 'materials' && materialsPreflight.status === 'ok' && materialsPreflight.fileCount === 0 && (
+              {materialsPreflight.status === 'ok' && materialsPreflight.fileCount === 0 && (
                 <div className="p-3 bg-amber-50 text-amber-800 rounded-lg text-sm">
                   The expected reviewer proposal PDF is not available for this request — reviewers
                   who follow their link will find nothing to download.
                 </div>
               )}
 
-              {templateType === 'materials' && materialsPreflight.status === 'unavailable' && (
+              {materialsPreflight.status === 'unavailable' && (
                 <div className="p-3 bg-gray-50 text-gray-500 rounded-lg text-sm">
                   Couldn’t verify reviewer materials availability.
                 </div>
@@ -1023,7 +1004,7 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
                 </div>
               </div>
 
-              {templateType === 'materials' && !attachProposalEmailEnabled && (
+              {!attachProposalEmailEnabled && (
                 <div className="bg-blue-50 rounded-lg p-3 text-sm text-blue-800">
                   Reviewers access materials via their secure portal link (included automatically) —
                   no attachment is sent. An admin can enable email attachments in Admin → Reviewer
@@ -1031,7 +1012,7 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
                 </div>
               )}
 
-              {templateType === 'materials' && attachProposalEmailEnabled && (
+              {attachProposalEmailEnabled && (
                 <div className="bg-gray-50 rounded-lg p-3 space-y-2">
                   <div className="flex items-center justify-between">
                     <p className="font-medium text-gray-900">Proposal document</p>
@@ -1585,7 +1566,7 @@ export default function ReviewerManagePanel({
   onDismissReferral,
 }) {
   const [selectedReviewers, setSelectedReviewers] = useState(new Set());
-  const [emailModalOpen, setEmailModalOpen] = useState(false);
+  const [releaseModalOpen, setReleaseModalOpen] = useState(false);
   const [editingNotes, setEditingNotes] = useState(null); // { suggestionId, value }
   const [savingNotes, setSavingNotes] = useState(false);
   const [activityDrawerId, setActivityDrawerId] = useState(null); // suggestionId
@@ -1612,13 +1593,19 @@ export default function ReviewerManagePanel({
     if (activityDrawerId && !activityReviewer) setActivityDrawerId(null);
   }, [activityDrawerId, activityReviewer]);
 
-  const selectedList = reviewers.filter(r => selectedReviewers.has(r.suggestionId));
-  const allSelected = reviewers.length > 0 && reviewers.every(r => selectedReviewers.has(r.suggestionId));
   const acceptedReviewers = reviewers.filter(r => r.reviewStatus === 'accepted');
-  const selectedAcceptedList = selectedList.filter(r => r.reviewStatus === 'accepted');
+  const selectedList = acceptedReviewers.filter(r => selectedReviewers.has(r.suggestionId));
+  const showSelectionColumn = canManage && acceptedReviewers.length > 0;
+  const allSelected = showSelectionColumn
+    && acceptedReviewers.every(r => selectedReviewers.has(r.suggestionId));
   const showFollowUpColumn = showReviewReminderAction;
   const showActionsColumn = canManage;
   const combinedControls = showFollowUpColumn && showActionsColumn;
+  const reviewerColumnWidth = combinedControls
+    ? showSelectionColumn ? 'w-[22%]' : 'w-[26%]'
+    : showActionsColumn
+      ? showSelectionColumn ? 'w-[24%]' : 'w-[28%]'
+      : showFollowUpColumn ? 'w-[29%]' : 'w-[32%]';
   const tableMinWidth = combinedControls
     ? 'min-w-[80rem]'
     : showFollowUpColumn || showActionsColumn
@@ -1629,7 +1616,7 @@ export default function ReviewerManagePanel({
     if (allSelected) {
       setSelectedReviewers(new Set());
     } else {
-      setSelectedReviewers(new Set(reviewers.map(r => r.suggestionId)));
+      setSelectedReviewers(new Set(acceptedReviewers.map(r => r.suggestionId)));
     }
   };
 
@@ -1868,13 +1855,15 @@ export default function ReviewerManagePanel({
           </ul>
         </div>
       )}
-      {/* Actions bar. Counts use selectedList (visible + selected), not the raw
+      {/* Actions bar. Counts use selectedList (eligible + visible + selected), not the raw
           selectedReviewers set, which can retain IDs no longer visible after a
           refresh removes a reviewer — that would overcount (Codex S209). */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <span className="text-sm text-gray-600">
-            {selectedList.length > 0 ? `${selectedList.length} selected` : `${reviewers.length} reviewer${reviewers.length !== 1 ? 's' : ''}`}
+            {selectedList.length > 0
+              ? `${selectedList.length} accepted reviewer${selectedList.length !== 1 ? 's' : ''} selected`
+              : `${reviewers.length} reviewer${reviewers.length !== 1 ? 's' : ''}`}
           </span>
           {loading && (
             <div className="w-4 h-4 border-2 border-gray-200 border-t-gray-600 rounded-full animate-spin" />
@@ -1893,19 +1882,14 @@ export default function ReviewerManagePanel({
           {canManage && acceptedReviewers.length > 0 && (
             <Button
               onClick={() => {
-                const releaseTargets = selectedAcceptedList.length > 0
-                  ? selectedAcceptedList
+                const releaseTargets = selectedList.length > 0
+                  ? selectedList
                   : acceptedReviewers;
                 setSelectedReviewers(new Set(releaseTargets.map(r => r.suggestionId)));
-                setEmailModalOpen(true);
+                setReleaseModalOpen(true);
               }}
             >
-              Release proposal to reviewers ({selectedAcceptedList.length > 0 ? selectedAcceptedList.length : acceptedReviewers.length})
-            </Button>
-          )}
-          {canManage && selectedList.length > 0 && (
-            <Button onClick={() => setEmailModalOpen(true)}>
-              Send Email ({selectedList.length})
+              Release proposal to reviewers ({selectedList.length > 0 ? selectedList.length : acceptedReviewers.length})
             </Button>
           )}
         </div>
@@ -1924,8 +1908,8 @@ export default function ReviewerManagePanel({
                 auto-sized columns and breaks vertical scanning across the
                 consolidated follow-up page. */}
             <colgroup>
-              {canManage && <col className="w-[4%]" />}
-              <col className={combinedControls ? 'w-[22%]' : canManage ? 'w-[24%]' : showFollowUpColumn ? 'w-[29%]' : 'w-[32%]'} />
+              {showSelectionColumn && <col className="w-[4%]" />}
+              <col className={reviewerColumnWidth} />
               <col className={combinedControls ? 'w-[11%]' : canManage ? 'w-[12%]' : showFollowUpColumn ? 'w-[14%]' : 'w-[16%]'} />
               <col className={combinedControls ? 'w-[9%]' : canManage ? 'w-[10%]' : showFollowUpColumn ? 'w-[12%]' : 'w-[14%]'} />
               <col className={combinedControls ? 'w-[10%]' : canManage ? 'w-[11%]' : showFollowUpColumn ? 'w-[13%]' : 'w-[14%]'} />
@@ -1936,12 +1920,13 @@ export default function ReviewerManagePanel({
             </colgroup>
             <thead className="bg-gray-50">
               <tr>
-                {canManage && (
+                {showSelectionColumn && (
                   <th className="px-3 py-3 w-10">
                     <input
                       type="checkbox"
                       checked={allSelected}
                       onChange={toggleSelectAll}
+                      aria-label="Select all reviewers awaiting materials"
                       className="rounded border-gray-300"
                     />
                   </th>
@@ -1973,14 +1958,17 @@ export default function ReviewerManagePanel({
 
                 return (
                   <tr key={r.suggestionId} className="hover:bg-gray-50 transition-colors">
-                    {canManage && (
+                    {showSelectionColumn && (
                       <td className="px-3 py-3 align-top">
-                        <input
-                          type="checkbox"
-                          checked={selectedReviewers.has(r.suggestionId)}
-                          onChange={() => toggleSelect(r.suggestionId)}
-                          className="rounded border-gray-300"
-                        />
+                        {r.reviewStatus === 'accepted' && (
+                          <input
+                            type="checkbox"
+                            checked={selectedReviewers.has(r.suggestionId)}
+                            onChange={() => toggleSelect(r.suggestionId)}
+                            aria-label={`Select ${r.name || 'reviewer'} for proposal release`}
+                            className="rounded border-gray-300"
+                          />
+                        )}
                       </td>
                     )}
                     <td className="px-4 py-3 align-top">
@@ -2121,9 +2109,9 @@ export default function ReviewerManagePanel({
       {/* Modals */}
       {canManage && (
         <>
-          <EmailModal
-            isOpen={emailModalOpen}
-            onClose={() => setEmailModalOpen(false)}
+          <ReleaseMaterialsModal
+            isOpen={releaseModalOpen}
+            onClose={() => setReleaseModalOpen(false)}
             reviewers={selectedList}
             proposalTitle={proposal.proposalTitle}
             requestId={proposal?.proposalId}
