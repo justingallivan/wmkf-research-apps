@@ -39,9 +39,12 @@ related:
 > branch therefore supports authenticated layout/filter/navigation UAT before
 > an owner promotion decision, while production retains the established reviewer
 > actions after promotion. `[VERIFIED 2026-09-01]` The exact branch callback is
-> registered and Microsoft sign-in succeeds. Populated Preview data remains
-> fail-closed until the owner explicitly authorizes branch-scoped
-> `DATAVERSE_ALLOW_PROD_READS=yes`; no Preview write authorization is present.
+> registered and Microsoft sign-in succeeds. `[AUTHORIZED + VERIFIED
+> 2026-09-01]` The owner authorized branch-scoped
+> `DATAVERSE_ALLOW_PROD_READS=yes`; the redeployed Preview loaded 10 D26 assigned
+> requests, 7 needing attention, 20 active reviewers, and 5 received reviews.
+> The read-only banner and hidden mutation controls were re-verified; no Preview
+> write acknowledgement or rehearsal grant is present.
 
 ## Outcome
 
