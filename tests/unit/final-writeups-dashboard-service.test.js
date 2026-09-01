@@ -224,6 +224,82 @@ test('ordinary and focused responses do not load or expose the coordinator matri
   expect(focused.dependencies.resolveMatrixAudiences).not.toHaveBeenCalled();
 });
 
+test('enabled Program Coordinator lens keeps all active rows and receives the neutral matrix', async () => {
+  const { dependencies } = harness();
+  dependencies.resolvePersonas.mockResolvedValue({
+    enabled: true,
+    personas: ['program-coordinator'],
+  });
+
+  const result = await loadFinalWriteupsDashboard({ actingUserSystemId: ACTOR_ID }, dependencies);
+
+  expect(result.counts).toEqual({ total: 3, open: 1, history: 1, stewardship: 1 });
+  expect(result.viewer).toMatchObject({
+    isSuperuser: false,
+    personaLensesEnabled: true,
+    personas: ['program-coordinator'],
+  });
+  expect(result.coordinatorMatrix).not.toBeNull();
+  expect(dependencies.resolveMatrixAudiences).toHaveBeenCalledTimes(1);
+});
+
+test('enabled Leadership lens includes only leadership-stage rows', async () => {
+  const { dependencies } = harness();
+  dependencies.resolvePersonas.mockResolvedValue({ enabled: true, personas: ['leadership'] });
+
+  const result = await loadFinalWriteupsDashboard({ actingUserSystemId: ACTOR_ID }, dependencies);
+
+  expect(result.counts).toEqual({ total: 1, open: 0, history: 1, stewardship: 0 });
+  expect(result.queues.history.map((row) => row.requestId)).toEqual([REQUEST_B_ID]);
+  expect(result.coordinatorMatrix).toBeNull();
+});
+
+test('enabled Program Director lens keeps group review plus own stewardship and excludes other leadership rows', async () => {
+  const { dependencies } = harness();
+  dependencies.resolvePersonas.mockResolvedValue({ enabled: true, personas: ['program-director'] });
+
+  const result = await loadFinalWriteupsDashboard({ actingUserSystemId: ACTOR_ID }, dependencies);
+
+  expect(result.counts).toEqual({ total: 2, open: 1, history: 0, stewardship: 1 });
+  expect(result.queues.open.map((row) => row.requestId)).toEqual([REQUEST_A_ID]);
+  expect(result.queues.stewardship.map((row) => row.requestId)).toEqual([REQUEST_C_ID]);
+});
+
+test('enabled multi-persona visibility is a union and an unassigned viewer fails closed', async () => {
+  const overlapping = harness();
+  overlapping.dependencies.resolvePersonas.mockResolvedValue({
+    enabled: true,
+    personas: ['program-director', 'leadership'],
+  });
+  const overlapResult = await loadFinalWriteupsDashboard(
+    { actingUserSystemId: ACTOR_ID },
+    overlapping.dependencies,
+  );
+  expect(overlapResult.counts.total).toBe(3);
+
+  const unassigned = harness();
+  unassigned.dependencies.resolvePersonas.mockResolvedValue({ enabled: true, personas: [] });
+  const unassignedResult = await loadFinalWriteupsDashboard(
+    { actingUserSystemId: ACTOR_ID },
+    unassigned.dependencies,
+  );
+  expect(unassignedResult.counts).toEqual({ total: 0, open: 0, history: 0, stewardship: 0 });
+  expect(unassignedResult.coordinatorMatrix).toBeNull();
+});
+
+test('focused reads fail closed when the selected row is outside the enabled persona lens', async () => {
+  const { dependencies } = harness();
+  dependencies.resolvePersonas.mockResolvedValue({ enabled: true, personas: ['leadership'] });
+
+  await expect(loadFinalWriteupsDashboard({
+    actingUserSystemId: ACTOR_ID,
+    selectedRequestId: REQUEST_A_ID,
+  }, dependencies)).rejects.toMatchObject({
+    httpStatus: 404,
+    body: { code: 'final_writeups_dashboard_request_not_found' },
+  });
+});
+
 test('superuser matrix propagates a stale configured-audience failure', async () => {
   const { dependencies } = harness();
   dependencies.resolveMatrixAudiences.mockRejectedValue(Object.assign(new Error('stale audience'), {

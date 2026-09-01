@@ -78,6 +78,13 @@ function dashboard(overrides = {}) {
   });
   return {
     success: true,
+    viewer: {
+      id: 'reviewer-1',
+      name: 'Ada Reviewer',
+      personas: [],
+      personaLensesEnabled: false,
+      isSuperuser: false,
+    },
     counts: { total: 3, open: 1, history: 1, stewardship: 1 },
     queues: { open: [open], history: [history], stewardship: [stewardship] },
     coordinatorMatrix: null,
@@ -117,6 +124,22 @@ test('dashboard search filters all queues without adding filter controls', async
   expect(screen.queryByText('Cellular repair after tissue injury')).not.toBeInTheDocument();
   expect(screen.getByText('A second proposal')).toBeInTheDocument();
   expect(screen.getByText('1 matching writeup')).toBeInTheDocument();
+});
+
+test('enabled overlapping persona lenses are named without adding another control panel', async () => {
+  global.fetch.mockResolvedValueOnce(response(dashboard({
+    viewer: {
+      id: 'reviewer-1',
+      name: 'Ada Reviewer',
+      personas: ['program-director', 'leadership'],
+      personaLensesEnabled: true,
+      isSuperuser: false,
+    },
+  })));
+  render(<FinalWriteupsDashboardView />);
+
+  expect(await screen.findByText('Program Director + Leadership view')).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /view/i })).not.toBeInTheDocument();
 });
 
 test('superuser dashboard renders a complete neutral coordinator matrix with direct Word links', async () => {

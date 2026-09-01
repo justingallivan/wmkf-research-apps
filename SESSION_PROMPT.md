@@ -79,12 +79,23 @@ Workbench redesign.
    Publishes round-trip the loaded Dataverse ETag and reject stale Admin drafts
    with `409`; unconfigured programs remain explicit and stale references fail
    closed.
-4. **[ROLLOUT DISABLED] Staff/executive lenses.** The approved persona contract
-   uses three no-privilege Dataverse teams (PD, PC, leadership), permits overlap,
-   and matches pinned GUIDs only. The teams are not yet provisioned, IDs are
-   null, and the source flag is false. Provision/verify them and prove
-   representative PC and leadership Word access before enabling lenses. Keep
-   the ordinary-staff dashboard unchanged in the meantime.
+4. **[SOURCE-BUILT / ROLLOUT DISABLED] Staff/executive lenses.** The approved
+   persona contract uses three no-privilege Dataverse owner teams (PD, PC,
+   leadership), permits overlap, and matches pinned GUIDs only. The disabled
+   source branch implements PD group/own queues, PC all-row access plus the
+   neutral matrix, leadership-stage queues, multi-persona union, and
+   fail-closed unassigned behavior; 32 focused tests pass. Commit `2f064351`
+   tracks the exact membership manifest and dry-run-by-default provisioning
+   tool. Read-only Production preflight found no exact-name collisions. An
+   authorized Production apply reached Dataverse but made zero writes because
+   the application user lacks `prvCreateTeam`; the signed-in Power Platform
+   admin surface listed no environments and direct Dataverse settings required
+   fresh password verification. A Dataverse administrator must create the exact
+   zero-role teams or run the tracked apply under an appropriately privileged
+   operator identity. Then read back exact membership and zero-role state, pin
+   the three GUIDs, prove representative PC and leadership Word access, and only
+   then enable/smoke the lenses. All IDs remain null and the source flag remains
+   false, so ordinary Production behavior is unchanged.
 
 ## Opportunistic Production Proof — Do Not Block the Deadline
 

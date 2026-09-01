@@ -405,6 +405,17 @@ function matchesSearch(row, search) {
   ].some((value) => String(value || '').toLowerCase().includes(needle));
 }
 
+function personaViewLabel(viewer) {
+  if (!viewer?.personaLensesEnabled) return null;
+  const labels = {
+    'program-director': 'Program Director',
+    'program-coordinator': 'Program Coordinator',
+    leadership: 'Leadership',
+  };
+  const resolved = (viewer.personas || []).map((persona) => labels[persona]).filter(Boolean);
+  return resolved.length ? `${resolved.join(' + ')} view` : 'No Final Writeup view assigned';
+}
+
 export function FinalWriteupsDashboardView() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -457,6 +468,11 @@ export function FinalWriteupsDashboardView() {
         <header className="mt-6 border-b border-gray-200 pb-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
+              {personaViewLabel(data?.viewer) && (
+                <p className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">
+                  {personaViewLabel(data.viewer)}
+                </p>
+              )}
               <h1 className="text-3xl font-bold tracking-[-0.03em] text-gray-900 sm:text-4xl">Final Writeups</h1>
               <p className="mt-2 max-w-2xl text-base leading-7 text-gray-600">
                 Review colleagues’ current writeups, or return to your own for editing.

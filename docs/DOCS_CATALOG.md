@@ -448,6 +448,6 @@ related:
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
-| [FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md](FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md) | plan | active |  | Final runtime and superuser matrix are Production-live; the disabled no-privilege-team persona contract is source-built; persona rollout remains. | 2026-08-28 |
+| [FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md](FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md) | plan | active |  | Final runtime and matrix are live; disabled persona logic is source-built, while Dataverse team creation and access proof block rollout. | 2026-08-28 |
 | [WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md](WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md) | plan | active |  | Pre-Site/Site Visit lifecycle, Final acknowledgement/dashboard, and the superuser matrix are live; persona-team rollout remains. | 2026-08-17 |
 
