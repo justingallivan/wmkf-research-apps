@@ -239,7 +239,7 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
       )}
 
       <div className="mb-6 flex flex-col gap-4 border-y border-gray-200 py-4 lg:flex-row lg:items-end lg:justify-between">
-        <div className="flex flex-wrap items-end gap-3">
+        <div className="flex flex-wrap items-start gap-3">
           <label className="flex flex-col gap-1 text-sm font-medium text-gray-700">
             <span>Cycle</span>
             <select
@@ -276,7 +276,7 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
             </div>
           </fieldset>
 
-          <label className="flex min-h-11 items-center gap-2 pb-0.5 text-sm font-medium text-gray-700">
+          <label className="flex min-h-11 self-end items-center gap-2 pb-0.5 text-sm font-medium text-gray-700">
             <input
               type="checkbox"
               checked={includeSetAside}
