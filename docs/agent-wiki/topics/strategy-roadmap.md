@@ -257,8 +257,9 @@ document inventory, and individual implementation plans do not establish priorit
   complete neutral current-Final × exact reviewer-role matrix. Signed-in
   Production DOM proof showed the exact 11-person roster and correct Request
   `1002788` states/actions with zero browser-console errors. Broader persona rollout
-  remains open behind the approved no-privilege-team contract and
-  representative Word-access proof.
+  remains open behind the reviewed version-2 Final Writeup staffing
+  configuration and representative Word-access proof. The unshipped
+  no-privilege-team prototype is superseded and created no Production teams.
 - **Prior owner-directed release (S469, 2026-08-30):** durable Executor
   budgets are Production-deployed and owner-viewed in the safe no-revision/code-
   fallback state; first publication remains an explicit administrator action.

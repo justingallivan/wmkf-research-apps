@@ -3,7 +3,7 @@ title: Final Writeup Review — Implementation Plan
 domain: workbench
 kind: plan
 status: active
-summary: "Final runtime and matrix are live; disabled persona logic is source-built, while Dataverse team creation and access proof block rollout."
+summary: "Final runtime and matrix are live; the reviewed v2 staffing configuration and access proof now gate the disabled persona rollout."
 canonical: false
 cataloged: 2026-08-28
 last_verified: 2026-08-31
@@ -69,9 +69,10 @@ Writeup Reviewer` role roster. Signed-in Production DOM proof showed the exact
 11-person audience and Request `1002788`, with Duncan Spore Reviewed, Justin
 Gallivan Responsible PD, every other cell Not reviewed, both direct actions,
 and zero browser-console errors. Prior local desktop and 390px browser QA also
-passed against Production reads. The source also contains the approved
-GUID-only, multi-valued persona-team resolver, but its three no-privilege team
-IDs are null and its rollout flag is false.
+passed against Production reads. The source also contains a disabled GUID-only,
+multi-valued persona-team prototype, but its three team IDs are null and its
+rollout flag is false. The owner has superseded that unshipped storage choice
+with `docs/FINAL_WRITEUP_PERSONA_CONFIGURATION_PLAN.md`.
 
 The named prerequisites are deliberately attached to the slices that need them:
 
@@ -92,32 +93,30 @@ The named prerequisites are deliberately attached to the slices that need them:
    six requested Global privileges. Dataverse automatically attached nine App
    Opener baseline privileges when it created the role; none is Delete, Assign,
    Share, or Request Document write.
-5. **Architecture resolved 2026-08-31; rollout proof open.** The application
-   will identify global Final Writeup personas through three no-privilege
-   Dataverse owner teams: Program Directors, Program Coordinators, and
-   Leadership. Runtime matching uses pinned team GUIDs only and permits
-   multiple memberships. Allison Keller is owner-confirmed President; Beth
-   Pruitt is owner-confirmed CSO and also has responsible-PD requests. The
-   disabled source implementation now applies the approved PD, PC, leadership,
-   overlap, and fail-closed queue rules. Read-only Production preflight found no
-   exact-name team collisions and established the exact 11-person membership
-   manifest; commit `2f064351` tracks the dry-run-by-default provisioning and
-   verification tooling. An authorized Production apply reached the Dataverse
-   authorization boundary but made zero writes because the application user
-   lacks `prvCreateTeam`. The signed-in Power Platform admin surface available
-   to the operator listed no environments, while direct Dataverse settings
-   required fresh Microsoft password verification. A Dataverse administrator
-   must therefore create the teams or run the tracked apply under an
-   appropriately privileged operator identity. Their GUIDs remain null and
-   representative PC/leadership SharePoint access is not yet proved, so persona
-   lenses remain disabled. No name, email, job-title, or program-taxonomy
-   inference is used.
+5. **Architecture superseded and independently reviewed 2026-08-31; rollout
+   proof open.** The owner rejected the unshipped three-owner-team mechanism
+   because it adds a separate privileged onboarding path. The selected
+   replacement extends the existing `final_writeup.matrix_audiences` setting to
+   a version-2 GUID-only contract containing explicit Program Director, Program
+   Coordinator, Leadership, overlap, and **No persona lens** assignments. It
+   uses the existing Final Writeup Admin editor, superuser route, one Publish
+   action, and optimistic ETag. Allison Keller is owner-confirmed President;
+   Beth Pruitt is owner-confirmed CSO and also has responsible-PD requests.
+   Claude reviewed the focused replacement plan as **READY WITH NAMED CHANGES**;
+   all findings are incorporated in
+   `docs/FINAL_WRITEUP_PERSONA_CONFIGURATION_PLAN.md`. The disabled source still
+   contains the superseded team prototype, but the failed apply made zero
+   writes and every team GUID remains null. Implement and migrate the v2
+   contract while the flag stays false, then prove representative PC/leadership
+   SharePoint access before enablement. No name, email, job-title,
+   program-taxonomy inference, new team privilege, or outside administrator is
+   used.
 
 Prerequisite 5 does **not** block the responsible-PD handoff, ordinary-PD
 review slices, or the superuser matrix. Those relationships and the exact
 reviewer-role roster are already server-verifiable; PC backup actions and
-leadership-specific queues remain disabled until the exact teams and file
-access are verified.
+leadership-specific queues remain disabled until the v2 staffing configuration
+and representative file access are verified.
 
 The board-package handoff remains excluded until the PCs describe their downstream process.
 
@@ -397,21 +396,22 @@ File access must be re-derived server-side from the Request and allowlisted docu
 
 ### Persona prerequisite
 
-Use the approved explicit Workbench-persona contract before enabling PC or
-leadership behavior: three no-privilege Dataverse owner teams, resolved from
-the session-linked staff system-user and matched against pinned team GUIDs.
-Membership is multi-valued because leadership and PD responsibility can
-overlap. Do not overload the Dynamics Explorer `dynamics_user_roles` table,
-infer role from a job title, or hardcode people.
+Use the reviewed explicit Workbench-persona contract before enabling PC or
+leadership behavior: version-2 GUID-only staffing assignments in the existing
+Final Writeup Admin setting, resolved from the session-linked staff system-user
+and current direct reviewer-role roster. Assignments are multi-valued because
+leadership and PD responsibility can overlap; an explicit empty-role row means
+**No persona lens**. Do not overload the Dynamics Explorer
+`dynamics_user_roles` table, infer role from a job title, or hardcode people.
 
 Before choosing storage, verify whether the assigned Program Coordinator lookup is populated reliably enough to authorize request-scoped backup actions. That lookup may solve the narrow assigned-PC case, but it cannot provide the global “all active writeups” PC dashboard or identify leadership.
 
-The storage decision is complete. `shared/config/finalWriteupPersonas.js`
-defines the three exact team names and keeps every team GUID null until
-provisioning/readback. `lib/services/final-writeup/persona-service.js` performs
-no Dataverse read while rollout is disabled and, when enabled, fails closed on
-an incomplete/duplicate configuration or ambiguous viewer. Team display names
-are diagnostic only and never authorize a persona.
+The replacement storage decision is complete in
+`docs/FINAL_WRITEUP_PERSONA_CONFIGURATION_PLAN.md`. The current source files
+still implement the superseded, disabled team prototype; every team GUID is
+null and no team was created. Slice D removes that prototype only after its
+caller census, while preserving the no-read rollout-off behavior and
+fail-closed viewer semantics in the v2 resolver.
 
 Until provisioning and file-access proof are complete:
 
@@ -584,8 +584,9 @@ were independently verified.
   rows plus their own writeups, PC users receive all rows plus the complete
   neutral matrix, leadership receives leadership-stage rows, overlapping
   memberships receive the union, and unassigned users fail closed. Rollout and
-  non-superuser matrix access remain deferred until exact team IDs and
-  representative Word access are proved.
+  non-superuser matrix access remain deferred until the reviewed v2 staffing
+  configuration is migrated/read back and representative Word access is
+  proved.
 
 This slice can ship before the PC/leadership persona model because responsible-PD versus other-PD is already server-verifiable.
 
@@ -693,7 +694,8 @@ Run each gate and its self-test sequentially where applicable:
 
 ## Final recommendation
 
-Proceed with persona-team provisioning/access proof on top of the
+Proceed with the reviewed v2 staffing-configuration implementation and access
+proof on top of the
 Production-proved Slices 2–3 foundation and the Production-live complete
 neutral superuser matrix. The 2026-09-04 same-item
 handoff is already Production-proved; Wave 23 is exact and Active in Production,
@@ -709,7 +711,8 @@ The superuser matrix is live in Ready deployment
 `dpl_Frc6fAonyFFYwiWyFJCzzE3UNune`; signed-in Production DOM proof showed the
 exact 11-person roster and correct Request `1002788` states/actions with zero
 browser-console errors. PC backup, non-superuser matrix visibility,
-leadership-specific lenses, and general rollout follow only after the exact
-no-privilege teams and representative Word access are verified. This sequence advances the
+leadership-specific lenses, and general rollout follow only after the v2
+configuration migration, rollback/repair proof, and representative Word access
+are verified. This sequence advances the
 approved experience without guessing role identity or inventing the still-unknown
 board-package workflow.

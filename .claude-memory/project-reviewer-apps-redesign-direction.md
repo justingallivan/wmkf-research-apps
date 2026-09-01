@@ -42,11 +42,13 @@ and President; the intended reviewer set for a request is configured by its
 broad Grant Program. A full coordinator matrix is required with neutral
 blank/Reviewed/Updated since review states and no compliance semantics.
 SharePoint file-permission
-verification and persona rollout remain open. The owner-approved persona
-contract is three no-privilege Dataverse teams keyed only by pinned GUID, with
-multi-membership allowed; Allison Keller is President and Beth Pruitt is CSO
-plus a responsible PD on some requests. The source team IDs remain null and the
-rollout flag remains false. The
+verification and persona rollout remain open. The reviewed replacement extends
+the existing versioned Final Writeup Admin setting with explicit GUID-only,
+multi-valued PD, PC, Leadership, and no-lens staffing assignments; Allison
+Keller is President and Beth Pruitt is CSO plus a responsible PD on some
+requests. The disabled source still contains the superseded team prototype,
+but its IDs remain null, no Production team was created, and the rollout flag
+remains false. The
 first fixed gate is a human-in-the-loop, end-to-end Initial Assessment pilot by
 2026-08-10, ahead of proposal intake around 2026-08-18. Authorized staff use a
 dedicated representative dummy production request to generate, inspect, and edit the canonical
@@ -277,8 +279,9 @@ planned. Current authority is
   all 11 confirmed audience members. The colleague's post-role retry succeeded,
   appeared in review history, and independent readback proved exactly one
   complete acknowledgement row for Request `1002788`. Persona lenses remain
-  disabled until the approved teams are provisioned and representative PC and
-  leadership Word access is proved.
+  disabled until the reviewed version-2 staffing configuration is implemented,
+  migrated/read back, and representative PC and leadership Word access is
+  proved.
   **[PRODUCTION-LIVE + SIGNED-IN READ/WRITE PROVED 2026-08-31]** Role
   eligibility is not the same as per-program matrix assignment. Commit
   `5573bca3` is live in Ready Production deployment

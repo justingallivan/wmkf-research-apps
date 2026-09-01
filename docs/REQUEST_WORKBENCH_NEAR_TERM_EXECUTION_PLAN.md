@@ -880,9 +880,10 @@ Decision order:
    superuser matrix is Production-live in Ready deployment
    `dpl_Frc6fAonyFFYwiWyFJCzzE3UNune`. Signed-in Production DOM proof showed
    the exact 11-person roster and correct Request `1002788` states/actions with
-   zero browser-console errors. Role-specific rollout remains
-   gated by no-privilege-team provisioning and representative file-access
-   verification.
+   zero browser-console errors. Role-specific rollout remains gated by the
+   reviewed version-2 Final Writeup staffing configuration, live-setting
+   migration/readback, and representative file-access verification. The
+   unshipped team mechanism is superseded.
 4. **Initial Assessment** — the pilot and administrator controls are
    Production-deployed and the signed-in read surface has passed. Decide
    whether to authorize exact restore and/or first Board-snapshot write proof,
@@ -1210,8 +1211,9 @@ Still required:
    coordinator;
 8. any additional Final Writeup inputs beyond the selected latest Pre-Site
    version; first-release regeneration is intentionally excluded; and
-9. provisioning/readback of the settled no-privilege PD/PC/leadership team
-   contract, representative SharePoint file-access verification, and restore
+9. implementation/readback of the reviewed GUID-only PD/PC/leadership staffing
+   configuration in the existing Final Writeup Admin setting, representative
+   SharePoint file-access verification, and restore
    authority. Acknowledgement granularity and the full coordinator matrix
    direction are settled in the Final implementation plan; the superuser
    matrix is Production-live and signed-in read-smoked in Ready deployment

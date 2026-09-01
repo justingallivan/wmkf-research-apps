@@ -3,7 +3,7 @@ title: Workbench Writeup Lifecycle Plan
 domain: workbench
 kind: plan
 status: active
-summary: "Pre-Site/Site Visit lifecycle, Final acknowledgement/dashboard, and the superuser matrix are live; persona-team rollout remains."
+summary: "Pre-Site/Site Visit lifecycle, Final acknowledgement/dashboard, and the superuser matrix are live; reviewed persona-config rollout remains."
 canonical: false
 cataloged: 2026-08-17
 last_verified: 2026-08-31
@@ -897,9 +897,10 @@ silently extend its paths or names to writeup publications.
    Anneli Stone and Saskia Pallais, and rendered Request `1002788` with exactly
    those nine reviewer columns and zero browser-console errors. Southern
    California remains explicitly unconfigured pending its complete audience.
-   Personal lenses
-   remain disabled pending no-privilege-team provisioning and representative
-   Word-access proof. Keep acknowledgement distinct from document lifecycle,
+   Personal lenses remain disabled pending implementation and publication of
+   the reviewed version-2 staffing configuration plus representative
+   Word-access proof. The unshipped team prototype is superseded and requires
+   no Dataverse administrator. Keep acknowledgement distinct from document lifecycle,
    external distribution, and the AkoyaGo publication projection.
 
 Each slice must trace caller → restriction context → registry persistence →

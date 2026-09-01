@@ -55,7 +55,8 @@ Workbench redesign.
    assignments. Owner confirmation establishes Allison Keller as President and
    Beth Pruitt as CSO; Beth also has responsible-PD requests. John Sader is
    owner-confirmed as a Program Director. All three owner-confirmed persona
-   facts remain rollout intent until the exact Dataverse teams are provisioned.
+   facts remain rollout intent until the reviewed v2 staffing configuration is
+   published and access proof is complete.
 2. **[PRODUCTION-LIVE + SIGNED-IN READ SMOKE PASSED 2026-08-31]
    Superuser coordinator matrix.** Commit `52575761` is live in Ready Production
    deployment `dpl_Frc6fAonyFFYwiWyFJCzzE3UNune`. The index projects every current Final row ×
@@ -79,23 +80,20 @@ Workbench redesign.
    Publishes round-trip the loaded Dataverse ETag and reject stale Admin drafts
    with `409`; unconfigured programs remain explicit and stale references fail
    closed.
-4. **[SOURCE-BUILT / ROLLOUT DISABLED] Staff/executive lenses.** The approved
-   persona contract uses three no-privilege Dataverse owner teams (PD, PC,
-   leadership), permits overlap, and matches pinned GUIDs only. The disabled
-   source branch implements PD group/own queues, PC all-row access plus the
-   neutral matrix, leadership-stage queues, multi-persona union, and
-   fail-closed unassigned behavior; 32 focused tests pass. Commit `2f064351`
-   tracks the exact membership manifest and dry-run-by-default provisioning
-   tool. Read-only Production preflight found no exact-name collisions. An
-   authorized Production apply reached Dataverse but made zero writes because
-   the application user lacks `prvCreateTeam`; the signed-in Power Platform
-   admin surface listed no environments and direct Dataverse settings required
-   fresh password verification. A Dataverse administrator must create the exact
-   zero-role teams or run the tracked apply under an appropriately privileged
-   operator identity. Then read back exact membership and zero-role state, pin
-   the three GUIDs, prove representative PC and leadership Word access, and only
-   then enable/smoke the lenses. All IDs remain null and the source flag remains
-   false, so ordinary Production behavior is unchanged.
+4. **[REVIEWED PLAN / ROLLOUT DISABLED] Staff/executive lenses.** The owner
+   rejected a second Dataverse-team onboarding layer. The reviewed replacement
+   extends the existing versioned Final Writeup Admin setting and its one
+   editor/Publish action with explicit PD, PC, Leadership, overlap, and **No
+   persona lens** assignments keyed only by stable reviewer GUID. The current
+   disabled source branch still contains the superseded team prototype and its
+   PD group/own queues, PC all-row access plus the neutral matrix,
+   leadership-stage queues, multi-persona union, and fail-closed unassigned
+   behavior; no team was created and ordinary Production behavior is unchanged.
+   Implement `docs/FINAL_WRITEUP_PERSONA_CONFIGURATION_PLAN.md` while the flag
+   stays false, migrate the live v1 Research audience to v2 through the existing
+   ETag seam, prove repair/rollback and representative PC/leadership Word
+   access, then enable and smoke the lenses. No elevated Dataverse team
+   privilege or outside administrator is part of the selected path.
 
 ## Opportunistic Production Proof — Do Not Block the Deadline
 

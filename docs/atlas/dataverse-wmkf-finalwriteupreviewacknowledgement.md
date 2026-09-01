@@ -182,7 +182,9 @@ returned the reviewed-history state. The stored acknowledgement time is
   lenses remain. The complete neutral matrix is Production-live for superusers
   in Ready deployment `dpl_Frc6fAonyFFYwiWyFJCzzE3UNune`, with signed-in DOM
   proof of the exact roster and correct Request `1002788` states/actions. The
-  approved persona contract uses three no-privilege Dataverse teams with
-  multi-membership support; exact team GUIDs remain null and the rollout flag
-  remains false until the teams are provisioned and representative PC and
-  leadership Word access is proved.
+  reviewed persona plan uses the existing versioned Final Writeup Admin setting
+  for GUID-only, multi-valued PD/PC/Leadership/no-lens assignments. The disabled
+  source still contains the superseded team prototype, but its GUIDs remain
+  null, no Production team was created, and the rollout flag remains false
+  until v2 migration/readback and representative PC/leadership Word access are
+  proved.

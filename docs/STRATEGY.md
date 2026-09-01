@@ -176,12 +176,15 @@ current reviewer-role members and excludes owner-confirmed Southern California
 staff Anneli Stone and Saskia Pallais. Signed-in Admin publication/readback
 survived reload; Request `1002788` rendered under Research with exactly those
 nine columns and zero browser-console errors. Southern California remains
-explicitly unconfigured pending its complete audience. The approved
-persona mechanism is three no-privilege Dataverse teams with GUID-only,
-multi-valued membership: Allison Keller is President; Beth Pruitt is CSO and
-also a responsible PD on some requests. Team provisioning, representative
+explicitly unconfigured pending its complete audience. The reviewed persona
+plan extends the same versioned Final Writeup setting and existing Admin editor
+with GUID-only, multi-valued PD, PC, Leadership, and explicit no-lens staffing
+assignments: Allison Keller is President; Beth Pruitt is CSO and also a
+responsible PD on some requests. The source still contains the superseded,
+disabled team prototype, but no team exists and no elevated team privilege is
+required by the selected path. V2 implementation/migration, representative
 PC/leadership Word-access proof, and persona-specific queues remain gated; the
-source rollout flag is false and the team IDs are null. Initial Assessment
+source rollout flag is false. Initial Assessment
 restore/Board writes remain separately owner-gated.
 
 **Recently completed:** the Staff Deliberations workspace/history UX, curated

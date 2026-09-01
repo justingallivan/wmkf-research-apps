@@ -448,6 +448,7 @@ related:
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
-| [FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md](FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md) | plan | active |  | Final runtime and matrix are live; disabled persona logic is source-built, while Dataverse team creation and access proof block rollout. | 2026-08-28 |
-| [WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md](WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md) | plan | active |  | Pre-Site/Site Visit lifecycle, Final acknowledgement/dashboard, and the superuser matrix are live; persona-team rollout remains. | 2026-08-17 |
+| [FINAL_WRITEUP_PERSONA_CONFIGURATION_PLAN.md](FINAL_WRITEUP_PERSONA_CONFIGURATION_PLAN.md) | plan | active |  | Replace no-privilege Dataverse persona teams with one versioned Final Writeup staffing configuration in the existing Admin editor. | 2026-08-31 |
+| [FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md](FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md) | plan | active |  | Final runtime and matrix are live; the reviewed v2 staffing configuration and access proof now gate the disabled persona rollout. | 2026-08-28 |
+| [WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md](WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md) | plan | active |  | Pre-Site/Site Visit lifecycle, Final acknowledgement/dashboard, and the superuser matrix are live; reviewed persona-config rollout remains. | 2026-08-17 |
 
