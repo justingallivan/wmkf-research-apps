@@ -1,6 +1,6 @@
 /** @jest-environment jsdom */
 
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import FinalWriteupMatrixAudiencesSection from '../../shared/components/admin/FinalWriteupMatrixAudiencesSection';
 
 jest.mock('next/router', () => ({
@@ -21,12 +21,22 @@ function response(body, status = 200) {
   };
 }
 
+function personas() {
+  return [
+    { reviewerId: ADA_ID, roles: ['program-director'] },
+    { reviewerId: ANNELI_ID, roles: ['program-director'] },
+    { reviewerId: SASKIA_ID, roles: [] },
+  ];
+}
+
 function state(overrides = {}) {
   return {
     success: true,
     configured: false,
+    storedVersion: null,
+    migrationRequired: false,
     revision: null,
-    config: { version: 1, programs: [] },
+    config: { version: 2, personas: personas(), programs: [] },
     programs: [
       { grantProgramId: RESEARCH_ID, name: 'Research' },
       { grantProgramId: SOCAL_ID, name: 'Southern California' },
@@ -37,6 +47,7 @@ function state(overrides = {}) {
       { reviewerId: SASKIA_ID, name: 'Saskia Pallais', initials: 'SP' },
     ],
     staleReferences: { grantProgramIds: [], reviewerIds: [] },
+    unassignedReviewerIds: [],
     ...overrides,
   };
 }
@@ -48,30 +59,33 @@ beforeEach(() => {
 
 afterEach(() => jest.restoreAllMocks());
 
-test('builds a Research audience from the live role roster and publishes explicit exclusions', async () => {
+test('publishes responsibilities and a Research audience through one v2 replacement', async () => {
   global.fetch
     .mockResolvedValueOnce(response(state()))
     .mockResolvedValueOnce(response(state({
       configured: true,
-      config: { version: 1, programs: [{ grantProgramId: RESEARCH_ID, reviewerIds: [ADA_ID] }] },
+      storedVersion: 2,
+      revision: 'W/"2"',
+      config: {
+        version: 2,
+        personas: personas(),
+        programs: [{ grantProgramId: RESEARCH_ID, reviewerIds: [ADA_ID] }],
+      },
     })));
 
   render(<FinalWriteupMatrixAudiencesSection />);
+  expect(await screen.findByText(/staffing has not been published/i)).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Staff responsibilities' })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Program review audiences' })).toBeInTheDocument();
 
-  expect(await screen.findByText(/matrix is still using the reviewer-role default/i)).toBeInTheDocument();
   fireEvent.change(screen.getByLabelText('Add a Grant Program audience'), {
     target: { value: RESEARCH_ID },
   });
   fireEvent.click(screen.getByRole('button', { name: 'Add program' }));
-
   expect(screen.getByRole('heading', { name: 'Research' })).toBeInTheDocument();
-  expect(screen.getByLabelText(/Ada Reviewer/)).toBeChecked();
-  expect(screen.getByLabelText(/Anneli Stone/)).toBeChecked();
-  expect(screen.getByLabelText(/Saskia Pallais/)).toBeChecked();
-
   fireEvent.click(screen.getByLabelText(/Anneli Stone/));
   fireEvent.click(screen.getByLabelText(/Saskia Pallais/));
-  fireEvent.click(screen.getByRole('button', { name: 'Publish audiences' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Publish Final Writeup staffing' }));
 
   await waitFor(() => expect(global.fetch).toHaveBeenNthCalledWith(
     2,
@@ -80,51 +94,120 @@ test('builds a Research audience from the live role roster and publishes explici
       method: 'PUT',
       body: JSON.stringify({
         config: {
-          version: 1,
+          version: 2,
+          personas: personas(),
           programs: [{ grantProgramId: RESEARCH_ID, reviewerIds: [ADA_ID] }],
         },
         expectedRevision: null,
       }),
     }),
   ));
-  expect(await screen.findByText(/program audiences published/i)).toBeInTheDocument();
+  expect(await screen.findByText(/responsibilities and program audiences now share this revision/i)).toBeInTheDocument();
+  expect(screen.getAllByRole('button', { name: /Publish/ })).toHaveLength(1);
 });
 
-test('keeps a stale draft visible when another administrator publishes first', async () => {
+test('a v1 migration draft is publishable without changing the preserved program audience', async () => {
+  const migration = state({
+    configured: true,
+    storedVersion: 1,
+    migrationRequired: true,
+    revision: 'W/"7"',
+    config: {
+      version: 2,
+      personas: personas(),
+      programs: [{ grantProgramId: RESEARCH_ID, reviewerIds: [ADA_ID] }],
+    },
+  });
   global.fetch
-    .mockResolvedValueOnce(response(state({ revision: 'W/"7"' })))
+    .mockResolvedValueOnce(response(migration))
+    .mockResolvedValueOnce(response(state({
+      ...migration,
+      storedVersion: 2,
+      migrationRequired: false,
+      revision: 'W/"8"',
+    })));
+
+  render(<FinalWriteupMatrixAudiencesSection />);
+  expect(await screen.findByText(/still stored as version 1/i)).toBeInTheDocument();
+  expect(screen.getByText('Unpublished changes')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Publish Final Writeup staffing' }));
+
+  await waitFor(() => expect(JSON.parse(global.fetch.mock.calls[1][1].body)).toEqual({
+    config: {
+      version: 2,
+      personas: personas(),
+      programs: [{ grantProgramId: RESEARCH_ID, reviewerIds: [ADA_ID] }],
+    },
+    expectedRevision: 'W/"7"',
+  }));
+});
+
+test('missing staff rows block publication until No persona lens is explicitly selected', async () => {
+  global.fetch.mockResolvedValueOnce(response(state({
+    configured: true,
+    storedVersion: 2,
+    revision: 'W/"4"',
+    config: {
+      version: 2,
+      personas: [{ reviewerId: ADA_ID, roles: ['program-director'] }],
+      programs: [{ grantProgramId: RESEARCH_ID, reviewerIds: [ADA_ID] }],
+    },
+    unassignedReviewerIds: [ANNELI_ID, SASKIA_ID],
+  })));
+
+  render(<FinalWriteupMatrixAudiencesSection />);
+  expect(await screen.findByText(/choose at least one responsibility/i)).toBeInTheDocument();
+  const publish = screen.getByRole('button', { name: 'Publish Final Writeup staffing' });
+  expect(publish).toBeDisabled();
+
+  fireEvent.click(within(screen.getByRole('group', { name: /Responsibilities for Anneli Stone/ }))
+    .getByLabelText('No persona lens'));
+  fireEvent.click(within(screen.getByRole('group', { name: /Responsibilities for Saskia Pallais/ }))
+    .getByLabelText('No persona lens'));
+  expect(publish).toBeEnabled();
+});
+
+test('stale conflict keeps the complete local draft retryable', async () => {
+  global.fetch
+    .mockResolvedValueOnce(response(state({
+      configured: true,
+      storedVersion: 2,
+      revision: 'W/"7"',
+      config: {
+        version: 2,
+        personas: personas(),
+        programs: [{ grantProgramId: RESEARCH_ID, reviewerIds: [ADA_ID] }],
+      },
+    })))
     .mockResolvedValueOnce(response({
-      error: 'Another administrator published matrix audience changes after this page loaded. Reload and review the current configuration before publishing again.',
-      code: 'final_writeup_matrix_audience_revision_conflict',
+      error: 'Another administrator published Final Writeup staffing changes after this state was loaded. Reload and review before publishing again.',
+      code: 'final_writeup_staffing_revision_conflict',
     }, 409));
 
   render(<FinalWriteupMatrixAudiencesSection />);
-  await screen.findByText(/reviewer-role default/i);
-  fireEvent.change(screen.getByLabelText('Add a Grant Program audience'), {
-    target: { value: RESEARCH_ID },
-  });
-  fireEvent.click(screen.getByRole('button', { name: 'Add program' }));
-  fireEvent.click(screen.getByRole('button', { name: 'Publish audiences' }));
+  const ada = await screen.findByRole('group', { name: /Responsibilities for Ada Reviewer/ });
+  fireEvent.click(within(ada).getByLabelText('Leadership'));
+  fireEvent.click(screen.getByRole('button', { name: 'Publish Final Writeup staffing' }));
 
   expect(await screen.findByRole('alert')).toHaveTextContent(/another administrator published/i);
-  expect(screen.getByRole('heading', { name: 'Research' })).toBeInTheDocument();
-  expect(screen.getByText('Unsaved changes')).toBeInTheDocument();
+  expect(within(ada).getByLabelText('Leadership')).toBeChecked();
+  expect(screen.getByText('Unpublished changes')).toBeInTheDocument();
   expect(JSON.parse(global.fetch.mock.calls[1][1].body)).toMatchObject({ expectedRevision: 'W/"7"' });
 });
 
-test('does not allow publishing a configured program with no reviewers', async () => {
+test('configured program with no reviewers remains visibly invalid and cannot publish', async () => {
   global.fetch.mockResolvedValueOnce(response(state({
     configured: true,
+    storedVersion: 2,
+    revision: 'W/"3"',
     config: {
-      version: 1,
+      version: 2,
+      personas: personas(),
       programs: [{ grantProgramId: RESEARCH_ID, reviewerIds: [ADA_ID] }],
     },
   })));
   render(<FinalWriteupMatrixAudiencesSection />);
-
-  const ada = await screen.findByLabelText(/Ada Reviewer/);
-  fireEvent.click(ada);
-
+  fireEvent.click(await screen.findByLabelText(/Ada Reviewer/));
   expect(screen.getByText(/select at least one reviewer/i)).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Publish audiences' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Publish Final Writeup staffing' })).toBeDisabled();
 });

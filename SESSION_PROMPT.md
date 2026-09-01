@@ -80,20 +80,21 @@ Workbench redesign.
    Publishes round-trip the loaded Dataverse ETag and reject stale Admin drafts
    with `409`; unconfigured programs remain explicit and stale references fail
    closed.
-4. **[REVIEWED PLAN / ROLLOUT DISABLED] Staff/executive lenses.** The owner
+4. **[SOURCE-BUILT V2 / ROLLOUT DISABLED] Staff/executive lenses.** The owner
    rejected a second Dataverse-team onboarding layer. The reviewed replacement
    extends the existing versioned Final Writeup Admin setting and its one
    editor/Publish action with explicit PD, PC, Leadership, overlap, and **No
-   persona lens** assignments keyed only by stable reviewer GUID. The current
-   disabled source branch still contains the superseded team prototype and its
-   PD group/own queues, PC all-row access plus the neutral matrix,
-   leadership-stage queues, multi-persona union, and fail-closed unassigned
-   behavior; no team was created and ordinary Production behavior is unchanged.
-   Implement `docs/FINAL_WRITEUP_PERSONA_CONFIGURATION_PLAN.md` while the flag
-   stays false, migrate the live v1 Research audience to v2 through the existing
-   ETag seam, prove repair/rollback and representative PC/leadership Word
-   access, then enable and smoke the lenses. No elevated Dataverse team
-   privilege or outside administrator is part of the selected path.
+   persona lens** assignments keyed only by stable reviewer GUID. The source now
+   implements strict v1/v2 reads, v2-only atomic publication, safe stale-reference
+   pruning, explicit no-lens rows, rollout-off no-read behavior, a dry-run-first
+   ETag upgrade/repair/downgrade command, and the consolidated one-panel editor.
+   The superseded team constants, adapter path, schema, and scripts are removed.
+   Production remains on the proved v1 Research setting and ordinary behavior is
+   unchanged because the persona flag is still false. Next: finish review/gates,
+   deploy the v2-capable floor, migrate/read back the unchanged Research audience,
+   prove representative PC/leadership Word access, then enable and smoke the
+   lenses. No elevated Dataverse team privilege or outside administrator is part
+   of the selected path.
 
 ## Opportunistic Production Proof — Do Not Block the Deadline
 
@@ -134,7 +135,7 @@ Workbench redesign.
 | `docs/API_ROUTE_SECURITY_MATRIX.md` | Current route/auth/write contracts |
 | `docs/APPLICATION_STATE_ATLAS.md` | Current live state and ownership routing |
 | `docs/atlas/dataverse-wmkf-requestdocument.md` | Request Document schema/producer truth |
-| `lib/services/final-writeup/matrix-audience-service.js` | Production-live program-audience settings contract |
+| `lib/services/final-writeup/matrix-audience-service.js` | Source-built v1/v2 staffing contract; Production still stores v1 |
 
 ## Verification Receipt
 

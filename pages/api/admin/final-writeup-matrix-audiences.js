@@ -1,7 +1,7 @@
 /**
- * Superuser editor for program-specific Final Writeup matrix audiences.
+ * Superuser editor for Final Writeup staffing and program matrix audiences.
  * GET resolves active Grant Programs and the exact reviewer-role roster.
- * PUT replaces the versioned reference-only configuration.
+ * PUT atomically replaces the versioned reference-only configuration.
  */
 
 import { withDalContext } from '../../../lib/dataverse/core/context';
@@ -13,15 +13,15 @@ import { ServiceHttpError } from '../../../lib/services/service-http-error';
 import { requireSuperuser } from '../../../lib/utils/auth';
 
 export const config = {
-  api: { bodyParser: { sizeLimit: '32kb' } },
+  api: { bodyParser: { sizeLimit: '96kb' } },
 };
 
 function sendError(res, error) {
   if (error instanceof ServiceHttpError) {
     return res.status(error.httpStatus).json(error.body ?? { error: error.message, code: error.code });
   }
-  console.error('admin Final Writeup matrix audiences error:', error);
-  return res.status(500).json({ error: 'The Final Writeup matrix audience operation failed.' });
+  console.error('admin Final Writeup staffing error:', error);
+  return res.status(500).json({ error: 'The Final Writeup staffing operation failed.' });
 }
 
 export default async function handler(req, res) {

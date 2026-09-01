@@ -880,10 +880,11 @@ Decision order:
    superuser matrix is Production-live in Ready deployment
    `dpl_Frc6fAonyFFYwiWyFJCzzE3UNune`. Signed-in Production DOM proof showed
    the exact 11-person roster and correct Request `1002788` states/actions with
-   zero browser-console errors. Role-specific rollout remains gated by the
-   reviewed version-2 Final Writeup staffing configuration, live-setting
-   migration/readback, and representative file-access verification. The
-   unshipped team mechanism is superseded.
+   zero browser-console errors. The reviewed version-2 Final Writeup staffing
+   configuration, consolidated Admin editor, and ETag tooling are source-built
+   with the feature flag false; live deployment/migration/readback and
+   representative file-access verification remain gated. The unshipped team
+   mechanism is removed from current source.
 4. **Initial Assessment** — the pilot and administrator controls are
    Production-deployed and the signed-in read surface has passed. Decide
    whether to authorize exact restore and/or first Board-snapshot write proof,

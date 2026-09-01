@@ -256,10 +256,11 @@ document inventory, and individual implementation plans do not establish priorit
   `52575761` and Ready deployment `dpl_Frc6fAonyFFYwiWyFJCzzE3UNune` ship the
   complete neutral current-Final × exact reviewer-role matrix. Signed-in
   Production DOM proof showed the exact 11-person roster and correct Request
-  `1002788` states/actions with zero browser-console errors. Broader persona rollout
-  remains open behind the reviewed version-2 Final Writeup staffing
-  configuration and representative Word-access proof. The unshipped
-  no-privilege-team prototype is superseded and created no Production teams.
+  `1002788` states/actions with zero browser-console errors. The version-2 Final
+  Writeup staffing contract and consolidated Admin editor are source-built with
+  the persona flag false; deployment/migration and representative Word-access
+  proof remain open. The unshipped no-privilege-team prototype is removed from
+  current source and created no Production teams.
 - **Prior owner-directed release (S469, 2026-08-30):** durable Executor
   budgets are Production-deployed and owner-viewed in the safe no-revision/code-
   fallback state; first publication remains an explicit administrator action.

@@ -69,10 +69,11 @@ Writeup Reviewer` role roster. Signed-in Production DOM proof showed the exact
 11-person audience and Request `1002788`, with Duncan Spore Reviewed, Justin
 Gallivan Responsible PD, every other cell Not reviewed, both direct actions,
 and zero browser-console errors. Prior local desktop and 390px browser QA also
-passed against Production reads. The source also contains a disabled GUID-only,
-multi-valued persona-team prototype, but its three team IDs are null and its
-rollout flag is false. The owner has superseded that unshipped storage choice
-with `docs/FINAL_WRITEUP_PERSONA_CONFIGURATION_PLAN.md`.
+passed against Production reads. The source now contains the reviewed GUID-only,
+multi-valued v2 staffing contract and consolidated Admin editor with its
+rollout flag false. The superseded persona-team prototype is removed; the owner
+decision and remaining rollout sequence live in
+`docs/FINAL_WRITEUP_PERSONA_CONFIGURATION_PLAN.md`.
 
 The named prerequisites are deliberately attached to the slices that need them:
 
@@ -104,11 +105,12 @@ The named prerequisites are deliberately attached to the slices that need them:
    Beth Pruitt is owner-confirmed CSO and also has responsible-PD requests.
    Claude reviewed the focused replacement plan as **READY WITH NAMED CHANGES**;
    all findings are incorporated in
-   `docs/FINAL_WRITEUP_PERSONA_CONFIGURATION_PLAN.md`. The disabled source still
-   contains the superseded team prototype, but the failed apply made zero
-   writes and every team GUID remains null. Implement and migrate the v2
-   contract while the flag stays false, then prove representative PC/leadership
-   SharePoint access before enablement. No name, email, job-title,
+   `docs/FINAL_WRITEUP_PERSONA_CONFIGURATION_PLAN.md`. The v2 contract, Admin
+   editor, and dry-run-first ETag migration/repair/downgrade tooling are
+   source-built with the flag false; the superseded team source is removed and
+   its failed apply made zero writes. Deploy the v2-capable rollback floor,
+   migrate/read back the setting while disabled, then prove representative
+   PC/leadership SharePoint access before enablement. No name, email, job-title,
    program-taxonomy inference, new team privilege, or outside administrator is
    used.
 
@@ -406,12 +408,11 @@ leadership and PD responsibility can overlap; an explicit empty-role row means
 
 Before choosing storage, verify whether the assigned Program Coordinator lookup is populated reliably enough to authorize request-scoped backup actions. That lookup may solve the narrow assigned-PC case, but it cannot provide the global “all active writeups” PC dashboard or identify leadership.
 
-The replacement storage decision is complete in
-`docs/FINAL_WRITEUP_PERSONA_CONFIGURATION_PLAN.md`. The current source files
-still implement the superseded, disabled team prototype; every team GUID is
-null and no team was created. Slice D removes that prototype only after its
-caller census, while preserving the no-read rollout-off behavior and
-fail-closed viewer semantics in the v2 resolver.
+The replacement storage decision and implementation status are recorded in
+`docs/FINAL_WRITEUP_PERSONA_CONFIGURATION_PLAN.md`. Current source implements
+the v2 resolver/editor/tooling and removes the team prototype after a caller
+census. No team was created. The no-read rollout-off behavior and fail-closed
+viewer semantics remain test-covered.
 
 Until provisioning and file-access proof are complete:
 

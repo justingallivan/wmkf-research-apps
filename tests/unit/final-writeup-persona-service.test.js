@@ -3,82 +3,104 @@
 import { resolveFinalWriteupPersonas } from '../../lib/services/final-writeup/persona-service.js';
 
 const USER_ID = '10000000-0000-4000-8000-000000000001';
-const PD_TEAM_ID = '20000000-0000-4000-8000-000000000001';
-const LEADERSHIP_TEAM_ID = '20000000-0000-4000-8000-000000000002';
+const OTHER_ID = '10000000-0000-4000-8000-000000000002';
 
-test('disabled persona rollout performs no Dataverse read', async () => {
-  const getUserWithTeams = jest.fn();
+test('disabled persona rollout performs no setting or roster read', async () => {
+  const getRuntimeState = jest.fn();
   await expect(resolveFinalWriteupPersonas(USER_ID, {
     enabled: false,
-    teamSpecs: [],
-    getUserWithTeams,
+    getRuntimeState,
   })).resolves.toEqual({ enabled: false, personas: [] });
-  expect(getUserWithTeams).not.toHaveBeenCalled();
+  expect(getRuntimeState).not.toHaveBeenCalled();
 });
 
-test('resolves overlapping personas only from pinned team GUID membership', async () => {
-  const getUserWithTeams = jest.fn(async () => ({
-    systemuserid: USER_ID,
-    isdisabled: false,
-    teammembership_association: [
-      { teamid: PD_TEAM_ID, name: 'Renamed diagnostic label' },
-      { teamid: LEADERSHIP_TEAM_ID, name: 'Another diagnostic label' },
-    ],
-  }));
+test('flag-on with a stored v1 configuration grants no persona and warns without throwing', async () => {
   await expect(resolveFinalWriteupPersonas(USER_ID, {
     enabled: true,
-    teamSpecs: [
-      { persona: 'program-director', teamId: PD_TEAM_ID },
-      { persona: 'leadership', teamId: LEADERSHIP_TEAM_ID },
-      { persona: 'program-coordinator', teamId: '20000000-0000-4000-8000-000000000003' },
-    ],
-    getUserWithTeams,
+    getRuntimeState: jest.fn(async () => ({
+      version: 1,
+      assignments: [],
+      reviewerIds: [USER_ID],
+      warnings: ['final_writeup_persona_configuration_not_v2'],
+    })),
   })).resolves.toEqual({
     enabled: true,
-    personas: ['program-director', 'leadership'],
+    personas: [],
+    warnings: ['final_writeup_persona_configuration_not_v2'],
   });
 });
 
-test('enabled rollout fails closed until every exact team GUID is pinned', async () => {
-  const getUserWithTeams = jest.fn();
+test('resolves overlapping roles only for a current reviewer-role member', async () => {
   await expect(resolveFinalWriteupPersonas(USER_ID, {
     enabled: true,
-    teamSpecs: [{ persona: 'leadership', teamId: null }],
-    getUserWithTeams,
-  })).rejects.toThrow('requires the exact persona team set');
-  expect(getUserWithTeams).not.toHaveBeenCalled();
+    getRuntimeState: jest.fn(async () => ({
+      version: 2,
+      assignments: [
+        { reviewerId: USER_ID, roles: ['program-director', 'leadership'] },
+        { reviewerId: OTHER_ID, roles: ['program-coordinator'] },
+      ],
+      reviewerIds: [USER_ID, OTHER_ID],
+      warnings: [],
+    })),
+  })).resolves.toEqual({
+    enabled: true,
+    personas: ['program-director', 'leadership'],
+    warnings: [],
+  });
 });
 
-test.each([
-  {
-    label: 'a missing required persona',
-    teamSpecs: [
-      { persona: 'program-director', teamId: PD_TEAM_ID },
-      { persona: 'leadership', teamId: LEADERSHIP_TEAM_ID },
-    ],
-  },
-  {
-    label: 'a duplicate persona',
-    teamSpecs: [
-      { persona: 'program-director', teamId: PD_TEAM_ID },
-      { persona: 'program-director', teamId: LEADERSHIP_TEAM_ID },
-      { persona: 'program-coordinator', teamId: '20000000-0000-4000-8000-000000000003' },
-    ],
-  },
-  {
-    label: 'an unknown persona',
-    teamSpecs: [
-      { persona: 'program-director', teamId: PD_TEAM_ID },
-      { persona: 'program-coordinator', teamId: '20000000-0000-4000-8000-000000000003' },
-      { persona: 'executive', teamId: LEADERSHIP_TEAM_ID },
-    ],
-  },
-])('enabled rollout fails closed with $label', async ({ teamSpecs }) => {
-  const getUserWithTeams = jest.fn();
+test('explicit no-lens and missing assignment both narrow to no personas but remain distinguishable', async () => {
+  const explicit = await resolveFinalWriteupPersonas(USER_ID, {
+    enabled: true,
+    getRuntimeState: jest.fn(async () => ({
+      version: 2,
+      assignments: [{ reviewerId: USER_ID, roles: [] }],
+      reviewerIds: [USER_ID],
+      warnings: [],
+    })),
+  });
+  expect(explicit).toEqual({ enabled: true, personas: [], warnings: [] });
+
+  const missing = await resolveFinalWriteupPersonas(USER_ID, {
+    enabled: true,
+    getRuntimeState: jest.fn(async () => ({
+      version: 2,
+      assignments: [],
+      reviewerIds: [USER_ID],
+      warnings: [],
+    })),
+  });
+  expect(missing).toEqual({
+    enabled: true,
+    personas: [],
+    warnings: ['final_writeup_persona_viewer_unassigned'],
+  });
+});
+
+test('a removed or disabled reviewer cannot retain a stored persona', async () => {
   await expect(resolveFinalWriteupPersonas(USER_ID, {
     enabled: true,
-    teamSpecs,
-    getUserWithTeams,
-  })).rejects.toThrow('requires the exact persona team set');
-  expect(getUserWithTeams).not.toHaveBeenCalled();
+    getRuntimeState: jest.fn(async () => ({
+      version: 2,
+      assignments: [{ reviewerId: USER_ID, roles: ['leadership'] }],
+      reviewerIds: [OTHER_ID],
+      warnings: ['final_writeup_persona_stale_assignments_pruned'],
+    })),
+  })).resolves.toEqual({
+    enabled: true,
+    personas: [],
+    warnings: [
+      'final_writeup_persona_stale_assignments_pruned',
+      'final_writeup_persona_viewer_ineligible',
+    ],
+  });
+});
+
+test('invalid server-derived viewer identity fails before any read', async () => {
+  const getRuntimeState = jest.fn();
+  await expect(resolveFinalWriteupPersonas('not-a-guid', {
+    enabled: true,
+    getRuntimeState,
+  })).rejects.toThrow(/requires a staff system-user GUID/);
+  expect(getRuntimeState).not.toHaveBeenCalled();
 });

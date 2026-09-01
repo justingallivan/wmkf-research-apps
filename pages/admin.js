@@ -3075,9 +3075,9 @@ function WorkflowsWorkspace({ view }) {
       return (
         <AdminEditorPanel
           id="final-writeup-matrix-audiences"
-          title="Final Writeup review matrix"
-          description="Choose the internal Final Writeup reviewers expected for each Dataverse Grant Program."
-          scope="Per Grant Program"
+          title="Final Writeup staffing"
+          description="Assign staff responsibilities and choose the reviewers expected for each Dataverse Grant Program."
+          scope="Global staff · Per Grant Program"
           dataverseFields={FINAL_WRITEUP_MATRIX_AUDIENCE_DATAVERSE_FIELDS}
         >
           <FinalWriteupMatrixAudiencesSection />

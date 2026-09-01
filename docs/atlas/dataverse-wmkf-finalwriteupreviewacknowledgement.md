@@ -183,8 +183,8 @@ returned the reviewed-history state. The stored acknowledgement time is
   in Ready deployment `dpl_Frc6fAonyFFYwiWyFJCzzE3UNune`, with signed-in DOM
   proof of the exact roster and correct Request `1002788` states/actions. The
   reviewed persona plan uses the existing versioned Final Writeup Admin setting
-  for GUID-only, multi-valued PD/PC/Leadership/no-lens assignments. The disabled
-  source still contains the superseded team prototype, but its GUIDs remain
-  null, no Production team was created, and the rollout flag remains false
-  until v2 migration/readback and representative PC/leadership Word access are
-  proved.
+  for GUID-only, multi-valued PD/PC/Leadership/no-lens assignments. That v2
+  contract, consolidated editor, and ETag tooling are source-built with the
+  rollout flag false; the superseded team source is removed and no Production
+  team was created. Deployment, v2 migration/readback, and representative
+  PC/leadership Word access remain before enablement.

@@ -180,11 +180,11 @@ explicitly unconfigured pending its complete audience. The reviewed persona
 plan extends the same versioned Final Writeup setting and existing Admin editor
 with GUID-only, multi-valued PD, PC, Leadership, and explicit no-lens staffing
 assignments: Allison Keller is President; Beth Pruitt is CSO and also a
-responsible PD on some requests. The source still contains the superseded,
-disabled team prototype, but no team exists and no elevated team privilege is
-required by the selected path. V2 implementation/migration, representative
-PC/leadership Word-access proof, and persona-specific queues remain gated; the
-source rollout flag is false. Initial Assessment
+responsible PD on some requests. The v2 contract, consolidated editor, and
+ETag upgrade/repair/downgrade tooling are source-built with the rollout flag
+false; the superseded team source is removed and no team exists. Deployment,
+v2 migration/readback, representative PC/leadership Word-access proof, and
+persona enablement remain gated. Initial Assessment
 restore/Board writes remain separately owner-gated.
 
 **Recently completed:** the Staff Deliberations workspace/history UX, curated

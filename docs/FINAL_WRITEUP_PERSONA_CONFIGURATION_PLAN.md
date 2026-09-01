@@ -3,7 +3,7 @@ title: Final Writeup Persona Configuration Consolidation Plan
 domain: workbench
 kind: plan
 status: active
-summary: "Replace no-privilege Dataverse persona teams with one versioned Final Writeup staffing configuration in the existing Admin editor."
+summary: "Source-built, rollout-disabled replacement for persona teams using one versioned Final Writeup staffing configuration in the existing Admin editor."
 canonical: false
 cataloged: 2026-08-31
 last_verified: 2026-08-31
@@ -19,7 +19,7 @@ related:
 
 ## Decision and status
 
-**Verdict: READY FOR IMPLEMENTATION WITH THE CLAUDE REVIEW CHANGES BELOW.
+**Verdict: SLICES A, B, AND D ARE SOURCE-BUILT; SLICE C IS NOT EXECUTED.
 DO NOT ENABLE YET.**
 
 The owner rejected the operational burden of creating and maintaining three
@@ -27,10 +27,11 @@ Dataverse owner teams solely as persona markers. This plan replaces that
 unshipped storage choice with an extension of the existing, Production-proved
 Final Writeup configuration and its existing Admin editor.
 
-The role-specific dashboard behavior already source-built on branch
-`codex/final-writeup-persona-rollout` remains useful, but the team resolver,
-team-provisioning specification, and provisioning scripts are a superseded
-prototype. The persona feature flag remains false, no persona team exists in
+The role-specific dashboard behavior and version-2 staffing contract are now
+source-built on branch `codex/final-writeup-persona-rollout`. The team resolver,
+team-provisioning specification, and provisioning scripts have been removed as
+a superseded prototype. The persona feature flag remains false, Production
+still stores the proved version-1 Research matrix, no persona team exists in
 Production, and the failed create attempt made zero Dataverse writes.
 
 ## Contract surface
@@ -57,16 +58,18 @@ Production, and the failed create attempt made zero Dataverse writes.
   `final_writeup.matrix_audiences` already stores the Research Grant Program
   audience and has passed signed-in superuser publish, ETag readback, reload,
   and dashboard consumption.
-- **[VERIFIED via `matrix-audience-service.js`]** the service already resolves
-  the exact enabled `WMKF Final Writeup Reviewer` roster, persists stable
-  `systemuser` GUIDs, resolves names live, rejects stale/unknown references,
-  and writes through `setSettingIfUnchanged`.
-- **[VERIFIED via `FinalWriteupMatrixAudiencesSection.js`]** one consolidated
-  Admin panel already owns the draft, unsaved-change guard, stale-reference
-  repair, optimistic revision, and one publication action.
-- **[VERIFIED via `persona-service.js`]** the disabled prototype uses team
-  membership only as a GUID-to-persona lookup. No Final Writeup behavior needs
-  team ownership, team security roles, record assignment, or team sharing.
+- **[VERIFIED via `matrix-audience-service.js` and focused tests]** the service
+  reads strict v1/v2 values, resolves the exact enabled `WMKF Final Writeup
+  Reviewer` roster, publishes only complete v2 replacements through
+  `setSettingIfUnchanged`, and prunes stale runtime references with warnings.
+- **[VERIFIED via `FinalWriteupMatrixAudiencesSection.js` and component tests]**
+  one consolidated Admin panel owns the responsibility/program draft,
+  unsaved-change guard, stale-reference repair, optimistic revision, and one
+  publication action.
+- **[VERIFIED via repository census]** the team membership resolver, team
+  constants, schema manifest, provisioning/preflight scripts, and isolated
+  adapter method have no live source path and are removed. No Final Writeup
+  behavior needs team ownership, roles, record assignment, or sharing.
 - **[VERIFIED via the 2026-08-31 Production preflight]** request relationships
   are useful evidence but are not a complete global staff directory: John
   Sader is owner-confirmed as a PD despite no matching request relationship;
@@ -74,9 +77,9 @@ Production, and the failed create attempt made zero Dataverse writes.
   their confirmed PC responsibility; leadership has no reliable request-field
   source. Names, email, job titles, and program labels therefore remain
   non-authoritative.
-- **[VERIFIED via source and Production readback]** the feature flag remains
-  false, every team ID is null, and Production ordinary-user behavior is
-  unchanged.
+- **[VERIFIED via source and prior Production readback]** the feature flag
+  remains false and Production ordinary-user behavior is unchanged. The v2
+  migration/repair command exists but has not been run against Production.
 
 ## Product and administration decision
 
@@ -267,7 +270,7 @@ existing Admin Overview, not as another configuration panel.
 
 ## Implementation slices
 
-### Slice A — replace the storage contract while disabled
+### Slice A — replace the storage contract while disabled — source-built
 
 - Add version-2 validation, canonicalization, v1 read compatibility, and v2
   optimistic publication to the existing matrix-audience service.
@@ -279,7 +282,7 @@ existing Admin Overview, not as another configuration panel.
 - Keep the existing Admin route path and superuser guard; update its response
   contract and body-size proof rather than adding a route.
 
-### Slice B — consolidate the existing Admin editor
+### Slice B — consolidate the existing Admin editor — source-built
 
 - Rename the one panel **Final Writeup staffing**.
 - Add the compact responsibility grid inside the existing component.
@@ -294,7 +297,7 @@ existing Admin Overview, not as another configuration panel.
 - Verify desktop and narrow layouts; responsibility labels remain visible and
   touch targets remain usable without horizontal dependence.
 
-### Slice C — migrate the live setting without enabling personas
+### Slice C — migrate the live setting without enabling personas — not executed
 
 - Dry-run the v1→v2 transformation against Production reads.
 - Prove the Research reviewer GUID set is unchanged.
@@ -304,7 +307,7 @@ existing Admin Overview, not as another configuration panel.
   optimistic setting seam and read back the exact stored value and new ETag.
 - Leave the persona feature flag false.
 
-### Slice D — remove the superseded team prototype
+### Slice D — remove the superseded team prototype — source-built
 
 - Delete the team provisioning/preflight scripts, team schema manifest,
   `FINAL_WRITEUP_PERSONA_TEAMS` constants,

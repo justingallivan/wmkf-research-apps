@@ -15,7 +15,7 @@ import {
   writeFinalWriteupMatrixAudienceConfig,
 } from '../../lib/services/final-writeup/matrix-audience-service';
 import { requireSuperuser } from '../../lib/utils/auth';
-import handler from '../../pages/api/admin/final-writeup-matrix-audiences';
+import handler, { config as routeConfig } from '../../pages/api/admin/final-writeup-matrix-audiences';
 
 function response() {
   return {
@@ -33,11 +33,14 @@ beforeEach(() => {
   requireSuperuser.mockResolvedValue({ profileId: 42 });
   getFinalWriteupMatrixAudienceAdminState.mockResolvedValue({
     configured: false,
-    config: { version: 1, programs: [] },
+    storedVersion: null,
+    migrationRequired: false,
+    config: { version: 2, personas: [], programs: [] },
     revision: null,
     programs: [],
     reviewers: [],
     staleReferences: { grantProgramIds: [], reviewerIds: [] },
+    unassignedReviewerIds: [],
   });
   writeFinalWriteupMatrixAudienceConfig.mockResolvedValue({ configured: true });
 });
@@ -56,7 +59,7 @@ test('GET is superuser-gated, rejects query input, and reads inside DAL context'
 });
 
 test('PUT accepts only config plus its expected revision and passes the authenticated profile id', async () => {
-  const config = { version: 1, programs: [] };
+  const config = { version: 2, personas: [], programs: [] };
   const res = response();
   await handler({ method: 'PUT', query: {}, body: { config, expectedRevision: null } }, res);
   expect(writeFinalWriteupMatrixAudienceConfig).toHaveBeenCalledWith(config, null, 42);
@@ -64,6 +67,10 @@ test('PUT accepts only config plus its expected revision and passes the authenti
   const rejected = response();
   await handler({ method: 'PUT', query: {}, body: { config, expectedRevision: null, extra: true } }, rejected);
   expect(rejected.statusCode).toBe(400);
+});
+
+test('route body limit covers the bounded v2 contract', () => {
+  expect(routeConfig.api.bodyParser.sizeLimit).toBe('96kb');
 });
 
 test('unauthenticated and unsupported methods stop before service reads', async () => {

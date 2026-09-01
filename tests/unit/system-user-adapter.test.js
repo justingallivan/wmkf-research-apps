@@ -8,7 +8,7 @@
 
 import { DynamicsService } from '../../lib/services/dynamics-service.js';
 import {
-  findByEmail, getById, getByIdWithSelect, getByIdWithTeams,
+  findByEmail, getById, getByIdWithSelect,
   listEnabledBySecurityRoleName, queryAllUsers, queryUsers,
 } from '../../lib/dataverse/adapters/system-user.js';
 
@@ -59,23 +59,6 @@ describe('system-user.getByIdWithSelect', () => {
     await getByIdWithSelect('su-4', 'internalemailaddress,isdisabled');
     expect(get).toHaveBeenCalledWith('systemusers', 'su-4', {
       select: 'internalemailaddress,isdisabled',
-    });
-  });
-});
-
-describe('system-user.getByIdWithTeams', () => {
-  test('reads the server-derived user and team membership association', async () => {
-    const get = jest.spyOn(DynamicsService, 'getRecord').mockResolvedValue({
-      systemuserid: 'su-5',
-      teammembership_association: [],
-    });
-    await expect(getByIdWithTeams('su-5')).resolves.toEqual({
-      systemuserid: 'su-5',
-      teammembership_association: [],
-    });
-    expect(get).toHaveBeenCalledWith('systemusers', 'su-5', {
-      select: 'systemuserid,fullname,isdisabled',
-      expand: 'teammembership_association($select=teamid,name,teamtype)',
     });
   });
 });

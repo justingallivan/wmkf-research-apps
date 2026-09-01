@@ -46,9 +46,10 @@ verification and persona rollout remain open. The reviewed replacement extends
 the existing versioned Final Writeup Admin setting with explicit GUID-only,
 multi-valued PD, PC, Leadership, and no-lens staffing assignments; Allison
 Keller is President and Beth Pruitt is CSO plus a responsible PD on some
-requests. The disabled source still contains the superseded team prototype,
-but its IDs remain null, no Production team was created, and the rollout flag
-remains false. The
+requests. The v2 contract, consolidated Admin editor, and dry-run-first ETag
+tooling are source-built with the rollout flag false; the superseded team
+source is removed and no Production team was created. Deployment,
+migration/readback, and representative Word access remain. The
 first fixed gate is a human-in-the-loop, end-to-end Initial Assessment pilot by
 2026-08-10, ahead of proposal intake around 2026-08-18. Authorized staff use a
 dedicated representative dummy production request to generate, inspect, and edit the canonical

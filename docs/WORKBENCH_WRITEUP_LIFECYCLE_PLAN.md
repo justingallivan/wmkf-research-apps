@@ -897,10 +897,11 @@ silently extend its paths or names to writeup publications.
    Anneli Stone and Saskia Pallais, and rendered Request `1002788` with exactly
    those nine reviewer columns and zero browser-console errors. Southern
    California remains explicitly unconfigured pending its complete audience.
-   Personal lenses remain disabled pending implementation and publication of
-   the reviewed version-2 staffing configuration plus representative
-   Word-access proof. The unshipped team prototype is superseded and requires
-   no Dataverse administrator. Keep acknowledgement distinct from document lifecycle,
+   Personal lenses remain disabled. The reviewed version-2 staffing contract,
+   consolidated Admin editor, and ETag tooling are source-built; deployment,
+   publication/readback, and representative Word-access proof remain. The
+   unshipped team prototype is removed and no Dataverse administrator is
+   required. Keep acknowledgement distinct from document lifecycle,
    external distribution, and the AkoyaGo publication projection.
 
 Each slice must trace caller → restriction context → registry persistence →

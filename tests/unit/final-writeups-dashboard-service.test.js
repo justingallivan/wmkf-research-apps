@@ -175,6 +175,7 @@ test('derives open, reviewed-history, and responsible-PD stewardship queues serv
     primaryAction: { key: 'edit', label: 'Edit in Word' },
   });
   expect(result.queues.open[0]).not.toHaveProperty('grantProgram');
+  expect(result.viewer).not.toHaveProperty('personaWarnings');
   expect(dependencies.findDocumentsByIds).toHaveBeenCalledTimes(1);
   expect(dependencies.findAcknowledgementsByFinalDocuments).toHaveBeenCalledTimes(1);
   expect(dependencies.getFileMetadataById).toHaveBeenCalledTimes(3);
@@ -229,6 +230,7 @@ test('enabled Program Coordinator lens keeps all active rows and receives the ne
   dependencies.resolvePersonas.mockResolvedValue({
     enabled: true,
     personas: ['program-coordinator'],
+    warnings: ['final_writeup_persona_stale_assignments_pruned'],
   });
 
   const result = await loadFinalWriteupsDashboard({ actingUserSystemId: ACTOR_ID }, dependencies);
@@ -238,6 +240,7 @@ test('enabled Program Coordinator lens keeps all active rows and receives the ne
     isSuperuser: false,
     personaLensesEnabled: true,
     personas: ['program-coordinator'],
+    personaWarnings: ['final_writeup_persona_stale_assignments_pruned'],
   });
   expect(result.coordinatorMatrix).not.toBeNull();
   expect(dependencies.resolveMatrixAudiences).toHaveBeenCalledTimes(1);
@@ -300,18 +303,18 @@ test('focused reads fail closed when the selected row is outside the enabled per
   });
 });
 
-test('superuser matrix propagates a stale configured-audience failure', async () => {
+test('superuser matrix propagates malformed configured-audience failures', async () => {
   const { dependencies } = harness();
-  dependencies.resolveMatrixAudiences.mockRejectedValue(Object.assign(new Error('stale audience'), {
+  dependencies.resolveMatrixAudiences.mockRejectedValue(Object.assign(new Error('invalid audience'), {
     httpStatus: 503,
-    body: { code: 'final_writeup_matrix_audience_reviewer_stale' },
+    body: { code: 'final_writeup_staffing_config_invalid' },
   }));
   await expect(loadFinalWriteupsDashboard({
     actingUserSystemId: ACTOR_ID,
     isSuperuser: true,
   }, dependencies)).rejects.toMatchObject({
     httpStatus: 503,
-    body: { code: 'final_writeup_matrix_audience_reviewer_stale' },
+    body: { code: 'final_writeup_staffing_config_invalid' },
   });
 });
 
