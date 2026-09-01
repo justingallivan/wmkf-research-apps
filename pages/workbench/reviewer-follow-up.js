@@ -111,6 +111,8 @@ function ReviewerGroup({ proposal, previewReadOnly, onRefresh }) {
               settings={{ reviewDueDate: proposal.reviewDeadline }}
               mode="track"
               canManage={canManage}
+              showReviewReminderAction={canManage || previewReadOnly}
+              previewReadOnly={previewReadOnly}
             />
           )}
         </div>
@@ -232,19 +234,19 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
       {previewReadOnly && (
         <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-950" role="status">
           <span className="font-semibold">Preview is read-only.</span>{' '}
-          This deployment uses production reviewer data for realistic layout, filter, and navigation testing. Reviewer actions are hidden here.
+          This deployment uses production reviewer data for realistic testing. Follow-up controls are shown below but remain disabled until production.
         </div>
       )}
 
       <div className="mb-6 flex flex-col gap-4 border-y border-gray-200 py-4 lg:flex-row lg:items-end lg:justify-between">
         <div className="flex flex-wrap items-end gap-3">
-          <label className="text-sm font-medium text-gray-700">
-            Cycle
+          <label className="flex flex-col gap-1 text-sm font-medium text-gray-700">
+            <span>Cycle</span>
             <select
               value={cycleCode}
               onChange={(event) => setCycleCode(event.target.value)}
               disabled={loadingCycles || cycles.length === 0}
-              className="mt-1 block min-h-11 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 disabled:opacity-50"
+              className="block min-h-11 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 disabled:opacity-50"
             >
               {cycles.map((cycle) => (
                 <option key={cycle.code} value={cycle.code}>
@@ -254,9 +256,9 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
             </select>
           </label>
 
-          <div>
-            <span className="block text-sm font-medium text-gray-700">View</span>
-            <div className="mt-1 inline-flex min-h-11 overflow-hidden rounded-lg border border-gray-300 bg-white">
+          <fieldset className="flex flex-col gap-1">
+            <legend className="text-sm font-medium text-gray-700">View</legend>
+            <div className="inline-flex min-h-11 overflow-hidden rounded-lg border border-gray-300 bg-white">
               <button
                 type="button"
                 onClick={() => setView('attention')}
@@ -272,7 +274,7 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
                 All requests
               </button>
             </div>
-          </div>
+          </fieldset>
 
           <label className="flex min-h-11 items-center gap-2 pb-0.5 text-sm font-medium text-gray-700">
             <input

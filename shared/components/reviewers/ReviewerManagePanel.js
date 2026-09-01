@@ -21,6 +21,10 @@
  *   - canManage  : soft UI gate (decided S207). When false, write controls are
  *                  hidden and the table is read-only. The reused server APIs stay
  *                  org-open regardless — this is cosmetic, not an auth boundary.
+ *   - showReviewReminderAction : exposes the direct review-due reminder in the
+ *                  consolidated follow-up page without changing other hosts.
+ *   - previewReadOnly : shows that reminder control disabled so a Preview backed
+ *                  by production Dataverse remains visibly fail-closed.
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -87,6 +91,113 @@ export function TokenStateBadge({ state, expiresAt, firstAccessedAt }) {
         <span className="ml-1 text-xs opacity-75">opened</span>
       )}
     </span>
+  );
+}
+
+const REVIEW_REMINDER_ERROR_MESSAGE = {
+  conflict: 'Already claimed by another send. Refresh and try again.',
+  removed: 'This reviewer was removed from the request.',
+  revoked: 'Their review link was revoked. Reissue it before sending a reminder.',
+  not_found: 'This reviewer is no longer available. Refresh the list.',
+  read_failed: 'The latest reviewer status could not be verified. Nothing was sent.',
+  prepare_failed: 'The reminder could not be prepared. Nothing was sent.',
+  send_failed: 'The reminder was prepared, but the email could not be sent.',
+  misconfigured: 'The review reminder email template is missing or blank in Admin.',
+  ineligible: 'This reviewer is no longer eligible for a reminder. Refresh the list.',
+};
+
+export function ReviewReminderAction({
+  requestId,
+  reviewer,
+  onSent,
+  previewReadOnly = false,
+}) {
+  const [sending, setSending] = useState(false);
+  const [feedback, setFeedback] = useState(null);
+  const mountedRef = useRef(true);
+  const generationRef = useRef(0);
+  const sendingRef = useRef(false);
+  const eligible = Boolean(
+    requestId
+    && reviewer?.suggestionId
+    && ['materials_sent', 'under_review'].includes(reviewer.reviewStatus)
+    && !reviewer.reviewReceivedAt
+    && reviewer.submitted !== true,
+  );
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      generationRef.current += 1;
+      sendingRef.current = false;
+    };
+  }, []);
+
+  if (!eligible) return <span className="text-xs text-gray-300">—</span>;
+
+  const handleSend = async () => {
+    if (previewReadOnly || sendingRef.current) return;
+    const generation = generationRef.current + 1;
+    generationRef.current = generation;
+    sendingRef.current = true;
+    setSending(true);
+    setFeedback(null);
+    try {
+      const response = await fetch('/api/review-manager/send-review-reminder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requestId,
+          suggestionId: reviewer.suggestionId,
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!mountedRef.current || generation !== generationRef.current) return;
+      if (!response.ok || !data.ok) {
+        setFeedback({
+          ok: false,
+          message: REVIEW_REMINDER_ERROR_MESSAGE[data.reason] || 'The reminder could not be sent.',
+        });
+        return;
+      }
+      setFeedback({ ok: true, message: 'Reminder sent.' });
+      if (onSent) onSent();
+    } catch (error) {
+      if (mountedRef.current && generation === generationRef.current) {
+        setFeedback({ ok: false, message: error.message || 'The reminder could not be sent.' });
+      }
+    } finally {
+      if (generation === generationRef.current) {
+        sendingRef.current = false;
+        if (mountedRef.current) setSending(false);
+      }
+    }
+  };
+
+  const previewTitle = 'Preview is read-only. This control is enabled after promotion to production.';
+
+  return (
+    <div className="flex flex-col items-end gap-1">
+      <button
+        type="button"
+        onClick={handleSend}
+        disabled={previewReadOnly || sending}
+        title={previewReadOnly ? previewTitle : 'Send a review-due reminder now'}
+        aria-label={`Send reminder to ${reviewer.name || 'reviewer'}${previewReadOnly ? ' (disabled in read-only Preview)' : ''}`}
+        className="min-h-9 whitespace-nowrap rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-gray-700 hover:border-gray-400 hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400"
+      >
+        {sending ? 'Sending…' : 'Send reminder'}
+      </button>
+      {feedback && (
+        <span
+          className={`max-w-40 text-right text-xs leading-4 ${feedback.ok ? 'text-green-700' : 'text-amber-700'}`}
+          role="status"
+        >
+          {feedback.message}
+        </span>
+      )}
+    </div>
   );
 }
 
@@ -1463,6 +1574,8 @@ export default function ReviewerManagePanel({
   settings = {},
   mode,
   canManage = true,
+  showReviewReminderAction = false,
+  previewReadOnly = false,
   declineReferrals = [],
   referralActions = {},
   onAddReferral,
@@ -1503,6 +1616,7 @@ export default function ReviewerManagePanel({
   const allSelected = reviewers.length > 0 && reviewers.every(r => selectedReviewers.has(r.suggestionId));
   const acceptedReviewers = reviewers.filter(r => r.reviewStatus === 'accepted');
   const selectedAcceptedList = selectedList.filter(r => r.reviewStatus === 'accepted');
+  const showFollowUpColumn = canManage || showReviewReminderAction;
 
   const toggleSelectAll = () => {
     if (allSelected) {
@@ -1797,20 +1911,20 @@ export default function ReviewerManagePanel({
         </Card>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
-          <table className={`w-full table-fixed divide-y divide-gray-200 ${canManage ? 'min-w-[72rem]' : 'min-w-[64rem]'}`}>
+          <table className={`w-full table-fixed divide-y divide-gray-200 ${showFollowUpColumn ? 'min-w-[76rem]' : 'min-w-[64rem]'}`}>
             {/* Every proposal uses the same column geometry. Without an explicit
                 grid, a long affiliation in one proposal changes that table's
                 auto-sized columns and breaks vertical scanning across the
                 consolidated follow-up page. */}
             <colgroup>
               {canManage && <col className="w-[4%]" />}
-              <col className={canManage ? 'w-[27%]' : 'w-[32%]'} />
-              <col className={canManage ? 'w-[13%]' : 'w-[16%]'} />
-              <col className={canManage ? 'w-[11%]' : 'w-[14%]'} />
-              <col className={canManage ? 'w-[12%]' : 'w-[14%]'} />
-              <col className={canManage ? 'w-[13%]' : 'w-[16%]'} />
-              <col className={canManage ? 'w-[13%]' : 'w-[8%]'} />
-              {canManage && <col className="w-[7%]" />}
+              <col className={canManage ? 'w-[24%]' : showFollowUpColumn ? 'w-[29%]' : 'w-[32%]'} />
+              <col className={canManage ? 'w-[12%]' : showFollowUpColumn ? 'w-[14%]' : 'w-[16%]'} />
+              <col className={canManage ? 'w-[10%]' : showFollowUpColumn ? 'w-[12%]' : 'w-[14%]'} />
+              <col className={canManage ? 'w-[11%]' : showFollowUpColumn ? 'w-[13%]' : 'w-[14%]'} />
+              <col className={canManage ? 'w-[13%]' : showFollowUpColumn ? 'w-[14%]' : 'w-[16%]'} />
+              <col className={canManage ? 'w-[13%]' : showFollowUpColumn ? 'w-[7%]' : 'w-[8%]'} />
+              {showFollowUpColumn && <col className={canManage ? 'w-[13%]' : 'w-[11%]'} />}
             </colgroup>
             <thead className="bg-gray-50">
               <tr>
@@ -1830,8 +1944,10 @@ export default function ReviewerManagePanel({
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Due date</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Action</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Notes</th>
-                {canManage && (
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                {showFollowUpColumn && (
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    {showReviewReminderAction ? 'Follow up' : 'Actions'}
+                  </th>
                 )}
               </tr>
             </thead>
@@ -1936,11 +2052,19 @@ export default function ReviewerManagePanel({
                         </span>
                       )}
                     </td>
-                    {canManage && (
+                    {showFollowUpColumn && (
                       <td className="px-4 py-3 align-top text-right">
                         <div className="flex items-center justify-end gap-1">
+                          {showReviewReminderAction && (
+                            <ReviewReminderAction
+                              requestId={proposal.proposalId}
+                              reviewer={r}
+                              onSent={onRefresh}
+                              previewReadOnly={previewReadOnly || !canManage}
+                            />
+                          )}
                           {/* Download received review from SharePoint via Graph. */}
-                          {r.reviewSharePointFolder && (
+                          {canManage && r.reviewSharePointFolder && (
                             <a
                               href={`/api/review-manager/download-review?suggestionId=${encodeURIComponent(r.suggestionId)}`}
                               className="p-1.5 text-green-600 hover:text-green-800 rounded-lg hover:bg-green-50"
@@ -1952,14 +2076,16 @@ export default function ReviewerManagePanel({
                             </a>
                           )}
                           {/* Magic-link actions menu */}
-                          <TokenActionsMenu
-                            reviewer={r}
-                            onRegenerate={() => handleRegenerateToken(r.suggestionId)}
-                            onRevoke={() => handleRevokeToken(r.suggestionId)}
-                            onRemove={() => handleRemoveReviewer(r)}
-                            onStatusChange={(newStatus) => updateStatus(r.suggestionId, newStatus)}
-                            onTransition={(terminalStatus) => transitionTerminal(r, terminalStatus)}
-                          />
+                          {canManage && (
+                            <TokenActionsMenu
+                              reviewer={r}
+                              onRegenerate={() => handleRegenerateToken(r.suggestionId)}
+                              onRevoke={() => handleRevokeToken(r.suggestionId)}
+                              onRemove={() => handleRemoveReviewer(r)}
+                              onStatusChange={(newStatus) => updateStatus(r.suggestionId, newStatus)}
+                              onTransition={(terminalStatus) => transitionTerminal(r, terminalStatus)}
+                            />
+                          )}
                         </div>
                       </td>
                     )}

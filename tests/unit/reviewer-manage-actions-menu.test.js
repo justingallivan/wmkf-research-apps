@@ -3,7 +3,10 @@
  */
 
 import { act, fireEvent, render, screen } from '@testing-library/react';
-import ReviewerManagePanel, { TokenActionsMenu } from '../../shared/components/reviewers/ReviewerManagePanel';
+import ReviewerManagePanel, {
+  ReviewReminderAction,
+  TokenActionsMenu,
+} from '../../shared/components/reviewers/ReviewerManagePanel';
 
 jest.mock('../../shared/components/Layout', () => ({
   Card: ({ children }) => <div>{children}</div>,
@@ -105,7 +108,90 @@ describe('reviewer table geometry', () => {
     });
 
     const table = container.querySelector('table');
-    expect(table).toHaveClass('table-fixed', 'min-w-[72rem]');
+    expect(table).toHaveClass('table-fixed', 'min-w-[76rem]');
     expect(table.querySelectorAll('colgroup col')).toHaveLength(8);
+  });
+});
+
+describe('direct review follow-up action', () => {
+  const originalFetch = global.fetch;
+  const reviewer = {
+    suggestionId: 'S1',
+    name: 'Ada Reviewer',
+    reviewStatus: 'materials_sent',
+  };
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
+
+  test('sends one request-bound review reminder and refreshes after confirmed success', async () => {
+    const onSent = jest.fn();
+    global.fetch = jest.fn(async () => ({
+      ok: true,
+      json: async () => ({ ok: true }),
+    }));
+
+    render(
+      <ReviewReminderAction
+        requestId="P1"
+        reviewer={reviewer}
+        onSent={onSent}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Send reminder to Ada Reviewer' }));
+    expect(await screen.findByText('Reminder sent.')).toBeInTheDocument();
+    expect(global.fetch).toHaveBeenCalledWith('/api/review-manager/send-review-reminder', expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({ requestId: 'P1', suggestionId: 'S1' }),
+    }));
+    expect(onSent).toHaveBeenCalledTimes(1);
+  });
+
+  test('shows the real control but cannot issue a write in read-only Preview', () => {
+    global.fetch = jest.fn();
+
+    render(
+      <ReviewReminderAction
+        requestId="P1"
+        reviewer={reviewer}
+        previewReadOnly
+      />,
+    );
+
+    const button = screen.getByRole('button', {
+      name: 'Send reminder to Ada Reviewer (disabled in read-only Preview)',
+    });
+    expect(button).toBeDisabled();
+    fireEvent.click(button);
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  test('keeps rapid repeat clicks to one reminder send', async () => {
+    let resolveRequest;
+    global.fetch = jest.fn(() => new Promise((resolve) => { resolveRequest = resolve; }));
+
+    render(<ReviewReminderAction requestId="P1" reviewer={reviewer} />);
+    const button = screen.getByRole('button', { name: 'Send reminder to Ada Reviewer' });
+    fireEvent.click(button);
+    fireEvent.click(button);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveRequest({ ok: true, json: async () => ({ ok: true }) });
+      await Promise.resolve();
+    });
+  });
+
+  test('does not offer a review-due reminder before materials are sent', () => {
+    render(
+      <ReviewReminderAction
+        requestId="P1"
+        reviewer={{ ...reviewer, reviewStatus: 'accepted' }}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: /send reminder/i })).not.toBeInTheDocument();
   });
 });
