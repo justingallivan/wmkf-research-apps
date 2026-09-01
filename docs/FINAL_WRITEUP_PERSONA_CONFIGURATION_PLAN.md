@@ -322,6 +322,10 @@ existing Admin Overview, not as another configuration panel.
 
 ### Slice E — access proof, enablement, and smoke
 
+Coordination steps, representative users, evidence records, and the exact
+enabled-persona smoke sequence are operationalized in
+`docs/FINAL_WRITEUP_WORD_ACCESS_PROOF_AND_PERSONA_SMOKE_RUNBOOK.md`.
+
 - Have a representative PC and representative Leadership user open the exact
   canonical Word item through the signed-in Final Writeup experience.
 - Flip the tracked persona source flag only after both proofs succeed.

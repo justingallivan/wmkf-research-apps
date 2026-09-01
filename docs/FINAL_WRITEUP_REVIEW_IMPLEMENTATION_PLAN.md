@@ -603,11 +603,13 @@ This slice can ship before the PC/leadership persona model because responsible-P
 - **Source behavior and provisioning contract complete; rollout disabled:** a
   read-only Production preflight proved the exact membership manifest and no
   exact-name collisions. The first authorized apply made zero writes because
-  the application user lacks `prvCreateTeam`. A Dataverse administrator must
-  create the exact no-privilege PD/PC/leadership teams (or run the tracked apply
-  under an appropriately privileged operator identity), after which engineering
-  must read back membership and zero-role state, pin the three GUIDs, and prove
-  representative PC/leadership Word access before enabling the resolver.
+  the application user lacks `prvCreateTeam`. **[SUPERSEDED]** The team-based
+  provisioning path in this bullet was rejected by the owner and replaced by
+  the Production-live v2 staffing configuration in
+  `docs/FINAL_WRITEUP_PERSONA_CONFIGURATION_PLAN.md`; no Dataverse team is
+  created. Only the representative PC/leadership Word-access proof remains
+  before enabling the resolver, coordinated in
+  `docs/FINAL_WRITEUP_WORD_ACCESS_PROOF_AND_PERSONA_SMOKE_RUNBOOK.md`.
 - Add **Ready for leadership review**, moving the Final lifecycle from `REVIEW` to `FINAL` and storing the exact milestone version/hash/time plus explicit actor/time.
 - Enable PC all-active view and exceptional backup transition.
 - Enable CSO/President leadership-stage queues.
@@ -647,7 +649,7 @@ No implementation should start under the original two-file ownership restriction
 
 ### Focused unit tests
 
-- Final handoff service and route: happy path, same-item proof, exact retry, stale source, changed Graph version, unknown lifecycle, pointer mismatch, duplicate active Final, claim lease expiry/takeover, missing ETag, claim loss, three `If-Match` fences, changeset failure, response-loss recovery, non-owner 403, superuser success, missing-lead fail-closed behavior, explicit actor persistence, and no false success after impersonation fallback.
+- Final handoff service and route: happy path, same-item proof, exact retry, stale source, changed Graph version, unrecognized lifecycle, pointer mismatch, duplicate active Final, claim lease expiry/takeover, missing ETag, claim loss, three `If-Match` fences, changeset failure, response-loss recovery, non-owner 403, superuser success, missing-lead fail-closed behavior, explicit actor persistence, and no false success after impersonation fallback.
 - Final tab and Staff Deliberations: stage copy, source row `FINAL`, retained Pre-Site pointer, regeneration-locked response, history continuity, filename-safe read-only source receipt, one active document link, intent-based labels, responsible-PD-only transition, materials-send non-gate, loading/error/retry states, stale-request cancellation.
 - Acknowledgement adapter/service/route: caller-derived identity, responsible-PD rejection, same-version no-restamp, later-version update with `If-Match`, AutoSave between observation and persistence, eTag-only change remains reviewed, publication-version change becomes updated, wrong-current-artifact rejection, alternate-key convergence and Active-index readiness.
 - Dashboard: persona filtering, positive review states, no reviewer denominator, President non-requeue behavior, no program-taxonomy grouping, search, empty/error states, stale response guards.
