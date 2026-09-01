@@ -69,6 +69,10 @@ test('renders submitted reviews with decoded ratings + download link; pending la
   expect(screen.getByText('Dr. NoFile')).toBeInTheDocument();
   expect(screen.getByRole('heading', { name: 'Outstanding reviews (1)' })).toBeInTheDocument();
   expect(screen.getByText('Dr. Pending')).toBeInTheDocument();
+  const followUpHeader = screen.getByText('Follow up').parentElement;
+  const pendingRow = screen.getByText('Dr. Pending').parentElement.parentElement;
+  expect(followUpHeader).toHaveClass('lg:grid-cols-[minmax(0,1fr)_16rem_20rem]');
+  expect(pendingRow).toHaveClass('lg:grid-cols-[minmax(0,1fr)_16rem_20rem]');
 
   // Decoded ratings (not raw numbers).
   expect(screen.getByText('Medium risk (parts may succeed, others may fail)')).toBeInTheDocument();

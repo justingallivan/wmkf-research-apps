@@ -111,6 +111,30 @@ describe('reviewer table geometry', () => {
     expect(table).toHaveClass('table-fixed', 'min-w-[76rem]');
     expect(table.querySelectorAll('colgroup col')).toHaveLength(8);
   });
+
+  test('separates follow-up and action controls into aligned labeled columns', async () => {
+    let container;
+    await act(async () => {
+      ({ container } = render(
+        <ReviewerManagePanel
+          proposal={proposal}
+          reviewers={[reviewer]}
+          canManage
+          mode="track"
+          showReviewReminderAction
+        />,
+      ));
+      await Promise.resolve();
+    });
+
+    const table = container.querySelector('table');
+    expect(table).toHaveClass('table-fixed', 'min-w-[80rem]');
+    expect(table.querySelectorAll('colgroup col')).toHaveLength(9);
+    expect(screen.getByRole('columnheader', { name: 'Follow up' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Actions' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Send reminder to Joshua Rosenthal' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Manage Joshua Rosenthal' })).toBeInTheDocument();
+  });
 });
 
 describe('direct review follow-up action', () => {

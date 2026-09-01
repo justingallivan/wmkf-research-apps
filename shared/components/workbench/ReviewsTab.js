@@ -651,7 +651,7 @@ function OutstandingRow({ reviewer, requestId, onSent, onManualEntry }) {
   }, [requestId, reviewer.suggestionId, onSent]);
 
   return (
-    <div className="grid gap-3 border-b border-gray-100 px-4 py-4 last:border-b-0 md:grid-cols-[minmax(0,1fr)_minmax(11rem,0.45fr)_auto] md:items-start">
+    <div className="grid gap-3 border-b border-gray-100 px-4 py-4 last:border-b-0 lg:grid-cols-[minmax(0,1fr)_16rem_20rem] lg:items-start">
       <div className="min-w-0">
         <p className="line-clamp-2 break-words text-sm font-medium text-gray-900" title={reviewer.name || ''}>
           {reviewer.name || 'Unnamed reviewer'}
@@ -684,7 +684,7 @@ function OutstandingRow({ reviewer, requestId, onSent, onManualEntry }) {
           </p>
         )}
       </div>
-      <div className="flex flex-wrap items-center gap-2 md:justify-end">
+      <div className="flex flex-wrap items-center gap-2 lg:justify-start">
         <button
           type="button"
           onClick={handleSend}
@@ -825,10 +825,10 @@ export default function ReviewsTab({ requestId }) {
             Accepted reviewer{outstanding.length === 1 ? '' : 's'} who {outstanding.length === 1 ? 'has' : 'have'} not yet submitted a review.
           </p>
           <div className="mt-3 overflow-hidden rounded-xl border border-gray-200 bg-white">
-            <div className="hidden grid-cols-[minmax(0,1fr)_minmax(11rem,0.45fr)_auto] gap-3 border-b border-gray-200 bg-gray-50 px-4 py-3 text-xs font-medium uppercase tracking-wider text-gray-500 md:grid">
+            <div className="hidden gap-3 border-b border-gray-200 bg-gray-50 px-4 py-3 text-xs font-medium uppercase tracking-wider text-gray-500 lg:grid lg:grid-cols-[minmax(0,1fr)_16rem_20rem]">
               <span>Reviewer</span>
               <span>Follow up</span>
-              <span className="text-right">Actions</span>
+              <span>Actions</span>
             </div>
             {outstanding.map((r) => (
               <OutstandingRow

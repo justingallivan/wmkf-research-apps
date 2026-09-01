@@ -1616,7 +1616,14 @@ export default function ReviewerManagePanel({
   const allSelected = reviewers.length > 0 && reviewers.every(r => selectedReviewers.has(r.suggestionId));
   const acceptedReviewers = reviewers.filter(r => r.reviewStatus === 'accepted');
   const selectedAcceptedList = selectedList.filter(r => r.reviewStatus === 'accepted');
-  const showFollowUpColumn = canManage || showReviewReminderAction;
+  const showFollowUpColumn = showReviewReminderAction;
+  const showActionsColumn = canManage;
+  const combinedControls = showFollowUpColumn && showActionsColumn;
+  const tableMinWidth = combinedControls
+    ? 'min-w-[80rem]'
+    : showFollowUpColumn || showActionsColumn
+      ? 'min-w-[76rem]'
+      : 'min-w-[64rem]';
 
   const toggleSelectAll = () => {
     if (allSelected) {
@@ -1911,20 +1918,21 @@ export default function ReviewerManagePanel({
         </Card>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
-          <table className={`w-full table-fixed divide-y divide-gray-200 ${showFollowUpColumn ? 'min-w-[76rem]' : 'min-w-[64rem]'}`}>
+          <table className={`w-full table-fixed divide-y divide-gray-200 ${tableMinWidth}`}>
             {/* Every proposal uses the same column geometry. Without an explicit
                 grid, a long affiliation in one proposal changes that table's
                 auto-sized columns and breaks vertical scanning across the
                 consolidated follow-up page. */}
             <colgroup>
               {canManage && <col className="w-[4%]" />}
-              <col className={canManage ? 'w-[24%]' : showFollowUpColumn ? 'w-[29%]' : 'w-[32%]'} />
-              <col className={canManage ? 'w-[12%]' : showFollowUpColumn ? 'w-[14%]' : 'w-[16%]'} />
-              <col className={canManage ? 'w-[10%]' : showFollowUpColumn ? 'w-[12%]' : 'w-[14%]'} />
-              <col className={canManage ? 'w-[11%]' : showFollowUpColumn ? 'w-[13%]' : 'w-[14%]'} />
-              <col className={canManage ? 'w-[13%]' : showFollowUpColumn ? 'w-[14%]' : 'w-[16%]'} />
-              <col className={canManage ? 'w-[13%]' : showFollowUpColumn ? 'w-[7%]' : 'w-[8%]'} />
+              <col className={combinedControls ? 'w-[22%]' : canManage ? 'w-[24%]' : showFollowUpColumn ? 'w-[29%]' : 'w-[32%]'} />
+              <col className={combinedControls ? 'w-[11%]' : canManage ? 'w-[12%]' : showFollowUpColumn ? 'w-[14%]' : 'w-[16%]'} />
+              <col className={combinedControls ? 'w-[9%]' : canManage ? 'w-[10%]' : showFollowUpColumn ? 'w-[12%]' : 'w-[14%]'} />
+              <col className={combinedControls ? 'w-[10%]' : canManage ? 'w-[11%]' : showFollowUpColumn ? 'w-[13%]' : 'w-[14%]'} />
+              <col className={combinedControls ? 'w-[12%]' : canManage ? 'w-[13%]' : showFollowUpColumn ? 'w-[14%]' : 'w-[16%]'} />
+              <col className={combinedControls ? 'w-[11%]' : canManage ? 'w-[13%]' : showFollowUpColumn ? 'w-[7%]' : 'w-[8%]'} />
               {showFollowUpColumn && <col className={canManage ? 'w-[13%]' : 'w-[11%]'} />}
+              {showActionsColumn && <col className={showFollowUpColumn ? 'w-[8%]' : 'w-[13%]'} />}
             </colgroup>
             <thead className="bg-gray-50">
               <tr>
@@ -1945,8 +1953,13 @@ export default function ReviewerManagePanel({
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Action</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Notes</th>
                 {showFollowUpColumn && (
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    {showReviewReminderAction ? 'Follow up' : 'Actions'}
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Follow up
+                  </th>
+                )}
+                {showActionsColumn && (
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
                   </th>
                 )}
               </tr>
@@ -2053,18 +2066,20 @@ export default function ReviewerManagePanel({
                       )}
                     </td>
                     {showFollowUpColumn && (
-                      <td className="px-4 py-3 align-top text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          {showReviewReminderAction && (
-                            <ReviewReminderAction
-                              requestId={proposal.proposalId}
-                              reviewer={r}
-                              onSent={onRefresh}
-                              previewReadOnly={previewReadOnly || !canManage}
-                            />
-                          )}
+                      <td className="px-4 py-3 align-top">
+                        <ReviewReminderAction
+                          requestId={proposal.proposalId}
+                          reviewer={r}
+                          onSent={onRefresh}
+                          previewReadOnly={previewReadOnly || !canManage}
+                        />
+                      </td>
+                    )}
+                    {showActionsColumn && (
+                      <td className="px-4 py-3 align-top">
+                        <div className="flex items-center gap-1">
                           {/* Download received review from SharePoint via Graph. */}
-                          {canManage && r.reviewSharePointFolder && (
+                          {r.reviewSharePointFolder && (
                             <a
                               href={`/api/review-manager/download-review?suggestionId=${encodeURIComponent(r.suggestionId)}`}
                               className="p-1.5 text-green-600 hover:text-green-800 rounded-lg hover:bg-green-50"
@@ -2076,16 +2091,14 @@ export default function ReviewerManagePanel({
                             </a>
                           )}
                           {/* Magic-link actions menu */}
-                          {canManage && (
-                            <TokenActionsMenu
-                              reviewer={r}
-                              onRegenerate={() => handleRegenerateToken(r.suggestionId)}
-                              onRevoke={() => handleRevokeToken(r.suggestionId)}
-                              onRemove={() => handleRemoveReviewer(r)}
-                              onStatusChange={(newStatus) => updateStatus(r.suggestionId, newStatus)}
-                              onTransition={(terminalStatus) => transitionTerminal(r, terminalStatus)}
-                            />
-                          )}
+                          <TokenActionsMenu
+                            reviewer={r}
+                            onRegenerate={() => handleRegenerateToken(r.suggestionId)}
+                            onRevoke={() => handleRevokeToken(r.suggestionId)}
+                            onRemove={() => handleRemoveReviewer(r)}
+                            onStatusChange={(newStatus) => updateStatus(r.suggestionId, newStatus)}
+                            onTransition={(terminalStatus) => transitionTerminal(r, terminalStatus)}
+                          />
                         </div>
                       </td>
                     )}
