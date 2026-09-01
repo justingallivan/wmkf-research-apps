@@ -896,12 +896,14 @@ silently extend its paths or names to writeup publications.
    reviewer-role members, excludes owner-confirmed Southern California staff
    Anneli Stone and Saskia Pallais, and rendered Request `1002788` with exactly
    those nine reviewer columns and zero application-console errors. Later
-   signed-in Production readback proved the stored v1 setting also contains a
+   signed-in Production readback proved the stored v1 setting also contained a
    six-person Southern California audience. Personal lenses remain disabled.
    The reviewed version-2 staffing contract, consolidated Admin editor, and
    ETag tooling are Production-deployed at `84bf465b` in Ready deployment
-   `dpl_41SybgPYfJXGarf7UqcMGCLMy4KS`; v2 publication/readback and representative
-   Word-access proof remain. The
+   `dpl_41SybgPYfJXGarf7UqcMGCLMy4KS`. The dry-run-first command upgraded the
+   setting once on 2026-09-01 UTC; exact readback proved v2 at
+   `W/"96944113"`, 11 complete assignments, zero stale/unassigned rows, and
+   unchanged 9/6 audiences. Representative Word-access proof remains. The
    unshipped team prototype is removed and no Dataverse administrator is
    required. Keep acknowledgement distinct from document lifecycle,
    external distribution, and the AkoyaGo publication projection.

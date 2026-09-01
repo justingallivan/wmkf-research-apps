@@ -883,10 +883,12 @@ Decision order:
    zero browser-console errors. The reviewed version-2 Final Writeup staffing
    configuration, consolidated Admin editor, and ETag tooling are
    Production-deployed at `84bf465b` in Ready deployment
-   `dpl_41SybgPYfJXGarf7UqcMGCLMy4KS` with the feature flag false. Signed-in
-   readback proved the stored v1 setting contains nine Research and six
-   Southern California reviewers. V2 migration/readback and representative
-   file-access verification remain gated. The unshipped team mechanism is
+   `dpl_41SybgPYfJXGarf7UqcMGCLMy4KS` with the feature flag false. On 2026-09-01
+   UTC, the dry-run-first command upgraded the setting once and exact readback
+   proved v2 at `W/"96944113"`, 11 complete assignments, zero stale/unassigned
+   rows, and unchanged nine-person Research/six-person Southern California
+   audiences. Signed-in Admin and Research-matrix reads passed. Representative
+   file-access verification remains gated. The unshipped team mechanism is
    removed from current source.
 4. **Initial Assessment** — the pilot and administrator controls are
    Production-deployed and the signed-in read surface has passed. Decide

@@ -56,7 +56,8 @@ publication/readback survived a full reload; the coordinator dashboard then
 rendered Request `1002788` under Research with exactly those nine reviewer
 columns and zero application-console errors. Later signed-in Production
 readback from the v2-capable deployment proved the stored v1 setting also
-contains a six-person Southern California audience. The Admin editor
+contained a six-person Southern California audience. The 2026-09-01 UTC v2
+migration preserved both audiences exactly. The Admin editor
 stores separate broad Grant Program GUID → reviewer `systemuser` GUID audiences
 in `wmkf_appsystemsettings`, using the request's existing `wmkf_grantprogram`
 lookup. Unconfigured request programs are called out explicitly and stale saved
@@ -110,10 +111,12 @@ The named prerequisites are deliberately attached to the slices that need them:
    editor, and dry-run-first ETag migration/repair/downgrade tooling are live
    at commit `84bf465b` in Ready Production deployment
    `dpl_41SybgPYfJXGarf7UqcMGCLMy4KS` with the flag false; the superseded team
-   source is removed and its failed apply made zero writes. Signed-in readback
-   proved Production still stores v1 with nine Research and six Southern
-   California reviewers. After explicit write authorization, migrate/read back
-   both unchanged audiences while disabled, then prove representative
+   source is removed and its failed apply made zero writes. On 2026-09-01 UTC,
+   the dry-run-first command upgraded the setting once from ETag
+   `W/"96930393"`; exact readback proved v2 at `W/"96944113"`, 11 complete
+   assignments, zero stale/unassigned rows, and unchanged nine-person Research
+   and six-person Southern California audiences. Signed-in Admin and matrix
+   reads passed while the flag remained false. Prove representative
    PC/leadership SharePoint access before enablement. No name, email, job-title,
    program-taxonomy inference, new team privilege, or outside administrator is
    used.
@@ -584,14 +587,14 @@ were independently verified.
   Anneli Stone and Saskia Pallais. Admin publish/readback survived reload, and
   Request `1002788` rendered under Research with exactly those nine columns and
   zero application-console errors. Later signed-in Production readback proved
-  the stored v1 setting also contains a six-person Southern California audience.
+  the stored v1 setting also contained a six-person Southern California audience;
+  the 2026-09-01 UTC v2 migration preserved both audiences exactly.
 - **Production-deployed behind the disabled resolver:** PD users receive group-review
   rows plus their own writeups, PC users receive all rows plus the complete
   neutral matrix, leadership receives leadership-stage rows, overlapping
   memberships receive the union, and unassigned users fail closed. Rollout and
-  non-superuser matrix access remain deferred until the reviewed v2 staffing
-  configuration is migrated/read back and representative Word access is
-  proved.
+  non-superuser persona access remains deferred until representative Word
+  access is proved; the v2 staffing configuration is migrated and read back.
 
 This slice can ship before the PC/leadership persona model because responsible-PD versus other-PD is already server-verifiable.
 

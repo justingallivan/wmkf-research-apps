@@ -448,7 +448,7 @@ related:
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
-| [FINAL_WRITEUP_PERSONA_CONFIGURATION_PLAN.md](FINAL_WRITEUP_PERSONA_CONFIGURATION_PLAN.md) | plan | active |  | Production-deployed v2-capable staffing replacement in the existing Admin editor; Production still stores v1 and persona lenses remain disabled. | 2026-08-31 |
+| [FINAL_WRITEUP_PERSONA_CONFIGURATION_PLAN.md](FINAL_WRITEUP_PERSONA_CONFIGURATION_PLAN.md) | plan | active |  | Production-live v2 staffing in the existing Admin editor; exact migration/readback passed and persona lenses remain disabled pending access proof. | 2026-08-31 |
 | [FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md](FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md) | plan | active |  | Final runtime and matrix are live; the reviewed v2 staffing configuration and access proof now gate the disabled persona rollout. | 2026-08-28 |
 | [WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md](WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md) | plan | active |  | Pre-Site/Site Visit lifecycle, Final acknowledgement/dashboard, and the superuser matrix are live; reviewed persona-config rollout remains. | 2026-08-17 |
 

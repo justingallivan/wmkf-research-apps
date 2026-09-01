@@ -3,10 +3,10 @@ title: Final Writeup Persona Configuration Consolidation Plan
 domain: workbench
 kind: plan
 status: active
-summary: "Production-deployed v2-capable staffing replacement in the existing Admin editor; Production still stores v1 and persona lenses remain disabled."
+summary: "Production-live v2 staffing in the existing Admin editor; exact migration/readback passed and persona lenses remain disabled pending access proof."
 canonical: false
 cataloged: 2026-08-31
-last_verified: 2026-08-31
+last_verified: 2026-09-01
 owner: product-engineering
 related:
   - docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md
@@ -19,8 +19,8 @@ related:
 
 ## Decision and status
 
-**Verdict: SLICES A, B, AND D ARE PRODUCTION-DEPLOYED; SLICE C PUBLICATION IS
-NOT EXECUTED. DO NOT ENABLE YET.**
+**Verdict: SLICES A–D ARE COMPLETE; SLICE E ACCESS PROOF AND ENABLEMENT REMAIN.
+DO NOT ENABLE YET.**
 
 The owner rejected the operational burden of creating and maintaining three
 Dataverse owner teams solely as persona markers. This plan replaces that
@@ -31,10 +31,11 @@ The role-specific dashboard behavior and version-2 staffing contract are live
 on `main` at commit `84bf465b` in Ready Production deployment
 `dpl_41SybgPYfJXGarf7UqcMGCLMy4KS`. The team resolver, team-provisioning
 specification, and provisioning scripts have been removed as a superseded
-prototype. The persona feature flag remains false, Production still stores
-version 1 with the proved Research and Southern California audiences, no
-persona team exists in Production, and the failed create attempt made zero
-Dataverse writes.
+prototype. On 2026-09-01 UTC, the setting was upgraded once to version 2 under
+the loaded ETag and exact readback proved the new ETag, all 11 assignments, and
+unchanged Research and Southern California audiences. The persona feature flag
+remains false, no persona team exists in Production, and the failed team-create
+attempt made zero Dataverse writes.
 
 ## Contract surface
 
@@ -56,11 +57,11 @@ Dataverse writes.
 
 ## Verified current state
 
-- **[VERIFIED via signed-in Production Admin and dashboard readback 2026-08-31]**
-  `final_writeup.matrix_audiences` stores v1 with nine Research reviewers and
-  six Southern California reviewers. The Research audience has passed signed-in
-  superuser publish, ETag readback, reload, and dashboard consumption; the
-  later deployment smoke read both audiences without writing the setting.
+- **[VERIFIED via operator command and signed-in Production Admin/dashboard
+  readback 2026-09-01 UTC]** `final_writeup.matrix_audiences` stores version 2
+  at ETag `W/"96944113"` with 11 complete persona rows, nine Research reviewers,
+  and six Southern California reviewers. The Admin reports **Published revision
+  loaded** and the Research dashboard retained its expected nine-column matrix.
 - **[VERIFIED via `matrix-audience-service.js` and focused tests]** the service
   reads strict v1/v2 values, resolves the exact enabled `WMKF Final Writeup
   Reviewer` roster, publishes only complete v2 replacements through
@@ -80,10 +81,11 @@ Dataverse writes.
   their confirmed PC responsibility; leadership has no reliable request-field
   source. Names, email, job titles, and program labels therefore remain
   non-authoritative.
-- **[VERIFIED via source, Vercel deployment inspection, and signed-in Production
-  readback]** the v2-capable code is Production-deployed, the feature flag
-  remains false, and ordinary-user behavior is unchanged. The v2
-  migration/repair command exists but has not been run against Production.
+- **[VERIFIED via source, Vercel deployment inspection, the operator command,
+  and signed-in Production readback]** the v2-capable code and stored v2 setting
+  are Production-live, the feature flag remains false, and ordinary-user
+  behavior is unchanged. The migration command ran once through its optimistic
+  write seam; repair/downgrade modes remain available but were not invoked.
 
 ## Product and administration decision
 
@@ -159,39 +161,32 @@ organizational facts.
 
 ## Backward compatibility and promotion
 
-Production currently contains a valid version-1 matrix with Research and
-Southern California audiences. Deployment of version-2-capable code at
-`84bf465b` / `dpl_41SybgPYfJXGarf7UqcMGCLMy4KS` did not disturb it.
+Production now contains a valid version-2 configuration with explicit staffing
+and the unchanged Research and Southern California audiences. Deployment of
+version-2-capable code at `84bf465b` /
+`dpl_41SybgPYfJXGarf7UqcMGCLMy4KS` preceded the migration.
 
 1. Readers continue accepting version 1 for matrix resolution exactly as they
    do today. A version-1 value has no persona contract. If the persona flag is
    accidentally enabled while v1 remains stored, the resolver returns no
    persona roles for every ordinary viewer and emits an operational warning;
    it does not throw a dashboard-wide error.
-2. Admin GET returns the existing program audiences unchanged, the live
-   reviewer roster, `migrationRequired: true`, and a version-2 draft. Persona
-   suggestions may be generated from the owner-confirmed GUID manifest for the
-   one-time draft, but suggestions never authorize runtime behavior before
-   publication.
+2. Admin GET now returns the published version-2 configuration, live reviewer
+   roster, `migrationRequired: false`, and current revision. The one-time
+   suggestion manifest no longer participates because the stored value is v2.
 3. Admin PUT accepts only a complete version-2 replacement and the exact loaded
    ETag. Both existing program audiences must survive the normalized v1→v2
    draft byte-for-byte in membership semantics.
-4. The first publication is either performed through the existing superuser UI
-   or through a dry-run-by-default, ETag-guarded upgrade command using the same
-   service. It requires normal Production-write authorization but no new
-   Dataverse privilege and no outside administrator. During this migration
-   window, any program-audience publication deliberately upgrades the whole
-   setting to v2; the explicit **No persona lens** state prevents that rule from
-   forcing a false staff assignment.
-5. Post-write readback must prove version 2, exact persona assignments, exact
-   unchanged Research and Southern California membership, exact configured
-   programs, and a new ETag.
-6. Persona lenses remain source-disabled until that readback and representative
-   PC/Leadership Word-access proof are complete.
+4. **Complete 2026-09-01 UTC:** the dry-run-by-default, ETag-guarded upgrade
+   command published through the same service under `W/"96930393"`; no new
+   Dataverse privilege or outside administrator was needed.
+5. **Complete:** post-write readback proved version 2, all 11 exact persona
+   assignments, unchanged Research and Southern California membership, zero
+   stale/unassigned rows, and new ETag `W/"96944113"`.
+6. Persona lenses remain source-disabled until representative PC/Leadership
+   Word-access proof is complete.
 
-If the v2 publish never occurs, the Production matrix remains on v1 and persona
-lenses remain disabled. Rollback before publication is therefore no-op. After
-v2 publication, the first v2-capable Production deployment becomes the
+Production now stores v2, so the first v2-capable Production deployment is the
 last-known-good rollback floor: no pre-v2 build may be promoted while v2 is
 stored because its matrix reader rejects the version.
 
@@ -303,16 +298,16 @@ existing Admin Overview, not as another configuration panel.
 - Verify desktop and narrow layouts; responsibility labels remain visible and
   touch targets remain usable without horizontal dependence.
 
-### Slice C — migrate the live setting without enabling personas — deployment complete; publication not executed
+### Slice C — migrate the live setting without enabling personas — complete
 
-- Dry-run the v1→v2 transformation against Production reads.
-- Prove both program-audience reviewer GUID sets are unchanged.
+- **Complete:** dry-ran the v1→v2 transformation against Production reads.
+- **Complete:** proved both program-audience reviewer GUID sets unchanged.
 - **Complete:** first v2-capable Production deployment
   `dpl_41SybgPYfJXGarf7UqcMGCLMy4KS` on `84bf465b` is the rollback floor.
-  Prove the ETag-guarded v1 projection/repair mode before publication.
-- Under explicit write authorization, publish once through the existing
-  optimistic setting seam and read back the exact stored value and new ETag.
-- Leave the persona feature flag false.
+  The existing tests cover the ETag-guarded v1 projection/repair mode.
+- **Complete:** under explicit write authorization, published once through the
+  optimistic setting seam and read back exact v2 at `W/"96944113"`.
+- **Complete:** left the persona feature flag false.
 
 ### Slice D — remove the superseded team prototype — Production-deployed
 
@@ -339,7 +334,7 @@ existing Admin Overview, not as another configuration panel.
 | Invariant | Likely surfaces | Required proof |
 |---|---|---|
 | No new Admin layer | `pages/admin.js`, existing Final Writeup component | One Workflows navigation entry, one editor panel, one Publish action |
-| Live Research matrix survives migration | configuration service and migration path | Exact reviewer-GUID set before/after plus signed-in matrix read |
+| Both live program audiences survive migration | configuration service and migration path | Exact reviewer-GUID sets before/after plus signed-in Research matrix read |
 | New reviewer-role users appear automatically | Admin GET and component | Add roster fixture absent from stored personas; it renders unassigned and selectable |
 | Unassigned users do not broaden access | persona resolver and dashboard | Positive row fixture exists but unassigned viewer receives zero persona rows |
 | Removed-role users cannot retain persona | resolver | Stored assignment plus absent current-role membership rejects/fails closed |
@@ -379,9 +374,9 @@ Run the relevant gate and its self-test sequentially:
    and agent-invariant gates for the durable reconciliation;
 8. production build, using the repository-documented webpack fallback only if
    canonical Turbopack is blocked by the known sandbox process/port signature;
-9. signed-in Admin desktop/narrow QA, v2 publication/readback, rollout-off
-   matrix regression smoke, representative Word-access proof, then enabled
-   persona smoke.
+9. **Complete through rollout-off regression:** signed-in Admin desktop/narrow
+   QA, v2 publication/readback, and matrix regression smoke. Representative
+   Word-access proof and enabled persona smoke remain.
 
 No Postgres migration, Dataverse schema wave, new API route, new environment
 variable, or new security privilege is planned.
@@ -390,7 +385,7 @@ variable, or new security privilege is planned.
 
 - **Atomic config coupling:** one publication changes persona and program
   audiences together. Mitigation: canonical full-draft comparison, one ETag,
-  exact pre/post Research membership proof, 409 on stale editors, and an
+  exact pre/post Research and Southern California membership proof, 409 on stale editors, and an
   explicit no-lens state so an audience-only edit never requires a false
   persona assignment.
 - **Roster changes after publication:** a new role member lacks a persona.
@@ -416,12 +411,11 @@ variable, or new security privilege is planned.
   counts.
 - Changing the existing Final Writeup reviewer role or its six custom
   privileges.
-- Completing the Southern California program audience; it remains a separate
-  product configuration after Research persona rollout.
+- Changing or expanding the current six-person Southern California audience.
 - Board-package workflow, required review counts, approval sequencing, or
   routine Word-edit notifications.
-- Enabling PC backup or Leadership queues before persona configuration and
-  representative Word access are proved.
+- Enabling PC backup or Leadership queues before representative Word access is
+  proved.
 
 ## Review questions for Claude
 

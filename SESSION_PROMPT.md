@@ -70,8 +70,8 @@ Workbench redesign.
 3. **[PRODUCTION-LIVE + SIGNED-IN READ/WRITE PROVED 2026-08-31]
    Program-specific matrix audiences.** Commit `5573bca3` is live in Ready
    Production deployment `dpl_5DNuc2BV76RihwuWu8ZFYBgxBXE7`. Role eligibility
-   and matrix assignment are explicitly separate. Production readback now
-   proves the stored v1 setting contains a nine-person Research audience and a
+   and matrix assignment are explicitly separate. Pre-migration Production
+   readback proved the stored v1 setting contained a nine-person Research audience and a
    six-person Southern California audience; Anneli Stone and Saskia Pallais are
    excluded from Research and included in Southern California.
    Signed-in Admin publication/readback survived a full reload; the coordinator
@@ -80,7 +80,7 @@ Workbench redesign.
    Publishes round-trip the loaded Dataverse ETag and reject stale Admin drafts
    with `409`; unconfigured programs remain explicit and stale references fail
    closed.
-4. **[PRODUCTION-DEPLOYED V2-CAPABLE / STORED V1 / ROLLOUT DISABLED]
+4. **[PRODUCTION-LIVE V2 / ROLLOUT DISABLED]
    Staff/executive lenses.** The owner
    rejected a second Dataverse-team onboarding layer. The reviewed replacement
    extends the existing versioned Final Writeup Admin setting and its one
@@ -92,10 +92,13 @@ Workbench redesign.
    The superseded team constants, adapter path, schema, and scripts are removed.
    Commit `84bf465b` is live in Ready Production deployment
    `dpl_41SybgPYfJXGarf7UqcMGCLMy4KS`, establishing the v2-capable rollback
-   floor. Production still stores v1 with the proved Research and Southern
-   California audiences, and ordinary behavior is unchanged because the
-   persona flag is still false. Next: under explicit write authorization,
-   dry-run and migrate/read back both unchanged audiences as v2, prove
+   floor. On 2026-09-01 UTC, the dry-run-first operator command upgraded the
+   setting once under ETag `W/"96930393"`; exact readback proved version 2 at
+   `W/"96944113"`, all 11 complete assignments, zero stale/unassigned rows,
+   and unchanged nine-person Research and six-person Southern California
+   audiences. Signed-in Admin reloaded as **Published revision loaded**, and
+   Request `1002788` retained its nine-column Research matrix. Ordinary
+   behavior is unchanged because the persona flag is still false. Next: prove
    representative PC/leadership Word access, then enable and smoke the lenses.
    No elevated Dataverse team privilege or outside administrator is part of
    the selected path.
@@ -139,7 +142,7 @@ Workbench redesign.
 | `docs/API_ROUTE_SECURITY_MATRIX.md` | Current route/auth/write contracts |
 | `docs/APPLICATION_STATE_ATLAS.md` | Current live state and ownership routing |
 | `docs/atlas/dataverse-wmkf-requestdocument.md` | Request Document schema/producer truth |
-| `lib/services/final-writeup/matrix-audience-service.js` | Production-deployed v1/v2 staffing contract; Production still stores v1 |
+| `lib/services/final-writeup/matrix-audience-service.js` | Production-live v2 staffing contract at ETag `W/"96944113"`; v1 remains rollback/read compatible |
 
 ## Verification Receipt
 

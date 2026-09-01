@@ -187,6 +187,8 @@ returned the reviewed-history state. The stored acknowledgement time is
   contract, consolidated editor, and ETag tooling are Production-deployed at
   `84bf465b` in Ready deployment `dpl_41SybgPYfJXGarf7UqcMGCLMy4KS` with the
   rollout flag false; the superseded team source is removed and no Production
-  team was created. Signed-in readback proved the stored v1 setting contains
-  nine Research and six Southern California reviewers. V2 migration/readback
-  and representative PC/leadership Word access remain before enablement.
+  team was created. On 2026-09-01 UTC, the dry-run-first command upgraded the
+  setting once; exact readback proved v2 at `W/"96944113"`, all 11 assignments,
+  zero stale/unassigned rows, and unchanged nine-person Research/six-person
+  Southern California audiences. Representative PC/leadership Word access
+  remains before enablement.

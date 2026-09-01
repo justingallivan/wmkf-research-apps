@@ -260,10 +260,13 @@ document inventory, and individual implementation plans do not establish priorit
   Writeup staffing contract and consolidated Admin editor are
   Production-deployed at `84bf465b` in Ready deployment
   `dpl_41SybgPYfJXGarf7UqcMGCLMy4KS` with the persona flag false. Signed-in
-  readback proved the stored v1 setting contains nine Research and six Southern
-  California reviewers. V2 migration and representative Word-access proof
-  remain open. The unshipped no-privilege-team prototype is removed from
-  current source and created no Production teams.
+  readback initially proved the stored v1 setting contained nine Research and
+  six Southern California reviewers. On 2026-09-01 UTC, the dry-run-first
+  command upgraded the setting once; exact readback proved v2 at
+  `W/"96944113"`, all 11 assignments, zero stale/unassigned rows, and unchanged
+  9/6 audiences. Representative Word-access proof remains open. The unshipped
+  no-privilege-team prototype is removed from current source and created no
+  Production teams.
 - **Prior owner-directed release (S469, 2026-08-30):** durable Executor
   budgets are Production-deployed and owner-viewed in the safe no-revision/code-
   fallback state; first publication remains an explicit administrator action.
@@ -542,7 +545,8 @@ document inventory, and individual implementation plans do not establish priorit
   survived reload; Request `1002788` rendered under Research with exactly those
   nine columns and zero application-console errors. A later signed-in readback
   from the v2-capable Production deployment proved the stored v1 setting also
-  contains a six-person Southern California audience.
+  contained a six-person Southern California audience. The 2026-09-01 UTC v2
+  migration preserved both audiences exactly at ETag `W/"96944113"`.
 - Calendar direction (owner-confirmed 2026-07-28): the first gate is a
   human-in-the-loop, end-to-end Initial Assessment pilot, originally targeted at
   2026-08-10, before proposals begin arriving around 2026-08-18. **The 2026-08-10

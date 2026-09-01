@@ -45,16 +45,16 @@ stored v1 setting. No Publish action or write route was invoked.
 The stored v1 program audiences read back as:
 
 - **Research — 9:** Allison Keller, Beth Pruitt, Connor Noda, Duncan Spore,
-  Jean Johnston, John Sader, Justin Gallivan, Kevin Kelly, and Sarah McKee.
+  Jean Kim, John Sader, Justin Gallivan, Kevin Moses, and Sarah Hibler.
 - **Southern California — 6:** Allison Keller, Anneli Stone, Connor Noda,
-  Duncan Spore, Sarah McKee, and Saskia Pallais.
+  Duncan Spore, Sarah Hibler, and Saskia Pallais.
 
 The generated staffing draft covered all 11 current direct members of `WMKF
 Final Writeup Reviewer`: Allison Keller — Leadership; Anneli Stone — Program
 Director; Beth Pruitt — Program Director + Leadership; Connor Noda — Program
-Coordinator; Duncan Spore — Program Coordinator; Jean Johnston — Program
+Coordinator; Duncan Spore — Program Coordinator; Jean Kim — Program
 Director; John Sader — Program Director; Justin Gallivan — Program Director;
-Kevin Kelly — Program Director; Sarah McKee — Program Coordinator; and Saskia
+Kevin Moses — Program Director; Sarah Hibler — Program Coordinator; and Saskia
 Pallais — Program Director. The panel reported 11 assigned, one overlapping,
 zero no-lens, and zero incomplete rows.
 
