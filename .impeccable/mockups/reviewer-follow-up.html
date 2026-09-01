@@ -94,6 +94,17 @@
 
     .page { padding: 28px 0 56px; }
 
+    .breadcrumb {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      margin-bottom: 13px;
+      color: var(--muted);
+      font-size: 0.875rem;
+    }
+    .breadcrumb a { color: var(--blue); text-decoration: none; }
+    .breadcrumb a:hover { text-decoration: underline; text-underline-offset: 3px; }
+
     .page-heading {
       display: flex;
       align-items: flex-start;
@@ -106,12 +117,20 @@
     .subtitle { margin: 0; color: var(--muted); }
     .updated { color: var(--muted); font-size: 0.875rem; padding-top: 8px; white-space: nowrap; }
 
+    .view-navigation { margin-bottom: 20px; }
+    .workbench-nav-label {
+      margin: 0 0 7px;
+      color: var(--muted);
+      font-size: 0.875rem;
+      font-weight: 700;
+    }
+
     .workbench-nav {
       display: flex;
       align-items: center;
       gap: 4px;
       padding: 4px;
-      margin-bottom: 20px;
+      margin-bottom: 0;
       border: 1px solid var(--border);
       background: var(--surface);
       border-radius: 0.75rem;
@@ -130,6 +149,12 @@
     }
     .workbench-nav button.active { color: white; background: var(--ink); }
     .workbench-nav button:not(.active):hover { color: var(--ink); background: #f3f4f6; }
+    .navigation-help {
+      margin: 8px 2px 0;
+      color: var(--muted);
+      font-size: 0.875rem;
+      line-height: 1.45;
+    }
 
     .filters {
       display: grid;
@@ -284,6 +309,7 @@
     .text-button { border: 0; background: transparent; color: var(--blue); padding: 0 6px; }
     .icon-button:hover, .secondary-button:hover { background: #f9fafb; border-color: #9ca3af; }
     .primary-button:hover { background: #1f2937; }
+    .open-panel { white-space: nowrap; }
 
     .group-actions {
       display: none;
@@ -424,6 +450,7 @@
       .app-header-inner { min-height: 58px; }
       .utility-nav a:not(:last-child) { display: none; }
       .page { padding-top: 18px; }
+      .breadcrumb { margin-bottom: 11px; }
       .page-heading { display: block; margin-bottom: 16px; }
       h1 { font-size: 1.5rem; }
       .updated { padding-top: 5px; }
@@ -436,8 +463,10 @@
       .summary-card { min-height: 80px; }
       .queue-heading { align-items: flex-end; }
       .request-header { grid-template-columns: 1fr auto; padding: 14px; }
+      .request-header > div:first-child { grid-column: 1 / -1; }
       .request-progress { grid-column: 1 / -1; text-align: left; min-width: 0; display: flex; gap: 7px; align-items: baseline; }
-      .request-tools .secondary-button { display: none; }
+      .request-tools { grid-column: 1 / -1; flex-wrap: wrap; }
+      .request-tools .secondary-button, .request-tools .primary-button { flex: 1; }
       .group-actions { align-items: flex-start; padding-inline: 14px; }
 
       .reviewer-table, .reviewer-table tbody { display: block; }
@@ -499,21 +528,28 @@
   </header>
 
   <main class="page">
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+      <a href="#">Request Workbench</a><span aria-hidden="true">/</span><span aria-current="page">Reviewer follow-up</span>
+    </nav>
     <div class="page-heading">
       <div>
-        <h1>Request Workbench</h1>
-        <p class="subtitle">Monitor reviewer progress and handle follow-up across the cycle.</p>
+        <h1>Reviewer follow-up</h1>
+        <p class="subtitle">Track reviewer progress across your assigned requests for the December 2026 cycle.</p>
       </div>
       <div class="updated">Updated just now</div>
     </div>
 
-    <nav class="workbench-nav" aria-label="Workbench sections">
-      <button type="button">Requests</button>
-      <button type="button" class="active" aria-current="page">Reviewer follow-up <span class="chip amber" style="margin-left:6px">7</span></button>
-      <button type="button">Final writeups</button>
-      <button type="button">Initial assessments</button>
-      <button type="button">Awardees</button>
-    </nav>
+    <section class="view-navigation" aria-labelledby="workbench-views-label">
+      <h2 class="workbench-nav-label" id="workbench-views-label">Workbench views — across requests</h2>
+      <nav class="workbench-nav" aria-label="Workbench views">
+        <button type="button">Request list</button>
+        <button type="button" class="active" aria-current="page">Reviewer follow-up <span class="chip amber" style="margin-left:6px">7</span></button>
+        <button type="button">Final writeups</button>
+        <button type="button">Initial assessments</button>
+        <button type="button">Awardees</button>
+      </nav>
+      <p class="navigation-help">These views summarize work across proposals. Open a proposal’s full reviewer panel below for Find, Invite Reviewers, Email templates, and all request tabs.</p>
+    </section>
 
     <section class="filters" aria-label="Reviewer follow-up filters">
       <div>
@@ -561,7 +597,7 @@
             <div class="request-meta">Johns Hopkins University · PI Anthony Leung · PD Justin Gallivan</div>
           </div>
           <div class="request-progress"><div class="progress-strong">0 of 3 received</div><div class="progress-detail">Review due Sep 9, 2026</div></div>
-          <div class="request-tools"><button class="secondary-button" type="button">Campaign settings</button><button class="icon-button collapse" type="button" aria-label="Collapse request" aria-expanded="true">⌃</button></div>
+          <div class="request-tools"><button class="primary-button open-panel" type="button" data-request="1002852">Open full reviewer panel</button><button class="secondary-button campaign-settings" type="button" data-request="1002852">Campaign settings</button><button class="icon-button collapse" type="button" aria-label="Collapse request" aria-expanded="true">⌃</button></div>
         </header>
         <div class="group-actions"><span><strong class="selected-count">0</strong> selected in Request #1002852</span><div><button class="secondary-button group-email" type="button">Send email</button></div></div>
         <div class="request-content">
@@ -611,7 +647,7 @@
             <div class="request-meta">W. M. Keck Foundation · PI Paige Kelley · PD Justin Gallivan</div>
           </div>
           <div class="request-progress"><div class="progress-strong">0 of 3 accepted</div><div class="progress-detail">Respond by Sep 5, 2026</div></div>
-          <div class="request-tools"><button class="secondary-button" type="button">Campaign settings</button><button class="icon-button collapse" type="button" aria-label="Collapse request" aria-expanded="true">⌃</button></div>
+          <div class="request-tools"><button class="primary-button open-panel" type="button" data-request="1002788">Open full reviewer panel</button><button class="secondary-button campaign-settings" type="button" data-request="1002788">Campaign settings</button><button class="icon-button collapse" type="button" aria-label="Collapse request" aria-expanded="true">⌃</button></div>
         </header>
         <div class="group-actions"><span><strong class="selected-count">0</strong> selected in Request #1002788</span><div><button class="secondary-button group-email" type="button">Send email</button></div></div>
         <div class="request-content">
@@ -661,7 +697,7 @@
             <div class="request-meta">California Institute of Technology · PI Elena Rossi · PD Justin Gallivan</div>
           </div>
           <div class="request-progress"><div class="progress-strong">2 of 3 received</div><div class="progress-detail">1 review still outstanding</div></div>
-          <div class="request-tools"><button class="secondary-button" type="button">Campaign settings</button><button class="icon-button collapse" type="button" aria-label="Collapse request" aria-expanded="true">⌃</button></div>
+          <div class="request-tools"><button class="primary-button open-panel" type="button" data-request="1002874">Open full reviewer panel</button><button class="secondary-button campaign-settings" type="button" data-request="1002874">Campaign settings</button><button class="icon-button collapse" type="button" aria-label="Collapse request" aria-expanded="true">⌃</button></div>
         </header>
         <div class="group-actions"><span><strong class="selected-count">0</strong> selected in Request #1002874</span><div><button class="secondary-button group-email" type="button">Send email</button></div></div>
         <div class="request-content">
@@ -707,7 +743,7 @@
         <header class="request-header">
           <div><div class="request-title-line"><span class="request-number">#1002911</span><span class="chip green">Complete</span><span class="chip violet">Research</span></div><div class="request-title">Adaptive materials for low-energy manufacturing</div><div class="request-meta">Northwestern University · PI Samuel Ortiz · PD Justin Gallivan</div></div>
           <div class="request-progress"><div class="progress-strong">3 of 3 received</div><div class="progress-detail">No follow-up needed</div></div>
-          <div class="request-tools"><button class="secondary-button" type="button">Open request</button><button class="icon-button collapse" type="button" aria-label="Expand request" aria-expanded="false">⌄</button></div>
+          <div class="request-tools"><button class="primary-button open-panel" type="button" data-request="1002911">Open full reviewer panel</button><button class="secondary-button campaign-settings" type="button" data-request="1002911">Campaign settings</button><button class="icon-button collapse" type="button" aria-label="Expand request" aria-expanded="false">⌄</button></div>
         </header>
         <div class="request-content" hidden></div>
       </section>
@@ -740,6 +776,14 @@
         }
       });
     });
+
+    document.querySelectorAll('.open-panel').forEach(button => button.addEventListener('click', () => {
+      showToast(`Opening Request #${button.dataset.request} at Reviewers → Track Reviewers.`);
+    }));
+
+    document.querySelectorAll('.campaign-settings').forEach(button => button.addEventListener('click', () => {
+      showToast(`Opening campaign settings for Request #${button.dataset.request}.`);
+    }));
 
     document.querySelectorAll('.collapse').forEach(button => {
       button.addEventListener('click', () => {
