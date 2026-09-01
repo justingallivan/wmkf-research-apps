@@ -635,37 +635,53 @@ function OutstandingRow({ reviewer, requestId, onSent, onManualEntry }) {
   }, [requestId, reviewer.suggestionId, onSent]);
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 py-3 border-b border-gray-100 last:border-b-0">
+    <div className="grid gap-3 border-b border-gray-100 px-4 py-4 last:border-b-0 md:grid-cols-[minmax(0,1fr)_minmax(11rem,0.45fr)_auto] md:items-start">
       <div className="min-w-0">
-        <div className="font-semibold text-gray-900">{reviewer.name || 'Unnamed reviewer'}</div>
-        {affiliation && <div className="text-sm text-gray-600 truncate">{affiliation}</div>}
-        <div className="text-xs text-gray-400 mt-0.5">
+        <p className="line-clamp-2 break-words text-sm font-medium text-gray-900" title={reviewer.name || ''}>
+          {reviewer.name || 'Unnamed reviewer'}
+        </p>
+        {affiliation && (
+          <p className="line-clamp-2 break-words text-xs leading-5 text-gray-500" title={affiliation}>
+            {affiliation}
+          </p>
+        )}
+        {reviewer.email && (
+          <p className="truncate text-xs leading-5 text-gray-400" title={reviewer.email}>
+            {reviewer.email}
+          </p>
+        )}
+      </div>
+      <div className="min-w-0 text-xs text-gray-500">
+        <p className="text-gray-700">
           {Number.isInteger(reviewer.daysSinceMaterialsSent)
             ? `${reviewer.daysSinceMaterialsSent} day${reviewer.daysSinceMaterialsSent === 1 ? '' : 's'} outstanding`
             : 'Materials not yet sent'}
-          {' · '}
+        </p>
+        <p className="mt-0.5">
           {reviewer.reminderCount > 0
             ? `${reviewer.reminderCount} reminder${reviewer.reminderCount === 1 ? '' : 's'} sent${lastReminder ? ` (last ${lastReminder})` : ''}`
             : 'No reminders sent yet'}
-        </div>
+        </p>
         {feedback && (
-          <div className={`text-xs mt-1 ${feedback.ok ? 'text-green-600' : 'text-amber-600'}`}>{feedback.message}</div>
+          <p className={`mt-1 text-xs ${feedback.ok ? 'text-green-700' : 'text-amber-700'}`} role="status">
+            {feedback.message}
+          </p>
         )}
       </div>
-      <div className="shrink-0 flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2 md:justify-end">
         <button
           type="button"
           onClick={handleSend}
           disabled={sending || !canSend}
           title={canSend ? 'Send a review-due reminder now' : 'Materials have not been sent to this reviewer yet'}
-          className="inline-flex items-center gap-1 text-sm text-gray-700 hover:text-gray-900 border border-gray-300 rounded-lg px-3 py-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+          className="inline-flex min-h-10 items-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 hover:border-gray-400 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 disabled:cursor-not-allowed disabled:opacity-40"
         >
-          {sending ? 'Sending…' : 'Send reminder now'}
+          {sending ? 'Sending…' : 'Send reminder'}
         </button>
         <button
           type="button"
           onClick={() => onManualEntry(reviewer)}
-          className="inline-flex items-center gap-1 text-sm text-gray-700 hover:text-gray-900 border border-gray-300 rounded-lg px-3 py-1.5"
+          className="inline-flex min-h-10 items-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 hover:border-gray-400 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500"
         >
           Enter review manually
         </button>
@@ -785,14 +801,19 @@ export default function ReviewsTab({ requestId }) {
   return (
     <div className="space-y-4">
       {outstanding.length > 0 && (
-        <Card hover={false}>
-          <p className="text-sm font-semibold text-gray-900 mb-1">
-            Outstanding ({outstanding.length})
-          </p>
-          <p className="text-xs text-gray-500 mb-2">
+        <section aria-labelledby="outstanding-reviews-heading">
+          <h2 id="outstanding-reviews-heading" className="text-sm font-semibold text-gray-900">
+            Outstanding reviews ({outstanding.length})
+          </h2>
+          <p className="mt-1 text-xs text-gray-500">
             Accepted reviewer{outstanding.length === 1 ? '' : 's'} who {outstanding.length === 1 ? 'has' : 'have'} not yet submitted a review.
           </p>
-          <div>
+          <div className="mt-3 overflow-hidden rounded-xl border border-gray-200 bg-white">
+            <div className="hidden grid-cols-[minmax(0,1fr)_minmax(11rem,0.45fr)_auto] gap-3 border-b border-gray-200 bg-gray-50 px-4 py-3 text-xs font-medium uppercase tracking-wider text-gray-500 md:grid">
+              <span>Reviewer</span>
+              <span>Follow up</span>
+              <span className="text-right">Actions</span>
+            </div>
             {outstanding.map((r) => (
               <OutstandingRow
                 key={r.suggestionId}
@@ -803,7 +824,7 @@ export default function ReviewsTab({ requestId }) {
               />
             ))}
           </div>
-        </Card>
+        </section>
       )}
       {manualEntryReviewer && (
         <ManualReviewEntryForm

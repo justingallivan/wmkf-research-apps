@@ -67,7 +67,7 @@ test('renders submitted reviews with decoded ratings + download link; pending la
   // above the cards, and the two lists are disjoint (keyed on reviewReceivedAt).
   expect(screen.getByText('Dr. Submitted')).toBeInTheDocument();
   expect(screen.getByText('Dr. NoFile')).toBeInTheDocument();
-  expect(screen.getByText(/Outstanding \(1\)/)).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Outstanding reviews (1)' })).toBeInTheDocument();
   expect(screen.getByText('Dr. Pending')).toBeInTheDocument();
 
   // Decoded ratings (not raw numbers).
@@ -167,7 +167,7 @@ test.each([
     });
 
   render(<ReviewsTab requestId="req1" />);
-  fireEvent.click(await screen.findByRole('button', { name: 'Send reminder now' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Send reminder' }));
 
   expect(await screen.findByText(copy)).toBeInTheDocument();
   expect(fetch).toHaveBeenCalledTimes(2);
@@ -371,7 +371,7 @@ test('terminal reviewers are excluded from Outstanding even without reviewReceiv
 
   render(<ReviewsTab requestId="req1" />);
 
-  expect(await screen.findByText(/Outstanding \(1\)/)).toBeInTheDocument();
+  expect(await screen.findByRole('heading', { name: 'Outstanding reviews (1)' })).toBeInTheDocument();
   expect(screen.getByText('Dr. Pending')).toBeInTheDocument();
   expect(screen.queryByText('Dr. Withdrew')).not.toBeInTheDocument();
   expect(screen.queryByText('Dr. Released')).not.toBeInTheDocument();
