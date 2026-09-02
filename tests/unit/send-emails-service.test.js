@@ -344,7 +344,15 @@ describe('send-emails-service — lifecycle-after-send ordering', () => {
 describe('send-emails-service — terminal thank-you guard', () => {
   test.each([100000005, 100000006])('thank-you does not resurrect terminal status %s', async (terminalValue) => {
     SUGGESTIONS[SUG_OK] = suggestion(SUG_OK, { wmkf_accepted: true, wmkf_reviewstatus: terminalValue });
-    await run({ drafts: [draft(SUG_OK)], templateType: 'thankyou' });
+    await run({
+      drafts: [{
+        suggestionId: SUG_OK,
+        subject: 'Thank you',
+        body: 'Thank you for submitting your review.',
+        externalLinkExpected: false,
+      }],
+      templateType: 'thankyou',
+    });
     expect(updateLifecycle).toHaveBeenCalledWith(
       SUG_OK,
       { thankYouSentAt: expect.any(String) },
@@ -703,6 +711,44 @@ describe('send-emails-service — send-time token authority gate (S404 Plan v4)'
       templateType: 'materials',
     });
     expect(verifySuggestionToken).toHaveBeenCalledWith(TOKEN);
+    expect(resultOf(emitted).sent).toHaveLength(1);
+  });
+
+  test('follow-up refuses a manually introduced reviewer URL and never verifies, mints, or dispatches it', async () => {
+    SUGGESTIONS[SUG_OK] = suggestion(SUG_OK, { wmkf_accepted: true, wmkf_reviewstatus: 100000001 });
+    const emitted = await run({
+      drafts: [{
+        suggestionId: SUG_OK,
+        subject: 'Reminder',
+        body: `Manually pasted:\nhttps://reviews.example.org/external/review/${TOKEN}`,
+        externalLinkExpected: false,
+      }],
+      templateType: 'followup',
+    });
+
+    expect(verifySuggestionToken).not.toHaveBeenCalled();
+    expect(mintAndStore).not.toHaveBeenCalled();
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+    expect(resultOf(emitted).failed[0]).toMatchObject({
+      suggestionId: SUG_OK,
+      code: 'external_link_forbidden',
+    });
+  });
+
+  test('link-free follow-up dispatches without rotating token authority', async () => {
+    SUGGESTIONS[SUG_OK] = suggestion(SUG_OK, { wmkf_accepted: true, wmkf_reviewstatus: 100000001 });
+    const emitted = await run({
+      drafts: [{
+        suggestionId: SUG_OK,
+        subject: 'Reminder',
+        body: 'Please use the link in your original materials email.',
+        externalLinkExpected: false,
+      }],
+      templateType: 'followup',
+    });
+
+    expect(mintAndStore).not.toHaveBeenCalled();
+    expect(createAndSendEmail).toHaveBeenCalledTimes(1);
     expect(resultOf(emitted).sent).toHaveLength(1);
   });
 

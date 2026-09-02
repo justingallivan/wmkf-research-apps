@@ -36,6 +36,7 @@ function messageForReason(reason, fallback) {
     conflict: 'The reviewer changed while this dialog was open. Reload and try again.',
     misconfigured: 'I could not prepare the deadline email. No deadline was changed. Try again, and contact an administrator if the problem continues.',
     notification_unavailable: 'I am missing the reviewer or Program Director information needed for this email. No deadline was changed. Contact an administrator.',
+    token_recovery_required: 'That deadline extends beyond the reviewer’s current secure link. No deadline was changed. Issue a replacement link through the explicit recovery action first.',
     read_failed: 'I could not load the reviewer data. No deadline was changed. Try again, and contact an administrator if the problem continues.',
     save_failed: 'I could not save the extension. Reload the reviewer list and try again.',
     send_failed: 'I could not send the deadline email. Try the email again, and contact an administrator if the problem continues.',

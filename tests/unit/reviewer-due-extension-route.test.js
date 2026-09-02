@@ -86,6 +86,29 @@ test('partial notification failure returns 502 while preserving saved=true for r
   expect(res.body).toMatchObject({ saved: true, notified: false, retryable: true });
 });
 
+test('extension beyond the current signed-link expiry returns 409 before any save', async () => {
+  saveReviewerDueDateExtension.mockResolvedValue({
+    ok: false,
+    saved: false,
+    notified: false,
+    retryable: false,
+    reason: 'token_recovery_required',
+  });
+  const res = response();
+
+  await handler({
+    method: 'POST',
+    body: { action: 'save', suggestionId: SUGGESTION_ID, reviewDueDateOverride: '2099-09-15' },
+  }, res);
+
+  expect(res.statusCode).toBe(409);
+  expect(res.body).toMatchObject({
+    saved: false,
+    notified: false,
+    reason: 'token_recovery_required',
+  });
+});
+
 test('retry sends from freshly stored state and does not accept a client deadline', async () => {
   retryReviewerDueDateNotification.mockResolvedValue({ ok: true, saved: false, notified: true });
   const res = response();

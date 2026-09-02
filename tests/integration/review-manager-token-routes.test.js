@@ -140,23 +140,24 @@ describe('/api/review-manager/regenerate-token', () => {
       expiresAt: expiresAt.toISOString(),
       jti: 'jti-1',
     });
-    // Regenerating drops any stale in-progress draft (plan §9 #draft-token).
-    expect(ReviewDraftService.deleteBySuggestion).toHaveBeenCalledWith(SUGGESTION_ID);
+    // Recovery replaces token authority without discarding work already autosaved
+    // against the stable reviewer engagement.
+    expect(ReviewDraftService.deleteBySuggestion).not.toHaveBeenCalled();
   });
 
-  it('still returns 200 if the post-mint draft cleanup fails (non-fatal)', async () => {
+  it('does not touch the saved draft while issuing a replacement token', async () => {
     mockAuthenticatedUser(2, ['review-manager']);
     DynamicsService.getRecord.mockResolvedValue({
       wmkf_appreviewersuggestionid: SUGGESTION_ID, _wmkf_request_value: REQUEST_ID,
     });
     mintAndStore.mockResolvedValue({ url: 'https://app.example/x', expiresAt: new Date(Date.now() + 60_000), jti: 'j' });
-    ReviewDraftService.deleteBySuggestion.mockRejectedValueOnce(new Error('pg down'));
 
     const req = createMockReq({ method: 'POST', body: { suggestionId: SUGGESTION_ID } });
     const res = createMockRes();
     await handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(200);
+    expect(ReviewDraftService.deleteBySuggestion).not.toHaveBeenCalled();
   });
 
   it('ignores a client-supplied past expiresAt and derives a safe server expiry', async () => {
