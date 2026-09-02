@@ -282,6 +282,25 @@ describe('ReviewerManagePanel release respects checkbox selection', () => {
   });
 });
 
+describe('ReviewerManagePanel one-time materials release', () => {
+  test('an already-released reviewer opens Send Email on Follow-up with no Materials option', async () => {
+    const releasedReviewer = {
+      ...reviewer,
+      reviewStatus: 'under_review',
+      materialsSentAt: '2026-08-18T20:00:00.000Z',
+    };
+    renderPanel({ reviewers: [releasedReviewer] });
+
+    const row = screen.getByText(releasedReviewer.name).closest('tr');
+    fireEvent.click(within(row).getByRole('checkbox'));
+    fireEvent.click(screen.getByRole('button', { name: /send email \(1\)/i }));
+
+    expect(await screen.findByRole('heading', { name: /generate followup emails/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^materials$/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^follow-up$/i })).toBeInTheDocument();
+  });
+});
+
 describe('ReviewerManagePanel release with attach-proposal-email OFF (default)', () => {
   async function openReleaseModalOff() {
     fireEvent.click(screen.getByRole('button', { name: /release proposal to reviewers \(1\)/i }));

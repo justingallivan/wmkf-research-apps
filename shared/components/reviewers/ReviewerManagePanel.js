@@ -337,6 +337,14 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
   // True whenever a preview render is queued or in flight — disables the
   // footer Preview button and the Retry button.
   const [rendering, setRendering] = useState(false);
+
+  // Materials are a one-time release transition. Once every selected reviewer
+  // has moved beyond Accepted, open this general-purpose composer on Follow-up
+  // and remove Materials from the choices. The send boundary independently
+  // enforces the same rule from fresh Dataverse state.
+  const materialsEligible = reviewers.length > 0
+    && reviewers.every(reviewer => reviewer.reviewStatus === 'accepted');
+
   // Synchronous single-flight lock for handlePreview, keyed to the modal-session
   // epoch that was current when a render was started. A second call for the SAME
   // session returns immediately; a stale finally (from a session that has since
@@ -372,6 +380,7 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
       activeRenderAbortRef.current = null;
     }
     if (isOpen) {
+      setTemplateType(materialsEligible ? 'materials' : 'followup');
       setStep('compose');
       setProgress({ current: 0, total: 0, message: '' });
       setDrafts([]);
@@ -380,7 +389,7 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
       setPreviewFailed(false);
       setRendering(false);
     }
-  }, [isOpen]);
+  }, [isOpen, materialsEligible]);
 
   // Read the attach-proposal-email setting fresh every time the modal opens
   // (never cached/build-time) so an admin toggle takes effect immediately.
@@ -853,7 +862,7 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Email Type</label>
                 <div className="flex gap-2">
-                  {['materials', 'followup', 'thankyou'].map(type => (
+                  {(materialsEligible ? ['materials', 'followup', 'thankyou'] : ['followup', 'thankyou']).map(type => (
                     <button
                       key={type}
                       onClick={() => setTemplateType(type)}

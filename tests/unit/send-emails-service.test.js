@@ -341,6 +341,79 @@ describe('send-emails-service — lifecycle-after-send ordering', () => {
   });
 });
 
+describe('send-emails-service — one-time materials delivery', () => {
+  test('a recorded materials receipt skips before token mint or transport', async () => {
+    SUGGESTIONS[SUG_OK] = suggestion(SUG_OK, {
+      wmkf_accepted: true,
+      wmkf_reviewstatus: 100000001,
+      wmkf_materialssentat: '2026-08-18T20:00:00.000Z',
+    });
+
+    const emitted = await run({ drafts: [draft(SUG_OK)], templateType: 'materials' });
+
+    expect(resultOf(emitted).skipped).toEqual([
+      expect.objectContaining({ suggestionId: SUG_OK, reason: 'materials_already_sent' }),
+    ]);
+    expect(mintAndStore).not.toHaveBeenCalled();
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+    expect(updateLifecycle).not.toHaveBeenCalled();
+  });
+
+  test.each([100000001, 100000002, 100000003, 100000004])(
+    'post-materials review status %s prevents a duplicate send even without a receipt timestamp',
+    async (reviewStatus) => {
+      SUGGESTIONS[SUG_OK] = suggestion(SUG_OK, {
+        wmkf_accepted: true,
+        wmkf_reviewstatus: reviewStatus,
+        wmkf_materialssentat: null,
+      });
+
+      const emitted = await run({ drafts: [draft(SUG_OK)], templateType: 'materials' });
+
+      expect(resultOf(emitted).skipped[0]).toMatchObject({
+        suggestionId: SUG_OK,
+        reason: 'materials_already_sent',
+      });
+      expect(mintAndStore).not.toHaveBeenCalled();
+      expect(createAndSendEmail).not.toHaveBeenCalled();
+    },
+  );
+
+  test('an accepted reviewer with no delivery evidence can receive first-time materials', async () => {
+    SUGGESTIONS[SUG_OK] = suggestion(SUG_OK, {
+      wmkf_accepted: true,
+      wmkf_reviewstatus: 100000000,
+      wmkf_materialssentat: null,
+    });
+
+    const emitted = await run({ drafts: [draft(SUG_OK)], templateType: 'materials' });
+
+    expect(resultOf(emitted).sent).toHaveLength(1);
+    expect(mintAndStore).toHaveBeenCalledTimes(1);
+    expect(createAndSendEmail).toHaveBeenCalledTimes(1);
+  });
+
+  test.each([100000005, 100000006, 199999999])(
+    'terminal or unknown review status %s cannot mint a materials link',
+    async (reviewStatus) => {
+      SUGGESTIONS[SUG_OK] = suggestion(SUG_OK, {
+        wmkf_accepted: true,
+        wmkf_reviewstatus: reviewStatus,
+        wmkf_materialssentat: null,
+      });
+
+      const emitted = await run({ drafts: [draft(SUG_OK)], templateType: 'materials' });
+
+      expect(resultOf(emitted).skipped[0]).toMatchObject({
+        suggestionId: SUG_OK,
+        reason: 'materials_release_ineligible',
+      });
+      expect(mintAndStore).not.toHaveBeenCalled();
+      expect(createAndSendEmail).not.toHaveBeenCalled();
+    },
+  );
+});
+
 describe('send-emails-service — terminal thank-you guard', () => {
   test.each([100000005, 100000006])('thank-you does not resurrect terminal status %s', async (terminalValue) => {
     SUGGESTIONS[SUG_OK] = suggestion(SUG_OK, { wmkf_accepted: true, wmkf_reviewstatus: terminalValue });
