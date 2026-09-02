@@ -4,8 +4,7 @@
  *
  * Adapter + token lifecycle + draft service mocked; covers the success
  * payload, the excluded fail-closed 409, both 404 shapes, and — critically —
- * the BEST-EFFORT post-mint draft cleanup (a delete failure never fails the
- * regenerate).
+ * the absence of draft deletion during explicit link recovery.
  */
 
 const getForTokenRegeneration = jest.fn();
@@ -21,12 +20,6 @@ const getRequestById = jest.fn();
 jest.mock('../../lib/dataverse/adapters/grant-request', () => ({
   getById: (...a) => getRequestById(...a),
 }));
-const deleteBySuggestion = jest.fn(async () => {});
-jest.mock('../../lib/services/review-draft-service', () => ({
-  __esModule: true,
-  default: { deleteBySuggestion: (...a) => deleteBySuggestion(...a) },
-}));
-
 const SUG = '22222222-2222-4222-8222-222222222222';
 const REQ = '11111111-1111-4111-8111-111111111111';
 const ACTOR = 'su-1';
@@ -57,7 +50,7 @@ beforeEach(() => {
   }));
 });
 
-test('success: server derives expiry from request default, returns ISO payload, cleans up draft', async () => {
+test('success: server derives expiry from request default and returns the replacement link without touching drafts', async () => {
   const out = await regenerateToken({ suggestionId: SUG, actingUserSystemId: ACTOR });
   expect(getRequestById).toHaveBeenCalledWith(REQ, { select: 'wmkf_reviewduedate' });
   expect(mintAndStore).toHaveBeenCalledWith({
@@ -66,7 +59,6 @@ test('success: server derives expiry from request default, returns ISO payload, 
     expiresAt: DEFAULT_EXPIRES,
     actingUserSystemId: ACTOR,
   });
-  expect(deleteBySuggestion).toHaveBeenCalledWith(SUG);
   expect(out).toEqual({
     ok: true,
     url: 'https://x/t?token=abc',
@@ -90,13 +82,6 @@ test('suggestion override wins over the request default for regenerated-token ex
   expect(mintAndStore).toHaveBeenCalledWith(expect.objectContaining({ expiresAt: overrideExpires }));
 });
 
-test('draft cleanup failure is BEST-EFFORT — regenerate still succeeds', async () => {
-  deleteBySuggestion.mockRejectedValueOnce(new Error('kv down'));
-  const out = await regenerateToken({ suggestionId: SUG, actingUserSystemId: null });
-  expect(out.ok).toBe(true);
-  expect(out.jti).toBe('jti-1');
-});
-
 test('applicant-excluded engagement fails closed: 409 { ok:false, reason:"excluded" }, no mint', async () => {
   getForTokenRegeneration.mockResolvedValueOnce({ _wmkf_request_value: REQ, wmkf_applicantdisposition: 100000002 });
   const err = await regenerateToken({ suggestionId: SUG, actingUserSystemId: null }).catch((e) => e);
@@ -104,7 +89,6 @@ test('applicant-excluded engagement fails closed: 409 { ok:false, reason:"exclud
   expect(err.httpStatus).toBe(409);
   expect(err.body).toEqual({ ok: false, reason: 'excluded' });
   expect(mintAndStore).not.toHaveBeenCalled();
-  expect(deleteBySuggestion).not.toHaveBeenCalled();
 });
 
 test('lookup 404 and missing _wmkf_request_value both → 404 { ok:false, reason:"not_found" }', async () => {

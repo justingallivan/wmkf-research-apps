@@ -1,7 +1,7 @@
 /**
  * Manual "Send reminder now" action (workbench Reviews tab Phase 1).
  *
- * Verifies eligibility rejection, atomic marker+token persistence (412 →
+ * Verifies eligibility rejection, atomic marker persistence (412 →
  * conflict, no send), marker+count stamped BEFORE the email goes out, and that a re-send IS
  * allowed even when `wmkf_remindersentat` is already set (unlike the cron,
  * which is fire-once). All Dataverse/email calls are mocked — no real sends.
@@ -68,6 +68,8 @@ function suggestionRow(over = {}) {
     _wmkf_request_value: REQ,
     _wmkf_potentialreviewer_value: PERSON,
     wmkf_selected: true,
+    wmkf_externaltokenhash: 'stored-token-hash',
+    wmkf_externaltokenexpires: '2100-01-01T00:00:00Z',
     wmkf_externaltokenrevoked: false,
     wmkf_invited: true,
     wmkf_emailsentat: '2026-06-01T00:00:00Z',
@@ -89,7 +91,7 @@ function requestRecord(over = {}) {
     akoya_requestnum: 'R-1',
     akoya_title: 'A Proposal',
     _wmkf_programdirector_value: PD,
-    wmkf_reviewduedate: null,
+    wmkf_reviewduedate: '2099-09-09',
     ...over,
   };
 }
@@ -125,29 +127,27 @@ beforeEach(() => {
 });
 
 describe('sendManualReviewDueReminder', () => {
-  test('eligible reviewer atomically claims marker with token persistence before sending', async () => {
+  test('eligible reviewer atomically claims the marker without rotating token authority before sending', async () => {
     installReads();
     const result = await sendManualReviewDueReminder({ requestId: REQ, suggestionId: SUG, actingUserSystemId: 'u-1' });
     expect(result).toEqual({ ok: true });
 
-    expect(updateRecord).not.toHaveBeenCalled();
-    expect(mintAndStore).toHaveBeenCalledTimes(1);
-    expect(mintAndStore).toHaveBeenCalledWith(expect.objectContaining({
-      ifMatch: 'W/"100"',
-      actingUserSystemId: 'u-1',
-      writeFields: expect.objectContaining({
-        wmkf_remindersentat: expect.any(String),
-        wmkf_remindercount: 1,
-      }),
-    }));
+    expect(mintAndStore).not.toHaveBeenCalled();
+    expect(updateRecord).toHaveBeenCalledWith(
+      'wmkf_appreviewersuggestions',
+      SUG,
+      expect.objectContaining({ wmkf_remindersentat: expect.any(String), wmkf_remindercount: 1 }),
+      { actingUserSystemId: 'u-1', ifMatch: 'W/"100"' },
+    );
     expect(createAndSendEmail).toHaveBeenCalledTimes(1);
-    // mintAndStore owns the conditional marker+token PATCH and finishes before send.
-    expect(mintAndStore.mock.invocationCallOrder[0]).toBeLessThan(createAndSendEmail.mock.invocationCallOrder[0]);
+    expect(updateRecord.mock.invocationCallOrder[0]).toBeLessThan(createAndSendEmail.mock.invocationCallOrder[0]);
 
     const email = createAndSendEmail.mock.calls[0][0];
     expect(email.from).toBe('pd@keck.org');
     expect(email.to).toBe('rev@example.org');
     expect(email.subject).toBe(REVIEW_DUE_SUBJECT);
+    expect(email.body).toContain('original review materials email');
+    expect(email.body).not.toContain('/external/review/');
   });
 
   test('re-send allowed even when wmkf_remindersentat is already set (unlike the cron)', async () => {
@@ -157,9 +157,10 @@ describe('sendManualReviewDueReminder', () => {
     // Marker already set from a prior send — manual send does not filter on it.
     const result = await sendManualReviewDueReminder({ requestId: REQ, suggestionId: SUG });
     expect(result).toEqual({ ok: true });
-    expect(mintAndStore).toHaveBeenCalledWith(expect.objectContaining({
-      writeFields: expect.objectContaining({ wmkf_remindercount: 3 }),
-    }));
+    expect(updateRecord).toHaveBeenCalledWith(
+      'wmkf_appreviewersuggestions', SUG,
+      expect.objectContaining({ wmkf_remindercount: 3 }), expect.any(Object),
+    );
     expect(createAndSendEmail).toHaveBeenCalledTimes(1);
   });
 
@@ -171,32 +172,32 @@ describe('sendManualReviewDueReminder', () => {
 
     await expect(sendManualReviewDueReminder({ requestId: REQ, suggestionId: SUG })).resolves.toEqual({ ok: true });
 
-    expect(mintAndStore).toHaveBeenCalledWith(expect.objectContaining({
-      ifMatch: 'W/"101"',
-      writeFields: expect.objectContaining({ wmkf_remindercount: 3 }),
-    }));
+    expect(updateRecord).toHaveBeenCalledWith(
+      'wmkf_appreviewersuggestions', SUG,
+      expect.objectContaining({ wmkf_remindercount: 3 }),
+      expect.objectContaining({ ifMatch: 'W/"101"' }),
+    );
   });
 
-  test('atomic marker+token conflict (412 / stale etag) → conflict result, no send', async () => {
+  test('atomic marker conflict (412 / stale etag) → conflict result, no send', async () => {
     installReads();
-    mintAndStore.mockRejectedValue(Object.assign(new Error('412'), { status: 412 }));
+    updateRecord.mockRejectedValue(Object.assign(new Error('412'), { status: 412 }));
     const result = await sendManualReviewDueReminder({ requestId: REQ, suggestionId: SUG });
     expect(result).toEqual({ ok: false, reason: 'conflict' });
-    expect(mintAndStore).toHaveBeenCalledWith(expect.objectContaining({
-      ifMatch: 'W/"100"',
-      writeFields: expect.objectContaining({ wmkf_remindercount: 1 }),
-    }));
+    expect(updateRecord).toHaveBeenCalled();
+    expect(mintAndStore).not.toHaveBeenCalled();
     expect(createAndSendEmail).not.toHaveBeenCalled();
   });
 
-  test('token preparation failure before persistence attempts no email and is retryable', async () => {
+  test('marker persistence failure attempts no email and is retryable', async () => {
     installReads();
-    mintAndStore.mockRejectedValueOnce(new Error('token service unavailable'));
+    updateRecord.mockRejectedValueOnce(new Error('Dataverse unavailable'));
 
     const result = await sendManualReviewDueReminder({ requestId: REQ, suggestionId: SUG });
 
     expect(result).toMatchObject({ ok: false, reason: 'prepare_failed' });
-    expect(updateRecord).not.toHaveBeenCalled();
+    expect(updateRecord).toHaveBeenCalled();
+    expect(mintAndStore).not.toHaveBeenCalled();
     expect(createAndSendEmail).not.toHaveBeenCalled();
   });
 
@@ -207,18 +208,53 @@ describe('sendManualReviewDueReminder', () => {
     const result = await sendManualReviewDueReminder({ requestId: REQ, suggestionId: SUG });
 
     expect(result).toMatchObject({ ok: false, reason: 'send_failed' });
-    expect(mintAndStore).toHaveBeenCalledWith(expect.objectContaining({
-      writeFields: expect.objectContaining({ wmkf_remindersentat: expect.any(String) }),
-    }));
+    expect(updateRecord).toHaveBeenCalledWith(
+      'wmkf_appreviewersuggestions', SUG,
+      expect.objectContaining({ wmkf_remindersentat: expect.any(String) }), expect.any(Object),
+    );
   });
 
   test.each([
     ['removed', { wmkf_selected: false, wmkf_externaltokenrevoked: true }, 'removed'],
-    ['revoked', { wmkf_selected: true, wmkf_externaltokenrevoked: true }, 'revoked'],
+    ['revoked', { wmkf_selected: true, wmkf_externaltokenrevoked: true }, 'token_revoked'],
   ])('%s reviewer passes every review-due gate but is refused before claim/mint/send', async (_label, state, reason) => {
     installReads({ suggestion: suggestionRow(state) });
     const result = await sendManualReviewDueReminder({ requestId: REQ, suggestionId: SUG });
     expect(result).toEqual({ ok: false, reason });
+    expect(updateRecord).not.toHaveBeenCalled();
+    expect(mintAndStore).not.toHaveBeenCalled();
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    ['not minted', { wmkf_externaltokenhash: '  ' }, {}, {}, 'token_not_minted'],
+    ['invalid metadata', { wmkf_externaltokenexpires: null }, {}, {}, 'token_invalid_data'],
+    ['expired', { wmkf_externaltokenexpires: '2000-01-01T00:00:00Z' }, {}, {}, 'token_expired'],
+    ['insufficient window', { wmkf_externaltokenexpires: '2099-09-09T23:59:59Z' }, {}, {}, 'token_insufficient_window'],
+    [
+      'missing due date',
+      { wmkf_reviewduedateoverride: null },
+      { wmkf_reviewduedateoverride: '2099-09-09' },
+      { wmkf_reviewduedate: null },
+      'due_date_missing',
+    ],
+  ])('initial %s refusal is independent of the eligible authorization re-read', async (
+    _label,
+    initialState,
+    authorizedState,
+    requestState,
+    reason,
+  ) => {
+    installReads({
+      suggestion: suggestionRow(initialState),
+      suggestionAfterClaim: suggestionRow({ ...authorizedState, _etag: 'W/"101"' }),
+      request: requestRecord(requestState),
+    });
+
+    const result = await sendManualReviewDueReminder({ requestId: REQ, suggestionId: SUG });
+
+    expect(result).toEqual({ ok: false, reason });
+    expect(getRecord.mock.calls.filter(([set]) => set === 'wmkf_appreviewersuggestions')).toHaveLength(1);
     expect(updateRecord).not.toHaveBeenCalled();
     expect(mintAndStore).not.toHaveBeenCalled();
     expect(createAndSendEmail).not.toHaveBeenCalled();
@@ -239,9 +275,26 @@ describe('sendManualReviewDueReminder', () => {
     expect(createAndSendEmail).not.toHaveBeenCalled();
   });
 
+  test('token becoming insufficient on the authorization re-read is refused before claim/send', async () => {
+    installReads({
+      suggestion: suggestionRow(),
+      suggestionAfterClaim: suggestionRow({
+        wmkf_externaltokenexpires: '2099-09-09T23:59:59Z',
+        _etag: 'W/"101"',
+      }),
+    });
+
+    const result = await sendManualReviewDueReminder({ requestId: REQ, suggestionId: SUG });
+
+    expect(result).toEqual({ ok: false, reason: 'token_insufficient_window' });
+    expect(updateRecord).not.toHaveBeenCalled();
+    expect(mintAndStore).not.toHaveBeenCalled();
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+  });
+
   test.each([
     ['removed', { wmkf_selected: false, wmkf_externaltokenrevoked: true }, 'removed'],
-    ['revoked', { wmkf_selected: true, wmkf_externaltokenrevoked: true }, 'revoked'],
+    ['revoked', { wmkf_selected: true, wmkf_externaltokenrevoked: true }, 'token_revoked'],
   ])('reviewer becoming %s after initial eligibility is refused before atomic claim/send', async (_label, state, reason) => {
     installReads({
       suggestion: suggestionRow(),

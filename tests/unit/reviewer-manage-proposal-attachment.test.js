@@ -278,6 +278,22 @@ describe('ReviewerManagePanel release respects checkbox selection', () => {
   });
 });
 
+describe('ReviewerManagePanel one-time materials release', () => {
+  test('excludes an already-released reviewer from Materials and exposes no generic email composer', () => {
+    const releasedReviewer = {
+      ...reviewer,
+      reviewStatus: 'under_review',
+      materialsSentAt: '2026-08-18T20:00:00.000Z',
+    };
+    renderPanel({ reviewers: [releasedReviewer] });
+
+    const row = screen.getByText(releasedReviewer.name).closest('tr');
+    expect(within(row).queryByRole('checkbox')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /release proposal/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /send email/i })).not.toBeInTheDocument();
+  });
+});
+
 describe('ReviewerManagePanel release with attach-proposal-email OFF (default)', () => {
   async function openReleaseModalOff() {
     fireEvent.click(screen.getByRole('button', { name: /release proposal to reviewers \(1\)/i }));

@@ -73,11 +73,18 @@ const TOKEN_STATE_INFO = {
   active:     { label: 'Active',   color: 'bg-blue-100 text-blue-800' },
   revoked:    { label: 'Revoked',  color: 'bg-red-100 text-red-800' },
   expired:    { label: 'Expired',  color: 'bg-orange-100 text-orange-800' },
+  invalid:    { label: 'Needs review', color: 'bg-amber-100 text-amber-800' },
 };
 
 export function TokenStateBadge({ state, expiresAt, firstAccessedAt }) {
-  const info = TOKEN_STATE_INFO[state] || TOKEN_STATE_INFO.not_minted;
+  const known = Boolean(TOKEN_STATE_INFO[state]);
+  const info = TOKEN_STATE_INFO[state] || {
+    label: 'Unknown',
+    color: 'bg-amber-100 text-amber-800',
+  };
   const tooltip = [
+    state === 'invalid' && 'Stored token metadata needs technical review',
+    !known && 'Unrecognized token state; refresh or request technical review',
     expiresAt && `Expires ${new Date(expiresAt).toLocaleDateString()}`,
     firstAccessedAt && `Opened ${new Date(firstAccessedAt).toLocaleDateString()}`,
   ].filter(Boolean).join(' · ');
@@ -98,6 +105,12 @@ const REVIEW_REMINDER_ERROR_MESSAGE = {
   conflict: 'Already claimed by another send. Refresh and try again.',
   removed: 'This reviewer was removed from the request.',
   revoked: 'Their review link was revoked. Reissue it before sending a reminder.',
+  token_revoked: 'This reviewer\'s access was withdrawn. Deliberately restore access before sending a reminder.',
+  token_not_minted: 'No review link is recorded. Investigate the Materials history before sending a link explicitly.',
+  token_invalid_data: 'The review-link metadata needs technical review. Do not regenerate the link automatically.',
+  token_expired: 'The review link expired. Send an explicit replacement link before sending a reminder.',
+  token_insufficient_window: 'The review link does not cover the deadline. Send a deliberate replacement link first.',
+  due_date_missing: 'Set a review due date before sending a reminder.',
   not_found: 'This reviewer is no longer available. Refresh the list.',
   read_failed: 'The latest reviewer status could not be verified. Nothing was sent.',
   prepare_failed: 'The reminder could not be prepared. Nothing was sent.',
@@ -117,13 +130,15 @@ export function ReviewReminderAction({
   const mountedRef = useRef(true);
   const generationRef = useRef(0);
   const sendingRef = useRef(false);
-  const eligible = Boolean(
+  const lifecycleEligible = Boolean(
     requestId
     && reviewer?.suggestionId
     && ['materials_sent', 'under_review'].includes(reviewer.reviewStatus)
     && !reviewer.reviewReceivedAt
     && reviewer.submitted !== true,
   );
+  const reminderEligibility = reviewer?.reviewDueReminderEligibility;
+  const canSend = lifecycleEligible && reminderEligibility === 'eligible';
 
   useEffect(() => {
     mountedRef.current = true;
@@ -134,10 +149,10 @@ export function ReviewReminderAction({
     };
   }, []);
 
-  if (!eligible) return <span className="text-xs text-gray-300">—</span>;
+  if (!lifecycleEligible) return <span className="text-xs text-gray-300">—</span>;
 
   const handleSend = async () => {
-    if (previewReadOnly || sendingRef.current) return;
+    if (previewReadOnly || !canSend || sendingRef.current) return;
     const generation = generationRef.current + 1;
     generationRef.current = generation;
     sendingRef.current = true;
@@ -176,14 +191,18 @@ export function ReviewReminderAction({
   };
 
   const previewTitle = 'Preview is read-only. This control is enabled after promotion to production.';
+  const eligibilityTitle = canSend
+    ? 'Send a review-due reminder now'
+    : REVIEW_REMINDER_ERROR_MESSAGE[reminderEligibility]
+      || 'Reminder eligibility could not be verified. Refresh before trying again.';
 
   return (
     <div className="flex flex-col items-end gap-1">
       <button
         type="button"
         onClick={handleSend}
-        disabled={previewReadOnly || sending}
-        title={previewReadOnly ? previewTitle : 'Send a review-due reminder now'}
+        disabled={previewReadOnly || !canSend || sending}
+        title={previewReadOnly ? previewTitle : eligibilityTitle}
         aria-label={`Send reminder to ${reviewer.name || 'reviewer'}${previewReadOnly ? ' (disabled in read-only Preview)' : ''}`}
         className="min-h-9 whitespace-nowrap rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-gray-700 hover:border-gray-400 hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400"
       >
@@ -217,6 +236,9 @@ export function TokenActionsMenu({
   const menuRef = useRef(null);
 
   const isActive = reviewer.tokenState === 'active';
+  const hasInvalidTokenMetadata = reviewer.tokenState === 'invalid';
+  const canRegenerate = !hasInvalidTokenMetadata;
+  const canRevoke = isActive || hasInvalidTokenMetadata;
   const canCorrectStatus = Boolean(
     onStatusChange && !TERMINAL_REVIEW_STATUSES.includes(reviewer.reviewStatus),
   );
@@ -229,10 +251,11 @@ export function TokenActionsMenu({
   // The estimate drives the upward flip so the portalled menu never opens
   // off-screen. Status correction and terminal actions are taller sections;
   // the remaining items are standard 40px menu rows.
-  const itemCount = 1 + (isActive ? 1 : 0) + (onRemove ? 1 : 0);
+  const itemCount = (canRegenerate ? 1 : 0) + (canRevoke ? 1 : 0) + (onRemove ? 1 : 0);
   const estimatedMenuHeight = (itemCount * 40)
     + (canCorrectStatus ? 118 : 0)
     + (canEndEngagement ? 104 : 0)
+    + (hasInvalidTokenMetadata ? 48 : 0)
     + 8;
 
   // Position the menu in viewport coords, flipping upward when there isn't room
@@ -345,13 +368,20 @@ export function TokenActionsMenu({
           <p className="px-3 pt-2 pb-0.5 text-xs font-medium uppercase tracking-wide text-gray-400">
             Reviewer link
           </p>
-          <button
-            onClick={() => { setOpen(false); onRegenerate(); }}
-            className="w-full text-left px-3 py-2 hover:bg-gray-50"
-          >
-            {reviewer.tokenState === 'not_minted' ? 'Generate link & copy' : 'Regenerate link & copy'}
-          </button>
-          {isActive && (
+          {canRegenerate && (
+            <button
+              onClick={() => { setOpen(false); onRegenerate(); }}
+              className="w-full text-left px-3 py-2 hover:bg-gray-50"
+            >
+              {reviewer.tokenState === 'not_minted' ? 'Generate link & copy' : 'Regenerate link & copy'}
+            </button>
+          )}
+          {hasInvalidTokenMetadata && (
+            <p className="px-3 py-2 text-xs leading-4 text-amber-700 bg-amber-50">
+              Token metadata needs repair. Do not regenerate this link.
+            </p>
+          )}
+          {canRevoke && (
             <button
               onClick={() => { setOpen(false); onRevoke(); }}
               className="w-full text-left px-3 py-2 hover:bg-gray-50 text-red-700"
@@ -453,6 +483,7 @@ function ReleaseMaterialsModal({ isOpen, onClose, reviewers, proposalTitle, requ
   // True whenever a preview render is queued or in flight — disables the
   // footer Preview button and the Retry button.
   const [rendering, setRendering] = useState(false);
+
   // Synchronous single-flight lock for handlePreview, keyed to the modal-session
   // epoch that was current when a render was started. A second call for the SAME
   // session returns immediately; a stale finally (from a session that has since

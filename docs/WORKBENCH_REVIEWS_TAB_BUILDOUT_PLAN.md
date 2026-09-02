@@ -6,7 +6,7 @@ status: active
 summary: "Reviews and synthesis are production-proven; the current Reviews-tab export is Word-only, with Graph-backed PDF conversion deferred."
 canonical: false
 cataloged: 2026-07-03
-last_verified: 2026-08-13
+last_verified: 2026-09-01
 owner: product-engineering
 related:
   - docs/audits/AUDIT_REQUEST_WORKBENCH_TRUTH_2026-07-26.md
@@ -26,6 +26,16 @@ PASSED all zero-submission-era checks: tab render, Outstanding rows against live
 acceptance data (disabled-nudge tooltip confirmed via accessible name), correct
 ABSENCE of Compare/Export with zero submissions, clean console, request-switch
 stale-guard.**
+
+**Reminder-incident closeout (2026-09-01):** the review-due reminder mechanism
+described in this historical build plan remains implemented, but the Vercel
+reviewer-reminder schedule is paused. Commit `4dd57369` made review-due reminders
+link-free and fail-closed on token liveness/runway before marker claim; they no
+longer mint or rotate token authority. After production deployment,
+authenticated smoke, and a 51-row D26 audit with zero blocked outcomes, the
+owner lifted the procedural manual-reminder freeze. The automatic schedule
+remains held. The canonical operating contract is
+`docs/REVIEWER_ENGAGEMENT_SPEC.md`.
 
 **Phase 4 DEPLOYED (S326, 2026-07-03): full go-live sequence executed in
 order — wave11 column provisioned in prod Dataverse
@@ -137,8 +147,9 @@ monitoring in-flight (status/nudges). Owner confirmed scope = all four phases (S
    be a PURE shared module (no DOM/browser APIs) so a server route or
    Dataverse-persisted roll-up can wrap it later. Do NOT build a roll-up column or
    server export route until a PA flow exists to consume it (owner decision, S326).
-5. **Reminder nudges reuse the existing sweep machinery.** Review-due reminders
-   already run via `sweepReviewDueReminders`
+5. **Reminder nudges reuse the existing sweep machinery.** Review-due reminder
+   code is implemented via `sweepReviewDueReminders`; the Vercel schedule is
+   paused as of 2026-09-01
    [VERIFIED via `reviewer-reminder-sweep.sweepReviewDueReminders`,
    `sendOneReminder`, and `email-defaults.readRequiredEmailDefaults`]. A manual nudge MUST
    share the sweep's exclusion/dedupe record so manual + cron cannot double-send.
@@ -198,12 +209,16 @@ monitoring in-flight (status/nudges). Owner confirmed scope = all four phases (S
 - Extend `/api/review-manager/reviewers` DTO with per-reviewer submission status,
   days since materials sent, and last-reminder timestamp — source is
   `wmkf_remindersentat` + `wmkf_remindercount` on the suggestion
-  [VERIFIED via `reviewer-reminder-sweep.sweepReviewDueReminders`; the cron
-  is fire-once (filters `wmkf_remindersentat eq null`)].
-- Manual-nudge semantics: stamps the SAME marker + increments `wmkf_remindercount`
-  (so cron and manual can never double-send — shared-marker mechanism), but manual
-  re-sends by staff are allowed deliberately; UI shows last-sent date + count so
-  the staffer sees prior nudges before sending again.
+  [VERIFIED via `reviewer-reminder-sweep.sweepReviewDueReminders`; the sweep
+  filters `wmkf_remindersentat eq null`].
+- Manual-nudge semantics: fail closed unless the current token is active and
+  covers the effective review deadline, then stamp the SAME marker + increment
+  `wmkf_remindercount` without minting or rotating token authority (so ordinary
+  cron/manual eligibility shares one dedupe marker; same-window concurrency and
+  a failed post-send stamp remain a known residual). The implemented contract
+  permits deliberate staff re-sends and shows last-sent date + count. Production
+  use resumed after the verified 2026-09-01 remediation; the automatic schedule
+  remains paused.
 - ReviewsTab: "Outstanding" section above submitted cards; per-reviewer
   "Send reminder now" action posting to a new guarded route
   (`requireAppAccess(..., 'review-manager', ...)` per the guarded

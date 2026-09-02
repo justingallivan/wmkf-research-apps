@@ -6,7 +6,7 @@ status: active
 summary: "Safe reviewer invitation and return rehearsal through browser mocks, capture-mode controlled writes, or an allowlisted live smoke."
 canonical: false
 cataloged: 2026-07-02
-last_verified: 2026-07-30
+last_verified: 2026-09-01
 owner: product-engineering
 related:
   - docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md
@@ -39,9 +39,10 @@ environment-variable definitions and rotation guidance.
 - Capture mode skips Dynamics email send and returns the rendered email artifact
   in the send result. Contact promotion and ORCID back-propagation are absent
   from every invitation-send mode; they occur later on acceptance.
-- Capture mode does **not** suppress every Dataverse write. Rendering a template
-  containing the external-link placeholder persists a fresh token hash/expiry, and
-  a captured invitation send with `markAsSent=true` still stamps invitation
+- Capture mode does **not** suppress every Dataverse write. Preview rendering is
+  read-only and uses a non-live send-time placeholder, but an actual captured send
+  of a link-bearing template still mints and persists a fresh token hash/expiry.
+  A captured invitation send with `markAsSent=true` also stamps invitation
   lifecycle state. Use only throwaway reviewer suggestions/requests when capture is
   connected to production Dataverse.
 - The browser E2E tests mock external-reviewer portal data routes at the browser boundary. They render the real reviewer pages, but they do not reach Dataverse, SharePoint, Dynamics, or Blob storage.
@@ -143,7 +144,7 @@ Suggested click paths while the browser stays open:
 3. `Invite`: `Release to reviewers` -> preview -> send.
 4. `Candidates`: select `Dr. Pending Invitee (already invited)` -> `Release as no longer needed`.
 
-There is no manual `Re-invite already-invited` button: invited non-responders are nudged automatically by the respond-by reminder cron (`/api/cron/reviewer-reminders`, Phase 3). For a pending invitee you want to drop, use `Release as no longer needed`.
+There is no manual `Re-invite already-invited` button. The respond-by reminder mechanism remains implemented at `/api/cron/reviewer-reminders`, but its Vercel schedule has been paused since 2026-09-01 and remains protected by the hold gate. The procedural manual-reminder freeze was lifted after production deployment `4dd57369`, authenticated smoke, and the D26 token-liveness audit. Respond-by nudges intentionally mint and deliver a replacement pre-acceptance link; review-due reminders are link-free, preserve the current token, and fail closed when that token is not live through the effective deadline. Live-email rehearsals still require the allowlisted procedure below; never substitute a Materials resend for a reminder. For a pending invitee you want to drop, use `Release as no longer needed`.
 
 Stop the rehearsal with `Ctrl-C` in the terminal that launched it.
 

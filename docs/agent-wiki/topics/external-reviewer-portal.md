@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-08-11
+last_verified: 2026-09-01
 stale_after_days: 60
 owner: reviewer-finder
 source_files:
@@ -39,6 +39,10 @@ source_files:
   - pages/api/review-manager/release-settings.js
   - pages/api/review-manager/review-due-extension.js
   - lib/services/reviewer-due-extension.js
+  - lib/services/reviewer-reminder-candidate.js
+  - lib/services/reviewer-reminder-eligibility.js
+  - lib/services/reviewer-reminder-sweep.js
+  - lib/services/review-manager/regenerate-token-service.js
   - lib/services/reviewer-release-config.js
   - shared/components/reviewers/ReviewerManagePanel.js
   - lib/utils/reviewer-invite.js
@@ -155,9 +159,14 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   `lib/external/review-engagement-state.js::computeEngagementState`.
   **Phase 4 (read-back):** `/api/review-manager/reviewers` attaches the re-sanitized `answers[]`
   snapshot per submitted reviewer (keyed child read on `wmkf_appreviewanswers`), rendered by
-  `ReviewsTab`. **Phase 5 (draft lifecycle):** the `review_drafts` scratchpad is deleted on submit,
-  on token **revoke/regenerate** (`revoke-token.js`/`regenerate-token.js` — NOT `mintAndStore`,
-  which runs on benign resends), and GC'd at 90d by the maintenance cron. The hidden-not-deleted
+  `ReviewsTab`. **Phase 5 (draft lifecycle, incident contract updated 2026-09-01):**
+  the `review_drafts` scratchpad is deleted on submit and explicit token
+  **revoke**, and GC'd at 90d by the maintenance cron. Explicit token
+  regeneration now preserves the matching saved draft because it belongs to the
+  engagement, not to one token. A compromise response that must discard draft
+  state therefore revokes first; benign replacement-link recovery regenerates
+  without data loss. Neither routine token minting nor email resend deletes a
+  draft. The hidden-not-deleted
   file-upload path: memory `project-reviewer-upload-dormant-not-deleted`.
   **The whole epic (Phases 0–5) is COMPLETE (S302).**
   Full plan: `docs/REVIEWER_REVIEW_FORM_AUTHORING_BUILD_PLAN.md`.
@@ -404,22 +413,20 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
 - **External reviewers get scoped file access.** Confirm the access path and
   expiry model before widening what an external token can read; see memory
   `project-external-reviewer-file-access` and `project-sharepoint-integration`.
-- **HAZARD — minting a token CLEARS revocation, so any send path can resurrect
-  withdrawn access (S424).** `setExternalToken`
-  (`lib/dataverse/adapters/reviewer-suggestion.js:209-217`) always writes
-  `wmkf_externaltokenrevoked: false`, and every `mintAndStore` caller routes
-  through it: `ensureToken`, `send-emails-service.js:674`,
-  `regenerate-token-service.js:93` (which gates only on applicant-excluded and
-  does not even select `wmkf_selected`/`wmkf_externaltokenrevoked`), and
-  `reviewer-reminder-sweep.js:283-294`. Removing a candidate writes
-  `wmkf_selected:false` + `wmkf_externaltokenrevoked:true` — and also
-  `accepted:false, declined:false, responsetype:null`
-  (`reviewer-suggestion.js:1951-1959`), which is exactly the shape
-  `sweepRespondReminders` selects (`:106-113`), so removal MANUFACTURES a
-  reminder-eligible row. That cron is safe today only because
-  `wmkf_respondreminderenabled` is null everywhere; do not arm it before its
-  sweep filters on selected and revoked. Plan and mint-surface audit:
-  `docs/REVIEWER_MANUAL_RESPOND_NUDGE_BUILD_PLAN.md`.
+- **Token minting clears revocation, so every mint caller needs an explicit
+  eligibility contract (incident remediation current 2026-09-01).** The low-level
+  `setExternalToken` primitive still writes `wmkf_externaltokenrevoked:false`.
+  Ordinary send paths now prevent accidental resurrection: the respond sweep
+  filters selected/non-revoked rows; Materials delivery refuses revoked,
+  non-accepted, terminal/unknown, and already-delivered rows before mint; manual
+  reminders freshly reauthorize; and review-due reminders are link-free and never mint.
+  `regenerate-token` remains the deliberate staff replacement-link action and can
+  restore access, so it is not a routine follow-up substitute. The automatic
+  reminder route is safe from execution because it is absent from the Vercel cron
+  registry under the hold gate—not because configuration is null. A 2026-09-01
+  read-only probe instead found 92 current-cycle active requests with both reminder
+  flags true. Keep the schedule held until the remaining reactivation prerequisites
+  in `docs/REVIEWER_ENGAGEMENT_SPEC.md` are satisfied.
 
 - **Accept/decline links are durable, signed surfaces.** Changes to link
   generation or response handling need an in-flight invitation compatibility check;

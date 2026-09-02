@@ -56,6 +56,9 @@ function suggestion(overrides = {}) {
     wmkf_reviewreceivedat: null,
     wmkf_completedat: null,
     wmkf_reviewduedateoverride: null,
+    wmkf_externaltokenhash: 'active-token-hash',
+    wmkf_externaltokenexpires: '2099-12-01T23:59:59Z',
+    wmkf_externaltokenrevoked: false,
     wmkf_reviewerfirstname: 'Ada',
     wmkf_reviewerlastname: 'Lovelace',
     wmkf_reviewernickname: 'Ada',
@@ -276,6 +279,33 @@ test('rejects an unchanged extension so save cannot become an accidental resend'
   })).resolves.toEqual({ ok: false, reason: 'no_change' });
   expect(suggestionAdapter.updateLifecycle).not.toHaveBeenCalled();
   expect(DynamicsService.createAndSendEmail).not.toHaveBeenCalled();
+});
+
+test('fails before writing or notifying when the requested deadline exceeds the signed token expiry', async () => {
+  suggestionAdapter.getByIdWithSelect.mockResolvedValueOnce(suggestion({
+    wmkf_externaltokenexpires: '2099-09-10T23:59:59Z',
+  }));
+
+  await expect(saveReviewerDueDateExtension({
+    suggestionId: SUGGESTION_ID,
+    reviewDueDateOverride: '2099-09-15',
+  })).resolves.toEqual({ ok: false, reason: 'token_recovery_required' });
+
+  expect(suggestionAdapter.updateLifecycle).not.toHaveBeenCalled();
+  expect(DynamicsService.createAndSendEmail).not.toHaveBeenCalled();
+});
+
+test('allows a pre-materials deadline extension when no token has been issued yet', async () => {
+  suggestionAdapter.getByIdWithSelect.mockResolvedValueOnce(suggestion({
+    wmkf_reviewstatus: 100000000,
+    wmkf_externaltokenhash: null,
+    wmkf_externaltokenexpires: null,
+  }));
+
+  await expect(saveReviewerDueDateExtension({
+    suggestionId: SUGGESTION_ID,
+    reviewDueDateOverride: '2099-09-15',
+  })).resolves.toMatchObject({ ok: true, effectiveReviewDeadline: '2099-09-15' });
 });
 
 test('keeps the saved deadline and returns retryable partial success when sending fails', async () => {

@@ -6,7 +6,7 @@ status: canonical
 summary: Mechanics, enforcement locations, exemption rules, and operating contracts for repository checks and their self-tests.
 canonical: true
 cataloged: 2026-07-02
-last_verified: 2026-08-29
+last_verified: 2026-09-01
 owner: product-engineering
 related:
   - docs/atlas/
@@ -26,7 +26,7 @@ hook, `/start`, or a manual release procedure.
 
 | Location | Current contract |
 |---|---|
-| GitHub Actions | `.github/workflows/test.yml` is authoritative. It runs lint; API-route, Atlas, doc-currency, docs-catalog, migration-manifest, agent-invariant, instruction-architecture, memory-router, doc-symbol, build-claim, model-warming, DAL/OData/context/route-service/route-lifecycle, Request Document writer, secret, scaffolding, harness, and type checks; most listed gate self-tests; build; and `test:ci`. |
+| GitHub Actions | `.github/workflows/test.yml` is authoritative. It runs lint; API-route, Atlas, doc-currency, docs-catalog, migration-manifest, reviewer-reminder incident-hold, agent-invariant, instruction-architecture, memory-router, doc-symbol, build-claim, model-warming, DAL/OData/context/route-service/route-lifecycle, Request Document writer, secret, scaffolding, harness, and type checks; most listed gate self-tests; build; and `test:ci`. |
 | Blocking commit hooks | `check:docs-catalog` runs for catalog-relevant staged/command paths. `check:status-enum-parity` and `check:trust-boundary-guid` run on every recognized `git commit`. These hooks fail open on hook-internal errors, so `/start` remains their backstop. |
 | Session-stop changed-surface hook | `check:api-routes`, `check:atlas`, `check:migrations-manifest`, `check:prompt-injection-tagging`, `check:agent-wiki`, and `check:fact-consistency` are selected by changed paths. `CLAUDE_STOP_GATE_MODE` defaults to `advisory`; only an explicit `block` value makes failures blocking. |
 | Session start / manual | `.claude/skills/start/SKILL.md` owns the broader startup battery. Advisory checks such as the read-only `check:memory-drift` / `check:memory-drift:no-write` aliases and `check:memory-health` do not become blocking merely because they have package scripts. |
@@ -55,6 +55,7 @@ unfixed because each subsequent session classified it as out-of-scope.
 | `check:route-service-boundary:self-test` | Temp-root fixture tree proving adapter-source detection inherits the hardened classes (direct import, in-file alias, wrapper re-export incl. ESM import-then-export and CJS binding re-export, dynamic import, inline require, dynamics-service, root-level route) plus greens (clean shell, service-only route, service exporting its own adapter-calling functions, exempt dirs), the fail-closed hard error on non-literal `require()`/`import()` sources in routes or re-export positions, and law mode failing closed on every red class (each offending route named) while a green-only tree exits 0. | Silent regressions in boundary detection, fail-closed handling, or the law gate. |
 | `check:request-document-writers` | Focused Wave 24 source census. Requires exactly the six registered Request Document create seams, actor policy/context at each adapter call, no raw Request Document create bypass, and no immutable origin actor/time write outside the adapter/actor service. | Request Document writer or attribution changes until the inventory and immutability contract are green. GitHub Actions runs it before build/test. |
 | `check:request-document-writers:self-test` | Positive fixture plus missing-policy, raw-create-bypass, and immutable-origin-write negative fixtures. | Silent fail-open regressions in the Wave 24 writer census. |
+| `check:reviewer-reminder-hold` | Reads `vercel.json` and fails closed if the cron registry is missing/malformed, `/api/cron/reviewer-reminders` is registered, or an alternate `vercel.ts`/JS config could supersede the checked registry. | Any deployment or PR that would accidentally restore the reviewer-reminder scheduler during the 2026-09-01 token-incident hold. GitHub Actions runs it, and `prebuild` re-runs it so a direct Vercel build cannot bypass the hold. |
 
 The fix is always to make the gate green. Adding to `ALLOWED_UNDOCUMENTED_*` requires a written justification and is a last resort, not a default. The rule applies regardless of which session caused the red state: "not my regression" is not a valid reason to proceed past it.
 
@@ -376,6 +377,13 @@ blocks. GitHub CI runs both the gate and
 - `check:migrations-manifest` verifies that the sorted manifest exactly matches
   `lib/db/migrations/*.sql`; GitHub CI also checks the build did not regenerate
   an uncommitted manifest.
+- `check:reviewer-reminder-hold` verifies that `/api/cron/reviewer-reminders`
+  remains absent from the Vercel cron registry. It fails closed on a missing or
+  malformed `crons` array, malformed cron entry, or an alternate Vercel config
+  file that could supersede the checked `vercel.json`. The hold is enforced in
+  GitHub Actions and `prebuild`; restoring the schedule requires a deliberate,
+  reviewed retirement of this guard after the reactivation prerequisites in
+  `docs/REVIEWER_ENGAGEMENT_SPEC.md` are complete.
 - `check:agent-invariants:ci` verifies the tracked `AGENTS.md` symlink in CI.
   Local `check:agent-invariants` additionally checks `.agents/skills` and the
   Claude memory-store symlink.
@@ -409,6 +417,7 @@ When modifying any `scripts/check-*.js` gate (or building a new one), the matchi
 | `check:secret-scan` | `check:secret-scan:self-test` |
 | `check:scaffolding-tokens` | `check:scaffolding-tokens:self-test` |
 | `check:prompt-injection-tagging` | `check:prompt-injection-tagging:self-test` |
+| `check:reviewer-reminder-hold` | `check:reviewer-reminder-hold:self-test` — safe registry and lookalike-path positives; exact held-route (including query-string registration), invalid JSON, missing/non-array registry, malformed entry, missing-path, and alternate-config negatives. |
 
 **When external review catches a structural pattern an existing gate missed, the order is mandatory:**
 

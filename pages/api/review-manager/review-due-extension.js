@@ -26,6 +26,7 @@ const REASON_STATUS = {
   read_failed: 502,
   misconfigured: 502,
   notification_unavailable: 502,
+  token_recovery_required: 409,
   send_failed: 502,
 };
 

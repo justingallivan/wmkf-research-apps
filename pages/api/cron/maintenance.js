@@ -241,7 +241,8 @@ export default async function handler(req, res) {
 
     // 9. External reviewer review-draft GC (reviewer authoring build, Phase 5).
     //    review_drafts is the Postgres autosave scratchpad. It's normally
-    //    deleted on submit and on token revoke/regenerate; this reaps drafts
+    //    deleted on submit and on token revoke; token regeneration deliberately
+    //    preserves the engagement's saved work. This reaps drafts
     //    abandoned mid-authoring (untouched > 90d), mirroring intake's draft
     //    retention. Pure scratchpad — a returning reviewer just re-enters.
     try {

@@ -50,7 +50,7 @@ export const EDITABLE_TEXT_DEFAULTS = [
   {
     key: 'email.reviewer_reminder_review_due.body',
     label: 'Reviewer review-due reminder body',
-    description: 'Default body copy for reviewer review-due reminder emails. {{proposalClause}} renders as a proposal phrase in context, e.g. the proposal “X” (or a neutral phrase if untitled).',
+    description: 'Default body copy for reviewer review-due reminder emails. These reminders preserve the original review link and do not include a new one. {{proposalClause}} renders as a proposal phrase in context, e.g. the proposal “X” (or a neutral phrase if untitled).',
     multiline: true,
     placeholders: ['{{greeting}}', '{{reviewerName}}', '{{proposalClause}}', '{{reviewDueDate}}', '{{signature}}'],
   },
