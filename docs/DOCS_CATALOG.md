@@ -277,7 +277,7 @@ related:
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
 | [PRE_SITE_VISIT_GENERATION_RESILIENCE_PLAN.md](PRE_SITE_VISIT_GENERATION_RESILIENCE_PLAN.md) | plan | active |  | Production-deployed Pre-Site resilience change with durable warnings and preserved integrity gates; generation + no-duplicate smokes passed 2026-08-27. | 2026-08-18 |
-| [REVIEWER_FOLLOW_UP_ORG_CYCLE_VISIBILITY_PLAN.md](REVIEWER_FOLLOW_UP_ORG_CYCLE_VISIBILITY_PLAN.md) | plan | active |  | Organization-wide Reviewer Follow-up cycle discovery and lead-PD/superuser request mutation enforcement, built on the implementation branch. | 2026-09-02 |
+| [REVIEWER_FOLLOW_UP_ORG_CYCLE_VISIBILITY_PLAN.md](REVIEWER_FOLLOW_UP_ORG_CYCLE_VISIBILITY_PLAN.md) | plan | historical |  | Organization-wide Reviewer Follow-up cycle discovery and lead-PD/superuser request mutation enforcement, deployed and verified in Production. | 2026-09-02 |
 
 ## review-manager
 
