@@ -73,7 +73,7 @@ describe('/api/workbench/dashboard', () => {
   });
 
   it('cycle-list mode: cycles derive from the PD\'s meeting-dated proposals; default = latest', async () => {
-    mockAuthenticatedUser(1, ['reviewers']);
+    mockAuthenticatedUser(1, ['reviewers'], { dynamicsSystemuserId: 'pd-1' });
     // Derived purely from meeting dates (S261: no hardcoded D26 anchor). The PD has
     // a Dec-2026 (D26) and a June-2026 (J26) proposal; latest (D26) is the default.
     DynamicsService.queryAllRecords.mockResolvedValueOnce({
@@ -103,7 +103,7 @@ describe('/api/workbench/dashboard', () => {
   });
 
   it('proposals mode: triage-driven filter (Advancing + Phase II Pending), hides Set aside, no allowlist query', async () => {
-    mockAuthenticatedUser(1, ['reviewers']);
+    mockAuthenticatedUser(1, ['reviewers'], { dynamicsSystemuserId: 'pd-1' });
     let proposalFilter = null;
     DynamicsService.queryAllRecords.mockImplementation((entity, opts) => {
       if (entity === 'wmkf_appreviewersuggestions') return Promise.resolve({ records: [] });

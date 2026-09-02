@@ -8,11 +8,13 @@
  */
 
 import { requireAppAccess } from '../../../lib/utils/auth';
+import { actorRefFromSession } from '../../../lib/utils/actor-ref';
 import { isGuid, allGuids } from '../../../lib/utils/guid';
 import { withDalContext } from '../../../lib/dataverse/core/context';
 import { ServiceHttpError } from '../../../lib/services/service-http-error';
 import { transitionReviewersTerminal } from '../../../lib/services/review-manager/terminal-transition-service';
 import { isTerminalReviewStatus } from '../../../shared/config/reviewerStatus';
+import { authorizeReviewerRequestMutation } from '../../../lib/services/reviewer-request-authorization';
 
 const MAX_BATCH = 100;
 
@@ -42,9 +44,15 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'terminalStatus must be withdrew or released' });
   }
 
-  const actingUserSystemId = access.session?.user?.dynamicsSystemuserId || null;
+  const actingUserSystemId = actorRefFromSession(access.session);
   return withDalContext('review-manager-terminal-transition', async () => {
     try {
+      await authorizeReviewerRequestMutation({
+        profileId: access.profileId,
+        callerSystemId: actingUserSystemId,
+        requestIds: [requestId],
+        suggestionIds,
+      });
       const result = await transitionReviewersTerminal({
         requestId,
         suggestionIds,

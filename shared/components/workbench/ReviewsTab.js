@@ -50,7 +50,23 @@ function reviewerAffiliationOf(reviewer) {
   const personAffiliation = typeof reviewer?.affiliation === 'string'
     ? reviewer.affiliation.trim()
     : '';
-  return acceptedAffiliation || personAffiliation || null;
+  const affiliation = acceptedAffiliation || personAffiliation;
+  const email = typeof reviewer?.email === 'string' ? reviewer.email.trim() : '';
+  if (!affiliation || !email) return affiliation || null;
+
+  // Some accepted-reviewer records carry a legacy free-text affiliation with
+  // the email appended (occasionally as "Electronic address: …"). The shared
+  // reviewer rows already render email separately, so remove only an exact
+  // trailing copy and leave all other affiliation text untouched.
+  const emailIndex = affiliation.toLowerCase().lastIndexOf(email.toLowerCase());
+  if (emailIndex < 0) return affiliation;
+  const suffix = affiliation.slice(emailIndex + email.length);
+  if (suffix.replace(/[\s,.;:]/g, '') !== '') return affiliation;
+  return affiliation
+    .slice(0, emailIndex)
+    .replace(/electronic\s+address\s*:?\s*$/i, '')
+    .replace(/[\s,.;:]+$/g, '')
+    .trim() || null;
 }
 
 // Reviews tab rating order, and the projection field that holds each value.
@@ -398,13 +414,14 @@ function CompareView({ submitted, liveQuestions }) {
 // as plain text nodes (NO dangerouslySetInnerHTML) per the plan's rendering
 // contract. `synthesis` is the stored `proposal.reviewSynthesis` (fail-soft
 // parsed server-side, or null when never generated / parse failed).
-function SynthesisCard({ requestId, synthesis, state, reviewers = [], onUpdated }) {
+function SynthesisCard({ requestId, synthesis, state, reviewers = [], onUpdated, previewReadOnly = false }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const automaticInFlight = state?.status === 'queued' || state?.status === 'running';
   const canGenerate = state?.canRunManually === true && !automaticInFlight;
 
   const generate = useCallback(async (overwrite) => {
+    if (previewReadOnly) return;
     const confirmEarly = state?.ready !== true;
     if (confirmEarly) {
       const confirmed = window.confirm(
@@ -450,7 +467,7 @@ function SynthesisCard({ requestId, synthesis, state, reviewers = [], onUpdated 
     } finally {
       setBusy(false);
     }
-  }, [requestId, state, onUpdated]);
+  }, [requestId, state, onUpdated, previewReadOnly]);
 
   const statusText = (() => {
     if (automaticInFlight) {
@@ -489,8 +506,10 @@ function SynthesisCard({ requestId, synthesis, state, reviewers = [], onUpdated 
           <button
             type="button"
             onClick={() => generate(!!synthesis)}
-            disabled={busy || !canGenerate}
-            title={!state?.canRunManually
+            disabled={previewReadOnly || busy || !canGenerate}
+            title={previewReadOnly
+              ? 'Synthesis generation is disabled in read-only Preview'
+              : !state?.canRunManually
               ? 'A submitted review is required'
               : automaticInFlight
                 ? 'Automatic synthesis is already in progress'
@@ -627,7 +646,7 @@ const REMINDER_ELIGIBILITY_INFO = {
   },
 };
 
-function OutstandingRow({ reviewer, requestId, onSent, onManualEntry }) {
+function OutstandingRow({ reviewer, requestId, onSent, onManualEntry, previewReadOnly = false }) {
   const [sending, setSending] = useState(false);
   const [feedback, setFeedback] = useState(null);
   const lastReminder = formatDate(reviewer.reminderSentAt);
@@ -642,6 +661,7 @@ function OutstandingRow({ reviewer, requestId, onSent, onManualEntry }) {
   const affiliation = reviewerAffiliationOf(reviewer);
 
   const handleSend = useCallback(async () => {
+    if (previewReadOnly) return;
     setSending(true);
     setFeedback(null);
     try {
@@ -676,40 +696,58 @@ function OutstandingRow({ reviewer, requestId, onSent, onManualEntry }) {
     } finally {
       setSending(false);
     }
-  }, [requestId, reviewer.suggestionId, onSent]);
+  }, [requestId, reviewer.suggestionId, onSent, previewReadOnly]);
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 py-3 border-b border-gray-100 last:border-b-0">
+    <div className="grid gap-3 border-b border-gray-100 px-4 py-4 last:border-b-0 lg:grid-cols-[minmax(0,1fr)_16rem_20rem] lg:items-start">
       <div className="min-w-0">
-        <div className="font-semibold text-gray-900">{reviewer.name || 'Unnamed reviewer'}</div>
-        {affiliation && <div className="text-sm text-gray-600 truncate">{affiliation}</div>}
-        <div className="text-xs text-gray-400 mt-0.5">
+        <p className="line-clamp-2 break-words text-sm font-medium text-gray-900" title={reviewer.name || ''}>
+          {reviewer.name || 'Unnamed reviewer'}
+        </p>
+        {affiliation && (
+          <p className="line-clamp-2 break-words text-xs leading-5 text-gray-500" title={affiliation}>
+            {affiliation}
+          </p>
+        )}
+        {reviewer.email && (
+          <p className="truncate text-xs leading-5 text-gray-400" title={reviewer.email}>
+            {reviewer.email}
+          </p>
+        )}
+      </div>
+      <div className="min-w-0 text-xs text-gray-500">
+        <p className="text-gray-700">
           {Number.isInteger(reviewer.daysSinceMaterialsSent)
             ? `${reviewer.daysSinceMaterialsSent} day${reviewer.daysSinceMaterialsSent === 1 ? '' : 's'} outstanding`
             : 'Materials not yet sent'}
-          {' · '}
+        </p>
+        <p className="mt-0.5">
           {reviewer.reminderCount > 0
             ? `${reviewer.reminderCount} reminder${reviewer.reminderCount === 1 ? '' : 's'} sent${lastReminder ? ` (last ${lastReminder})` : ''}`
             : 'No reminders sent yet'}
-        </div>
+        </p>
         {feedback && (
-          <div className={`text-xs mt-1 ${feedback.ok ? 'text-green-600' : 'text-amber-600'}`}>{feedback.message}</div>
+          <p className={`mt-1 text-xs ${feedback.ok ? 'text-green-700' : 'text-amber-700'}`} role="status">
+            {feedback.message}
+          </p>
         )}
       </div>
-      <div className="shrink-0 flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2 lg:justify-start">
         <button
           type="button"
           onClick={handleSend}
-          disabled={sending || !canSend}
-          title={eligibilityInfo.title}
-          className="inline-flex items-center gap-1 text-sm text-gray-700 hover:text-gray-900 border border-gray-300 rounded-lg px-3 py-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+          disabled={previewReadOnly || sending || !canSend}
+          title={previewReadOnly ? 'Reminders are disabled in read-only Preview' : eligibilityInfo.title}
+          className="inline-flex min-h-10 items-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 hover:border-gray-400 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 disabled:cursor-not-allowed disabled:opacity-40"
         >
-          {sending ? 'Sending…' : 'Send reminder now'}
+          {sending ? 'Sending…' : 'Send reminder'}
         </button>
         <button
           type="button"
           onClick={() => onManualEntry(reviewer)}
-          className="inline-flex items-center gap-1 text-sm text-gray-700 hover:text-gray-900 border border-gray-300 rounded-lg px-3 py-1.5"
+          disabled={previewReadOnly}
+          title={previewReadOnly ? 'Manual review entry is disabled in read-only Preview' : undefined}
+          className="inline-flex min-h-10 items-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 hover:border-gray-400 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 disabled:cursor-not-allowed disabled:opacity-40"
         >
           Enter review manually
         </button>
@@ -718,7 +756,7 @@ function OutstandingRow({ reviewer, requestId, onSent, onManualEntry }) {
   );
 }
 
-export default function ReviewsTab({ requestId }) {
+export default function ReviewsTab({ requestId, previewReadOnly = false }) {
   const [proposal, setProposal] = useState(null);
   // Phase 2: the live admin-panel question set (or null on fetch failure —
   // fail-soft per the route; the matrix derivation falls back to
@@ -821,6 +859,7 @@ export default function ReviewsTab({ requestId }) {
           state={proposal?.reviewSynthesisState ?? null}
           reviewers={submitted}
           onUpdated={load}
+          previewReadOnly={previewReadOnly}
         />
       </div>
     );
@@ -829,14 +868,19 @@ export default function ReviewsTab({ requestId }) {
   return (
     <div className="space-y-4">
       {outstanding.length > 0 && (
-        <Card hover={false}>
-          <p className="text-sm font-semibold text-gray-900 mb-1">
-            Outstanding ({outstanding.length})
-          </p>
-          <p className="text-xs text-gray-500 mb-2">
+        <section aria-labelledby="outstanding-reviews-heading">
+          <h2 id="outstanding-reviews-heading" className="text-sm font-semibold text-gray-900">
+            Outstanding reviews ({outstanding.length})
+          </h2>
+          <p className="mt-1 text-xs text-gray-500">
             Accepted reviewer{outstanding.length === 1 ? '' : 's'} who {outstanding.length === 1 ? 'has' : 'have'} not yet submitted a review.
           </p>
-          <div>
+          <div className="mt-3 overflow-hidden rounded-xl border border-gray-200 bg-white">
+            <div className="hidden gap-3 border-b border-gray-200 bg-gray-50 px-4 py-3 text-xs font-medium uppercase tracking-wider text-gray-500 lg:grid lg:grid-cols-[minmax(0,1fr)_16rem_20rem]">
+              <span>Reviewer</span>
+              <span>Follow up</span>
+              <span>Actions</span>
+            </div>
             {outstanding.map((r) => (
               <OutstandingRow
                 key={r.suggestionId}
@@ -844,12 +888,13 @@ export default function ReviewsTab({ requestId }) {
                 requestId={requestId}
                 onSent={load}
                 onManualEntry={(reviewer) => setManualEntry({ requestId, reviewer })}
+                previewReadOnly={previewReadOnly}
               />
             ))}
           </div>
-        </Card>
+        </section>
       )}
-      {manualEntryReviewer && (
+      {manualEntryReviewer && !previewReadOnly && (
         <ManualReviewEntryForm
           key={manualEntryReviewer.suggestionId}
           reviewer={manualEntryReviewer}
@@ -908,6 +953,7 @@ export default function ReviewsTab({ requestId }) {
         state={proposal?.reviewSynthesisState ?? null}
         reviewers={submitted}
         onUpdated={load}
+        previewReadOnly={previewReadOnly}
       />
     </div>
   );

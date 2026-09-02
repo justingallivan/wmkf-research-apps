@@ -30,20 +30,22 @@
  *   - complete { message, sent, failed, skipped, unconfirmed }
  *   - error { message } — terminal; no result/complete follows
  *
- * Data boundary: staff-shared. Any `review-manager` user can send to any
- * suggestion's reviewer; the sender attribution is the caller's session
- * email (Dynamics email activity sender + MSCRMCallerID on lifecycle writes
- * when impersonation is enabled). Contact promotion occurs later in the
- * token-authenticated acceptance drain. The trusted DAL
- * context is established here because reviewer outreach is a foundation-
- * owned workflow, not user-private.
+ * Data boundary: draft rendering remains staff-shared, but sending is limited
+ * to the lead PD for every targeted request or a superuser. The full draft
+ * batch is authorized before SSE starts or any email/lifecycle side effect.
+ * Sender attribution is the caller's session identity. Contact promotion
+ * occurs later in the token-authenticated acceptance drain.
  */
 
 import { BASE_CONFIG } from '../../../shared/config/baseConfig';
 import { requireAppAccess } from '../../../lib/utils/auth';
+import { actorRefFromSession } from '../../../lib/utils/actor-ref';
+import { isGuid } from '../../../lib/utils/guid';
 import { nextRateLimiter } from '../../../shared/api/middleware/rateLimiter';
 import { withDalContext } from '../../../lib/dataverse/core/context';
 import { sendEmails } from '../../../lib/services/review-manager/send-emails-service';
+import { ServiceHttpError } from '../../../lib/services/service-http-error';
+import { authorizeReviewerRequestMutation } from '../../../lib/services/reviewer-request-authorization';
 
 const limiter = nextRateLimiter({ max: 10 });
 
@@ -61,7 +63,7 @@ export default async function handler(req, res) {
   if (!access) return;
 
   const fromEmail = access.session?.user?.azureEmail;
-  const actingUserSystemId = access.session?.user?.dynamicsSystemuserId || null;
+  const actingUserSystemId = actorRefFromSession(access.session);
   if (!fromEmail) {
     return res.status(400).json({
       error: 'Could not determine sender email from your session. Please sign out and back in.',
@@ -70,6 +72,31 @@ export default async function handler(req, res) {
 
   const allowed = await limiter(req, res);
   if (allowed !== true) return;
+
+  // The service owns the historical streaming validation contract. Only run
+  // the authorization read when every draft already has the valid identifier
+  // needed to resolve ownership; otherwise the service emits its existing
+  // terminal validation event without any write or send.
+  const drafts = req.body?.drafts;
+  const suggestionIds = Array.isArray(drafts)
+    ? drafts.map((draft) => draft?.suggestionId)
+    : [];
+  if (suggestionIds.length > 0 && suggestionIds.every((id) => isGuid(id))) {
+    try {
+      await withDalContext('review-manager-send-authorize', () =>
+        authorizeReviewerRequestMutation({
+          profileId: access.profileId,
+          callerSystemId: actingUserSystemId,
+          suggestionIds,
+        }));
+    } catch (error) {
+      if (error instanceof ServiceHttpError) {
+        return res.status(error.httpStatus).json(error.body ?? { error: error.message });
+      }
+      console.error('Review Manager send-emails authorization error:', error);
+      return res.status(500).json({ error: 'Could not verify request ownership' });
+    }
+  }
 
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');

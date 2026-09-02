@@ -3,10 +3,15 @@
 jest.mock('../../lib/utils/auth', () => ({
   requireAppAccess: jest.fn(async () => ({ session: { user: { dynamicsSystemuserId: 'staff-1' } } })),
 }));
+jest.mock('../../lib/services/reviewer-request-authorization', () => ({
+  authorizeReviewerRequestMutation: jest.fn(async () => ({})),
+}));
 const transitionReviewersTerminal = jest.fn();
 jest.mock('../../lib/services/review-manager/terminal-transition-service', () => ({
   transitionReviewersTerminal: (...args) => transitionReviewersTerminal(...args),
 }));
+const { authorizeReviewerRequestMutation } = require('../../lib/services/reviewer-request-authorization');
+const { ServiceHttpError } = require('../../lib/services/service-http-error');
 
 const { createMockReq, createMockRes } = require('../helpers/auth-mock');
 const handler = require('../../pages/api/review-manager/terminal-transition').default;
@@ -29,6 +34,24 @@ test('valid partial-success request maps service result to 200', async () => {
   const res = createMockRes();
   await handler(req, res);
   expect(res.status).toHaveBeenCalledWith(200);
+  expect(authorizeReviewerRequestMutation).toHaveBeenCalledWith({
+    profileId: undefined,
+    callerSystemId: 'staff-1',
+    requestIds: [REQUEST],
+    suggestionIds: [SUGGESTION],
+  });
+});
+
+test('authorization denial prevents the terminal-transition service', async () => {
+  authorizeReviewerRequestMutation.mockRejectedValueOnce(new ServiceHttpError('foreign', { httpStatus: 403 }));
+  const req = createMockReq({
+    method: 'POST',
+    body: { requestId: REQUEST, suggestionIds: [SUGGESTION], terminalStatus: 'withdrew' },
+  });
+  const res = createMockRes();
+  await handler(req, res);
+  expect(res.status).toHaveBeenCalledWith(403);
+  expect(transitionReviewersTerminal).not.toHaveBeenCalled();
 });
 
 test('whole-request state conflict returns 409 with per-row reason', async () => {

@@ -10,6 +10,7 @@ import {
   sendManualRespondReminder,
   sendManualReviewDueReminder,
 } from '../../lib/services/reviewer-manual-reminder';
+import { authorizeReviewerRequestMutation } from '../../lib/services/reviewer-request-authorization';
 
 jest.mock('../../lib/utils/auth', () => ({ requireAppAccess: jest.fn() }));
 jest.mock('../../lib/dataverse/core/context', () => ({
@@ -19,6 +20,9 @@ jest.mock('../../lib/services/reviewer-manual-reminder', () => ({
   previewManualRespondReminder: jest.fn(),
   sendManualRespondReminder: jest.fn(),
   sendManualReviewDueReminder: jest.fn(),
+}));
+jest.mock('../../lib/services/reviewer-request-authorization', () => ({
+  authorizeReviewerRequestMutation: jest.fn(async () => ({})),
 }));
 
 const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
@@ -62,6 +66,12 @@ test('omitted kind preserves the existing review-due behavior', async () => {
     actingUserSystemId: 'user-1',
   });
   expect(sendManualRespondReminder).not.toHaveBeenCalled();
+  expect(authorizeReviewerRequestMutation).toHaveBeenCalledWith({
+    profileId: undefined,
+    callerSystemId: 'user-1',
+    requestIds: [REQUEST_ID],
+    suggestionIds: [SUGGESTION_ID],
+  });
   expect(res.statusCode).toBe(200);
 });
 
@@ -90,6 +100,7 @@ test('respond preview dispatches read-only rendering and returns the draft', asy
     actingUserSystemId: 'user-1',
   });
   expect(sendManualRespondReminder).not.toHaveBeenCalled();
+  expect(authorizeReviewerRequestMutation).not.toHaveBeenCalled();
   expect(res.statusCode).toBe(200);
   expect(res._data).toEqual({ ok: true, draft: { subject: 'Preview' } });
 });

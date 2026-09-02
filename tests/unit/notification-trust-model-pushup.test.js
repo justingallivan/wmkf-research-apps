@@ -146,6 +146,9 @@ jest.mock('../../lib/external/rate-limit', () => ({
 }));
 jest.mock('../../lib/utils/cron-auth', () => ({ verifyCronSecret: mockVerifyCronSecret }));
 jest.mock('../../lib/utils/auth', () => ({ requireAppAccess: mockRequireAppAccess }));
+jest.mock('../../lib/services/reviewer-request-authorization', () => ({
+  authorizeReviewerRequestMutation: jest.fn(async () => ({})),
+}));
 jest.mock('../../lib/utils/health-checker', () => ({ runHealthChecks: mockRunHealthChecks }));
 jest.mock('../../lib/services/alert-service', () => mockAlertService);
 jest.mock('../../lib/services/alert-recipients', () => mockAlertRecipients);

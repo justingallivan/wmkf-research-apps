@@ -19,8 +19,9 @@ Date: 2026-06-08 (S235)
 Status: IMPLEMENTED 2026-06-08 (S235) on branch `reviewer-slice-g-invite-confidence` —
 Codex design-reviewed (READY WITH NAMED CHANGES), all 4 named changes folded in (see
 "## R."). One implementation refinement beyond the spec: **the gate is scoped to
-`templateType==='invitation'`** (see §3e note) — verified `ReviewerManagePanel` only sends
-post-acceptance types (materials/followup/thankyou), and once a reviewer accepts via the
+`templateType==='invitation'`** (see §3e note) — the current `ReviewerManagePanel` release
+modal sends only post-acceptance `materials` (the shared route retains legacy
+`followup`/`thankyou` compatibility), and once a reviewer accepts via the
 magic link the address is proven, so only first-contact invitations are gated. Implements
 Slice G of `docs/REVIEWER_CONTACT_INVITE_FOLLOWON_PLAN.md` §4. Builds on Slice E (shipped
 S235) and the S234 contact-anchoring slice.
@@ -145,9 +146,10 @@ not in the confirmed set and is refused (`email_unconfirmed`). A HIGH-only batch
 empty allowlist and is unaffected.
 
 **Scope (impl refinement):** the gate fires only for `templateType === 'invitation'`.
-Disconfirming check: `ReviewerManagePanel` (the post-acceptance materials/followup/thankyou
-flow) can only set `templateType ∈ {materials, followup, thankyou}` (its selector at
-`ReviewerManagePanel.js:482`; never `invitation`), so it never trips the gate. Once a
+Disconfirming check: `ReviewerManagePanel`'s current post-acceptance release flow hardcodes
+`templateType:'materials'` (never `invitation`), so it never trips the gate. The shared
+route still recognizes `followup`/`thankyou` for compatibility, without an active generic
+batch-composer entry point. Once a
 reviewer accepts via the magic link sent to the address, the address is proven, so only the
 first-contact invitation is gated — same invitation-only scope as
 `shouldSkipDuplicateInvitation`. `emailConfidence` is still recorded on `email_sent` for all

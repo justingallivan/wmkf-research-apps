@@ -25,10 +25,12 @@
  */
 
 import { requireAppAccess } from '../../../lib/utils/auth';
+import { actorRefFromSession } from '../../../lib/utils/actor-ref';
 import { isGuid } from '../../../lib/utils/guid';
 import { withDalContext } from '../../../lib/dataverse/core/context';
 import { ServiceHttpError } from '../../../lib/services/service-http-error';
 import { regenerateToken } from '../../../lib/services/review-manager/regenerate-token-service';
+import { authorizeReviewerRequestMutation } from '../../../lib/services/reviewer-request-authorization';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -39,7 +41,7 @@ export default async function handler(req, res) {
   const access = await requireAppAccess(req, res, 'review-manager', 'reviewers');
   if (!access) return;
 
-  const actingUserSystemId = access.session?.user?.dynamicsSystemuserId || null;
+  const actingUserSystemId = actorRefFromSession(access.session);
 
   const { suggestionId } = req.body || {};
   if (!suggestionId || typeof suggestionId !== 'string') {
@@ -53,6 +55,11 @@ export default async function handler(req, res) {
 
   return withDalContext('regenerate-token-lookup', async () => {
     try {
+      await authorizeReviewerRequestMutation({
+        profileId: access.profileId,
+        callerSystemId: actingUserSystemId,
+        suggestionIds: [suggestionId],
+      });
       const result = await regenerateToken({ suggestionId, actingUserSystemId });
       return res.status(200).json(result);
     } catch (error) {

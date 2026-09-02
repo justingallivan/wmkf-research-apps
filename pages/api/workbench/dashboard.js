@@ -23,6 +23,7 @@
  */
 
 import { requireAppAccess } from '../../../lib/utils/auth';
+import { actorRefFromSession } from '../../../lib/utils/actor-ref';
 import { withDalContext } from '../../../lib/dataverse/core/context';
 import { ServiceHttpError } from '../../../lib/services/service-http-error';
 import { loadDashboard } from '../../../lib/services/workbench/dashboard-service';
@@ -50,6 +51,7 @@ export default async function handler(req, res) {
       const body = await loadDashboard({
         azureEmail,
         profileId: access.profileId,
+        callerSystemId: actorRefFromSession(access.session),
         cycleCode,
         scope,
         includeSetAside,

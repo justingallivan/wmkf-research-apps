@@ -135,7 +135,7 @@ afterEach(() => {
   window.confirm.mockRestore();
 });
 
-describe('ReviewerManagePanel proposal attachment in materials EmailModal', () => {
+describe('ReviewerManagePanel proposal attachment in the materials release modal', () => {
   test('materials send includes the loaded proposal blobUrl before manual attachments', async () => {
     localStorage.setItem('review_manager_attachments', JSON.stringify({
       materials: [
@@ -159,29 +159,19 @@ describe('ReviewerManagePanel proposal attachment in materials EmailModal', () =
     });
   });
 
-  test.each([
-    ['followup', 'Follow-up'],
-    ['thankyou', 'Thank You'],
-  ])('%s send does not include the proposal attachment', async (templateType, buttonLabel) => {
-    localStorage.setItem('review_manager_attachments', JSON.stringify({
-      materials: [],
-      followup: [{ url: `${MANUAL_URL}?followup`, filename: 'Follow-up.pdf' }],
-      thankyou: [{ url: `${MANUAL_URL}?thankyou`, filename: 'Thank-you.pdf' }],
-    }));
+  test('release modal is materials-only and cannot switch into reminder or thank-you email', async () => {
     renderPanel();
 
     await openReleaseModal();
-    await screen.findByText(/Will attach:/);
-    fireEvent.click(screen.getByRole('button', { name: buttonLabel }));
-    expect(screen.queryByText('Proposal document')).not.toBeInTheDocument();
+    expect(screen.queryByText('Email Type')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Follow-up' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Thank You' })).not.toBeInTheDocument();
 
     await previewAndSend();
 
     expect(sentPayload()).toMatchObject({
-      templateType,
-      attachmentUrls: [`${MANUAL_URL}?${templateType}`],
+      templateType: 'materials',
     });
-    expect(sentPayload().attachmentUrls).not.toContain(PROPOSAL_URL);
   });
 
   test('override picker re-calls load-proposal with the selected fileKey', async () => {
@@ -238,7 +228,9 @@ describe('ReviewerManagePanel release respects checkbox selection', () => {
   }
 
   function recipientsSummary() {
-    return screen.getByText(/reviewer(s)? selected/).closest('p');
+    return screen.getAllByText(/reviewer(s)? selected/)
+      .map((node) => node.closest('p'))
+      .find(Boolean);
   }
 
   test('selecting one of several accepted reviewers releases only that subset', async () => {
@@ -268,22 +260,26 @@ describe('ReviewerManagePanel release respects checkbox selection', () => {
     expect(recipientsSummary().textContent).toMatch(/2 reviewers selected/);
   });
 
-  test('selecting a non-accepted reviewer alongside an accepted one excludes it from release', async () => {
+  test('only accepted reviewers awaiting materials are selectable', async () => {
     renderPanel({ reviewers: [acceptedA, pendingC] });
 
-    fireEvent.click(checkboxForRow('Accepted A'));
-    fireEvent.click(checkboxForRow('Pending C'));
+    expect(checkboxForRow('Accepted A')).toBeInTheDocument();
+    const pendingRow = screen.getByText('Pending C').closest('tr');
+    expect(within(pendingRow).queryByRole('checkbox')).not.toBeInTheDocument();
 
-    const releaseButton = screen.getByRole('button', { name: /release proposal to reviewers \(1\)/i });
-    fireEvent.click(releaseButton);
-    await screen.findByText('Proposal document');
+    expect(screen.queryByRole('button', { name: /send email/i })).not.toBeInTheDocument();
+  });
 
-    expect(recipientsSummary().textContent).toMatch(/1 reviewer selected/);
+  test('when no reviewer is awaiting materials, selection controls and generic email action are absent', () => {
+    renderPanel({ reviewers: [pendingC] });
+
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /send email/i })).not.toBeInTheDocument();
   });
 });
 
 describe('ReviewerManagePanel one-time materials release', () => {
-  test('an already-released reviewer opens Send Email on Follow-up with no Materials option', async () => {
+  test('excludes an already-released reviewer from Materials and exposes no generic email composer', () => {
     const releasedReviewer = {
       ...reviewer,
       reviewStatus: 'under_review',
@@ -292,12 +288,9 @@ describe('ReviewerManagePanel one-time materials release', () => {
     renderPanel({ reviewers: [releasedReviewer] });
 
     const row = screen.getByText(releasedReviewer.name).closest('tr');
-    fireEvent.click(within(row).getByRole('checkbox'));
-    fireEvent.click(screen.getByRole('button', { name: /send email \(1\)/i }));
-
-    expect(await screen.findByRole('heading', { name: /generate followup emails/i })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /^materials$/i })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /^follow-up$/i })).toBeInTheDocument();
+    expect(within(row).queryByRole('checkbox')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /release proposal/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /send email/i })).not.toBeInTheDocument();
   });
 });
 

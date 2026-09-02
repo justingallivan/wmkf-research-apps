@@ -15,6 +15,7 @@ import * as pr from '../../lib/dataverse/adapters/potential-reviewer.js';
 import * as researcher from '../../lib/dataverse/adapters/researcher.js';
 import * as suggestion from '../../lib/dataverse/adapters/reviewer-suggestion.js';
 import { selectFields } from '../../lib/dataverse/core/entity-registry.js';
+import { cycleCodeToOdataFilter } from '../../lib/utils/cycle-code.js';
 
 afterEach(() => jest.restoreAllMocks());
 
@@ -360,5 +361,30 @@ describe('reviewer-suggestion.findAcceptedByPD (characterization)', () => {
     expect(secondOrChain.split(' or ')).toEqual(
       requestIds.slice(25).map((id) => `_wmkf_request_value eq ${id}`),
     );
+  });
+});
+
+describe('reviewer-suggestion.findAcceptedByCycle', () => {
+  test('queries accepted reviewers across the cycle without a lead-PD filter', async () => {
+    const qAll = jest.spyOn(DynamicsService, 'queryAllRecords').mockResolvedValue({
+      records: [{ akoya_requestid: GUID_A, akoya_requestnum: 'REQ-1' }],
+    });
+    const q = jest.spyOn(DynamicsService, 'queryRecords').mockResolvedValue({ records: [] });
+
+    await suggestion.findAcceptedByCycle('D26');
+
+    expect(qAll.mock.calls[0][1].select).toBe(PD_ACCEPTED_REQUEST_SELECT);
+    expect(qAll.mock.calls[0][1].filter).toBe(cycleCodeToOdataFilter('D26', 'wmkf_meetingdate'));
+    expect(qAll.mock.calls[0][1].filter).not.toContain('_wmkf_programdirector_value');
+    expect(q.mock.calls[0][1].filter).toBe(
+      `(_wmkf_request_value eq ${GUID_A}) and wmkf_selected eq true and wmkf_accepted eq true and ` +
+        '(wmkf_applicantdisposition eq null or wmkf_applicantdisposition ne 100000001)',
+    );
+  });
+
+  test('missing cycle returns empty without querying all request history', async () => {
+    const qAll = jest.spyOn(DynamicsService, 'queryAllRecords').mockResolvedValue({ records: [] });
+    await expect(suggestion.findAcceptedByCycle()).resolves.toEqual({ suggestions: [], requestById: {} });
+    expect(qAll).not.toHaveBeenCalled();
   });
 });

@@ -66,4 +66,23 @@ production reads then failed closed because Preview omitted
 and re-inspected at its exact prior deployment. No Entra URI or application data
 was changed.
 
+**VERIFIED 2026-09-01:** for Workbench reviewer-follow-up UAT, the exact branch
+alias callback
+`https://wmkfresearchapps-git-codex-wor-464bcd-justin-gallivans-projects.vercel.app/api/auth/callback/azure-ad`
+was added to Entra application `a652a292-2574-434c-ae6f-aa01f61d82ad` with Azure
+CLI after preserving and re-reading all four prior redirect URIs. Direct branch
+sign-in then succeeded and the page displayed its Preview read-only gate.
+
+**AUTHORIZED + VERIFIED 2026-09-01:** the owner explicitly authorized
+branch-scoped `DATAVERSE_ALLOW_PROD_READS=yes` for
+`codex/workbench-reviewer-follow-up`. It was stored as a Preview Config value and
+redeployed as `dpl_2EKZYPN21mRTcUMBHJYrj4sb2AD5`. Signed-in D26 smoke loaded 10
+assigned requests, 7 needing attention, 20 active reviewers, and 5 received
+reviews. Search reduced Johns Hopkins to one request; All requests showed 10;
+returning to Needs attention showed 7. The read-only banner remained present,
+and campaign settings, email templates, due-date extension, notes-edit, reviewer
+selection, and action controls remained absent. No Preview write acknowledgement
+or rehearsal grant was added. Remove both the exact branch callback and the
+branch-scoped read variable when this UAT branch is retired.
+
 Related: [[project-vercel-sensitive-env-pull-empty]], [[project-dev-environment]], [[project-local-dev-auth-setup]], [[project-branded-domains]].

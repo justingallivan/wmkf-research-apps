@@ -11,10 +11,12 @@
 const updateLifecycle = jest.fn(async () => {});
 const findByRequest = jest.fn();
 const findAcceptedByPD = jest.fn();
+const findAcceptedByCycle = jest.fn();
 jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
   updateLifecycle: (...a) => updateLifecycle(...a),
   findByRequest: (...a) => findByRequest(...a),
   findAcceptedByPD: (...a) => findAcceptedByPD(...a),
+  findAcceptedByCycle: (...a) => findAcceptedByCycle(...a),
   RESPONSE_TYPE_BY_VALUE: { 100000000: 'accepted' },
 }));
 const getRequestById = jest.fn();
@@ -59,6 +61,7 @@ beforeAll(async () => {
 beforeEach(() => {
   jest.clearAllMocks();
   updateLifecycle.mockImplementation(async () => {});
+  findAcceptedByCycle.mockResolvedValue({ suggestions: [], requestById: {} });
 });
 
 describe('patchReviewers', () => {
@@ -115,6 +118,22 @@ describe('getReviewers', () => {
     resolvePD.mockResolvedValueOnce(null);
     const out = await getReviewers({ azureEmail: 'someone@wmkeck.org' });
     expect(out).toEqual({ success: true, proposals: [], totalReviewers: 0, programDirector: null });
+  });
+
+  test('all scope reads accepted reviewers across the specified cycle without resolving the caller as PD', async () => {
+    const out = await getReviewers({ scope: 'all', cycleCode: 'D26', azureEmail: 'staff@wmkeck.org' });
+
+    expect(findAcceptedByCycle).toHaveBeenCalledWith('D26');
+    expect(findAcceptedByPD).not.toHaveBeenCalled();
+    expect(resolvePD).not.toHaveBeenCalled();
+    expect(out).toEqual({ success: true, proposals: [], totalReviewers: 0 });
+  });
+
+  test('all scope requires a cycle and never falls through to an unbounded query', async () => {
+    await expect(getReviewers({ scope: 'all', azureEmail: 'staff@wmkeck.org' }))
+      .rejects.toMatchObject({ httpStatus: 400, message: 'cycleCode is required when scope=all' });
+    expect(findAcceptedByCycle).not.toHaveBeenCalled();
+    expect(resolvePD).not.toHaveBeenCalled();
   });
 
   test('proposalId scope groups accepted suggestions into the proposal DTO with liveQuestions', async () => {

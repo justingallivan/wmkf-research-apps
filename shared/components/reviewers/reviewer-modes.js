@@ -2,7 +2,7 @@
  * reviewer-modes — pure (React-free) logic for the reviewer management surface.
  *
  * Extracted so the status pipeline, the sub-tab mode→status bucketing, the
- * state-aware default landing, and the soft canManage gate can be unit-tested
+ * state-aware default landing, and the fail-closed canManage display logic can be unit-tested
  * without rendering any component. Imported by ReviewerManagePanel,
  * SubTabBadges, ReviewersTab, and the Workbench shell. See
  * docs/REQUEST_WORKBENCH_BUILD_PLAN.md § Phase 2.
@@ -84,14 +84,12 @@ export function computeDefaultSub(reviewers) {
 }
 
 /**
- * Soft UI gate (S207 decision): the lead PD and superusers see the reviewer-
- * management write controls. Cosmetic only — the reused server APIs stay
- * org-open — so it FAILS OPEN: hides controls only when we can positively tell
- * the viewer is a non-superuser, identity-resolved, non-PD staffer. A superuser,
- * an unresolved viewer systemuser id, or an unresolved request PD all stay
- * permissive (Codex S209 catch — the prior gate wrongly hid controls from
- * superusers and identity-unresolved staff).
+ * Fail-closed display gate for request-owner controls: lead PD or superuser.
+ * Mutation routes independently enforce server authorization and never trust
+ * this client-side value. GUID case does not affect the comparison.
  */
 export function computeCanManage({ isSuperuser = false, pdId = null, myUserId = null } = {}) {
-  return Boolean(isSuperuser || !pdId || !myUserId || myUserId === pdId);
+  if (isSuperuser) return true;
+  if (!pdId || !myUserId) return false;
+  return String(myUserId).toLowerCase() === String(pdId).toLowerCase();
 }

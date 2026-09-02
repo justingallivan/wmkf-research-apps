@@ -108,3 +108,12 @@ reflect the 2026-08-26 snapshot and are superseded on these points:
 The remaining cross-cutting finding — PD-attributed mail triggered by other
 staff (#1, #7, #8, #11, #12) — is a design axis for the reviewer slice of the
 VIP/digest plan, not a hygiene fix, and stays open.
+
+## Update 2026-09-01 — generic post-acceptance composer retired
+
+The table remains the dated transport-capability snapshot, but the staff UI no
+longer exposes #3 or #4 through `ReviewerManagePanel`. Track Reviewers now uses
+one accepted-reviewer-only materials release (#2), the dedicated row-level
+review-due reminder route (#8), and the fire-once thank-you sweep (#9). The
+shared `send-emails` route and four stored template records retain
+`followup`/`thankyou` compatibility; they are not current panel actions.

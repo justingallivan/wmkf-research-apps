@@ -67,8 +67,12 @@ test('renders submitted reviews with decoded ratings + download link; pending la
   // above the cards, and the two lists are disjoint (keyed on reviewReceivedAt).
   expect(screen.getByText('Dr. Submitted')).toBeInTheDocument();
   expect(screen.getByText('Dr. NoFile')).toBeInTheDocument();
-  expect(screen.getByText(/Outstanding \(1\)/)).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Outstanding reviews (1)' })).toBeInTheDocument();
   expect(screen.getByText('Dr. Pending')).toBeInTheDocument();
+  const followUpHeader = screen.getByText('Follow up').parentElement;
+  const pendingRow = screen.getByText('Dr. Pending').parentElement.parentElement;
+  expect(followUpHeader).toHaveClass('lg:grid-cols-[minmax(0,1fr)_16rem_20rem]');
+  expect(pendingRow).toHaveClass('lg:grid-cols-[minmax(0,1fr)_16rem_20rem]');
 
   // Decoded ratings (not raw numbers).
   expect(screen.getByText('Medium risk (parts may succeed, others may fail)')).toBeInTheDocument();
@@ -168,12 +172,39 @@ test.each([
     });
 
   render(<ReviewsTab requestId="req1" />);
-  fireEvent.click(await screen.findByRole('button', { name: 'Send reminder now' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Send reminder' }));
 
   expect(await screen.findByText(copy)).toBeInTheDocument();
   expect(fetch).toHaveBeenCalledTimes(2);
   expect(screen.getByText('Dr. Pending')).toBeInTheDocument();
   expect(screen.queryByText(reason, { exact: true })).not.toBeInTheDocument();
+});
+
+test('separates a trailing reviewer email from the affiliation identity line', async () => {
+  fetch.mockResolvedValue({
+    ok: true,
+    json: async () => ({
+      success: true,
+      proposals: [{
+        proposalId: 'req1',
+        reviewers: [{
+          suggestionId: 'g2',
+          name: 'Dr. Pending',
+          reviewerAffiliation: 'Department of Biology, Lund University. Electronic address: pending@lund.se.',
+          email: 'pending@lund.se',
+          reviewStatus: 'materials_sent',
+          materialsSentAt: '2026-08-01T00:00:00Z',
+          reviewDueReminderEligibility: 'eligible',
+        }],
+      }],
+    }),
+  });
+
+  render(<ReviewsTab requestId="req1" />);
+
+  expect(await screen.findByText('Department of Biology, Lund University')).toBeInTheDocument();
+  expect(screen.getAllByText('pending@lund.se')).toHaveLength(1);
+  expect(screen.queryByText(/Electronic address/i)).not.toBeInTheDocument();
 });
 
 test.each([
@@ -203,7 +234,7 @@ test.each([
   });
 
   render(<ReviewsTab requestId="req1" />);
-  const button = await screen.findByRole('button', { name: 'Send reminder now' });
+  const button = await screen.findByRole('button', { name: 'Send reminder' });
   expect(button).toBeDisabled();
   expect(button).toHaveAttribute('title', expect.stringMatching(title));
 });
@@ -404,7 +435,7 @@ test('terminal reviewers are excluded from Outstanding even without reviewReceiv
 
   render(<ReviewsTab requestId="req1" />);
 
-  expect(await screen.findByText(/Outstanding \(1\)/)).toBeInTheDocument();
+  expect(await screen.findByRole('heading', { name: 'Outstanding reviews (1)' })).toBeInTheDocument();
   expect(screen.getByText('Dr. Pending')).toBeInTheDocument();
   expect(screen.queryByText('Dr. Withdrew')).not.toBeInTheDocument();
   expect(screen.queryByText('Dr. Released')).not.toBeInTheDocument();
@@ -482,4 +513,57 @@ test('opens the dedicated full manual-entry rescue from Outstanding and refreshe
     },
     setVersion: 'v1',
   });
+});
+
+test('read-only Preview disables every Reviews mutation while preserving read and export controls', async () => {
+  const proposal = {
+    proposalId: 'req1',
+    reviewers: [
+      {
+        suggestionId: 'pending',
+        name: 'Dr. Pending',
+        reviewStatus: 'materials_sent',
+        materialsSentAt: '2026-08-01T00:00:00Z',
+        reviewDueReminderEligibility: 'eligible',
+      },
+      {
+        suggestionId: 'submitted',
+        name: 'Dr. Submitted',
+        reviewReceivedAt: '2026-08-20T00:00:00Z',
+        answers: [],
+      },
+    ],
+    reviewSynthesis: null,
+    reviewSynthesisState: {
+      current: false,
+      status: 'not_started',
+      ready: true,
+      canRunManually: true,
+      submittedCount: 1,
+      blockingCount: 0,
+    },
+  };
+  fetch.mockResolvedValue({
+    ok: true,
+    json: async () => ({ success: true, proposals: [proposal] }),
+  });
+
+  render(<ReviewsTab requestId="req1" previewReadOnly />);
+
+  const reminder = await screen.findByRole('button', { name: 'Send reminder' });
+  const manualEntry = screen.getByRole('button', { name: 'Enter review manually' });
+  const synthesis = screen.getByRole('button', { name: 'Generate synthesis' });
+  expect(reminder).toBeDisabled();
+  expect(reminder).toHaveAttribute('title', 'Reminders are disabled in read-only Preview');
+  expect(manualEntry).toBeDisabled();
+  expect(manualEntry).toHaveAttribute('title', 'Manual review entry is disabled in read-only Preview');
+  expect(synthesis).toBeDisabled();
+  expect(synthesis).toHaveAttribute('title', 'Synthesis generation is disabled in read-only Preview');
+  expect(screen.getByRole('button', { name: 'Word (.docx)' })).toBeEnabled();
+
+  fireEvent.click(reminder);
+  fireEvent.click(manualEntry);
+  fireEvent.click(synthesis);
+  expect(fetch).toHaveBeenCalledTimes(1);
+  expect(screen.queryByText(/Recording a complete review/i)).not.toBeInTheDocument();
 });

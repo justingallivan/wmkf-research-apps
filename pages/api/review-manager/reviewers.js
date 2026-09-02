@@ -7,7 +7,9 @@
  *   Query overrides:
  *     ?proposalId=<guid>     specific request (collaborator override; bypasses PD filter)
  *     ?requestNumber=<num>   same, by request number
- *     ?cycleCode=Jxx|Dxx     narrow within PD scope
+ *     ?cycleCode=Jxx|Dxx     narrow within PD scope; required for all scope
+ *     ?scope=my|all          my (default) = requests where the caller is lead PD;
+ *                            all = every request in the specified cycle
  *     ?status=<reviewStatus> post-filter (e.g. 'materials_sent', 'complete')
  *
  * PATCH /api/review-manager/reviewers
@@ -18,11 +20,9 @@
  * are the legacy string codes — the suggestion adapter translates them to the
  * picklist optionset on write.
  *
- * Data boundary: staff-shared. The PD-default scope is a listing convenience,
- * not an auth boundary — any `review-manager` user can target a specific
- * suggestion via `proposalId`/`requestNumber` and update its lifecycle.
- * Reviewer suggestions are foundation-owned operational data, not
- * user-private, hence the staff-shared trusted DAL context.
+ * Data boundary: reads remain staff-shared. PATCH resolves every suggestion
+ * to its request and permits only the lead PD or a superuser. Batch ownership
+ * is verified in full before the first lifecycle write.
  *
  * Thin route shell (Route→Service Consolidation Plan, Stage 2): auth guard
  * (BEFORE method dispatch — preserved from the original route) → one
@@ -34,11 +34,13 @@
  */
 
 import { requireAppAccess } from '../../../lib/utils/auth';
+import { actorRefFromSession } from '../../../lib/utils/actor-ref';
 import { isGuid, allGuids } from '../../../lib/utils/guid';
 import { withDalContext } from '../../../lib/dataverse/core/context';
 import { ServiceHttpError } from '../../../lib/services/service-http-error';
 import { getReviewers, patchReviewers } from '../../../lib/services/review-manager/reviewers-service';
 import { withRequestCorrelation, mintCorrelationId } from '../../../lib/observability/request-correlation';
+import { authorizeReviewerRequestMutation } from '../../../lib/services/reviewer-request-authorization';
 
 export default async function handler(req, res) {
   return withRequestCorrelation(
@@ -61,6 +63,7 @@ async function handleWithCorrelation(req, res) {
 async function handleGet(req, res, access) {
   try {
     const { proposalId, requestNumber, cycleCode, status } = req.query;
+    const scope = req.query.scope === 'all' ? 'all' : 'my';
 
     // GUID-validate proposalId before it becomes a Dataverse selector
     // (fetchRequestByIdOrNumber → getRecord). requestNumber is an escaped string lookup.
@@ -73,6 +76,7 @@ async function handleGet(req, res, access) {
       requestNumber,
       cycleCode,
       status,
+      scope,
       azureEmail: access.session?.user?.azureEmail,
     });
     return res.status(200).json(result);
@@ -90,7 +94,7 @@ async function handleGet(req, res, access) {
 }
 
 async function handlePatch(req, res, access) {
-  const actingUserSystemId = access.session?.user?.dynamicsSystemuserId || null;
+  const actingUserSystemId = actorRefFromSession(access.session);
   try {
     const {
       suggestionId,
@@ -110,6 +114,11 @@ async function handlePatch(req, res, access) {
       if (!allGuids(suggestionIds)) {
         return res.status(400).json({ error: 'suggestionIds must all be valid GUIDs' });
       }
+      await authorizeReviewerRequestMutation({
+        profileId: access.profileId,
+        callerSystemId: actingUserSystemId,
+        suggestionIds,
+      });
       const result = await patchReviewers({ suggestionIds, reviewStatus, actingUserSystemId });
       return res.status(200).json(result);
     }
@@ -130,6 +139,11 @@ async function handlePatch(req, res, access) {
       return res.status(400).json({ error: 'No supported fields to update' });
     }
 
+    await authorizeReviewerRequestMutation({
+      profileId: access.profileId,
+      callerSystemId: actingUserSystemId,
+      suggestionIds: [suggestionId],
+    });
     const result = await patchReviewers({ suggestionId, lifecycle, actingUserSystemId });
     return res.status(200).json(result);
   } catch (error) {

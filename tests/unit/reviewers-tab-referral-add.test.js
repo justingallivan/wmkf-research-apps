@@ -19,7 +19,12 @@ import { render, screen, waitFor, act } from '@testing-library/react';
 
 jest.mock('../../shared/components/reviewers/ReviewerManagePanel', () => function ManagePanelStub(props) {
   return (
-    <div data-testid="manage-panel" data-actions={JSON.stringify(props.referralActions || {})}>
+    <div
+      data-testid="manage-panel"
+      data-actions={JSON.stringify(props.referralActions || {})}
+      data-can-manage={String(props.canManage)}
+      data-preview-read-only={String(props.previewReadOnly)}
+    >
       {(props.declineReferrals || []).map((r) => (
         <div key={r.referralId || r.suggestionId}>
           {!r.legacy && (
@@ -292,4 +297,29 @@ test.each(['promotion_required', 'restore_required', 'already_handled'])('typed 
   await waitFor(() => expect(actionsOf()['s-a:0']?.status).toBe('remedy'));
   expect(actionsOf()['s-a:0']).toMatchObject({ outcome, suggestionId: 's-existing' });
   expect(mockPush).not.toHaveBeenCalled();
+});
+
+test('read-only Preview disables settings, passes a read-only panel contract, and guards referral writes', async () => {
+  global.fetch = baseFetch(() => Promise.reject(new Error('manual add should not run')));
+
+  render(<ReviewersTab requestId={REQ} previewReadOnly />);
+  await waitFor(() => expect(screen.getByTestId('manage-panel')).toBeInTheDocument());
+
+  expect(screen.getByRole('button', { name: /Campaign settings/i })).toBeDisabled();
+  expect(screen.getByRole('button', { name: /Campaign settings/i }))
+    .toHaveAttribute('title', 'Campaign settings are disabled in read-only Preview');
+  expect(screen.getByRole('button', { name: /Email templates/i })).toBeDisabled();
+  expect(screen.getByRole('button', { name: /Email templates/i }))
+    .toHaveAttribute('title', 'Email templates are disabled in read-only Preview');
+  expect(screen.getByTestId('manage-panel')).toHaveAttribute('data-can-manage', 'false');
+  expect(screen.getByTestId('manage-panel')).toHaveAttribute('data-preview-read-only', 'true');
+  expect(screen.getByText('Manage in Profile →')).toHaveAttribute('aria-disabled', 'true');
+  expect(screen.queryByRole('link', { name: 'Manage in Profile →' })).not.toBeInTheDocument();
+
+  await waitFor(() => expect(screen.getByTestId('add-s-a:0')).toBeInTheDocument());
+  await act(async () => {
+    screen.getByTestId('add-s-a:0').click();
+    screen.getByTestId('dismiss-s-a:0').click();
+  });
+  expect(global.fetch.mock.calls.some(([, options]) => ['POST', 'PATCH'].includes(options?.method))).toBe(false);
 });

@@ -23,11 +23,13 @@
  * when the relevant marker is already set IS allowed — see that module's
  * header for the full semantics.
  *
- * Data boundary: staff-shared, matching every other `/api/review-manager/*`
- * route — any `review-manager` user can nudge any suggestion's reviewer.
+ * Data boundary: preview remains read-only and staff-shared. Send resolves the
+ * suggestion/request ownership server-side and permits only the lead PD or a
+ * superuser before any marker, token, or email side effect.
  */
 
 import { requireAppAccess } from '../../../lib/utils/auth';
+import { actorRefFromSession } from '../../../lib/utils/actor-ref';
 import { isGuid } from '../../../lib/utils/guid';
 import { withDalContext } from '../../../lib/dataverse/core/context';
 import {
@@ -35,6 +37,8 @@ import {
   sendManualRespondReminder,
   sendManualReviewDueReminder,
 } from '../../../lib/services/reviewer-manual-reminder';
+import { ServiceHttpError } from '../../../lib/services/service-http-error';
+import { authorizeReviewerRequestMutation } from '../../../lib/services/reviewer-request-authorization';
 
 const REASON_STATUS = {
   misconfigured: 502,
@@ -66,7 +70,7 @@ export default async function handler(req, res) {
   const access = await requireAppAccess(req, res, 'review-manager', 'reviewers');
   if (!access) return;
 
-  const actingUserSystemId = access.session?.user?.dynamicsSystemuserId || null;
+  const actingUserSystemId = actorRefFromSession(access.session);
 
   try {
     const { requestId, suggestionId } = req.body || {};
@@ -108,9 +112,17 @@ export default async function handler(req, res) {
         ? sendManualRespondReminder
         : sendManualReviewDueReminder;
     const reviewed = action === 'send' && kind === 'respond' ? req.body?.reviewed : undefined;
-    const result = await withDalContext('review-manager-send-review-reminder', () =>
-      reminderAction({ requestId, suggestionId, actingUserSystemId, ...(reviewed === undefined ? {} : { reviewed }) }),
-    );
+    const result = await withDalContext('review-manager-send-review-reminder', async () => {
+      if (action === 'send') {
+        await authorizeReviewerRequestMutation({
+          profileId: access.profileId,
+          callerSystemId: actingUserSystemId,
+          requestIds: [requestId],
+          suggestionIds: [suggestionId],
+        });
+      }
+      return reminderAction({ requestId, suggestionId, actingUserSystemId, ...(reviewed === undefined ? {} : { reviewed }) });
+    });
 
     if (!result.ok) {
       const status = REASON_STATUS[result.reason] || 500;
@@ -118,6 +130,9 @@ export default async function handler(req, res) {
     }
     return res.status(200).json(result.draft ? { ok: true, draft: result.draft } : { ok: true });
   } catch (error) {
+    if (error instanceof ServiceHttpError) {
+      return res.status(error.httpStatus).json(error.body ?? { ok: false, reason: error.message });
+    }
     console.error('[review-manager send-review-reminder] error:', error);
     return res.status(500).json({ ok: false, reason: 'server_error' });
   }

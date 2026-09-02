@@ -94,14 +94,20 @@ The default permissions should work. If needed:
 
 ### 1.5 Add Additional Redirect URIs
 
-For Vercel preview deployments, add additional redirect URIs:
+For authenticated Vercel preview testing, use an exact registered hostname:
 1. Go to **Authentication** in the left menu
 2. Under **Web** → **Redirect URIs**, add:
    - `https://your-app.vercel.app/api/auth/callback/azure-ad` (production)
-   - `https://your-app-git-*.vercel.app/api/auth/callback/azure-ad` (preview deployments)
+   - `https://wmkfresearchapps-preview.vercel.app/api/auth/callback/azure-ad` (registered stable Preview smoke alias)
    - `http://localhost:3000/api/auth/callback/azure-ad` (local development)
 
-**Note:** For preview deployments, you may need to use a wildcard pattern or add specific preview URLs as needed.
+**Preview rule:** Entra Web redirect URIs must match exactly; do not rely on a
+wildcard branch URL. Prefer temporarily pointing the registered stable Preview
+alias at an attested immutable deployment, then restore its previous target. If
+the stable alias cannot serve the test, add the exact branch-alias callback for
+the bounded UAT window and remove it when that branch is retired. See
+`.claude-memory/project-vercel-cli-deploy-preview-auth.md` for the attestation and
+rollback checklist.
 
 ---
 

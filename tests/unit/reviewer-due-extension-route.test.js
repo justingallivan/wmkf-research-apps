@@ -12,6 +12,9 @@ jest.mock('../../lib/services/reviewer-due-extension', () => ({
   saveReviewerDueDateExtension: jest.fn(),
   retryReviewerDueDateNotification: jest.fn(),
 }));
+jest.mock('../../lib/services/reviewer-request-authorization', () => ({
+  authorizeReviewerRequestMutation: jest.fn(async () => ({})),
+}));
 
 import handler from '../../pages/api/review-manager/review-due-extension';
 import { requireAppAccess } from '../../lib/utils/auth';
@@ -20,6 +23,7 @@ import {
   retryReviewerDueDateNotification,
   saveReviewerDueDateExtension,
 } from '../../lib/services/reviewer-due-extension';
+import { authorizeReviewerRequestMutation } from '../../lib/services/reviewer-request-authorization';
 
 const SUGGESTION_ID = '11111111-1111-4111-8111-111111111111';
 const ACTOR_ID = '22222222-2222-4222-8222-222222222222';
@@ -63,6 +67,11 @@ test('save validates the selector and dispatches inside the review-manager DAL c
     suggestionId: SUGGESTION_ID,
     reviewDueDateOverride: '2099-09-15',
     actingUserSystemId: ACTOR_ID,
+  });
+  expect(authorizeReviewerRequestMutation).toHaveBeenCalledWith({
+    profileId: 7,
+    callerSystemId: ACTOR_ID,
+    suggestionIds: [SUGGESTION_ID],
   });
   expect(res.statusCode).toBe(200);
 });

@@ -9,10 +9,13 @@
  */
 
 import { requireAppAccess } from '../../../lib/utils/auth';
+import { actorRefFromSession } from '../../../lib/utils/actor-ref';
 import { isGuid } from '../../../lib/utils/guid';
 import { withDalContext } from '../../../lib/dataverse/core/context';
 import { revoke } from '../../../lib/external/token-lifecycle';
 import ReviewDraftService from '../../../lib/services/review-draft-service';
+import { ServiceHttpError } from '../../../lib/services/service-http-error';
+import { authorizeReviewerRequestMutation } from '../../../lib/services/reviewer-request-authorization';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -23,7 +26,7 @@ export default async function handler(req, res) {
   const access = await requireAppAccess(req, res, 'review-manager', 'reviewers');
   if (!access) return;
 
-  const actingUserSystemId = access.session?.user?.dynamicsSystemuserId || null;
+  const actingUserSystemId = actorRefFromSession(access.session);
 
   try {
     const { suggestionId } = req.body || {};
@@ -43,7 +46,14 @@ export default async function handler(req, res) {
       // Decision 3 ("services assume a trusted DAL context already exists;
       // establishment stays at the route"). Label byte-preserved from the
       // wrap that used to live inside revoke() itself.
-      await withDalContext('external-token-revoke', () => revoke(suggestionId, { actingUserSystemId }));
+      await withDalContext('external-token-revoke', async () => {
+        await authorizeReviewerRequestMutation({
+          profileId: access.profileId,
+          callerSystemId: actingUserSystemId,
+          suggestionIds: [suggestionId],
+        });
+        return revoke(suggestionId, { actingUserSystemId });
+      });
     } catch (e) {
       if (/update.*failed.*404/i.test(e.message || '')) {
         return res.status(404).json({ ok: false, reason: 'not_found' });
@@ -74,6 +84,9 @@ export default async function handler(req, res) {
 
     return res.status(200).json({ ok: true });
   } catch (error) {
+    if (error instanceof ServiceHttpError) {
+      return res.status(error.httpStatus).json(error.body ?? { error: error.message });
+    }
     console.error('[review-manager revoke-token] error:', error);
     return res.status(500).json({ ok: false, reason: 'server_error' });
   }

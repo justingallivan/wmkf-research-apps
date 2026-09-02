@@ -226,8 +226,10 @@ low-confidence address — enforced server-side.
   batch boolean would let a row that became LOW after preview ride on another row's
   confirmation). The computed confidence is also recorded on each `email_sent` outcome for audit.
 - **Scope:** the gate fires only for `templateType==='invitation'` (first contact). Once a
-  reviewer accepts via the magic link, the address is proven, so post-acceptance sends
-  (materials/followup/thankyou) are not re-gated.
+  reviewer accepts via the magic link, the address is proven, so the current post-acceptance
+  materials release is not re-gated. The shared route retains legacy
+  `followup`/`thankyou` compatibility, but the generic batch UI was retired 2026-09-01 in
+  favor of the dedicated reminder action and automated thank-you sweep.
 
 ### 3.2 Prod validation
 
@@ -265,7 +267,7 @@ a LOW recipient, and **omit** `confirmedLowConfidenceIds` (or send an empty arra
 **T3.6 — Post-acceptance is not re-gated.**
 *Precondition:* a reviewer who has accepted (so `wmkf_accepted=true`) but whose stored address is
 `manual`/LOW.
-*Steps:* send a `materials` (or `followup`/`thankyou`) email from the Review Manager panel.
+*Steps:* release `materials` from the Track Reviewers panel.
 *Expected:* it sends with **no** confidence gate (gate is invitation-only).
 
 ---

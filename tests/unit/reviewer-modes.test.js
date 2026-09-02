@@ -147,7 +147,7 @@ describe('computeDefaultSub (state-aware landing)', () => {
   });
 });
 
-describe('computeCanManage (soft gate, fails open)', () => {
+describe('computeCanManage (authoritative-gate mirror, fails closed)', () => {
   const PD = 'pd-guid';
   const ME = 'me-guid';
 
@@ -157,16 +157,19 @@ describe('computeCanManage (soft gate, fails open)', () => {
   it('lead PD manages their own request', () => {
     expect(computeCanManage({ isSuperuser: false, pdId: PD, myUserId: PD })).toBe(true);
   });
-  it('fails open when the request PD is unresolved', () => {
-    expect(computeCanManage({ isSuperuser: false, pdId: null, myUserId: ME })).toBe(true);
+  it('fails closed when the request PD is unresolved', () => {
+    expect(computeCanManage({ isSuperuser: false, pdId: null, myUserId: ME })).toBe(false);
   });
-  it('fails open when the viewer systemuser id is unresolved', () => {
-    expect(computeCanManage({ isSuperuser: false, pdId: PD, myUserId: null })).toBe(true);
+  it('fails closed when the viewer systemuser id is unresolved', () => {
+    expect(computeCanManage({ isSuperuser: false, pdId: PD, myUserId: null })).toBe(false);
   });
   it('hides controls only for a resolved non-superuser non-PD viewer', () => {
     expect(computeCanManage({ isSuperuser: false, pdId: PD, myUserId: ME })).toBe(false);
   });
-  it('defaults to permissive with no args', () => {
-    expect(computeCanManage()).toBe(true);
+  it('compares Dynamics GUIDs case-insensitively', () => {
+    expect(computeCanManage({ isSuperuser: false, pdId: 'PD-GUID', myUserId: 'pd-guid' })).toBe(true);
+  });
+  it('defaults to denied with no args', () => {
+    expect(computeCanManage()).toBe(false);
   });
 });

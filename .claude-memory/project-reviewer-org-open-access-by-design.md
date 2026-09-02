@@ -1,29 +1,37 @@
 ---
 name: project-reviewer-org-open-access-by-design
-description: "Owner principle (2026-08-15): reviewer and document operations are org-open by design — app-level access is the correct and only meaningful boundary because Dataverse has no technical ownership of requests or data to scope against. Covers reviewer merge (T1) and staff-wide cross-request document reads (D4). Do not re-flag app-level-auth-on-a-record-scoped-op as a security gap for these surfaces."
+description: "Owner principle for global reviewer merge and staff-wide document reads: org-open by design. Narrow exception decided and branch-built 2026-09-02: request-bound Reviewer Follow-up mutations are lead-PD/superuser-only at the server boundary."
 metadata:
   type: project
   status: active
   scope: security
-  last_verified: 2026-08-15 (S428) — owner decisions on T1 (merge) and D4 (document reads)
+  last_verified: 2026-09-02 — T1 merge and D4 reads remain org-open; request-bound mutation exception built and test-verified on implementation branch
 ---
 
 ## Recall Rule
 
-Read this before flagging "app-level guard on a request-scoped / record-scoped
-operation" as a security finding on **reviewer or document** surfaces (merge,
-review-file/proposal/document download, and similar). The owner has settled the
-question: it is **by design**, not a gap.
+Read this before flagging an app-level guard on reviewer or document surfaces.
+The org-open decision remains settled for the global reviewer-person merge and
+staff-wide document reads. Do not generalize it to request-bound Reviewer
+Follow-up mutations: the owner selected a lead-PD/superuser server boundary for
+those actions on 2026-09-02. That boundary is implemented on
+`codex/workbench-reviewer-follow-up`; Production remains unchanged until
+deliberate promotion.
 
 ## The principle
 
-**There is no technical ownership of requests or data in Dataverse** (no
-"this PD owns this request" field to authorize against). Therefore a
-request-scoped or PD-scoped fence has nothing real to key on, and **app-level
-access (`requireAppAccess`) is the correct and only meaningful boundary** for
-reviewer and document operations. Any per-record data-eligibility predicate that
-exists (e.g. the merge block predicate) is a *safety* mechanism, not an
-authorization gate — and that is intended.
+The 2026-08-15 decision established app-level access (`requireAppAccess`) as the
+correct boundary for operations without a meaningful single-request owner: the
+global reviewer-person merge and staff-wide document reads. The merge's
+per-record data-eligibility predicate is a safety mechanism, not authorization.
+
+That rationale is not universal. An `akoya_request` has a lead Program Director
+lookup (`_wmkf_programdirector_value`) that can authorize request-bound follow-up
+mutations. On 2026-09-02 the owner selected that boundary: lead PD or superuser
+may mutate; other authorized staff retain read access only. The server hardening
+is implemented and automated-test verified on the branch documented by
+`docs/REVIEWER_FOLLOW_UP_ORG_CYCLE_VISIBILITY_PLAN.md`. It is not Production-live
+until deliberate promotion.
 
 ## Settled instances
 
@@ -38,13 +46,20 @@ authorization gate — and that is intended.
   reviewer's submitted review file. Accepted by-design; `blob-proxy.js:11` already
   documents staff-wide read as intended. Recorded in
   `docs/audits/fable-security-audit-2026-08-14.md` (finding D4).
+- **Request-bound Reviewer Follow-up mutations — implemented exception (owner,
+  2026-09-02):** server-authoritative lead-PD/superuser writes are built and
+  test-verified on the implementation branch; other authorized staff remain
+  organization-wide readers. This does not alter T1 or D4.
 
 ## How to apply
 
 - Do NOT re-open T1/D4-shaped findings as gaps; cite this decision instead.
+- Do not use the older general "reviewer APIs stay org-open" wording to block or
+  weaken the request-bound mutation hardening.
 - The boundary that DOES matter is `requireAppAccess` itself and `is_active`
   session revocation — audit those, not the absence of a per-record fence.
-- This principle is scoped to reviewer/document reads under trusted staff access.
-  It is NOT license to accept identity-from-request-input, fail-open guards, or
-  missing app-access — those remain real findings. See
+- For request-bound Reviewer Follow-up mutations, also audit the server-resolved
+  target request, lead-PD/superuser gate, and fail-closed actor identity.
+- This principle is NOT license to accept identity-from-request-input, fail-open
+  guards, or missing app access — those remain real findings. See
   [[project-app-access-control]].

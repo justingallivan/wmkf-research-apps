@@ -23,8 +23,8 @@
  * Props:
  *   - requestId : the akoya_request GUID
  *   - context   : light request context from resolve-request (title, etc.)
- *   - canManage : soft UI gate passed through to the panel (cosmetic; the
- *                 reused server APIs stay org-open)
+ *   - canManage : UI display gate for request-owner controls. Mutation
+ *                 routes independently enforce their applicable server policy.
  *   - settings  : { signature } for the email templates
  */
 
@@ -56,7 +56,13 @@ const SUB_TAB_KEYS = new Set(SUB_TABS.map((t) => t.key));
 // future, without version-plumbing the send stream and roster DTO.
 const OVERLAY_RECONCILE_MS = 4000;
 
-export default function ReviewersTab({ requestId, context, canManage = true, settings = {} }) {
+export default function ReviewersTab({
+  requestId,
+  context,
+  canManage = true,
+  settings = {},
+  previewReadOnly = false,
+}) {
   const router = useRouter();
   const [proposal, setProposal] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -91,6 +97,7 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
   // fallback). Drives structured add/identity confirmation and per-referral
   // dismissal without conflating those workflows.
   const [referralActions, setReferralActions] = useState({});
+  const canEdit = canManage && !previewReadOnly;
 
   const reviewers = proposal?.reviewers || [];
   const findSavedPool = useMemo(() => [
@@ -276,6 +283,7 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
   // On success we refresh both lists and land on
   // the Invite Reviewers sub-tab where the new candidate now appears.
   const addReferralCandidate = async (referral, resolution) => {
+    if (!canEdit) return;
     const sid = referral?.suggestionId;
     const actionKey = referral?.referralId || sid;
     if (referral?.legacy) return;
@@ -343,6 +351,7 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
   };
 
   const dismissDeclineReferral = async (referral) => {
+    if (!canEdit) return;
     const sid = referral?.suggestionId;
     const actionKey = referral?.referralId || sid;
     if (!sid || !requestId) return;
@@ -449,30 +458,48 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
         <button
           type="button"
           onClick={() => setCampaignOpen(true)}
-          className="text-xs text-gray-500 hover:text-gray-800 px-2 py-1 whitespace-nowrap"
-          title="Edit this request's reviewer campaign settings (days to respond, review due date)"
+          disabled={!canEdit}
+          className="text-xs text-gray-500 hover:text-gray-800 px-2 py-1 whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-40"
+          title={previewReadOnly
+            ? 'Campaign settings are disabled in read-only Preview'
+            : !canManage
+              ? 'Only the lead Program Director or a superuser can edit campaign settings'
+            : "Edit this request's reviewer campaign settings (days to respond, review due date)"}
         >
           ⚙ Campaign settings
         </button>
         <button
           type="button"
           onClick={() => setTemplatesOpen(true)}
-          className="text-xs text-gray-500 hover:text-gray-800 px-2 py-1 whitespace-nowrap"
-          title="Edit your default reviewer email templates"
+          disabled={previewReadOnly}
+          className="text-xs text-gray-500 hover:text-gray-800 px-2 py-1 whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-40"
+          title={previewReadOnly
+            ? 'Email templates are disabled in read-only Preview'
+            : 'Edit your default reviewer email templates'}
         >
           ✎ Email templates
         </button>
-        <Link
-          href="/profile-settings"
-          className="text-xs text-gray-400 hover:text-gray-700 px-1 py-1 whitespace-nowrap"
-          title="Manage all your email templates in Profile Settings"
-        >
-          Manage in Profile →
-        </Link>
+        {previewReadOnly ? (
+          <span
+            className="px-1 py-1 text-xs text-gray-400 opacity-40 whitespace-nowrap"
+            title="Template management is disabled in read-only Preview"
+            aria-disabled="true"
+          >
+            Manage in Profile →
+          </span>
+        ) : (
+          <Link
+            href="/profile-settings"
+            className="text-xs text-gray-400 hover:text-gray-700 px-1 py-1 whitespace-nowrap"
+            title="Manage all your email templates in Profile Settings"
+          >
+            Manage in Profile →
+          </Link>
+        )}
       </div>
 
-      {templatesOpen && <EmailTemplatesModal onClose={() => setTemplatesOpen(false)} />}
-      {campaignOpen && requestId && (
+      {templatesOpen && !previewReadOnly && <EmailTemplatesModal onClose={() => setTemplatesOpen(false)} />}
+      {campaignOpen && requestId && canEdit && (
         <CampaignConfigModal requestId={requestId} onClose={() => setCampaignOpen(false)} />
       )}
 
@@ -490,7 +517,7 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
         <ReviewerFindPanel
           requestId={requestId}
           context={context}
-          canManage={canManage}
+          canManage={canEdit}
           proposalFileKey={proposalFileKey}
           proposalBindingReady={router.isReady !== false}
           onProposalFileKeyChange={persistProposalFileKey}
@@ -507,7 +534,7 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
           loading={candidatesLoading}
           onRefresh={refreshAll}
           settings={settings}
-          canManage={canManage}
+          canManage={canEdit}
           repairSuggestionId={repairSuggestionId}
         />
       ) : (
@@ -518,7 +545,9 @@ export default function ReviewersTab({ requestId, context, canManage = true, set
           onRefresh={refreshAll}
           settings={settings}
           mode={current}
-          canManage={canManage}
+          canManage={canEdit}
+          showReviewReminderAction={current === 'track'}
+          previewReadOnly={previewReadOnly}
           declineReferrals={declineReferrals}
           referralActions={referralActions}
           onAddReferral={addReferralCandidate}

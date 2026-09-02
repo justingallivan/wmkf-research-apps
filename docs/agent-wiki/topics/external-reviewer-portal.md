@@ -467,7 +467,7 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   (`wmkf_appsystemsettings`, default `false`, read/write via
   `pages/api/review-manager/release-settings.js` and
   `lib/services/reviewer-release-config.js`), controls whether
-  `ReviewerManagePanel`'s EmailModal *additionally* offers the SharePoint
+  `ReviewerManagePanel`'s `ReleaseMaterialsModal` *additionally* offers the SharePoint
   proposal auto-attach (Blob upload from `pages/api/reviewer-finder/load-proposal.js`)
   and the manual attachment file picker, and whether `attachmentUrls` are sent
   to `send-emails.js` at all. The panel GETs the setting fresh every time the
