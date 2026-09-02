@@ -69,11 +69,18 @@ const TOKEN_STATE_INFO = {
   active:     { label: 'Active',   color: 'bg-blue-100 text-blue-800' },
   revoked:    { label: 'Revoked',  color: 'bg-red-100 text-red-800' },
   expired:    { label: 'Expired',  color: 'bg-orange-100 text-orange-800' },
+  invalid:    { label: 'Needs review', color: 'bg-amber-100 text-amber-800' },
 };
 
 export function TokenStateBadge({ state, expiresAt, firstAccessedAt }) {
-  const info = TOKEN_STATE_INFO[state] || TOKEN_STATE_INFO.not_minted;
+  const known = Boolean(TOKEN_STATE_INFO[state]);
+  const info = TOKEN_STATE_INFO[state] || {
+    label: 'Unknown',
+    color: 'bg-amber-100 text-amber-800',
+  };
   const tooltip = [
+    state === 'invalid' && 'Stored token metadata needs technical review',
+    !known && 'Unrecognized token state; refresh or request technical review',
     expiresAt && `Expires ${new Date(expiresAt).toLocaleDateString()}`,
     firstAccessedAt && `Opened ${new Date(firstAccessedAt).toLocaleDateString()}`,
   ].filter(Boolean).join(' · ');
@@ -106,6 +113,9 @@ export function TokenActionsMenu({
   const menuRef = useRef(null);
 
   const isActive = reviewer.tokenState === 'active';
+  const hasInvalidTokenMetadata = reviewer.tokenState === 'invalid';
+  const canRegenerate = !hasInvalidTokenMetadata;
+  const canRevoke = isActive || hasInvalidTokenMetadata;
   const canCorrectStatus = Boolean(
     onStatusChange && !TERMINAL_REVIEW_STATUSES.includes(reviewer.reviewStatus),
   );
@@ -118,10 +128,11 @@ export function TokenActionsMenu({
   // The estimate drives the upward flip so the portalled menu never opens
   // off-screen. Status correction and terminal actions are taller sections;
   // the remaining items are standard 40px menu rows.
-  const itemCount = 1 + (isActive ? 1 : 0) + (onRemove ? 1 : 0);
+  const itemCount = (canRegenerate ? 1 : 0) + (canRevoke ? 1 : 0) + (onRemove ? 1 : 0);
   const estimatedMenuHeight = (itemCount * 40)
     + (canCorrectStatus ? 118 : 0)
     + (canEndEngagement ? 104 : 0)
+    + (hasInvalidTokenMetadata ? 48 : 0)
     + 8;
 
   // Position the menu in viewport coords, flipping upward when there isn't room
@@ -234,13 +245,20 @@ export function TokenActionsMenu({
           <p className="px-3 pt-2 pb-0.5 text-[11px] font-medium uppercase tracking-wide text-gray-400">
             Reviewer link
           </p>
-          <button
-            onClick={() => { setOpen(false); onRegenerate(); }}
-            className="w-full text-left px-3 py-2 hover:bg-gray-50"
-          >
-            {reviewer.tokenState === 'not_minted' ? 'Generate link & copy' : 'Regenerate link & copy'}
-          </button>
-          {isActive && (
+          {canRegenerate && (
+            <button
+              onClick={() => { setOpen(false); onRegenerate(); }}
+              className="w-full text-left px-3 py-2 hover:bg-gray-50"
+            >
+              {reviewer.tokenState === 'not_minted' ? 'Generate link & copy' : 'Regenerate link & copy'}
+            </button>
+          )}
+          {hasInvalidTokenMetadata && (
+            <p className="px-3 py-2 text-xs leading-4 text-amber-700 bg-amber-50">
+              Token metadata needs repair. Do not regenerate this link.
+            </p>
+          )}
+          {canRevoke && (
             <button
               onClick={() => { setOpen(false); onRevoke(); }}
               className="w-full text-left px-3 py-2 hover:bg-gray-50 text-red-700"
@@ -337,6 +355,14 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
   // True whenever a preview render is queued or in flight — disables the
   // footer Preview button and the Retry button.
   const [rendering, setRendering] = useState(false);
+
+  // Materials are a one-time release transition. Once every selected reviewer
+  // has moved beyond Accepted, open this general-purpose composer on Follow-up
+  // and remove Materials from the choices. The send boundary independently
+  // enforces the same rule from fresh Dataverse state.
+  const materialsEligible = reviewers.length > 0
+    && reviewers.every(reviewer => reviewer.reviewStatus === 'accepted');
+
   // Synchronous single-flight lock for handlePreview, keyed to the modal-session
   // epoch that was current when a render was started. A second call for the SAME
   // session returns immediately; a stale finally (from a session that has since
@@ -372,6 +398,7 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
       activeRenderAbortRef.current = null;
     }
     if (isOpen) {
+      setTemplateType(materialsEligible ? 'materials' : 'followup');
       setStep('compose');
       setProgress({ current: 0, total: 0, message: '' });
       setDrafts([]);
@@ -380,7 +407,7 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
       setPreviewFailed(false);
       setRendering(false);
     }
-  }, [isOpen]);
+  }, [isOpen, materialsEligible]);
 
   // Read the attach-proposal-email setting fresh every time the modal opens
   // (never cached/build-time) so an admin toggle takes effect immediately.
@@ -853,7 +880,7 @@ function EmailModal({ isOpen, onClose, reviewers, proposalTitle, requestId, sett
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Email Type</label>
                 <div className="flex gap-2">
-                  {['materials', 'followup', 'thankyou'].map(type => (
+                  {(materialsEligible ? ['materials', 'followup', 'thankyou'] : ['followup', 'thankyou']).map(type => (
                     <button
                       key={type}
                       onClick={() => setTemplateType(type)}

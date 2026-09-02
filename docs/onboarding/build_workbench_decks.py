@@ -206,7 +206,7 @@ def build_pd():
         (1, "Why they fit, h-index/citations, expertise keywords, Scholar/ORCID/website links."),
         "Select candidates and click Send invitation to invite the ones not yet invited.",
         "Heads-up — there is no longer a \"Re-invite\" button:",
-        (1, "Invited people who haven't replied are nudged automatically by a reminder (Step 8/11)."),
+        (1, "Automatic reminders are paused; do not use a link-bearing resend during the incident hold."),
     ])
 
     section_slide(prs, "8", SPINE[7])
@@ -214,7 +214,7 @@ def build_pd():
         "Set the timing once for the whole request; invitations inherit it.",
         ("", "Days to respond — how long a reviewer has to accept (an offset, so later waves get the full window)."),
         ("", "Review due date — the fixed deadline reviews are due."),
-        ("", "Reminders — turn the respond-by and review-due nudges on/off and set how many days before."),
+        ("", "Reminder controls are not available in this panel; automatic reminders are paused."),
         ("", "Desired count — how many accepted reviewers you're aiming for (drives the quota notice)."),
     ])
 
@@ -238,9 +238,9 @@ def build_pd():
     content_slide(prs, "STEP 11", "Reviewers · Track Reviewers", [
         "Accepted reviewers live here — use Release to reviewers to send the proposal to those awaiting materials.",
         "Track everyone in flight, from materials sent through review received (this one tab absorbed the old Invite and Completed sub-tabs).",
-        "The system chases for you:",
-        (1, "Respond-by reminder nudges invitees who haven't replied."),
-        (1, "Review-due reminder nudges accepted reviewers who haven't submitted."),
+        "Automatic reviewer reminders are paused during the token-incident hold.",
+        (1, "Manual token-issuing reminders and resends are also procedurally frozen."),
+        (1, "Do not issue or regenerate reviewer links until the hold is lifted."),
     ])
 
     section_slide(prs, "12", SPINE[11])
@@ -272,7 +272,7 @@ def build_pd():
     ])
 
     content_slide(prs, "WRAP-UP", "FAQ & where to get help", [
-        "\"Where did the Re-invite button go?\" — replaced by the automatic respond-by reminder.",
+        "\"Where did the Re-invite button go?\" — it was removed; automatic reminders are currently paused.",
         "\"A change isn't showing\" — hard-refresh; the app updates as we ship.",
         "\"A tab says coming soon\" — that lifecycle stage isn't built yet; it's on the roadmap.",
         "Who to ask: your team lead for workflow; Connor for anything technical.",
@@ -353,8 +353,8 @@ def build_tech():
         "Component: ReviewerInvitePanel.js; roster from /api/reviewer-finder/my-candidates?requestId=.",
         "Candidate detail maps off the person row wmkf_potentialreviewers (bibliometrics folded on; sidecar dropped S213).",
         "Invite → InviteEmailModal → render-emails / send-emails with templateType:'invitation'.",
-        "S277: the manual \"Re-invite already-invited\" button was REMOVED;",
-        (1, "server allowResend re-mint contract retained (shouldSkipDuplicateInvitation) for programmatic re-mint only."),
+        "S277: the manual \"Re-invite already-invited\" button was removed;",
+        (1, "the allowResend re-mint path remains callable but is frozen during the hold."),
     ])
 
     section_slide(prs, "8", SPINE[7])
@@ -363,7 +363,7 @@ def build_tech():
         "Persisted per-request on akoya_request (wave 7-reviewer-engagement, prod 2026-06-21):",
         (1, "wmkf_respondoffsetdays, wmkf_reviewduedate, wmkf_respondreminderenabled/leaddays,"),
         (1, "wmkf_reviewduereminderenabled/leaddays, wmkf_desiredcount, wmkf_quotanotifiedat."),
-        "Discrete columns (not a JSON blob) so the cron/sweep can $filter server-side.",
+        "CampaignConfigModal exposes timing/quota only; reminder controls are absent and both flags default true.",
     ])
 
     section_slide(prs, "9", SPINE[8])
@@ -387,7 +387,7 @@ def build_tech():
     content_slide(prs, "STEP 11", "Track Reviewers + token TTL + reminders", [
         "Release/materials send mints a long-lived token (~review-due + 90d); only accepted reviewers receive it.",
         "Non-responder/invite links cap at review-due + grace (lib/external/reviewer-token-ttl.js via send-emails).",
-        "Reminders cron: /api/cron/reviewer-reminders (daily) → lib/services/reviewer-reminder-sweep.js.",
+        "Reminder route is implemented but unscheduled; manual token-issuing reminders/resends are frozen.",
         (1, "respond-by: deadline = emailSentAt + respondOffsetDays - lead; fire-once wmkf_respondremindersentat."),
         (1, "review-due: deadline = reviewDueDate - lead; fire-once via existing wmkf_remindersentat. Claim-before-send (If-Match)."),
     ])
@@ -424,13 +424,13 @@ def build_tech():
         ("", "New columns carry NO Power Automate trigger (verified post-deploy)."),
     ])
     content_slide(prs, "APPENDIX", "Automation & ops", [
-        "Crons in pages/api/cron/: reviewer-reminders (daily), sweep-stale-invites (status bookkeeping at meeting date).",
+        "reviewer-reminders route remains implemented but is unscheduled; sweep-stale-invites still runs for status bookkeeping.",
         "Token cap (access gate at review-due) and the stale-invite sweep (status at meeting date) are DIFFERENT gates — both stay.",
         "Cron auth: Vercel CRON_SECRET on all /api/cron/* routes.",
-        "Reminder/quota writes use If-Match claim-before-send for at-most-once semantics.",
+        "Prebuild + CI hold gate blocks accidental reviewer-reminder cron re-registration.",
     ])
     content_slide(prs, "POINTERS", "Source of truth (don't let this deck rot)", [
-        "Spec: docs/REVIEWER_ENGAGEMENT_SPEC.md (status: IMPLEMENTED, all 4 phases LIVE S275).",
+        "Spec: docs/REVIEWER_ENGAGEMENT_SPEC.md (Phases 1/2/4 live; Phase 3 mechanism implemented, schedule paused).",
         "Atlas: docs/atlas/dataverse-akoya-request.md, dataverse-wmkf-appreviewersuggestion.md.",
         "Agent wiki: docs/agent-wiki/topics/reviewer-workbench-lifecycle.md (+ reviewer-* topics).",
         "Build plans: REQUEST_WORKBENCH_BUILD_PLAN.md, WORKBENCH_PROPOSAL_TAB_BUILD_PLAN.md.",

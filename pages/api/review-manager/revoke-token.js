@@ -55,14 +55,15 @@ export default async function handler(req, res) {
     // stale (possibly tampered) draft can't resurface if a new token is later
     // minted for this suggestion (drafts key on the stable suggestion_id, not the
     // token; plan §9 #draft-token / Codex P1-4). Best-effort: the revoke already
-    // succeeded, and a leftover draft is otherwise swept by GC / the next
-    // regenerate, so a delete failure must not fail the revoke.
+    // succeeded, and a leftover draft is otherwise swept by GC, so a delete
+    // failure must not fail the revoke. Regeneration deliberately preserves a
+    // matching draft and is not a cleanup fallback.
     //
     // ACCEPTED RESIDUAL (Codex S302 P1): a sub-second TOCTOU exists — a draft PUT
     // whose verifySuggestionToken passed JUST before this revoke flipped the flag
     // can land its upsert AFTER this delete, resurrecting the draft under a now-
     // dead token. Not closed because the resurrected draft is harmless: the dead
-    // token can't GET it back or submit it, and GC / the next regenerate sweep it.
+    // token can't GET it back or submit it, and GC eventually sweeps it.
     // A pre-write re-check in the draft route would only narrow (not close) the
     // window at the cost of a Dataverse read on every autosave.
     try {

@@ -51,8 +51,8 @@ place. Close the files in PowerPoint first, or the write can collide with the op
 ## Grounding / source of truth
 
 Deck content was read from source during the authoring session (S277), not memory; refreshed
-2026-06-26 for the S280 3-sub-tab collapse (Find · Invite Reviewers · Track Reviewers) and the
-now-live Reviews tab:
+2026-09-01 for the reviewer-reminder incident hold as well as the S280 3-sub-tab collapse
+(Find · Invite Reviewers · Track Reviewers) and the now-live Reviews tab:
 
 - Shell + tab strip: `pages/workbench/[requestId].js` — live tabs are **Overview, Proposal,
   Reviewers, Reviews, Status, Awardee**; the other four lifecycle tabs render a "coming in a later
@@ -62,7 +62,8 @@ now-live Reviews tab:
   Completed).
 - Tab components: `OverviewTab.js`, `ProposalTab.js`, `ReviewsTab.js`, `StatusTab.js`, `AwardeeTab.js`.
 - Reviewer engagement (campaign config, reminders, token TTL, quota, withdraw):
-  `docs/REVIEWER_ENGAGEMENT_SPEC.md` (IMPLEMENTED, all four phases LIVE S275) and the
+  `docs/REVIEWER_ENGAGEMENT_SPEC.md` (Phases 1, 2, and 4 live; Phase 3 mechanism
+  implemented but its Vercel schedule paused 2026-09-01) and the
   `docs/atlas/dataverse-*` pages.
 
 When Workbench behavior changes, update the spec / Atlas / agent-wiki first, then regenerate

@@ -153,6 +153,7 @@ test.each([
       reviewStatus: 'materials_sent',
       materialsSentAt: '2026-08-01T00:00:00Z',
       reminderCount: 0,
+      reviewDueReminderEligibility: 'eligible',
     }],
   };
   fetch
@@ -173,6 +174,38 @@ test.each([
   expect(fetch).toHaveBeenCalledTimes(2);
   expect(screen.getByText('Dr. Pending')).toBeInTheDocument();
   expect(screen.queryByText(reason, { exact: true })).not.toBeInTheDocument();
+});
+
+test.each([
+  ['token_revoked', /deliberately restore access/i],
+  ['token_not_minted', /investigate the Materials history/i],
+  ['token_invalid_data', /needs technical review/i],
+  ['token_expired', /send an explicit replacement link/i],
+  ['token_insufficient_window', /does not cover the deadline/i],
+  ['due_date_missing', /set a review due date/i],
+])('disables review-due reminder for %s and explains the required recovery', async (eligibility, title) => {
+  fetch.mockResolvedValue({
+    ok: true,
+    json: async () => ({
+      success: true,
+      proposals: [{
+        proposalId: 'req1',
+        reviewers: [{
+          suggestionId: 'g2',
+          name: 'Dr. Pending',
+          reviewStatus: 'materials_sent',
+          materialsSentAt: '2026-08-01T00:00:00Z',
+          reviewDueReminderEligibility: eligibility,
+          reminderCount: 0,
+        }],
+      }],
+    }),
+  });
+
+  render(<ReviewsTab requestId="req1" />);
+  const button = await screen.findByRole('button', { name: 'Send reminder now' });
+  expect(button).toBeDisabled();
+  expect(button).toHaveAttribute('title', expect.stringMatching(title));
 });
 
 test('keeps a stored synthesis visible even when there are no accepted reviewer rows', async () => {

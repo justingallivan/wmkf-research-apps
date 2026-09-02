@@ -46,7 +46,11 @@ beforeEach(() => {
   jest.clearAllMocks();
   requireAppAccess.mockResolvedValue({ session: { user: { azureEmail: 'pd@example.com' } } });
   DynamicsService.getRecord.mockResolvedValue({
-    akoya_requestid: REQUEST_ID, akoya_requestnum: '1002788', akoya_title: 'Test', wmkf_meetingdate: null,
+    akoya_requestid: REQUEST_ID,
+    akoya_requestnum: '1002788',
+    akoya_title: 'Test',
+    wmkf_meetingdate: null,
+    wmkf_reviewduedate: '2099-09-09',
   });
   DynamicsService.queryRecords.mockResolvedValue({
     records: [
@@ -75,6 +79,9 @@ test('accepted, materials sent, not submitted → submitted:false with days-sinc
     wmkf_remindersentat: null,
     wmkf_remindercount: 0,
     wmkf_reviewreceivedat: null,
+    wmkf_externaltokenhash: 'stored-token-hash',
+    wmkf_externaltokenexpires: '2100-01-01T00:00:00Z',
+    wmkf_externaltokenrevoked: false,
   }]);
 
   const { req, res } = get({ proposalId: REQUEST_ID });
@@ -87,6 +94,30 @@ test('accepted, materials sent, not submitted → submitted:false with days-sinc
   expect(reviewer.daysSinceMaterialsSent).toBe(5);
   expect(reviewer.reminderSentAt).toBeNull();
   expect(reviewer.reminderCount).toBe(0);
+  expect(reviewer.tokenState).toBe('active');
+  expect(reviewer.reviewDueReminderEligibility).toBe('eligible');
+});
+
+test('token state remains pure liveness while reminder eligibility reports deadline coverage separately', async () => {
+  suggestionAdapter.findByRequest.mockResolvedValue([{
+    wmkf_appreviewersuggestionid: OUTSTANDING_ID,
+    _wmkf_request_value: REQUEST_ID,
+    _wmkf_potentialreviewer_value: PERSON_OUTSTANDING,
+    wmkf_accepted: true,
+    wmkf_reviewstatus: 100000001,
+    wmkf_materialssentat: '2026-08-01T00:00:00Z',
+    wmkf_reviewreceivedat: null,
+    wmkf_externaltokenhash: 'stored-token-hash',
+    wmkf_externaltokenexpires: '2099-09-09T23:59:59Z',
+    wmkf_externaltokenrevoked: false,
+  }]);
+
+  const { req, res } = get({ proposalId: REQUEST_ID });
+  await handler(req, res);
+
+  const reviewer = res._data.proposals[0].reviewers[0];
+  expect(reviewer.tokenState).toBe('active');
+  expect(reviewer.reviewDueReminderEligibility).toBe('token_insufficient_window');
 });
 
 test('submitted reviewer → submitted:true regardless of materialsSentAt age', async () => {

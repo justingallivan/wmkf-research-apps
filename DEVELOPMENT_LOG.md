@@ -10,6 +10,28 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## September 2026 — Reviewer-token incident contained and reminder safety restored
+
+**Milestone:** Review-due reminders no longer replace or expose reviewer links;
+they fail closed on the existing token's liveness and deadline runway before any
+marker write or email. Respond-by nudges remain the intentional replacement-link
+path.
+**Sessions:** September 1 incident diagnosis, independent Claude audits, policy
+adjudication, implementation, production promotion, authenticated smoke, and
+post-deploy read-only audit.
+**Ship state:** commit `4dd57369` is live in Ready deployment
+`dpl_89s9MzdUnDST6Jm9Vs3cnMLPmUDu`. The D26 audit examined 51 current candidates:
+51 active and reminder-eligible, zero blocked. The owner lifted the procedural
+manual-reminder freeze; the automatic `/api/cron/reviewer-reminders` schedule
+remains absent and protected by the hold gate.
+**Why it matters:** ordinary review follow-up can resume without invalidating a
+reviewer's saved work or active link, while automatic sends remain contained until
+campaign configuration defaults and the armed-row policy are deliberately fixed.
+**Pointers:** `docs/REVIEWER_ENGAGEMENT_SPEC.md`;
+`docs/REVIEWER_REMINDER_TOKEN_LIVENESS_PLAN.md`;
+`outputs/reviewer-reminder-token-liveness-D26-postdeploy-2026-09-01.json`;
+commit `4dd57369`.
+
 ## August 2026 — Explicit Request Document actors reached Production (Session 471)
 
 **Milestone:** Request Document writes remain application-owned while immutable,
