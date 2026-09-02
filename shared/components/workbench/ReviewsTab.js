@@ -414,13 +414,14 @@ function CompareView({ submitted, liveQuestions }) {
 // as plain text nodes (NO dangerouslySetInnerHTML) per the plan's rendering
 // contract. `synthesis` is the stored `proposal.reviewSynthesis` (fail-soft
 // parsed server-side, or null when never generated / parse failed).
-function SynthesisCard({ requestId, synthesis, state, reviewers = [], onUpdated }) {
+function SynthesisCard({ requestId, synthesis, state, reviewers = [], onUpdated, previewReadOnly = false }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const automaticInFlight = state?.status === 'queued' || state?.status === 'running';
   const canGenerate = state?.canRunManually === true && !automaticInFlight;
 
   const generate = useCallback(async (overwrite) => {
+    if (previewReadOnly) return;
     const confirmEarly = state?.ready !== true;
     if (confirmEarly) {
       const confirmed = window.confirm(
@@ -466,7 +467,7 @@ function SynthesisCard({ requestId, synthesis, state, reviewers = [], onUpdated 
     } finally {
       setBusy(false);
     }
-  }, [requestId, state, onUpdated]);
+  }, [requestId, state, onUpdated, previewReadOnly]);
 
   const statusText = (() => {
     if (automaticInFlight) {
@@ -505,8 +506,10 @@ function SynthesisCard({ requestId, synthesis, state, reviewers = [], onUpdated 
           <button
             type="button"
             onClick={() => generate(!!synthesis)}
-            disabled={busy || !canGenerate}
-            title={!state?.canRunManually
+            disabled={previewReadOnly || busy || !canGenerate}
+            title={previewReadOnly
+              ? 'Synthesis generation is disabled in read-only Preview'
+              : !state?.canRunManually
               ? 'A submitted review is required'
               : automaticInFlight
                 ? 'Automatic synthesis is already in progress'
@@ -643,7 +646,7 @@ const REMINDER_ELIGIBILITY_INFO = {
   },
 };
 
-function OutstandingRow({ reviewer, requestId, onSent, onManualEntry }) {
+function OutstandingRow({ reviewer, requestId, onSent, onManualEntry, previewReadOnly = false }) {
   const [sending, setSending] = useState(false);
   const [feedback, setFeedback] = useState(null);
   const lastReminder = formatDate(reviewer.reminderSentAt);
@@ -658,6 +661,7 @@ function OutstandingRow({ reviewer, requestId, onSent, onManualEntry }) {
   const affiliation = reviewerAffiliationOf(reviewer);
 
   const handleSend = useCallback(async () => {
+    if (previewReadOnly) return;
     setSending(true);
     setFeedback(null);
     try {
@@ -692,7 +696,7 @@ function OutstandingRow({ reviewer, requestId, onSent, onManualEntry }) {
     } finally {
       setSending(false);
     }
-  }, [requestId, reviewer.suggestionId, onSent]);
+  }, [requestId, reviewer.suggestionId, onSent, previewReadOnly]);
 
   return (
     <div className="grid gap-3 border-b border-gray-100 px-4 py-4 last:border-b-0 lg:grid-cols-[minmax(0,1fr)_16rem_20rem] lg:items-start">
@@ -732,8 +736,8 @@ function OutstandingRow({ reviewer, requestId, onSent, onManualEntry }) {
         <button
           type="button"
           onClick={handleSend}
-          disabled={sending || !canSend}
-          title={eligibilityInfo.title}
+          disabled={previewReadOnly || sending || !canSend}
+          title={previewReadOnly ? 'Reminders are disabled in read-only Preview' : eligibilityInfo.title}
           className="inline-flex min-h-10 items-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 hover:border-gray-400 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {sending ? 'Sending…' : 'Send reminder'}
@@ -741,7 +745,9 @@ function OutstandingRow({ reviewer, requestId, onSent, onManualEntry }) {
         <button
           type="button"
           onClick={() => onManualEntry(reviewer)}
-          className="inline-flex min-h-10 items-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 hover:border-gray-400 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500"
+          disabled={previewReadOnly}
+          title={previewReadOnly ? 'Manual review entry is disabled in read-only Preview' : undefined}
+          className="inline-flex min-h-10 items-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 hover:border-gray-400 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 disabled:cursor-not-allowed disabled:opacity-40"
         >
           Enter review manually
         </button>
@@ -750,7 +756,7 @@ function OutstandingRow({ reviewer, requestId, onSent, onManualEntry }) {
   );
 }
 
-export default function ReviewsTab({ requestId }) {
+export default function ReviewsTab({ requestId, previewReadOnly = false }) {
   const [proposal, setProposal] = useState(null);
   // Phase 2: the live admin-panel question set (or null on fetch failure —
   // fail-soft per the route; the matrix derivation falls back to
@@ -853,6 +859,7 @@ export default function ReviewsTab({ requestId }) {
           state={proposal?.reviewSynthesisState ?? null}
           reviewers={submitted}
           onUpdated={load}
+          previewReadOnly={previewReadOnly}
         />
       </div>
     );
@@ -881,12 +888,13 @@ export default function ReviewsTab({ requestId }) {
                 requestId={requestId}
                 onSent={load}
                 onManualEntry={(reviewer) => setManualEntry({ requestId, reviewer })}
+                previewReadOnly={previewReadOnly}
               />
             ))}
           </div>
         </section>
       )}
-      {manualEntryReviewer && (
+      {manualEntryReviewer && !previewReadOnly && (
         <ManualReviewEntryForm
           key={manualEntryReviewer.suggestionId}
           reviewer={manualEntryReviewer}
@@ -945,6 +953,7 @@ export default function ReviewsTab({ requestId }) {
         state={proposal?.reviewSynthesisState ?? null}
         reviewers={submitted}
         onUpdated={load}
+        previewReadOnly={previewReadOnly}
       />
     </div>
   );

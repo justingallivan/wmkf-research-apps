@@ -514,3 +514,56 @@ test('opens the dedicated full manual-entry rescue from Outstanding and refreshe
     setVersion: 'v1',
   });
 });
+
+test('read-only Preview disables every Reviews mutation while preserving read and export controls', async () => {
+  const proposal = {
+    proposalId: 'req1',
+    reviewers: [
+      {
+        suggestionId: 'pending',
+        name: 'Dr. Pending',
+        reviewStatus: 'materials_sent',
+        materialsSentAt: '2026-08-01T00:00:00Z',
+        reviewDueReminderEligibility: 'eligible',
+      },
+      {
+        suggestionId: 'submitted',
+        name: 'Dr. Submitted',
+        reviewReceivedAt: '2026-08-20T00:00:00Z',
+        answers: [],
+      },
+    ],
+    reviewSynthesis: null,
+    reviewSynthesisState: {
+      current: false,
+      status: 'not_started',
+      ready: true,
+      canRunManually: true,
+      submittedCount: 1,
+      blockingCount: 0,
+    },
+  };
+  fetch.mockResolvedValue({
+    ok: true,
+    json: async () => ({ success: true, proposals: [proposal] }),
+  });
+
+  render(<ReviewsTab requestId="req1" previewReadOnly />);
+
+  const reminder = await screen.findByRole('button', { name: 'Send reminder' });
+  const manualEntry = screen.getByRole('button', { name: 'Enter review manually' });
+  const synthesis = screen.getByRole('button', { name: 'Generate synthesis' });
+  expect(reminder).toBeDisabled();
+  expect(reminder).toHaveAttribute('title', 'Reminders are disabled in read-only Preview');
+  expect(manualEntry).toBeDisabled();
+  expect(manualEntry).toHaveAttribute('title', 'Manual review entry is disabled in read-only Preview');
+  expect(synthesis).toBeDisabled();
+  expect(synthesis).toHaveAttribute('title', 'Synthesis generation is disabled in read-only Preview');
+  expect(screen.getByRole('button', { name: 'Word (.docx)' })).toBeEnabled();
+
+  fireEvent.click(reminder);
+  fireEvent.click(manualEntry);
+  fireEvent.click(synthesis);
+  expect(fetch).toHaveBeenCalledTimes(1);
+  expect(screen.queryByText(/Recording a complete review/i)).not.toBeInTheDocument();
+});

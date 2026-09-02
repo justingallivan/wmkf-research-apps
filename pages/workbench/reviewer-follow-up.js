@@ -234,7 +234,7 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
       {previewReadOnly && (
         <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-950" role="status">
           <span className="font-semibold">Preview is read-only.</span>{' '}
-          This deployment uses production reviewer data for realistic testing. Follow-up controls are shown below but remain disabled until production.
+          This Preview is not connected to the reviewer sandbox. Follow-up controls are shown below but remain disabled here.
         </div>
       )}
 
@@ -375,7 +375,7 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
 
 export async function getServerSideProps() {
   const previewReadOnly = process.env.VERCEL_ENV === 'preview'
-    && classifyTarget(process.env.DYNAMICS_URL) === 'production';
+    && classifyTarget(process.env.DYNAMICS_URL) !== 'sandbox';
   return { props: { previewReadOnly } };
 }
 

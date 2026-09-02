@@ -162,4 +162,13 @@ describe('reviewer follow-up preview safety', () => {
       props: { previewReadOnly: false },
     });
   });
+
+  test('fails closed when a Preview target is unknown', async () => {
+    process.env.VERCEL_ENV = 'preview';
+    process.env.DYNAMICS_URL = 'https://unregistered-target.example';
+
+    await expect(getServerSideProps()).resolves.toEqual({
+      props: { previewReadOnly: true },
+    });
+  });
 });

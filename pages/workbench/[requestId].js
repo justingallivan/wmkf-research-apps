@@ -35,6 +35,7 @@ import InitialAssessmentTab from '../../shared/components/workbench/InitialAsses
 import StaffDeliberationsTab from '../../shared/components/workbench/StaffDeliberationsTab';
 import FinalWriteupTab from '../../shared/components/workbench/FinalWriteupTab';
 import { computeCanManage } from '../../shared/components/reviewers/reviewer-modes';
+import { classifyTarget } from '../../lib/dataverse/core/interlock';
 
 // Implemented tabs: Overview, Proposal, Initial Assessment, Reviewers, Reviews,
 // Staff Deliberations (the merged site-visit writeup workspace, S466), Status,
@@ -57,7 +58,7 @@ const LEGACY_TAB_ALIASES = {
   'site-visit': 'staff-deliberations',
 };
 
-function WorkbenchRequest() {
+export function WorkbenchRequest({ previewReadOnly = false }) {
   const router = useRouter();
   const { data: session } = useSession();
   const { isSuperuser } = useAppAccess();
@@ -67,6 +68,7 @@ function WorkbenchRequest() {
   const rawTabParam = typeof router.query.tab === 'string' ? router.query.tab : null;
   const tabParam = rawTabParam ? (LEGACY_TAB_ALIASES[rawTabParam] || rawTabParam) : null;
   const activeTab = tabParam && TAB_KEYS.has(tabParam) ? tabParam : 'overview';
+  const reviewerSurfaceReadOnly = previewReadOnly && ['reviewers', 'reviews'].includes(activeTab);
 
   const [ctx, setCtx] = useState(null);
   const [error, setError] = useState(null);
@@ -139,6 +141,13 @@ function WorkbenchRequest() {
         {error && <p className="text-sm text-amber-600 mt-1">Couldn’t load request details: {error}</p>}
       </div>
 
+      {reviewerSurfaceReadOnly && (
+        <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-950" role="status">
+          <span className="font-semibold">Preview is read-only for reviewer work.</span>{' '}
+          This Preview is not connected to the reviewer sandbox. Reviewer changes are disabled here.
+        </div>
+      )}
+
       {/* Tab strip */}
       <div className="border-b border-gray-200 mb-6 overflow-x-auto">
         <nav className="flex gap-1 min-w-max" aria-label="Request sections">
@@ -179,6 +188,7 @@ function WorkbenchRequest() {
           context={ctx}
           canManage={canManage}
           settings={reviewerSettings}
+          previewReadOnly={reviewerSurfaceReadOnly}
         />
       ) : activeTab === 'proposal' ? (
         <ProposalTab context={ctx} />
@@ -189,7 +199,10 @@ function WorkbenchRequest() {
           isSuperuser={isSuperuser}
         />
       ) : activeTab === 'reviews' ? (
-        <ReviewsTab requestId={typeof requestId === 'string' ? requestId : ''} />
+        <ReviewsTab
+          requestId={typeof requestId === 'string' ? requestId : ''}
+          previewReadOnly={reviewerSurfaceReadOnly}
+        />
       ) : activeTab === 'staff-deliberations' ? (
         <StaffDeliberationsTab
           key={typeof requestId === 'string' ? requestId : ''}
@@ -219,10 +232,16 @@ function WorkbenchRequest() {
   );
 }
 
-export default function WorkbenchRequestGuard() {
+export async function getServerSideProps() {
+  const previewReadOnly = process.env.VERCEL_ENV === 'preview'
+    && classifyTarget(process.env.DYNAMICS_URL) !== 'sandbox';
+  return { props: { previewReadOnly } };
+}
+
+export default function WorkbenchRequestGuard(props) {
   return (
     <RequireAppAccess appKey="reviewers">
-      <WorkbenchRequest />
+      <WorkbenchRequest {...props} />
     </RequireAppAccess>
   );
 }
