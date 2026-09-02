@@ -66,10 +66,11 @@ const nextConfig = {
   // The webpack builder (used by the Playwright e2e job via `next build
   // --webpack`) refuses a CommonJS require() of an ESM package even when both
   // are being bundled; 'loose' lets it bundle sanitize-html -> htmlparser2.
-  // Turbopack ignores this key.
-  experimental: {
-    esmExternals: 'loose',
-  },
+  // Turbopack panics on this key ("esmExternals = loose is not supported"),
+  // so it is set only when Turbopack is not the active bundler. Next sets
+  // process.env.TURBOPACK before loading this file for Turbopack builds and
+  // leaves it unset for --webpack (verified empirically on Next 16.2).
+  ...(process.env.TURBOPACK ? {} : { experimental: { esmExternals: 'loose' } }),
   transpilePackages: [
     'sanitize-html',
     'htmlparser2',
