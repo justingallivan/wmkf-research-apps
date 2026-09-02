@@ -37,9 +37,8 @@ eligible requests to authorized `reviewers` users. Request-bound mutations are
 independently server-gated to the resolved request's lead PD or a superuser, so
 foreign rows are read-only for ordinary non-lead users. Authenticated Production
 proof showed D26 My 10 → All 44 (picker: 44 active + 184 set aside) and J26 My 0
-→ All 5 without exercising a write. Current `main` commit `8e23aa95` is Ready in
-deployment `dpl_FyiMz13BupWcGtTSaMNLxPd5FntP`. The canonical next item is Final
-Writeup persona access proof and rollout, not more Reviewer Follow-up promotion.
+→ All 5 without exercising a write. The canonical next item is Final Writeup
+persona access proof and rollout, not more Reviewer Follow-up promotion.
 
 **2026-07-29 editor-direction implementation checkpoint:** Allison is a confirmed primary
 user for the Editor lens. The target contract preserves the former

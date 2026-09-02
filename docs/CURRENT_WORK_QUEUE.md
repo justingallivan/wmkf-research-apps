@@ -169,10 +169,9 @@ sequence.
   candidate passed 17 focused suites / 241 tests plus relevant gates, lint, types,
   and build. Authenticated Production proof showed D26 My 10 → All 44 (picker:
   44 active + 184 set aside) and J26 My 0 → All 5 without exercising a write.
-  Current `main` `8e23aa95` is Ready in deployment
-  `dpl_FyiMz13BupWcGtTSaMNLxPd5FntP`; rollback target is
-  `dpl_3SJebjL3tPTdv89o5dVzR1dBS3Y2` (`39413e3d`). Queue order 2—Final Writeup
-  persona access proof and rollout—remains the next item.
+  Release deployment `dpl_7ToPKYtpXhyW3WmPmn1WiY9wz2iv` reached Ready; rollback
+  target is `dpl_3SJebjL3tPTdv89o5dVzR1dBS3Y2` (`39413e3d`). Queue order
+  2—Final Writeup persona access proof and rollout—remains the next item.
 
 - Final Writeup acknowledgement Wave 23: **[PRODUCTION-PROVED 2026-08-31]**
   schema-as-code defines the

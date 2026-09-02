@@ -36,9 +36,6 @@ to Final Writeup persona rollout.
    - Runtime merge commit `acf40fb85a36ab2d481869c706a069abea52c087`
      reached Ready Production deployment
      `dpl_7ToPKYtpXhyW3WmPmn1WiY9wz2iv`.
-   - Current `main` commit `8e23aa95c5ef48c0724ccd06018d1a484015e5cc`
-     is Ready in Production deployment
-     `dpl_FyiMz13BupWcGtTSaMNLxPd5FntP`.
    - Authenticated Production proof: D26 changed from **My 10** to **All 44**;
      its picker reports **44 active + 184 set aside**. J26 changed from **My 0**
      to **All 5**. No write control was exercised.

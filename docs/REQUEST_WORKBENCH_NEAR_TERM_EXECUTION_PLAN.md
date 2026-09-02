@@ -40,10 +40,8 @@ related:
 > the merged candidate passed 17 focused suites / 241 tests plus the relevant
 > gates and build. Authenticated Production proof showed D26 My 10 → All 44
 > (picker: 44 active + 184 set aside) and J26 My 0 → All 5, with no write action
-> exercised. Current `main` commit `8e23aa95` is Ready in deployment
-> `dpl_FyiMz13BupWcGtTSaMNLxPd5FntP`. The preceding read-only Preview proof is
-> retained in the completed implementation plan; it is no longer a promotion
-> prerequisite.
+> exercised. The preceding read-only Preview proof is retained in the completed
+> implementation plan; it is no longer a promotion prerequisite.
 
 ## Outcome
 

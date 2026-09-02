@@ -28,8 +28,8 @@ chronology remains historical.
 ## Authoritative evidence
 
 - **Source:** runtime merge
-  `acf40fb85a36ab2d481869c706a069abea52c087`; current `main`
-  `8e23aa95c5ef48c0724ccd06018d1a484015e5cc`.
+  `acf40fb85a36ab2d481869c706a069abea52c087`; later documentation commits do
+  not change this runtime evidence anchor.
 - **Authorization contract:** request-bound Reviewer Follow-up mutations resolve
   the target request server-side and permit its lead PD or a superuser; authorized
   non-lead staff retain organization-wide reads.
@@ -37,8 +37,7 @@ chronology remains historical.
   17 focused suites / 241 tests, relevant gates, lint, types, and build passed for
   the merged candidate.
 - **Deployment:** runtime deployment
-  `dpl_7ToPKYtpXhyW3WmPmn1WiY9wz2iv`; current Ready Production deployment
-  `dpl_FyiMz13BupWcGtTSaMNLxPd5FntP`.
+  `dpl_7ToPKYtpXhyW3WmPmn1WiY9wz2iv` reached Ready in Production.
 - **Authenticated Production read proof:** D26 My 10 → All 44, picker 44 active +
   184 set aside; J26 My 0 → All 5. No write action was exercised.
 - **Rollback:** `dpl_3SJebjL3tPTdv89o5dVzR1dBS3Y2` at `39413e3d`.
