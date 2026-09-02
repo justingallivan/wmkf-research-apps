@@ -108,7 +108,8 @@ export function WorkbenchRequest({ previewReadOnly = false }) {
     );
   };
 
-  // Soft UI gate (S207 decision) — cosmetic, fails open. See computeCanManage.
+  // Fail-closed UI gate. Protected mutation routes independently enforce their
+  // server-side policy; this client projection is never authorization.
   const myUserId = session?.user?.dynamicsSystemuserId || null;
   const pdId = ctx?.programDirectorId || null;
   const canManage = computeCanManage({ isSuperuser, pdId, myUserId });

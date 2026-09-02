@@ -18,9 +18,10 @@
  *                  always the signed-in MS account; signature is freeform text)
  *   - mode       : undefined|'all' → every reviewer (Review Manager behavior);
  *                  'track' → Workbench post-acceptance lifecycle sub-tab
- *   - canManage  : UI mirror of the authoritative lead-PD/superuser gate. When
- *                  false, request-bound write controls are hidden and the table
- *                  is read-only.
+ *   - canManage  : fail-closed UI gate for request-owner controls. When false,
+ *                  write controls are hidden and the table is read-only. Each
+ *                  mutation route must enforce its own server authorization;
+ *                  this prop is never an authorization boundary.
  *   - showReviewReminderAction : exposes the direct review-due reminder in the
  *                  consolidated follow-up page without changing other hosts.
  *   - previewReadOnly : shows that reminder control disabled so a Preview backed
@@ -904,6 +905,13 @@ function ReleaseMaterialsModal({ isOpen, onClose, reviewers, proposalTitle, requ
         }),
       });
       if (modalSessionRef.current !== epoch) return;
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || data.message || `Email send failed (${response.status})`);
+      }
+      if (!response.body || typeof response.body.getReader !== 'function') {
+        throw new Error('Email send returned no readable response stream');
+      }
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();

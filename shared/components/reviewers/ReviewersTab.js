@@ -23,8 +23,8 @@
  * Props:
  *   - requestId : the akoya_request GUID
  *   - context   : light request context from resolve-request (title, etc.)
- *   - canManage : UI mirror of the authoritative lead-PD/superuser gate for
- *                 request-bound reviewer mutations
+ *   - canManage : fail-closed UI gate for request-owner controls. Mutation
+ *                 routes independently enforce their applicable server policy.
  *   - settings  : { signature } for the email templates
  */
 

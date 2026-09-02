@@ -84,9 +84,9 @@ export function computeDefaultSub(reviewers) {
 }
 
 /**
- * UI mirror of the authoritative request mutation gate: lead PD or superuser.
- * Missing identity or request ownership fails closed, and GUID case does not
- * affect the comparison.
+ * Fail-closed display gate for request-owner controls: lead PD or superuser.
+ * Mutation routes independently enforce server authorization and never trust
+ * this client-side value. GUID case does not affect the comparison.
  */
 export function computeCanManage({ isSuperuser = false, pdId = null, myUserId = null } = {}) {
   if (isSuperuser) return true;

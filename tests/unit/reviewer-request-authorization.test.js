@@ -64,6 +64,26 @@ test.each([
   })).rejects.toMatchObject({ httpStatus: 403 });
 });
 
+test('fails closed for a request with no lead PD', async () => {
+  findByIds.mockResolvedValue({
+    records: [{ akoya_requestid: REQUEST_A, _wmkf_programdirector_value: null }],
+  });
+  await expect(authorizeReviewerRequestMutation({
+    profileId: 7,
+    callerSystemId: 'pd-1',
+    requestIds: [REQUEST_A],
+  })).rejects.toMatchObject({ httpStatus: 403 });
+});
+
+test('deduplicates repeated targets before authorization reads', async () => {
+  await expect(authorizeReviewerRequestMutation({
+    profileId: 7,
+    callerSystemId: 'pd-1',
+    requestIds: [REQUEST_A, REQUEST_A.toUpperCase()],
+  })).resolves.toEqual({ requestIds: [REQUEST_A], isSuperuser: false });
+  expect(findByIds).toHaveBeenCalledWith([REQUEST_A], expect.any(Object));
+});
+
 test('preauthorizes every request in a batch and rejects when any target is foreign', async () => {
   queryAllSuggestions.mockResolvedValue({
     records: [
@@ -105,4 +125,23 @@ test('fails closed when a suggestion or request is missing, or the suggestion sc
     callerSystemId: 'pd-1',
     suggestionIds: [SUGGESTION_A],
   })).rejects.toMatchObject({ httpStatus: 503 });
+});
+
+test('maps ownership adapter failures to sanitized 502 responses', async () => {
+  const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+  queryAllSuggestions.mockRejectedValueOnce(new Error('Dataverse suggestion read failed'));
+  await expect(authorizeReviewerRequestMutation({
+    profileId: 7,
+    callerSystemId: 'pd-1',
+    suggestionIds: [SUGGESTION_A],
+  })).rejects.toMatchObject({ httpStatus: 502 });
+
+  findByIds.mockRejectedValueOnce(new Error('Dataverse request read failed'));
+  await expect(authorizeReviewerRequestMutation({
+    profileId: 7,
+    callerSystemId: 'pd-1',
+    requestIds: [REQUEST_A],
+  })).rejects.toMatchObject({ httpStatus: 502 });
+  expect(errorSpy).toHaveBeenCalledTimes(2);
+  errorSpy.mockRestore();
 });

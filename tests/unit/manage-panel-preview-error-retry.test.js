@@ -208,6 +208,33 @@ test('pin 3: a terminal send-stream error shows its message without Retry, and p
   expect(screen.queryByRole('button', { name: /Retry/ })).toBeNull();
 });
 
+test('pre-stream authorization failure returns to preview with the server message', async () => {
+  renderEmailsBehavior = () => mockJson({
+    drafts: [{
+      suggestionId: REVIEWER_A.suggestionId,
+      candidateName: REVIEWER_A.name,
+      candidateEmail: REVIEWER_A.email,
+      subject: 'S',
+      body: 'B',
+    }],
+  });
+  global.fetch = jest.fn(async (url) => {
+    const u = String(url);
+    if (u === '/api/review-manager/send-emails') {
+      return mockJson({ error: 'Only the lead Program Director can send these emails.' }, false, 403);
+    }
+    return baseFetchImpl(u);
+  });
+
+  renderPanel();
+  openReleaseModal();
+  fireEvent.click(await screen.findByRole('button', { name: /preview 1 email/i }));
+  fireEvent.click(await screen.findByRole('button', { name: /send 1 email/i }));
+
+  await screen.findByText('Only the lead Program Director can send these emails.');
+  expect(screen.getByRole('button', { name: /send 1 email/i })).toBeTruthy();
+});
+
 // Pin 4 -----------------------------------------------------------------
 
 test('pin 4: deferred-response reopen — stale drafts do not render, and Send posts only the new session\'s suggestion IDs', async () => {
