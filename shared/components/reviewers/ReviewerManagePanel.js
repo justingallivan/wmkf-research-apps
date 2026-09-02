@@ -69,11 +69,18 @@ const TOKEN_STATE_INFO = {
   active:     { label: 'Active',   color: 'bg-blue-100 text-blue-800' },
   revoked:    { label: 'Revoked',  color: 'bg-red-100 text-red-800' },
   expired:    { label: 'Expired',  color: 'bg-orange-100 text-orange-800' },
+  invalid:    { label: 'Needs review', color: 'bg-amber-100 text-amber-800' },
 };
 
 export function TokenStateBadge({ state, expiresAt, firstAccessedAt }) {
-  const info = TOKEN_STATE_INFO[state] || TOKEN_STATE_INFO.not_minted;
+  const known = Boolean(TOKEN_STATE_INFO[state]);
+  const info = TOKEN_STATE_INFO[state] || {
+    label: 'Unknown',
+    color: 'bg-amber-100 text-amber-800',
+  };
   const tooltip = [
+    state === 'invalid' && 'Stored token metadata needs technical review',
+    !known && 'Unrecognized token state; refresh or request technical review',
     expiresAt && `Expires ${new Date(expiresAt).toLocaleDateString()}`,
     firstAccessedAt && `Opened ${new Date(firstAccessedAt).toLocaleDateString()}`,
   ].filter(Boolean).join(' · ');

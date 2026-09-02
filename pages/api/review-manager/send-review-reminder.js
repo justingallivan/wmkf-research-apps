@@ -17,8 +17,9 @@
  * Delegates all claim/eligibility/send logic to
  * `lib/services/reviewer-manual-reminder.js`, which reuses the review-due
  * cron's send/token/template machinery (`reviewer-reminder-sweep.js`). The
- * manual service freshly authorizes the row, then persists its marker + token
- * in one ETag-bound PATCH before sending. Unlike the cron, a manual re-send
+ * manual service freshly authorizes the row, then persists the relevant marker
+ * (and a token only for respond-by nudges) in an ETag-bound PATCH before sending.
+ * Unlike the cron, a manual re-send
  * when the relevant marker is already set IS allowed — see that module's
  * header for the full semantics.
  *
@@ -41,6 +42,12 @@ const REASON_STATUS = {
   read_failed: 502,
   removed: 409,
   revoked: 409,
+  token_revoked: 409,
+  token_not_minted: 409,
+  token_invalid_data: 409,
+  token_expired: 409,
+  token_insufficient_window: 409,
+  due_date_missing: 409,
   ineligible: 409,
   conflict: 409,
   prepare_failed: 502,

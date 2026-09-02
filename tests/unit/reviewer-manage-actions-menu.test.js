@@ -3,7 +3,10 @@
  */
 
 import { fireEvent, render, screen } from '@testing-library/react';
-import { TokenActionsMenu } from '../../shared/components/reviewers/ReviewerManagePanel';
+import {
+  TokenActionsMenu,
+  TokenStateBadge,
+} from '../../shared/components/reviewers/ReviewerManagePanel';
 
 jest.mock('../../shared/components/Layout', () => ({
   Card: ({ children }) => <div>{children}</div>,
@@ -41,6 +44,7 @@ describe('reviewer management actions menu', () => {
     expect(screen.getByText('Use only to fix the recorded stage. No email is sent.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Record reviewer withdrawal' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Release from assignment' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Revoke link' })).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText('Correct status for Dr. Test Reviewer'), {
       target: { value: 'under_review' },
@@ -50,5 +54,11 @@ describe('reviewer management actions menu', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Manage Dr. Test Reviewer' }));
     fireEvent.click(screen.getByRole('button', { name: 'Record reviewer withdrawal' }));
     expect(onTransition).toHaveBeenCalledWith('withdrew');
+  });
+
+  test('invalid token metadata renders a data-review warning instead of looking unsent', () => {
+    render(<TokenStateBadge state="invalid" expiresAt={null} firstAccessedAt={null} />);
+    expect(screen.getByText('Needs review')).toBeInTheDocument();
+    expect(screen.queryByText('Not sent')).not.toBeInTheDocument();
   });
 });

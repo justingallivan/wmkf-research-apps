@@ -596,11 +596,49 @@ function isOutstanding(r) {
   return !r.reviewReceivedAt && !isTerminalReviewStatus(r.reviewStatus);
 }
 
+const REMINDER_ELIGIBILITY_INFO = {
+  eligible: {
+    title: 'Send a review-due reminder now',
+    message: null,
+  },
+  token_revoked: {
+    title: 'Access was withdrawn; deliberately restore access before reminding',
+    message: "This reviewer's access was withdrawn. Deliberately restore access before sending a reminder.",
+  },
+  token_not_minted: {
+    title: 'No review link is recorded; investigate the Materials history before sending one explicitly',
+    message: 'No review link is recorded. Investigate the Materials history before sending a link explicitly.',
+  },
+  token_invalid_data: {
+    title: 'Token metadata needs technical review; do not regenerate automatically',
+    message: 'The review-link metadata needs technical review. Do not regenerate the link automatically.',
+  },
+  token_expired: {
+    title: 'The review link expired; send an explicit replacement link before reminding',
+    message: 'The review link expired. Send an explicit replacement link before sending a reminder.',
+  },
+  token_insufficient_window: {
+    title: 'The review link does not cover the deadline; send a deliberate replacement first',
+    message: 'The review link does not cover the deadline. Send a deliberate replacement link first.',
+  },
+  due_date_missing: {
+    title: 'Set a review due date before sending a reminder',
+    message: 'Set a review due date before sending a reminder.',
+  },
+};
+
 function OutstandingRow({ reviewer, requestId, onSent, onManualEntry }) {
   const [sending, setSending] = useState(false);
   const [feedback, setFeedback] = useState(null);
   const lastReminder = formatDate(reviewer.reminderSentAt);
-  const canSend = !!reviewer.materialsSentAt;
+  const reminderEligibility = reviewer.materialsSentAt
+    ? reviewer.reviewDueReminderEligibility
+    : 'materials_not_sent';
+  const eligibilityInfo = reminderEligibility === 'materials_not_sent'
+    ? { title: 'Materials have not been sent to this reviewer yet', message: null }
+    : REMINDER_ELIGIBILITY_INFO[reminderEligibility]
+      || { title: 'Reminder eligibility could not be verified', message: 'Reminder eligibility could not be verified. Refresh before trying again.' };
+  const canSend = reminderEligibility === 'eligible';
   const affiliation = reviewerAffiliationOf(reviewer);
 
   const handleSend = useCallback(async () => {
@@ -618,6 +656,12 @@ function OutstandingRow({ reviewer, requestId, onSent, onManualEntry }) {
           conflict: 'Already claimed by another send — refresh to see the latest status.',
           removed: 'This reviewer was removed from the proposal — restore them first.',
           revoked: "This reviewer's access was withdrawn — reissue their link before sending a reminder.",
+          token_revoked: REMINDER_ELIGIBILITY_INFO.token_revoked.message,
+          token_not_minted: REMINDER_ELIGIBILITY_INFO.token_not_minted.message,
+          token_invalid_data: REMINDER_ELIGIBILITY_INFO.token_invalid_data.message,
+          token_expired: REMINDER_ELIGIBILITY_INFO.token_expired.message,
+          token_insufficient_window: REMINDER_ELIGIBILITY_INFO.token_insufficient_window.message,
+          due_date_missing: REMINDER_ELIGIBILITY_INFO.due_date_missing.message,
           not_found: 'This reviewer is no longer available — refresh to update the list.',
           read_failed: "Couldn't verify this reviewer's latest status. No reminder was sent; try again.",
           prepare_failed: 'Could not prepare the reminder. No reminder was sent; try again.',
@@ -657,7 +701,7 @@ function OutstandingRow({ reviewer, requestId, onSent, onManualEntry }) {
           type="button"
           onClick={handleSend}
           disabled={sending || !canSend}
-          title={canSend ? 'Send a review-due reminder now' : 'Materials have not been sent to this reviewer yet'}
+          title={eligibilityInfo.title}
           className="inline-flex items-center gap-1 text-sm text-gray-700 hover:text-gray-900 border border-gray-300 rounded-lg px-3 py-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {sending ? 'Sending…' : 'Send reminder now'}

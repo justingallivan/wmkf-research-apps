@@ -140,6 +140,22 @@ test.each(['removed', 'revoked', 'conflict'])('%s refusal remains a typed 409 re
   expect(res._data).toMatchObject({ ok: false, reason });
 });
 
+test.each([
+  'token_revoked',
+  'token_not_minted',
+  'token_invalid_data',
+  'token_expired',
+  'token_insufficient_window',
+  'due_date_missing',
+])('%s liveness refusal is a typed 409 response', async (reason) => {
+  sendManualReviewDueReminder.mockResolvedValueOnce({ ok: false, reason });
+  const { req, res } = post({ requestId: REQUEST_ID, suggestionId: SUGGESTION_ID });
+  await handler(req, res);
+
+  expect(res.statusCode).toBe(409);
+  expect(res._data).toMatchObject({ ok: false, reason });
+});
+
 test.each(['read_failed', 'prepare_failed', 'send_failed'])('%s remains a typed 502 response', async (reason) => {
   sendManualRespondReminder.mockResolvedValueOnce({ ok: false, reason });
   const { req, res } = post({ requestId: REQUEST_ID, suggestionId: SUGGESTION_ID, kind: 'respond', reviewed: REVIEWED });

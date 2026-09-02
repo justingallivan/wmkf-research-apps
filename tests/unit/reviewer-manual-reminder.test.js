@@ -68,6 +68,8 @@ function suggestionRow(over = {}) {
     _wmkf_request_value: REQ,
     _wmkf_potentialreviewer_value: PERSON,
     wmkf_selected: true,
+    wmkf_externaltokenhash: 'stored-token-hash',
+    wmkf_externaltokenexpires: '2100-01-01T00:00:00Z',
     wmkf_externaltokenrevoked: false,
     wmkf_invited: true,
     wmkf_emailsentat: '2026-06-01T00:00:00Z',
@@ -89,7 +91,7 @@ function requestRecord(over = {}) {
     akoya_requestnum: 'R-1',
     akoya_title: 'A Proposal',
     _wmkf_programdirector_value: PD,
-    wmkf_reviewduedate: null,
+    wmkf_reviewduedate: '2099-09-09',
     ...over,
   };
 }
@@ -214,7 +216,7 @@ describe('sendManualReviewDueReminder', () => {
 
   test.each([
     ['removed', { wmkf_selected: false, wmkf_externaltokenrevoked: true }, 'removed'],
-    ['revoked', { wmkf_selected: true, wmkf_externaltokenrevoked: true }, 'revoked'],
+    ['revoked', { wmkf_selected: true, wmkf_externaltokenrevoked: true }, 'token_revoked'],
   ])('%s reviewer passes every review-due gate but is refused before claim/mint/send', async (_label, state, reason) => {
     installReads({ suggestion: suggestionRow(state) });
     const result = await sendManualReviewDueReminder({ requestId: REQ, suggestionId: SUG });
@@ -239,9 +241,26 @@ describe('sendManualReviewDueReminder', () => {
     expect(createAndSendEmail).not.toHaveBeenCalled();
   });
 
+  test('token becoming insufficient on the authorization re-read is refused before claim/send', async () => {
+    installReads({
+      suggestion: suggestionRow(),
+      suggestionAfterClaim: suggestionRow({
+        wmkf_externaltokenexpires: '2099-09-09T23:59:59Z',
+        _etag: 'W/"101"',
+      }),
+    });
+
+    const result = await sendManualReviewDueReminder({ requestId: REQ, suggestionId: SUG });
+
+    expect(result).toEqual({ ok: false, reason: 'token_insufficient_window' });
+    expect(updateRecord).not.toHaveBeenCalled();
+    expect(mintAndStore).not.toHaveBeenCalled();
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+  });
+
   test.each([
     ['removed', { wmkf_selected: false, wmkf_externaltokenrevoked: true }, 'removed'],
-    ['revoked', { wmkf_selected: true, wmkf_externaltokenrevoked: true }, 'revoked'],
+    ['revoked', { wmkf_selected: true, wmkf_externaltokenrevoked: true }, 'token_revoked'],
   ])('reviewer becoming %s after initial eligibility is refused before atomic claim/send', async (_label, state, reason) => {
     installReads({
       suggestion: suggestionRow(),

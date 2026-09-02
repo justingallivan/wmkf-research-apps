@@ -54,7 +54,11 @@ jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => {
   };
 });
 
-const { sweepRespondReminders, sweepReviewDueReminders } = require('../../lib/services/reviewer-reminder-sweep');
+const {
+  sendOneReminder,
+  sweepRespondReminders,
+  sweepReviewDueReminders,
+} = require('../../lib/services/reviewer-reminder-sweep');
 
 const DAY = 24 * 60 * 60 * 1000;
 const SUG = '11111111-1111-4111-8111-111111111111';
@@ -370,6 +374,9 @@ describe('sweepReviewDueReminders', () => {
       _wmkf_potentialreviewer_value: PERSON,
       _wmkf_request_value: REQ,
       wmkf_remindercount: 0,
+      wmkf_externaltokenhash: 'stored-token-hash',
+      wmkf_externaltokenexpires: new Date(Date.now() + 120 * DAY).toISOString(),
+      wmkf_externaltokenrevoked: false,
       _etag: 'W/"200"',
       ...over,
     };
@@ -564,6 +571,29 @@ describe('sweepReviewDueReminders', () => {
     installReads({ request: reviewDueRequest({ wmkf_reviewduedate: null }) });
     const r = await sweepReviewDueReminders();
     expect(r.sent).toBe(0);
+    expect(r.blocked.due_date_missing).toBe(1);
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    ['token_revoked', { wmkf_externaltokenrevoked: true }, {}],
+    ['token_not_minted', { wmkf_externaltokenhash: '  ' }, {}],
+    ['token_invalid_data', { wmkf_externaltokenexpires: null }, {}],
+    ['token_expired', { wmkf_externaltokenexpires: isoDaysAgo(1) }, {}],
+    ['token_insufficient_window', { wmkf_externaltokenexpires: new Date(Date.now() + 5 * DAY).toISOString() }, {
+      wmkf_reviewduedate: ymdDaysFromNow(10),
+      wmkf_reviewduereminderleaddays: 20,
+    }],
+  ])('%s is counted as a block, not a sweep error, before claim/send', async (reason, rowOver, requestOver) => {
+    queryAllRecords.mockResolvedValue({ records: [reviewDueCandidate(rowOver)] });
+    installReads({ request: reviewDueRequest(requestOver) });
+
+    const r = await sweepReviewDueReminders();
+
+    expect(r.blocked[reason]).toBe(1);
+    expect(r.errors).toEqual([]);
+    expect(r.sent).toBe(0);
+    expect(updateRecord).not.toHaveBeenCalled();
     expect(createAndSendEmail).not.toHaveBeenCalled();
   });
 
@@ -573,4 +603,29 @@ describe('sweepReviewDueReminders', () => {
     const r = await sweepReviewDueReminders();
     expect(r.sent).toBe(0);
   });
+});
+
+test('unknown reminder kind fails before any marker or token write', async () => {
+  const result = {
+    sent: 0,
+    skipped: 0,
+    prepareFailed: 0,
+    claimFailed: 0,
+    sendFailed: 0,
+    errors: [],
+  };
+
+  await sendOneReminder({
+    kind: 'unexpected',
+    row: { wmkf_appreviewersuggestionid: SUG, _etag: 'W/"1"' },
+    request: requestConfig({ wmkf_reviewduedate: ymdDaysFromNow(-1) }),
+    pd: { internalemailaddress: 'pd@keck.org', systemuserid: PD },
+    reviewer: { wmkf_emailaddress: 'rev@example.org' },
+    result,
+  });
+
+  expect(result).toMatchObject({ prepareFailed: 1, refusalReason: 'invalid_kind' });
+  expect(updateRecord).not.toHaveBeenCalled();
+  expect(mintAndStore).not.toHaveBeenCalled();
+  expect(createAndSendEmail).not.toHaveBeenCalled();
 });
