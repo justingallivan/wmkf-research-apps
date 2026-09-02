@@ -26,7 +26,8 @@ still open in **My requests**. Under the owner-selected mutation policy,
 non-superusers will be unable to mutate requests led by another Program
 Director. The owner selected that policy on 2026-09-02. The implementation is
 built and automated-test verified on `codex/workbench-reviewer-follow-up`;
-Preview verification and promotion remain release steps.
+authenticated Preview verification is complete, while deliberate Production
+promotion remains a separate release step.
 
 This is primarily a read-discovery correction. It adds no route, table,
 migration, permission, role, or write capability. Because the current
@@ -63,7 +64,7 @@ unchanged until deliberate promotion.
 | Before this build, the UI hid foreign-row management while request-bound Reviewer APIs remained staff-shared. The implementation routes those mutations through `authorizeReviewerRequestMutation` before side effects. | `lib/services/reviewer-request-authorization.js`; affected route shells; focused route tests | `[VERIFIED via source and automated tests on implementation branch]` |
 | The adapter docblock says the PD-scoped helper also serves Reviewer Finder, but a live symbol census finds only the Workbench dashboard caller; Reviewer Finder now builds its own PD-scoped `queryAllRequests` call. | `lib/dataverse/adapters/grant-request.js:172-190`; `lib/services/reviewer-finder/my-proposals-service.js:65-81` | `[STALE/CONFLICT verified via CodeGraph + rg + source]` |
 | In the authenticated Preview, the owner account saw 10 requests in **My requests** and 44 in **All requests** for D26. | Preview UAT on 2026-09-02 | `[VERIFIED via authenticated browser probe]` |
-| A Reviewer user with no assignment in a cycle cannot currently discover that cycle through this picker. | Follows directly from the PD-filtered cycle query | `[VERIFIED via source; browser complement still required]` |
+| The authenticated owner account had no J26 assignment, could select **June 2026 (5 active)** directly, and saw all 5 cycle requests after selecting **All requests**. | Preview UAT on 2026-09-02 | `[VERIFIED via authenticated browser complement]` |
 | Reviewer Follow-up always loads selected-cycle dashboard rows with `includeSetAside=1`, then its checkbox filters set-aside rows in the client. | `pages/workbench/reviewer-follow-up.js:172-222` | `[VERIFIED via source]` |
 
 ## Owner decision: foreign-row mutation policy — resolved 2026-09-02
@@ -459,6 +460,17 @@ organization-wide cycles and counts. Verify **Show set aside** separately on a
 selected cycle. Preview remains read-only unless the owner separately authorizes
 a write rehearsal.
 
+Authenticated owner UAT completed on deployment
+`dpl_GPvSiRA8wbFw7kJkKYwFbZEfMatM` on 2026-09-02. Azure CLI registration and a
+read-back probe confirmed the exact deployment-specific Microsoft callback URI
+while preserving all existing registrations (9 total). In D26, **My requests**
+showed 10 assigned requests and **All requests** showed 44 active cycle
+requests; the picker reported `44 active + 184 set aside`. In J26, **My
+requests** showed the no-assignment empty state and **All requests** reported all
+5 active cycle requests. The Preview read-only banner remained present and
+follow-up controls remained disabled. Production was not changed and no Preview
+write rehearsal was performed.
+
 ## Failure and rollback behavior
 
 - A Dataverse read failure remains a route failure; do not return a partial
@@ -550,10 +562,11 @@ security matrix; this build does not silently expand its census to those flows.
 
 ## Status
 
-`[BUILT + CLAUDE-REVIEWED + TEST-VERIFIED — PREVIEW PENDING 2026-09-02]` The organization-wide
+`[BUILT + CLAUDE-REVIEWED + PREVIEW-VERIFIED 2026-09-02]` The organization-wide
 cycle picker, truthful active/set-aside counts and defaults, fail-closed UI
 mirrors, and server-authoritative lead-PD/superuser request mutation boundary
 are implemented on `codex/workbench-reviewer-follow-up`. The Production volume
 probe returned 236 eligible rows with `capped:false`. Claude code review is
-complete; authenticated Preview verification and deliberate Production
-promotion remain release steps. Production is unchanged.
+complete. Authenticated Preview verification passed on deployment
+`dpl_GPvSiRA8wbFw7kJkKYwFbZEfMatM`; deliberate Production promotion remains a
+separate release step. Production is unchanged.
