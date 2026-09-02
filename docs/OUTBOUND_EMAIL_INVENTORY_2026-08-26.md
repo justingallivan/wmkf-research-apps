@@ -21,10 +21,12 @@ verify sender/control claims against live source before building on them.
 
 **Current-state correction (2026-09-01):** rows #5 and #6 remain implemented,
 but `/api/cron/reviewer-reminders` is no longer registered in Vercel. Rows #1–3,
-#7–8, and #11 remain callable; production staff are under a procedural freeze
-on token-issuing reminders, link-bearing resends, regeneration, and deadline
-resends during the reviewer-token incident response. This snapshot does not
-override the canonical hold and reactivation rules in
+#7–8, and #11 remain callable. The owner lifted the procedural manual-reminder
+freeze after the production remediation and read-only D26 audit; the automatic
+schedule remains held. Row #7 intentionally mints and sends a replacement
+pre-acceptance link. Row #8 is link-free, preserves token authority, and fails
+closed on token liveness and deadline runway before its marker or email. This
+dated inventory does not override the canonical hold and reactivation rules in
 `docs/REVIEWER_ENGAGEMENT_SPEC.md`.
 
 ## Transport layer (shared)

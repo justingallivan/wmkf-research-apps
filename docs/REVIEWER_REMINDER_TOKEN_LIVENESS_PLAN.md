@@ -99,10 +99,16 @@ state is summarized immediately after the list.
   continue to use pure `tokenState`. Invalid metadata offers Revoke but not
   Regenerate.
 - The read-only production audit reuses the sweep predicate. The post-deploy D26
-  run examined 51 rows: all 51 active/eligible, zero blocked.
-- Commit `4dd57369` is live in Ready production deployment
-  `dpl_89s9MzdUnDST6Jm9Vs3cnMLPmUDu`; authenticated Workbench smoke passed and
-  the deployed cron registry still omits `/api/cron/reviewer-reminders`.
+  run examined 51 never-reminded rows (`wmkf_remindersentat eq null`): all 51
+  active/eligible, zero blocked. Reviewers already marked reminded, including the
+  morning batch, were outside this audit population.
+- Runtime source at commit `4dd57369` contains the guard. Incident-session
+  operations observed Ready production deployment
+  `dpl_89s9MzdUnDST6Jm9Vs3cnMLPmUDu` and an authenticated Workbench smoke, while
+  the deployed cron registry still omitted `/api/cron/reviewer-reminders`.
+  Vercel deployment metadata exposed no source SHA, and no tracked smoke artifact
+  was retained; those two observations are not independently reproducible from
+  repository evidence alone.
 
 ## 3. Change surface
 
@@ -390,12 +396,16 @@ test doubles for email assertions; the reminder transport has no capture mode.
 
 ## 10. Release and freeze-lift checklist — complete 2026-09-01
 
-All nine steps completed. The exact promoted commit is `4dd57369`; Ready
-production deployment is `dpl_89s9MzdUnDST6Jm9Vs3cnMLPmUDu`. The hold gate,
-cron absence, health/error scan, authenticated Workbench smoke, focused/full
-tests, and post-deploy read-only D26 audit were verified. The audit examined 51
-rows with zero blocked outcomes. The owner then lifted the procedural manual
-review-due reminder freeze while explicitly retaining the automatic-cron hold.
+All nine steps completed. Runtime source is commit `4dd57369`; incident-session
+operations observed Ready production deployment
+`dpl_89s9MzdUnDST6Jm9Vs3cnMLPmUDu`. The hold gate, cron absence,
+health/error scan, focused/full tests, and post-deploy read-only D26 audit were
+verified from retained evidence. The authenticated Workbench smoke was observed
+but has no tracked artifact, and the deployment metadata exposed no source SHA.
+The audit examined 51 never-reminded D26 sweep candidates with zero blocked
+outcomes; already-reminded rows were outside its population. The owner then
+lifted the procedural manual review-due reminder freeze while explicitly
+retaining the automatic-cron hold.
 
 1. Claude reviews this plan read-only and either approves it or names required
    corrections.

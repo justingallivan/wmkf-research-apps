@@ -1,9 +1,9 @@
 # Atlas: `review_drafts` (Postgres — operational scratchpad)
 
-**Last verified:** 2026-07-26 via
-`lib/db/migrations/021_review_drafts.sql`,
-`lib/services/review-draft-service.js`, and the live external reviewer
-authoring routes/UI.
+**Last verified:** 2026-09-01 via
+`lib/services/review-draft-service.js`, the revoke/regenerate routes and
+service, and the live external reviewer authoring routes/UI. Migration 021
+remains the applied schema history; its original lifecycle comment is historical.
 **Live row count:** **probe required.** The earlier zero-row count was a
 post-migration snapshot, not a durable fact. The authoring UI, autosave, submit,
 and cleanup paths have since shipped.
@@ -28,12 +28,12 @@ Same reasoning as `intake_drafts`: autosave fires many times per session, and Da
 - `lib/services/review-draft-service.js` — the only data-access layer:
   - `getBySuggestion(suggestionId)` — read the single draft (or null).
   - `upsertDraftJson({ suggestionId, draftJson })` — autosave (last-write-wins; touches `draft_json` + `updated_at`).
-  - `deleteBySuggestion(suggestionId)` — after the submit changeset commits, and on staff token revoke/regenerate.
+  - `deleteBySuggestion(suggestionId)` — after the submit changeset commits and on explicit staff token revoke. Regeneration preserves the draft.
   - `deleteExpired({ olderThanDays })` — maintenance-cron GC (interval finalized in Phase 5).
 - `pages/api/external/review/[token]/draft.js` — GET (rehydrate) / PUT (autosave). PUT sanitizes every rich-text answer via `lib/external/sanitize-review-html.js` BEFORE persisting (stored-XSS boundary), whitelists to schema keys, and gates writes on the engagement stage (`computeEngagementState`): 409 once submitted, 409 before materials are released.
 
 ## Lifecycle / gotchas
 
 - **Finality is enforced in the ROUTE, not this layer.** The "refuse once submitted" check reads `wmkf_reviewreceivedat` from Dataverse; `ReviewDraftService` is pure Postgres and has no finality awareness.
-- **Draft survives benign email resends, dies on revoke/regenerate** (the leak/compromise actions). Wired in Phase 5 into `revoke-token.js` + `regenerate-token.js`, NOT `mintAndStore` (which also runs on every benign resend). Drafts key on `suggestion_id`, stable across token regeneration.
+- **Draft survives benign email resends and explicit token regeneration; it dies on submit, explicit revoke, or 90-day GC.** Drafts key on `suggestion_id`, stable across token regeneration. Regeneration is the replacement-link recovery action and preserves in-progress work. If compromise response must discard possibly tampered draft state, staff revoke first; revocation deletes the draft best-effort before any deliberate replacement token is issued.
 - **Two-tab autosave is last-write-wins** — a single reviewer is the only writer and there is no async drain to corrupt, so no idempotency key.
