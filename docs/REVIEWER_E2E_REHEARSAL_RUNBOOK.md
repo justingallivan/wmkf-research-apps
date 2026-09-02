@@ -6,7 +6,7 @@ status: active
 summary: "Safe reviewer invitation and return rehearsal through browser mocks, capture-mode controlled writes, or an allowlisted live smoke."
 canonical: false
 cataloged: 2026-07-02
-last_verified: 2026-07-30
+last_verified: 2026-09-01
 owner: product-engineering
 related:
   - docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md
@@ -143,7 +143,7 @@ Suggested click paths while the browser stays open:
 3. `Invite`: `Release to reviewers` -> preview -> send.
 4. `Candidates`: select `Dr. Pending Invitee (already invited)` -> `Release as no longer needed`.
 
-There is no manual `Re-invite already-invited` button: invited non-responders are nudged automatically by the respond-by reminder cron (`/api/cron/reviewer-reminders`, Phase 3). For a pending invitee you want to drop, use `Release as no longer needed`.
+There is no manual `Re-invite already-invited` button. The respond-by reminder mechanism remains implemented at `/api/cron/reviewer-reminders`, but its Vercel schedule has been paused since 2026-09-01. The staff reminder action also remains callable but is under a procedural production freeze because it rotates token authority. Rehearsals must not send a live reminder or substitute another link-bearing resend during the hold. For a pending invitee you want to drop, use `Release as no longer needed`.
 
 Stop the rehearsal with `Ctrl-C` in the terminal that launched it.
 

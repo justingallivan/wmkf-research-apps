@@ -135,7 +135,7 @@ related:
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
 | [EMAIL_TOKEN_SYNTAX_UNIFICATION_PLAN.md](EMAIL_TOKEN_SYNTAX_UNIFICATION_PLAN.md) | plan | historical |  | Historical record of the completed July 2026 mustache-token migration; current template behavior lives in the resolver source and seed defaults. | 2026-07-02 |
-| [OUTBOUND_EMAIL_INVENTORY_2026-08-26.md](OUTBOUND_EMAIL_INVENTORY_2026-08-26.md) | audit | active |  | Dated snapshot of all 18 outbound email types: trigger class, sender identity, recipients, controls, automation-notice and noFallback coverage. | 2026-08-26 |
+| [OUTBOUND_EMAIL_INVENTORY_2026-08-26.md](OUTBOUND_EMAIL_INVENTORY_2026-08-26.md) | audit | historical |  | Dated snapshot of all 18 outbound email types: trigger class, sender identity, recipients, controls, automation-notice and noFallback coverage. | 2026-08-26 |
 | [RESOLVED_PAGE_EMAIL_TIER_DESIGN.md](RESOLVED_PAGE_EMAIL_TIER_DESIGN.md) | spec | active |  | Guarded page fetch plus deterministic mailbox ranking; only a unique grounded winner receives the invitation-ready institution_page source. | 2026-07-02 |
 | [SCHEDULED_EMAIL_VIP_DIGEST_PLAN.md](SCHEDULED_EMAIL_VIP_DIGEST_PLAN.md) | plan | active |  | Owner-settled scheduled-email redesign: automatic labeled sends, per-PD VIP recipient flags, digest as single interface, explicit rollout onboarding. | 2026-08-26 |
 | [SCHEDULED_PERSONALIZED_EMAIL_P0.md](SCHEDULED_PERSONALIZED_EMAIL_P0.md) | plan | superseded |  | Source-built P0 for per-PD review preferences, durable drafts, personalized automation disclosure, and recoverable send/finalization. | 2026-08-25 |

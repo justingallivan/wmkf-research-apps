@@ -2,7 +2,7 @@
 title: "Outbound email inventory (2026-08-26)"
 domain: email
 kind: audit
-status: active
+status: historical
 summary: "Dated snapshot of all 18 outbound email types: trigger class, sender identity, recipients, controls, automation-notice and noFallback coverage."
 canonical: false
 cataloged: 2026-08-26
@@ -18,6 +18,14 @@ Compiled by a repo-wide sweep on branch state at merge `4a743d63` to seed the
 reviewer-email extension of the VIP/digest decision layer
 (`docs/SCHEDULED_EMAIL_VIP_DIGEST_PLAN.md` "Broader effort"). Dated snapshot:
 verify sender/control claims against live source before building on them.
+
+**Current-state correction (2026-09-01):** rows #5 and #6 remain implemented,
+but `/api/cron/reviewer-reminders` is no longer registered in Vercel. Rows #1–3,
+#7–8, and #11 remain callable; production staff are under a procedural freeze
+on token-issuing reminders, link-bearing resends, regeneration, and deadline
+resends during the reviewer-token incident response. This snapshot does not
+override the canonical hold and reactivation rules in
+`docs/REVIEWER_ENGAGEMENT_SPEC.md`.
 
 ## Transport layer (shared)
 

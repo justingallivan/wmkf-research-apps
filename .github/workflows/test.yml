@@ -24,6 +24,8 @@ jobs:
       - run: npm run check:doc-currency:self-test
       - run: npm run check:docs-catalog
       - run: npm run check:migrations-manifest
+      - run: npm run check:reviewer-reminder-hold
+      - run: npm run check:reviewer-reminder-hold:self-test
       - run: npm run check:agent-invariants:ci
       - run: npm run check:instruction-architecture
       - run: npm run check:memory-router

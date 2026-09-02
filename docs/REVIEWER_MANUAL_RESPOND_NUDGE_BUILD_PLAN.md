@@ -23,6 +23,15 @@ not performed. Phase B remains open.
 **Session:** S424-S425, 2026-08-13.
 **Build owner:** Codex leads implementation; Claude reviews.
 
+**Current incident override (2026-09-01):** the manual action remains deployed,
+but production staff are under a procedural freeze on it and every other
+token-issuing reminder/resend surface. `/api/cron/reviewer-reminders` is no
+longer registered in Vercel and is protected by the build/CI hold gate. The
+earlier production posture below is historical: a 2026-09-01 read-only probe
+found 92 current-cycle active requests with both reminder flags true, not null.
+Use `docs/REVIEWER_ENGAGEMENT_SPEC.md` for the current hold and reactivation
+contract.
+
 **Review history.** Claude drafted; Codex adversarial review returned
 `needs-attention` with two `[high]` findings, both confirmed against source:
 §2's original defect claim was wrong (it asserted `softDelete` leaves
@@ -64,10 +73,11 @@ scale figures as `[ASSUMED]` until re-measured.
 
 ## 1. Why this, and why not the cron
 
-A PD cannot currently nudge an invited reviewer who has not answered. The
-respond-by reminder exists and is scheduled daily, but has never fired: its
-per-request opt-in `wmkf_respondreminderenabled` is `null` on every request,
-and no UI can set it.
+A PD could not nudge an invited reviewer when this plan was written. The manual
+action built by this plan later closed that UI gap. The automatic respond-by
+mechanism remains implemented, but its Vercel schedule was paused on 2026-09-01;
+the null-on-every-request observation below was a 2026-08-13 snapshot and is no
+longer current.
 
 `[VERIFIED via production probe, 2026-08-13]`
 `scripts/probe-respond-reminder-gates.js --target=prod`: every scanned invited,
@@ -170,10 +180,11 @@ refused rather than silently reopened.
 ### Out (explicitly deferred)
 - Arming `respondReminderEnabled` / exposing campaign-settings toggles.
 - Per-reason `skipped` counters in the cron sweep.
-- Adding `wmkf_selected` / revocation checks to the **cron** sweep. The cron is
-  disabled everywhere, so it cannot fire; fixing it is a separate change made
-  when the toggle work happens. **This plan must not leave a reader believing
-  the cron is safe** — it is unfixed, and gated only by the null flag.
+- Adding `wmkf_selected` / revocation checks to the **cron** sweep was deferred
+  by this plan and later implemented. The automatic route is currently
+  unscheduled in Vercel under the token-incident hold; the hold gate, not null
+  flags, is the scheduling control. The current Campaign settings UI still
+  omits the reminder toggles/leads.
 - Sticky per-user reminder defaults.
 
 ### Mint-surface audit
@@ -283,7 +294,7 @@ the respond marker and the new refusal reason. `check:api-routes` must pass.
 | A removed/revoked reviewer is never nudged, on **either** path | Unit: fixture with `selected=false`+`revoked=true` that passes every OTHER check → `removed`, and `sendOneReminder` NOT called |
 | The token is not un-revoked as a side effect | Assert no mint/patch occurs on the refusal path |
 | Respond nudge stamps the respond marker, not the review-due one | Assert patch fields per `kind` |
-| Manual re-send still allowed | Second call with the marker set succeeds |
+| Implemented manual re-send contract remains callable (production use frozen by the 2026-09-01 hold) | Second call with the marker set succeeds |
 | A claim conflict aborts without sending | Existing sweep harness pattern |
 | Cron behavior unchanged | `sweepRespondReminders` tests untouched and green |
 | Wrong `kind` is rejected | Route test asserts a validation failure on an unknown value |

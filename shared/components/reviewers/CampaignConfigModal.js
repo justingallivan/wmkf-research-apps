@@ -7,9 +7,10 @@
  * Phase 1 exposes "days to respond" (the per-reviewer respond-by offset), the fixed
  * review-due date, and the reviewer quota target (`desiredCount` — the number of
  * committed/accepted reviewers needed before the lead PD is notified; it does not
- * auto-withdraw anyone). The reminder toggles/leads are persisted on the same record
- * but get their UI controls in the phase that consumes them (3), so we don't surface
- * a control that does nothing yet.
+ * auto-withdraw anyone). The reminder toggles/leads are persisted on the same record,
+ * but this modal never received their UI controls. The reviewer-reminder Vercel
+ * schedule is paused under the 2026-09-01 incident hold; do not describe these fields
+ * as operator-configurable until the UI and fail-closed defaults ship together.
  *
  * Props:
  *   - requestId : the akoya_request GUID

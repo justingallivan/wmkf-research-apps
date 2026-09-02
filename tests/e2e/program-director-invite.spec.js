@@ -514,9 +514,9 @@ test.describe('Program Director reviewer invitation flow', () => {
     });
   });
 
-  // Note: there is no manual "Re-invite already-invited" UI affordance — the
-  // automated respond-by reminder (cron reviewer-reminders) nudges pending
-  // invitees. The server-side `allowResend` re-mint contract is still covered by
+  // Note: there is no manual "Re-invite already-invited" UI affordance. The
+  // automatic reviewer-reminder schedule is paused under the 2026-09-01 hold.
+  // The server-side `allowResend` re-mint contract is still covered by
   // tests/unit/reviewer-invite.test.js and tests/integration/send-emails-route.test.js.
 
   test('edits reviewer-engagement campaign settings without Dataverse', async ({ page, context }, testInfo) => {
