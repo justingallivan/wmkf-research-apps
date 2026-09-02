@@ -18,9 +18,13 @@ jest.mock('../../lib/services/dynamics-context', () => ({
     return Promise.resolve().then(() => fn());
   },
 }));
+jest.mock('../../lib/services/reviewer-request-authorization', () => ({
+  authorizeReviewerRequestMutation: jest.fn(async () => ({})),
+}));
 
 import { requireAppAccess } from '../../lib/utils/auth';
 import { DynamicsService } from '../../lib/services/dynamics-service';
+import { authorizeReviewerRequestMutation } from '../../lib/services/reviewer-request-authorization';
 import handler from '../../pages/api/review-manager/campaign-config';
 
 const GUID = '55555555-5555-5555-5555-555555555555';
@@ -107,5 +111,10 @@ describe('POST /api/review-manager/campaign-config (grant-request adapter contra
     expect(DynamicsService.updateRecord).toHaveBeenCalledWith('akoya_requests', GUID,
       { wmkf_respondoffsetdays: 7, wmkf_desiredcount: 4 },
       { actingUserSystemId: 'sys-1' });
+    expect(authorizeReviewerRequestMutation).toHaveBeenCalledWith({
+      profileId: undefined,
+      callerSystemId: 'sys-1',
+      requestIds: [GUID],
+    });
   });
 });

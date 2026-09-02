@@ -23,6 +23,13 @@ jest.mock('../../shared/components/Layout', () => {
   return { __esModule: true, default: Layout, Card, PageHeader };
 });
 
+jest.mock('../../shared/components/reviewers/ReviewerManagePanel', () => {
+  const React = require('react');
+  return function MockReviewerManagePanel({ canManage }) {
+    return React.createElement('div', { 'data-testid': 'reviewer-manage-panel', 'data-can-manage': String(canManage) });
+  };
+});
+
 const dashboardProposals = [
   {
     requestId: 'request-a',
@@ -149,6 +156,7 @@ describe('reviewer follow-up request scope', () => {
 
   afterEach(() => {
     global.fetch = originalFetch;
+    window.history.replaceState({}, '', '/workbench/reviewer-follow-up');
   });
 
   test('keeps request scope separate from reviewer-state view and refetches both feeds for All requests', async () => {
@@ -183,6 +191,68 @@ describe('reviewer follow-up request scope', () => {
     });
     expect(screen.getByRole('button', { name: 'All requests' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('button', { name: 'All reviewers' })).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  test('uses the server default even when it is not the first cycle, while honoring a valid URL override', async () => {
+    const cycleResponse = {
+      cycles: [
+        { code: 'D26', label: 'December 2026', count: 44, setAsideCount: 6 },
+        { code: 'J26', label: 'June 2026', count: 0, setAsideCount: 3 },
+      ],
+      defaultCycleCode: 'J26',
+    };
+    global.fetch = jest.fn(async (url) => ({
+      ok: true,
+      json: async () => url === '/api/workbench/dashboard' ? cycleResponse : { proposals: [] },
+    }));
+
+    const { unmount } = render(<ReviewerFollowUpDashboard />);
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Cycle' })).toHaveValue('J26'));
+    expect(screen.getByRole('option', { name: 'December 2026 (44 active + 6 set aside)' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'June 2026 (0 active + 3 set aside)' })).toBeInTheDocument();
+    unmount();
+
+    window.history.replaceState({}, '', '/workbench/reviewer-follow-up?cycleCode=D26');
+    render(<ReviewerFollowUpDashboard />);
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Cycle' })).toHaveValue('D26'));
+  });
+
+  test('guides an unassigned user to All requests from the initial My requests view', async () => {
+    global.fetch = jest.fn(async (url) => ({
+      ok: true,
+      json: async () => url === '/api/workbench/dashboard'
+        ? { cycles: [{ code: 'D26', label: 'December 2026', count: 44, setAsideCount: 0 }], defaultCycleCode: 'D26' }
+        : { proposals: [] },
+    }));
+
+    render(<ReviewerFollowUpDashboard />);
+    expect(await screen.findByText('No requests are assigned to you in this cycle.')).toBeInTheDocument();
+    expect(screen.getByText('Select All requests to view the full cycle.')).toBeInTheDocument();
+  });
+
+  test('missing canManage projection fails closed in the rendered reviewer controls', async () => {
+    global.fetch = jest.fn(async (url) => {
+      if (url === '/api/workbench/dashboard') {
+        return { ok: true, json: async () => ({ cycles: [{ code: 'D26', label: 'December 2026', count: 1 }], defaultCycleCode: 'D26' }) };
+      }
+      if (String(url).startsWith('/api/workbench/dashboard?')) {
+        return {
+          ok: true,
+          json: async () => ({
+            proposals: [{ requestId: 'request-a', requestNumber: '1001', title: 'Foreign request', setAside: false }],
+          }),
+        };
+      }
+      return {
+        ok: true,
+        json: async () => ({ proposals: [{ proposalId: 'request-a', reviewers: [{ suggestionId: 'reviewer-1', reviewStatus: 'materials_sent' }] }] }),
+      };
+    });
+
+    render(<ReviewerFollowUpDashboard />);
+    expect(await screen.findByText('Foreign request')).toBeInTheDocument();
+    expect(screen.getByTestId('reviewer-manage-panel')).toHaveAttribute('data-can-manage', 'false');
+    expect(screen.queryByRole('button', { name: 'Campaign settings' })).not.toBeInTheDocument();
   });
 });
 

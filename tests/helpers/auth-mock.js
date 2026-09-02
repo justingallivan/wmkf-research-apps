@@ -92,7 +92,7 @@ export function mockUnauthenticated() {
  *
  * @param {number} profileId - The user's profile ID
  * @param {string[]} appKeys - App keys the user has been granted
- * @param {{ isSuperuser?: boolean }} [opts]
+ * @param {{ isSuperuser?: boolean, azureEmail?: string|null, dynamicsSystemuserId?: string|null }} [opts]
  */
 export function mockAuthenticatedUser(profileId, appKeys = [], opts = {}) {
   // Real staff sessions carry azureEmail (set in the NextAuth callback from
@@ -106,6 +106,7 @@ export function mockAuthenticatedUser(profileId, appKeys = [], opts = {}) {
       profileId,
       email: `user${profileId}@wmkeck.org`,
       ...(azureEmail ? { azureEmail } : {}),
+      ...(opts.dynamicsSystemuserId ? { dynamicsSystemuserId: opts.dynamicsSystemuserId } : {}),
       name: `Test User ${profileId}`,
     },
   };

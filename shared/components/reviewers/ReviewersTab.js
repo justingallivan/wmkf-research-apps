@@ -23,8 +23,8 @@
  * Props:
  *   - requestId : the akoya_request GUID
  *   - context   : light request context from resolve-request (title, etc.)
- *   - canManage : soft UI gate passed through to the panel (cosmetic; the
- *                 reused server APIs stay org-open)
+ *   - canManage : UI mirror of the authoritative lead-PD/superuser gate for
+ *                 request-bound reviewer mutations
  *   - settings  : { signature } for the email templates
  */
 
@@ -458,10 +458,10 @@ export default function ReviewersTab({
         <button
           type="button"
           onClick={() => setCampaignOpen(true)}
-          disabled={previewReadOnly}
+          disabled={!canEdit}
           className="text-xs text-gray-500 hover:text-gray-800 px-2 py-1 whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-40"
-          title={previewReadOnly
-            ? 'Campaign settings are disabled in read-only Preview'
+          title={!canEdit
+            ? 'Only the lead Program Director or a superuser can edit campaign settings'
             : "Edit this request's reviewer campaign settings (days to respond, review due date)"}
         >
           ⚙ Campaign settings
@@ -497,7 +497,7 @@ export default function ReviewersTab({
       </div>
 
       {templatesOpen && !previewReadOnly && <EmailTemplatesModal onClose={() => setTemplatesOpen(false)} />}
-      {campaignOpen && requestId && !previewReadOnly && (
+      {campaignOpen && requestId && canEdit && (
         <CampaignConfigModal requestId={requestId} onClose={() => setCampaignOpen(false)} />
       )}
 

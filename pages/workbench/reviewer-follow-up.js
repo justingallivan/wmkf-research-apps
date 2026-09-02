@@ -37,7 +37,7 @@ function ReviewerGroup({ proposal, previewReadOnly, onRefresh }) {
     || reviewer.submitted
     || ['review_received', 'complete'].includes(reviewer.reviewStatus)
   )).length;
-  const canManage = !previewReadOnly && proposal.workbench?.canManage !== false;
+  const canManage = !previewReadOnly && proposal.workbench?.canManage === true;
   const requestHref = `/workbench/${encodeURIComponent(proposal.proposalId)}?tab=reviewers&sub=track${
     proposal.requestNumber ? `&n=${encodeURIComponent(proposal.requestNumber)}` : ''
   }`;
@@ -252,7 +252,9 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
             >
               {cycles.map((cycle) => (
                 <option key={cycle.code} value={cycle.code}>
-                  {cycle.label || cycle.code}{cycle.count ? ` (${cycle.count})` : ''}
+                  {cycle.label || cycle.code} ({cycle.count || 0} active{cycle.setAsideCount
+                    ? ` + ${cycle.setAsideCount} set aside`
+                    : ''})
                 </option>
               ))}
             </select>
@@ -371,12 +373,16 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
       ) : !error && visibleProposals.length === 0 ? (
         <Card hover={false}>
           <p className="font-medium text-gray-900">
-            {view === 'attention'
+            {scope === 'my' && proposals.length === 0
+              ? 'No requests are assigned to you in this cycle.'
+              : view === 'attention'
               ? 'No reviewer follow-up needs attention.'
               : `No ${scope === 'all' ? 'cycle' : 'assigned'} requests match this view.`}
           </p>
           <p className="mt-1 text-sm text-gray-500">
-            {view === 'attention'
+            {scope === 'my' && proposals.length === 0
+              ? 'Select All requests to view the full cycle.'
+              : view === 'attention'
               ? 'Switch to All reviewers to see completed reviews and proposals without active reviewer engagements.'
               : 'Change the cycle, search, or set-aside filter.'}
           </p>

@@ -12,10 +12,15 @@
 import { createMockReq, createMockRes } from '../helpers/auth-mock';
 import { requireAppAccess } from '../../lib/utils/auth';
 import * as suggestionAdapter from '../../lib/dataverse/adapters/reviewer-suggestion';
+import { authorizeReviewerRequestMutation } from '../../lib/services/reviewer-request-authorization';
+import { ServiceHttpError } from '../../lib/services/service-http-error';
 
 jest.mock('../../lib/utils/auth', () => ({ requireAppAccess: jest.fn() }));
 jest.mock('../../lib/services/dynamics-context', () => ({
   bypassDynamicsRestrictions: jest.fn((_label, fn) => fn()),
+}));
+jest.mock('../../lib/services/reviewer-request-authorization', () => ({
+  authorizeReviewerRequestMutation: jest.fn(async () => ({})),
 }));
 jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
   updateLifecycle: jest.fn(),
@@ -71,6 +76,19 @@ test('PATCH single-suggestion success returns the full envelope and forwards act
     { reviewStatus: 'complete', notes: 'looks good' },
     { actingUserSystemId: ACTING_USER_ID },
   );
+  expect(authorizeReviewerRequestMutation).toHaveBeenCalledWith({
+    profileId: undefined,
+    callerSystemId: ACTING_USER_ID,
+    suggestionIds: [SUGGESTION_ID],
+  });
+});
+
+test('PATCH rejects a foreign request before the first lifecycle write', async () => {
+  authorizeReviewerRequestMutation.mockRejectedValueOnce(new ServiceHttpError('foreign', { httpStatus: 403 }));
+  const { req, res } = call('PATCH', { suggestionIds: [SUGGESTION_ID, SUGGESTION_ID_2], reviewStatus: 'complete' });
+  await handler(req, res);
+  expect(res.statusCode).toBe(403);
+  expect(suggestionAdapter.updateLifecycle).not.toHaveBeenCalled();
 });
 
 test('PATCH batch success returns the full envelope and applies the update per-id, sequentially in array order', async () => {

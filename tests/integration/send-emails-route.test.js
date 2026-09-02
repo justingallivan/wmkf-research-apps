@@ -19,6 +19,11 @@ jest.mock('../../shared/api/middleware/rateLimiter', () => ({
 jest.mock('../../lib/services/dynamics-context', () => ({
   bypassDynamicsRestrictions: (_label, fn) => fn(),
 }));
+jest.mock('../../lib/services/reviewer-request-authorization', () => ({
+  authorizeReviewerRequestMutation: jest.fn(async () => ({})),
+}));
+const { authorizeReviewerRequestMutation } = require('../../lib/services/reviewer-request-authorization');
+const { ServiceHttpError } = require('../../lib/services/service-http-error');
 
 const createAndSendEmail = jest.fn(async () => ({ emailId: 'email-1' }));
 const getRecord = jest.fn(async (entity) => {
@@ -220,6 +225,19 @@ async function run(body) {
   await handler(req, res);
   return res;
 }
+
+test('preauthorizes the complete draft batch and rejects before opening the send stream', async () => {
+  authorizeReviewerRequestMutation.mockRejectedValueOnce(new ServiceHttpError('foreign', { httpStatus: 403 }));
+  const res = await run({ drafts: [draft(SUG_1)], templateType: 'materials' });
+  expect(authorizeReviewerRequestMutation).toHaveBeenCalledWith({
+    profileId: undefined,
+    callerSystemId: 'u-1',
+    suggestionIds: [SUG_1],
+  });
+  expect(res.status).toHaveBeenCalledWith(403);
+  expect(createAndSendEmail).not.toHaveBeenCalled();
+  expect(res.write).not.toHaveBeenCalled();
+});
 // Fake three-segment token whose first two segments the mocked
 // verifySuggestionToken above decodes back into suggestionId/requestId — real
 // JWT structure/signing is irrelevant here since verification is mocked.

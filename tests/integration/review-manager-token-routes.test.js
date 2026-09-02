@@ -14,6 +14,7 @@ import {
 import { DynamicsService } from '../../lib/services/dynamics-service';
 import { mintAndStore, revoke } from '../../lib/external/token-lifecycle';
 import ReviewDraftService from '../../lib/services/review-draft-service';
+import { authorizeReviewerRequestMutation } from '../../lib/services/reviewer-request-authorization';
 
 jest.mock('../../lib/services/dynamics-service', () => ({
   DynamicsService: {
@@ -32,6 +33,9 @@ jest.mock('../../lib/services/review-draft-service', () => ({
 
 jest.mock('../../lib/services/dynamics-context', () => ({
   bypassDynamicsRestrictions: jest.fn((_label, fn) => fn()),
+}));
+jest.mock('../../lib/services/reviewer-request-authorization', () => ({
+  authorizeReviewerRequestMutation: jest.fn(async () => ({})),
 }));
 
 // regenerate-token GUID-validates suggestionId before it becomes a Dataverse
@@ -139,6 +143,11 @@ describe('/api/review-manager/regenerate-token', () => {
       url: 'https://app.example/external/review/new-token',
       expiresAt: expiresAt.toISOString(),
       jti: 'jti-1',
+    });
+    expect(authorizeReviewerRequestMutation).toHaveBeenCalledWith({
+      profileId: 2,
+      callerSystemId: null,
+      suggestionIds: [SUGGESTION_ID],
     });
     // Recovery replaces token authority without discarding work already autosaved
     // against the stable reviewer engagement.
@@ -271,6 +280,11 @@ describe('/api/review-manager/revoke-token', () => {
     expect(res.json).toHaveBeenCalledWith({ ok: true });
     // Revoke is a leak/compromise action → drop any in-progress draft.
     expect(ReviewDraftService.deleteBySuggestion).toHaveBeenCalledWith(SUGGESTION_ID);
+    expect(authorizeReviewerRequestMutation).toHaveBeenCalledWith({
+      profileId: 3,
+      callerSystemId: null,
+      suggestionIds: [SUGGESTION_ID],
+    });
   });
 
   it('still returns 200 if the post-revoke draft cleanup fails (non-fatal)', async () => {

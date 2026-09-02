@@ -18,9 +18,9 @@
  *                  always the signed-in MS account; signature is freeform text)
  *   - mode       : undefined|'all' → every reviewer (Review Manager behavior);
  *                  'track' → Workbench post-acceptance lifecycle sub-tab
- *   - canManage  : soft UI gate (decided S207). When false, write controls are
- *                  hidden and the table is read-only. The reused server APIs stay
- *                  org-open regardless — this is cosmetic, not an auth boundary.
+ *   - canManage  : UI mirror of the authoritative lead-PD/superuser gate. When
+ *                  false, request-bound write controls are hidden and the table
+ *                  is read-only.
  *   - showReviewReminderAction : exposes the direct review-due reminder in the
  *                  consolidated follow-up page without changing other hosts.
  *   - previewReadOnly : shows that reminder control disabled so a Preview backed

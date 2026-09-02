@@ -15,8 +15,8 @@
  *           snapshot rows + the suggestion row) + isolated best-effort
  *           cleanups for optional contact delete, SharePoint review files,
  *           and Postgres review_drafts, with a pre-delete audit breadcrumb.
- *           Same app-access gate as the soft delete — no additional
- *           precondition (owner decision: no blocks).
+ *           Request-bound PATCH/DELETE operations additionally require the
+ *           target request's lead PD or a superuser.
  *
  * Thin multi-verb route shell (Route→Service Consolidation Plan, Stage 3 —
  * the P1m multi-verb pilot, Decision 1): auth guard → ONE withDalContext
@@ -30,6 +30,7 @@
  */
 
 import { requireAppAccess } from '../../../lib/utils/auth';
+import { actorRefFromSession } from '../../../lib/utils/actor-ref';
 import { isGuid } from '../../../lib/utils/guid';
 import { withDalContext } from '../../../lib/dataverse/core/context';
 import { ServiceHttpError } from '../../../lib/services/service-http-error';
@@ -43,6 +44,7 @@ import {
   removeCandidateEntirely,
 } from '../../../lib/services/reviewer-finder/remove-candidate-service';
 import { withRequestCorrelation, mintCorrelationId } from '../../../lib/observability/request-correlation';
+import { authorizeReviewerRequestMutation } from '../../../lib/services/reviewer-request-authorization';
 
 export default async function handler(req, res) {
   return withRequestCorrelation(
@@ -116,10 +118,25 @@ async function handleGet(req, res, access) {
 }
 
 async function handlePatch(req, res, access) {
+  const body = req.body || {};
+  const actingUserSystemId = actorRefFromSession(access.session);
   try {
+    if (isGuid(body.suggestionId)) {
+      await authorizeReviewerRequestMutation({
+        profileId: access.profileId,
+        callerSystemId: actingUserSystemId,
+        suggestionIds: [body.suggestionId],
+      });
+    } else if (body.suggestionId === undefined && isGuid(body.proposalId)) {
+      await authorizeReviewerRequestMutation({
+        profileId: access.profileId,
+        callerSystemId: actingUserSystemId,
+        requestIds: [body.proposalId],
+      });
+    }
     const result = await patchMyCandidates({
-      body: req.body || {},
-      actingUserSystemId: access.session?.user?.dynamicsSystemuserId || null,
+      body,
+      actingUserSystemId,
     });
     return res.status(200).json(result);
   } catch (error) {
@@ -145,15 +162,28 @@ async function handleDelete(req, res, access) {
     return res.status(400).json({ error: 'suggestionId is not a valid GUID' });
   }
 
+  const actingUserSystemId = actorRefFromSession(access.session);
+  try {
+    await authorizeReviewerRequestMutation({
+      profileId: access.profileId,
+      callerSystemId: actingUserSystemId,
+      suggestionIds: [suggestionId],
+    });
+  } catch (error) {
+    if (error instanceof ServiceHttpError) {
+      return res.status(error.httpStatus).json(error.body ?? { error: error.message });
+    }
+    throw error;
+  }
+
   // mode:'hard' — PERMANENT removal (docs/REVIEWER_REMOVE_ENTIRELY_BUILD_PLAN.md).
-  // Same app-access gate as the soft delete above; no per-PD ownership scoping
-  // (high-trust all-PDs-manage-all model, matching today's soft-delete).
+  // The shared ownership gate above runs before either soft or hard removal.
   if (mode === 'hard') {
     try {
       const result = await removeCandidateEntirely({
         suggestionId,
         deleteContact: deleteContact === true,
-        actingUserSystemId: access.session?.user?.dynamicsSystemuserId || null,
+        actingUserSystemId,
       });
       return res.status(200).json(result);
     } catch (error) {
@@ -171,7 +201,7 @@ async function handleDelete(req, res, access) {
   try {
     const result = await deleteMyCandidates({
       suggestionId,
-      actingUserSystemId: access.session?.user?.dynamicsSystemuserId || null,
+      actingUserSystemId,
     });
     return res.status(200).json(result);
   } catch (error) {

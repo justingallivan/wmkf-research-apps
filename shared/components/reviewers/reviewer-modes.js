@@ -84,14 +84,12 @@ export function computeDefaultSub(reviewers) {
 }
 
 /**
- * Soft UI gate (S207 decision): the lead PD and superusers see the reviewer-
- * management write controls. Cosmetic only — the reused server APIs stay
- * org-open — so it FAILS OPEN: hides controls only when we can positively tell
- * the viewer is a non-superuser, identity-resolved, non-PD staffer. A superuser,
- * an unresolved viewer systemuser id, or an unresolved request PD all stay
- * permissive (Codex S209 catch — the prior gate wrongly hid controls from
- * superusers and identity-unresolved staff).
+ * UI mirror of the authoritative request mutation gate: lead PD or superuser.
+ * Missing identity or request ownership fails closed, and GUID case does not
+ * affect the comparison.
  */
 export function computeCanManage({ isSuperuser = false, pdId = null, myUserId = null } = {}) {
-  return Boolean(isSuperuser || !pdId || !myUserId || myUserId === pdId);
+  if (isSuperuser) return true;
+  if (!pdId || !myUserId) return false;
+  return String(myUserId).toLowerCase() === String(pdId).toLowerCase();
 }

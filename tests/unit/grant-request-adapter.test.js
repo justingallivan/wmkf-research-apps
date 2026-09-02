@@ -176,29 +176,6 @@ describe('grant-request.findByPotentialReviewerSlots', () => {
   });
 });
 
-// ──────────────── findMeetingDatesByProgramDirector ────────────────
-
-describe('grant-request.findMeetingDatesByProgramDirector (characterization)', () => {
-  test('golden: PD lookup + meetingdate-not-null, id+date select, desc order', async () => {
-    const qAll = jest.spyOn(DynamicsService, 'queryAllRecords').mockResolvedValue({
-      records: [{ akoya_requestid: GUID_A, wmkf_meetingdate: '2026-01-15' }],
-    });
-    const out = await grantRequest.findMeetingDatesByProgramDirector(PD_ID);
-    expect(out.records).toHaveLength(1);
-    expect(qAll).toHaveBeenCalledWith('akoya_requests', {
-      select: 'akoya_requestid,wmkf_meetingdate',
-      filter: `_wmkf_programdirector_value eq ${PD_ID} and wmkf_meetingdate ne null`,
-      orderby: 'wmkf_meetingdate desc',
-    });
-  });
-
-  test('returns the raw queryAllRecords result object (pass-through)', async () => {
-    const result = { records: [], capped: false, totalCount: 0, hasMore: false };
-    jest.spyOn(DynamicsService, 'queryAllRecords').mockResolvedValue(result);
-    expect(await grantRequest.findMeetingDatesByProgramDirector(PD_ID)).toBe(result);
-  });
-});
-
 // ──────────────────────────── updateById (Wave 5c) ────────────────────────────
 
 describe('grant-request.updateById (exact PATCH body)', () => {

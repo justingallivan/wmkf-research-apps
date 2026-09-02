@@ -18,6 +18,9 @@ jest.mock('../../lib/utils/auth', () => ({
 jest.mock('../../lib/services/dynamics-context', () => ({
   bypassDynamicsRestrictions: jest.fn((_label, fn) => fn()),
 }));
+jest.mock('../../lib/services/reviewer-request-authorization', () => ({
+  authorizeReviewerRequestMutation: jest.fn(async () => ({})),
+}));
 jest.mock('../../lib/services/program-director-resolver', () => ({
   resolveByEmail: jest.fn(),
 }));
@@ -73,6 +76,7 @@ const grantRequestAdapter = require('../../lib/dataverse/adapters/grant-request'
 const suggestionAdapter = require('../../lib/dataverse/adapters/reviewer-suggestion');
 const potentialReviewerAdapter = require('../../lib/dataverse/adapters/potential-reviewer');
 const { describeRemoval, removeCandidateEntirely } = require('../../lib/services/reviewer-finder/remove-candidate-service');
+const { authorizeReviewerRequestMutation } = require('../../lib/services/reviewer-request-authorization');
 
 const REQUEST_ID = '11111111-1111-1111-1111-111111111111';
 const SUGGESTION_ID = '33333333-3333-3333-3333-333333333333';
@@ -220,6 +224,11 @@ describe('PATCH', () => {
     expect(suggestionAdapter.updateLifecycle).toHaveBeenCalledWith(
       SUGGESTION_ID, { invited: true }, { actingUserSystemId: 'u-1' },
     );
+    expect(authorizeReviewerRequestMutation).toHaveBeenCalledWith({
+      profileId: undefined,
+      callerSystemId: 'u-1',
+      suggestionIds: [SUGGESTION_ID],
+    });
   });
 
   test('happy path (bulk-by-request edit): envelope pinned exactly', async () => {
@@ -237,6 +246,11 @@ describe('PATCH', () => {
       success: true,
       message: 'Proposal updated',
       updated: { proposalId: REQUEST_ID, programArea: 'Science', suggestionsUpdated: 3 },
+    });
+    expect(authorizeReviewerRequestMutation).toHaveBeenCalledWith({
+      profileId: undefined,
+      callerSystemId: 'u-1',
+      requestIds: [REQUEST_ID],
     });
   });
 
@@ -272,6 +286,11 @@ describe('DELETE', () => {
     expect(suggestionAdapter.softDelete).toHaveBeenCalledWith(
       SUGGESTION_ID, { actingUserSystemId: 'u-1', alsoRevokeToken: true },
     );
+    expect(authorizeReviewerRequestMutation).toHaveBeenCalledWith({
+      profileId: undefined,
+      callerSystemId: 'u-1',
+      suggestionIds: [SUGGESTION_ID],
+    });
   });
 
   test('domain error: missing suggestionId → 400', async () => {
