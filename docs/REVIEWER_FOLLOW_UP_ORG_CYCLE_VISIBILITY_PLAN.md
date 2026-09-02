@@ -22,16 +22,17 @@ Every active user who passes the existing `reviewers` app authorization will be
 able to discover every cycle containing Reviewer Follow-up-eligible requests,
 including a cycle whose only eligible rows are set aside, and
 then select **All requests** to see that cycle-wide population. The page will
-still open in **My requests**. Under the recommended mutation policy,
+still open in **My requests**. Under the owner-selected mutation policy,
 non-superusers will be unable to mutate requests led by another Program
-Director; the owner decision gate below must be resolved first.
+Director. The owner selected that policy on 2026-09-02; implementation remains
+planned.
 
 This is primarily a read-discovery correction. It adds no route, table,
 migration, permission, role, or write capability. Because the current
 Reviewer Follow-up `canManage` distinction is a UI rule rather than a complete
-server authorization boundary, the owner must resolve the write-policy gate
-below before implementation. Authoritative foreign-row denial is not a verified
-current-state claim.
+server authorization boundary, the plan includes an explicit hardening step.
+The policy decision is resolved, but authoritative foreign-row denial is not
+yet a verified current-state claim.
 
 ## Contract boundary
 
@@ -44,8 +45,9 @@ current-state claim.
   requests remain excluded until **Show set aside** is selected.
 - **Read, not manage:** organization-wide rows remain visible in **All requests**,
   but `canManage` is true only for the lead Program Director or a superuser.
-  This describes the current UI and the recommended target policy. The current
-  server contract is staff-shared. Client-side hiding is not authorization.
+  This describes the current UI and the owner-selected target policy. The
+  current server contract remains staff-shared until step 0 is implemented.
+  Client-side hiding is not authorization.
 - **Default view:** **My requests** remains the initial request scope. The new
   cycle list does not silently change the page to **All requests**.
 
@@ -64,7 +66,7 @@ current-state claim.
 | A Reviewer user with no assignment in a cycle cannot currently discover that cycle through this picker. | Follows directly from the PD-filtered cycle query | `[VERIFIED via source; browser complement still required]` |
 | Reviewer Follow-up always loads selected-cycle dashboard rows with `includeSetAside=1`, then its checkbox filters set-aside rows in the client. | `pages/workbench/reviewer-follow-up.js:172-222` | `[VERIFIED via source]` |
 
-## Blocking owner decision: foreign-row mutation policy
+## Owner decision: foreign-row mutation policy — resolved 2026-09-02
 
 The existing API matrix and reviewer-manager service intentionally describe
 reviewer operations as staff-shared. Changing them to lead-PD/superuser writes
@@ -72,19 +74,20 @@ would remove capability from Reviewer-app users who are not a request's lead
 PD. The organization-wide picker must not silently reverse that dated product
 policy.
 
-Before step 0 starts, the owner must explicitly choose and record one of:
+**[OWNER DECISION 2026-09-02] Lead-PD/superuser writes selected.** Foreign rows
+will be genuinely read-only in both UI and server routes. Complete step 0 before
+releasing organization-wide cycle discovery.
 
-1. **Lead-PD/superuser writes (recommended):** foreign rows are genuinely
-   read-only in both UI and server routes. Complete step 0 before releasing
-   organization-wide cycle discovery.
-2. **Staff-shared writes:** retain the current route authorization, describe
-   `canManage` as presentation guidance rather than a security boundary, and
-   remove all claims that foreign rows are read-only. The cycle-discovery change
-   can then proceed without step 0's authorization tightening.
+Affected population: users with `reviewers` or `review-manager` app access who
+are neither a superuser nor the target request's lead Program Director. After
+implementation they retain organization-wide reads but lose mutation capability
+for foreign requests. Lead Program Directors retain writes on their own
+requests; superusers retain writes everywhere.
 
-This plan is otherwise implementation-ready, but completion criterion 4 cannot
-be satisfied until that decision is recorded with its date and affected staff
-population.
+This narrowly supersedes the S207/S428 org-open decision for request-bound
+Reviewer Follow-up mutations. It does not change the accepted org-open policy
+for global reviewer-person merges, which have no single request owner, or for
+staff-wide document reads.
 
 The 104 displayed beside D26 in the current picker is not the same population
 as the 44 rows in the default **All requests** view. The picker counts every
@@ -155,9 +158,8 @@ No selected-cycle response-shape change is planned:
 - Reviewer Follow-up requests `includeSetAside=1`; its checkbox controls whether
   those returned rows are displayed.
 - `canManage` remains server-derived per row.
-- If the owner selects the recommended policy, mutation routes are hardened to
-  enforce that same manage decision authoritatively before organization-wide
-  discovery is released.
+- Mutation routes are hardened to enforce that same manage decision
+  authoritatively before organization-wide discovery is released.
 
 ## End-to-end contract trace
 
@@ -183,9 +185,8 @@ No selected-cycle response-shape change is planned:
    existing Reviewer aggregate request.
 9. The UI renders other Program Directors' rows read-only only when
    `workbench.canManage === true`; missing authorization data fails closed.
-10. If the owner selects the recommended write policy, every page mutation
-    resolves the target row back to its request and rejects a non-lead,
-    non-superuser caller at the server boundary.
+10. Every page mutation resolves the target row back to its request and rejects
+    a non-lead, non-superuser caller at the server boundary.
 
 There is no persistence or background work in this flow.
 
@@ -193,7 +194,7 @@ There is no persistence or background work in this flow.
 
 ### 0. Make foreign-row read-only behavior authoritative
 
-This step runs only after the owner selects **Lead-PD/superuser writes**.
+This step is authorized by the 2026-09-02 owner decision above.
 
 Before widening cycle discovery, inventory every mutation control rendered by
 `ReviewerGroup`, `ReviewerManagePanel`, `CampaignConfigModal`, and the reminder
@@ -326,9 +327,8 @@ In `pages/workbench/reviewer-follow-up.js`:
   an unassigned user only to **All reviewers**;
 - retain the existing attention-filter empty state when proposals exist but no
   reviewer currently needs attention; and
-- use `workbench?.canManage === true` for every mutation surface. This is a
-  fail-closed presentation rule even if the owner retains staff-shared server
-  authority.
+- use `workbench?.canManage === true` for every mutation surface, aligned with
+  the owner-selected server policy.
 
 Verify:
 
@@ -349,8 +349,8 @@ Update the `/api/workbench/dashboard` row in
 - default selection prefers the caller's newest eligible cycle and falls back
   to the newest organization-wide cycle; and
 - selected-cycle `my|all` and set-aside behavior is unchanged; document the
-  owner-selected mutation policy and, under the recommended policy, make
-  foreign-row denial server-authoritative rather than only a UI rule.
+  owner-selected mutation policy and make foreign-row denial
+  server-authoritative rather than only a UI rule.
 
 Search all durable restatements of the old PD-scoped picker fact and reconcile
 each current-state statement. Keep historical/as-built notes historical rather
@@ -409,9 +409,9 @@ Add route/service tests for each mutation endpoint found in step 0. At minimum,
 superuser, foreign Reviewer user, unresolved identity, single-row, and
 preauthorized-all-or-nothing batch behavior.
 
-If the owner chooses the recommended write policy, add request-local page tests
-for missing actor identity, case-varied GUIDs, foreign staff, lead PD, and
-superuser. Reconcile the current soft/fail-open statements in
+Add request-local page tests for missing actor identity, case-varied GUIDs,
+foreign staff, lead PD, and superuser. Reconcile the current soft/fail-open
+statements in
 `shared/components/reviewers/ReviewerManagePanel.js`,
 `shared/components/reviewers/ReviewersTab.js`,
 `shared/components/reviewers/reviewer-modes.js`,
@@ -443,7 +443,7 @@ Deploy the implementation branch to Vercel Preview and register the exact
 deployment callback URI through Azure CLI before Microsoft sign-in testing.
 Do not treat a project alias as sufficient for the deployment-specific callback.
 
-Under the recommended mutation policy, exercise at least:
+Exercise at least:
 
 | Persona | My requests | All requests | Manage controls |
 |---|---|---|---|
@@ -465,8 +465,7 @@ a write rehearsal.
   successful partial list.
 - No optimistic client state is introduced, so there is no new stale-write or
   partial-success state.
-- Under the recommended write policy, authorization is completed for the whole
-  batch before the first write.
+- Authorization is completed for the whole batch before the first write.
 - Rollback of cycle discovery restores the prior Workbench `listCycles` call.
   Authorization hardening must not be rolled back merely to restore the picker;
   treat it as a separate security commit.
@@ -475,8 +474,9 @@ a write rehearsal.
 
 - Granting the Reviewer app to additional people.
 - Making Reviewer Follow-up public or available to other app roles.
-- Changing the current shared-staff foreign-row mutation behavior unless the
-  owner selects the recommended policy at the blocking decision gate.
+- Changing global reviewer-person merge authorization or staff-wide document
+  read authorization; the 2026-09-02 decision is limited to request-bound
+  Reviewer Follow-up mutations.
 - Changing the triage eligibility rule or making `Set aside` visible by default.
 - Redesigning mobile navigation or the Reviewer Follow-up layout.
 - Changing Reviewer Finder's personal proposal/cycle contract.
@@ -491,9 +491,9 @@ This plan is complete only when:
 2. an authorized user with no personal assignment can select a cycle and see
    its rows under **All requests**;
 3. **My requests** remains the default and personal-default selection works;
-4. the owner-selected mutation policy is recorded and implemented consistently;
-   under the recommended policy, non-superusers cannot manage foreign rows in
-   UI or through authoritative write routes;
+4. the owner-selected mutation policy is implemented consistently;
+   non-superusers cannot manage foreign rows in UI or through authoritative
+   write routes;
 5. picker and selected-cycle eligibility predicates are contract-tested against
    drift;
 6. Reviewer Finder behavior is unchanged;
@@ -527,11 +527,12 @@ the plan to pin one actor identity, cover the fail-open request-local gate,
 record an owner decision before reversing the staff-shared write policy,
 enumerate the mutation census, state the intentional no-history-bound decision,
 and make the dead-helper test conditional. This revision incorporates each of
-those points. The only open item is the explicitly identified owner policy
-decision; no further Claude pass is required before that decision.
+those points. The owner resolved the remaining policy decision on 2026-09-02 by
+selecting lead-PD/superuser-only writes for request-bound Reviewer Follow-up
+mutations. No further Claude pass is required before implementation.
 
 ## Status
 
-`[PLANNED]` No implementation described here has been made by this document.
-The current Preview still uses the PD-scoped cycle picker described under
-Verified current state.
+`[PLANNED — OWNER-AUTHORIZED 2026-09-02]` No implementation described here has
+been made by this document. The current Preview still uses the PD-scoped cycle
+picker and staff-shared mutation routes described under Verified current state.
