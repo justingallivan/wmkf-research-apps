@@ -306,6 +306,26 @@ describe('externalLinkExpected render-time stamp (S404 Plan v4)', () => {
     expect(buildSendTimeExternalUrlPlaceholder).not.toHaveBeenCalled();
   });
 
+  test('follow-up rendering removes a separate stale superseding-link direction', async () => {
+    findById.mockResolvedValueOnce(suggestion());
+    getReviewerByIdWithSelect.mockResolvedValueOnce(person());
+    const out = await renderEmails({
+      suggestionIds: [SUG1],
+      template: {
+        subject: 'Reminder',
+        body: 'Your review is due soon.\n\nUse the link in this email — it supersedes any earlier link:\n\n{{externalLink}}\n\nThank you.',
+      },
+      settings: {},
+      templateType: 'followup',
+      actingUserSystemId: null,
+    });
+
+    expect(out.drafts[0].body).toContain('original review materials email');
+    expect(out.drafts[0].body).not.toContain('supersedes any earlier');
+    expect(out.drafts[0].body).not.toContain('{{externalLink}}');
+    expect(out.drafts[0].externalLinkExpected).toBe(false);
+  });
+
   test('every skip shape (no_email, address_conflict_pending, email_research_only) also carries the stamp', async () => {
     // no_email
     findById.mockResolvedValueOnce(suggestion());

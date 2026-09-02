@@ -392,8 +392,30 @@ describe('sweepReviewDueReminders', () => {
     expect(email.body).toContain('Dear Dr. Reviewer,');
     expect(email.body).toContain('Your review is due by');
     expect(email.body).toContain('original review materials email');
+    expect(email.body).toContain('If you have already submitted');
     expect(email.body).not.toContain('/external/review/');
     expect(email.body).not.toContain('secure link below');
+  });
+
+  test('a configured reviewer URL fails before the fire-once marker is claimed', async () => {
+    getSettingStrict.mockImplementation(async (key) => {
+      if (key === REVIEW_DUE_SUBJECT_KEY) return { found: true, value: REVIEW_DUE_SUBJECT };
+      if (key === REVIEW_DUE_BODY_KEY) return {
+        found: true,
+        value: 'Continue here: https://reviews.example.org/external/review/token.value.sig',
+      };
+      throw new Error(`unexpected setting ${key}`);
+    });
+    queryAllRecords.mockResolvedValue({ records: [reviewDueCandidate()] });
+    installReads({ request: reviewDueRequest() });
+
+    const r = await sweepReviewDueReminders();
+
+    expect(r.prepareFailed).toBe(1);
+    expect(r.sent).toBe(0);
+    expect(updateRecord).not.toHaveBeenCalled();
+    expect(mintAndStore).not.toHaveBeenCalled();
+    expect(createAndSendEmail).not.toHaveBeenCalled();
   });
 
   test('per-reviewer override controls eligibility and rendered date without minting a token', async () => {
