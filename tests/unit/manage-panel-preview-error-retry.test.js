@@ -221,7 +221,10 @@ test('pre-stream authorization failure returns to preview with the server messag
   global.fetch = jest.fn(async (url) => {
     const u = String(url);
     if (u === '/api/review-manager/send-emails') {
-      return mockJson({ error: 'Only the lead Program Director can send these emails.' }, false, 403);
+      return {
+        ...mockJson({ error: 'Only the lead Program Director can send these emails.' }, false, 403),
+        body: mockSseFromChunks(['{"error":"Only the lead Program Director can send these emails."}']).body,
+      };
     }
     return baseFetchImpl(u);
   });

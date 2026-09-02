@@ -2,7 +2,7 @@
  * reviewer-modes — pure (React-free) logic for the reviewer management surface.
  *
  * Extracted so the status pipeline, the sub-tab mode→status bucketing, the
- * state-aware default landing, and the fail-closed canManage mirror can be unit-tested
+ * state-aware default landing, and the fail-closed canManage display logic can be unit-tested
  * without rendering any component. Imported by ReviewerManagePanel,
  * SubTabBadges, ReviewersTab, and the Workbench shell. See
  * docs/REQUEST_WORKBENCH_BUILD_PLAN.md § Phase 2.

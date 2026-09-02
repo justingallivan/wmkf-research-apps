@@ -18,7 +18,7 @@
  *                  always the signed-in MS account; signature is freeform text)
  *   - mode       : undefined|'all' → every reviewer (Review Manager behavior);
  *                  'track' → Workbench post-acceptance lifecycle sub-tab
- *   - canManage  : fail-closed UI gate for request-owner controls. When false,
+ *   - canManage  : UI display gate for request-owner controls. When false,
  *                  write controls are hidden and the table is read-only. Each
  *                  mutation route must enforce its own server authorization;
  *                  this prop is never an authorization boundary.

@@ -17,6 +17,7 @@ import { authorizeReviewerRequestMutation } from '../../lib/services/reviewer-re
 
 const REQUEST_A = '11111111-1111-4111-8111-111111111111';
 const REQUEST_B = '22222222-2222-4222-8222-222222222222';
+const REQUEST_CASE = 'abcdef12-abcd-4abc-8abc-abcdefabcdef';
 const SUGGESTION_A = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const SUGGESTION_B = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 
@@ -79,9 +80,9 @@ test('deduplicates repeated targets before authorization reads', async () => {
   await expect(authorizeReviewerRequestMutation({
     profileId: 7,
     callerSystemId: 'pd-1',
-    requestIds: [REQUEST_A, REQUEST_A.toUpperCase()],
-  })).resolves.toEqual({ requestIds: [REQUEST_A], isSuperuser: false });
-  expect(findByIds).toHaveBeenCalledWith([REQUEST_A], expect.any(Object));
+    requestIds: [REQUEST_CASE, REQUEST_CASE.toUpperCase()],
+  })).resolves.toEqual({ requestIds: [REQUEST_CASE], isSuperuser: false });
+  expect(findByIds).toHaveBeenCalledWith([REQUEST_CASE], expect.any(Object));
 });
 
 test('preauthorizes every request in a batch and rejects when any target is foreign', async () => {
@@ -134,14 +135,20 @@ test('maps ownership adapter failures to sanitized 502 responses', async () => {
     profileId: 7,
     callerSystemId: 'pd-1',
     suggestionIds: [SUGGESTION_A],
-  })).rejects.toMatchObject({ httpStatus: 502 });
+  })).rejects.toMatchObject({
+    httpStatus: 502,
+    message: 'Reviewer ownership could not be verified.',
+  });
 
   findByIds.mockRejectedValueOnce(new Error('Dataverse request read failed'));
   await expect(authorizeReviewerRequestMutation({
     profileId: 7,
     callerSystemId: 'pd-1',
     requestIds: [REQUEST_A],
-  })).rejects.toMatchObject({ httpStatus: 502 });
+  })).rejects.toMatchObject({
+    httpStatus: 502,
+    message: 'Request ownership could not be verified.',
+  });
   expect(errorSpy).toHaveBeenCalledTimes(2);
   errorSpy.mockRestore();
 });

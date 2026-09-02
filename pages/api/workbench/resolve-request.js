@@ -30,7 +30,7 @@ export default async function handler(req, res) {
 
   // Resolve by GUID (the Workbench route always has it) OR by human request
   // number (dashboard links / typed). GUID is preferred so the per-request shell
-  // can always load context — header, empty-states, and the fail-closed canManage mirror
+  // can always load context — header, empty-states, and the canManage display state
   // must not depend on the optional ?n= number being present (Codex S209 catch).
   const requestId = req.query.requestId ? String(req.query.requestId).trim() : '';
   const requestNumber = req.query.requestNumber ? String(req.query.requestNumber).trim() : '';

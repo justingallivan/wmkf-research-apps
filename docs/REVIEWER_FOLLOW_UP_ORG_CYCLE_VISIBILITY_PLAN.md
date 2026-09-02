@@ -533,12 +533,27 @@ those points. The owner resolved the remaining policy decision on 2026-09-02 by
 selecting lead-PD/superuser-only writes for request-bound Reviewer Follow-up
 mutations. No further Claude pass is required before implementation.
 
+Claude Code reviewed the completed implementation read-only through the same
+authenticated subscription on 2026-09-02 and returned **APPROVE** against this
+contract. It verified the organization-wide cycle/default/count behavior,
+server-resolved ownership, GUID normalization, missing-actor denial,
+all-before-side-effect batch authorization, and the Follow-up route census. It
+identified two promotion prerequisites: a pre-stream `send-emails` authorization
+response could leave the release modal stuck, and shared component comments
+overstated the route-specific server boundary. Commit `a4dfe47f` fixes both,
+adds server-side ownership-read logging with sanitized outward errors, and
+strengthens the authorizer tests. A focused second Claude pass returned
+**APPROVE** with no regression; its remaining low-severity test-teeth and wording
+notes were folded in before Preview deployment. Invite- and Reviews-tab routes
+outside the Follow-up page retain the existing policies recorded in the API
+security matrix; this build does not silently expand its census to those flows.
+
 ## Status
 
-`[BUILT + TEST-VERIFIED — RELEASE PENDING 2026-09-02]` The organization-wide
+`[BUILT + CLAUDE-REVIEWED + TEST-VERIFIED — PREVIEW PENDING 2026-09-02]` The organization-wide
 cycle picker, truthful active/set-aside counts and defaults, fail-closed UI
 mirrors, and server-authoritative lead-PD/superuser request mutation boundary
 are implemented on `codex/workbench-reviewer-follow-up`. The Production volume
-probe returned 236 eligible rows with `capped:false`. Claude code review,
-authenticated Preview verification, and deliberate Production promotion remain
-release steps; Production is unchanged.
+probe returned 236 eligible rows with `capped:false`. Claude code review is
+complete; authenticated Preview verification and deliberate Production
+promotion remain release steps. Production is unchanged.
