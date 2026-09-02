@@ -1,155 +1,209 @@
-# Session 472 Prompt: Final Writeup Persona and Coordinator Matrix
+# Session 473 Prompt: Resume Workbench UI/UX Consolidation
 
-## Session 471 Summary
+## Session 472 Summary
 
-Session 471 (2026-08-31) shipped and Production-proved the Final Writeup
-acknowledgement foundation and Request Document explicit-actor architecture.
-The September 4, 2026 deadline remains the governing priority: finish the
-staff/executive Final Writeup visibility needed for real use without a dramatic
-Workbench redesign.
+Session 472 (2026-09-01) began the owner-requested holistic Workbench UI/UX
+consolidation, then paused that feature work for a production reviewer-token
+incident. The incident is contained and the remediation is Production-live.
+The owner explicitly chose to return to the Workbench UI/UX work next session.
 
-### Completed
+### What Was Completed
 
-1. **Final Writeup acknowledgement and dashboard foundation.** Wave 23 is exact
-   and Production readiness is `on`. Signed-in reads proved responsible-PD
-   exclusion. After the dedicated role reached all 11 audience members, an
-   eligible colleague successfully marked Request `1002788` reviewed; it
-   appeared in review history and independent readback found exactly one
-   complete acknowledgement row.
-2. **Request Document attribution decision.** The owner selected Option B:
-   retain service-principal writes and add explicit, server-controlled business
-   actors. No broad staff Request Document role is needed. The earlier Connor
-   privilege brief was never sent and is withdrawn.
-3. **Wave 24 implementation and promotion.** OAuth Claude adversarial review
-   found no Blocker/High issue after reconciliation. Production schema is 3
-   exact / 0 absent / 0 divergent, the Production-only readiness flag is `on`,
-   signed-in health passed, and commit
-   `8ff4205a0ad43337cd987a4fc76639f936bab4bc` first reached Ready deployment
-   `dpl_D94J9aRcfLfK81iBDsVYARVhZFPb`.
-4. **First natural Wave 24 proof.** Request `1002874` created Ready/Draft
-   Pre-Site row `103b9a0f-86a5-f111-b8dd-6045bd03ed63`. Explicit
-   `InitiatedBy`/`InitiatedAt` identified enabled user Justin Gallivan and the
-   exact create time; built-in creator/modifier remained the application. The
-   request pointer matched, no missing-attribution event existed, and the
-   deployment-boundary census was 1 attributed / 0 event-backed unattributed /
-   0 violations.
-5. **Release reconciliation.** Current Atlas, route/security, credential,
-   lifecycle, queue, service-catalog, audit, identity, milestone, and handoff
-   surfaces now distinguish the proved Pre-Site path from still-opportunistic
-   producer-specific proof.
+1. **Workbench critique and linked mockups**
+   - Impeccable produced a comprehensive Workbench critique plus linked desktop
+     and mobile mockups for the Request list and Reviewer follow-up views.
+   - The mockups establish the owner-reviewed lifecycle order: **Request list →
+     Initial assessments → Reviewer follow-up → Final writeups → Awardees**.
+   - The consolidated reviewer view puts Cycle and View controls on one
+     top-aligned row, uses stable table columns rather than affiliation-driven
+     widths, and exposes direct reviewer follow-up without forcing a proposal
+     round trip.
 
-### Commits already on `main`
+2. **Workbench feature branch implemented and Preview-tested before the incident**
+   - `codex/workbench-reviewer-follow-up` contains the common Workbench view
+     navigation, consolidated Reviewer follow-up page, direct reminder actions,
+     stable reviewer-table columns, top-aligned filters, Track Reviewers action
+     parity, and simplified reviewer release actions.
+   - The Preview OAuth callback was corrected and a populated read-only Preview
+     was verified against Production reviewer data.
+   - The generic Track Reviewers **Send Email** bulk action was removed. Row
+     checkboxes remain only for selecting accepted reviewers for first Materials
+     release; reviewer reminders are explicit row actions.
 
-- `b5eeda7b` — Add explicit Request Document actor tracking
-- `a543a45b` — Document Wave 24 source implementation
-- `c9e915c1` — Harden Wave 24 after adversarial review
-- `0396b187` — Record exact Wave 24 Production schema
-- `8ff4205a` — Clean Wave 24 review receipt / first active runtime commit
-- `b4615362` — Record Wave 24 Production activation
+3. **Reviewer-token incident contained and remediated**
+   - Automatic `/api/cron/reviewer-reminders` scheduling was removed and is
+     protected by a CI/prebuild hold gate.
+   - Review-due reminders are link-free, never mint or rotate token authority,
+     and fail closed before marker claim or email unless the existing token is
+     live through the effective deadline.
+   - Respond-by nudges remain the intentional pre-acceptance replacement-link
+     path. First Materials delivery is one-time and refuses revoked,
+     already-delivered, terminal, and otherwise ineligible recipients.
+   - Explicit token regeneration preserves the saved review draft; explicit
+     revocation deletes the draft best-effort. Manual review-due reminders have
+     resumed. The automatic cron remains held.
+   - The post-deploy read-only D26 audit examined 51 **never-reminded** sweep
+     candidates; all 51 were active and reminder-eligible, with zero blocked.
+     Reviewers already marked reminded, including the morning batch, were not in
+     that audit population.
 
-## Current Deadline-Critical Order
+4. **Incident closeout and deployment**
+   - Independent Claude reviews approved the runtime remediation for Production
+     with the automatic-cron hold retained.
+   - Runtime remediation through `4dd57369` and closeout corrections through
+     `4a58ab52` are on `main`. Production deployment
+     `dpl_HJjYUw79UwobKcePrAgLZL7sJ4cP` reached Ready; the error scan was clean,
+     `/workbench` returned the expected sign-in redirect, and the deployment
+     manifest still omitted the reviewer-reminder cron.
+   - Internal operating docs now reflect the incident contract. Public/onboarding
+     cleanup remains deliberately deferred future work.
 
-1. **[COMPLETE 2026-08-31] Read-only persona/access preflight.** The exact
-   enabled `WMKF Final Writeup Reviewer` roster is the intended 11-person
-   audience. Request relationships positively identify the active PD/PC
-   assignments. Owner confirmation establishes Allison Keller as President and
-   Beth Pruitt as CSO; Beth also has responsible-PD requests. John Sader is
-   owner-confirmed as a Program Director. All three owner-confirmed persona
-   facts remain rollout intent until the reviewed v2 staffing configuration is
-   published and access proof is complete.
-2. **[PRODUCTION-LIVE + SIGNED-IN READ SMOKE PASSED 2026-08-31]
-   Superuser coordinator matrix.** Commit `52575761` is live in Ready Production
-   deployment `dpl_Frc6fAonyFFYwiWyFJCzzE3UNune`. The index projects every current Final row ×
-   exact enabled reviewer-role member with neutral Reviewed, Updated, Not
-   reviewed, and Responsible PD states plus direct focused-review/Word links.
-   Signed-in Production DOM proof showed the exact 11-person roster and Request
-   `1002788`, with Duncan Spore Reviewed, Justin Gallivan Responsible PD, all
-   other cells Not reviewed, both direct actions present, and zero browser-console
-   errors. Prior local desktop and 390px browser QA also passed against Production
-   read data. The matrix has no approval, compliance, deadline, count, or order meaning.
-3. **[PRODUCTION-LIVE + SIGNED-IN READ/WRITE PROVED 2026-08-31]
-   Program-specific matrix audiences.** Commit `5573bca3` is live in Ready
-   Production deployment `dpl_5DNuc2BV76RihwuWu8ZFYBgxBXE7`. Role eligibility
-   and matrix assignment are explicitly separate. Pre-migration Production
-   readback proved the stored v1 setting contained a nine-person Research audience and a
-   six-person Southern California audience; Anneli Stone and Saskia Pallais are
-   excluded from Research and included in Southern California.
-   Signed-in Admin publication/readback survived a full reload; the coordinator
-   dashboard then rendered Request `1002788` under Research with exactly those
-   nine reviewer columns and zero application-console errors.
-   Publishes round-trip the loaded Dataverse ETag and reject stale Admin drafts
-   with `409`; unconfigured programs remain explicit and stale references fail
-   closed.
-4. **[PRODUCTION-LIVE V2 / ROLLOUT DISABLED]
-   Staff/executive lenses.** The owner
-   rejected a second Dataverse-team onboarding layer. The reviewed replacement
-   extends the existing versioned Final Writeup Admin setting and its one
-   editor/Publish action with explicit PD, PC, Leadership, overlap, and **No
-   persona lens** assignments keyed only by stable reviewer GUID. The source now
-   implements strict v1/v2 reads, v2-only atomic publication, safe stale-reference
-   pruning, explicit no-lens rows, rollout-off no-read behavior, a dry-run-first
-   ETag upgrade/repair/downgrade command, and the consolidated one-panel editor.
-   The superseded team constants, adapter path, schema, and scripts are removed.
-   Commit `84bf465b` is live in Ready Production deployment
-   `dpl_41SybgPYfJXGarf7UqcMGCLMy4KS`, establishing the v2-capable rollback
-   floor. On 2026-09-01 UTC, the dry-run-first operator command upgraded the
-   setting once under ETag `W/"96930393"`; exact readback proved version 2 at
-   `W/"96944113"`, all 11 complete assignments, zero stale/unassigned rows,
-   and unchanged nine-person Research and six-person Southern California
-   audiences. Signed-in Admin reloaded as **Published revision loaded**, and
-   Request `1002788` retained its nine-column Research matrix. Ordinary
-   behavior is unchanged because the persona flag is still false. Next: prove
-   representative PC/leadership Word access, then enable and smoke the lenses.
-   No elevated Dataverse team privilege or outside administrator is part of
-   the selected path.
+### Commits
 
-## Opportunistic Production Proof — Do Not Block the Deadline
+#### Workbench critique and mockups now preserved on `main`
 
-- On the next naturally needed Site Visit handoff, verify
-  `MilestoneCreatedBy`. Other producer-specific first writes, guarded reopen,
-  and Board snapshot remain their own approval-gated checks.
-- Do not manufacture Request Documents merely to test attribution.
+- `15ae08c9` — Record comprehensive Workbench critique
+- `eb2ad030` — Add reviewer follow-up Workbench mockup
+- `c3fd39c1` — Clarify reviewer follow-up navigation hierarchy
+- `e772d8f1` — Add linked Workbench request-list mockup
+- `6a65db63` — Order Workbench views by grant lifecycle
 
-## Scheduled Follow-up
+#### Workbench implementation branch
 
-- Monday, September 7, 2026: send Connor only the confirmation question asking
-  whether compliance, audit, or a CRM consumer specifically requires staff in
-  built-in Dataverse `createdby`/`modifiedby`. If the answer is no, no privilege
-  work is requested. The reminder is already scheduled.
+- `8dd28914` — Add consolidated reviewer follow-up Workbench
+- `59368d06` / `12f3c8c5` — Correct and verify Preview authentication/data
+- `f8428419` / `2475d54a` / `6a5c2b36` — Stabilize columns, add direct actions,
+  and top-align filters
+- `4ac3a4d4` / `0c3cd424` / `fcc72c4b` / `449d739e` — Reconcile the related
+  reviewer pages, affiliations, Track Reviewers actions, and column headings
+- `54108529` — Simplify reviewer release actions
+- `aee2cafd` / `55adf692` — Preserve the independent token audits on the branch
 
-## Owner Decisions Still Open
+#### Incident remediation and closeout on `main`
 
-- First Executor budget publication remains an explicit owner action; current
-  Production behavior safely uses the reviewed code fallback.
-- Initial Assessment restore and Board-snapshot Production writes remain
-  owner-deferred until the pre-J27-scale checkpoint.
+- `42098b8e` / `359aa2df` — Pause and guard the automatic reminder cron
+- `13817955` — Stabilize external reviewer token recovery
+- `bf7ed857` / `2e5241a4` / `733a3a2f` — Harden link-free reminders, one-time
+  Materials delivery, and preproduction gaps
+- `fbce0027` / `4dd57369` — Add token-liveness enforcement and close follow-ups
+- `4462bfe5` / `4a58ab52` — Reconcile incident closeout documentation
 
-## Do Not Reopen
+## Next Items
 
-- In-Workbench document editing; Word remains in its own browser or desktop
-  window.
-- A broad staff Request Document role or the unsent Connor privilege request.
-- Metered or credit-consuming review products without explicit authorization.
-- A global Workbench redesign before the September 4 deadline.
+### Verified Open — Owner-Directed Next Session Focus
 
-## Key Files
+1. **Safely reconcile `main` into `codex/workbench-reviewer-follow-up`.**
+   Evidence: `git log main..codex/workbench-reviewer-follow-up` and
+   `git diff main...codex/workbench-reviewer-follow-up` on 2026-09-01.
+   The feature branch predates the incident remediation and overlaps
+   `ReviewerManagePanel`, `ReviewsTab`, reminder services/tests, and several
+   durable reviewer docs. Do **not** rebase or resolve mechanically. Preserve
+   these incident invariants during the merge:
+   - review-due reminders remain link-free and token-liveness-gated;
+   - Materials remains first-delivery-only and refuses revoked/ineligible rows;
+   - regeneration preserves drafts and revocation deletes them;
+   - `/api/cron/reviewer-reminders` remains absent and the hold gate remains green.
 
-| File | Current purpose |
+2. **Re-run the integrated Workbench Preview before further design changes.**
+   Evidence: branch commits `59368d06` and `12f3c8c5` record the corrected OAuth
+   callback and populated read-only Preview proof, but that proof predates the
+   incident merge. Use the branch/Preview workflow with Production reads allowed
+   and writes denied. Verify common navigation, cycle retention, top-aligned
+   filters, proposal expansion, direct reminders, long affiliations, narrow
+   viewport behavior, Track Reviewers, and Reviews after integration.
+
+3. **Continue the holistic UI/UX evaluation from the implemented state.**
+   Evidence: `.impeccable/critique/2026-09-01T04-47-39Z__pages-workbench-js.md`,
+   `.impeccable/mockups/reviewer-follow-up.html`, and
+   `.impeccable/mockups/workbench-request-list.html`.
+   Compare the integrated Preview—not only the mockups—against the owner's
+   feedback. Prioritize consistency among Reviewer follow-up, Track Reviewers,
+   and Reviews; clear action ownership; stable columns; restrained affiliation
+   display; and one coherent Workbench navigation model. Keep this on Preview
+   until the owner approves promotion because it touches several visible surfaces.
+
+### Owner Decision Needed
+
+1. **Final Workbench UI acceptance after integrated Preview review.**
+   Evidence: the owner approved building on Preview but has not approved this
+   broad UI change for Production. Promotion requires a fresh visual/functional
+   review after the incident-safe merge.
+
+2. **Final Writeup persona rollout remains a separate access-coordination gate.**
+   Evidence: `docs/CURRENT_WORK_QUEUE.md` item 2. Representative PC and Leadership
+   Word access must be proved before deliberately enabling the persona lenses.
+   The owner chose UI/UX work as the next-session focus; do not silently enable
+   personas while doing Workbench design work.
+
+### Parked
+
+1. **Automatic reviewer-reminder scheduling and campaign configuration.**
+   Evidence: `docs/REVIEWER_ENGAGEMENT_SPEC.md` reactivation prerequisites.
+   The cron remains held until settings are visible/editable, new defaults fail
+   closed, existing armed rows have an owner-approved value, the hold gate is
+   deliberately retired, and a dry run is reviewed.
+
+2. **Public/onboarding reviewer-token documentation cleanup.**
+   Evidence: `docs/CURRENT_WORK_QUEUE.md` owner-deferred audit follow-up.
+   Update source generators first and regenerate outputs before their next
+   publication; this is not the next UI/UX task.
+
+### Do Not Reopen Without New Decision
+
+1. A separate standalone reviewer dashboard outside the Workbench navigation.
+   The selected direction is a coherent Workbench view family.
+2. A generic bulk **Send Email** action for Track Reviewers. First Materials
+   release and reviewer reminders have distinct, explicit actions.
+3. Automatic reviewer reminders while the incident hold prerequisites remain open.
+4. Metered or credit-consuming review products without explicit authorization.
+
+## Key Files Reference
+
+| File | Purpose |
 |---|---|
-| `docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md` | Final acknowledgement/dashboard contract and rollout status |
-| `docs/REQUEST_DOCUMENT_EXPLICIT_ACTOR_PLAN.md` | Wave 24 Option B architecture, promotion, and proof |
-| `docs/CURRENT_WORK_QUEUE.md` | Deadline order and verified open work |
-| `docs/API_ROUTE_SECURITY_MATRIX.md` | Current route/auth/write contracts |
-| `docs/APPLICATION_STATE_ATLAS.md` | Current live state and ownership routing |
-| `docs/atlas/dataverse-wmkf-requestdocument.md` | Request Document schema/producer truth |
-| `lib/services/final-writeup/matrix-audience-service.js` | Production-live v2 staffing contract at ETag `W/"96944113"`; v1 remains rollback/read compatible |
+| `.impeccable/critique/2026-09-01T04-47-39Z__pages-workbench-js.md` | Holistic Workbench critique |
+| `.impeccable/mockups/workbench-request-list.html` | Linked Request-list mockup |
+| `.impeccable/mockups/reviewer-follow-up.html` | Consolidated reviewer-follow-up mockup |
+| `pages/workbench.js` | Current Request-list entry point |
+| `pages/workbench/reviewer-follow-up.js` | Feature-branch consolidated reviewer view |
+| `shared/components/workbench/WorkbenchViewsNav.js` | Feature-branch common Workbench navigation |
+| `shared/components/reviewers/ReviewerManagePanel.js` | Track Reviewers and Materials/reviewer actions |
+| `shared/components/workbench/ReviewsTab.js` | Per-request outstanding-review actions |
+| `docs/REVIEWER_ENGAGEMENT_SPEC.md` | Canonical reminder/token policy and cron hold |
+| `docs/REVIEWER_REMINDER_TOKEN_LIVENESS_PLAN.md` | Implemented liveness guard and release evidence |
 
-## Verification Receipt
+## Testing for the Restart
 
-- Wave 24 focused implementation receipt: 12 suites / 229 tests plus relevant
-  route/data/doc gates and canonical Next.js build passed before promotion.
-- Production schema readback: 3 exact / 0 absent / 0 divergent.
-- Request `1002874` read-only proof and census: 1 attributed / 0 event-backed
-  unattributed / 0 violations.
-- Claim-evidence pilot report was unavailable because local observation state
-  could not be read; no pilot row was added.
+After merging `main` into the feature branch and resolving contracts:
+
+```bash
+npm test -- --runInBand \
+  tests/unit/reviewer-follow-up.test.js \
+  tests/unit/reviewer-manage-actions-menu.test.js \
+  tests/unit/reviewer-manage-proposal-attachment.test.js \
+  tests/unit/reviewers-tab-proposal-binding.test.js \
+  tests/unit/reviews-tab.test.js \
+  tests/unit/reviewer-manual-reminder.test.js \
+  tests/unit/reviewer-reminder-eligibility.test.js \
+  tests/unit/reviewer-reminder-sweep.test.js
+
+npm run check:reviewer-reminder-hold
+npm run check:reviewer-reminder-hold:self-test
+npm run check:api-routes
+npm run check:api-routes:self-test
+npm run build
+```
+
+## Handoff Notes
+
+- `main` contains the deployed incident remediation plus the five Workbench
+  critique/mockup commits. The merge preserving both histories is intentional.
+- `codex/workbench-reviewer-follow-up` is the implementation branch to resume.
+  Its local tip is `55adf692`; its prior remote tip was `54108529` before
+  stop-time synchronization.
+- Claim-evidence pilot reporting was unavailable because its local observation
+  state could not be read; no observation-table row was added.
+- `CLAUDE.md` needs no stop-time change: no new app, schema, endpoint,
+  instruction, or convention was introduced by the handoff itself.
+- The reviewer-token incident already has a milestone entry at the top of
+  `DEVELOPMENT_LOG.md`; no duplicate milestone entry is required.
