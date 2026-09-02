@@ -165,16 +165,14 @@ to expose the Revoke compromise-response action.
 For review-due reminders, the proposed required access boundary is the later
 of:
 
-1. the effective review due date at 23:59:59 UTC; and
-2. 24 hours after the eligibility check.
+1. the effective review due date at 23:59:59 UTC, when that deadline is still
+   ahead; and
+2. `nowMs`, when the review is already overdue.
 
-Expiry equal to the boundary is insufficient; it must be strictly later. The
-24-hour floor is a recommended minimum and remains an **owner decision before
-implementation**. Normal accepted-reviewer Materials tokens extend about 90
-days beyond the review due date, so ordinary current-cycle rows should clear it
-comfortably. A production read-only audit should report how many rows would be
-blocked at 24 hours and at any longer candidate runway; it must not silently
-choose policy from the data.
+Expiry equal to the boundary is insufficient; it must be strictly later. There
+is no additional arbitrary runway. Normal accepted-reviewer Materials tokens
+extend about 90 days beyond the review due date, so ordinary current-cycle rows
+should clear this rule comfortably.
 
 Neither evaluator proves that a reviewer still possesses the plaintext JWT or
 that a specific email was delivered. The application cannot reconstruct the
@@ -194,7 +192,7 @@ presents its plaintext JWT.
    `lib/services/review-manager/reviewers-service.js` with the shared helper.
 4. Add only the pure `invalid` state to the generic token badge. Compute and
    emit `reviewDueReminderEligibility` separately with the request's effective
-   due date and the approved runway.
+   due date and the defined boundary above.
 5. Preserve `tokenState === 'active'` for a currently working token even when
    reminder runway is insufficient, so Revoke remains available. Unknown UI
    states must render as a warning, not silently as `not_minted` or `active`.
@@ -345,12 +343,12 @@ must not be waived merely because it existed before.
 No verification step may deliver a real reviewer email. Use mocks or explicit
 test doubles for email assertions; the reminder transport has no capture mode.
 
-## 9. Owner decisions before implementation
+## 9. Owner decisions — resolved 2026-09-01
 
-1. **Reminder runway:** approve the proposed 24-hour minimum or choose a longer
-   named interval. The audit may compare counts, but it does not choose policy.
-2. **Blocked-state adjudication:** approve the following operator contract or
-   replace it explicitly:
+1. **Reminder boundary:** no additional 24-hour or other arbitrary floor. A
+   token must be live now and cover the effective review deadline when that
+   deadline is still ahead.
+2. **Blocked-state adjudication:** approved as follows:
    - revoked → remain blocked unless an owner deliberately restores access;
    - not minted → investigate the Materials/token inconsistency, then perform
      explicit first/replacement delivery if warranted;
@@ -360,9 +358,11 @@ test doubles for email assertions; the reminder transport has no capture mode.
    - insufficient window → generic reminder stays blocked; any deliberate
      replacement must itself communicate the new link and supersession;
    - missing due date → repair campaign data before reminding.
-3. **Freeze lift:** confirm that resuming manual review-due reminders requires a
-   written owner decision after release evidence; deployment alone never lifts
-   the freeze.
+3. **Freeze lift:** resuming manual review-due reminders requires a written
+   owner decision after release evidence; deployment alone never lifts the
+   freeze. An email from Justin to colleagues stating that manual reminders may
+   resume is sufficient. That email must also state that automatic reminders
+   remain paused.
 
 ## 10. Release and freeze-lift checklist
 
@@ -381,7 +381,9 @@ test doubles for email assertions; the reminder transport has no capture mode.
    of verification.
 9. The owner explicitly lifts the **manual review-due reminder freeze**. Cron
    remains paused until all separate reactivation prerequisites in
-   `docs/REVIEWER_ENGAGEMENT_SPEC.md` are satisfied.
+   `docs/REVIEWER_ENGAGEMENT_SPEC.md` are satisfied. Justin's email to colleagues
+   is the required written record; no new application setting or approval panel
+   is needed.
 
 ## 11. Residual risks and deferred work
 
