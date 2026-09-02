@@ -54,5 +54,26 @@ const customJestConfig = {
   verbose: true,
 }
 
+// ESM-only packages that CommonJS test code requires transitively. next/jest
+// ignores all of node_modules for transformation except its transpiled list,
+// and custom transformIgnorePatterns can only append, so widen the exemption
+// group after the fact. sanitize-html >= 2.17.7 pulls htmlparser2 12 (ESM).
+const ESM_NODE_MODULES = [
+  'htmlparser2',
+  'domhandler',
+  'domutils',
+  'dom-serializer',
+  'domelementtype',
+  'entities',
+]
+
 // createJestConfig is exported this way to ensure that next/jest can load the Next.js config which is async
-module.exports = createJestConfig(customJestConfig)
+module.exports = async () => {
+  const config = await createJestConfig(customJestConfig)()
+  config.transformIgnorePatterns = config.transformIgnorePatterns.map((pattern) =>
+    pattern.startsWith('/node_modules/(?!.pnpm)(?!(')
+      ? pattern.replace('(?!(', `(?!(${ESM_NODE_MODULES.join('|')}|`)
+      : pattern
+  )
+  return config
+}
