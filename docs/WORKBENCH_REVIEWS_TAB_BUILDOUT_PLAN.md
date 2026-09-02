@@ -27,11 +27,14 @@ acceptance data (disabled-nudge tooltip confirmed via accessible name), correct
 ABSENCE of Compare/Export with zero submissions, clean console, request-switch
 stale-guard.**
 
-**Current reminder-incident note (2026-09-01):** the review-due reminder
-mechanism described in this historical build plan remains implemented, but the
-Vercel reviewer-reminder schedule is paused. Manual review reminders remain
-callable but are under a procedural production freeze because they rotate token
-authority. The canonical operating contract is
+**Reminder-incident closeout (2026-09-01):** the review-due reminder mechanism
+described in this historical build plan remains implemented, but the Vercel
+reviewer-reminder schedule is paused. Commit `4dd57369` made review-due reminders
+link-free and fail-closed on token liveness/runway before marker claim; they no
+longer mint or rotate token authority. After production deployment,
+authenticated smoke, and a 51-row D26 audit with zero blocked outcomes, the
+owner lifted the procedural manual-reminder freeze. The automatic schedule
+remains held. The canonical operating contract is
 `docs/REVIEWER_ENGAGEMENT_SPEC.md`.
 
 **Phase 4 DEPLOYED (S326, 2026-07-03): full go-live sequence executed in
@@ -208,12 +211,14 @@ monitoring in-flight (status/nudges). Owner confirmed scope = all four phases (S
   `wmkf_remindersentat` + `wmkf_remindercount` on the suggestion
   [VERIFIED via `reviewer-reminder-sweep.sweepReviewDueReminders`; the sweep
   filters `wmkf_remindersentat eq null`].
-- Manual-nudge semantics: stamps the SAME marker + increments `wmkf_remindercount`
-  (so ordinary cron/manual eligibility shares one dedupe marker; same-window
-  concurrency and a failed post-send stamp remain a known residual). The
-  implemented contract permits deliberate staff re-sends and shows last-sent
-  date + count, but the 2026-09-01 incident hold currently forbids production
-  use of that callable send path.
+- Manual-nudge semantics: fail closed unless the current token is active and
+  covers the effective review deadline, then stamp the SAME marker + increment
+  `wmkf_remindercount` without minting or rotating token authority (so ordinary
+  cron/manual eligibility shares one dedupe marker; same-window concurrency and
+  a failed post-send stamp remain a known residual). The implemented contract
+  permits deliberate staff re-sends and shows last-sent date + count. Production
+  use resumed after the verified 2026-09-01 remediation; the automatic schedule
+  remains paused.
 - ReviewsTab: "Outstanding" section above submitted cards; per-reviewer
   "Send reminder now" action posting to a new guarded route
   (`requireAppAccess(..., 'review-manager', ...)` per the guarded

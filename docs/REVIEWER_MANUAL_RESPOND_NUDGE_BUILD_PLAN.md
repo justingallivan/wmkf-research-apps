@@ -2,8 +2,8 @@
 title: "Manual Respond-By Nudge — Build Plan"
 domain: reviewer-identity
 kind: plan
-status: active
-summary: "Give PDs an on-demand nudge for unanswered reviewers while blocking removed/revoked token resurrection."
+status: historical
+summary: "Historical build plan for the production manual respond-by nudge; current reminder policy and cron hold live in the engagement spec."
 canonical: false
 cataloged: 2026-08-13
 owner: product-engineering
@@ -23,14 +23,18 @@ not performed. Phase B remains open.
 **Session:** S424-S425, 2026-08-13.
 **Build owner:** Codex leads implementation; Claude reviews.
 
-**Current incident override (2026-09-01):** the manual action remains deployed,
-but production staff are under a procedural freeze on it and every other
-token-issuing reminder/resend surface. `/api/cron/reviewer-reminders` is no
-longer registered in Vercel and is protected by the build/CI hold gate. The
-earlier production posture below is historical: a 2026-09-01 read-only probe
-found 92 current-cycle active requests with both reminder flags true, not null.
-Use `docs/REVIEWER_ENGAGEMENT_SPEC.md` for the current hold and reactivation
-contract.
+**Incident closeout (2026-09-01):** the manual action remains deployed.
+Production remediation at `4dd57369` distinguishes its intended behavior from
+review-due reminders: respond-by nudges mint and deliver the replacement link,
+while review-due reminders preserve the current token and fail closed on
+liveness/runway. The owner lifted the procedural manual-reminder freeze after
+production deployment, authenticated smoke, and the D26 audit. The automatic
+`/api/cron/reviewer-reminders` schedule remains unregistered and protected by
+the build/CI hold gate. The earlier production posture and Phase A/B discussion
+below are retained as dated build history, not current operating guidance. A
+2026-09-01 read-only probe found 92 current-cycle active requests with both
+reminder flags true, not null. Use `docs/REVIEWER_ENGAGEMENT_SPEC.md` for the
+current cron hold and reactivation contract.
 
 **Review history.** Claude drafted; Codex adversarial review returned
 `needs-attention` with two `[high]` findings, both confirmed against source:
@@ -294,7 +298,7 @@ the respond marker and the new refusal reason. `check:api-routes` must pass.
 | A removed/revoked reviewer is never nudged, on **either** path | Unit: fixture with `selected=false`+`revoked=true` that passes every OTHER check → `removed`, and `sendOneReminder` NOT called |
 | The token is not un-revoked as a side effect | Assert no mint/patch occurs on the refusal path |
 | Respond nudge stamps the respond marker, not the review-due one | Assert patch fields per `kind` |
-| Implemented manual re-send contract remains callable (production use frozen by the 2026-09-01 hold) | Second call with the marker set succeeds |
+| Implemented manual re-send contract remains callable (production use resumed after the 2026-09-01 incident remediation) | Second call with the marker set succeeds |
 | A claim conflict aborts without sending | Existing sweep harness pattern |
 | Cron behavior unchanged | `sweepRespondReminders` tests untouched and green |
 | Wrong `kind` is rejected | Route test asserts a validation failure on an unknown value |

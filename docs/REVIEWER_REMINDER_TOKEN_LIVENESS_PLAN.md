@@ -2,8 +2,8 @@
 title: "Reviewer Reminder Token-Liveness Guard Plan"
 domain: reviewer-workbench
 kind: plan
-status: draft
-summary: "Fail-closed review-due reminder token checks, staff guidance, and a read-only audit before lifting the manual-send freeze."
+status: historical
+summary: "Historical implementation record for production review-due token-liveness checks; current policy and cron hold live in the engagement spec."
 canonical: false
 cataloged: 2026-09-01
 owner: product-engineering
@@ -20,15 +20,15 @@ related:
 
 ## 1. Decision and scope
 
-Add a fail-closed token-state eligibility guard to every accepted-reviewer
+Implemented a fail-closed token-state eligibility guard on every accepted-reviewer
 review-due reminder path before the reminder marker is claimed or an email is
 sent. This is a defense-in-depth follow-up to the 2026-09-01 reviewer-token
 incident remediation.
 
-This plan does **not**:
+This completed implementation did **not**:
 
 - restore `/api/cron/reviewer-reminders` to the Vercel cron registry;
-- lift the manual review-due reminder freeze by itself;
+- lift the manual review-due reminder freeze merely by deployment;
 - mint, rotate, reconstruct, expose, or store a plaintext reviewer token;
 - add a token or reviewer URL to review-due reminder copy;
 - change invitation, respond-by reminder, Materials, or explicit regeneration
@@ -37,11 +37,16 @@ This plan does **not**:
 - add Dataverse columns, Postgres tables, API routes, or migrations.
 
 The production reviewer-reminder schedule remains absent and guarded by
-`scripts/check-reviewer-reminder-hold.js`. The manual freeze remains in force
-until the implementation, tests, production deployment, and read-only audit in
-this plan are complete and the owner explicitly lifts it.
+`scripts/check-reviewer-reminder-hold.js`. The implementation, tests,
+production deployment, authenticated smoke, and read-only D26 audit completed
+at commit `4dd57369`; the owner then explicitly lifted the procedural manual
+review-due reminder freeze. Automatic scheduling remains a separate held change.
 
-## 2. Verified current state
+## 2. Verified pre-build state (historical)
+
+The eight findings below are the 2026-09-01 pre-build baseline retained as
+implementation history. They are not current operating guidance. The completed
+state is summarized immediately after the list.
 
 1. [VERIFIED via `lib/services/reviewer-manual-reminder.js:38-55,68-85`]
    The manual review-due path freshly reads selection, revocation, acceptance,
@@ -80,6 +85,25 @@ this plan are complete and the owner explicitly lifts it.
    marker, and fails later during rendering/send selection. The planned
    allowlist closes a pre-existing write-before-refusal defect.
 
+### Completed state (production-verified 2026-09-01)
+
+- `lib/external/reviewer-token-state.js` now derives pure fail-closed token
+  liveness; `lib/services/reviewer-reminder-eligibility.js` separately evaluates
+  review-due runway.
+- Manual and scheduled review-due paths classify before hydration/claim and
+  again at the final shared sender. Blocked states write no marker, mint no
+  token, and send no email.
+- Review-due reminders remain link-free and preserve token authority. Respond
+  reminders retain their explicit mint-and-deliver contract.
+- The Reviews tab uses `reviewDueReminderEligibility`; generic token actions
+  continue to use pure `tokenState`. Invalid metadata offers Revoke but not
+  Regenerate.
+- The read-only production audit reuses the sweep predicate. The post-deploy D26
+  run examined 51 rows: all 51 active/eligible, zero blocked.
+- Commit `4dd57369` is live in Ready production deployment
+  `dpl_89s9MzdUnDST6Jm9Vs3cnMLPmUDu`; authenticated Workbench smoke passed and
+  the deployed cron registry still omits `/api/cron/reviewer-reminders`.
+
 ## 3. Change surface
 
 - **Entry points:** Reviews-tab `Send reminder now`; the dormant
@@ -116,7 +140,7 @@ this plan are complete and the owner explicitly lifts it.
 | A concurrent token change cannot be overwritten or ignored. | shared sender; Dataverse adapter | Existing `If-Match`/412 tests remain green; new tests prove token fields are part of the fresh projection. |
 | The UI is advisory and matches the server without becoming an authority. Generic token actions use pure `tokenState`; only the Reviews-tab reminder uses `reviewDueReminderEligibility`. | reviewers service; ReviewsTab; ReviewerManagePanel | Revoke/action-menu tests remain valid; direct API tests still reject stale/forged client state. |
 | The current-cycle audit is read-only and cannot send email or mutate reminder/token state. | new audit script | Static/test guard rejects imports/calls to mail, lifecycle update, mint, or mutation helpers; operator run uses production-read authorization only. |
-| Neither the manual freeze nor cron hold is lifted implicitly by merging this work. | Vercel config; hold gate; release checklist | Hold gate and self-test remain green; production cron registry inspected after deploy. |
+| Deployment does not implicitly lift either operational decision; the owner may lift the manual freeze only after release evidence, while cron restoration remains separately gated. | Vercel config; hold gate; release checklist | Owner lifted manual review-due reminders after production evidence; hold gate remains green and production cron registry remains absent. |
 
 ## 5. State contracts
 
@@ -180,7 +204,7 @@ JWT from its hash. The claim is deliberately narrower: authoritative server
 state describes a matching token that should remain usable if the reviewer
 presents its plaintext JWT.
 
-## 6. Implementation sequence
+## 6. Implemented sequence (historical build record)
 
 ### 6.1 Canonical classification
 
@@ -358,13 +382,20 @@ test doubles for email assertions; the reminder transport has no capture mode.
    - insufficient window → generic reminder stays blocked; any deliberate
      replacement must itself communicate the new link and supersession;
    - missing due date → repair campaign data before reminding.
-3. **Freeze lift:** resuming manual review-due reminders requires a written
+3. **Freeze lift (completed 2026-09-01):** resuming manual review-due reminders required a written
    owner decision after release evidence; deployment alone never lifts the
    freeze. An email from Justin to colleagues stating that manual reminders may
    resume is sufficient. That email must also state that automatic reminders
    remain paused.
 
-## 10. Release and freeze-lift checklist
+## 10. Release and freeze-lift checklist — complete 2026-09-01
+
+All nine steps completed. The exact promoted commit is `4dd57369`; Ready
+production deployment is `dpl_89s9MzdUnDST6Jm9Vs3cnMLPmUDu`. The hold gate,
+cron absence, health/error scan, authenticated Workbench smoke, focused/full
+tests, and post-deploy read-only D26 audit were verified. The audit examined 51
+rows with zero blocked outcomes. The owner then lifted the procedural manual
+review-due reminder freeze while explicitly retaining the automatic-cron hold.
 
 1. Claude reviews this plan read-only and either approves it or names required
    corrections.

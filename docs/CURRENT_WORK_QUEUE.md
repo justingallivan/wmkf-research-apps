@@ -6,7 +6,7 @@ status: canonical
 summary: Canonical priority queue separating current commitments, evidence windows, optional work, external dependencies, and parked programs.
 canonical: true
 cataloged: 2026-07-22
-last_verified: 2026-08-31
+last_verified: 2026-09-01
 owner: product-engineering
 related:
   - docs/SYSTEM_MODEL.md
@@ -38,6 +38,16 @@ sequence.
 | 2 | Final Writeup persona rollout and complete dashboards | **[PRODUCTION-LIVE V2 / PERSONAS DISABLED 2026-09-01 UTC.]** Commit `84bf465b` is live in Ready deployment `dpl_41SybgPYfJXGarf7UqcMGCLMy4KS`, establishing the reviewed v2-capable floor. The dry-run-first operator command then upgraded `final_writeup.matrix_audiences` once under ETag `W/"96930393"`; exact readback proved version 2 at `W/"96944113"`, all 11 complete explicit assignments including Beth Pruitt's PD + Leadership overlap, zero stale/unassigned rows, and unchanged nine-person Research and six-person Southern California audiences. Signed-in Admin reloaded as **Published revision loaded**, and Request `1002788` retained the expected nine-column Research matrix. The superseded team source is removed and persona lenses remain hard-disabled. | **Next gate:** prove representative PC and Leadership Word access, then deliberately enable and smoke-test PD, PC, Leadership, overlap, unassigned/ineligible, and superuser behavior. No elevated team privilege, outside Dataverse administrator, or runtime inference from names, titles, email, or program labels is required. |
 
 ## Audit follow-ups — verified open, not silently prioritized
+- **Public/onboarding reviewer-token documentation reconciliation.**
+  **[OWNER-DEFERRED 2026-09-01.]** Internal operating sources now reflect the
+  production incident remediation: review-due reminders are link-free and
+  preserve token authority, manual reminders have resumed, and the automatic
+  schedule remains held. Public/onboarding artifacts were intentionally left
+  untouched during the emergency response. Before their next publication,
+  audit `docs/onboarding/` and any generated public help/decks for stale claims
+  about reminder token rotation, manual-send freezes, or scheduler operation;
+  update the source generators first, regenerate outputs, and verify that no
+  credential/runbook material becomes public accidentally.
 - **Request Document explicit actor tracking (Option B).**
   **[OWNER-APPROVED 2026-08-31; ADVERSARIAL REVIEWED; PRODUCTION-PROVED FOR
   PRE-SITE CREATION.]** Keep Request Document CRUD off staff roles and

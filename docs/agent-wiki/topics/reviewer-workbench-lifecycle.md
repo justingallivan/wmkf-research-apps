@@ -35,6 +35,9 @@ source_files:
   - lib/services/reviewer-due-extension.js
   - lib/services/reviewer-manual-reminder.js
   - lib/services/reviewer-reminder-sweep.js
+  - lib/services/reviewer-reminder-eligibility.js
+  - lib/services/reviewer-reminder-candidate.js
+  - lib/services/reviewer-reminder-liveness-audit.js
   - lib/services/review-manager/send-emails-service.js
   - lib/services/reviewer-acceptance-drain.js
   - lib/bill/honorarium-onboard-orchestrator.js
@@ -62,6 +65,7 @@ source_files:
   - lib/services/reviewer-campaign-timeline.js
   - lib/services/review-manager/terminal-transition-service.js
   - lib/external/token-lifecycle.js
+  - lib/external/reviewer-token-state.js
   - lib/external/reviewer-token-ttl.js
   - lib/external/verify-suggestion-token.js
   - lib/services/review-receipt-guard.js
@@ -146,7 +150,7 @@ Record of truth for the increment (gitignored working doc):
 `outputs/reviewer-find-warm-revisit-step0-findings.md`; durable summary in
 `SESSION_PROMPT.md` "incremental plan ACTIVE" section.
 
-**Reviewer-engagement build (Model B):** spec is `docs/REVIEWER_ENGAGEMENT_SPEC.md`. The 9 backing Dataverse fields are **provisioned in prod (2026-06-21, wave `7-reviewer-engagement`)**. Per-request campaign config lives on `akoya_request`; the per-reviewer respond-reminder marker lives on `wmkf_appreviewersuggestion`. **Phases 1, 2, and 4 remain live. Phase 3 mechanism IMPLEMENTED (S275), schedule PAUSED (2026-09-01):** `/api/cron/reviewer-reminders` can send respond-by and review-due reminders, but it is absent from the Vercel cron registry under the reviewer-token incident hold. Both paths claim before send and rotate token authority. The Campaign settings modal still omits reminder toggles/leads, the Dataverse schema defaults both flags true, and a 2026-09-01 read-only probe found 92 current-cycle active requests with both flags true. `scripts/check-reviewer-reminder-hold.js` blocks accidental re-registration in CI and Vercel prebuild. Staff reminder sends, link-bearing email sends, regenerate-token, and review-due resend remain callable, so the production manual-send freeze is procedural rather than code-enforced. The manual "Re-invite already-invited" button was removed in S277; `allowResend` remains only as a programmatic re-mint contract. Campaign timing, accepted-only materials release, token TTL, quota notification, and selective decline remain implemented as described in the canonical spec. See the two Atlas pages for the exact column list and the canonical spec for reactivation prerequisites.
+**Reviewer-engagement build (Model B):** spec is `docs/REVIEWER_ENGAGEMENT_SPEC.md`. The 9 backing Dataverse fields are **provisioned in prod (2026-06-21, wave `7-reviewer-engagement`)**. Per-request campaign config lives on `akoya_request`; the per-reviewer respond-reminder marker lives on `wmkf_appreviewersuggestion`. **Phases 1, 2, and 4 remain live. Phase 3 mechanism IMPLEMENTED (S275), schedule PAUSED (2026-09-01):** `/api/cron/reviewer-reminders` can send respond-by and review-due reminders, but it is absent from the Vercel cron registry under the reviewer-token incident hold. Respond reminders claim with If-Match, mint, and deliver a replacement pre-acceptance link. Review-due reminders claim with If-Match only after a fail-closed token-liveness/runway check; they are link-free and preserve the existing token. Commit `4dd57369` is production-live in Ready deployment `dpl_89s9MzdUnDST6Jm9Vs3cnMLPmUDu`; authenticated Workbench smoke passed, and the post-deploy D26 read-only audit found 51/51 active and eligible with zero blocked rows. The owner lifted the procedural manual reminder freeze after that evidence; the automatic schedule remains held. The Campaign settings modal still omits reminder toggles/leads, the Dataverse schema defaults both flags true, and a 2026-09-01 read-only probe found 92 current-cycle active requests with both flags true. `scripts/check-reviewer-reminder-hold.js` blocks accidental re-registration in CI and Vercel prebuild. The manual "Re-invite already-invited" button was removed in S277; `allowResend` remains only as a programmatic re-mint contract. Campaign timing, accepted-only Materials delivery, token TTL, quota notification, and selective decline remain implemented as described in the canonical spec. See the two Atlas pages for the exact column list and the canonical spec for the remaining cron-reactivation prerequisites.
 
 **Per-reviewer extension workflow (Wave 18 production-live 2026-08-11):** eligible accepted rows in **Track Reviewers** expose Grant/Change extension. The dedicated `/api/review-manager/review-due-extension` route freshly enforces accepted/non-terminal/no-receipt state, requires a date strictly after the request default (and current/future Pacific date) with no maximum, and permits null to restore the original. It first validates the admin body, Dynamics impersonation setting, assigned sender, confirmed recipient, signature, and calendar. Confirmed engagement snapshot name/email take precedence; legacy missing values fall back field-by-field to the server-read linked reviewer person, and absence from both sources still fails before the write. It then ETag-saves and automatically dispatches the fixed-subject message with the assigned-PD signature and stable-UID calendar update. Only an actual Dynamics dispatch failure preserves the date without the notice. The open modal offers a server-fresh retry, and an existing extension always offers Resend deadline email without another date write; there is no durable notification-owed marker for a failed restore send. Invite Reviewers and generic `my-candidates` PATCH cannot write the field. The 90-day accepted-token cushion remains intentional and saving does not rotate a delivered token. [VERIFIED via production create/publish/exact/runtime-select probes, the non-clobbering admin-body seed, main `8647af33`, Vercel `dpl_AbTvWvMYb5inwPnYKTK2mkrkNXZz`, and live HTTP checks on 2026-08-11 / 2026-08-12 UTC] the column and runtime are live. [VERIFIED via the exact read-only production Request `1002788`/Test Homer row probe, main `ccb7e0c8`, Vercel `dpl_DjRmd4axNpUUpHAo6ZmeoBgumxTe`, and live HTTP checks] the legacy identity fallback is live. [VERIFIED via owner production smoke on Request `1002788`] the retry saved the extension and delivered the automatic deadline email. Its `Dear Test Homer,` greeting exposed the last copy defect. The admin body now requires `{{greeting}}`, the shared reviewer honorific helper renders `Dear Dr. Homer,`, and the live Dataverse setting matches the source default. [VERIFIED via main `6526a934`, Vercel `dpl_33KVRu3WmQhWBztd7RqDd2X6LBCr`, 610 suites / 7,717 tests, webpack build, and live HTTP 200] that correction is production-live; no second test email was sent.
 
@@ -919,7 +923,7 @@ Submitted reviewers still render as a read-only per-reviewer card list
 (ratings decoded via the static schema, richtext narrative answers, SharePoint
 download). Panel-prep roll-up/export now exists client-side (Phase 3, below).
 
-**Phase 1 LIVE (S326; deployed, browser-drive-verified against live acceptance data):** outstanding tracking + manual nudge. The manual send remains callable in the UI/API but is under the procedural production freeze described in the reviewer-engagement hold above; the following paragraph describes implemented behavior, not current permission to send. The DTO
+**Phase 1 LIVE (S326; deployed, browser-drive-verified against live acceptance data; reminder safety production-verified 2026-09-01):** outstanding tracking + manual nudge. The owner lifted the procedural manual reminder freeze after commit `4dd57369` reached production, authenticated Workbench smoke passed, and the post-deploy D26 liveness audit found zero blocked rows. The DTO
 (`reviewers.js` GET) adds `submitted` (accepted-reviewer submission status),
 `daysSinceMaterialsSent` (derived from `wmkf_materialssentat`, null until
 materials are sent), and passes through `reminderSentAt`/`reminderCount`
@@ -936,15 +940,19 @@ from a fresh row immediately before persistence (accepted, materials sent or
 under review, review not received, selected, not token-revoked, and not
 applicant-excluded via `isExcluded`). It reuses
 `reviewer-reminder-sweep.js`'s exported `loadRequestContext` / `loadReviewer` /
-`sendOneReminder` send/token/template machinery, but the manual path writes
-`wmkf_remindersentat` + `wmkf_remindercount` + fresh token authority in one
-PATCH bound to that fresh row's ETag. The email is attempted only after the
-atomic write succeeds; a 412 returns conflict without sending. A read failure
-and a pre-email token-preparation failure remain distinct retryable outcomes,
+`sendOneReminder` send/template machinery. Before writing, the service
+classifies the stored token and effective due date on the initial read, the
+fresh authorization read, and the final shared sender; missing, revoked,
+invalid, expired, or insufficient-window state refuses without a write or
+email. The review-due email is link-free and never mints or rotates token
+authority. The manual path writes only `wmkf_remindersentat` +
+`wmkf_remindercount` in one PATCH bound to that fresh row's ETag. The email is
+attempted only after the atomic write succeeds; a 412 returns conflict without
+sending. A read failure and a pre-email preparation failure remain distinct retryable outcomes,
 while an email failure after persistence retains the marker. Manual and cron
 share the marker, and the implemented contract permits a deliberate staff
-manual re-send even when it is already set. Staff must not exercise that
-contract during the 2026-09-01 token-incident hold.
+manual re-send even when it is already set. The automatic cron remains paused
+under the separate scheduling hold.
 
 **Structured staff review rescue:** each accepted, not-yet-submitted reviewer in
 the Reviews tab also offers "Enter review manually" for cases where the external
