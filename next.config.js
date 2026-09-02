@@ -63,6 +63,13 @@ const nextConfig = {
   // after PR #142). Bundling means no runtime require() of these packages;
   // next/jest also transforms transpilePackages, so Jest needs no separate
   // exemption. Memory: project-vercel-node22-no-require-esm.
+  // The webpack builder (used by the Playwright e2e job via `next build
+  // --webpack`) refuses a CommonJS require() of an ESM package even when both
+  // are being bundled; 'loose' lets it bundle sanitize-html -> htmlparser2.
+  // Turbopack ignores this key.
+  experimental: {
+    esmExternals: 'loose',
+  },
   transpilePackages: [
     'sanitize-html',
     'htmlparser2',
