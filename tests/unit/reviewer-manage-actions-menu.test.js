@@ -61,4 +61,25 @@ describe('reviewer management actions menu', () => {
     expect(screen.getByText('Needs review')).toBeInTheDocument();
     expect(screen.queryByText('Not sent')).not.toBeInTheDocument();
   });
+
+  test('invalid token metadata can be revoked but cannot be regenerated', () => {
+    const onRevoke = jest.fn();
+    render(
+      <TokenActionsMenu
+        reviewer={{ ...reviewer, tokenState: 'invalid' }}
+        onRegenerate={jest.fn()}
+        onRevoke={onRevoke}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Manage Dr. Test Reviewer' }));
+
+    expect(screen.getByText('Token metadata needs repair. Do not regenerate this link.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Revoke link' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Regenerate link & copy' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Generate link & copy' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Revoke link' }));
+    expect(onRevoke).toHaveBeenCalledTimes(1);
+  });
 });

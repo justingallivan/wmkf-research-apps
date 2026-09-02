@@ -592,7 +592,9 @@ describe('sweepReviewDueReminders', () => {
 
     expect(r.blocked[reason]).toBe(1);
     expect(r.errors).toEqual([]);
+    expect(r.eligible).toBe(0);
     expect(r.sent).toBe(0);
+    expect(getRecord.mock.calls.some(([set]) => set === 'wmkf_potentialreviewerses')).toBe(false);
     expect(updateRecord).not.toHaveBeenCalled();
     expect(createAndSendEmail).not.toHaveBeenCalled();
   });
@@ -603,6 +605,49 @@ describe('sweepReviewDueReminders', () => {
     const r = await sweepReviewDueReminders();
     expect(r.sent).toBe(0);
   });
+});
+
+test('a direct review-due caller cannot bypass the final token-liveness guard', async () => {
+  const result = {
+    sent: 0,
+    skipped: 0,
+    prepareFailed: 0,
+    claimFailed: 0,
+    sendFailed: 0,
+    errors: [],
+    blocked: {
+      token_revoked: 0,
+      token_not_minted: 0,
+      token_invalid_data: 0,
+      token_expired: 0,
+      token_insufficient_window: 0,
+      due_date_missing: 0,
+    },
+  };
+
+  await sendOneReminder({
+    kind: 'reviewdue',
+    subjectTemplate: REVIEW_DUE_SUBJECT,
+    bodyTemplate: REVIEW_DUE_BODY,
+    row: {
+      wmkf_appreviewersuggestionid: SUG,
+      wmkf_externaltokenhash: 'stored-token-hash',
+      wmkf_externaltokenexpires: isoDaysAgo(1),
+      wmkf_externaltokenrevoked: false,
+      wmkf_remindercount: 0,
+      _etag: 'W/"direct"',
+    },
+    request: requestConfig({ wmkf_reviewduedate: ymdDaysFromNow(-1) }),
+    pd: { internalemailaddress: 'pd@keck.org', systemuserid: PD },
+    reviewer: { wmkf_name: 'Dr. Reviewer', wmkf_emailaddress: 'rev@example.org' },
+    result,
+  });
+
+  expect(result.blocked.token_expired).toBe(1);
+  expect(result.sent).toBe(0);
+  expect(updateRecord).not.toHaveBeenCalled();
+  expect(mintAndStore).not.toHaveBeenCalled();
+  expect(createAndSendEmail).not.toHaveBeenCalled();
 });
 
 test('unknown reminder kind fails before any marker or token write', async () => {

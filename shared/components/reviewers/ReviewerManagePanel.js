@@ -113,6 +113,9 @@ export function TokenActionsMenu({
   const menuRef = useRef(null);
 
   const isActive = reviewer.tokenState === 'active';
+  const hasInvalidTokenMetadata = reviewer.tokenState === 'invalid';
+  const canRegenerate = !hasInvalidTokenMetadata;
+  const canRevoke = isActive || hasInvalidTokenMetadata;
   const canCorrectStatus = Boolean(
     onStatusChange && !TERMINAL_REVIEW_STATUSES.includes(reviewer.reviewStatus),
   );
@@ -125,10 +128,11 @@ export function TokenActionsMenu({
   // The estimate drives the upward flip so the portalled menu never opens
   // off-screen. Status correction and terminal actions are taller sections;
   // the remaining items are standard 40px menu rows.
-  const itemCount = 1 + (isActive ? 1 : 0) + (onRemove ? 1 : 0);
+  const itemCount = (canRegenerate ? 1 : 0) + (canRevoke ? 1 : 0) + (onRemove ? 1 : 0);
   const estimatedMenuHeight = (itemCount * 40)
     + (canCorrectStatus ? 118 : 0)
     + (canEndEngagement ? 104 : 0)
+    + (hasInvalidTokenMetadata ? 48 : 0)
     + 8;
 
   // Position the menu in viewport coords, flipping upward when there isn't room
@@ -241,13 +245,20 @@ export function TokenActionsMenu({
           <p className="px-3 pt-2 pb-0.5 text-[11px] font-medium uppercase tracking-wide text-gray-400">
             Reviewer link
           </p>
-          <button
-            onClick={() => { setOpen(false); onRegenerate(); }}
-            className="w-full text-left px-3 py-2 hover:bg-gray-50"
-          >
-            {reviewer.tokenState === 'not_minted' ? 'Generate link & copy' : 'Regenerate link & copy'}
-          </button>
-          {isActive && (
+          {canRegenerate && (
+            <button
+              onClick={() => { setOpen(false); onRegenerate(); }}
+              className="w-full text-left px-3 py-2 hover:bg-gray-50"
+            >
+              {reviewer.tokenState === 'not_minted' ? 'Generate link & copy' : 'Regenerate link & copy'}
+            </button>
+          )}
+          {hasInvalidTokenMetadata && (
+            <p className="px-3 py-2 text-xs leading-4 text-amber-700 bg-amber-50">
+              Token metadata needs repair. Do not regenerate this link.
+            </p>
+          )}
+          {canRevoke && (
             <button
               onClick={() => { setOpen(false); onRevoke(); }}
               className="w-full text-left px-3 py-2 hover:bg-gray-50 text-red-700"

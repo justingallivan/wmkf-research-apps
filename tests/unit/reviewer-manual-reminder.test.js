@@ -226,6 +226,40 @@ describe('sendManualReviewDueReminder', () => {
     expect(createAndSendEmail).not.toHaveBeenCalled();
   });
 
+  test.each([
+    ['not minted', { wmkf_externaltokenhash: '  ' }, {}, {}, 'token_not_minted'],
+    ['invalid metadata', { wmkf_externaltokenexpires: null }, {}, {}, 'token_invalid_data'],
+    ['expired', { wmkf_externaltokenexpires: '2000-01-01T00:00:00Z' }, {}, {}, 'token_expired'],
+    ['insufficient window', { wmkf_externaltokenexpires: '2099-09-09T23:59:59Z' }, {}, {}, 'token_insufficient_window'],
+    [
+      'missing due date',
+      { wmkf_reviewduedateoverride: null },
+      { wmkf_reviewduedateoverride: '2099-09-09' },
+      { wmkf_reviewduedate: null },
+      'due_date_missing',
+    ],
+  ])('initial %s refusal is independent of the eligible authorization re-read', async (
+    _label,
+    initialState,
+    authorizedState,
+    requestState,
+    reason,
+  ) => {
+    installReads({
+      suggestion: suggestionRow(initialState),
+      suggestionAfterClaim: suggestionRow({ ...authorizedState, _etag: 'W/"101"' }),
+      request: requestRecord(requestState),
+    });
+
+    const result = await sendManualReviewDueReminder({ requestId: REQ, suggestionId: SUG });
+
+    expect(result).toEqual({ ok: false, reason });
+    expect(getRecord.mock.calls.filter(([set]) => set === 'wmkf_appreviewersuggestions')).toHaveLength(1);
+    expect(updateRecord).not.toHaveBeenCalled();
+    expect(mintAndStore).not.toHaveBeenCalled();
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+  });
+
   test('a review submitted after initial eligibility is refused before atomic claim/send', async () => {
     installReads({
       suggestion: suggestionRow(),
