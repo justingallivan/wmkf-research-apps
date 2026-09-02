@@ -1,5 +1,5 @@
 /**
- * Consolidated reviewer follow-up — cycle-wide tracking for the signed-in PD.
+ * Consolidated reviewer follow-up — cycle-wide tracking for staff.
  *
  * Read contract: combines the existing Workbench assignment feed with the
  * existing Review Manager aggregate DTO. Write controls are the unchanged
@@ -133,6 +133,7 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
   const [cycles, setCycles] = useState([]);
   const [cycleCode, setCycleCode] = useState('');
   const [proposals, setProposals] = useState([]);
+  const [scope, setScope] = useState('my');
   const [view, setView] = useState('attention');
   const [search, setSearch] = useState('');
   const [includeSetAside, setIncludeSetAside] = useState(false);
@@ -168,15 +169,16 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
     return () => { active = false; };
   }, []);
 
-  const loadProposals = useCallback(async (selectedCycle) => {
+  const loadProposals = useCallback(async (selectedCycle, selectedScope) => {
     if (!selectedCycle) return;
     const requestId = ++requestIdRef.current;
+    const requestScope = selectedScope === 'all' ? 'all' : 'my';
     setLoadingProposals(true);
     setError(null);
     try {
       const [dashboardResponse, reviewerResponse] = await Promise.all([
-        fetch(`/api/workbench/dashboard?cycleCode=${encodeURIComponent(selectedCycle)}&scope=my&includeSetAside=1`),
-        fetch(`/api/review-manager/reviewers?cycleCode=${encodeURIComponent(selectedCycle)}`),
+        fetch(`/api/workbench/dashboard?cycleCode=${encodeURIComponent(selectedCycle)}&scope=${requestScope}&includeSetAside=1`),
+        fetch(`/api/review-manager/reviewers?cycleCode=${encodeURIComponent(selectedCycle)}&scope=${requestScope}`),
       ]);
       const [dashboardBody, reviewerBody] = await Promise.all([
         dashboardResponse.json().catch(() => ({})),
@@ -204,9 +206,9 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
 
   useEffect(() => {
     if (!cycleCode) return undefined;
-    const timer = window.setTimeout(() => { void loadProposals(cycleCode); }, 0);
+    const timer = window.setTimeout(() => { void loadProposals(cycleCode, scope); }, 0);
     return () => window.clearTimeout(timer);
-  }, [cycleCode, loadProposals]);
+  }, [cycleCode, loadProposals, scope]);
 
   useEffect(() => () => { requestIdRef.current += 1; }, []);
 
@@ -223,7 +225,7 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
     <Layout title="Reviewer follow-up">
       <PageHeader
         title="Reviewer follow-up"
-        subtitle="Monitor every assigned request in one place and follow up without opening each proposal first."
+        subtitle="Monitor reviewer progress across a grant cycle and follow up without opening each proposal first."
       />
       <WorkbenchViewsNav
         activeKey="reviewer-follow-up"
@@ -257,11 +259,34 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
           </label>
 
           <fieldset className="flex flex-col gap-1">
-            <legend className="text-sm font-medium text-gray-700">View</legend>
+            <legend className="text-sm font-medium text-gray-700">Requests</legend>
+            <div className="inline-flex min-h-11 overflow-hidden rounded-lg border border-gray-300 bg-white">
+              <button
+                type="button"
+                onClick={() => setScope('my')}
+                aria-pressed={scope === 'my'}
+                className={`px-4 py-2 text-sm font-semibold ${scope === 'my' ? 'bg-gray-900 text-white' : 'text-gray-700 hover:bg-gray-50'}`}
+              >
+                My requests
+              </button>
+              <button
+                type="button"
+                onClick={() => setScope('all')}
+                aria-pressed={scope === 'all'}
+                className={`border-l border-gray-300 px-4 py-2 text-sm font-semibold ${scope === 'all' ? 'bg-gray-900 text-white' : 'text-gray-700 hover:bg-gray-50'}`}
+              >
+                All requests
+              </button>
+            </div>
+          </fieldset>
+
+          <fieldset className="flex flex-col gap-1">
+            <legend className="text-sm font-medium text-gray-700">Reviewers</legend>
             <div className="inline-flex min-h-11 overflow-hidden rounded-lg border border-gray-300 bg-white">
               <button
                 type="button"
                 onClick={() => setView('attention')}
+                aria-pressed={view === 'attention'}
                 className={`px-4 py-2 text-sm font-semibold ${view === 'attention' ? 'bg-gray-900 text-white' : 'text-gray-700 hover:bg-gray-50'}`}
               >
                 Needs attention ({summary.attentionRequests})
@@ -269,9 +294,10 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
               <button
                 type="button"
                 onClick={() => setView('all')}
+                aria-pressed={view === 'all'}
                 className={`border-l border-gray-300 px-4 py-2 text-sm font-semibold ${view === 'all' ? 'bg-gray-900 text-white' : 'text-gray-700 hover:bg-gray-50'}`}
               >
-                All requests
+                All reviewers
               </button>
             </div>
           </fieldset>
@@ -300,7 +326,7 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
 
       <dl className="mb-6 flex flex-wrap gap-x-8 gap-y-3 text-sm">
         {[
-          ['Assigned requests', summary.assignedRequests],
+          [scope === 'all' ? 'Cycle requests' : 'Assigned requests', summary.assignedRequests],
           ['Active reviewers', summary.activeReviewers],
           ['Overdue', summary.overdueReviewers],
           ['Reviews received', summary.reviewsReceived],
@@ -331,7 +357,7 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
           {cycleCode && (
             <button
               type="button"
-              onClick={() => void loadProposals(cycleCode)}
+              onClick={() => void loadProposals(cycleCode, scope)}
               className="mt-3 min-h-10 rounded-lg bg-gray-900 px-3 py-2 font-semibold text-white hover:bg-gray-800"
             >
               Try again
@@ -345,11 +371,13 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
       ) : !error && visibleProposals.length === 0 ? (
         <Card hover={false}>
           <p className="font-medium text-gray-900">
-            {view === 'attention' ? 'No reviewer follow-up needs attention.' : 'No assigned requests match this view.'}
+            {view === 'attention'
+              ? 'No reviewer follow-up needs attention.'
+              : `No ${scope === 'all' ? 'cycle' : 'assigned'} requests match this view.`}
           </p>
           <p className="mt-1 text-sm text-gray-500">
             {view === 'attention'
-              ? 'Switch to All requests to see completed reviews and proposals without active reviewer engagements.'
+              ? 'Switch to All reviewers to see completed reviews and proposals without active reviewer engagements.'
               : 'Change the cycle, search, or set-aside filter.'}
           </p>
         </Card>
@@ -360,7 +388,7 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
               key={proposal.proposalId}
               proposal={proposal}
               previewReadOnly={previewReadOnly}
-              onRefresh={() => loadProposals(cycleCode)}
+              onRefresh={() => loadProposals(cycleCode, scope)}
             />
           ))}
         </div>

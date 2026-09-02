@@ -6,7 +6,22 @@ import {
   summarizeReviewerFollowUp,
 } from '../../shared/utils/reviewer-follow-up';
 import { getServerSideProps } from '../../pages/workbench/reviewer-follow-up';
+import { ReviewerFollowUpDashboard } from '../../pages/workbench/reviewer-follow-up';
 import { PRODUCTION_HOSTS, SANDBOX_HOSTS } from '../../lib/dataverse/core/target-registry';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+
+jest.mock('../../shared/components/Layout', () => {
+  const React = require('react');
+  const Layout = ({ children }) => React.createElement('main', null, children);
+  const Card = ({ children }) => React.createElement('section', null, children);
+  const PageHeader = ({ title, subtitle }) => React.createElement(
+    'header',
+    null,
+    React.createElement('h1', null, title),
+    React.createElement('p', null, subtitle),
+  );
+  return { __esModule: true, default: Layout, Card, PageHeader };
+});
 
 const dashboardProposals = [
   {
@@ -126,6 +141,48 @@ describe('reviewer follow-up projection', () => {
       effectiveReviewDeadline: '2026-08-01',
       reviewReceivedAt: '2026-08-02',
     }, '2026-09-01')).toBe(false);
+  });
+});
+
+describe('reviewer follow-up request scope', () => {
+  const originalFetch = global.fetch;
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
+
+  test('keeps request scope separate from reviewer-state view and refetches both feeds for All requests', async () => {
+    global.fetch = jest.fn(async (url) => {
+      if (url === '/api/workbench/dashboard') {
+        return {
+          ok: true,
+          json: async () => ({ cycles: [{ code: 'D26', label: 'December 2026' }], defaultCycleCode: 'D26' }),
+        };
+      }
+      return {
+        ok: true,
+        json: async () => ({ proposals: [] }),
+      };
+    });
+
+    render(<ReviewerFollowUpDashboard />);
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('/api/workbench/dashboard?cycleCode=D26&scope=my'));
+      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('/api/review-manager/reviewers?cycleCode=D26&scope=my'));
+    });
+
+    expect(screen.getByRole('button', { name: 'My requests' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'All reviewers' })).toHaveAttribute('aria-pressed', 'false');
+
+    fireEvent.click(screen.getByRole('button', { name: 'All requests' }));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('/api/workbench/dashboard?cycleCode=D26&scope=all'));
+      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('/api/review-manager/reviewers?cycleCode=D26&scope=all'));
+    });
+    expect(screen.getByRole('button', { name: 'All requests' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'All reviewers' })).toHaveAttribute('aria-pressed', 'false');
   });
 });
 

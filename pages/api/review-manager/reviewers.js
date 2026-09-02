@@ -7,7 +7,9 @@
  *   Query overrides:
  *     ?proposalId=<guid>     specific request (collaborator override; bypasses PD filter)
  *     ?requestNumber=<num>   same, by request number
- *     ?cycleCode=Jxx|Dxx     narrow within PD scope
+ *     ?cycleCode=Jxx|Dxx     narrow within PD scope; required for all scope
+ *     ?scope=my|all          my (default) = requests where the caller is lead PD;
+ *                            all = every request in the specified cycle
  *     ?status=<reviewStatus> post-filter (e.g. 'materials_sent', 'complete')
  *
  * PATCH /api/review-manager/reviewers
@@ -61,6 +63,7 @@ async function handleWithCorrelation(req, res) {
 async function handleGet(req, res, access) {
   try {
     const { proposalId, requestNumber, cycleCode, status } = req.query;
+    const scope = req.query.scope === 'all' ? 'all' : 'my';
 
     // GUID-validate proposalId before it becomes a Dataverse selector
     // (fetchRequestByIdOrNumber → getRecord). requestNumber is an escaped string lookup.
@@ -73,6 +76,7 @@ async function handleGet(req, res, access) {
       requestNumber,
       cycleCode,
       status,
+      scope,
       azureEmail: access.session?.user?.azureEmail,
     });
     return res.status(200).json(result);
