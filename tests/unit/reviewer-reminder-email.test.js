@@ -41,5 +41,19 @@ test.each([
   'Paste this URL: https://reviews.example.org/external/review/token.value.sig',
   'Use {{externalLink}} to continue.',
 ])('refuses structural reviewer-link content: %s', (bodyTemplate) => {
-  expect(() => render(bodyTemplate)).toThrow(/cannot contain a reviewer URL/i);
+  expect(() => render(bodyTemplate)).toThrow(/body cannot contain a reviewer URL/i);
+});
+
+test.each([
+  'Continue at https://reviews.example.org/external/review/token.value.sig',
+  'Review reminder {{externalLink}}',
+])('refuses reviewer-link content in the subject: %s', (subjectTemplate) => {
+  expect(() => renderReviewDueReminder({
+    subjectTemplate,
+    bodyTemplate: 'Your review is due soon.',
+    reviewerName: 'Dr. Reviewer',
+    title: 'A Proposal',
+    reviewDueDate: '2026-09-09',
+    signatureBlock: { name: 'Dr. PD', email: 'pd@example.org', signature: 'Dr. PD' },
+  })).toThrow(/subject cannot contain a reviewer URL/i);
 });

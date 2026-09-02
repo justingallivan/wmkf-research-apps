@@ -393,6 +393,25 @@ describe('send-emails-service — one-time materials delivery', () => {
     expect(createAndSendEmail).toHaveBeenCalledTimes(1);
   });
 
+  test('an accepted reviewer with revoked token authority cannot receive materials', async () => {
+    SUGGESTIONS[SUG_OK] = suggestion(SUG_OK, {
+      wmkf_accepted: true,
+      wmkf_reviewstatus: 100000000,
+      wmkf_materialssentat: null,
+      wmkf_externaltokenrevoked: true,
+    });
+
+    const emitted = await run({ drafts: [draft(SUG_OK)], templateType: 'materials' });
+
+    expect(resultOf(emitted).skipped[0]).toMatchObject({
+      suggestionId: SUG_OK,
+      reason: 'materials_release_ineligible',
+    });
+    expect(mintAndStore).not.toHaveBeenCalled();
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+    expect(updateLifecycle).not.toHaveBeenCalled();
+  });
+
   test.each([100000005, 100000006, 199999999])(
     'terminal or unknown review status %s cannot mint a materials link',
     async (reviewStatus) => {
