@@ -56,6 +56,22 @@ const nextConfig = {
   // block on someone's next dev run. Next 16 guidance still lives in
   // `node_modules/next/dist/docs/` for anyone who needs it.
   agentRules: false,
+  // Bundle sanitize-html and its htmlparser2 12 tree into the server chunks
+  // instead of externalizing them. htmlparser2 >= 11 is ESM-only and Vercel's
+  // 22.x function runtime cannot require() ESM (2026-09-01 incident: every
+  // route importing sanitize-html 500'd at module load with ERR_REQUIRE_ESM
+  // after PR #142). Bundling means no runtime require() of these packages;
+  // next/jest also transforms transpilePackages, so Jest needs no separate
+  // exemption. Memory: project-vercel-node22-no-require-esm.
+  transpilePackages: [
+    'sanitize-html',
+    'htmlparser2',
+    'domhandler',
+    'domutils',
+    'dom-serializer',
+    'domelementtype',
+    'entities',
+  ],
   async redirects() {
     return [
       // Legacy production host page navigations move to the canonical branded host.
