@@ -460,8 +460,10 @@ export default function ReviewersTab({
           onClick={() => setCampaignOpen(true)}
           disabled={!canEdit}
           className="text-xs text-gray-500 hover:text-gray-800 px-2 py-1 whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-40"
-          title={!canEdit
-            ? 'Only the lead Program Director or a superuser can edit campaign settings'
+          title={previewReadOnly
+            ? 'Campaign settings are disabled in read-only Preview'
+            : !canManage
+              ? 'Only the lead Program Director or a superuser can edit campaign settings'
             : "Edit this request's reviewer campaign settings (days to respond, review due date)"}
         >
           ⚙ Campaign settings

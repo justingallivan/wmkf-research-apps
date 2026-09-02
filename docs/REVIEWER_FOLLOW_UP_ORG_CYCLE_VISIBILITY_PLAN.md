@@ -3,7 +3,7 @@ title: Reviewer Follow-up organization-wide cycle visibility plan
 domain: request-workbench
 kind: plan
 status: active
-summary: Make every eligible review cycle discoverable to authorized Reviewer users while preserving personal defaults and deciding write ownership explicitly.
+summary: Organization-wide Reviewer Follow-up cycle discovery and lead-PD/superuser request mutation enforcement, built on the implementation branch.
 canonical: false
 cataloged: 2026-09-02
 last_verified: 2026-09-02
@@ -24,15 +24,16 @@ including a cycle whose only eligible rows are set aside, and
 then select **All requests** to see that cycle-wide population. The page will
 still open in **My requests**. Under the owner-selected mutation policy,
 non-superusers will be unable to mutate requests led by another Program
-Director. The owner selected that policy on 2026-09-02; implementation remains
-planned.
+Director. The owner selected that policy on 2026-09-02. The implementation is
+built and automated-test verified on `codex/workbench-reviewer-follow-up`;
+Preview verification and promotion remain release steps.
 
 This is primarily a read-discovery correction. It adds no route, table,
 migration, permission, role, or write capability. Because the current
-Reviewer Follow-up `canManage` distinction is a UI rule rather than a complete
-server authorization boundary, the plan includes an explicit hardening step.
-The policy decision is resolved, but authoritative foreign-row denial is not
-yet a verified current-state claim.
+Reviewer Follow-up `canManage` distinction was only a UI rule, the build adds a
+shared server authorization boundary before request-bound side effects. The
+policy decision and branch implementation are now verified; Production remains
+unchanged until deliberate promotion.
 
 ## Contract boundary
 
@@ -45,9 +46,8 @@ yet a verified current-state claim.
   requests remain excluded until **Show set aside** is selected.
 - **Read, not manage:** organization-wide rows remain visible in **All requests**,
   but `canManage` is true only for the lead Program Director or a superuser.
-  This describes the current UI and the owner-selected target policy. The
-  current server contract remains staff-shared until step 0 is implemented.
-  Client-side hiding is not authorization.
+  The implementation branch enforces the same decision server-side before
+  request-bound side effects. Client-side hiding is not authorization.
 - **Default view:** **My requests** remains the initial request scope. The new
   cycle list does not silently change the page to **All requests**.
 
@@ -60,7 +60,7 @@ yet a verified current-state claim.
 | `scope=all` omits the Program Director filter after a cycle is selected. | `lib/services/workbench/dashboard-service.js:126-156` | `[VERIFIED via source]` |
 | Non-superusers can receive another Program Director's row while `canManage=false`; superusers can manage it. | `lib/services/workbench/dashboard-service.js:180-204`; `tests/unit/workbench-dashboard-service.test.js` | `[VERIFIED via source and unit tests]` |
 | The merged Reviewer Follow-up rows always originate from dashboard rows and carry the dashboard projection under `workbench`. | `shared/utils/reviewer-follow-up.js:21-41` | `[VERIFIED via source]` |
-| The UI hides foreign-row management, but `PATCH /api/review-manager/reviewers` authorizes either app and does not enforce lead-PD/superuser ownership; its service documents the data boundary as staff-shared. | `pages/api/review-manager/reviewers.js:52-58,96-138`; `lib/services/review-manager/reviewers-service.js:19-25` | `[VERIFIED via source — security prerequisite]` |
+| Before this build, the UI hid foreign-row management while request-bound Reviewer APIs remained staff-shared. The implementation routes those mutations through `authorizeReviewerRequestMutation` before side effects. | `lib/services/reviewer-request-authorization.js`; affected route shells; focused route tests | `[VERIFIED via source and automated tests on implementation branch]` |
 | The adapter docblock says the PD-scoped helper also serves Reviewer Finder, but a live symbol census finds only the Workbench dashboard caller; Reviewer Finder now builds its own PD-scoped `queryAllRequests` call. | `lib/dataverse/adapters/grant-request.js:172-190`; `lib/services/reviewer-finder/my-proposals-service.js:65-81` | `[STALE/CONFLICT verified via CodeGraph + rg + source]` |
 | In the authenticated Preview, the owner account saw 10 requests in **My requests** and 44 in **All requests** for D26. | Preview UAT on 2026-09-02 | `[VERIFIED via authenticated browser probe]` |
 | A Reviewer user with no assignment in a cycle cannot currently discover that cycle through this picker. | Follows directly from the PD-filtered cycle query | `[VERIFIED via source; browser complement still required]` |
@@ -201,16 +201,18 @@ Before widening cycle discovery, inventory every mutation control rendered by
 action. Trace each endpoint from target suggestion/request to its lead Program
 Director and current authorization.
 
-The initial census denominator is:
+The final component-to-route census is:
 
 - `PATCH /api/review-manager/reviewers`;
 - `POST /api/review-manager/regenerate-token`;
 - `POST /api/review-manager/revoke-token`;
-- `DELETE /api/reviewer-finder/my-candidates`;
+- request-bound `PATCH` and `DELETE /api/reviewer-finder/my-candidates`;
 - `POST /api/review-manager/terminal-transition`;
 - `POST /api/review-manager/send-review-reminder`;
 - `POST /api/review-manager/send-emails`;
-- the write performed through `/api/upload-handler` for manual review receipt;
+- `/api/upload-handler` is not request-bound: it stages generic outbound email
+  attachments and accepts no request/suggestion ownership input, so it remains
+  under its existing authenticated upload contract;
 - `POST /api/review-manager/campaign-config`; and
 - `POST /api/review-manager/review-due-extension`.
 
@@ -285,8 +287,8 @@ eligibility boundary; do not duplicate it in memory.
 
 Handle the adapter result explicitly. If `capped` is true, throw a
 `ServiceHttpError` with HTTP 503 and a sanitized incomplete-picker message.
-Before implementation approval, probe the current eligible organization-wide
-row count so the expected volume and headroom are recorded.
+The approved read-only production probe on 2026-09-02 returned 236 eligible
+rows and `capped:false`: 4.7% of the 5,000-row cap, with 95.3% headroom.
 
 No meeting-date history bound is planned because the requested contract is
 complete cycle discovery and the current picker exposes the caller's full
@@ -533,6 +535,10 @@ mutations. No further Claude pass is required before implementation.
 
 ## Status
 
-`[PLANNED — OWNER-AUTHORIZED 2026-09-02]` No implementation described here has
-been made by this document. The current Preview still uses the PD-scoped cycle
-picker and staff-shared mutation routes described under Verified current state.
+`[BUILT + TEST-VERIFIED — RELEASE PENDING 2026-09-02]` The organization-wide
+cycle picker, truthful active/set-aside counts and defaults, fail-closed UI
+mirrors, and server-authoritative lead-PD/superuser request mutation boundary
+are implemented on `codex/workbench-reviewer-follow-up`. The Production volume
+probe returned 236 eligible rows with `capped:false`. Claude code review,
+authenticated Preview verification, and deliberate Production promotion remain
+release steps; Production is unchanged.

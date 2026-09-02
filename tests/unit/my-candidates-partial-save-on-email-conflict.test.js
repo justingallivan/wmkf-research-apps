@@ -15,6 +15,9 @@ jest.mock('../../lib/utils/auth', () => ({
 jest.mock('../../lib/services/dynamics-context', () => ({
   bypassDynamicsRestrictions: jest.fn((_label, fn) => fn()),
 }));
+jest.mock('../../lib/services/reviewer-request-authorization', () => ({
+  authorizeReviewerRequestMutation: jest.fn(async () => ({})),
+}));
 jest.mock('../../lib/services/dynamics-service', () => ({
   DynamicsService: { getRecord: jest.fn(), queryRecords: jest.fn() },
 }));
