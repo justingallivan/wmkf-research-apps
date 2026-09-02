@@ -6,7 +6,7 @@ status: canonical
 summary: Canonical priority queue separating current commitments, evidence windows, optional work, external dependencies, and parked programs.
 canonical: true
 cataloged: 2026-07-22
-last_verified: 2026-09-01
+last_verified: 2026-09-02
 owner: product-engineering
 related:
   - docs/SYSTEM_MODEL.md
@@ -157,6 +157,22 @@ sequence.
   queued in `docs/PUBLIC_GIT_HISTORY_REMEDIATION_PLAN.md`).
 
 ## Completed in this execution
+
+- Reviewer Follow-up organization-wide cycle visibility and server authorization:
+  **[PRODUCTION-LIVE + AUTHENTICATED READ PROOF 2026-09-02]** Runtime merge
+  `acf40fb85a36ab2d481869c706a069abea52c087` ships the shared lifecycle
+  navigation and consolidated `/workbench/reviewer-follow-up` surface. Authorized
+  `reviewers` users can select organization-wide eligible cycles and use **All
+  requests**, while **My requests** remains the personal default. Request-bound
+  mutations independently resolve the target request and allow only its lead PD
+  or a superuser. Two Claude code-review passes returned APPROVE; the merged
+  candidate passed 17 focused suites / 241 tests plus relevant gates, lint, types,
+  and build. Authenticated Production proof showed D26 My 10 → All 44 (picker:
+  44 active + 184 set aside) and J26 My 0 → All 5 without exercising a write.
+  Current `main` `8e23aa95` is Ready in deployment
+  `dpl_FyiMz13BupWcGtTSaMNLxPd5FntP`; rollback target is
+  `dpl_3SJebjL3tPTdv89o5dVzR1dBS3Y2` (`39413e3d`). Queue order 2—Final Writeup
+  persona access proof and rollout—remains the next item.
 
 - Final Writeup acknowledgement Wave 23: **[PRODUCTION-PROVED 2026-08-31]**
   schema-as-code defines the

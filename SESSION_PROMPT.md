@@ -1,209 +1,104 @@
-# Session 473 Prompt: Resume Workbench UI/UX Consolidation
+# Session 474 Prompt: Final Writeup Persona Access Proof and Rollout
 
-## Session 472 Summary
+## Session 473 Summary
 
-Session 472 (2026-09-01) began the owner-requested holistic Workbench UI/UX
-consolidation, then paused that feature work for a production reviewer-token
-incident. The incident is contained and the remediation is Production-live.
-The owner explicitly chose to return to the Workbench UI/UX work next session.
+Session 473 (2026-09-02) completed, reviewed, promoted, and Production-verified
+the Workbench Reviewer Follow-up consolidation. The canonical queue now returns
+to Final Writeup persona rollout.
 
 ### What Was Completed
 
-1. **Workbench critique and linked mockups**
-   - Impeccable produced a comprehensive Workbench critique plus linked desktop
-     and mobile mockups for the Request list and Reviewer follow-up views.
-   - The mockups establish the owner-reviewed lifecycle order: **Request list →
+1. **Reviewer Follow-up is Production-live**
+   - The shared lifecycle navigation is live in this order: **Request list →
      Initial assessments → Reviewer follow-up → Final writeups → Awardees**.
-   - The consolidated reviewer view puts Cycle and View controls on one
-     top-aligned row, uses stable table columns rather than affiliation-driven
-     widths, and exposes direct reviewer follow-up without forcing a proposal
-     round trip.
+   - `/workbench/reviewer-follow-up` provides the consolidated cycle-level
+     follow-up surface while preserving the existing per-request reviewer
+     workflow and explicit action semantics.
+   - The cycle picker is organization-wide for authorized `reviewers` app users.
+     **My requests** remains the personal default; **All requests** exposes every
+     eligible request in the selected cycle, including set-aside rows only when
+     explicitly requested.
 
-2. **Workbench feature branch implemented and Preview-tested before the incident**
-   - `codex/workbench-reviewer-follow-up` contains the common Workbench view
-     navigation, consolidated Reviewer follow-up page, direct reminder actions,
-     stable reviewer-table columns, top-aligned filters, Track Reviewers action
-     parity, and simplified reviewer release actions.
-   - The Preview OAuth callback was corrected and a populated read-only Preview
-     was verified against Production reviewer data.
-   - The generic Track Reviewers **Send Email** bulk action was removed. Row
-     checkboxes remain only for selecting accepted reviewers for first Materials
-     release; reviewer reminders are explicit row actions.
+2. **Request-bound writes are enforced at the server boundary**
+   - Authorized staff may read the organization-wide projection.
+   - Reviewer Follow-up mutations independently resolve the target request and
+     allow only its lead PD or a superuser. Foreign requests are therefore
+     read-only for ordinary non-lead users even if a client attempts a direct
+     API call.
+   - This narrow exception does not change the settled organization-open
+     reviewer-person merge or staff-wide document-read decisions.
 
-3. **Reviewer-token incident contained and remediated**
-   - Automatic `/api/cron/reviewer-reminders` scheduling was removed and is
-     protected by a CI/prebuild hold gate.
-   - Review-due reminders are link-free, never mint or rotate token authority,
-     and fail closed before marker claim or email unless the existing token is
-     live through the effective deadline.
-   - Respond-by nudges remain the intentional pre-acceptance replacement-link
-     path. First Materials delivery is one-time and refuses revoked,
-     already-delivered, terminal, and otherwise ineligible recipients.
-   - Explicit token regeneration preserves the saved review draft; explicit
-     revocation deletes the draft best-effort. Manual review-due reminders have
-     resumed. The automatic cron remains held.
-   - The post-deploy read-only D26 audit examined 51 **never-reminded** sweep
-     candidates; all 51 were active and reminder-eligible, with zero blocked.
-     Reviewers already marked reminded, including the morning batch, were not in
-     that audit population.
+3. **Review and release evidence is complete**
+   - Two independent Claude code-review passes returned **APPROVE** after the
+     requested corrections.
+   - The merged candidate passed 17 focused suites / 241 tests, relevant CI
+     gates, lint with zero errors, type checking, and the production build.
+   - Runtime merge commit `acf40fb85a36ab2d481869c706a069abea52c087`
+     reached Ready Production deployment
+     `dpl_7ToPKYtpXhyW3WmPmn1WiY9wz2iv`.
+   - Current `main` commit `8e23aa95c5ef48c0724ccd06018d1a484015e5cc`
+     is Ready in Production deployment
+     `dpl_FyiMz13BupWcGtTSaMNLxPd5FntP`.
+   - Authenticated Production proof: D26 changed from **My 10** to **All 44**;
+     its picker reports **44 active + 184 set aside**. J26 changed from **My 0**
+     to **All 5**. No write control was exercised.
+   - Rollback target: deployment
+     `dpl_3SJebjL3tPTdv89o5dVzR1dBS3Y2`, commit `39413e3d`.
 
-4. **Incident closeout and deployment**
-   - Independent Claude reviews approved the runtime remediation for Production
-     with the automatic-cron hold retained.
-   - Runtime remediation through `4dd57369` and closeout corrections through
-     `4a58ab52` are on `main`. Production deployment
-     `dpl_HJjYUw79UwobKcePrAgLZL7sJ4cP` reached Ready; the error scan was clean,
-     `/workbench` returned the expected sign-in redirect, and the deployment
-     manifest still omitted the reviewer-reminder cron.
-   - Internal operating docs now reflect the incident contract. Public/onboarding
-     cleanup remains deliberately deferred future work.
+## Next Item
 
-### Commits
+### Final Writeup Persona Access Proof and Deliberate Rollout
 
-#### Workbench critique and mockups now preserved on `main`
+The canonical next item is `docs/CURRENT_WORK_QUEUE.md` order 2. The v2 Final
+Writeup audience configuration is already Production-live and exact, but persona
+lenses remain hard-disabled in `shared/config/finalWriteupPersonas.js`.
 
-- `15ae08c9` — Record comprehensive Workbench critique
-- `eb2ad030` — Add reviewer follow-up Workbench mockup
-- `c3fd39c1` — Clarify reviewer follow-up navigation hierarchy
-- `e772d8f1` — Add linked Workbench request-list mockup
-- `6a65db63` — Order Workbench views by grant lifecycle
+Proceed in this order:
 
-#### Workbench implementation branch
+1. Identify one representative Program Coordinator and one representative
+   Leadership user, plus an exact existing canonical Final Writeup Word item
+   appropriate for access testing.
+2. Prove each representative can open that exact Word item under their normal
+   identity. App visibility and SharePoint file permission are separate controls;
+   both must pass.
+3. If both access checks pass, deliberately enable the tracked persona flag and
+   run the focused tests, relevant gates, build, Preview smoke, and controlled
+   Production promotion.
+4. Smoke the PD, PC, Leadership, overlap, unassigned/ineligible, and superuser
+   cases. Preserve the responsible-PD no-self-review rule and the neutral
+   Reviewed / Updated since review semantics.
 
-- `8dd28914` — Add consolidated reviewer follow-up Workbench
-- `59368d06` / `12f3c8c5` — Correct and verify Preview authentication/data
-- `f8428419` / `2475d54a` / `6a5c2b36` — Stabilize columns, add direct actions,
-  and top-align filters
-- `4ac3a4d4` / `0c3cd424` / `fcc72c4b` / `449d739e` — Reconcile the related
-  reviewer pages, affiliations, Track Reviewers actions, and column headings
-- `54108529` — Simplify reviewer release actions
-- `aee2cafd` / `55adf692` — Preserve the independent token audits on the branch
+Do not infer personas from names, titles, email addresses, or program labels.
+Do not add an elevated team privilege or require an outside Dataverse
+administrator. Do not enable the flag before the two representative Word-access
+checks pass.
 
-#### Incident remediation and closeout on `main`
+## Parked — Retain for Future Work
 
-- `42098b8e` / `359aa2df` — Pause and guard the automatic reminder cron
-- `13817955` — Stabilize external reviewer token recovery
-- `bf7ed857` / `2e5241a4` / `733a3a2f` — Harden link-free reminders, one-time
-  Materials delivery, and preproduction gaps
-- `fbce0027` / `4dd57369` — Add token-liveness enforcement and close follow-ups
-- `4462bfe5` / `4a58ab52` — Reconcile incident closeout documentation
+1. Automatic reviewer-reminder scheduling and its campaign-setting prerequisites
+   remain held under `docs/REVIEWER_ENGAGEMENT_SPEC.md`.
+2. Public/onboarding reviewer-token documentation cleanup remains owner-deferred;
+   update source generators before republishing derived artifacts.
+3. Mobile-specific Workbench redesign is lower priority because mobile use is
+   expected to be rare; preserve responsive correctness without treating mobile
+   polish as the current work item.
+4. Pre-J27 Initial Assessment Production write proof remains owner-deferred.
+5. Post-cycle invitation-link strictness and reviewer-cron ledger promotion remain
+   parked until the current reviewer cycle ends.
 
-## Next Items
-
-### Verified Open — Owner-Directed Next Session Focus
-
-1. **Safely reconcile `main` into `codex/workbench-reviewer-follow-up`.**
-   Evidence: `git log main..codex/workbench-reviewer-follow-up` and
-   `git diff main...codex/workbench-reviewer-follow-up` on 2026-09-01.
-   The feature branch predates the incident remediation and overlaps
-   `ReviewerManagePanel`, `ReviewsTab`, reminder services/tests, and several
-   durable reviewer docs. Do **not** rebase or resolve mechanically. Preserve
-   these incident invariants during the merge:
-   - review-due reminders remain link-free and token-liveness-gated;
-   - Materials remains first-delivery-only and refuses revoked/ineligible rows;
-   - regeneration preserves drafts and revocation deletes them;
-   - `/api/cron/reviewer-reminders` remains absent and the hold gate remains green.
-
-2. **Re-run the integrated Workbench Preview before further design changes.**
-   Evidence: branch commits `59368d06` and `12f3c8c5` record the corrected OAuth
-   callback and populated read-only Preview proof, but that proof predates the
-   incident merge. Use the branch/Preview workflow with Production reads allowed
-   and writes denied. Verify common navigation, cycle retention, top-aligned
-   filters, proposal expansion, direct reminders, long affiliations, narrow
-   viewport behavior, Track Reviewers, and Reviews after integration.
-
-3. **Continue the holistic UI/UX evaluation from the implemented state.**
-   Evidence: `.impeccable/critique/2026-09-01T04-47-39Z__pages-workbench-js.md`,
-   `.impeccable/mockups/reviewer-follow-up.html`, and
-   `.impeccable/mockups/workbench-request-list.html`.
-   Compare the integrated Preview—not only the mockups—against the owner's
-   feedback. Prioritize consistency among Reviewer follow-up, Track Reviewers,
-   and Reviews; clear action ownership; stable columns; restrained affiliation
-   display; and one coherent Workbench navigation model. Keep this on Preview
-   until the owner approves promotion because it touches several visible surfaces.
-
-### Owner Decision Needed
-
-1. **Final Workbench UI acceptance after integrated Preview review.**
-   Evidence: the owner approved building on Preview but has not approved this
-   broad UI change for Production. Promotion requires a fresh visual/functional
-   review after the incident-safe merge.
-
-2. **Final Writeup persona rollout remains a separate access-coordination gate.**
-   Evidence: `docs/CURRENT_WORK_QUEUE.md` item 2. Representative PC and Leadership
-   Word access must be proved before deliberately enabling the persona lenses.
-   The owner chose UI/UX work as the next-session focus; do not silently enable
-   personas while doing Workbench design work.
-
-### Parked
-
-1. **Automatic reviewer-reminder scheduling and campaign configuration.**
-   Evidence: `docs/REVIEWER_ENGAGEMENT_SPEC.md` reactivation prerequisites.
-   The cron remains held until settings are visible/editable, new defaults fail
-   closed, existing armed rows have an owner-approved value, the hold gate is
-   deliberately retired, and a dry run is reviewed.
-
-2. **Public/onboarding reviewer-token documentation cleanup.**
-   Evidence: `docs/CURRENT_WORK_QUEUE.md` owner-deferred audit follow-up.
-   Update source generators first and regenerate outputs before their next
-   publication; this is not the next UI/UX task.
-
-### Do Not Reopen Without New Decision
-
-1. A separate standalone reviewer dashboard outside the Workbench navigation.
-   The selected direction is a coherent Workbench view family.
-2. A generic bulk **Send Email** action for Track Reviewers. First Materials
-   release and reviewer reminders have distinct, explicit actions.
-3. Automatic reviewer reminders while the incident hold prerequisites remain open.
-4. Metered or credit-consuming review products without explicit authorization.
-
-## Key Files Reference
+## Key Files
 
 | File | Purpose |
 |---|---|
-| `.impeccable/critique/2026-09-01T04-47-39Z__pages-workbench-js.md` | Holistic Workbench critique |
-| `.impeccable/mockups/workbench-request-list.html` | Linked Request-list mockup |
-| `.impeccable/mockups/reviewer-follow-up.html` | Consolidated reviewer-follow-up mockup |
-| `pages/workbench.js` | Current Request-list entry point |
-| `pages/workbench/reviewer-follow-up.js` | Feature-branch consolidated reviewer view |
-| `shared/components/workbench/WorkbenchViewsNav.js` | Feature-branch common Workbench navigation |
-| `shared/components/reviewers/ReviewerManagePanel.js` | Track Reviewers and Materials/reviewer actions |
-| `shared/components/workbench/ReviewsTab.js` | Per-request outstanding-review actions |
-| `docs/REVIEWER_ENGAGEMENT_SPEC.md` | Canonical reminder/token policy and cron hold |
-| `docs/REVIEWER_REMINDER_TOKEN_LIVENESS_PLAN.md` | Implemented liveness guard and release evidence |
+| `docs/CURRENT_WORK_QUEUE.md` | Canonical priority and next gate |
+| `docs/FINAL_WRITEUP_PERSONA_CONFIGURATION_PLAN.md` | Persona configuration and rollout contract |
+| `shared/config/finalWriteupPersonas.js` | Tracked rollout flag; currently `false` |
+| `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` | Canonical Final artifact and access model |
+| `docs/REVIEWER_FOLLOW_UP_ORG_CYCLE_VISIBILITY_PLAN.md` | Historical, completed Reviewer Follow-up release record |
+| `docs/REVIEWER_ENGAGEMENT_SPEC.md` | Reminder/token policy and cron hold |
 
-## Testing for the Restart
+## First Action
 
-After merging `main` into the feature branch and resolving contracts:
-
-```bash
-npm test -- --runInBand \
-  tests/unit/reviewer-follow-up.test.js \
-  tests/unit/reviewer-manage-actions-menu.test.js \
-  tests/unit/reviewer-manage-proposal-attachment.test.js \
-  tests/unit/reviewers-tab-proposal-binding.test.js \
-  tests/unit/reviews-tab.test.js \
-  tests/unit/reviewer-manual-reminder.test.js \
-  tests/unit/reviewer-reminder-eligibility.test.js \
-  tests/unit/reviewer-reminder-sweep.test.js
-
-npm run check:reviewer-reminder-hold
-npm run check:reviewer-reminder-hold:self-test
-npm run check:api-routes
-npm run check:api-routes:self-test
-npm run build
-```
-
-## Handoff Notes
-
-- `main` contains the deployed incident remediation plus the five Workbench
-  critique/mockup commits. The merge preserving both histories is intentional.
-- `codex/workbench-reviewer-follow-up` is the implementation branch to resume.
-  Its local tip is `55adf692`; its prior remote tip was `54108529` before
-  stop-time synchronization.
-- Claim-evidence pilot reporting was unavailable because its local observation
-  state could not be read; no observation-table row was added.
-- `CLAUDE.md` needs no stop-time change: no new app, schema, endpoint,
-  instruction, or convention was introduced by the handoff itself.
-- The reviewer-token incident already has a milestone entry at the top of
-  `DEVELOPMENT_LOG.md`; no duplicate milestone entry is required.
+Re-read the canonical queue and persona plan, then coordinate the two named
+representative access checks against one exact existing Final Writeup Word item.
+No configuration or runtime write is authorized merely by beginning that proof.

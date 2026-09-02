@@ -16,7 +16,7 @@ related:
 
 # Workbench Triage Field — build plan (S260)
 
-> **Current routing:** Historical S261 implementation record. Use the current Workbench triage service, route, and schema contracts for changes. Its PD-scoped cycle-picker statements describe S261 history and are superseded by the organization-wide Reviewer Follow-up picker built on `codex/workbench-reviewer-follow-up` (deployment pending 2026-09-02); see `docs/REVIEWER_FOLLOW_UP_ORG_CYCLE_VISIBILITY_PLAN.md`.
+> **Current routing:** Historical S261 implementation record. Use the current Workbench triage service, route, and schema contracts for changes. Its PD-scoped cycle-picker statements describe S261 history and are superseded by the organization-wide Reviewer Follow-up picker deployed to Production from runtime merge `acf40fb8` on 2026-09-02; see `docs/REVIEWER_FOLLOW_UP_ORG_CYCLE_VISIBILITY_PLAN.md`.
 
 > **Status:** Stages 0–4 BUILT + DEPLOYED (S261, 2026-06-15) — field live in prod, D26 backfill applied
 > (35 Advancing + 170 Set aside, 205 rows, idempotent). §3 dashboard switch DONE (S261) — the dashboard reads

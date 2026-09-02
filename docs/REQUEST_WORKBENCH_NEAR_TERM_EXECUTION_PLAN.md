@@ -6,7 +6,7 @@ status: canonical
 summary: "Canonical Workbench sequence; current cross-request lifecycle navigation and reviewer follow-up work are tracked here."
 canonical: true
 cataloged: 2026-07-26
-last_verified: 2026-09-01
+last_verified: 2026-09-02
 owner: product-engineering
 related:
   - docs/audits/AUDIT_REQUEST_WORKBENCH_TRUTH_2026-07-26.md
@@ -27,24 +27,23 @@ related:
 > distribution) now live as sections of the merged tab. Document-lifecycle
 > decisions and route contracts in this plan are unchanged.
 
-> **Preview branch update (2026-09-01):** `[BUILT ON BRANCH — NOT PRODUCTION]`
-> `codex/workbench-reviewer-follow-up` adds a shared lifecycle-ordered tier-2
+> **Reviewer Follow-up release (2026-09-02):** `[PRODUCTION-LIVE]` Runtime merge
+> `acf40fb8` adds a shared lifecycle-ordered tier-2
 > navigation (`Request list → Initial assessments → Reviewer follow-up → Final
 > writeups → Awardees`) and `/workbench/reviewer-follow-up`. The consolidated
 > page combines the existing `/api/workbench/dashboard` assignment feed with
 > the existing `/api/review-manager/reviewers` aggregate DTO, and renders the
-> existing `ReviewerManagePanel` per request. It adds no route, schema, table,
-> or write contract. A Vercel Preview pointed at the tracked production
-> Dataverse target is explicitly read-only and hides mutation controls; the
-> branch therefore supports authenticated layout/filter/navigation UAT before
-> an owner promotion decision, while production retains the established reviewer
-> actions after promotion. `[VERIFIED 2026-09-01]` The exact branch callback is
-> registered and Microsoft sign-in succeeds. `[AUTHORIZED + VERIFIED
-> 2026-09-01]` The owner authorized branch-scoped
-> `DATAVERSE_ALLOW_PROD_READS=yes`; the redeployed Preview loaded 10 D26 assigned
-> requests, 7 needing attention, 20 active reviewers, and 5 received reviews.
-> The read-only banner and hidden mutation controls were re-verified; no Preview
-> write acknowledgement or rehearsal grant is present.
+> existing `ReviewerManagePanel` per request. Organization-wide eligible cycle
+> discovery now backs **All requests**, while **My requests** remains the
+> personal default. Request-bound mutations independently resolve the target and
+> allow only its lead PD or a superuser. Two Claude reviews approved the code;
+> the merged candidate passed 17 focused suites / 241 tests plus the relevant
+> gates and build. Authenticated Production proof showed D26 My 10 → All 44
+> (picker: 44 active + 184 set aside) and J26 My 0 → All 5, with no write action
+> exercised. Current `main` commit `8e23aa95` is Ready in deployment
+> `dpl_FyiMz13BupWcGtTSaMNLxPd5FntP`. The preceding read-only Preview proof is
+> retained in the completed implementation plan; it is no longer a promotion
+> prerequisite.
 
 ## Outcome
 

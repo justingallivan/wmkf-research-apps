@@ -5,7 +5,7 @@ metadata:
   type: project
   status: active
   scope: reviewer
-  last_verified: 2026-09-02 via source/tests for organization-wide Reviewer Follow-up discovery and request-bound mutation authorization; deployment pending
+  last_verified: 2026-09-02 via source/tests, independent review, Ready Production deployment, and authenticated D26/J26 read proof for organization-wide Reviewer Follow-up discovery and request-bound mutation authorization
 ---
 
 ## Recall Rule
@@ -28,6 +28,18 @@ Ground truth: `pages/workbench/[requestId].js`,
 `docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md`, and the per-surface source/Atlas
 contracts. `docs/REQUEST_WORKBENCH_BUILD_PLAN.md` and
 `docs/REQUEST_WORKBENCH_SCOPING.md` are historical chronology/rationale.
+
+**2026-09-02 Reviewer Follow-up release checkpoint:** organization-wide eligible
+cycle discovery and the consolidated `/workbench/reviewer-follow-up` surface are
+Production-live from runtime merge `acf40fb8`. **My requests** remains the
+personal default; **All requests** exposes the selected cycle's organization-wide
+eligible requests to authorized `reviewers` users. Request-bound mutations are
+independently server-gated to the resolved request's lead PD or a superuser, so
+foreign rows are read-only for ordinary non-lead users. Authenticated Production
+proof showed D26 My 10 → All 44 (picker: 44 active + 184 set aside) and J26 My 0
+→ All 5 without exercising a write. Current `main` commit `8e23aa95` is Ready in
+deployment `dpl_FyiMz13BupWcGtTSaMNLxPd5FntP`. The canonical next item is Final
+Writeup persona access proof and rollout, not more Reviewer Follow-up promotion.
 
 **2026-07-29 editor-direction implementation checkpoint:** Allison is a confirmed primary
 user for the Editor lens. The target contract preserves the former
@@ -354,7 +366,7 @@ S194 set direction (replace Finder + Manager with Reviewer Workbench + Reviewer 
   D26 backfill applied (35 Advancing + 170 Set aside, 205 rows). It is DESIGNED to retire the manual `d26Allowlist.js`,
   The §3 dashboard switch is DONE (S261): the dashboard now reads the field (Advancing + Phase II Pending shown,
   Set aside hidden, Concepts excluded). §5 allowlist retirement DONE (S261): `d26Allowlist.js` retired from live use (kept as historical/backfill
-  replacement). The later PD-scoped picker is superseded on the 2026-09-02 implementation branch by organization-wide eligible meeting-date discovery; the personal default still prefers the caller's newest active assigned cycle before falling back to the newest organization-wide active cycle. The per-row triage-flip UI is DONE (S261: canManage-gated
+  replacement). The later PD-scoped picker is superseded in Production by organization-wide eligible meeting-date discovery; the personal default still prefers the caller's newest active assigned cycle before falling back to the newest organization-wide active cycle. The per-row triage-flip UI is DONE (S261: canManage-gated
   per-row control POSTs to /api/workbench/triage). (PA-trigger risk assessed low +
   accepted S261: only the new field written, `akoya_requeststatus` untouched → status-filtered intake flow can't
   fire; residual = any unfiltered modify-flow, run-history not spot-checked.) J27 expands
