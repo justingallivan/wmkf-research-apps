@@ -10,6 +10,24 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## September 2026 — Reviewer Follow-up became organization-wide with request-safe writes (Session 474)
+
+**Milestone:** Authorized Workbench users can monitor every eligible request in
+a cycle from one Reviewer Follow-up surface, while request mutations remain
+limited at the server boundary to that request's lead PD or a superuser.
+**Sessions:** 473–474 (design, implementation, two Claude review passes,
+Preview verification, Production promotion, authenticated read proof, and
+durable reconciliation).
+**Ship state:** runtime merge `acf40fb8` is live in Ready deployment
+`dpl_7ToPKYtpXhyW3WmPmn1WiY9wz2iv`. Production proof showed D26 My 10 → All
+44 and J26 My 0 → All 5 without exercising a write; rollback remains
+`39413e3d` / `dpl_3SJebjL3tPTdv89o5dVzR1dBS3Y2`.
+**Why it matters:** staff can follow the complete reviewer workload without
+opening each proposal, but organization-wide visibility does not expand who may
+send, edit, or otherwise act on another PD's request.
+**Pointers:** `docs/REVIEWER_FOLLOW_UP_ORG_CYCLE_VISIBILITY_PLAN.md`;
+`docs/CURRENT_WORK_QUEUE.md`; commits `acf40fb8`, `8e23aa95`, `05276137`.
+
 ## September 2026 — Reviewer-token incident contained and reminder safety restored
 
 **Milestone:** Review-due reminders no longer replace or expose reviewer links;
