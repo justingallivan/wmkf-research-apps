@@ -164,8 +164,15 @@ run for Request `1002874` / Agnes Karasik. Its validated schema-v2 manifest has
 one eligible missing file, zero blockers, and hash
 `8cc5c7821fa515828a2426cde6e800de131a4ab826c240881a97001899e41711`; a
 metadata-only Production read confirmed the request, suggestion, and reviewer
-identity. No write occurred. Separate explicit approval to execute that exact
-manifest is the next ordered gate. Final Writeup persona
+identity. The owner separately approved that exact manifest. The backfill
+created one 69,761-byte version-1.0 SharePoint DOCX, committed the exact
+Dataverse pointer pair, and independent download/hash readback matched the
+reviewed semantic hash. The signed-in Workbench displayed Agnes Karasik's exact
+download link; Chrome automation blocked the attempted navigation client-side,
+so browser-transfer confirmation remains available. A fresh clean manifest now
+contains 22 eligible missing files plus the same visible test exclusion and no
+Request `1002874` candidate. Separate approval of that remaining Wave 4 set is
+the next ordered write gate. Final Writeup persona
 access proof and deliberate enablement remain preserved immediately afterward.
 As of 2026-08-31, the ordinary-staff
 dashboard/focused-review foundation is Production-deployed

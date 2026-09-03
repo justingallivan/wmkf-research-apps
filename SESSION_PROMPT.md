@@ -125,9 +125,24 @@ one eligible missing file, zero blockers, zero existing item, and exact request
 GUID `e2639251-9644-f111-88b4-000d3a306d0c`. A separate metadata-only
 Production read confirmed suggestion `1a0fb28f-0f9b-f111-b8db-6045bd008868`
 belongs to Agnes Karasik. No write flag, acknowledgement, `--execute`,
-SharePoint mutation, or Dataverse pointer write was used. The next gate is
-separate explicit approval to execute this exact manifest, followed by full
-Graph/Dataverse/Workbench verification.
+SharePoint mutation, or Dataverse pointer write was used at dry-run time. The
+owner then explicitly approved that exact manifest. Execution result
+`outputs/review-docx-backfill/review-docx-D26-2026-09-03T21-53-38-014Z.execute-result-2026-09-03T22-03-52-432Z.json`
+reports one created, zero failed: SharePoint item
+`01G4GVMSZ3RAXEKILFYRCISR6CGKHFVCQI`, `Review-1002874.docx`, 69,761 bytes,
+version `1.0`, with the exact generated folder committed to both Dataverse
+pointer fields. Independent readback classified the row `already_filed` and
+proved downloaded semantic hash
+`gdc1:O7QmzK_dojK9xwRvpFNXObuKCbKddrRpSc25P3gj5-A` equals the reviewed hash.
+The signed-in Production Workbench exposes the exact Agnes Karasik download
+link. Chrome automation blocked the attempted link navigation with
+`ERR_BLOCKED_BY_CLIENT`, so a browser-completed transfer remains owner-
+confirmable even though independent Graph download/hash passed. A fresh
+cycle-wide read-only manifest
+`outputs/review-docx-backfill/review-docx-D26-2026-09-03T22-06-27-808Z.json`
+has hash `11fa767360417c723a2b229b97a48700b1ecd5b1fe5142198e08c832366de3c0`,
+22 eligible missing files, one visible Request `1003223` test exclusion, zero
+blockers, and no Request `1002874` candidate. No additional write is approved.
 
 ## Parked
 

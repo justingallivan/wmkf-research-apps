@@ -73,7 +73,7 @@ maintenance row. Claude's Wave 2 build review approved the source with
 non-blocking suggestions; the accepted hardening is incorporated. Both rollout
 variables are absent in Production. An authenticated flag-off request returned
 `enabled:false` and left the job's maintenance-run population unchanged at
-zero. The write path has not been exercised. The dry-run-first D26 Wave 3
+zero. The scheduled write path has not been exercised. The dry-run-first D26 Wave 3
 backfill is source-built with a redacted hash-bound unfinished population,
 pre-write drift checks, exact Production Dataverse plus SharePoint target
 binding, and the existing create-only ensure service. Claude's Wave 3 review
@@ -88,6 +88,13 @@ proof. Its fresh request-scoped manifest validates with one eligible missing
 file, zero blockers, no existing item, and hash
 `8cc5c7821fa515828a2426cde6e800de131a4ab826c240881a97001899e41711`; a
 metadata-only Production read confirmed the exact request/suggestion/reviewer
-identity. No write flag, acknowledgement, `--execute`, Graph mutation, or
-Dataverse pointer write was used. Describe Wave 2 as Production-deployed inert
-and Wave 3 as one-file-manifest ready, write-unexecuted, and not activated.
+identity. The owner then explicitly approved that exact manifest. The operator
+backfill created SharePoint item `01G4GVMSZ3RAXEKILFYRCISR6CGKHFVCQI`
+(`Review-1002874.docx`, 69,761 bytes, version `1.0`) and committed the exact
+Dataverse pointer pair. Independent readback classified it `already_filed` and
+matched the reviewed governed hash. The signed-in Workbench displays the exact
+download link; Chrome automation blocked the attempted transfer client-side.
+The fresh post-write D26 manifest has 22 eligible missing files, one visible
+test exclusion, zero blockers, and no Request `1002874` candidate. Describe
+Wave 2 as Production-deployed inert, Wave 3 as one-file storage/pointer proved,
+and automatic filing as not activated.

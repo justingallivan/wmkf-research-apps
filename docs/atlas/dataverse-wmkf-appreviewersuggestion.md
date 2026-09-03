@@ -154,19 +154,28 @@ review returned APPROVE WITH NON-BLOCKING NOTES and the accepted hardening is
 incorporated. The first read-only Production manifest found 23 eligible rows and
 one invalid snapshot on owner-confirmed test Request `1003223`. The replacement
 schema-v2 manifest retains that row visibly as a hash-bound, non-writing
-`excluded_test_request` and reports zero blockers. Write execution remains
-unrun. The owner selected Request `1002874` / Agnes Karasik for the one-file
+`excluded_test_request` and reports zero blockers. The owner selected Request
+`1002874` / Agnes Karasik for the one-file
 proof; its fresh request-scoped schema-v2 manifest validates with one eligible
 missing file, zero blockers, no existing item, and the exact Workbench request
 GUID. A separate metadata-only Production read confirmed the sole suggestion's
 reviewer identity. The manifest hash is
 `8cc5c7821fa515828a2426cde6e800de131a4ab826c240881a97001899e41711`;
-execution still requires separate explicit approval. The scheduled route remains inert,
+the owner separately approved it, and execution created SharePoint item
+`01G4GVMSZ3RAXEKILFYRCISR6CGKHFVCQI` (`Review-1002874.docx`, 69,761 bytes,
+version `1.0`) before ETag-committing the exact folder/filename pair to this
+suggestion. Independent readback classified it `already_filed` and matched its
+downloaded governed hash to the reviewed generation. The signed-in Workbench
+showed the exact download link; Chrome automation blocked the attempted
+navigation client-side. A fresh post-write manifest contains 22 eligible
+missing rows plus the visible test exclusion, zero blockers, and no Request
+`1002874` candidate. The scheduled route remains inert,
 including no maintenance row, while
 `REVIEW_DOCX_SHAREPOINT_WRITE` is unset. Both rollout variables were confirmed
 absent in Production; an authenticated flag-off route probe returned
 `enabled:false`, and the job's maintenance-run count remained zero before and
-after. No Graph/pointer write path has been Production-exercised.
+after. The local operator backfill write path is now Production-proved for this
+one row; the scheduled route and remaining D26 set have not been exercised.
 
 Structured review fields (S130 schema additions):
 - `wmkf_revieweraffiliation` (String) — parent identity column; still the read source for the review-context affiliation prefill.
@@ -345,9 +354,11 @@ Write (verified 2026-05-07; +Phase 3 ingestion S210):
   `DATAVERSE_PROD_WRITE_ACK`. Artifacts are create-only; execution results use
   timestamped filenames. Dry-run-only `--exclude-test-request` records an
   owner-confirmed test request in the manifest; an unmatched exclusion blocks.
-  The clean Production read-only run on 2026-09-03 reported 23 eligible rows,
-  one visible test exclusion, and zero blockers; it has created no SharePoint
-  file or Dataverse pointer.
+  The initial clean Production read-only run on 2026-09-03 reported 23 eligible
+  rows, one visible test exclusion, and zero blockers. The exact approved
+  Request `1002874` manifest later created one SharePoint file and Dataverse
+  pointer pair; a fresh manifest now reports 22 eligible rows, the visible test
+  exclusion, and zero blockers.
 - `scripts/backfill-postgres-to-dataverse.js` — `suggestionAdapter.upsert` and `updateLifecycle` for Wave 2 backfill, preserving outreach/reminder timestamps
 
 ## Cross-system

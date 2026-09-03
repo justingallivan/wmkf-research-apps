@@ -24,17 +24,18 @@ related:
 
 ## Decision and status
 
-**Status: WAVES 1–2 ARE PRODUCTION-DEPLOYED ON `main` AT `83da197f`; WAVE 3 IS
-SOURCE-BUILT, ADVERSARIALLY REVIEWED, AND ONE-FILE READ-ONLY MANIFEST READY;
-WAVES 4–5 REMAIN PLANNED. Ready
+**Status: WAVES 1–2 ARE PRODUCTION-DEPLOYED ON `main` AT `83da197f`; WAVE 3'S
+ONE-FILE STORAGE/POINTER PROOF PASSED; WAVE 4 HAS A FRESH READ-ONLY MANIFEST;
+WAVE 5 REMAINS PLANNED. Ready
 deployment `dpl_F3oZ9MDbnyFox7S8Ekdos7423ece` contains the filing service and
 dedicated cron, but both rollout variables are absent and the route is
 Production-proved inert. A clean 24-row Production read-only manifest was
 created on 2026-09-03 with 23 eligible reviews and one visible owner-confirmed
-test exclusion. The owner selected Request `1002874` / Agnes Karasik for the
-one-file proof; its fresh scoped manifest validates with one eligible missing
-file and zero blockers. No SharePoint or Dataverse mutation has been authorized
-or performed.**
+test exclusion. The owner selected Request `1002874` / Agnes Karasik and
+explicitly approved its exact scoped manifest. The resulting SharePoint item,
+Dataverse pointer pair, and semantic content passed independent readback. A
+fresh post-write manifest has 22 eligible missing files, the same visible test
+exclusion, and zero blockers. No additional write is authorized.**
 
 The recommended design is to generate and retain one individual DOCX for every
 structured review, using the same approved individual template as the thank-you
@@ -64,14 +65,15 @@ probes on 2026-09-03:
 | Structured submission and thank-you generation do not currently retain that DOCX in SharePoint. | Submission services and thank-you sweep | N/A | N/A | Source/caller search; current release docs | **VERIFIED** |
 | Uploaded review files use the request library and store folder + filename on the suggestion row. | `review-upload.js` | SharePoint `akoya_request` + suggestion pointer fields | Reviews-tab Download action | Current source, Atlas, and download service | **VERIFIED** |
 | Reusing both pointer fields makes the existing Download action available. | Review upload / suggestion adapter | Suggestion pointer fields | `ReviewsTab.js` → existing download route/service | Current source | **VERIFIED** |
-| D26 currently has 24 received reviews and 228 answer rows. All 24 are selected, have at least one rich-text answer row, have exact receipt/answer identity parity, and have zero complete or partial SharePoint pointers. This proves current eligibility shape, not merely row-count parity. | Existing structured writers | Production Dataverse | Proposed backfill | Updated `DATAVERSE_ALLOW_PROD_READS=yes node scripts/probe-review-blank-slate.mjs` | **VERIFIED AS OF 2026-09-03; RECHECK BEFORE EXECUTION** |
+| Before Wave 3 execution, D26 had 24 received reviews and 228 answer rows. All 24 were selected, had at least one rich-text answer row, had exact receipt/answer identity parity, and had zero complete or partial SharePoint pointers. After the one-row proof, the fresh unfinished-population manifest has 22 eligible missing files plus one visible test exclusion; Request `1002874` has a complete verified pointer pair. | Existing structured writers plus Wave 3 backfill | Production Dataverse | Backfill and existing pointer consumers | Initial blank-slate probe; execution result; independent readback; fresh post-write manifest | **VERIFIED 2026-09-03** |
 | Rendering identical semantic input twice does not produce byte-identical ZIP packages, while the governed Word-part hash is stable. | Current renderer | Generated DOCX package | Retry/conflict logic | Local two-render experiment: raw SHA-256 differed; governed hash matched | **VERIFIED** |
 | The thank-you attachment now uses one shared individual-review builder with caller-owned generation time. | `reviewer-thankyou-sweep.js` | Existing answer snapshot + transient DOCX bytes | Thank-you attachment; filing service | Focused builder/thank-you/hash tests, rendered-page inspection, and Ready Production deployment | **PRODUCTION-LIVE AT `83da197f`; TRANSPORT BEHAVIOR UNCHANGED** |
-| Automatic retention and D26 write execution are activated and Production-proved. | Dedicated filing service/cron is deployed but disabled; the adversarially reviewed backfill produced clean full-cycle and request-scoped schema-v2 Production read-only manifests | Local redacted manifests; no SharePoint/Dataverse write | Existing pointer consumers | Ready deployment plus authenticated flag-off route and maintenance-table before/after probe; Wave 3 source/tests/review; D26 dry runs | **NOT YET: PRODUCTION-DEPLOYED INERT; REQUEST 1002874 ONE-FILE MANIFEST READY; WRITES OPEN** |
+| Automatic retention and full D26 write execution are activated and Production-proved. | Dedicated filing service/cron is deployed but disabled; the operator backfill executed one exact reviewed request and produced a fresh remaining-population manifest | One generated SharePoint DOCX + exact suggestion pointer pair; local redacted artifacts | Existing pointer consumers | Ready inert deployment; Wave 3 execution result; independent Graph/Dataverse semantic readback; signed-in Workbench link visibility | **PARTIAL: ONE BACKFILL ROW PROVED; SCHEDULED ROUTE AND REMAINING 22 WRITES UNPROVED** |
 
 ### Sweep boundary
 
-This was a Mode B domain truth audit covering the structured-review writers,
+This began as a Mode B domain truth audit and now includes a Mode A changed-fact
+reconciliation covering the structured-review writers,
 answer and reviewer-suggestion persistence, individual renderer, thank-you
 consumer, SharePoint upload/download services, current plans, Atlas pages, wiki,
 memory, and session handoff. Historical/current statements that say the Wave 25
@@ -148,7 +150,23 @@ The manifest validator reported zero anomalies, one eligible missing file, zero
 blockers, no existing item, and the exact Workbench request GUID. A separate
 metadata-only Production read tied its sole suggestion to Agnes Karasik. No
 write flag, Production-write acknowledgement, `--execute`, SharePoint mutation,
-or Dataverse pointer write was used.
+or Dataverse pointer write was used during that dry run. The owner subsequently
+approved the exact manifest. Execution result
+`outputs/review-docx-backfill/review-docx-D26-2026-09-03T21-53-38-014Z.execute-result-2026-09-03T22-03-52-432Z.json`
+reports one created and zero failed. The result identifies SharePoint item
+`01G4GVMSZ3RAXEKILFYRCISR6CGKHFVCQI`, `Review-1002874.docx`, 69,761 bytes,
+version `1.0`, at the exact generated folder. Independent readback classified
+the row `already_filed`, confirmed both Dataverse pointers, downloaded the item,
+and matched semantic hash
+`gdc1:O7QmzK_dojK9xwRvpFNXObuKCbKddrRpSc25P3gj5-A`. The signed-in Workbench
+displayed the exact Agnes Karasik download link; the automation Chrome client
+blocked the attempted navigation with `ERR_BLOCKED_BY_CLIENT`, so this proves
+the consumer action is present but leaves a browser-completed transfer for
+owner confirmation. Fresh post-write manifest
+`outputs/review-docx-backfill/review-docx-D26-2026-09-03T22-06-27-808Z.json`
+has hash `11fa767360417c723a2b229b97a48700b1ecd5b1fe5142198e08c832366de3c0`,
+22 eligible missing files, one visible Request `1003223` test exclusion, zero
+blockers, and no completed Request `1002874` candidate.
 
 ## Product contract
 
@@ -655,8 +673,9 @@ pointer-provenance consumer semantics are implemented with focused tests. The
 scheduled scan is exact-stamp-only and newest-first; a disabled route creates no
 maintenance row. Claude returned APPROVE WITH NON-BLOCKING SUGGESTIONS, and the
 accepted pre-release hardening is incorporated. The rollout/cycle flags remain
-absent in Production; no Graph or Dataverse pointer write occurred. The guarded
-mutation path is therefore not Production-proved. Wave 3 backfill code is built
+absent in Production; no Graph or Dataverse pointer write occurred during the
+Wave 2 flag-off proof. The scheduled mutation path is therefore not
+Production-proved. Wave 3 backfill code is built
 on `codex/review-docx-wave3-backfill` with focused tests. Claude's Wave 3
 adversarial review returned APPROVE WITH NON-BLOCKING NOTES; the accepted
 remediation is incorporated on the feature branch. The first Production
@@ -666,8 +685,8 @@ mutation.
 
 ### Wave 3 — D26 dry run and one-file proof
 
-**Status: REQUEST 1002874 ONE-FILE PRODUCTION READ-ONLY MANIFEST VALIDATED;
-AWAITING SEPARATE ONE-WRITE APPROVAL.**
+**Status: REQUEST 1002874 ONE-FILE STORAGE/POINTER PROOF PASSED; NO ADDITIONAL
+WRITE APPROVED.**
 
 - [x] Build the dry-run-first backfill script using the same ensure service.
 - [x] Complete the read-only adversarial review and incorporate its accepted
@@ -680,14 +699,19 @@ AWAITING SEPARATE ONE-WRITE APPROVAL.**
   blockers, and zero existing generated items.
 - [x] Select Request `1002874` / Agnes Karasik and validate a fresh scoped
   one-row manifest with zero blockers and no existing item.
-- Stop for explicit approval of one exact write target.
-- Execute and verify one review end to end.
+- [x] Stop for and receive explicit approval of that exact manifest hash.
+- [x] Execute one review; independently verify exact Graph item/content,
+  Dataverse pointers, and signed-in Workbench download-link visibility.
+- [ ] Optionally confirm a browser-completed download; the automation Chrome
+  client blocked its navigation even though direct Graph download/hash passed.
 
 **Gate:** Graph + Dataverse + Workbench readback and bounded logs.
 
 ### Wave 4 — D26 completion
 
-- Produce another fresh manifest.
+- [x] Produce another fresh manifest: 22 eligible missing files, one visible
+  test exclusion, zero blockers, hash
+  `11fa767360417c723a2b229b97a48700b1ecd5b1fe5142198e08c832366de3c0`.
 - Stop for explicit approval of the remaining bounded write set.
 - Execute, reconcile every suggestion identity, and prove a clean rerun.
 
@@ -721,23 +745,24 @@ Stop before writes or further rollout if any of the following appears:
 ## Sweep report
 
 ```text
-Sweep mode: Mode B domain truth audit plus Mode A Wave 3 dry-run reconciliation
+Sweep mode: Mode B domain truth audit plus Mode A Wave 3 execution reconciliation
 Domain: structured individual review DOCX generation and SharePoint retention
 Claims: Waves 1–2 implementation and flag-off Production deployment VERIFIED;
-  Wave 3 backfill SOURCE/FOCUSED-TEST/ADVERSARIAL-REVIEW VERIFIED, clean
-  Production read-only schema-v2 full-cycle manifest VERIFIED, and exact
-  Request 1002874 one-file manifest/identity VERIFIED; execution, activation,
-  and Production write behavior UNPROVED
+  Wave 3 backfill SOURCE/FOCUSED-TEST/ADVERSARIAL-REVIEW VERIFIED, exact
+  Request 1002874 create-only SharePoint/pointer/semantic proof VERIFIED, and
+  signed-in Workbench link visibility VERIFIED; browser-completed transfer,
+  remaining 22 writes, and scheduled activation UNPROVED
 Durable restatements: current no-upload statements remain accurate historical/current baseline
-Structural fix: reconciled plan/queue/strategy/Atlas/runbook/wiki/memory/handoff
-  to the exact scoped-manifest checkpoint while preserving the separate
-  activation and write-proof gates
+Structural fix: reconciled plan/queue/strategy/Atlas/runbook/wiki/catalog/memory/
+  handoff to the one-file proof and fresh remaining-population checkpoint while
+  preserving separate approval and activation gates
 Semantic omissions found: operator-confirmed test data needed an explicit,
   reviewable, hash-bound exclusion contract rather than relaxed validation or a
   silent population filter; the wiki lacked the separate inert retention path,
   and the evidence-matrix claim incorrectly phrased disabled retention as live
 Remaining live STALE: 0 within this plan's stated scope
-Remaining UNKNOWN/ASSUMED: all Production write behavior remains unproved
-Verdict: WAVES 1–2 PRODUCTION-DEPLOYED INERT; WAVE 3 REQUEST 1002874 MANIFEST
-  READY; ALL WRITES REMAIN GATED
+Remaining UNKNOWN/ASSUMED: browser-completed staff download, the remaining 22
+  backfill writes, and scheduled automatic filing remain unproved
+Verdict: WAVE 3 ONE-FILE STORAGE/POINTER PROOF PASSED; WAVE 4 CLEAN MANIFEST
+  READY; ALL ADDITIONAL WRITES REMAIN GATED
 ```
