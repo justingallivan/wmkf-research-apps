@@ -90,9 +90,9 @@ test('builds a redacted hash-bound dry-run manifest', async () => {
 
   expect(manifest).toMatchObject({
     artifactType: 'review_docx_sharepoint_backfill_v1',
-    schemaVersion: 1,
+    schemaVersion: 2,
     dryRun: true,
-    scope: { cycleCode: 'D26', requestNumber: '1002903' },
+    scope: { cycleCode: 'D26', requestNumber: '1002903', excludedTestRequestNumbers: [] },
     target: {
       siteId: 'site-1', driveId: 'drive-1', dynamicsBase: 'https://wmkf.crm.dynamics.com',
     },
@@ -147,6 +147,49 @@ test('omits a row that became fully filed between discovery and planning', async
   expect(manifest.candidates).toEqual([]);
   expect(manifest.summary).toMatchObject({ population: 0, blocking: 0 });
   expect(manifest.summary).not.toHaveProperty('alreadyFiled');
+});
+
+test('retains an operator-confirmed test request as a hash-bound nonblocking exclusion', async () => {
+  planIndividualReviewFileCandidate.mockImplementation(async (id) => eligiblePlan(id, {
+    requestNumber: '1003223',
+    status: 'invalid_snapshot',
+    semanticHash: null,
+    error: { code: 'invalid_snapshot', message: 'duplicate order' },
+  }));
+  const manifest = await buildReviewDocxBackfillManifest({
+    cycleCode: 'D26',
+    excludedTestRequestNumbers: ['1003223'],
+    observedAt: '2026-09-03T18:00:00.000Z',
+  });
+  expect(manifest.scope.excludedTestRequestNumbers).toEqual(['1003223']);
+  expect(manifest.candidates[0]).toMatchObject({
+    requestNumber: '1003223',
+    eligibility: 'excluded_test_request',
+    originalEligibility: 'invalid_snapshot',
+    exclusion: { kind: 'operator_confirmed_test_request', requestNumber: '1003223' },
+  });
+  expect(manifest.summary).toMatchObject({
+    blocking: 0,
+    counts: { excluded_test_request: 1 },
+    eligibleMissing: 0,
+  });
+
+  const tampered = JSON.parse(JSON.stringify(manifest));
+  tampered.scope.excludedTestRequestNumbers = [];
+  expect(() => validateReviewDocxBackfillManifest(tampered)).toThrow('hash');
+});
+
+test('blocks a misspelled or stale test-request exclusion that matches no candidate', async () => {
+  const manifest = await buildReviewDocxBackfillManifest({
+    cycleCode: 'D26',
+    excludedTestRequestNumbers: ['9999999'],
+    observedAt: '2026-09-03T18:00:00.000Z',
+  });
+  expect(manifest.summary.blocking).toBe(1);
+  expect(manifest.anomalies).toContainEqual({
+    code: 'excluded_test_request_not_found',
+    requestNumber: '9999999',
+  });
 });
 
 test('classifies partial pointers and a multi-review smoke scope as blocking', async () => {
@@ -256,6 +299,39 @@ test('uses the reviewed write set and continues after a row failure', async () =
     status: 'completed_with_failures',
     summary: { created: 1, failed: 1 },
   });
+});
+
+test('never includes an excluded test request in write preflight or ensure', async () => {
+  findReviewDocxBackfillPopulation.mockResolvedValue({
+    records: [
+      { wmkf_appreviewersuggestionid: FIRST_ID },
+      { wmkf_appreviewersuggestionid: SECOND_ID },
+    ],
+    capped: false,
+  });
+  planIndividualReviewFileCandidate.mockImplementation(async (id) => (
+    id === SECOND_ID
+      ? eligiblePlan(id, { requestNumber: '1003223', status: 'invalid_snapshot', semanticHash: null })
+      : eligiblePlan(id)
+  ));
+  const manifest = await buildReviewDocxBackfillManifest({
+    cycleCode: 'D26',
+    excludedTestRequestNumbers: ['1003223'],
+    observedAt: '2026-09-03T18:00:00.000Z',
+  });
+
+  const report = await executeReviewDocxBackfill(manifest);
+
+  expect(preflightReviewDocxWrite).toHaveBeenCalledWith({
+    executionMode: 'backfill', suggestionIds: [FIRST_ID],
+  });
+  expect(ensureIndividualReviewFile).toHaveBeenCalledTimes(1);
+  expect(ensureIndividualReviewFile).toHaveBeenCalledWith(FIRST_ID, expect.any(Object));
+  expect(report.results).toContainEqual(expect.objectContaining({
+    suggestionId: SECOND_ID,
+    status: 'skipped',
+    reason: 'excluded_test_request',
+  }));
 });
 
 test('rejects a write-target identity change before ensure', async () => {

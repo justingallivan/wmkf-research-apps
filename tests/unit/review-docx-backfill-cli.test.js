@@ -32,6 +32,28 @@ test('keeps request-number and dry-run output contracts explicit', () => {
   expect(() => parseArgs(['--cycle', 'D26', '--cycle=D26'])).toThrow('only once');
 });
 
+test('accepts repeatable exact test-request exclusions only for dry run', () => {
+  expect(parseArgs([
+    '--cycle', 'D26',
+    '--exclude-test-request', '1003223',
+    '--exclude-test-request=1003000',
+  ])).toMatchObject({
+    excludedTestRequestNumbers: ['1003000', '1003223'],
+  });
+  expect(() => parseArgs(['--cycle', 'D26', '--exclude-test-request', 'abc']))
+    .toThrow('digits');
+  expect(() => parseArgs([
+    '--cycle', 'D26', '--exclude-test-request', '1003223', '--exclude-test-request', '1003223',
+  ])).toThrow('unique');
+  expect(() => parseArgs([
+    '--cycle', 'D26', '--request-number', '1003223', '--exclude-test-request', '1003223',
+  ])).toThrow('cannot also');
+  expect(() => parseArgs([
+    '--cycle', 'D26', '--execute', '--manifest', '/private/tmp/review.json',
+    '--exclude-test-request', '1003223',
+  ])).toThrow('dry-run-only');
+});
+
 test('uses a unique execution-result path that cannot overwrite the manifest', () => {
   expect(resultPathFor('/private/tmp/review.json', '2026-09-03T20:01:02.345Z'))
     .toBe('/private/tmp/review.execute-result-2026-09-03T20-01-02-345Z.json');

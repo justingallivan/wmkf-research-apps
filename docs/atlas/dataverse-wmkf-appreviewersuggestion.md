@@ -151,10 +151,11 @@ agreement plus the same-day local Production-write acknowledgement before it
 can call the same ensure service. Complete pointer pairs leave fresh backfill
 manifests; they are not re-audited by this missing-file command. Claude's Wave 3
 review returned APPROVE WITH NON-BLOCKING NOTES and the accepted hardening is
-incorporated. The first read-only Production manifest was created on 2026-09-03
-for 24 unfinished D26 rows; 23 were eligible and one blocked as
-`invalid_snapshot` because unique/readable answer rows on Request `1003223`
-share stored question orders 8 and 9. Write execution remains unrun. The scheduled route remains inert,
+incorporated. The first read-only Production manifest found 23 eligible rows and
+one invalid snapshot on owner-confirmed test Request `1003223`. The replacement
+schema-v2 manifest retains that row visibly as a hash-bound, non-writing
+`excluded_test_request` and reports zero blockers. Write execution remains
+unrun. The scheduled route remains inert,
 including no maintenance row, while
 `REVIEW_DOCX_SHAREPOINT_WRITE` is unset. Both rollout variables were confirmed
 absent in Production; an authenticated flag-off route probe returned
@@ -336,9 +337,11 @@ Write (verified 2026-05-07; +Phase 3 ingestion S210):
   and Production Dataverse/SharePoint target agreement, the literal-on writer
   flag, enforcing target interlock, and a current
   `DATAVERSE_PROD_WRITE_ACK`. Artifacts are create-only; execution results use
-  timestamped filenames. Its first Production read-only run created a blocked
-  24-row manifest on 2026-09-03 (23 eligible, one duplicate-order invalid
-  snapshot); it has created no SharePoint file or Dataverse pointer.
+  timestamped filenames. Dry-run-only `--exclude-test-request` records an
+  owner-confirmed test request in the manifest; an unmatched exclusion blocks.
+  The clean Production read-only run on 2026-09-03 reported 23 eligible rows,
+  one visible test exclusion, and zero blockers; it has created no SharePoint
+  file or Dataverse pointer.
 - `scripts/backfill-postgres-to-dataverse.js` — `suggestionAdapter.upsert` and `updateLifecycle` for Wave 2 backfill, preserving outreach/reminder timestamps
 
 ## Cross-system

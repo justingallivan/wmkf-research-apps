@@ -43,7 +43,14 @@ function loadLocalEnv() {
 }
 
 export function parseArgs(argv) {
-  const out = { execute: false, cycleCode: null, requestNumber: null, manifestPath: null, outputPath: null };
+  const out = {
+    execute: false,
+    cycleCode: null,
+    requestNumber: null,
+    excludedTestRequestNumbers: [],
+    manifestPath: null,
+    outputPath: null,
+  };
   const seen = new Set();
   const markOnce = (name) => {
     if (seen.has(name)) throw new Error(`${name} may be specified only once.`);
@@ -61,6 +68,12 @@ export function parseArgs(argv) {
     else if (arg.startsWith('--cycle=')) { markOnce('--cycle'); out.cycleCode = arg.slice('--cycle='.length); }
     else if (arg === '--request-number') { markOnce('--request-number'); out.requestNumber = takeValue(index++, '--request-number'); }
     else if (arg.startsWith('--request-number=')) { markOnce('--request-number'); out.requestNumber = arg.slice('--request-number='.length); }
+    else if (arg === '--exclude-test-request') { out.excludedTestRequestNumbers.push(takeValue(index++, '--exclude-test-request')); }
+    else if (arg.startsWith('--exclude-test-request=')) {
+      const value = arg.slice('--exclude-test-request='.length);
+      if (!value) throw new Error('--exclude-test-request requires a value.');
+      out.excludedTestRequestNumbers.push(value);
+    }
     else if (arg === '--manifest') { markOnce('--manifest'); out.manifestPath = path.resolve(takeValue(index++, '--manifest')); }
     else if (arg.startsWith('--manifest=')) {
       markOnce('--manifest');
@@ -76,9 +89,16 @@ export function parseArgs(argv) {
     }
     else throw new Error(`Unsupported argument: ${arg}`);
   }
-  const scope = validateBackfillScope({ cycleCode: out.cycleCode, requestNumber: out.requestNumber });
+  const scope = validateBackfillScope({
+    cycleCode: out.cycleCode,
+    requestNumber: out.requestNumber,
+    excludedTestRequestNumbers: out.excludedTestRequestNumbers,
+  });
   if (out.execute && !out.manifestPath) throw new Error('--execute requires --manifest <path>.');
   if (!out.execute && out.manifestPath) throw new Error('--manifest is an execute-only input; use --output for a dry-run destination.');
+  if (out.execute && scope.excludedTestRequestNumbers.length > 0) {
+    throw new Error('--exclude-test-request is a dry-run-only input recorded in the reviewed manifest.');
+  }
   return { ...out, ...scope };
 }
 
@@ -126,6 +146,7 @@ export async function main(argv = process.argv.slice(2)) {
       const manifest = await buildReviewDocxBackfillManifest({
         cycleCode: args.cycleCode,
         requestNumber: args.requestNumber,
+        excludedTestRequestNumbers: args.excludedTestRequestNumbers,
         observedAt,
       });
       const manifestPath = args.outputPath || defaultManifestPath(args.cycleCode, observedAt);

@@ -111,11 +111,14 @@ contract, target-binding, deterministic-ordering, create-only result-artifact,
 and discriminating-test hardening is incorporated. The first read-only
 Production dry run completed on 2026-09-03 and created the redacted manifest
 `outputs/review-docx-backfill/review-docx-D26-2026-09-03T21-26-05-683Z.json`.
-It found 24 unfinished reviews: 23 eligible and one blocking
-`invalid_snapshot` on Request `1003223`, caused by duplicate stored question
-orders 8 and 9 across otherwise unique/readable answer rows. No SharePoint or
-Dataverse mutation occurred. Resolve that historical-order policy and generate
-a fresh clean manifest before requesting separate approval for even one write.
+It found 24 unfinished reviews: 23 eligible and one `invalid_snapshot` on owner-
+confirmed test Request `1003223`. A second read-only run used the new explicit,
+hash-bound `--exclude-test-request 1003223` contract and created clean schema-v2
+manifest `outputs/review-docx-backfill/review-docx-D26-2026-09-03T21-35-11-024Z.json`:
+23 eligible, one visible `excluded_test_request`, zero blockers, and zero
+existing generated items. No SharePoint or Dataverse mutation occurred. The
+next gate is review of that manifest and separate explicit approval for one
+exact write target.
 
 ## Parked
 
