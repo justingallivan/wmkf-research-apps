@@ -1103,13 +1103,18 @@ owner confirmed `Download: Review-1002874.docx` succeeds and looks correct.
 Opening the retained item through akoyaGO/Word for the web exposed a tab-layout
 defect that split the first-page title. The branch removes those tabs and
 directly right-aligns both review-template titles; source tests and rendered
-inspection pass, but the fix is not deployed and the existing item is
-unchanged at its legacy path/name. The owner-directed path simplification and
+inspection pass, but the runtime fix is not deployed. The owner authorized an
+exact local repair that created and verified item
+`01G4GVMSZZ25YPTP3RGFEK6LCT64W3JPX2` at
+`Reviews/Review-1002874-Agnes Karasik.docx` and ETag-conditionally repointed
+Dataverse. Independent readback matched the corrected semantic hash and proved
+the old item remains for later cleanup; owner Word-web visual confirmation is
+pending. The owner-directed path simplification and
 Word-web correction produce replacement manifest hash
 `25f10fcd0347d7de02abcc8a744357d4e215fe56efa462ff8cc0a6eef99650ff`, with 22
 eligible missing files at unique destinations plus the same visible test
 exclusion and no completed Request `1002874` candidate. No additional write or
-exact-item repair is approved. Active
+old-file cleanup is approved. Active
 contract: `docs/REVIEW_DOCX_SHAREPOINT_RETENTION_PLAN.md`.
 
 **Phase 4 BUILT (2026-07-03); reliability production-proven 2026-07-28:**

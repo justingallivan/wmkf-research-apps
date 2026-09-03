@@ -171,8 +171,13 @@ suggestion. Independent readback classified it `already_filed` and matched its
 downloaded governed hash to the reviewed generation. The owner confirmed the
 Workbench download succeeds. Opening the retained item through akoyaGO/Word for
 the web exposed a tab-positioned title defect. The branch carries a
-source-tested/rendered no-tab correction, but the existing item and pointer pair
-remain unchanged pending an explicit repair decision. The owner-directed
+source-tested/rendered no-tab correction. The owner then authorized exact repair
+manifest hash `c30c76e47281208b8b4cc25976360453eebbdc65ba3d4b203c19a6e0f1a5692d`.
+Execution created item `01G4GVMSZZ25YPTP3RGFEK6LCT64W3JPX2` at
+`Reviews/Review-1002874-Agnes Karasik.docx`, ETag-conditionally repointed this
+suggestion, and independently matched the corrected semantic hash. The old item
+still exists for later cleanup; owner Word-web visual confirmation is pending.
+The owner-directed
 path/name simplification and Word-web template correction produce replacement
 manifest hash
 `25f10fcd0347d7de02abcc8a744357d4e215fe56efa462ff8cc0a6eef99650ff`,

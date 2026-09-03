@@ -83,6 +83,8 @@ const REVIEWER_ID = '33333333-3333-4333-8333-333333333333';
 const FOLDER = '1002903_22222222222242228222222222222222/Reviews';
 const SECOND_FOLDER = FOLDER;
 const FILENAME = 'Review-1002903-Reviewer.docx';
+const OLD_FOLDER = '1002903_22222222222242228222222222222222/Reviewer_Uploads/Generated/11111111111141118111111111111111';
+const OLD_FILENAME = 'Review-1002903.docx';
 const DOCX = Buffer.from('generated-docx');
 const ITEM = {
   siteId: 'site-1', driveId: 'drive-1', id: 'item-1', name: FILENAME,
@@ -115,6 +117,15 @@ function exactPointer(overrides = {}) {
   return baseRow({
     wmkf_reviewsharepointfolder: FOLDER,
     wmkf_reviewfilename: FILENAME,
+    _etag: 'W/"2"',
+    ...overrides,
+  });
+}
+
+function oldPointer(overrides = {}) {
+  return baseRow({
+    wmkf_reviewsharepointfolder: OLD_FOLDER,
+    wmkf_reviewfilename: OLD_FILENAME,
     _etag: 'W/"2"',
     ...overrides,
   });
@@ -394,6 +405,113 @@ test('manifest-bound already-filed state is semantically verified without upload
   expect(result).toMatchObject({ status: 'already_filed', item: { id: 'item-1' } });
   expect(graph.uploadFile).not.toHaveBeenCalled();
   expect(suggestion.patchReviewReceipt).not.toHaveBeenCalled();
+});
+
+test('plans an exact pointer repair only when explicitly requested', async () => {
+  suggestion.getByIdWithSelect.mockResolvedValue(oldPointer());
+  const target = {
+    siteUrl: 'https://appriver3651007194.sharepoint.com/sites/akoyaGO',
+    siteId: 'site-1',
+    driveId: 'drive-1',
+    dynamicsBase: 'https://wmkf.crm.dynamics.com',
+  };
+
+  await expect(planIndividualReviewFileCandidate(SUGGESTION_ID, {
+    cycleCode: 'D26', target,
+  })).resolves.toMatchObject({ status: 'pointer_conflict' });
+
+  await expect(planIndividualReviewFileCandidate(SUGGESTION_ID, {
+    cycleCode: 'D26', target, allowPointerRepair: true,
+  })).resolves.toMatchObject({
+    status: 'eligible_repair',
+    reviewerName: 'Reviewer',
+    priorPointer: { folder: OLD_FOLDER, filename: OLD_FILENAME },
+    expectedFolder: FOLDER,
+    expectedFilename: FILENAME,
+    semanticHash: 'gdc1:semantic-hash',
+  });
+});
+
+test('repairs one exact manifest-bound pointer and leaves the prior file untouched', async () => {
+  process.env.VERCEL_ENV = '';
+  suggestion.getByIdWithSelect.mockResolvedValueOnce(oldPointer());
+
+  const planned = await planIndividualReviewFileCandidate(SUGGESTION_ID, {
+    cycleCode: 'D26',
+    target: {
+      siteUrl: 'https://appriver3651007194.sharepoint.com/sites/akoyaGO',
+      siteId: 'site-1', driveId: 'drive-1', dynamicsBase: 'https://wmkf.crm.dynamics.com',
+    },
+    allowPointerRepair: true,
+  });
+  suggestion.getByIdWithSelect.mockReset();
+  suggestion.getByIdWithSelect
+    .mockResolvedValueOnce(oldPointer())
+    .mockResolvedValueOnce(exactPointer())
+    .mockResolvedValueOnce(exactPointer());
+
+  const result = await ensureIndividualReviewFile(SUGGESTION_ID, {
+    cycleCode: 'D26',
+    executionMode: 'backfill',
+    expectedSuggestionEtag: planned.suggestionEtag,
+    expectedSourceFingerprint: planned.sourceFingerprint,
+    expectedSemanticHash: planned.semanticHash,
+    repairFromPointer: planned.priorPointer,
+  });
+
+  expect(result).toMatchObject({ status: 'created', item: { id: 'item-1' } });
+  expect(suggestion.patchReviewReceipt).toHaveBeenCalledWith(SUGGESTION_ID, {
+    wmkf_reviewsharepointfolder: FOLDER,
+    wmkf_reviewfilename: FILENAME,
+  }, { ifMatch: 'W/"2"' });
+  expect(graph.deleteFile).not.toHaveBeenCalled();
+});
+
+test('rejects pointer repair without all exact manifest bindings before Graph access', async () => {
+  const result = await ensureIndividualReviewFile(SUGGESTION_ID, {
+    cycleCode: 'D26',
+    executionMode: 'backfill',
+    repairFromPointer: { folder: OLD_FOLDER, filename: OLD_FILENAME },
+  });
+  expect(result).toMatchObject({
+    status: 'target_guard_failed', error: { code: 'repair_not_manifest_bound' },
+  });
+  expect(graph.getFileMetadataByPath).not.toHaveBeenCalled();
+  expect(graph.uploadFile).not.toHaveBeenCalled();
+  expect(suggestion.patchReviewReceipt).not.toHaveBeenCalled();
+});
+
+test('cleans up only the newly created replacement when the old pointer cannot be moved', async () => {
+  process.env.VERCEL_ENV = '';
+  suggestion.getByIdWithSelect.mockResolvedValueOnce(oldPointer());
+  const planned = await planIndividualReviewFileCandidate(SUGGESTION_ID, {
+    cycleCode: 'D26',
+    target: {
+      siteUrl: 'https://appriver3651007194.sharepoint.com/sites/akoyaGO',
+      siteId: 'site-1', driveId: 'drive-1', dynamicsBase: 'https://wmkf.crm.dynamics.com',
+    },
+    allowPointerRepair: true,
+  });
+  const conflict = Object.assign(new Error('precondition'), { status: 412 });
+  suggestion.getByIdWithSelect.mockReset();
+  suggestion.getByIdWithSelect
+    .mockResolvedValueOnce(oldPointer())
+    .mockResolvedValueOnce(oldPointer({ _etag: 'W/"3"' }))
+    .mockResolvedValueOnce(oldPointer({ _etag: 'W/"4"' }));
+  suggestion.patchReviewReceipt.mockRejectedValue(conflict);
+
+  const result = await ensureIndividualReviewFile(SUGGESTION_ID, {
+    cycleCode: 'D26',
+    executionMode: 'backfill',
+    expectedSuggestionEtag: planned.suggestionEtag,
+    expectedSourceFingerprint: planned.sourceFingerprint,
+    expectedSemanticHash: planned.semanticHash,
+    repairFromPointer: planned.priorPointer,
+  });
+
+  expect(result.status).toBe('pointer_write_failed');
+  expect(suggestion.patchReviewReceipt).toHaveBeenCalledTimes(2);
+  expect(graph.deleteFile).toHaveBeenCalledWith('drive-1', 'item-1');
 });
 
 test('creates with conflictBehavior=fail, conditionally commits exact pointers, and verifies by stable id', async () => {

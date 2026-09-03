@@ -53,9 +53,14 @@ Request `1002874` document from this snapshot, created one immutable SharePoint
 item, and committed both suggestion pointers. Independent download/readback
 matched the reviewed governed hash. The owner later observed that the retained
 item's tab-positioned title breaks in Word for the web. The branch's no-tab
-template correction is source-tested and rendered but not deployed; the
-existing item is unchanged. A replacement manifest excludes the completed row
-and reports 22 eligible missing files plus the same visible test exclusion. The
+template correction is source-tested and rendered but not deployed. Under a
+second exact owner-approved repair manifest, the local operator path regenerated
+the snapshot with the corrected template, created and verified
+`Reviews/Review-1002874-Agnes Karasik.docx`, and ETag-conditionally repointed the
+suggestion. Independent readback matched the corrected governed hash and proved
+the old item remains for later cleanup. Owner Word-web visual confirmation is
+pending. A replacement population manifest excludes the completed row and
+reports 22 eligible missing files plus the same visible test exclusion. The
 scheduled path remains disabled and unproved.
 
 ## Write Paths

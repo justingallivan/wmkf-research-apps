@@ -177,9 +177,12 @@ inspection pass, but the fix is not deployed and the existing retained item is
 unchanged at its legacy path/name. Replacement manifest hash
 `25f10fcd0347d7de02abcc8a744357d4e215fe56efa462ff8cc0a6eef99650ff`
 contains 22 eligible missing files with unique destinations plus the same
-visible test exclusion and no Request `1002874` candidate. Template/path-fix
-promotion and an explicit exact-item repair decision now precede approval of
-the remaining Wave 4 set. Final Writeup persona
+visible test exclusion and no Request `1002874` candidate. The owner-authorized
+exact repair then created and verified
+`Reviews/Review-1002874-Agnes Karasik.docx`, repointed Dataverse, and retained
+the old item for later cleanup. Owner Word-web visual confirmation and
+template/path-fix promotion now precede approval of the remaining Wave 4 set.
+Final Writeup persona
 access proof and deliberate enablement remain preserved immediately afterward.
 As of 2026-08-31, the ordinary-staff
 dashboard/focused-review foundation is Production-deployed

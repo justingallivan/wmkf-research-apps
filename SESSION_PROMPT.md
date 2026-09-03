@@ -156,7 +156,19 @@ compatibility. Because the governed hash and target identity changed, the prior
 has hash `25f10fcd0347d7de02abcc8a744357d4e215fe56efa462ff8cc0a6eef99650ff`,
 22 eligible missing files, one visible Request `1003223` test exclusion, zero
 blockers, 22 unique destinations, and no Request `1002874` candidate. No
-additional write or exact-item repair is approved.
+additional population write was approved. The owner then authorized an exact
+Request `1002874` repair that leaves the old file for later cleanup. Hash-bound
+manifest
+`outputs/review-docx-repair/review-docx-repair-1002874-2026-09-03T23-21-31-299Z.json`
+(`c30c76e47281208b8b4cc25976360453eebbdc65ba3d4b203c19a6e0f1a5692d`)
+had zero blockers and proved the new target absent. Execution created
+SharePoint item `01G4GVMSZZ25YPTP3RGFEK6LCT64W3JPX2`,
+`Reviews/Review-1002874-Agnes Karasik.docx`, 69,733 bytes, version `1.0`, then
+ETag-conditionally repointed Dataverse. Independent readback matched semantic
+hash `gdc1:IjQ_lTPljr-Hz3msRORXRuMNm2SwZfPffHjlE3fO52o` and confirmed the old
+item still exists. Owner Word-web visual confirmation is pending. The runtime
+fix is not deployed; the remaining 22 writes, scheduled activation, and old-file
+cleanup remain unapproved.
 
 ## Parked
 

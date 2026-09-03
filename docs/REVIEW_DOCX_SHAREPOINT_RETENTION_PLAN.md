@@ -17,7 +17,9 @@ related:
   - lib/services/reviewer-thankyou-sweep.js
   - lib/services/review-upload.js
   - lib/services/review-documents/docx-renderer.js
+  - lib/services/review-documents/repair-service.js
   - scripts/probe-review-blank-slate.mjs
+  - scripts/repair-review-docx-sharepoint.mjs
 ---
 
 # Review DOCX SharePoint Retention and D26 Backfill Plan
@@ -38,16 +40,20 @@ akoyaGO/Word for the web split the tab-positioned first-page title. The branch
 preserves v1 and selects new v2 templates that directly right-align both titles
 without tabs. The owner then simplified the generated-file destination to the
 request-level `Reviews/Review-{request}-{reviewer name}.docx`; the two
-intermediate folders are retired for new files. Neither change is deployed and
-the existing item is unchanged. Replacement manifest hash
+intermediate folders are retired for new files. Neither runtime change is
+deployed. The owner authorized an exact local repair that generated the v2
+Agnes Karasik document at the new path, verified it, and repointed Dataverse;
+the old file remains intact for later cleanup. Replacement manifest hash
 `25f10fcd0347d7de02abcc8a744357d4e215fe56efa462ff8cc0a6eef99650ff` has 22
 eligible missing files, the same visible test exclusion, and zero blockers. No
-additional write or exact-item repair is authorized.**
+additional backfill write, old-file cleanup, or forward activation is
+authorized.**
 
 The recommended design is to generate and retain one individual DOCX for every
 structured review, using the same approved individual template as the thank-you
 attachment. Dataverse answer snapshots remain the semantic source of truth. The
-SharePoint DOCX is an immutable derived record and staff convenience copy.
+SharePoint DOCX files are append-only derived records and staff convenience
+copies; an explicit repair creates a new item and leaves the prior item intact.
 
 The implementation should reuse the existing
 `wmkf_appreviewersuggestion.wmkf_reviewsharepointfolder` and
@@ -75,8 +81,8 @@ probes on 2026-09-03:
 | Before Wave 3 execution, D26 had 24 received reviews and 228 answer rows. All 24 were selected, had at least one rich-text answer row, had exact receipt/answer identity parity, and had zero complete or partial SharePoint pointers. After the one-row proof, the fresh unfinished-population manifest has 22 eligible missing files plus one visible test exclusion; Request `1002874` has a complete verified pointer pair. | Existing structured writers plus Wave 3 backfill | Production Dataverse | Backfill and existing pointer consumers | Initial blank-slate probe; execution result; independent readback; fresh post-write manifest | **VERIFIED 2026-09-03** |
 | Rendering identical semantic input twice does not produce byte-identical ZIP packages, while the governed Word-part hash is stable. | Current renderer | Generated DOCX package | Retry/conflict logic | Local two-render experiment: raw SHA-256 differed; governed hash matched | **VERIFIED** |
 | The thank-you attachment now uses one shared individual-review builder with caller-owned generation time. | `reviewer-thankyou-sweep.js` | Existing answer snapshot + transient DOCX bytes | Thank-you attachment; filing service | Focused builder/thank-you/hash tests, rendered-page inspection, and Ready Production deployment | **PRODUCTION-LIVE AT `83da197f`; TRANSPORT BEHAVIOR UNCHANGED** |
-| First-page review titles render portably without tab stops outside the usable width. | Tracked individual and combined templates | `word/header2.xml` | Desktop Word, Word for the web, LibreOffice/PDF render | Owner Word-web screenshot identified the defect; source fix removes both title tabs, preserves every other ZIP part, and passes focused tests plus rendered inspection | **SOURCE-VERIFIED; NOT DEPLOYED; EXISTING REQUEST `1002874` ITEM STILL NEEDS AN EXPLICIT REPAIR DECISION** |
-| Automatic retention and full D26 write execution are activated and Production-proved. | Dedicated filing service/cron is deployed but disabled; the operator backfill executed one exact reviewed request and produced a fresh remaining-population manifest | One generated SharePoint DOCX + exact suggestion pointer pair; local redacted artifacts | Existing pointer consumers | Ready inert deployment; Wave 3 execution result; independent Graph/Dataverse semantic readback; signed-in Workbench link visibility | **PARTIAL: ONE BACKFILL ROW PROVED; SCHEDULED ROUTE AND REMAINING 22 WRITES UNPROVED** |
+| First-page review titles render portably without tab stops outside the usable width. | Tracked individual and combined templates | `word/header2.xml` | Desktop Word, Word for the web, LibreOffice/PDF render | Owner Word-web screenshot identified the defect; source fix removes both title tabs, preserves every other ZIP part, and passes focused tests plus rendered inspection. The repaired SharePoint item has the reviewed v2 semantic hash, but owner Word-web inspection remains pending. | **SOURCE/RETAINED-PACKAGE VERIFIED; NOT DEPLOYED; WORD-WEB VISUAL CONFIRMATION PENDING** |
+| Automatic retention and full D26 write execution are activated and Production-proved. | Dedicated filing service/cron is deployed but disabled; the operator backfill and exact repair command executed one owner-approved request | New generated SharePoint DOCX + exact suggestion pointer pair; old proof file retained; local redacted artifacts | Existing pointer consumers | Ready inert deployment; repair execution result; independent Graph/Dataverse semantic readback; both old/new Graph item readback | **PARTIAL: REQUEST `1002874` NEW-PATH REPAIR PROVED; SCHEDULED ROUTE AND REMAINING 22 WRITES UNPROVED** |
 
 ### Sweep boundary
 
@@ -178,8 +184,21 @@ and selects new v2 templates that remove those tabs and directly right-align the
 first-page title in both formats. A package
 comparison proves only `word/header2.xml` changed in each template; 19 focused
 tests and one-page renders for both outputs pass. The fix is not deployed and
-the existing SharePoint item is unchanged. Because the governed hash covers all
-`word/` parts, the prior remaining-population manifest is superseded.
+the deployed runtime remains unchanged. The owner then authorized an exact,
+manifest-bound local repair. Manifest
+`outputs/review-docx-repair/review-docx-repair-1002874-2026-09-03T23-21-31-299Z.json`
+with hash `c30c76e47281208b8b4cc25976360453eebbdc65ba3d4b203c19a6e0f1a5692d`
+bound the old pointer, ETag `W/"97233421"`, corrected semantic hash, absent new
+target, request, reviewer, suggestion, Production Dataverse, and canonical
+SharePoint site/drive. Execution created item
+`01G4GVMSZZ25YPTP3RGFEK6LCT64W3JPX2`,
+`Reviews/Review-1002874-Agnes Karasik.docx`, 69,733 bytes, version `1.0`, and
+ETag-conditionally moved the pointer pair. Independent readback returned
+`already_filed`, matched semantic hash
+`gdc1:IjQ_lTPljr-Hz3msRORXRuMNm2SwZfPffHjlE3fO52o`, and separately confirmed
+the old item `01G4GVMSZ3RAXEKILFYRCISR6CGKHFVCQI` still exists. Owner Word-web
+visual confirmation of the repaired file remains pending. Because the governed
+hash covers all `word/` parts, the prior remaining-population manifest is superseded.
 Replacement manifest
 `outputs/review-docx-backfill/review-docx-D26-2026-09-03T23-02-20-955Z.json`
 has hash `25f10fcd0347d7de02abcc8a744357d4e215fe56efa462ff8cc0a6eef99650ff`,
@@ -205,7 +224,8 @@ blockers, and no completed Request `1002874` candidate.
 - Uploaded-review ingestion, which already stores the uploaded source file.
 - Every `mark received without file` row, including rows with partial rating or
   multiselect snapshots.
-- Automatic replacement or reformatting of a file already retained in SharePoint.
+- Automatic replacement or reformatting of a file already retained in SharePoint;
+  exact manifest-bound operator repair remains separately authorized per item.
 - PDF generation, combined-report storage, in-app editing, or a new document
   registry.
 - Changes to review questions or answer-snapshot schema.
@@ -215,14 +235,16 @@ blockers, and no completed Request `1002874` candidate.
 1. **Dataverse remains authoritative.** The DOCX must always be regenerated from
    the suggestion, request, reviewer identity, and self-describing answer snapshot
    rows loaded from Dataverse. Browser-supplied report data is never accepted.
-2. **The retained file is derived and immutable.** A later template change does
-   not silently replace prior files. Any future explicit regeneration/versioning
-   workflow is a separate owner decision.
-3. **Existing pointers win.** The shared ensure service reports
+2. **Retained files are derived and append-only.** A later template change does
+   not silently replace prior files. An exact owner-authorized repair creates a
+   new item and leaves the old item for separately approved cleanup.
+3. **Existing pointers win in ordinary filing.** The shared ensure service reports
    `already_filed` and performs no upload or replacement when invoked for a row
    whose exact pointer pair is already set. The backfill CLI is narrower: its
    missing-file population excludes complete pointer pairs, so completed rows
-   leave fresh manifests and retries entirely.
+   leave fresh manifests and retries entirely. Only the one-item repair command
+   may move a complete pointer, and only when its manifest binds the current old
+   pointer, ETag, source fingerprint, semantic hash, and exact new target.
 4. **A partial pointer is an anomaly.** Folder-without-filename or
    filename-without-folder must fail for investigation; the service must not guess
    or repair it automatically.
@@ -280,20 +302,22 @@ generated-review folder:
     Review-{requestNumber}-{sanitized reviewer name}.docx
 ```
 
-The request folder already supplies request identity, so the two GUID-only
-intermediate layers add no staff value. `Reviews` is reserved for generated
+The request folder already supplies request identity, so the two intermediate
+layers add no staff value. `Reviews` is reserved for generated
 structured-review copies; uploaded-review `Reviewer_Uploads/{reviewer}/attempt_*`
 paths remain unchanged. The filename uses the authoritative Dataverse reviewer
 display name and replaces only SharePoint-invalid characters. Folder and
 filename are derived only on the server. Existing complete pointers remain
-immutable even if a reviewer name later changes, while any name change before a
-backfill write changes the source fingerprint and invalidates the manifest.
+unchanged in ordinary filing even if a reviewer name later changes, while any
+name change before a backfill or repair write changes the source fingerprint
+and invalidates the manifest.
 Two no-pointer suggestions in one backfill manifest that resolve to the same
 request and sanitized name fail closed as a duplicate target. The scheduled
 writer remains create-only and never overwrites a target; divergent existing
 content is an actionable conflict. The retired
 `Reviewer_Uploads/Generated/{suggestionGuid}` shape remains recognized only for
-backward-compatible consumer behavior and the explicit Request `1002874` repair.
+backward-compatible consumer behavior, old-item verification, and any later
+explicit cleanup of the Request `1002874` proof file.
 
 ## Generation service
 
@@ -732,9 +756,14 @@ WRITE APPROVED.**
   Dataverse pointers, and signed-in Workbench download-link visibility.
 - [x] Owner confirmed the Workbench browser download succeeds and the downloaded
   document looks correct.
-- [ ] Promote the no-tab Word-web compatibility fix and explicitly repair the
-  already-retained Request `1002874` item into the new request-level `Reviews`
-  location and reviewer-name filename; no repair write is yet authorized.
+- [x] Use the exact manifest-bound local repair to create and verify
+  `Reviews/Review-1002874-Agnes Karasik.docx`, then ETag-conditionally repoint
+  Dataverse. Independent readback proved the new item/hash and the old item was
+  deliberately retained.
+- [ ] Owner confirms the repaired item visually in Word for the web.
+- [ ] Promote the no-tab/path runtime changes before any further backfill or
+  forward activation.
+- [ ] Clean up the old Request `1002874` item only after separate approval.
 
 **Gate:** Graph + Dataverse + Workbench readback and bounded logs.
 
@@ -777,31 +806,33 @@ Stop before writes or further rollout if any of the following appears:
 ## Sweep report
 
 ```text
-Sweep mode: Mode B domain truth audit plus Mode A Word-web/path reconciliation
+Sweep mode: Mode B domain truth audit plus Mode A Word-web/path/repair reconciliation
 Domain: structured individual review DOCX generation and SharePoint retention
 Claims: Waves 1–2 implementation and flag-off Production deployment VERIFIED;
   Wave 3 backfill SOURCE/FOCUSED-TEST/ADVERSARIAL-REVIEW VERIFIED, exact
   Request 1002874 create-only SharePoint/pointer/semantic proof VERIFIED, and
   owner browser download VERIFIED; Word-web title defect OWNER-OBSERVED, no-tab
   source fix/test/render VERIFIED; request-level Reviews path and reviewer-name
-  filename SOURCE/TEST/READ-ONLY-MANIFEST VERIFIED; deployment and exact-item
-  repair UNPROVED;
+  filename SOURCE/TEST/READ-ONLY-MANIFEST VERIFIED; exact manifest-bound
+  Request 1002874 repair and independent new/old item readback VERIFIED;
+  runtime deployment UNPROVED;
   remaining 22 writes and scheduled activation UNPROVED
 Durable restatements: current no-upload statements remain accurate historical/current baseline
 Structural fix: reconciled plan/queue/strategy/Atlas/runbook/wiki/catalog/memory/
   handoff to the observed compatibility defect, source fix, simplified
   request-level Reviews destination, human-readable filename, superseded
-  manifest, replacement manifest, and explicit repair/promotion/write gates
+  manifest, replacement manifest, exact repair result, retained old file, and
+  explicit visual-confirmation/promotion/cleanup/write gates
 Semantic omissions found: operator-confirmed test data needed an explicit,
   reviewable, hash-bound exclusion contract rather than relaxed validation or a
   silent population filter; the wiki lacked the separate inert retention path,
   and the evidence-matrix claim incorrectly phrased disabled retention as live
 Remaining live STALE: 0 within this plan's stated scope
-Remaining UNKNOWN/ASSUMED: Word-web behavior of the corrected package and the
-  new Reviews path until a SharePoint-hosted smoke, the exact repair method for
-  Request 1002874, any future same-name reviewer pair (blocked in backfill and a
-  stop condition before forward activation), the remaining 22 backfill writes,
-  and scheduled automatic filing remain unproved
-Verdict: SOURCE/PATH FIX VERIFIED; PROMOTION, EXACT-ITEM REPAIR, AND ALL
-  ADDITIONAL WRITES REMAIN GATED
+Remaining UNKNOWN/ASSUMED: owner visual confirmation of the corrected
+  SharePoint-hosted package in Word for the web, any future same-name reviewer
+  pair (blocked in backfill and a stop condition before forward activation),
+  the remaining 22 backfill writes, runtime promotion, scheduled automatic
+  filing, and old-file cleanup remain unproved or unapproved
+Verdict: SOURCE/PATH FIX AND EXACT REPAIR VERIFIED; VISUAL CONFIRMATION,
+  PROMOTION, CLEANUP, AND ALL ADDITIONAL WRITES REMAIN GATED
 ```

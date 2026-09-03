@@ -97,14 +97,20 @@ succeeds and the downloaded file looks correct. Opening the retained item
 through akoyaGO/Word for the web exposed a tab-layout defect that split
 `Proposal Review` after its first character. The branch removes the positioning
 tabs and directly right-aligns both review-template titles; focused tests,
-package isolation checks, and rendered inspection pass. The fix is not deployed
-and the existing item is unchanged. The owner then simplified the retained-file
+package isolation checks, and rendered inspection pass. The fix is not deployed.
+The owner then simplified the retained-file
 destination to request-level
 `Reviews/Review-<request>-<reviewer name>.docx`, removing both intermediate
 generated/GUID layers from the current target. The old Request `1002874` item
 remains backward-compatible. The replacement post-change D26 manifest has hash
 `25f10fcd0347d7de02abcc8a744357d4e215fe56efa462ff8cc0a6eef99650ff`,
 22 eligible missing files with unique destinations, one visible test exclusion,
-zero blockers, and no Request `1002874` candidate. Describe Wave 2 as
-Production-deployed inert, Wave 3 as storage/pointer proved with an open
-exact-item layout/path repair, and automatic filing as not activated.
+zero blockers, and no Request `1002874` candidate. The owner then approved the
+exact Request `1002874` repair while deferring old-file cleanup. Manifest hash
+`c30c76e47281208b8b4cc25976360453eebbdc65ba3d4b203c19a6e0f1a5692d`
+created and verified item `01G4GVMSZZ25YPTP3RGFEK6LCT64W3JPX2` at
+`Reviews/Review-1002874-Agnes Karasik.docx`, repointed Dataverse, and left the
+old item present. Independent readback matched the corrected semantic hash.
+Owner Word-web visual confirmation remains pending. Describe Wave 2 as
+Production-deployed inert, Wave 3 as exact new-path storage/pointer repaired and
+proved, and automatic filing as not activated.
