@@ -65,11 +65,14 @@ deployed/source/test/render verified rather than transport-smoked in Production.
 The owner has initiated planning for automatic retention of individual structured
 review DOCX files in SharePoint plus a dry-run-first D26 backfill. The active plan
 is `docs/REVIEW_DOCX_SHAREPOINT_RETENTION_PLAN.md`; it is planning only and
-authorizes no SharePoint write. The recommended next gate is adversarial review of
-that plan, followed by an explicit owner decision on Wave 1. This planning pass
-does not by itself reorder the canonical implementation sequence in
-`docs/CURRENT_WORK_QUEUE.md`, where Final Writeup persona rollout remains the
-recorded following priority.
+authorizes no SharePoint write. Claude's read-only adversarial review returned
+APPROVE WITH CONDITIONS; the plan now incorporates the verified eligibility,
+SharePoint target, dedicated-cron, pointer-consumer, 412, cycle, and helper-scope
+corrections. Claude's reviewer thank-you honorarium-copy change is Production-live
+on `main` at `41326cf5`, and this branch is rebased onto that baseline. The next
+gate is an explicit owner decision on Wave 1. This planning pass does not by itself
+reorder the canonical implementation sequence in `docs/CURRENT_WORK_QUEUE.md`,
+where Final Writeup persona rollout remains the recorded following priority.
 
 ## Parked
 

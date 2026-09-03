@@ -35,8 +35,9 @@ SharePoint DOCX is an immutable derived record and staff convenience copy.
 The implementation should reuse the existing
 `wmkf_appreviewersuggestion.wmkf_reviewsharepointfolder` and
 `wmkf_reviewfilename` fields. That immediately activates the existing Reviews-tab
-Download action and its guarded server download route; no new document table,
-Postgres queue, API route, or UI feature is needed for the first release.
+Download action and its guarded server download route. No new document table or
+Postgres queue is needed. One dedicated cron route is required so automatic
+filing does not extend the reviewer-submission or thank-you-email request.
 
 The current combined **Aggregated Proposal Reviews** export remains unchanged and
 on demand. This plan applies only to individual review documents.
@@ -54,7 +55,7 @@ probes on 2026-09-03:
 | Structured submission and thank-you generation do not currently retain that DOCX in SharePoint. | Submission services and thank-you sweep | N/A | N/A | Source/caller search; current release docs | **VERIFIED** |
 | Uploaded review files use the request library and store folder + filename on the suggestion row. | `review-upload.js` | SharePoint `akoya_request` + suggestion pointer fields | Reviews-tab Download action | Current source, Atlas, and download service | **VERIFIED** |
 | Reusing both pointer fields makes the existing Download action available. | Review upload / suggestion adapter | Suggestion pointer fields | `ReviewsTab.js` → existing download route/service | Current source | **VERIFIED** |
-| D26 currently has 22 received reviews, 210 answer rows, exact identity parity between received suggestions and answer-bearing suggestions, and zero complete or partial SharePoint pointers. | Existing structured writers | Production Dataverse | Proposed backfill | `DATAVERSE_ALLOW_PROD_READS=yes node scripts/probe-review-blank-slate.mjs` | **VERIFIED AS OF 2026-09-03; RECHECK BEFORE EXECUTION** |
+| D26 currently has 24 received reviews and 228 answer rows. All 24 are selected, have at least one rich-text answer row, have exact receipt/answer identity parity, and have zero complete or partial SharePoint pointers. This proves current eligibility shape, not merely row-count parity. | Existing structured writers | Production Dataverse | Proposed backfill | Updated `DATAVERSE_ALLOW_PROD_READS=yes node scripts/probe-review-blank-slate.mjs` | **VERIFIED AS OF 2026-09-03; RECHECK BEFORE EXECUTION** |
 | Rendering identical semantic input twice does not produce byte-identical ZIP packages, while the governed Word-part hash is stable. | Current renderer | Generated DOCX package | Retry/conflict logic | Local two-render experiment: raw SHA-256 differed; governed hash matched | **VERIFIED** |
 | Automatically retaining future individual DOCX files and backfilling D26 is live. | N/A | N/A | N/A | No implementation exists yet | **PLANNED** |
 
@@ -68,13 +69,43 @@ release performs no SharePoint upload remain correct: they describe the shipped
 baseline. This document is the single forward plan and is explicitly marked
 `PLANNED`, so it does not rewrite that history as deployed behavior.
 
+### Adversarial review reconciliation
+
+Claude's read-only review returned **APPROVE WITH CONDITIONS**. Each condition
+was then checked against source rather than accepted by assertion:
+
+- **Accepted:** mark-received-without-file can atomically write only rating and
+  multiselect rows, so receipt/answer parity alone was insufficient. Rich-text
+  presence is now an explicit first-release provenance gate, and the updated
+  Production probe proves all 24 current D26 rows meet it.
+- **Accepted:** Graph writes are outside the Dataverse target interlock. The plan
+  now requires exact SharePoint target identity plus an enforcing Dataverse
+  pointer-write preflight before Graph mutation.
+- **Accepted with architectural change:** no filing runs inline after submission
+  or inside the thank-you cron. A dedicated bounded five-minute cron owns both
+  automatic generation and repair.
+- **Accepted:** generated pointer metadata must not look like a reviewer upload;
+  generated paths receive a stable namespace and explicit consumer handling.
+- **Accepted:** a 412 followed by still-null pointers needs one bounded
+  fresh-ETag retry; selected/excluded state and cycle derivation are explicit.
+- **Accepted simplification:** the governed DOCX hash and reviewer-subfolder
+  helpers are already exported. This release does not extract either helper and
+  the generated GUID path does not depend on reviewer name.
+- **Confirmed safe:** create-only upload, semantic-hash adoption, exact-item
+  cleanup, existing Download activation, and scoped remove-entirely cleanup
+  remain valid. The generated non-attempt path is handled by the existing
+  primary-filename-only deletion policy.
+
+With these amendments, no adversarial condition remains open at the plan layer.
+Implementation and Production behavior remain unproved and separately gated.
+
 ## Product contract
 
 ### Included
 
-1. Generate an individual DOCX after a successful external structured review
-   submission.
-2. Generate an individual DOCX after a successful staff Manual Review Entry.
+1. Automatically generate an individual DOCX shortly after a successful external
+   structured review submission, outside the submission request.
+2. Do the same after a successful staff Manual Review Entry.
 3. Store the generated file in the existing request SharePoint library hierarchy.
 4. Persist the existing folder/filename pointers on the reviewer suggestion.
 5. Repair missing generated files through a bounded recurring sweep.
@@ -85,7 +116,8 @@ baseline. This document is the single forward plan and is explicitly marked
 ### Excluded
 
 - Uploaded-review ingestion, which already stores the uploaded source file.
-- `mark received without file` rows that do not have a structured answer snapshot.
+- Every `mark received without file` row, including rows with partial rating or
+  multiselect snapshots.
 - Automatic replacement or reformatting of a file already retained in SharePoint.
 - PDF generation, combined-report storage, in-app editing, or a new document
   registry.
@@ -116,20 +148,33 @@ fresh authoritative read:
 
 - `wmkf_reviewreceivedat` is non-null;
 - both existing SharePoint pointer fields are null;
+- `wmkf_selected` is exactly `true` and the applicant disposition is not
+  Excluded;
 - the request and reviewer relationships resolve;
 - a non-empty, internally coherent set of self-describing answer snapshot rows
   exists and passes the individual-report input contract;
-- the suggestion is not excluded or otherwise outside the submitted-review
-  lifecycle; and
 - for backfill, the server-derived cycle code equals the exact requested cycle.
 
 Completeness must not be inferred from today's editable question definitions.
 The structured writers commit the receipt and the full submitted snapshot in one
 Dataverse changeset; the reader validates that persisted historical set's own
-question keys, order, text, type, option snapshots, and answer shapes. A received
-row with no structured snapshot is `not_structured` and skipped. A malformed or
-internally inconsistent snapshot is `invalid_snapshot` and fails visibly; it is
-not converted into a misleading file.
+question keys, order, text, type, option snapshots, and answer shapes.
+
+For the first release, **at least one persisted `richtext` answer row is the
+enforced provenance discriminator** between a full external/manual structured
+submission and the ratings/multiselect-only rows written by uploaded-review and
+mark-received-without-file paths. A received row with no rich-text snapshot is
+`not_structured` and skipped even if other answer rows exist. This rule is
+version-independent for historical rows, but a future approved question set with
+no rich-text questions must deliberately replace the discriminator before it is
+published. A malformed or internally inconsistent snapshot is
+`invalid_snapshot` and fails visibly; it is not converted into a misleading
+file.
+
+For cycle resolution, prefer the suggestion's stamped
+`wmkf_grantcyclecode`; when null, derive the request cycle from its meeting date
+using the existing cycle helper. A row with neither source is `no_cycle` and is
+skipped/reported. Backfill still requires an exact caller-supplied cycle match.
 
 ## SharePoint destination
 
@@ -139,19 +184,18 @@ reviewer path helpers:
 ```text
 {requestNumber}_{REQUEST_GUID_WITHOUT_HYPHENS_UPPER}/
   Reviewer_Uploads/
-    {sanitizedReviewerLastName}_{shortSuggestionId}/
-      Review-{requestNumber}.docx
+    Generated/
+      {SUGGESTION_GUID_WITHOUT_HYPHENS_UPPER}/
+        Review-{requestNumber}.docx
 ```
 
 This intentionally uses the canonical plural `Reviewer_Uploads` hierarchy so the
-existing pointer consumer continues to work. Generated records do not use an
-`attempt_{uuid}` subfolder: the suggestion-specific reviewer folder already gives
-the generated artifact a unique, stable destination. Folder and filename are
-derived only on the server.
-
-Before implementation, move the existing reviewer-subfolder builder into a narrow
-shared helper used unchanged by both uploaded and generated review paths. Its
-characterization tests must prove byte-identical paths for existing uploads.
+existing pointer consumer continues to work, while the explicit `Generated`
+namespace cannot collide with uploaded-review `attempt_{uuid}` folders. The full
+suggestion GUID makes the path stable across reviewer-name corrections and
+process loss. Folder and filename are derived only on the server. Existing
+`buildReviewerSubfolder` is already exported and remains unchanged for uploads;
+the generated path does not need it.
 
 ## Generation service
 
@@ -168,23 +212,22 @@ there is one data-loading/composition contract. It must not require SharePoint t
 be healthy before sending a thank-you: a new filing outage must not become an
 email outage.
 
-Use `wmkf_reviewreceivedat` as `generatedAtIso`. That gives regenerated documents
-a stable, historically meaningful timestamp instead of retry time.
+For the retained SharePoint copy, use `wmkf_reviewreceivedat` as
+`generatedAtIso`. That gives retries a stable, historically meaningful timestamp.
+The thank-you attachment must continue to receive its current send-time value so
+sharing the builder does not change the already shipped attachment semantics.
 
 ### Semantic content identity
 
 Raw DOCX bytes cannot be used for idempotency because ZIP entry timestamps differ
-between otherwise identical renders. Extract the existing proven governed Word
-content-hash implementation from
-`initial-assessment/artifact-service.js` into a narrowly shared document helper,
-for example `lib/services/documents/governed-docx-hash.js`. Preserve its current
-canonicalization and re-export/import it without behavior change for Initial
-Assessment. The review service uses the same semantic hash over governed `word/*`
-parts.
-
-This helper extraction is a contract-sensitive change: characterization tests for
-all existing Initial Assessment hash cases must stay green before review filing is
-added.
+between otherwise identical renders. For the first release, import the already
+exported `hashGovernedDocxContent` directly from
+`initial-assessment/artifact-service.js`; do not extract or rename it. Existing
+Pre-Site, Site Visit, distribution, controls, reopen, Final Writeup, and Initial
+Assessment consumers make extraction a broader contract change with no benefit
+required for this feature. Map an invalid/non-DOCX item at the target path to
+`content_conflict` rather than leaking the helper's Initial-Assessment-branded
+exception.
 
 ### Create-only and recovery algorithm
 
@@ -193,71 +236,131 @@ For one eligible suggestion:
 1. Reload the suggestion, ETag, request, reviewer, and answer rows.
 2. Render with the stable receipt timestamp and calculate the semantic hash.
 3. Derive the exact server-owned path and filename.
-4. Read the exact target path.
-5. If absent, upload with `conflictBehavior: 'fail'`; never use `replace`.
-6. If the path exists, or a competing create returns a conflict, download that
+4. Resolve and assert the exact SharePoint site/drive and the intended Dataverse
+   pointer-write target **before any Graph mutation**.
+5. Read the exact target path.
+6. If absent, upload with `conflictBehavior: 'fail'`; never use `replace`.
+7. If the path exists, or a competing create returns a conflict, download that
    exact item and compare semantic hashes.
-7. If hashes match, reuse the existing item. If they differ, return
+8. If hashes match, reuse the existing item. If they differ, return
    `content_conflict`; never overwrite or delete the existing item.
-8. Patch both pointer fields using the fresh suggestion ETag.
-9. On a 412/lost response, reread the suggestion. Exact pointers mean success;
-   different pointers mean `pointer_conflict` and must not be overwritten.
-10. If this invocation created a unique item but lost the pointer race, delete
+9. Patch both pointer fields using the fresh suggestion ETag.
+10. On a 412/lost response, reread the suggestion. Exact pointers mean success;
+    different non-null pointers mean `pointer_conflict`; both pointers still null
+    means retry the pointer PATCH once with the fresh ETag and the same already
+    resolved item. A second conflict fails visibly without another upload.
+11. If this invocation created a unique item but loses the pointer race, delete
     only that exact item by stable drive/item ID. Never delete a pre-existing
     candidate. A cleanup failure must be logged with the exact stable identity for
     operator action.
-11. Reread pointer fields and Graph metadata before returning success.
+12. Reread pointer fields and Graph metadata before returning success.
+
+`GraphService.deleteFile` already treats a missing item (404) as successful
+cleanup, so exact-item cleanup is safely repeatable.
 
 Return a structured per-suggestion result containing the suggestion ID, status,
 expected folder/filename, item identity and semantic hash when available, and a
 bounded error code/message. Do not log review answers or document contents.
 
-## Forward submission wiring
+## SharePoint target/write guard
+
+The Dataverse target interlock does not inspect Microsoft Graph calls. Therefore
+the filing service needs an explicit review-document preflight before step 6:
+
+1. `REVIEW_DOCX_SHAREPOINT_WRITE` must equal literal `on`.
+2. `DATAVERSE_TARGET_INTERLOCK` must resolve to `on`; `off` or `warn` is not
+   sufficient for this writer.
+3. The configured SharePoint URL must exactly match the tracked canonical
+   akoyaGO site URL, not merely an allowlisted tenant hostname.
+4. Resolve and return the site ID and `akoya_request` drive ID; execution uses
+   only those asserted identities. The backfill manifest records both.
+5. Before Graph upload, call the existing Dataverse interlock for the exact
+   intended suggestion-pointer PATCH URL and method. This proves a local
+   Production backfill has a valid same-day `DATAVERSE_PROD_WRITE_ACK` before
+   the file can be created.
+6. Scheduled automatic filing is allowed only from a Production deployment.
+   Preview, test, and ordinary local runtime calls fail closed even if the feature
+   flag is accidentally enabled. The operator backfill is the sole local
+   exception and must satisfy its manifest and acknowledgement contract.
+
+A noncanonical site, a backfill site/drive mismatch against its manifest,
+non-enforcing Dataverse interlock, non-Production scheduled deployment, or missing
+local Production acknowledgement is a pre-mutation hard failure. Tests must prove
+`GraphService.uploadFile` is not reached.
+
+## Automatic filing route
 
 Add a non-sensitive literal-on rollout flag:
 
 ```text
 REVIEW_DOCX_SHAREPOINT_WRITE=on
+REVIEW_DOCX_SHAREPOINT_CYCLE=D26
 ```
 
 Unset, empty, or any value other than literal `on` skips forward filing. Add the
-flag to the tracked environment contract before deployment.
+flag to the tracked environment contract before deployment. The automatic cron
+also requires one exact valid cycle code and considers only that cycle. This
+prevents activation from unexpectedly filing older historical cohorts; advancing
+the automatic cycle is a deliberate configuration change. The operator backfill
+continues to use its explicit `--cycle` manifest instead.
 
-After the atomic Dataverse submission is committed, both structured writers call
-`ensureIndividualReviewFile(suggestionId)` inside the existing trusted DAL
-context. The call is awaited; do not use fire-and-forget work. A filing failure is
-recorded and returned to server telemetry but does **not** roll back or misreport
-the already accepted review. Preserve the public external response contract.
+Add a dedicated CRON-secret-guarded route, for example
+`pages/api/cron/file-review-docx.js`, scheduled every five minutes. It calls
+`sweepMissingIndividualReviewFiles` inside its own trusted DAL context. This is
+both the normal automatic producer and the repair path: successful submissions
+become eligible through their atomic Dataverse receipt, and the next sweep files
+them without extending or changing either submission response.
 
-The Graph upload has a current 60-second bound. Focused tests and Preview timing
-must verify that post-commit filing does not exceed the submission route budget or
-produce a misleading client failure. If that budget is not acceptable, stop and
-move the immediate attempt to a durable job design; do not hide it in unawaited
-server work.
+Do **not** call filing from the external submit service, Manual Review Entry,
+`review-upload.js`, mark-received-without-file, or the thank-you cron. This avoids
+unawaited work, misleading post-commit submission failures, external-path DAL
+context ambiguity, and competition with the thank-you claim/send time budget.
 
-Do not invoke generated filing from `review-upload.js` or the mark-received-no-file
-path.
+The dedicated route should have an explicit 300-second function duration, a
+conservative attempt cap, sequential or very low concurrency, and an overall
+deadline that refuses to begin another item without enough remaining Graph
+budget. Its sweep should:
 
-## Automatic repair without new durable infrastructure
-
-Add a bounded `sweepMissingIndividualReviewFiles` pass to the beginning of the
-existing daily reviewer thank-you cron, independent of thank-you marker state.
-This provides automatic recovery when a post-commit attempt fails and includes
-reviews that were already thanked.
-
-The sweep should:
-
-- discover only received, no-pointer candidates;
+- discover rich-text-bearing, received, selected, non-excluded, no-pointer
+  candidates rather than every received row;
 - apply the same eligibility and ensure service, never a second implementation;
-- use a conservative per-run cap and low concurrency;
+- order candidates deterministically, use separate scan/attempt caps, and
+  continue past ineligible/conflicting rows so one bad row cannot starve later
+  submissions;
 - continue after individual failures and report per-ID results;
 - leave partial pointers and content conflicts untouched; and
 - run only when the same literal-on flag is enabled.
 
-Null pointers are the durable pending signal, so a new Postgres queue is not
-required for this first release. If Production volume or recovery latency later
-outgrows the bounded cron, reassess a durable queue explicitly rather than adding
-one preemptively.
+Null pointers are the durable pending signal only after the eligibility filter is
+applied. The result must retain stable per-ID classifications such as
+`not_structured`, `not_selected`, `excluded`, `no_cycle`, `invalid_snapshot`,
+`content_conflict`, and `partial_pointer`. Expected skips are summarized
+compactly; actionable repeated failures use the existing deduplicated operational
+event mechanism rather than noisy full-content logs. Do not promise that every
+healthy run is silent while unresolved anomalies remain.
+
+A new Postgres queue is not required for this first release. If Production volume
+or recovery latency later outgrows the bounded cron, reassess a durable queue
+explicitly rather than adding one preemptively.
+
+## Pointer consumer semantics
+
+Both pointer fields remain the storage contract, but generated metadata must not
+be presented as if the reviewer uploaded a file:
+
+- external context suppresses `submission.filename` only for the server-recognized
+  generated namespace; every existing non-generated/legacy pointer retains its
+  current display behavior, while a generated path remains hidden in the
+  reviewer's received notice;
+- the Reviews tab labels an `attempt_{uuid}` path with
+  `wmkf_reviewuploadedbystaff=true` as **staff upload** and a generated path with
+  that flag as **staff entry**, rather than treating every staff-entered review as
+  an upload; and
+- the existing staff download service continues to require and use both exact
+  pointer fields.
+
+Use one tested server/shared path classifier for these consumer distinctions; do
+not let the browser infer provenance from an arbitrary filename.
 
 ## D26 backfill script
 
@@ -277,8 +380,9 @@ node scripts/backfill-review-docx-sharepoint.mjs --cycle D26 --execute --manifes
 - Writes require both `--execute` and a previously generated manifest.
 - `--request-number` supports a one-review controlled smoke.
 - There is no `--force` or overwrite mode.
-- Production reads/writes continue to require the repository's explicit target
-  and interlock controls; the script must not bypass them.
+- Execution requires `DATAVERSE_TARGET_INTERLOCK=on`, the repository's same-day
+  `DATAVERSE_PROD_WRITE_ACK`, the literal-on review-DOCX flag, and the exact
+  SharePoint target check. These are asserted before any Graph write.
 
 ### Dry-run manifest
 
@@ -288,12 +392,19 @@ records:
 - reviewer suggestion GUID and ETag/source fingerprint;
 - request GUID and request number;
 - receipt timestamp and exact cycle;
+- selected/disposition state and rich-text presence;
 - eligibility classification;
 - expected folder and filename;
 - semantic document hash for eligible rows;
+- the exact canonical SharePoint URL plus resolved site and drive IDs;
 - whether an item already exists at the exact path and, if so, its stable metadata
   and semantic match result; and
 - a digest of the ordered candidate population.
+
+The source fingerprint includes every field that changes rendered content or
+identity, including reviewer display name/title/affiliation, request metadata,
+receipt time, and the ordered answer snapshots. A corrected reviewer identity or
+proposal label therefore invalidates a stale manifest before execution.
 
 Dry run exits nonzero for partial pointers, target-content conflicts, invalid
 snapshots, duplicate identities, or unresolved relationships. It can report
@@ -314,7 +425,7 @@ metadata, and the downloaded semantic hash. Count-only or upload-response-only
 verification is insufficient.
 
 The final dry run must show zero eligible missing rows, zero partial pointers,
-zero divergent collisions, and no duplicate generated paths. The dated 22-review
+zero divergent collisions, and no duplicate generated paths. The dated 24-review
 D26 count is evidence for planning only and must never be hardcoded.
 
 ## Verification matrix
@@ -322,21 +433,35 @@ D26 count is evidence for planning only and must never be hardcoded.
 ### Focused automated tests
 
 - Stable semantic hash across two renders whose raw bytes differ.
-- Existing Initial Assessment governed-hash cases remain unchanged after helper
-  extraction.
-- Eligibility: structured/no-pointer eligible; complete pointer skipped; partial
-  pointer fails; no-answer receipt skipped; malformed snapshot fails.
+- Existing Initial Assessment and all current governed-hash consumer suites
+  remain unchanged; no helper extraction occurs in this release.
+- Eligibility: rich-text-bearing structured/no-pointer eligible; complete pointer
+  skipped; partial pointer fails; ratings/multiselect-only mark-received fixture
+  skipped; no-answer receipt skipped; malformed snapshot fails.
 - Manual structured rows are eligible even when
   `wmkf_reviewuploadedbystaff=true`.
-- Deterministic path/filename and unchanged legacy upload folder derivation.
+- `wmkf_selected=false`, excluded-disposition, and null-cycle fixtures follow the
+  explicit skip policy; suggestion-cycle and request-cycle fallback are tested.
+- Deterministic GUID-only generated path/filename remains stable across reviewer
+  name corrections; legacy upload folder derivation is unchanged.
+- The SharePoint target guard denies Preview/local scheduled writes, a
+  noncanonical site, backfill site/drive drift, interlock `off`/`warn`, and a
+  missing local Production acknowledgement before Graph upload.
+- The automatic sweep fails closed when its exact cycle setting is absent,
+  malformed, or does not match a candidate; an explicit backfill cycle does not
+  broaden automatic eligibility.
 - Create-only upload; matching pre-existing content reconciles; mismatched content
-  never overwrites.
-- Pointer 412: exact winner succeeds, divergent winner conflicts, and cleanup can
-  delete only the exact newly created item.
-- External and manual post-commit filing failures do not undo or misreport the
-  stored review.
-- SharePoint filing failure does not prevent the existing thank-you attachment.
-- Repair sweep is independent of thank-you marker state and respects its cap.
+  or non-DOCX content never overwrites and maps to `content_conflict`.
+- Pointer 412: exact winner succeeds, null-pointer reread retries once, divergent
+  winner conflicts, and cleanup can delete only the exact newly created item;
+  repeated cleanup accepts a 404.
+- External and manual submission services are byte-behavior unchanged and make
+  no filing call.
+- Dedicated filing cron is independent of thank-you marker state, cannot invoke
+  the thank-you sweep, respects scan/attempt/time caps, and cannot let a failing
+  first row starve all later candidates.
+- Generated filenames stay hidden in the external received notice; staff-upload
+  versus staff-entry labels use the trusted path classifier.
 - Backfill dry-run default, required exact cycle, manifest drift abort, per-row
   partial success, nonzero failure exit, and clean rerun.
 - Existing review upload, remove-entirely cleanup, Reviews-tab download, and
@@ -346,8 +471,9 @@ D26 count is evidence for planning only and must never be hardcoded.
 
 1. Render representative external and manual individual reviews and inspect every
    page, including the approved blank line below the header.
-2. In Preview/mocks, prove upload, exact retry, collision, lost response, 412, and
-   cleanup behavior.
+2. In tests/mocks, prove upload, exact retry, collision, lost response, 412,
+   cleanup, and target-denial behavior. Preview must prove fail-closed and perform
+   no SharePoint write.
 3. In Production with the runtime flag still off, generate a fresh D26 dry-run
    manifest and reconcile it to the read-only probe.
 4. After explicit owner approval, run one manifest-selected review as the write
@@ -357,8 +483,9 @@ D26 count is evidence for planning only and must never be hardcoded.
 6. Scan bounded Production dependency/error logs.
 7. After separate approval, execute the remainder against a fresh manifest.
 8. Rerun dry-run and prove zero missing/partial/divergent/duplicate results.
-9. Enable forward filing deliberately, then verify the next natural structured
-   submission and the repair sweep.
+9. Enable the dedicated Production filing cron deliberately, then verify the next
+   natural structured submission is retained within the scheduled interval
+   without changing its submission response or thank-you state.
 
 The repository's reviewer sandbox does not reproduce the full live review schema,
 so it can prove route/auth mechanics but is not a substitute for the controlled
@@ -371,9 +498,8 @@ with a self-test runs sequentially with its self-test:
 
 - `npm run check:dataverse-access-layer` then its self-test;
 - `npm run check:dynamics-context-boundary` then its self-test;
-- `npm run check:request-document-writers` then its self-test if the new writer is
-  registered by that gate;
-- `npm run check:api-routes` then its self-test after persistence/matrix updates;
+- `npm run check:api-routes` then its self-test after adding the cron route and
+  its persistence-matrix entry;
 - `npm run check:atlas` then its self-test after Atlas updates;
 - `npm run check:fact-consistency` then its self-test for retained live-count or
   rollout facts;
@@ -387,20 +513,26 @@ with a self-test runs sequentially with its self-test:
 
 ### Wave 1 — Shared, behavior-preserving foundations
 
+- Wait for Claude's separate reviewer thank-you honorarium-copy feature to finish,
+  be reviewed, and land; then update this branch from the resulting `main` before
+  touching the shared thank-you service.
 - Land the approved individual-template header-spacing change before generating
   retained files.
-- Extract and characterize the governed DOCX hash helper.
-- Share the reviewer folder and individual document build helpers without changing
-  upload, export, or email behavior.
+- Characterize the existing governed DOCX hash through its current export without
+  extracting it.
+- Share the individual document build helper while preserving thank-you send-time
+  generation metadata and all existing upload/export/email behavior.
 
 **Gate:** focused regression tests and rendered-page inspection.
 
-### Wave 2 — Filing service and automatic repair, flag off
+### Wave 2 — Filing service and dedicated cron, flag off
 
 - Implement eligibility, create-only upload, semantic reconciliation, ETag pointer
-  commit, exact cleanup, telemetry, structured results, and bounded repair sweep.
-- Wire external/manual post-commit calls and thank-you-cron repair behind the
-  literal-on flag.
+  commit, exact cleanup, target guards, telemetry, structured results, and the
+  bounded dedicated filing/repair sweep.
+- Add the dedicated five-minute cron behind the literal-on flag; do not modify the
+  submission or thank-you execution paths to perform filing.
+- Correct the external filename and staff upload/entry consumer semantics.
 - Update Atlas, route persistence matrix if applicable, environment contract, and
   tests.
 
@@ -425,9 +557,10 @@ Ready Production deployment with the flag off.
 ### Wave 5 — Forward activation
 
 - Enable `REVIEW_DOCX_SHAREPOINT_WRITE=on` deliberately.
-- Verify the next natural external or manual structured submission.
-- Confirm the repair sweep stays quiet when nothing is missing and reports only
-  actionable failures.
+- Verify the dedicated cron files the next natural external or manual structured
+  submission within the scheduled interval.
+- Confirm a no-work run performs no writes; unresolved anomalies remain compactly
+  classified and deduplicated rather than falsely described as silent.
 
 ## Stop conditions
 
@@ -437,9 +570,13 @@ Stop before writes or further rollout if any of the following appears:
 - a file at the expected path with a different semantic hash;
 - manifest population/source drift;
 - missing or invalid answer snapshots;
+- a ratings/multiselect-only snapshot, unselected/excluded row, or unresolved
+  cycle;
 - unresolved request/reviewer identity;
+- `DATAVERSE_TARGET_INTERLOCK` is not enforcing, the scheduled caller is not a
+  Production deployment, the configured SharePoint site is not the canonical
+  site, or a backfill's resolved site/drive differs from its manifest;
 - any attempt would overwrite or broadly delete an existing SharePoint item;
-- post-commit filing threatens the submission response budget; or
 - the one-file smoke cannot be verified by stable identity, content, Dataverse
   pointers, and the staff download path.
 
@@ -452,9 +589,10 @@ Claims: 9 -> VERIFIED 8 / PLANNED 1 / PARTIAL 0 / ASSUMED 0 / UNKNOWN 0
 Durable restatements: current no-upload statements remain accurate historical/current baseline
 Structural fix: added this separately labeled forward plan and catalog entry
 Semantic omissions found: upload flag, eligibility distinction for manual structured rows,
-  create-only conflict recovery, semantic rather than raw-byte identity, partial-success
-  backfill accounting, and post-commit repair were not previously specified
+  mark-received provenance, Graph target protection, dedicated-cron isolation,
+  pointer-consumer semantics, 412-null retry, exact cycle scoping, create-only conflict
+  recovery, semantic rather than raw-byte identity, and partial-success backfill accounting
 Remaining live STALE: 0 within this plan's stated scope
 Remaining UNKNOWN/ASSUMED: Production write behavior remains unproved until the approved smoke
-Verdict: RECONCILED FOR PLANNING; IMPLEMENTATION REMAINS PLANNED
+Verdict: ADVERSARIAL CONDITIONS RECONCILED FOR PLANNING; IMPLEMENTATION REMAINS PLANNED
 ```

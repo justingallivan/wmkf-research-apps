@@ -12,7 +12,8 @@
  * Reports:
  *   1. Dataverse `wmkf_appreviewanswer` rows — the answer snapshot, by question key.
  *   2. Dataverse suggestions carrying `wmkf_reviewreceivedat` — reviews on record
- *      by ANY path (portal, staff rescue, legacy upload, mark-received).
+ *      by ANY path (portal, staff rescue, legacy upload, mark-received), including
+ *      selected state, disposition, rich-text provenance, and SharePoint pointers.
  *   3. Postgres `review_drafts` — in-progress authoring that a key/type change
  *      would silently discard (buildInitialValues drops unknown/mismatched keys).
  *   4. Postgres `review_question_audit` — prior staff edits to the question set.
@@ -52,7 +53,10 @@ async function probeAnswerRows() {
   const byKey = new Map();
   for (const r of records) {
     const sid = r._wmkf_appreviewersuggestion_value;
-    bySuggestion.set(sid, (bySuggestion.get(sid) || 0) + 1);
+    const snapshot = bySuggestion.get(sid) || { rowCount: 0, types: new Set() };
+    snapshot.rowCount += 1;
+    snapshot.types.add(r.wmkf_questiontype);
+    bySuggestion.set(sid, snapshot);
     byKey.set(r.wmkf_questionkey, (byKey.get(r.wmkf_questionkey) || 0) + 1);
   }
   console.log(`Distinct reviewer suggestions with answers: ${bySuggestion.size}`);
@@ -62,15 +66,15 @@ async function probeAnswerRows() {
   for (const r of records.slice(0, 15)) {
     console.log(`  [${r.wmkf_questionkey}/${r.wmkf_questiontype}] value=${r.wmkf_answervalue ?? 'null'} text=${JSON.stringify((r.wmkf_answertext || '').slice(0, 60))}`);
   }
-  return new Set(bySuggestion.keys());
+  return bySuggestion;
 }
 
-async function probeReceivedReviews(answerSuggestionIds) {
+async function probeReceivedReviews(answerSnapshotsBySuggestion) {
   head('2. Dataverse suggestions with wmkf_reviewreceivedat — reviews by ANY path');
   const { records } = await bypassDynamicsRestrictions(
     { reason: 'read-only blank-slate probe (scripts/probe-review-blank-slate.mjs)' },
     () => DynamicsService.queryAllRecords('wmkf_appreviewersuggestions', {
-      select: 'wmkf_appreviewersuggestionid,_wmkf_request_value,wmkf_grantcyclecode,wmkf_reviewreceivedat,wmkf_reviewuploadedbystaff,wmkf_reviewsharepointfolder,wmkf_reviewfilename,wmkf_reviewstatus',
+      select: 'wmkf_appreviewersuggestionid,_wmkf_request_value,wmkf_grantcyclecode,wmkf_selected,wmkf_applicantdisposition,wmkf_reviewreceivedat,wmkf_reviewuploadedbystaff,wmkf_reviewsharepointfolder,wmkf_reviewfilename,wmkf_reviewstatus',
       filter: 'wmkf_reviewreceivedat ne null',
     }),
   );
@@ -78,21 +82,34 @@ async function probeReceivedReviews(answerSuggestionIds) {
   const byCycle = new Map();
   for (const r of records) {
     const cycle = String(r.wmkf_grantcyclecode || '(unassigned)').toUpperCase();
-    const bucket = byCycle.get(cycle) || { total: 0, completePointers: 0, partialPointers: 0, noPointers: 0 };
+    const bucket = byCycle.get(cycle) || {
+      total: 0,
+      selected: 0,
+      withRichtext: 0,
+      selectedWithRichtext: 0,
+      completePointers: 0,
+      partialPointers: 0,
+      noPointers: 0,
+    };
     const hasFolder = Boolean(r.wmkf_reviewsharepointfolder);
     const hasFilename = Boolean(r.wmkf_reviewfilename);
+    const hasRichtext = answerSnapshotsBySuggestion.get(r.wmkf_appreviewersuggestionid)?.types.has('richtext') === true;
     bucket.total += 1;
+    if (r.wmkf_selected === true) bucket.selected += 1;
+    if (hasRichtext) bucket.withRichtext += 1;
+    if (r.wmkf_selected === true && hasRichtext) bucket.selectedWithRichtext += 1;
     if (hasFolder && hasFilename) bucket.completePointers += 1;
     else if (hasFolder || hasFilename) bucket.partialPointers += 1;
     else bucket.noPointers += 1;
     byCycle.set(cycle, bucket);
-    console.log(`  ${r.wmkf_appreviewersuggestionid} request=${r._wmkf_request_value || 'none'} cycle=${cycle} received=${r.wmkf_reviewreceivedat} staffUpload=${r.wmkf_reviewuploadedbystaff === true} folder=${r.wmkf_reviewsharepointfolder || 'none'} file=${r.wmkf_reviewfilename || 'none'}`);
+    console.log(`  ${r.wmkf_appreviewersuggestionid} request=${r._wmkf_request_value || 'none'} cycle=${cycle} selected=${r.wmkf_selected === true} disposition=${r.wmkf_applicantdisposition ?? 'none'} richtext=${hasRichtext} received=${r.wmkf_reviewreceivedat} staffUpload=${r.wmkf_reviewuploadedbystaff === true} folder=${r.wmkf_reviewsharepointfolder || 'none'} file=${r.wmkf_reviewfilename || 'none'}`);
   }
   console.log('\nReceived-review SharePoint pointer summary by cycle:');
   for (const [cycle, bucket] of [...byCycle.entries()].sort(([a], [b]) => a.localeCompare(b))) {
-    console.log(`  ${cycle}: total=${bucket.total} complete=${bucket.completePointers} partial=${bucket.partialPointers} none=${bucket.noPointers}`);
+    console.log(`  ${cycle}: total=${bucket.total} selected=${bucket.selected} richtext=${bucket.withRichtext} selectedRichtext=${bucket.selectedWithRichtext} complete=${bucket.completePointers} partial=${bucket.partialPointers} none=${bucket.noPointers}`);
   }
   const receivedIds = new Set(records.map((row) => row.wmkf_appreviewersuggestionid));
+  const answerSuggestionIds = new Set(answerSnapshotsBySuggestion.keys());
   const receivedWithoutAnswers = [...receivedIds].filter((id) => !answerSuggestionIds.has(id));
   const answersWithoutReceipt = [...answerSuggestionIds].filter((id) => !receivedIds.has(id));
   console.log(`\nSnapshot/receipt identity check: receivedWithoutAnswers=${receivedWithoutAnswers.length} answersWithoutReceipt=${answersWithoutReceipt.length}`);
