@@ -107,6 +107,18 @@ test('keeps the existing fallback filename when request number is absent', async
   expect(payload.filename).toBe('Review-copy.docx');
 });
 
+test('allows the retained-file caller to supply its server-derived storage filename', async () => {
+  const payload = await buildIndividualReviewDocx({
+    suggestionId: SUGGESTION_ID,
+    reviewer: { wmkf_name: 'Agnes Karasik' },
+    request: { akoya_requestnum: '1002874' },
+    row: {},
+    generatedAtIso: '2026-09-03T12:00:00.000Z',
+    outputFilename: 'Review-1002874-Agnes Karasik.docx',
+  });
+  expect(payload.filename).toBe('Review-1002874-Agnes Karasik.docx');
+});
+
 test('uses a caller-supplied authoritative answer snapshot without reading it again', async () => {
   const supplied = [{ ...answers[0], answerHtml: '<p>Supplied.</p>' }];
   await buildIndividualReviewDocx({

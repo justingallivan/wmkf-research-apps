@@ -118,9 +118,9 @@ describe('buildReviewContext', () => {
     const generated = await buildReviewContext({
       suggestion: baseSuggestion({
         wmkf_reviewreceivedat: '2026-09-03T12:00:00Z',
-        wmkf_reviewfilename: 'Review-1002903.docx',
+        wmkf_reviewfilename: 'Review-1002903-Dr. R.docx',
         wmkf_reviewsharepointfolder:
-          '1002903_A/Reviewer_Uploads/Generated/11111111111141118111111111111111',
+          '1002903_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/Reviews',
       }),
       request,
       reviewer,

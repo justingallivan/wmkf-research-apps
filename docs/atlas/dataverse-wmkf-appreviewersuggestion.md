@@ -141,8 +141,11 @@ External-reviewer intake (S128–S130):
 fields only for a freshly revalidated full structured snapshot. Complete
 pointers always win; partial pointers are reported and left untouched. The
 writer uses an ETag conditional PATCH, one bounded pointer retry, and the
-server-derived `Reviewer_Uploads/Generated/<suggestion-guid>/Review-<request>.docx`
-identity. Scheduled discovery requires the exact stamped cycle and processes
+server-derived request-level
+`Reviews/Review-<request>-<sanitized reviewer name>.docx` identity. There are
+no generated or suggestion-GUID intermediate folders in the current target;
+the old shape remains recognized for existing pointers. Scheduled discovery
+requires the exact stamped cycle and processes
 newest receipts first. The source-built Wave 3 operator backfill separately
 unions exact stamps with request meeting-cycle fallback over unfinished pointer
 rows, produces a redacted hash-bound manifest that includes the exact Production
@@ -169,10 +172,13 @@ downloaded governed hash to the reviewed generation. The owner confirmed the
 Workbench download succeeds. Opening the retained item through akoyaGO/Word for
 the web exposed a tab-positioned title defect. The branch carries a
 source-tested/rendered no-tab correction, but the existing item and pointer pair
-remain unchanged pending an explicit repair decision. Replacement manifest hash
-`35bfdcd9cdfee7b8ce229c2039b0164ba21e1f800b7b36cbbbe95ed649b79af0`
-contains 22 eligible missing rows plus the visible test exclusion, zero
-blockers, and no Request `1002874` candidate. The scheduled route remains inert,
+remain unchanged pending an explicit repair decision. The owner-directed
+path/name simplification and Word-web template correction produce replacement
+manifest hash
+`25f10fcd0347d7de02abcc8a744357d4e215fe56efa462ff8cc0a6eef99650ff`,
+containing 22 eligible missing rows with unique destinations plus the visible
+test exclusion, zero blockers, and no Request `1002874` candidate. The
+scheduled route remains inert,
 including no maintenance row, while
 `REVIEW_DOCX_SHAREPOINT_WRITE` is unset. Both rollout variables were confirmed
 absent in Production; an authenticated flag-off route probe returned

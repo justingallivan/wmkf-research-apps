@@ -100,8 +100,8 @@ test('distinguishes a generated staff entry from a staff-uploaded file', async (
         reviewers: [
           {
             suggestionId: 'g1', name: 'Generated', reviewReceivedAt: '2026-09-03T00:00:00Z',
-            reviewSharePointFolder: '100_A/Reviewer_Uploads/Generated/11111111111141118111111111111111',
-            reviewFilename: 'Review-100.docx', reviewUploadedByStaff: true,
+            reviewSharePointFolder: '100_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA/Reviews',
+            reviewFilename: 'Review-100-Generated Reviewer.docx', reviewUploadedByStaff: true,
             reviewFileProvenance: 'generated',
           },
           {

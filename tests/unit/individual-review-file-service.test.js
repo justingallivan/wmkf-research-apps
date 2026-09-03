@@ -80,9 +80,9 @@ const SUGGESTION_ID = '11111111-1111-4111-8111-111111111111';
 const SECOND_SUGGESTION_ID = '44444444-4444-4444-8444-444444444444';
 const REQUEST_ID = '22222222-2222-4222-8222-222222222222';
 const REVIEWER_ID = '33333333-3333-4333-8333-333333333333';
-const FOLDER = '1002903_22222222222242228222222222222222/Reviewer_Uploads/Generated/11111111111141118111111111111111';
-const SECOND_FOLDER = '1002903_22222222222242228222222222222222/Reviewer_Uploads/Generated/44444444444444448444444444444444';
-const FILENAME = 'Review-1002903.docx';
+const FOLDER = '1002903_22222222222242228222222222222222/Reviews';
+const SECOND_FOLDER = FOLDER;
+const FILENAME = 'Review-1002903-Reviewer.docx';
 const DOCX = Buffer.from('generated-docx');
 const ITEM = {
   siteId: 'site-1', driveId: 'drive-1', id: 'item-1', name: FILENAME,
@@ -160,12 +160,28 @@ beforeEach(() => {
 });
 afterEach(() => { process.env = OLD_ENV; });
 
-test('builds the deterministic Generated path from server-owned identities', () => {
+test('builds the request-level Reviews path and human-readable filename', () => {
   expect(buildGeneratedReviewPath({
     requestId: REQUEST_ID,
     requestNumber: '1002903',
-    suggestionId: SUGGESTION_ID,
-  })).toEqual({ folder: FOLDER, filename: FILENAME });
+    reviewerName: 'Agnes Karasik',
+  })).toEqual({
+    folder: '1002903_22222222222242228222222222222222/Reviews',
+    filename: 'Review-1002903-Agnes Karasik.docx',
+  });
+  expect(buildGeneratedReviewPath({
+    requestId: REQUEST_ID,
+    requestNumber: '1002903',
+    reviewerName: ' Dr. Ana/Bé <Test> ',
+  })).toEqual({
+    folder: '1002903_22222222222242228222222222222222/Reviews',
+    filename: 'Review-1002903-Dr. Ana-Bé -Test-.docx',
+  });
+  expect(() => buildGeneratedReviewPath({
+    requestId: REQUEST_ID,
+    requestNumber: '1002903',
+    reviewerName: ' ... ',
+  })).toThrow('reviewer name');
 });
 
 test('classifies complete and partial pointers before rendering or Graph access', async () => {
@@ -391,6 +407,7 @@ test('creates with conflictBehavior=fail, conditionally commits exact pointers, 
   expect(buildIndividualReviewDocx).toHaveBeenCalledWith(expect.objectContaining({
     generatedAtIso: '2026-09-02T17:30:00.000Z',
     answerSnapshot: ANSWERS,
+    outputFilename: FILENAME,
   }));
   expect(graph.uploadFile).toHaveBeenCalledWith(
     'akoya_request', FOLDER, FILENAME, DOCX, expect.any(String),

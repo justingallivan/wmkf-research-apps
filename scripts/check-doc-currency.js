@@ -137,7 +137,7 @@ const DRIFT_PATTERNS = [
     kind: 'path-contract drift',
     needle: /Reviewer_Upload\b(?!s\/\{)/g,
     reason:
-      'Canonical path is `Reviewer_Uploads/{reviewerSubfolder}` (plural, with subfolder). Singular or other shapes are stale.',
+      'Uploaded source reviews use `Reviewer_Uploads/{reviewerSubfolder}` (plural, with subfolder); generated structured review copies use the request-level `Reviews/` folder. Singular Reviewer_Upload remains stale.',
     allow: ['check-doc-currency.js'],
   },
   {

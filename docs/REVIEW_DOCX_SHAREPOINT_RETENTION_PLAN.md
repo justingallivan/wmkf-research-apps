@@ -36,9 +36,11 @@ explicitly approved its exact scoped manifest. The resulting SharePoint item,
 Dataverse pointer pair, semantic content, and Workbench download passed, but
 akoyaGO/Word for the web split the tab-positioned first-page title. The branch
 preserves v1 and selects new v2 templates that directly right-align both titles
-without tabs; the fix is not deployed and the existing item is unchanged.
-Replacement manifest hash
-`35bfdcd9cdfee7b8ce229c2039b0164ba21e1f800b7b36cbbbe95ed649b79af0` has 22
+without tabs. The owner then simplified the generated-file destination to the
+request-level `Reviews/Review-{request}-{reviewer name}.docx`; the two
+intermediate folders are retired for new files. Neither change is deployed and
+the existing item is unchanged. Replacement manifest hash
+`25f10fcd0347d7de02abcc8a744357d4e215fe56efa462ff8cc0a6eef99650ff` has 22
 eligible missing files, the same visible test exclusion, and zero blockers. No
 additional write or exact-item repair is authorized.**
 
@@ -104,13 +106,16 @@ was then checked against source rather than accepted by assertion:
 - **Accepted with architectural change:** no filing runs inline after submission
   or inside the thank-you cron. A dedicated bounded five-minute cron owns both
   automatic generation and repair.
-- **Accepted:** generated pointer metadata must not look like a reviewer upload;
-  generated paths receive a stable namespace and explicit consumer handling.
+- **Accepted, later simplified by the owner:** generated pointer metadata must
+  not look like a reviewer upload. The dedicated request-level `Reviews` folder
+  is now the stable generated namespace, and explicit consumer handling also
+  recognizes the retired GUID path for the existing proof file.
 - **Accepted:** a 412 followed by still-null pointers needs one bounded
   fresh-ETag retry; selected/excluded state and cycle derivation are explicit.
 - **Accepted simplification:** the governed DOCX hash and reviewer-subfolder
-  helpers are already exported. This release does not extract either helper and
-  the generated GUID path does not depend on reviewer name.
+  helpers are already exported. This release does not extract either helper.
+  The later owner decision does not reuse the upload-specific reviewer folder;
+  it stores generated files directly under the request-level `Reviews` folder.
 - **Confirmed safe:** create-only upload, semantic-hash adoption, exact-item
   cleanup, existing Download activation, and scoped remove-entirely cleanup
   remain valid. The generated non-attempt path is handled by the existing
@@ -176,8 +181,8 @@ tests and one-page renders for both outputs pass. The fix is not deployed and
 the existing SharePoint item is unchanged. Because the governed hash covers all
 `word/` parts, the prior remaining-population manifest is superseded.
 Replacement manifest
-`outputs/review-docx-backfill/review-docx-D26-2026-09-03T22-33-03-942Z.json`
-has hash `35bfdcd9cdfee7b8ce229c2039b0164ba21e1f800b7b36cbbbe95ed649b79af0`,
+`outputs/review-docx-backfill/review-docx-D26-2026-09-03T23-02-20-955Z.json`
+has hash `25f10fcd0347d7de02abcc8a744357d4e215fe56efa462ff8cc0a6eef99650ff`,
 22 eligible missing files, one visible Request `1003223` test exclusion, zero
 blockers, and no completed Request `1002874` candidate.
 
@@ -266,24 +271,29 @@ requires an exact caller-supplied cycle match.
 
 ## SharePoint destination
 
-Use the existing `akoya_request` document library and the established request and
-reviewer path helpers:
+Use the existing `akoya_request` document library and a single request-level
+generated-review folder:
 
 ```text
 {requestNumber}_{REQUEST_GUID_WITHOUT_HYPHENS_UPPER}/
-  Reviewer_Uploads/
-    Generated/
-      {SUGGESTION_GUID_WITHOUT_HYPHENS_UPPER}/
-        Review-{requestNumber}.docx
+  Reviews/
+    Review-{requestNumber}-{sanitized reviewer name}.docx
 ```
 
-This intentionally uses the canonical plural `Reviewer_Uploads` hierarchy so the
-existing pointer consumer continues to work, while the explicit `Generated`
-namespace cannot collide with uploaded-review `attempt_{uuid}` folders. The full
-suggestion GUID makes the path stable across reviewer-name corrections and
-process loss. Folder and filename are derived only on the server. Existing
-`buildReviewerSubfolder` is already exported and remains unchanged for uploads;
-the generated path does not need it.
+The request folder already supplies request identity, so the two GUID-only
+intermediate layers add no staff value. `Reviews` is reserved for generated
+structured-review copies; uploaded-review `Reviewer_Uploads/{reviewer}/attempt_*`
+paths remain unchanged. The filename uses the authoritative Dataverse reviewer
+display name and replaces only SharePoint-invalid characters. Folder and
+filename are derived only on the server. Existing complete pointers remain
+immutable even if a reviewer name later changes, while any name change before a
+backfill write changes the source fingerprint and invalidates the manifest.
+Two no-pointer suggestions in one backfill manifest that resolve to the same
+request and sanitized name fail closed as a duplicate target. The scheduled
+writer remains create-only and never overwrites a target; divergent existing
+content is an actionable conflict. The retired
+`Reviewer_Uploads/Generated/{suggestionGuid}` shape remains recognized only for
+backward-compatible consumer behavior and the explicit Request `1002874` repair.
 
 ## Generation service
 
@@ -291,7 +301,10 @@ Wave 1 adds
 `lib/services/review-documents/individual-review-builder.js` as the shared
 answer-read, composition, filename/content-type, and render seam. It accepts the
 authoritative suggestion/request/reviewer context already loaded by its caller
-and deliberately requires a caller-supplied generation timestamp.
+and deliberately requires a caller-supplied generation timestamp. Its default
+`Review-{request}.docx` courtesy-attachment filename remains unchanged; the
+retention service supplies its server-derived
+`Review-{request}-{reviewer name}.docx` storage filename.
 
 Wave 2 adds a narrow filing service, for example
 `lib/services/review-documents/individual-file-service.js`, around that builder:
@@ -457,10 +470,10 @@ explicitly rather than adding one preemptively.
 Both pointer fields remain the storage contract, but generated metadata must not
 be presented as if the reviewer uploaded a file:
 
-- external context suppresses `submission.filename` only for the server-recognized
-  generated namespace; every existing non-generated/legacy pointer retains its
-  current display behavior, while a generated path remains hidden in the
-  reviewer's received notice;
+- external context suppresses `submission.filename` only for a server-recognized
+  request-level `Reviews` folder or the retired generated GUID shape; every
+  existing non-generated/legacy pointer retains its current display behavior,
+  while a generated path remains hidden in the reviewer's received notice;
 - the Reviews tab labels an `attempt_{uuid}` path with
   `wmkf_reviewuploadedbystaff=true` as **staff upload** and a generated path with
   that flag as **staff entry**, rather than treating every staff-entered review as
@@ -572,8 +585,10 @@ D26 count is evidence for planning only and must never be hardcoded.
   `wmkf_reviewuploadedbystaff=true`.
 - `wmkf_selected=false`, excluded-disposition, and null-cycle fixtures follow the
   explicit skip policy; suggestion-cycle and request-cycle fallback are tested.
-- Deterministic GUID-only generated path/filename remains stable across reviewer
-  name corrections; legacy upload folder derivation is unchanged.
+- Request-level `Reviews/Review-{request}-{reviewer name}.docx` derivation uses
+  authoritative identity, sanitizes forbidden filename characters, leaves the
+  courtesy-attachment and legacy upload paths unchanged, recognizes the retired
+  generated GUID shape, and fails closed on duplicate generated targets.
 - The SharePoint target guard denies Preview/local scheduled writes, a
   noncanonical site, backfill site/drive drift, interlock `off`/`warn`, and a
   missing local Production acknowledgement before Graph upload.
@@ -718,15 +733,16 @@ WRITE APPROVED.**
 - [x] Owner confirmed the Workbench browser download succeeds and the downloaded
   document looks correct.
 - [ ] Promote the no-tab Word-web compatibility fix and explicitly repair the
-  already-retained Request `1002874` item; no repair write is yet authorized.
+  already-retained Request `1002874` item into the new request-level `Reviews`
+  location and reviewer-name filename; no repair write is yet authorized.
 
 **Gate:** Graph + Dataverse + Workbench readback and bounded logs.
 
 ### Wave 4 — D26 completion
 
-- [x] After the template correction, produce a replacement fresh manifest: 22
+- [x] After the template and path corrections, produce a replacement fresh manifest: 22
   eligible missing files, one visible test exclusion, zero blockers, hash
-  `35bfdcd9cdfee7b8ce229c2039b0164ba21e1f800b7b36cbbbe95ed649b79af0`.
+  `25f10fcd0347d7de02abcc8a744357d4e215fe56efa462ff8cc0a6eef99650ff`.
 - Stop for explicit approval of the remaining bounded write set.
 - Execute, reconcile every suggestion identity, and prove a clean rerun.
 
@@ -745,6 +761,7 @@ Stop before writes or further rollout if any of the following appears:
 - a partial existing pointer;
 - a file at the expected path with a different semantic hash;
 - manifest population/source drift;
+- two candidates resolving to the same `Reviews` filename;
 - missing or invalid answer snapshots;
 - a ratings/multiselect-only snapshot, unselected/excluded row, or unresolved
   cycle;
@@ -760,26 +777,31 @@ Stop before writes or further rollout if any of the following appears:
 ## Sweep report
 
 ```text
-Sweep mode: Mode B domain truth audit plus Mode A Word-web defect reconciliation
+Sweep mode: Mode B domain truth audit plus Mode A Word-web/path reconciliation
 Domain: structured individual review DOCX generation and SharePoint retention
 Claims: Waves 1–2 implementation and flag-off Production deployment VERIFIED;
   Wave 3 backfill SOURCE/FOCUSED-TEST/ADVERSARIAL-REVIEW VERIFIED, exact
   Request 1002874 create-only SharePoint/pointer/semantic proof VERIFIED, and
   owner browser download VERIFIED; Word-web title defect OWNER-OBSERVED, no-tab
-  source fix/test/render VERIFIED, deployment and exact-item repair UNPROVED;
+  source fix/test/render VERIFIED; request-level Reviews path and reviewer-name
+  filename SOURCE/TEST/READ-ONLY-MANIFEST VERIFIED; deployment and exact-item
+  repair UNPROVED;
   remaining 22 writes and scheduled activation UNPROVED
 Durable restatements: current no-upload statements remain accurate historical/current baseline
 Structural fix: reconciled plan/queue/strategy/Atlas/runbook/wiki/catalog/memory/
-  handoff to the observed compatibility defect, source fix, superseded manifest,
-  replacement manifest, and explicit repair/promotion/write gates
+  handoff to the observed compatibility defect, source fix, simplified
+  request-level Reviews destination, human-readable filename, superseded
+  manifest, replacement manifest, and explicit repair/promotion/write gates
 Semantic omissions found: operator-confirmed test data needed an explicit,
   reviewable, hash-bound exclusion contract rather than relaxed validation or a
   silent population filter; the wiki lacked the separate inert retention path,
   and the evidence-matrix claim incorrectly phrased disabled retention as live
 Remaining live STALE: 0 within this plan's stated scope
-Remaining UNKNOWN/ASSUMED: Word-web behavior of the corrected package until a
-  SharePoint-hosted smoke, the exact repair method for Request 1002874, the
-  remaining 22 backfill writes, and scheduled automatic filing remain unproved
-Verdict: SOURCE FIX VERIFIED; PROMOTION, EXACT-ITEM REPAIR, AND ALL ADDITIONAL
-  WRITES REMAIN GATED
+Remaining UNKNOWN/ASSUMED: Word-web behavior of the corrected package and the
+  new Reviews path until a SharePoint-hosted smoke, the exact repair method for
+  Request 1002874, any future same-name reviewer pair (blocked in backfill and a
+  stop condition before forward activation), the remaining 22 backfill writes,
+  and scheduled automatic filing remain unproved
+Verdict: SOURCE/PATH FIX VERIFIED; PROMOTION, EXACT-ITEM REPAIR, AND ALL
+  ADDITIONAL WRITES REMAIN GATED
 ```

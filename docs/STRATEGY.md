@@ -170,13 +170,16 @@ Dataverse pointer pair, and independent download/hash readback matched the
 reviewed semantic hash. The owner confirmed Agnes Karasik's Workbench download
 succeeds and the downloaded document looks correct, but opening the retained
 file through akoyaGO/Word for the web split the tab-positioned first-page title.
-The branch now directly right-aligns both review-template titles without tabs;
-focused tests and rendered inspection pass, but the fix is not deployed and the
-existing retained item is unchanged. Replacement manifest hash
-`35bfdcd9cdfee7b8ce229c2039b0164ba21e1f800b7b36cbbbe95ed649b79af0`
-contains 22 eligible missing files plus the same visible test exclusion and no
-Request `1002874` candidate. Template-fix promotion and an explicit exact-item
-repair decision now precede approval of the remaining Wave 4 set. Final Writeup persona
+The branch now directly right-aligns both review-template titles without tabs
+and targets generated retention at request-level
+`Reviews/Review-<request>-<reviewer name>.docx`; focused tests and rendered
+inspection pass, but the fix is not deployed and the existing retained item is
+unchanged at its legacy path/name. Replacement manifest hash
+`25f10fcd0347d7de02abcc8a744357d4e215fe56efa462ff8cc0a6eef99650ff`
+contains 22 eligible missing files with unique destinations plus the same
+visible test exclusion and no Request `1002874` candidate. Template/path-fix
+promotion and an explicit exact-item repair decision now precede approval of
+the remaining Wave 4 set. Final Writeup persona
 access proof and deliberate enablement remain preserved immediately afterward.
 As of 2026-08-31, the ordinary-staff
 dashboard/focused-review foundation is Production-deployed

@@ -1085,9 +1085,11 @@ contract: `docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md`.
 **Individual-review SharePoint retention (Waves 1–2 Production-deployed inert;
 Wave 3 one-file storage/pointer proof passed, 2026-09-03):** the separate dedicated
 `/api/cron/file-review-docx` path can render a structured review through the
-same individual builder, create-only upload it beneath
-`Reviewer_Uploads/Generated/<suggestion-guid>/`, and ETag-conditionally commit
-the existing suggestion folder/filename pointers. It is not part of submission
+same individual builder, create-only upload it to request-level
+`Reviews/Review-<request>-<sanitized reviewer name>.docx`, and
+ETag-conditionally commit the existing suggestion folder/filename pointers.
+There are no generated or suggestion-GUID intermediate folders in the current
+target; existing legacy pointers remain recognized. It is not part of submission
 or thank-you transport. Both Production rollout variables remain absent, so the
 route is inert and its scheduled write path is not Production-proved. The guarded local
 backfill produced a clean full-cycle D26 schema-v2 manifest with 23 eligible
@@ -1102,11 +1104,12 @@ Opening the retained item through akoyaGO/Word for the web exposed a tab-layout
 defect that split the first-page title. The branch removes those tabs and
 directly right-aligns both review-template titles; source tests and rendered
 inspection pass, but the fix is not deployed and the existing item is
-unchanged. Replacement manifest hash
-`35bfdcd9cdfee7b8ce229c2039b0164ba21e1f800b7b36cbbbe95ed649b79af0` has 22
-eligible missing files plus the same visible test exclusion and no completed
-Request `1002874` candidate. No additional write or exact-item repair is
-approved. Active
+unchanged at its legacy path/name. The owner-directed path simplification and
+Word-web correction produce replacement manifest hash
+`25f10fcd0347d7de02abcc8a744357d4e215fe56efa462ff8cc0a6eef99650ff`, with 22
+eligible missing files at unique destinations plus the same visible test
+exclusion and no completed Request `1002874` candidate. No additional write or
+exact-item repair is approved. Active
 contract: `docs/REVIEW_DOCX_SHAREPOINT_RETENTION_PLAN.md`.
 
 **Phase 4 BUILT (2026-07-03); reliability production-proven 2026-07-28:**

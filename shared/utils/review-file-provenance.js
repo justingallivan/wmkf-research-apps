@@ -21,6 +21,11 @@ function normalizedFolder(folderPath) {
 export function classifyReviewFileProvenance(folderPath) {
   const folder = normalizedFolder(folderPath);
   if (!folder) return REVIEW_FILE_PROVENANCE.NONE;
+  if (/(?:^|\/)[^/]+_[a-f0-9]{32}\/Reviews$/i.test(folder)) {
+    return REVIEW_FILE_PROVENANCE.GENERATED;
+  }
+  // Backward compatibility for generated review files retained before the
+  // request-level Reviews folder became the canonical destination.
   if (/(?:^|\/)Reviewer_Uploads\/Generated\/[a-f0-9]{32}$/i.test(folder)) {
     return REVIEW_FILE_PROVENANCE.GENERATED;
   }

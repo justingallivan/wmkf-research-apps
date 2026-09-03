@@ -145,13 +145,18 @@ Production-used v1 templates and selects new v2 templates that remove the two
 out-of-bounds positioning tabs and directly right-aligns both individual and
 combined first-page titles. Focused tests, structural package checks, and
 one-page renders for both templates pass; the fix is not deployed and the
-existing SharePoint item is unchanged. Because the governed hash covers the
-header part, the prior 22-row manifest is superseded. Fresh read-only manifest
-`outputs/review-docx-backfill/review-docx-D26-2026-09-03T22-33-03-942Z.json`
-has hash `35bfdcd9cdfee7b8ce229c2039b0164ba21e1f800b7b36cbbbe95ed649b79af0`,
+existing SharePoint item is unchanged. The owner then simplified the retained
+file contract: generated documents now target the request-level `Reviews/`
+folder with filename `Review-<request>-<reviewer name>.docx`; no
+`Reviewer_Uploads/Generated` or suggestion-GUID layer remains in the current
+target. The old Request `1002874` item remains unchanged and recognized for
+compatibility. Because the governed hash and target identity changed, the prior
+22-row manifest is superseded. Fresh read-only manifest
+`outputs/review-docx-backfill/review-docx-D26-2026-09-03T23-02-20-955Z.json`
+has hash `25f10fcd0347d7de02abcc8a744357d4e215fe56efa462ff8cc0a6eef99650ff`,
 22 eligible missing files, one visible Request `1003223` test exclusion, zero
-blockers, and no Request `1002874` candidate. No additional write or exact-item
-repair is approved.
+blockers, 22 unique destinations, and no Request `1002874` candidate. No
+additional write or exact-item repair is approved.
 
 ## Parked
 

@@ -98,9 +98,13 @@ through akoyaGO/Word for the web exposed a tab-layout defect that split
 `Proposal Review` after its first character. The branch removes the positioning
 tabs and directly right-aligns both review-template titles; focused tests,
 package isolation checks, and rendered inspection pass. The fix is not deployed
-and the existing item is unchanged. The replacement post-change D26 manifest
-has hash `35bfdcd9cdfee7b8ce229c2039b0164ba21e1f800b7b36cbbbe95ed649b79af0`,
-22 eligible missing files, one visible test exclusion, zero blockers, and no
-Request `1002874` candidate. Describe Wave 2 as Production-deployed inert, Wave
-3 as storage/pointer proved with an open exact-item layout repair, and automatic
-filing as not activated.
+and the existing item is unchanged. The owner then simplified the retained-file
+destination to request-level
+`Reviews/Review-<request>-<reviewer name>.docx`, removing both intermediate
+generated/GUID layers from the current target. The old Request `1002874` item
+remains backward-compatible. The replacement post-change D26 manifest has hash
+`25f10fcd0347d7de02abcc8a744357d4e215fe56efa462ff8cc0a6eef99650ff`,
+22 eligible missing files with unique destinations, one visible test exclusion,
+zero blockers, and no Request `1002874` candidate. Describe Wave 2 as
+Production-deployed inert, Wave 3 as storage/pointer proved with an open
+exact-item layout/path repair, and automatic filing as not activated.

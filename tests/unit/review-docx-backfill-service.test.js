@@ -49,8 +49,8 @@ function eligiblePlan(suggestionId = FIRST_ID, overrides = {}) {
     disposition: null,
     richTextPresent: true,
     status: 'eligible',
-    expectedFolder: `1002903_${REQUEST_ID}/Reviewer_Uploads/Generated/${suggestionId}`,
-    expectedFilename: 'Review-1002903.docx',
+    expectedFolder: `1002903_${REQUEST_ID}/Reviews`,
+    expectedFilename: `Review-1002903-Reviewer ${suggestionId.slice(0, 8)}.docx`,
     semanticHash: `gdc1:${suggestionId}`,
     item: null,
     semanticMatch: null,
@@ -71,9 +71,9 @@ beforeEach(() => {
   ensureIndividualReviewFile.mockResolvedValue({
     status: 'created',
     expectedFolder: eligiblePlan().expectedFolder,
-    expectedFilename: 'Review-1002903.docx',
+    expectedFilename: eligiblePlan().expectedFilename,
     semanticHash: `gdc1:${FIRST_ID}`,
-    item: { siteId: 'site-1', driveId: 'drive-1', id: 'item-1', name: 'Review-1002903.docx' },
+    item: { siteId: 'site-1', driveId: 'drive-1', id: 'item-1', name: eligiblePlan().expectedFilename },
   });
 });
 
@@ -128,6 +128,29 @@ test('orders candidates by code-point keys independent of discovery order', asyn
     .toEqual([FIRST_ID, SECOND_ID]);
 });
 
+test('blocks two reviews that resolve to the same request-level filename', async () => {
+  findReviewDocxBackfillPopulation.mockResolvedValue({
+    records: [
+      { wmkf_appreviewersuggestionid: FIRST_ID },
+      { wmkf_appreviewersuggestionid: SECOND_ID },
+    ],
+    capped: false,
+  });
+  planIndividualReviewFileCandidate.mockImplementation(async (id) => eligiblePlan(id, {
+    expectedFilename: 'Review-1002903-Same Reviewer.docx',
+  }));
+
+  const manifest = await buildReviewDocxBackfillManifest({
+    cycleCode: 'D26', observedAt: '2026-09-03T18:00:00.000Z',
+  });
+
+  expect(manifest.summary.blocking).toBe(1);
+  expect(manifest.anomalies).toContainEqual({
+    code: 'duplicate_generated_paths',
+    values: [`1002903_${REQUEST_ID}/reviews/review-1002903-same reviewer.docx`],
+  });
+});
+
 test('rejects a capped discovery before planning candidates', async () => {
   findReviewDocxBackfillPopulation.mockResolvedValue({ records: [], capped: true });
   await expect(buildReviewDocxBackfillManifest({ cycleCode: 'D26' }))
@@ -138,7 +161,7 @@ test('rejects a capped discovery before planning candidates', async () => {
 test('omits a row that became fully filed between discovery and planning', async () => {
   planIndividualReviewFileCandidate.mockImplementation(async (id) => eligiblePlan(id, {
     status: 'already_filed',
-    item: { siteId: 'site-1', driveId: 'drive-1', id: 'item-1', name: 'Review-1002903.docx' },
+    item: { siteId: 'site-1', driveId: 'drive-1', id: 'item-1', name: eligiblePlan(id).expectedFilename },
     semanticMatch: true,
   }));
   const manifest = await buildReviewDocxBackfillManifest({
