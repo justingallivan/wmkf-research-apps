@@ -156,9 +156,9 @@ export const EDITABLE_TEXT_DEFAULTS = [
   {
     key: 'email.reviewer_thankyou.body',
     label: 'Reviewer thank-you body',
-    description: 'Default body for the reviewer thank-you email.',
+    description: 'Default body for the reviewer thank-you email. {{honorariumNote}} becomes the honorarium follow-up sentence, or nothing when the reviewer declined the honorarium.',
     multiline: true,
-    placeholders: ['{{greeting}}', '{{proposalTitle}}', '{{signature}}'],
+    placeholders: ['{{greeting}}', '{{proposalTitle}}', '{{honorariumNote}}', '{{signature}}'],
   },
   {
     key: 'email.grantee_reminder.subject',

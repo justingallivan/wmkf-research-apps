@@ -248,4 +248,81 @@ describe('sweepReviewThankYous', () => {
     expect(r.sent).toBe(0);
     expect(r.skipped).toBe(3);
   });
+
+  describe('honorarium line selected from the server-authoritative Stage 2a choice', () => {
+    const HONORARIUM_LINE = 'We will be in touch regarding the processing of your honorarium.';
+    const BODY_WITH_NOTE = '{{greeting}},\n\nThank you for completing your review of “{{proposalTitle}}”.\n\n{{honorariumNote}}\n\nWith gratitude,\n\n{{signature}}';
+
+    beforeEach(() => {
+      readRequiredEmailDefaults.mockResolvedValue({
+        ok: true,
+        values: { [SUBJECT_KEY]: SUBJECT, [BODY_KEY]: BODY_WITH_NOTE },
+        failures: [],
+      });
+    });
+
+    test('projects wmkf_honorariumoptout in the eligibility select', async () => {
+      queryAllRecords.mockResolvedValue({ records: [] });
+      await sweepReviewThankYous();
+      const [, opts] = queryAllRecords.mock.calls[0];
+      expect(opts.select.split(',')).toContain('wmkf_honorariumoptout');
+    });
+
+    test('opt-out true → honorarium line omitted, no literal token, no blank paragraph; claim/attachment/send unchanged', async () => {
+      queryAllRecords.mockResolvedValue({ records: [candidate({ wmkf_honorariumoptout: true })] });
+      installReads();
+      const r = await sweepReviewThankYous();
+      expect(r.sent).toBe(1);
+      const email = createAndSendEmail.mock.calls[0][0];
+      expect(email.body).not.toContain(HONORARIUM_LINE);
+      expect(email.body).not.toContain('honorarium');
+      expect(email.body).not.toContain('{{honorariumNote}}');
+      expect(email.body).not.toMatch(/<p[^>]*><\/p>/);
+      expect(email.body).toContain('Dear Dr. Reviewer,');
+      expect(email.body).toContain('With gratitude,');
+      // Existing contract untouched: recipients, subject, attachment, claim-before-send.
+      expect(email.to).toBe('rev@example.org');
+      expect(email.subject).toBe('Thank You for Your Review — A Proposal');
+      expect(email.attachments).toHaveLength(1);
+      expect(updateRecord).toHaveBeenCalledWith(
+        'wmkf_appreviewersuggestions', SUG,
+        expect.objectContaining({ wmkf_thankyousentat: expect.any(String) }),
+        expect.objectContaining({ ifMatch: 'W/"100"' }),
+      );
+      expect(updateRecord.mock.invocationCallOrder[0]).toBeLessThan(createAndSendEmail.mock.invocationCallOrder[0]);
+    });
+
+    test('opt-out false (reviewer took the honorarium) → honorarium line included', async () => {
+      queryAllRecords.mockResolvedValue({ records: [candidate({ wmkf_honorariumoptout: false })] });
+      installReads();
+      await sweepReviewThankYous();
+      const email = createAndSendEmail.mock.calls[0][0];
+      expect(email.body).toContain(HONORARIUM_LINE);
+      expect(email.body).not.toContain('{{honorariumNote}}');
+    });
+
+    test.each([
+      ['null (row predates the Stage 2a column)', null],
+      ['undefined (field absent from the row)', undefined],
+    ])('uncaptured choice — %s → honorarium line included (not opted out unless true)', async (_label, value) => {
+      const row = candidate();
+      if (value === undefined) delete row.wmkf_honorariumoptout; else row.wmkf_honorariumoptout = value;
+      queryAllRecords.mockResolvedValue({ records: [row] });
+      installReads();
+      await sweepReviewThankYous();
+      const email = createAndSendEmail.mock.calls[0][0];
+      expect(email.body).toContain(HONORARIUM_LINE);
+    });
+
+    test('opt-out true + attachment failure → still unclaimed and unsent for retry', async () => {
+      queryAllRecords.mockResolvedValue({ records: [candidate({ wmkf_honorariumoptout: true })] });
+      installReads();
+      renderIndividualReviewDocx.mockRejectedValueOnce(new Error('docx boom'));
+      const r = await sweepReviewThankYous();
+      expect(r.attachmentFailed).toBe(1);
+      expect(r.sent).toBe(0);
+      expect(updateRecord).not.toHaveBeenCalled();
+      expect(createAndSendEmail).not.toHaveBeenCalled();
+    });
+  });
 });

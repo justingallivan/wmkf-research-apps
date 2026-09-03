@@ -985,7 +985,16 @@ without marker rollback or retry (at-most-once — owner-approved
 acceptance-confirmation posture). It reuses the reminder sweep's exported
 `loadRequestContext`/`loadReviewer` for the PD sender + signature + reviewer
 email, and renders the seeded `thankyou` template via
-`reviewer-reminder-email.js#renderThankYou`. It sends the email as the PD
+`reviewer-reminder-email.js#renderThankYou`. The stored body carries a
+`{{honorariumNote}}` token (branch `claude/reviewer-thankyou-honorarium-context`,
+2026-09-03): the sweep projects `wmkf_honorariumoptout` and the token resolves to
+the honorarium follow-up sentence unless that field is strictly `true` (reviewer
+declined the honorarium at Stage 2a), in which case the line is omitted — `false`,
+`null`, and pre-Stage-2a rows keep it, matching the acceptance drain's
+"not opted out unless true" rule. The staff manual thank-you render
+(`render-emails-service.js`) resolves the same token from the same field so it can
+never reach a reviewer verbatim. The live Production template must be edited by
+the owner to contain the token; the seeder skips existing values. It sends the email as the PD
 (`createAndSendEmail`, `noFallback:true`) with a **courtesy DOCX copy of the
 reviewer's own review** attached as real file bytes (`activitymimeattachments`,
 never Blob-staged): `composeSingleReviewCopy` (pure, in

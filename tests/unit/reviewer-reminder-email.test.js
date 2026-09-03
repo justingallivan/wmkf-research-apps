@@ -3,8 +3,11 @@
  */
 
 const {
+  HONORARIUM_NOTE_TEXT,
   REVIEW_DUE_ACCESS_INSTRUCTION,
   renderReviewDueReminder,
+  renderThankYou,
+  resolveHonorariumNote,
 } = require('../../lib/external/reviewer-reminder-email');
 
 function render(bodyTemplate) {
@@ -56,4 +59,50 @@ test.each([
     reviewDueDate: '2026-09-09',
     signatureBlock: { name: 'Dr. PD', email: 'pd@example.org', signature: 'Dr. PD' },
   })).toThrow(/subject cannot contain a reviewer URL/i);
+});
+
+describe('thank-you honorarium note', () => {
+  const BODY = '{{greeting}},\n\nThank you for your review of “{{proposalTitle}}”.\n\n{{honorariumNote}}\n\nWith gratitude,\n\n{{signature}}';
+  function thankYou(honorariumOptOut) {
+    return renderThankYou({
+      subjectTemplate: 'Thanks — {{proposalTitle}}',
+      bodyTemplate: BODY,
+      reviewerName: 'Dr. Reviewer',
+      title: 'A Proposal',
+      signatureBlock: { name: 'Dr. PD', email: 'pd@example.org', signature: 'Dr. PD' },
+      honorariumOptOut,
+    });
+  }
+
+  test('resolveHonorariumNote omits the line only for a strict true', () => {
+    expect(resolveHonorariumNote(true)).toBe('');
+    for (const v of [false, null, undefined, 'true', 1]) expect(resolveHonorariumNote(v)).toBe(HONORARIUM_NOTE_TEXT);
+  });
+
+  test('opted out → line and token absent, paragraphs stay contiguous', () => {
+    const { html } = thankYou(true);
+    expect(html).not.toContain('honorarium');
+    expect(html).not.toContain('{{honorariumNote}}');
+    expect(html).not.toMatch(/<p[^>]*><\/p>/);
+    expect(html).toContain('A Proposal');
+    expect(html).toContain('With gratitude,');
+  });
+
+  test.each([false, null, undefined])('not opted out (%p) → honorarium line present once', (v) => {
+    const { html } = thankYou(v);
+    expect(html.match(new RegExp(HONORARIUM_NOTE_TEXT.replace(/\./g, '\\.'), 'g'))).toHaveLength(1);
+    expect(html).not.toContain('{{honorariumNote}}');
+  });
+
+  test('a stored body without the token renders unchanged', () => {
+    const { html } = renderThankYou({
+      subjectTemplate: 'Thanks',
+      bodyTemplate: '{{greeting}},\n\nThank you.\n\n{{signature}}',
+      reviewerName: 'Dr. Reviewer',
+      title: 'A Proposal',
+      signatureBlock: { name: 'Dr. PD', email: 'pd@example.org', signature: 'Dr. PD' },
+      honorariumOptOut: false,
+    });
+    expect(html).not.toContain('honorarium');
+  });
 });
