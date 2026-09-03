@@ -24,9 +24,10 @@ related:
 
 ## Decision and status
 
-**Status: WAVES 1–2 ARE SOURCE-BUILT ON THE FEATURE BRANCH; WAVES 3–5 REMAIN
-PLANNED. The filing service and inert dedicated cron are not deployed, their
-rollout flags remain unset, and no SharePoint write or historical backfill has
+**Status: WAVES 1–2 ARE PRODUCTION-DEPLOYED ON `main` AT `83da197f`; WAVES 3–5
+REMAIN PLANNED. Ready deployment `dpl_F3oZ9MDbnyFox7S8Ekdos7423ece` contains the
+filing service and dedicated cron, but both rollout variables are absent and the
+route is Production-proved inert. No SharePoint write or historical backfill has
 been authorized for execution.**
 
 The recommended design is to generate and retain one individual DOCX for every
@@ -59,8 +60,8 @@ probes on 2026-09-03:
 | Reusing both pointer fields makes the existing Download action available. | Review upload / suggestion adapter | Suggestion pointer fields | `ReviewsTab.js` → existing download route/service | Current source | **VERIFIED** |
 | D26 currently has 24 received reviews and 228 answer rows. All 24 are selected, have at least one rich-text answer row, have exact receipt/answer identity parity, and have zero complete or partial SharePoint pointers. This proves current eligibility shape, not merely row-count parity. | Existing structured writers | Production Dataverse | Proposed backfill | Updated `DATAVERSE_ALLOW_PROD_READS=yes node scripts/probe-review-blank-slate.mjs` | **VERIFIED AS OF 2026-09-03; RECHECK BEFORE EXECUTION** |
 | Rendering identical semantic input twice does not produce byte-identical ZIP packages, while the governed Word-part hash is stable. | Current renderer | Generated DOCX package | Retry/conflict logic | Local two-render experiment: raw SHA-256 differed; governed hash matched | **VERIFIED** |
-| The thank-you attachment now uses one shared individual-review builder with caller-owned generation time. | `reviewer-thankyou-sweep.js` | Existing answer snapshot + transient DOCX bytes | Thank-you attachment; future filing service | Focused builder/thank-you/hash tests plus rendered-page inspection | **IMPLEMENTED ON FEATURE BRANCH; NOT YET PRODUCTION-LIVE** |
-| Automatically retaining future individual DOCX files and backfilling D26 is live. | Dedicated filing service/cron is source-built; backfill script is not built | No Production write | Existing pointer consumers | Branch source and focused tests; no deployment or write activation | **NOT PRODUCTION-LIVE** |
+| The thank-you attachment now uses one shared individual-review builder with caller-owned generation time. | `reviewer-thankyou-sweep.js` | Existing answer snapshot + transient DOCX bytes | Thank-you attachment; filing service | Focused builder/thank-you/hash tests, rendered-page inspection, and Ready Production deployment | **PRODUCTION-LIVE AT `83da197f`; TRANSPORT BEHAVIOR UNCHANGED** |
+| Automatically retaining future individual DOCX files and backfilling D26 is live. | Dedicated filing service/cron is deployed but disabled; backfill script is not built | No Production write | Existing pointer consumers | Ready deployment plus authenticated flag-off route and maintenance-table before/after probe | **PRODUCTION-DEPLOYED INERT; WRITES/BACKFILL NOT LIVE** |
 
 ### Sweep boundary
 
@@ -100,16 +101,18 @@ was then checked against source rather than accepted by assertion:
   primary-filename-only deletion policy.
 
 With these amendments, no adversarial condition remains open at the plan layer.
-Wave 1's behavior-preserving foundation is source/test/render verified on the
-feature branch. SharePoint filing, backfill, and all Production behavior remain
-unproved and separately gated.
+Wave 1's behavior-preserving foundation is source/test/render verified and now
+Production-deployed. SharePoint mutation, backfill, and activated automatic
+filing behavior remain unproved and separately gated.
 
 Claude's subsequent read-only Wave 2 build review returned **APPROVE WITH
 NON-BLOCKING SUGGESTIONS**. The accepted pre-release hardening keeps scheduled
 discovery to exact cycle-stamped rows, orders newest receipts first, avoids
 flag-off maintenance noise, centralizes actionable status classification, adds
 the missing negative-path tests, and documents post-commit verification failure.
-This approval covers source and local tests only; it is not Production proof.
+That review covered source and local tests only. The later release proved the
+Production deployment and disabled-route boundary, but not the guarded write
+path.
 
 ## Product contract
 
@@ -543,8 +546,7 @@ with a self-test runs sequentially with its self-test:
 
 ### Wave 1 — Shared, behavior-preserving foundations
 
-**Status: COMPLETE ON `codex/review-docx-header-spacing` (2026-09-03), pending
-review/promotion.**
+**Status: COMPLETE AND PRODUCTION-LIVE ON `main` AT `83da197f` (2026-09-03).**
 
 - Claude's reviewer thank-you honorarium-copy feature landed on `main` at
   `41326cf5`; this branch was rebased onto it before the shared service changed.
@@ -571,19 +573,22 @@ clean. No SharePoint call, pointer write, route, cron, or rollout flag was added
 - Update Atlas, route persistence matrix if applicable, environment contract, and
   tests.
 
-**Gate:** adversarial review, all relevant gates, Preview/mock verification, and a
-Ready Production deployment with the flag off.
+**Gate: PASSED.** Adversarial review and all relevant source/test/build gates
+passed. Ready Production deployment `dpl_F3oZ9MDbnyFox7S8Ekdos7423ece` contains
+the route with both rollout variables absent. An authenticated GET returned the
+exact disabled response before persistence, and the `file-review-docx`
+maintenance-run population remained zero before and after.
 
-**Status: SOURCE-BUILT AND ADVERSARIALLY REVIEWED ON
-`codex/review-docx-header-spacing` (2026-09-03), pending release gates.** The dedicated guarded
+**Status: PRODUCTION-DEPLOYED INERT ON `main` AT `83da197f` (2026-09-03).** The dedicated guarded
 service/cron, create-only Graph path, semantic hash reconciliation, bounded ETag
 pointer recovery, safe exact-item cleanup, per-row telemetry/results, and shared
 pointer-provenance consumer semantics are implemented with focused tests. The
 scheduled scan is exact-stamp-only and newest-first; a disabled route creates no
 maintenance row. Claude returned APPROVE WITH NON-BLOCKING SUGGESTIONS, and the
 accepted pre-release hardening is incorporated. The rollout/cycle flags remain
-unset; nothing has been deployed or written to Production. Wave 3 backfill code
-has not been started.
+absent in Production; no Graph or Dataverse pointer write occurred. The guarded
+mutation path is therefore not Production-proved. Wave 3 backfill code has not
+been started.
 
 ### Wave 3 — D26 dry run and one-file proof
 
@@ -629,13 +634,13 @@ Stop before writes or further rollout if any of the following appears:
 ## Sweep report
 
 ```text
-Sweep mode: Mode B domain truth audit plus Mode A Wave 2 build-review reconciliation
+Sweep mode: Mode B domain truth audit plus Mode A Wave 2 release reconciliation
 Domain: structured individual review DOCX generation and SharePoint retention
-Claims: Waves 1–2 source implementation VERIFIED; Wave 3 backfill PLANNED;
-  deployment, activation, and Production write behavior UNPROVED
+Claims: Waves 1–2 implementation and flag-off Production deployment VERIFIED;
+  Wave 3 backfill PLANNED; activation and Production write behavior UNPROVED
 Durable restatements: current no-upload statements remain accurate historical/current baseline
-Structural fix: forward plan/catalog plus exact-stamp newest-first scheduled discovery,
-  quiet flag-off route, shared actionable classification, and negative-path tests
+Structural fix: reconciled plan/catalog/Atlas/runbook/handoff to the Ready inert
+  release while preserving the separate activation and write-proof gates
 Semantic omissions found: upload flag, eligibility distinction for manual structured rows,
   mark-received provenance, Graph target protection, dedicated-cron isolation,
   pointer-consumer semantics, 412-null retry, exact cycle scoping, create-only conflict
@@ -643,5 +648,5 @@ Semantic omissions found: upload flag, eligibility distinction for manual struct
   candidate-starvation prevention, and post-commit verification operations
 Remaining live STALE: 0 within this plan's stated scope
 Remaining UNKNOWN/ASSUMED: Production write behavior remains unproved until the approved smoke
-Verdict: WAVES 1–2 SOURCE-BUILT AND ADVERSARIALLY REVIEWED; RELEASE/PRODUCTION PROOF PENDING
+Verdict: WAVES 1–2 PRODUCTION-DEPLOYED INERT; WAVE 3 AND ALL WRITES REMAIN GATED
 ```

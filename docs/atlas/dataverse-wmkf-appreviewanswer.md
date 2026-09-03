@@ -39,13 +39,15 @@ Data:
 
 The same DTO derives ratings from these rows (`ratingsFromAnswers`, `lib/external/review-answer-snapshot.js`) instead of parent columns, and the external review-context prefill reads them per suggestion. In the active target contract the projection contains only `riskLevel` and `overallAssessment`; a rating with no snapshot row remains null (informal/unrated).
 
-**[SOURCE-BUILT 2026-09-03; NOT DEPLOYED OR PRODUCTION-PROVED]** The dedicated
+**[PRODUCTION-DEPLOYED INERT 2026-09-03 AT `83da197f` /
+`dpl_F3oZ9MDbnyFox7S8Ekdos7423ece`; WRITE PATH NOT PRODUCTION-PROVED]** The dedicated
 individual-review retention service now also reads this self-describing snapshot
 as its sole content source. It requires at least one persisted `richtext` row and
 rejects malformed identity/order/type/categorical shapes before rendering; it
 does not consult today's editable question definitions to judge historical
-completeness. The scheduled writer remains inert while its SharePoint flag is
-unset.
+completeness. Both rollout variables are absent in Production; the authenticated
+disabled-route probe returned before a candidate read or persistence and left
+the job's maintenance-run population unchanged at zero.
 
 ## Write Paths
 

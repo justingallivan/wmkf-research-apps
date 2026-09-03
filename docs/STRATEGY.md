@@ -147,8 +147,15 @@ reviewed commits reached `main` at `3101f067` and Ready deployment
 `dpl_AjT5FeDh5wkdeFSoZWJsVDM5oBqs`; signed-in Request `1002903` generated a
 valid 60,586-byte aggregated DOCX and the bounded post-deploy error scan was
 empty. The courtesy path is deployed and source/test/render verified but was not
-email-send smoked. Final Writeup persona access proof and deliberate enablement
-is now the next ordered priority. As of 2026-08-31, the ordinary-staff
+email-send smoked. The separately approved individual-review retention work is
+now Production-deployed inert at `83da197f` in Ready deployment
+`dpl_F3oZ9MDbnyFox7S8Ekdos7423ece`: both rollout variables are absent, an
+authenticated route call returned `enabled:false`, and the maintenance-run
+population remained zero before/after. Wave 3's dry-run-first D26 backfill
+script and manifest are the next ordered priority; no SharePoint file or
+Dataverse pointer write is authorized by that deployment. Final Writeup persona
+access proof and deliberate enablement remain preserved immediately afterward.
+As of 2026-08-31, the ordinary-staff
 dashboard/focused-review foundation is Production-deployed
 through PR #140 (`ce229778`) with bounded reads and external-Word actions. Its
 separate acknowledgement readiness value is exact `on` in Production. The

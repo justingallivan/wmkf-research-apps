@@ -5,7 +5,7 @@ status: active
 metadata:
   node_type: memory
   type: project
-  last_verified: 2026-09-03 via exact Production Wave 25 readback, Ready deployment, and signed-in combined-export DOCX smoke
+  last_verified: 2026-09-03 via exact Production Wave 25 readback, signed-in combined-export DOCX smoke, and the Ready inert Wave 2 retention deployment
   originSessionId: 7db29a2d-b16d-490a-80f0-7e4fa4c04f0a
 ---
 
@@ -64,11 +64,14 @@ unclaimed and unsent so the complete delivery retries later. Both use the same a
 snapshot interpretation but distinct approved templates. Historical categorical
 rows without a full option snapshot render selected-only with an explicit note;
 new submissions snapshot every presented option. Wave 2 retention is now
-source-built on `codex/review-docx-header-spacing`: a dedicated guarded sweep
+Production-deployed on `main` at `83da197f` in Ready deployment
+`dpl_F3oZ9MDbnyFox7S8Ekdos7423ece`: a dedicated guarded sweep
 creates immutable individual DOCX files under the generated SharePoint namespace
 and conditionally stores the existing pointer pair. Its scheduled discovery is
 exact-cycle-stamp-only and newest-first, and flag-off requests create no
 maintenance row. Claude's Wave 2 build review approved the source with
-non-blocking suggestions; the accepted hardening is incorporated. The rollout
-flag remains unset, the branch is not deployed, and the dry-run-first D26
-backfill remains Wave 3; do not describe retention as Production-live yet.
+non-blocking suggestions; the accepted hardening is incorporated. Both rollout
+variables are absent in Production. An authenticated flag-off request returned
+`enabled:false` and left the job's maintenance-run population unchanged at
+zero. The write path has not been exercised, and the dry-run-first D26 backfill
+remains Wave 3; describe Wave 2 as Production-deployed inert, not activated.

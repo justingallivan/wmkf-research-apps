@@ -71,18 +71,19 @@ SharePoint target, dedicated-cron, pointer-consumer, 412, cycle, and helper-scop
 corrections. Claude's reviewer thank-you honorarium-copy change is Production-live
 on `main` at `41326cf5`, and this branch is rebased onto that baseline.
 
-[VERIFIED via source, focused tests, governed-hash characterization, and rendered
-page inspection] Wave 1 is complete on the feature branch: the shared
+[VERIFIED via source, focused tests, governed-hash characterization, rendered
+page inspection, and the Ready Production deployment] Wave 1 is complete on
+`main` at `83da197f`: the shared
 `review-documents/individual-review-builder.js` now owns answer loading,
 composition, filename/content type, and template rendering. The thank-you sweep
 still supplies send time, builds before its If-Match claim, and preserves the
 honorarium projection/pass-through. No SharePoint call, pointer write, route,
-cron, or rollout flag was added. The next gate is an explicit owner decision on
-Wave 2.
+cron, or rollout flag was added by Wave 1.
 
-[VERIFIED via feature-branch source and focused tests; NOT DEPLOYED OR
-PRODUCTION-PROVED] Wave 2 is source-built on
-`codex/review-docx-header-spacing`: a dedicated CRON-secret route and filing
+[VERIFIED via source/tests and flag-off Production route proof; ACTIVATED WRITES
+NOT PRODUCTION-PROVED] Wave 2 is Production-deployed on `main` at `83da197f` in
+Ready deployment `dpl_F3oZ9MDbnyFox7S8Ekdos7423ece`: a dedicated CRON-secret
+route and filing
 service enforce exact-stamped-cycle/fresh-snapshot eligibility, newest-first
 scheduled discovery, create-only canonical
 SharePoint writes, governed semantic reconciliation, ETag pointer commit with one
@@ -93,9 +94,14 @@ one shared server classifier. `vercel.json` schedules the route every five
 minutes with a 300-second function duration; flag-off requests return before a
 maintenance row or data read. Claude's Wave 2 build review returned APPROVE WITH
 NON-BLOCKING SUGGESTIONS, and the accepted hardening is incorporated. The
-non-sensitive write/cycle flags remain unset and no deployment, Graph mutation,
-or pointer write has occurred. The next gate is the relevant release checks and
-Preview/mock verification. Wave 3 will add the dry-run-first D26 backfill.
+non-sensitive write/cycle flags are absent from the Production environment. An
+authenticated Production GET returned
+`{ok:true,enabled:false,status:"disabled",scanCap:7,attemptCap:2}`; the
+`file-review-docx` maintenance-run count was zero immediately before and after.
+No Graph mutation, Dataverse pointer write, or candidate read was authorized or
+performed. Wave 3 is now the next gate and will add the dry-run-first D26
+backfill script; executing even one generated-file write still requires a fresh
+manifest and separate explicit owner approval.
 
 ## Parked
 
