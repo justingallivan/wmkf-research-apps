@@ -1,6 +1,6 @@
 # Review Manager Guide
 
-> **Note (updated 2026-09-02):** Reviewer email sends go directly through Dynamics CRM and appear as activities on the request. Reviewers use a secure magic link to read materials and complete the structured review form. The current staff workflow deliberately separates materials release, reviewer reminders, automated thank-yous, and the combined staff export rather than presenting one generic action.
+> **Note (updated 2026-09-03):** Reviewer email sends go directly through Dynamics CRM and appear as activities on the request. Reviewers use a secure magic link to read materials and complete the structured review form. The current staff workflow deliberately separates materials release, reviewer reminders, automated thank-yous, and the combined staff export rather than presenting one generic action. The template-backed combined Word export is Production-live; generated review documents are not filed to SharePoint.
 
 Manage the peer review lifecycle from sending materials through collecting completed reviews.
 

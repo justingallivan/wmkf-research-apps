@@ -1,11 +1,11 @@
 ---
 name: project-review-output-formatting
-description: "Reviewer output formatting: approved individual and combined Word templates are source-built behind a schema-first release gate; PDF remains deferred"
+description: "Reviewer output formatting: approved individual and combined Word templates are Production-live; PDF remains deferred"
 status: active
 metadata:
   node_type: memory
   type: project
-  last_verified: 2026-09-03 via template-backed renderer QA plus exact Production Wave 25 apply/readback; code remains source-built and not deployed
+  last_verified: 2026-09-03 via exact Production Wave 25 readback, Ready deployment, and signed-in combined-export DOCX smoke
   originSessionId: 7db29a2d-b16d-490a-80f0-7e4fa4c04f0a
 ---
 
@@ -30,12 +30,14 @@ Do not:
 - Describe PDF as a current Reviews-tab affordance; the UI is Word-only as of
   the owner decision on 2026-08-13.
 
-Ground truth: the formatting pass is `[SOURCE-BUILT, NOT DEPLOYED]` on
-`codex/review-docx-templates`. The tracked templates and OOXML renderer are in
-`shared/templates/reviews/` and `lib/services/review-documents/`. Production
-Wave 25 was applied and independently read back exact on 2026-09-03; the
-schema-first gate is cleared, but code still requires the normal reviewed
-merge/deployment sequence.
+Ground truth: the formatting pass is `[PRODUCTION-LIVE 2026-09-03]` on `main`
+at `3101f067` in Ready deployment `dpl_AjT5FeDh5wkdeFSoZWJsVDM5oBqs`.
+The tracked templates and OOXML renderer are in `shared/templates/reviews/`
+and `lib/services/review-documents/`. Production Wave 25 was independently
+read back exact. A signed-in export from Request `1002903` produced a valid
+60,586-byte DOCX with the **Aggregated Proposal Reviews** title. No courtesy
+email was sent for release verification; that deployed path is source/test/
+render verified, not Production transport-smoked.
 
 Owner note (S328, 2026-07-04), captured while architecting the review
 thank-you sweep with courtesy-copy attachment:

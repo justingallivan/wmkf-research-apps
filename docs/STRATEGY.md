@@ -137,15 +137,18 @@ The ordered agenda is maintained in `docs/CURRENT_WORK_QUEUE.md`. Final Writeup
 infrastructure is complete through the bounded ordinary-staff dashboard and
 versioned persona-configuration foundation described below. On 2026-09-02, the
 owner refined the submitted-review DOCX task after confirming the existing
-export is a combined document: **[SOURCE-BUILT, NOT DEPLOYED]** the combined
+export is a combined document: **[PRODUCTION-LIVE 2026-09-03]** the combined
 download now uses a server-authoritative tracked template, while the thank-you
 sweep uses a separate individual-review template for its courtesy attachment.
 This phase does not upload review outputs to SharePoint. New categorical rows
 snapshot every presented option so future regeneration is faithful. Production
-Wave 25 was owner-approved, applied, and read back exact on 2026-09-03; the code
-remains source-built pending normal reviewed promotion and signed-in verification.
-Final Writeup persona access proof and deliberate enablement remains immediately
-after that review-DOCX release. As of 2026-08-31, the ordinary-staff
+Wave 25 was owner-approved, applied, and read back exact on 2026-09-03. The six
+reviewed commits reached `main` at `3101f067` and Ready deployment
+`dpl_AjT5FeDh5wkdeFSoZWJsVDM5oBqs`; signed-in Request `1002903` generated a
+valid 60,586-byte aggregated DOCX and the bounded post-deploy error scan was
+empty. The courtesy path is deployed and source/test/render verified but was not
+email-send smoked. Final Writeup persona access proof and deliberate enablement
+is now the next ordered priority. As of 2026-08-31, the ordinary-staff
 dashboard/focused-review foundation is Production-deployed
 through PR #140 (`ce229778`) with bounded reads and external-Word actions. Its
 separate acknowledgement readiness value is exact `on` in Production. The

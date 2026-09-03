@@ -232,15 +232,18 @@ document inventory, and individual implementation plans do not establish priorit
   and hazards in `project-reviewer-card-simplification-direction`; S395 scope-accretion
   caution applies; high-risk automation stays review-only until the representative
   benchmark exists.
-- Current priorities: `docs/CURRENT_WORK_QUEUE.md`. **Owner priority refinement
-  2026-09-02:** the review-DOCX formatting work is source-built but not deployed.
+- Current priorities: `docs/CURRENT_WORK_QUEUE.md`. **Review-DOCX release complete
+  2026-09-03:** the formatting work is Production-live at `3101f067` in Ready
+  deployment `dpl_AjT5FeDh5wkdeFSoZWJsVDM5oBqs`.
   The existing Reviews-tab action remains one combined, server-authoritative
   download, and the thank-you sweep produces the separate individual courtesy
   attachment. No SharePoint export registry/upload is part of this phase. New
   categorical rows snapshot the complete option set. Production Wave 25 was
-  owner-approved, applied, and read back exact on 2026-09-03; reviewed code
-  promotion and signed-in verification remain. Final Writeup persona access
-  proof and deliberate enablement remains immediately afterward.
+  owner-approved, applied, and read back exact. Signed-in Request `1002903`
+  generated a valid 60,586-byte aggregated DOCX with 2xx route dependencies and
+  no post-deploy error logs. The courtesy path is deployed/tested but was not
+  transport-smoked. Final Writeup persona access proof and deliberate enablement
+  is now the next ordered priority.
 - **Most recent owner-directed release (S470, 2026-08-30 PT / 2026-08-31 UTC):**
   Final Writeup Slice 1 is Production-proved on `main` at `ebb147bb` in Ready
   deployment `dpl_7kzQ1v7XGtyNx4Fady2JxMrTxQEJ`; Wave 22 is exact and

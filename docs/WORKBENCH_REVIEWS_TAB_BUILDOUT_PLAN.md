@@ -3,7 +3,7 @@ title: "Workbench Reviews Tab — Consumption Build-Out Plan"
 domain: reviewer-workbench
 kind: plan
 status: active
-summary: "Reviews and synthesis are live; Wave 25 is exact and template-backed Word exports await reviewed code promotion."
+summary: "Reviews, synthesis, and template-backed Word exports are Production-live; Wave 25 is exact and the combined export is signed-in smoke-proved."
 canonical: false
 cataloged: 2026-07-03
 last_verified: 2026-09-03
@@ -75,7 +75,7 @@ restored exactly while the new synthesis and audit remained.
 
 **Current export decision (owner-confirmed 2026-09-02):** the Reviews-tab UI
 continues to offer only **Word (.docx)**. The approved formatting pass is
-`[SOURCE-BUILT, NOT DEPLOYED]`: the button calls a guarded server route that
+`[PRODUCTION-LIVE + SIGNED-IN EXPORT PROVED 2026-09-03]`: the button calls a guarded server route that
 rereads authoritative Dataverse data and renders a tracked combined template.
 The thank-you sweep uses a separate tracked individual-review template for its
 courtesy attachment. Neither output is filed to SharePoint in this phase. The
@@ -105,7 +105,7 @@ atomic Dataverse changeset — parent `wmkf_appreviewersuggestion`
 `answerValue`, `answerText` (= picklist option label at submit time), `answerHtml`
 [VERIFIED via `lib/external/build-review-submission.js`
 `buildReviewSubmission`].
-**[SCHEMA APPLIED; WRITER SOURCE-BUILT, NOT DEPLOYED]** Wave 25 adds the complete
+**[SCHEMA AND COMPATIBLE WRITER PRODUCTION-LIVE 2026-09-03]** Wave 25 adds the complete
 ordered categorical option set in `wmkf_questionoptions`. The owner-approved
 Production apply completed and independent readback was exact on 2026-09-03.
 Existing rows remain renderable with an explicit selected-only
@@ -278,8 +278,8 @@ monitoring in-flight (status/nudges). Owner confirmed scope = all four phases (S
   dedicated `piName` field; `proposalAuthors` (project leader/applicant)
   stands in as the best-available PI identity rather than extending the
   route.
-- **[SOURCE-BUILT and focused-test/visual-QA verified 2026-09-02; Wave 25
-  exact 2026-09-03; reviewed deployment still pending.]**
+- **[PRODUCTION-LIVE 2026-09-03; focused-test/visual-QA and signed-in export
+  verified; Wave 25 exact.]**
   The report model and Word renderer add a named `Reviewers` roster for the
   submitted-review population. Each row renders name plus accepted
   self-reported affiliation, falling back to the person affiliation and then
@@ -373,7 +373,7 @@ Required pre-build verification:
   queued/running/failed state. Early manual generation uses an explicit browser
   confirmation and sends `confirmEarly:true`. LLM output remains plain-text
   only (no `dangerouslySetInnerHTML`). **[VERIFIED via source and focused tests
-  2026-08-10; deployment pending.]** When submitted reviews exist, the card
+  2026-08-10; deployed with the review-DOCX release 2026-09-03.]** When submitted reviews exist, the card
   now renders their deterministic named affiliation roster above the anonymous
   synthesis values. A non-current synthesis carries an explicit warning that
   the roster is current while the synthesis may cover an earlier set.

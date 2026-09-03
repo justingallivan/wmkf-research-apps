@@ -1028,8 +1028,8 @@ stacked with attribution, rendered the same way the Cards view's
 text wins (documented in the module header) when the key isn't live; live text
 always wins when it is.
 
-**Phase 3 DEPLOYED BASE; TEMPLATE-BACKED FORMAT PASS SOURCE-BUILT, NOT DEPLOYED
-(2026-09-02):** panel-prep roll-up/export.
+**Phase 3 + TEMPLATE-BACKED FORMAT PASS PRODUCTION-LIVE; SIGNED-IN EXPORT
+PROVED (2026-09-03):** panel-prep roll-up/export.
 `shared/utils/review-report.js#composeReviewReport(...)` is a
 pure, DOM/React/Dataverse-free composition over a `deriveReviewMatrix` result
 (consumed, not re-derived) plus proposal identity — header, summary
@@ -1062,8 +1062,12 @@ SharePoint drive item → Microsoft Graph `content?format=pdf` workflow is
 `[PLANNED]`, not built; its permissions, temporary-file retention/cleanup, and
 tenant conversion behavior must be verified before implementation. The format
 pass uses Wave 25 `wmkf_questionoptions`, provisioned and read back exact in
-Production on 2026-09-03; the compatible code still awaits reviewed deployment. Full
-future contract: `docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md`.
+Production on 2026-09-03. The compatible code is live on `main` at `3101f067`
+in Ready deployment `dpl_AjT5FeDh5wkdeFSoZWJsVDM5oBqs`. Signed-in Request
+`1002903` generated a valid 60,586-byte DOCX titled **Aggregated Proposal
+Reviews**; focused route logs showed 2xx dependencies and the bounded error scan
+was empty. The courtesy-email path was not transport-smoked. Full future
+contract: `docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md`.
 
 **Phase 4 BUILT (2026-07-03); reliability production-proven 2026-07-28:**
 Executor-based AI synthesis of a proposal's submitted reviews. New Tier-1

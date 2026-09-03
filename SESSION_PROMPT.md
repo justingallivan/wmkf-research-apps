@@ -2,15 +2,15 @@
 
 ## Current Outcome
 
-The owner approved the recommended review-DOCX design. A complete implementation
-is source-built on branch `codex/review-docx-templates`; it is not merged,
-deployed, or production-enabled.
+The owner approved the recommended review-DOCX design. The complete implementation
+is Production-live on `main` at `3101f067` in Ready deployment
+`dpl_AjT5FeDh5wkdeFSoZWJsVDM5oBqs`.
 
-- [VERIFIED via source and focused tests] The Review Manager's existing combined
+- [VERIFIED via source, focused tests, and signed-in Production export] The Review Manager's existing combined
   Word export now calls a guarded server route, rereads the proposal and submitted
   reviews from Dataverse, and renders the approved combined template. The browser
   supplies only a validated proposal GUID.
-- [VERIFIED via source and rendered-page inspection] The thank-you sweep renders
+- [VERIFIED via deployed source, focused tests, and rendered-page inspection] The thank-you sweep renders
   the submitted review through the approved individual template and attaches it
   when generation succeeds. Per-review render failure remains nonfatal to the
   thank-you send and is reported separately.
@@ -27,19 +27,21 @@ deployed, or production-enabled.
 
 ## Release Boundary
 
-The Wave 25 schema-first gate is cleared in Production. The source branch is
-still not merged or deployed. As of 2026-09-03 it is five commits ahead and
-zero behind `origin/main`; the expanded review workflow suite passed 306/306,
-all relevant structural gates and self-tests passed, TypeScript passed, lint
-reported 0 errors/76 existing warnings, and the production build passed with
-both templates present in the export and thank-you route traces.
+The release is complete. Wave 25 is exact in Production, the six reviewed commits
+were fast-forwarded to `main`, and deployment
+`dpl_AjT5FeDh5wkdeFSoZWJsVDM5oBqs` reached Ready at 2026-09-03 09:07 PDT.
+The pre-release evidence remains: 306/306 affected-workflow tests, all relevant
+structural gates and self-tests, TypeScript, lint with 0 errors/76 existing
+warnings, a production build, and both template bundle traces.
 
-Remaining release sequence:
-
-1. Obtain explicit owner approval before merging or pushing to `main`, which
-   auto-deploys Production.
-2. After deployment reaches Ready, run signed-in read/export verification. Do not manufacture
-   or alter a submitted review merely to prove the new snapshot writer.
+[VERIFIED via signed-in Production Workbench export] Request `1002903` exposed
+the Word action for its submitted review and generated a valid 60,586-byte DOCX
+named `reviews-1002903-20260903.docx`. ZIP integrity passed and the package title
+and header read **Aggregated Proposal Reviews**. Focused Vercel logs recorded
+three export requests with successful 2xx Dataverse dependencies; the bounded
+post-deploy error-level scan returned no logs. No review data was altered and no
+thank-you email was sent during verification, so the courtesy-send path remains
+deployed/source/test/render verified rather than transport-smoked in Production.
 
 ## Implementation Surfaces
 
