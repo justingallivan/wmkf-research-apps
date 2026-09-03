@@ -159,7 +159,13 @@ manifest found 23 eligible rows plus one invalid snapshot on owner-confirmed tes
 Request `1003223`. The replacement schema-v2 manifest records that exact test
 exclusion and is clean with zero blockers and zero existing generated items; no
 SharePoint file or Dataverse pointer write occurred. Reviewing the manifest and
-selecting one exact write smoke is the next ordered gate. Final Writeup persona
+selecting one exact write smoke was completed with a fresh request-scoped dry
+run for Request `1002874` / Agnes Karasik. Its validated schema-v2 manifest has
+one eligible missing file, zero blockers, and hash
+`8cc5c7821fa515828a2426cde6e800de131a4ab826c240881a97001899e41711`; a
+metadata-only Production read confirmed the request, suggestion, and reviewer
+identity. No write occurred. Separate explicit approval to execute that exact
+manifest is the next ordered gate. Final Writeup persona
 access proof and deliberate enablement remain preserved immediately afterward.
 As of 2026-08-31, the ordinary-staff
 dashboard/focused-review foundation is Production-deployed

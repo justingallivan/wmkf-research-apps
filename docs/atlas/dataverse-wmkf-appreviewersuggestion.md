@@ -155,7 +155,13 @@ incorporated. The first read-only Production manifest found 23 eligible rows and
 one invalid snapshot on owner-confirmed test Request `1003223`. The replacement
 schema-v2 manifest retains that row visibly as a hash-bound, non-writing
 `excluded_test_request` and reports zero blockers. Write execution remains
-unrun. The scheduled route remains inert,
+unrun. The owner selected Request `1002874` / Agnes Karasik for the one-file
+proof; its fresh request-scoped schema-v2 manifest validates with one eligible
+missing file, zero blockers, no existing item, and the exact Workbench request
+GUID. A separate metadata-only Production read confirmed the sole suggestion's
+reviewer identity. The manifest hash is
+`8cc5c7821fa515828a2426cde6e800de131a4ab826c240881a97001899e41711`;
+execution still requires separate explicit approval. The scheduled route remains inert,
 including no maintenance row, while
 `REVIEW_DOCX_SHAREPOINT_WRITE` is unset. Both rollout variables were confirmed
 absent in Production; an authenticated flag-off route probe returned

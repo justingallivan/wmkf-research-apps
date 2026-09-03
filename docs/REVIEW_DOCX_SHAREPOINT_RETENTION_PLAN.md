@@ -25,13 +25,16 @@ related:
 ## Decision and status
 
 **Status: WAVES 1–2 ARE PRODUCTION-DEPLOYED ON `main` AT `83da197f`; WAVE 3 IS
-SOURCE-BUILT, ADVERSARIALLY REVIEWED, AND CLEAN READ-ONLY MANIFEST READY; WAVES 4–5 REMAIN PLANNED. Ready
+SOURCE-BUILT, ADVERSARIALLY REVIEWED, AND ONE-FILE READ-ONLY MANIFEST READY;
+WAVES 4–5 REMAIN PLANNED. Ready
 deployment `dpl_F3oZ9MDbnyFox7S8Ekdos7423ece` contains the filing service and
 dedicated cron, but both rollout variables are absent and the route is
 Production-proved inert. A clean 24-row Production read-only manifest was
 created on 2026-09-03 with 23 eligible reviews and one visible owner-confirmed
-test exclusion; no SharePoint or Dataverse mutation has been authorized or
-performed.**
+test exclusion. The owner selected Request `1002874` / Agnes Karasik for the
+one-file proof; its fresh scoped manifest validates with one eligible missing
+file and zero blockers. No SharePoint or Dataverse mutation has been authorized
+or performed.**
 
 The recommended design is to generate and retain one individual DOCX for every
 structured review, using the same approved individual template as the thank-you
@@ -64,7 +67,7 @@ probes on 2026-09-03:
 | D26 currently has 24 received reviews and 228 answer rows. All 24 are selected, have at least one rich-text answer row, have exact receipt/answer identity parity, and have zero complete or partial SharePoint pointers. This proves current eligibility shape, not merely row-count parity. | Existing structured writers | Production Dataverse | Proposed backfill | Updated `DATAVERSE_ALLOW_PROD_READS=yes node scripts/probe-review-blank-slate.mjs` | **VERIFIED AS OF 2026-09-03; RECHECK BEFORE EXECUTION** |
 | Rendering identical semantic input twice does not produce byte-identical ZIP packages, while the governed Word-part hash is stable. | Current renderer | Generated DOCX package | Retry/conflict logic | Local two-render experiment: raw SHA-256 differed; governed hash matched | **VERIFIED** |
 | The thank-you attachment now uses one shared individual-review builder with caller-owned generation time. | `reviewer-thankyou-sweep.js` | Existing answer snapshot + transient DOCX bytes | Thank-you attachment; filing service | Focused builder/thank-you/hash tests, rendered-page inspection, and Ready Production deployment | **PRODUCTION-LIVE AT `83da197f`; TRANSPORT BEHAVIOR UNCHANGED** |
-| Automatically retaining future individual DOCX files and backfilling D26 is live. | Dedicated filing service/cron is deployed but disabled; the adversarially reviewed backfill produced a clean schema-v2 Production read-only manifest | Local redacted manifest; no SharePoint/Dataverse write | Existing pointer consumers | Ready deployment plus authenticated flag-off route and maintenance-table before/after probe; Wave 3 source/tests/review; D26 dry run | **PRODUCTION-DEPLOYED INERT; CLEAN MANIFEST 23 ELIGIBLE / 1 VISIBLE TEST EXCLUSION / 0 BLOCKERS; WRITES OPEN** |
+| Automatic retention and D26 write execution are activated and Production-proved. | Dedicated filing service/cron is deployed but disabled; the adversarially reviewed backfill produced clean full-cycle and request-scoped schema-v2 Production read-only manifests | Local redacted manifests; no SharePoint/Dataverse write | Existing pointer consumers | Ready deployment plus authenticated flag-off route and maintenance-table before/after probe; Wave 3 source/tests/review; D26 dry runs | **NOT YET: PRODUCTION-DEPLOYED INERT; REQUEST 1002874 ONE-FILE MANIFEST READY; WRITES OPEN** |
 
 ### Sweep boundary
 
@@ -137,7 +140,15 @@ dry run then created a redacted 24-row manifest: 23 eligible and one
 schema-v2 manifest records that exact request as a hash-bound, non-writing
 `excluded_test_request`; unmatched exclusions block rather than disappearing
 silently. The clean manifest has zero blockers. Every write remains separately
-owner-gated.
+owner-gated. The owner then selected Request `1002874` / Agnes Karasik. The
+fresh request-scoped dry run created
+`outputs/review-docx-backfill/review-docx-D26-2026-09-03T21-53-38-014Z.json`
+with hash `8cc5c7821fa515828a2426cde6e800de131a4ab826c240881a97001899e41711`.
+The manifest validator reported zero anomalies, one eligible missing file, zero
+blockers, no existing item, and the exact Workbench request GUID. A separate
+metadata-only Production read tied its sole suggestion to Agnes Karasik. No
+write flag, Production-write acknowledgement, `--execute`, SharePoint mutation,
+or Dataverse pointer write was used.
 
 ## Product contract
 
@@ -655,8 +666,8 @@ mutation.
 
 ### Wave 3 — D26 dry run and one-file proof
 
-**Status: CLEAN PRODUCTION READ-ONLY MANIFEST CREATED; AWAITING MANIFEST REVIEW
-AND SEPARATE ONE-WRITE APPROVAL.**
+**Status: REQUEST 1002874 ONE-FILE PRODUCTION READ-ONLY MANIFEST VALIDATED;
+AWAITING SEPARATE ONE-WRITE APPROVAL.**
 
 - [x] Build the dry-run-first backfill script using the same ensure service.
 - [x] Complete the read-only adversarial review and incorporate its accepted
@@ -667,7 +678,8 @@ AND SEPARATE ONE-WRITE APPROVAL.**
 - [x] Record that exact test request as an explicit hash-bound exclusion and
   produce a clean schema-v2 manifest: 23 eligible, one test exclusion, zero
   blockers, and zero existing generated items.
-- Review the clean manifest and select one exact eligible smoke target.
+- [x] Select Request `1002874` / Agnes Karasik and validate a fresh scoped
+  one-row manifest with zero blockers and no existing item.
 - Stop for explicit approval of one exact write target.
 - Execute and verify one review end to end.
 
@@ -712,17 +724,20 @@ Stop before writes or further rollout if any of the following appears:
 Sweep mode: Mode B domain truth audit plus Mode A Wave 3 dry-run reconciliation
 Domain: structured individual review DOCX generation and SharePoint retention
 Claims: Waves 1–2 implementation and flag-off Production deployment VERIFIED;
-  Wave 3 backfill SOURCE/FOCUSED-TEST/ADVERSARIAL-REVIEW VERIFIED and clean
-  Production read-only schema-v2 manifest VERIFIED; execution, activation, and
-  Production write behavior UNPROVED
+  Wave 3 backfill SOURCE/FOCUSED-TEST/ADVERSARIAL-REVIEW VERIFIED, clean
+  Production read-only schema-v2 full-cycle manifest VERIFIED, and exact
+  Request 1002874 one-file manifest/identity VERIFIED; execution, activation,
+  and Production write behavior UNPROVED
 Durable restatements: current no-upload statements remain accurate historical/current baseline
-Structural fix: reconciled plan/catalog/Atlas/runbook/handoff to the Ready inert
-  release while preserving the separate activation and write-proof gates
+Structural fix: reconciled plan/queue/strategy/Atlas/runbook/wiki/memory/handoff
+  to the exact scoped-manifest checkpoint while preserving the separate
+  activation and write-proof gates
 Semantic omissions found: operator-confirmed test data needed an explicit,
   reviewable, hash-bound exclusion contract rather than relaxed validation or a
-  silent population filter
+  silent population filter; the wiki lacked the separate inert retention path,
+  and the evidence-matrix claim incorrectly phrased disabled retention as live
 Remaining live STALE: 0 within this plan's stated scope
 Remaining UNKNOWN/ASSUMED: all Production write behavior remains unproved
-Verdict: WAVES 1–2 PRODUCTION-DEPLOYED INERT; WAVE 3 CLEAN MANIFEST READY;
-  ALL WRITES REMAIN GATED
+Verdict: WAVES 1–2 PRODUCTION-DEPLOYED INERT; WAVE 3 REQUEST 1002874 MANIFEST
+  READY; ALL WRITES REMAIN GATED
 ```

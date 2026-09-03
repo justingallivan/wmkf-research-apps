@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-09-02
+last_verified: 2026-09-03
 stale_after_days: 90
 owner: reviewers
 source_files:
@@ -30,7 +30,11 @@ source_files:
   - shared/utils/review-report.js
   - shared/utils/review-report-docx.js
   - lib/services/review-documents/docx-renderer.js
+  - lib/services/review-documents/individual-file-service.js
+  - lib/services/review-documents/backfill-service.js
   - lib/services/reviewer-thankyou-sweep.js
+  - pages/api/cron/file-review-docx.js
+  - scripts/backfill-review-docx-sharepoint.mjs
   - lib/services/review-manager/export-reviews-service.js
   - pages/api/review-manager/export-reviews.js
   - lib/services/graph-service.js
@@ -1077,6 +1081,24 @@ in Ready deployment `dpl_AjT5FeDh5wkdeFSoZWJsVDM5oBqs`. Signed-in Request
 Reviews**; focused route logs showed 2xx dependencies and the bounded error scan
 was empty. The courtesy-email path was not transport-smoked. Full future
 contract: `docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md`.
+
+**Individual-review SharePoint retention (Waves 1–2 Production-deployed inert;
+Wave 3 one-file manifest ready, 2026-09-03):** the separate dedicated
+`/api/cron/file-review-docx` path can render a structured review through the
+same individual builder, create-only upload it beneath
+`Reviewer_Uploads/Generated/<suggestion-guid>/`, and ETag-conditionally commit
+the existing suggestion folder/filename pointers. It is not part of submission
+or thank-you transport. Both Production rollout variables remain absent, so the
+route is inert and the write path is not Production-proved. The guarded local
+backfill produced a clean full-cycle D26 schema-v2 manifest with 23 eligible
+rows plus one visible owner-confirmed test exclusion. The owner selected Request
+`1002874` / Agnes Karasik for the one-file proof; a fresh request-scoped manifest
+validated with one eligible missing file, zero blockers, no existing item, and
+hash `8cc5c7821fa515828a2426cde6e800de131a4ab826c240881a97001899e41711`.
+A metadata-only Production read confirmed the exact request, suggestion, and
+reviewer identity. No SharePoint or Dataverse write occurred; executing that
+exact manifest still requires separate explicit owner approval. Active
+contract: `docs/REVIEW_DOCX_SHAREPOINT_RETENTION_PLAN.md`.
 
 **Phase 4 BUILT (2026-07-03); reliability production-proven 2026-07-28:**
 Executor-based AI synthesis of a proposal's submitted reviews. New Tier-1

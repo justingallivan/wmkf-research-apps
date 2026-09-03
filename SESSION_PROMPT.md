@@ -117,8 +117,17 @@ hash-bound `--exclude-test-request 1003223` contract and created clean schema-v2
 manifest `outputs/review-docx-backfill/review-docx-D26-2026-09-03T21-35-11-024Z.json`:
 23 eligible, one visible `excluded_test_request`, zero blockers, and zero
 existing generated items. No SharePoint or Dataverse mutation occurred. The
-next gate is review of that manifest and separate explicit approval for one
-exact write target.
+owner then selected Request `1002874` for the one-file proof. A fresh scoped
+read-only run created validated schema-v2 manifest
+`outputs/review-docx-backfill/review-docx-D26-2026-09-03T21-53-38-014Z.json`
+with hash `8cc5c7821fa515828a2426cde6e800de131a4ab826c240881a97001899e41711`:
+one eligible missing file, zero blockers, zero existing item, and exact request
+GUID `e2639251-9644-f111-88b4-000d3a306d0c`. A separate metadata-only
+Production read confirmed suggestion `1a0fb28f-0f9b-f111-b8db-6045bd008868`
+belongs to Agnes Karasik. No write flag, acknowledgement, `--execute`,
+SharePoint mutation, or Dataverse pointer write was used. The next gate is
+separate explicit approval to execute this exact manifest, followed by full
+Graph/Dataverse/Workbench verification.
 
 ## Parked
 

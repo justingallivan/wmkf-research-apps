@@ -83,5 +83,11 @@ one `invalid_snapshot` on owner-confirmed test Request `1003223`. The replacemen
 schema-v2 manifest records that exact request as a hash-bound
 `excluded_test_request` and is clean: 23 eligible, one visible test exclusion,
 zero blockers, and zero existing generated items. No Graph or Dataverse mutation
-occurred. Describe Wave 2 as Production-deployed inert and Wave 3 as clean-
-manifest ready, write-unexecuted, and not activated.
+occurred. The owner selected Request `1002874` / Agnes Karasik for the one-file
+proof. Its fresh request-scoped manifest validates with one eligible missing
+file, zero blockers, no existing item, and hash
+`8cc5c7821fa515828a2426cde6e800de131a4ab826c240881a97001899e41711`; a
+metadata-only Production read confirmed the exact request/suggestion/reviewer
+identity. No write flag, acknowledgement, `--execute`, Graph mutation, or
+Dataverse pointer write was used. Describe Wave 2 as Production-deployed inert
+and Wave 3 as one-file-manifest ready, write-unexecuted, and not activated.
