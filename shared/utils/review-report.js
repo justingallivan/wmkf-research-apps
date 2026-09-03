@@ -371,7 +371,12 @@ export function composeReviewReport({
           label: c.state === 'answered'
             ? (c.answerText || (Number.isFinite(c.answerValue) ? String(c.answerValue) : null))
             : null,
+          value: Number.isFinite(c.answerValue) ? c.answerValue : null,
+          options: Array.isArray(c.questionOptions) ? c.questionOptions : null,
+          optionsUnreadable: c.questionOptionsUnreadable === true,
         })),
+        optionCatalog: Array.isArray(q.optionCatalog) ? q.optionCatalog : [],
+        optionSnapshotCoverage: q.optionSnapshotCoverage || null,
       }
       : q.type === 'multiselect'
       ? {
@@ -385,8 +390,13 @@ export function composeReviewReport({
           reviewerName: reviewerName.get(c.suggestionId) ?? null,
           state: c.state,
           unreadable: c.answerValuesUnreadable === true,
+          values: Array.isArray(c.answerValues) ? c.answerValues : [],
           labels: Array.isArray(c.answerValues) ? c.answerValues.map((pair) => pair.label) : [],
+          options: Array.isArray(c.questionOptions) ? c.questionOptions : null,
+          optionsUnreadable: c.questionOptionsUnreadable === true,
         })),
+        optionCatalog: Array.isArray(q.optionCatalog) ? q.optionCatalog : [],
+        optionSnapshotCoverage: q.optionSnapshotCoverage || null,
       }
       : {
         type: 'richtext',
@@ -443,22 +453,29 @@ export function composeReviewReport({
  *
  * @param {Object} params
  * @param {string|null} [params.reviewerName]
+ * @param {string|null} [params.reviewerTitleAndOrganization]
  * @param {string|null} [params.requestNumber]
  * @param {string|null} [params.requestTitle]
+ * @param {string|null} [params.institution]
+ * @param {string|null} [params.submittedAt]
  * @param {string} params.generatedAtIso - caller-supplied (keeps this pure).
  * @param {Array<{questionText:string, questionType:string, answerHtml:string,
  *   answerText:string, answerValue:(number|null)}>} params.answers
  * @returns {{
- *   header: {reviewerName:(string|null), requestNumber:(string|null),
- *     requestTitle:(string|null), generatedAtIso:string},
+ *   header: {reviewerName:(string|null), reviewerTitleAndOrganization:(string|null),
+ *     requestNumber:(string|null), requestTitle:(string|null), institution:(string|null),
+ *     submittedAt:(string|null), generatedAtIso:string},
  *   sections: Array<{questionText:string, questionType:string,
  *     state:('answered'|'empty'), answerLabel:(string|null), blocks:Array}>,
  * }}
  */
 export function composeSingleReviewCopy({
   reviewerName = null,
+  reviewerTitleAndOrganization = null,
   requestNumber = null,
   requestTitle = null,
+  institution = null,
+  submittedAt = null,
   generatedAtIso,
   answers = [],
 }) {
@@ -469,6 +486,8 @@ export function composeSingleReviewCopy({
     if (isRichtext) {
       const blocks = htmlToBlocks(a.answerHtml);
       return {
+        questionKey: a.questionKey || null,
+        questionOrder: Number.isFinite(a.questionOrder) ? a.questionOrder : null,
         questionText: a.questionText || '',
         questionType: 'richtext',
         state: blocks.length > 0 ? 'answered' : 'empty',
@@ -479,11 +498,21 @@ export function composeSingleReviewCopy({
     const label = (a.answerText && a.answerText.trim().length > 0)
       ? a.answerText
       : (Number.isFinite(a.answerValue) ? String(a.answerValue) : null);
+    const hasMultiselectAnswer = a.questionType === 'multiselect'
+      && (a.answerValuesUnreadable === true
+        || (Array.isArray(a.answerValues) && a.answerValues.length > 0));
     return {
+      questionKey: a.questionKey || null,
+      questionOrder: Number.isFinite(a.questionOrder) ? a.questionOrder : null,
       questionText: a.questionText || '',
       questionType: a.questionType || 'picklist',
-      state: label != null ? 'answered' : 'empty',
+      state: label != null || hasMultiselectAnswer ? 'answered' : 'empty',
       answerLabel: label,
+      answerValue: Number.isFinite(a.answerValue) ? a.answerValue : null,
+      answerValues: Array.isArray(a.answerValues) ? a.answerValues : null,
+      answerValuesUnreadable: a.answerValuesUnreadable === true,
+      questionOptions: Array.isArray(a.questionOptions) ? a.questionOptions : null,
+      questionOptionsUnreadable: a.questionOptionsUnreadable === true,
       blocks: [],
     };
   });
@@ -491,8 +520,11 @@ export function composeSingleReviewCopy({
   return {
     header: {
       reviewerName,
+      reviewerTitleAndOrganization,
       requestNumber,
       requestTitle,
+      institution,
+      submittedAt,
       generatedAtIso,
     },
     sections,

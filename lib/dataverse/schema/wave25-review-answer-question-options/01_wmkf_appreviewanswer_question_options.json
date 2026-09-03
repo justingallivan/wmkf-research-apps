@@ -1,0 +1,15 @@
+{
+  "name": "wmkf_appreviewanswer-question-options",
+  "kind": "extensions-on-existing",
+  "entityLogicalName": "wmkf_appreviewanswer",
+  "_comment": "Additive point-in-time snapshot of the complete option list presented for categorical review questions. This makes each submitted review self-contained for exact later rendering even after the live question set changes.",
+  "attributes": [
+    {
+      "type": "Memo",
+      "schemaName": "wmkf_QuestionOptions",
+      "displayName": "Question Options",
+      "description": "Canonical ordered JSON array of every {value,label} option presented for picklist and multiselect questions at submission time. Null for richtext and string answers. Independent of the selected answer fields.",
+      "maxLength": 20000
+    }
+  ]
+}

@@ -22,6 +22,7 @@ jest.mock('../../lib/services/maintenance-service', () => ({
 }));
 
 import handler from '../../pages/api/cron/send-review-thankyous';
+import MaintenanceService from '../../lib/services/maintenance-service';
 
 function mockRes() {
   const res = { statusCode: 200, headers: {}, body: null };
@@ -69,4 +70,18 @@ test('runs the sweep with a valid bearer secret and returns its result', async (
   expect(res.statusCode).toBe(200);
   expect(sweepReviewThankYous).toHaveBeenCalledWith({ maxBatch: 50, dryRun: true });
   expect(res.body.ok).toBe(true);
+});
+
+test('records attachment or configuration failures as a failed maintenance run', async () => {
+  sweepReviewThankYous.mockResolvedValue({
+    scanned: 1, eligible: 1, sent: 1, skipped: 0, skippedMisconfigured: 0,
+    claimFailed: 0, sendFailed: 0, attachmentFailed: 1,
+    errors: [{ id: 's1', message: 'attachment failed' }], dryRun: false,
+  });
+  const res = mockRes();
+  await handler({ method: 'GET', query: {}, headers: { authorization: 'Bearer topsecret' } }, res);
+  expect(MaintenanceService.completeRun).toHaveBeenCalledWith('run-1', expect.objectContaining({
+    status: 'failed',
+    errorMessage: expect.stringContaining('1 attachment'),
+  }));
 });

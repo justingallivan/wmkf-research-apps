@@ -136,13 +136,15 @@ index and workflow surface, not a second editor or document store.
 The ordered agenda is maintained in `docs/CURRENT_WORK_QUEUE.md`. Final Writeup
 infrastructure is complete through the bounded ordinary-staff dashboard and
 versioned persona-configuration foundation described below. On 2026-09-02, the
-owner selected submitted-review DOCX export to SharePoint as the immediate next
-session task. That work is **planned, not built**: generate one staff-readable
-derivative per authoritative submitted Dataverse review, store it under the
-request's existing SharePoint document root, and preserve server-side write
-authorization, durable identity, idempotent retry, and truthful per-review
-partial-failure handling. Final Writeup persona access proof and deliberate
-enablement remains immediately afterward. As of 2026-08-31, the ordinary-staff
+owner refined the submitted-review DOCX task after confirming the existing
+export is a combined document: **[SOURCE-BUILT, NOT DEPLOYED]** the combined
+download now uses a server-authoritative tracked template, while the thank-you
+sweep uses a separate individual-review template for its courtesy attachment.
+This phase does not upload review outputs to SharePoint. New categorical rows
+snapshot every presented option so future regeneration is faithful; Production
+Wave 25 is still absent and must be applied/read back before code deployment.
+Final Writeup persona access proof and deliberate enablement remains immediately
+after that schema-first release. As of 2026-08-31, the ordinary-staff
 dashboard/focused-review foundation is Production-deployed
 through PR #140 (`ce229778`) with bounded reads and external-Word actions. Its
 separate acknowledgement readiness value is exact `on` in Production. The
@@ -154,8 +156,7 @@ assigned and its six requested Global privileges are effective for all 11
 confirmed audience members. The colleague's post-role retry succeeded, appeared
 in review history, and independent Production readback proved exactly one
 complete acknowledgement row. Program-audience configuration is now
-Production-live; persona-specific work is next after the submitted-review DOCX
-export task.
+Production-live; persona-specific work is next after the review-DOCX release.
 Every edit/review action opens the canonical SharePoint Word document in its
 own browser window/tab (or desktop Word through Microsoft's supported option);
 the application will not embed or recreate Word editing.

@@ -43,7 +43,7 @@ describe('answerRowUrl', () => {
 });
 
 describe('answerRowBody', () => {
-  it('maps the row to the seven snapshot columns', () => {
+  it('maps the row to the eight snapshot columns', () => {
     expect(answerRowBody({
       questionOrder: 1, questionText: 'Q', questionType: 'picklist',
       answerHtml: null, answerText: 'Will rewrite textbooks', answerValue: 4,
@@ -55,6 +55,7 @@ describe('answerRowBody', () => {
       wmkf_answertext: 'Will rewrite textbooks',
       wmkf_answervalue: 4,
       wmkf_answervalues: null,
+      wmkf_questionoptions: null,
     });
   });
 });
@@ -73,6 +74,7 @@ describe('buildRatingSnapshotRows', () => {
       questionKey: 'riskLevel', questionOrder: 4, questionType: 'picklist',
       answerHtml: null, answerValue: 2, answerText: 'Medium risk (parts may succeed, others may fail)',
       answerValues: null,
+      questionOptions: reviewFormSchema.fields.find((field) => field.key === 'riskLevel').options,
     });
     expect(byKey.overallAssessment).toMatchObject({ answerValue: 5, answerText: 'Excellent', questionOrder: 10 });
     // affiliation is a string field, never a snapshot row
@@ -121,6 +123,7 @@ describe('buildMultiselectSnapshotRows', () => {
           { value: 1, label: 'Provide enabling tools to the community' },
           { value: 4, label: 'Revise textbooks' },
         ],
+        questionOptions: reviewFormSchema.fields.find((field) => field.key === 'impactAreas').options,
       }),
     ]);
   });

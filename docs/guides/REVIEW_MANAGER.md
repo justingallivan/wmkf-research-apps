@@ -1,6 +1,6 @@
 # Review Manager Guide
 
-> **Note (updated 2026-09-01):** Reviewer email sends go directly through Dynamics CRM and appear as activities on the request. Reviewers use a secure magic link to read materials and complete the structured review form. The current staff workflow deliberately separates materials release, reviewer reminders, and automated thank-yous rather than presenting one generic email composer.
+> **Note (updated 2026-09-02):** Reviewer email sends go directly through Dynamics CRM and appear as activities on the request. Reviewers use a secure magic link to read materials and complete the structured review form. The current staff workflow deliberately separates materials release, reviewer reminders, automated thank-yous, and the combined staff export rather than presenting one generic action.
 
 Manage the peer review lifecycle from sending materials through collecting completed reviews.
 
@@ -13,6 +13,7 @@ The Review Manager picks up where the Reviewer Finder leaves off. Once reviewers
 3. **Send reminders** to reviewers who haven't responded
 4. **Confirm automated thank-yous** after reviews are submitted
 5. **Enter a review manually** when a reviewer cannot use the portal
+6. **Export submitted reviews** as one combined Word document
 
 ## Getting Started
 
@@ -52,6 +53,14 @@ Track Reviewers and Reviews expose only the actions valid for the row's current 
 ## Sending Thank-You Emails
 
 Thank-yous are sent by the daily fire-once sweep after `Review Received`. There is no separate batch **Send Thanks** action in Track Reviewers. The thank-you includes a courtesy Word copy of the review when that attachment can be produced.
+
+## Exporting Submitted Reviews
+
+When at least one review has been submitted, use **Export Word** on the Reviews
+tab to download one combined, template-formatted document. The server rereads
+the proposal and submitted reviews from Dataverse before rendering; the browser
+does not supply the document content. The export is a download and is not filed
+to SharePoint in the current release.
 
 ## Entering a Review Manually
 

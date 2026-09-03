@@ -25,15 +25,21 @@ describe('composeSingleReviewCopy', () => {
   test('header carries reviewer + request identity', () => {
     const copy = composeSingleReviewCopy({
       reviewerName: 'Dr. Reviewer',
+      reviewerTitleAndOrganization: null,
       requestNumber: 'R-1',
       requestTitle: 'A Proposal',
+      institution: null,
+      submittedAt: null,
       generatedAtIso: GEN,
       answers: [],
     });
     expect(copy.header).toEqual({
       reviewerName: 'Dr. Reviewer',
+      reviewerTitleAndOrganization: null,
       requestNumber: 'R-1',
       requestTitle: 'A Proposal',
+      institution: null,
+      submittedAt: null,
       generatedAtIso: GEN,
     });
     expect(copy.sections).toEqual([]);

@@ -3,10 +3,10 @@ title: "Workbench Reviews Tab — Consumption Build-Out Plan"
 domain: reviewer-workbench
 kind: plan
 status: active
-summary: "Reviews and synthesis are production-proven; the current Reviews-tab export is Word-only, with Graph-backed PDF conversion deferred."
+summary: "Reviews and synthesis are production-proven; a template-backed server-authoritative Word export is source-built behind a Wave 25 schema-first gate, with PDF deferred."
 canonical: false
 cataloged: 2026-07-03
-last_verified: 2026-09-01
+last_verified: 2026-09-02
 owner: product-engineering
 related:
   - docs/audits/AUDIT_REQUEST_WORKBENCH_TRUTH_2026-07-26.md
@@ -73,14 +73,14 @@ through PR #92 (`ab1d2943`), and reached a Ready production deployment on
 the same day; the 11 synthetic answers and four staged parent fields were
 restored exactly while the new synthesis and audit remained.
 
-**Current export decision (owner-confirmed 2026-08-13):** the Reviews-tab UI
-offers only **Word (.docx)**. The earlier client-side PDF button was removed
-because its `pdf-lib` renderer flattened reviewer-authored rich-text formatting.
-Staff who need a PDF can download the Word document and convert it externally.
-The former PDF renderer remains in source and focused tests, but has no
-Reviews-tab UI consumer. A possible Microsoft Graph DOCX-to-PDF conversion is
-documented below as `[PLANNED]`; no route, conversion service, temporary-file
-workflow, or new permission is built by this decision.
+**Current export decision (owner-confirmed 2026-09-02):** the Reviews-tab UI
+continues to offer only **Word (.docx)**. The approved formatting pass is
+`[SOURCE-BUILT, NOT DEPLOYED]`: the button calls a guarded server route that
+rereads authoritative Dataverse data and renders a tracked combined template.
+The thank-you sweep uses a separate tracked individual-review template for its
+courtesy attachment. Neither output is filed to SharePoint in this phase. The
+earlier PDF button remains removed; possible Microsoft Graph DOCX-to-PDF
+conversion is still `[PLANNED]`.
 
 ## Context
 
@@ -105,6 +105,11 @@ atomic Dataverse changeset — parent `wmkf_appreviewersuggestion`
 `answerValue`, `answerText` (= picklist option label at submit time), `answerHtml`
 [VERIFIED via `lib/external/build-review-submission.js`
 `buildReviewSubmission`].
+**[SOURCE-BUILT, NOT DEPLOYED]** Wave 25 additionally stores the complete ordered
+categorical option set in `wmkf_questionoptions`. Production preflight on
+2026-09-02 reported the field absent, so schema application/readback must precede
+deployment. Existing rows remain renderable with an explicit selected-only
+fallback; current question definitions are never relabeled as historical state.
 
 At the S326 starting point, the staff-facing consumption side was a read-only
 card list. That gap is now closed: `ReviewsTab` includes Outstanding tracking,
@@ -133,12 +138,13 @@ monitoring in-flight (status/nudges). Owner confirmed scope = all four phases (S
 3. **Question-set drift across reviewers** (same proposal): matrix takes the union
    of question keys; averages/spread compute per key only across reviewers who
    answered it; unasked renders as "not asked", distinct from missing.
-4. **Current export renders Word client-side; content stays in Dataverse for
-   Power Automate.** File generation reuses the existing client-side `.docx`
-   package [VERIFIED via `shared/utils/review-report-docx.js`]. The historical
-   `pdf-lib` renderer remains available as a source module, but the Reviews tab
-   no longer imports or exposes it [VERIFIED via `ReviewsTab.ExportMenu`,
-   2026-08-13]. No server export route exists.
+4. **Current export is a server-authoritative Word download; content remains in
+   Dataverse.** The browser sends only the proposal GUID to guarded GET
+   `/api/review-manager/export-reviews`; the service rereads the proposal,
+   submitted reviews, answers, and synthesis before composing and rendering the
+   tracked combined template. The historical generic DOCX and `pdf-lib` renderers
+   remain source modules, but the Reviews tab imports neither. No SharePoint
+   storage, roll-up column, or browser-authored report DTO is part of this phase.
    The Power Automate option is preserved by DATA, not by a server route: raw
    answers are already in Dataverse, and Phase 4 synthesis persists to an
    `akoya_request` output column via the Executor
@@ -146,7 +152,7 @@ monitoring in-flight (status/nudges). Owner confirmed scope = all four phases (S
    preflight guards, and `persistOutputs`]. Phase 3's report composition must
    be a PURE shared module (no DOM/browser APIs) so a server route or
    Dataverse-persisted roll-up can wrap it later. Do NOT build a roll-up column or
-   server export route until a PA flow exists to consume it (owner decision, S326).
+   separate Dataverse roll-up column until a PA flow exists to consume it.
 5. **Reminder nudges reuse the existing sweep machinery.** Review-due reminder
    code is implemented via `sweepReviewDueReminders`; the Vercel schedule is
    paused as of 2026-09-01
@@ -250,16 +256,18 @@ monitoring in-flight (status/nudges). Owner confirmed scope = all four phases (S
   retained legacy PDF renderer; an
   unknown/malformed tag degrades to plain text rather than throwing or
   dropping content.
-- `shared/utils/review-report-docx.js` (dynamic `import('docx')`) preserves
-  bold/italic/subscript/superscript runs, lists, headings, blockquotes, and line breaks. Link runs
-  receive Word's `Hyperlink` style, but the current renderer does not embed the
-  actual href as an external hyperlink relationship. The retained
-  `shared/utils/review-report-pdf.js` flattens rich-text runs to plain text and
-  is not exposed by the current Reviews-tab UI.
+- `lib/services/review-documents/docx-renderer.js` preserves the approved Word
+  package shell and injects escaped report content at one required marker. It
+  retains headers, footer, section geometry, categorical checkbox tables, lists,
+  headings, blockquotes, line breaks, and supported inline styles. The separate
+  tracked individual and combined templates live in `shared/templates/reviews/`.
+  The retained generic DOCX and PDF renderers are not exposed by the current UI.
 - "Export: Word (.docx)" affordance on `ReviewsTab`'s submitted-reviews
-  toolbar (visible once ≥1 review is submitted); composes client-side from
-  already-loaded `submitted`/`liveQuestions` — no new fetch, no new route, no
-  Dataverse roll-up column. Filename: `reviews-<requestNumber>-<yyyymmdd>.docx`.
+  toolbar (visible once ≥1 review is submitted) fetches
+  `/api/review-manager/export-reviews?proposalId=<guid>`. The server calls the
+  existing reviewers service with the session email, filters to authoritative
+  submitted rows, and returns private/no-store DOCX bytes. Filename remains
+  server-owned. No Dataverse roll-up column or SharePoint write is introduced.
 - Proposal identity on the export uses whatever `proposals[0]` already
   carries on the `/api/review-manager/reviewers` DTO — `requestNumber`,
   `proposalTitle`, `proposalInstitution`, `proposalAuthors`
@@ -268,7 +276,8 @@ monitoring in-flight (status/nudges). Owner confirmed scope = all four phases (S
   dedicated `piName` field; `proposalAuthors` (project leader/applicant)
   stands in as the best-available PI identity rather than extending the
   route.
-- **[VERIFIED via source and focused tests 2026-08-10; deployment pending.]**
+- **[SOURCE-BUILT and focused-test/visual-QA verified 2026-09-02; deployment
+  blocked on Wave 25.]**
   The report model and Word renderer add a named `Reviewers` roster for the
   submitted-review population. Each row renders name plus accepted
   self-reported affiliation, falling back to the person affiliation and then
@@ -291,9 +300,10 @@ probe. The current `GraphService.downloadFile` retrieves original bytes only.
 
 Proposed contract:
 
-1. Move the staff report's canonical DOCX production behind a guarded server
-   service that reads request/review data authoritatively and returns a Buffer.
-   Do not trust a browser-supplied report DTO as the source of review content.
+1. **Completed locally for Word export.** The staff report's canonical DOCX is
+   behind a guarded server service that reads request/review data authoritatively
+   and returns a Buffer. A future PDF route must reuse that service and must not
+   trust a browser-supplied report DTO.
 2. Upload that DOCX as a uniquely named temporary drive item in the request's
    governed SharePoint location (exact folder/retention policy still requires an
    owner decision).
@@ -416,8 +426,8 @@ Required pre-build verification:
 
 ## Verification per phase
 
-Relevant red gates before completion claims: `check:api-routes`(+self-test) and
-`check:route-lifecycle-auth`(+self-test) for any new route; `check:atlas`
-(+self-test) for the new Postgres surface; unit tests for the DTO extension,
-matrix derivation (drift/retired/not-asked cases), composition module, and nudge
-dedupe; E2E drive of the tab for each shipped phase.
+Relevant red gates before completion claims: schema preflight/readback before
+code deployment; `check:api-routes`(+self-test), trust/route/DAL boundary gates,
+`check:atlas`(+self-test), fact consistency, focused renderer/service/route and
+answer-snapshot tests, DOCX render inspection, traced-template bundle inspection,
+and a production build. Signed-in export verification follows deployment.

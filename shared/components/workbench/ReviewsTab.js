@@ -19,19 +19,14 @@
  * route's `liveQuestions` (the live admin-panel question set, or null on a
  * fetch failure). "Cards" stays byte-identical to the pre-Phase-2 rendering.
  *
- * Phase 3 (panel-prep export) adds a Word export affordance to the submitted-
- * reviews toolbar via `composeReviewReport` +
- * `shared/utils/review-report-docx.js`, composed client-side from the same
- * already-loaded `submitted`/`liveQuestions` data — no new fetch, no new
- * route, no Dataverse roll-up column (governing decision 4 in the plan doc).
+ * The panel-prep Word export is regenerated server-side from authoritative
+ * Dataverse answer snapshots; the browser only requests and downloads it.
  */
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Card } from '../Layout';
 import { labelForReviewRating, reviewRatingShortLabels } from '../../../lib/external/review-form-schema';
 import { deriveReviewMatrix } from '../../utils/review-matrix';
-import { composeReviewReport } from '../../utils/review-report';
-import { generateReviewReportDocx } from '../../utils/review-report-docx';
 import ManualReviewEntryForm from './ManualReviewEntryForm';
 import { isTerminalReviewStatus } from '../../config/reviewerStatus';
 
@@ -327,47 +322,27 @@ function CompareNarrativeBrowser({ matrix }) {
 // proposalAuthors/proposalInstitution) — there is no dedicated `piName`
 // field, so `proposalAuthors` (project leader/applicant) is used as the best
 // available PI identity.
-function pad2(n) {
-  return String(n).padStart(2, '0');
-}
-
-function yyyymmdd(date) {
-  return `${date.getFullYear()}${pad2(date.getMonth() + 1)}${pad2(date.getDate())}`;
-}
-
-function ExportMenu({ proposal, submitted, liveQuestions }) {
+function ExportMenu({ proposal }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
-  const synthesisCurrent = proposal?.reviewSynthesisState?.current ?? null;
-
-  const buildReport = useCallback(() => {
-    const matrix = deriveReviewMatrix(submitted, liveQuestions);
-    return composeReviewReport({
-      requestNumber: proposal?.requestNumber ?? null,
-      requestTitle: proposal?.proposalTitle ?? null,
-      piName: proposal?.proposalAuthors ?? null,
-      institution: proposal?.proposalInstitution ?? null,
-      matrix,
-      generatedAtIso: new Date().toISOString(),
-      // Phase 4: include the stored AI synthesis when present (additive —
-      // omitting it keeps the export byte-identical to the Phase 3 shape).
-      synthesis: proposal?.reviewSynthesis ?? null,
-      synthesisCurrent,
-    });
-  }, [proposal, submitted, liveQuestions, synthesisCurrent]);
-
-  const filenameBase = `reviews-${proposal?.requestNumber || proposal?.proposalId || 'export'}-${yyyymmdd(new Date())}`;
+  const proposalId = proposal?.proposalId || '';
 
   const handleWordExport = useCallback(async () => {
     setBusy(true);
     setError(null);
     try {
-      const report = buildReport();
-      const blob = await generateReviewReportDocx(report);
+      const response = await fetch(`/api/review-manager/export-reviews?proposalId=${encodeURIComponent(proposalId)}`);
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.error || `Failed to export reviews (${response.status})`);
+      }
+      const blob = await response.blob();
+      const disposition = response.headers.get('Content-Disposition') || '';
+      const filenameMatch = disposition.match(/filename="([^"]+)"/i);
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `${filenameBase}.docx`;
+      link.download = filenameMatch?.[1] || 'reviews.docx';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -377,7 +352,7 @@ function ExportMenu({ proposal, submitted, liveQuestions }) {
     } finally {
       setBusy(false);
     }
-  }, [buildReport, filenameBase]);
+  }, [proposalId]);
 
   return (
     <div className="flex items-center gap-2">
@@ -915,7 +890,7 @@ export default function ReviewsTab({ requestId, previewReadOnly = false }) {
               {submitted.length} of {acceptedCount} accepted reviewer{acceptedCount === 1 ? '' : 's'} submitted a review.
             </p>
             <div className="flex flex-wrap items-center gap-3">
-              <ExportMenu proposal={proposal} submitted={submitted} liveQuestions={liveQuestions} />
+              <ExportMenu proposal={proposal} />
               <div className="inline-flex rounded-lg border border-gray-300 overflow-hidden text-xs">
                 <button
                   type="button"

@@ -128,6 +128,8 @@ export function deriveReviewMatrix(reviewers, liveQuestions) {
           answerValue: null,
           answerValues: null,
           answerValuesUnreadable: false,
+          questionOptions: null,
+          questionOptionsUnreadable: false,
         };
       }
       const hasText = typeof row.answerText === 'string' && row.answerText.trim().length > 0;
@@ -145,6 +147,8 @@ export function deriveReviewMatrix(reviewers, liveQuestions) {
         answerValue: row.answerValue ?? null,
         answerValues: Array.isArray(row.answerValues) ? row.answerValues : null,
         answerValuesUnreadable: row.answerValuesUnreadable === true,
+        questionOptions: Array.isArray(row.questionOptions) ? row.questionOptions : null,
+        questionOptionsUnreadable: row.questionOptionsUnreadable === true,
       };
     });
 
@@ -195,6 +199,35 @@ export function deriveReviewMatrix(reviewers, liveQuestions) {
         (cell) => !cell.answerValuesUnreadable && Array.isArray(cell.answerValues),
       ).length;
       question.totalReviewers = reviewerList.length;
+    }
+
+    if (type === 'picklist' || type === 'multiselect') {
+      const catalog = new Map();
+      let exactCount = 0;
+      for (const cell of cells) {
+        if (Array.isArray(cell.questionOptions)) {
+          exactCount += 1;
+          for (const option of cell.questionOptions) {
+            catalog.set(`${option.value}\u0000${option.label}`, option);
+          }
+        }
+        if (type === 'multiselect' && Array.isArray(cell.answerValues)) {
+          for (const option of cell.answerValues) {
+            catalog.set(`${option.value}\u0000${option.label}`, option);
+          }
+        } else if (type === 'picklist' && Number.isFinite(cell.answerValue) && cell.answerText) {
+          const option = { value: cell.answerValue, label: cell.answerText };
+          catalog.set(`${option.value}\u0000${option.label}`, option);
+        }
+      }
+      question.optionCatalog = [...catalog.values()].sort(
+        (a, b) => (a.value - b.value) || a.label.localeCompare(b.label),
+      );
+      question.optionSnapshotCoverage = {
+        exactCount,
+        totalReviewers: reviewerList.length,
+        complete: reviewerList.length > 0 && exactCount === reviewerList.length,
+      };
     }
 
     return question;

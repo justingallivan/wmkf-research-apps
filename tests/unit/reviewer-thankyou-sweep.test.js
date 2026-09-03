@@ -28,9 +28,11 @@ const fetchAnswersBySuggestion = jest.fn();
 jest.mock('../../lib/services/review-answers', () => ({
   fetchAnswersBySuggestion: (...a) => fetchAnswersBySuggestion(...a),
 }));
-const generateSingleReviewCopyDocx = jest.fn();
-jest.mock('../../shared/utils/review-report-docx', () => ({
-  generateSingleReviewCopyDocx: (...a) => generateSingleReviewCopyDocx(...a),
+const preflightReviewDocxTemplates = jest.fn();
+const renderIndividualReviewDocx = jest.fn();
+jest.mock('../../lib/services/review-documents/docx-renderer', () => ({
+  preflightReviewDocxTemplates: (...a) => preflightReviewDocxTemplates(...a),
+  renderIndividualReviewDocx: (...a) => renderIndividualReviewDocx(...a),
 }));
 jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
   notExcludedFilter: () => 'wmkf_applicantdisposition ne 100000001',
@@ -75,6 +77,7 @@ function candidate(over = {}) {
     wmkf_appreviewersuggestionid: SUG,
     _wmkf_potentialreviewer_value: PERSON,
     _wmkf_request_value: REQ,
+    wmkf_reviewreceivedat: '2026-08-20T12:00:00.000Z',
     _etag: 'W/"100"',
     ...over,
   };
@@ -93,7 +96,8 @@ beforeEach(() => {
       { questionKey: 'q2', questionOrder: 2, questionText: 'Comments', questionType: 'richtext', answerHtml: '<p>Strong work</p>', answerText: '', answerValue: null },
     ],
   });
-  generateSingleReviewCopyDocx.mockResolvedValue(Buffer.from('docx-bytes'));
+  preflightReviewDocxTemplates.mockResolvedValue(undefined);
+  renderIndividualReviewDocx.mockResolvedValue(Buffer.from('docx-bytes'));
   createAndSendEmail.mockResolvedValue({ emailId: 'e-1' });
   updateRecord.mockResolvedValue(undefined);
 });
@@ -171,13 +175,24 @@ describe('sweepReviewThankYous', () => {
   test('attachment compose failure → sends WITHOUT attachment, counts attachmentFailed', async () => {
     queryAllRecords.mockResolvedValue({ records: [candidate()] });
     installReads();
-    generateSingleReviewCopyDocx.mockRejectedValueOnce(new Error('docx boom'));
+    renderIndividualReviewDocx.mockRejectedValueOnce(new Error('docx boom'));
     const r = await sweepReviewThankYous();
     expect(r.sent).toBe(1);
     expect(r.attachmentFailed).toBe(1);
     expect(updateRecord).toHaveBeenCalledTimes(1); // claim still landed
     const email = createAndSendEmail.mock.calls[0][0];
     expect(email.attachments).toEqual([]); // plain thank-you, no courtesy copy
+  });
+
+  test('template preflight failure skips every row before any claim', async () => {
+    queryAllRecords.mockResolvedValue({ records: [candidate()] });
+    installReads();
+    preflightReviewDocxTemplates.mockRejectedValueOnce(new Error('marker missing'));
+    const r = await sweepReviewThankYous();
+    expect(r.skippedMisconfigured).toBe(1);
+    expect(r.errors[0].message).toMatch(/template misconfigured/);
+    expect(updateRecord).not.toHaveBeenCalled();
+    expect(createAndSendEmail).not.toHaveBeenCalled();
   });
 
   test('email defaults misconfigured → skip all before claim, no send', async () => {

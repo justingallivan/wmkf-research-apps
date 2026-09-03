@@ -19,8 +19,9 @@
  *   wmkf_appreviewanswers(_wmkf_appreviewersuggestion_value=<id>,wmkf_questionkey='<key>')
  * — the same upsert the live writers use (S302-verified). A row already present
  * (external-submit reviews) is left untouched; a re-run is a no-op. Rows are
- * built by the SAME buildRatingSnapshotRows() helper the writers use, so a
- * backfilled row is byte-identical to a freshly-written one.
+ * built by the SAME buildRatingSnapshotRows() helper the writers use. Because
+ * the historical option set cannot be reconstructed safely, this script
+ * explicitly leaves the later-added question-options snapshot null.
  *
  * The "informal feedback" rows (mark-received with no ratings) have null parent
  * columns, are excluded by the filter, and correctly get NO snapshot rows.
@@ -34,6 +35,9 @@
  * stored answerText), so this is display-faithful; only a since-edited option
  * label would make a backfilled row's stored answerText differ from the label in
  * force at the original submit (historical-export nuance only, value is exact).
+ * Full categorical option sets remain unknown and must not be inferred from the
+ * current question set; regenerated historical DOCX files use selected-only
+ * fallback rendering for these rows.
  */
 
 import { createRequire } from 'module';
@@ -101,7 +105,12 @@ async function main() {
 
     // Build the full set of rating rows this suggestion SHOULD have from its
     // parent columns, then subtract the rows already in the snapshot.
-    const wanted = buildRatingSnapshotRows(s, questionSet);
+    const wanted = buildRatingSnapshotRows(s, questionSet).map((row) => ({
+      ...row,
+      // Historical submissions predate the option snapshot. Never mislabel
+      // today's option set as the one presented when the review was submitted.
+      questionOptions: null,
+    }));
     if (wanted.length === 0) continue; // defensive (filter guarantees ≥1)
 
     const { records: existing } = await bypassDynamicsRestrictions('backfill-rating-snapshot', () =>

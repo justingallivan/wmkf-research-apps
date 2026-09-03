@@ -25,7 +25,7 @@ const SID_B = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
 const ANSWER_SELECT =
   'wmkf_appreviewanswerid,wmkf_questionkey,wmkf_questionorder,wmkf_questiontext,' +
   'wmkf_questiontype,wmkf_answerhtml,wmkf_answertext,wmkf_answervalue,' +
-  'wmkf_answervalues,_wmkf_appreviewersuggestion_value';
+  'wmkf_answervalues,wmkf_questionoptions,_wmkf_appreviewersuggestion_value';
 
 // ─────────────────────── adapter: fetchAnswersBySuggestion ───────────────────────
 
@@ -70,6 +70,8 @@ describe('review-answer.fetchAnswersBySuggestion (mirror of review-answers.js)',
         answerValue: 3,
         answerValues: null,
         answerValuesUnreadable: false,
+        questionOptions: null,
+        questionOptionsUnreadable: false,
       },
     ]);
   });
@@ -86,6 +88,11 @@ describe('review-answer.fetchAnswersBySuggestion (mirror of review-answers.js)',
           wmkf_answertext: 'One; Three',
           wmkf_answervalues: JSON.stringify([
             { value: 1, label: 'One' },
+            { value: 3, label: 'Three' },
+          ]),
+          wmkf_questionoptions: JSON.stringify([
+            { value: 1, label: 'One' },
+            { value: 2, label: 'Two' },
             { value: 3, label: 'Three' },
           ]),
         },
@@ -111,12 +118,52 @@ describe('review-answer.fetchAnswersBySuggestion (mirror of review-answers.js)',
       ],
       answerValuesUnreadable: false,
       answerText: 'One; Three',
+      questionOptions: [
+        { value: 1, label: 'One' },
+        { value: 2, label: 'Two' },
+        { value: 3, label: 'Three' },
+      ],
+      questionOptionsUnreadable: false,
     });
     expect(out[SID_A][1]).toMatchObject({
       answerId: 'answer-bad',
       answerValues: null,
       answerValuesUnreadable: true,
       answerText: 'Unreadable answer',
+    });
+  });
+
+  test('distinguishes legacy missing option snapshots from malformed non-null JSON', async () => {
+    jest.spyOn(DynamicsService, 'queryAllRecords').mockResolvedValue({
+      records: [
+        {
+          _wmkf_appreviewersuggestion_value: SID_A,
+          wmkf_questionkey: 'legacy',
+          wmkf_questiontype: 'picklist',
+          wmkf_answertext: 'Selected only',
+          wmkf_answervalue: 1,
+          wmkf_questionoptions: null,
+        },
+        {
+          _wmkf_appreviewersuggestion_value: SID_A,
+          wmkf_questionkey: 'corrupt',
+          wmkf_questiontype: 'picklist',
+          wmkf_answertext: 'Selected only',
+          wmkf_answervalue: 2,
+          wmkf_questionoptions: '{bad json',
+        },
+      ],
+      capped: false,
+    });
+
+    const out = await reviewAnswer.fetchAnswersBySuggestion([SID_A]);
+    expect(out[SID_A][0]).toMatchObject({
+      questionOptions: null,
+      questionOptionsUnreadable: false,
+    });
+    expect(out[SID_A][1]).toMatchObject({
+      questionOptions: null,
+      questionOptionsUnreadable: true,
     });
   });
 
@@ -285,6 +332,7 @@ describe('review-answer alt-key upsert URL/body (mirror of review-answer-snapsho
       wmkf_answertext: 'High',
       wmkf_answervalue: 3,
       wmkf_answervalues: null,
+      wmkf_questionoptions: null,
     });
   });
 
@@ -306,6 +354,7 @@ describe('review-answer alt-key upsert URL/body (mirror of review-answer-snapsho
         wmkf_answertext: 'Low',
         wmkf_answervalue: 1,
         wmkf_answervalues: null,
+        wmkf_questionoptions: null,
       },
     });
   });
@@ -411,8 +460,8 @@ describe('changeset atomic parent+answers (covers the external-review submit flo
     expect(exec).toHaveBeenCalledTimes(1);
     expect(exec.mock.calls[0][1]).toEqual({ actingUserSystemId: 'user-1' });
     expect(exec.mock.calls[0][0]).toEqual([
-      { method: 'PATCH', url: `wmkf_appreviewanswers(_wmkf_appreviewersuggestion_value=${SID_A},wmkf_questionkey='riskLevel')`, body: { wmkf_questionorder: 4, wmkf_questiontext: 'Risk', wmkf_questiontype: 'picklist', wmkf_answerhtml: null, wmkf_answertext: 'High', wmkf_answervalue: 3, wmkf_answervalues: null } },
-      { method: 'PATCH', url: `wmkf_appreviewanswers(_wmkf_appreviewersuggestion_value=${SID_A},wmkf_questionkey='overallAssessment')`, body: { wmkf_questionorder: 10, wmkf_questiontext: 'Overall', wmkf_questiontype: 'picklist', wmkf_answerhtml: null, wmkf_answertext: 'Poor', wmkf_answervalue: 1, wmkf_answervalues: null } },
+      { method: 'PATCH', url: `wmkf_appreviewanswers(_wmkf_appreviewersuggestion_value=${SID_A},wmkf_questionkey='riskLevel')`, body: { wmkf_questionorder: 4, wmkf_questiontext: 'Risk', wmkf_questiontype: 'picklist', wmkf_answerhtml: null, wmkf_answertext: 'High', wmkf_answervalue: 3, wmkf_answervalues: null, wmkf_questionoptions: null } },
+      { method: 'PATCH', url: `wmkf_appreviewanswers(_wmkf_appreviewersuggestion_value=${SID_A},wmkf_questionkey='overallAssessment')`, body: { wmkf_questionorder: 10, wmkf_questiontext: 'Overall', wmkf_questiontype: 'picklist', wmkf_answerhtml: null, wmkf_answertext: 'Poor', wmkf_answervalue: 1, wmkf_answervalues: null, wmkf_questionoptions: null } },
       { method: 'PATCH', url: `wmkf_appreviewersuggestions(${SID_A})`, body: parentPatch, ifMatch: 'W/"9"' },
     ]);
   });

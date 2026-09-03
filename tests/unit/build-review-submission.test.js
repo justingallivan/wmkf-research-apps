@@ -144,6 +144,7 @@ describe('buildReviewSubmission', () => {
       ],
       answerText: 'Provide enabling tools to the community; Revise textbooks',
       answerHtml: null,
+      questionOptions: reviewFormSchema.fields.find((field) => field.key === 'impactAreas').options,
     });
   });
 
@@ -153,12 +154,14 @@ describe('buildReviewSubmission', () => {
       answerValue: 2,
       answerText: 'Medium risk (parts may succeed, others may fail)',
       answerValues: null,
+      questionOptions: reviewFormSchema.fields.find((field) => field.key === 'riskLevel').options,
     });
     expect(answerRows.find((row) => row.questionKey === 'foreseenImpacts')).toMatchObject({
       answerHtml: '<p>Significant impact on the field.</p>',
       answerText: 'Significant impact on the field.',
       answerValue: null,
       answerValues: null,
+      questionOptions: null,
     });
   });
 

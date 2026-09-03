@@ -35,8 +35,8 @@ sequence.
 | Order | Work | Current boundary | Completion decision |
 | --- | --- | --- | --- |
 | 1 | Final Writeup acknowledgement infrastructure and dashboard data foundation | **[FOUNDATION COMPLETE 2026-08-31.]** Slice 1 is Production-proved. Wave 23 is exact/Active, and Production acknowledgement readiness is exact `on` in Ready deployment `dpl_B9k3AprnYp5ExpkqpT3dUxCUZqWo` (Preview remains unset). The signed-in ordinary-staff dashboard and Request `1002788` Final tab loaded, retained the external Word action, and correctly omitted responsible-PD self-review. After the dedicated reviewer role became effective for all 11 audience members, an eligible colleague successfully marked the Final reviewed and saw it in review history; independent readback proved exactly one complete acknowledgement row. No PC/leadership persona or broader supporting-material projection is inferred. | **Met:** acknowledgement persistence and the superuser-testable dashboard data path are in place with exact identity/version keys, focused tests, and one successful cross-user Production acknowledgement/readback. |
-| 2 | Export submitted reviews as DOCX files to SharePoint | **[OWNER-SELECTED NEXT TASK 2026-09-02; PLANNED, NOT BUILT.]** Add an explicit authenticated request-level action that renders every currently submitted review from its immutable Dataverse question/answer snapshot and writes one derivative DOCX per review under the request's existing SharePoint document root. Dataverse remains authoritative; the exported files are staff-readable derivatives. Reuse the existing server-resolved lead-PD-or-superuser write boundary, `GraphService.ensureFolderPath`/`uploadFile`, and established DOCX renderer patterns. The implementation must settle the smallest durable identity registry before coding, use server-owned folder/filename rules, make an unchanged rerun idempotent, version only changed submitted content, and report per-review partial success without rolling back successful uploads. | **Next gate:** run `/contract-reconcile`; trace submitted-review producer → Dataverse snapshot → staff reader → SharePoint writer; then write a reviewed implementation plan that fixes folder, document content, durable identity/fingerprint, authorization, retry/concurrency, and partial-failure contracts before schema or runtime changes. Completion requires focused renderer/service/route tests, applicable gates/build, Preview read-only verification, and an explicitly authorized controlled SharePoint write smoke. |
-| 3 | Final Writeup persona rollout and complete dashboards | **[PRODUCTION-LIVE V2 / PERSONAS DISABLED 2026-09-01 UTC.]** Commit `84bf465b` is live in Ready deployment `dpl_41SybgPYfJXGarf7UqcMGCLMy4KS`, establishing the reviewed v2-capable floor. The dry-run-first operator command then upgraded `final_writeup.matrix_audiences` once under ETag `W/"96930393"`; exact readback proved version 2 at `W/"96944113"`, all 11 complete explicit assignments including Beth Pruitt's PD + Leadership overlap, zero stale/unassigned rows, and unchanged nine-person Research and six-person Southern California audiences. Signed-in Admin reloaded as **Published revision loaded**, and Request `1002788` retained the expected nine-column Research matrix. The superseded team source is removed and persona lenses remain hard-disabled. | **Following gate:** after the submitted-review export task, prove representative PC and Leadership Word access, then deliberately enable and smoke-test PD, PC, Leadership, overlap, unassigned/ineligible, and superuser behavior. No elevated team privilege, outside Dataverse administrator, or runtime inference from names, titles, email, or program labels is required. |
+| 2 | Release template-backed review DOCX outputs | **[SOURCE-BUILT, NOT DEPLOYED 2026-09-02.]** The approved scope keeps the combined Reviews-tab action as an on-demand download and makes the individual review a template-backed courtesy attachment; this phase performs no SharePoint upload. The guarded combined-export route rereads Dataverse authoritatively. New categorical answer rows preserve the complete submitted option set in planned Wave 25 `wmkf_questionoptions`; historical rows use an explicit selected-only fallback. Production read-only preflight reports the field absent. | **Next gate:** obtain explicit owner approval for the scoped Production Wave 25 apply, read back exact metadata/selectability, then rebase, rerun gates/build, review/merge, and perform signed-in export verification. Code must not deploy before schema. |
+| 3 | Final Writeup persona rollout and complete dashboards | **[PRODUCTION-LIVE V2 / PERSONAS DISABLED 2026-09-01 UTC.]** Commit `84bf465b` is live in Ready deployment `dpl_41SybgPYfJXGarf7UqcMGCLMy4KS`, establishing the reviewed v2-capable floor. The dry-run-first operator command then upgraded `final_writeup.matrix_audiences` once under ETag `W/"96930393"`; exact readback proved version 2 at `W/"96944113"`, all 11 complete explicit assignments including Beth Pruitt's PD + Leadership overlap, zero stale/unassigned rows, and unchanged nine-person Research and six-person Southern California audiences. Signed-in Admin reloaded as **Published revision loaded**, and Request `1002788` retained the expected nine-column Research matrix. The superseded team source is removed and persona lenses remain hard-disabled. | **Following gate:** after the review-DOCX schema-first release, prove representative PC and Leadership Word access, then deliberately enable and smoke-test PD, PC, Leadership, overlap, unassigned/ineligible, and superuser behavior. No elevated team privilege, outside Dataverse administrator, or runtime inference from names, titles, email, or program labels is required. |
 
 ## Audit follow-ups — verified open, not silently prioritized
 - **Public/onboarding reviewer-token documentation reconciliation.**
@@ -159,6 +159,13 @@ sequence.
 
 ## Completed in this execution
 
+- Review DOCX template implementation: **[SOURCE-BUILT, NOT DEPLOYED
+  2026-09-02]** approved individual/combined templates, strict OOXML renderer,
+  server-authoritative combined export route, thank-you courtesy attachment,
+  and full categorical option snapshots are implemented with focused tests and
+  rendered-page QA. Production Wave 25 remains unapplied and is the release
+  blocker; no SharePoint review-export workflow was built.
+
 - Reviewer Follow-up organization-wide cycle visibility and server authorization:
   **[PRODUCTION-LIVE + AUTHENTICATED READ PROOF 2026-09-02]** Runtime merge
   `acf40fb85a36ab2d481869c706a069abea52c087` ships the shared lifecycle
@@ -172,9 +179,10 @@ sequence.
   44 active + 184 set aside) and J26 My 0 → All 5 without exercising a write.
   Release deployment `dpl_7ToPKYtpXhyW3WmPmn1WiY9wz2iv` reached Ready; rollback
   target is `dpl_3SJebjL3tPTdv89o5dVzR1dBS3Y2` (`39413e3d`). The owner then
-  selected submitted-review DOCX export to SharePoint as queue order 2; Final
-  Writeup persona access proof and rollout remains preserved immediately after
-  it as order 3.
+  selected review-DOCX work as queue order 2; the later scope refinement keeps
+  the combined output as a download and the individual output as a thank-you
+  attachment, with no SharePoint upload in this phase. Final Writeup persona
+  access proof and rollout remains preserved immediately after it as order 3.
 
 - Final Writeup acknowledgement Wave 23: **[PRODUCTION-PROVED 2026-08-31]**
   schema-as-code defines the

@@ -80,6 +80,13 @@ const nextConfig = {
     'domelementtype',
     'entities',
   ],
+  // Both review DOCX endpoints load approved binary templates from disk at
+  // runtime. Include them explicitly because the filenames are resolved by the
+  // shared renderer rather than through a static JavaScript import.
+  outputFileTracingIncludes: {
+    '/api/review-manager/export-reviews': ['./shared/templates/reviews/*.docx'],
+    '/api/cron/send-review-thankyous': ['./shared/templates/reviews/*.docx'],
+  },
   async redirects() {
     return [
       // Legacy production host page navigations move to the canonical branded host.
