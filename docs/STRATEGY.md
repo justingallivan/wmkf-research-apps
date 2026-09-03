@@ -167,12 +167,16 @@ metadata-only Production read confirmed the request, suggestion, and reviewer
 identity. The owner separately approved that exact manifest. The backfill
 created one 69,761-byte version-1.0 SharePoint DOCX, committed the exact
 Dataverse pointer pair, and independent download/hash readback matched the
-reviewed semantic hash. The signed-in Workbench displayed Agnes Karasik's exact
-download link; Chrome automation blocked the attempted navigation client-side,
-so browser-transfer confirmation remains available. A fresh clean manifest now
+reviewed semantic hash. The owner confirmed Agnes Karasik's Workbench download
+succeeds and the downloaded document looks correct, but opening the retained
+file through akoyaGO/Word for the web split the tab-positioned first-page title.
+The branch now directly right-aligns both review-template titles without tabs;
+focused tests and rendered inspection pass, but the fix is not deployed and the
+existing retained item is unchanged. Replacement manifest hash
+`35bfdcd9cdfee7b8ce229c2039b0164ba21e1f800b7b36cbbbe95ed649b79af0`
 contains 22 eligible missing files plus the same visible test exclusion and no
-Request `1002874` candidate. Separate approval of that remaining Wave 4 set is
-the next ordered write gate. Final Writeup persona
+Request `1002874` candidate. Template-fix promotion and an explicit exact-item
+repair decision now precede approval of the remaining Wave 4 set. Final Writeup persona
 access proof and deliberate enablement remain preserved immediately afterward.
 As of 2026-08-31, the ordinary-staff
 dashboard/focused-review foundation is Production-deployed

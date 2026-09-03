@@ -55,6 +55,8 @@ deployed/source/test/render verified rather than transport-smoked in Production.
 - `lib/services/review-documents/docx-renderer.js`
 - `shared/templates/reviews/individual-review-v1.docx`
 - `shared/templates/reviews/combined-review-v1.docx`
+- `shared/templates/reviews/individual-review-v2.docx`
+- `shared/templates/reviews/combined-review-v2.docx`
 - `lib/services/review-manager/export-reviews-service.js`
 - `pages/api/review-manager/export-reviews.js`
 - `lib/services/reviewer-thankyou-sweep.js`
@@ -135,14 +137,21 @@ pointer fields. Independent readback classified the row `already_filed` and
 proved downloaded semantic hash
 `gdc1:O7QmzK_dojK9xwRvpFNXObuKCbKddrRpSc25P3gj5-A` equals the reviewed hash.
 The signed-in Production Workbench exposes the exact Agnes Karasik download
-link. Chrome automation blocked the attempted link navigation with
-`ERR_BLOCKED_BY_CLIENT`, so a browser-completed transfer remains owner-
-confirmable even though independent Graph download/hash passed. A fresh
-cycle-wide read-only manifest
-`outputs/review-docx-backfill/review-docx-D26-2026-09-03T22-06-27-808Z.json`
-has hash `11fa767360417c723a2b229b97a48700b1ecd5b1fe5142198e08c832366de3c0`,
+link, and the owner confirmed the browser download succeeds and the downloaded
+document looks correct. Opening the retained item through akoyaGO/Word for the
+web exposed a first-page compatibility defect: the tab-positioned `Proposal
+Review` title split after its first character. The branch now preserves the
+Production-used v1 templates and selects new v2 templates that remove the two
+out-of-bounds positioning tabs and directly right-aligns both individual and
+combined first-page titles. Focused tests, structural package checks, and
+one-page renders for both templates pass; the fix is not deployed and the
+existing SharePoint item is unchanged. Because the governed hash covers the
+header part, the prior 22-row manifest is superseded. Fresh read-only manifest
+`outputs/review-docx-backfill/review-docx-D26-2026-09-03T22-33-03-942Z.json`
+has hash `35bfdcd9cdfee7b8ce229c2039b0164ba21e1f800b7b36cbbbe95ed649b79af0`,
 22 eligible missing files, one visible Request `1003223` test exclusion, zero
-blockers, and no Request `1002874` candidate. No additional write is approved.
+blockers, and no Request `1002874` candidate. No additional write or exact-item
+repair is approved.
 
 ## Parked
 

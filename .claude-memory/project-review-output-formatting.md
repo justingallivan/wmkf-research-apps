@@ -92,9 +92,15 @@ identity. The owner then explicitly approved that exact manifest. The operator
 backfill created SharePoint item `01G4GVMSZ3RAXEKILFYRCISR6CGKHFVCQI`
 (`Review-1002874.docx`, 69,761 bytes, version `1.0`) and committed the exact
 Dataverse pointer pair. Independent readback classified it `already_filed` and
-matched the reviewed governed hash. The signed-in Workbench displays the exact
-download link; Chrome automation blocked the attempted transfer client-side.
-The fresh post-write D26 manifest has 22 eligible missing files, one visible
-test exclusion, zero blockers, and no Request `1002874` candidate. Describe
-Wave 2 as Production-deployed inert, Wave 3 as one-file storage/pointer proved,
-and automatic filing as not activated.
+matched the reviewed governed hash. The owner confirmed the Workbench download
+succeeds and the downloaded file looks correct. Opening the retained item
+through akoyaGO/Word for the web exposed a tab-layout defect that split
+`Proposal Review` after its first character. The branch removes the positioning
+tabs and directly right-aligns both review-template titles; focused tests,
+package isolation checks, and rendered inspection pass. The fix is not deployed
+and the existing item is unchanged. The replacement post-change D26 manifest
+has hash `35bfdcd9cdfee7b8ce229c2039b0164ba21e1f800b7b36cbbbe95ed649b79af0`,
+22 eligible missing files, one visible test exclusion, zero blockers, and no
+Request `1002874` candidate. Describe Wave 2 as Production-deployed inert, Wave
+3 as storage/pointer proved with an open exact-item layout repair, and automatic
+filing as not activated.

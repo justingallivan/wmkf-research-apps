@@ -51,9 +51,12 @@ the job's maintenance-run population unchanged at zero. Under an exact
 owner-approved manifest, the local operator path regenerated Agnes Karasik's
 Request `1002874` document from this snapshot, created one immutable SharePoint
 item, and committed both suggestion pointers. Independent download/readback
-matched the reviewed governed hash. A fresh manifest excludes the completed
-row and reports 22 eligible missing files plus the same visible test exclusion.
-The scheduled path remains disabled and unproved.
+matched the reviewed governed hash. The owner later observed that the retained
+item's tab-positioned title breaks in Word for the web. The branch's no-tab
+template correction is source-tested and rendered but not deployed; the
+existing item is unchanged. A replacement manifest excludes the completed row
+and reports 22 eligible missing files plus the same visible test exclusion. The
+scheduled path remains disabled and unproved.
 
 ## Write Paths
 

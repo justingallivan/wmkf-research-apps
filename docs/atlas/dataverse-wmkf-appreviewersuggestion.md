@@ -165,11 +165,14 @@ the owner separately approved it, and execution created SharePoint item
 `01G4GVMSZ3RAXEKILFYRCISR6CGKHFVCQI` (`Review-1002874.docx`, 69,761 bytes,
 version `1.0`) before ETag-committing the exact folder/filename pair to this
 suggestion. Independent readback classified it `already_filed` and matched its
-downloaded governed hash to the reviewed generation. The signed-in Workbench
-showed the exact download link; Chrome automation blocked the attempted
-navigation client-side. A fresh post-write manifest contains 22 eligible
-missing rows plus the visible test exclusion, zero blockers, and no Request
-`1002874` candidate. The scheduled route remains inert,
+downloaded governed hash to the reviewed generation. The owner confirmed the
+Workbench download succeeds. Opening the retained item through akoyaGO/Word for
+the web exposed a tab-positioned title defect. The branch carries a
+source-tested/rendered no-tab correction, but the existing item and pointer pair
+remain unchanged pending an explicit repair decision. Replacement manifest hash
+`35bfdcd9cdfee7b8ce229c2039b0164ba21e1f800b7b36cbbbe95ed649b79af0`
+contains 22 eligible missing rows plus the visible test exclusion, zero
+blockers, and no Request `1002874` candidate. The scheduled route remains inert,
 including no maintenance row, while
 `REVIEW_DOCX_SHAREPOINT_WRITE` is unset. Both rollout variables were confirmed
 absent in Production; an authenticated flag-off route probe returned

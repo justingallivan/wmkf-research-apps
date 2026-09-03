@@ -1097,10 +1097,16 @@ exact manifest hash
 `8cc5c7821fa515828a2426cde6e800de131a4ab826c240881a97001899e41711`.
 Execution created one SharePoint DOCX and committed the exact suggestion
 pointers. Independent download/readback matched the governed hash, and the
-signed-in Workbench displayed `Download: Review-1002874.docx`; Chrome automation
-blocked the attempted navigation client-side. A fresh clean manifest now has 22
+owner confirmed `Download: Review-1002874.docx` succeeds and looks correct.
+Opening the retained item through akoyaGO/Word for the web exposed a tab-layout
+defect that split the first-page title. The branch removes those tabs and
+directly right-aligns both review-template titles; source tests and rendered
+inspection pass, but the fix is not deployed and the existing item is
+unchanged. Replacement manifest hash
+`35bfdcd9cdfee7b8ce229c2039b0164ba21e1f800b7b36cbbbe95ed649b79af0` has 22
 eligible missing files plus the same visible test exclusion and no completed
-Request `1002874` candidate. No additional write is approved. Active
+Request `1002874` candidate. No additional write or exact-item repair is
+approved. Active
 contract: `docs/REVIEW_DOCX_SHAREPOINT_RETENTION_PLAN.md`.
 
 **Phase 4 BUILT (2026-07-03); reliability production-proven 2026-07-28:**
