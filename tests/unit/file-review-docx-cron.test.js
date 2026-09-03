@@ -4,7 +4,10 @@ jest.mock('../../lib/dataverse/core/context', () => ({
   withDalContext: (_label, fn) => Promise.resolve().then(fn),
 }));
 const sweepMissingIndividualReviewFiles = jest.fn();
+const mockIsActionableReviewDocxStatus = jest.fn((status) => status === 'content_conflict');
 jest.mock('../../lib/services/review-documents/individual-file-service', () => ({
+  REVIEW_DOCX_WRITE_FLAG: 'REVIEW_DOCX_SHAREPOINT_WRITE',
+  isActionableReviewDocxStatus: (...args) => mockIsActionableReviewDocxStatus(...args),
   sweepMissingIndividualReviewFiles: (...args) => sweepMissingIndividualReviewFiles(...args),
 }));
 jest.mock('../../lib/services/maintenance-service', () => ({
@@ -29,7 +32,12 @@ function mockRes() {
 const OLD_ENV = process.env;
 beforeEach(() => {
   jest.clearAllMocks();
-  process.env = { ...OLD_ENV, NODE_ENV: 'production', CRON_SECRET: 'topsecret' };
+  process.env = {
+    ...OLD_ENV,
+    NODE_ENV: 'production',
+    CRON_SECRET: 'topsecret',
+    REVIEW_DOCX_SHAREPOINT_WRITE: 'on',
+  };
   sweepMissingIndividualReviewFiles.mockResolvedValue({
     status: 'completed', scanned: 0, attempted: 0, counts: {}, results: [],
   });
@@ -43,6 +51,17 @@ test('rejects requests without the cron bearer secret', async () => {
   expect(sweepMissingIndividualReviewFiles).not.toHaveBeenCalled();
 });
 
+test('returns disabled without writing a maintenance row when the rollout flag is off', async () => {
+  process.env.REVIEW_DOCX_SHAREPOINT_WRITE = '';
+  const res = mockRes();
+  await handler({ method: 'GET', query: {}, headers: { authorization: 'Bearer topsecret' } }, res);
+  expect(res.body).toEqual({
+    ok: true, enabled: false, status: 'disabled', scanCap: 50, attemptCap: 5,
+  });
+  expect(MaintenanceService.startRun).not.toHaveBeenCalled();
+  expect(sweepMissingIndividualReviewFiles).not.toHaveBeenCalled();
+});
+
 test('runs the bounded sweep inside the cron shell', async () => {
   const res = mockRes();
   await handler({
@@ -53,6 +72,7 @@ test('runs the bounded sweep inside the cron shell', async () => {
   expect(res.statusCode).toBe(200);
   expect(sweepMissingIndividualReviewFiles).toHaveBeenCalledWith({ scanCap: 70, attemptCap: 7 });
   expect(MaintenanceService.completeRun).toHaveBeenCalledWith('run-1', expect.objectContaining({ status: 'completed' }));
+  expect(MaintenanceService.completeRun.mock.calls[0][1]).not.toHaveProperty('recordsDeleted');
 });
 
 test('records actionable per-row results as a failed maintenance run', async () => {

@@ -6,7 +6,11 @@
 
 import { verifyCronSecret } from '../../../lib/utils/cron-auth';
 import { withDalContext } from '../../../lib/dataverse/core/context';
-import { sweepMissingIndividualReviewFiles } from '../../../lib/services/review-documents/individual-file-service';
+import {
+  isActionableReviewDocxStatus,
+  REVIEW_DOCX_WRITE_FLAG,
+  sweepMissingIndividualReviewFiles,
+} from '../../../lib/services/review-documents/individual-file-service';
 import MaintenanceService from '../../../lib/services/maintenance-service';
 
 function clampInt(raw, lo, hi, fallback) {
@@ -22,6 +26,9 @@ export default async function handler(req, res) {
 
   const scanCap = clampInt(req.query.scanCap, 1, 100, 50);
   const attemptCap = clampInt(req.query.attemptCap, 1, 20, 5);
+  if (process.env[REVIEW_DOCX_WRITE_FLAG] !== 'on') {
+    return res.json({ ok: true, enabled: false, status: 'disabled', scanCap, attemptCap });
+  }
   const runId = await MaintenanceService.startRun('file-review-docx');
 
   try {
@@ -29,25 +36,11 @@ export default async function handler(req, res) {
       sweepMissingIndividualReviewFiles({ scanCap, attemptCap }),
     );
     const failed = Object.entries(result.counts || {})
-      .filter(([status]) => [
-        'invalid_cycle',
-        'partial_pointer',
-        'invalid_snapshot',
-        'read_failed',
-        'generation_failed',
-        'content_conflict',
-        'pointer_conflict',
-        'sharepoint_failed',
-        'pointer_write_failed',
-        'verification_failed',
-        'cleanup_failed',
-        'target_guard_failed',
-      ].includes(status))
+      .filter(([status]) => isActionableReviewDocxStatus(status))
       .reduce((sum, [, count]) => sum + count, 0);
     await MaintenanceService.completeRun(runId, {
       status: failed > 0 || result.status === 'target_guard_failed' ? 'failed' : 'completed',
       recordsProcessed: result.scanned || 0,
-      recordsDeleted: result.counts?.created || 0,
       details: { scanCap, attemptCap, ...result },
       errorMessage: failed > 0 ? `${failed} review DOCX filing result(s) require attention` : undefined,
     });

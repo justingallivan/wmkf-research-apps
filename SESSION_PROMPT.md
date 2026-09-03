@@ -83,16 +83,19 @@ Wave 2.
 [VERIFIED via feature-branch source and focused tests; NOT DEPLOYED OR
 PRODUCTION-PROVED] Wave 2 is source-built on
 `codex/review-docx-header-spacing`: a dedicated CRON-secret route and filing
-service enforce exact-cycle/fresh-snapshot eligibility, create-only canonical
+service enforce exact-stamped-cycle/fresh-snapshot eligibility, newest-first
+scheduled discovery, create-only canonical
 SharePoint writes, governed semantic reconciliation, ETag pointer commit with one
 bounded retry, exact safe cleanup, structured per-row results, and deduplicated
 operational events. External reviewer context hides only generated filenames;
 the Workbench distinguishes generated staff entry from uploaded staff files via
 one shared server classifier. `vercel.json` schedules the route every five
-minutes with a 300-second function duration, but the non-sensitive write/cycle
-flags remain unset and no deployment, Graph mutation, or pointer write has
-occurred. The next gate is adversarial build review followed by relevant gates
-and Preview/mock verification. Wave 3 will add the dry-run-first D26 backfill.
+minutes with a 300-second function duration; flag-off requests return before a
+maintenance row or data read. Claude's Wave 2 build review returned APPROVE WITH
+NON-BLOCKING SUGGESTIONS, and the accepted hardening is incorporated. The
+non-sensitive write/cycle flags remain unset and no deployment, Graph mutation,
+or pointer write has occurred. The next gate is the relevant release checks and
+Preview/mock verification. Wave 3 will add the dry-run-first D26 backfill.
 
 ## Parked
 

@@ -68,6 +68,7 @@ const {
   buildGeneratedReviewPath,
   ensureIndividualReviewFile,
   inspectIndividualReviewFileCandidate,
+  isActionableReviewDocxStatus,
   sweepMissingIndividualReviewFiles,
 } = require('../../lib/services/review-documents/individual-file-service');
 
@@ -175,6 +176,44 @@ test('classifies complete and partial pointers before rendering or Graph access'
   expect(graph.getFileMetadataByPath).not.toHaveBeenCalled();
 });
 
+test.each([
+  ['not_selected', { wmkf_selected: false }],
+  ['excluded', { wmkf_applicantdisposition: 100000001 }],
+])('classifies %s before dependent reads or rendering', async (status, overrides) => {
+  suggestion.getByIdWithSelect.mockResolvedValueOnce(baseRow(overrides));
+  await expect(inspectIndividualReviewFileCandidate(SUGGESTION_ID, { cycleCode: 'D26' }))
+    .resolves.toMatchObject({ status });
+  expect(getRequestById).not.toHaveBeenCalled();
+  expect(fetchAnswersBySuggestion).not.toHaveBeenCalled();
+  expect(buildIndividualReviewDocx).not.toHaveBeenCalled();
+});
+
+test.each([
+  ['no_cycle', null, '2026-11-03T00:00:00Z'],
+  ['wrong_cycle', 'J26', '2026-12-03T00:00:00Z'],
+  ['eligible', null, '2026-12-03T00:00:00Z'],
+])('classifies cycle resolution as %s', async (status, stampedCycle, meetingDate) => {
+  suggestion.getByIdWithSelect.mockResolvedValueOnce(baseRow({
+    wmkf_grantcyclecode: stampedCycle,
+  }));
+  getRequestById.mockResolvedValueOnce({
+    akoya_requestid: REQUEST_ID,
+    akoya_requestnum: '1002903',
+    akoya_title: 'Proposal',
+    wmkf_organizationname: 'University',
+    wmkf_meetingdate: meetingDate,
+  });
+  await expect(inspectIndividualReviewFileCandidate(SUGGESTION_ID, { cycleCode: 'D26' }))
+    .resolves.toMatchObject({ status });
+});
+
+test('uses one shared actionable-status contract', () => {
+  expect(isActionableReviewDocxStatus('content_conflict')).toBe(true);
+  expect(isActionableReviewDocxStatus('partial_pointer')).toBe(true);
+  expect(isActionableReviewDocxStatus('already_filed')).toBe(false);
+  expect(isActionableReviewDocxStatus('unknown_future_status')).toBe(false);
+});
+
 test('requires a rich-text row and rejects malformed self-describing snapshots', async () => {
   fetchAnswersBySuggestion.mockResolvedValueOnce({
     [SUGGESTION_ID]: [{ ...ANSWERS[0], questionType: 'picklist', answerValue: 1 }],
@@ -187,6 +226,18 @@ test('requires a rich-text row and rejects malformed self-describing snapshots',
   });
   await expect(inspectIndividualReviewFileCandidate(SUGGESTION_ID, { cycleCode: 'D26' }))
     .resolves.toMatchObject({ status: 'invalid_snapshot', error: { code: 'invalid_snapshot' } });
+});
+
+test('classifies a received row with no answer snapshot as not_structured', async () => {
+  fetchAnswersBySuggestion.mockResolvedValueOnce({ [SUGGESTION_ID]: [] });
+  await expect(inspectIndividualReviewFileCandidate(SUGGESTION_ID, { cycleCode: 'D26' }))
+    .resolves.toMatchObject({ status: 'not_structured' });
+});
+
+test('keeps a staff-entered review eligible when its full structured snapshot is present', async () => {
+  suggestion.getByIdWithSelect.mockResolvedValueOnce(baseRow({ wmkf_reviewuploadedbystaff: true }));
+  await expect(inspectIndividualReviewFileCandidate(SUGGESTION_ID, { cycleCode: 'D26' }))
+    .resolves.toMatchObject({ status: 'eligible' });
 });
 
 test('literal-off flag reaches no Graph mutation or pointer write', async () => {
@@ -315,6 +366,16 @@ test('disabled sweep performs no Dataverse candidate read and no Graph call', as
   expect(graph.uploadFile).not.toHaveBeenCalled();
 });
 
+test('malformed automatic cycle fails before target or candidate discovery and records the anomaly', async () => {
+  const result = await sweepMissingIndividualReviewFiles({ cycleCode: 'December 2026' });
+  expect(result).toMatchObject({ status: 'invalid_cycle', counts: { invalid_cycle: 1 } });
+  expect(recordEvent).toHaveBeenCalledWith(expect.objectContaining({
+    eventType: 'review_docx_filing_failed', stage: 'invalid_cycle',
+  }));
+  expect(suggestion.findReviewDocxFilingCandidates).not.toHaveBeenCalled();
+  expect(graph.getSiteId).not.toHaveBeenCalled();
+});
+
 test('target preflight fails closed before upload outside Production', async () => {
   process.env.VERCEL_ENV = 'preview';
   const result = await ensureIndividualReviewFile(SUGGESTION_ID, { cycleCode: 'D26' });
@@ -337,6 +398,105 @@ test('target preflight rejects a noncanonical SharePoint site before Graph resol
   expect(result).toMatchObject({ status: 'target_guard_failed', error: { code: 'sharepoint_target_mismatch' } });
   expect(graph.getSiteId).not.toHaveBeenCalled();
   expect(graph.uploadFile).not.toHaveBeenCalled();
+});
+
+test('target preflight rejects a missing Dataverse target before Graph resolution', async () => {
+  process.env.DYNAMICS_URL = '';
+  const result = await ensureIndividualReviewFile(SUGGESTION_ID, { cycleCode: 'D26' });
+  expect(result).toMatchObject({ status: 'target_guard_failed', error: { code: 'dataverse_target_missing' } });
+  expect(graph.getSiteId).not.toHaveBeenCalled();
+  expect(graph.uploadFile).not.toHaveBeenCalled();
+});
+
+test('target preflight rejects a missing SharePoint identity before mutation', async () => {
+  graph.getSiteId.mockResolvedValueOnce(null);
+  graph.getDriveId.mockResolvedValueOnce(null);
+  const result = await ensureIndividualReviewFile(SUGGESTION_ID, { cycleCode: 'D26' });
+  expect(result).toMatchObject({ status: 'target_guard_failed', error: { code: 'sharepoint_identity_missing' } });
+  expect(graph.uploadFile).not.toHaveBeenCalled();
+  expect(suggestion.patchReviewReceipt).not.toHaveBeenCalled();
+});
+
+test('reports final stable-item verification failure after pointer commit', async () => {
+  suggestion.getByIdWithSelect
+    .mockResolvedValueOnce(baseRow())
+    .mockResolvedValueOnce(exactPointer())
+    .mockResolvedValueOnce(exactPointer());
+  graph.getFileMetadataById.mockResolvedValueOnce(null);
+  const result = await ensureIndividualReviewFile(SUGGESTION_ID, { cycleCode: 'D26' });
+  expect(result).toMatchObject({ status: 'verification_failed', error: { code: 'verification_failed' } });
+  expect(graph.deleteFile).not.toHaveBeenCalled();
+});
+
+test('records an exact orphan-cleanup event when deleting this invocation item fails', async () => {
+  const conflict = Object.assign(new Error('precondition'), { status: 412 });
+  suggestion.patchReviewReceipt.mockRejectedValueOnce(conflict);
+  suggestion.getByIdWithSelect
+    .mockResolvedValueOnce(baseRow())
+    .mockResolvedValueOnce(exactPointer({
+      wmkf_reviewsharepointfolder: 'other/folder',
+      wmkf_reviewfilename: 'other.docx',
+    }));
+  graph.deleteFile.mockRejectedValueOnce(new Error('delete unavailable'));
+  const result = await ensureIndividualReviewFile(SUGGESTION_ID, { cycleCode: 'D26' });
+  expect(result).toMatchObject({ status: 'cleanup_failed', item: { id: 'item-1' } });
+  expect(recordEvent).toHaveBeenCalledWith(expect.objectContaining({
+    eventType: 'review_docx_orphan_cleanup_failed',
+    entityRefs: expect.objectContaining({ suggestionId: SUGGESTION_ID, itemId: 'item-1' }),
+  }));
+});
+
+test('reports scan-cap and deadline exhaustion without beginning extra rows', async () => {
+  suggestion.findReviewDocxFilingCandidates.mockResolvedValue({
+    records: [
+      { wmkf_appreviewersuggestionid: SUGGESTION_ID },
+      { wmkf_appreviewersuggestionid: SECOND_SUGGESTION_ID },
+    ],
+    capped: false,
+  });
+  fetchAnswersBySuggestion.mockResolvedValueOnce({
+    [SUGGESTION_ID]: ANSWERS,
+    [SECOND_SUGGESTION_ID]: ANSWERS,
+  });
+
+  const result = await sweepMissingIndividualReviewFiles({
+    scanCap: 1, attemptCap: 1, deadlineMs: -1, minRemainingMs: 0,
+  });
+
+  expect(result).toMatchObject({
+    candidateCount: 2, hasMore: true, deadlineReached: true, scanned: 0, attempted: 0,
+  });
+  expect(suggestion.getByIdWithSelect).not.toHaveBeenCalled();
+  expect(graph.uploadFile).not.toHaveBeenCalled();
+});
+
+test('a content conflict consumes only the bounded attempt and classifies later rows as attempt_limit', async () => {
+  suggestion.findReviewDocxFilingCandidates.mockResolvedValue({
+    records: [
+      { wmkf_appreviewersuggestionid: SUGGESTION_ID },
+      { wmkf_appreviewersuggestionid: SECOND_SUGGESTION_ID },
+    ],
+    capped: false,
+  });
+  suggestion.getByIdWithSelect
+    .mockResolvedValueOnce(baseRow())
+    .mockResolvedValueOnce(baseRow())
+    .mockResolvedValueOnce(baseRow({ wmkf_appreviewersuggestionid: SECOND_SUGGESTION_ID }));
+  fetchAnswersBySuggestion
+    .mockResolvedValueOnce({ [SUGGESTION_ID]: ANSWERS, [SECOND_SUGGESTION_ID]: ANSWERS })
+    .mockResolvedValueOnce({ [SUGGESTION_ID]: ANSWERS })
+    .mockResolvedValueOnce({ [SUGGESTION_ID]: ANSWERS })
+    .mockResolvedValueOnce({ [SECOND_SUGGESTION_ID]: ANSWERS });
+  graph.getFileMetadataByPath.mockResolvedValueOnce(ITEM);
+  hashGovernedDocxContent
+    .mockResolvedValueOnce('gdc1:expected')
+    .mockResolvedValueOnce('gdc1:different');
+
+  const result = await sweepMissingIndividualReviewFiles({ scanCap: 10, attemptCap: 1 });
+
+  expect(result).toMatchObject({ attempted: 1, counts: { content_conflict: 1, attempt_limit: 1 } });
+  expect(result.results.map((row) => row.status)).toEqual(['content_conflict', 'attempt_limit']);
+  expect(suggestion.patchReviewReceipt).not.toHaveBeenCalled();
 });
 
 test('ineligible scanned rows do not consume the mutation attempt cap or starve a later eligible row', async () => {

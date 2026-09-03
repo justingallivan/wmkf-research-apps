@@ -104,6 +104,13 @@ Wave 1's behavior-preserving foundation is source/test/render verified on the
 feature branch. SharePoint filing, backfill, and all Production behavior remain
 unproved and separately gated.
 
+Claude's subsequent read-only Wave 2 build review returned **APPROVE WITH
+NON-BLOCKING SUGGESTIONS**. The accepted pre-release hardening keeps scheduled
+discovery to exact cycle-stamped rows, orders newest receipts first, avoids
+flag-off maintenance noise, centralizes actionable status classification, adds
+the missing negative-path tests, and documents post-commit verification failure.
+This approval covers source and local tests only; it is not Production proof.
+
 ## Product contract
 
 ### Included
@@ -176,10 +183,13 @@ published. A malformed or internally inconsistent snapshot is
 `invalid_snapshot` and fails visibly; it is not converted into a misleading
 file.
 
-For cycle resolution, prefer the suggestion's stamped
+For one explicitly addressed row, prefer the suggestion's stamped
 `wmkf_grantcyclecode`; when null, derive the request cycle from its meeting date
-using the existing cycle helper. A row with neither source is `no_cycle` and is
-skipped/reported. Backfill still requires an exact caller-supplied cycle match.
+using the existing cycle helper. This fallback supports the future operator
+backfill. Scheduled discovery is narrower: it admits only rows whose stamped
+cycle exactly matches the configured automatic cohort. A row with neither source
+is `no_cycle` and is skipped/reported. Backfill still requires an exact
+caller-supplied cycle match.
 
 ## SharePoint destination
 
@@ -267,6 +277,12 @@ For one eligible suggestion:
     operator action.
 12. Reread pointer fields and Graph metadata before returning success.
 
+If step 12 fails after the pointer commit, return `verification_failed` and
+raise the deduplicated operational event. The complete durable pointer makes the
+next ordinary sweep return `already_filed`, so this post-commit anomaly requires
+operator verification/resolution; the automatic path must not rewrite or delete
+the retained file merely to clear the event.
+
 `GraphService.deleteFile` already treats a missing item (404) as successful
 cleanup, so exact-item cleanup is safely repeatable.
 
@@ -309,12 +325,14 @@ REVIEW_DOCX_SHAREPOINT_WRITE=on
 REVIEW_DOCX_SHAREPOINT_CYCLE=D26
 ```
 
-Unset, empty, or any value other than literal `on` skips forward filing. Add the
-flag to the tracked environment contract before deployment. The automatic cron
-also requires one exact valid cycle code and considers only that cycle. This
-prevents activation from unexpectedly filing older historical cohorts; advancing
-the automatic cycle is a deliberate configuration change. The operator backfill
-continues to use its explicit `--cycle` manifest instead.
+Unset, empty, or any value other than literal `on` skips forward filing before a
+maintenance run or any candidate/Graph read. Add the flag to the tracked
+environment contract before deployment. The automatic cron also requires one
+exact valid cycle code and discovers only suggestions carrying that exact cycle
+stamp. This prevents activation from unexpectedly filing older historical
+cohorts; advancing the automatic cycle is a deliberate configuration change.
+The operator backfill continues to use its explicit `--cycle` manifest and may
+apply the request-meeting-date fallback during per-row validation.
 
 Add a dedicated CRON-secret-guarded route, for example
 `pages/api/cron/file-review-docx.js`, scheduled every five minutes. It calls
@@ -336,9 +354,9 @@ budget. Its sweep should:
 - discover rich-text-bearing, received, selected, non-excluded, no-pointer
   candidates rather than every received row;
 - apply the same eligibility and ensure service, never a second implementation;
-- order candidates deterministically, use separate scan/attempt caps, and
-  continue past ineligible/conflicting rows so one bad row cannot starve later
-  submissions;
+- order exact cycle-stamped candidates newest-first, use separate scan/attempt
+  caps, and continue past ineligible rows so historical anomalies cannot starve
+  later submissions;
 - continue after individual failures and report per-ID results;
 - leave partial pointers and content conflicts untouched; and
 - run only when the same literal-on flag is enabled.
@@ -556,13 +574,16 @@ clean. No SharePoint call, pointer write, route, cron, or rollout flag was added
 **Gate:** adversarial review, all relevant gates, Preview/mock verification, and a
 Ready Production deployment with the flag off.
 
-**Status: SOURCE-BUILT ON `codex/review-docx-header-spacing` (2026-09-03),
-pending adversarial build review and release gates.** The dedicated guarded
+**Status: SOURCE-BUILT AND ADVERSARIALLY REVIEWED ON
+`codex/review-docx-header-spacing` (2026-09-03), pending release gates.** The dedicated guarded
 service/cron, create-only Graph path, semantic hash reconciliation, bounded ETag
 pointer recovery, safe exact-item cleanup, per-row telemetry/results, and shared
 pointer-provenance consumer semantics are implemented with focused tests. The
-rollout/cycle flags remain unset; nothing has been deployed or written to
-Production. Wave 3 backfill code has not been started.
+scheduled scan is exact-stamp-only and newest-first; a disabled route creates no
+maintenance row. Claude returned APPROVE WITH NON-BLOCKING SUGGESTIONS, and the
+accepted pre-release hardening is incorporated. The rollout/cycle flags remain
+unset; nothing has been deployed or written to Production. Wave 3 backfill code
+has not been started.
 
 ### Wave 3 — D26 dry run and one-file proof
 
@@ -608,16 +629,19 @@ Stop before writes or further rollout if any of the following appears:
 ## Sweep report
 
 ```text
-Sweep mode: Mode B — domain truth audit
+Sweep mode: Mode B domain truth audit plus Mode A Wave 2 build-review reconciliation
 Domain: structured individual review DOCX generation and SharePoint retention
-Claims: 9 -> VERIFIED 8 / PLANNED 1 / PARTIAL 0 / ASSUMED 0 / UNKNOWN 0
+Claims: Waves 1–2 source implementation VERIFIED; Wave 3 backfill PLANNED;
+  deployment, activation, and Production write behavior UNPROVED
 Durable restatements: current no-upload statements remain accurate historical/current baseline
-Structural fix: added this separately labeled forward plan and catalog entry
+Structural fix: forward plan/catalog plus exact-stamp newest-first scheduled discovery,
+  quiet flag-off route, shared actionable classification, and negative-path tests
 Semantic omissions found: upload flag, eligibility distinction for manual structured rows,
   mark-received provenance, Graph target protection, dedicated-cron isolation,
   pointer-consumer semantics, 412-null retry, exact cycle scoping, create-only conflict
-  recovery, semantic rather than raw-byte identity, and partial-success backfill accounting
+  recovery, semantic rather than raw-byte identity, partial-success backfill accounting,
+  candidate-starvation prevention, and post-commit verification operations
 Remaining live STALE: 0 within this plan's stated scope
 Remaining UNKNOWN/ASSUMED: Production write behavior remains unproved until the approved smoke
-Verdict: ADVERSARIAL CONDITIONS RECONCILED FOR PLANNING; IMPLEMENTATION REMAINS PLANNED
+Verdict: WAVES 1–2 SOURCE-BUILT AND ADVERSARIALLY REVIEWED; RELEASE/PRODUCTION PROOF PENDING
 ```

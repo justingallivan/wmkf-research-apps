@@ -66,6 +66,9 @@ rows without a full option snapshot render selected-only with an explicit note;
 new submissions snapshot every presented option. Wave 2 retention is now
 source-built on `codex/review-docx-header-spacing`: a dedicated guarded sweep
 creates immutable individual DOCX files under the generated SharePoint namespace
-and conditionally stores the existing pointer pair. The rollout flag remains
-unset, the branch is not deployed, and the dry-run-first D26 backfill remains
-Wave 3; do not describe retention as Production-live yet.
+and conditionally stores the existing pointer pair. Its scheduled discovery is
+exact-cycle-stamp-only and newest-first, and flag-off requests create no
+maintenance row. Claude's Wave 2 build review approved the source with
+non-blocking suggestions; the accepted hardening is incorporated. The rollout
+flag remains unset, the branch is not deployed, and the dry-run-first D26
+backfill remains Wave 3; do not describe retention as Production-live yet.

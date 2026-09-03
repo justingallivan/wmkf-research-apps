@@ -65,11 +65,11 @@ describe('reviewer-suggestion.queryAllSuggestions', () => {
 });
 
 describe('reviewer-suggestion.findReviewDocxFilingCandidates', () => {
-  it('uses a complete deterministic parent filter while leaving final eligibility to the service', async () => {
+  it('uses an exact stamped-cycle filter and puts newest receipts first', async () => {
     const spy = jest.spyOn(DynamicsService, 'queryAllRecords').mockResolvedValue({ records: [], capped: false });
     await findReviewDocxFilingCandidates({ cycleCode: 'D26', top: 500 });
     expect(spy).toHaveBeenCalledWith('wmkf_appreviewersuggestions', expect.objectContaining({
-      orderby: 'wmkf_reviewreceivedat asc,wmkf_appreviewersuggestionid asc',
+      orderby: 'wmkf_reviewreceivedat desc,wmkf_appreviewersuggestionid asc',
       filter: expect.stringContaining("wmkf_grantcyclecode eq 'D26'"),
     }));
     const filter = spy.mock.calls[0][1].filter;
@@ -77,6 +77,7 @@ describe('reviewer-suggestion.findReviewDocxFilingCandidates', () => {
     expect(filter).toContain('wmkf_selected eq true');
     expect(filter).toContain('wmkf_reviewsharepointfolder eq null or wmkf_reviewfilename eq null');
     expect(filter).toContain('wmkf_applicantdisposition eq null');
+    expect(filter).not.toContain('wmkf_grantcyclecode eq null');
   });
 });
 

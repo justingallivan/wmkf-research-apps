@@ -141,7 +141,10 @@ fields only for a freshly revalidated full structured snapshot. Complete
 pointers always win; partial pointers are reported and left untouched. The
 writer uses an ETag conditional PATCH, one bounded pointer retry, and the
 server-derived `Reviewer_Uploads/Generated/<suggestion-guid>/Review-<request>.docx`
-identity. It remains inert while `REVIEW_DOCX_SHAREPOINT_WRITE` is unset.
+identity. Scheduled discovery requires the exact stamped cycle and processes
+newest receipts first; historical meeting-date fallback belongs to the future
+operator backfill. It remains inert, including no maintenance row, while
+`REVIEW_DOCX_SHAREPOINT_WRITE` is unset.
 
 Structured review fields (S130 schema additions):
 - `wmkf_revieweraffiliation` (String) — parent identity column; still the read source for the review-context affiliation prefill.
@@ -305,7 +308,8 @@ Write (verified 2026-05-07; +Phase 3 ingestion S210):
 - `pages/api/external/review/[token]/submit.js` — canonical structured external receipt sink; the verifier row (or the supported fresh missing-ETag fallback) passes the same shared guard and its ETag protects the atomic parent/answer changeset. The fallback selects `wmkf_reviewstatus`, so it cannot acquire a terminal row's fresh ETag blindly.
 - `pages/api/external/review/[token]/context.js` — best-effort `wmkf_proposalfirstaccessed` stamp on first reviewer access (non-fatal on failure)
 - `pages/api/cron/file-review-docx.js` — source-built dedicated exact-cycle
-  retention/repair sweep. It re-reads the row and ETag through
+  retention/repair sweep. It discovers exact-stamped rows newest-first, re-reads
+  the row and ETag through
   `individual-file-service.js`, writes only the two existing pointer fields
   after create-only SharePoint reconciliation, and is not part of submission or
   thank-you delivery. Deployment and Production activation remain pending.
