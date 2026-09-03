@@ -85,6 +85,9 @@ function ReviewCard({ reviewer }) {
   const received = formatDate(reviewer.reviewReceivedAt);
   const affiliation = reviewerAffiliationOf(reviewer);
   const hasFile = !!reviewer.reviewSharePointFolder;
+  const staffReceiptLabel = reviewer.reviewUploadedByStaff
+    ? (reviewer.reviewFileProvenance === 'generated' || !hasFile ? 'staff entry' : 'staff upload')
+    : null;
   return (
     <Card hover={false}>
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -93,7 +96,7 @@ function ReviewCard({ reviewer }) {
           {affiliation && <div className="text-sm text-gray-600 truncate">{affiliation}</div>}
           <div className="text-xs text-gray-400 mt-0.5">
             {received ? `Review received ${received}` : 'Review received'}
-            {reviewer.reviewUploadedByStaff ? ' · staff upload' : ''}
+            {staffReceiptLabel ? ` · ${staffReceiptLabel}` : ''}
           </div>
         </div>
         <div className="shrink-0">

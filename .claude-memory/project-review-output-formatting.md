@@ -63,5 +63,9 @@ the shared builder by the thank-you sweep before its If-Match claim. A render fa
 unclaimed and unsent so the complete delivery retries later. Both use the same answer
 snapshot interpretation but distinct approved templates. Historical categorical
 rows without a full option snapshot render selected-only with an explicit note;
-new submissions snapshot every presented option. SharePoint retention/link
-replacement remains planned and has not been implemented by Wave 1.
+new submissions snapshot every presented option. Wave 2 retention is now
+source-built on `codex/review-docx-header-spacing`: a dedicated guarded sweep
+creates immutable individual DOCX files under the generated SharePoint namespace
+and conditionally stores the existing pointer pair. The rollout flag remains
+unset, the branch is not deployed, and the dry-run-first D26 backfill remains
+Wave 3; do not describe retention as Production-live yet.

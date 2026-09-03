@@ -87,6 +87,38 @@ test('renders submitted reviews with decoded ratings + download link; pending la
 
   // The no-file submission shows the explicit no-file marker, not a broken link.
   expect(screen.getByText('No file on record')).toBeInTheDocument();
+  expect(screen.getByText(/staff entry/i)).toBeInTheDocument();
+});
+
+test('distinguishes a generated staff entry from a staff-uploaded file', async () => {
+  fetch.mockResolvedValue({
+    ok: true,
+    json: async () => ({
+      success: true,
+      proposals: [{
+        proposalId: 'req1',
+        reviewers: [
+          {
+            suggestionId: 'g1', name: 'Generated', reviewReceivedAt: '2026-09-03T00:00:00Z',
+            reviewSharePointFolder: '100_A/Reviewer_Uploads/Generated/11111111111141118111111111111111',
+            reviewFilename: 'Review-100.docx', reviewUploadedByStaff: true,
+            reviewFileProvenance: 'generated',
+          },
+          {
+            suggestionId: 'g2', name: 'Uploaded', reviewReceivedAt: '2026-09-03T00:00:00Z',
+            reviewSharePointFolder: '100_A/Reviewer_Uploads/Smith/attempt_11111111111141118111111111111111',
+            reviewFilename: 'review.pdf', reviewUploadedByStaff: true,
+            reviewFileProvenance: 'attempt_upload',
+          },
+        ],
+      }],
+    }),
+  });
+
+  render(<ReviewsTab requestId="req1" />);
+  expect(await screen.findByText('Generated')).toBeInTheDocument();
+  expect(screen.getByText(/staff entry/i)).toBeInTheDocument();
+  expect(screen.getByText(/staff upload/i)).toBeInTheDocument();
 });
 
 test('renders every answered question in order, including picklist rows inline', async () => {

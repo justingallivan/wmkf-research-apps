@@ -24,9 +24,10 @@ related:
 
 ## Decision and status
 
-**Status: WAVE 1 IMPLEMENTED ON THE FEATURE BRANCH; WAVES 2–5 REMAIN PLANNED.
-No automatic SharePoint write or historical backfill described here has been
-implemented or authorized for execution.**
+**Status: WAVES 1–2 ARE SOURCE-BUILT ON THE FEATURE BRANCH; WAVES 3–5 REMAIN
+PLANNED. The filing service and inert dedicated cron are not deployed, their
+rollout flags remain unset, and no SharePoint write or historical backfill has
+been authorized for execution.**
 
 The recommended design is to generate and retain one individual DOCX for every
 structured review, using the same approved individual template as the thank-you
@@ -59,7 +60,7 @@ probes on 2026-09-03:
 | D26 currently has 24 received reviews and 228 answer rows. All 24 are selected, have at least one rich-text answer row, have exact receipt/answer identity parity, and have zero complete or partial SharePoint pointers. This proves current eligibility shape, not merely row-count parity. | Existing structured writers | Production Dataverse | Proposed backfill | Updated `DATAVERSE_ALLOW_PROD_READS=yes node scripts/probe-review-blank-slate.mjs` | **VERIFIED AS OF 2026-09-03; RECHECK BEFORE EXECUTION** |
 | Rendering identical semantic input twice does not produce byte-identical ZIP packages, while the governed Word-part hash is stable. | Current renderer | Generated DOCX package | Retry/conflict logic | Local two-render experiment: raw SHA-256 differed; governed hash matched | **VERIFIED** |
 | The thank-you attachment now uses one shared individual-review builder with caller-owned generation time. | `reviewer-thankyou-sweep.js` | Existing answer snapshot + transient DOCX bytes | Thank-you attachment; future filing service | Focused builder/thank-you/hash tests plus rendered-page inspection | **IMPLEMENTED ON FEATURE BRANCH; NOT YET PRODUCTION-LIVE** |
-| Automatically retaining future individual DOCX files and backfilling D26 is live. | N/A | N/A | N/A | No implementation exists yet | **PLANNED** |
+| Automatically retaining future individual DOCX files and backfilling D26 is live. | Dedicated filing service/cron is source-built; backfill script is not built | No Production write | Existing pointer consumers | Branch source and focused tests; no deployment or write activation | **NOT PRODUCTION-LIVE** |
 
 ### Sweep boundary
 
@@ -554,6 +555,14 @@ clean. No SharePoint call, pointer write, route, cron, or rollout flag was added
 
 **Gate:** adversarial review, all relevant gates, Preview/mock verification, and a
 Ready Production deployment with the flag off.
+
+**Status: SOURCE-BUILT ON `codex/review-docx-header-spacing` (2026-09-03),
+pending adversarial build review and release gates.** The dedicated guarded
+service/cron, create-only Graph path, semantic hash reconciliation, bounded ETag
+pointer recovery, safe exact-item cleanup, per-row telemetry/results, and shared
+pointer-provenance consumer semantics are implemented with focused tests. The
+rollout/cycle flags remain unset; nothing has been deployed or written to
+Production. Wave 3 backfill code has not been started.
 
 ### Wave 3 — D26 dry run and one-file proof
 

@@ -114,6 +114,32 @@ const reviewer = { wmkf_name: 'Dr. R', wmkf_emailaddress: 'r@x.org' };
 beforeEach(() => jest.clearAllMocks());
 
 describe('buildReviewContext', () => {
+  it('hides only server-recognized generated filenames from the reviewer receipt', async () => {
+    const generated = await buildReviewContext({
+      suggestion: baseSuggestion({
+        wmkf_reviewreceivedat: '2026-09-03T12:00:00Z',
+        wmkf_reviewfilename: 'Review-1002903.docx',
+        wmkf_reviewsharepointfolder:
+          '1002903_A/Reviewer_Uploads/Generated/11111111111141118111111111111111',
+      }),
+      request,
+      reviewer,
+    });
+    expect(generated.submission.filename).toBeNull();
+
+    const uploaded = await buildReviewContext({
+      suggestion: baseSuggestion({
+        wmkf_reviewreceivedat: '2026-09-03T12:00:00Z',
+        wmkf_reviewfilename: 'review.pdf',
+        wmkf_reviewsharepointfolder:
+          '1002903_A/Reviewer_Uploads/Smith/attempt_11111111111141118111111111111111',
+      }),
+      request,
+      reviewer,
+    });
+    expect(uploaded.submission.filename).toBe('review.pdf');
+  });
+
   it('stage2a policy failure throws the explicit fail-closed body', async () => {
     getActivePolicies.mockRejectedValueOnce(new Error('slot missing'));
     await expect(buildReviewContext({ suggestion: baseSuggestion(), request, reviewer }))

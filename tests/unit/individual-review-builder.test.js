@@ -107,6 +107,23 @@ test('keeps the existing fallback filename when request number is absent', async
   expect(payload.filename).toBe('Review-copy.docx');
 });
 
+test('uses a caller-supplied authoritative answer snapshot without reading it again', async () => {
+  const supplied = [{ ...answers[0], answerHtml: '<p>Supplied.</p>' }];
+  await buildIndividualReviewDocx({
+    suggestionId: SUGGESTION_ID,
+    reviewer: {},
+    request: {},
+    row: {},
+    generatedAtIso: GENERATED_AT,
+    answerSnapshot: supplied,
+  });
+  expect(fetchAnswersBySuggestion).not.toHaveBeenCalled();
+  expect(renderIndividualReviewDocx.mock.calls[0][0].sections[0]).toMatchObject({
+    questionKey: 'approach',
+    state: 'answered',
+  });
+});
+
 test('propagates render failure so the thank-you caller can remain retryable before claim', async () => {
   renderIndividualReviewDocx.mockRejectedValueOnce(new Error('template unavailable'));
   await expect(buildIndividualReviewDocx({

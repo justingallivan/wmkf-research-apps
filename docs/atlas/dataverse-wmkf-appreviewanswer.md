@@ -39,6 +39,14 @@ Data:
 
 The same DTO derives ratings from these rows (`ratingsFromAnswers`, `lib/external/review-answer-snapshot.js`) instead of parent columns, and the external review-context prefill reads them per suggestion. In the active target contract the projection contains only `riskLevel` and `overallAssessment`; a rating with no snapshot row remains null (informal/unrated).
 
+**[SOURCE-BUILT 2026-09-03; NOT DEPLOYED OR PRODUCTION-PROVED]** The dedicated
+individual-review retention service now also reads this self-describing snapshot
+as its sole content source. It requires at least one persisted `richtext` row and
+rejects malformed identity/order/type/categorical shapes before rendering; it
+does not consult today's editable question definitions to judge historical
+completeness. The scheduled writer remains inert while its SharePoint flag is
+unset.
+
 ## Write Paths
 
 **LIVE (Phase 3, S302).** `/api/external/review/[token]/submit` upserts the N answer rows by alternate key (lookup addressed as `_wmkf_appreviewersuggestion_value=<guid>` — memory `reference-dataverse-altkey-lookup-upsert-url`) inside an all-or-nothing `DynamicsService.executeChangeset` changeset, alongside the parent affiliation/`wmkf_reviewreceivedat` PATCH (If-Match-guarded). Post-E1 the parent PATCH no longer carries the rating columns — the rating rows in this snapshot are their only home.

@@ -155,6 +155,43 @@ it('can make a path upload create-only instead of replacing an existing file', a
   expect(global.fetch.mock.calls[0][0]).toContain('@microsoft.graph.conflictBehavior=fail');
 });
 
+it('uses an asserted site/drive pair without re-resolving upload identity', async () => {
+  const getSiteId = jest.spyOn(GraphService, 'getSiteId');
+  const getDriveId = jest.spyOn(GraphService, 'getDriveId');
+  jest.spyOn(GraphService, 'getAccessToken').mockResolvedValue('token');
+  global.fetch = jest.fn().mockResolvedValue(response(201, {
+    id: 'new-item', name: 'snapshot.docx', size: 5,
+  }));
+
+  const result = await GraphService.uploadFile(
+    'akoya_request',
+    'Request/Board Milestones',
+    'snapshot.docx',
+    Buffer.from('bytes'),
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    { conflictBehavior: 'fail', siteId: 'asserted-site', driveId: 'asserted-drive' },
+  );
+
+  expect(result).toMatchObject({ siteId: 'asserted-site', driveId: 'asserted-drive' });
+  expect(getSiteId).not.toHaveBeenCalled();
+  expect(getDriveId).not.toHaveBeenCalled();
+  expect(global.fetch.mock.calls[0][0]).toContain('/drives/asserted-drive/');
+});
+
+it('rejects a partial asserted identity before a path read or upload', async () => {
+  jest.spyOn(GraphService, 'getAccessToken');
+
+  await expect(GraphService.getFileMetadataByPath(
+    'akoya_request', 'Request/Reviews', 'review.docx', { siteId: 'site-only' },
+  )).rejects.toThrow('siteId and driveId must be supplied together');
+  await expect(GraphService.uploadFile(
+    'akoya_request', 'Request/Reviews', 'review.docx', Buffer.from('bytes'),
+    undefined, { driveId: 'drive-only' },
+  )).rejects.toThrow('siteId and driveId must be supplied together');
+
+  expect(GraphService.getAccessToken).not.toHaveBeenCalled();
+});
+
 it('downloads Graph PDF conversion bytes from the frozen Word item', async () => {
   jest.spyOn(GraphService, 'getAccessToken').mockResolvedValue('token');
   const bytes = Buffer.from('%PDF-test');

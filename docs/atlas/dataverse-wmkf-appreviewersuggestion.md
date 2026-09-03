@@ -134,6 +134,15 @@ External-reviewer intake (S128–S130):
 - `wmkf_reviewsharepointfolder`
 - `wmkf_reviewuploadedbystaff`
 
+**Generated individual-review retention (Wave 2 source-built 2026-09-03; not
+deployed or Production-proved):** the dedicated CRON-secret route
+`/api/cron/file-review-docx` can populate the two existing SharePoint pointer
+fields only for a freshly revalidated full structured snapshot. Complete
+pointers always win; partial pointers are reported and left untouched. The
+writer uses an ETag conditional PATCH, one bounded pointer retry, and the
+server-derived `Reviewer_Uploads/Generated/<suggestion-guid>/Review-<request>.docx`
+identity. It remains inert while `REVIEW_DOCX_SHAREPOINT_WRITE` is unset.
+
 Structured review fields (S130 schema additions):
 - `wmkf_revieweraffiliation` (String) — parent identity column; still the read source for the review-context affiliation prefill.
 - ~~`wmkf_reviewerimpact` / `wmkf_reviewerrisk` / `wmkf_revieweroverallrating` (Picklist)~~ — **DROPPED from Dataverse (Phase E2, S305).** Ratings now live solely in the `wmkf_appreviewanswer` snapshot (migrated to read in Phase D, write stopped in E1, columns deleted in E2 via `scripts/drop-reviewer-rating-columns.mjs`). Retired from schema-as-code so a re-apply can't recreate them. Forward constraint: never redeploy pre-E1 code (it would PATCH these missing columns).
@@ -295,6 +304,11 @@ Write (verified 2026-05-07; +Phase 3 ingestion S210):
 - `lib/services/review-upload.js` `writeReviewFiles` — shared staff/self-token file receipt sink; the same guard authorizes the pre-upload row, its ETag protects the later parent PATCH/changeset, and every attempt uploads into a unique `attempt_<uuid>` SharePoint subfolder whose exact path is persisted by the winner. A lost race cleans up only the losing attempt and excludes any item id visible in the winning persisted folder before deletion. Also calls `extendForPostSubmissionWindow` after commit.
 - `pages/api/external/review/[token]/submit.js` — canonical structured external receipt sink; the verifier row (or the supported fresh missing-ETag fallback) passes the same shared guard and its ETag protects the atomic parent/answer changeset. The fallback selects `wmkf_reviewstatus`, so it cannot acquire a terminal row's fresh ETag blindly.
 - `pages/api/external/review/[token]/context.js` — best-effort `wmkf_proposalfirstaccessed` stamp on first reviewer access (non-fatal on failure)
+- `pages/api/cron/file-review-docx.js` — source-built dedicated exact-cycle
+  retention/repair sweep. It re-reads the row and ETag through
+  `individual-file-service.js`, writes only the two existing pointer fields
+  after create-only SharePoint reconciliation, and is not part of submission or
+  thank-you delivery. Deployment and Production activation remain pending.
 - `scripts/backfill-postgres-to-dataverse.js` — `suggestionAdapter.upsert` and `updateLifecycle` for Wave 2 backfill, preserving outreach/reminder timestamps
 
 ## Cross-system

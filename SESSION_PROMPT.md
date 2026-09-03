@@ -62,10 +62,10 @@ deployed/source/test/render verified rather than transport-smoked in Production.
 
 ## Following Priority
 
-The owner has initiated planning for automatic retention of individual structured
-review DOCX files in SharePoint plus a dry-run-first D26 backfill. The active plan
-is `docs/REVIEW_DOCX_SHAREPOINT_RETENTION_PLAN.md`; it is planning only and
-authorizes no SharePoint write. Claude's read-only adversarial review returned
+The owner approved Wave 2 of automatic retention for individual structured
+review DOCX files in SharePoint; the dry-run-first D26 backfill remains Wave 3.
+The active plan is `docs/REVIEW_DOCX_SHAREPOINT_RETENTION_PLAN.md`. Claude's
+read-only adversarial review of the plan returned
 APPROVE WITH CONDITIONS; the plan now incorporates the verified eligibility,
 SharePoint target, dedicated-cron, pointer-consumer, 412, cycle, and helper-scope
 corrections. Claude's reviewer thank-you honorarium-copy change is Production-live
@@ -78,9 +78,21 @@ composition, filename/content type, and template rendering. The thank-you sweep
 still supplies send time, builds before its If-Match claim, and preserves the
 honorarium projection/pass-through. No SharePoint call, pointer write, route,
 cron, or rollout flag was added. The next gate is an explicit owner decision on
-Wave 2. This work does not by itself reorder the canonical implementation sequence
-in `docs/CURRENT_WORK_QUEUE.md`, where Final Writeup persona rollout remains the
-recorded following priority.
+Wave 2.
+
+[VERIFIED via feature-branch source and focused tests; NOT DEPLOYED OR
+PRODUCTION-PROVED] Wave 2 is source-built on
+`codex/review-docx-header-spacing`: a dedicated CRON-secret route and filing
+service enforce exact-cycle/fresh-snapshot eligibility, create-only canonical
+SharePoint writes, governed semantic reconciliation, ETag pointer commit with one
+bounded retry, exact safe cleanup, structured per-row results, and deduplicated
+operational events. External reviewer context hides only generated filenames;
+the Workbench distinguishes generated staff entry from uploaded staff files via
+one shared server classifier. `vercel.json` schedules the route every five
+minutes with a 300-second function duration, but the non-sensitive write/cycle
+flags remain unset and no deployment, Graph mutation, or pointer write has
+occurred. The next gate is adversarial build review followed by relevant gates
+and Preview/mock verification. Wave 3 will add the dry-run-first D26 backfill.
 
 ## Parked
 

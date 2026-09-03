@@ -12,7 +12,11 @@
 import { jest } from '@jest/globals';
 import { DynamicsService } from '../../lib/services/dynamics-service.js';
 import { getByIdWithSelect, queryReviewers } from '../../lib/dataverse/adapters/potential-reviewer.js';
-import { patchFields, queryAllSuggestions } from '../../lib/dataverse/adapters/reviewer-suggestion.js';
+import {
+  findReviewDocxFilingCandidates,
+  patchFields,
+  queryAllSuggestions,
+} from '../../lib/dataverse/adapters/reviewer-suggestion.js';
 import { queryAllAnswers } from '../../lib/dataverse/adapters/review-answer.js';
 
 const ID = '11111111-1111-4111-8111-111111111111';
@@ -57,6 +61,22 @@ describe('reviewer-suggestion.queryAllSuggestions', () => {
     const options = { select: 'wmkf_appreviewersuggestionid', filter: 'wmkf_selected eq true' };
     await queryAllSuggestions(options);
     expect(spy).toHaveBeenCalledWith('wmkf_appreviewersuggestions', options);
+  });
+});
+
+describe('reviewer-suggestion.findReviewDocxFilingCandidates', () => {
+  it('uses a complete deterministic parent filter while leaving final eligibility to the service', async () => {
+    const spy = jest.spyOn(DynamicsService, 'queryAllRecords').mockResolvedValue({ records: [], capped: false });
+    await findReviewDocxFilingCandidates({ cycleCode: 'D26', top: 500 });
+    expect(spy).toHaveBeenCalledWith('wmkf_appreviewersuggestions', expect.objectContaining({
+      orderby: 'wmkf_reviewreceivedat asc,wmkf_appreviewersuggestionid asc',
+      filter: expect.stringContaining("wmkf_grantcyclecode eq 'D26'"),
+    }));
+    const filter = spy.mock.calls[0][1].filter;
+    expect(filter).toContain('wmkf_reviewreceivedat ne null');
+    expect(filter).toContain('wmkf_selected eq true');
+    expect(filter).toContain('wmkf_reviewsharepointfolder eq null or wmkf_reviewfilename eq null');
+    expect(filter).toContain('wmkf_applicantdisposition eq null');
   });
 });
 
