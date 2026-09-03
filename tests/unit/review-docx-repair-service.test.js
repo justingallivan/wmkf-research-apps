@@ -46,6 +46,27 @@ const PLAN = {
   existingSemanticHash: null,
   semanticMatch: null,
 };
+const CONTENT_PLAN = {
+  ...PLAN,
+  status: 'content_conflict',
+  currentPointer: {
+    folder: PLAN.expectedFolder,
+    filename: PLAN.expectedFilename,
+  },
+  priorPointer: null,
+  item: {
+    siteId: TARGET.siteId,
+    driveId: TARGET.driveId,
+    id: 'current-item',
+    name: PLAN.expectedFilename,
+    size: 69733,
+    eTag: 'current-item-etag',
+    versionId: '1.0',
+  },
+  existingSemanticHash: 'gdc1:old-template',
+  semanticMatch: false,
+  error: { code: 'content_conflict' },
+};
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -67,9 +88,10 @@ test('builds a hash-bound one-item repair manifest without review content', asyn
     observedAt: '2026-09-03T23:30:00.000Z',
   });
   expect(manifest).toMatchObject({
-    artifactType: 'review_docx_sharepoint_repair_v1',
-    schemaVersion: 1,
+    artifactType: 'review_docx_sharepoint_repair_v2',
+    schemaVersion: 2,
     dryRun: true,
+    repairKind: 'relocation',
     summary: { blocking: 0, eligibleRepairs: 1 },
     candidate: {
       reviewerName: 'Agnes Karasik',
@@ -117,6 +139,7 @@ test('rebuilds the source contract, preflights the exact row, and repairs withou
     expectedSourceFingerprint: PLAN.sourceFingerprint,
     expectedSemanticHash: PLAN.semanticHash,
     repairFromPointer: PLAN.priorPointer,
+    replaceExistingItem: null,
   });
   expect(report).toMatchObject({
     status: 'completed',
@@ -136,4 +159,54 @@ test('rejects invalid scope and drift before write preflight', async () => {
   await expect(executeReviewDocxRepair(manifest)).rejects.toMatchObject({ code: 'manifest_drift' });
   expect(preflightReviewDocxWrite).not.toHaveBeenCalled();
   expect(ensureIndividualReviewFile).not.toHaveBeenCalled();
+});
+
+test('binds an exact current-item content repair and retains the prior SharePoint version', async () => {
+  planIndividualReviewFileCandidate.mockResolvedValue(CONTENT_PLAN);
+  ensureIndividualReviewFile.mockResolvedValue({
+    status: 'replaced',
+    expectedFolder: PLAN.expectedFolder,
+    expectedFilename: PLAN.expectedFilename,
+    semanticHash: PLAN.semanticHash,
+    priorVersionId: '1.0',
+    item: { ...CONTENT_PLAN.item, eTag: 'new-etag', versionId: '2.0' },
+  });
+  const manifest = await buildReviewDocxRepairManifest({
+    cycleCode: 'D26', requestNumber: '1002874', suggestionId: SUGGESTION_ID,
+  });
+  expect(manifest).toMatchObject({
+    repairKind: 'content',
+    summary: { blocking: 0, eligibleRepairs: 1 },
+    candidate: {
+      status: 'eligible_content_repair',
+      currentPointer: CONTENT_PLAN.currentPointer,
+      existingItem: { id: 'current-item', versionId: '1.0' },
+      existingSemanticHash: 'gdc1:old-template',
+      semanticMatch: false,
+      error: null,
+    },
+  });
+
+  const report = await executeReviewDocxRepair(manifest);
+  expect(ensureIndividualReviewFile).toHaveBeenCalledWith(SUGGESTION_ID, {
+    cycleCode: 'D26',
+    executionMode: 'backfill',
+    target: TARGET,
+    expectedSuggestionEtag: PLAN.suggestionEtag,
+    expectedSourceFingerprint: PLAN.sourceFingerprint,
+    expectedSemanticHash: PLAN.semanticHash,
+    repairFromPointer: null,
+    replaceExistingItem: {
+      id: 'current-item',
+      eTag: 'current-item-etag',
+      versionId: '1.0',
+      semanticHash: 'gdc1:old-template',
+    },
+  });
+  expect(report).toMatchObject({
+    status: 'completed',
+    repairKind: 'content',
+    priorFileCleanup: 'retained_as_sharepoint_version',
+    summary: { repaired: 1, failed: 0 },
+  });
 });

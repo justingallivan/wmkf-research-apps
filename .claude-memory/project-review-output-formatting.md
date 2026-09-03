@@ -111,6 +111,16 @@ exact Request `1002874` repair while deferring old-file cleanup. Manifest hash
 created and verified item `01G4GVMSZZ25YPTP3RGFEK6LCT64W3JPX2` at
 `Reviews/Review-1002874-Agnes Karasik.docx`, repointed Dataverse, and left the
 old item present. Independent readback matched the corrected semantic hash.
-Owner Word-web visual confirmation remains pending. Describe Wave 2 as
-Production-deployed inert, Wave 3 as exact new-path storage/pointer repaired and
-proved, and automatic filing as not activated.
+The owner confirmed that v2 fixed the split title but Word Online still moved it
+below the floating logo. The v3 templates preserve the package except for the
+first-page logo wrap directive, replacing contradictory behind-text
+`wrapTight` geometry with explicit `wrapNone`. The exact content-repair manifest
+hash is `ab98b779b660c77719c317f73b8f1004b08a898f7159971d6f5c97f9bfb2295d`.
+Its first execution received an explicit SharePoint 423 lock and changed
+nothing; the retry versioned the same stable item/name from `1.0` to `2.0`,
+retained and verified the prior version, and produced governed hash
+`gdc1:E3KvF7rvlOaGoxps6DHihILCQlyDlSheguneB0F0ojw`. Independent readback matched
+that hash and the existing Dataverse pointer pair. Owner Word Online visual
+confirmation of version `2.0` remains pending. Describe Wave 2 as
+Production-deployed inert, Wave 3 as exact new-path storage/pointer and
+manifest-bound v3 content repair proved, and automatic filing as not activated.

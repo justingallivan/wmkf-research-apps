@@ -3,9 +3,9 @@
  * Guarded exact-item repair for one retained individual-review DOCX.
  *
  * Dry run is the default. Execute requires the exact reviewed manifest plus
- * the ordinary local Production-write interlocks. The prior SharePoint file is
- * intentionally retained; this command only creates/verifies the replacement
- * and conditionally changes the Dataverse pointer pair.
+ * the ordinary local Production-write interlocks. Relocation retains the prior
+ * SharePoint item; content repair writes a new version of the exact current item
+ * and verifies that the prior version remains downloadable.
  */
 
 import fs from 'node:fs';

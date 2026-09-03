@@ -42,8 +42,8 @@ function reviewer(suggestionId, name, options, answerValues) {
 
 describe('template-backed review DOCX renderer', () => {
   test('tracked templates pass marker/section preflight', async () => {
-    expect(REVIEW_DOCX_TEMPLATES.individual).toMatchObject({ version: 2, relativePath: 'shared/templates/reviews/individual-review-v2.docx' });
-    expect(REVIEW_DOCX_TEMPLATES.combined).toMatchObject({ version: 2, relativePath: 'shared/templates/reviews/combined-review-v2.docx' });
+    expect(REVIEW_DOCX_TEMPLATES.individual).toMatchObject({ version: 3, relativePath: 'shared/templates/reviews/individual-review-v3.docx' });
+    expect(REVIEW_DOCX_TEMPLATES.combined).toMatchObject({ version: 3, relativePath: 'shared/templates/reviews/combined-review-v3.docx' });
     await expect(preflightReviewDocxTemplates()).resolves.toBeUndefined();
   });
 
@@ -93,6 +93,8 @@ describe('template-backed review DOCX renderer', () => {
     expect(firstPageHeader).toContain(' Program');
     expect(firstPageHeader).toContain('<w:jc w:val="right"/>');
     expect(firstPageHeader).not.toContain('<w:tab');
+    expect(firstPageHeader).toContain('<wp:wrapNone/>');
+    expect(firstPageHeader).not.toContain('<wp:wrapTight');
     expect(continuationHeader).toContain('Proposal Review');
     expect(`${firstPageHeader}${continuationHeader}`).not.toContain('Individual');
     expect(documentXml).not.toContain('EXTERNAL REVIEW');
@@ -106,7 +108,7 @@ describe('template-backed review DOCX renderer', () => {
     expect(documentXml).toContain('Dr. A &lt;Reviewer&gt;');
     expect(coreXml).toContain('W. M. Keck Foundation');
     expect(coreXml).toContain('Proposal Review R-101');
-    expect(coreXml).toContain('individual-review version 2 template');
+    expect(coreXml).toContain('individual-review version 3 template');
     expect(coreXml).not.toContain('Individual');
     expect(coreXml).not.toMatch(/SAMPLE|Mockup/i);
     expect(generatedFooter).toContain('Generated August 20, 2026');
@@ -249,6 +251,8 @@ describe('template-backed review DOCX renderer', () => {
     expect(header4).toContain('Aggregated Proposal Reviews');
     expect(header4).toContain('<w:jc w:val="right"/>');
     expect(header4).not.toContain('<w:tab');
+    expect(header4).toContain('<wp:wrapNone/>');
+    expect(header4).not.toContain('<wp:wrapTight');
     expect(header4).not.toContain('Combined Proposal Review');
     expect(xml4).toContain('Tools');
     expect(xml4).toContain('1: ');

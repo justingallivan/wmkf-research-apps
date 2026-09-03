@@ -1103,17 +1103,26 @@ owner confirmed `Download: Review-1002874.docx` succeeds and looks correct.
 Opening the retained item through akoyaGO/Word for the web exposed a tab-layout
 defect that split the first-page title. The branch removes those tabs and
 directly right-aligns both review-template titles; source tests and rendered
-inspection pass, but the runtime fix is not deployed. The owner authorized an
+inspection passed. The owner authorized an
 exact local repair that created and verified item
 `01G4GVMSZZ25YPTP3RGFEK6LCT64W3JPX2` at
 `Reviews/Review-1002874-Agnes Karasik.docx` and ETag-conditionally repointed
 Dataverse. Independent readback matched the corrected semantic hash and proved
-the old item remains for later cleanup; owner Word-web visual confirmation is
-pending. The owner-directed path simplification and
-Word-web correction produce replacement manifest hash
+the old item remains for later cleanup. Owner inspection showed v2 kept the
+title together but Word Online pushed it below the floating logo. The v3
+templates explicitly change that behind-text shape from `wrapTight` to
+`wrapNone`. Exact content-repair manifest hash
+`ab98b779b660c77719c317f73b8f1004b08a898f7159971d6f5c97f9bfb2295d`
+then replaced the same stable item as SharePoint version `2.0`, retained and
+verified version `1.0`, and independently matched v3 governed hash
+`gdc1:E3KvF7rvlOaGoxps6DHihILCQlyDlSheguneB0F0ojw` without changing the
+Dataverse pointer pair. Owner Word Online visual confirmation of version `2.0`
+is pending; the runtime fix is not deployed. The owner-directed path
+simplification and historical v2 Word-web correction produced replacement manifest hash
 `25f10fcd0347d7de02abcc8a744357d4e215fe56efa462ff8cc0a6eef99650ff`, with 22
 eligible missing files at unique destinations plus the same visible test
-exclusion and no completed Request `1002874` candidate. No additional write or
+exclusion and no completed Request `1002874` candidate. It is superseded by v3
+and must be regenerated before execution. No additional write or
 old-file cleanup is approved. Active
 contract: `docs/REVIEW_DOCX_SHAREPOINT_RETENTION_PLAN.md`.
 

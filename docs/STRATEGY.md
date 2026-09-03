@@ -170,18 +170,27 @@ Dataverse pointer pair, and independent download/hash readback matched the
 reviewed semantic hash. The owner confirmed Agnes Karasik's Workbench download
 succeeds and the downloaded document looks correct, but opening the retained
 file through akoyaGO/Word for the web split the tab-positioned first-page title.
-The branch now directly right-aligns both review-template titles without tabs
+The branch first directly right-aligned both review-template titles without tabs
 and targets generated retention at request-level
 `Reviews/Review-<request>-<reviewer name>.docx`; focused tests and rendered
-inspection pass, but the fix is not deployed and the existing retained item is
-unchanged at its legacy path/name. Replacement manifest hash
+inspection passed. Replacement manifest hash
 `25f10fcd0347d7de02abcc8a744357d4e215fe56efa462ff8cc0a6eef99650ff`
 contains 22 eligible missing files with unique destinations plus the same
 visible test exclusion and no Request `1002874` candidate. The owner-authorized
 exact repair then created and verified
 `Reviews/Review-1002874-Agnes Karasik.docx`, repointed Dataverse, and retained
-the old item for later cleanup. Owner Word-web visual confirmation and
-template/path-fix promotion now precede approval of the remaining Wave 4 set.
+the old item for later cleanup. Owner inspection showed that Word Online kept
+the v2 title together but still pushed it below the floating logo. The v3
+templates resolve that remaining OOXML ambiguity by retaining the behind-text
+logo and changing its wrap directive from `wrapTight` to explicit `wrapNone`.
+An exact manifest-bound content repair then versioned the same current item from
+`1.0` to `2.0`, retained and verified the prior version, and independently
+matched v3 governed hash
+`gdc1:E3KvF7rvlOaGoxps6DHihILCQlyDlSheguneB0F0ojw` without changing Dataverse
+pointers. The v3 fix remains undeployed, and the historical remaining-population
+manifest is superseded. Owner Word Online visual confirmation and
+template/path-fix promotion now precede a fresh Wave 4 manifest and any
+remaining writes.
 Final Writeup persona
 access proof and deliberate enablement remain preserved immediately afterward.
 As of 2026-08-31, the ordinary-staff

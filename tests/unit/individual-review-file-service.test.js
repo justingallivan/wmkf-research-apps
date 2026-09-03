@@ -1,5 +1,5 @@
 /**
- * Create-only retained individual-review DOCX contract.
+ * Create-only filing plus exact manifest-bound repair contract.
  *
  * @jest-environment node
  */
@@ -9,7 +9,9 @@ const graph = {
   getDriveId: jest.fn(),
   getFileMetadataByPath: jest.fn(),
   uploadFile: jest.fn(),
+  replaceFileContent: jest.fn(),
   downloadFile: jest.fn(),
+  downloadFileVersion: jest.fn(),
   getFileMetadataById: jest.fn(),
   deleteFile: jest.fn(),
 };
@@ -163,7 +165,9 @@ beforeEach(() => {
   graph.getDriveId.mockResolvedValue('drive-1');
   graph.getFileMetadataByPath.mockResolvedValue(null);
   graph.uploadFile.mockResolvedValue(ITEM);
+  graph.replaceFileContent.mockResolvedValue({ ...ITEM, eTag: 'new-item-etag', versionId: '2.0' });
   graph.downloadFile.mockResolvedValue({ buffer: DOCX, filename: FILENAME, size: DOCX.length });
+  graph.downloadFileVersion.mockResolvedValue(DOCX);
   graph.getFileMetadataById.mockResolvedValue(ITEM);
   graph.deleteFile.mockResolvedValue(undefined);
   suggestion.patchReviewReceipt.mockResolvedValue(undefined);
@@ -306,6 +310,7 @@ test('read-only planning renders and hashes without requiring the write flag', a
     requestId: REQUEST_ID,
     requestNumber: '1002903',
     richTextPresent: true,
+    currentPointer: null,
     semanticHash: 'gdc1:semantic-hash',
     item: null,
   });
@@ -313,6 +318,87 @@ test('read-only planning renders and hashes without requiring the write flag', a
   expect(result).not.toHaveProperty('answers');
   expect(graph.uploadFile).not.toHaveBeenCalled();
   expect(suggestion.patchReviewReceipt).not.toHaveBeenCalled();
+});
+
+test('replaces one exact manifest-bound current item and verifies its retained prior version', async () => {
+  process.env.VERCEL_ENV = '';
+  suggestion.getByIdWithSelect.mockResolvedValueOnce(exactPointer());
+  graph.getFileMetadataByPath.mockResolvedValueOnce(ITEM);
+  hashGovernedDocxContent
+    .mockResolvedValueOnce('gdc1:new-template')
+    .mockResolvedValueOnce('gdc1:old-template');
+  const planned = await planIndividualReviewFileCandidate(SUGGESTION_ID, {
+    cycleCode: 'D26',
+    target: {
+      siteUrl: 'https://appriver3651007194.sharepoint.com/sites/akoyaGO',
+      siteId: 'site-1', driveId: 'drive-1', dynamicsBase: 'https://wmkf.crm.dynamics.com',
+    },
+    allowPointerRepair: true,
+  });
+  expect(planned).toMatchObject({
+    status: 'content_conflict',
+    currentPointer: { folder: FOLDER, filename: FILENAME },
+    semanticHash: 'gdc1:new-template',
+    existingSemanticHash: 'gdc1:old-template',
+    semanticMatch: false,
+    item: { id: ITEM.id, eTag: ITEM.eTag, versionId: ITEM.versionId },
+  });
+
+  suggestion.getByIdWithSelect.mockReset();
+  suggestion.getByIdWithSelect
+    .mockResolvedValueOnce(exactPointer())
+    .mockResolvedValueOnce(exactPointer());
+  graph.getFileMetadataByPath.mockReset();
+  graph.getFileMetadataByPath.mockResolvedValueOnce(ITEM);
+  const updatedItem = { ...ITEM, eTag: 'new-item-etag', versionId: '2.0' };
+  graph.replaceFileContent.mockResolvedValueOnce(updatedItem);
+  graph.getFileMetadataById.mockResolvedValueOnce(updatedItem);
+  hashGovernedDocxContent.mockReset();
+  hashGovernedDocxContent
+    .mockResolvedValueOnce('gdc1:new-template')
+    .mockResolvedValueOnce('gdc1:old-template')
+    .mockResolvedValueOnce('gdc1:new-template')
+    .mockResolvedValueOnce('gdc1:old-template');
+
+  const result = await ensureIndividualReviewFile(SUGGESTION_ID, {
+    cycleCode: 'D26',
+    executionMode: 'backfill',
+    expectedSuggestionEtag: planned.suggestionEtag,
+    expectedSourceFingerprint: planned.sourceFingerprint,
+    expectedSemanticHash: planned.semanticHash,
+    replaceExistingItem: {
+      id: ITEM.id,
+      eTag: ITEM.eTag,
+      versionId: ITEM.versionId,
+      semanticHash: planned.existingSemanticHash,
+    },
+  });
+
+  expect(result).toMatchObject({
+    status: 'replaced',
+    priorVersionId: '1.0',
+    item: { id: ITEM.id, versionId: '2.0' },
+  });
+  expect(graph.replaceFileContent).toHaveBeenCalledWith(
+    'drive-1', ITEM.id, DOCX, expect.any(String), { siteId: 'site-1', ifMatch: ITEM.eTag },
+  );
+  expect(graph.downloadFileVersion).toHaveBeenCalledWith('drive-1', ITEM.id, '1.0');
+  expect(graph.uploadFile).not.toHaveBeenCalled();
+  expect(suggestion.patchReviewReceipt).not.toHaveBeenCalled();
+  expect(graph.deleteFile).not.toHaveBeenCalled();
+});
+
+test('content repair rejects an unbound request before Graph access', async () => {
+  const result = await ensureIndividualReviewFile(SUGGESTION_ID, {
+    cycleCode: 'D26',
+    executionMode: 'backfill',
+    replaceExistingItem: { id: ITEM.id },
+  });
+  expect(result).toMatchObject({
+    status: 'target_guard_failed', error: { code: 'content_repair_not_manifest_bound' },
+  });
+  expect(graph.getFileMetadataByPath).not.toHaveBeenCalled();
+  expect(graph.replaceFileContent).not.toHaveBeenCalled();
 });
 
 test('backfill preflight is the sole local write exception and asserts every pointer target', async () => {

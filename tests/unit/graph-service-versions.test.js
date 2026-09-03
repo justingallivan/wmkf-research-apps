@@ -178,6 +178,54 @@ it('uses an asserted site/drive pair without re-resolving upload identity', asyn
   expect(global.fetch.mock.calls[0][0]).toContain('/drives/asserted-drive/');
 });
 
+it('replaces one stable item by id without using a path conflict behavior', async () => {
+  jest.spyOn(GraphService, 'getAccessToken').mockResolvedValue('token');
+  global.fetch = jest.fn().mockResolvedValue(response(200, {
+    id: 'item/id',
+    name: 'review.docx',
+    size: 9,
+    webUrl: 'https://sharepoint.test/review',
+    eTag: 'new-etag',
+    publication: { versionId: '2.0' },
+    lastModifiedDateTime: '2026-09-03T23:00:00Z',
+  }));
+
+  await expect(GraphService.replaceFileContent(
+    'drive/id',
+    'item/id',
+    Buffer.from('new-bytes'),
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    { siteId: 'site/id', ifMatch: 'old-etag' },
+  )).resolves.toMatchObject({
+    siteId: 'site/id', driveId: 'drive/id', id: 'item/id', versionId: '2.0',
+  });
+
+  expect(global.fetch.mock.calls[0][0])
+    .toContain('/drives/drive%2Fid/items/item%2Fid/content');
+  expect(global.fetch.mock.calls[0][0]).not.toContain('conflictBehavior');
+  expect(global.fetch.mock.calls[0][1]).toMatchObject({
+    method: 'PUT',
+    headers: expect.objectContaining({ Authorization: 'Bearer token', 'If-Match': 'old-etag' }),
+    body: Buffer.from('new-bytes'),
+  });
+});
+
+it('rejects stable-item content replacement without an exact ETag', async () => {
+  jest.spyOn(GraphService, 'getAccessToken');
+  global.fetch = jest.fn();
+
+  await expect(GraphService.replaceFileContent(
+    'drive/id',
+    'item/id',
+    Buffer.from('new-bytes'),
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    { siteId: 'site/id' },
+  )).rejects.toThrow('ifMatch is required');
+
+  expect(GraphService.getAccessToken).not.toHaveBeenCalled();
+  expect(global.fetch).not.toHaveBeenCalled();
+});
+
 it('rejects a partial asserted identity before a path read or upload', async () => {
   jest.spyOn(GraphService, 'getAccessToken');
 

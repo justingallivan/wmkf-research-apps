@@ -57,6 +57,8 @@ deployed/source/test/render verified rather than transport-smoked in Production.
 - `shared/templates/reviews/combined-review-v1.docx`
 - `shared/templates/reviews/individual-review-v2.docx`
 - `shared/templates/reviews/combined-review-v2.docx`
+- `shared/templates/reviews/individual-review-v3.docx`
+- `shared/templates/reviews/combined-review-v3.docx`
 - `lib/services/review-manager/export-reviews-service.js`
 - `pages/api/review-manager/export-reviews.js`
 - `lib/services/reviewer-thankyou-sweep.js`
@@ -166,9 +168,27 @@ SharePoint item `01G4GVMSZZ25YPTP3RGFEK6LCT64W3JPX2`,
 `Reviews/Review-1002874-Agnes Karasik.docx`, 69,733 bytes, version `1.0`, then
 ETag-conditionally repointed Dataverse. Independent readback matched semantic
 hash `gdc1:IjQ_lTPljr-Hz3msRORXRuMNm2SwZfPffHjlE3fO52o` and confirmed the old
-item still exists. Owner Word-web visual confirmation is pending. The runtime
-fix is not deployed; the remaining 22 writes, scheduled activation, and old-file
-cleanup remain unapproved.
+item still exists. The owner then confirmed that v2 kept the title on one line
+but Word Online still pushed it below the logo. OOXML inspection identified the
+remaining cross-renderer ambiguity: the behind-text floating logo still declared
+`wrapTight`, allowing Word Online to wrap the title around its shape. New v3
+individual and combined templates change only that first-page header geometry
+to explicit `wrapNone`; both render as clean one-page fixtures locally and the
+focused repair suite passes. The owner approved replacing the exact current
+Agnes file before later cleanup of the separate legacy item. Repair manifest
+`outputs/review-docx-repair/review-docx-repair-1002874-2026-09-03T23-45-44-078Z.json`
+(`ab98b779b660c77719c317f73b8f1004b08a898f7159971d6f5c97f9bfb2295d`)
+bound the current item ID, ETag, version `1.0`, prior semantic hash, new v3
+semantic hash, Dataverse ETag/source fingerprint, and exact target. The first
+write attempt failed safely with HTTP 423 while Word Online held the item lock;
+no bytes or pointers changed. The retry replaced the same stable SharePoint item
+`01G4GVMSZZ25YPTP3RGFEK6LCT64W3JPX2` and filename in place as version `2.0`,
+retaining and verifying version `1.0`. Independent read-only regeneration and
+download now classify the row `already_filed` and match v3 semantic hash
+`gdc1:E3KvF7rvlOaGoxps6DHihILCQlyDlSheguneB0F0ojw`; Dataverse pointers did not
+change. Owner Word Online visual confirmation of version `2.0` is pending. The
+runtime fix is not deployed; the remaining 22 writes, scheduled activation, and
+old-file cleanup remain unapproved.
 
 ## Parked
 

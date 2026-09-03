@@ -176,13 +176,21 @@ manifest hash `c30c76e47281208b8b4cc25976360453eebbdc65ba3d4b203c19a6e0f1a5692d`
 Execution created item `01G4GVMSZZ25YPTP3RGFEK6LCT64W3JPX2` at
 `Reviews/Review-1002874-Agnes Karasik.docx`, ETag-conditionally repointed this
 suggestion, and independently matched the corrected semantic hash. The old item
-still exists for later cleanup; owner Word-web visual confirmation is pending.
-The owner-directed
-path/name simplification and Word-web template correction produce replacement
-manifest hash
+still exists for later cleanup. Owner inspection of the new-path v2 item showed
+that Word Online kept the title together but moved it below the floating logo.
+The branch's v3 templates replace the behind-text logo's contradictory
+`wrapTight` directive with explicit `wrapNone`. Exact content-repair manifest
+hash `ab98b779b660c77719c317f73b8f1004b08a898f7159971d6f5c97f9bfb2295d`
+then versioned the same current item/name from `1.0` to `2.0`, retained and
+verified the prior version, and independently matched governed hash
+`gdc1:E3KvF7rvlOaGoxps6DHihILCQlyDlSheguneB0F0ojw` with this suggestion's
+pointers unchanged. Owner Word Online visual confirmation of version `2.0` is
+pending. The owner-directed path/name simplification and historical v2
+Word-web template correction produced replacement manifest hash
 `25f10fcd0347d7de02abcc8a744357d4e215fe56efa462ff8cc0a6eef99650ff`,
 containing 22 eligible missing rows with unique destinations plus the visible
-test exclusion, zero blockers, and no Request `1002874` candidate. The
+test exclusion, zero blockers, and no Request `1002874` candidate; it is now
+superseded by the v3 governed hash and must be regenerated before execution. The
 scheduled route remains inert,
 including no maintenance row, while
 `REVIEW_DOCX_SHAREPOINT_WRITE` is unset. Both rollout variables were confirmed
