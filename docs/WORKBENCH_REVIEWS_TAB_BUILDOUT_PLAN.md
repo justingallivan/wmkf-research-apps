@@ -3,10 +3,10 @@ title: "Workbench Reviews Tab — Consumption Build-Out Plan"
 domain: reviewer-workbench
 kind: plan
 status: active
-summary: "Reviews and synthesis are live; template-backed Word exports are source-built behind the Wave 25 schema-first release gate."
+summary: "Reviews and synthesis are live; Wave 25 is exact and template-backed Word exports await reviewed code promotion."
 canonical: false
 cataloged: 2026-07-03
-last_verified: 2026-09-02
+last_verified: 2026-09-03
 owner: product-engineering
 related:
   - docs/audits/AUDIT_REQUEST_WORKBENCH_TRUTH_2026-07-26.md
@@ -105,10 +105,10 @@ atomic Dataverse changeset — parent `wmkf_appreviewersuggestion`
 `answerValue`, `answerText` (= picklist option label at submit time), `answerHtml`
 [VERIFIED via `lib/external/build-review-submission.js`
 `buildReviewSubmission`].
-**[SOURCE-BUILT, NOT DEPLOYED]** Wave 25 additionally stores the complete ordered
-categorical option set in `wmkf_questionoptions`. Production preflight on
-2026-09-02 reported the field absent, so schema application/readback must precede
-deployment. Existing rows remain renderable with an explicit selected-only
+**[SCHEMA APPLIED; WRITER SOURCE-BUILT, NOT DEPLOYED]** Wave 25 adds the complete
+ordered categorical option set in `wmkf_questionoptions`. The owner-approved
+Production apply completed and independent readback was exact on 2026-09-03.
+Existing rows remain renderable with an explicit selected-only
 fallback; current question definitions are never relabeled as historical state.
 
 At the S326 starting point, the staff-facing consumption side was a read-only
@@ -278,8 +278,8 @@ monitoring in-flight (status/nudges). Owner confirmed scope = all four phases (S
   dedicated `piName` field; `proposalAuthors` (project leader/applicant)
   stands in as the best-available PI identity rather than extending the
   route.
-- **[SOURCE-BUILT and focused-test/visual-QA verified 2026-09-02; deployment
-  blocked on Wave 25.]**
+- **[SOURCE-BUILT and focused-test/visual-QA verified 2026-09-02; Wave 25
+  exact 2026-09-03; reviewed deployment still pending.]**
   The report model and Word renderer add a named `Reviewers` roster for the
   submitted-review population. Each row renders name plus accepted
   self-reported affiliation, falling back to the person affiliation and then

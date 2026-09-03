@@ -1061,8 +1061,8 @@ externally when they need PDF. A server-side canonical-DOCX → temporary
 SharePoint drive item → Microsoft Graph `content?format=pdf` workflow is
 `[PLANNED]`, not built; its permissions, temporary-file retention/cleanup, and
 tenant conversion behavior must be verified before implementation. The format
-pass requires Wave 25 `wmkf_questionoptions` to be provisioned and read back
-before deployment. Full
+pass uses Wave 25 `wmkf_questionoptions`, provisioned and read back exact in
+Production on 2026-09-03; the compatible code still awaits reviewed deployment. Full
 future contract: `docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md`.
 
 **Phase 4 BUILT (2026-07-03); reliability production-proven 2026-07-28:**

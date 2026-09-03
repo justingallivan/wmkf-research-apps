@@ -14,9 +14,9 @@ deployed, or production-enabled.
   the submitted review through the approved individual template and attaches it
   when generation succeeds. Per-review render failure remains nonfatal to the
   thank-you send and is reported separately.
-- [VERIFIED via production metadata preflight 2026-09-02] The planned
-  `wmkf_appreviewanswer.wmkf_questionoptions` Memo field is absent in Production.
-  No schema write was performed.
+- [VERIFIED via Production apply and independent metadata readback 2026-09-03]
+  Wave 25 created `wmkf_appreviewanswer.wmkf_questionoptions` as the exact
+  nullable Memo field declared by the schema, with `MaxLength=20000`.
 - [VERIFIED via source] New categorical answer rows snapshot the complete ordered
   `{value,label}` option set. Legacy rows with no option snapshot regenerate with
   an explicit selected-only note; corrupt snapshots render an explicit unavailable
@@ -27,18 +27,15 @@ deployed, or production-enabled.
 
 ## Release Boundary
 
-Do not merge or deploy the branch before the Wave 25 field is applied and read
-back exact in Production. The reader and every active answer writer select/write
-the new field, so a code-first deployment would fail at runtime.
+The Wave 25 schema-first gate is cleared in Production. The source branch is
+still not merged or deployed.
 
-The next authorized action requires explicit owner approval:
+Remaining release sequence:
 
-1. Run the dry-run Production preflight again.
-2. Apply only `wave25-review-answer-question-options` to Production.
-3. Read back exact Memo metadata and a selectable entity-set projection.
-4. Rebase the branch on current `main`, rerun focused/full gates and build, then
-   open/merge the normal reviewed release.
-5. After deployment, run signed-in read/export verification. Do not manufacture
+1. Rebase the branch on current `main` and rerun focused/full gates and build.
+2. Review the final diff and obtain explicit owner approval before merging or
+   pushing to `main`, which auto-deploys Production.
+3. After deployment, run signed-in read/export verification. Do not manufacture
    or alter a submitted review merely to prove the new snapshot writer.
 
 ## Implementation Surfaces

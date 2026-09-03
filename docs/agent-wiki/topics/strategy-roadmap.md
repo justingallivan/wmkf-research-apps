@@ -237,9 +237,10 @@ document inventory, and individual implementation plans do not establish priorit
   The existing Reviews-tab action remains one combined, server-authoritative
   download, and the thank-you sweep produces the separate individual courtesy
   attachment. No SharePoint export registry/upload is part of this phase. New
-  categorical rows snapshot the complete option set; Production Wave 25 is
-  currently absent and is the schema-first release blocker. Final Writeup persona
-  access proof and deliberate enablement remains immediately afterward.
+  categorical rows snapshot the complete option set. Production Wave 25 was
+  owner-approved, applied, and read back exact on 2026-09-03; reviewed code
+  promotion and signed-in verification remain. Final Writeup persona access
+  proof and deliberate enablement remains immediately afterward.
 - **Most recent owner-directed release (S470, 2026-08-30 PT / 2026-08-31 UTC):**
   Final Writeup Slice 1 is Production-proved on `main` at `ebb147bb` in Ready
   deployment `dpl_7kzQ1v7XGtyNx4Fady2JxMrTxQEJ`; Wave 22 is exact and

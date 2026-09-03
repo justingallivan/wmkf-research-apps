@@ -6,7 +6,7 @@ status: active
 summary: "Long-term product direction; current execution priority is owned by CURRENT_WORK_QUEUE.md."
 canonical: false
 cataloged: 2026-07-02
-last_verified: 2026-09-02
+last_verified: 2026-09-03
 owner: product-engineering
 related:
   - docs/SYSTEM_MODEL.md
@@ -18,7 +18,7 @@ related:
 
 # Where We're Headed
 
-**Last verified: 2026-09-02.** This document owns long-term direction and principles. The
+**Last verified: 2026-09-03.** This document owns long-term direction and principles. The
 ordered, current delivery agenda lives in `docs/CURRENT_WORK_QUEUE.md`; this document is not a
 backlog.
 
@@ -141,10 +141,11 @@ export is a combined document: **[SOURCE-BUILT, NOT DEPLOYED]** the combined
 download now uses a server-authoritative tracked template, while the thank-you
 sweep uses a separate individual-review template for its courtesy attachment.
 This phase does not upload review outputs to SharePoint. New categorical rows
-snapshot every presented option so future regeneration is faithful; Production
-Wave 25 is still absent and must be applied/read back before code deployment.
+snapshot every presented option so future regeneration is faithful. Production
+Wave 25 was owner-approved, applied, and read back exact on 2026-09-03; the code
+remains source-built pending normal reviewed promotion and signed-in verification.
 Final Writeup persona access proof and deliberate enablement remains immediately
-after that schema-first release. As of 2026-08-31, the ordinary-staff
+after that review-DOCX release. As of 2026-08-31, the ordinary-staff
 dashboard/focused-review foundation is Production-deployed
 through PR #140 (`ce229778`) with bounded reads and external-Word actions. Its
 separate acknowledgement readiness value is exact `on` in Production. The

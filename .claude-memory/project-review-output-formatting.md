@@ -5,7 +5,7 @@ status: active
 metadata:
   node_type: memory
   type: project
-  last_verified: 2026-09-02 via template-backed renderer, focused tests, and rendered-page inspection; production rollout remains blocked on Wave 25
+  last_verified: 2026-09-03 via template-backed renderer QA plus exact Production Wave 25 apply/readback; code remains source-built and not deployed
   originSessionId: 7db29a2d-b16d-490a-80f0-7e4fa4c04f0a
 ---
 
@@ -33,8 +33,9 @@ Do not:
 Ground truth: the formatting pass is `[SOURCE-BUILT, NOT DEPLOYED]` on
 `codex/review-docx-templates`. The tracked templates and OOXML renderer are in
 `shared/templates/reviews/` and `lib/services/review-documents/`. Production
-metadata preflight on 2026-09-02 reported the required option-snapshot field
-absent; code must follow schema.
+Wave 25 was applied and independently read back exact on 2026-09-03; the
+schema-first gate is cleared, but code still requires the normal reviewed
+merge/deployment sequence.
 
 Owner note (S328, 2026-07-04), captured while architecting the review
 thank-you sweep with courtesy-copy attachment:
