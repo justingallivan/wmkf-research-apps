@@ -124,7 +124,11 @@ describe('template-backed review DOCX renderer', () => {
       matrix: deriveReviewMatrix(four, null),
       generatedAtIso: GENERATED_AT,
     });
-    const xml4 = await archiveText(await renderCombinedReviewDocx(report4), 'word/document.xml');
+    const buffer4 = await renderCombinedReviewDocx(report4);
+    const xml4 = await archiveText(buffer4, 'word/document.xml');
+    const header4 = await archiveText(buffer4, 'word/header2.xml');
+    expect(header4).toContain('Aggregated Proposal Reviews');
+    expect(header4).not.toContain('Combined Proposal Review');
     expect(xml4).toContain('Outcome');
     expect(xml4).toContain('☒');
     expect(xml4).toContain('☐');
