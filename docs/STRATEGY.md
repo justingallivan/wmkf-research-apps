@@ -6,7 +6,7 @@ status: active
 summary: "Long-term product direction; current execution priority is owned by CURRENT_WORK_QUEUE.md."
 canonical: false
 cataloged: 2026-07-02
-last_verified: 2026-08-31
+last_verified: 2026-09-02
 owner: product-engineering
 related:
   - docs/SYSTEM_MODEL.md
@@ -18,7 +18,7 @@ related:
 
 # Where We're Headed
 
-**Last verified: 2026-08-31.** This document owns long-term direction and principles. The
+**Last verified: 2026-09-02.** This document owns long-term direction and principles. The
 ordered, current delivery agenda lives in `docs/CURRENT_WORK_QUEUE.md`; this document is not a
 backlog.
 
@@ -133,12 +133,17 @@ index and workflow surface, not a second editor or document store.
 
 ## Current execution
 
-The ordered agenda is maintained in `docs/CURRENT_WORK_QUEUE.md`. As of
-2026-08-30, the owner selected Final Writeup infrastructure as the next delivery
-priority. The target is an underlying, superuser-testable path by 2026-09-04,
-not broad staff rollout: same-item Final lineage, explicit transition
-attribution, acknowledgement persistence, and dashboard data. As of 2026-08-31,
-the ordinary-staff dashboard/focused-review foundation is Production-deployed
+The ordered agenda is maintained in `docs/CURRENT_WORK_QUEUE.md`. Final Writeup
+infrastructure is complete through the bounded ordinary-staff dashboard and
+versioned persona-configuration foundation described below. On 2026-09-02, the
+owner selected submitted-review DOCX export to SharePoint as the immediate next
+session task. That work is **planned, not built**: generate one staff-readable
+derivative per authoritative submitted Dataverse review, store it under the
+request's existing SharePoint document root, and preserve server-side write
+authorization, durable identity, idempotent retry, and truthful per-review
+partial-failure handling. Final Writeup persona access proof and deliberate
+enablement remains immediately afterward. As of 2026-08-31, the ordinary-staff
+dashboard/focused-review foundation is Production-deployed
 through PR #140 (`ce229778`) with bounded reads and external-Word actions. Its
 separate acknowledgement readiness value is exact `on` in Production. The
 signed-in dashboard/Final read path and responsible-PD exclusion passed on
@@ -149,7 +154,8 @@ assigned and its six requested Global privileges are effective for all 11
 confirmed audience members. The colleague's post-role retry succeeded, appeared
 in review history, and independent Production readback proved exactly one
 complete acknowledgement row. Program-audience configuration is now
-Production-live; persona-specific work is next.
+Production-live; persona-specific work is next after the submitted-review DOCX
+export task.
 Every edit/review action opens the canonical SharePoint Word document in its
 own browser window/tab (or desktop Word through Microsoft's supported option);
 the application will not embed or recreate Word editing.

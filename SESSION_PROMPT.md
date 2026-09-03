@@ -1,74 +1,118 @@
-# Session 474 Prompt: Final Writeup Persona Access Proof and Rollout
+# Session 475 Prompt: Submitted Review DOCX Export to SharePoint
 
-## Session 473 Summary
+## Session 474 Summary
 
-Session 473 (2026-09-02) completed, reviewed, promoted, and Production-verified
-the Workbench Reviewer Follow-up consolidation. The canonical queue now returns
-to Final Writeup persona rollout.
+Session 474 (2026-09-02) reconciled the completed Reviewer Follow-up release and
+recorded the owner's next priority: export DOCX versions of submitted reviews
+to each request's SharePoint document area. This is a handoff task only; the
+export capability is **planned, not built**.
 
 ### What Was Completed
 
-1. **Reviewer Follow-up is Production-live**
-   - The shared lifecycle navigation is live in this order: **Request list →
-     Initial assessments → Reviewer follow-up → Final writeups → Awardees**.
-   - `/workbench/reviewer-follow-up` provides the consolidated cycle-level
-     follow-up surface while preserving the existing per-request reviewer
-     workflow and explicit action semantics.
-   - The cycle picker is organization-wide for authorized `reviewers` app users.
-     **My requests** remains the personal default; **All requests** exposes every
-     eligible request in the selected cycle, including set-aside rows only when
-     explicitly requested.
+1. **Reviewer Follow-up release documentation is reconciled**
+   - Runtime merge `acf40fb85a36ab2d481869c706a069abea52c087` remains the
+     Production release for organization-wide Reviewer Follow-up visibility and
+     lead-PD/superuser-only request mutations.
+   - The durable release reconciliation is on `main` in commits `05276137` and
+     `35d0c54c`; Ready Production deployment
+     `dpl_8gdbmegvhoTiXDK1xPyEjFjYUWAX` carried the documentation-only release.
+   - No Vercel CLI update was performed. The CLI was used only for read-only
+     deployment verification.
 
-2. **Request-bound writes are enforced at the server boundary**
-   - Authorized staff may read the organization-wide projection.
-   - Reviewer Follow-up mutations independently resolve the target request and
-     allow only its lead PD or a superuser. Foreign requests are therefore
-     read-only for ordinary non-lead users even if a client attempts a direct
-     API call.
-   - This narrow exception does not change the settled organization-open
-     reviewer-person merge or staff-wide document-read decisions.
+2. **The next task is explicitly bounded**
+   - [VERIFIED via `lib/services/review-manager/reviewers-service.js`,
+     `lib/services/review-answers.js`, and
+     `docs/APPLICATION_STATE_ATLAS.md`] A submitted review is authoritative in
+     Dataverse: `wmkf_reviewreceivedat` marks receipt and
+     `wmkf_appreviewanswer` stores the point-in-time question/answer snapshot.
+   - [VERIFIED via `lib/services/graph-service.js` and the Initial Assessment /
+     Pre-Site artifact services] The app already knows how to create a nested
+     folder beneath the existing request document root and upload a DOCX.
+   - [PLANNED] The new action will create staff-readable DOCX derivatives in
+     SharePoint. The DOCX files do not become the review system of record.
 
-3. **Review and release evidence is complete**
-   - Two independent Claude code-review passes returned **APPROVE** after the
-     requested corrections.
-   - The merged candidate passed 17 focused suites / 241 tests, relevant CI
-     gates, lint with zero errors, type checking, and the production build.
-   - Runtime merge commit `acf40fb85a36ab2d481869c706a069abea52c087`
-     reached Ready Production deployment
-     `dpl_7ToPKYtpXhyW3WmPmn1WiY9wz2iv`.
-   - Authenticated Production proof: D26 changed from **My 10** to **All 44**;
-     its picker reports **44 active + 184 set aside**. J26 changed from **My 0**
-     to **All 5**. No write control was exercised.
-   - Rollback target: deployment
-     `dpl_3SJebjL3tPTdv89o5dVzR1dBS3Y2`, commit `39413e3d`.
+3. **Priority was reconciled without dropping existing work**
+   - `docs/CURRENT_WORK_QUEUE.md` now places the export task at order 2.
+   - Final Writeup persona access proof and deliberate rollout moves to order 3
+     and remains the immediate following task.
 
 ## Next Item
 
+### Export Submitted Reviews as DOCX Files to SharePoint
+
+Build the simplest request-level, authenticated export that produces one Word
+document per currently submitted review and files it beneath the request's
+existing SharePoint document root.
+
+Start with `/contract-reconcile` because this crosses the submitted-review
+producer, Dataverse persistence, staff reader, DOCX renderer, API authorization,
+and SharePoint writer. Before implementation, write a concise plan that resolves
+the following contracts from current source and live metadata rather than
+guessing:
+
+1. **Source and content**
+   - Include only reviews whose authoritative parent has
+     `wmkf_reviewreceivedat`.
+   - Render the immutable snapshot question text and answers in stored order,
+     plus only the minimum useful request/reviewer/submission metadata.
+   - Re-sanitize rich text at the server boundary and render supported
+     formatting safely. Do not call an LLM.
+
+2. **Folder and file ownership**
+   - Use the request's existing Dynamics-tracked SharePoint folder and a
+     server-owned subfolder. The working recommendation is
+     `Artifacts/Submitted Reviews`; confirm it does not collide with a live
+     convention before locking it.
+   - Use server-generated, SharePoint-safe filenames. Do not accept a folder or
+     filename from the browser.
+   - Persist stable Graph site/drive/item identity and a source fingerprint in
+     the smallest suitable durable registry. Probe the existing Dataverse
+     model first; do not assume a new table or overload a field without tracing
+     its current consumers.
+
+3. **Authorization**
+   - The export is a write. Resolve the request and actor server-side and reuse
+     the Reviewer Follow-up hard boundary: the request's lead PD or a
+     superuser. UI visibility is not authorization.
+   - Keep foreign requests read-only for ordinary non-lead users and preserve
+     the existing organization-open reviewer read contract.
+
+4. **Retry, concurrency, and partial success**
+   - An unchanged rerun must reuse the existing exported item rather than create
+     a duplicate. If submitted content has genuinely changed, create a new
+     SharePoint version of the same stable item unless the plan finds a stronger
+     current contract.
+   - Key idempotency to stable review identity plus a deterministic source
+     fingerprint, not display names or paths.
+   - Return a per-review outcome. One failed upload must not erase successful
+     exports or be reported as whole-batch success; retry only missing, failed,
+     or changed items.
+   - Define the race behavior for two concurrent export requests before wiring
+     the UI.
+
+5. **Verification and release**
+   - Cover renderer structure and sanitization, filename safety, submitted-only
+     selection, lead-PD/superuser authorization, foreign non-lead denial,
+     idempotent rerun, changed-content versioning, concurrent calls, Graph
+     failure, and mixed batch outcomes.
+   - Run the applicable route/security, trust-boundary, documentation/Atlas,
+     focused test, and build gates. Any new persistence requires schema-as-code,
+     migration/readiness treatment, and Atlas reconciliation.
+   - Preview may verify read-only/UI behavior but cannot prove the write against
+     its disconnected reviewer sandbox. A controlled Production SharePoint write
+     smoke requires a named request and fresh explicit owner authorization; do
+     not infer that authorization from this planning handoff.
+
+## Following Item
+
 ### Final Writeup Persona Access Proof and Deliberate Rollout
 
-The canonical next item is `docs/CURRENT_WORK_QUEUE.md` order 2. The v2 Final
-Writeup audience configuration is already Production-live and exact, but persona
-lenses remain hard-disabled in `shared/config/finalWriteupPersonas.js`.
-
-Proceed in this order:
-
-1. Identify one representative Program Coordinator and one representative
-   Leadership user, plus an exact existing canonical Final Writeup Word item
-   appropriate for access testing.
-2. Prove each representative can open that exact Word item under their normal
-   identity. App visibility and SharePoint file permission are separate controls;
-   both must pass.
-3. If both access checks pass, deliberately enable the tracked persona flag and
-   run the focused tests, relevant gates, build, Preview smoke, and controlled
-   Production promotion.
-4. Smoke the PD, PC, Leadership, overlap, unassigned/ineligible, and superuser
-   cases. Preserve the responsible-PD no-self-review rule and the neutral
-   Reviewed / Updated since review semantics.
-
-Do not infer personas from names, titles, email addresses, or program labels.
-Do not add an elevated team privilege or require an outside Dataverse
-administrator. Do not enable the flag before the two representative Word-access
-checks pass.
+After the export task, return to `docs/CURRENT_WORK_QUEUE.md` order 3. Prove one
+representative Program Coordinator and one representative Leadership user can
+open the exact canonical Final Writeup Word item under their normal identities;
+then, and only then, deliberately enable and smoke the existing persona lenses.
+The production v2 configuration remains exact and the tracked rollout flag
+remains false.
 
 ## Parked — Retain for Future Work
 
@@ -76,26 +120,32 @@ checks pass.
    remain held under `docs/REVIEWER_ENGAGEMENT_SPEC.md`.
 2. Public/onboarding reviewer-token documentation cleanup remains owner-deferred;
    update source generators before republishing derived artifacts.
-3. Mobile-specific Workbench redesign is lower priority because mobile use is
-   expected to be rare; preserve responsive correctness without treating mobile
-   polish as the current work item.
+3. Mobile-specific Workbench redesign remains lower priority because mobile use
+   is expected to be rare; preserve responsive correctness without treating
+   mobile polish as current work.
 4. Pre-J27 Initial Assessment Production write proof remains owner-deferred.
-5. Post-cycle invitation-link strictness and reviewer-cron ledger promotion remain
-   parked until the current reviewer cycle ends.
+5. Post-cycle invitation-link strictness and reviewer-cron ledger promotion
+   remain parked until the current reviewer cycle ends.
 
 ## Key Files
 
 | File | Purpose |
 |---|---|
-| `docs/CURRENT_WORK_QUEUE.md` | Canonical priority and next gate |
-| `docs/FINAL_WRITEUP_PERSONA_CONFIGURATION_PLAN.md` | Persona configuration and rollout contract |
-| `shared/config/finalWriteupPersonas.js` | Tracked rollout flag; currently `false` |
-| `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` | Canonical Final artifact and access model |
-| `docs/REVIEWER_FOLLOW_UP_ORG_CYCLE_VISIBILITY_PLAN.md` | Historical, completed Reviewer Follow-up release record |
-| `docs/REVIEWER_ENGAGEMENT_SPEC.md` | Reminder/token policy and cron hold |
+| `docs/CURRENT_WORK_QUEUE.md` | Canonical priority and completion gate |
+| `docs/APPLICATION_STATE_ATLAS.md` | Authoritative ownership/read/write map |
+| `docs/atlas/dataverse-wmkf-appreviewanswer.md` | Submitted answer-snapshot contract |
+| `lib/services/review-manager/reviewers-service.js` | Current submitted-review projection |
+| `lib/services/review-answers.js` | Shared answer-snapshot reader |
+| `pages/api/review-manager/reviewers.js` | Organization-open read and request-write policy context |
+| `lib/services/graph-service.js` | Existing folder creation and SharePoint upload primitives |
+| `lib/services/initial-assessment/artifact-service.js` | Existing DOCX render/upload reference |
+| `lib/services/pre-site-visit/artifact-service.js` | Existing stable artifact identity and upload reference |
+| `shared/config/requestDocument.js` | Existing server-owned artifact folder conventions |
+| `docs/FINAL_WRITEUP_PERSONA_CONFIGURATION_PLAN.md` | Following persona-rollout contract |
 
 ## First Action
 
-Re-read the canonical queue and persona plan, then coordinate the two named
-representative access checks against one exact existing Final Writeup Word item.
-No configuration or runtime write is authorized merely by beginning that proof.
+Run `/contract-reconcile`, trace the current submitted-review and SharePoint
+contracts end to end, and produce the concise implementation plan. Do not add a
+schema, route, folder, or UI control until the durable identity and partial-batch
+contracts have been reviewed.

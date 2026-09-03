@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-08-31
+last_verified: 2026-09-02
 stale_after_days: 90
 owner: product-strategy
 source_files:
@@ -232,7 +232,14 @@ document inventory, and individual implementation plans do not establish priorit
   and hazards in `project-reviewer-card-simplification-direction`; S395 scope-accretion
   caution applies; high-risk automation stays review-only until the representative
   benchmark exists.
-- Current priorities: `docs/CURRENT_WORK_QUEUE.md`.
+- Current priorities: `docs/CURRENT_WORK_QUEUE.md`. **Owner priority change
+  2026-09-02:** the immediate next-session task is a planned, not-yet-built
+  request-level export that renders one DOCX from each authoritative submitted
+  Dataverse review snapshot and writes the derivatives beneath the request's
+  existing SharePoint document root. The implementation must settle durable
+  identity, authorization, idempotent rerun/versioning, and per-review partial
+  success before coding. Final Writeup persona access proof and deliberate
+  enablement remains preserved immediately afterward.
 - **Most recent owner-directed release (S470, 2026-08-30 PT / 2026-08-31 UTC):**
   Final Writeup Slice 1 is Production-proved on `main` at `ebb147bb` in Ready
   deployment `dpl_7kzQ1v7XGtyNx4Fady2JxMrTxQEJ`; Wave 22 is exact and
