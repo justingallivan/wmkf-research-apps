@@ -43,6 +43,7 @@ import RespondReminderModal from './RespondReminderModal';
 import { buildScholarSearchUrl, isRealScholarProfileUrl } from '../../../lib/utils/scholar-url';
 import { ContactParser } from '../../../lib/utils/contact-parser';
 import { splitReferredByReason } from '../../../lib/utils/reviewer-provenance';
+import { acceptedReviewerRemoveWarning } from './remove-reviewer-confirm';
 
 export const VIP_FLAGS_LOAD_TIMEOUT_MS = 10000;
 
@@ -388,6 +389,9 @@ function ReviewerInvitePanelForRequest({ requestId, candidates = [], removedCand
   // throw on 4xx/5xx, so we check resp.ok before refreshing.
   const removeCandidate = async (c) => {
     const msg = `Remove ${c.name || 'this candidate'} from this request?\n\n`
+      // Accepted reviewers who back out belong in "Record reviewer withdrawal"
+      // (Track Reviewers), not Remove — Remove erases the acceptance.
+      + acceptedReviewerRemoveWarning({ accepted: c.accepted === true, withdrawalLocation: 'track-reviewers' })
       + 'This drops them from the candidate list for this proposal'
       + (c.invited && !c.accepted ? ' and revokes their invitation link' : '')
       + '. Their reviewer record is preserved, and you can restore them from the '

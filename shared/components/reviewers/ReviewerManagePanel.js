@@ -33,6 +33,7 @@ import { createPortal } from 'react-dom';
 import ReviewerDueDateEditor from './ReviewerDueDateEditor';
 import ReviewerActivityDrawer from './ReviewerActivityDrawer';
 import { latestActivitySummary } from './reviewer-activity-history';
+import { acceptedReviewerRemoveWarning } from './remove-reviewer-confirm';
 import { Card, Button } from '../Layout';
 import {
   STATUS_PIPELINE,
@@ -1745,7 +1746,15 @@ export default function ReviewerManagePanel({
   // we never leave an unselected row with a live link.
   const handleRemoveReviewer = async (reviewer) => {
     const hasLiveLink = reviewer.tokenState === 'active';
+    // An accepted reviewer who backed out should be recorded as a withdrawal
+    // (same menu, "Record reviewer withdrawal"), not removed — Remove erases
+    // the acceptance. Warn first; the staffer still decides.
     const msg = `Remove ${reviewer.name || 'this reviewer'} from this request?\n\n`
+      + acceptedReviewerRemoveWarning({
+        accepted: reviewer.responseType === 'accepted',
+        // The menu only offers withdrawal while the review is outstanding.
+        withdrawalLocation: canTransitionToTerminal(reviewer) ? 'same-menu' : 'track-reviewers',
+      })
       + 'This drops them from your reviewer list for this proposal. '
       + (hasLiveLink ? 'Their review link will be revoked. ' : '')
       + 'Their reviewer record and any review history are preserved.';
