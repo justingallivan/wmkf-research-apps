@@ -80,8 +80,12 @@ describe('template-backed review DOCX renderer', () => {
     const documentXml = await archive.file('word/document.xml').async('string');
     const coreXml = await archive.file('docProps/core.xml').async('string');
     const rootRelationships = await archive.file('_rels/.rels').async('string');
+    const firstPageHeader = await archive.file('word/header2.xml').async('string');
+    const continuationHeader = await archive.file('word/header1.xml').async('string');
     expect(archive.file('word/header1.xml')).not.toBeNull();
     expect(archive.file('word/footer1.xml')).not.toBeNull();
+    expect(firstPageHeader).toContain('Proposal Review');
+    expect(`${firstPageHeader}${continuationHeader}`).not.toContain('Individual');
     expect(documentXml).toContain('☒  First &amp; strongest');
     expect(documentXml).toContain('☐  Second &lt;later&gt;');
     expect(documentXml).toContain('Choose one');
