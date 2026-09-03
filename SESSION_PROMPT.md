@@ -36,6 +36,16 @@ export capability is **planned, not built**.
    - Final Writeup persona access proof and deliberate rollout moves to order 3
      and remains the immediate following task.
 
+4. **The Vercel Node 22 ESM runtime incident is closed**
+   - [PRODUCTION-PROVED] The `sanitize-html` 2.17.7 upgrade initially caused
+     `ERR_REQUIRE_ESM` at module load despite green CI and a Ready deployment.
+     The release was reverted, then fixed forward by bundling the ESM dependency
+     chain through `transpilePackages`.
+   - PR #144 merge `39413e3d` is Production-live; the external-review draft
+     probe reaches the expected application 401 rather than a module-load 500.
+   - The durable runtime constraint is recorded in
+     `.claude-memory/project-vercel-node22-no-require-esm.md`.
+
 ### Commits
 
 - `0b395495` - Build organization-wide reviewer follow-up visibility
@@ -43,6 +53,8 @@ export capability is **planned, not built**.
 - `a4dfe47f` - Address reviewer authorization review findings
 - `fda69558` - Record Claude approval and strengthen review tests
 - `0962bc99` - Record reviewer follow-up Preview verification
+- `9a59297a` - Revert the production-breaking sanitize-html upgrade
+- `39413e3d` - Bundle sanitize-html's ESM dependency chain on Vercel
 - `acf40fb8` - Merge organization-wide reviewer follow-up visibility
 - `8e23aa95` - Record reviewer follow-up Production release
 - `05276137` - Reconcile Reviewer Follow-up release docs
@@ -170,6 +182,7 @@ remains false.
 | `lib/services/pre-site-visit/artifact-service.js` | Existing stable artifact identity and upload reference |
 | `shared/config/requestDocument.js` | Existing server-owned artifact folder conventions |
 | `docs/FINAL_WRITEUP_PERSONA_CONFIGURATION_PLAN.md` | Following persona-rollout contract |
+| `.claude-memory/project-vercel-node22-no-require-esm.md` | Vercel Node 22 ESM loading incident and prevention contract |
 
 ## First Action
 

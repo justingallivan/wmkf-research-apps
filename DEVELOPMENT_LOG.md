@@ -10,6 +10,24 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## September 2026 — Vercel ESM runtime incompatibility contained (Session 474)
+
+**Milestone:** A production-wide `ERR_REQUIRE_ESM` outage triggered by the
+security-required `sanitize-html` upgrade was reverted, diagnosed, and fixed
+forward without leaving the dependency vulnerable.
+**Sessions:** 473–474 (incident response, revert, runtime diagnosis, bundling
+fix, review, promotion, and Production route proof).
+**Ship state:** PR #144 merge `39413e3d` bundles `sanitize-html` and its ESM-only
+parser dependencies through `transpilePackages`; the webpack-only loose ESM
+external setting is excluded from Turbopack. Production now runs
+`sanitize-html` 2.17.7, and the external-review draft probe reaches its expected
+application 401 instead of failing at module load.
+**Why it matters:** green CI and a Ready deployment do not prove that an
+externalized dependency can load in Vercel's older Node 22.x runtime; future
+ESM-only server dependencies now have a documented bundle-and-probe contract.
+**Pointers:** `.claude-memory/project-vercel-node22-no-require-esm.md`;
+`next.config.js`; commits `9a59297a`, `39413e3d`.
+
 ## September 2026 — Reviewer Follow-up became organization-wide with request-safe writes (Session 474)
 
 **Milestone:** Authorized Workbench users can monitor every eligible request in
