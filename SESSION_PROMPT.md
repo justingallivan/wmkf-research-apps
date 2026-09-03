@@ -63,7 +63,8 @@ deployed/source/test/render verified rather than transport-smoked in Production.
 ## Following Priority
 
 After this schema-first release is verified, return to Final Writeup persona
-access proof and deliberate rollout in `docs/CURRENT_WORK_QUEUE.md`.
+deliberate rollout in `docs/CURRENT_WORK_QUEUE.md`; the representative Word-access
+proof passed 2026-09-03 (owner-reported).
 
 ## Parked
 

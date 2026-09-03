@@ -3,10 +3,10 @@ title: Final Writeup Review — Implementation Plan
 domain: workbench
 kind: plan
 status: active
-summary: "Final runtime and matrix are live; the reviewed v2 staffing configuration and access proof now gate the disabled persona rollout."
+summary: "Final runtime and matrix are live; v2 staffing and representative Word access are proved, so only deliberate enablement and smoke gate the persona rollout."
 canonical: false
 cataloged: 2026-08-28
-last_verified: 2026-08-31
+last_verified: 2026-09-03
 owner: product-engineering
 related:
   - docs/audits/final-writeup-review-fable-review-2026-08-28.md
@@ -421,7 +421,7 @@ the v2 resolver/editor/tooling and removes the team prototype after a caller
 census. No team was created. The no-read rollout-off behavior and fail-closed
 viewer semantics remain test-covered.
 
-Until provisioning and file-access proof are complete:
+Until deliberate enablement and persona smoke are complete (representative file-access proof passed 2026-09-03):
 
 - responsible-PD ownership can be enforced now;
 - ordinary PD review can be enabled for existing Workbench users;
@@ -607,7 +607,9 @@ This slice can ship before the PC/leadership persona model because responsible-P
   create the exact no-privilege PD/PC/leadership teams (or run the tracked apply
   under an appropriately privileged operator identity), after which engineering
   must read back membership and zero-role state, pin the three GUIDs, and prove
-  representative PC/leadership Word access before enabling the resolver.
+  representative PC/leadership Word access before enabling the resolver. (The
+  team approach was later superseded by the v2 staffing configuration; the
+  Word-access proof itself passed 2026-09-03, see Slice 5.)
 - Add **Ready for leadership review**, moving the Final lifecycle from `REVIEW` to `FINAL` and storing the exact milestone version/hash/time plus explicit actor/time.
 - Enable PC all-active view and exceptional backup transition.
 - Enable CSO/President leadership-stage queues.
@@ -623,7 +625,7 @@ This slice can ship before the PC/leadership persona model because responsible-P
 - Prove another PD can review and acknowledge without stage authority.
 - Prove a responsible PD cannot mark their own writeup reviewed.
 - Prove a routine Word edit changes the personal label without requeueing leadership.
-- Prove CSO/President/PC SharePoint access independently; do not equate an app link with file permission.
+- **Complete for President and PC:** **[OWNER-REPORTED 2026-09-03]** Representative Word access is proved: President Allison Keller (Leadership) opened the canonical Word item through the signed-in Final Writeups experience and marked it reviewed on 2026-09-03, and Program Coordinators Duncan Spore and Sarah Hibler did the same (dates not recorded). The owner saw Allison's acknowledgement on the dashboard; no independent Dataverse readback was run. CSO access is not yet separately proved.
 - Stop before board-package generation or Power Automate integration.
 
 ## Likely file surface
@@ -721,6 +723,6 @@ exact 11-person roster and correct Request `1002788` states/actions with zero
 browser-console errors. PC backup, non-superuser matrix visibility,
 leadership-specific lenses, and general rollout follow only after the v2
 configuration migration, rollback/repair proof, and representative Word access
-are verified. This sequence advances the
+are verified; the Word-access proof passed 2026-09-03 (owner-reported). This sequence advances the
 approved experience without guessing role identity or inventing the still-unknown
 board-package workflow.

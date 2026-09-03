@@ -38,7 +38,7 @@ independently server-gated to the resolved request's lead PD or a superuser, so
 foreign rows are read-only for ordinary non-lead users. Authenticated Production
 proof showed D26 My 10 → All 44 (picker: 44 active + 184 set aside) and J26 My 0
 → All 5 without exercising a write. The canonical next item is Final Writeup
-persona access proof and rollout, not more Reviewer Follow-up promotion.
+persona rollout (access proof passed 2026-09-03), not more Reviewer Follow-up promotion.
 
 **2026-07-29 editor-direction implementation checkpoint:** Allison is a confirmed primary
 user for the Editor lens. The target contract preserves the former
@@ -64,7 +64,8 @@ team source is removed and no Production team was created. On 2026-09-01 UTC,
 the dry-run-first command upgraded the setting once; exact readback proved v2
 at `W/"96944113"`, all 11 assignments, zero stale/unassigned rows, and unchanged
 nine-person Research/six-person Southern California audiences. Representative
-Word access remains. The
+Word access was proved 2026-09-03 (owner-reported: Allison Keller, Duncan Spore,
+Sarah Hibler opened Word and acknowledged); the flag flip remains. The
 first fixed gate is a human-in-the-loop, end-to-end Initial Assessment pilot by
 2026-08-10, ahead of proposal intake around 2026-08-18. Authorized staff use a
 dedicated representative dummy production request to generate, inspect, and edit the canonical
@@ -295,9 +296,9 @@ planned. Current authority is
   all 11 confirmed audience members. The colleague's post-role retry succeeded,
   appeared in review history, and independent readback proved exactly one
   complete acknowledgement row for Request `1002788`. Persona lenses remain
-  disabled until the reviewed version-2 staffing configuration is implemented,
-  migrated/read back, and representative PC and leadership Word access is
-  proved.
+  disabled; the version-2 staffing configuration is migrated/read back and
+  representative PC and leadership Word access was proved 2026-09-03, so only
+  the deliberate flag flip, deployment, and persona smoke remain.
   **[PRODUCTION-LIVE + SIGNED-IN READ/WRITE PROVED 2026-08-31]** Role
   eligibility is not the same as per-program matrix assignment. Commit
   `5573bca3` is live in Ready Production deployment

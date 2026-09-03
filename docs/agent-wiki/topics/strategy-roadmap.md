@@ -242,8 +242,8 @@ document inventory, and individual implementation plans do not establish priorit
   owner-approved, applied, and read back exact. Signed-in Request `1002903`
   generated a valid 60,586-byte aggregated DOCX with 2xx route dependencies and
   no post-deploy error logs. The courtesy path is deployed/tested but was not
-  transport-smoked. Final Writeup persona access proof and deliberate enablement
-  is now the next ordered priority.
+  transport-smoked. Final Writeup persona access proof passed 2026-09-03; deliberate
+  enablement is now the next ordered priority.
 - **Most recent owner-directed release (S470, 2026-08-30 PT / 2026-08-31 UTC):**
   Final Writeup Slice 1 is Production-proved on `main` at `ebb147bb` in Ready
   deployment `dpl_7kzQ1v7XGtyNx4Fady2JxMrTxQEJ`; Wave 22 is exact and
@@ -275,7 +275,8 @@ document inventory, and individual implementation plans do not establish priorit
   six Southern California reviewers. On 2026-09-01 UTC, the dry-run-first
   command upgraded the setting once; exact readback proved v2 at
   `W/"96944113"`, all 11 assignments, zero stale/unassigned rows, and unchanged
-  9/6 audiences. Representative Word-access proof remains open. The unshipped
+  9/6 audiences. Representative Word-access proof passed 2026-09-03 (President
+  Allison Keller; PCs Duncan Spore and Sarah Hibler; owner-reported). The unshipped
   no-privilege-team prototype is removed from current source and created no
   Production teams.
 - **Prior owner-directed release (S469, 2026-08-30):** durable Executor

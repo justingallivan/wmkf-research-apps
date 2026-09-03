@@ -3,10 +3,10 @@ title: Final Writeup Persona Configuration Consolidation Plan
 domain: workbench
 kind: plan
 status: active
-summary: "Production-live v2 staffing in the existing Admin editor; exact migration/readback passed and persona lenses remain disabled pending access proof."
+summary: "Production-live v2 staffing in the Admin editor; migration and Word-access proof passed; persona lenses stay disabled pending deliberate enablement."
 canonical: false
 cataloged: 2026-08-31
-last_verified: 2026-09-01
+last_verified: 2026-09-03
 owner: product-engineering
 related:
   - docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md
@@ -19,8 +19,8 @@ related:
 
 ## Decision and status
 
-**Verdict: SLICES A–D ARE COMPLETE; SLICE E ACCESS PROOF AND ENABLEMENT REMAIN.
-DO NOT ENABLE YET.**
+**Verdict: SLICES A–D ARE COMPLETE; SLICE E ACCESS PROOF PASSED 2026-09-03; ENABLEMENT AND
+PERSONA SMOKE REMAIN. THE FLAG IS STILL FALSE.**
 
 The owner rejected the operational burden of creating and maintaining three
 Dataverse owner teams solely as persona markers. This plan replaces that
@@ -183,8 +183,9 @@ version-2-capable code at `84bf465b` /
 5. **Complete:** post-write readback proved version 2, all 11 exact persona
    assignments, unchanged Research and Southern California membership, zero
    stale/unassigned rows, and new ETag `W/"96944113"`.
-6. Persona lenses remain source-disabled until representative PC/Leadership
-   Word-access proof is complete.
+6. Persona lenses remain source-disabled. Representative PC/Leadership
+   Word-access proof completed 2026-09-03 (owner-reported); enablement is the
+   next deliberate step.
 
 Production now stores v2, so the first v2-capable Production deployment is the
 last-known-good rollback floor: no pre-v2 build may be promoted while v2 is
@@ -322,9 +323,9 @@ existing Admin Overview, not as another configuration panel.
 
 ### Slice E — access proof, enablement, and smoke
 
-- Have a representative PC and representative Leadership user open the exact
-  canonical Word item through the signed-in Final Writeup experience.
-- Flip the tracked persona source flag only after both proofs succeed.
+- **Complete:** **[OWNER-REPORTED 2026-09-03]** Representative Word access is proved: President Allison Keller (Leadership) opened the canonical Word item through the signed-in Final Writeups experience and marked it reviewed on 2026-09-03, and Program Coordinators Duncan Spore and Sarah Hibler did the same (dates not recorded). The owner saw Allison's acknowledgement on the dashboard; no independent Dataverse readback was run.
+- Flip the tracked persona source flag in its own commit and deployment now that
+  both proofs have succeeded.
 - Deploy deliberately, then smoke PD, PC, Leadership, overlapping-persona,
   unassigned, and superuser behavior with non-sensitive requests.
 - Verify no team read, create, membership, or role-management call occurs.
@@ -376,7 +377,7 @@ Run the relevant gate and its self-test sequentially:
    canonical Turbopack is blocked by the known sandbox process/port signature;
 9. **Complete through rollout-off regression:** signed-in Admin desktop/narrow
    QA, v2 publication/readback, and matrix regression smoke. Representative
-   Word-access proof and enabled persona smoke remain.
+   Word-access proof passed 2026-09-03; enablement and persona smoke remain.
 
 No Postgres migration, Dataverse schema wave, new API route, new environment
 variable, or new security privilege is planned.
@@ -414,8 +415,8 @@ variable, or new security privilege is planned.
 - Changing or expanding the current six-person Southern California audience.
 - Board-package workflow, required review counts, approval sequencing, or
   routine Word-edit notifications.
-- Enabling PC backup or Leadership queues before representative Word access is
-  proved.
+- Enabling PC backup or Leadership queues without a deliberate flag-flip
+  commit, deployment, and persona smoke (Word access was proved 2026-09-03).
 
 ## Review questions for Claude
 
