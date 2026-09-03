@@ -46,7 +46,7 @@ async function probeAnswerRows() {
   console.log(`TOTAL answer rows: ${records.length}`);
   if (records.length === 0) {
     console.log('  (blank slate confirmed for this surface)');
-    return;
+    return new Set();
   }
   const bySuggestion = new Map();
   const byKey = new Map();
@@ -62,21 +62,42 @@ async function probeAnswerRows() {
   for (const r of records.slice(0, 15)) {
     console.log(`  [${r.wmkf_questionkey}/${r.wmkf_questiontype}] value=${r.wmkf_answervalue ?? 'null'} text=${JSON.stringify((r.wmkf_answertext || '').slice(0, 60))}`);
   }
+  return new Set(bySuggestion.keys());
 }
 
-async function probeReceivedReviews() {
+async function probeReceivedReviews(answerSuggestionIds) {
   head('2. Dataverse suggestions with wmkf_reviewreceivedat — reviews by ANY path');
   const { records } = await bypassDynamicsRestrictions(
     { reason: 'read-only blank-slate probe (scripts/probe-review-blank-slate.mjs)' },
     () => DynamicsService.queryAllRecords('wmkf_appreviewersuggestions', {
-      select: 'wmkf_appreviewersuggestionid,wmkf_reviewreceivedat,wmkf_reviewuploadedbystaff,wmkf_reviewfilename,wmkf_reviewstatus',
+      select: 'wmkf_appreviewersuggestionid,_wmkf_request_value,wmkf_grantcyclecode,wmkf_reviewreceivedat,wmkf_reviewuploadedbystaff,wmkf_reviewsharepointfolder,wmkf_reviewfilename,wmkf_reviewstatus',
       filter: 'wmkf_reviewreceivedat ne null',
     }),
   );
   console.log(`Suggestions with a review on record: ${records.length}`);
+  const byCycle = new Map();
   for (const r of records) {
-    console.log(`  ${r.wmkf_appreviewersuggestionid} received=${r.wmkf_reviewreceivedat} staffUpload=${r.wmkf_reviewuploadedbystaff === true} file=${r.wmkf_reviewfilename || 'none'}`);
+    const cycle = String(r.wmkf_grantcyclecode || '(unassigned)').toUpperCase();
+    const bucket = byCycle.get(cycle) || { total: 0, completePointers: 0, partialPointers: 0, noPointers: 0 };
+    const hasFolder = Boolean(r.wmkf_reviewsharepointfolder);
+    const hasFilename = Boolean(r.wmkf_reviewfilename);
+    bucket.total += 1;
+    if (hasFolder && hasFilename) bucket.completePointers += 1;
+    else if (hasFolder || hasFilename) bucket.partialPointers += 1;
+    else bucket.noPointers += 1;
+    byCycle.set(cycle, bucket);
+    console.log(`  ${r.wmkf_appreviewersuggestionid} request=${r._wmkf_request_value || 'none'} cycle=${cycle} received=${r.wmkf_reviewreceivedat} staffUpload=${r.wmkf_reviewuploadedbystaff === true} folder=${r.wmkf_reviewsharepointfolder || 'none'} file=${r.wmkf_reviewfilename || 'none'}`);
   }
+  console.log('\nReceived-review SharePoint pointer summary by cycle:');
+  for (const [cycle, bucket] of [...byCycle.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+    console.log(`  ${cycle}: total=${bucket.total} complete=${bucket.completePointers} partial=${bucket.partialPointers} none=${bucket.noPointers}`);
+  }
+  const receivedIds = new Set(records.map((row) => row.wmkf_appreviewersuggestionid));
+  const receivedWithoutAnswers = [...receivedIds].filter((id) => !answerSuggestionIds.has(id));
+  const answersWithoutReceipt = [...answerSuggestionIds].filter((id) => !receivedIds.has(id));
+  console.log(`\nSnapshot/receipt identity check: receivedWithoutAnswers=${receivedWithoutAnswers.length} answersWithoutReceipt=${answersWithoutReceipt.length}`);
+  if (receivedWithoutAnswers.length > 0) console.log(`  receivedWithoutAnswers: ${receivedWithoutAnswers.join(', ')}`);
+  if (answersWithoutReceipt.length > 0) console.log(`  answersWithoutReceipt: ${answersWithoutReceipt.join(', ')}`);
 }
 
 async function probePostgres() {
@@ -124,8 +145,8 @@ async function probePostgres() {
 }
 
 async function main() {
-  await probeAnswerRows();
-  await probeReceivedReviews();
+  const answerSuggestionIds = await probeAnswerRows();
+  await probeReceivedReviews(answerSuggestionIds);
   await probePostgres();
   console.log('');
 }

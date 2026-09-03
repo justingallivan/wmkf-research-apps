@@ -62,12 +62,16 @@ deployed/source/test/render verified rather than transport-smoked in Production.
 
 ## Following Priority
 
-After this schema-first release is verified, return to Final Writeup persona
-deliberate rollout in `docs/CURRENT_WORK_QUEUE.md`; the representative Word-access
-proof passed 2026-09-03 (owner-reported).
+The owner has initiated planning for automatic retention of individual structured
+review DOCX files in SharePoint plus a dry-run-first D26 backfill. The active plan
+is `docs/REVIEW_DOCX_SHAREPOINT_RETENTION_PLAN.md`; it is planning only and
+authorizes no SharePoint write. The recommended next gate is adversarial review of
+that plan, followed by an explicit owner decision on Wave 1. This planning pass
+does not by itself reorder the canonical implementation sequence in
+`docs/CURRENT_WORK_QUEUE.md`, where Final Writeup persona rollout remains the
+recorded following priority.
 
 ## Parked
 
-- Review-DOCX storage/link replacement in SharePoint is not part of this release.
 - One-click PDF remains a possible future conversion of the canonical DOCX.
 - Automatic review-due reminder scheduling remains held.

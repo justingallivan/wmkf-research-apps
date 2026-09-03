@@ -354,6 +354,7 @@ related:
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
+| [REVIEW_DOCX_SHAREPOINT_RETENTION_PLAN.md](REVIEW_DOCX_SHAREPOINT_RETENTION_PLAN.md) | plan | active |  | Retain structured-review DOCX files in SharePoint after submission and backfill missing D26 files with a dry-run-first, conflict-safe script. | 2026-09-03 |
 | [REVIEWER_ACCEPT_FAST_RESPONSE_DESIGN.md](REVIEWER_ACCEPT_FAST_RESPONSE_DESIGN.md) | spec | historical |  | Completed design record for the shipped reviewer_acceptance_jobs queue and durable acceptance drain. | 2026-07-02 |
 | [REVIEWER_ANALYZE_CONTRACT_SPEC.md](REVIEWER_ANALYZE_CONTRACT_SPEC.md) | source-of-truth | canonical | yes | REVIEWER_FINDER_RETRIEVAL_REDESIGN_PLAN.md §4.4/§5/§7. Labels: [VERIFIED] (read from source this session), [PROPOSED], [OPEN] (decide with reviewer). | 2026-07-02 |
 | [REVIEWER_ARCHITECTURE.md](REVIEWER_ARCHITECTURE.md) | spec | active |  | Current reviewer person, engagement, invitation, and acceptance-promotion mental model. | 2026-07-02 |
