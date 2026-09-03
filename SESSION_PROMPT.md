@@ -36,9 +36,24 @@ export capability is **planned, not built**.
    - Final Writeup persona access proof and deliberate rollout moves to order 3
      and remains the immediate following task.
 
-## Next Item
+### Commits
 
-### Export Submitted Reviews as DOCX Files to SharePoint
+- `0b395495` - Build organization-wide reviewer follow-up visibility
+- `c6dc8de4` - Reconcile reviewer follow-up authorization state
+- `a4dfe47f` - Address reviewer authorization review findings
+- `fda69558` - Record Claude approval and strengthen review tests
+- `0962bc99` - Record reviewer follow-up Preview verification
+- `acf40fb8` - Merge organization-wide reviewer follow-up visibility
+- `8e23aa95` - Record reviewer follow-up Production release
+- `05276137` - Reconcile Reviewer Follow-up release docs
+- `35d0c54c` - Keep release docs deployment-stable
+- `c763072a` - Document Session 474 and create Session 475 prompt
+
+## Next Items
+
+### Verified Open
+
+#### 1. Export Submitted Reviews as DOCX Files to SharePoint
 
 Build the simplest request-level, authenticated export that produces one Word
 document per currently submitted review and files it beneath the request's
@@ -103,9 +118,7 @@ guessing:
      smoke requires a named request and fresh explicit owner authorization; do
      not infer that authorization from this planning handoff.
 
-## Following Item
-
-### Final Writeup Persona Access Proof and Deliberate Rollout
+#### 2. Final Writeup Persona Access Proof and Deliberate Rollout
 
 After the export task, return to `docs/CURRENT_WORK_QUEUE.md` order 3. Prove one
 representative Program Coordinator and one representative Leadership user can
@@ -114,7 +127,22 @@ then, and only then, deliberately enable and smoke the existing persona lenses.
 The production v2 configuration remains exact and the tracked rollout flag
 remains false.
 
-## Parked — Retain for Future Work
+### Owner Decision Needed
+
+1. **Controlled Production write target and authorization.**
+   Evidence: Preview is read-only and disconnected from the reviewer sandbox.
+   After implementation and review are complete, the owner must name the test
+   request and explicitly authorize the SharePoint write smoke.
+
+### Verify Before Acting
+
+1. **Durable export identity and folder convention.**
+   Evidence currently available: stable Graph identities are the established
+   document identity, while `Artifacts/Submitted Reviews` is only the working
+   folder recommendation. Trace the current Dataverse fields/consumers and
+   probe for folder collisions before adding schema or writing a file.
+
+### Parked
 
 1. Automatic reviewer-reminder scheduling and its campaign-setting prerequisites
    remain held under `docs/REVIEWER_ENGAGEMENT_SPEC.md`.
@@ -127,7 +155,7 @@ remains false.
 5. Post-cycle invitation-link strictness and reviewer-cron ledger promotion
    remain parked until the current reviewer cycle ends.
 
-## Key Files
+## Key Files Reference
 
 | File | Purpose |
 |---|---|
