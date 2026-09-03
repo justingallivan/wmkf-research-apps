@@ -69,10 +69,18 @@ authorizes no SharePoint write. Claude's read-only adversarial review returned
 APPROVE WITH CONDITIONS; the plan now incorporates the verified eligibility,
 SharePoint target, dedicated-cron, pointer-consumer, 412, cycle, and helper-scope
 corrections. Claude's reviewer thank-you honorarium-copy change is Production-live
-on `main` at `41326cf5`, and this branch is rebased onto that baseline. The next
-gate is an explicit owner decision on Wave 1. This planning pass does not by itself
-reorder the canonical implementation sequence in `docs/CURRENT_WORK_QUEUE.md`,
-where Final Writeup persona rollout remains the recorded following priority.
+on `main` at `41326cf5`, and this branch is rebased onto that baseline.
+
+[VERIFIED via source, focused tests, governed-hash characterization, and rendered
+page inspection] Wave 1 is complete on the feature branch: the shared
+`review-documents/individual-review-builder.js` now owns answer loading,
+composition, filename/content type, and template rendering. The thank-you sweep
+still supplies send time, builds before its If-Match claim, and preserves the
+honorarium projection/pass-through. No SharePoint call, pointer write, route,
+cron, or rollout flag was added. The next gate is an explicit owner decision on
+Wave 2. This work does not by itself reorder the canonical implementation sequence
+in `docs/CURRENT_WORK_QUEUE.md`, where Final Writeup persona rollout remains the
+recorded following priority.
 
 ## Parked
 

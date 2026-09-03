@@ -449,8 +449,9 @@ export function composeReviewReport({
 
 /**
  * composeSingleReviewCopy — pure composer for a SINGLE reviewer's own review,
- * used by the thank-you sweep (`lib/services/reviewer-thankyou-sweep.js`) to
- * build the courtesy DOCX copy attached to the thank-you email. Same purity
+ * used by the shared individual-review builder
+ * (`lib/services/review-documents/individual-review-builder.js`) for both the
+ * thank-you courtesy copy and future retained-file generation. Same purity
  * contract as `composeReviewReport` (no DOM/React/network); reuses the
  * `htmlToBlocks` tokenizer above for richtext answers so no HTML re-parsing
  * happens in the renderer.

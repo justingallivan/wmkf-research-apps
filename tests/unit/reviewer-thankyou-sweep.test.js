@@ -126,6 +126,8 @@ describe('sweepReviewThankYous', () => {
     // Claim-before-send ordering.
     expect(updateRecord.mock.invocationCallOrder[0]).toBeLessThan(createAndSendEmail.mock.invocationCallOrder[0]);
     expect(renderIndividualReviewDocx.mock.invocationCallOrder[0]).toBeLessThan(updateRecord.mock.invocationCallOrder[0]);
+    expect(renderIndividualReviewDocx.mock.calls[0][0].header.generatedAtIso)
+      .toBe(updateRecord.mock.calls[0][2].wmkf_thankyousentat);
     const email = createAndSendEmail.mock.calls[0][0];
     expect(email.from).toBe('pd@keck.org');
     expect(email.to).toBe('rev@example.org');

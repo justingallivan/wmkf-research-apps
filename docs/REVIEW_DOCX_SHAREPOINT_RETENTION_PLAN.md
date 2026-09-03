@@ -24,8 +24,9 @@ related:
 
 ## Decision and status
 
-**Status: PLANNED. No automatic SharePoint write or historical backfill described
-here has been implemented or authorized for execution.**
+**Status: WAVE 1 IMPLEMENTED ON THE FEATURE BRANCH; WAVES 2–5 REMAIN PLANNED.
+No automatic SharePoint write or historical backfill described here has been
+implemented or authorized for execution.**
 
 The recommended design is to generate and retain one individual DOCX for every
 structured review, using the same approved individual template as the thank-you
@@ -57,6 +58,7 @@ probes on 2026-09-03:
 | Reusing both pointer fields makes the existing Download action available. | Review upload / suggestion adapter | Suggestion pointer fields | `ReviewsTab.js` → existing download route/service | Current source | **VERIFIED** |
 | D26 currently has 24 received reviews and 228 answer rows. All 24 are selected, have at least one rich-text answer row, have exact receipt/answer identity parity, and have zero complete or partial SharePoint pointers. This proves current eligibility shape, not merely row-count parity. | Existing structured writers | Production Dataverse | Proposed backfill | Updated `DATAVERSE_ALLOW_PROD_READS=yes node scripts/probe-review-blank-slate.mjs` | **VERIFIED AS OF 2026-09-03; RECHECK BEFORE EXECUTION** |
 | Rendering identical semantic input twice does not produce byte-identical ZIP packages, while the governed Word-part hash is stable. | Current renderer | Generated DOCX package | Retry/conflict logic | Local two-render experiment: raw SHA-256 differed; governed hash matched | **VERIFIED** |
+| The thank-you attachment now uses one shared individual-review builder with caller-owned generation time. | `reviewer-thankyou-sweep.js` | Existing answer snapshot + transient DOCX bytes | Thank-you attachment; future filing service | Focused builder/thank-you/hash tests plus rendered-page inspection | **IMPLEMENTED ON FEATURE BRANCH; NOT YET PRODUCTION-LIVE** |
 | Automatically retaining future individual DOCX files and backfilling D26 is live. | N/A | N/A | N/A | No implementation exists yet | **PLANNED** |
 
 ### Sweep boundary
@@ -97,7 +99,9 @@ was then checked against source rather than accepted by assertion:
   primary-filename-only deletion policy.
 
 With these amendments, no adversarial condition remains open at the plan layer.
-Implementation and Production behavior remain unproved and separately gated.
+Wave 1's behavior-preserving foundation is source/test/render verified on the
+feature branch. SharePoint filing, backfill, and all Production behavior remain
+unproved and separately gated.
 
 ## Product contract
 
@@ -199,11 +203,18 @@ the generated path does not need it.
 
 ## Generation service
 
-Add a narrow service, for example
-`lib/services/review-documents/individual-file-service.js`, with two layers:
+Wave 1 adds
+`lib/services/review-documents/individual-review-builder.js` as the shared
+answer-read, composition, filename/content-type, and render seam. It accepts the
+authoritative suggestion/request/reviewer context already loaded by its caller
+and deliberately requires a caller-supplied generation timestamp.
 
-1. `buildIndividualReviewDocx(suggestionId)` performs the authoritative reads,
-   composes the current individual report, and renders the DOCX.
+Wave 2 adds a narrow filing service, for example
+`lib/services/review-documents/individual-file-service.js`, around that builder:
+
+1. the filing path freshly reloads the authoritative suggestion, request,
+   reviewer, ETag, and answer snapshot context before calling
+   `buildIndividualReviewDocx(...)`;
 2. `ensureIndividualReviewFile(suggestionId)` applies eligibility, identity,
    conflict, upload, pointer-commit, and reconciliation rules.
 
@@ -513,17 +524,22 @@ with a self-test runs sequentially with its self-test:
 
 ### Wave 1 — Shared, behavior-preserving foundations
 
-- Wait for Claude's separate reviewer thank-you honorarium-copy feature to finish,
-  be reviewed, and land; then update this branch from the resulting `main` before
-  touching the shared thank-you service.
-- Land the approved individual-template header-spacing change before generating
-  retained files.
-- Characterize the existing governed DOCX hash through its current export without
-  extracting it.
-- Share the individual document build helper while preserving thank-you send-time
-  generation metadata and all existing upload/export/email behavior.
+**Status: COMPLETE ON `codex/review-docx-header-spacing` (2026-09-03), pending
+review/promotion.**
 
-**Gate:** focused regression tests and rendered-page inspection.
+- Claude's reviewer thank-you honorarium-copy feature landed on `main` at
+  `41326cf5`; this branch was rebased onto it before the shared service changed.
+- The approved individual-template header-spacing change is present.
+- The existing governed DOCX hash is characterized through its current export
+  without extraction; raw-distinct individual renders produce the same governed
+  hash.
+- `individual-review-builder.js` now owns the shared answer-read → compose →
+  render contract. The thank-you sweep passes its existing send-time `nowIso`,
+  preserves attachment-before-claim ordering, and retains Claude's
+  `wmkf_honorariumoptout` projection and `honorariumOptOut` email pass-through.
+
+**Gate: PASSED** — focused regression tests and one-page rendered inspection are
+clean. No SharePoint call, pointer write, route, cron, or rollout flag was added.
 
 ### Wave 2 — Filing service and dedicated cron, flag off
 
