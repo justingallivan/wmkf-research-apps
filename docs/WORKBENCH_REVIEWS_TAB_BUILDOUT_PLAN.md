@@ -3,7 +3,7 @@ title: "Workbench Reviews Tab — Consumption Build-Out Plan"
 domain: reviewer-workbench
 kind: plan
 status: active
-summary: "Reviews and synthesis are production-proven; a template-backed server-authoritative Word export is source-built behind a Wave 25 schema-first gate, with PDF deferred."
+summary: "Reviews and synthesis are live; template-backed Word exports are source-built behind the Wave 25 schema-first release gate."
 canonical: false
 cataloged: 2026-07-03
 last_verified: 2026-09-02
@@ -258,8 +258,10 @@ monitoring in-flight (status/nudges). Owner confirmed scope = all four phases (S
   dropping content.
 - `lib/services/review-documents/docx-renderer.js` preserves the approved Word
   package shell and injects escaped report content at one required marker. It
-  retains headers, footer, section geometry, categorical checkbox tables, lists,
-  headings, blockquotes, line breaks, and supported inline styles. The separate
+  retains headers, footer, section geometry, categorical checkbox comparisons, lists,
+  headings, blockquotes, line breaks, and supported inline styles. Independent
+  ordered lists restart at one; historical option gaps and unreadable snapshots
+  are labeled rather than silently presented as unselected choices. The separate
   tracked individual and combined templates live in `shared/templates/reviews/`.
   The retained generic DOCX and PDF renderers are not exposed by the current UI.
 - "Export: Word (.docx)" affordance on `ReviewsTab`'s submitted-reviews

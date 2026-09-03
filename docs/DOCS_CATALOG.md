@@ -393,7 +393,7 @@ related:
 | [REVIEWER_TIMEOUT_BUDGET_PLAN.md](REVIEWER_TIMEOUT_BUDGET_PLAN.md) | plan | historical |  | Shipped reviewer search time-budget implementation and follow-up fixes; retained as historical record. | 2026-07-02 |
 | [REVIEWER_WARM_STAGE_PRODUCER_SPEC.md](REVIEWER_WARM_STAGE_PRODUCER_SPEC.md) | spec | superseded |  | Historical: warm-stage evidence/receipt contracts removed by the 2026-08-03 baseline revert. Do not implement against this spec. | 2026-08-02 |
 | [REVIEWER_WORKBENCH_NICE_TO_HAVES_PLAN.md](REVIEWER_WORKBENCH_NICE_TO_HAVES_PLAN.md) | plan | active |  | Planning only. No feature code, migrations, API routes, or schema files were created for this pass. | 2026-07-02 |
-| [WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md](WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md) | plan | active |  | Reviews and synthesis are production-proven; the current Reviews-tab export is Word-only, with Graph-backed PDF conversion deferred. | 2026-07-03 |
+| [WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md](WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md) | plan | active |  | Reviews and synthesis are live; template-backed Word exports are source-built behind the Wave 25 schema-first release gate. | 2026-07-03 |
 
 ## reviewers
 

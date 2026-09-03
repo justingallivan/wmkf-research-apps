@@ -79,13 +79,17 @@ describe('template-backed review DOCX renderer', () => {
     const archive = await JSZip.loadAsync(buffer);
     const documentXml = await archive.file('word/document.xml').async('string');
     const coreXml = await archive.file('docProps/core.xml').async('string');
+    const appXml = await archive.file('docProps/app.xml').async('string');
+    const generatedFooter = await archive.file('word/footer2.xml').async('string');
     const rootRelationships = await archive.file('_rels/.rels').async('string');
     const firstPageHeader = await archive.file('word/header2.xml').async('string');
     const continuationHeader = await archive.file('word/header1.xml').async('string');
     expect(archive.file('word/header1.xml')).not.toBeNull();
     expect(archive.file('word/footer1.xml')).not.toBeNull();
     expect(firstPageHeader).toContain('Proposal Review');
+    expect(continuationHeader).toContain('Proposal Review');
     expect(`${firstPageHeader}${continuationHeader}`).not.toContain('Individual');
+    expect(documentXml).not.toContain('EXTERNAL REVIEW');
     expect(documentXml).toContain('☒  First &amp; strongest');
     expect(documentXml).toContain('☐  Second &lt;later&gt;');
     expect(documentXml).toContain('Choose one');
@@ -94,7 +98,13 @@ describe('template-backed review DOCX renderer', () => {
     expect((documentXml.match(/\[\[WMKF:BODY\]\]/g) || [])).toHaveLength(1);
     expect(documentXml).toContain('Dr. A &lt;Reviewer&gt;');
     expect(coreXml).toContain('W. M. Keck Foundation');
+    expect(coreXml).toContain('Proposal Review R-101');
+    expect(coreXml).not.toContain('Individual');
     expect(coreXml).not.toMatch(/SAMPLE|Mockup/i);
+    expect(generatedFooter).toContain('Generated August 20, 2026');
+    expect(generatedFooter).not.toContain('[[WMKF:GENERATED]]');
+    expect(appXml).toContain('<DocSecurity>0</DocSecurity>');
+    expect(appXml).not.toMatch(/<(Pages|Words|Characters|Lines|Paragraphs)>/);
     expect(Object.keys(archive.files).some((name) => name.startsWith('customXml/'))).toBe(false);
     expect(rootRelationships).not.toContain('custom-properties');
   });
@@ -116,7 +126,102 @@ describe('template-backed review DOCX renderer', () => {
     expect(xml).toContain('☒  Selected answer');
   });
 
-  test('combined comparison uses a reviewer grid through four and vertical attribution above four', async () => {
+  test('empty multiselect snapshots render every option unchecked', async () => {
+    const copy = composeSingleReviewCopy({
+      generatedAtIso: GENERATED_AT,
+      answers: [{
+        questionText: 'Applicable outcomes',
+        questionType: 'multiselect',
+        answerValues: [],
+        questionOptions: [{ value: 1, label: 'Tools' }, { value: 2, label: 'Training' }],
+      }],
+    });
+    expect(copy.sections[0].state).toBe('answered');
+    const xml = await archiveText(await renderIndividualReviewDocx(copy), 'word/document.xml');
+    expect(xml).toContain('☐  Tools');
+    expect(xml).toContain('☐  Training');
+    expect(xml).not.toContain('No answer provided');
+  });
+
+  test('question cleanup preserves digit-leading words and strips only question numbering', async () => {
+    const copy = composeSingleReviewCopy({
+      generatedAtIso: GENERATED_AT,
+      answers: [
+        { questionText: '3D methods and expected impact', questionType: 'string', answerText: 'Strong' },
+        { questionText: 'Question 12: Feasibility', questionType: 'string', answerText: 'High' },
+      ],
+    });
+    const xml = await archiveText(await renderIndividualReviewDocx(copy), 'word/document.xml');
+    expect(xml).toContain('3D methods and expected impact');
+    expect(xml).toContain('Feasibility');
+    expect(xml).not.toContain('Question 12: Feasibility');
+  });
+
+  test('separate ordered lists restart at one with stable literal numbering', async () => {
+    const copy = composeSingleReviewCopy({
+      generatedAtIso: GENERATED_AT,
+      answers: [
+        { questionText: 'First list', questionType: 'richtext', answerHtml: '<ol><li>Alpha</li><li>Beta</li></ol>' },
+        { questionText: 'Second list', questionType: 'richtext', answerHtml: '<ol><li>Gamma</li><li>Delta</li></ol>' },
+      ],
+    });
+    const buffer = await renderIndividualReviewDocx(copy);
+    const documentXml = await archiveText(buffer, 'word/document.xml');
+    expect(documentXml.match(/>1\.  <\/w:t>/g)).toHaveLength(2);
+    expect(documentXml.match(/>2\.  <\/w:t>/g)).toHaveLength(2);
+    expect(documentXml).not.toContain('<w:numId w:val="37"/>');
+  });
+
+  test('combined output labels incomplete option history and retains string answers', async () => {
+    const report = composeReviewReport({
+      matrix: deriveReviewMatrix([
+        {
+          suggestionId: 'legacy', name: 'Legacy Reviewer', answers: [
+            { questionKey: 'outcomes', questionOrder: 1, questionText: 'Outcomes', questionType: 'multiselect', answerValues: [{ value: 2, label: 'Training' }], questionOptions: null },
+            { questionKey: 'identifier', questionOrder: 2, questionText: '3D identifier', questionType: 'string', answerText: 'ID-17' },
+          ],
+        },
+        {
+          suggestionId: 'corrupt', name: 'Corrupt Reviewer', answers: [
+            { questionKey: 'outcomes', questionOrder: 1, questionText: 'Outcomes', questionType: 'multiselect', answerValuesUnreadable: true, questionOptionsUnreadable: true },
+            { questionKey: 'identifier', questionOrder: 2, questionText: '3D identifier', questionType: 'string', answerText: 'ID-22' },
+          ],
+        },
+      ], null),
+      requestNumber: 'R-202',
+      generatedAtIso: GENERATED_AT,
+      synthesis: { consensus: ['Shared strength'], disagreements: [], keyConcerns: [], overall: '' },
+    });
+    const buffer = await renderCombinedReviewDocx(report);
+    const xml = await archiveText(buffer, 'word/document.xml');
+    const header = await archiveText(buffer, 'word/header1.xml');
+    const core = await archiveText(buffer, 'docProps/core.xml');
+    expect(xml).toContain('Option history is incomplete');
+    expect(xml).toContain('Unknown');
+    expect(xml).toContain('Unreadable');
+    expect(xml).toContain('3D identifier');
+    expect(xml).toContain('ID-17');
+    expect(xml).toContain('ID-22');
+    expect(xml).toContain('•  ');
+    expect(xml).toContain('Shared strength');
+    expect(xml).not.toContain('COMBINED EXTERNAL REVIEWS');
+    expect(header).toContain('Aggregated Proposal Reviews');
+    expect(core).toContain('Aggregated Proposal Reviews R-202');
+  });
+
+  test('invalid XML control characters are removed from generated content', async () => {
+    const copy = composeSingleReviewCopy({
+      generatedAtIso: GENERATED_AT,
+      reviewerName: 'A\u0000B\u0008C',
+      answers: [{ questionText: 'Comments', questionType: 'string', answerText: 'D\u0001E' }],
+    });
+    const xml = await archiveText(await renderIndividualReviewDocx(copy), 'word/document.xml');
+    expect(xml).toContain('ABC');
+    expect(xml).toContain('DE');
+    expect(xml).not.toMatch(/[\u0000\u0001\u0008]/);
+  });
+
+  test('combined comparison uses compact checkbox attribution through four and named attribution above four', async () => {
     const options = [{ value: 1, label: 'Tools' }, { value: 2, label: 'Training' }];
     const four = Array.from({ length: 4 }, (_, index) => reviewer(
       `r${index + 1}`,
@@ -133,7 +238,9 @@ describe('template-backed review DOCX renderer', () => {
     const header4 = await archiveText(buffer4, 'word/header2.xml');
     expect(header4).toContain('Aggregated Proposal Reviews');
     expect(header4).not.toContain('Combined Proposal Review');
-    expect(xml4).toContain('Outcome');
+    expect(xml4).toContain('Tools');
+    expect(xml4).toContain('1: ');
+    expect(xml4).toContain('Total: 2');
     expect(xml4).toContain('☒');
     expect(xml4).toContain('☐');
 

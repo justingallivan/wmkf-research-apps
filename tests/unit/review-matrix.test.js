@@ -20,6 +20,8 @@ function row(questionKey, questionOrder, questionType, questionText, {
   answerValue = null,
   answerValues = null,
   answerValuesUnreadable = false,
+  questionOptions = null,
+  questionOptionsUnreadable = false,
 } = {}) {
   return {
     questionKey,
@@ -31,6 +33,8 @@ function row(questionKey, questionOrder, questionType, questionText, {
     answerValue,
     answerValues,
     answerValuesUnreadable,
+    questionOptions,
+    questionOptionsUnreadable,
   };
 }
 
@@ -286,5 +290,29 @@ describe('deriveReviewMatrix', () => {
     expect(question.cells[0].state).toBe('unreadable');
     expect(question.answeredCount).toBe(0);
     expect(question.tallies).toEqual([]);
+  });
+
+  test('categorical option catalog preserves first snapshot presentation order and counts only asked reviewers', () => {
+    const question = deriveReviewMatrix([
+      reviewer('r1', 'Dr. A', [
+        row('rating', 1, 'picklist', 'Rating?', {
+          answerText: 'Middle',
+          answerValue: 20,
+          questionOptions: [
+            { value: 30, label: 'Last' },
+            { value: 10, label: 'First' },
+            { value: 20, label: 'Middle' },
+          ],
+        }),
+      ]),
+      reviewer('r2', 'Not asked', []),
+    ], null).questions[0];
+
+    expect(question.optionCatalog).toEqual([
+      { value: 30, label: 'Last' },
+      { value: 10, label: 'First' },
+      { value: 20, label: 'Middle' },
+    ]);
+    expect(question.optionSnapshotCoverage).toEqual({ exactCount: 1, totalReviewers: 1, complete: true });
   });
 });

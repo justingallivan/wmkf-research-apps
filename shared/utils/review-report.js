@@ -357,7 +357,7 @@ export function composeReviewReport({
   // other questions (owner decision 2026-08-09: no separate Ratings section);
   // their average/spread stats remain in the Summary above.
   const answerSections = safeMatrix.questions
-    .filter((q) => q.type === 'picklist' || q.type === 'multiselect' || q.type === 'richtext')
+    .filter((q) => q.type === 'picklist' || q.type === 'multiselect' || q.type === 'richtext' || q.type === 'string')
     .map((q) => (q.type === 'picklist'
       ? {
         type: 'picklist',
@@ -398,7 +398,8 @@ export function composeReviewReport({
         optionCatalog: Array.isArray(q.optionCatalog) ? q.optionCatalog : [],
         optionSnapshotCoverage: q.optionSnapshotCoverage || null,
       }
-      : {
+      : q.type === 'richtext'
+      ? {
         type: 'richtext',
         key: q.key,
         text: q.text,
@@ -408,6 +409,18 @@ export function composeReviewReport({
           reviewerName: reviewerName.get(c.suggestionId) ?? null,
           state: c.state,
           blocks: c.state === 'answered' ? htmlToBlocks(c.answerHtml) : [],
+        })),
+      }
+      : {
+        type: 'string',
+        key: q.key,
+        text: q.text,
+        retired: !!q.retired,
+        answers: q.cells.map((c) => ({
+          suggestionId: c.suggestionId,
+          reviewerName: reviewerName.get(c.suggestionId) ?? null,
+          state: c.state,
+          label: c.state === 'answered' ? (c.answerText || '') : null,
         })),
       }));
 
@@ -500,7 +513,7 @@ export function composeSingleReviewCopy({
       : (Number.isFinite(a.answerValue) ? String(a.answerValue) : null);
     const hasMultiselectAnswer = a.questionType === 'multiselect'
       && (a.answerValuesUnreadable === true
-        || (Array.isArray(a.answerValues) && a.answerValues.length > 0));
+        || Array.isArray(a.answerValues));
     return {
       questionKey: a.questionKey || null,
       questionOrder: Number.isFinite(a.questionOrder) ? a.questionOrder : null,

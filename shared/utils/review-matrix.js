@@ -204,7 +204,9 @@ export function deriveReviewMatrix(reviewers, liveQuestions) {
     if (type === 'picklist' || type === 'multiselect') {
       const catalog = new Map();
       let exactCount = 0;
+      let askedCount = 0;
       for (const cell of cells) {
+        if (cell.state !== 'not-asked') askedCount += 1;
         if (Array.isArray(cell.questionOptions)) {
           exactCount += 1;
           for (const option of cell.questionOptions) {
@@ -220,13 +222,14 @@ export function deriveReviewMatrix(reviewers, liveQuestions) {
           catalog.set(`${option.value}\u0000${option.label}`, option);
         }
       }
-      question.optionCatalog = [...catalog.values()].sort(
-        (a, b) => (a.value - b.value) || a.label.localeCompare(b.label),
-      );
+      // Map insertion order preserves the presentation order from the first
+      // exact snapshot, then appends historically distinct options as they
+      // first appear in later submissions.
+      question.optionCatalog = [...catalog.values()];
       question.optionSnapshotCoverage = {
         exactCount,
-        totalReviewers: reviewerList.length,
-        complete: reviewerList.length > 0 && exactCount === reviewerList.length,
+        totalReviewers: askedCount,
+        complete: askedCount > 0 && exactCount === askedCount,
       };
     }
 

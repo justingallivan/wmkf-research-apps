@@ -1,6 +1,6 @@
 /**
  * Reviewer thank-you sweep — eligibility, fire-once claim-before-send,
- * at-most-once on send failure, and non-fatal attachment.
+ * at-most-once on send failure, and retryable pre-claim attachment generation.
  *
  * @jest-environment node
  */
@@ -112,7 +112,7 @@ describe('sweepReviewThankYous', () => {
     expect(opts.filter).not.toContain('wmkf_reviewstatus');
   });
 
-  test('eligible: claims wmkf_thankyousentat (If-Match) THEN sends with the DOCX attachment', async () => {
+  test('eligible: builds DOCX, claims wmkf_thankyousentat (If-Match), THEN sends with the attachment', async () => {
     queryAllRecords.mockResolvedValue({ records: [candidate()] });
     installReads();
     const r = await sweepReviewThankYous();
@@ -125,6 +125,7 @@ describe('sweepReviewThankYous', () => {
     );
     // Claim-before-send ordering.
     expect(updateRecord.mock.invocationCallOrder[0]).toBeLessThan(createAndSendEmail.mock.invocationCallOrder[0]);
+    expect(renderIndividualReviewDocx.mock.invocationCallOrder[0]).toBeLessThan(updateRecord.mock.invocationCallOrder[0]);
     const email = createAndSendEmail.mock.calls[0][0];
     expect(email.from).toBe('pd@keck.org');
     expect(email.to).toBe('rev@example.org');
@@ -172,16 +173,15 @@ describe('sweepReviewThankYous', () => {
     expect(createAndSendEmail).toHaveBeenCalledTimes(1); // no retry
   });
 
-  test('attachment compose failure → sends WITHOUT attachment, counts attachmentFailed', async () => {
+  test('attachment compose failure → leaves row unclaimed and unsent for retry', async () => {
     queryAllRecords.mockResolvedValue({ records: [candidate()] });
     installReads();
     renderIndividualReviewDocx.mockRejectedValueOnce(new Error('docx boom'));
     const r = await sweepReviewThankYous();
-    expect(r.sent).toBe(1);
+    expect(r.sent).toBe(0);
     expect(r.attachmentFailed).toBe(1);
-    expect(updateRecord).toHaveBeenCalledTimes(1); // claim still landed
-    const email = createAndSendEmail.mock.calls[0][0];
-    expect(email.attachments).toEqual([]); // plain thank-you, no courtesy copy
+    expect(updateRecord).not.toHaveBeenCalled();
+    expect(createAndSendEmail).not.toHaveBeenCalled();
   });
 
   test('template preflight failure skips every row before any claim', async () => {

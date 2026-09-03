@@ -341,6 +341,22 @@ describe('composeReviewReport', () => {
     ]);
   });
 
+  test('string questions remain in report order with each reviewer answer', () => {
+    const matrix = deriveReviewMatrix([
+      reviewer('r1', 'Dr. A', [row('identifier', 1, 'string', 'Project identifier?', { answerText: 'ID-17' })]),
+      reviewer('r2', 'Dr. B', [row('identifier', 1, 'string', 'Project identifier?', { answerText: '' })]),
+    ], null);
+    const report = composeReviewReport({ matrix, generatedAtIso: '2026-07-03T00:00:00.000Z' });
+    expect(report.answerSections).toEqual([expect.objectContaining({
+      key: 'identifier',
+      type: 'string',
+      answers: [
+        expect.objectContaining({ reviewerName: 'Dr. A', state: 'answered', label: 'ID-17' }),
+        expect.objectContaining({ reviewerName: 'Dr. B', state: 'empty', label: null }),
+      ],
+    })]);
+  });
+
   test('a malformed/unsanitized-looking answerHtml on an answered cell does not throw during composition', () => {
     const reviewers = [
       reviewer('r1', 'Dr. A', [row('comments', 1, 'richtext', 'Comments?', { answerHtml: '<p>unterminated <strong>bold' })]),

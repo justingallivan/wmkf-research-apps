@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-09-01
+last_verified: 2026-09-02
 stale_after_days: 90
 owner: reviewers
 source_files:
@@ -29,6 +29,10 @@ source_files:
   - lib/external/sanitize-review-html.js
   - shared/utils/review-report.js
   - shared/utils/review-report-docx.js
+  - lib/services/review-documents/docx-renderer.js
+  - lib/services/reviewer-thankyou-sweep.js
+  - lib/services/review-manager/export-reviews-service.js
+  - pages/api/review-manager/export-reviews.js
   - lib/services/graph-service.js
   - pages/api/review-manager/review-due-extension.js
   - pages/api/review-manager/send-review-reminder.js
@@ -95,6 +99,7 @@ watch_paths:
   - pages/api/workbench/export-candidates.js
   - lib/services/reviewer-candidate-export.js
   - lib/services/review-manager/**
+  - lib/services/review-documents/**
   - lib/services/reviewer-roster-store.js
 update_triggers:
   - reviewer workbench UX or lifecycle changes
@@ -985,11 +990,12 @@ email, and renders the seeded `thankyou` template via
 reviewer's own review** attached as real file bytes (`activitymimeattachments`,
 never Blob-staged): `composeSingleReviewCopy` (pure, in
 `shared/utils/review-report.js`, reusing the `htmlToBlocks` tokenizer) →
-`generateSingleReviewCopyDocx` (server-side `import('docx')`, returns a Buffer,
-in `shared/utils/review-report-docx.js`), over the answer snapshot read through
+`renderIndividualReviewDocx` (template-backed OOXML renderer returning a Buffer,
+in `lib/services/review-documents/docx-renderer.js`), over the answer snapshot read through
 the hoisted `lib/services/review-answers.js#fetchAnswersBySuggestion` (shared with
-the Reviews-tab GET). The attachment is NON-FATAL — a compose/render failure
-still sends the thank-you without the DOCX and counts `attachmentFailed`. The
+the Reviews-tab GET). Per-row attachment generation happens before the If-Match
+claim. A compose/render failure counts `attachmentFailed` and returns without a
+marker or email, leaving the complete delivery retryable on the next sweep. The
 `wmkf_thankyousentat` marker remains shared with the legacy `thankyou` branch
 in `send-emails.js`, so compatibility callers cannot cause the sweep to
 double-send. `ReviewerManagePanel` no longer exposes a manual thank-you
@@ -1022,8 +1028,9 @@ stacked with attribution, rendered the same way the Cards view's
 text wins (documented in the module header) when the key isn't live; live text
 always wins when it is.
 
-**Phase 3 DEPLOYED (S326; current export decision updated 2026-08-13):** panel-prep
-roll-up/export. `shared/utils/review-report.js#composeReviewReport(...)` is a
+**Phase 3 DEPLOYED BASE; TEMPLATE-BACKED FORMAT PASS SOURCE-BUILT, NOT DEPLOYED
+(2026-09-02):** panel-prep roll-up/export.
+`shared/utils/review-report.js#composeReviewReport(...)` is a
 pure, DOM/React/Dataverse-free composition over a `deriveReviewMatrix` result
 (consumed, not re-derived) plus proposal identity — header, summary
 (reviews-submitted count + per-rating-question average/spread), a ratings
@@ -1035,26 +1042,27 @@ tokenizer scoped to the sanitizer's allowlisted grammar ONLY
 em/i, sub/sup, ul/ol/li, h2/h3, blockquote, a — no tables/images/spans/divs), producing
 typed blocks with inline runs; an unknown/malformed tag degrades to plain text
 (tag stripped, text kept) rather than throwing or dropping content.
-`shared/utils/review-report-docx.js` (docx, dynamic `import('docx')` per
-`word-export.js` convention) renders bold, italic, subscript, and superscript
-as native Word text-run formatting while retaining the historical structural
-tags for already-saved reviews. As of the owner
-decision on 2026-08-13, `ReviewsTab` exposes only "Export: Word (.docx)"
-(visible only once ≥1 review is submitted), because the earlier independent
-`pdf-lib` rendition flattened reviewer-authored formatting. It composes
-client-side from already-loaded `submitted`/
-`liveQuestions` — no new fetch, no new route, no Dataverse roll-up column
-(governing decision 4). Proposal identity on the export (request
-number/title/institution/PI) uses whatever `proposals[0]` already carries
-(`requestNumber`/`proposalTitle`/`proposalInstitution`/`proposalAuthors`) — the
-DTO has no dedicated `piName` field, so `proposalAuthors` (project
-leader/applicant) stands in as the best-available PI identity. The legacy
-`shared/utils/review-report-pdf.js` module remains in source/tests but has no
+`lib/services/review-documents/docx-renderer.js` now applies separate tracked
+individual and aggregated templates over that shared semantic model. The
+reviewer-facing first-page title is **Proposal Review** and the staff-facing
+title is **Aggregated Proposal Reviews**; generated dates and package metadata
+are rewritten at render time. Categorical options come from submitted snapshots;
+legacy/malformed gaps are explicit, and independent ordered lists restart at one.
+
+The current `ReviewsTab` exposes only "Export: Word (.docx)" once at least one
+review is submitted. It calls guarded GET
+`/api/review-manager/export-reviews?proposalId=<guid>`; the server authoritatively
+rereads the request, submitted reviewer rows, answer snapshots, live questions,
+and synthesis before returning private/no-store DOCX bytes. No browser-authored
+report DTO, Dataverse roll-up column, or SharePoint retention is introduced.
+The legacy generic DOCX and PDF renderers remain in source/tests but have no
 Reviews-tab UI consumer. Staff currently convert the downloaded Word document
 externally when they need PDF. A server-side canonical-DOCX → temporary
 SharePoint drive item → Microsoft Graph `content?format=pdf` workflow is
 `[PLANNED]`, not built; its permissions, temporary-file retention/cleanup, and
-tenant conversion behavior must be verified before implementation. Full
+tenant conversion behavior must be verified before implementation. The format
+pass requires Wave 25 `wmkf_questionoptions` to be provisioned and read back
+before deployment. Full
 future contract: `docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md`.
 
 **Phase 4 BUILT (2026-07-03); reliability production-proven 2026-07-28:**
