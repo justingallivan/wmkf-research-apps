@@ -116,6 +116,38 @@ describe('reviewer-suggestion.findReviewDocxBackfillPopulation', () => {
     expect(spy).toHaveBeenCalledTimes(1);
     expect(spy.mock.calls[0][1].filter).toContain("akoya_requestnum eq '1002903'");
   });
+
+  it('deduplicates a suggestion returned by both cycle populations', async () => {
+    const requestId = '22222222-2222-4222-8222-222222222222';
+    const suggestionId = '33333333-3333-4333-8333-333333333333';
+    jest.spyOn(DynamicsService, 'queryAllRecords')
+      .mockResolvedValueOnce({ records: [{ akoya_requestid: requestId }], capped: false })
+      .mockResolvedValueOnce({ records: [{
+        wmkf_appreviewersuggestionid: suggestionId,
+        wmkf_reviewreceivedat: '2026-08-01T00:00:00Z',
+      }], capped: false })
+      .mockResolvedValueOnce({ records: [{
+        wmkf_appreviewersuggestionid: suggestionId.toUpperCase(),
+        wmkf_reviewreceivedat: '2026-08-01T00:00:00Z',
+      }], capped: false });
+
+    const result = await findReviewDocxBackfillPopulation({ cycleCode: 'D26' });
+
+    expect(result).toMatchObject({ capped: false });
+    expect(result.records).toHaveLength(1);
+    expect(result.records[0].wmkf_appreviewersuggestionid.toLowerCase()).toBe(suggestionId);
+  });
+
+  it('fails the population closed when any paginated batch reaches its cap', async () => {
+    const requestId = '22222222-2222-4222-8222-222222222222';
+    jest.spyOn(DynamicsService, 'queryAllRecords')
+      .mockResolvedValueOnce({ records: [{ akoya_requestid: requestId }], capped: false })
+      .mockResolvedValueOnce({ records: [], capped: true })
+      .mockResolvedValueOnce({ records: [], capped: false });
+
+    await expect(findReviewDocxBackfillPopulation({ cycleCode: 'D26' }))
+      .resolves.toEqual({ records: [], capped: true });
+  });
 });
 
 describe('review-answer.queryAllAnswers', () => {

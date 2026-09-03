@@ -2,7 +2,11 @@
  * @jest-environment node
  */
 
-import { parseArgs } from '../../scripts/backfill-review-docx-sharepoint.mjs';
+import {
+  backfillExitCode,
+  parseArgs,
+  resultPathFor,
+} from '../../scripts/backfill-review-docx-sharepoint.mjs';
 
 test('defaults to dry run and requires an exact cycle', () => {
   expect(parseArgs(['--cycle', 'D26'])).toMatchObject({
@@ -26,4 +30,18 @@ test('keeps request-number and dry-run output contracts explicit', () => {
   expect(() => parseArgs(['--cycle', 'D26', '--manifest', '/private/tmp/input.json']))
     .toThrow('execute-only');
   expect(() => parseArgs(['--cycle', 'D26', '--cycle=D26'])).toThrow('only once');
+});
+
+test('uses a unique execution-result path that cannot overwrite the manifest', () => {
+  expect(resultPathFor('/private/tmp/review.json', '2026-09-03T20:01:02.345Z'))
+    .toBe('/private/tmp/review.execute-result-2026-09-03T20-01-02-345Z.json');
+  expect(resultPathFor('/private/tmp/review.manifest', '2026-09-03T20:01:02.345Z'))
+    .toBe('/private/tmp/review.manifest.execute-result-2026-09-03T20-01-02-345Z.json');
+});
+
+test('maps blocking dry runs and row failures to a nonzero CLI exit', () => {
+  expect(backfillExitCode({ manifest: { summary: { blocking: 1 } } })).toBe(1);
+  expect(backfillExitCode({ manifest: { summary: { blocking: 0 } } })).toBe(0);
+  expect(backfillExitCode({ report: { summary: { failed: 2 } } })).toBe(1);
+  expect(backfillExitCode({ report: { summary: { failed: 0 } } })).toBe(0);
 });

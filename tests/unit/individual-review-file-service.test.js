@@ -55,6 +55,7 @@ const assertDataverseOperationAllowed = jest.fn();
 jest.mock('../../lib/dataverse/core/interlock', () => ({
   assertDataverseOperationAllowed: (...args) => assertDataverseOperationAllowed(...args),
   classifyDeployment: () => process.env.VERCEL_ENV === 'production' ? 'production' : 'local',
+  classifyTarget: (url) => String(url).includes('wmkf.crm.dynamics.com') ? 'production' : 'sandbox',
   resolveInterlockMode: () => process.env.DATAVERSE_TARGET_INTERLOCK || 'off',
 }));
 
@@ -210,6 +211,20 @@ test.each([
     .resolves.toMatchObject({ status });
 });
 
+test('keeps unresolved reviewer identity ahead of cycle classification', async () => {
+  suggestion.getByIdWithSelect.mockResolvedValueOnce(baseRow({ wmkf_grantcyclecode: 'J26' }));
+  getReviewerById.mockResolvedValueOnce(null);
+  await expect(planIndividualReviewFileCandidate(SUGGESTION_ID, {
+    cycleCode: 'D26',
+    target: {
+      siteUrl: 'https://appriver3651007194.sharepoint.com/sites/akoyaGO',
+      siteId: 'site-1',
+      driveId: 'drive-1',
+      dynamicsBase: 'https://wmkf.crm.dynamics.com',
+    },
+  })).resolves.toMatchObject({ status: 'unresolved_relationship' });
+});
+
 test('uses one shared actionable-status contract', () => {
   expect(isActionableReviewDocxStatus('content_conflict')).toBe(true);
   expect(isActionableReviewDocxStatus('partial_pointer')).toBe(true);
@@ -289,6 +304,16 @@ test('backfill preflight is the sole local write exception and asserts every poi
   await expect(preflightReviewDocxWrite({
     executionMode: 'backfill', suggestionIds: [SUGGESTION_ID],
   })).rejects.toMatchObject({ code: 'backfill_not_local' });
+});
+
+test('backfill preflight rejects a non-Production Dataverse target before Graph resolution', async () => {
+  process.env.VERCEL_ENV = '';
+  process.env.DYNAMICS_URL = 'https://wmkf-sandbox.crm.dynamics.com';
+  await expect(preflightReviewDocxWrite({
+    executionMode: 'backfill', suggestionIds: [SUGGESTION_ID],
+  })).rejects.toMatchObject({ code: 'backfill_dataverse_target_mismatch' });
+  expect(graph.getSiteId).not.toHaveBeenCalled();
+  expect(graph.uploadFile).not.toHaveBeenCalled();
 });
 
 test('manifest source drift fails before render, Graph access, or pointer mutation', async () => {

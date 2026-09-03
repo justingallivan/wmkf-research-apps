@@ -24,11 +24,12 @@ related:
 
 ## Decision and status
 
-**Status: WAVES 1–2 ARE PRODUCTION-DEPLOYED ON `main` AT `83da197f`; WAVES 3–5
-REMAIN PLANNED. Ready deployment `dpl_F3oZ9MDbnyFox7S8Ekdos7423ece` contains the
-filing service and dedicated cron, but both rollout variables are absent and the
-route is Production-proved inert. No SharePoint write or historical backfill has
-been authorized for execution.**
+**Status: WAVES 1–2 ARE PRODUCTION-DEPLOYED ON `main` AT `83da197f`; WAVE 3 IS
+SOURCE-BUILT AND ADVERSARIALLY REVIEWED; WAVES 4–5 REMAIN PLANNED. Ready
+deployment `dpl_F3oZ9MDbnyFox7S8Ekdos7423ece` contains the filing service and
+dedicated cron, but both rollout variables are absent and the route is
+Production-proved inert. No Production backfill read, SharePoint write, or
+Dataverse pointer write has been authorized or performed.**
 
 The recommended design is to generate and retain one individual DOCX for every
 structured review, using the same approved individual template as the thank-you
@@ -61,7 +62,7 @@ probes on 2026-09-03:
 | D26 currently has 24 received reviews and 228 answer rows. All 24 are selected, have at least one rich-text answer row, have exact receipt/answer identity parity, and have zero complete or partial SharePoint pointers. This proves current eligibility shape, not merely row-count parity. | Existing structured writers | Production Dataverse | Proposed backfill | Updated `DATAVERSE_ALLOW_PROD_READS=yes node scripts/probe-review-blank-slate.mjs` | **VERIFIED AS OF 2026-09-03; RECHECK BEFORE EXECUTION** |
 | Rendering identical semantic input twice does not produce byte-identical ZIP packages, while the governed Word-part hash is stable. | Current renderer | Generated DOCX package | Retry/conflict logic | Local two-render experiment: raw SHA-256 differed; governed hash matched | **VERIFIED** |
 | The thank-you attachment now uses one shared individual-review builder with caller-owned generation time. | `reviewer-thankyou-sweep.js` | Existing answer snapshot + transient DOCX bytes | Thank-you attachment; filing service | Focused builder/thank-you/hash tests, rendered-page inspection, and Ready Production deployment | **PRODUCTION-LIVE AT `83da197f`; TRANSPORT BEHAVIOR UNCHANGED** |
-| Automatically retaining future individual DOCX files and backfilling D26 is live. | Dedicated filing service/cron is deployed but disabled; backfill script is not built | No Production write | Existing pointer consumers | Ready deployment plus authenticated flag-off route and maintenance-table before/after probe | **PRODUCTION-DEPLOYED INERT; WRITES/BACKFILL NOT LIVE** |
+| Automatically retaining future individual DOCX files and backfilling D26 is live. | Dedicated filing service/cron is deployed but disabled; the adversarially reviewed backfill source has not been run | No Production backfill manifest or write | Existing pointer consumers | Ready deployment plus authenticated flag-off route and maintenance-table before/after probe; Wave 3 source/tests/review | **PRODUCTION-DEPLOYED INERT; BACKFILL SOURCE BUILT; LIVE OPERATIONS OPEN** |
 
 ### Sweep boundary
 
@@ -70,8 +71,10 @@ answer and reviewer-suggestion persistence, individual renderer, thank-you
 consumer, SharePoint upload/download services, current plans, Atlas pages, wiki,
 memory, and session handoff. Historical/current statements that say the Wave 25
 release performs no SharePoint upload remain correct: they describe the shipped
-baseline. This document is the single forward plan and is explicitly marked
-`PLANNED`, so it does not rewrite that history as deployed behavior.
+baseline. This document is the single active forward plan. Its wave statuses
+distinguish the Production-deployed inert runtime, source-built backfill, and
+still-planned activation work, so it does not rewrite that history as deployed
+behavior.
 
 ### Adversarial review reconciliation
 
@@ -114,6 +117,21 @@ That review covered source and local tests only. The later release proved the
 Production deployment and disabled-route boundary, but not the guarded write
 path.
 
+Claude's read-only Wave 3 build review returned **APPROVE WITH NON-BLOCKING
+NOTES**. The accepted remediation keeps the CLI population explicitly limited
+to received rows with a missing or partial pointer: a completed pointer pair
+leaves later manifests and retries rather than being reported as
+`already_filed`. It also binds the tracked Production Dataverse base URL into
+the reviewed target, replaces locale-sensitive ordering, preserves every
+execution report under a timestamped create-only filename, restores scheduled
+classification precedence, and strengthens tests with present confidential
+fixtures plus duplicate/cap/blocking/exit-path cases. The interlock's same-day
+operator acknowledgement remains a process-wide Production-write exception,
+not a record-scoped grant; the service separately asserts every exact suggestion
+PATCH target before Graph mutation and again per row. The review and remediation
+cover source and local tests only. The first Production dry-run manifest and
+every write remain separately owner-gated.
+
 ## Product contract
 
 ### Included
@@ -146,8 +164,11 @@ path.
 2. **The retained file is derived and immutable.** A later template change does
    not silently replace prior files. Any future explicit regeneration/versioning
    workflow is a separate owner decision.
-3. **Existing pointers win.** If both SharePoint pointer fields are already set,
-   the service reports `already_filed` and performs no upload or replacement.
+3. **Existing pointers win.** The shared ensure service reports
+   `already_filed` and performs no upload or replacement when invoked for a row
+   whose exact pointer pair is already set. The backfill CLI is narrower: its
+   missing-file population excludes complete pointer pairs, so completed rows
+   leave fresh manifests and retries entirely.
 4. **A partial pointer is an anomaly.** Folder-without-filename or
    filename-without-folder must fail for investigation; the service must not guess
    or repair it automatically.
@@ -191,8 +212,8 @@ For one explicitly addressed row, prefer the suggestion's stamped
 using the existing cycle helper. This fallback supports the future operator
 backfill. Scheduled discovery is narrower: it admits only rows whose stamped
 cycle exactly matches the configured automatic cohort. A row with neither source
-is `no_cycle` and is skipped/reported. Backfill still requires an exact
-caller-supplied cycle match.
+is `no_cycle` and blocks the manifest for operator resolution. Backfill still
+requires an exact caller-supplied cycle match.
 
 ## SharePoint destination
 
@@ -304,19 +325,25 @@ the filing service needs an explicit review-document preflight before step 6:
 3. The configured SharePoint URL must exactly match the tracked canonical
    akoyaGO site URL, not merely an allowlisted tenant hostname.
 4. Resolve and return the site ID and `akoya_request` drive ID; execution uses
-   only those asserted identities. The backfill manifest records both.
+   only those asserted identities. The backfill manifest records both plus the
+   exact tracked Production Dataverse base URL.
 5. Before Graph upload, call the existing Dataverse interlock for the exact
-   intended suggestion-pointer PATCH URL and method. This proves a local
-   Production backfill has a valid same-day `DATAVERSE_PROD_WRITE_ACK` before
-   the file can be created.
+   intended suggestion-pointer PATCH URL and method, once for the reviewed write
+   set and again immediately before each row's mutation sequence. This proves a
+   local Production backfill has a valid same-day
+   `DATAVERSE_PROD_WRITE_ACK` before the file can be created. The acknowledgement
+   is a blanket local-process exception for Production Dataverse writes, not a
+   record-scoped authorization; exact row scope comes from these asserted URLs
+   and the hash-bound manifest.
 6. Scheduled automatic filing is allowed only from a Production deployment.
    Preview, test, and ordinary local runtime calls fail closed even if the feature
    flag is accidentally enabled. The operator backfill is the sole local
    exception and must satisfy its manifest and acknowledgement contract.
 
-A noncanonical site, a backfill site/drive mismatch against its manifest,
-non-enforcing Dataverse interlock, non-Production scheduled deployment, or missing
-local Production acknowledgement is a pre-mutation hard failure. Tests must prove
+A noncanonical site, a backfill site/drive/Dataverse mismatch against its
+manifest, a non-Production Dataverse target, non-enforcing Dataverse interlock,
+non-Production scheduled deployment, or missing local Production
+acknowledgement is a pre-mutation hard failure. Tests must prove
 `GraphService.uploadFile` is not reached.
 
 ## Automatic filing route
@@ -414,9 +441,12 @@ node scripts/backfill-review-docx-sharepoint.mjs --cycle D26 --execute --manifes
 - Writes require both `--execute` and a previously generated manifest.
 - `--request-number` supports a one-review controlled smoke.
 - There is no `--force` or overwrite mode.
+- Manifest and timestamped execution-result files are created with exclusive
+  filesystem semantics; an existing artifact is never overwritten.
 - Execution requires `DATAVERSE_TARGET_INTERLOCK=on`, the repository's same-day
   `DATAVERSE_PROD_WRITE_ACK`, the literal-on review-DOCX flag, and the exact
-  SharePoint target check. These are asserted before any Graph write.
+  Production Dataverse plus SharePoint target check. These are asserted before
+  any Graph write.
 
 ### Dry-run manifest
 
@@ -430,7 +460,8 @@ records:
 - eligibility classification;
 - expected folder and filename;
 - semantic document hash for eligible rows;
-- the exact canonical SharePoint URL plus resolved site and drive IDs;
+- the exact canonical SharePoint URL, resolved site and drive IDs, and tracked
+  Production Dataverse base URL;
 - whether an item already exists at the exact path and, if so, its stable metadata
   and semantic match result; and
 - a digest of the ordered candidate population.
@@ -441,18 +472,28 @@ receipt time, and the ordered answer snapshots. A corrected reviewer identity or
 proposal label therefore invalidates a stale manifest before execution.
 
 Dry run exits nonzero for partial pointers, target-content conflicts, invalid
-snapshots, duplicate identities, or unresolved relationships. It can report
-ineligible legacy rows without treating them as writes.
+snapshots, duplicate identities, missing cycles, missing rows, or unresolved
+relationships. It can report reviewed nonblocking ineligible legacy rows without
+treating them as writes.
 
 ### Execute and partial-success behavior
 
 Before the first write, execute must reread the population and source fingerprints
 and compare them with the manifest. Any drift aborts the run before mutation.
 
-Process conservatively and report each suggestion as `created`, `reconciled`,
-`already_filed`, `skipped`, or `failed`. Continue after a row-specific failure,
-but exit nonzero if any row failed. A retry uses a fresh manifest and targets only
-still-missing suggestions; completed rows are idempotent no-ops.
+Process conservatively and report each manifest suggestion as `created`,
+`reconciled`, `skipped`, or `failed`. Continue after a row-specific failure, but
+exit nonzero if any row failed. A retry uses a fresh manifest and targets only
+still-missing suggestions; completed rows have left the population and are not
+re-audited by this missing-file command.
+
+The same-day acknowledgement is reasserted before each pointer target. If UTC
+midnight falls between a successful Graph upload and pointer PATCH, the
+interlock can deny the PATCH and leave a create-only orphan for the next fresh
+manifest to reconcile. If exact-item cleanup itself fails, the shared service
+records a bounded Postgres operational event; that telemetry write is outside
+the Dataverse interlock and contains identifiers/error codes, not review
+content.
 
 After every apparent success, reread both Dataverse pointer fields, Graph stable
 metadata, and the downloaded semantic hash. Count-only or upload-response-only
@@ -469,9 +510,10 @@ D26 count is evidence for planning only and must never be hardcoded.
 - Stable semantic hash across two renders whose raw bytes differ.
 - Existing Initial Assessment and all current governed-hash consumer suites
   remain unchanged; no helper extraction occurs in this release.
-- Eligibility: rich-text-bearing structured/no-pointer eligible; complete pointer
-  skipped; partial pointer fails; ratings/multiselect-only mark-received fixture
-  skipped; no-answer receipt skipped; malformed snapshot fails.
+- Eligibility: rich-text-bearing structured/no-pointer eligible; the shared
+  ensure service skips a complete pointer while the backfill manifest omits it;
+  partial pointer fails; ratings/multiselect-only mark-received fixture skipped;
+  no-answer receipt skipped; malformed snapshot fails.
 - Manual structured rows are eligible even when
   `wmkf_reviewuploadedbystaff=true`.
 - `wmkf_selected=false`, excluded-disposition, and null-cycle fixtures follow the
@@ -497,7 +539,10 @@ D26 count is evidence for planning only and must never be hardcoded.
 - Generated filenames stay hidden in the external received notice; staff-upload
   versus staff-entry labels use the trusted path classifier.
 - Backfill dry-run default, required exact cycle, manifest drift abort, per-row
-  partial success, nonzero failure exit, and clean rerun.
+  partial success, nonzero failure exit, create-only timestamped result artifact,
+  host-independent ordering, duplicate-union/capped-batch handling, and clean
+  rerun. Redaction fixtures must contain answer text and DOCX bytes that would
+  leak if the allowlist projection were removed.
 - Existing review upload, remove-entirely cleanup, Reviews-tab download, and
   combined export tests stay green.
 
@@ -589,14 +634,20 @@ maintenance row. Claude returned APPROVE WITH NON-BLOCKING SUGGESTIONS, and the
 accepted pre-release hardening is incorporated. The rollout/cycle flags remain
 absent in Production; no Graph or Dataverse pointer write occurred. The guarded
 mutation path is therefore not Production-proved. Wave 3 backfill code is built
-on `codex/review-docx-wave3-backfill` with focused tests; it has not undergone
-the external adversarial review or been run against Production.
+on `codex/review-docx-wave3-backfill` with focused tests. Claude's Wave 3
+adversarial review returned APPROVE WITH NON-BLOCKING NOTES; the accepted
+remediation is incorporated on the feature branch. It has not been run against
+Production.
 
 ### Wave 3 — D26 dry run and one-file proof
 
-**Status: IMPLEMENTATION BUILT; ADVERSARIAL REVIEW AND ALL LIVE OPERATIONS OPEN.**
+**Status: IMPLEMENTATION BUILT AND ADVERSARIALLY REVIEWED; ALL LIVE OPERATIONS
+OPEN.**
 
 - [x] Build the dry-run-first backfill script using the same ensure service.
+- [x] Complete the read-only adversarial review and incorporate its accepted
+  contract, target-binding, determinism, artifact-preservation, and test
+  hardening.
 - Produce a fresh D26 manifest in Production.
 - Stop for explicit approval of one exact write target.
 - Execute and verify one review end to end.
@@ -630,7 +681,8 @@ Stop before writes or further rollout if any of the following appears:
 - unresolved request/reviewer identity;
 - `DATAVERSE_TARGET_INTERLOCK` is not enforcing, the scheduled caller is not a
   Production deployment, the configured SharePoint site is not the canonical
-  site, or a backfill's resolved site/drive differs from its manifest;
+  site, the backfill Dataverse target is not the tracked Production instance,
+  or a backfill's resolved site/drive/Dataverse base differs from its manifest;
 - any attempt would overwrite or broadly delete an existing SharePoint item;
 - the one-file smoke cannot be verified by stable identity, content, Dataverse
   pointers, and the staff download path.
@@ -638,19 +690,18 @@ Stop before writes or further rollout if any of the following appears:
 ## Sweep report
 
 ```text
-Sweep mode: Mode B domain truth audit plus Mode A Wave 2 release reconciliation
+Sweep mode: Mode B domain truth audit plus Mode A Wave 3 review remediation
 Domain: structured individual review DOCX generation and SharePoint retention
 Claims: Waves 1–2 implementation and flag-off Production deployment VERIFIED;
-  Wave 3 backfill SOURCE/FOCUSED-TEST VERIFIED but externally unreviewed and
-  unexecuted; activation and Production write behavior UNPROVED
+  Wave 3 backfill SOURCE/FOCUSED-TEST/ADVERSARIAL-REVIEW VERIFIED but
+  unexecuted; live manifest, activation, and Production write behavior UNPROVED
 Durable restatements: current no-upload statements remain accurate historical/current baseline
 Structural fix: reconciled plan/catalog/Atlas/runbook/handoff to the Ready inert
   release while preserving the separate activation and write-proof gates
-Semantic omissions found: upload flag, eligibility distinction for manual structured rows,
-  mark-received provenance, Graph target protection, dedicated-cron isolation,
-  pointer-consumer semantics, 412-null retry, exact cycle scoping, create-only conflict
-  recovery, semantic rather than raw-byte identity, partial-success backfill accounting,
-  candidate-starvation prevention, and post-commit verification operations
+Semantic omissions found: Wave 3 unfinished-only population versus shared
+  already-filed verification, exact Dataverse target binding, process-wide ack
+  scope, host-independent ordering, result-artifact overwrite risk, midnight
+  ack expiry, and cleanup-failure Postgres telemetry
 Remaining live STALE: 0 within this plan's stated scope
 Remaining UNKNOWN/ASSUMED: Production write behavior remains unproved until the approved smoke
 Verdict: WAVES 1–2 PRODUCTION-DEPLOYED INERT; WAVE 3 CODE BUILT, LIVE MANIFEST

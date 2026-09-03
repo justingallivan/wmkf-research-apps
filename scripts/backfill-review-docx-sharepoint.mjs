@@ -4,7 +4,8 @@
  *
  * Dry run is the default and writes a redacted manifest under outputs/. Execute
  * requires that previously generated manifest and all service-level write
- * interlocks. There is no force or overwrite mode.
+ * interlocks. Manifest and timestamped execution-result artifacts are written
+ * create-only. There is no force or overwrite mode.
  */
 
 import fs from 'node:fs';
@@ -86,13 +87,25 @@ function defaultManifestPath(cycleCode, observedAt) {
   return path.resolve('outputs', 'review-docx-backfill', `review-docx-${cycleCode}-${stamp}.json`);
 }
 
-function resultPathFor(manifestPath) {
-  return manifestPath.replace(/\.json$/i, '.execute-result.json');
+export function resultPathFor(manifestPath, generatedAt = new Date().toISOString()) {
+  const stamp = generatedAt.replace(/[:.]/g, '-');
+  const base = /\.json$/i.test(manifestPath) ? manifestPath.slice(0, -5) : manifestPath;
+  return `${base}.execute-result-${stamp}.json`;
 }
 
 function writeJson(filePath, value) {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  fs.writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`, { encoding: 'utf8', mode: 0o600 });
+  fs.writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`, {
+    encoding: 'utf8',
+    mode: 0o600,
+    flag: 'wx',
+  });
+}
+
+export function backfillExitCode({ manifest = null, report = null } = {}) {
+  if (manifest && isBlockingReviewDocxBackfillManifest(manifest)) return 1;
+  if (report && Number(report.summary?.failed || 0) > 0) return 1;
+  return 0;
 }
 
 function assertOperatorReadTarget() {
@@ -123,7 +136,7 @@ export async function main(argv = process.argv.slice(2)) {
         manifestHash: manifest.manifestHash,
         ...manifest.summary,
       }, null, 2));
-      if (isBlockingReviewDocxBackfillManifest(manifest)) process.exitCode = 1;
+      process.exitCode = backfillExitCode({ manifest });
       return { manifestPath, manifest };
     }
 
@@ -136,10 +149,11 @@ export async function main(argv = process.argv.slice(2)) {
       invariant(manifest.scope.requestNumber === args.requestNumber, '--request-number does not match the reviewed manifest');
     }
     const report = await executeReviewDocxBackfill(manifest);
-    const resultPath = resultPathFor(args.manifestPath);
-    writeJson(resultPath, { generatedAt: new Date().toISOString(), ...report });
+    const generatedAt = new Date().toISOString();
+    const resultPath = resultPathFor(args.manifestPath, generatedAt);
+    writeJson(resultPath, { generatedAt, ...report });
     console.log(JSON.stringify({ mode: 'execute', resultPath, ...report.summary }, null, 2));
-    if (report.summary.failed > 0) process.exitCode = 1;
+    process.exitCode = backfillExitCode({ report });
     return { resultPath, report };
   });
 }

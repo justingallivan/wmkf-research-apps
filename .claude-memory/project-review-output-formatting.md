@@ -74,7 +74,9 @@ non-blocking suggestions; the accepted hardening is incorporated. Both rollout
 variables are absent in Production. An authenticated flag-off request returned
 `enabled:false` and left the job's maintenance-run population unchanged at
 zero. The write path has not been exercised. The dry-run-first D26 Wave 3
-backfill is source-built with a redacted hash-bound manifest, pre-write drift
-checks, and the existing create-only ensure service; adversarial review and all
-Production runs remain open. Describe Wave 2 as Production-deployed inert and
-Wave 3 as built but unexecuted, not activated.
+backfill is source-built with a redacted hash-bound unfinished population,
+pre-write drift checks, exact Production Dataverse plus SharePoint target
+binding, and the existing create-only ensure service. Claude's Wave 3 review
+returned APPROVE WITH NON-BLOCKING NOTES and its accepted hardening is
+incorporated; all Production runs remain open. Describe Wave 2 as
+Production-deployed inert and Wave 3 as reviewed but unexecuted, not activated.

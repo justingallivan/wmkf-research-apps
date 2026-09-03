@@ -102,13 +102,15 @@ No Graph mutation, Dataverse pointer write, or candidate read was authorized or
 performed by the Wave 2 release. Wave 3 is now source-built on
 `codex/review-docx-wave3-backfill`: the operator CLI defaults to a read-only
 Production dry run, records no answer/document content, binds its ordered
-population and exact SharePoint target into a hashed manifest, rechecks all
-source/ETag/semantic hashes before writes, and uses the existing create-only
-ensure service under the local same-day Production acknowledgement. Focused
-tests and Dataverse/context/type gates pass. External adversarial review and the
-first Production dry run have not occurred; executing even one generated-file
-write still requires a fresh reviewed manifest and separate explicit owner
-approval.
+unfinished population and exact Production Dataverse plus SharePoint target into
+a hashed manifest, rechecks all source/ETag/semantic hashes before writes, and
+uses the existing create-only ensure service under the local same-day Production
+acknowledgement. Focused tests and Dataverse/context/type gates pass. Claude's
+Wave 3 adversarial review returned APPROVE WITH NON-BLOCKING NOTES; the accepted
+contract, target-binding, deterministic-ordering, create-only result-artifact,
+and discriminating-test hardening is incorporated. The first Production dry run
+has not occurred; executing even one generated-file write still requires a
+fresh reviewed manifest and separate explicit owner approval.
 
 ## Parked
 
