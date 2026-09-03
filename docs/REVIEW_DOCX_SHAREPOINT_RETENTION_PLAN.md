@@ -397,8 +397,9 @@ not let the browser infer provenance from an arbitrary filename.
 
 ## D26 backfill script
 
-Add `scripts/backfill-review-docx-sharepoint.mjs` as an operator-only script. It
-must use the same service as forward generation and be safe by default.
+The source-built operator entry point is
+`scripts/backfill-review-docx-sharepoint.mjs`. It uses the same ensure service
+as forward generation and is safe by default.
 
 ### Interface
 
@@ -587,12 +588,15 @@ scheduled scan is exact-stamp-only and newest-first; a disabled route creates no
 maintenance row. Claude returned APPROVE WITH NON-BLOCKING SUGGESTIONS, and the
 accepted pre-release hardening is incorporated. The rollout/cycle flags remain
 absent in Production; no Graph or Dataverse pointer write occurred. The guarded
-mutation path is therefore not Production-proved. Wave 3 backfill code has not
-been started.
+mutation path is therefore not Production-proved. Wave 3 backfill code is built
+on `codex/review-docx-wave3-backfill` with focused tests; it has not undergone
+the external adversarial review or been run against Production.
 
 ### Wave 3 — D26 dry run and one-file proof
 
-- Build the dry-run-first backfill script using the same ensure service.
+**Status: IMPLEMENTATION BUILT; ADVERSARIAL REVIEW AND ALL LIVE OPERATIONS OPEN.**
+
+- [x] Build the dry-run-first backfill script using the same ensure service.
 - Produce a fresh D26 manifest in Production.
 - Stop for explicit approval of one exact write target.
 - Execute and verify one review end to end.
@@ -637,7 +641,8 @@ Stop before writes or further rollout if any of the following appears:
 Sweep mode: Mode B domain truth audit plus Mode A Wave 2 release reconciliation
 Domain: structured individual review DOCX generation and SharePoint retention
 Claims: Waves 1–2 implementation and flag-off Production deployment VERIFIED;
-  Wave 3 backfill PLANNED; activation and Production write behavior UNPROVED
+  Wave 3 backfill SOURCE/FOCUSED-TEST VERIFIED but externally unreviewed and
+  unexecuted; activation and Production write behavior UNPROVED
 Durable restatements: current no-upload statements remain accurate historical/current baseline
 Structural fix: reconciled plan/catalog/Atlas/runbook/handoff to the Ready inert
   release while preserving the separate activation and write-proof gates
@@ -648,5 +653,6 @@ Semantic omissions found: upload flag, eligibility distinction for manual struct
   candidate-starvation prevention, and post-commit verification operations
 Remaining live STALE: 0 within this plan's stated scope
 Remaining UNKNOWN/ASSUMED: Production write behavior remains unproved until the approved smoke
-Verdict: WAVES 1–2 PRODUCTION-DEPLOYED INERT; WAVE 3 AND ALL WRITES REMAIN GATED
+Verdict: WAVES 1–2 PRODUCTION-DEPLOYED INERT; WAVE 3 CODE BUILT, LIVE MANIFEST
+  AND ALL WRITES REMAIN GATED
 ```

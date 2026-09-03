@@ -69,6 +69,9 @@ const {
   ensureIndividualReviewFile,
   inspectIndividualReviewFileCandidate,
   isActionableReviewDocxStatus,
+  planIndividualReviewFileCandidate,
+  preflightReviewDocxWrite,
+  resolveReviewDocxTarget,
   sweepMissingIndividualReviewFiles,
 } = require('../../lib/services/review-documents/individual-file-service');
 
@@ -244,6 +247,110 @@ test('literal-off flag reaches no Graph mutation or pointer write', async () => 
   process.env.REVIEW_DOCX_SHAREPOINT_WRITE = 'off';
   const result = await ensureIndividualReviewFile(SUGGESTION_ID, { cycleCode: 'D26' });
   expect(result).toMatchObject({ status: 'target_guard_failed', error: { code: 'write_disabled' } });
+  expect(graph.uploadFile).not.toHaveBeenCalled();
+  expect(suggestion.patchReviewReceipt).not.toHaveBeenCalled();
+});
+
+test('read-only planning renders and hashes without requiring the write flag', async () => {
+  process.env.REVIEW_DOCX_SHAREPOINT_WRITE = '';
+  const target = await resolveReviewDocxTarget();
+  const result = await planIndividualReviewFileCandidate(SUGGESTION_ID, {
+    cycleCode: 'D26', target,
+  });
+  expect(result).toMatchObject({
+    status: 'eligible',
+    suggestionId: SUGGESTION_ID,
+    suggestionEtag: 'W/"1"',
+    requestId: REQUEST_ID,
+    requestNumber: '1002903',
+    richTextPresent: true,
+    semanticHash: 'gdc1:semantic-hash',
+    item: null,
+  });
+  expect(result.sourceFingerprint).toMatch(/^[a-f0-9]{64}$/);
+  expect(result).not.toHaveProperty('answers');
+  expect(graph.uploadFile).not.toHaveBeenCalled();
+  expect(suggestion.patchReviewReceipt).not.toHaveBeenCalled();
+});
+
+test('backfill preflight is the sole local write exception and asserts every pointer target', async () => {
+  process.env.VERCEL_ENV = '';
+  const target = await preflightReviewDocxWrite({
+    executionMode: 'backfill', suggestionIds: [SUGGESTION_ID, SECOND_SUGGESTION_ID],
+  });
+  expect(target).toMatchObject({ siteId: 'site-1', driveId: 'drive-1' });
+  expect(assertDataverseOperationAllowed).toHaveBeenCalledTimes(2);
+  expect(assertDataverseOperationAllowed).toHaveBeenNthCalledWith(1, expect.objectContaining({
+    method: 'PATCH',
+    url: `https://wmkf.crm.dynamics.com/api/data/v9.2/wmkf_appreviewersuggestions(${SUGGESTION_ID})`,
+  }));
+
+  process.env.VERCEL_ENV = 'production';
+  await expect(preflightReviewDocxWrite({
+    executionMode: 'backfill', suggestionIds: [SUGGESTION_ID],
+  })).rejects.toMatchObject({ code: 'backfill_not_local' });
+});
+
+test('manifest source drift fails before render, Graph access, or pointer mutation', async () => {
+  const result = await ensureIndividualReviewFile(SUGGESTION_ID, {
+    cycleCode: 'D26',
+    expectedSuggestionEtag: 'W/"stale"',
+    expectedSourceFingerprint: 'stale-source',
+    expectedSemanticHash: 'gdc1:stale',
+  });
+  expect(result).toMatchObject({ status: 'source_drift', error: { code: 'source_drift' } });
+  expect(buildIndividualReviewDocx).not.toHaveBeenCalled();
+  expect(graph.getFileMetadataByPath).not.toHaveBeenCalled();
+  expect(graph.uploadFile).not.toHaveBeenCalled();
+  expect(suggestion.patchReviewReceipt).not.toHaveBeenCalled();
+});
+
+test('manifest-bound already-filed state is semantically verified without upload or pointer rewrite', async () => {
+  suggestion.getByIdWithSelect.mockResolvedValueOnce(exactPointer());
+  graph.getFileMetadataByPath.mockResolvedValueOnce(ITEM);
+  const planned = await planIndividualReviewFileCandidate(SUGGESTION_ID, {
+    cycleCode: 'D26',
+    target: {
+      siteUrl: 'https://appriver3651007194.sharepoint.com/sites/akoyaGO',
+      siteId: 'site-1',
+      driveId: 'drive-1',
+    },
+  });
+  expect(planned.status).toBe('already_filed');
+
+  jest.clearAllMocks();
+  suggestion.isExcluded.mockImplementation((row) => row.wmkf_applicantdisposition === 100000001);
+  suggestion.getByIdWithSelect
+    .mockResolvedValueOnce(exactPointer())
+    .mockResolvedValueOnce(exactPointer());
+  getRequestById.mockResolvedValue({
+    akoya_requestid: REQUEST_ID,
+    akoya_requestnum: '1002903',
+    akoya_title: 'Proposal',
+    wmkf_organizationname: 'University',
+    wmkf_meetingdate: '2026-12-03T00:00:00Z',
+  });
+  getReviewerById.mockResolvedValue({ wmkf_potentialreviewersid: REVIEWER_ID, wmkf_name: 'Reviewer' });
+  fetchAnswersBySuggestion.mockResolvedValue({ [SUGGESTION_ID]: ANSWERS });
+  buildIndividualReviewDocx.mockResolvedValue({
+    filename: FILENAME,
+    contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    content: DOCX,
+  });
+  hashGovernedDocxContent.mockResolvedValue('gdc1:semantic-hash');
+  graph.getSiteId.mockResolvedValue('site-1');
+  graph.getDriveId.mockResolvedValue('drive-1');
+  graph.getFileMetadataByPath.mockResolvedValue(ITEM);
+  graph.getFileMetadataById.mockResolvedValue(ITEM);
+  graph.downloadFile.mockResolvedValue({ buffer: DOCX, filename: FILENAME, size: DOCX.length });
+
+  const result = await ensureIndividualReviewFile(SUGGESTION_ID, {
+    cycleCode: 'D26',
+    expectedSuggestionEtag: planned.suggestionEtag,
+    expectedSourceFingerprint: planned.sourceFingerprint,
+    expectedSemanticHash: planned.semanticHash,
+  });
+  expect(result).toMatchObject({ status: 'already_filed', item: { id: 'item-1' } });
   expect(graph.uploadFile).not.toHaveBeenCalled();
   expect(suggestion.patchReviewReceipt).not.toHaveBeenCalled();
 });

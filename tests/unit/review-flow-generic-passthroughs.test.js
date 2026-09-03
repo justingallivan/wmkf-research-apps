@@ -13,6 +13,7 @@ import { jest } from '@jest/globals';
 import { DynamicsService } from '../../lib/services/dynamics-service.js';
 import { getByIdWithSelect, queryReviewers } from '../../lib/dataverse/adapters/potential-reviewer.js';
 import {
+  findReviewDocxBackfillPopulation,
   findReviewDocxFilingCandidates,
   patchFields,
   queryAllSuggestions,
@@ -78,6 +79,42 @@ describe('reviewer-suggestion.findReviewDocxFilingCandidates', () => {
     expect(filter).toContain('wmkf_reviewsharepointfolder eq null or wmkf_reviewfilename eq null');
     expect(filter).toContain('wmkf_applicantdisposition eq null');
     expect(filter).not.toContain('wmkf_grantcyclecode eq null');
+  });
+});
+
+describe('reviewer-suggestion.findReviewDocxBackfillPopulation', () => {
+  it('unions meeting-cycle and stamped-cycle rows while preserving ineligible rows for classification', async () => {
+    const requestId = '22222222-2222-4222-8222-222222222222';
+    const meetingSuggestion = '33333333-3333-4333-8333-333333333333';
+    const stampedSuggestion = '44444444-4444-4444-8444-444444444444';
+    const spy = jest.spyOn(DynamicsService, 'queryAllRecords')
+      .mockResolvedValueOnce({ records: [{ akoya_requestid: requestId }], capped: false })
+      .mockResolvedValueOnce({ records: [{
+        wmkf_appreviewersuggestionid: meetingSuggestion,
+        wmkf_reviewreceivedat: '2026-08-01T00:00:00Z',
+      }], capped: false })
+      .mockResolvedValueOnce({ records: [{
+        wmkf_appreviewersuggestionid: stampedSuggestion,
+        wmkf_reviewreceivedat: '2026-08-02T00:00:00Z',
+      }], capped: false });
+
+    const result = await findReviewDocxBackfillPopulation({ cycleCode: 'D26' });
+
+    expect(result.records.map((row) => row.wmkf_appreviewersuggestionid))
+      .toEqual([meetingSuggestion, stampedSuggestion]);
+    expect(spy).toHaveBeenCalledTimes(3);
+    expect(spy.mock.calls[0][1].filter).toContain('wmkf_meetingdate ge 2026-12-01T00:00:00Z');
+    expect(spy.mock.calls[1][1].filter).toContain(`_wmkf_request_value eq ${requestId}`);
+    expect(spy.mock.calls[2][1].filter).toContain("wmkf_grantcyclecode eq 'D26'");
+    expect(spy.mock.calls[1][1].filter).not.toContain('wmkf_selected eq true');
+  });
+
+  it('keeps a request-number smoke inside the exact meeting-cycle request set', async () => {
+    const spy = jest.spyOn(DynamicsService, 'queryAllRecords')
+      .mockResolvedValueOnce({ records: [], capped: false });
+    await findReviewDocxBackfillPopulation({ cycleCode: 'D26', requestNumber: '1002903' });
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy.mock.calls[0][1].filter).toContain("akoya_requestnum eq '1002903'");
   });
 });
 

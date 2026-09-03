@@ -143,8 +143,12 @@ pointers always win; partial pointers are reported and left untouched. The
 writer uses an ETag conditional PATCH, one bounded pointer retry, and the
 server-derived `Reviewer_Uploads/Generated/<suggestion-guid>/Review-<request>.docx`
 identity. Scheduled discovery requires the exact stamped cycle and processes
-newest receipts first; historical meeting-date fallback belongs to the future
-operator backfill. It remains inert, including no maintenance row, while
+newest receipts first. The source-built Wave 3 operator backfill separately
+unions exact stamps with request meeting-cycle fallback, produces a redacted
+hash-bound manifest, and requires fresh population/source agreement plus the
+same-day local Production-write acknowledgement before it can call the same
+ensure service. It remains unexecuted. The scheduled route remains inert,
+including no maintenance row, while
 `REVIEW_DOCX_SHAREPOINT_WRITE` is unset. Both rollout variables were confirmed
 absent in Production; an authenticated flag-off route probe returned
 `enabled:false`, and the job's maintenance-run count remained zero before and
@@ -319,6 +323,12 @@ Write (verified 2026-05-07; +Phase 3 ingestion S210):
   after create-only SharePoint reconciliation, and is not part of submission or
   thank-you delivery. Deployment is complete; Production activation and write
   proof remain pending and separately owner-gated.
+- `scripts/backfill-review-docx-sharepoint.mjs` — source-built Wave 3 local
+  operator entry point. Dry run is the default and writes a content-free
+  manifest; `--execute` requires that reviewed manifest, exact source/population
+  and SharePoint target agreement, the literal-on writer flag, enforcing target
+  interlock, and a current `DATAVERSE_PROD_WRITE_ACK`. It has not been run
+  against Production and has created no file or pointer.
 - `scripts/backfill-postgres-to-dataverse.js` — `suggestionAdapter.upsert` and `updateLifecycle` for Wave 2 backfill, preserving outreach/reminder timestamps
 
 ## Cross-system

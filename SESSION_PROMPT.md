@@ -62,8 +62,8 @@ deployed/source/test/render verified rather than transport-smoked in Production.
 
 ## Following Priority
 
-The owner approved Wave 2 of automatic retention for individual structured
-review DOCX files in SharePoint; the dry-run-first D26 backfill remains Wave 3.
+The owner approved automatic retention for individual structured review DOCX
+files in SharePoint; the dry-run-first D26 backfill is Wave 3.
 The active plan is `docs/REVIEW_DOCX_SHAREPOINT_RETENTION_PLAN.md`. Claude's
 read-only adversarial review of the plan returned
 APPROVE WITH CONDITIONS; the plan now incorporates the verified eligibility,
@@ -99,9 +99,16 @@ authenticated Production GET returned
 `{ok:true,enabled:false,status:"disabled",scanCap:7,attemptCap:2}`; the
 `file-review-docx` maintenance-run count was zero immediately before and after.
 No Graph mutation, Dataverse pointer write, or candidate read was authorized or
-performed. Wave 3 is now the next gate and will add the dry-run-first D26
-backfill script; executing even one generated-file write still requires a fresh
-manifest and separate explicit owner approval.
+performed by the Wave 2 release. Wave 3 is now source-built on
+`codex/review-docx-wave3-backfill`: the operator CLI defaults to a read-only
+Production dry run, records no answer/document content, binds its ordered
+population and exact SharePoint target into a hashed manifest, rechecks all
+source/ETag/semantic hashes before writes, and uses the existing create-only
+ensure service under the local same-day Production acknowledgement. Focused
+tests and Dataverse/context/type gates pass. External adversarial review and the
+first Production dry run have not occurred; executing even one generated-file
+write still requires a fresh reviewed manifest and separate explicit owner
+approval.
 
 ## Parked
 
