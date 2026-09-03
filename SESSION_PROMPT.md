@@ -28,14 +28,17 @@ deployed, or production-enabled.
 ## Release Boundary
 
 The Wave 25 schema-first gate is cleared in Production. The source branch is
-still not merged or deployed.
+still not merged or deployed. As of 2026-09-03 it is five commits ahead and
+zero behind `origin/main`; the expanded review workflow suite passed 306/306,
+all relevant structural gates and self-tests passed, TypeScript passed, lint
+reported 0 errors/76 existing warnings, and the production build passed with
+both templates present in the export and thank-you route traces.
 
 Remaining release sequence:
 
-1. Rebase the branch on current `main` and rerun focused/full gates and build.
-2. Review the final diff and obtain explicit owner approval before merging or
-   pushing to `main`, which auto-deploys Production.
-3. After deployment, run signed-in read/export verification. Do not manufacture
+1. Obtain explicit owner approval before merging or pushing to `main`, which
+   auto-deploys Production.
+2. After deployment reaches Ready, run signed-in read/export verification. Do not manufacture
    or alter a submitted review merely to prove the new snapshot writer.
 
 ## Implementation Surfaces
