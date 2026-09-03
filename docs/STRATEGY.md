@@ -154,9 +154,11 @@ authenticated route call returned `enabled:false`, and the maintenance-run
 population remained zero before/after. Wave 3's dry-run-first D26 backfill
 script and content-free manifest/execution contract are source-built with
 focused tests. Claude's adversarial review returned APPROVE WITH NON-BLOCKING
-NOTES and the accepted hardening is incorporated; the first read-only Production
-manifest remains the next ordered gate. No SharePoint file or Dataverse pointer
-write is authorized by that work. Final Writeup persona
+NOTES and the accepted hardening is incorporated. The first read-only Production
+manifest was created on 2026-09-03 and stopped with 23 eligible rows plus one
+blocking duplicate-question-order snapshot on Request `1003223`; no SharePoint
+file or Dataverse pointer write occurred. Resolving that historical-order policy
+and producing a fresh clean manifest is the next ordered gate. Final Writeup persona
 access proof and deliberate enablement remain preserved immediately afterward.
 As of 2026-08-31, the ordinary-staff
 dashboard/focused-review foundation is Production-deployed

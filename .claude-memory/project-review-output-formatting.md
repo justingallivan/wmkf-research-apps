@@ -78,5 +78,8 @@ backfill is source-built with a redacted hash-bound unfinished population,
 pre-write drift checks, exact Production Dataverse plus SharePoint target
 binding, and the existing create-only ensure service. Claude's Wave 3 review
 returned APPROVE WITH NON-BLOCKING NOTES and its accepted hardening is
-incorporated; all Production runs remain open. Describe Wave 2 as
-Production-deployed inert and Wave 3 as reviewed but unexecuted, not activated.
+incorporated. The first read-only Production dry run created a 24-row manifest
+on 2026-09-03: 23 eligible and one blocking `invalid_snapshot` on Request
+`1003223` because unique/readable answer rows share stored orders 8 and 9. No
+Graph or Dataverse mutation occurred. Describe Wave 2 as Production-deployed
+inert and Wave 3 as dry-run blocked, unexecuted, and not activated.

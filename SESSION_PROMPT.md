@@ -108,9 +108,14 @@ uses the existing create-only ensure service under the local same-day Production
 acknowledgement. Focused tests and Dataverse/context/type gates pass. Claude's
 Wave 3 adversarial review returned APPROVE WITH NON-BLOCKING NOTES; the accepted
 contract, target-binding, deterministic-ordering, create-only result-artifact,
-and discriminating-test hardening is incorporated. The first Production dry run
-has not occurred; executing even one generated-file write still requires a
-fresh reviewed manifest and separate explicit owner approval.
+and discriminating-test hardening is incorporated. The first read-only
+Production dry run completed on 2026-09-03 and created the redacted manifest
+`outputs/review-docx-backfill/review-docx-D26-2026-09-03T21-26-05-683Z.json`.
+It found 24 unfinished reviews: 23 eligible and one blocking
+`invalid_snapshot` on Request `1003223`, caused by duplicate stored question
+orders 8 and 9 across otherwise unique/readable answer rows. No SharePoint or
+Dataverse mutation occurred. Resolve that historical-order policy and generate
+a fresh clean manifest before requesting separate approval for even one write.
 
 ## Parked
 

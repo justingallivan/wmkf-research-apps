@@ -25,11 +25,12 @@ related:
 ## Decision and status
 
 **Status: WAVES 1–2 ARE PRODUCTION-DEPLOYED ON `main` AT `83da197f`; WAVE 3 IS
-SOURCE-BUILT AND ADVERSARIALLY REVIEWED; WAVES 4–5 REMAIN PLANNED. Ready
+SOURCE-BUILT, ADVERSARIALLY REVIEWED, AND READ-ONLY DRY-RUN BLOCKED; WAVES 4–5 REMAIN PLANNED. Ready
 deployment `dpl_F3oZ9MDbnyFox7S8Ekdos7423ece` contains the filing service and
 dedicated cron, but both rollout variables are absent and the route is
-Production-proved inert. No Production backfill read, SharePoint write, or
-Dataverse pointer write has been authorized or performed.**
+Production-proved inert. The first Production backfill read created a blocked
+24-row manifest on 2026-09-03; no SharePoint or Dataverse mutation has been
+authorized or performed.**
 
 The recommended design is to generate and retain one individual DOCX for every
 structured review, using the same approved individual template as the thank-you
@@ -62,7 +63,7 @@ probes on 2026-09-03:
 | D26 currently has 24 received reviews and 228 answer rows. All 24 are selected, have at least one rich-text answer row, have exact receipt/answer identity parity, and have zero complete or partial SharePoint pointers. This proves current eligibility shape, not merely row-count parity. | Existing structured writers | Production Dataverse | Proposed backfill | Updated `DATAVERSE_ALLOW_PROD_READS=yes node scripts/probe-review-blank-slate.mjs` | **VERIFIED AS OF 2026-09-03; RECHECK BEFORE EXECUTION** |
 | Rendering identical semantic input twice does not produce byte-identical ZIP packages, while the governed Word-part hash is stable. | Current renderer | Generated DOCX package | Retry/conflict logic | Local two-render experiment: raw SHA-256 differed; governed hash matched | **VERIFIED** |
 | The thank-you attachment now uses one shared individual-review builder with caller-owned generation time. | `reviewer-thankyou-sweep.js` | Existing answer snapshot + transient DOCX bytes | Thank-you attachment; filing service | Focused builder/thank-you/hash tests, rendered-page inspection, and Ready Production deployment | **PRODUCTION-LIVE AT `83da197f`; TRANSPORT BEHAVIOR UNCHANGED** |
-| Automatically retaining future individual DOCX files and backfilling D26 is live. | Dedicated filing service/cron is deployed but disabled; the adversarially reviewed backfill source has not been run | No Production backfill manifest or write | Existing pointer consumers | Ready deployment plus authenticated flag-off route and maintenance-table before/after probe; Wave 3 source/tests/review | **PRODUCTION-DEPLOYED INERT; BACKFILL SOURCE BUILT; LIVE OPERATIONS OPEN** |
+| Automatically retaining future individual DOCX files and backfilling D26 is live. | Dedicated filing service/cron is deployed but disabled; the adversarially reviewed backfill produced its first read-only Production manifest | Local redacted manifest; no SharePoint/Dataverse write | Existing pointer consumers | Ready deployment plus authenticated flag-off route and maintenance-table before/after probe; Wave 3 source/tests/review; D26 dry run | **PRODUCTION-DEPLOYED INERT; DRY RUN BLOCKED 23 ELIGIBLE / 1 INVALID SNAPSHOT; WRITES OPEN** |
 
 ### Sweep boundary
 
@@ -129,8 +130,11 @@ fixtures plus duplicate/cap/blocking/exit-path cases. The interlock's same-day
 operator acknowledgement remains a process-wide Production-write exception,
 not a record-scoped grant; the service separately asserts every exact suggestion
 PATCH target before Graph mutation and again per row. The review and remediation
-cover source and local tests only. The first Production dry-run manifest and
-every write remain separately owner-gated.
+cover source and local tests only. The separately authorized first Production
+dry run then created a redacted 24-row manifest: 23 eligible and one blocking
+`invalid_snapshot` on Request `1003223`, caused by duplicate stored orders 8 and
+9 across otherwise unique/readable answer rows. Every write remains separately
+owner-gated.
 
 ## Product contract
 
@@ -636,19 +640,22 @@ absent in Production; no Graph or Dataverse pointer write occurred. The guarded
 mutation path is therefore not Production-proved. Wave 3 backfill code is built
 on `codex/review-docx-wave3-backfill` with focused tests. Claude's Wave 3
 adversarial review returned APPROVE WITH NON-BLOCKING NOTES; the accepted
-remediation is incorporated on the feature branch. It has not been run against
-Production.
+remediation is incorporated on the feature branch. Its first Production
+read-only run created a blocked manifest and performed no mutation.
 
 ### Wave 3 — D26 dry run and one-file proof
 
-**Status: IMPLEMENTATION BUILT AND ADVERSARIALLY REVIEWED; ALL LIVE OPERATIONS
-OPEN.**
+**Status: FIRST PRODUCTION READ-ONLY MANIFEST CREATED; BLOCKED BEFORE WRITES ON
+ONE INVALID HISTORICAL SNAPSHOT.**
 
 - [x] Build the dry-run-first backfill script using the same ensure service.
 - [x] Complete the read-only adversarial review and incorporate its accepted
   contract, target-binding, determinism, artifact-preservation, and test
   hardening.
-- Produce a fresh D26 manifest in Production.
+- [x] Produce the first fresh D26 manifest in Production: 24 unfinished rows,
+  23 eligible, one blocking duplicate-order snapshot on Request `1003223`.
+- Resolve the historical duplicate-question-order policy and produce a fresh
+  clean manifest.
 - Stop for explicit approval of one exact write target.
 - Execute and verify one review end to end.
 
@@ -690,20 +697,21 @@ Stop before writes or further rollout if any of the following appears:
 ## Sweep report
 
 ```text
-Sweep mode: Mode B domain truth audit plus Mode A Wave 3 review remediation
+Sweep mode: Mode B domain truth audit plus Mode A Wave 3 dry-run reconciliation
 Domain: structured individual review DOCX generation and SharePoint retention
 Claims: Waves 1–2 implementation and flag-off Production deployment VERIFIED;
-  Wave 3 backfill SOURCE/FOCUSED-TEST/ADVERSARIAL-REVIEW VERIFIED but
-  unexecuted; live manifest, activation, and Production write behavior UNPROVED
+  Wave 3 backfill SOURCE/FOCUSED-TEST/ADVERSARIAL-REVIEW VERIFIED and first
+  Production read-only manifest VERIFIED; execution, activation, and Production
+  write behavior UNPROVED
 Durable restatements: current no-upload statements remain accurate historical/current baseline
 Structural fix: reconciled plan/catalog/Atlas/runbook/handoff to the Ready inert
   release while preserving the separate activation and write-proof gates
-Semantic omissions found: Wave 3 unfinished-only population versus shared
-  already-filed verification, exact Dataverse target binding, process-wide ack
-  scope, host-independent ordering, result-artifact overwrite risk, midnight
-  ack expiry, and cleanup-failure Postgres telemetry
+Semantic omissions found: live D26 contains one otherwise readable snapshot with
+  duplicate question orders 8 and 9; current validator blocks duplicate display
+  order and the owner policy for this historical shape is unresolved
 Remaining live STALE: 0 within this plan's stated scope
-Remaining UNKNOWN/ASSUMED: Production write behavior remains unproved until the approved smoke
-Verdict: WAVES 1–2 PRODUCTION-DEPLOYED INERT; WAVE 3 CODE BUILT, LIVE MANIFEST
-  AND ALL WRITES REMAIN GATED
+Remaining UNKNOWN/ASSUMED: duplicate-order handling policy and all Production
+  write behavior remain unresolved/unproved
+Verdict: WAVES 1–2 PRODUCTION-DEPLOYED INERT; WAVE 3 FIRST MANIFEST BLOCKED;
+  ALL WRITES REMAIN GATED
 ```
