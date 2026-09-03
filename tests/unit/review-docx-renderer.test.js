@@ -90,6 +90,7 @@ describe('template-backed review DOCX renderer', () => {
     expect(continuationHeader).toContain('Proposal Review');
     expect(`${firstPageHeader}${continuationHeader}`).not.toContain('Individual');
     expect(documentXml).not.toContain('EXTERNAL REVIEW');
+    expect(documentXml).toMatch(/<w:spacing w:before="0" w:after="0"\/>[\s\S]*?Applicant Institution/);
     expect(documentXml).toContain('☒  First &amp; strongest');
     expect(documentXml).toContain('☐  Second &lt;later&gt;');
     expect(documentXml).toContain('Choose one');
@@ -189,6 +190,7 @@ describe('template-backed review DOCX renderer', () => {
         },
       ], null),
       requestNumber: 'R-202',
+      institution: 'Example Institute',
       generatedAtIso: GENERATED_AT,
       synthesis: { consensus: ['Shared strength'], disagreements: [], keyConcerns: [], overall: '' },
     });
@@ -197,6 +199,7 @@ describe('template-backed review DOCX renderer', () => {
     const header = await archiveText(buffer, 'word/header1.xml');
     const core = await archiveText(buffer, 'docProps/core.xml');
     expect(xml).toContain('Option history is incomplete');
+    expect(xml).toMatch(/<w:spacing w:before="0" w:after="0"\/>[\s\S]*?Applicant Institution/);
     expect(xml).toContain('Unknown');
     expect(xml).toContain('Unreadable');
     expect(xml).toContain('3D identifier');
