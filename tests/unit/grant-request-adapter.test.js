@@ -114,6 +114,38 @@ describe('grant-request.findByRequestNumber (characterization)', () => {
   });
 });
 
+// ─────────────────────────── searchRequests ───────────────────────────
+
+describe('grant-request.searchRequests (entity-scoped Dataverse Search)', () => {
+  test('fixes the logical table and forwards the bounded search/filter contract', async () => {
+    const result = { results: [{ objectId: GUID_A }], totalCount: 1, queryContext: null };
+    const search = jest.spyOn(DynamicsService, 'searchRecords').mockResolvedValue(result);
+    const out = await grantRequest.searchRequests('liver regeneration', {
+      top: 25,
+      skip: 25,
+      orderby: ['@search.score desc', 'modifiedon desc'],
+      filter: "akoya_request:(akoya_requeststatus eq 'Active')",
+    });
+    expect(out).toBe(result);
+    expect(search).toHaveBeenCalledWith('liver regeneration', {
+      entities: ['akoya_request'],
+      top: 25,
+      skip: 25,
+      orderby: ['@search.score desc', 'modifiedon desc'],
+      filter: "akoya_request:(akoya_requeststatus eq 'Active')",
+    });
+  });
+
+  test('omits an empty filter rather than forwarding an ambiguous value', async () => {
+    const search = jest.spyOn(DynamicsService, 'searchRecords').mockResolvedValue({ results: [] });
+    await grantRequest.searchRequests('University of Washington');
+    expect(search).toHaveBeenCalledWith('University of Washington', {
+      entities: ['akoya_request'],
+      top: 25,
+    });
+  });
+});
+
 // ──────────────────────────── findByIds ────────────────────────────
 
 describe('grant-request.findByIds (characterization)', () => {

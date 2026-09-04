@@ -86,6 +86,20 @@ and Operations/Finance retains final authorization to remit.
    Production-enabled and authenticated zero-work execution passed; the next
    naturally received eligible review remains the runtime proof.
 
+3. **Promote and smoke the broader historical Workbench locator.**
+   **[SOURCE-BUILT 2026-09-04; NOT DEPLOYED]** the approved inline locator now
+   searches by institution, PI, proposal title, cycle, and request status,
+   pages 25 results under a 100-result ceiling, and opens the existing
+   per-request Workbench without changing the active-cycle queue. It uses the
+   existing `reviewers` grant, live filter values, and a read-only bounded
+   endpoint; legacy Search operators are escaped, filters are entity-qualified,
+   escaped expressions beyond the transport limit fail before Dataverse, and
+   25-row pages use native skip plus a total ordering ending in request number.
+   Before calling it complete, deliberately promote it and run a
+   signed-in institution/PI/title/filter/exact-number/no-result smoke; the
+   enforcing target interlock correctly prevented a local-to-Production Search
+   POST probe, so Production search/filter behavior remains unproved.
+
 ### Verify Before Acting
 
 1. **Do not backfill Review Received rows from `wmkf_thankyousentat` alone.** The

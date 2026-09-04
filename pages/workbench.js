@@ -14,6 +14,7 @@ import Layout, { PageHeader, Card } from '../shared/components/Layout';
 import RequireAppAccess from '../shared/components/RequireAppAccess';
 import ReviewerStatusIndicator from '../shared/components/workbench/ReviewerStatusIndicator';
 import WorkbenchViewsNav from '../shared/components/workbench/WorkbenchViewsNav';
+import RequestLocator from '../shared/components/workbench/RequestLocator';
 import { TRIAGE_STATUS } from '../shared/config/triageStatus';
 
 const STAGE_META = {
@@ -65,51 +66,9 @@ export function WorkbenchDashboard() {
   const [loadingCycles, setLoadingCycles] = useState(true);
   const [loadingProposals, setLoadingProposals] = useState(false);
   const [error, setError] = useState(null);
-  const [requestLookup, setRequestLookup] = useState('');
-  const [requestLookupBusy, setRequestLookupBusy] = useState(false);
-  const [requestLookupError, setRequestLookupError] = useState(null);
-  const requestLookupIdRef = useRef(0);
-
   // Per-row triage flip: ids currently being saved disable only those controls.
   const [savingIds, setSavingIds] = useState(() => new Set());
   const filtersRef = useRef({ cycleCode: null, scope: 'my', includeSetAside: false });
-
-  useEffect(() => () => {
-    requestLookupIdRef.current += 1;
-  }, []);
-
-  const openRequestByNumber = useCallback(async (event) => {
-    event.preventDefault();
-    const requestNumber = requestLookup.trim();
-    const lookupId = ++requestLookupIdRef.current;
-    if (!requestNumber) {
-      setRequestLookupError('Enter a request number.');
-      return;
-    }
-
-    setRequestLookupBusy(true);
-    setRequestLookupError(null);
-    try {
-      const res = await fetch(
-        `/api/workbench/resolve-request?requestNumber=${encodeURIComponent(requestNumber)}`,
-      );
-      const body = await res.json().catch(() => ({}));
-      if (requestLookupIdRef.current !== lookupId) return;
-      if (!res.ok) throw new Error(body.error || `Failed to find request (${res.status})`);
-      if (!body.requestId) throw new Error('The request lookup returned no request identity.');
-      await router.push(
-        `/workbench/${encodeURIComponent(body.requestId)}?n=${encodeURIComponent(
-          body.requestNumber || requestNumber,
-        )}`,
-      );
-    } catch (lookupError) {
-      if (requestLookupIdRef.current === lookupId) {
-        setRequestLookupError(lookupError.message);
-      }
-    } finally {
-      if (requestLookupIdRef.current === lookupId) setRequestLookupBusy(false);
-    }
-  }, [requestLookup, router]);
 
   // Load the cycle picker once on mount.
   useEffect(() => {
@@ -216,40 +175,7 @@ export function WorkbenchDashboard() {
       />
       <WorkbenchViewsNav activeKey="requests" cycleCode={cycleCode} />
 
-      <Card hover={false} className="mb-4">
-        <form onSubmit={openRequestByNumber} className="flex flex-wrap items-end gap-3">
-          <label className="flex-1 min-w-64 text-sm font-medium text-gray-700">
-            Open request by number
-            <input
-              type="text"
-              inputMode="numeric"
-              autoComplete="off"
-              value={requestLookup}
-              onChange={(event) => {
-                requestLookupIdRef.current += 1;
-                setRequestLookup(event.target.value);
-                setRequestLookupBusy(false);
-                setRequestLookupError(null);
-              }}
-              placeholder="For example, 1002379"
-              className="mt-1 block w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white"
-            />
-          </label>
-          <button
-            type="submit"
-            disabled={requestLookupBusy}
-            className="px-4 py-2 rounded-lg bg-gray-900 text-white text-sm font-medium disabled:opacity-50"
-          >
-            {requestLookupBusy ? 'Opening…' : 'Open request'}
-          </button>
-        </form>
-        <p className="mt-2 text-xs text-gray-500">
-          Opens active or historical requests without changing their status or adding them to the active-cycle list.
-        </p>
-        {requestLookupError && (
-          <p className="mt-2 text-sm text-red-700" role="alert">{requestLookupError}</p>
-        )}
-      </Card>
+      <RequestLocator />
 
       {/* Controls */}
       <div className="flex flex-wrap items-center gap-4 mb-6">

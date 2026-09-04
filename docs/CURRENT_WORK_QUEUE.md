@@ -120,15 +120,18 @@ sequence.
   Workbench dashboard now opens an exact active or historical
   request number through the existing authenticated `resolve-request` route;
   this does not change the active-cycle dashboard filter or request status.
-  **[OWNER-DECIDED FUTURE WORK 2026-08-17; PLANNED]** add a broader historical
-  locator/search by institution, PI, proposal title, cycle, and request status.
-  Results should open the existing per-request Workbench rather than create a
-  separate workflow/data silo. Pagination, query bounds, result fields, and
-  exact authorization/search semantics must be designed before implementation.
-  The existing Expertise Finder historical-proposals query already projects
-  request number, title, institution, PI, cycle/program, and Phase I/II status,
-  but it is guarded by a different app grant and loads a whole fiscal-year set;
-  treat it as reusable design/source material, not as the Workbench endpoint.
+  **[SOURCE-BUILT 2026-09-04; NOT DEPLOYED]** the approved broader locator is
+  now an inline dashboard card that searches by institution, PI, proposal
+  title, cycle, and request status, returns compact 25-row pages under a
+  100-result ceiling, and opens the existing per-request Workbench. The new
+  read-only route keeps the existing `reviewers` grant, refuses an unfiltered
+  scan, uses live cycle/status options, escapes legacy Search syntax, uses
+  entity-qualified filters and native stable paging, and leaves the active-cycle
+  queue unchanged. Focused UI/route/service/adapter/transport tests are green.
+  A deliberate promotion still needs a signed-in search smoke (institution,
+  PI, title, cycle/status, exact request number, and empty/no-result behavior); local to
+  Production Dataverse Search POST was correctly blocked by the enforcing
+  target interlock, so Production search/filter behavior is not yet claimed.
 - **Retired-table operational scripts:** 25 non-archive scripts mention the
   dropped `reviewer_suggestions` table. `scripts/README.md` now blocks the
   copy-pasteable commands, but code quarantine/removal requires an owner-approved
