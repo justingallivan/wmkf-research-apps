@@ -4,8 +4,8 @@
  * GET returns the ordinary Workbench-user Final Writeups queue. Optional
  * `requestId` returns the same bounded projection plus one focused row and its
  * server-derived previous/next navigation. The index response adds a complete
- * coordinator matrix for superusers. Persona-specific leadership/PC lenses
- * remain rollout-disabled pending their separate access proof.
+ * coordinator matrix for superusers. Persona-specific lenses are derived from
+ * the published v2 staffing configuration and current reviewer-role roster.
  */
 
 import { withDalContext } from '../../../lib/dataverse/core/context';

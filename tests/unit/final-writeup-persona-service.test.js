@@ -1,9 +1,14 @@
 /** @jest-environment node */
 
 import { resolveFinalWriteupPersonas } from '../../lib/services/final-writeup/persona-service.js';
+import { FINAL_WRITEUP_PERSONA_LENSES_ENABLED } from '../../shared/config/finalWriteupPersonas.js';
 
 const USER_ID = '10000000-0000-4000-8000-000000000001';
 const OTHER_ID = '10000000-0000-4000-8000-000000000002';
+
+test('persona lenses are enabled in the tracked rollout configuration', () => {
+  expect(FINAL_WRITEUP_PERSONA_LENSES_ENABLED).toBe(true);
+});
 
 test('disabled persona rollout performs no setting or roster read', async () => {
   const getRuntimeState = jest.fn();

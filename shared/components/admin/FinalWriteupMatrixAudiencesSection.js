@@ -248,7 +248,7 @@ export default function FinalWriteupMatrixAudiencesSection() {
       {migrationRequired && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950" role="status">
           <p className="font-semibold">The live Research matrix is still stored as version 1.</p>
-          <p className="mt-1">This draft preserves its program membership and adds the confirmed staffing assignments. The first publication upgrades both under the current ETag; persona lenses remain disabled separately.</p>
+          <p className="mt-1">This draft preserves its program membership and adds the confirmed staffing assignments. The first publication upgrades both under the current ETag; persona lenses require the published version 2 staffing configuration.</p>
         </div>
       )}
       {!configured && (

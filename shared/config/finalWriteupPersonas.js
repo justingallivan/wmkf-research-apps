@@ -21,6 +21,6 @@ export const FINAL_WRITEUP_PERSONA_ORDER = Object.freeze([
   FINAL_WRITEUP_PERSONA.LEADERSHIP,
 ]);
 
-// Remains false until v2 is published/read back and representative PC and
-// leadership Word access is proved.
-export const FINAL_WRITEUP_PERSONA_LENSES_ENABLED = false;
+// Enabled after the v2 staffing configuration was published/read back and
+// representative Program Coordinator and Leadership Word access was proved.
+export const FINAL_WRITEUP_PERSONA_LENSES_ENABLED = true;
