@@ -108,7 +108,7 @@ was then checked against source rather than accepted by assertion:
   now requires exact SharePoint target identity plus an enforcing Dataverse
   pointer-write preflight before Graph mutation.
 - **Accepted with architectural change:** no filing runs inline after submission
-  or inside the thank-you cron. A dedicated bounded five-minute cron owns both
+  or inside the thank-you cron. A dedicated bounded hourly cron owns both
   automatic generation and repair.
 - **Accepted, later simplified by the owner:** generated pointer metadata must
   not look like a reviewer upload. The dedicated request-level `Reviews` folder
@@ -489,7 +489,7 @@ The operator backfill continues to use its explicit `--cycle` manifest and may
 apply the request-meeting-date fallback during per-row validation.
 
 Add a dedicated CRON-secret-guarded route, for example
-`pages/api/cron/file-review-docx.js`, scheduled every five minutes. It calls
+`pages/api/cron/file-review-docx.js`, scheduled hourly. It calls
 `sweepMissingIndividualReviewFiles` inside its own trusted DAL context. This is
 both the normal automatic producer and the repair path: successful submissions
 become eligible through their atomic Dataverse receipt, and the next sweep files
@@ -749,7 +749,7 @@ clean. No SharePoint call, pointer write, route, cron, or rollout flag was added
 - Implement eligibility, create-only upload, semantic reconciliation, ETag pointer
   commit, exact cleanup, target guards, telemetry, structured results, and the
   bounded dedicated filing/repair sweep.
-- Add the dedicated five-minute cron behind the literal-on flag; do not modify the
+- Add the dedicated hourly cron behind the literal-on flag; do not modify the
   submission or thank-you execution paths to perform filing.
 - Correct the external filename and staff upload/entry consumer semantics.
 - Update Atlas, route persistence matrix if applicable, environment contract, and

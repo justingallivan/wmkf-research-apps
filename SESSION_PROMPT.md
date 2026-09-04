@@ -103,8 +103,8 @@ SharePoint writes, governed semantic reconciliation, ETag pointer commit with on
 bounded retry, exact safe cleanup, structured per-row results, and deduplicated
 operational events. External reviewer context hides only generated filenames;
 the Workbench distinguishes generated staff entry from uploaded staff files via
-one shared server classifier. `vercel.json` schedules the route every five
-minutes with a 300-second function duration; flag-off requests return before a
+one shared server classifier. `vercel.json` schedules the route hourly
+with a 300-second function duration; flag-off requests return before a
 maintenance row or data read. Claude's Wave 2 build review returned APPROVE WITH
 NON-BLOCKING SUGGESTIONS, and the accepted hardening is incorporated. The
 non-sensitive write/cycle flags are absent from the Production environment. An
