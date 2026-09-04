@@ -216,10 +216,14 @@ preserving the received-review history; the immediate enabled follow-up sweep
 returned zero candidates and zero attempts. The owner then deleted Request
 `1002874`'s obsolete `Reviewer_Uploads/Generated` tree; Graph returned 404 for
 the old path and 200 for the current file, and Dataverse retained the current
-`Reviews` pointer. The next natural automatic filing remains unproved.
+`Reviews` pointer. Production maintenance run `70820` then naturally filed
+Manuel Müller's newly received Request `1002959` review as
+`Reviews/Review-1002959-Manuel Müller.docx` (version `1.0`, 43,498 bytes),
+completed without error, and left the matching complete Dataverse pointer.
 Final Writeup persona access proof, deliberate enablement, and the read-only
-production-data projection smoke are now complete; one signed-in
-non-superuser dashboard observation remains for the next natural staff visit.
+production-data projection smoke are now complete. **[OWNER-REPORTED
+2026-09-04]** Program Coordinator Duncan Spore found Request `1002788` in
+History, saw the review-status matrix, and opened the Word document successfully.
 As of 2026-08-31, the ordinary-staff
 dashboard/focused-review foundation is Production-deployed
 through PR #140 (`ce229778`) with bounded reads and external-Word actions. Its

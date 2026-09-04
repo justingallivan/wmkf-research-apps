@@ -396,8 +396,10 @@ Write (verified 2026-05-07; +Phase 3 ingestion S210):
   after create-only SharePoint reconciliation, and is not part of submission or
   thank-you delivery. Exact D26 activation and its no-document/pointer-mutation
   boundary are Production-proved; the former `1003223` test anomaly is now
-  ineligible through `wmkf_selected=false`, and the next natural filing remains
-  pending.
+  ineligible through `wmkf_selected=false`. Production maintenance run `70820`
+  then naturally filed Manuel Müller's Request `1002959` review, creating the
+  version `1.0`, 43,498-byte reviewer DOCX and matching complete Dataverse
+  pointer without error.
 - `scripts/backfill-review-docx-sharepoint.mjs` — source-built Wave 3 local
   operator entry point. Dry run is the default and writes a content-free
   manifest; `--execute` requires that reviewed manifest, exact source/population

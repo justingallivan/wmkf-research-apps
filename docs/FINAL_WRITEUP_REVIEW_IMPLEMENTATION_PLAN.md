@@ -42,8 +42,10 @@ This plan translates the approved Final Writeup and group-review experience into
 The 2026-09-04 milestone delivered the underlying handoff, identity,
 acknowledgement, dashboard data, superuser matrix, and explicit persona lenses.
 Representative SharePoint access and the production-data persona projections
-passed before enablement; a signed-in non-superuser dashboard observation
-remains useful on the next natural staff visit. No broad Request Document staff-role
+passed before enablement. **[OWNER-REPORTED 2026-09-04]** Program Coordinator
+Duncan Spore then found Request `1002788` in History, saw the review-status
+matrix, and opened the Word document; the natural staff observation is complete.
+No broad Request Document staff-role
 privilege grant is pending: the owner selected service-principal writes with
 explicit actor tracking, a separate attribution effort that does not block the
 working acknowledgement role or this milestone.
@@ -601,8 +603,9 @@ were independently verified.
   neutral matrix, leadership receives leadership-stage rows, overlapping
   memberships receive the union, and unassigned users fail closed. The v2
   staffing configuration, representative Word-access proof, tracked enablement,
-  and read-only production-data persona smoke are complete. A signed-in
-  non-superuser dashboard observation remains for the next natural staff visit.
+  and read-only production-data persona smoke are complete. Owner-reported
+  natural use by Program Coordinator Duncan Spore then proved History discovery,
+  matrix visibility, and Word open for Request `1002788`.
 
 This slice can ship before the PC/leadership persona model because responsible-PD versus other-PD is already server-verifiable.
 

@@ -1165,8 +1165,11 @@ only the Request `1003223` test exclusion. The first authenticated enabled
 sweep returned HTTP 200, resolved exact D26, and attempted no filing because
 that known test row was classified `invalid_snapshot`. Bounded Production logs
 showed no Graph mutation, Dataverse PATCH, or runtime error. The scheduled route
-is active, but the next natural automatic create/pointer path is not yet
-Production-proved. The test row is now out of that population through an
+is active, and Production maintenance run `70820` subsequently proved its
+natural create/pointer path: Manuel Müller's newly received Request `1002959`
+review produced `Reviews/Review-1002959-Manuel Müller.docx` at version `1.0`
+(43,498 bytes), completed without error, and left the matching complete
+Dataverse pointer. The test row is now out of that population through an
 ETag-protected one-field `wmkf_selected=false` correction that preserved its
 received-review history; the immediate enabled follow-up returned zero
 candidates and zero attempts. The owner subsequently deleted Request `1002874`'s

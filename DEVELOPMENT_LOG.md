@@ -10,6 +10,23 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## September 2026 — Historical Workbench request locator shipped (Session 477)
+
+**Milestone:** Staff can now locate historical requests from the Workbench by
+exact request number, title, principal investigator, or organization without
+changing the existing active-work queues.
+**Sessions:** 477 (UI/UX map, implementation, independent review, hardening,
+Production promotion, and signed-in smoke).
+**Ship state:** runtime commit `cd2c73d5` is live in Ready Production deployment
+`dpl_D6r4deRuAwe6xCgwGSmc5WTHWa7W`. Signed-in smoke proved exact-number open,
+no-result handling, stable 25→50 pagination, prefix stability, and zero duplicate
+requests; Request `993357` ranked first for exact PI Cynthia Reinhart-King.
+**Why it matters:** Staff can recover older Request Workbench records without
+asking an administrator or weakening the bounded, read-only lookup contract.
+**Pointers:** `SESSION_PROMPT.md`; `docs/API_ROUTE_SECURITY_MATRIX.md`;
+`docs/SERVICE_AND_UTILITY_CATALOG.md`; commits `ebf0b5c5`, `1766f6d2`,
+`41d2f77c`, and `cd2c73d5`.
+
 ## September 2026 — Final Writeup persona dashboard lenses enabled (Session 476)
 
 **Milestone:** Explicit Program Director, Program Coordinator, Leadership, and
@@ -21,8 +38,9 @@ staffing publication, representative Word proof, enablement, and smoke).
 `dpl_HGrbWUNPJMJunVevYLVEmtn7He6a`. Live preflight re-proved all 11 current
 reviewer-role members assigned with zero stale/unassigned references; read-only
 production-data smoke passed for PD, PC, Leadership, overlap,
-ineligible/unassigned, and superuser projections. A signed-in non-superuser
-dashboard observation remains for the next natural staff visit.
+ineligible/unassigned, and superuser projections. **[OWNER-REPORTED
+2026-09-04]** Program Coordinator Duncan Spore subsequently found Request
+`1002788` in History, saw the review-status matrix, and opened the Word document.
 **Why it matters:** PCs now receive the complete neutral matrix, PD and
 Leadership queues are explicitly scoped, and stale or ineligible identities
 fail closed; PC backup and Leadership-stage transitions remain separate work.

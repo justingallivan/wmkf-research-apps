@@ -3,7 +3,7 @@ title: Final Writeup Persona Configuration Consolidation Plan
 domain: workbench
 kind: plan
 status: active
-summary: "Version-2 staffing and explicit Final Writeup persona lenses are Production-live; server-side live-data smoke passed and signed-in staff observation remains."
+summary: "Version-2 staffing and explicit Final Writeup persona lenses are Production-live; live-data smoke and natural signed-in staff observation passed."
 canonical: false
 cataloged: 2026-08-31
 last_verified: 2026-09-04
@@ -19,8 +19,8 @@ related:
 
 ## Decision and status
 
-**Verdict: SLICES A–E ARE PRODUCTION-DEPLOYED; ACCESS PROOF AND THE READ-ONLY
-PRODUCTION-DATA PERSONA SMOKE PASSED. A SIGNED-IN STAFF DASHBOARD OBSERVATION REMAINS.**
+**Verdict: SLICES A–E ARE PRODUCTION-DEPLOYED; ACCESS PROOF, THE READ-ONLY
+PRODUCTION-DATA PERSONA SMOKE, AND NATURAL SIGNED-IN STAFF OBSERVATION PASSED.**
 
 The owner rejected the operational burden of creating and maintaining three
 Dataverse owner teams solely as persona markers. This plan replaces that
@@ -333,8 +333,9 @@ existing Admin Overview, not as another configuration panel.
 - **Complete at the server-side live-data boundary:** read-only production-data
   smoke verified PD, PC, Leadership, overlapping-persona,
   ineligible/unassigned, and superuser behavior. The isolated browser reached
-  the expected sign-in boundary, so one signed-in non-superuser dashboard
-  observation remains useful on the next natural staff visit.
+  the expected sign-in boundary. **[OWNER-REPORTED 2026-09-04]** Program
+  Coordinator Duncan Spore later found Request `1002788` in History, saw the
+  review-status matrix, and opened the Word document successfully.
 - **Complete via source census:** no team read, create, membership, or
   role-management call exists in the runtime path.
 
@@ -385,9 +386,9 @@ Run the relevant gate and its self-test sequentially:
    canonical Turbopack is blocked by the known sandbox process/port signature;
 9. **Complete through deployment and live-data persona smoke:** signed-in Admin
    desktop/narrow QA, v2 publication/readback, matrix regression, representative
-   Word access, tracked enablement, and all six persona projection cases passed.
-   A signed-in non-superuser dashboard observation remains for the next natural
-   staff visit.
+   Word access, tracked enablement, all six persona projection cases, and the
+   owner-reported natural Program Coordinator History/matrix/Word observation
+   for Request `1002788` passed.
 
 No Postgres migration, Dataverse schema wave, new API route, new environment
 variable, or new security privilege is planned.

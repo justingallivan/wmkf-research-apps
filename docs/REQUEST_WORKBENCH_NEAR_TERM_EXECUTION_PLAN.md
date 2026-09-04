@@ -907,8 +907,9 @@ Decision order:
    PC/Leadership Word access then passed, and commit `213f6c34` enabled the
    explicit persona dashboard lenses in Ready Production deployment
    `dpl_HGrbWUNPJMJunVevYLVEmtn7He6a`. A six-case read-only production-data
-   smoke passed; one signed-in non-superuser dashboard observation remains for
-   natural use. PC backup and Leadership-stage transitions remain separate.
+   smoke passed. **[OWNER-REPORTED 2026-09-04]** Program Coordinator Duncan
+   Spore then found Request `1002788` in History, saw the matrix, and opened the
+   Word document. PC backup and Leadership-stage transitions remain separate.
    The unshipped team mechanism is removed from current source.
 4. **Initial Assessment** — the pilot and administrator controls are
    Production-deployed and the signed-in read surface has passed. Decide

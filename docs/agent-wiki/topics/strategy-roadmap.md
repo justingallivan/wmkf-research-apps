@@ -243,8 +243,9 @@ document inventory, and individual implementation plans do not establish priorit
   generated a valid 60,586-byte aggregated DOCX with 2xx route dependencies and
   no post-deploy error logs. The courtesy path is deployed/tested but was not
   transport-smoked. Final Writeup persona access proof, tracked enablement, and
-  the six-case read-only production-data smoke completed 2026-09-03 PT; one
-  signed-in non-superuser dashboard observation remains for natural use.
+  the six-case read-only production-data smoke completed 2026-09-03 PT.
+  **[OWNER-REPORTED 2026-09-04]** Program Coordinator Duncan Spore then found
+  Request `1002788` in History, saw the matrix, and opened the Word document.
 - **Most recent owner-directed release (S470, 2026-08-30 PT / 2026-08-31 UTC):**
   Final Writeup Slice 1 is Production-proved on `main` at `ebb147bb` in Ready
   deployment `dpl_7kzQ1v7XGtyNx4Fady2JxMrTxQEJ`; Wave 22 is exact and

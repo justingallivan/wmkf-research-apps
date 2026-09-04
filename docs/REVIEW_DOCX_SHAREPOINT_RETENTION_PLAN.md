@@ -51,8 +51,12 @@ and 200 for the current Agnes file, while Dataverse still pointed to the
 run returned HTTP 200, resolved exact cycle `D26`, and made zero filing attempts:
 the sole candidate was owner-confirmed test Request `1003223`, classified
 `invalid_snapshot`. Bounded logs showed only Graph/Dataverse reads—no Graph
-upload and no Dataverse PATCH—and the deployment error scan was empty. The next
-natural structured-review filing remains the final Wave 5 end-to-end proof. On
+upload and no Dataverse PATCH—and the deployment error scan was empty. Production
+maintenance run `70820` then supplied the final Wave 5 end-to-end proof: Manuel
+Müller's newly received Request `1002959` review created
+`Reviews/Review-1002959-Manuel Müller.docx` at SharePoint version `1.0`
+(43,498 bytes), completed without error, and left the matching complete
+Dataverse pointer. On
 2026-09-04 UTC the test-row anomaly
 was resolved by ETag-conditionally changing only the sole suggestion's
 `wmkf_selected` value from `true` to `false`, preserving Request `1003223`, its
@@ -142,9 +146,9 @@ was then checked against source rather than accepted by assertion:
 
 With these amendments, no adversarial condition remains open at the plan layer.
 Waves 1–4 are source/test/render verified, Production-deployed, and the bounded
-D26 SharePoint/Dataverse backfill is Production-proved. Wave 5 activation and
-its no-document/pointer-mutation boundary are Production-proved; the next
-naturally arriving automatic filing remains unproved.
+D26 SharePoint/Dataverse backfill is Production-proved. Wave 5 activation, its
+no-document/pointer-mutation boundary, and the natural automatic create/pointer
+path are Production-proved through maintenance run `70820` and Request `1002959`.
 
 Claude's subsequent read-only Wave 2 build review returned **APPROVE WITH
 NON-BLOCKING SUGGESTIONS**. The accepted pre-release hardening keeps scheduled
@@ -878,8 +882,11 @@ failures, and a fresh Production dry run found no eligible or reconcile rows.**
   error-level entries. Maintenance telemetry and the deduplicated actionable
   event are expected enabled-route persistence, so this proves no document or
   pointer mutation rather than literally no writes of any kind.
-- [ ] Verify the dedicated cron files the next natural external or manual structured
-  submission within the scheduled interval.
+- [x] Verify the dedicated cron files the next natural external or manual
+  structured submission within the scheduled interval. Production maintenance
+  run `70820` naturally filed Manuel Müller's Request `1002959` review as
+  `Reviews/Review-1002959-Manuel Müller.docx` (version `1.0`, 43,498 bytes),
+  completed without error, and left the matching complete Dataverse pointer.
 - [x] Confirm an anomaly-only run performs no SharePoint document or Dataverse
   pointer mutation; unresolved anomalies remain compactly classified and
   deduplicated rather than falsely described as silent.
@@ -932,7 +939,7 @@ Claims: Waves 1–4 implementation and Production deployment VERIFIED;
   exact 22-row execution and clean post-write survey VERIFIED; exact Production
   rollout variables, Ready activation deployment, authenticated enabled-route
   boundary, no document/pointer mutation, and empty error scan VERIFIED;
-  next natural automatic filing UNPROVED
+  natural Request 1002959 automatic filing and complete pointer VERIFIED
 Durable restatements: current no-upload statements remain accurate historical/current baseline
 Structural fix: reconciled plan/queue/strategy/Atlas/runbook/wiki/catalog/memory/
   handoff to the observed compatibility defect, source fix, simplified
@@ -946,9 +953,8 @@ Semantic omissions found: operator-confirmed test data needed an explicit,
   and the evidence-matrix claim incorrectly phrased disabled retention as live
 Remaining live STALE: 0 within this plan's stated scope
 Remaining UNKNOWN/ASSUMED: any future same-name reviewer
-  pair (blocked in backfill and a stop condition before forward activation),
-  the next natural automatic filing remains unproved
+  pair (blocked in backfill and a stop condition before forward activation)
 Verdict: WAVES 1–4, RUNTIME PROMOTION, EXACT REPAIRS, OWNER WORD-ONLINE VISUAL
   CONFIRMATION, D26 BACKFILL, WAVE 5 ACTIVATION BOUNDARY, TEST-ROW DISPOSITION,
-  AND LEGACY CLEANUP VERIFIED; NATURAL AUTOMATIC-FILING PROOF REMAINS OPEN
+  LEGACY CLEANUP, AND NATURAL AUTOMATIC-FILING PROOF VERIFIED
 ```

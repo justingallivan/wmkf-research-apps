@@ -907,8 +907,9 @@ silently extend its paths or names to writeup publications.
    `W/"96944113"`, 11 complete assignments, zero stale/unassigned rows, and
    unchanged 9/6 audiences. Representative Word-access proof passed
    2026-09-03, followed by the tracked enablement and a six-case read-only
-   production-data persona smoke. A signed-in non-superuser dashboard
-   observation remains for the next natural staff visit. The
+   production-data persona smoke. **[OWNER-REPORTED 2026-09-04]** Program
+   Coordinator Duncan Spore subsequently found Request `1002788` in History,
+   saw its review-status matrix, and opened the Word document. The
    unshipped team prototype is removed and no Dataverse administrator is
    required. Keep acknowledgement distinct from document lifecycle,
    external distribution, and the AkoyaGo publication projection.

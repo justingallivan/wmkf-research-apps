@@ -5,7 +5,7 @@ status: active
 metadata:
   node_type: memory
   type: project
-  last_verified: 2026-09-04 via Ready v4 retention deployment, exact 22-row D26 backfill reconciliation, and authenticated Wave 5 activation proof
+  last_verified: 2026-09-04 via Ready v4 retention deployment, exact 22-row D26 backfill reconciliation, authenticated Wave 5 activation proof, and natural Request 1002959 filing readback
   originSessionId: 7db29a2d-b16d-490a-80f0-7e4fa4c04f0a
 ---
 
@@ -153,5 +153,8 @@ received-review history; the immediate enabled follow-up returned zero
 candidates and zero attempts. The owner then deleted Request `1002874`'s
 obsolete `Reviewer_Uploads/Generated` tree; Graph returned `404 itemNotFound`
 for the old path and 200 for the current Agnes file, and Dataverse retained the
-current `Reviews` pointer. Describe automatic filing as active but not yet
-proved on a naturally arriving review.
+current `Reviews` pointer. Production maintenance run `70820` then naturally
+filed Manuel Müller's newly received Request `1002959` review as
+`Reviews/Review-1002959-Manuel Müller.docx` at SharePoint version `1.0`
+(43,498 bytes), completed without error, and left the matching complete
+Dataverse pointer. Describe automatic filing as Production-proved.

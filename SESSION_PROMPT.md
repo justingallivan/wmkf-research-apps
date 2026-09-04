@@ -1,17 +1,12 @@
-# Session 477 Prompt: Reviewer Completion and Honorarium Eligibility
+# Session 478 Prompt: Reviewer Closeout Dependency and Next Work
 
-## Session 476 Summary
+## Session 477 Summary
 
-Session 476 completed the Final Writeup persona rollout and then reviewed a
-draft change that would make the automated reviewer thank-you sweep mark
-reviewers Complete. The review found that the draft conflated review receipt,
-automated thank-you processing, PD approval of the review, honorarium
-eligibility, and final authorization to remit.
-
-The owner restored an important business requirement at closeout and settled
-the contract on 2026-09-04: a Program Director closes a received review with an
-engagement-level honorarium disposition; thank-you processing remains separate;
-and Operations/Finance retains final authorization to remit.
+Session 477 closed the Final Writeup staff observation, proved the automatic
+review-DOCX filing path on a naturally received review, designed and shipped a
+read-only historical Workbench request locator, and reconciled the reviewer
+closeout/honorarium boundary. It also removed a bounded set of obsolete merged
+worktrees and branches without touching unmerged or dirty work.
 
 ### What Was Completed
 
@@ -83,6 +78,27 @@ and Operations/Finance retains final authorization to remit.
      correct exact-number navigation, an honest no-result state, and stable
      25→50 append with no duplicates. No request data was changed.
 
+6. **Natural review-DOCX filing proof completed**
+   - [VERIFIED via Production `maintenance_runs` and Dataverse pointer readback
+     2026-09-04] Hourly run `70820` scanned and created exactly one file:
+     `Reviews/Review-1002959-Manuel Müller.docx` for the newly received review
+     on Request `1002959`; the result recorded SharePoint item identity, version
+     `1.0`, 43,498 bytes, and no error.
+   - Dataverse independently held the matching complete folder/filename pointer
+     on suggestion `f99cb803-f791-f111-8076-70a8a59cded0`. The owner also saw
+     the generated DOCX in the signed-in Workbench. This closes the final Wave 5
+     natural automatic-filing proof; no manufactured review was needed.
+
+7. **Merged branch/worktree clutter reduced safely**
+   - [VERIFIED via Git ancestry and clean-worktree checks 2026-09-04] Removed
+     seven clean, fully merged obsolete worktrees; preserved the dirty
+     `claude/grantee-submit-visibility-spec` worktree and every unmerged branch.
+   - Deleted eight corresponding merged local branches and five corresponding
+     remote branches, including `codex/workbench-request-locator-release`.
+     Counts after cleanup: 213 local branches (170 merged, 43 unmerged), 184
+     remote branches excluding `origin/main`/`origin/HEAD` (141 merged), and
+     seven worktrees including the current temporary `main` worktree.
+
 ### Commits
 
 - `213f6c34` — Enable Final Writeup persona lenses
@@ -91,23 +107,20 @@ and Operations/Finance retains final authorization to remit.
 - `1766f6d2` — Harden request locator review findings
 - `41d2f77c` — Search historical requests by Project Leader
 - `cd2c73d5` — Stabilize Project Leader search pagination
-- The decision brief and Session 477 handoff are committed together in the
-  documentation closeout commit that contains this prompt.
+- `d525911e` — Record request locator rollout
 
 ## Next Items
 
 ### Verified Open
 
-1. **Implement the approved reviewer closeout contract on a feature branch.**
-   Follow `docs/REVIEWER_COMPLETION_AND_HONORARIUM_DECISION_BRIEF.md`: additive
-   schema first, one-row ETag closeout, no final-remit write, generic Complete
-   rejection, thank-you decoupling, and deeper-green badge. Operations must
-   confirm where the disposition will be visible from the honorarium request
-   before end-to-end Production rollout.
+No unblocked implementation item is carried forward from this session. At the
+next `/start`, select the next priority from `docs/CURRENT_WORK_QUEUE.md` only
+after re-verifying its current status.
 
-2. **Observe the next natural review-DOCX cron filing.** Wave 5 is
-   Production-enabled and authenticated zero-work execution passed; the next
-   naturally received eligible review remains the runtime proof.
+### Owner Decision Needed
+
+None currently. Resume the closeout implementation only after the external
+Power Apps dependency below changes state.
 
 ### Verify Before Acting
 
@@ -119,10 +132,37 @@ and Operations/Finance retains final authorization to remit.
    `scripts/probe-request-review-receipts.mjs` was preserved and committed as
    `65e212ed` on `codex/final-writeup-personas-enable`; it is not on `main`.
 
+3. **Branch cleanup.** Forty-three local branches remain unmerged. Do not
+   bulk-delete them. Audit exact ancestry, open worktrees/PRs, and dirtiness
+   first. The merged `claude/grantee-submit-visibility-spec` worktree contains
+   untracked `CLAUDE_BUG_FIX_PROMPT.md` and `before.txt` and was deliberately
+   preserved.
+
+4. **Honorarium schema names.** Use display name **App Reviewer Suggestion**
+   and logical table `wmkf_appreviewersuggestion`. Do not search for Honorarium
+   Eligibility on the Request table; the planned field belongs to the reviewer
+   suggestion row and is shown on Request only through the related subgrid.
+
 ### Parked
 
-1. One-click PDF conversion of canonical review DOCX files.
-2. Automatic review-due reminder scheduling.
+1. **Reviewer Complete + Honorarium Eligibility implementation — externally
+   blocked.** Evidence: `docs/REVIEWER_COMPLETION_AND_HONORARIUM_DECISION_BRIEF.md`
+   and the 2026-09-04 Production metadata probe show the local Picklist/view is
+   absent. A colleague confirmed she can customize Request forms and dashboard
+   views; corrected field/table naming instructions were sent. Re-open when she
+   confirms the customization exists or requests a working session.
+
+   Saved Power Apps instruction:
+
+   > Could you add a reviewer-engagement view showing Honorarium Request,
+   > Reviewer, Reviewed Grant Request, Cycle, Review Status, and Honorarium
+   > Eligibility, then place it as a related subgrid on the Request
+   > (Accounting) form? The reverse relationship is
+   > `wmkf_appreviewersuggestion_HonorariumRequest_akoya_request`.
+
+2. One-click PDF conversion of canonical review DOCX files.
+3. Automatic review-due reminder scheduling; the cron-registry hold remains in
+   force.
 
 ### Do Not Reopen Without New Decision
 
@@ -130,6 +170,8 @@ and Operations/Finance retains final authorization to remit.
    approval/payability discussion does not authorize reviving it.
 2. **Automatically mark reviewers Complete from any thank-you path.** The owner
    explicitly rejected that coupling on 2026-09-04.
+3. **Do not write `wmkf_authorizationtoremitpaymentflag`.** Operations/Finance
+   retains final remit authority.
 
 ## Key Files Reference
 
@@ -141,19 +183,34 @@ and Operations/Finance retains final authorization to remit.
 | `lib/services/reviewer-thankyou-sweep.js` | Automated thank-you eligibility, claim, attachment, and send behavior. |
 | `lib/services/review-manager/send-emails-service.js` | Retained manual thank-you compatibility behavior. |
 | `lib/dataverse/adapters/reviewer-suggestion.js` | Complete transition semantics and honorarium lookup. |
+| `shared/components/workbench/RequestLocator.js` | Historical request-search UI and browser-session state. |
+| `pages/api/workbench/search-requests.js` | Guarded read-only request-search endpoint. |
+| `lib/services/workbench/request-search-service.js` | Bounded Search + Project Leader union and pagination. |
+| `lib/dataverse/adapters/contact.js` | Uniquely ordered bounded Contact directory lookup. |
+| `docs/REVIEW_DOCX_SHAREPOINT_RETENTION_PLAN.md` | Completed review-DOCX retention rollout and proof. |
 | `.claude-memory/project-reviewer-closeout-payability.md` | Prior payability-disposition direction and current unbuilt state. |
 | `.claude-memory/project-honorarium-payment-landscape.md` | Current honorarium creation, BILL deferral, and payment-control posture. |
 
 ## Testing
 
-No runtime code changed during this closeout. Documentation gates:
+Locator verification and documentation gates:
 
 ```bash
-npm run generate:docs-catalog
-npm run check:docs-catalog
+npx jest tests/unit/reviewer-manual-add-dedup-adapters.test.js tests/unit/workbench-request-number-lookup.test.js tests/unit/workbench-request-preview-safety.test.js tests/unit/workbench-request-search-route.test.js tests/unit/workbench-request-search-service.test.js --runInBand
+npm run check:dataverse-access-layer
+npm run check:dataverse-access-layer:self-test
+npm run check:route-service-boundary
+npm run check:route-service-boundary:self-test
+npm run check:api-routes
+npm run check:api-routes:self-test
+npm run check:fact-consistency
+npm run check:fact-consistency:self-test
 npm run check:doc-currency
+npm run check:doc-currency:self-test
 npm run check:doc-symbol-refs
 npm run check:build-claim-freshness
+npm run check:docs-catalog
+npm run build -- --webpack
 ```
 
 ## Prior Session 476 Context (Historical Reference)
@@ -235,8 +292,8 @@ Production `REVIEW_DOCX_SHAREPOINT_WRITE=on` and
 `dpl_E6VKW5Wi8zDTfU1ZRhNsbH9yg9oM`. The first authenticated enabled run returned
 HTTP 200, attempted no filing, and found only test Request `1003223` as
 `invalid_snapshot`; bounded logs showed no Graph mutation, Dataverse PATCH, or
-runtime error. The next natural automatic filing remains unproved. Test-row
-disposition is now resolved: on 2026-09-04 UTC the sole suggestion for test
+runtime error. Test-row disposition is now resolved: on 2026-09-04 UTC the sole
+suggestion for test
 Request `1003223` was ETag-conditionally changed only from
 `wmkf_selected=true` to `false`, preserving its received-review history and
 empty SharePoint pointers. A follow-up authenticated enabled sweep returned
@@ -407,8 +464,9 @@ follow-up enabled sweep returned zero candidates and zero attempts. The owner
 then deleted Request `1002874`'s obsolete `Reviewer_Uploads/Generated` tree;
 read-only Graph verification returned `404 itemNotFound` for that path and 200
 for the current Agnes file, while Dataverse still pointed to the `Reviews`
-folder and reviewer-named file. Only the next natural automatic filing remains
-open for this workstream.
+folder and reviewer-named file. Production maintenance run `70820` subsequently
+created `Reviews/Review-1002959-Manuel Müller.docx` for the naturally received
+review and Dataverse stored the complete pointer, closing Wave 5 proof.
 
 ## Parked
 
