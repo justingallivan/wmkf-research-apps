@@ -169,6 +169,30 @@ test('renders broad results with live cycle/status filters and semantic open lin
     .toHaveTextContent('Search complete. 1 result; 1 shown.');
 });
 
+test('shows the generalized limit warning when a bounded source is incomplete', async () => {
+  global.fetch.mockImplementation(async (url) => {
+    if (url === '/api/workbench/search-requests?q=Smith') {
+      return response({ body: {
+        success: true,
+        results: [],
+        totalCount: 0,
+        hasMore: false,
+        capped: true,
+      } });
+    }
+    return baseResponse(url);
+  });
+  await renderReady();
+
+  fireEvent.change(screen.getByLabelText(SEARCH_LABEL), { target: { value: 'Smith' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Search' }));
+
+  expect(await screen.findByText(
+    'Results are limited; narrow the search to see more precise matches',
+  )).toBeInTheDocument();
+  expect(screen.getByText('No requests matched.')).toBeInTheDocument();
+});
+
 test('loads the next bounded page and appends it to the restored search state', async () => {
   const firstPage = Array.from({ length: 25 }, (_, index) => ({
     requestId: `request-${index}`,

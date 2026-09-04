@@ -166,7 +166,7 @@ describe('contact candidate helpers', () => {
     expect(query).toHaveBeenCalledTimes(1);
     expect(query).toHaveBeenCalledWith('contacts', expect.objectContaining({
       filter: "(startswith(lastname,'Love') or startswith(firstname,'Love'))",
-      orderby: 'statecode asc,lastname asc,firstname asc',
+      orderby: 'statecode asc,lastname asc,firstname asc,contactid asc',
       top: 50,
     }));
   });

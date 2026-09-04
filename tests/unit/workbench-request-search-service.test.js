@@ -333,6 +333,28 @@ test('deduplicates overlap before deciding whether the merged result set is capp
   expect(body.results[1].requestId).toBe(piRows[1].akoya_requestid);
 });
 
+test('does not report a cap when a PI row overlaps an exact 100-result indexed set', async () => {
+  const contactId = '33333333-3333-3333-3333-333333333333';
+  const indexedIds = Array.from({ length: 100 }, (_, index) => (
+    `20000000-0000-0000-0000-${String(index).padStart(12, '0')}`
+  ));
+  searchDirectoryByName.mockResolvedValue([{ contactid: contactId }]);
+  searchRequests.mockResolvedValue({
+    results: indexedIds.map((objectId) => ({ objectId })),
+    totalCount: indexedIds.length,
+  });
+  queryRequests.mockResolvedValue({
+    records: [requestRow(indexedIds[0])],
+    totalCount: 1,
+    hasMore: false,
+  });
+  findByIds.mockImplementation(async (ids) => ({ records: ids.map((id) => requestRow(id)) }));
+
+  const body = await searchWorkbenchRequests({ query: 'Ada' });
+
+  expect(body).toMatchObject({ totalCount: 100, returnedCount: 25, capped: false });
+});
+
 test('discloses when project-leader contact candidates exceed the bounded 25-contact join', async () => {
   const contacts = Array.from({ length: 26 }, (_, index) => ({
     contactid: `30000000-0000-0000-0000-${String(index).padStart(12, '0')}`,
