@@ -109,7 +109,8 @@ remains backward-compatible. The current v4 D26 manifest has hash
 22 eligible missing files with unique destinations, one visible test exclusion,
 zero blockers, and no Request `1002874` candidate. Its exact suggestion set was
 unchanged from the preceding survey; no new qualifying rows appeared. The owner then approved the
-exact Request `1002874` repair while deferring old-file cleanup. Manifest hash
+exact Request `1002874` repair while initially deferring old-file cleanup; that
+cleanup is now independently verified complete. Manifest hash
 `c30c76e47281208b8b4cc25976360453eebbdc65ba3d4b203c19a6e0f1a5692d`
 created and verified item `01G4GVMSZZ25YPTP3RGFEK6LCT64W3JPX2` at
 `Reviews/Review-1002874-Agnes Karasik.docx`, repointed Dataverse, and left the
@@ -149,5 +150,8 @@ or Dataverse pointer mutation, and surfaced only known test Request `1003223` as
 `invalid_snapshot`; the error scan was empty. The test suggestion was then
 ETag-conditionally changed only to `wmkf_selected=false`, preserving the
 received-review history; the immediate enabled follow-up returned zero
-candidates and zero attempts. Describe automatic filing as active but not yet
-proved on a naturally arriving review. Legacy cleanup remains separately gated.
+candidates and zero attempts. The owner then deleted Request `1002874`'s
+obsolete `Reviewer_Uploads/Generated` tree; Graph returned `404 itemNotFound`
+for the old path and 200 for the current Agnes file, and Dataverse retained the
+current `Reviews` pointer. Describe automatic filing as active but not yet
+proved on a naturally arriving review.

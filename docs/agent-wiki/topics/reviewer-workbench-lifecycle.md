@@ -1108,8 +1108,9 @@ inspection passed. The owner authorized an
 exact local repair that created and verified item
 `01G4GVMSZZ25YPTP3RGFEK6LCT64W3JPX2` at
 `Reviews/Review-1002874-Agnes Karasik.docx` and ETag-conditionally repointed
-Dataverse. Independent readback matched the corrected semantic hash and proved
-the old item remains for later cleanup. Owner inspection showed v2 kept the
+Dataverse. Independent readback matched the corrected semantic hash; the old
+item was retained at that stage and later owner-deleted after the current file
+was verified. Owner inspection showed v2 kept the
 title together but Word Online pushed it below the floating logo. The v3
 templates explicitly change that behind-text shape from `wrapTight` to
 `wrapNone`. Exact content-repair manifest hash
@@ -1148,8 +1149,10 @@ is active, but the next natural automatic create/pointer path is not yet
 Production-proved. The test row is now out of that population through an
 ETag-protected one-field `wmkf_selected=false` correction that preserved its
 received-review history; the immediate enabled follow-up returned zero
-candidates and zero attempts. Old-file cleanup remains a separate owner
-decision. Active
+candidates and zero attempts. The owner subsequently deleted Request `1002874`'s
+obsolete `Reviewer_Uploads/Generated` tree; Graph returned 404 for the old path
+and 200 for the current file, and Dataverse retained the current `Reviews`
+pointer. Active
 contract: `docs/REVIEW_DOCX_SHAREPOINT_RETENTION_PLAN.md`.
 
 **Phase 4 BUILT (2026-07-03); reliability production-proven 2026-07-28:**

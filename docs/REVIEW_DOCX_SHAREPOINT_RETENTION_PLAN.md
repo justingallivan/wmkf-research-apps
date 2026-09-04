@@ -44,13 +44,16 @@ SharePoint item identities match the reviewed manifest. A fresh Production
 dry run then reported zero eligible missing files, zero reconcile candidates,
 zero blockers, and only the visible test exclusion. Request `1002874` remains
 the owner-approved Word Online proof at stable item version `4.0`; its separate
-legacy-path file is retained for later cleanup. The first authenticated enabled
+legacy-path file was subsequently owner-deleted. Read-only Graph verification
+returned `404 itemNotFound` for the obsolete `Reviewer_Uploads/Generated` path
+and 200 for the current Agnes file, while Dataverse still pointed to the
+`Reviews` folder and reviewer-named file. The first authenticated enabled
 run returned HTTP 200, resolved exact cycle `D26`, and made zero filing attempts:
 the sole candidate was owner-confirmed test Request `1003223`, classified
 `invalid_snapshot`. Bounded logs showed only Graph/Dataverse reads—no Graph
 upload and no Dataverse PATCH—and the deployment error scan was empty. The next
-natural structured-review filing remains the final Wave 5 end-to-end proof;
-legacy cleanup remains an owner decision. On 2026-09-04 UTC the test-row anomaly
+natural structured-review filing remains the final Wave 5 end-to-end proof. On
+2026-09-04 UTC the test-row anomaly
 was resolved by ETag-conditionally changing only the sole suggestion's
 `wmkf_selected` value from `true` to `false`, preserving Request `1003223`, its
 received-review history, and its empty SharePoint pointers. The immediate
@@ -831,7 +834,10 @@ D26 completion write.**
 - [x] Promote the v4/path/runtime changes before any further backfill or
   forward activation. `main` commit `3ba2a6ad` reached Ready deployment
   `dpl_22wUzC1cCi4nhKTSFQftfaycucSh` before the 22-row execution.
-- [ ] Clean up the old Request `1002874` item only after separate approval.
+- [x] After separate owner approval, delete Request `1002874`'s obsolete
+  `Reviewer_Uploads/Generated` tree. Read-only Graph verification returned
+  `404 itemNotFound` for that path and 200 for the current Agnes file; Dataverse
+  still points to `Reviews/Review-1002874-Agnes Karasik.docx`.
 
 **Gate:** Graph + Dataverse + Workbench readback and bounded logs.
 
@@ -941,9 +947,8 @@ Semantic omissions found: operator-confirmed test data needed an explicit,
 Remaining live STALE: 0 within this plan's stated scope
 Remaining UNKNOWN/ASSUMED: any future same-name reviewer
   pair (blocked in backfill and a stop condition before forward activation),
-  the next natural automatic filing remains unproved; old-file cleanup remains
-  unapproved
+  the next natural automatic filing remains unproved
 Verdict: WAVES 1–4, RUNTIME PROMOTION, EXACT REPAIRS, OWNER WORD-ONLINE VISUAL
-  CONFIRMATION, D26 BACKFILL, AND WAVE 5 ACTIVATION BOUNDARY VERIFIED; NATURAL
-  AUTOMATIC-FILING PROOF AND CLEANUP REMAIN OPEN; TEST-ROW DISPOSITION RESOLVED
+  CONFIRMATION, D26 BACKFILL, WAVE 5 ACTIVATION BOUNDARY, TEST-ROW DISPOSITION,
+  AND LEGACY CLEANUP VERIFIED; NATURAL AUTOMATIC-FILING PROOF REMAINS OPEN
 ```

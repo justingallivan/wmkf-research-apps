@@ -185,7 +185,8 @@ manifest hash `c30c76e47281208b8b4cc25976360453eebbdc65ba3d4b203c19a6e0f1a5692d`
 Execution created item `01G4GVMSZZ25YPTP3RGFEK6LCT64W3JPX2` at
 `Reviews/Review-1002874-Agnes Karasik.docx`, ETag-conditionally repointed this
 suggestion, and independently matched the corrected semantic hash. The old item
-still exists for later cleanup. Owner inspection of the new-path v2 item showed
+was retained at that stage and later owner-deleted after read-only Graph and
+Dataverse verification. Owner inspection of the new-path v2 item showed
 that Word Online kept the title together but moved it below the floating logo.
 The branch's v3 templates replace the behind-text logo's contradictory
 `wrapTight` directive with explicit `wrapNone`. Exact content-repair manifest

@@ -84,9 +84,9 @@ disposition is now resolved: on 2026-09-04 UTC the sole suggestion for test
 Request `1003223` was ETag-conditionally changed only from
 `wmkf_selected=true` to `false`, preserving its received-review history and
 empty SharePoint pointers. A follow-up authenticated enabled sweep returned
-HTTP 200 with zero candidates and zero attempts. Old-file cleanup remains an
-owner decision; the work queue otherwise returns to Final Writeup persona
-rollout.
+HTTP 200 with zero candidates and zero attempts. The later owner cleanup of
+Request `1002874` is independently verified complete; the work queue otherwise
+returns to Final Writeup persona rollout.
 The active plan is `docs/REVIEW_DOCX_SHAREPOINT_RETENTION_PLAN.md`. Claude's
 read-only adversarial review of the plan returned
 APPROVE WITH CONDITIONS; the plan now incorporates the verified eligibility,
@@ -170,8 +170,9 @@ been deployed and the existing SharePoint item was unchanged. The owner then sim
 file contract: generated documents now target the request-level `Reviews/`
 folder with filename `Review-<request>-<reviewer name>.docx`; no
 `Reviewer_Uploads/Generated` or suggestion-GUID layer remains in the current
-target. The old Request `1002874` item remains unchanged and recognized for
-compatibility. Because the governed hash and target identity changed, the prior
+target. The old Request `1002874` item was initially retained for compatibility
+and was owner-deleted after the repair was verified. Because the governed hash
+and target identity changed, the prior
 22-row manifest is superseded. Fresh v4 read-only manifest
 `outputs/review-docx-backfill/review-docx-D26-2026-09-04T01-18-31-489Z.json`
 has hash `9254df9e5e504c79007391efc85d189e89e8b8b2ff80b8e4f11990baca08f4f8`,
@@ -180,7 +181,8 @@ blockers, 22 unique destinations, and no Request `1002874` candidate. No
 suggestion IDs were added or removed versus the prior survey; the apparent new
 reviews were already included. At that stage no additional population write had
 been approved. The owner then authorized an exact
-Request `1002874` repair that leaves the old file for later cleanup. Hash-bound
+Request `1002874` repair that initially retained the old file; its separately
+approved cleanup is now complete. Hash-bound
 manifest
 `outputs/review-docx-repair/review-docx-repair-1002874-2026-09-03T23-21-31-299Z.json`
 (`c30c76e47281208b8b4cc25976360453eebbdc65ba3d4b203c19a6e0f1a5692d`)
@@ -196,7 +198,8 @@ remaining cross-renderer ambiguity: the behind-text floating logo still declared
 individual and combined templates change only that first-page header geometry
 to explicit `wrapNone`; both render as clean one-page fixtures locally and the
 focused repair suite passes. The owner approved replacing the exact current
-Agnes file before later cleanup of the separate legacy item. Repair manifest
+Agnes file while initially retaining the separate legacy item; that item was
+later owner-deleted and its absence independently verified. Repair manifest
 `outputs/review-docx-repair/review-docx-repair-1002874-2026-09-03T23-45-44-078Z.json`
 (`ab98b779b660c77719c317f73b8f1004b08a898f7159971d6f5c97f9bfb2295d`)
 bound the current item ID, ETag, version `1.0`, prior semantic hash, new v3
@@ -237,8 +240,12 @@ at `dpl_E6VKW5Wi8zDTfU1ZRhNsbH9yg9oM`; an authenticated enabled run resolved
 pointer mutation. It surfaced only known test Request `1003223` as
 `invalid_snapshot`. The row was subsequently removed from the filing population
 by changing only its suggestion's `wmkf_selected` value to `false`; the exact
-follow-up enabled sweep returned zero candidates and zero attempts. The next
-natural automatic filing and old-file cleanup remain open.
+follow-up enabled sweep returned zero candidates and zero attempts. The owner
+then deleted Request `1002874`'s obsolete `Reviewer_Uploads/Generated` tree;
+read-only Graph verification returned `404 itemNotFound` for that path and 200
+for the current Agnes file, while Dataverse still pointed to the `Reviews`
+folder and reviewer-named file. Only the next natural automatic filing remains
+open for this workstream.
 
 ## Parked
 

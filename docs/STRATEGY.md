@@ -175,8 +175,9 @@ and targets generated retention at request-level
 inspection passed. The earlier replacement manifest was later superseded by
 the approved v4 governed hash. The owner-authorized
 exact repair then created and verified
-`Reviews/Review-1002874-Agnes Karasik.docx`, repointed Dataverse, and retained
-the old item for later cleanup. Owner inspection showed that Word Online kept
+`Reviews/Review-1002874-Agnes Karasik.docx`, repointed Dataverse, and initially
+retained the old item. Its later owner cleanup is independently verified.
+Owner inspection showed that Word Online kept
 the v2 title together but still pushed it below the floating logo. The v3
 templates resolve that remaining OOXML ambiguity by retaining the behind-text
 logo and changing its wrap directive from `wrapTight` to explicit `wrapNone`.
@@ -212,8 +213,10 @@ known test Request `1003223`, classified `invalid_snapshot`; the bounded error
 scan was empty. The test row was then removed from the filing population by an
 ETag-protected update of only its suggestion's `wmkf_selected` value to `false`,
 preserving the received-review history; the immediate enabled follow-up sweep
-returned zero candidates and zero attempts. The next natural automatic filing
-remains unproved. Legacy-file cleanup remains an owner decision.
+returned zero candidates and zero attempts. The owner then deleted Request
+`1002874`'s obsolete `Reviewer_Uploads/Generated` tree; Graph returned 404 for
+the old path and 200 for the current file, and Dataverse retained the current
+`Reviews` pointer. The next natural automatic filing remains unproved.
 Final Writeup persona
 access proof and deliberate enablement remain preserved immediately afterward.
 As of 2026-08-31, the ordinary-staff
