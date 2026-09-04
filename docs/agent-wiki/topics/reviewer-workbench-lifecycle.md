@@ -1145,8 +1145,11 @@ sweep returned HTTP 200, resolved exact D26, and attempted no filing because
 that known test row was classified `invalid_snapshot`. Bounded Production logs
 showed no Graph mutation, Dataverse PATCH, or runtime error. The scheduled route
 is active, but the next natural automatic create/pointer path is not yet
-Production-proved; test-row disposition and old-file cleanup remain separate
-owner decisions. Active
+Production-proved. The test row is now out of that population through an
+ETag-protected one-field `wmkf_selected=false` correction that preserved its
+received-review history; the immediate enabled follow-up returned zero
+candidates and zero attempts. Old-file cleanup remains a separate owner
+decision. Active
 contract: `docs/REVIEW_DOCX_SHAREPOINT_RETENTION_PLAN.md`.
 
 **Phase 4 BUILT (2026-07-03); reliability production-proven 2026-07-28:**

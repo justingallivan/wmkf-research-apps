@@ -209,8 +209,11 @@ activation-proof deployment `dpl_E6VKW5Wi8zDTfU1ZRhNsbH9yg9oM`. Its first
 authenticated enabled run returned HTTP 200, attempted no filing, and made no
 SharePoint document or Dataverse pointer mutation because the sole candidate was
 known test Request `1003223`, classified `invalid_snapshot`; the bounded error
-scan was empty. The next natural automatic filing remains unproved. Test-row
-disposition and legacy-file cleanup remain owner decisions.
+scan was empty. The test row was then removed from the filing population by an
+ETag-protected update of only its suggestion's `wmkf_selected` value to `false`,
+preserving the received-review history; the immediate enabled follow-up sweep
+returned zero candidates and zero attempts. The next natural automatic filing
+remains unproved. Legacy-file cleanup remains an owner decision.
 Final Writeup persona
 access proof and deliberate enablement remain preserved immediately afterward.
 As of 2026-08-31, the ordinary-staff

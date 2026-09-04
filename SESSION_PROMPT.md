@@ -80,8 +80,13 @@ Production `REVIEW_DOCX_SHAREPOINT_WRITE=on` and
 HTTP 200, attempted no filing, and found only test Request `1003223` as
 `invalid_snapshot`; bounded logs showed no Graph mutation, Dataverse PATCH, or
 runtime error. The next natural automatic filing remains unproved. Test-row
-disposition and old-file cleanup remain owner decisions; the work queue otherwise
-returns to Final Writeup persona rollout.
+disposition is now resolved: on 2026-09-04 UTC the sole suggestion for test
+Request `1003223` was ETag-conditionally changed only from
+`wmkf_selected=true` to `false`, preserving its received-review history and
+empty SharePoint pointers. A follow-up authenticated enabled sweep returned
+HTTP 200 with zero candidates and zero attempts. Old-file cleanup remains an
+owner decision; the work queue otherwise returns to Final Writeup persona
+rollout.
 The active plan is `docs/REVIEW_DOCX_SHAREPOINT_RETENTION_PLAN.md`. Claude's
 read-only adversarial review of the plan returned
 APPROVE WITH CONDITIONS; the plan now incorporates the verified eligibility,
@@ -230,8 +235,10 @@ has no eligible or reconcile rows and no blockers. Wave 5 activation is complete
 at `dpl_E6VKW5Wi8zDTfU1ZRhNsbH9yg9oM`; an authenticated enabled run resolved
 `D26`, attempted zero filings, and made no SharePoint document or Dataverse
 pointer mutation. It surfaced only known test Request `1003223` as
-`invalid_snapshot`. The next natural automatic filing, test-row disposition,
-and old-file cleanup remain open.
+`invalid_snapshot`. The row was subsequently removed from the filing population
+by changing only its suggestion's `wmkf_selected` value to `false`; the exact
+follow-up enabled sweep returned zero candidates and zero attempts. The next
+natural automatic filing and old-file cleanup remain open.
 
 ## Parked
 

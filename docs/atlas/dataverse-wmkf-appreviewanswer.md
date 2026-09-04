@@ -69,8 +69,10 @@ the visible test exclusion. Exact Production `WRITE=on` and `CYCLE=D26` now
 activate the hourly path. Its first authenticated enabled run attempted no
 filing and made no SharePoint document or Dataverse pointer mutation because the
 sole candidate was known test Request `1003223`, classified `invalid_snapshot`;
-the bounded error scan was empty. The next natural automatic filing remains
-unproved.
+the bounded error scan was empty. The test suggestion was then
+ETag-conditionally changed only to `wmkf_selected=false`, preserving its review
+history; the immediate enabled follow-up sweep returned zero candidates and
+zero attempts. The next natural automatic filing remains unproved.
 
 ## Write Paths
 

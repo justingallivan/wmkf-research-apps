@@ -3,6 +3,13 @@
 <!-- drain-table:file-purpose=atlas-state-page -->
 
 **Last verified:** Review-DOCX retention runtime and exact D26 backfill reconciled 2026-09-04 UTC: 22 created, zero failed, and a clean post-write survey. Wave 5 automatic filing is active for exact D26 in Ready activation-proof deployment `dpl_E6VKW5Wi8zDTfU1ZRhNsbH9yg9oM`; the authenticated enabled boundary made no filing attempt or document/pointer mutation and surfaced only known test Request `1003223` as `invalid_snapshot`. Reviewer-reminder token-liveness remediation exists in runtime source at commit `4dd57369`. Incident-session operations observed Ready deployment `dpl_89s9MzdUnDST6Jm9Vs3cnMLPmUDu` and authenticated Workbench smoke, but the deployment metadata exposed no source SHA and no tracked smoke artifact was retained. The post-deploy read-only D26 audit found all 51 never-reminded sweep candidates active and reminder-eligible with zero blocked; already-reminded rows were outside the population (2026-09-01). Row count re-probed 2026-08-15 PT (`2026-08-16T04:47:14Z`) via a direct read-only Dataverse `/$count` request; capped request-link context read verified in feature-branch source/tests 2026-08-21 (deployment pending); reviewer-reminder marker and schedule-hold contract reconciled 2026-09-01; decline-referral per-row dismissal contract reconciled 2026-08-14 via source and focused tests; Wave 18 review-due override provisioned and runtime promoted 2026-08-11 / 2026-08-12 UTC [VERIFIED via production create, entity-scoped publish, typed metadata EXACT, successful entity-set `$select` of `wmkf_reviewduedateoverride`, non-clobbering settings seed, main `8647af33`, Vercel `dpl_AbTvWvMYb5inwPnYKTK2mkrkNXZz`, and live HTTP checks]; acceptance-time affiliation→Contact parent-Account contract reconciled 2026-08-10; **implementation promoted to production 2026-08-10 (S412, merge `42abd72a`)** [VERIFIED via `origin/main`: `reviewer-acceptance-drain.js:611`, no env/feature gate]; runtime decline-referral reader/writer contract originally reconciled 2026-08-01; Wave 13 metadata/population and M1.3 lifecycle/source aggregates refreshed 2026-07-14 via `node scripts/preflight-reviewer-identity-binding-fields.mjs --target=prod --include-population` and the explicit-target read-only `scripts/probe-reviewer-channel-baseline.js`. Prior live metadata probe: 2026-05-31 (S208 — `wmkf_applicantdisposition` deployed; 77 `wmkf_`-prefixed attrs, 108 total).
+**Review-DOCX test-row follow-up (verified 2026-09-04 UTC):** the sole
+suggestion for test Request `1003223` was ETag-conditionally changed only from
+`wmkf_selected=true` to `false`. Its request/reviewer links, received timestamp,
+Review Received status, D26 stamp, and empty SharePoint pointers were preserved.
+The immediate authenticated enabled filing sweep returned HTTP 200 with zero
+candidates and zero attempts.
+
 **Live row count:** 793 (dated snapshot; rows are expected to change with normal reviewer activity)
 **Entity set:** `wmkf_appreviewersuggestions`
 **Adapter:** `lib/dataverse/adapters/reviewer-suggestion.js`
@@ -216,6 +223,9 @@ mutation or Dataverse PATCH, and no runtime error. Enabled runs do write
 maintenance telemetry and deduplicated actionable events. The local operator
 backfill write path is Production-proved for the exact D26 set; the scheduled
 route is active but its first natural create/pointer mutation remains unproved.
+The `1003223` test suggestion is now `wmkf_selected=false`, with its received
+review history and empty pointers preserved; the immediate enabled follow-up
+sweep returned zero candidates and zero attempts.
 
 Structured review fields (S130 schema additions):
 - `wmkf_revieweraffiliation` (String) — parent identity column; still the read source for the review-context affiliation prefill.
@@ -384,7 +394,9 @@ Write (verified 2026-05-07; +Phase 3 ingestion S210):
   `individual-file-service.js`, writes only the two existing pointer fields
   after create-only SharePoint reconciliation, and is not part of submission or
   thank-you delivery. Exact D26 activation and its no-document/pointer-mutation
-  boundary are Production-proved; the next natural filing remains pending.
+  boundary are Production-proved; the former `1003223` test anomaly is now
+  ineligible through `wmkf_selected=false`, and the next natural filing remains
+  pending.
 - `scripts/backfill-review-docx-sharepoint.mjs` — source-built Wave 3 local
   operator entry point. Dry run is the default and writes a content-free
   manifest; `--execute` requires that reviewed manifest, exact source/population

@@ -50,7 +50,12 @@ the sole candidate was owner-confirmed test Request `1003223`, classified
 `invalid_snapshot`. Bounded logs showed only Graph/Dataverse reads—no Graph
 upload and no Dataverse PATCH—and the deployment error scan was empty. The next
 natural structured-review filing remains the final Wave 5 end-to-end proof;
-handling the persistent test-row anomaly and legacy cleanup remain owner decisions.**
+legacy cleanup remains an owner decision. On 2026-09-04 UTC the test-row anomaly
+was resolved by ETag-conditionally changing only the sole suggestion's
+`wmkf_selected` value from `true` to `false`, preserving Request `1003223`, its
+received-review history, and its empty SharePoint pointers. The immediate
+authenticated enabled follow-up sweep returned HTTP 200 with zero candidates
+and zero attempts.**
 
 The recommended design is to generate and retain one individual DOCX for every
 structured review, using the same approved individual template as the thank-you
@@ -872,9 +877,12 @@ failures, and a fresh Production dry run found no eligible or reconcile rows.**
 - [x] Confirm an anomaly-only run performs no SharePoint document or Dataverse
   pointer mutation; unresolved anomalies remain compactly classified and
   deduplicated rather than falsely described as silent.
-- [ ] Resolve or deliberately retain the owner-confirmed `1003223` test row. Until
-  then it remains safely unfiled but causes each hourly maintenance run to report
-  one actionable `invalid_snapshot` result.
+- [x] Resolve the owner-confirmed `1003223` test row without deleting its review
+  history. An ETag-protected Production correction changed only its sole
+  suggestion's `wmkf_selected` value from `true` to `false`; the received time,
+  Review Received status, request/reviewer links, D26 stamp, and empty SharePoint
+  pointers were unchanged. The immediate authenticated enabled sweep returned
+  HTTP 200 with `candidateCount:0`, `scanned:0`, and `attempted:0`.
 
 ## Stop conditions
 
@@ -933,9 +941,9 @@ Semantic omissions found: operator-confirmed test data needed an explicit,
 Remaining live STALE: 0 within this plan's stated scope
 Remaining UNKNOWN/ASSUMED: any future same-name reviewer
   pair (blocked in backfill and a stop condition before forward activation),
-  the next natural automatic filing remains unproved; owner disposition of the
-  known test anomaly and old-file cleanup remain unapproved
+  the next natural automatic filing remains unproved; old-file cleanup remains
+  unapproved
 Verdict: WAVES 1–4, RUNTIME PROMOTION, EXACT REPAIRS, OWNER WORD-ONLINE VISUAL
   CONFIRMATION, D26 BACKFILL, AND WAVE 5 ACTIVATION BOUNDARY VERIFIED; NATURAL
-  AUTOMATIC-FILING PROOF, TEST-ROW DISPOSITION, AND CLEANUP REMAIN OPEN
+  AUTOMATIC-FILING PROOF AND CLEANUP REMAIN OPEN; TEST-ROW DISPOSITION RESOLVED
 ```

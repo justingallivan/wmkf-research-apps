@@ -146,6 +146,8 @@ files, zero reconcile candidates, zero blockers, and only the visible Request
 Ready activation-proof deployment `dpl_E6VKW5Wi8zDTfU1ZRhNsbH9yg9oM`. The
 first authenticated enabled run attempted no filing, made no SharePoint document
 or Dataverse pointer mutation, and surfaced only known test Request `1003223` as
-`invalid_snapshot`; the error scan was empty. Describe automatic filing as active
-but not yet proved on a naturally arriving review. Test-row disposition and
-legacy cleanup remain separately gated.
+`invalid_snapshot`; the error scan was empty. The test suggestion was then
+ETag-conditionally changed only to `wmkf_selected=false`, preserving the
+received-review history; the immediate enabled follow-up returned zero
+candidates and zero attempts. Describe automatic filing as active but not yet
+proved on a naturally arriving review. Legacy cleanup remains separately gated.
