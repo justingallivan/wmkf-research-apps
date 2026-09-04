@@ -203,8 +203,8 @@ and in-place upload wrote the same real v4 output as version `4.0` at
 regeneration/download now returns
 `already_filed`, matches v4 governed hash
 `gdc1:fbIC8o5aWoe_rOjXNK6mAKR6kbNRQ_I6MU60R28Chi4`, and confirms unchanged
-Dataverse pointers. Owner Word Online visual confirmation of version `4.0` is
-pending. The runtime fix is not deployed; the remaining 22 writes, scheduled
+Dataverse pointers. The owner visually confirmed version `4.0` in Word Online
+and approved the v4 header on 2026-09-03. The runtime fix is not deployed; the remaining 22 writes, scheduled
 activation, and old-file cleanup remain unapproved.
 
 ## Parked

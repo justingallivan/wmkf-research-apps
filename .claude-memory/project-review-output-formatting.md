@@ -132,6 +132,7 @@ and the existing Dataverse pointer pair. At the owner's explicit request, a
 second guarded in-place upload regenerated the same real v4 output as version
 `4.0` at `2026-09-04T00:59:51Z`; versions `1.0`–`3.0` remain in SharePoint
 history, and independent readback again matched the v4 hash and unchanged
-pointers. Owner Word Online visual confirmation of version `4.0` remains pending. Describe Wave 2 as
+pointers. The owner visually confirmed version `4.0` in Word Online and approved
+the v4 header on 2026-09-03. Describe Wave 2 as
 Production-deployed inert, Wave 3 as exact new-path storage/pointer and
 manifest-bound v3/v4 content repairs proved, and automatic filing as not activated.

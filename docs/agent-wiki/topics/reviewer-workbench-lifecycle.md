@@ -1126,8 +1126,9 @@ v4 governed hash `gdc1:fbIC8o5aWoe_rOjXNK6mAKR6kbNRQ_I6MU60R28Chi4` with
 the Dataverse pointer pair unchanged. At the owner's explicit request, a second
 guarded generation/upload advanced the same stable item to version `4.0` at
 `2026-09-04T00:59:51Z`, retained versions `1.0`–`3.0`, and independently
-reverified the same v4 hash with unchanged pointers. Owner Word Online visual confirmation of
-version `4.0` is pending; the runtime fix is not deployed. The owner-directed path
+reverified the same v4 hash with unchanged pointers. The owner visually confirmed
+version `4.0` in Word Online and approved the v4 header on 2026-09-03; the
+runtime fix is not deployed. The owner-directed path
 simplification and historical v2 Word-web correction produced replacement manifest hash
 `25f10fcd0347d7de02abcc8a744357d4e215fe56efa462ff8cc0a6eef99650ff`, with 22
 eligible missing files at unique destinations plus the same visible test

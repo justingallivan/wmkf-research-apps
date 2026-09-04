@@ -58,8 +58,10 @@ second exact owner-approved repair manifest, the local operator path regenerated
 the snapshot with the corrected template, created and verified
 `Reviews/Review-1002874-Agnes Karasik.docx`, and ETag-conditionally repointed the
 suggestion. Independent readback matched the corrected governed hash and proved
-the old item remains for later cleanup. Owner Word-web visual confirmation is
-pending. A replacement population manifest excludes the completed row and
+the old item remains for later cleanup. After subsequent guarded same-item
+content writes, the v4 generated output is current as version `4.0`; versions
+`1.0`–`3.0` remain in history, and the owner visually confirmed the v4 header in
+Word Online on 2026-09-03. A replacement population manifest excludes the completed row and
 reports 22 eligible missing files plus the same visible test exclusion. The
 scheduled path remains disabled and unproved.
 

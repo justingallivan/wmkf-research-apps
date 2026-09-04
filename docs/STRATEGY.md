@@ -197,8 +197,9 @@ unchanged pointers. At the owner's explicit request, a further guarded upload
 wrote the same generated v4 output to the same item as version `4.0`, retained
 versions `1.0`–`3.0`, and independently reverified the v4 hash and unchanged
 pointers. The v4 fix remains undeployed, and the historical remaining-population
-manifest is superseded. Owner Word Online visual confirmation of version `4.0` and
-template/path-fix promotion now precede a fresh Wave 4 manifest and any
+manifest is superseded. The owner visually confirmed version `4.0` in Word
+Online and approved the v4 header on 2026-09-03. Template/path-fix promotion now
+precedes a fresh Wave 4 manifest and any
 remaining writes.
 Final Writeup persona
 access proof and deliberate enablement remain preserved immediately afterward.
