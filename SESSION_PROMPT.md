@@ -59,6 +59,8 @@ deployed/source/test/render verified rather than transport-smoked in Production.
 - `shared/templates/reviews/combined-review-v2.docx`
 - `shared/templates/reviews/individual-review-v3.docx`
 - `shared/templates/reviews/combined-review-v3.docx`
+- `shared/templates/reviews/individual-review-v4.docx`
+- `shared/templates/reviews/combined-review-v4.docx`
 - `lib/services/review-manager/export-reviews-service.js`
 - `pages/api/review-manager/export-reviews.js`
 - `lib/services/reviewer-thankyou-sweep.js`
@@ -186,9 +188,21 @@ no bytes or pointers changed. The retry replaced the same stable SharePoint item
 retaining and verifying version `1.0`. Independent read-only regeneration and
 download now classify the row `already_filed` and match v3 semantic hash
 `gdc1:E3KvF7rvlOaGoxps6DHihILCQlyDlSheguneB0F0ojw`; Dataverse pointers did not
-change. Owner Word Online visual confirmation of version `2.0` is pending. The
-runtime fix is not deployed; the remaining 22 writes, scheduled activation, and
-old-file cleanup remain unapproved.
+change. Owner inspection showed that the v3 floating-logo header was still not
+the desired alignment. The owner then edited and returned a header-only Word
+file; new v4 individual and combined templates preserve that exact fixed
+9360-DXA two-column Times New Roman text header, with no image, drawing, anchor,
+tab, or first-page header relationship. Both full generated fixtures render
+cleanly and the focused 92-test suite passes. Exact content-repair manifest
+`outputs/review-docx-repair/review-docx-repair-1002874-2026-09-04T00-37-00-977Z.json`
+(`18007d495f52ab7abb88c03e6d3099eadb953157e69051b0c4c96898881ef09e`)
+versioned the same stable SharePoint item/name from `2.0` to `3.0`, retaining its
+prior versions. Independent read-only regeneration/download now returns
+`already_filed`, matches v4 governed hash
+`gdc1:fbIC8o5aWoe_rOjXNK6mAKR6kbNRQ_I6MU60R28Chi4`, and confirms unchanged
+Dataverse pointers. Owner Word Online visual confirmation of version `3.0` is
+pending. The runtime fix is not deployed; the remaining 22 writes, scheduled
+activation, and old-file cleanup remain unapproved.
 
 ## Parked
 

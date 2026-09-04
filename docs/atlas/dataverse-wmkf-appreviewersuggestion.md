@@ -184,13 +184,20 @@ hash `ab98b779b660c77719c317f73b8f1004b08a898f7159971d6f5c97f9bfb2295d`
 then versioned the same current item/name from `1.0` to `2.0`, retained and
 verified the prior version, and independently matched governed hash
 `gdc1:E3KvF7rvlOaGoxps6DHihILCQlyDlSheguneB0F0ojw` with this suggestion's
-pointers unchanged. Owner Word Online visual confirmation of version `2.0` is
-pending. The owner-directed path/name simplification and historical v2
+pointers unchanged. Owner inspection still rejected the floating-logo
+alignment, then supplied an edited text-only header. The v4 individual and
+combined templates use that exact fixed two-column table and contain no
+first-page drawing, anchor, or image relationship. Exact content-repair
+manifest hash `18007d495f52ab7abb88c03e6d3099eadb953157e69051b0c4c96898881ef09e`
+versioned the same item/name from `2.0` to `3.0`; independent readback matched
+v4 governed hash `gdc1:fbIC8o5aWoe_rOjXNK6mAKR6kbNRQ_I6MU60R28Chi4` with
+this suggestion's pointers unchanged. Owner Word Online visual confirmation of
+version `3.0` is pending. The owner-directed path/name simplification and historical v2
 Word-web template correction produced replacement manifest hash
 `25f10fcd0347d7de02abcc8a744357d4e215fe56efa462ff8cc0a6eef99650ff`,
 containing 22 eligible missing rows with unique destinations plus the visible
 test exclusion, zero blockers, and no Request `1002874` candidate; it is now
-superseded by the v3 governed hash and must be regenerated before execution. The
+superseded by the v4 governed hash and must be regenerated before execution. The
 scheduled route remains inert,
 including no maintenance row, while
 `REVIEW_DOCX_SHAREPOINT_WRITE` is unset. Both rollout variables were confirmed

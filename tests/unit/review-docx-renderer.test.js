@@ -42,8 +42,8 @@ function reviewer(suggestionId, name, options, answerValues) {
 
 describe('template-backed review DOCX renderer', () => {
   test('tracked templates pass marker/section preflight', async () => {
-    expect(REVIEW_DOCX_TEMPLATES.individual).toMatchObject({ version: 3, relativePath: 'shared/templates/reviews/individual-review-v3.docx' });
-    expect(REVIEW_DOCX_TEMPLATES.combined).toMatchObject({ version: 3, relativePath: 'shared/templates/reviews/combined-review-v3.docx' });
+    expect(REVIEW_DOCX_TEMPLATES.individual).toMatchObject({ version: 4, relativePath: 'shared/templates/reviews/individual-review-v4.docx' });
+    expect(REVIEW_DOCX_TEMPLATES.combined).toMatchObject({ version: 4, relativePath: 'shared/templates/reviews/combined-review-v4.docx' });
     await expect(preflightReviewDocxTemplates()).resolves.toBeUndefined();
   });
 
@@ -89,12 +89,20 @@ describe('template-backed review DOCX renderer', () => {
     expect(archive.file('word/header1.xml')).not.toBeNull();
     expect(archive.file('word/footer1.xml')).not.toBeNull();
     expect(firstPageHeader).toContain('Proposal Review');
-    expect(firstPageHeader).toContain('Research');
-    expect(firstPageHeader).toContain(' Program');
+    expect(firstPageHeader).toContain('Research Program');
+    expect(firstPageHeader).toContain('W.M. KECK');
+    expect(firstPageHeader).toContain('FOUNDATION');
+    expect(firstPageHeader).toContain('<w:tblW w:w="9360" w:type="dxa"/>');
+    expect(firstPageHeader).toContain('<w:gridCol w:w="3888"/>');
+    expect(firstPageHeader).toContain('<w:gridCol w:w="5472"/>');
     expect(firstPageHeader).toContain('<w:jc w:val="right"/>');
     expect(firstPageHeader).not.toContain('<w:tab');
-    expect(firstPageHeader).toContain('<wp:wrapNone/>');
-    expect(firstPageHeader).not.toContain('<wp:wrapTight');
+    expect(firstPageHeader).not.toContain('<w:drawing');
+    expect(firstPageHeader).not.toContain('<wp:anchor');
+    expect(firstPageHeader).not.toContain('<wp:inline');
+    expect(archive.file('word/_rels/header2.xml.rels')).toBeNull();
+    expect(archive.file('word/media/image2.png')).toBeNull();
+    expect(archive.file('word/media/image3.svg')).toBeNull();
     expect(continuationHeader).toContain('Proposal Review');
     expect(`${firstPageHeader}${continuationHeader}`).not.toContain('Individual');
     expect(documentXml).not.toContain('EXTERNAL REVIEW');
@@ -108,7 +116,7 @@ describe('template-backed review DOCX renderer', () => {
     expect(documentXml).toContain('Dr. A &lt;Reviewer&gt;');
     expect(coreXml).toContain('W. M. Keck Foundation');
     expect(coreXml).toContain('Proposal Review R-101');
-    expect(coreXml).toContain('individual-review version 3 template');
+    expect(coreXml).toContain('individual-review version 4 template');
     expect(coreXml).not.toContain('Individual');
     expect(coreXml).not.toMatch(/SAMPLE|Mockup/i);
     expect(generatedFooter).toContain('Generated August 20, 2026');
@@ -246,13 +254,21 @@ describe('template-backed review DOCX renderer', () => {
       generatedAtIso: GENERATED_AT,
     });
     const buffer4 = await renderCombinedReviewDocx(report4);
-    const xml4 = await archiveText(buffer4, 'word/document.xml');
-    const header4 = await archiveText(buffer4, 'word/header2.xml');
+    const archive4 = await JSZip.loadAsync(buffer4);
+    const xml4 = await archive4.file('word/document.xml').async('string');
+    const header4 = await archive4.file('word/header2.xml').async('string');
     expect(header4).toContain('Aggregated Proposal Reviews');
+    expect(header4).toContain('W.M. KECK');
+    expect(header4).toContain('FOUNDATION');
+    expect(header4).toContain('<w:tblW w:w="9360" w:type="dxa"/>');
     expect(header4).toContain('<w:jc w:val="right"/>');
     expect(header4).not.toContain('<w:tab');
-    expect(header4).toContain('<wp:wrapNone/>');
-    expect(header4).not.toContain('<wp:wrapTight');
+    expect(header4).not.toContain('<w:drawing');
+    expect(header4).not.toContain('<wp:anchor');
+    expect(header4).not.toContain('<wp:inline');
+    expect(archive4.file('word/_rels/header2.xml.rels')).toBeNull();
+    expect(archive4.file('word/media/image2.png')).toBeNull();
+    expect(archive4.file('word/media/image3.svg')).toBeNull();
     expect(header4).not.toContain('Combined Proposal Review');
     expect(xml4).toContain('Tools');
     expect(xml4).toContain('1: ');

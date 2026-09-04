@@ -48,10 +48,14 @@ the old file remains intact for later cleanup. Word Online still pushed the v2
 title below the logo, so a second exact content repair versioned that same item
 from `1.0` to `2.0` with v3 bytes, retained and verified the prior version, and
 independently matched the new governed hash without changing the pointer.
+Owner inspection still rejected the floating-logo alignment. The owner-edited
+v4 header replaces it with a fixed two-column text table; a third exact content
+repair versioned the same item from `2.0` to `3.0`, and independent readback
+matched the v4 governed hash with unchanged pointers.
 Historical replacement manifest hash
 `25f10fcd0347d7de02abcc8a744357d4e215fe56efa462ff8cc0a6eef99650ff` has 22
 eligible missing files, the same visible test exclusion, and zero blockers, but
-is superseded by the v3 governed hash and must be regenerated. No
+is superseded by the v4 governed hash and must be regenerated. No
 additional backfill write, old-file cleanup, or forward activation is
 authorized.**
 
@@ -89,7 +93,7 @@ probes on 2026-09-03:
 | Before Wave 3 execution, D26 had 24 received reviews and 228 answer rows. All 24 were selected, had at least one rich-text answer row, had exact receipt/answer identity parity, and had zero complete or partial SharePoint pointers. After the one-row proof, the fresh unfinished-population manifest has 22 eligible missing files plus one visible test exclusion; Request `1002874` has a complete verified pointer pair. | Existing structured writers plus Wave 3 backfill | Production Dataverse | Backfill and existing pointer consumers | Initial blank-slate probe; execution result; independent readback; fresh post-write manifest | **VERIFIED 2026-09-03** |
 | Rendering identical semantic input twice does not produce byte-identical ZIP packages, while the governed Word-part hash is stable. | Current renderer | Generated DOCX package | Retry/conflict logic | Local two-render experiment: raw SHA-256 differed; governed hash matched | **VERIFIED** |
 | The thank-you attachment now uses one shared individual-review builder with caller-owned generation time. | `reviewer-thankyou-sweep.js` | Existing answer snapshot + transient DOCX bytes | Thank-you attachment; filing service | Focused builder/thank-you/hash tests, rendered-page inspection, and Ready Production deployment | **PRODUCTION-LIVE AT `83da197f`; TRANSPORT BEHAVIOR UNCHANGED** |
-| First-page review titles render portably without tab stops or shape wrapping outside the usable width. | Tracked individual and combined templates | `word/header2.xml` | Desktop Word, Word for the web, LibreOffice/PDF render | The first owner screenshot identified out-of-bounds title tabs; v2 removed them. A second screenshot showed Word Online still wrapping the title below the floating logo. v3 preserves the behind-text logo while replacing `wrapTight` with explicit `wrapNone`; package assertions and both one-page rendered fixtures pass. The live Request `1002874` item now has the reviewed v3 semantic hash as version `2.0`; owner Word Online inspection remains pending. | **SOURCE/RETAINED-PACKAGE/LIVE-BYTES VERIFIED; NOT DEPLOYED; WORD-ONLINE VISUAL CONFIRMATION PENDING** |
+| First-page review titles render portably without tab stops, floating shapes, or wrapping outside the usable width. | Tracked individual and combined templates | `word/header2.xml` | Desktop Word, Word for the web, LibreOffice/PDF render | v2 removed out-of-bounds title tabs and v3 changed the floating logo to `wrapNone`, but owner inspection still rejected the Word Online alignment. The owner-edited v4 header replaces the drawing with a fixed 9360-DXA two-column Times New Roman table. Structural assertions and both full generated fixtures pass. The live Request `1002874` item now has the reviewed v4 semantic hash as version `3.0`; owner Word Online inspection remains pending. | **SOURCE/RETAINED-PACKAGE/LIVE-BYTES VERIFIED; NOT DEPLOYED; WORD-ONLINE VISUAL CONFIRMATION PENDING** |
 | Automatic retention and full D26 write execution are activated and Production-proved. | Dedicated filing service/cron is deployed but disabled; the operator backfill and exact repair command executed one owner-approved request | New generated SharePoint DOCX + exact suggestion pointer pair; old proof file retained; local redacted artifacts | Existing pointer consumers | Ready inert deployment; repair execution result; independent Graph/Dataverse semantic readback; both old/new Graph item readback | **PARTIAL: REQUEST `1002874` NEW-PATH REPAIR PROVED; SCHEDULED ROUTE AND REMAINING 22 WRITES UNPROVED** |
 
 ### Sweep boundary
@@ -220,8 +224,23 @@ made no change. The retry replaced the same item/name as SharePoint version
 `gdc1:E3KvF7rvlOaGoxps6DHihILCQlyDlSheguneB0F0ojw` and retained prior version
 `1.0`. Independent read-only regeneration/download returned `already_filed`
 with the same v3 hash and unchanged Dataverse pointers. Owner Word Online visual
-confirmation of version `2.0` remains pending. Because the governed hash covers
-all `word/` parts, the prior remaining-population manifest is superseded.
+inspection still rejected the floating-logo alignment. The owner edited and
+returned a header-only DOCX whose first-page header is an exact fixed 9360-DXA
+two-column Times New Roman table. New v4 individual and combined templates use
+that header, remove the first-page image/drawing/anchor relationships, and keep
+all existing body/footer markers and continuation headers. Both full generated
+fixtures render cleanly, structural checks pass, and the focused seven-suite
+run passed 92/92. Exact schema-v2 content-repair manifest
+`outputs/review-docx-repair/review-docx-repair-1002874-2026-09-04T00-37-00-977Z.json`
+with hash `18007d495f52ab7abb88c03e6d3099eadb953157e69051b0c4c96898881ef09e`
+bound version `2.0`, the stable item/ETag, both semantic hashes, and the exact
+Dataverse/SharePoint target. Execution replaced the same item/name as version
+`3.0` and retained prior versions. Independent read-only regeneration/download
+returns `already_filed`, matches v4 hash
+`gdc1:fbIC8o5aWoe_rOjXNK6mAKR6kbNRQ_I6MU60R28Chi4`, and confirms unchanged
+Dataverse pointers. Owner Word Online visual confirmation of version `3.0`
+remains pending. Because the governed hash covers all `word/` parts, the prior
+remaining-population manifest is superseded.
 Replacement manifest
 `outputs/review-docx-backfill/review-docx-D26-2026-09-03T23-02-20-955Z.json`
 has hash `25f10fcd0347d7de02abcc8a744357d4e215fe56efa462ff8cc0a6eef99650ff`,
@@ -797,8 +816,11 @@ WRITE APPROVED.**
   explicit no-wrap logo geometry, and version the exact current item from `1.0`
   to `2.0`. Independent readback matched v3 and the prior version was retained
   and verified; Dataverse pointers were unchanged.
-- [ ] Owner confirms version `2.0` visually in Word for the web.
-- [ ] Promote the v3/path/runtime changes before any further backfill or
+- [x] Use the owner-edited header-only DOCX to create v4 text-table templates,
+  render both full outputs, and version the same item from `2.0` to `3.0` under
+  an exact manifest. Independent readback matched v4 with unchanged pointers.
+- [ ] Owner confirms version `3.0` visually in Word for the web.
+- [ ] Promote the v4/path/runtime changes before any further backfill or
   forward activation.
 - [ ] Clean up the old Request `1002874` item only after separate approval.
 
@@ -809,8 +831,8 @@ WRITE APPROVED.**
 - [x] After the v2 template and path corrections, produce a replacement manifest: 22
   eligible missing files, one visible test exclusion, zero blockers, hash
   `25f10fcd0347d7de02abcc8a744357d4e215fe56efa462ff8cc0a6eef99650ff`.
-- [ ] Regenerate the remaining-population manifest with the v3 governed hash;
-  the v2 manifest is superseded and must not execute.
+- [ ] Regenerate the remaining-population manifest with the v4 governed hash;
+  the earlier manifest is superseded and must not execute.
 - Stop for explicit approval of the remaining bounded write set.
 - Execute, reconcile every suggestion identity, and prove a clean rerun.
 
@@ -852,20 +874,20 @@ Domain: structured individual review DOCX generation and SharePoint retention
 Claims: Waves 1–2 implementation and flag-off Production deployment VERIFIED;
   Wave 3 backfill SOURCE/FOCUSED-TEST/ADVERSARIAL-REVIEW VERIFIED, exact
   Request 1002874 create-only SharePoint/pointer/semantic proof VERIFIED, and
-  owner browser download VERIFIED; two Word Online title defects OWNER-OBSERVED,
-  no-tab v2 and explicit-no-wrap v3 source fixes/test/render VERIFIED;
+  owner browser download VERIFIED; three Word Online header defects OWNER-OBSERVED,
+  no-tab v2, explicit-no-wrap v3, and owner-edited table-header v4 source fixes/test/render VERIFIED;
   request-level Reviews path and reviewer-name
   filename SOURCE/TEST/READ-ONLY-MANIFEST VERIFIED; exact manifest-bound
   Request 1002874 relocation repair and independent new/old item readback
-  VERIFIED; exact same-item v3 content repair, retained prior-version proof,
-  and independent current-hash/pointer readback VERIFIED;
+  VERIFIED; exact same-item v3 and v4 content repairs, retained prior-version
+  history, and independent current-hash/pointer readback VERIFIED;
   runtime deployment UNPROVED;
   remaining 22 writes and scheduled activation UNPROVED
 Durable restatements: current no-upload statements remain accurate historical/current baseline
 Structural fix: reconciled plan/queue/strategy/Atlas/runbook/wiki/catalog/memory/
   handoff to the observed compatibility defect, source fix, simplified
   request-level Reviews destination, human-readable filename, superseded
-  manifest, superseded v2 manifest, exact relocation/content repair results,
+  manifest, superseded v2/v3 manifests, exact relocation/content repair results,
   retained old file and prior SharePoint version, and
   explicit visual-confirmation/promotion/cleanup/write gates
 Semantic omissions found: operator-confirmed test data needed an explicit,
@@ -873,11 +895,11 @@ Semantic omissions found: operator-confirmed test data needed an explicit,
   silent population filter; the wiki lacked the separate inert retention path,
   and the evidence-matrix claim incorrectly phrased disabled retention as live
 Remaining live STALE: 0 within this plan's stated scope
-Remaining UNKNOWN/ASSUMED: owner visual confirmation of SharePoint version 2.0
+Remaining UNKNOWN/ASSUMED: owner visual confirmation of SharePoint version 3.0
   in Word Online, any future same-name reviewer
   pair (blocked in backfill and a stop condition before forward activation),
   the remaining 22 backfill writes, runtime promotion, scheduled automatic
   filing, and old-file cleanup remain unproved or unapproved
-Verdict: SOURCE/PATH/V3 FIX AND BOTH EXACT REPAIRS VERIFIED; VISUAL CONFIRMATION,
+Verdict: SOURCE/PATH/V4 FIX AND ALL EXACT REPAIRS VERIFIED; VISUAL CONFIRMATION,
   PROMOTION, CLEANUP, AND ALL ADDITIONAL WRITES REMAIN GATED
 ```

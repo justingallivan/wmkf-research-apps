@@ -120,7 +120,15 @@ Its first execution received an explicit SharePoint 423 lock and changed
 nothing; the retry versioned the same stable item/name from `1.0` to `2.0`,
 retained and verified the prior version, and produced governed hash
 `gdc1:E3KvF7rvlOaGoxps6DHihILCQlyDlSheguneB0F0ojw`. Independent readback matched
-that hash and the existing Dataverse pointer pair. Owner Word Online visual
-confirmation of version `2.0` remains pending. Describe Wave 2 as
+that hash and the existing Dataverse pointer pair. Owner inspection still
+rejected the floating-logo alignment and supplied an edited header-only Word
+file. The v4 templates preserve its exact fixed two-column Times New Roman text
+header without first-page drawings, anchors, tabs, or image relationships.
+Exact content-repair manifest hash
+`18007d495f52ab7abb88c03e6d3099eadb953157e69051b0c4c96898881ef09e`
+versioned the same stable item/name from `2.0` to `3.0`; independent readback
+matched v4 governed hash `gdc1:fbIC8o5aWoe_rOjXNK6mAKR6kbNRQ_I6MU60R28Chi4`
+and the existing Dataverse pointer pair. Owner Word Online visual confirmation
+of version `3.0` remains pending. Describe Wave 2 as
 Production-deployed inert, Wave 3 as exact new-path storage/pointer and
-manifest-bound v3 content repair proved, and automatic filing as not activated.
+manifest-bound v3/v4 content repairs proved, and automatic filing as not activated.

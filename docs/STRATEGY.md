@@ -187,7 +187,13 @@ An exact manifest-bound content repair then versioned the same current item from
 `1.0` to `2.0`, retained and verified the prior version, and independently
 matched v3 governed hash
 `gdc1:E3KvF7rvlOaGoxps6DHihILCQlyDlSheguneB0F0ojw` without changing Dataverse
-pointers. The v3 fix remains undeployed, and the historical remaining-population
+pointers. Owner inspection still rejected the floating-logo alignment, then
+supplied an edited header-only Word file. The v4 templates preserve its exact
+fixed two-column Times New Roman text header and remove the first-page drawing,
+anchor, tabs, and image relationships. A second exact manifest-bound content
+repair versioned the same item from `2.0` to `3.0`; independent readback matched
+v4 governed hash `gdc1:fbIC8o5aWoe_rOjXNK6mAKR6kbNRQ_I6MU60R28Chi4` with
+unchanged pointers. The v4 fix remains undeployed, and the historical remaining-population
 manifest is superseded. Owner Word Online visual confirmation and
 template/path-fix promotion now precede a fresh Wave 4 manifest and any
 remaining writes.

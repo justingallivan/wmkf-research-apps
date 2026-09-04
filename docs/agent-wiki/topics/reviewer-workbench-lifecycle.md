@@ -1116,12 +1116,19 @@ templates explicitly change that behind-text shape from `wrapTight` to
 then replaced the same stable item as SharePoint version `2.0`, retained and
 verified version `1.0`, and independently matched v3 governed hash
 `gdc1:E3KvF7rvlOaGoxps6DHihILCQlyDlSheguneB0F0ojw` without changing the
-Dataverse pointer pair. Owner Word Online visual confirmation of version `2.0`
-is pending; the runtime fix is not deployed. The owner-directed path
+Dataverse pointer pair. Owner inspection still rejected the floating-logo
+alignment, then supplied an edited header-only DOCX. The v4 templates preserve
+that exact fixed two-column Times New Roman text header and remove the
+first-page drawing/image relationships. Exact content-repair manifest hash
+`18007d495f52ab7abb88c03e6d3099eadb953157e69051b0c4c96898881ef09e`
+versioned the same item/name from `2.0` to `3.0`; independent readback matched
+v4 governed hash `gdc1:fbIC8o5aWoe_rOjXNK6mAKR6kbNRQ_I6MU60R28Chi4` with
+the Dataverse pointer pair unchanged. Owner Word Online visual confirmation of
+version `3.0` is pending; the runtime fix is not deployed. The owner-directed path
 simplification and historical v2 Word-web correction produced replacement manifest hash
 `25f10fcd0347d7de02abcc8a744357d4e215fe56efa462ff8cc0a6eef99650ff`, with 22
 eligible missing files at unique destinations plus the same visible test
-exclusion and no completed Request `1002874` candidate. It is superseded by v3
+exclusion and no completed Request `1002874` candidate. It is superseded by v4
 and must be regenerated before execution. No additional write or
 old-file cleanup is approved. Active
 contract: `docs/REVIEW_DOCX_SHAREPOINT_RETENTION_PLAN.md`.
