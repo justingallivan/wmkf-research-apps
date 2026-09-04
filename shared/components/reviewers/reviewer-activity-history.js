@@ -20,9 +20,10 @@
  * answer rows, and staff-upload flag are not engagement-scoped.
  *
  * Review receipt is the exception and is decided per row — see `isSyntheticReceipt`.
- * A staff close-out fabricates `wmkf_reviewreceivedat`, so the bare stamp proves only
- * that a receipt was recorded. It does not prove who submitted a review or through
- * which path (Codex adversarial review, 2026-08-12).
+ * Historical generic close-out writes could fabricate `wmkf_reviewreceivedat`, so
+ * the legacy equal-timestamp pair still proves only that a receipt was recorded.
+ * The dedicated closeout contract source-built 2026-09-04 requires pre-existing
+ * receipt evidence and cannot create this pair.
  *
  * DELIBERATE EXCLUSIONS — do not add these back without addressing the reason:
  *
@@ -139,7 +140,7 @@ export const EVENT_DESCRIPTORS = [
 /** Timestamps that survive a failed send get this caveat in the drawer. */
 export const UNPROVEN_DELIVERY_NOTE = 'Recorded in the record; delivery not confirmed.';
 
-/** Shown instead when the receipt stamp was fabricated by a close-out. */
+/** Shown for a legacy receipt stamp fabricated by the former generic close-out. */
 export const SYNTHETIC_RECEIPT_NOTE = 'Recorded by close-out; no submitted review on record.';
 
 const RESPONSE_EVENT_BY_TYPE = Object.freeze({
@@ -187,16 +188,13 @@ const TERMINAL_STATUS_HAS_DATED_EVENT = Object.freeze({
 });
 
 /**
- * Did a staff close-out fabricate this row's review receipt?
+ * Did the former generic staff close-out fabricate this row's review receipt?
  *
- * `updateLifecycle` stamps `wmkf_reviewreceivedat` with `now` on any transition to
- * `reviewStatus=complete` when the field is empty, in the SAME payload that stamps
- * `wmkf_completedat` with the same `now` (`reviewer-suggestion.js:1662-1670`). So a
- * PD closing out a reviewer who never submitted produces a receipt timestamp for a
- * review that does not exist. The adapter itself flags this hazard: its
- * `aggregateReviewHistory` header (line 341) states the engagement signal is when the
- * review was RECEIVED, "NOT the PD's closeout", and the S369 note at 1641-1646
- * records a past bug that re-created exactly this false positive.
+ * Before the 2026-09-04 dedicated closeout contract, `updateLifecycle` stamped
+ * `wmkf_reviewreceivedat` and `wmkf_completedat` from one `now` when Complete was
+ * written without a receipt. The current sink requires an existing receipt and
+ * stamps only completion; this detector remains solely so old equal-timestamp rows
+ * do not get laundered into genuine review evidence.
  *
  * Identical instants are the only engagement-scoped signal available: both stamps
  * come from one `now` in one payload, so a fabricated pair matches exactly. A real

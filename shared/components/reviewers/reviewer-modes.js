@@ -18,7 +18,7 @@ export const STATUS_PIPELINE = [
   { key: 'materials_sent', label: 'Materials Sent', color: 'bg-indigo-100 text-indigo-800' },
   { key: 'under_review', label: 'Under Review', color: 'bg-yellow-100 text-yellow-800' },
   { key: 'review_received', label: 'Review Received', color: 'bg-green-100 text-green-800' },
-  { key: 'complete', label: 'Complete', color: 'bg-gray-100 text-gray-800' },
+  { key: 'complete', label: 'Complete', color: 'bg-green-200 text-green-900' },
   { key: 'withdrew', label: 'Withdrew', color: 'bg-red-100 text-red-800' },
   { key: 'released', label: 'Released', color: 'bg-slate-100 text-slate-700' },
 ];

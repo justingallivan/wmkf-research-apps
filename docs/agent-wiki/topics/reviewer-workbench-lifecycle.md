@@ -63,6 +63,7 @@ source_files:
   - lib/utils/reviewer-vetted-email.js
   - pages/api/review-manager/campaign-timeline-defaults.js
   - pages/api/review-manager/terminal-transition.js
+  - pages/api/review-manager/close-review.js
   - pages/api/workbench/enrich-recommended.js
   - pages/api/workbench/applicant-reviewers.js
   - pages/api/workbench/promote-applicant-reviewer.js
@@ -161,16 +162,20 @@ Record of truth for the increment (gitignored working doc):
 
 **Reviewer-engagement build (Model B):** spec is `docs/REVIEWER_ENGAGEMENT_SPEC.md`. The 9 backing Dataverse fields are **provisioned in prod (2026-06-21, wave `7-reviewer-engagement`)**. Per-request campaign config lives on `akoya_request`; the per-reviewer respond-reminder marker lives on `wmkf_appreviewersuggestion`. **Phases 1, 2, and 4 remain live. Phase 3 mechanism IMPLEMENTED (S275), schedule PAUSED (2026-09-01):** `/api/cron/reviewer-reminders` can send respond-by and review-due reminders, but it is absent from the Vercel cron registry under the reviewer-token incident hold. Respond reminders claim with If-Match, mint, and deliver a replacement pre-acceptance link. Review-due reminders claim with If-Match only after a fail-closed token-liveness/runway check; they are link-free and preserve the existing token. Runtime source at commit `4dd57369` contains the remediation. Incident-session operations observed Ready deployment `dpl_89s9MzdUnDST6Jm9Vs3cnMLPmUDu` and authenticated Workbench smoke, but deployment metadata exposed no source SHA and no tracked smoke artifact was retained. The post-deploy D26 read-only audit found all 51 never-reminded sweep candidates active and eligible with zero blocked; already-reminded rows were outside the audit. The owner lifted the procedural manual reminder freeze after that evidence; the automatic schedule remains held. The Campaign settings modal still omits reminder toggles/leads, the Dataverse schema defaults both flags true, and a 2026-09-01 read-only probe found 92 current-cycle active requests with both flags true. `scripts/check-reviewer-reminder-hold.js` blocks accidental re-registration in CI and Vercel prebuild. The manual "Re-invite already-invited" button was removed in S277; `allowResend` remains only as a programmatic re-mint contract. Campaign timing, accepted-only Materials delivery, token TTL, quota notification, and selective decline remain implemented as described in the canonical spec. See the two Atlas pages for the exact column list and the canonical spec for the remaining cron-reactivation prerequisites.
 
-**Reviewer closeout and honorarium eligibility (owner-approved 2026-09-04;
-implementation pending):** Complete will mean a lead-PD human closeout of a
+**Reviewer closeout and honorarium eligibility (owner-approved and source-built
+2026-09-04; deployment pending):** Complete means a lead-PD human closeout of a
 received review, not “thank-you sent.” The same one-row ETag update will set
-Complete, `wmkf_completedat`, and a planned nullable engagement Picklist
+Complete, `wmkf_completedat`, and the nullable engagement Picklist
 `wmkf_honorariumeligibility` with `eligible`, `not_eligible`, or
-`not_applicable`. Production metadata currently has no such field. The app will
+`not_applicable`. Production has the manually created, published/readable local
+Picklist with exact values `100000000..100000002`; the tracked preflight reports
+only a deficient description that must be corrected before runtime promotion. The app will
 never write the linked honorarium request's
 `wmkf_authorizationtoremitpaymentflag`; Operations/Finance retains final remit
-authority. The generic status PATCH must stop accepting Complete, and the
-manual thank-you compatibility path must stop setting it. Contract:
+authority. Generic status PATCH now rejects Complete in source; the dedicated
+route uses a fresh one-row ETag closeout, and manual/automatic thank-you paths
+write only the courtesy marker with legacy payment language stripped. Operations'
+system view exists but remains to be surfaced in AkoyaGO as a separate follow-up. Contract:
 `docs/REVIEWER_COMPLETION_AND_HONORARIUM_DECISION_BRIEF.md`.
 
 **Per-reviewer extension workflow (Wave 18 production-live 2026-08-11):** eligible accepted rows in **Track Reviewers** expose Grant/Change extension. The dedicated `/api/review-manager/review-due-extension` route freshly enforces accepted/non-terminal/no-receipt state, requires a date strictly after the request default (and current/future Pacific date) with no maximum, and permits null to restore the original. It first validates the admin body, Dynamics impersonation setting, assigned sender, confirmed recipient, signature, and calendar. Confirmed engagement snapshot name/email take precedence; legacy missing values fall back field-by-field to the server-read linked reviewer person, and absence from both sources still fails before the write. It then ETag-saves and automatically dispatches the fixed-subject message with the assigned-PD signature and stable-UID calendar update. Only an actual Dynamics dispatch failure preserves the date without the notice. The open modal offers a server-fresh retry, and an existing extension always offers Resend deadline email without another date write; there is no durable notification-owed marker for a failed restore send. Invite Reviewers and generic `my-candidates` PATCH cannot write the field. The 90-day accepted-token cushion remains intentional and saving does not rotate a delivered token. [VERIFIED via production create/publish/exact/runtime-select probes, the non-clobbering admin-body seed, main `8647af33`, Vercel `dpl_AbTvWvMYb5inwPnYKTK2mkrkNXZz`, and live HTTP checks on 2026-08-11 / 2026-08-12 UTC] the column and runtime are live. [VERIFIED via the exact read-only production Request `1002788`/Test Homer row probe, main `ccb7e0c8`, Vercel `dpl_DjRmd4axNpUUpHAo6ZmeoBgumxTe`, and live HTTP checks] the legacy identity fallback is live. [VERIFIED via owner production smoke on Request `1002788`] the retry saved the extension and delivered the automatic deadline email. Its `Dear Test Homer,` greeting exposed the last copy defect. The admin body now requires `{{greeting}}`, the shared reviewer honorific helper renders `Dear Dr. Homer,`, and the live Dataverse setting matches the source default. [VERIFIED via main `6526a934`, Vercel `dpl_33KVRu3WmQhWBztd7RqDd2X6LBCr`, 610 suites / 7,717 tests, webpack build, and live HTTP 200] that correction is production-live; no second test email was sent.
@@ -1026,13 +1031,14 @@ in `send-emails.js`, so compatibility callers cannot cause the sweep to
 double-send. `ReviewerManagePanel` no longer exposes a manual thank-you
 composer. Knobs: `?maxBatch=N`, `?dryRun=1`.
 
-**Approved next change, not yet built:** thank-you remains a prompt receipt
-acknowledgement and retains the current claim-before-send/at-most-once mechanics,
-but no thank-you path may set Complete or eligibility. The manual compatibility
-branch's Complete write will be removed. The honorarium-processing sentence and
-token will also be removed from the seeded and live default so the courtesy
-message does not communicate approval or payment eligibility. Existing
-`wmkf_thankyousentat` values will not be backfilled into either decision field.
+**Source-built next behavior; deployment pending:** thank-you remains a prompt
+receipt acknowledgement and retains the current claim-before-send/at-most-once
+mechanics. No thank-you path sets Complete or eligibility. The manual
+compatibility branch writes only `wmkf_thankyousentat`; the seeded default drops
+the honorarium-processing token, and existing stored templates resolve that
+legacy token to blank. The live Dataverse default is unchanged until a separately
+authorized settings write. Existing `wmkf_thankyousentat` values are not
+backfilled into either decision field.
 
 **Phase 2 DEPLOYED (S326; unit-tested; populated Compare view NOT browser-verifiable until the first portal submission — zero exist, portal built ahead of the D26 cycle; correct zero-submission absence drive-verified):** schema-free
 comparison matrix. `shared/utils/review-matrix.js#deriveReviewMatrix(reviewers,

@@ -380,9 +380,8 @@ describe('externalLinkExpected render-time stamp (S404 Plan v4)', () => {
   });
 });
 
-describe('manual thank-you render resolves {{honorariumNote}} from the suggestion row', () => {
+describe('manual thank-you render strips the retired {{honorariumNote}} token', () => {
   const THANKYOU = { subject: 'Thanks', body: 'Hello.\n\n{{honorariumNote}}\n\nBye.' };
-  const LINE = 'We will be in touch regarding the processing of your honorarium.';
 
   test('opt-out true → token removed, no honorarium sentence', async () => {
     findById.mockResolvedValueOnce(suggestion({ wmkf_honorariumoptout: true }));
@@ -393,11 +392,11 @@ describe('manual thank-you render resolves {{honorariumNote}} from the suggestio
     expect(out.drafts[0].body).toContain('Bye.');
   });
 
-  test.each([false, null, undefined])('opt-out %p → honorarium sentence included', async (v) => {
+  test.each([false, null, undefined])('opt-out %p → token removed without payment language', async (v) => {
     findById.mockResolvedValueOnce(suggestion(v === undefined ? {} : { wmkf_honorariumoptout: v }));
     getReviewerByIdWithSelect.mockResolvedValueOnce(person());
     const out = await renderEmails({ suggestionIds: [SUG1], template: THANKYOU, settings: {}, templateType: 'thankyou', actingUserSystemId: null });
-    expect(out.drafts[0].body).toContain(LINE);
+    expect(out.drafts[0].body).not.toContain('honorarium');
     expect(out.drafts[0].body).not.toContain('{{honorariumNote}}');
   });
 });

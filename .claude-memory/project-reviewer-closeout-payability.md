@@ -5,7 +5,7 @@ status: active
 metadata: 
   node_type: memory
   type: project
-  last_verified: 2026-09-04 via owner decisions, reviewer-suggestion source, Production metadata, and honorarium/request flag probes
+  last_verified: 2026-09-04 via owner decisions, source build/tests, Production metadata/runtime select, and honorarium/request flag probes
   originSessionId: 4eb6d1fe-c277-43b8-977b-92cc18644286
 ---
 
@@ -25,8 +25,8 @@ Owner-endorsed direction (Justin, S343, 2026-07-07). Two-part framing for the
    via `hardDeleteById`. Primitives already exist. See [[project-reviewer-closed-work-archive]]
    context in [[reviewer-workbench-lifecycle]] wiki.
 
-2. **Accept-side "oops, don't pay" → annotation, NOT teardown (APPROVED,
-   implementation pending).**
+2. **Accept-side "oops, don't pay" → annotation, NOT teardown (APPROVED and
+   source-built; deployment pending).**
    Never delete the honorarium `akoya_request` (a financial record) for a bad/test
    accept. Instead, extend the **review closeout** so a PD marks payability.
    **SUPERSEDED IN PART (owner, S369, 2026-07-22):** `did_not_serve` is NOT a
@@ -51,15 +51,19 @@ must not set Complete. No closeout path writes
 `akoya_request.wmkf_authorizationtoremitpaymentflag`; Operations/Finance retains
 that separate final authority.
 
-**[VERIFIED via read-only Production metadata 2026-09-04]:** the suggestion table
-has 109 attributes and no honorarium-eligibility/payability field. The planned
-local Picklist `wmkf_honorariumeligibility` is therefore additive and remains
-unbuilt. All 159 exact honorarium requests had the separate authorization flag
+**[VERIFIED via read-only Production metadata/runtime `$select` 2026-09-04]:**
+the manually created local Picklist `wmkf_honorariumeligibility` is
+published/readable, nullable, has no default, and has exact values
+`100000000..100000002`. The tracked source preflight reports one divergence:
+the live description lacks the explicit Operations/Finance-authority warning.
+All 159 exact honorarium requests had the separate authorization flag
 explicitly false, while a broader Research-request scan found 87 true values;
 the field is live elsewhere but is not the reviewer-closeout signal.
 
 Implementation contract:
 `docs/REVIEWER_COMPLETION_AND_HONORARIUM_DECISION_BRIEF.md`. Operations-facing
-visibility from the linked honorarium request remains the external rollout
-prerequisite; never compensate for a missing consumer by writing the final remit
+The app route/UI and thank-you decoupling are source-built on
+`codex/reviewer-closeout-eligibility-app`; deployment is pending. Operations has
+built the AkoyaGO system view but has not surfaced it. The owner accepted that
+interface step as a later follow-up; never compensate by writing the final remit
 flag.

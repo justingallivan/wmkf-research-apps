@@ -1,0 +1,21 @@
+{
+  "name": "wmkf_appreviewersuggestion-honorarium-eligibility",
+  "kind": "extensions-on-existing",
+  "entityLogicalName": "wmkf_appreviewersuggestion",
+  "_comment": "Additive lead-PD closeout disposition on one reviewer engagement. Null means no human closeout disposition has been recorded. This field does not authorize payment and must never be substituted for akoya_request.wmkf_authorizationtoremitpaymentflag. Run scripts/preflight-reviewer-closeout-schema.mjs before the creation-only schema applier; an exact manually-created field is an expected no-op.",
+  "attributes": [
+    {
+      "type": "Picklist",
+      "schemaName": "wmkf_HonorariumEligibility",
+      "displayName": "Honorarium Eligibility",
+      "description": "Lead Program Director disposition for a completed reviewer engagement. This does not authorize payment; Operations and Finance retain final authorization to remit.",
+      "requiredLevel": "None",
+      "defaultValue": -1,
+      "options": [
+        { "value": 100000000, "label": "Eligible" },
+        { "value": 100000001, "label": "Not eligible" },
+        { "value": 100000002, "label": "Not applicable" }
+      ]
+    }
+  ]
+}

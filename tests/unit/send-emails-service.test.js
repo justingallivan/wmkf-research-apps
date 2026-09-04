@@ -433,9 +433,9 @@ describe('send-emails-service — one-time materials delivery', () => {
   );
 });
 
-describe('send-emails-service — terminal thank-you guard', () => {
-  test.each([100000005, 100000006])('thank-you does not resurrect terminal status %s', async (terminalValue) => {
-    SUGGESTIONS[SUG_OK] = suggestion(SUG_OK, { wmkf_accepted: true, wmkf_reviewstatus: terminalValue });
+describe('send-emails-service — thank-you is independent from closeout', () => {
+  test.each([100000003, 100000004, 100000005, 100000006])('thank-you stamps only delivery for status %s', async (statusValue) => {
+    SUGGESTIONS[SUG_OK] = suggestion(SUG_OK, { wmkf_accepted: true, wmkf_reviewstatus: statusValue });
     await run({
       drafts: [{
         suggestionId: SUG_OK,

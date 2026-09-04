@@ -40,7 +40,17 @@ defined Complete as “review received and reviewer thanked.”
 
 The deeper-green Complete badge remains approved as a presentation-only change.
 
-## Verified baseline
+**Implementation state (2026-09-04):** the application-side contract is
+source-built on `codex/reviewer-closeout-eligibility-app`; deployment is
+pending. Production already contains the manually created, published/readable
+local Picklist with the exact three values. The tracked preflight reports one
+named metadata divergence: the live field description does not yet state that
+Operations/Finance retains final authorization-to-remit authority. Operations'
+AkoyaGO system view exists but is not yet surfaced; the owner explicitly
+accepted that interface work as a later operational follow-up rather than an
+application-build blocker.
+
+## Pre-build baseline (superseded by the source build below)
 
 - [VERIFIED via `shared/components/reviewers/ReviewerManagePanel.js:244-252,
   319-345,1781-1791`] The generic **Correct recorded status** control currently
@@ -73,6 +83,23 @@ The deeper-green Complete badge remains approved as a presentation-only change.
 - [VERIFIED via repository-wide symbol search, 2026-09-04] Application source has
   no writer for `wmkf_authorizationtoremitpaymentflag`.
 
+## Source-build verification
+
+- [VERIFIED via source and focused tests, 2026-09-04] generic single/batch PATCH
+  rejects Complete; `/api/review-manager/close-review` is the sole app closeout
+  route and uses session-derived lead-PD/superuser authorization.
+- [VERIFIED via source and focused tests, 2026-09-04] first closeout performs one
+  ETag-bound suggestion update for status, completion time, and eligibility;
+  duplicate same-value requests write nothing and corrections write eligibility
+  only. Receipt evidence is never synthesized.
+- [VERIFIED via source and focused tests, 2026-09-04] both thank-you paths write
+  only `wmkf_thankyousentat`; stored legacy `{{honorariumNote}}` tokens resolve
+  to blank.
+- [VERIFIED via Production metadata and runtime `$select`, 2026-09-04] the live
+  nullable local Picklist is readable with exact values `100000000..100000002`,
+  no default, and the expected labels. Its description is the sole tracked
+  schema divergence.
+
 ## Contract map
 
 | Event | Authority | Durable state | Meaning |
@@ -82,7 +109,7 @@ The deeper-green Complete badge remains approved as a presentation-only change.
 | Review closed | Lead PD or superuser | status `complete`; `wmkf_completedat`; `wmkf_honorariumeligibility` | The human closeout decision was recorded. |
 | Authorization to remit | Operations/Finance | honorarium request's `wmkf_authorizationtoremitpaymentflag` | Separate financial control outside this application. |
 
-`wmkf_honorariumeligibility` is the planned logical name for a local Picklist on
+`wmkf_honorariumeligibility` is the live logical name for a local Picklist on
 `wmkf_appreviewersuggestion`. Null means no closeout disposition has been
 recorded. The values are:
 
@@ -163,8 +190,9 @@ Add a new `extensions-on-existing` schema wave and exact read-only preflight for
 - description explicitly distinguishes reviewer eligibility from final
   authorization to remit.
 
-Apply and read back the additive Production field before deploying runtime that
-selects it. Update the schema manifest and the reviewer-suggestion Atlas page.
+The field was created manually before this source build and is published/readable.
+The source wave and exact preflight now baseline it. Correct the live description
+before runtime promotion, then rerun the preflight; do not recreate the field.
 
 ### 2. Adapter and read projection
 
@@ -271,8 +299,8 @@ are not Tier 0 and must not land directly on `main`.
 
 ## Contract-reconcile verdict
 
-**READY TO IMPLEMENT WITH ONE EXTERNAL RELEASE PREREQUISITE:** Operations must
-confirm where the new engagement-level disposition is consumed in AkoyaGO.
-That prerequisite affects end-to-end rollout, not the approved app-side
-contract. The safest build is a one-row ETag closeout with no honorarium-request
-write, so cross-record partial success is N/A by construction.
+**APPLICATION CONTRACT SOURCE-BUILT; DEPLOYMENT PENDING.** The one-row ETag
+closeout has no honorarium-request write, so cross-record partial success is N/A
+by construction. Before promotion, correct the live field description and rerun
+the exact preflight. Surfacing Operations' already-built AkoyaGO view remains a
+separate accepted follow-up and is not replaced by writing the payment gate.

@@ -18,6 +18,11 @@ jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
   findAcceptedByPD: (...a) => findAcceptedByPD(...a),
   findAcceptedByCycle: (...a) => findAcceptedByCycle(...a),
   RESPONSE_TYPE_BY_VALUE: { 100000000: 'accepted' },
+  HONORARIUM_ELIGIBILITY_BY_VALUE: {
+    100000000: 'eligible',
+    100000001: 'not_eligible',
+    100000002: 'not_applicable',
+  },
 }));
 const getRequestById = jest.fn();
 jest.mock('../../lib/dataverse/adapters/grant-request', () => ({
@@ -49,6 +54,8 @@ const IDS = [
   '33333333-3333-4333-8333-333333333333',
   '44444444-4444-4444-8444-444444444444',
 ];
+const { REVIEW_STATUS_MAP } = require('../../shared/config/reviewerLifecycle');
+const { TERMINAL_REVIEW_STATUS_VALUES } = require('../../shared/config/reviewerStatus');
 
 let getReviewers;
 let patchReviewers;
@@ -68,11 +75,11 @@ describe('patchReviewers', () => {
   test('batch is a SEQUENTIAL loop in input order with per-id {reviewStatus} payloads', async () => {
     const order = [];
     updateLifecycle.mockImplementation(async (id) => { order.push(id); });
-    const out = await patchReviewers({ suggestionIds: IDS, reviewStatus: 'complete', actingUserSystemId: 'su-1' });
+    const out = await patchReviewers({ suggestionIds: IDS, reviewStatus: 'under_review', actingUserSystemId: 'su-1' });
     expect(order).toEqual(IDS);
     expect(updateLifecycle).toHaveBeenCalledTimes(3);
     for (const call of updateLifecycle.mock.calls) {
-      expect(call[1]).toEqual({ reviewStatus: 'complete' });
+      expect(call[1]).toEqual({ reviewStatus: 'under_review' });
       expect(call[2]).toEqual({ actingUserSystemId: 'su-1' });
     }
     expect(out).toEqual({ success: true, message: 'Updated 3 reviewers' });
@@ -82,7 +89,7 @@ describe('patchReviewers', () => {
     updateLifecycle
       .mockResolvedValueOnce(undefined)
       .mockRejectedValueOnce(new Error('dataverse 500'));
-    const err = await patchReviewers({ suggestionIds: IDS, reviewStatus: 'complete', actingUserSystemId: null })
+    const err = await patchReviewers({ suggestionIds: IDS, reviewStatus: 'under_review', actingUserSystemId: null })
       .catch((e) => e);
     expect(err.message).toBe('dataverse 500'); // shell maps to the PATCH 500 envelope
     expect(updateLifecycle).toHaveBeenCalledTimes(2); // ids[0] applied, ids[1] failed, ids[2] never attempted
@@ -91,12 +98,15 @@ describe('patchReviewers', () => {
   });
 
   test('single update forwards the shell-built lifecycle object', async () => {
-    const out = await patchReviewers({ suggestionId: IDS[0], lifecycle: { reviewStatus: 'complete', notes: 'n' }, actingUserSystemId: 'su-1' });
-    expect(updateLifecycle).toHaveBeenCalledWith(IDS[0], { reviewStatus: 'complete', notes: 'n' }, { actingUserSystemId: 'su-1' });
+    const out = await patchReviewers({ suggestionId: IDS[0], lifecycle: { reviewStatus: 'under_review', notes: 'n' }, actingUserSystemId: 'su-1' });
+    expect(updateLifecycle).toHaveBeenCalledWith(IDS[0], { reviewStatus: 'under_review', notes: 'n' }, { actingUserSystemId: 'su-1' });
     expect(out).toEqual({ success: true, message: 'Reviewer updated' });
   });
 
-  test.each(['withdrew', 'released'])('generic PATCH service refuses terminal status %s', async (reviewStatus) => {
+  test.each([
+    'complete', ' Complete ', REVIEW_STATUS_MAP.complete,
+    'withdrew', 'released', TERMINAL_REVIEW_STATUS_VALUES.withdrew,
+  ])('generic PATCH service refuses dedicated status %s', async (reviewStatus) => {
     await expect(patchReviewers({
       suggestionId: IDS[0],
       lifecycle: { reviewStatus },
@@ -152,6 +162,9 @@ describe('getReviewers', () => {
         wmkf_accepted: true,
         wmkf_reviewstatus: 100000001,
         wmkf_reviewduedateoverride: '2026-09-15',
+        wmkf_honorariumeligibility: 100000000,
+        wmkf_honorariumoptout: false,
+        _wmkf_honorariumrequest_value: 'honorarium-1',
       },
       { wmkf_appreviewersuggestionid: IDS[1], _wmkf_request_value: REQ, wmkf_accepted: false },
     ]);
@@ -167,6 +180,9 @@ describe('getReviewers', () => {
       tokenState: 'not_minted',
       reviewDueDateOverride: '2026-09-15',
       effectiveReviewDeadline: '2026-09-15',
+      honorariumEligibility: 'eligible',
+      honorariumOptOut: false,
+      honorariumRequestId: 'honorarium-1',
       answers: [],
     });
     expect(out.proposals[0].statusSummary).toEqual({ materials_sent: 1 });

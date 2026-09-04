@@ -32,6 +32,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import ReviewerDueDateEditor from './ReviewerDueDateEditor';
 import ReviewerActivityDrawer from './ReviewerActivityDrawer';
+import ReviewerCloseoutModal, { closeoutDispositionLabel } from './ReviewerCloseoutModal';
 import { latestActivitySummary } from './reviewer-activity-history';
 import { acceptedReviewerRemoveWarning } from './remove-reviewer-confirm';
 import { Card, Button } from '../Layout';
@@ -231,6 +232,7 @@ export function TokenActionsMenu({
   onRemove,
   onStatusChange,
   onTransition,
+  onCloseReview,
 }) {
   const [open, setOpen] = useState(false);
   const [coords, setCoords] = useState(null); // { left, top } in viewport px, or null
@@ -242,21 +244,34 @@ export function TokenActionsMenu({
   const canRegenerate = !hasInvalidTokenMetadata;
   const canRevoke = isActive || hasInvalidTokenMetadata;
   const canCorrectStatus = Boolean(
-    onStatusChange && !TERMINAL_REVIEW_STATUSES.includes(reviewer.reviewStatus),
+    onStatusChange
+      && reviewer.reviewStatus !== 'complete'
+      && !TERMINAL_REVIEW_STATUSES.includes(reviewer.reviewStatus),
   );
   const canEndEngagement = Boolean(
     onTransition && canTransitionToTerminal(reviewer),
   );
   const settableStatuses = STATUS_PIPELINE.filter(
-    s => s.key !== 'accepted' && !TERMINAL_REVIEW_STATUSES.includes(s.key),
+    s => s.key !== 'accepted'
+      && s.key !== 'complete'
+      && !TERMINAL_REVIEW_STATUSES.includes(s.key),
+  );
+  const canCloseReview = Boolean(
+    onCloseReview && ['review_received', 'complete'].includes(reviewer.reviewStatus),
+  );
+  const canRemove = Boolean(
+    onRemove
+      && reviewer.reviewStatus !== 'complete'
+      && !TERMINAL_REVIEW_STATUSES.includes(reviewer.reviewStatus),
   );
   // The estimate drives the upward flip so the portalled menu never opens
   // off-screen. Status correction and terminal actions are taller sections;
   // the remaining items are standard 40px menu rows.
-  const itemCount = (canRegenerate ? 1 : 0) + (canRevoke ? 1 : 0) + (onRemove ? 1 : 0);
+  const itemCount = (canRegenerate ? 1 : 0) + (canRevoke ? 1 : 0) + (canRemove ? 1 : 0);
   const estimatedMenuHeight = (itemCount * 40)
     + (canCorrectStatus ? 118 : 0)
     + (canEndEngagement ? 104 : 0)
+    + (canCloseReview ? 72 : 0)
     + (hasInvalidTokenMetadata ? 48 : 0)
     + 8;
 
@@ -367,6 +382,20 @@ export function TokenActionsMenu({
               </button>
             </div>
           )}
+          {canCloseReview && (
+            <div className="py-1 border-b border-gray-100">
+              <p className="px-3 pt-1 pb-0.5 text-xs font-medium uppercase tracking-wide text-gray-400">
+                Review closeout
+              </p>
+              <button
+                type="button"
+                onClick={() => { setOpen(false); onCloseReview(); }}
+                className="w-full text-left px-3 py-2 hover:bg-green-50 text-green-800"
+              >
+                {reviewer.reviewStatus === 'complete' ? 'Edit closeout' : 'Close review'}
+              </button>
+            </div>
+          )}
           <p className="px-3 pt-2 pb-0.5 text-xs font-medium uppercase tracking-wide text-gray-400">
             Reviewer link
           </p>
@@ -391,7 +420,7 @@ export function TokenActionsMenu({
               Revoke link
             </button>
           )}
-          {onRemove && (
+          {canRemove && (
             <button
               onClick={() => { setOpen(false); onRemove(); }}
               className="w-full text-left px-3 py-2 hover:bg-gray-50 text-red-700 border-t border-gray-100"
@@ -1610,6 +1639,7 @@ export default function ReviewerManagePanel({
   const [editingNotes, setEditingNotes] = useState(null); // { suggestionId, value }
   const [savingNotes, setSavingNotes] = useState(false);
   const [activityDrawerId, setActivityDrawerId] = useState(null); // suggestionId
+  const [closeoutReviewerId, setCloseoutReviewerId] = useState(null); // suggestionId
 
   const allReviewers = reviewersProp || proposal?.reviewers || [];
   const reviewers = filterByMode(allReviewers, mode);
@@ -1627,6 +1657,9 @@ export default function ReviewerManagePanel({
   // vanishing (removed, or filtered out by a mode/status change), which closes it.
   const activityReviewer = activityDrawerId
     ? reviewers.find(r => r.suggestionId === activityDrawerId) || null
+    : null;
+  const closeoutReviewer = closeoutReviewerId
+    ? reviewers.find(r => r.suggestionId === closeoutReviewerId) || null
     : null;
 
   useEffect(() => {
@@ -2026,6 +2059,11 @@ export default function ReviewerManagePanel({
                     </td>
                     <td className="px-4 py-3 align-top">
                       <StatusBadge status={r.reviewStatus} />
+                      {r.reviewStatus === 'complete' && (
+                        <span className="mt-1 block text-xs leading-4 text-gray-600">
+                          {closeoutDispositionLabel(r.honorariumEligibility)}
+                        </span>
+                      )}
                       {r.reminderCount > 0 && (
                         <span className="text-xs text-gray-400 ml-1">({r.reminderCount} reminder{r.reminderCount !== 1 ? 's' : ''})</span>
                       )}
@@ -2134,6 +2172,7 @@ export default function ReviewerManagePanel({
                             onRemove={() => handleRemoveReviewer(r)}
                             onStatusChange={(newStatus) => updateStatus(r.suggestionId, newStatus)}
                             onTransition={(terminalStatus) => transitionTerminal(r, terminalStatus)}
+                            onCloseReview={() => setCloseoutReviewerId(r.suggestionId)}
                           />
                         </div>
                       </td>
@@ -2151,6 +2190,18 @@ export default function ReviewerManagePanel({
         <ReviewerActivityDrawer
           reviewer={activityReviewer}
           onClose={() => setActivityDrawerId(null)}
+        />
+      )}
+
+      {closeoutReviewer && (
+        <ReviewerCloseoutModal
+          isOpen
+          reviewer={closeoutReviewer}
+          proposal={proposal}
+          onClose={() => setCloseoutReviewerId(null)}
+          onSaved={() => {
+            if (onRefresh) onRefresh();
+          }}
         />
       )}
 

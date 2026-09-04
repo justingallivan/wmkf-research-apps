@@ -64,6 +64,33 @@ describe('reviewer management actions menu', () => {
     expect(screen.queryByText('Not sent')).not.toBeInTheDocument();
   });
 
+  test('review-received and complete rows use the dedicated closeout action', () => {
+    const onCloseReview = jest.fn();
+    const { rerender } = render(
+      <TokenActionsMenu
+        reviewer={{ ...reviewer, reviewStatus: 'review_received' }}
+        onCloseReview={onCloseReview}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Manage Dr. Test Reviewer' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Close review' }));
+    expect(onCloseReview).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <TokenActionsMenu
+        reviewer={{ ...reviewer, reviewStatus: 'complete' }}
+        onCloseReview={onCloseReview}
+        onRemove={jest.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Manage Dr. Test Reviewer' }));
+    expect(screen.queryByText('Correct recorded status')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Remove from this request' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Edit closeout' }));
+    expect(onCloseReview).toHaveBeenCalledTimes(2);
+  });
+
   test('invalid token metadata can be revoked but cannot be regenerated', () => {
     const onRevoke = jest.fn();
     render(

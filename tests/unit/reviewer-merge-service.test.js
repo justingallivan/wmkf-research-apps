@@ -146,6 +146,20 @@ describe('planMerge — block predicate (fail-closed)', () => {
     expect(plan.reasons.map((r) => r.code)).toContain('loser_engaged');
   });
 
+  test('blocks when eligibility is the only populated closeout signal', async () => {
+    const deps = makeDeps({
+      keeperRow: bareKeeper, loserRow: bareLoser,
+      loserSug: [{
+        wmkf_appreviewersuggestionid: SUG_L,
+        _wmkf_request_value: REQ1,
+        wmkf_honorariumeligibility: 100000001,
+      }],
+    });
+    const plan = await planMerge({ keeperId: KEEPER, loserId: LOSER }, deps);
+    expect(plan.blocked).toBe(true);
+    expect(plan.reasons.map((r) => r.code)).toContain('loser_engaged');
+  });
+
   test('blocks when a loser suggestion carries a staff-set due-date override', async () => {
     const deps = makeDeps({
       keeperRow: bareKeeper,

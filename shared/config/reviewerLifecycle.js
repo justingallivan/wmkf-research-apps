@@ -32,3 +32,20 @@ export const APPLICANT_DISPOSITION_MAP = {
 };
 
 export const APPLICANT_DISPOSITION_EXCLUDED = APPLICANT_DISPOSITION_MAP.excluded;
+
+// Lead-PD closeout disposition on one reviewer engagement. This is deliberately
+// separate from akoya_request.wmkf_authorizationtoremitpaymentflag, which remains
+// an Operations/Finance decision outside the reviewer application.
+export const HONORARIUM_ELIGIBILITY_MAP = Object.freeze({
+  eligible: 100000000,
+  not_eligible: 100000001,
+  not_applicable: 100000002,
+});
+
+export const HONORARIUM_ELIGIBILITY_KEYS = Object.freeze(
+  Object.keys(HONORARIUM_ELIGIBILITY_MAP),
+);
+
+export function isHonorariumEligibility(value) {
+  return HONORARIUM_ELIGIBILITY_KEYS.includes(value);
+}

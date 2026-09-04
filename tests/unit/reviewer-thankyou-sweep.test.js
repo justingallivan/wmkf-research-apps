@@ -251,7 +251,7 @@ describe('sweepReviewThankYous', () => {
     expect(r.skipped).toBe(3);
   });
 
-  describe('honorarium line selected from the server-authoritative Stage 2a choice', () => {
+  describe('retired honorarium token cannot imply a closeout decision', () => {
     const HONORARIUM_LINE = 'We will be in touch regarding the processing of your honorarium.';
     const BODY_WITH_NOTE = '{{greeting}},\n\nThank you for completing your review of “{{proposalTitle}}”.\n\n{{honorariumNote}}\n\nWith gratitude,\n\n{{signature}}';
 
@@ -294,26 +294,26 @@ describe('sweepReviewThankYous', () => {
       expect(updateRecord.mock.invocationCallOrder[0]).toBeLessThan(createAndSendEmail.mock.invocationCallOrder[0]);
     });
 
-    test('opt-out false (reviewer took the honorarium) → honorarium line included', async () => {
+    test('opt-out false still omits payment language', async () => {
       queryAllRecords.mockResolvedValue({ records: [candidate({ wmkf_honorariumoptout: false })] });
       installReads();
       await sweepReviewThankYous();
       const email = createAndSendEmail.mock.calls[0][0];
-      expect(email.body).toContain(HONORARIUM_LINE);
+      expect(email.body).not.toContain(HONORARIUM_LINE);
       expect(email.body).not.toContain('{{honorariumNote}}');
     });
 
     test.each([
       ['null (row predates the Stage 2a column)', null],
       ['undefined (field absent from the row)', undefined],
-    ])('uncaptured choice — %s → honorarium line included (not opted out unless true)', async (_label, value) => {
+    ])('uncaptured choice — %s → payment language remains omitted', async (_label, value) => {
       const row = candidate();
       if (value === undefined) delete row.wmkf_honorariumoptout; else row.wmkf_honorariumoptout = value;
       queryAllRecords.mockResolvedValue({ records: [row] });
       installReads();
       await sweepReviewThankYous();
       const email = createAndSendEmail.mock.calls[0][0];
-      expect(email.body).toContain(HONORARIUM_LINE);
+      expect(email.body).not.toContain(HONORARIUM_LINE);
     });
 
     test('opt-out true + attachment failure → still unclaimed and unsent for retry', async () => {

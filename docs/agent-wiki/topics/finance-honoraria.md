@@ -38,17 +38,22 @@ source, Atlas, and the Power Automate owner before testing against production.
 
 ## Honorarium Request Creation And BILL Deferral
 
-**Reviewer closeout decision (owner-approved 2026-09-04; implementation
-pending):** a Program Director will record `eligible`, `not_eligible`, or
+**Reviewer closeout decision (owner-approved and source-built 2026-09-04;
+deployment pending):** a Program Director records `eligible`, `not_eligible`, or
 `not_applicable` on the reviewer engagement when closing a received review.
 That is not final authorization to pay. The application will not write
 `akoya_request.wmkf_authorizationtoremitpaymentflag`; Operations/Finance retains
 that control. Read-only Production probes found the flag explicitly false on all
 159 exact honorarium requests, while 87 broader Research requests were true, so
 the field is live elsewhere rather than the reviewer-closeout signal. The
-planned `wmkf_appreviewersuggestion.wmkf_honorariumeligibility` Picklist was
-absent from the 109-attribute Production metadata response. Implementation and
-the Operations-visibility prerequisite are specified in
+Production now contains the manually created, published/readable nullable local
+`wmkf_appreviewersuggestion.wmkf_honorariumeligibility` Picklist with exact
+values `Eligible=100000000`, `Not eligible=100000001`, and `Not
+applicable=100000002`; runtime `$select` succeeds. The tracked preflight reports
+only that the live description lacks the explicit Operations/Finance-authority
+warning. The app route/UI and thank-you decoupling are source-built but not
+deployed. Operations has built an AkoyaGO system view and will surface it later;
+the owner accepted that UI as a follow-up. Implementation details are specified in
 `docs/REVIEWER_COMPLETION_AND_HONORARIUM_DECISION_BRIEF.md`.
 
 **OWNER DECISION 2026-07-12: the BILL API integration is TABLED for several

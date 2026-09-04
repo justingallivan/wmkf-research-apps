@@ -3,7 +3,6 @@
  */
 
 const {
-  HONORARIUM_NOTE_TEXT,
   REVIEW_DUE_ACCESS_INSTRUCTION,
   renderReviewDueReminder,
   renderThankYou,
@@ -61,7 +60,7 @@ test.each([
   })).toThrow(/subject cannot contain a reviewer URL/i);
 });
 
-describe('thank-you honorarium note', () => {
+describe('retired thank-you honorarium token', () => {
   const BODY = '{{greeting}},\n\nThank you for your review of “{{proposalTitle}}”.\n\n{{honorariumNote}}\n\nWith gratitude,\n\n{{signature}}';
   function thankYou(honorariumOptOut) {
     return renderThankYou({
@@ -74,9 +73,8 @@ describe('thank-you honorarium note', () => {
     });
   }
 
-  test('resolveHonorariumNote omits the line only for a strict true', () => {
-    expect(resolveHonorariumNote(true)).toBe('');
-    for (const v of [false, null, undefined, 'true', 1]) expect(resolveHonorariumNote(v)).toBe(HONORARIUM_NOTE_TEXT);
+  test('resolveHonorariumNote always returns blank for stored-template compatibility', () => {
+    for (const v of [true, false, null, undefined, 'true', 1]) expect(resolveHonorariumNote(v)).toBe('');
   });
 
   test('opted out → line and token absent, paragraphs stay contiguous', () => {
@@ -88,9 +86,9 @@ describe('thank-you honorarium note', () => {
     expect(html).toContain('With gratitude,');
   });
 
-  test.each([false, null, undefined])('not opted out (%p) → honorarium line present once', (v) => {
+  test.each([false, null, undefined])('legacy opt-out value %p cannot add payment language', (v) => {
     const { html } = thankYou(v);
-    expect(html.match(new RegExp(HONORARIUM_NOTE_TEXT.replace(/\./g, '\\.'), 'g'))).toHaveLength(1);
+    expect(html).not.toContain('honorarium');
     expect(html).not.toContain('{{honorariumNote}}');
   });
 

@@ -5,7 +5,7 @@ metadata:
   type: project
   status: active
   scope: bill
-  last_verified: 2026-07-27 via GET-only honorarium-link census, finance-honoraria wiki, no-BILL strategy, and current honorarium source; numeric payment probes remain 2026-06-27/28
+  last_verified: 2026-09-04 via closeout source/tests, Production eligibility metadata/runtime select, finance-honoraria wiki, and prior GET-only honorarium-link census; numeric payment probes remain 2026-06-27/28
 ---
 
 ## Recall Rule
@@ -86,8 +86,10 @@ design documents, but agents must not present them as the next step.
 **Owner decision 2026-09-04:** reviewer closeout must not set
 `wmkf_authorizationtoremitpaymentflag`. The PD will record a separate
 engagement-level eligibility disposition (`eligible`, `not_eligible`, or
-`not_applicable`) when closing a received review; that field/workflow is approved
-but not yet built. Operations/Finance retains the final remit decision. A
+`not_applicable`) when closing a received review; the app workflow is source-built
+and awaiting deployment. Production contains the published/readable exact local
+Picklist, though its description still needs the tracked authority-warning
+correction. Operations/Finance retains the final remit decision. A
 read-only Production probe that day found all 159 exact honorarium requests
 explicitly false on the remit flag, while a broader Research-request scan found
 87 true values, confirming that the field is live elsewhere rather than the

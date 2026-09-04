@@ -36,6 +36,7 @@ const {
   APPLICANT_DISPOSITION_MAP,
   RESPONSE_TYPE_MAP,
   REVIEW_STATUS_MAP,
+  HONORARIUM_ELIGIBILITY_MAP,
 } = suggestionAdapter;
 
 const REVIEW_STATUS_COMPLETE = 100000004;
@@ -60,6 +61,7 @@ const ENGAGEMENT_STAMP_RESET_PAYLOAD = {
   wmkf_responsereceivedat: null,
   wmkf_thankyousentat: null,
   wmkf_completedat: null,
+  wmkf_honorariumeligibility: null,
   wmkf_withdrawnsufficientat: null,
   wmkf_proposalfirstaccessed: null,
   wmkf_reviewduedateoverride: null,
@@ -552,7 +554,7 @@ describe('updateLifecycle refuses to reopen a terminal engagement', () => {
     });
 
     await expect(updateLifecycle(SUGGESTION_ID, { reviewStatus: target }))
-      .rejects.toThrow(/out of a terminal review status/);
+      .rejects.toThrow(/out of a closed review status/);
     expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
   });
 
@@ -590,28 +592,34 @@ describe('updateLifecycle refuses to reopen a terminal engagement', () => {
   });
 });
 
-describe('updateLifecycle stamps close-out timestamps on EVERY complete transition', () => {
-  test('stamps completedAt + reviewReceivedAt when both are empty', async () => {
+describe('updateLifecycle enforces the dedicated reviewer closeout contract', () => {
+  test('stamps completedAt and maps eligibility without fabricating receipt evidence', async () => {
     DynamicsService.getRecord.mockResolvedValue({
       wmkf_appreviewersuggestionid: SUGGESTION_ID,
       wmkf_completedat: null,
-      wmkf_reviewreceivedat: null,
+      wmkf_reviewreceivedat: '2026-09-04T12:00:00Z',
+      wmkf_honorariumeligibility: null,
       wmkf_applicantdisposition: null,
     });
 
-    await updateLifecycle(SUGGESTION_ID, { reviewStatus: 'complete' });
+    await updateLifecycle(SUGGESTION_ID, {
+      reviewStatus: 'complete',
+      honorariumEligibility: 'eligible',
+    });
 
     const payload = DynamicsService.updateRecord.mock.calls[0][2];
     expect(payload.wmkf_reviewstatus).toBe(REVIEW_STATUS_COMPLETE);
     expect(payload.wmkf_completedat).toEqual(expect.any(String));
-    expect(payload.wmkf_reviewreceivedat).toEqual(expect.any(String));
+    expect(payload.wmkf_honorariumeligibility).toBe(HONORARIUM_ELIGIBILITY_MAP.eligible);
+    expect(payload.wmkf_reviewreceivedat).toBeUndefined();
   });
 
-  test('is idempotent — preserves existing close-out timestamps', async () => {
+  test('preserves an existing close-out timestamp', async () => {
     DynamicsService.getRecord.mockResolvedValue({
       wmkf_appreviewersuggestionid: SUGGESTION_ID,
       wmkf_completedat: '2020-01-01T00:00:00Z',
       wmkf_reviewreceivedat: '2020-02-02T00:00:00Z',
+      wmkf_honorariumeligibility: HONORARIUM_ELIGIBILITY_MAP.not_eligible,
       wmkf_applicantdisposition: null,
     });
 
@@ -624,12 +632,58 @@ describe('updateLifecycle stamps close-out timestamps on EVERY complete transiti
   });
 
   test('does not override a caller-supplied completedAt', async () => {
-    DynamicsService.getRecord.mockResolvedValue({ wmkf_completedat: null, wmkf_reviewreceivedat: null, wmkf_applicantdisposition: null });
+    DynamicsService.getRecord.mockResolvedValue({
+      wmkf_completedat: null,
+      wmkf_reviewreceivedat: '2026-09-04T12:00:00Z',
+      wmkf_honorariumeligibility: HONORARIUM_ELIGIBILITY_MAP.not_eligible,
+      wmkf_applicantdisposition: null,
+    });
 
     await updateLifecycle(SUGGESTION_ID, { reviewStatus: 'complete', completedAt: '2030-12-31T00:00:00Z' });
 
     const payload = DynamicsService.updateRecord.mock.calls[0][2];
     expect(payload.wmkf_completedat).toBe('2030-12-31T00:00:00Z');
+  });
+
+  test('refuses Complete without a pre-existing receipt or a valid disposition', async () => {
+    DynamicsService.getRecord.mockResolvedValue({
+      wmkf_completedat: null,
+      wmkf_reviewreceivedat: null,
+      wmkf_honorariumeligibility: null,
+      wmkf_applicantdisposition: null,
+    });
+    await expect(updateLifecycle(SUGGESTION_ID, {
+      reviewStatus: 'complete',
+      honorariumEligibility: 'eligible',
+    })).rejects.toThrow(/received-review timestamp/);
+
+    DynamicsService.getRecord.mockResolvedValue({
+      wmkf_completedat: null,
+      wmkf_reviewreceivedat: '2026-09-04T12:00:00Z',
+      wmkf_honorariumeligibility: null,
+      wmkf_applicantdisposition: null,
+    });
+    await expect(updateLifecycle(SUGGESTION_ID, { reviewStatus: 'complete' }))
+      .rejects.toThrow(/valid honorarium eligibility/);
+    expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
+  });
+
+  test('refuses eligibility writes outside a Complete transition or correction', async () => {
+    DynamicsService.getRecord.mockResolvedValue({
+      wmkf_reviewstatus: REVIEW_STATUS_MAP.review_received,
+      wmkf_reviewreceivedat: '2026-09-04T12:00:00Z',
+      wmkf_applicantdisposition: null,
+    });
+    await expect(updateLifecycle(SUGGESTION_ID, { honorariumEligibility: 'eligible' }))
+      .rejects.toThrow(/non-complete suggestion/);
+    expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
+  });
+
+  test('refuses unknown numeric eligibility values', async () => {
+    await expect(updateLifecycle(SUGGESTION_ID, { honorariumEligibility: 100000099 }))
+      .rejects.toThrow(/unknown honorariumEligibility/);
+    expect(DynamicsService.getRecord).not.toHaveBeenCalled();
+    expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
   });
 
   test('a NON-complete update reads for the exclusion guard but does not stamp', async () => {
@@ -1074,11 +1128,32 @@ describe('upsert relevance-score range guard', () => {
 });
 
 // S369 adversarial findings (all confirmed against source before fixing).
-describe('terminal engagements survive the other write paths', () => {
+describe('closed engagements survive the other write paths', () => {
   test('softDelete refuses a terminal row instead of erasing its status', async () => {
     DynamicsService.getRecord.mockResolvedValue({ wmkf_reviewstatus: REVIEW_STATUS_MAP.released, _etag: 'W/"9"' });
     await expect(suggestionAdapter.softDelete(SUGGESTION_ID))
-      .rejects.toThrow(/terminal review status/);
+      .rejects.toThrow(/closed review status/);
+    expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
+  });
+
+  test('softDelete refuses a Complete row instead of leaving orphaned closeout fields', async () => {
+    DynamicsService.getRecord.mockResolvedValue({ wmkf_reviewstatus: REVIEW_STATUS_MAP.complete, _etag: 'W/"10"' });
+    await expect(suggestionAdapter.softDelete(SUGGESTION_ID))
+      .rejects.toThrow(/closed review status/);
+    expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
+  });
+
+  test('updateLifecycle refuses to reopen a Complete row', async () => {
+    DynamicsService.getRecord.mockResolvedValue({
+      wmkf_applicantdisposition: null,
+      wmkf_reviewstatus: REVIEW_STATUS_MAP.complete,
+      wmkf_reviewreceivedat: '2026-09-04T12:00:00Z',
+      wmkf_completedat: '2026-09-04T13:00:00Z',
+      wmkf_honorariumeligibility: HONORARIUM_ELIGIBILITY_MAP.eligible,
+      _etag: 'W/"11"',
+    });
+    await expect(updateLifecycle(SUGGESTION_ID, { reviewStatus: 'under_review' }))
+      .rejects.toThrow(/closed review status/);
     expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
   });
 
@@ -1096,9 +1171,10 @@ describe('terminal engagements survive the other write paths', () => {
   test('a status write with no caller ETag binds to the guard read', async () => {
     DynamicsService.getRecord.mockResolvedValue({
       wmkf_completedat: null,
-      wmkf_reviewreceivedat: null,
       wmkf_applicantdisposition: null,
       wmkf_reviewstatus: REVIEW_STATUS_MAP.under_review,
+      wmkf_reviewreceivedat: '2026-09-04T12:00:00Z',
+      wmkf_honorariumeligibility: HONORARIUM_ELIGIBILITY_MAP.eligible,
       _etag: 'W/"33"',
     });
     await updateLifecycle(SUGGESTION_ID, { reviewStatus: 'complete' });
@@ -1109,9 +1185,10 @@ describe('terminal engagements survive the other write paths', () => {
   test('a caller-supplied ETag still wins over the guard read', async () => {
     DynamicsService.getRecord.mockResolvedValue({
       wmkf_completedat: null,
-      wmkf_reviewreceivedat: null,
       wmkf_applicantdisposition: null,
       wmkf_reviewstatus: REVIEW_STATUS_MAP.under_review,
+      wmkf_reviewreceivedat: '2026-09-04T12:00:00Z',
+      wmkf_honorariumeligibility: HONORARIUM_ELIGIBILITY_MAP.eligible,
       _etag: 'W/"33"',
     });
     await updateLifecycle(SUGGESTION_ID, { reviewStatus: 'complete' }, { ifMatch: 'W/"1"' });

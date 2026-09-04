@@ -34,7 +34,8 @@ Visual orientation for the reviewer-domain Dataverse entities and how they conne
 > retained rescue/compatibility paths. Their presence does not prove a current or
 > genuine review; legacy test files are known to remain.
 
-> **Approved closeout extension (owner decision 2026-09-04; not yet built):**
+> **Reviewer closeout extension (owner decision and source build 2026-09-04;
+> deployment pending):**
 > receipt means the review exists, not that it is eligible for payment. A lead
 > PD will close the received review with a new engagement-level Picklist,
 > `wmkf_honorariumeligibility` (`eligible`, `not_eligible`, or
@@ -120,7 +121,7 @@ erDiagram
         bool wmkf_honorariumoptout
         datetime wmkf_reviewreceivedat "reviewer-done signal"
         datetime wmkf_completedat "PD-done signal (S196)"
-        picklist wmkf_honorariumeligibility "PLANNED PD closeout disposition"
+        picklist wmkf_honorariumeligibility "nullable PD closeout disposition"
     }
     POLICY {
         guid wmkf_policyid PK
@@ -182,7 +183,7 @@ erDiagram
         lookup wmkf_HonorariumRequest "→ HONORARIUM_REQUEST (S196)"
         picklist wmkf_reviewstatus
         bool wmkf_honorariumoptout
-        picklist wmkf_honorariumeligibility "PLANNED; nullable until PD closeout"
+        picklist wmkf_honorariumeligibility "nullable until PD closeout"
         string wmkf_reviewbloburl "legacy PDF-upload pointer"
         picklist wmkf_revieweroverallrating
         datetime wmkf_completedat "PD closeout (S196)"
@@ -254,7 +255,7 @@ flowchart TD
     S5 --> S5w["ONE Dataverse changeset:<br/>• UPSERT wmkf_appreviewanswer rows (ratings, multiselect, narratives)<br/>• PATCH suggestion affiliation + wmkf_reviewreceivedat (RECEIPT SIGNAL; not eligibility)<br/>• wmkf_reviewstatus = review_received<br/>Then delete Postgres draft.<br/>Legacy PDF/file/rating parent fields are not the current content authority."]
 
     S5w --> S6["Stage 6 — PD closes out (Request Workbench, S196)"]
-    S6 --> S6w["CURRENT: Complete + wmkf_completedat.<br/>APPROVED, NOT BUILT: same ETag-bound row update also writes<br/>wmkf_honorariumeligibility = eligible | not_eligible | not_applicable.<br/>Completed rows remain visible."]
+    S6 --> S6w["SOURCE-BUILT; DEPLOYMENT PENDING: one ETag-bound row update writes<br/>Complete + wmkf_completedat + wmkf_honorariumeligibility<br/>(eligible | not_eligible | not_applicable).<br/>Completed rows remain visible."]
 
     S6w --> S7["Stage 7 — finance processes payment offline"]
     S7 --> S7w["Honorarium request remains the CRM record;<br/>automated BILL vendor/network/webhook tail is dormant"]
@@ -273,7 +274,7 @@ flowchart TD
 | Decline reason and alternate-reviewer referrals | `wmkf_appreviewersuggestion.wmkf_declinereasonpicklist` (structured) + `.wmkf_declinereferral` | The current portal has no prose reason/referral fields. It stores up to four name/institution/email rows as a versioned envelope in the existing referral memo; legacy `.wmkf_declinereason` and free-text referral values remain readable for compatibility. |
 | COI / AI policy acknowledged? | `wmkf_appreviewersuggestion.wmkf_coiackedat` (timestamp) + `wmkf_coipolicyversion` (which version they saw) | Same shape for AI-use |
 | Honorarium opt-out | `wmkf_appreviewersuggestion.wmkf_honorariumoptout` | |
-| Is the completed review eligible for an honorarium? | `[PLANNED] wmkf_appreviewersuggestion.wmkf_honorariumeligibility` | Approved values: `eligible`, `not_eligible`, `not_applicable`; null means no PD disposition. Field absent in Production as of the 2026-09-04 metadata probe. |
+| Is the completed review eligible for an honorarium? | `wmkf_appreviewersuggestion.wmkf_honorariumeligibility` | Production-live local Picklist values: `eligible=100000000`, `not_eligible=100000001`, `not_applicable=100000002`; null means no PD disposition. Runtime writer/UI are source-built on 2026-09-04 and not yet deployed. The live field description still lacks the explicit Operations/Finance-authority warning required by the tracked schema preflight. |
 | The honorarium row for a reviewer engagement | `akoya_request` via `wmkf_appreviewersuggestion.wmkf_HonorariumRequest` | S196-new link; one hop |
 | Honorarium amount | `akoya_request.akoya_request` (on the honorarium row) | Field name = entity name. Yes, confusing. |
 | Is payment authorized? | `akoya_request.wmkf_authorizationtoremitpaymentflag` (honorarium row) | Operations/Finance final gate; this application does not write it. |

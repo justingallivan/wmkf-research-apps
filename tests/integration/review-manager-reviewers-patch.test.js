@@ -65,7 +65,7 @@ test('wrong method (not GET/PATCH) returns 405 with no Allow header set', async 
 
 test('PATCH single-suggestion success returns the full envelope and forwards actingUserSystemId', async () => {
   suggestionAdapter.updateLifecycle.mockResolvedValue(undefined);
-  const { req, res } = call('PATCH', { suggestionId: SUGGESTION_ID, reviewStatus: 'complete', notes: 'looks good' });
+  const { req, res } = call('PATCH', { suggestionId: SUGGESTION_ID, reviewStatus: 'accepted', notes: 'looks good' });
   await handler(req, res);
 
   expect(res.statusCode).toBe(200);
@@ -73,7 +73,7 @@ test('PATCH single-suggestion success returns the full envelope and forwards act
   expect(suggestionAdapter.updateLifecycle).toHaveBeenCalledTimes(1);
   expect(suggestionAdapter.updateLifecycle).toHaveBeenCalledWith(
     SUGGESTION_ID,
-    { reviewStatus: 'complete', notes: 'looks good' },
+    { reviewStatus: 'accepted', notes: 'looks good' },
     { actingUserSystemId: ACTING_USER_ID },
   );
   expect(authorizeReviewerRequestMutation).toHaveBeenCalledWith({
@@ -85,7 +85,7 @@ test('PATCH single-suggestion success returns the full envelope and forwards act
 
 test('PATCH rejects a foreign request before the first lifecycle write', async () => {
   authorizeReviewerRequestMutation.mockRejectedValueOnce(new ServiceHttpError('foreign', { httpStatus: 403 }));
-  const { req, res } = call('PATCH', { suggestionIds: [SUGGESTION_ID, SUGGESTION_ID_2], reviewStatus: 'complete' });
+  const { req, res } = call('PATCH', { suggestionIds: [SUGGESTION_ID, SUGGESTION_ID_2], reviewStatus: 'accepted' });
   await handler(req, res);
   expect(res.statusCode).toBe(403);
   expect(suggestionAdapter.updateLifecycle).not.toHaveBeenCalled();
@@ -97,7 +97,7 @@ test('PATCH batch success returns the full envelope and applies the update per-i
     callOrder.push(id);
   });
 
-  const { req, res } = call('PATCH', { suggestionIds: [SUGGESTION_ID, SUGGESTION_ID_2], reviewStatus: 'complete' });
+  const { req, res } = call('PATCH', { suggestionIds: [SUGGESTION_ID, SUGGESTION_ID_2], reviewStatus: 'accepted' });
   await handler(req, res);
 
   expect(res.statusCode).toBe(200);
@@ -108,16 +108,16 @@ test('PATCH batch success returns the full envelope and applies the update per-i
   expect(suggestionAdapter.updateLifecycle).toHaveBeenCalledTimes(2);
   expect(callOrder).toEqual([SUGGESTION_ID, SUGGESTION_ID_2]);
   expect(suggestionAdapter.updateLifecycle).toHaveBeenNthCalledWith(
-    1, SUGGESTION_ID, { reviewStatus: 'complete' }, { actingUserSystemId: ACTING_USER_ID },
+    1, SUGGESTION_ID, { reviewStatus: 'accepted' }, { actingUserSystemId: ACTING_USER_ID },
   );
   expect(suggestionAdapter.updateLifecycle).toHaveBeenNthCalledWith(
-    2, SUGGESTION_ID_2, { reviewStatus: 'complete' }, { actingUserSystemId: ACTING_USER_ID },
+    2, SUGGESTION_ID_2, { reviewStatus: 'accepted' }, { actingUserSystemId: ACTING_USER_ID },
   );
 });
 
 test('PATCH domain error (adapter throw) returns 500 with the failure envelope', async () => {
   suggestionAdapter.updateLifecycle.mockRejectedValue(new Error('Dataverse unavailable'));
-  const { req, res } = call('PATCH', { suggestionId: SUGGESTION_ID, reviewStatus: 'complete' });
+  const { req, res } = call('PATCH', { suggestionId: SUGGESTION_ID, reviewStatus: 'accepted' });
   await handler(req, res);
 
   expect(res.statusCode).toBe(500);

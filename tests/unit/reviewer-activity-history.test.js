@@ -204,7 +204,7 @@ describe('synthetic close-out receipt (Codex adversarial finding, 2026-08-12)', 
   // submitted therefore produces a receipt for a review that does not exist.
   const CLOSEOUT_INSTANT = '2026-08-12T15:04:05Z';
 
-  it('demotes a close-out-fabricated receipt instead of asserting it', () => {
+  it('demotes a legacy close-out-fabricated receipt instead of asserting it', () => {
     const events = buildActivityHistory({
       suggestionId: 'c1',
       materialsSentAt: '2026-07-05T00:00:00Z',

@@ -1,4 +1,4 @@
-# Session 478 Prompt: Reviewer Closeout Dependency and Next Work
+# Session 479 Prompt: Reviewer Closeout Implementation Handoff
 
 ## Session 477 Summary
 
@@ -28,9 +28,8 @@ worktrees and branches without touching unmerged or dirty work.
      change is presentation-safe.
    - [VERIFIED via `lib/services/reviewer-thankyou-sweep.js`] The automated sweep
      claims `wmkf_thankyousentat` before sending and does not write Complete.
-   - [VERIFIED via `lib/services/review-manager/send-emails-service.js`] The
-     retained manual compatibility path marks a nonterminal reviewer Complete
-     only after a successful thank-you send.
+   - [VERIFIED via current source] Manual and automated thank-you paths record
+     thank-you delivery only; neither path marks a reviewer Complete.
    - [OWNER DECISION 2026-09-04] Complete means a lead-PD human closeout of a
      received review and carries `eligible`, `not_eligible`, or
      `not_applicable`; no thank-you path sets it.
@@ -45,9 +44,10 @@ worktrees and branches without touching unmerged or dirty work.
    - [VERIFIED via repository-wide source search] The application has no writer
      for `wmkf_authorizationtoremitpaymentflag`; marking a reviewer Complete does
      not currently authorize the linked honorarium request.
-   - [VERIFIED via read-only Production metadata 2026-09-04] No reviewer-level
-     eligibility/payability field currently exists; the approved
-     `wmkf_honorariumeligibility` Picklist remains planned.
+   - [VERIFIED via read-only Production metadata and runtime select 2026-09-04]
+     `wmkf_appreviewersuggestion.wmkf_honorariumeligibility` now exists with the
+     approved three local Picklist values. The Ops view exists but is not yet
+     published in akoyaGO; that interface work does not block the app writer.
    - [VERIFIED via read-only Production rows 2026-09-04] All 159 exact
      honorarium requests had the final-remit flag explicitly false. A broader
      Research-request scan found 87 true values, so the field remains live
@@ -109,18 +109,37 @@ worktrees and branches without touching unmerged or dirty work.
 - `cd2c73d5` — Stabilize Project Leader search pagination
 - `d525911e` — Record request locator rollout
 
+## Session 478 Implementation Update
+
+- [VERIFIED via source and focused tests] Branch
+  `codex/reviewer-closeout-eligibility-app` adds a dedicated lead-PD/superuser
+  closeout action for one Review Received engagement. The ETag-bound write sets
+  Complete, the immutable first-completion timestamp, and exactly one honorarium
+  eligibility disposition on the reviewer suggestion row.
+- [VERIFIED via source and adversarial contract review] Complete is durable:
+  generic status PATCH, removal, and reviewer merge cannot reopen, erase, or
+  discard closeout state. Authorization is bound to the same request ownership
+  observed by the fresh closeout read.
+- [VERIFIED via source] Eligibility can be corrected later without restamping
+  completion. Repeating the same closeout is a no-write success.
+- [VERIFIED via source] The app does not write
+  `wmkf_authorizationtoremitpaymentflag`; Operations/Finance retains remit
+  authority. Thank-you templates and sends no longer infer payment or Complete.
+- [VERIFIED via `npm run build -- --webpack`, focused Jest, and relevant gates]
+  The implementation is source-complete. It has not been merged, promoted, or
+  deployed; the colleague's akoyaGO view publishing remains separate follow-up.
+
 ## Next Items
 
 ### Verified Open
 
-No unblocked implementation item is carried forward from this session. At the
-next `/start`, select the next priority from `docs/CURRENT_WORK_QUEUE.md` only
-after re-verifying its current status.
+Promote `codex/reviewer-closeout-eligibility-app` deliberately after reviewing
+the commit and deployment posture. Then run a signed-in Review Manager smoke on
+a safe received-review row before treating the workflow as Production-proven.
 
 ### Owner Decision Needed
 
-None currently. Resume the closeout implementation only after the external
-Power Apps dependency below changes state.
+None currently.
 
 ### Verify Before Acting
 
@@ -145,12 +164,10 @@ Power Apps dependency below changes state.
 
 ### Parked
 
-1. **Reviewer Complete + Honorarium Eligibility implementation — externally
-   blocked.** Evidence: `docs/REVIEWER_COMPLETION_AND_HONORARIUM_DECISION_BRIEF.md`
-   and the 2026-09-04 Production metadata probe show the local Picklist/view is
-   absent. A colleague confirmed she can customize Request forms and dashboard
-   views; corrected field/table naming instructions were sent. Re-open when she
-   confirms the customization exists or requests a working session.
+1. **akoyaGO Ops view publication — app implementation is not blocked.** The
+   field and system view exist, and the source writer is complete on the feature
+   branch. A colleague plans to surface the view in akoyaGO next week; that is an
+   Ops-interface follow-up, not an application write dependency.
 
    Saved Power Apps instruction:
 
