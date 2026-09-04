@@ -331,7 +331,7 @@ export default function RequestLocator() {
             </p>
             {capped && (
               <span className="text-xs font-medium text-amber-700">
-                Search limited to the first 100 matches
+                Results are limited; narrow the search to see more precise matches
               </span>
             )}
             {unavailableCount > 0 && (
