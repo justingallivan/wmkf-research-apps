@@ -1123,8 +1123,11 @@ first-page drawing/image relationships. Exact content-repair manifest hash
 `18007d495f52ab7abb88c03e6d3099eadb953157e69051b0c4c96898881ef09e`
 versioned the same item/name from `2.0` to `3.0`; independent readback matched
 v4 governed hash `gdc1:fbIC8o5aWoe_rOjXNK6mAKR6kbNRQ_I6MU60R28Chi4` with
-the Dataverse pointer pair unchanged. Owner Word Online visual confirmation of
-version `3.0` is pending; the runtime fix is not deployed. The owner-directed path
+the Dataverse pointer pair unchanged. At the owner's explicit request, a second
+guarded generation/upload advanced the same stable item to version `4.0` at
+`2026-09-04T00:59:51Z`, retained versions `1.0`–`3.0`, and independently
+reverified the same v4 hash with unchanged pointers. Owner Word Online visual confirmation of
+version `4.0` is pending; the runtime fix is not deployed. The owner-directed path
 simplification and historical v2 Word-web correction produced replacement manifest hash
 `25f10fcd0347d7de02abcc8a744357d4e215fe56efa462ff8cc0a6eef99650ff`, with 22
 eligible missing files at unique destinations plus the same visible test

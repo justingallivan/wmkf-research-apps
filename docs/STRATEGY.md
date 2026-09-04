@@ -193,8 +193,11 @@ fixed two-column Times New Roman text header and remove the first-page drawing,
 anchor, tabs, and image relationships. A second exact manifest-bound content
 repair versioned the same item from `2.0` to `3.0`; independent readback matched
 v4 governed hash `gdc1:fbIC8o5aWoe_rOjXNK6mAKR6kbNRQ_I6MU60R28Chi4` with
-unchanged pointers. The v4 fix remains undeployed, and the historical remaining-population
-manifest is superseded. Owner Word Online visual confirmation and
+unchanged pointers. At the owner's explicit request, a further guarded upload
+wrote the same generated v4 output to the same item as version `4.0`, retained
+versions `1.0`–`3.0`, and independently reverified the v4 hash and unchanged
+pointers. The v4 fix remains undeployed, and the historical remaining-population
+manifest is superseded. Owner Word Online visual confirmation of version `4.0` and
 template/path-fix promotion now precede a fresh Wave 4 manifest and any
 remaining writes.
 Final Writeup persona

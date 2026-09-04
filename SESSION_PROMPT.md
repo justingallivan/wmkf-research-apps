@@ -197,10 +197,13 @@ cleanly and the focused 92-test suite passes. Exact content-repair manifest
 `outputs/review-docx-repair/review-docx-repair-1002874-2026-09-04T00-37-00-977Z.json`
 (`18007d495f52ab7abb88c03e6d3099eadb953157e69051b0c4c96898881ef09e`)
 versioned the same stable SharePoint item/name from `2.0` to `3.0`, retaining its
-prior versions. Independent read-only regeneration/download now returns
+prior versions. At the owner's explicit request, a second guarded generation
+and in-place upload wrote the same real v4 output as version `4.0` at
+`2026-09-04T00:59:51Z`, retaining versions `1.0`–`3.0`. Independent read-only
+regeneration/download now returns
 `already_filed`, matches v4 governed hash
 `gdc1:fbIC8o5aWoe_rOjXNK6mAKR6kbNRQ_I6MU60R28Chi4`, and confirms unchanged
-Dataverse pointers. Owner Word Online visual confirmation of version `3.0` is
+Dataverse pointers. Owner Word Online visual confirmation of version `4.0` is
 pending. The runtime fix is not deployed; the remaining 22 writes, scheduled
 activation, and old-file cleanup remain unapproved.
 

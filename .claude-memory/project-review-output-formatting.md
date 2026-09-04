@@ -128,7 +128,10 @@ Exact content-repair manifest hash
 `18007d495f52ab7abb88c03e6d3099eadb953157e69051b0c4c96898881ef09e`
 versioned the same stable item/name from `2.0` to `3.0`; independent readback
 matched v4 governed hash `gdc1:fbIC8o5aWoe_rOjXNK6mAKR6kbNRQ_I6MU60R28Chi4`
-and the existing Dataverse pointer pair. Owner Word Online visual confirmation
-of version `3.0` remains pending. Describe Wave 2 as
+and the existing Dataverse pointer pair. At the owner's explicit request, a
+second guarded in-place upload regenerated the same real v4 output as version
+`4.0` at `2026-09-04T00:59:51Z`; versions `1.0`–`3.0` remain in SharePoint
+history, and independent readback again matched the v4 hash and unchanged
+pointers. Owner Word Online visual confirmation of version `4.0` remains pending. Describe Wave 2 as
 Production-deployed inert, Wave 3 as exact new-path storage/pointer and
 manifest-bound v3/v4 content repairs proved, and automatic filing as not activated.

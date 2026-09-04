@@ -93,7 +93,7 @@ probes on 2026-09-03:
 | Before Wave 3 execution, D26 had 24 received reviews and 228 answer rows. All 24 were selected, had at least one rich-text answer row, had exact receipt/answer identity parity, and had zero complete or partial SharePoint pointers. After the one-row proof, the fresh unfinished-population manifest has 22 eligible missing files plus one visible test exclusion; Request `1002874` has a complete verified pointer pair. | Existing structured writers plus Wave 3 backfill | Production Dataverse | Backfill and existing pointer consumers | Initial blank-slate probe; execution result; independent readback; fresh post-write manifest | **VERIFIED 2026-09-03** |
 | Rendering identical semantic input twice does not produce byte-identical ZIP packages, while the governed Word-part hash is stable. | Current renderer | Generated DOCX package | Retry/conflict logic | Local two-render experiment: raw SHA-256 differed; governed hash matched | **VERIFIED** |
 | The thank-you attachment now uses one shared individual-review builder with caller-owned generation time. | `reviewer-thankyou-sweep.js` | Existing answer snapshot + transient DOCX bytes | Thank-you attachment; filing service | Focused builder/thank-you/hash tests, rendered-page inspection, and Ready Production deployment | **PRODUCTION-LIVE AT `83da197f`; TRANSPORT BEHAVIOR UNCHANGED** |
-| First-page review titles render portably without tab stops, floating shapes, or wrapping outside the usable width. | Tracked individual and combined templates | `word/header2.xml` | Desktop Word, Word for the web, LibreOffice/PDF render | v2 removed out-of-bounds title tabs and v3 changed the floating logo to `wrapNone`, but owner inspection still rejected the Word Online alignment. The owner-edited v4 header replaces the drawing with a fixed 9360-DXA two-column Times New Roman table. Structural assertions and both full generated fixtures pass. The live Request `1002874` item now has the reviewed v4 semantic hash as version `3.0`; owner Word Online inspection remains pending. | **SOURCE/RETAINED-PACKAGE/LIVE-BYTES VERIFIED; NOT DEPLOYED; WORD-ONLINE VISUAL CONFIRMATION PENDING** |
+| First-page review titles render portably without tab stops, floating shapes, or wrapping outside the usable width. | Tracked individual and combined templates | `word/header2.xml` | Desktop Word, Word for the web, LibreOffice/PDF render | v2 removed out-of-bounds title tabs and v3 changed the floating logo to `wrapNone`, but owner inspection still rejected the Word Online alignment. The owner-edited v4 header replaces the drawing with a fixed 9360-DXA two-column Times New Roman table. Structural assertions and both full generated fixtures pass. The live Request `1002874` item now has the reviewed v4 semantic hash as version `4.0`; owner Word Online inspection remains pending. | **SOURCE/RETAINED-PACKAGE/LIVE-BYTES VERIFIED; NOT DEPLOYED; WORD-ONLINE VISUAL CONFIRMATION PENDING** |
 | Automatic retention and full D26 write execution are activated and Production-proved. | Dedicated filing service/cron is deployed but disabled; the operator backfill and exact repair command executed one owner-approved request | New generated SharePoint DOCX + exact suggestion pointer pair; old proof file retained; local redacted artifacts | Existing pointer consumers | Ready inert deployment; repair execution result; independent Graph/Dataverse semantic readback; both old/new Graph item readback | **PARTIAL: REQUEST `1002874` NEW-PATH REPAIR PROVED; SCHEDULED ROUTE AND REMAINING 22 WRITES UNPROVED** |
 
 ### Sweep boundary
@@ -238,8 +238,12 @@ Dataverse/SharePoint target. Execution replaced the same item/name as version
 `3.0` and retained prior versions. Independent read-only regeneration/download
 returns `already_filed`, matches v4 hash
 `gdc1:fbIC8o5aWoe_rOjXNK6mAKR6kbNRQ_I6MU60R28Chi4`, and confirms unchanged
-Dataverse pointers. Owner Word Online visual confirmation of version `3.0`
-remains pending. Because the governed hash covers all `word/` parts, the prior
+Dataverse pointers. At the owner's explicit request, a second guarded generation
+and in-place upload wrote the same real v4 output as version `4.0` at
+`2026-09-04T00:59:51Z`. Live version history retains versions `1.0`–`3.0`, and
+an independent post-write regeneration/download again returned `already_filed`
+with the same v4 hash and unchanged pointers. Owner Word Online visual
+confirmation of version `4.0` remains pending. Because the governed hash covers all `word/` parts, the prior
 remaining-population manifest is superseded.
 Replacement manifest
 `outputs/review-docx-backfill/review-docx-D26-2026-09-03T23-02-20-955Z.json`
@@ -819,7 +823,10 @@ WRITE APPROVED.**
 - [x] Use the owner-edited header-only DOCX to create v4 text-table templates,
   render both full outputs, and version the same item from `2.0` to `3.0` under
   an exact manifest. Independent readback matched v4 with unchanged pointers.
-- [ ] Owner confirms version `3.0` visually in Word for the web.
+- [x] At the owner's explicit request, regenerate and upload the same real v4
+  output to the stable item as version `4.0`; independent readback matched v4,
+  retained versions `1.0`–`3.0`, and left Dataverse pointers unchanged.
+- [ ] Owner confirms version `4.0` visually in Word for the web.
 - [ ] Promote the v4/path/runtime changes before any further backfill or
   forward activation.
 - [ ] Clean up the old Request `1002874` item only after separate approval.
@@ -895,7 +902,7 @@ Semantic omissions found: operator-confirmed test data needed an explicit,
   silent population filter; the wiki lacked the separate inert retention path,
   and the evidence-matrix claim incorrectly phrased disabled retention as live
 Remaining live STALE: 0 within this plan's stated scope
-Remaining UNKNOWN/ASSUMED: owner visual confirmation of SharePoint version 3.0
+Remaining UNKNOWN/ASSUMED: owner visual confirmation of SharePoint version 4.0
   in Word Online, any future same-name reviewer
   pair (blocked in backfill and a stop condition before forward activation),
   the remaining 22 backfill writes, runtime promotion, scheduled automatic
