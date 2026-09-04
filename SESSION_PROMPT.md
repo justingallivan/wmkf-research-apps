@@ -73,10 +73,15 @@ Production-live on `main` at `3ba2a6ad` in Ready deployment
 `dpl_22wUzC1cCi4nhKTSFQftfaycucSh`. The exact v4 manifest executed 22 files
 with zero failures, and a fresh post-write Production dry run found zero
 eligible missing files, zero reconcile candidates, zero blockers, and only the
-explicit Request `1003223` test exclusion. Both Production rollout variables
-remain absent, so forward automatic filing is still disabled. Old-file cleanup
-and Wave 5 activation remain separately owner-gated; the work queue now returns
-to Final Writeup persona rollout.
+explicit Request `1003223` test exclusion. Wave 5 is now activated with exact
+Production `REVIEW_DOCX_SHAREPOINT_WRITE=on` and
+`REVIEW_DOCX_SHAREPOINT_CYCLE=D26` in Ready activation-proof deployment
+`dpl_E6VKW5Wi8zDTfU1ZRhNsbH9yg9oM`. The first authenticated enabled run returned
+HTTP 200, attempted no filing, and found only test Request `1003223` as
+`invalid_snapshot`; bounded logs showed no Graph mutation, Dataverse PATCH, or
+runtime error. The next natural automatic filing remains unproved. Test-row
+disposition and old-file cleanup remain owner decisions; the work queue otherwise
+returns to Final Writeup persona rollout.
 The active plan is `docs/REVIEW_DOCX_SHAREPOINT_RETENTION_PLAN.md`. Claude's
 read-only adversarial review of the plan returned
 APPROVE WITH CONDITIONS; the plan now incorporates the verified eligibility,
@@ -221,8 +226,12 @@ reports 22 created and zero failed; row-by-row reconciliation matched every
 reviewed identity, destination, semantic hash, and unique SharePoint item.
 Fresh post-write manifest
 `outputs/review-docx-backfill/review-docx-D26-2026-09-04T01-33-20-264Z.json`
-has no eligible or reconcile rows and no blockers. Scheduled activation and
-old-file cleanup remain unapproved.
+has no eligible or reconcile rows and no blockers. Wave 5 activation is complete
+at `dpl_E6VKW5Wi8zDTfU1ZRhNsbH9yg9oM`; an authenticated enabled run resolved
+`D26`, attempted zero filings, and made no SharePoint document or Dataverse
+pointer mutation. It surfaced only known test Request `1003223` as
+`invalid_snapshot`. The next natural automatic filing, test-row disposition,
+and old-file cleanup remain open.
 
 ## Parked
 

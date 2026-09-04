@@ -5,7 +5,7 @@ status: active
 metadata:
   node_type: memory
   type: project
-  last_verified: 2026-09-04 via Ready v4 retention deployment, exact 22-row D26 backfill reconciliation, and clean post-write Production survey
+  last_verified: 2026-09-04 via Ready v4 retention deployment, exact 22-row D26 backfill reconciliation, and authenticated Wave 5 activation proof
   originSessionId: 7db29a2d-b16d-490a-80f0-7e4fa4c04f0a
 ---
 
@@ -70,10 +70,11 @@ creates individual DOCX files under the request-level `Reviews` folder
 and conditionally stores the existing pointer pair. Its scheduled discovery is
 exact-cycle-stamp-only and newest-first, and flag-off requests create no
 maintenance row. Claude's Wave 2 build review approved the source with
-non-blocking suggestions; the accepted hardening is incorporated. Both rollout
-variables are absent in Production. An authenticated flag-off request returned
+non-blocking suggestions; the accepted hardening is incorporated. In the
+initial flag-off release both rollout variables were absent in Production, and
+an authenticated request returned
 `enabled:false` and left the job's maintenance-run population unchanged at
-zero. The scheduled write path has not been exercised. The dry-run-first D26 Wave 3
+zero. That historical flag-off proof did not exercise the scheduled writer. The dry-run-first D26 Wave 3
 backfill is source-built with a redacted hash-bound unfinished population,
 pre-write drift checks, exact Production Dataverse plus SharePoint target
 binding, and the existing create-only ensure service. Claude's Wave 3 review
@@ -140,6 +141,11 @@ exact owner-approved v4 manifest completed 22 created / zero failed. Row-by-row
 reconciliation matched all expected identities, destinations, semantic hashes,
 and unique SharePoint items. A fresh post-write survey has zero eligible missing
 files, zero reconcile candidates, zero blockers, and only the visible Request
-`1003223` test exclusion. Describe Waves 1–4 as Production-live and the D26
-backfill as complete; automatic filing remains disabled and legacy cleanup
-remains separately gated.
+`1003223` test exclusion. Wave 5 is now active with exact Production
+`REVIEW_DOCX_SHAREPOINT_WRITE=on` and `REVIEW_DOCX_SHAREPOINT_CYCLE=D26` in
+Ready activation-proof deployment `dpl_E6VKW5Wi8zDTfU1ZRhNsbH9yg9oM`. The
+first authenticated enabled run attempted no filing, made no SharePoint document
+or Dataverse pointer mutation, and surfaced only known test Request `1003223` as
+`invalid_snapshot`; the error scan was empty. Describe automatic filing as active
+but not yet proved on a naturally arriving review. Test-row disposition and
+legacy cleanup remain separately gated.

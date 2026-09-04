@@ -1,6 +1,6 @@
 # Atlas: `wmkf_appreviewanswer` (Dataverse, WMKF child entity)
 
-**Last verified:** 2026-09-04 for the Production-live v4 review-DOCX retention runtime (`3ba2a6ad`, Ready deployment `dpl_22wUzC1cCi4nhKTSFQftfaycucSh`), exact 22-row D26 backfill reconciliation, and clean post-write survey; 2026-09-03 for Production Wave 25 apply/readback and the initial template-backed review-DOCX implementation (`3101f067`, Ready deployment `dpl_AjT5FeDh5wkdeFSoZWJsVDM5oBqs`). A signed-in Request `1002903` export produced a valid 60,586-byte DOCX titled **Aggregated Proposal Reviews**; the courtesy-email path was not transport-smoked. The base entity remains live in **prod** from wave 8, and waves 15 and 25 are applied. Production metadata reports `wmkf_answervalues` as nullable custom Memo `wmkf_AnswerValues` with `MaxLength=150000`; the property is selectable through `wmkf_appreviewanswers`. **[VERIFIED via `scripts/probe-review-answer-multiselect-field.mjs` production readback after `scripts/apply-dataverse-schema.js --target=prod --wave=15-review-answer-multiselect --execute`].** Production metadata reports `wmkf_questionoptions` as the exact nullable Memo `wmkf_QuestionOptions` with `MaxLength=20000`. **[VERIFIED via `scripts/preflight-review-answer-question-options-schema.mjs --target=prod` after the owner-approved Wave 25 apply].**
+**Last verified:** 2026-09-04 for the Production-live v4 review-DOCX retention runtime, exact 22-row D26 backfill reconciliation, clean post-write survey, and active exact-D26 Wave 5 boundary (`dpl_E6VKW5Wi8zDTfU1ZRhNsbH9yg9oM`); 2026-09-03 for Production Wave 25 apply/readback and the initial template-backed review-DOCX implementation (`3101f067`, Ready deployment `dpl_AjT5FeDh5wkdeFSoZWJsVDM5oBqs`). A signed-in Request `1002903` export produced a valid 60,586-byte DOCX titled **Aggregated Proposal Reviews**; the courtesy-email path was not transport-smoked. The base entity remains live in **prod** from wave 8, and waves 15 and 25 are applied. Production metadata reports `wmkf_answervalues` as nullable custom Memo `wmkf_AnswerValues` with `MaxLength=150000`; the property is selectable through `wmkf_appreviewanswers`. **[VERIFIED via `scripts/probe-review-answer-multiselect-field.mjs` production readback after `scripts/apply-dataverse-schema.js --target=prod --wave=15-review-answer-multiselect --execute`].** Production metadata reports `wmkf_questionoptions` as the exact nullable Memo `wmkf_QuestionOptions` with `MaxLength=20000`. **[VERIFIED via `scripts/preflight-review-answer-question-options-schema.mjs --target=prod` after the owner-approved Wave 25 apply].**
 **Live row count:** non-zero in prod once reviewers submit (Phase 3 write path is live S302); not independently re-counted here.
 **Entity set:** `wmkf_appreviewanswers`
 **Schema specs:** base entity `lib/dataverse/schema/wave8-review-answer-snapshot/01_wmkf_appreviewanswer.json`; applied multiselect extension `lib/dataverse/schema/wave15-review-answer-multiselect/`; applied option-snapshot extension `lib/dataverse/schema/wave25-review-answer-question-options/`.
@@ -45,9 +45,9 @@ individual-review retention service now also reads this self-describing snapshot
 as its sole content source. It requires at least one persisted `richtext` row and
 rejects malformed identity/order/type/categorical shapes before rendering; it
 does not consult today's editable question definitions to judge historical
-completeness. Both rollout variables are absent in Production; the authenticated
-disabled-route probe returned before a candidate read or persistence and left
-the job's maintenance-run population unchanged at zero. Under an exact
+completeness. The historical disabled-route probe returned before a candidate
+read or persistence and left the job's maintenance-run population unchanged at
+zero. Under an exact
 owner-approved manifest, the local operator path regenerated Agnes Karasik's
 Request `1002874` document from this snapshot, created one immutable SharePoint
 item, and committed both suggestion pointers. Independent download/readback
@@ -65,7 +65,12 @@ exact owner-approved population manifest executed 22 created / zero failed.
 Row-by-row reconciliation matched all expected identities, destinations,
 semantic hashes, and unique SharePoint items. A fresh post-write survey reports
 zero eligible missing files, zero reconcile candidates, zero blockers, and only
-the visible test exclusion. The scheduled path remains disabled and unproved.
+the visible test exclusion. Exact Production `WRITE=on` and `CYCLE=D26` now
+activate the hourly path. Its first authenticated enabled run attempted no
+filing and made no SharePoint document or Dataverse pointer mutation because the
+sole candidate was known test Request `1003223`, classified `invalid_snapshot`;
+the bounded error scan was empty. The next natural automatic filing remains
+unproved.
 
 ## Write Paths
 

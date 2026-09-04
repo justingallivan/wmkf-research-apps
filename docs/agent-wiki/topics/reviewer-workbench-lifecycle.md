@@ -1082,16 +1082,17 @@ Reviews**; focused route logs showed 2xx dependencies and the bounded error scan
 was empty. The courtesy-email path was not transport-smoked. Full future
 contract: `docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md`.
 
-**Individual-review SharePoint retention (Waves 1–2 Production-deployed inert;
-Wave 3 one-file storage/pointer proof passed, 2026-09-03):** the separate dedicated
+**Individual-review SharePoint retention (Waves 1–4 Production-live; Wave 5
+active for exact D26, 2026-09-03):** the separate dedicated
 `/api/cron/file-review-docx` path can render a structured review through the
 same individual builder, create-only upload it to request-level
 `Reviews/Review-<request>-<sanitized reviewer name>.docx`, and
 ETag-conditionally commit the existing suggestion folder/filename pointers.
 There are no generated or suggestion-GUID intermediate folders in the current
 target; existing legacy pointers remain recognized. It is not part of submission
-or thank-you transport. Both Production rollout variables remain absent, so the
-route is inert and its scheduled write path is not Production-proved. The guarded local
+or thank-you transport. Exact Production `REVIEW_DOCX_SHAREPOINT_WRITE=on` and
+`REVIEW_DOCX_SHAREPOINT_CYCLE=D26` are active in Ready activation-proof
+deployment `dpl_E6VKW5Wi8zDTfU1ZRhNsbH9yg9oM`. The guarded local
 backfill produced a clean full-cycle D26 schema-v2 manifest with 23 eligible
 rows plus one visible owner-confirmed test exclusion. The owner selected Request
 `1002874` / Agnes Karasik for the one-file proof and separately approved its
@@ -1139,8 +1140,13 @@ row-by-row reconciliation matched every reviewed identity, destination,
 semantic hash, and unique SharePoint item. Fresh post-write manifest
 `f17eae89d00bf1c85301ae7a0b7ad6f3de37ff394030fbb0d66de793d10b1b64`
 has zero eligible missing files, zero reconcile candidates, zero blockers, and
-only the Request `1003223` test exclusion. Scheduled activation and old-file
-cleanup remain separately owner-gated. Active
+only the Request `1003223` test exclusion. The first authenticated enabled
+sweep returned HTTP 200, resolved exact D26, and attempted no filing because
+that known test row was classified `invalid_snapshot`. Bounded Production logs
+showed no Graph mutation, Dataverse PATCH, or runtime error. The scheduled route
+is active, but the next natural automatic create/pointer path is not yet
+Production-proved; test-row disposition and old-file cleanup remain separate
+owner decisions. Active
 contract: `docs/REVIEW_DOCX_SHAREPOINT_RETENTION_PLAN.md`.
 
 **Phase 4 BUILT (2026-07-03); reliability production-proven 2026-07-28:**

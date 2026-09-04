@@ -18,7 +18,7 @@ related:
 
 # Where We're Headed
 
-**Last verified: 2026-09-03.** This document owns long-term direction and principles. The
+**Last verified: 2026-09-04.** This document owns long-term direction and principles. The
 ordered, current delivery agenda lives in `docs/CURRENT_WORK_QUEUE.md`; this document is not a
 backlog.
 
@@ -149,9 +149,8 @@ valid 60,586-byte aggregated DOCX and the bounded post-deploy error scan was
 empty. The courtesy path is deployed and source/test/render verified but was not
 email-send smoked. The separately approved individual-review retention work is
 now Production-live at `3ba2a6ad` in Ready deployment
-`dpl_22wUzC1cCi4nhKTSFQftfaycucSh`: both rollout variables are absent, an
-authenticated route call returned `enabled:false`, and the maintenance-run
-population remained zero before/after. Wave 3's dry-run-first D26 backfill
+`dpl_22wUzC1cCi4nhKTSFQftfaycucSh`; that release first proved the flag-off
+boundary. Wave 3's dry-run-first D26 backfill
 script and content-free manifest/execution contract are source-built with
 focused tests. Claude's adversarial review returned APPROVE WITH NON-BLOCKING
 NOTES and the accepted hardening is incorporated. The first read-only Production
@@ -203,8 +202,15 @@ runtime was promoted before the owner-approved exact manifest executed. The
 result reports 22 created and zero failed; all suggestion identities,
 destinations, semantic hashes, and unique SharePoint items reconcile. A fresh
 post-write Production survey has zero eligible missing files, zero reconcile
-candidates, zero blockers, and only the visible test exclusion. Scheduled
-automatic filing remains disabled and legacy-file cleanup remains owner-gated.
+candidates, zero blockers, and only the visible test exclusion. Wave 5 then set
+exact Production `REVIEW_DOCX_SHAREPOINT_WRITE=on` and
+`REVIEW_DOCX_SHAREPOINT_CYCLE=D26` and redeployed the hourly route in Ready
+activation-proof deployment `dpl_E6VKW5Wi8zDTfU1ZRhNsbH9yg9oM`. Its first
+authenticated enabled run returned HTTP 200, attempted no filing, and made no
+SharePoint document or Dataverse pointer mutation because the sole candidate was
+known test Request `1003223`, classified `invalid_snapshot`; the bounded error
+scan was empty. The next natural automatic filing remains unproved. Test-row
+disposition and legacy-file cleanup remain owner decisions.
 Final Writeup persona
 access proof and deliberate enablement remain preserved immediately afterward.
 As of 2026-08-31, the ordinary-staff
