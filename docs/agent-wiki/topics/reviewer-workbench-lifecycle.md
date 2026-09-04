@@ -1128,12 +1128,11 @@ guarded generation/upload advanced the same stable item to version `4.0` at
 `2026-09-04T00:59:51Z`, retained versions `1.0`–`3.0`, and independently
 reverified the same v4 hash with unchanged pointers. The owner visually confirmed
 version `4.0` in Word Online and approved the v4 header on 2026-09-03; the
-runtime fix is not deployed. The owner-directed path
-simplification and historical v2 Word-web correction produced replacement manifest hash
-`25f10fcd0347d7de02abcc8a744357d4e215fe56efa462ff8cc0a6eef99650ff`, with 22
-eligible missing files at unique destinations plus the same visible test
-exclusion and no completed Request `1002874` candidate. It is superseded by v4
-and must be regenerated before execution. No additional write or
+runtime fix is not deployed. Fresh v4 population manifest hash
+`9254df9e5e504c79007391efc85d189e89e8b8b2ff80b8e4f11990baca08f4f8` contains
+22 eligible missing files at unique destinations plus the same visible test
+exclusion, zero blockers, and no completed Request `1002874` candidate. Exact
+comparison found no added or removed suggestion IDs versus the prior survey. No additional write or
 old-file cleanup is approved. Active
 contract: `docs/REVIEW_DOCX_SHAREPOINT_RETENTION_PLAN.md`.
 

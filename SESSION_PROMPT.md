@@ -155,12 +155,13 @@ folder with filename `Review-<request>-<reviewer name>.docx`; no
 `Reviewer_Uploads/Generated` or suggestion-GUID layer remains in the current
 target. The old Request `1002874` item remains unchanged and recognized for
 compatibility. Because the governed hash and target identity changed, the prior
-22-row manifest is superseded. Fresh read-only manifest
-`outputs/review-docx-backfill/review-docx-D26-2026-09-03T23-02-20-955Z.json`
-has hash `25f10fcd0347d7de02abcc8a744357d4e215fe56efa462ff8cc0a6eef99650ff`,
+22-row manifest is superseded. Fresh v4 read-only manifest
+`outputs/review-docx-backfill/review-docx-D26-2026-09-04T01-18-31-489Z.json`
+has hash `9254df9e5e504c79007391efc85d189e89e8b8b2ff80b8e4f11990baca08f4f8`,
 22 eligible missing files, one visible Request `1003223` test exclusion, zero
 blockers, 22 unique destinations, and no Request `1002874` candidate. No
-additional population write was approved. The owner then authorized an exact
+suggestion IDs were added or removed versus the prior survey; the apparent new
+reviews were already included. No additional population write was approved. The owner then authorized an exact
 Request `1002874` repair that leaves the old file for later cleanup. Hash-bound
 manifest
 `outputs/review-docx-repair/review-docx-repair-1002874-2026-09-03T23-21-31-299Z.json`

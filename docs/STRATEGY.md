@@ -173,10 +173,8 @@ file through akoyaGO/Word for the web split the tab-positioned first-page title.
 The branch first directly right-aligned both review-template titles without tabs
 and targets generated retention at request-level
 `Reviews/Review-<request>-<reviewer name>.docx`; focused tests and rendered
-inspection passed. Replacement manifest hash
-`25f10fcd0347d7de02abcc8a744357d4e215fe56efa462ff8cc0a6eef99650ff`
-contains 22 eligible missing files with unique destinations plus the same
-visible test exclusion and no Request `1002874` candidate. The owner-authorized
+inspection passed. The earlier replacement manifest was later superseded by
+the approved v4 governed hash. The owner-authorized
 exact repair then created and verified
 `Reviews/Review-1002874-Agnes Karasik.docx`, repointed Dataverse, and retained
 the old item for later cleanup. Owner inspection showed that Word Online kept
@@ -198,8 +196,11 @@ wrote the same generated v4 output to the same item as version `4.0`, retained
 versions `1.0`–`3.0`, and independently reverified the v4 hash and unchanged
 pointers. The v4 fix remains undeployed, and the historical remaining-population
 manifest is superseded. The owner visually confirmed version `4.0` in Word
-Online and approved the v4 header on 2026-09-03. Template/path-fix promotion now
-precedes a fresh Wave 4 manifest and any
+Online and approved the v4 header on 2026-09-03. Fresh v4 population manifest
+hash `9254df9e5e504c79007391efc85d189e89e8b8b2ff80b8e4f11990baca08f4f8`
+contains 22 eligible missing files, one visible test exclusion, zero blockers,
+and no suggestion-ID changes versus the preceding survey. Template/path-fix
+promotion now precedes any
 remaining writes.
 Final Writeup persona
 access proof and deliberate enablement remain preserved immediately afterward.

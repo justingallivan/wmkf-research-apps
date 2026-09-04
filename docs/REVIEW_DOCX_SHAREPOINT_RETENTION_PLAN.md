@@ -52,10 +52,11 @@ Owner inspection still rejected the floating-logo alignment. The owner-edited
 v4 header replaces it with a fixed two-column text table; a third exact content
 repair versioned the same item from `2.0` to `3.0`, and independent readback
 matched the v4 governed hash with unchanged pointers.
-Historical replacement manifest hash
-`25f10fcd0347d7de02abcc8a744357d4e215fe56efa462ff8cc0a6eef99650ff` has 22
-eligible missing files, the same visible test exclusion, and zero blockers, but
-is superseded by the v4 governed hash and must be regenerated. No
+Fresh v4 replacement manifest hash
+`9254df9e5e504c79007391efc85d189e89e8b8b2ff80b8e4f11990baca08f4f8` has 22
+eligible missing files, the same visible test exclusion, zero blockers, and 22
+unique eligible destinations. Its exact suggestion set is unchanged from the
+preceding survey; no new qualifying rows appeared. No
 additional backfill write, old-file cleanup, or forward activation is
 authorized.**
 
@@ -245,12 +246,12 @@ an independent post-write regeneration/download again returned `already_filed`
 with the same v4 hash and unchanged pointers. Owner Word Online visual
 confirmation of version `4.0` was supplied on 2026-09-03, and the owner approved
 the v4 header. Because the governed hash covers all `word/` parts, the prior
-remaining-population manifest is superseded.
-Replacement manifest
-`outputs/review-docx-backfill/review-docx-D26-2026-09-03T23-02-20-955Z.json`
-has hash `25f10fcd0347d7de02abcc8a744357d4e215fe56efa462ff8cc0a6eef99650ff`,
+remaining-population manifest was superseded. Fresh v4 replacement manifest
+`outputs/review-docx-backfill/review-docx-D26-2026-09-04T01-18-31-489Z.json`
+has hash `9254df9e5e504c79007391efc85d189e89e8b8b2ff80b8e4f11990baca08f4f8`,
 22 eligible missing files, one visible Request `1003223` test exclusion, zero
-blockers, and no completed Request `1002874` candidate.
+blockers, and no completed Request `1002874` candidate. Exact comparison with
+the prior survey found no added or removed suggestion IDs.
 
 ## Product contract
 
@@ -840,8 +841,11 @@ WRITE APPROVED.**
 - [x] After the v2 template and path corrections, produce a replacement manifest: 22
   eligible missing files, one visible test exclusion, zero blockers, hash
   `25f10fcd0347d7de02abcc8a744357d4e215fe56efa462ff8cc0a6eef99650ff`.
-- [ ] Regenerate the remaining-population manifest with the v4 governed hash;
-  the earlier manifest is superseded and must not execute.
+- [x] Regenerate the remaining-population manifest with the v4 governed hash:
+  22 eligible missing files, one visible test exclusion, zero blockers, hash
+  `9254df9e5e504c79007391efc85d189e89e8b8b2ff80b8e4f11990baca08f4f8`.
+  Exact comparison found no added or removed suggestion IDs versus the prior
+  survey; the earlier manifest remains superseded and must not execute.
 - Stop for explicit approval of the remaining bounded write set.
 - Execute, reconcile every suggestion identity, and prove a clean rerun.
 
@@ -889,7 +893,9 @@ Claims: Waves 1–2 implementation and flag-off Production deployment VERIFIED;
   filename SOURCE/TEST/READ-ONLY-MANIFEST VERIFIED; exact manifest-bound
   Request 1002874 relocation repair and independent new/old item readback
   VERIFIED; exact same-item v3 and v4 content repairs, retained prior-version
-  history, and independent current-hash/pointer readback VERIFIED;
+  history, independent current-hash/pointer readback, owner Word Online approval,
+  and fresh v4 22-row/no-blocker population survey with no suggestion-ID change
+  versus the preceding survey VERIFIED;
   runtime deployment UNPROVED;
   remaining 22 writes and scheduled activation UNPROVED
 Durable restatements: current no-upload statements remain accurate historical/current baseline
@@ -897,7 +903,7 @@ Structural fix: reconciled plan/queue/strategy/Atlas/runbook/wiki/catalog/memory
   handoff to the observed compatibility defect, source fix, simplified
   request-level Reviews destination, human-readable filename, superseded
   manifest, superseded v2/v3 manifests, exact relocation/content repair results,
-  retained old file and prior SharePoint version, and
+  retained old file and prior SharePoint version, fresh v4 population manifest, and
   explicit visual-confirmation/promotion/cleanup/write gates
 Semantic omissions found: operator-confirmed test data needed an explicit,
   reviewable, hash-bound exclusion contract rather than relaxed validation or a
