@@ -64,10 +64,33 @@ and Operations/Finance retains final authorization to remit.
      Allison, and Sarah initially appeared Reviewed and later Updated, consistent
      with the dashboard's version-freshness state.
 
+5. **Historical Workbench locator shipped and Production-smoked**
+   - [VERIFIED via source, focused tests, independent review, Ready Production
+     deployment, and signed-in browser smoke 2026-09-04] Commits `ebf0b5c5`,
+     `1766f6d2`, `41d2f77c`, and `cd2c73d5` added the inline read-only locator,
+     fixed the Project Leader lookup gap, and gave saturated Contact searches a
+     unique ordering before closeout. Production deployment
+     `dpl_D6r4deRuAwe6xCgwGSmc5WTHWa7W` serves
+     `https://applications.wmkeck.org/workbench`.
+   - Text discovery unions bounded Dataverse Search results with requests joined
+     through up to 25 matching Contact rows on authoritative
+     `_wmkf_projectleader_value`, puts Project Leader matches first, deduplicates,
+     and exposes at most 100 candidates in stable 25-row pages. The secondary
+     full-text leg intentionally remains recall-oriented and can include broad
+     lexical matches after an exact PI match.
+   - Signed-in smoke proved Request `993357` first for PI
+     `Cynthia Reinhart-King`, the same request for title `Phenotypic sorting`,
+     correct exact-number navigation, an honest no-result state, and stable
+     25→50 append with no duplicates. No request data was changed.
+
 ### Commits
 
 - `213f6c34` — Enable Final Writeup persona lenses
 - `29aa4b71` — Record Final Writeup persona rollout
+- `ebf0b5c5` — Add historical Workbench request locator
+- `1766f6d2` — Harden request locator review findings
+- `41d2f77c` — Search historical requests by Project Leader
+- `cd2c73d5` — Stabilize Project Leader search pagination
 - The decision brief and Session 477 handoff are committed together in the
   documentation closeout commit that contains this prompt.
 
@@ -85,28 +108,6 @@ and Operations/Finance retains final authorization to remit.
 2. **Observe the next natural review-DOCX cron filing.** Wave 5 is
    Production-enabled and authenticated zero-work execution passed; the next
    naturally received eligible review remains the runtime proof.
-
-3. **Promote and smoke the broader historical Workbench locator.**
-   **[SOURCE-BUILT 2026-09-04; NOT DEPLOYED]** the approved inline locator now
-   searches by institution, PI, proposal title, cycle, and request status,
-   pages 25 results under a 100-result ceiling, and opens the existing
-   per-request Workbench without changing the active-cycle queue. It uses the
-   existing `reviewers` grant, live filter values, and a read-only bounded
-   endpoint; legacy Search operators are escaped, filters are entity-qualified,
-   escaped expressions beyond the transport limit fail before Dataverse, and
-   25-row pages use native skip plus a total ordering ending in request number.
-   Claude's read-only code review returned **APPROVE WITH CONDITIONS**. The
-   code-addressable conditions are incorporated: live options now use the
-   grant-request adapter's restriction-checked aggregate path, broad-search /
-   load-more / clear races have discriminating tests, negative Search count
-   sentinels cannot render, and the result announcement exists before its first
-   update. Before any broader release checks, the first signed-in promotion
-   smoke must submit a text search with a cycle filter that has more than 25
-   matches, click **Load 25 more**, and verify stable ordered append with no
-   duplicates. Then run the institution/PI/title/exact-number/no-result checks.
-   The enforcing target interlock correctly prevented a local-to-Production
-   Search POST probe, so Production Search order/filter/skip/index behavior
-   remains unproved until that smoke.
 
 ### Verify Before Acting
 
