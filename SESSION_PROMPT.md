@@ -95,10 +95,18 @@ and Operations/Finance retains final authorization to remit.
    endpoint; legacy Search operators are escaped, filters are entity-qualified,
    escaped expressions beyond the transport limit fail before Dataverse, and
    25-row pages use native skip plus a total ordering ending in request number.
-   Before calling it complete, deliberately promote it and run a
-   signed-in institution/PI/title/filter/exact-number/no-result smoke; the
-   enforcing target interlock correctly prevented a local-to-Production Search
-   POST probe, so Production search/filter behavior remains unproved.
+   Claude's read-only code review returned **APPROVE WITH CONDITIONS**. The
+   code-addressable conditions are incorporated: live options now use the
+   grant-request adapter's restriction-checked aggregate path, broad-search /
+   load-more / clear races have discriminating tests, negative Search count
+   sentinels cannot render, and the result announcement exists before its first
+   update. Before any broader release checks, the first signed-in promotion
+   smoke must submit a text search with a cycle filter that has more than 25
+   matches, click **Load 25 more**, and verify stable ordered append with no
+   duplicates. Then run the institution/PI/title/exact-number/no-result checks.
+   The enforcing target interlock correctly prevented a local-to-Production
+   Search POST probe, so Production Search order/filter/skip/index behavior
+   remains unproved until that smoke.
 
 ### Verify Before Acting
 

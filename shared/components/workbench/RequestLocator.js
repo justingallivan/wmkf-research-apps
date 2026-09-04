@@ -215,6 +215,11 @@ export default function RequestLocator() {
   }, [invalidatePending]);
 
   const showingCount = results?.length || 0;
+  const searchAnnouncement = busy
+    ? 'Searching requests.'
+    : results
+      ? `Search complete. ${totalCount.toLocaleString()} result${totalCount === 1 ? '' : 's'}; ${showingCount} shown.`
+      : '';
 
   return (
     <section aria-labelledby="request-locator-heading" className="mb-6">
@@ -305,12 +310,21 @@ export default function RequestLocator() {
           </p>
         )}
         {error && <p className="mt-3 text-sm text-red-700" role="alert">{error}</p>}
+        <p
+          className="sr-only"
+          role="status"
+          aria-label="Request search status"
+          aria-live="polite"
+          aria-atomic="true"
+        >
+          {searchAnnouncement}
+        </p>
       </Card>
 
       {results && (
         <Card hover={false} className="mt-3" padding="p-0">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 px-5 py-3">
-            <p className="text-sm text-gray-600" aria-live="polite">
+            <p className="text-sm text-gray-600">
               <span className="font-semibold text-gray-900">{totalCount.toLocaleString()}</span>{' '}
               result{totalCount === 1 ? '' : 's'}
               {showingCount > 0 ? ` · showing ${showingCount}` : ''}

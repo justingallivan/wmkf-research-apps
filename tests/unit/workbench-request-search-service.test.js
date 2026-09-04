@@ -5,22 +5,19 @@
 const searchRequests = jest.fn();
 const findByIds = jest.fn();
 const queryRequests = jest.fn();
+const aggregateRequests = jest.fn();
 jest.mock('../../lib/dataverse/adapters/grant-request.js', () => ({
   searchRequests: (...args) => searchRequests(...args),
   findByIds: (...args) => findByIds(...args),
   queryRequests: (...args) => queryRequests(...args),
-}));
-
-const fetchXmlAll = jest.fn();
-jest.mock('../../lib/services/dataverse-export/fetch-client.js', () => ({
-  fetchXmlAll: (...args) => fetchXmlAll(...args),
+  aggregateRequests: (...args) => aggregateRequests(...args),
 }));
 
 import {
   loadRequestSearchOptions,
   searchWorkbenchRequests,
   REQUEST_SEARCH_MAX_RESULTS,
-  REQUEST_SEARCH_OPTIONS_FETCH,
+  REQUEST_SEARCH_OPTIONS_AGGREGATES,
   REQUEST_SEARCH_ORDER,
   REQUEST_SEARCH_SELECT,
 } from '../../lib/services/workbench/request-search-service';
@@ -41,33 +38,29 @@ const requestRow = (id, over = {}) => ({
 
 beforeEach(() => {
   jest.clearAllMocks();
-  fetchXmlAll.mockResolvedValue({ rows: [], capped: false, truncatedByBudget: false });
+  aggregateRequests.mockResolvedValue({ results: [] });
   searchRequests.mockResolvedValue({ results: [], totalCount: 0 });
   findByIds.mockResolvedValue({ records: [] });
   queryRequests.mockResolvedValue({ records: [], totalCount: 0, hasMore: false });
 });
 
-test('loads distinct live cycles/statuses and sorts them for the filters', async () => {
-  fetchXmlAll
+test('loads grouped live cycles/statuses and sorts them for the filters', async () => {
+  aggregateRequests
     .mockResolvedValueOnce({
-      rows: [
+      results: [
         { akoya_fiscalyear: 'June 2026' },
         { akoya_fiscalyear: 'December 2025' },
         { akoya_fiscalyear: 'December 2026' },
         { akoya_fiscalyear: 'June 2026' },
         { akoya_fiscalyear: null },
       ],
-      capped: false,
-      truncatedByBudget: false,
     })
     .mockResolvedValueOnce({
-      rows: [
+      results: [
         { akoya_requeststatus: 'Phase II Pending' },
         { akoya_requeststatus: 'Active' },
         { akoya_requeststatus: 'Active' },
       ],
-      capped: false,
-      truncatedByBudget: false,
     });
 
   await expect(loadRequestSearchOptions()).resolves.toEqual({
@@ -79,28 +72,13 @@ test('loads distinct live cycles/statuses and sorts them for the filters', async
     ],
     statuses: ['Active', 'Phase II Pending'],
   });
-  expect(fetchXmlAll).toHaveBeenNthCalledWith(
-    1,
-    'akoya_requests',
-    REQUEST_SEARCH_OPTIONS_FETCH.cycles,
-    { hardCapRows: 500 },
-  );
-  expect(fetchXmlAll).toHaveBeenNthCalledWith(
-    2,
-    'akoya_requests',
-    REQUEST_SEARCH_OPTIONS_FETCH.statuses,
-    { hardCapRows: 500 },
-  );
+  expect(aggregateRequests).toHaveBeenNthCalledWith(1, REQUEST_SEARCH_OPTIONS_AGGREGATES.cycles);
+  expect(aggregateRequests).toHaveBeenNthCalledWith(2, REQUEST_SEARCH_OPTIONS_AGGREGATES.statuses);
 });
 
-test('fails loud when either live option query is truncated', async () => {
-  fetchXmlAll
-    .mockResolvedValueOnce({ rows: [], capped: true, truncatedByBudget: false })
-    .mockResolvedValueOnce({ rows: [], capped: false, truncatedByBudget: false });
-  await expect(loadRequestSearchOptions()).rejects.toMatchObject({
-    httpStatus: 503,
-    message: 'Request search options were incomplete. Please try again.',
-  });
+test('propagates a rejected guarded aggregate without returning partial options', async () => {
+  aggregateRequests.mockRejectedValueOnce(new Error('Access denied'));
+  await expect(loadRequestSearchOptions()).rejects.toThrow('Access denied');
 });
 
 test('text search applies escaped server filters, hydrates rows, and preserves relevance order', async () => {
@@ -209,6 +187,16 @@ test('text search uses native stable paging and advances by indexed hits', async
     nextOffset: 50,
     capped: false,
   });
+});
+
+test('uses the hydrated page size when Search returns a negative total count sentinel', async () => {
+  const id = '11111111-1111-1111-1111-111111111111';
+  searchRequests.mockResolvedValue({ results: [{ objectId: id }], totalCount: -1 });
+  findByIds.mockResolvedValue({ records: [requestRow(id)] });
+
+  const body = await searchWorkbenchRequests({ query: 'university' });
+
+  expect(body).toMatchObject({ totalCount: 1, returnedCount: 1, hasMore: false });
 });
 
 test('filter-only search stays bounded and reports the 100-result ceiling honestly', async () => {

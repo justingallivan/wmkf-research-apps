@@ -251,7 +251,7 @@ describe('grant-request.updateById (exact PATCH body)', () => {
   });
 });
 
-// ──────────────── queryRequests / queryAllRequests (Wave 5c passthroughs) ────────────────
+// ────── queryRequests / queryAllRequests / aggregateRequests passthroughs ──────
 
 describe('grant-request.queryRequests (business-filter passthrough)', () => {
   test('forwards the options object verbatim to queryRecords, returns raw result', async () => {
@@ -272,6 +272,26 @@ describe('grant-request.queryAllRequests (business-filter passthrough)', () => {
     const out = await grantRequest.queryAllRequests(opts);
     expect(out).toBe(result);
     expect(qAll).toHaveBeenCalledWith('akoya_requests', opts);
+  });
+});
+
+describe('grant-request.aggregateRequests (business-aggregation passthrough)', () => {
+  test('forwards the options object verbatim to aggregateRecords, returns raw result', async () => {
+    const result = {
+      results: [{ akoya_fiscalyear: 'December 2026', value: 10 }],
+      operation: 'countdistinct',
+      field: 'akoya_requestid',
+      groupBy: 'akoya_fiscalyear',
+    };
+    const aggregate = jest.spyOn(DynamicsService, 'aggregateRecords').mockResolvedValue(result);
+    const opts = {
+      field: 'akoya_requestid',
+      operation: 'countdistinct',
+      groupBy: 'akoya_fiscalyear',
+    };
+    const out = await grantRequest.aggregateRequests(opts);
+    expect(out).toBe(result);
+    expect(aggregate).toHaveBeenCalledWith('akoya_requests', opts);
   });
 });
 
