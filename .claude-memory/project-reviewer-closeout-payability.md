@@ -1,11 +1,11 @@
 ---
 name: project-reviewer-closeout-payability
-description: "Owner ask (S343) — add a PD \"did-their-duty / payable-or-not\" disposition to review closeout so ops has a clean signal; the accept-side guardrail for reviewer/test-case limbo."
+description: "Approved direction — PD reviewer closeout records eligible/not eligible/not applicable on the engagement; Operations/Finance retains final remit authority."
 status: active
 metadata: 
   node_type: memory
   type: project
-  last_verified: 2026-07-22 via reviewer-suggestion adapter, Atlas, and repo-wide payability search
+  last_verified: 2026-09-04 via owner decisions, reviewer-suggestion source, Production metadata, and honorarium/request flag probes
   originSessionId: 4eb6d1fe-c277-43b8-977b-92cc18644286
 ---
 
@@ -25,15 +25,16 @@ Owner-endorsed direction (Justin, S343, 2026-07-07). Two-part framing for the
    via `hardDeleteById`. Primitives already exist. See [[project-reviewer-closed-work-archive]]
    context in [[reviewer-workbench-lifecycle]] wiki.
 
-2. **Accept-side "oops, don't pay" → annotation, NOT teardown (THIS action item).**
+2. **Accept-side "oops, don't pay" → annotation, NOT teardown (APPROVED,
+   implementation pending).**
    Never delete the honorarium `akoya_request` (a financial record) for a bad/test
    accept. Instead, extend the **review closeout** so a PD marks payability.
    **SUPERSEDED IN PART (owner, S369, 2026-07-22):** `did_not_serve` is NOT a
    payability value — it is the missing terminal *status*, split into
-   `withdrew` (reviewer bailed) vs `released` (PD stood them down). Payability
-   therefore narrows to the genuinely-completed path, and the terminal status
-   is built FIRST. See [[project-reviewer-reliability-data]]. Ops reads the
-   payability flag when deciding payment.
+   `withdrew` (reviewer bailed) vs `released` (PD stood them down). Eligibility
+   therefore belongs only to the received-review closeout path. See
+   [[project-reviewer-reliability-data]]. Operations/Finance consumes the
+   closeout disposition separately when deciding payment.
 
 **Why:** post-accept resets are rare and dangerous (they orphan honorarium
 requests, uploaded reviews, review-answer snapshots). Payment is already manual +
@@ -42,11 +43,23 @@ offline by check until … separately approved and verified"), so an annotation 
 sufficient — it decouples limbo/reset (data side, potential/invited) from
 don't-pay (annotation, accept side) and never touches the money path.
 
-**[VERIFIED via source/Atlas, 2026-07-22]:** no payability/did-not-serve field exists in
-the adapter or Atlas; this remains unbuilt. Closeout today only writes `wmkf_reviewstatus=complete` +
-`wmkf_completedat` (a binary "done" marker — no payability). This is ADDITIVE: one
-new field (payability disposition or boolean) on `wmkf_appreviewersuggestion`, set
-in the existing closeout UI, surfaced wherever ops views honorarium requests. Low
-effort; scope as its own tiny feature separate from the reset button. Closeout
-writer: `reviewStatus:'complete'` path in review-manager; field would need Atlas +
-schema-as-code coverage (new durable column).
+**[OWNER DECISION 2026-09-04]:** Complete means the lead PD evaluated and closed
+a received review. The same one-row, ETag-bound action records `eligible`,
+`not_eligible`, or `not_applicable` on `wmkf_appreviewersuggestion`. Null means
+no disposition recorded. The thank-you remains a receipt acknowledgement and
+must not set Complete. No closeout path writes
+`akoya_request.wmkf_authorizationtoremitpaymentflag`; Operations/Finance retains
+that separate final authority.
+
+**[VERIFIED via read-only Production metadata 2026-09-04]:** the suggestion table
+has 109 attributes and no honorarium-eligibility/payability field. The planned
+local Picklist `wmkf_honorariumeligibility` is therefore additive and remains
+unbuilt. All 159 exact honorarium requests had the separate authorization flag
+explicitly false, while a broader Research-request scan found 87 true values;
+the field is live elsewhere but is not the reviewer-closeout signal.
+
+Implementation contract:
+`docs/REVIEWER_COMPLETION_AND_HONORARIUM_DECISION_BRIEF.md`. Operations-facing
+visibility from the linked honorarium request remains the external rollout
+prerequisite; never compensate for a missing consumer by writing the final remit
+flag.

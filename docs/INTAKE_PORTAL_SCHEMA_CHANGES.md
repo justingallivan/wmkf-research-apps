@@ -89,7 +89,13 @@ Host-entity history: Connor's 2026-05-26 decision said "junction." An earlier dr
 
 **Rationale:** The Request Workbench (S195 design reframe, scoped in S196) needs a per-engagement "PD has closed this out" signal so the PD dashboard can filter `wmkf_reviewstatus != complete` and show "closed out N days ago." The existing `wmkf_reviewstatus` picklist already has a `complete` value (100000004) that was previously unused (Connor confirmed S196) — the Workbench claims it for "PD has read the review and is done paying attention" semantics. The new `wmkf_completedat` field pairs with that state, closing the only transition on the row that previously had no paired timestamp (existing pattern: `emailsentat`, `materialssentat`, `responsereceivedat`, `reviewreceivedat`, `thankyousentat`).
 
-Distinct from `wmkf_reviewreceivedat`: that field marks when the *reviewer* submitted (payment-eligibility signal for Steph); `wmkf_completedat` marks when the *PD* finished processing.
+Distinct from `wmkf_reviewreceivedat`: that field marks when the *reviewer*
+submitted; `wmkf_completedat` marks when the *PD* finished processing. The
+parenthetical payment-eligibility interpretation recorded here in S196 was
+superseded by the 2026-09-04 owner decision: receipt alone is not eligibility.
+The approved, not-yet-built closeout contract adds a separate engagement
+disposition, while Operations/Finance retains final remit authority. See
+`docs/REVIEWER_COMPLETION_AND_HONORARIUM_DECISION_BRIEF.md`.
 
 **Changes:**
 
@@ -97,7 +103,7 @@ Distinct from `wmkf_reviewreceivedat`: that field marks when the *reviewer* subm
 
 | Schema name | Logical name | Type | Required | Notes |
 |---|---|---|---|---|
-| `wmkf_CompletedAt` | `wmkf_completedat` | DateTime | None (nullable) | Set by the Request Workbench when PD clicks "Close out." No PA / no downstream automation reacts to it; pure record-keeping + dashboard surface. |
+| `wmkf_CompletedAt` | `wmkf_completedat` | DateTime | None (nullable) | Set by the Request Workbench when the PD closes the engagement. The original S196 no-trigger interpretation is historical; the approved 2026-09-04 contract pairs this timestamp with a separate engagement disposition, without writing the honorarium request's final remit flag. |
 
 **Verification:** Live metadata GET on `EntityDefinitions(LogicalName='wmkf_appreviewersuggestion')/Attributes?$filter=LogicalName eq 'wmkf_completedat'` confirmed `AttributeType=DateTime, IsCustomAttribute=true`. Throwaway verification script (run-and-delete pattern).
 

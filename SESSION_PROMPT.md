@@ -8,10 +8,10 @@ reviewers Complete. The review found that the draft conflated review receipt,
 automated thank-you processing, PD approval of the review, honorarium
 eligibility, and final authorization to remit.
 
-The owner restored an important business requirement at closeout: a Program
-Director may approve a completed review and thereby make the reviewer eligible
-for an honorarium. The thank-you cron must therefore not consume the Complete
-state until the approval/payability contract is settled.
+The owner restored an important business requirement at closeout and settled
+the contract on 2026-09-04: a Program Director closes a received review with an
+engagement-level honorarium disposition; thank-you processing remains separate;
+and Operations/Finance retains final authorization to remit.
 
 ### What Was Completed
 
@@ -21,10 +21,11 @@ state until the approval/payability contract is settled.
      Director, Program Coordinator, Leadership, overlap, ineligible, and
      superuser projections.
    - [VERIFIED via Production deployment and durable reconciliation] Commit
-     `29aa4b71` recorded the rollout. One natural signed-in non-superuser
-     dashboard observation remains useful rather than release-blocking.
+     `29aa4b71` recorded the rollout. [OWNER-REPORTED 2026-09-04] Duncan Spore
+     subsequently completed the natural signed-in non-superuser History,
+     matrix, and Word-link observation on Request `1002788`.
 
-2. **Reviewer Complete-status proposal reviewed**
+2. **Reviewer Complete-status contract approved**
    - The draft `outputs/codex-prompt-2026-09-03-reviewer-complete-status.md`
      proposed a deeper green Complete badge and automatic Complete transitions
      from the thank-you cron.
@@ -35,20 +36,33 @@ state until the approval/payability contract is settled.
    - [VERIFIED via `lib/services/review-manager/send-emails-service.js`] The
      retained manual compatibility path marks a nonterminal reviewer Complete
      only after a successful thank-you send.
-   - The runtime proposal **NEEDS REWORK**: a pre-send Complete transition could
-     report completion after a failed send and would bypass the human PD review
-     approval remembered by the owner.
+   - [OWNER DECISION 2026-09-04] Complete means a lead-PD human closeout of a
+     received review and carries `eligible`, `not_eligible`, or
+     `not_applicable`; no thank-you path sets it.
+   - [OWNER DECISION 2026-09-04] The app never writes
+     `wmkf_authorizationtoremitpaymentflag`; Operations/Finance retains final
+     remit authority.
 
-3. **Completion/payability discussion brief created**
-   - `docs/REVIEWER_COMPLETION_AND_HONORARIUM_DECISION_BRIEF.md` separates review
-     receipt, thank-you processing, PD approval, honorarium eligibility, and
-     final authorization to remit.
+3. **Completion/payability implementation brief approved**
+   - `docs/REVIEWER_COMPLETION_AND_HONORARIUM_DECISION_BRIEF.md` is now the
+     reconciled implementation contract for review receipt, thank-you,
+     closeout, eligibility, and final-remit separation.
    - [VERIFIED via repository-wide source search] The application has no writer
      for `wmkf_authorizationtoremitpaymentflag`; marking a reviewer Complete does
      not currently authorize the linked honorarium request.
-   - [VERIFIED via `.claude-memory/project-reviewer-closeout-payability.md`] A
-     PD-entered payability disposition was previously proposed but remains
-     unbuilt.
+   - [VERIFIED via read-only Production metadata 2026-09-04] No reviewer-level
+     eligibility/payability field currently exists; the approved
+     `wmkf_honorariumeligibility` Picklist remains planned.
+   - [VERIFIED via read-only Production rows 2026-09-04] All 159 exact
+     honorarium requests had the final-remit flag explicitly false. A broader
+     Research-request scan found 87 true values, so the field remains live
+     elsewhere rather than serving as reviewer closeout.
+
+4. **Natural Final Writeups dashboard check completed**
+   - [OWNER-REPORTED 2026-09-04] Duncan Spore found Request `1002788` in History,
+     saw the review matrix, and opened the Word document successfully. Duncan,
+     Allison, and Sarah initially appeared Reviewed and later Updated, consistent
+     with the dashboard's version-freshness state.
 
 ### Commits
 
@@ -59,50 +73,16 @@ state until the approval/payability contract is settled.
 
 ## Next Items
 
-### Owner Decision Needed
-
-1. **Define PD review approval and honorarium eligibility.** Recommended: the PD
-   confirms that the returned review satisfactorily fulfilled the engagement;
-   that action sets `reviewStatus=complete` and `wmkf_completedat`.
-   Evidence: `docs/REVIEWER_COMPLETION_AND_HONORARIUM_DECISION_BRIEF.md`.
-
-2. **Choose eligibility versus final-remit authority.** Recommended: the PD
-   records a dedicated reviewer-engagement payability value, while
-   Operations/Finance retains the honorarium request's final
-   `wmkf_authorizationtoremitpaymentflag`. The alternative—PD approval directly
-   setting that flag—requires an explicit owner/Operations decision.
-   Evidence: `.claude-memory/project-reviewer-closeout-payability.md` and
-   `.claude-memory/project-honorarium-payment-landscape.md`.
-
-3. **Choose the payability dispositions.** Decide whether the human step needs
-   at least `eligible`, `not_eligible`, and `not_applicable`, and how an
-   unsatisfactory received review should appear without repurposing the
-   pre-review terminal statuses `withdrew` or `released`.
-   Evidence: `docs/REVIEWER_COMPLETION_AND_HONORARIUM_DECISION_BRIEF.md`.
-
-4. **Confirm thank-you timing.** Current behavior thanks the reviewer after
-   receipt, before PD approval. Recommended: keep communication and approval
-   independent unless the email itself is intended to communicate acceptance of
-   the work. Evidence: `lib/services/reviewer-thankyou-sweep.js`.
-
 ### Verified Open
 
-1. **Revise the Complete-status implementation prompt after the decisions.**
-   Retain the presentation-only deeper-green Complete badge. Do not instruct the
-   cron to mark Complete unless the owner explicitly overturns the human
-   approval model.
+1. **Implement the approved reviewer closeout contract on a feature branch.**
+   Follow `docs/REVIEWER_COMPLETION_AND_HONORARIUM_DECISION_BRIEF.md`: additive
+   schema first, one-row ETag closeout, no final-remit write, generic Complete
+   rejection, thank-you decoupling, and deeper-green badge. Operations must
+   confirm where the disposition will be visible from the honorarium request
+   before end-to-end Production rollout.
 
-2. **Plan the PD approval/payability flow with `/contract-reconcile`.** Trace UI
-   → authenticated route → ETag-guarded reviewer write → linked honorarium →
-   eligibility/remit write → Operations consumer. Include partial success,
-   opt-out, missing-link, terminal, duplicate-click, and concurrency behavior.
-
-3. **Observe one signed-in non-superuser Final Writeups dashboard.** Duncan Spore
-   should open Final Writeups, select History, and confirm Request `1002788`
-   appears with its matrix and working document link. This is post-release
-   evidence, not a release blocker.
-
-4. **Observe the next natural review-DOCX cron filing.** Wave 5 is
+2. **Observe the next natural review-DOCX cron filing.** Wave 5 is
    Production-enabled and authenticated zero-work execution passed; the next
    naturally received eligible review remains the runtime proof.
 
@@ -112,10 +92,9 @@ state until the approval/payability contract is settled.
    sweep claims that marker before send and retains it after a post-claim
    failure. It proves neither PD approval nor guaranteed delivery.
 
-2. **Preserve the unrelated untracked probe in the original checkout.**
-   Stop-time `git status` on `/Users/gallivan/Code/WMKF_Apps` showed
-   `scripts/probe-request-review-receipts.mjs` untracked. It was not created,
-   modified, staged, or committed during this closeout.
+2. **Reviewer-receipt probe branch location.** The formerly untracked
+   `scripts/probe-request-review-receipts.mjs` was preserved and committed as
+   `65e212ed` on `codex/final-writeup-personas-enable`; it is not on `main`.
 
 ### Parked
 
@@ -126,15 +105,15 @@ state until the approval/payability contract is settled.
 
 1. **BILL API reviewer onboarding.** The BILL integration remains tabled; the PD
    approval/payability discussion does not authorize reviving it.
-2. **Automatically mark reviewers Complete from the thank-you cron.** The draft
-   runtime change is blocked on the owner decisions above.
+2. **Automatically mark reviewers Complete from any thank-you path.** The owner
+   explicitly rejected that coupling on 2026-09-04.
 
 ## Key Files Reference
 
 | File | Purpose |
 | --- | --- |
-| `docs/REVIEWER_COMPLETION_AND_HONORARIUM_DECISION_BRIEF.md` | Next-session discussion and recommended separation of responsibilities. |
-| `outputs/codex-prompt-2026-09-03-reviewer-complete-status.md` | Draft implementation prompt; runtime portion needs rework. |
+| `docs/REVIEWER_COMPLETION_AND_HONORARIUM_DECISION_BRIEF.md` | Approved implementation contract and invariant table. |
+| `outputs/codex-prompt-2026-09-03-reviewer-complete-status.md` | Ignored historical working prompt; superseded by the tracked brief. |
 | `shared/components/reviewers/reviewer-modes.js` | Reviewer status labels, ordering, and badge colors. |
 | `lib/services/reviewer-thankyou-sweep.js` | Automated thank-you eligibility, claim, attachment, and send behavior. |
 | `lib/services/review-manager/send-emails-service.js` | Retained manual thank-you compatibility behavior. |
@@ -246,8 +225,8 @@ on `main` at `213f6c34` in Ready deployment
 the deployed source verified Program Director, Program Coordinator,
 Leadership, PD + Leadership overlap, ineligible/unassigned, and superuser
 projections; no data was written. The isolated browser reached the expected
-sign-in boundary, so a signed-in non-superuser dashboard observation remains
-useful on the next natural staff visit rather than a release blocker.
+sign-in boundary; Duncan's later owner-reported signed-in non-superuser check
+completed the natural dashboard observation.
 The active plan is `docs/REVIEW_DOCX_SHAREPOINT_RETENTION_PLAN.md`. Claude's
 read-only adversarial review of the plan returned
 APPROVE WITH CONDITIONS; the plan now incorporates the verified eligibility,

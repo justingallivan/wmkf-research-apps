@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-07-27
+last_verified: 2026-09-04
 stale_after_days: 90
 owner: finance-ops
 source_files:
@@ -37,6 +37,19 @@ source, Atlas, and the Power Automate owner before testing against production.
 - External accept automation hazard: `project-reviewer-accept-prod-automation`.
 
 ## Honorarium Request Creation And BILL Deferral
+
+**Reviewer closeout decision (owner-approved 2026-09-04; implementation
+pending):** a Program Director will record `eligible`, `not_eligible`, or
+`not_applicable` on the reviewer engagement when closing a received review.
+That is not final authorization to pay. The application will not write
+`akoya_request.wmkf_authorizationtoremitpaymentflag`; Operations/Finance retains
+that control. Read-only Production probes found the flag explicitly false on all
+159 exact honorarium requests, while 87 broader Research requests were true, so
+the field is live elsewhere rather than the reviewer-closeout signal. The
+planned `wmkf_appreviewersuggestion.wmkf_honorariumeligibility` Picklist was
+absent from the 109-attribute Production metadata response. Implementation and
+the Operations-visibility prerequisite are specified in
+`docs/REVIEWER_COMPLETION_AND_HONORARIUM_DECISION_BRIEF.md`.
 
 **OWNER DECISION 2026-07-12: the BILL API integration is TABLED for several
 months, possibly permanently.** Reviewer onboarding will instead use the

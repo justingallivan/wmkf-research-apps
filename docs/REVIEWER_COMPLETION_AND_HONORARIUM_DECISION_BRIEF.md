@@ -1,199 +1,278 @@
 ---
-title: Reviewer Completion and Honorarium Decision Brief
+title: Reviewer Completion and Honorarium Implementation Brief
 domain: reviewer-workbench
-kind: decision
-status: draft
-summary: "Discussion brief separating review receipt, automated thank-you processing, PD review approval, honorarium eligibility, and final authorization to remit."
+kind: plan
+status: active
+summary: "Approved contract separating review receipt, thank-you, PD closeout and honorarium eligibility, and final authorization to remit."
 canonical: false
 cataloged: 2026-09-03
+last_verified: 2026-09-04
 owner: product-engineering
 related:
-  - docs/REQUEST_WORKBENCH_SCOPING.md
+  - docs/REVIEWER_DATA_MODEL.md
+  - docs/atlas/dataverse-wmkf-appreviewersuggestion.md
   - docs/agent-wiki/topics/reviewer-workbench-lifecycle.md
   - docs/agent-wiki/topics/finance-honoraria.md
   - .claude-memory/project-reviewer-closeout-payability.md
 ---
 
-# Reviewer Completion and Honorarium Decision Brief
+# Reviewer Completion and Honorarium Implementation Brief
 
-## Purpose
+## Status and owner decisions
 
-This document preserves the open product discussion about what **Review
-Received**, **Thanked**, and **Complete** should mean when a Program Director's
-review approval may also make a reviewer eligible for an honorarium. It is a
-discussion brief, not an approved implementation plan.
+This is the approved build contract for reviewer closeout. It supersedes the
+runtime portion of the ignored working prompt
+`outputs/codex-prompt-2026-09-03-reviewer-complete-status.md`, which incorrectly
+defined Complete as “review received and reviewer thanked.”
 
-The immediate conclusion is that the automated thank-you cron should **not** be
-changed to mark reviewers Complete until the human approval and payment-control
-semantics are settled.
+- [OWNER DECISION, 2026-09-04] **Complete** means that the Program Director has
+  evaluated and closed a received review. It is not an email-delivery state.
+- [OWNER DECISION, 2026-09-04] The closeout records one of `eligible`,
+  `not_eligible`, or `not_applicable` on the reviewer engagement.
+- [OWNER DECISION, 2026-09-04] The application does **not** write
+  `akoya_request.wmkf_authorizationtoremitpaymentflag`. Operations/Finance
+  retains final payment authority.
+- [OWNER DECISION, 2026-09-04] The thank-you remains prompt and independent: it
+  acknowledges receipt, does not mark Complete, and does not imply approval or
+  payment eligibility.
+- [OWNER DECISION, 2026-09-04] Existing thank-you markers are not evidence of PD
+  approval and must not be used for a backfill.
 
-## Verified Current State
+The deeper-green Complete badge remains approved as a presentation-only change.
 
-### Review receipt
+## Verified baseline
 
-- [VERIFIED via `lib/services/reviewer-thankyou-sweep.js:137-142`] The automated
-  thank-you sweep treats `wmkf_reviewreceivedat` as the durable signal that a
-  review was received.
-- [VERIFIED via `lib/services/review-receipt-guard.js:32-44`] Current receipt
-  writers accept only an active, accepted, nonterminal engagement that does not
-  already have a receipt, and bind the write to the authorizing row ETag.
-- [VERIFIED via `docs/REQUEST_WORKBENCH_SCOPING.md:119-121`] The historical
-  Workbench design treated a returned review as awaiting a separate PD closeout.
-
-### Automated thank-you
-
-- [VERIFIED via `lib/services/reviewer-thankyou-sweep.js:83-125`] The cron builds
-  the courtesy attachment, claims `wmkf_thankyousentat` with an ETag-conditional
-  write, and then sends the email. It deliberately does not roll the marker back
-  or retry after a post-claim send failure.
-- [VERIFIED via `lib/services/reviewer-thankyou-sweep.js:83-93`] The automated
-  path currently writes only the thank-you marker. It does not set
-  `wmkf_reviewstatus=complete` or `wmkf_completedat`.
-- [VERIFIED via `lib/services/review-manager/send-emails-service.js:910-947`]
-  The retained manual compatibility path differs: after a successful thank-you
-  send, it marks a nonterminal reviewer Complete.
-
-This explains the observed Production behavior: reviewers whose reviews were
-received and whose automated thank-you was processed generally remain **Review
-Received** in the Track Reviewers table.
-
-### Complete / PD closeout
-
-- [VERIFIED via `lib/dataverse/adapters/reviewer-suggestion.js:1764-1886`] A
-  transition to `reviewStatus='complete'` writes the Complete picklist value and
-  idempotently stamps `wmkf_completedat`; if the receipt stamp is empty, the
-  helper also supplies it.
-- [VERIFIED via
-  `lib/dataverse/schema/wave5/01_wmkf_appreviewersuggestion_workbench.json`] The
-  field was introduced for “PD has read the review and is done paying attention”
-  semantics.
-- [VERIFIED via `docs/REQUEST_WORKBENCH_SCOPING.md:119-120`] The historical UI
-  design described Complete as the PD reading the returned review and marking it
-  complete, not merely an email event.
-
-### Honorarium creation and payment control
-
-- [VERIFIED via `.claude-memory/project-honorarium-payment-landscape.md`] For a
-  reviewer who accepts and does not opt out, the portal can create a linked
-  honorarium `akoya_request`; request creation is not proof of payment.
-- [VERIFIED via `lib/dataverse/adapters/reviewer-suggestion.js:2109-2115`] The
-  per-request reviewer engagement stores the link to that honorarium through
-  `wmkf_HonorariumRequest`.
-- [VERIFIED via repository-wide source search, 2026-09-03]
-  `wmkf_authorizationtoremitpaymentflag` has no application writer. Current app
-  source does not automatically authorize remittance when a review becomes
+- [VERIFIED via `shared/components/reviewers/ReviewerManagePanel.js:244-252,
+  319-345,1781-1791`] The generic **Correct recorded status** control currently
+  offers Complete, posts it to the general reviewers PATCH, and refreshes without
+  first checking `response.ok`.
+- [VERIFIED via `pages/api/review-manager/reviewers.js` and
+  `lib/services/reviewer-request-authorization.js:42-133`] The current write path
+  is authenticated and permits only the request's lead PD or a superuser.
+- [VERIFIED via `lib/services/review-manager/reviewers-service.js:451-486`] The
+  general PATCH supports single and sequential batch Complete writes. A failed
+  batch can leave earlier rows changed and returns no partial-success IDs.
+- [VERIFIED via `lib/dataverse/adapters/reviewer-suggestion.js:1764-1886`] The
+  adapter ETag-guards status changes and stamps `wmkf_completedat`, but it also
+  fabricates `wmkf_reviewreceivedat` when Complete is written without a receipt.
+- [VERIFIED via `lib/services/reviewer-thankyou-sweep.js:58-110,131-142`] The
+  automated thank-you flow claims only `wmkf_thankyousentat`; it does not write
   Complete.
-- [VERIFIED via `.claude-memory/project-reviewer-closeout-payability.md`] A later
-  product direction proposed a PD-entered payability disposition at review
-  closeout while retaining a separate Operations payment gate, but that field
-  and workflow remain unbuilt.
+- [VERIFIED via `lib/services/review-manager/send-emails-service.js:909-958`]
+  The retained manual compatibility path currently marks a nonterminal reviewer
+  Complete after a successful thank-you send.
+- [VERIFIED via read-only Production metadata, 2026-09-04T17:47:19Z] The
+  `wmkf_appreviewersuggestion` table has 109 attributes and no field whose name,
+  label, or description denotes honorarium eligibility/payability. The new field
+  below is not provisioned.
+- [VERIFIED via read-only Production rows, 2026-09-04] All 159 rows matching the
+  exact honorarium-request discriminator had
+  `wmkf_authorizationtoremitpaymentflag=false`; none were true or null. A broader
+  Research-request probe found 87 true values, so the field is live elsewhere
+  rather than globally unused.
+- [VERIFIED via repository-wide symbol search, 2026-09-04] Application source has
+  no writer for `wmkf_authorizationtoremitpaymentflag`.
 
-## Why the Proposed Cron Change Is Unsafe as Written
+## Contract map
 
-The reviewed prompt at
-`outputs/codex-prompt-2026-09-03-reviewer-complete-status.md` assumed that
-“review received and reviewer thanked” and “Complete” were the same real-world
-state. The PD-approval scenario shows they are not necessarily the same:
-
-1. a reviewer submits a review;
-2. the automated system sends or attempts the thank-you;
-3. a PD reads the review and decides whether it satisfactorily fulfills the
-   engagement;
-4. that human decision may establish honorarium eligibility;
-5. Operations or Finance separately authorizes and processes remittance.
-
-Marking Complete during the cron's pre-send claim would bypass step 3. It could
-also mark a review Complete even when the subsequent email send fails. Existing
-automatically thanked rows should therefore not be bulk-changed to Complete
-until the meaning of Complete is approved.
-
-## Recommended Lifecycle Model for Discussion
-
-| Event | Suggested authority | Existing durable evidence | Meaning |
+| Event | Authority | Durable state | Meaning |
 | --- | --- | --- | --- |
-| Review received | Reviewer portal or authorized staff receipt path | `wmkf_reviewreceivedat`; status `review_received` | The review exists and can be evaluated. |
-| Thank-you processed | Automated thank-you sweep | `wmkf_thankyousentat` | The at-most-once thank-you workflow was claimed; History remains honest that delivery may not be provable. |
-| Review approved / engagement complete | Program Director | `wmkf_reviewstatus=complete`; `wmkf_completedat` | The PD reviewed and accepted the work. |
-| Honorarium eligibility | Program Director | **Unbuilt; decision required** | The completed review qualifies the reviewer for an honorarium. |
-| Authorization to remit | Operations/Finance | Honorarium request's `wmkf_authorizationtoremitpaymentflag` | The separate financial control permits payment processing. |
+| Review received | Reviewer portal or authorized staff receipt path | `wmkf_reviewreceivedat`; status `review_received` | Review material exists and awaits PD judgment. |
+| Thank-you processed | Automated sweep or retained compatibility sender | `wmkf_thankyousentat` | Courtesy workflow was claimed; it is not approval or guaranteed delivery. |
+| Review closed | Lead PD or superuser | status `complete`; `wmkf_completedat`; `wmkf_honorariumeligibility` | The human closeout decision was recorded. |
+| Authorization to remit | Operations/Finance | honorarium request's `wmkf_authorizationtoremitpaymentflag` | Separate financial control outside this application. |
 
-This model keeps communication, programmatic review approval, and financial
-authorization separate. It also explains why a reviewer can legitimately be
-both **Review Received** and **Thanked** while still awaiting PD approval.
+`wmkf_honorariumeligibility` is the planned logical name for a local Picklist on
+`wmkf_appreviewersuggestion`. Null means no closeout disposition has been
+recorded. The values are:
 
-## Recommended Direction
+| API value | Dataverse label | Meaning |
+| --- | --- | --- |
+| `eligible` | Eligible | The completed review qualifies for the honorarium. |
+| `not_eligible` | Not eligible | The review was received and closed, but does not qualify for payment. |
+| `not_applicable` | Not applicable | No honorarium applies, normally because the reviewer opted out or the engagement has no honorarium request. |
 
-1. Proceed with the presentation-only change that gives the existing Complete
-   badge a deeper success green.
-2. Do **not** make the thank-you cron set Complete.
-3. Preserve or clarify an explicit PD action such as **Approve review / Mark
-   Complete**.
-4. When a linked honorarium exists and the reviewer did not opt out, have that PD
-   action record honorarium **eligibility**.
-5. Preserve a distinct Operations/Finance authorization-to-remit step unless the
-   owner explicitly decides that the PD should control the final remit flag.
-6. For an opt-out reviewer or a reviewer with no linked honorarium, the PD should
-   still be able to approve the review and mark the engagement Complete without
-   a financial write.
-7. Do not backfill existing Review Received rows merely because a thank-you
-   marker exists; those rows may still be waiting for the human approval step.
+The schema wave must pin exact integer values and verify them by metadata
+readback. No default is permitted; null is intentionally distinct from every
+human decision.
 
-## Decisions for the Next Session
+## Implementation invariants
 
-### 1. What exactly does the PD approve?
+| Invariant | Files likely touched | Verification |
+| --- | --- | --- |
+| Complete is reachable only through the dedicated human closeout contract. | `ReviewerManagePanel.js`; reviewers service; new close-review route/service | UI and route tests prove generic single/batch PATCH rejects Complete. |
+| A new closeout requires an accepted, selected, non-excluded `review_received` row with a pre-existing receipt timestamp. | close-review service; reviewer-suggestion adapter | Each absent/invalid prerequisite produces no PATCH. |
+| Status, completion time, and eligibility disposition commit in one ETag-bound update of one suggestion row. | close-review service; reviewer-suggestion adapter | Payload and If-Match tests; 412 returns conflict with no retry/write fan-out. |
+| The closeout path never writes the linked honorarium request or authorization-to-remit flag. | close-review service; tests | Positive fixture includes a linked honorarium; spies prove zero `akoya_request` update. |
+| Thank-you processing writes only its thank-you marker and never Complete or eligibility. | thank-you sweep; manual send compatibility path | Both paths use fixtures that would expose an accidental Complete/eligibility write. |
+| A restored/reused engagement does not inherit a prior closeout decision. | reviewer-suggestion reset set | Reset contract clears `wmkf_honorariumeligibility`; parity test derives the reset set. |
+| Unknown disposition values fail closed. | route; service; adapter maps and reverse maps | Invalid and unmapped values return 400/no write; all three valid values round-trip. |
+| Existing Complete rows are not inferred or bulk-backfilled. | UI/read projection; deployment procedure | Null renders “Closeout disposition not recorded”; no migration updates rows. |
+| Complete remains visible and uses the approved deeper success green. | reviewer modes and Track table | Status partition and class tests remain total. |
 
-Recommended answer: the PD confirms that the returned review satisfactorily
-fulfilled the engagement. That action sets Complete and its timestamp.
+## Closeout rules
 
-### 2. Does PD approval establish eligibility or final payment authorization?
+### New closeout
 
-Recommended answer: it establishes eligibility through a dedicated reviewer-
-engagement payability value. Operations/Finance retains the final
-`wmkf_authorizationtoremitpaymentflag` control on the linked honorarium request.
+The dedicated action accepts one reviewer at a time. The server freshly reads
+the engagement and requires:
 
-Alternative: the PD action directly sets the authorization-to-remit flag. This
-is simpler but merges program approval with a final financial control and should
-be adopted only as an explicit owner/Operations decision.
+1. `wmkf_selected=true` and `wmkf_accepted=true`;
+2. no applicant exclusion;
+3. `wmkf_reviewstatus=review_received`;
+4. non-null `wmkf_reviewreceivedat`; and
+5. one recognized disposition.
 
-### 3. What dispositions are required?
+Disposition-specific validation:
 
-At minimum, decide whether the PD needs more than a positive approval:
+| Disposition | Required server state | Invalid complement |
+| --- | --- | --- |
+| `eligible` | `wmkf_honorariumoptout` is not true **and** `wmkf_HonorariumRequest` is linked | Opt-out or missing link → 409, no write. |
+| `not_eligible` | Received-review prerequisites above | No honorarium link is required; this is still a human judgment about the completed engagement. |
+| `not_applicable` | Opt-out is true **or** no honorarium request is linked | Non-opt-out with a linked honorarium → 409; choose eligible/not eligible. |
 
-- **Eligible / approved** — satisfactory review; Complete.
-- **Not eligible** — review was received but should not be paid.
-- **Not applicable** — reviewer opted out or no honorarium exists.
+On success, one PATCH writes the mapped disposition, `reviewStatus='complete'`,
+and `wmkf_completedat`. It must not write `wmkf_reviewreceivedat`; the receipt
+must already exist.
 
-The existing `withdrew` and `released` terminal statuses describe engagements
-that ended before a satisfactory review; they should not be repurposed as
-post-review payment decisions.
+### Duplicate clicks and corrections
 
-### 4. Should the thank-you wait for PD approval?
+- Two concurrent first-close requests can read the same row, but only one may win
+  the ETag PATCH. The loser returns 409/reload-required; it does not retry with a
+  fresh ETag.
+- Repeating the same disposition on an already Complete row returns an explicit
+  unchanged success and does not re-stamp `wmkf_completedat`.
+- A lead PD or superuser may reopen the same modal as **Edit closeout** and change
+  only the disposition on an already Complete row. That correction is also
+  ETag-bound and leaves status and completion time unchanged.
+- Reopening a Complete engagement to an earlier lifecycle status is out of scope.
 
-Current behavior sends the thank-you after receipt, before PD approval.
-Recommended answer: keep that timing unless staff want the message itself to
-communicate acceptance of the review. The thank-you and approval records should
-remain independent either way.
+This keeps corrections possible without using the generic status picker or
+creating a second timestamp that falsely looks like a new closeout.
 
-### 5. How should existing rows be handled?
+## Build slices
 
-Recommended answer: do not infer PD approval from `wmkf_thankyousentat`. After
-the final model is approved, survey current-cycle rows and expose the PD approval
-action for those still at Review Received. Any automated repair must use the
-approved human-decision evidence rather than the email marker alone.
+### 1. Additive Dataverse schema
 
-## Likely Implementation Shape After Approval
+Add a new `extensions-on-existing` schema wave and exact read-only preflight for
+`wmkf_appreviewersuggestion.wmkf_honorariumeligibility`:
 
-This is deliberately not yet a build plan. A later plan should trace:
+- local Picklist;
+- labels Eligible / Not eligible / Not applicable;
+- nullable, no default;
+- description explicitly distinguishes reviewer eligibility from final
+  authorization to remit.
 
-1. Track Reviewers PD action and server authorization;
-2. the reviewer-suggestion Complete transition and ETag behavior;
-3. the linked honorarium request lookup;
-4. the chosen eligibility persistence field;
-5. whether and where the final remit flag is written;
-6. partial success across the reviewer and honorarium records;
-7. opt-out, missing-link, terminal, duplicate-click, and concurrency behavior;
-8. downstream Operations visibility, Atlas/schema work, tests, and durable-doc
-   reconciliation.
+Apply and read back the additive Production field before deploying runtime that
+selects it. Update the schema manifest and the reviewer-suggestion Atlas page.
 
-Until that contract is approved, the original reviewer-Complete prompt should
-be treated as **NEEDS REWORK**, with only its badge-color portion safe to retain.
+### 2. Adapter and read projection
+
+- Add symmetric API↔integer maps for all three dispositions.
+- Add the raw field to every reviewer-suggestion select/projection that feeds
+  Track Reviewers, closeout authorization, reset/reuse, and Operations-facing
+  export/read surfaces.
+- Add it to `ENGAGEMENT_STAMP_RESET` so a later engagement starts blank.
+- Change the adapter's Complete guard: require an existing receipt and a valid
+  existing-or-same-write disposition; remove the synthetic receipt fallback.
+- Retain the legacy activity-history detector for old equal-timestamp rows, but
+  add a test proving new closeouts cannot create such a pair.
+
+### 3. Dedicated service and route
+
+Add `POST /api/review-manager/close-review` with body
+`{ suggestionId, disposition }`:
+
+1. `requireAppAccess('review-manager', 'reviewers')` before dispatch;
+2. GUID and exact-enum validation;
+3. trusted DAL context and session-derived actor identity;
+4. `authorizeReviewerRequestMutation` for lead-PD/superuser ownership;
+5. one fresh server read of receipt/status/selection/acceptance/opt-out/link/
+   disposition plus ETag;
+6. fail-closed rule validation; and
+7. one ETag-bound reviewer-suggestion update.
+
+Return the exact result shape
+`{ success:true, status:'closed'|'unchanged'|'corrected', suggestionId,
+disposition, completedAt }`. Map stale state to 409 and validation failures to
+400/409 without returning raw Dataverse errors.
+
+There is no batch closeout. Human judgment is per reviewer, and a single-row
+contract avoids the current sequential partial-success problem.
+
+### 4. Track Reviewers UI
+
+- Exclude Complete from **Correct recorded status**, hide that generic control
+  for an already Complete row, and keep the server rejection as the real guard.
+- For a `review_received` row, show **Close review**. The modal identifies the
+  reviewer/request, shows opt-out and linked-honorarium state, and requires one
+  disposition.
+- For a Complete row, show the disposition and **Edit closeout**.
+- Show null on legacy Complete rows as **Closeout disposition not recorded**;
+  never infer it from receipt, thank-you, opt-out, or linked-request state.
+- Check `response.ok`, display the server reason, disable duplicate submission
+  while pending, and refresh only after a confirmed result.
+- Change Complete's badge classes only to `bg-green-200 text-green-900`; preserve
+  labels, ordering, and status buckets.
+
+### 5. Decouple thank-you from completion
+
+- Leave the automated sweep's receipt eligibility, pre-send attachment build,
+  ETag claim, claim-before-send ordering, and at-most-once behavior unchanged.
+- Change the retained manual `thankyou` branch to write only
+  `thankYouSentAt`; remove its `reviewStatus:'complete'` update.
+- Remove the honorarium-processing sentence/token from the seeded and live
+  thank-you default so the message acknowledges receipt without communicating
+  approval or eligibility. Updating the live Dataverse template is a separate,
+  explicitly authorized deployment write; source changes alone do not alter an
+  existing seeded value.
+- Do not backfill Complete or eligibility from `wmkf_thankyousentat`.
+
+### 6. Operations visibility
+
+The application records eligibility but does not authorize payment. Before
+production rollout, confirm with Operations where the reviewer-engagement
+disposition will be visible from the linked honorarium request in AkoyaGO. That
+may be a reverse-related view/form addition owned outside this repository. If no
+Operations consumer exists, the schema/UI release is not end-to-end complete;
+do not compensate by writing `wmkf_authorizationtoremitpaymentflag`.
+
+## Tests and gates
+
+Minimum discriminating coverage:
+
+- all three valid dispositions and invalid/unknown values;
+- missing receipt, wrong source status, unaccepted/unselected/excluded row;
+- eligible + opt-out and eligible + missing-link failures;
+- not-applicable complement rejection;
+- first close, duplicate same choice, correction, and 412 conflict;
+- linked honorarium present while proving no honorarium-request write;
+- single and batch generic PATCH reject Complete;
+- automated and manual thank-you paths write no Complete/eligibility state;
+- reset clears the new field;
+- new closeout cannot synthesize a receipt;
+- DTO/map/select/bucket parity and Complete badge color.
+
+Run focused tests plus the current schema, Atlas, API-route, route/service,
+Dataverse-context, status-enum, docs-catalog, doc-currency, doc-symbol, and
+fact-consistency gates. Run each gate and its self-test sequentially where a
+self-test exists. Use a feature branch: schema plus authenticated runtime changes
+are not Tier 0 and must not land directly on `main`.
+
+## Explicitly out of scope
+
+- Writing or defaulting `wmkf_authorizationtoremitpaymentflag`.
+- BILL API/vendor automation or person-payment rails.
+- Creating another honorarium request at closeout; request creation remains the
+  accept-time workflow.
+- Bulk-inference/backfill from receipt or thank-you timestamps.
+- Reopening completed engagements or repurposing `withdrew`/`released`.
+- Changing the automated thank-you's at-most-once delivery posture.
+
+## Contract-reconcile verdict
+
+**READY TO IMPLEMENT WITH ONE EXTERNAL RELEASE PREREQUISITE:** Operations must
+confirm where the new engagement-level disposition is consumed in AkoyaGO.
+That prerequisite affects end-to-end rollout, not the approved app-side
+contract. The safest build is a one-row ETag closeout with no honorarium-request
+write, so cross-record partial success is N/A by construction.

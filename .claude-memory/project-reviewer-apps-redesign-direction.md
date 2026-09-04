@@ -21,7 +21,10 @@ Do:
 Do not:
 - Propose incremental cleanup to Finder/Manager, or design Workbench as a narrow reviewer-only surface.
 - Re-flag `akoya_requeststatus` values as "unverified," or advance status early for D26 (use the manual request-number allowlist instead — advancing status fires PA triggers prematurely).
-- Treat "Completed" as paying anyone or firing a trigger (option a: record-keeping only, no drop-off).
+- Treat "Completed" as final payment authorization or as an email state. The
+  approved 2026-09-04 design makes it a human PD closeout with a separate
+  engagement-level honorarium-eligibility disposition; Operations/Finance still
+  controls remittance. Completed rows remain visible.
 
 Ground truth: `pages/workbench/[requestId].js`,
 `docs/audits/AUDIT_REQUEST_WORKBENCH_TRUTH_2026-07-26.md`,
@@ -39,7 +42,8 @@ foreign rows are read-only for ordinary non-lead users. Authenticated Production
 proof showed D26 My 10 → All 44 (picker: 44 active + 184 set aside) and J26 My 0
 → All 5 without exercising a write. The Final Writeup persona rollout then
 completed through tracked Production enablement and read-only live-data smoke
-on 2026-09-03 PT; one signed-in non-superuser dashboard observation remains.
+on 2026-09-03 PT. [OWNER-REPORTED 2026-09-04] Duncan Spore then found Request
+`1002788` in History, saw the matrix, and opened the Word document successfully.
 
 **2026-07-29 editor-direction implementation checkpoint:** Allison is a confirmed primary
 user for the Editor lens. The target contract preserves the former
@@ -303,8 +307,9 @@ planned. Current authority is
   configuration is migrated/read back; representative PC and Leadership Word
   access was proved 2026-09-03. Commit `213f6c34` then enabled persona lenses in
   Ready Production deployment `dpl_HGrbWUNPJMJunVevYLVEmtn7He6a`, and the
-  six-case read-only production-data smoke passed. One signed-in
-  non-superuser dashboard observation remains for natural use.
+  six-case read-only production-data smoke passed. [OWNER-REPORTED 2026-09-04]
+  Duncan Spore then completed the signed-in non-superuser History/matrix/Word
+  observation on Request `1002788`.
   **[PRODUCTION-LIVE + SIGNED-IN READ/WRITE PROVED 2026-08-31]** Role
   eligibility is not the same as per-program matrix assignment. Commit
   `5573bca3` is live in Ready Production deployment
@@ -392,7 +397,7 @@ S194 set direction (replace Finder + Manager with Reviewer Workbench + Reviewer 
 
 **S206 mockup + decisions (2026-05-31):** Built the first clickable navigation mockup at `docs/mockups/lifecycle-ui-mockup.html` (self-contained HTML, committed 3f659a6; NOT a live app change — no `pages/` route). Decisions Justin made driving it:
 - **Reviewer-tab structure = 4-tab + status badges, DECIDED S206** (Find / Invite / Track / Completed). The arc within S206: first landed on 3-tab (Find/Roster/Completed) as simpler, then Justin reconsidered and locked 4-tab — "Roster" is a noun that breaks the all-actions label pattern and hides the work; Invite (compose+send) vs Track (monitor+chase) are genuinely different modes worth separating; the white-space worry was inherited from the old standalone Manager and is minor at per-request scale. Resolution = 4-tab with count/status badges on the tab bar (e.g. Track "1 pending · ⚠1", Completed "1 to review · 1 completed"), so the bar doubles as the at-a-glance overview that Roster provided. Badge semantics: each tab surfaces **work-remaining (attention)** — Find # candidates, Invite # to send, Track # pending + ⚠overdue, **Completed # to review (amber, = returned-not-yet-marked)** — and Completed *also* shows # completed (green progress). (Justin asked S206 that "needs your attention" stay visible on Completed, not just a done-count.) Every sub-panel's rows are generated from the same per-request counts so row-count and badge never drift. Default landing is **state-aware** — the earliest funnel step with outstanding PD work (Invite if shortlisted-but-unsent, Track if invited/in-flight, Completed if reviews are back awaiting completion, Find if nothing started); a fixed "always Track" would skip the actionable Invite state. 3-tab kept behind a compare toggle in the mockup only.
-- **"Closeout" disambiguated (S206).** The word was overloaded across two scopes. The per-REVIEWER step (PD reads the returned review and marks it done) is now **"Completed"** — record-keeping only, **NO trigger and NO drop-off** (option a, settled 2026-05-31; see Honorarium note below). The whole-REQUEST endpoint is a separate concern (below).
+- **"Closeout" disambiguated (S206, historical semantics superseded 2026-09-04).** The word was overloaded across two scopes. The per-REVIEWER step (PD reads the returned review and marks it done) was named **"Completed."** S206 treated it as record-keeping only with no trigger and no drop-off. The 2026-09-04 owner decision preserves the name and no-drop-off behavior but replaces the record-keeping-only meaning: Complete is now an explicit PD closeout paired with an engagement disposition (`eligible`, `not_eligible`, or `not_applicable`). It still does not write the honorarium request's final remit flag. The whole-REQUEST endpoint is a separate concern (below).
 - **Request endpoint = read-only "Status" tab, NOT a PD decision.** Justin: staff only *recommend*; the BOARD decides approve/decline and it is entered into Dynamics by someone else. So the top-level final tab is a read-only reflection of the proposal's own lifecycle string `akoya_requeststatus` on `akoya_request`, not an editable PD field. The value set is documented (don't re-flag as "unverified") BUT it is a **living taxonomy — enumerate live at query time, never hardcode a value list** (per `docs/DATAVERSE_POWER_TOOLS_DESIGN.md`; values get added/deactivated/duplicated; a value absent from the live map ⇒ UNCLASSIFIED, not a guess). That doc's value→class map (`scripts/probe-akoya-status-predicate.js`, 2026-05-16) keeps **probe-proven** and **inferred** explicitly separate: Pending-family (Concept / Phase I / Phase II Pending, Pending) ⇒ in-flight (probe-clean, 0% leakage); a decided-terminal class with probe-proven examples (Approved, Denied, *Declined, *Ineligible, Closed, *Done); and a **user-attested ambiguous-middle** (Active = awarded-in-performance, Proposal Not Invited = triage-decline, Withdrawn — S158, inferred intent labels, NOT probe-proven). Treat the lists as examples, not an exhaustive enum. ([[project-grant-lifecycle-states-confirmed]] surveyed only the pending stages on 2026-05-01; the terminal classes were enumerated later in the Power Tools probes — consistent, not contradictory.) This is **distinct from** (a) the reviewer-level closeout fields on `wmkf_appreviewersuggestion` (`wmkf_reviewstatus=complete` + `wmkf_completedat`, deployed S196; honorarium linked via `wmkf_HonorariumRequest`, shipped 2026-05-28) — reviewer-scoped, and they do NOT drive this request-level tab — and (b) `wmkf_phaseiistatus` (a separate Phase-II-specific field, often null). Still tentative — Justin isn't sure yet what else belongs at the request endpoint.
 - **Screening is backend-automated, not a Workbench tab.** Integrity Screener, WMKF Expertise, Funding Analysis live in the Tools menu (manual, on-demand) only.
 - **Virtual Review Panel → Tools menu, labeled beta** (in dev, not part of this cycle).
@@ -476,7 +481,19 @@ S194 set direction (replace Finder + Manager with Reviewer Workbench + Reviewer 
 
 The badges on the tab bar recover the at-a-glance "where is everyone" overview that the rejected 3-tab Roster consolidated into one table — without giving up the descriptive action labels. The 3-tab alternative (Find / Roster / Completed) is kept behind a compare-only toggle in the mockup.
 
-**Honorarium is NOT a PD-facing tab, and the Completed tab does NOT pay anyone (option a, settled 2026-05-31).** Completed maps to **existing, deployed** fields on `wmkf_appreviewersuggestion`: PD marks done → `wmkf_reviewstatus = complete (100000004)` + `wmkf_completedat` (S196, prod 2026-05-28). `docs/INTAKE_PORTAL_SCHEMA_CHANGES.md` originally intended the field as record-keeping with the dashboard filtering completed rows OFF — but **S206 overrides the drop-off: completed rows stay visible; cycle-scoping handles cleanup (next cycle = clean dashboard; reopen a past cycle to review).** NO automation reacts to completion. Honorarium provenance = the `wmkf_HonorariumRequest` lookup on `wmkf_appreviewersuggestion` (**SHIPPED 2026-05-28** per [[project-bill-honorarium-integration]] — NOT owed, NOT on `wmkf_potentialreviewer`). Payment-eligibility keys on `wmkf_reviewreceivedat` (reviewer submitted) + staff remit gate `wmkf_authorizationtoremitpaymentflag`. The earlier "should PD closeout gate payment?" question is **CLOSED — no**: option a keeps the existing payment path untouched.
+**Honorarium is NOT a PD-facing tab, and the Completed tab does NOT pay anyone.**
+Completed maps to **existing, deployed** fields on
+`wmkf_appreviewersuggestion`: `wmkf_reviewstatus = complete (100000004)` plus
+`wmkf_completedat` (S196, prod 2026-05-28). **S206 overrides the original
+drop-off:** completed rows stay visible; cycle-scoping handles cleanup.
+**Superseding owner decision 2026-09-04, implementation pending:** Complete is a
+lead-PD human closeout of a received review and must carry a separate
+engagement-level disposition (`eligible`, `not_eligible`, or `not_applicable`).
+Review receipt and thank-you processing do not imply that disposition. Honorarium
+provenance remains the shipped `wmkf_HonorariumRequest` lookup. The application
+never writes the honorarium request's `wmkf_authorizationtoremitpaymentflag`;
+Operations/Finance retains final remit authority. Contract:
+`docs/REVIEWER_COMPLETION_AND_HONORARIUM_DECISION_BRIEF.md`.
 
 **BILL chunk 5 is NOT absorbed by Workbench** (correction from earlier S195 thinking). Stage 2a address-capture lives on the external reviewer surface (`/external/review/[token]/accept`) — that's the reviewer entering their address during accept, not a PD action. Workbench just sees the consequence (a confirmed reviewer with address on file). Chunk 5 ships on its own timeline against `/external/*`.
 
@@ -508,6 +525,13 @@ The reason this redesign is now urgent: Connor maintains a parallel SharePoint f
 
 `docs/REQUEST_WORKBENCH_SCOPING.md` (or similar) — Connor/Sarah-shareable. Captures: holistic architecture; phasing change; reviewer-lifecycle v1 in detail (URL, tabs, what they do, what they replace, integration points with shipped reviewer infra); artifact-storage inventory pass (what's in Dataverse already, what's missing); explicit out-of-scope-for-v1 list (writeup, analyses, triage surface).
 
-S206 settled the reviewer tab-structure fork — DECIDED 4-tab + status badges (briefly 3-tab, then reconsidered and locked) — and disambiguated "Closeout" (reviewer-level → "Completed", no trigger/no drop-off; request-level → read-only "Status"). **Scoping doc written 2026-05-31: `docs/REQUEST_WORKBENCH_SCOPING.md`.** Two items that were tracked as open are now closed: the "approve→payable field owed to Connor" (stale — closeout fields already deployed) and the PD-closeout-gates-payment question (option a — no trigger). Remaining open: PD dashboard row content; J27 phase trigger (Connor).
+S206 settled the reviewer tab-structure fork — DECIDED 4-tab + status badges
+(briefly 3-tab, then reconsidered and locked) — and disambiguated "Closeout"
+(reviewer-level → "Completed", no drop-off; request-level → read-only "Status").
+**Scoping doc written 2026-05-31: `docs/REQUEST_WORKBENCH_SCOPING.md`.** Its
+historical option-a statement that receipt alone supplied payment eligibility is
+superseded by the approved 2026-09-04 engagement-disposition plan. Final remit
+remains outside the app. Remaining open: PD dashboard row content; J27 phase
+trigger (Connor); and Operations visibility for the planned closeout disposition.
 
 Related: [[reviewer-identity-fragmentation]], [[project-reviewer-finder-dataverse-entry-path]], [[project-reviewer-institution-match]], [[project-w6-table-drop-closed]], [[project-app-roadmap-2026-04-25]], [[project-bill-honorarium-integration]], [[project-grant-phasing-evolution]], [[project-backend-automation]], [[project-staged-review-pipeline]], [[project-proposal-context-extraction]], [[project-prompt-storage-strategy]], [[project-dynamics-ai-writeback]].

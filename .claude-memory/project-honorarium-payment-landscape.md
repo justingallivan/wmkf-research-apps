@@ -83,10 +83,16 @@ webhook, and resume-sweep recommendations are **not active work** after the
 2026-07-12 decision. Their old measurements remain in git history and the BILL
 design documents, but agents must not present them as the next step.
 
-One separate idea also remains unapproved: setting
-`wmkf_authorizationtoremitpaymentflag` when a review is completed. Current source
-does not do this. Treat reviewer closeout/payability as its own product decision
-(`project-reviewer-closeout-payability`), not as an implicit BILL task.
+**Owner decision 2026-09-04:** reviewer closeout must not set
+`wmkf_authorizationtoremitpaymentflag`. The PD will record a separate
+engagement-level eligibility disposition (`eligible`, `not_eligible`, or
+`not_applicable`) when closing a received review; that field/workflow is approved
+but not yet built. Operations/Finance retains the final remit decision. A
+read-only Production probe that day found all 159 exact honorarium requests
+explicitly false on the remit flag, while a broader Research-request scan found
+87 true values, confirming that the field is live elsewhere rather than the
+honorarium closeout signal. Treat this as the reviewer-closeout project
+(`project-reviewer-closeout-payability`), not an implicit BILL task.
 
 ## Ground truth
 

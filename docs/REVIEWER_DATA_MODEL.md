@@ -6,7 +6,7 @@ status: canonical
 summary: "Visual orientation for the reviewer-domain Dataverse entities and how they connect. Use this when you're not sure which entity holds which piece..."
 canonical: true
 cataloged: 2026-07-02
-last_verified: 2026-08-01
+last_verified: 2026-09-04
 owner: product-engineering
 related:
   - docs/REVIEWER_INTERACTION_DESIGN.md
@@ -33,6 +33,15 @@ Visual orientation for the reviewer-domain Dataverse entities and how they conne
 > `wmkf_reviewsharepointfolder` belong to the earlier file-upload experiment and
 > retained rescue/compatibility paths. Their presence does not prove a current or
 > genuine review; legacy test files are known to remain.
+
+> **Approved closeout extension (owner decision 2026-09-04; not yet built):**
+> receipt means the review exists, not that it is eligible for payment. A lead
+> PD will close the received review with a new engagement-level Picklist,
+> `wmkf_honorariumeligibility` (`eligible`, `not_eligible`, or
+> `not_applicable`), in the same ETag-bound reviewer-suggestion update that sets
+> Complete. The application will not write the honorarium request's
+> `wmkf_authorizationtoremitpaymentflag`; Operations/Finance retains that final
+> authority. See `docs/REVIEWER_COMPLETION_AND_HONORARIUM_DECISION_BRIEF.md`.
 
 > **Identity-binding durability foundation (deployed, not authoritative,
 > 2026-07-13):** Wave 13 added nullable binding generation/source/anchor/time,
@@ -111,6 +120,7 @@ erDiagram
         bool wmkf_honorariumoptout
         datetime wmkf_reviewreceivedat "reviewer-done signal"
         datetime wmkf_completedat "PD-done signal (S196)"
+        picklist wmkf_honorariumeligibility "PLANNED PD closeout disposition"
     }
     POLICY {
         guid wmkf_policyid PK
@@ -172,6 +182,7 @@ erDiagram
         lookup wmkf_HonorariumRequest "→ HONORARIUM_REQUEST (S196)"
         picklist wmkf_reviewstatus
         bool wmkf_honorariumoptout
+        picklist wmkf_honorariumeligibility "PLANNED; nullable until PD closeout"
         string wmkf_reviewbloburl "legacy PDF-upload pointer"
         picklist wmkf_revieweroverallrating
         datetime wmkf_completedat "PD closeout (S196)"
@@ -240,10 +251,10 @@ flowchart TD
 
     S3w --> S4["Stage 4 — Reviewer works in form<br/>(Postgres review_drafts scratchpad)"]
     S4 --> S5["Stage 5 — Reviewer submits review"]
-    S5 --> S5w["ONE Dataverse changeset:<br/>• UPSERT wmkf_appreviewanswer rows (ratings, multiselect, narratives)<br/>• PATCH suggestion affiliation + wmkf_reviewreceivedat (PAYMENT-ELIGIBILITY SIGNAL)<br/>• wmkf_reviewstatus = review_received<br/>Then delete Postgres draft.<br/>Legacy PDF/file/rating parent fields are not the current content authority."]
+    S5 --> S5w["ONE Dataverse changeset:<br/>• UPSERT wmkf_appreviewanswer rows (ratings, multiselect, narratives)<br/>• PATCH suggestion affiliation + wmkf_reviewreceivedat (RECEIPT SIGNAL; not eligibility)<br/>• wmkf_reviewstatus = review_received<br/>Then delete Postgres draft.<br/>Legacy PDF/file/rating parent fields are not the current content authority."]
 
     S5w --> S6["Stage 6 — PD closes out (Request Workbench, S196)"]
-    S6 --> S6w["WRITES on wmkf_appreviewersuggestion:<br/>• wmkf_reviewstatus = complete<br/>• wmkf_completedat<br/><br/>Row drops off PD dashboard."]
+    S6 --> S6w["CURRENT: Complete + wmkf_completedat.<br/>APPROVED, NOT BUILT: same ETag-bound row update also writes<br/>wmkf_honorariumeligibility = eligible | not_eligible | not_applicable.<br/>Completed rows remain visible."]
 
     S6w --> S7["Stage 7 — finance processes payment offline"]
     S7 --> S7w["Honorarium request remains the CRM record;<br/>automated BILL vendor/network/webhook tail is dormant"]
@@ -262,9 +273,10 @@ flowchart TD
 | Decline reason and alternate-reviewer referrals | `wmkf_appreviewersuggestion.wmkf_declinereasonpicklist` (structured) + `.wmkf_declinereferral` | The current portal has no prose reason/referral fields. It stores up to four name/institution/email rows as a versioned envelope in the existing referral memo; legacy `.wmkf_declinereason` and free-text referral values remain readable for compatibility. |
 | COI / AI policy acknowledged? | `wmkf_appreviewersuggestion.wmkf_coiackedat` (timestamp) + `wmkf_coipolicyversion` (which version they saw) | Same shape for AI-use |
 | Honorarium opt-out | `wmkf_appreviewersuggestion.wmkf_honorariumoptout` | |
+| Is the completed review eligible for an honorarium? | `[PLANNED] wmkf_appreviewersuggestion.wmkf_honorariumeligibility` | Approved values: `eligible`, `not_eligible`, `not_applicable`; null means no PD disposition. Field absent in Production as of the 2026-09-04 metadata probe. |
 | The honorarium row for a reviewer engagement | `akoya_request` via `wmkf_appreviewersuggestion.wmkf_HonorariumRequest` | S196-new link; one hop |
 | Honorarium amount | `akoya_request.akoya_request` (on the honorarium row) | Field name = entity name. Yes, confusing. |
-| Is payment authorized? | `akoya_request.wmkf_authorizationtoremitpaymentflag` (honorarium row) | Steph's manual final gate |
+| Is payment authorized? | `akoya_request.wmkf_authorizationtoremitpaymentflag` (honorarium row) | Operations/Finance final gate; this application does not write it. |
 | Has payment been sent? | `akoya_request.akoya_folio = 'PAID'` (honorarium row) | NOT `akoya_paymentsent` — empirically not a payment gate |
 | BILL vendor id for a reviewer | `contact.wmkf_billcomid` | Retained dormant field; automated BILL onboarding is tabled |
 | BILL network state | `akoya_request.wmkf_exisitngbillcomaccount` (honorarium row, sic spelling) | Retained dormant field; not the current payment path |
