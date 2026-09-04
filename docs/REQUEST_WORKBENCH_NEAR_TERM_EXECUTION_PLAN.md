@@ -6,7 +6,7 @@ status: canonical
 summary: "Canonical Workbench sequence; current cross-request lifecycle navigation and reviewer follow-up work are tracked here."
 canonical: true
 cataloged: 2026-07-26
-last_verified: 2026-09-02
+last_verified: 2026-09-04
 owner: product-engineering
 related:
   - docs/audits/AUDIT_REQUEST_WORKBENCH_TRUTH_2026-07-26.md
@@ -899,13 +899,17 @@ Decision order:
    zero browser-console errors. The reviewed version-2 Final Writeup staffing
    configuration, consolidated Admin editor, and ETag tooling are
    Production-deployed at `84bf465b` in Ready deployment
-   `dpl_41SybgPYfJXGarf7UqcMGCLMy4KS` with the feature flag false. On 2026-09-01
+   `dpl_41SybgPYfJXGarf7UqcMGCLMy4KS`. On 2026-09-01
    UTC, the dry-run-first command upgraded the setting once and exact readback
    proved v2 at `W/"96944113"`, 11 complete assignments, zero stale/unassigned
    rows, and unchanged nine-person Research/six-person Southern California
    audiences. Signed-in Admin and Research-matrix reads passed. Representative
-   file-access verification remains gated. The unshipped team mechanism is
-   removed from current source.
+   PC/Leadership Word access then passed, and commit `213f6c34` enabled the
+   explicit persona dashboard lenses in Ready Production deployment
+   `dpl_HGrbWUNPJMJunVevYLVEmtn7He6a`. A six-case read-only production-data
+   smoke passed; one signed-in non-superuser dashboard observation remains for
+   natural use. PC backup and Leadership-stage transitions remain separate.
+   The unshipped team mechanism is removed from current source.
 4. **Initial Assessment** — the pilot and administrator controls are
    Production-deployed and the signed-in read surface has passed. Decide
    whether to authorize exact restore and/or first Board-snapshot write proof,

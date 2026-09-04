@@ -3,10 +3,10 @@ title: Final Writeup Review — Implementation Plan
 domain: workbench
 kind: plan
 status: active
-summary: "Final runtime and matrix are live; v2 staffing and representative Word access are proved, so only deliberate enablement and smoke gate the persona rollout."
+summary: "Final runtime, v2 staffing, and explicit persona dashboard lenses are Production-live; stage-transition and signed-in persona observation work remain."
 canonical: false
 cataloged: 2026-08-28
-last_verified: 2026-09-03
+last_verified: 2026-09-04
 owner: product-engineering
 related:
   - docs/audits/final-writeup-review-fable-review-2026-08-28.md
@@ -34,14 +34,16 @@ related:
 
 ## Plan status
 
-**Verdict: OWNER-APPROVED FOR STAGED IMPLEMENTATION WITH NAMED PREREQUISITES.**
+**Verdict: CORE FINAL REVIEW AND PERSONA DASHBOARD LENSES ARE PRODUCTION-LIVE;
+LEADERSHIP-STAGE AND PC-BACKUP TRANSITIONS REMAIN STAGED WORK.**
 
 This plan translates the approved Final Writeup and group-review experience into the current Request Workbench architecture. Slice 0 is complete. **[PRODUCTION-PROVED 2026-08-30 PT / 2026-08-31 UTC]** Slice 1 shipped on `main` at `ebb147bb` in Ready Production deployment `dpl_7kzQ1v7XGtyNx4Fady2JxMrTxQEJ`; Wave 22 is 4 exact / 0 absent / 0 divergent and the non-sensitive `FINAL_WRITEUP_SCHEMA_READY` value is literal `on` in Production. The authorized Request `1002788` transition created one Ready/Review Final row, moved the retained current Pre-Site source to lifecycle Final, set the current-Final pointer, recorded Justin Gallivan and `2026-08-31T03:57:20Z`, and reused the exact same SharePoint drive/item, version `1.0`, 38,273-byte file, and governed hash. The distinct SharePoint-file count remained four, proving that no copy or upload occurred. A bounded 30-minute scan found no Production error logs or 5xx responses.
 
-The 2026-09-04 milestone means the underlying handoff, identity, acknowledgement,
-dashboard-data, and superuser test path are in place. It does not promise broad
-staff rollout by that date. General-role enablement remains gated by verified
-identity/persona and SharePoint access. No broad Request Document staff-role
+The 2026-09-04 milestone delivered the underlying handoff, identity,
+acknowledgement, dashboard data, superuser matrix, and explicit persona lenses.
+Representative SharePoint access and the production-data persona projections
+passed before enablement; a signed-in non-superuser dashboard observation
+remains useful on the next natural staff visit. No broad Request Document staff-role
 privilege grant is pending: the owner selected service-principal writes with
 explicit actor tracking, a separate attribution effort that does not block the
 working acknowledgement role or this milestone.
@@ -72,9 +74,10 @@ Writeup Reviewer` role roster. Signed-in Production DOM proof showed the exact
 Gallivan Responsible PD, every other cell Not reviewed, both direct actions,
 and zero browser-console errors. Prior local desktop and 390px browser QA also
 passed against Production reads. The source now contains the reviewed GUID-only,
-multi-valued v2 staffing contract and consolidated Admin editor with its
-rollout flag false. The superseded persona-team prototype is removed; the owner
-decision and remaining rollout sequence live in
+multi-valued v2 staffing contract and consolidated Admin editor. Commit
+`213f6c34` enabled the tracked rollout flag in Ready Production deployment
+`dpl_HGrbWUNPJMJunVevYLVEmtn7He6a`. The superseded persona-team prototype is removed; the owner
+decision and rollout evidence live in
 `docs/FINAL_WRITEUP_PERSONA_CONFIGURATION_PLAN.md`.
 
 The named prerequisites are deliberately attached to the slices that need them:
@@ -97,7 +100,7 @@ The named prerequisites are deliberately attached to the slices that need them:
    Opener baseline privileges when it created the role; none is Delete, Assign,
    Share, or Request Document write.
 5. **Architecture superseded and independently reviewed 2026-08-31; rollout
-   proof open.** The owner rejected the unshipped three-owner-team mechanism
+   Production-live 2026-09-03 PT.** The owner rejected the unshipped three-owner-team mechanism
    because it adds a separate privileged onboarding path. The selected
    replacement extends the existing `final_writeup.matrix_audiences` setting to
    a version-2 GUID-only contract containing explicit Program Director, Program
@@ -110,22 +113,26 @@ The named prerequisites are deliberately attached to the slices that need them:
    `docs/FINAL_WRITEUP_PERSONA_CONFIGURATION_PLAN.md`. The v2 contract, Admin
    editor, and dry-run-first ETag migration/repair/downgrade tooling are live
    at commit `84bf465b` in Ready Production deployment
-   `dpl_41SybgPYfJXGarf7UqcMGCLMy4KS` with the flag false; the superseded team
+   `dpl_41SybgPYfJXGarf7UqcMGCLMy4KS`; the superseded team
    source is removed and its failed apply made zero writes. On 2026-09-01 UTC,
    the dry-run-first command upgraded the setting once from ETag
    `W/"96930393"`; exact readback proved v2 at `W/"96944113"`, 11 complete
    assignments, zero stale/unassigned rows, and unchanged nine-person Research
    and six-person Southern California audiences. Signed-in Admin and matrix
-   reads passed while the flag remained false. Prove representative
-   PC/leadership SharePoint access before enablement. No name, email, job-title,
+   reads passed while the flag remained false. Representative PC/Leadership
+   Word access then passed (owner-reported), and commit `213f6c34` enabled the
+   source flag in Ready Production deployment
+   `dpl_HGrbWUNPJMJunVevYLVEmtn7He6a`. A read-only production-data smoke
+   exercised PD, PC, Leadership, overlap, ineligible/unassigned, and superuser
+   projections. No name, email, job-title,
    program-taxonomy inference, new team privilege, or outside administrator is
    used.
 
 Prerequisite 5 does **not** block the responsible-PD handoff, ordinary-PD
 review slices, or the superuser matrix. Those relationships and the exact
-reviewer-role roster are already server-verifiable; PC backup actions and
-leadership-specific queues remain disabled until the v2 staffing configuration
-and representative file access are verified.
+reviewer-role roster are already server-verifiable. Persona-specific dashboard
+queues are now enabled; PC backup actions and the transition into Leadership
+review remain separate unbuilt authority/workflow slices.
 
 The board-package handoff remains excluded until the PCs describe their downstream process.
 
@@ -137,11 +144,11 @@ subject to the same caveats as individual acknowledgements: it is tracking, not
 approval; blanks are not failures; there is no required count, due date, or
 leadership sequence; and a later Word version yields **Updated since review**
 rather than erasing the acknowledgement. The responsible PD does not
-self-acknowledge their own writeup. In Production, the complete matrix remains
-limited to freshly identified superusers. The disabled source branch extends
-the same neutral matrix to positively identified PCs and adds the approved
-persona queues, but it changes no runtime response until exact team GUIDs are
-pinned, representative file access is proved, and the rollout flag is enabled.
+self-acknowledge their own writeup. In Production, the complete matrix is
+available to freshly identified superusers and explicitly configured Program
+Coordinators. PD, Leadership, and overlapping queue visibility is derived from
+the published v2 assignments intersected with the current reviewer-role roster;
+no team GUID is involved.
 
 ## Independent review disposition
 
@@ -352,8 +359,9 @@ Build a new service rather than adding Final logic to the reviewer-finding dashb
 **[PRODUCTION-LIVE; SIGNED-IN READ SMOKE PASSED 2026-08-31]** The ordinary-staff subset now
 implements that separate service and its read route with a 100-row fail-closed
 census cap, 25-ID exact read batches, four-way Graph concurrency, stable item
-deduplication, and server-derived open/history/stewardship queues. PC and
-leadership lenses remain disabled pending positive persona resolution.
+deduplication, and server-derived open/history/stewardship queues. Explicit PD,
+PC, Leadership, overlap, and no-lens/ineligible projections are now enabled
+from the published v2 staffing configuration and current reviewer-role roster.
 
 Every returned row includes:
 
@@ -397,13 +405,13 @@ File access must be re-derived server-side from the Request and allowlisted docu
 - The responsible PD normally performs both transitions.
 - A PC may advance as an exceptional backup only after the application can positively identify the PC role.
 - CSO and President can review leadership-stage writeups in either order.
-- SharePoint continues to enforce actual Word-file access; the application must verify those permissions with each representative persona before rollout.
+- SharePoint continues to enforce actual Word-file access; representative PC and Leadership access was proved before rollout (owner-reported 2026-09-03).
 - Superusers may perform responsible-PD transitions, with their actual identity recorded explicitly.
 - A Request without a responsible-PD lookup fails closed to superuser-only transition authority.
 - A recorded materials distribution is useful context but is not a server-side prerequisite for **Ready for group review**.
 - The existing organization-open **Start sharing** authorization remains unchanged in this feature; revisiting it is separate work.
 
-### Persona prerequisite
+### Persona prerequisite — complete for dashboard lenses
 
 Use the reviewed explicit Workbench-persona contract before enabling PC or
 leadership behavior: version-2 GUID-only staffing assignments in the existing
@@ -418,14 +426,13 @@ Before choosing storage, verify whether the assigned Program Coordinator lookup 
 The replacement storage decision and implementation status are recorded in
 `docs/FINAL_WRITEUP_PERSONA_CONFIGURATION_PLAN.md`. Current source implements
 the v2 resolver/editor/tooling and removes the team prototype after a caller
-census. No team was created. The no-read rollout-off behavior and fail-closed
-viewer semantics remain test-covered.
-
-Until deliberate enablement and persona smoke are complete (representative file-access proof passed 2026-09-03):
-
-- responsible-PD ownership can be enforced now;
-- ordinary PD review can be enabled for existing Workbench users;
-- PC backup advancement and leadership-specific default queues remain disabled rather than guessed.
+census. No team was created. Commit `213f6c34` enabled dashboard persona
+resolution in Production after representative Word access; read-only live-data
+smoke passed for all six required identity shapes. The no-read rollout-off path
+remains test-covered as the rollback behavior, and stale/missing/ineligible
+viewers continue to fail closed. This completed identity contract does not by
+itself implement PC backup transition authority or the transition into
+Leadership review.
 
 ## UI surfaces
 
@@ -589,33 +596,31 @@ were independently verified.
   zero application-console errors. Later signed-in Production readback proved
   the stored v1 setting also contained a six-person Southern California audience;
   the 2026-09-01 UTC v2 migration preserved both audiences exactly.
-- **Production-deployed behind the disabled resolver:** PD users receive group-review
+- **Production-live behind the enabled resolver:** PD users receive group-review
   rows plus their own writeups, PC users receive all rows plus the complete
   neutral matrix, leadership receives leadership-stage rows, overlapping
-  memberships receive the union, and unassigned users fail closed. Rollout and
-  non-superuser persona access remains deferred until representative Word
-  access is proved; the v2 staffing configuration is migrated and read back.
+  memberships receive the union, and unassigned users fail closed. The v2
+  staffing configuration, representative Word-access proof, tracked enablement,
+  and read-only production-data persona smoke are complete. A signed-in
+  non-superuser dashboard observation remains for the next natural staff visit.
 
 This slice can ship before the PC/leadership persona model because responsible-PD versus other-PD is already server-verifiable.
 
 ### Slice 4 — leadership readiness and persona lenses
 
-- **Source behavior and provisioning contract complete; rollout disabled:** a
-  read-only Production preflight proved the exact membership manifest and no
-  exact-name collisions. The first authorized apply made zero writes because
-  the application user lacks `prvCreateTeam`. A Dataverse administrator must
-  create the exact no-privilege PD/PC/leadership teams (or run the tracked apply
-  under an appropriately privileged operator identity), after which engineering
-  must read back membership and zero-role state, pin the three GUIDs, and prove
-  representative PC/leadership Word access before enabling the resolver. (The
-  team approach was later superseded by the v2 staffing configuration; the
-  Word-access proof itself passed 2026-09-03, see Slice 5.)
+- **Dashboard persona lenses Production-live 2026-09-03 PT:** the v2 staffing
+  configuration and current reviewer-role roster are the only persona
+  authority. Representative Word access and all six read-only production-data
+  projections passed; no team exists or is required.
 - Add **Ready for leadership review**, moving the Final lifecycle from `REVIEW` to `FINAL` and storing the exact milestone version/hash/time plus explicit actor/time.
-- Enable PC all-active view and exceptional backup transition.
-- Enable CSO/President leadership-stage queues.
+- **Complete for dashboard visibility:** enable the PC all-active view; the
+  exceptional backup transition remains unbuilt.
+- **Complete for dashboard visibility:** enable CSO/President leadership-stage
+  queues; the transition that creates Leadership-stage work remains unbuilt.
 - Verify the President’s reviewed-history behavior and the no-sequence rule.
-- Extend the already-built complete coordinator matrix to confirmed PC users
-  and preserve its non-compliance semantics for all audiences.
+- **Complete:** extend the already-built complete coordinator matrix to
+  configured PC users and preserve its non-compliance semantics for all
+  audiences.
 
 ### Slice 5 — production proof and rollout
 
@@ -720,9 +725,9 @@ edit/review actions open the canonical Word document outside the Workbench.
 The superuser matrix is live in Ready deployment
 `dpl_Frc6fAonyFFYwiWyFJCzzE3UNune`; signed-in Production DOM proof showed the
 exact 11-person roster and correct Request `1002788` states/actions with zero
-browser-console errors. PC backup, non-superuser matrix visibility,
-leadership-specific lenses, and general rollout follow only after the v2
-configuration migration, rollback/repair proof, and representative Word access
-are verified; the Word-access proof passed 2026-09-03 (owner-reported). This sequence advances the
+browser-console errors. Non-superuser persona visibility is now Production-live
+at `213f6c34` / `dpl_HGrbWUNPJMJunVevYLVEmtn7He6a`; its v2 configuration,
+representative Word access, and six-case read-only production-data smoke passed.
+PC backup and the Leadership-stage transition remain separate work. This sequence advances the
 approved experience without guessing role identity or inventing the still-unknown
 board-package workflow.

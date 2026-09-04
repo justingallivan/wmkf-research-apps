@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-09-02
+last_verified: 2026-09-04
 stale_after_days: 90
 owner: product-strategy
 source_files:
@@ -242,8 +242,9 @@ document inventory, and individual implementation plans do not establish priorit
   owner-approved, applied, and read back exact. Signed-in Request `1002903`
   generated a valid 60,586-byte aggregated DOCX with 2xx route dependencies and
   no post-deploy error logs. The courtesy path is deployed/tested but was not
-  transport-smoked. Final Writeup persona access proof passed 2026-09-03; deliberate
-  enablement is now the next ordered priority.
+  transport-smoked. Final Writeup persona access proof, tracked enablement, and
+  the six-case read-only production-data smoke completed 2026-09-03 PT; one
+  signed-in non-superuser dashboard observation remains for natural use.
 - **Most recent owner-directed release (S470, 2026-08-30 PT / 2026-08-31 UTC):**
   Final Writeup Slice 1 is Production-proved on `main` at `ebb147bb` in Ready
   deployment `dpl_7kzQ1v7XGtyNx4Fady2JxMrTxQEJ`; Wave 22 is exact and
@@ -270,13 +271,17 @@ document inventory, and individual implementation plans do not establish priorit
   `1002788` states/actions with zero browser-console errors. The version-2 Final
   Writeup staffing contract and consolidated Admin editor are
   Production-deployed at `84bf465b` in Ready deployment
-  `dpl_41SybgPYfJXGarf7UqcMGCLMy4KS` with the persona flag false. Signed-in
+  `dpl_41SybgPYfJXGarf7UqcMGCLMy4KS`. Signed-in
   readback initially proved the stored v1 setting contained nine Research and
   six Southern California reviewers. On 2026-09-01 UTC, the dry-run-first
   command upgraded the setting once; exact readback proved v2 at
   `W/"96944113"`, all 11 assignments, zero stale/unassigned rows, and unchanged
   9/6 audiences. Representative Word-access proof passed 2026-09-03 (President
-  Allison Keller; PCs Duncan Spore and Sarah Hibler; owner-reported). The unshipped
+  Allison Keller; PCs Duncan Spore and Sarah Hibler; owner-reported). Commit
+  `213f6c34` then enabled persona lenses in Ready Production deployment
+  `dpl_HGrbWUNPJMJunVevYLVEmtn7He6a`; read-only production-data smoke passed
+  for PD, PC, Leadership, overlap, ineligible/unassigned, and superuser
+  projections. The unshipped
   no-privilege-team prototype is removed from current source and created no
   Production teams.
 - **Prior owner-directed release (S469, 2026-08-30):** durable Executor
@@ -547,9 +552,10 @@ document inventory, and individual implementation plans do not establish priorit
   partial row. The dedicated role is now assigned/effective for all 11 confirmed
   audience members; the post-role retry succeeded and its review-history state
   and complete acknowledgement row passed independent readback. The services derive
-  ownership/actions server-side and cap and batch reads. Ordinary/focused and
-  persona-specific responses do not infer PC/leadership personas or expose the
-  full matrix; the fresh-superuser index does. **Production-live + signed-in
+  ownership/actions server-side and cap and batch reads. Persona-specific
+  responses use explicit v2 assignments and never infer from names, titles, or
+  program audiences; configured PCs and fresh superusers receive the full
+  matrix on the index, while focused responses do not. **Production-live + signed-in
   read/write proved 2026-08-31:** commit `5573bca3` is live in Ready deployment
   `dpl_5DNuc2BV76RihwuWu8ZFYBgxBXE7`. The published Research audience contains
   nine current reviewer-role members and excludes owner-confirmed Southern

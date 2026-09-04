@@ -86,7 +86,14 @@ Request `1003223` was ETag-conditionally changed only from
 empty SharePoint pointers. A follow-up authenticated enabled sweep returned
 HTTP 200 with zero candidates and zero attempts. The later owner cleanup of
 Request `1002874` is independently verified complete; the work queue otherwise
-returns to Final Writeup persona rollout.
+returns to Final Writeup persona rollout. That rollout is now Production-live
+on `main` at `213f6c34` in Ready deployment
+`dpl_HGrbWUNPJMJunVevYLVEmtn7He6a`. A read-only production-data smoke using
+the deployed source verified Program Director, Program Coordinator,
+Leadership, PD + Leadership overlap, ineligible/unassigned, and superuser
+projections; no data was written. The isolated browser reached the expected
+sign-in boundary, so a signed-in non-superuser dashboard observation remains
+useful on the next natural staff visit rather than a release blocker.
 The active plan is `docs/REVIEW_DOCX_SHAREPOINT_RETENTION_PLAN.md`. Claude's
 read-only adversarial review of the plan returned
 APPROVE WITH CONDITIONS; the plan now incorporates the verified eligibility,

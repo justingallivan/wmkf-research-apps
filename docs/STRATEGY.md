@@ -217,8 +217,9 @@ returned zero candidates and zero attempts. The owner then deleted Request
 `1002874`'s obsolete `Reviewer_Uploads/Generated` tree; Graph returned 404 for
 the old path and 200 for the current file, and Dataverse retained the current
 `Reviews` pointer. The next natural automatic filing remains unproved.
-Final Writeup persona
-access proof and deliberate enablement remain preserved immediately afterward.
+Final Writeup persona access proof, deliberate enablement, and the read-only
+production-data projection smoke are now complete; one signed-in
+non-superuser dashboard observation remains for the next natural staff visit.
 As of 2026-08-31, the ordinary-staff
 dashboard/focused-review foundation is Production-deployed
 through PR #140 (`ce229778`) with bounded reads and external-Word actions. Its
@@ -230,8 +231,8 @@ no row. The dedicated `WMKF Final Writeup Reviewer` role is now directly
 assigned and its six requested Global privileges are effective for all 11
 confirmed audience members. The colleague's post-role retry succeeded, appeared
 in review history, and independent Production readback proved exactly one
-complete acknowledgement row. Program-audience configuration is now
-Production-live; persona-specific work is next after the review-DOCX release.
+complete acknowledgement row. Program-audience configuration and explicit
+persona dashboard lenses are now Production-live.
 Every edit/review action opens the canonical SharePoint Word document in its
 own browser window/tab (or desktop Word through Microsoft's supported option);
 the application will not embed or recreate Word editing.
@@ -266,12 +267,15 @@ with GUID-only, multi-valued PD, PC, Leadership, and explicit no-lens staffing
 assignments: Allison Keller is President; Beth Pruitt is CSO and also a
 responsible PD on some requests. The v2 contract, consolidated editor, and
 ETag upgrade/repair/downgrade tooling are Production-deployed at `84bf465b` in
-Ready deployment `dpl_41SybgPYfJXGarf7UqcMGCLMy4KS` with the rollout flag
-false; the superseded team source is removed and no team exists. The
+Ready deployment `dpl_41SybgPYfJXGarf7UqcMGCLMy4KS`; the superseded team
+source is removed and no team exists. The
 dry-run-first command upgraded the setting once on 2026-09-01 UTC; exact
 readback proved v2 at `W/"96944113"`, 11 complete assignments, zero
 stale/unassigned rows, and unchanged 9/6 audiences. Representative
-PC/leadership Word-access proof and persona enablement remain gated. Initial Assessment
+PC/Leadership Word access passed before commit `213f6c34` enabled the tracked
+persona flag in Ready deployment `dpl_HGrbWUNPJMJunVevYLVEmtn7He6a`.
+Read-only production-data smoke passed for PD, PC, Leadership, overlap,
+ineligible/unassigned, and superuser projections. Initial Assessment
 restore/Board writes remain separately owner-gated.
 
 **Recently completed:** the Staff Deliberations workspace/history UX, curated

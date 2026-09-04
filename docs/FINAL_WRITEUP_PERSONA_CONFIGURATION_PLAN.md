@@ -3,10 +3,10 @@ title: Final Writeup Persona Configuration Consolidation Plan
 domain: workbench
 kind: plan
 status: active
-summary: "Production-live v2 staffing in the Admin editor; migration and Word-access proof passed; persona lenses stay disabled pending deliberate enablement."
+summary: "Version-2 staffing and explicit Final Writeup persona lenses are Production-live; server-side live-data smoke passed and signed-in staff observation remains."
 canonical: false
 cataloged: 2026-08-31
-last_verified: 2026-09-03
+last_verified: 2026-09-04
 owner: product-engineering
 related:
   - docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md
@@ -19,8 +19,8 @@ related:
 
 ## Decision and status
 
-**Verdict: SLICES A–D ARE COMPLETE; SLICE E ACCESS PROOF PASSED 2026-09-03; ENABLEMENT AND
-PERSONA SMOKE REMAIN. THE FLAG IS STILL FALSE.**
+**Verdict: SLICES A–E ARE PRODUCTION-DEPLOYED; ACCESS PROOF AND THE READ-ONLY
+PRODUCTION-DATA PERSONA SMOKE PASSED. A SIGNED-IN STAFF DASHBOARD OBSERVATION REMAINS.**
 
 The owner rejected the operational burden of creating and maintaining three
 Dataverse owner teams solely as persona markers. This plan replaces that
@@ -33,9 +33,10 @@ on `main` at commit `84bf465b` in Ready Production deployment
 specification, and provisioning scripts have been removed as a superseded
 prototype. On 2026-09-01 UTC, the setting was upgraded once to version 2 under
 the loaded ETag and exact readback proved the new ETag, all 11 assignments, and
-unchanged Research and Southern California audiences. The persona feature flag
-remains false, no persona team exists in Production, and the failed team-create
-attempt made zero Dataverse writes.
+unchanged Research and Southern California audiences. On 2026-09-03 PT, commit
+`213f6c34` enabled the tracked source flag in Ready Production deployment
+`dpl_HGrbWUNPJMJunVevYLVEmtn7He6a`. No persona team exists in Production, and
+the earlier failed team-create attempt made zero Dataverse writes.
 
 ## Contract surface
 
@@ -81,11 +82,13 @@ attempt made zero Dataverse writes.
   their confirmed PC responsibility; leadership has no reliable request-field
   source. Names, email, job titles, and program labels therefore remain
   non-authoritative.
-- **[VERIFIED via source, Vercel deployment inspection, the operator command,
-  and signed-in Production readback]** the v2-capable code and stored v2 setting
-  are Production-live, the feature flag remains false, and ordinary-user
-  behavior is unchanged. The migration command ran once through its optimistic
-  write seam; repair/downgrade modes remain available but were not invoked.
+- **[VERIFIED via source, Vercel deployment inspection, live Dataverse/Graph
+  reads, and focused tests 2026-09-03 PT]** the v2-capable code and stored v2
+  setting are Production-live and the tracked feature flag is true. The
+  production-data smoke verified PD, PC, Leadership, overlap,
+  ineligible/unassigned, and superuser projections without a write. The
+  migration command ran once through its optimistic write seam;
+  repair/downgrade modes remain available but were not invoked.
 
 ## Product and administration decision
 
@@ -183,9 +186,9 @@ version-2-capable code at `84bf465b` /
 5. **Complete:** post-write readback proved version 2, all 11 exact persona
    assignments, unchanged Research and Southern California membership, zero
    stale/unassigned rows, and new ETag `W/"96944113"`.
-6. Persona lenses remain source-disabled. Representative PC/Leadership
-   Word-access proof completed 2026-09-03 (owner-reported); enablement is the
-   next deliberate step.
+6. **Complete 2026-09-03 PT:** representative PC/Leadership Word-access proof
+   completed (owner-reported), then the tracked persona source flag was enabled
+   in its own commit and Ready Production deployment.
 
 Production now stores v2, so the first v2-capable Production deployment is the
 last-known-good rollback floor: no pre-v2 build may be promoted while v2 is
@@ -321,14 +324,19 @@ existing Admin Overview, not as another configuration panel.
   route matrix, service catalog, work queue, strategy/wiki, memory, and session
   handoff. Historical commits remain untouched.
 
-### Slice E — access proof, enablement, and smoke
+### Slice E — access proof, enablement, and smoke — Production-deployed
 
 - **Complete:** **[OWNER-REPORTED 2026-09-03]** Representative Word access is proved: President Allison Keller (Leadership) opened the canonical Word item through the signed-in Final Writeups experience and marked it reviewed on 2026-09-03, and Program Coordinators Duncan Spore and Sarah Hibler did the same (dates not recorded). The owner saw Allison's acknowledgement on the dashboard; no independent Dataverse readback was run.
-- Flip the tracked persona source flag in its own commit and deployment now that
-  both proofs have succeeded.
-- Deploy deliberately, then smoke PD, PC, Leadership, overlapping-persona,
-  unassigned, and superuser behavior with non-sensitive requests.
-- Verify no team read, create, membership, or role-management call occurs.
+- **Complete:** flipped the tracked persona source flag in commit `213f6c34` and
+  deployed it as Ready Production deployment
+  `dpl_HGrbWUNPJMJunVevYLVEmtn7He6a`.
+- **Complete at the server-side live-data boundary:** read-only production-data
+  smoke verified PD, PC, Leadership, overlapping-persona,
+  ineligible/unassigned, and superuser behavior. The isolated browser reached
+  the expected sign-in boundary, so one signed-in non-superuser dashboard
+  observation remains useful on the next natural staff visit.
+- **Complete via source census:** no team read, create, membership, or
+  role-management call exists in the runtime path.
 
 ## Invariants and verification
 
@@ -375,9 +383,11 @@ Run the relevant gate and its self-test sequentially:
    and agent-invariant gates for the durable reconciliation;
 8. production build, using the repository-documented webpack fallback only if
    canonical Turbopack is blocked by the known sandbox process/port signature;
-9. **Complete through rollout-off regression:** signed-in Admin desktop/narrow
-   QA, v2 publication/readback, and matrix regression smoke. Representative
-   Word-access proof passed 2026-09-03; enablement and persona smoke remain.
+9. **Complete through deployment and live-data persona smoke:** signed-in Admin
+   desktop/narrow QA, v2 publication/readback, matrix regression, representative
+   Word access, tracked enablement, and all six persona projection cases passed.
+   A signed-in non-superuser dashboard observation remains for the next natural
+   staff visit.
 
 No Postgres migration, Dataverse schema wave, new API route, new environment
 variable, or new security privilege is planned.
@@ -415,8 +425,8 @@ variable, or new security privilege is planned.
 - Changing or expanding the current six-person Southern California audience.
 - Board-package workflow, required review counts, approval sequencing, or
   routine Word-edit notifications.
-- Enabling PC backup or Leadership queues without a deliberate flag-flip
-  commit, deployment, and persona smoke (Word access was proved 2026-09-03).
+- PC backup transition authority, Leadership stage transitions, or broader
+  supporting-material access; the enabled flag changes dashboard lenses only.
 
 ## Review questions for Claude
 

@@ -3,10 +3,10 @@ title: Workbench Writeup Lifecycle Plan
 domain: workbench
 kind: plan
 status: active
-summary: "Pre-Site/Site Visit lifecycle, Final acknowledgement/dashboard, and the superuser matrix are live; reviewed persona-config rollout remains."
+summary: "Pre-Site/Site Visit lifecycle, Final acknowledgement/dashboard, and explicit persona lenses are live; later Final stage transitions remain."
 canonical: false
 cataloged: 2026-08-17
-last_verified: 2026-08-31
+last_verified: 2026-09-04
 owner: product-engineering
 related:
   - docs/PRE_SITE_VISIT_DATAVERSE_SCHEMA_DESIGN.md
@@ -897,13 +897,18 @@ silently extend its paths or names to writeup publications.
    Anneli Stone and Saskia Pallais, and rendered Request `1002788` with exactly
    those nine reviewer columns and zero application-console errors. Later
    signed-in Production readback proved the stored v1 setting also contained a
-   six-person Southern California audience. Personal lenses remain disabled.
+   six-person Southern California audience. Explicit personal lenses are now
+   Production-live from commit `213f6c34` / Ready deployment
+   `dpl_HGrbWUNPJMJunVevYLVEmtn7He6a`.
    The reviewed version-2 staffing contract, consolidated Admin editor, and
    ETag tooling are Production-deployed at `84bf465b` in Ready deployment
    `dpl_41SybgPYfJXGarf7UqcMGCLMy4KS`. The dry-run-first command upgraded the
    setting once on 2026-09-01 UTC; exact readback proved v2 at
    `W/"96944113"`, 11 complete assignments, zero stale/unassigned rows, and
-   unchanged 9/6 audiences. Representative Word-access proof remains. The
+   unchanged 9/6 audiences. Representative Word-access proof passed
+   2026-09-03, followed by the tracked enablement and a six-case read-only
+   production-data persona smoke. A signed-in non-superuser dashboard
+   observation remains for the next natural staff visit. The
    unshipped team prototype is removed and no Dataverse administrator is
    required. Keep acknowledgement distinct from document lifecycle,
    external distribution, and the AkoyaGo publication projection.

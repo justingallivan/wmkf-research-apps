@@ -1,8 +1,8 @@
 # Atlas: `wmkf_finalwriteupreviewacknowledgement` (Dataverse, WMKF child entity)
 
-**Last verified:** 2026-08-31 via
-`scripts/preflight-final-writeup-review-acknowledgement-schema.mjs --target=prod`
-after the owner-approved Wave 23 Production apply.
+**Last verified:** schema 2026-08-31 via
+`scripts/preflight-final-writeup-review-acknowledgement-schema.mjs --target=prod`;
+persona consumer and live-data projection 2026-09-03 PT.
 **Live row count:** 1, verified by an exact Production entity-set count and
 complete-row readback on 2026-08-31.
 **Entity set:** `wmkf_finalwriteupreviewacknowledgements`
@@ -178,17 +178,20 @@ returned the reviewed-history state. The stored acknowledgement time is
   review history displayed the completed state; independent readback proved one
   complete acknowledgement row for Request `1002788`. No session-identity bypass
   or manufactured Final was used.
-  Dedicated supporting-material data routes and the PC/leadership persona
-  lenses remain. The complete neutral matrix is Production-live for superusers
+  Dedicated supporting-material data routes remain separate. The complete neutral matrix is Production-live for superusers
   in Ready deployment `dpl_Frc6fAonyFFYwiWyFJCzzE3UNune`, with signed-in DOM
   proof of the exact roster and correct Request `1002788` states/actions. The
   reviewed persona plan uses the existing versioned Final Writeup Admin setting
   for GUID-only, multi-valued PD/PC/Leadership/no-lens assignments. That v2
   contract, consolidated editor, and ETag tooling are Production-deployed at
-  `84bf465b` in Ready deployment `dpl_41SybgPYfJXGarf7UqcMGCLMy4KS` with the
-  rollout flag false; the superseded team source is removed and no Production
+  `84bf465b` in Ready deployment `dpl_41SybgPYfJXGarf7UqcMGCLMy4KS`; the
+  superseded team source is removed and no Production
   team was created. On 2026-09-01 UTC, the dry-run-first command upgraded the
   setting once; exact readback proved v2 at `W/"96944113"`, all 11 assignments,
   zero stale/unassigned rows, and unchanged nine-person Research/six-person
-  Southern California audiences. Representative PC/leadership Word access
-  remains before enablement.
+  Southern California audiences. Representative PC/Leadership Word access
+  passed before commit `213f6c34` enabled persona lenses in Ready Production
+  deployment `dpl_HGrbWUNPJMJunVevYLVEmtn7He6a`. A read-only production-data
+  smoke passed for PD, PC, Leadership, overlap, ineligible/unassigned, and
+  superuser projections; a signed-in non-superuser dashboard observation
+  remains for natural use.

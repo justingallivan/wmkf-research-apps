@@ -6,7 +6,7 @@ status: active
 summary: Governed request-artifact registry with Production-proved same-item Final lineage and explicit group-review attribution.
 canonical: false
 owner: product-engineering
-last_verified: 2026-08-31
+last_verified: 2026-09-04
 related:
   - lib/dataverse/schema/wave16-request-document-registry/wmkf_requestdocument.json
   - lib/dataverse/schema/wave19-pre-site-draft/01_wmkf_requestdocument_pre_site_draft.json
@@ -456,7 +456,7 @@ preserved.
 
 No live command in this sequence is authorized merely by this page.
 
-Wave 22's read-only preflight, explicit owner-approved additive apply, exact Production readback, literal-on readiness, deliberate runtime promotion, and authorized controlled transition proof completed 2026-08-30 PT / 2026-08-31 UTC. The bounded postcheck found one Final row/pointer, retained Pre-Site pointer, explicit actor/time, identical drive/item/version/hash/size, and no new SharePoint file; the 30-minute Production error/5xx scan was clean. Later acknowledgement, dashboard, persona, leadership, or backward-stage work remains separately gated and is not authorized merely by this Atlas entry.
+Wave 22's read-only preflight, explicit owner-approved additive apply, exact Production readback, literal-on readiness, deliberate runtime promotion, and authorized controlled transition proof completed 2026-08-30 PT / 2026-08-31 UTC. The bounded postcheck found one Final row/pointer, retained Pre-Site pointer, explicit actor/time, identical drive/item/version/hash/size, and no new SharePoint file; the 30-minute Production error/5xx scan was clean. Acknowledgement, dashboard, and explicit persona lenses are now separately Production-live; the Leadership-stage transition and backward-stage work remain gated and are not authorized merely by this Atlas entry.
 
 Wave 20's Production sequence completed 2026-08-23: clean absent-only
 preflight, approved additive apply, exact typed readback, literal-on readiness

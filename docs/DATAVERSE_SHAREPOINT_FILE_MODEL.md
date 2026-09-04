@@ -6,7 +6,7 @@ status: active
 summary: "File storage and linking in AkoyaGO/Dynamics, including governed staff writeups and Site Visit artifacts."
 canonical: true
 cataloged: 2026-07-02
-last_verified: 2026-08-30
+last_verified: 2026-09-04
 owner: product-engineering
 related:
   - scripts/probe-sharepoint-write.js
@@ -788,8 +788,10 @@ the reviewer and Final artifact, with the observed SharePoint publication
 version. The approved dashboard includes a full coordinator matrix for
 positively identified PCs and superusers. It shows neutral blank, Reviewed, and
 Updated since review states and is not an approval, required count, due-date,
-or compliance surface. The access/persona key remains a prerequisite before
-broad role rollout.
+or compliance surface. The v2 access/persona contract and representative Word
+access are now proved, and commit `213f6c34` enables the dashboard lenses in
+Ready Production deployment `dpl_HGrbWUNPJMJunVevYLVEmtn7He6a`; PC backup and
+Leadership-stage transitions remain separate work.
 The first draft-functional delivery gate was targeted at 2026-08-10, before
 proposal intake begins around 2026-08-18. That date was a deliberately early
 **internal buffer, not an external commitment** (owner, 2026-08-10 / S412) and

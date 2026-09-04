@@ -1,11 +1,11 @@
 ---
 name: project-reviewer-apps-redesign-direction
-description: The unified Request Workbench has proven Pre-Site/Initial/Site Visit and same-item Final paths; acknowledgement/dashboard runtime and the 11-person permission role are live for the 2026-09-04 milestone.
+description: The unified Request Workbench has proven Pre-Site/Initial/Site Visit and same-item Final paths; acknowledgement, matrix, and explicit persona dashboard lenses are Production-live.
 metadata:
   type: project
   status: active
   scope: reviewer
-  last_verified: 2026-09-02 via source/tests, independent review, Ready Production deployment, and authenticated D26/J26 read proof for organization-wide Reviewer Follow-up discovery and request-bound mutation authorization
+  last_verified: 2026-09-04 via source/tests, live Dataverse/Graph reads, Ready Production deployment, and persona projection smoke
 ---
 
 ## Recall Rule
@@ -37,8 +37,9 @@ eligible requests to authorized `reviewers` users. Request-bound mutations are
 independently server-gated to the resolved request's lead PD or a superuser, so
 foreign rows are read-only for ordinary non-lead users. Authenticated Production
 proof showed D26 My 10 → All 44 (picker: 44 active + 184 set aside) and J26 My 0
-→ All 5 without exercising a write. The canonical next item is Final Writeup
-persona rollout (access proof passed 2026-09-03), not more Reviewer Follow-up promotion.
+→ All 5 without exercising a write. The Final Writeup persona rollout then
+completed through tracked Production enablement and read-only live-data smoke
+on 2026-09-03 PT; one signed-in non-superuser dashboard observation remains.
 
 **2026-07-29 editor-direction implementation checkpoint:** Allison is a confirmed primary
 user for the Editor lens. The target contract preserves the former
@@ -52,20 +53,22 @@ publication version. The global role-eligible audience is all PDs, PCs, CSO,
 and President; the intended reviewer set for a request is configured by its
 broad Grant Program. A full coordinator matrix is required with neutral
 blank/Reviewed/Updated since review states and no compliance semantics.
-SharePoint file-permission
-verification and persona rollout remain open. The reviewed replacement extends
+Representative SharePoint file-permission verification and persona rollout are
+complete at the source/deployment/live-data boundary. The reviewed replacement extends
 the existing versioned Final Writeup Admin setting with explicit GUID-only,
 multi-valued PD, PC, Leadership, and no-lens staffing assignments; Allison
 Keller is President and Beth Pruitt is CSO plus a responsible PD on some
 requests. The v2 contract, consolidated Admin editor, and dry-run-first ETag
 tooling are Production-deployed at `84bf465b` in Ready deployment
-`dpl_41SybgPYfJXGarf7UqcMGCLMy4KS` with the rollout flag false; the superseded
+`dpl_41SybgPYfJXGarf7UqcMGCLMy4KS`; the superseded
 team source is removed and no Production team was created. On 2026-09-01 UTC,
 the dry-run-first command upgraded the setting once; exact readback proved v2
 at `W/"96944113"`, all 11 assignments, zero stale/unassigned rows, and unchanged
 nine-person Research/six-person Southern California audiences. Representative
 Word access was proved 2026-09-03 (owner-reported: Allison Keller, Duncan Spore,
-Sarah Hibler opened Word and acknowledged); the flag flip remains. The
+Sarah Hibler opened Word and acknowledged); commit `213f6c34` then enabled the
+flag in Ready Production deployment `dpl_HGrbWUNPJMJunVevYLVEmtn7He6a`, and
+the read-only six-case production-data persona smoke passed. The
 first fixed gate is a human-in-the-loop, end-to-end Initial Assessment pilot by
 2026-08-10, ahead of proposal intake around 2026-08-18. Authorized staff use a
 dedicated representative dummy production request to generate, inspect, and edit the canonical
@@ -285,7 +288,8 @@ planned. Current authority is
   roster and Request `1002788`, with Duncan Spore Reviewed, Justin Gallivan
   Responsible PD, all other cells Not reviewed, both direct actions, and zero
   browser-console errors.
-  Ordinary and focused responses receive no matrix. PR #140 merge `ce229778` is Ready in deployment
+  Focused responses receive no matrix; configured PCs now receive it on the
+  index alongside superusers. PR #140 merge `ce229778` is Ready in deployment
   `dpl_P7xay61LHnxohad9FEtSniBAosuY`; Wave 23 Production readiness is exact
   `on` in Ready deployment `dpl_B9k3AprnYp5ExpkqpT3dUxCUZqWo`. Signed-in
   dashboard and Request `1002788` Final reads passed with zero reviews and
@@ -295,10 +299,12 @@ planned. Current authority is
   directly assigned and its six requested Global privileges are effective for
   all 11 confirmed audience members. The colleague's post-role retry succeeded,
   appeared in review history, and independent readback proved exactly one
-  complete acknowledgement row for Request `1002788`. Persona lenses remain
-  disabled; the version-2 staffing configuration is migrated/read back and
-  representative PC and leadership Word access was proved 2026-09-03, so only
-  the deliberate flag flip, deployment, and persona smoke remain.
+  complete acknowledgement row for Request `1002788`. The version-2 staffing
+  configuration is migrated/read back; representative PC and Leadership Word
+  access was proved 2026-09-03. Commit `213f6c34` then enabled persona lenses in
+  Ready Production deployment `dpl_HGrbWUNPJMJunVevYLVEmtn7He6a`, and the
+  six-case read-only production-data smoke passed. One signed-in
+  non-superuser dashboard observation remains for natural use.
   **[PRODUCTION-LIVE + SIGNED-IN READ/WRITE PROVED 2026-08-31]** Role
   eligibility is not the same as per-program matrix assignment. Commit
   `5573bca3` is live in Ready Production deployment

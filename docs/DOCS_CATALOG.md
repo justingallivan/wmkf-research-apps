@@ -451,7 +451,7 @@ related:
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
-| [FINAL_WRITEUP_PERSONA_CONFIGURATION_PLAN.md](FINAL_WRITEUP_PERSONA_CONFIGURATION_PLAN.md) | plan | active |  | Production-live v2 staffing in the Admin editor; migration and Word-access proof passed; persona lenses stay disabled pending deliberate enablement. | 2026-08-31 |
-| [FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md](FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md) | plan | active |  | Final runtime and matrix are live; v2 staffing and representative Word access are proved, so only deliberate enablement and smoke gate the persona rollout. | 2026-08-28 |
-| [WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md](WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md) | plan | active |  | Pre-Site/Site Visit lifecycle, Final acknowledgement/dashboard, and the superuser matrix are live; reviewed persona-config rollout remains. | 2026-08-17 |
+| [FINAL_WRITEUP_PERSONA_CONFIGURATION_PLAN.md](FINAL_WRITEUP_PERSONA_CONFIGURATION_PLAN.md) | plan | active |  | Version-2 staffing and explicit Final Writeup persona lenses are Production-live; server-side live-data smoke passed and signed-in staff observation remains. | 2026-08-31 |
+| [FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md](FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md) | plan | active |  | Final runtime, v2 staffing, and explicit persona dashboard lenses are Production-live; stage-transition and signed-in persona observation work remain. | 2026-08-28 |
+| [WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md](WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md) | plan | active |  | Pre-Site/Site Visit lifecycle, Final acknowledgement/dashboard, and explicit persona lenses are live; later Final stage transitions remain. | 2026-08-17 |
 

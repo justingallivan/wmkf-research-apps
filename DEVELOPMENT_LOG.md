@@ -10,6 +10,25 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## September 2026 — Final Writeup persona dashboard lenses enabled (Session 476)
+
+**Milestone:** Explicit Program Director, Program Coordinator, Leadership, and
+overlapping Final Writeup dashboard lenses are Production-live without
+Dataverse persona teams or inferred staff roles.
+**Sessions:** 470–476 (acknowledgement foundation, role rollout, matrix and v2
+staffing publication, representative Word proof, enablement, and smoke).
+**Ship state:** commit `213f6c34` is live in Ready deployment
+`dpl_HGrbWUNPJMJunVevYLVEmtn7He6a`. Live preflight re-proved all 11 current
+reviewer-role members assigned with zero stale/unassigned references; read-only
+production-data smoke passed for PD, PC, Leadership, overlap,
+ineligible/unassigned, and superuser projections. A signed-in non-superuser
+dashboard observation remains for the next natural staff visit.
+**Why it matters:** PCs now receive the complete neutral matrix, PD and
+Leadership queues are explicitly scoped, and stale or ineligible identities
+fail closed; PC backup and Leadership-stage transitions remain separate work.
+**Pointers:** `docs/FINAL_WRITEUP_PERSONA_CONFIGURATION_PLAN.md`;
+`docs/CURRENT_WORK_QUEUE.md`; commit `213f6c34`.
+
 ## September 2026 — Vercel ESM runtime incompatibility contained (Session 474)
 
 **Milestone:** A production-wide `ERR_REQUIRE_ESM` outage triggered by the
