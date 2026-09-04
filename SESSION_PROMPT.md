@@ -68,8 +68,15 @@ deployed/source/test/render verified rather than transport-smoked in Production.
 
 ## Following Priority
 
-The owner approved automatic retention for individual structured review DOCX
-files in SharePoint; the dry-run-first D26 backfill is Wave 3.
+The owner-approved D26 retention backfill is complete. Waves 1–4 are
+Production-live on `main` at `3ba2a6ad` in Ready deployment
+`dpl_22wUzC1cCi4nhKTSFQftfaycucSh`. The exact v4 manifest executed 22 files
+with zero failures, and a fresh post-write Production dry run found zero
+eligible missing files, zero reconcile candidates, zero blockers, and only the
+explicit Request `1003223` test exclusion. Both Production rollout variables
+remain absent, so forward automatic filing is still disabled. Old-file cleanup
+and Wave 5 activation remain separately owner-gated; the work queue now returns
+to Final Writeup persona rollout.
 The active plan is `docs/REVIEW_DOCX_SHAREPOINT_RETENTION_PLAN.md`. Claude's
 read-only adversarial review of the plan returned
 APPROVE WITH CONDITIONS; the plan now incorporates the verified eligibility,
@@ -79,16 +86,16 @@ on `main` at `41326cf5`, and this branch is rebased onto that baseline.
 
 [VERIFIED via source, focused tests, governed-hash characterization, rendered
 page inspection, and the Ready Production deployment] Wave 1 is complete on
-`main` at `83da197f`: the shared
+`main` and included in current runtime `3ba2a6ad`: the shared
 `review-documents/individual-review-builder.js` now owns answer loading,
 composition, filename/content type, and template rendering. The thank-you sweep
 still supplies send time, builds before its If-Match claim, and preserves the
 honorarium projection/pass-through. No SharePoint call, pointer write, route,
 cron, or rollout flag was added by Wave 1.
 
-[VERIFIED via source/tests and flag-off Production route proof; ACTIVATED WRITES
-NOT PRODUCTION-PROVED] Wave 2 is Production-deployed on `main` at `83da197f` in
-Ready deployment `dpl_F3oZ9MDbnyFox7S8Ekdos7423ece`: a dedicated CRON-secret
+[VERIFIED via source/tests and flag-off Production route proof; SCHEDULED WRITES
+NOT PRODUCTION-PROVED] Wave 2 is included in current `main` commit `3ba2a6ad` and
+Ready deployment `dpl_22wUzC1cCi4nhKTSFQftfaycucSh`: a dedicated CRON-secret
 route and filing
 service enforce exact-stamped-cycle/fresh-snapshot eligibility, newest-first
 scheduled discovery, create-only canonical
@@ -148,8 +155,8 @@ Review` title split after its first character. The branch now preserves the
 Production-used v1 templates and selects new v2 templates that remove the two
 out-of-bounds positioning tabs and directly right-aligns both individual and
 combined first-page titles. Focused tests, structural package checks, and
-one-page renders for both templates pass; the fix is not deployed and the
-existing SharePoint item is unchanged. The owner then simplified the retained
+one-page renders for both templates passed; at that stage the fix had not yet
+been deployed and the existing SharePoint item was unchanged. The owner then simplified the retained
 file contract: generated documents now target the request-level `Reviews/`
 folder with filename `Review-<request>-<reviewer name>.docx`; no
 `Reviewer_Uploads/Generated` or suggestion-GUID layer remains in the current
@@ -161,7 +168,8 @@ has hash `9254df9e5e504c79007391efc85d189e89e8b8b2ff80b8e4f11990baca08f4f8`,
 22 eligible missing files, one visible Request `1003223` test exclusion, zero
 blockers, 22 unique destinations, and no Request `1002874` candidate. No
 suggestion IDs were added or removed versus the prior survey; the apparent new
-reviews were already included. No additional population write was approved. The owner then authorized an exact
+reviews were already included. At that stage no additional population write had
+been approved. The owner then authorized an exact
 Request `1002874` repair that leaves the old file for later cleanup. Hash-bound
 manifest
 `outputs/review-docx-repair/review-docx-repair-1002874-2026-09-03T23-21-31-299Z.json`
@@ -205,8 +213,16 @@ regeneration/download now returns
 `already_filed`, matches v4 governed hash
 `gdc1:fbIC8o5aWoe_rOjXNK6mAKR6kbNRQ_I6MU60R28Chi4`, and confirms unchanged
 Dataverse pointers. The owner visually confirmed version `4.0` in Word Online
-and approved the v4 header on 2026-09-03. The runtime fix is not deployed; the remaining 22 writes, scheduled
-activation, and old-file cleanup remain unapproved.
+and approved the v4 header on 2026-09-03. The reviewed runtime was subsequently
+promoted at `3ba2a6ad` / `dpl_22wUzC1cCi4nhKTSFQftfaycucSh`. Exact execution
+artifact
+`outputs/review-docx-backfill/review-docx-D26-2026-09-04T01-18-31-489Z.execute-result-2026-09-04T01-32-42-926Z.json`
+reports 22 created and zero failed; row-by-row reconciliation matched every
+reviewed identity, destination, semantic hash, and unique SharePoint item.
+Fresh post-write manifest
+`outputs/review-docx-backfill/review-docx-D26-2026-09-04T01-33-20-264Z.json`
+has no eligible or reconcile rows and no blockers. Scheduled activation and
+old-file cleanup remain unapproved.
 
 ## Parked
 

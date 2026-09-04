@@ -5,7 +5,7 @@ status: active
 metadata:
   node_type: memory
   type: project
-  last_verified: 2026-09-03 via exact Production Wave 25 readback, signed-in combined-export DOCX smoke, and the Ready inert Wave 2 retention deployment
+  last_verified: 2026-09-04 via Ready v4 retention deployment, exact 22-row D26 backfill reconciliation, and clean post-write Production survey
   originSessionId: 7db29a2d-b16d-490a-80f0-7e4fa4c04f0a
 ---
 
@@ -63,10 +63,10 @@ the shared builder by the thank-you sweep before its If-Match claim. A render fa
 unclaimed and unsent so the complete delivery retries later. Both use the same answer
 snapshot interpretation but distinct approved templates. Historical categorical
 rows without a full option snapshot render selected-only with an explicit note;
-new submissions snapshot every presented option. Wave 2 retention is now
-Production-deployed on `main` at `83da197f` in Ready deployment
-`dpl_F3oZ9MDbnyFox7S8Ekdos7423ece`: a dedicated guarded sweep
-creates immutable individual DOCX files under the generated SharePoint namespace
+new submissions snapshot every presented option. Review retention Waves 1–4 are
+Production-live on `main` at `3ba2a6ad` in Ready deployment
+`dpl_22wUzC1cCi4nhKTSFQftfaycucSh`: a dedicated guarded sweep
+creates individual DOCX files under the request-level `Reviews` folder
 and conditionally stores the existing pointer pair. Its scheduled discovery is
 exact-cycle-stamp-only and newest-first, and flag-off requests create no
 maintenance row. Claude's Wave 2 build review approved the source with
@@ -97,7 +97,8 @@ succeeds and the downloaded file looks correct. Opening the retained item
 through akoyaGO/Word for the web exposed a tab-layout defect that split
 `Proposal Review` after its first character. The branch removes the positioning
 tabs and directly right-aligns both review-template titles; focused tests,
-package isolation checks, and rendered inspection pass. The fix is not deployed.
+package isolation checks, and rendered inspection passed. At that stage the fix
+had not yet been deployed.
 The owner then simplified the retained-file
 destination to request-level
 `Reviews/Review-<request>-<reviewer name>.docx`, removing both intermediate
@@ -105,7 +106,7 @@ generated/GUID layers from the current target. The old Request `1002874` item
 remains backward-compatible. The current v4 D26 manifest has hash
 `9254df9e5e504c79007391efc85d189e89e8b8b2ff80b8e4f11990baca08f4f8`,
 22 eligible missing files with unique destinations, one visible test exclusion,
-zero blockers, and no Request `1002874` candidate. Its exact suggestion set is
+zero blockers, and no Request `1002874` candidate. Its exact suggestion set was
 unchanged from the preceding survey; no new qualifying rows appeared. The owner then approved the
 exact Request `1002874` repair while deferring old-file cleanup. Manifest hash
 `c30c76e47281208b8b4cc25976360453eebbdc65ba3d4b203c19a6e0f1a5692d`
@@ -134,6 +135,11 @@ second guarded in-place upload regenerated the same real v4 output as version
 `4.0` at `2026-09-04T00:59:51Z`; versions `1.0`–`3.0` remain in SharePoint
 history, and independent readback again matched the v4 hash and unchanged
 pointers. The owner visually confirmed version `4.0` in Word Online and approved
-the v4 header on 2026-09-03. Describe Wave 2 as
-Production-deployed inert, Wave 3 as exact new-path storage/pointer and
-manifest-bound v3/v4 content repairs proved, and automatic filing as not activated.
+the v4 header on 2026-09-03. The reviewed runtime was then promoted, and the
+exact owner-approved v4 manifest completed 22 created / zero failed. Row-by-row
+reconciliation matched all expected identities, destinations, semantic hashes,
+and unique SharePoint items. A fresh post-write survey has zero eligible missing
+files, zero reconcile candidates, zero blockers, and only the visible Request
+`1003223` test exclusion. Describe Waves 1–4 as Production-live and the D26
+backfill as complete; automatic filing remains disabled and legacy cleanup
+remains separately gated.

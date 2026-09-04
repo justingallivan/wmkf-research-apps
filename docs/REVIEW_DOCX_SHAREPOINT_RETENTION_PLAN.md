@@ -6,7 +6,7 @@ status: active
 summary: "Retain structured-review DOCX files in SharePoint after submission and backfill missing D26 files with a dry-run-first, conflict-safe script."
 canonical: false
 cataloged: 2026-09-03
-last_verified: 2026-09-03
+last_verified: 2026-09-04
 owner: product-engineering
 related:
   - docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md
@@ -26,39 +26,24 @@ related:
 
 ## Decision and status
 
-**Status: WAVES 1–2 ARE PRODUCTION-DEPLOYED ON `main` AT `83da197f`; WAVE 3'S
-ONE-FILE STORAGE/POINTER PROOF PASSED; THE FOLLOW-UP V3 CONTENT REPAIR IS
-PRODUCTION-PROVED; WAVE 5 REMAINS PLANNED. Ready
-deployment `dpl_F3oZ9MDbnyFox7S8Ekdos7423ece` contains the filing service and
-dedicated cron, but both rollout variables are absent and the route is
-Production-proved inert. A clean 24-row Production read-only manifest was
-created on 2026-09-03 with 23 eligible reviews and one visible owner-confirmed
-test exclusion. The owner selected Request `1002874` / Agnes Karasik and
-explicitly approved its exact scoped manifest. The resulting SharePoint item,
-Dataverse pointer pair, semantic content, and Workbench download passed, but
-akoyaGO/Word for the web split the tab-positioned first-page title. The branch
-preserves v1/v2 and selects new v3 templates that directly right-align both
-titles without tabs and explicitly disable wrapping around the behind-text logo.
-The owner then simplified the generated-file destination to the
-request-level `Reviews/Review-{request}-{reviewer name}.docx`; the two
-intermediate folders are retired for new files. Neither runtime change is
-deployed. The owner authorized an exact local repair that generated the v2
-Agnes Karasik document at the new path, verified it, and repointed Dataverse;
-the old file remains intact for later cleanup. Word Online still pushed the v2
-title below the logo, so a second exact content repair versioned that same item
-from `1.0` to `2.0` with v3 bytes, retained and verified the prior version, and
-independently matched the new governed hash without changing the pointer.
-Owner inspection still rejected the floating-logo alignment. The owner-edited
-v4 header replaces it with a fixed two-column text table; a third exact content
-repair versioned the same item from `2.0` to `3.0`, and independent readback
-matched the v4 governed hash with unchanged pointers.
-Fresh v4 replacement manifest hash
-`9254df9e5e504c79007391efc85d189e89e8b8b2ff80b8e4f11990baca08f4f8` has 22
-eligible missing files, the same visible test exclusion, zero blockers, and 22
-unique eligible destinations. Its exact suggestion set is unchanged from the
-preceding survey; no new qualifying rows appeared. No
-additional backfill write, old-file cleanup, or forward activation is
-authorized.**
+**Status: WAVES 1–4 ARE COMPLETE. The v4 templates, request-level `Reviews`
+path, guarded repair service, and D26 backfill were fast-forwarded to `main` at
+`3ba2a6ad` and reached Ready Production deployment
+`dpl_22wUzC1cCi4nhKTSFQftfaycucSh` on 2026-09-03 PDT. Both Production rollout
+variables remain absent, so the scheduled route is still inert. The exact
+owner-approved manifest
+`outputs/review-docx-backfill/review-docx-D26-2026-09-04T01-18-31-489Z.json`
+(`9254df9e5e504c79007391efc85d189e89e8b8b2ff80b8e4f11990baca08f4f8`)
+executed from a local operator process against the tracked Production targets.
+Its result artifact reports 22 created, zero reconciled, one explicitly skipped
+test request (`1003223`), and zero failed. Programmatic row-by-row reconciliation
+proved all 22 expected suggestion IDs, destinations, governed hashes, and unique
+SharePoint item identities match the reviewed manifest. A fresh Production
+dry run then reported zero eligible missing files, zero reconcile candidates,
+zero blockers, and only the visible test exclusion. Request `1002874` remains
+the owner-approved Word Online proof at stable item version `4.0`; its separate
+legacy-path file is retained for later cleanup. Wave 5 forward activation and
+that cleanup remain separately owner-gated.**
 
 The recommended design is to generate and retain one individual DOCX for every
 structured review, using the same approved individual template as the thank-you
@@ -91,11 +76,11 @@ probes on 2026-09-03:
 | Structured submission and thank-you generation do not currently retain that DOCX in SharePoint. | Submission services and thank-you sweep | N/A | N/A | Source/caller search; current release docs | **VERIFIED** |
 | Uploaded review files use the request library and store folder + filename on the suggestion row. | `review-upload.js` | SharePoint `akoya_request` + suggestion pointer fields | Reviews-tab Download action | Current source, Atlas, and download service | **VERIFIED** |
 | Reusing both pointer fields makes the existing Download action available. | Review upload / suggestion adapter | Suggestion pointer fields | `ReviewsTab.js` → existing download route/service | Current source | **VERIFIED** |
-| Before Wave 3 execution, D26 had 24 received reviews and 228 answer rows. All 24 were selected, had at least one rich-text answer row, had exact receipt/answer identity parity, and had zero complete or partial SharePoint pointers. After the one-row proof, the fresh unfinished-population manifest has 22 eligible missing files plus one visible test exclusion; Request `1002874` has a complete verified pointer pair. | Existing structured writers plus Wave 3 backfill | Production Dataverse | Backfill and existing pointer consumers | Initial blank-slate probe; execution result; independent readback; fresh post-write manifest | **VERIFIED 2026-09-03** |
+| Before Wave 3 execution, D26 had 24 received reviews and 228 answer rows. All 24 were selected, had at least one rich-text answer row, had exact receipt/answer identity parity, and had zero complete or partial SharePoint pointers. After the one-row proof and exact 22-row completion, the fresh unfinished-population manifest contains only the visible test exclusion and no eligible or reconcile rows. | Existing structured writers plus Wave 3/4 backfill | Production Dataverse + SharePoint | Backfill and existing pointer consumers | Initial blank-slate probe; both execution results; row-by-row manifest/result reconciliation; fresh post-write manifest | **VERIFIED 2026-09-04 UTC** |
 | Rendering identical semantic input twice does not produce byte-identical ZIP packages, while the governed Word-part hash is stable. | Current renderer | Generated DOCX package | Retry/conflict logic | Local two-render experiment: raw SHA-256 differed; governed hash matched | **VERIFIED** |
-| The thank-you attachment now uses one shared individual-review builder with caller-owned generation time. | `reviewer-thankyou-sweep.js` | Existing answer snapshot + transient DOCX bytes | Thank-you attachment; filing service | Focused builder/thank-you/hash tests, rendered-page inspection, and Ready Production deployment | **PRODUCTION-LIVE AT `83da197f`; TRANSPORT BEHAVIOR UNCHANGED** |
-| First-page review titles render portably without tab stops, floating shapes, or wrapping outside the usable width. | Tracked individual and combined templates | `word/header2.xml` | Desktop Word, Word for the web, LibreOffice/PDF render | v2 removed out-of-bounds title tabs and v3 changed the floating logo to `wrapNone`, but owner inspection still rejected the Word Online alignment. The owner-edited v4 header replaces the drawing with a fixed 9360-DXA two-column Times New Roman table. Structural assertions and both full generated fixtures pass. The live Request `1002874` item now has the reviewed v4 semantic hash as version `4.0`; the owner visually confirmed that version in Word Online and approved the v4 header. | **SOURCE/RETAINED-PACKAGE/LIVE-BYTES VERIFIED; OWNER WORD-ONLINE CONFIRMED; NOT DEPLOYED** |
-| Automatic retention and full D26 write execution are activated and Production-proved. | Dedicated filing service/cron is deployed but disabled; the operator backfill and exact repair command executed one owner-approved request | New generated SharePoint DOCX + exact suggestion pointer pair; old proof file retained; local redacted artifacts | Existing pointer consumers | Ready inert deployment; repair execution result; independent Graph/Dataverse semantic readback; both old/new Graph item readback | **PARTIAL: REQUEST `1002874` NEW-PATH REPAIR PROVED; SCHEDULED ROUTE AND REMAINING 22 WRITES UNPROVED** |
+| The thank-you attachment now uses one shared individual-review builder with caller-owned generation time. | `reviewer-thankyou-sweep.js` | Existing answer snapshot + transient DOCX bytes | Thank-you attachment; filing service | Focused builder/thank-you/hash tests, rendered-page inspection, and Ready Production deployment | **PRODUCTION-LIVE AT `3ba2a6ad`; TRANSPORT BEHAVIOR UNCHANGED** |
+| First-page review titles render portably without tab stops, floating shapes, or wrapping outside the usable width. | Tracked individual and combined templates | `word/header2.xml` | Desktop Word, Word for the web, LibreOffice/PDF render | v2 removed out-of-bounds title tabs and v3 changed the floating logo to `wrapNone`, but owner inspection still rejected the Word Online alignment. The owner-edited v4 header replaces the drawing with a fixed 9360-DXA two-column Times New Roman table. Structural assertions and both full generated fixtures pass. The live Request `1002874` item has the reviewed v4 semantic hash as version `4.0`; the owner visually confirmed that version in Word Online. The same templates are deployed at `3ba2a6ad` / `dpl_22wUzC1cCi4nhKTSFQftfaycucSh`. | **PRODUCTION-LIVE; OWNER WORD-ONLINE CONFIRMED** |
+| The exact D26 backfill is Production-proved while scheduled automatic retention remains disabled. | Dedicated filing service/cron plus guarded local operator backfill | 22 new generated SharePoint DOCX files + exact suggestion pointer pairs; local redacted manifest/result artifacts | Existing pointer consumers | Ready deployment; exact execution result; row-by-row identity/destination/hash reconciliation; clean post-write survey | **BACKFILL VERIFIED; SCHEDULED ROUTE INERT** |
 
 ### Sweep boundary
 
@@ -106,9 +91,9 @@ consumer, SharePoint upload/download services, current plans, Atlas pages, wiki,
 memory, and session handoff. Historical/current statements that say the Wave 25
 release performs no SharePoint upload remain correct: they describe the shipped
 baseline. This document is the single active forward plan. Its wave statuses
-distinguish the Production-deployed inert runtime, source-built backfill, and
-still-planned activation work, so it does not rewrite that history as deployed
-behavior.
+distinguish the Production-live v4 runtime, completed operator backfill, inert
+scheduled route, and still-planned activation work, so it does not rewrite that
+history as deployed behavior.
 
 ### Adversarial review reconciliation
 
@@ -141,9 +126,9 @@ was then checked against source rather than accepted by assertion:
   primary-filename-only deletion policy.
 
 With these amendments, no adversarial condition remains open at the plan layer.
-Wave 1's behavior-preserving foundation is source/test/render verified and now
-Production-deployed. SharePoint mutation, backfill, and activated automatic
-filing behavior remain unproved and separately gated.
+Waves 1–4 are source/test/render verified, Production-deployed, and the bounded
+D26 SharePoint/Dataverse backfill is Production-proved. Activated automatic
+filing remains unproved and separately gated.
 
 Claude's subsequent read-only Wave 2 build review returned **APPROVE WITH
 NON-BLOCKING SUGGESTIONS**. The accepted pre-release hardening keeps scheduled
@@ -196,8 +181,8 @@ title-layout defect: two tabs targeting a stop past the usable width split
 and selects new v2 templates that remove those tabs and directly right-align the
 first-page title in both formats. A package
 comparison proves only `word/header2.xml` changed in each template; 19 focused
-tests and one-page renders for both outputs pass. The fix is not deployed and
-the deployed runtime remains unchanged. The owner then authorized an exact,
+tests and one-page renders for both outputs passed. At that stage the fix had
+not yet been deployed and the deployed runtime remained unchanged. The owner then authorized an exact,
 manifest-bound local repair. Manifest
 `outputs/review-docx-repair/review-docx-repair-1002874-2026-09-03T23-21-31-299Z.json`
 with hash `c30c76e47281208b8b4cc25976360453eebbdc65ba3d4b203c19a6e0f1a5692d`
@@ -743,7 +728,7 @@ with a self-test runs sequentially with its self-test:
 
 ### Wave 1 — Shared, behavior-preserving foundations
 
-**Status: COMPLETE AND PRODUCTION-LIVE ON `main` AT `83da197f` (2026-09-03).**
+**Status: COMPLETE AND PRODUCTION-LIVE ON `main` AT `3ba2a6ad` (2026-09-03).**
 
 - Claude's reviewer thank-you honorarium-copy feature landed on `main` at
   `41326cf5`; this branch was rebased onto it before the shared service changed.
@@ -771,12 +756,12 @@ clean. No SharePoint call, pointer write, route, cron, or rollout flag was added
   tests.
 
 **Gate: PASSED.** Adversarial review and all relevant source/test/build gates
-passed. Ready Production deployment `dpl_F3oZ9MDbnyFox7S8Ekdos7423ece` contains
+passed. Ready Production deployment `dpl_22wUzC1cCi4nhKTSFQftfaycucSh` contains
 the route with both rollout variables absent. An authenticated GET returned the
 exact disabled response before persistence, and the `file-review-docx`
 maintenance-run population remained zero before and after.
 
-**Status: PRODUCTION-DEPLOYED INERT ON `main` AT `83da197f` (2026-09-03).** The dedicated guarded
+**Status: PRODUCTION-DEPLOYED INERT ON `main` AT `3ba2a6ad` (2026-09-03).** The dedicated guarded
 service/cron, create-only Graph path, semantic hash reconciliation, bounded ETag
 pointer recovery, safe exact-item cleanup, per-row telemetry/results, and shared
 pointer-provenance consumer semantics are implemented with focused tests. The
@@ -785,18 +770,19 @@ maintenance row. Claude returned APPROVE WITH NON-BLOCKING SUGGESTIONS, and the
 accepted pre-release hardening is incorporated. The rollout/cycle flags remain
 absent in Production; no Graph or Dataverse pointer write occurred during the
 Wave 2 flag-off proof. The scheduled mutation path is therefore not
-Production-proved. Wave 3 backfill code is built
-on `codex/review-docx-wave3-backfill` with focused tests. Claude's Wave 3
+Production-proved. Wave 3 backfill code is now included in the deployed runtime
+with focused tests. Claude's Wave 3
 adversarial review returned APPROVE WITH NON-BLOCKING NOTES; the accepted
-remediation is incorporated on the feature branch. The first Production
+remediation is incorporated. The first Production
 read-only run found one owner-confirmed test request; the replacement schema-v2
 manifest records its explicit exclusion, has zero blockers, and performed no
 mutation.
 
 ### Wave 3 — D26 dry run and one-file proof
 
-**Status: REQUEST 1002874 ONE-FILE STORAGE/POINTER PROOF PASSED; NO ADDITIONAL
-WRITE APPROVED.**
+**Status: COMPLETE. Request `1002874` passed the storage, pointer, retained-version,
+and Word Online proof; the reviewed runtime was then promoted before the bounded
+D26 completion write.**
 
 - [x] Build the dry-run-first backfill script using the same ensure service.
 - [x] Complete the read-only adversarial review and incorporate its accepted
@@ -830,13 +816,17 @@ WRITE APPROVED.**
   retained versions `1.0`–`3.0`, and left Dataverse pointers unchanged.
 - [x] Owner confirmed version `4.0` visually in Word for the web and approved
   the v4 header on 2026-09-03.
-- [ ] Promote the v4/path/runtime changes before any further backfill or
-  forward activation.
+- [x] Promote the v4/path/runtime changes before any further backfill or
+  forward activation. `main` commit `3ba2a6ad` reached Ready deployment
+  `dpl_22wUzC1cCi4nhKTSFQftfaycucSh` before the 22-row execution.
 - [ ] Clean up the old Request `1002874` item only after separate approval.
 
 **Gate:** Graph + Dataverse + Workbench readback and bounded logs.
 
 ### Wave 4 — D26 completion
+
+**Status: COMPLETE. The exact approved 22-row manifest executed with zero
+failures, and a fresh Production dry run found no eligible or reconcile rows.**
 
 - [x] After the v2 template and path corrections, produce a replacement manifest: 22
   eligible missing files, one visible test exclusion, zero blockers, hash
@@ -846,8 +836,18 @@ WRITE APPROVED.**
   `9254df9e5e504c79007391efc85d189e89e8b8b2ff80b8e4f11990baca08f4f8`.
   Exact comparison found no added or removed suggestion IDs versus the prior
   survey; the earlier manifest remains superseded and must not execute.
-- Stop for explicit approval of the remaining bounded write set.
-- Execute, reconcile every suggestion identity, and prove a clean rerun.
+- [x] Stop for and receive explicit approval of the remaining bounded write set.
+- [x] Execute the exact v4 manifest. Result artifact
+  `outputs/review-docx-backfill/review-docx-D26-2026-09-04T01-18-31-489Z.execute-result-2026-09-04T01-32-42-926Z.json`
+  reports 22 created, zero reconciled, one explicitly skipped test request, and
+  zero failed.
+- [x] Reconcile every expected suggestion identity, destination, governed hash,
+  and unique SharePoint item identity to the approved manifest.
+- [x] Prove a clean rerun. Fresh manifest
+  `outputs/review-docx-backfill/review-docx-D26-2026-09-04T01-33-20-264Z.json`
+  (`f17eae89d00bf1c85301ae7a0b7ad6f3de37ff394030fbb0d66de793d10b1b64`)
+  has zero eligible missing files, zero reconcile candidates, zero blockers,
+  and only the visible Request `1003223` test exclusion.
 
 ### Wave 5 — Forward activation
 
@@ -882,9 +882,9 @@ Stop before writes or further rollout if any of the following appears:
 ## Sweep report
 
 ```text
-Sweep mode: Mode B domain truth audit plus Mode A Word Online/path/version-repair reconciliation
+Sweep mode: Mode B domain truth audit plus Mode A release/backfill reconciliation
 Domain: structured individual review DOCX generation and SharePoint retention
-Claims: Waves 1–2 implementation and flag-off Production deployment VERIFIED;
+Claims: Waves 1–4 implementation and Production deployment VERIFIED;
   Wave 3 backfill SOURCE/FOCUSED-TEST/ADVERSARIAL-REVIEW VERIFIED, exact
   Request 1002874 create-only SharePoint/pointer/semantic proof VERIFIED, and
   owner browser download VERIFIED; three Word Online header defects OWNER-OBSERVED,
@@ -895,16 +895,16 @@ Claims: Waves 1–2 implementation and flag-off Production deployment VERIFIED;
   VERIFIED; exact same-item v3 and v4 content repairs, retained prior-version
   history, independent current-hash/pointer readback, owner Word Online approval,
   and fresh v4 22-row/no-blocker population survey with no suggestion-ID change
-  versus the preceding survey VERIFIED;
-  runtime deployment UNPROVED;
-  remaining 22 writes and scheduled activation UNPROVED
+  versus the preceding survey VERIFIED; runtime deployment VERIFIED;
+  exact 22-row execution and clean post-write survey VERIFIED;
+  scheduled activation UNPROVED
 Durable restatements: current no-upload statements remain accurate historical/current baseline
 Structural fix: reconciled plan/queue/strategy/Atlas/runbook/wiki/catalog/memory/
   handoff to the observed compatibility defect, source fix, simplified
   request-level Reviews destination, human-readable filename, superseded
   manifest, superseded v2/v3 manifests, exact relocation/content repair results,
-  retained old file and prior SharePoint version, fresh v4 population manifest, and
-  explicit visual-confirmation/promotion/cleanup/write gates
+  retained old file and prior SharePoint version, exact v4 population/result,
+  clean post-write manifest, and explicit cleanup/activation gates
 Semantic omissions found: operator-confirmed test data needed an explicit,
   reviewable, hash-bound exclusion contract rather than relaxed validation or a
   silent population filter; the wiki lacked the separate inert retention path,
@@ -912,8 +912,7 @@ Semantic omissions found: operator-confirmed test data needed an explicit,
 Remaining live STALE: 0 within this plan's stated scope
 Remaining UNKNOWN/ASSUMED: any future same-name reviewer
   pair (blocked in backfill and a stop condition before forward activation),
-  the remaining 22 backfill writes, runtime promotion, scheduled automatic
-  filing, and old-file cleanup remain unproved or unapproved
-Verdict: SOURCE/PATH/V4 FIX, EXACT REPAIRS, AND OWNER WORD-ONLINE VISUAL
-  CONFIRMATION VERIFIED; PROMOTION, CLEANUP, AND ALL ADDITIONAL WRITES REMAIN GATED
+  scheduled automatic filing and old-file cleanup remain unproved or unapproved
+Verdict: WAVES 1–4, RUNTIME PROMOTION, EXACT REPAIRS, OWNER WORD-ONLINE VISUAL
+  CONFIRMATION, AND D26 BACKFILL VERIFIED; CLEANUP AND FORWARD ACTIVATION REMAIN GATED
 ```

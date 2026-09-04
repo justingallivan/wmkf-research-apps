@@ -1,6 +1,6 @@
 # Atlas: `wmkf_appreviewanswer` (Dataverse, WMKF child entity)
 
-**Last verified:** 2026-09-03 for Production Wave 25 apply/readback and the Production-live template-backed review-DOCX implementation (`3101f067`, Ready deployment `dpl_AjT5FeDh5wkdeFSoZWJsVDM5oBqs`). A signed-in Request `1002903` export produced a valid 60,586-byte DOCX titled **Aggregated Proposal Reviews**; the courtesy-email path was not transport-smoked. The base entity remains live in **prod** from wave 8, and waves 15 and 25 are applied. Production metadata reports `wmkf_answervalues` as nullable custom Memo `wmkf_AnswerValues` with `MaxLength=150000`; the property is selectable through `wmkf_appreviewanswers`. **[VERIFIED via `scripts/probe-review-answer-multiselect-field.mjs` production readback after `scripts/apply-dataverse-schema.js --target=prod --wave=15-review-answer-multiselect --execute`].** Production metadata reports `wmkf_questionoptions` as the exact nullable Memo `wmkf_QuestionOptions` with `MaxLength=20000`. **[VERIFIED via `scripts/preflight-review-answer-question-options-schema.mjs --target=prod` after the owner-approved Wave 25 apply].**
+**Last verified:** 2026-09-04 for the Production-live v4 review-DOCX retention runtime (`3ba2a6ad`, Ready deployment `dpl_22wUzC1cCi4nhKTSFQftfaycucSh`), exact 22-row D26 backfill reconciliation, and clean post-write survey; 2026-09-03 for Production Wave 25 apply/readback and the initial template-backed review-DOCX implementation (`3101f067`, Ready deployment `dpl_AjT5FeDh5wkdeFSoZWJsVDM5oBqs`). A signed-in Request `1002903` export produced a valid 60,586-byte DOCX titled **Aggregated Proposal Reviews**; the courtesy-email path was not transport-smoked. The base entity remains live in **prod** from wave 8, and waves 15 and 25 are applied. Production metadata reports `wmkf_answervalues` as nullable custom Memo `wmkf_AnswerValues` with `MaxLength=150000`; the property is selectable through `wmkf_appreviewanswers`. **[VERIFIED via `scripts/probe-review-answer-multiselect-field.mjs` production readback after `scripts/apply-dataverse-schema.js --target=prod --wave=15-review-answer-multiselect --execute`].** Production metadata reports `wmkf_questionoptions` as the exact nullable Memo `wmkf_QuestionOptions` with `MaxLength=20000`. **[VERIFIED via `scripts/preflight-review-answer-question-options-schema.mjs --target=prod` after the owner-approved Wave 25 apply].**
 **Live row count:** non-zero in prod once reviewers submit (Phase 3 write path is live S302); not independently re-counted here.
 **Entity set:** `wmkf_appreviewanswers`
 **Schema specs:** base entity `lib/dataverse/schema/wave8-review-answer-snapshot/01_wmkf_appreviewanswer.json`; applied multiselect extension `lib/dataverse/schema/wave15-review-answer-multiselect/`; applied option-snapshot extension `lib/dataverse/schema/wave25-review-answer-question-options/`.
@@ -39,8 +39,8 @@ Data:
 
 The same DTO derives ratings from these rows (`ratingsFromAnswers`, `lib/external/review-answer-snapshot.js`) instead of parent columns, and the external review-context prefill reads them per suggestion. In the active target contract the projection contains only `riskLevel` and `overallAssessment`; a rating with no snapshot row remains null (informal/unrated).
 
-**[PRODUCTION-DEPLOYED INERT 2026-09-03 AT `83da197f` /
-`dpl_F3oZ9MDbnyFox7S8Ekdos7423ece`; LOCAL BACKFILL WRITE PROVED FOR ONE ROW]** The dedicated
+**[PRODUCTION-LIVE 2026-09-03 AT `3ba2a6ad` /
+`dpl_22wUzC1cCi4nhKTSFQftfaycucSh`; EXACT D26 BACKFILL PROVED 2026-09-04 UTC]** The dedicated
 individual-review retention service now also reads this self-describing snapshot
 as its sole content source. It requires at least one persisted `richtext` row and
 rejects malformed identity/order/type/categorical shapes before rendering; it
@@ -52,8 +52,7 @@ owner-approved manifest, the local operator path regenerated Agnes Karasik's
 Request `1002874` document from this snapshot, created one immutable SharePoint
 item, and committed both suggestion pointers. Independent download/readback
 matched the reviewed governed hash. The owner later observed that the retained
-item's tab-positioned title breaks in Word for the web. The branch's no-tab
-template correction is source-tested and rendered but not deployed. Under a
+item's tab-positioned title breaks in Word for the web. Under a
 second exact owner-approved repair manifest, the local operator path regenerated
 the snapshot with the corrected template, created and verified
 `Reviews/Review-1002874-Agnes Karasik.docx`, and ETag-conditionally repointed the
@@ -61,9 +60,12 @@ suggestion. Independent readback matched the corrected governed hash and proved
 the old item remains for later cleanup. After subsequent guarded same-item
 content writes, the v4 generated output is current as version `4.0`; versions
 `1.0`–`3.0` remain in history, and the owner visually confirmed the v4 header in
-Word Online on 2026-09-03. A replacement population manifest excludes the completed row and
-reports 22 eligible missing files plus the same visible test exclusion. The
-scheduled path remains disabled and unproved.
+Word Online on 2026-09-03. The reviewed v4/path runtime was promoted before an
+exact owner-approved population manifest executed 22 created / zero failed.
+Row-by-row reconciliation matched all expected identities, destinations,
+semantic hashes, and unique SharePoint items. A fresh post-write survey reports
+zero eligible missing files, zero reconcile candidates, zero blockers, and only
+the visible test exclusion. The scheduled path remains disabled and unproved.
 
 ## Write Paths
 

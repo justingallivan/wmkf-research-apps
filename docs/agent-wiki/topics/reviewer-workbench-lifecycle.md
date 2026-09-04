@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-09-03
+last_verified: 2026-09-04
 stale_after_days: 90
 owner: reviewers
 source_files:
@@ -1127,13 +1127,20 @@ the Dataverse pointer pair unchanged. At the owner's explicit request, a second
 guarded generation/upload advanced the same stable item to version `4.0` at
 `2026-09-04T00:59:51Z`, retained versions `1.0`–`3.0`, and independently
 reverified the same v4 hash with unchanged pointers. The owner visually confirmed
-version `4.0` in Word Online and approved the v4 header on 2026-09-03; the
-runtime fix is not deployed. Fresh v4 population manifest hash
+version `4.0` in Word Online and approved the v4 header on 2026-09-03. The
+reviewed runtime was then promoted at `3ba2a6ad` in Ready deployment
+`dpl_22wUzC1cCi4nhKTSFQftfaycucSh`. Fresh v4 population manifest hash
 `9254df9e5e504c79007391efc85d189e89e8b8b2ff80b8e4f11990baca08f4f8` contains
 22 eligible missing files at unique destinations plus the same visible test
 exclusion, zero blockers, and no completed Request `1002874` candidate. Exact
-comparison found no added or removed suggestion IDs versus the prior survey. No additional write or
-old-file cleanup is approved. Active
+comparison found no added or removed suggestion IDs versus the prior survey.
+The exact owner-approved manifest then completed 22 created / zero failed, and
+row-by-row reconciliation matched every reviewed identity, destination,
+semantic hash, and unique SharePoint item. Fresh post-write manifest
+`f17eae89d00bf1c85301ae7a0b7ad6f3de37ff394030fbb0d66de793d10b1b64`
+has zero eligible missing files, zero reconcile candidates, zero blockers, and
+only the Request `1003223` test exclusion. Scheduled activation and old-file
+cleanup remain separately owner-gated. Active
 contract: `docs/REVIEW_DOCX_SHAREPOINT_RETENTION_PLAN.md`.
 
 **Phase 4 BUILT (2026-07-03); reliability production-proven 2026-07-28:**

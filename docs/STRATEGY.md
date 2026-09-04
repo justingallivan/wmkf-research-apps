@@ -6,7 +6,7 @@ status: active
 summary: "Long-term product direction; current execution priority is owned by CURRENT_WORK_QUEUE.md."
 canonical: false
 cataloged: 2026-07-02
-last_verified: 2026-09-03
+last_verified: 2026-09-04
 owner: product-engineering
 related:
   - docs/SYSTEM_MODEL.md
@@ -148,8 +148,8 @@ reviewed commits reached `main` at `3101f067` and Ready deployment
 valid 60,586-byte aggregated DOCX and the bounded post-deploy error scan was
 empty. The courtesy path is deployed and source/test/render verified but was not
 email-send smoked. The separately approved individual-review retention work is
-now Production-deployed inert at `83da197f` in Ready deployment
-`dpl_F3oZ9MDbnyFox7S8Ekdos7423ece`: both rollout variables are absent, an
+now Production-live at `3ba2a6ad` in Ready deployment
+`dpl_22wUzC1cCi4nhKTSFQftfaycucSh`: both rollout variables are absent, an
 authenticated route call returned `enabled:false`, and the maintenance-run
 population remained zero before/after. Wave 3's dry-run-first D26 backfill
 script and content-free manifest/execution contract are source-built with
@@ -194,14 +194,17 @@ v4 governed hash `gdc1:fbIC8o5aWoe_rOjXNK6mAKR6kbNRQ_I6MU60R28Chi4` with
 unchanged pointers. At the owner's explicit request, a further guarded upload
 wrote the same generated v4 output to the same item as version `4.0`, retained
 versions `1.0`–`3.0`, and independently reverified the v4 hash and unchanged
-pointers. The v4 fix remains undeployed, and the historical remaining-population
-manifest is superseded. The owner visually confirmed version `4.0` in Word
+pointers. The owner visually confirmed version `4.0` in Word
 Online and approved the v4 header on 2026-09-03. Fresh v4 population manifest
 hash `9254df9e5e504c79007391efc85d189e89e8b8b2ff80b8e4f11990baca08f4f8`
-contains 22 eligible missing files, one visible test exclusion, zero blockers,
-and no suggestion-ID changes versus the preceding survey. Template/path-fix
-promotion now precedes any
-remaining writes.
+contained 22 eligible missing files, one visible test exclusion, zero blockers,
+and no suggestion-ID changes versus the preceding survey. The reviewed v4/path
+runtime was promoted before the owner-approved exact manifest executed. The
+result reports 22 created and zero failed; all suggestion identities,
+destinations, semantic hashes, and unique SharePoint items reconcile. A fresh
+post-write Production survey has zero eligible missing files, zero reconcile
+candidates, zero blockers, and only the visible test exclusion. Scheduled
+automatic filing remains disabled and legacy-file cleanup remains owner-gated.
 Final Writeup persona
 access proof and deliberate enablement remain preserved immediately afterward.
 As of 2026-08-31, the ordinary-staff
