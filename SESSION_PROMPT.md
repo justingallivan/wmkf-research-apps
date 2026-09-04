@@ -111,7 +111,7 @@ worktrees and branches without touching unmerged or dirty work.
 
 ## Session 478 Implementation Update
 
-- [VERIFIED via source and focused tests] Branch
+- [VERIFIED via source and focused tests] Commit `2631c914` on branch
   `codex/reviewer-closeout-eligibility-app` adds a dedicated lead-PD/superuser
   closeout action for one Review Received engagement. The ETag-bound write sets
   Complete, the immutable first-completion timestamp, and exactly one honorarium
