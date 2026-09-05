@@ -230,8 +230,9 @@ scope. No DEVELOPMENT_LOG milestone is required: this stage shipped no runtime
 capability or architecture. The local claim-evidence metadata report was
 unavailable; no unsupported observation row was invented.
 
-Remote backup is blocked: automatic approval review rejected publication of
-this branch to the user-owned **public** GitHub origin, even after read-only
-ownership/ADMIN verification. All work remains committed locally; the owner
-must explicitly authorize publishing this new payload before the branch can
-be pushed. No merge, deployment, or remote branch write occurred.
+[VERIFIED via successful branch push] Remote backup is complete. The owner
+explicitly authorized publishing the branch's tests, census and documentation
+to the public GitHub repository; `codex/reviewer-lifecycle-stage0` was pushed
+to the configured origin with its upstream set. The earlier automatic-review
+publication block is resolved. No merge to main or production deployment was
+performed.
