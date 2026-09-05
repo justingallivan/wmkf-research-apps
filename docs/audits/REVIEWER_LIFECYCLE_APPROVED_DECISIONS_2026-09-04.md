@@ -55,9 +55,10 @@ Change surfaces: generic reviewer correction and batch outcome paths; existing
 receipt code is verification-only. Entry points: staff reviewer/candidate UI,
 their authenticated API routes and services. Persistence: existing Dataverse
 reviewer suggestions; no new store/field/enum. Consumers: existing reviewer DTOs,
-mutation responses and staff UI refresh/error handling. Prior findings: F1 is
-already refuted for successful current producers; F3/F5 remain implementation
-targets. Source fan-out and exact caller/adapter contracts are being probed.
+mutation responses and staff UI refresh/error handling. F1 is refuted for
+successful current producers. F3 is fixed at `c51fa34d`; F5 remains the UI/batch
+implementation target. Source fan-out and caller/adapter contracts were probed
+before the separately verified implementations.
 
 | Invariant | Intended surface | Verification |
 |---|---|---|
@@ -77,8 +78,11 @@ core run passed 15 suites / 240 tests; a separate upload receipt selection passe
 The no-file route header is corrected to name Review Received and ordinary
 resubmission locking; no executable receipt code changed.
 
-[PLANNED] Stage 1D implementation follows the read-only caller investigation.
-Its exact contract is:
+[VERIFIED via source, tests, build, gates and independent review] Stage 1D is
+complete at frozen `c51fa34d`: full 770 suites / 10,291 tests, 59 distinct
+sequential gate/self-tests, webpack build, and independent PASS (591 tests/probes
+and eight detected mutations). Deployment remains separate and pending.
+Its contract is:
 
 - Protect defined invitation/response inputs (`invited`, `accepted`, `declined`,
   `emailSentAt`, `responseType`, `responseReceivedAt`), including false/null.
@@ -101,7 +105,56 @@ Its exact contract is:
   separate Request ownership changes, restore generations and postcommit token
   or person failure remain distinct existing boundaries.
 
-Tests must first fail against the unchanged runtime, then prove the six-field
-closed/complement matrix, Request/version races, no later side effects on
-rejection, and positive named-command/closeout/courtesy behavior.
+Regressions failed against unchanged runtime before implementation. The complete
+focused service/route/adapter suites now pass 301 tests, compatibility suites 309,
+and composed races 185. These prove the six-field closed/complement matrix,
+Request/version races, no later side effects on rejection and retained named
+operations. Full evidence and limitations are tracked in
+[the Stage 1D receipt](REVIEWER_LIFECYCLE_STAGE1D_RECEIPT_2026-09-05.md).
 Stage 1E and 6A are still planned; policy approval is not runtime completion.
+
+## Planned outcome contracts
+
+Stage 1E will fix the existing single-reviewer status handler in place: require
+both HTTP success and `success:true`, identify the reviewer when reporting
+failure, and refresh only after confirmed mutation success. A failure to refresh
+after a confirmed write must not be reported as a failed write. Status feedback
+and callbacks must remain bound to the current request, reviewer, action and
+mounted context; no automatic retry or general action-framework extraction.
+The status-only stale-result protection does not claim to complete general 6B.
+
+The fresh Stage 1E planning review requires a synchronous per-reviewer pending
+lock plus an operation token. The lock persists until the attempt settles;
+request/mode changes, lost permission, row disappearance and unmount permanently
+invalidate that attempt's feedback. Returning to the same request or row does
+not revive it. Check currentness after fetch and JSON, before alert/refresh,
+and after an awaited refresh failure. Cleanup removes only its matching token
+and releases the pending control even when feedback was invalidated. Ordinary
+same-context object/callback replacements do not invalidate a valid attempt.
+Different reviewers remain independent. No latest-result-only substitute is
+accepted because it still permits overlapping same-reviewer writes.
+
+This lock belongs to one mounted panel. Remounts, other tabs and backend
+generations never observed by the client remain outside that guarantee. A
+callback that returns void or handles its own read errors does not certify a
+successful refresh. These limits are not reasons to introduce a shared mutation
+framework or alter host loaders in Stage 1E.
+
+The Stage 6A probe found one application PATCH caller, always single-item.
+The service still supports batches, so its additive response will use
+`savedIds`, `failedIds`, and `notAttemptedIds` for both forms. Preserve HTTP 200
+for full success, existing typed pre-write errors, and HTTP 500 for unknown
+persistence failures. `success:true` requires every submitted target to have
+confirmed success. A failed id denotes an attempted, unconfirmed outcome; it
+does not prove the server made no write. Lost responses require reviewing fresh
+state before a deliberate retry. No automatic replay or rollback is included.
+
+For a nonempty batch, normalize GUID identity using the authorization helper's
+existing trim/lowercase convention and deduplicate in first-occurrence order.
+The three arrays must partition those unique targets. Keep current empty-array
+validation/fallback behavior and characterize it. Complete authorization of all
+targets still precedes all writes; authorization failures retain their existing
+error-only envelope and disclose no per-target authorization results. The actual
+UI will check returned identities, refresh confirmed saves and describe remaining
+outcomes. Its materials-release selection remains unrelated. No new batch screen,
+207 status, queue, schema, or cross-request idempotency protocol is introduced.

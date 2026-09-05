@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-09-04
+last_verified: 2026-09-05
 stale_after_days: 90
 owner: reviewers
 source_files:
@@ -53,6 +53,7 @@ source_files:
   - pages/external/review/[token].js
   - shared/components/reviewers/reviewer-search-logic.js
   - pages/api/reviewer-finder/my-candidates.js
+  - lib/services/reviewer-finder/my-candidates-service.js
   - lib/services/reviewer-finder/remove-candidate-service.js
   - shared/components/reviewers/RemoveEntirelyModal.js
   - pages/api/reviewer-finder/enrich-contacts.js
@@ -177,6 +178,30 @@ route uses a fresh one-row ETag closeout, and manual/automatic thank-you paths
 write only the courtesy marker with legacy payment language stripped. Operations'
 system view exists but remains to be surfaced in AkoyaGO as a separate follow-up. Contract:
 `docs/REVIEWER_COMPLETION_AND_HONORARIUM_DECISION_BRIEF.md`.
+
+**Generic invitation/response corrections (Stage 1D):** **[VERIFIED in source
+at `c51fa34d`, 2026-09-05; full-stage source validation passed; deployment pending]**
+`PATCH /api/reviewer-finder/my-candidates` protects `invited`, `accepted`,
+`declined`, `emailSentAt`, `responseType`, and `responseReceivedAt` even when
+no review status is supplied. After lead-PD/superuser authorization, the route
+passes its server-resolved Request separately from the body. The service
+freshly requires the same Request binding, a non-excluded row, no completed-at
+marker, explicit null or accepted/materials-sent/under-review/review-received
+status, and a concrete ETag. Complete/withdrew/released, missing or unknown
+status, and missing or malformed versions fail closed. `updateLifecycle`
+independently enforces that source-state/version boundary for these six fields
+and preserves the caller's exact ETag; a stale version is never replaced with
+the adapter's newer guard-read version. Numeric 412 returns
+`correction_conflict`, with no automatic retry. Rejection occurs before token
+follow-up or person edits; success retains lifecycle write → nonfatal
+`accepted:true` token follow-up → person edits ordering.
+
+The dedicated closeout service still permits changed eligibility/notes on a
+complete row under its own fresh Request/receipt/disposition/ETag contract,
+without restamping completion. Named manual-invitation recording, restore,
+person-only edits, and bulk cycle/program-area assignment remain distinct
+operations. This protection does not turn the generic correction into a
+withdrawal command or extend its field set.
 
 **Per-reviewer extension workflow (Wave 18 production-live 2026-08-11):** eligible accepted rows in **Track Reviewers** expose Grant/Change extension. The dedicated `/api/review-manager/review-due-extension` route freshly enforces accepted/non-terminal/no-receipt state, requires a date strictly after the request default (and current/future Pacific date) with no maximum, and permits null to restore the original. It first validates the admin body, Dynamics impersonation setting, assigned sender, confirmed recipient, signature, and calendar. Confirmed engagement snapshot name/email take precedence; legacy missing values fall back field-by-field to the server-read linked reviewer person, and absence from both sources still fails before the write. It then ETag-saves and automatically dispatches the fixed-subject message with the assigned-PD signature and stable-UID calendar update. Only an actual Dynamics dispatch failure preserves the date without the notice. The open modal offers a server-fresh retry, and an existing extension always offers Resend deadline email without another date write; there is no durable notification-owed marker for a failed restore send. Invite Reviewers and generic `my-candidates` PATCH cannot write the field. The 90-day accepted-token cushion remains intentional and saving does not rotate a delivered token. [VERIFIED via production create/publish/exact/runtime-select probes, the non-clobbering admin-body seed, main `8647af33`, Vercel `dpl_AbTvWvMYb5inwPnYKTK2mkrkNXZz`, and live HTTP checks on 2026-08-11 / 2026-08-12 UTC] the column and runtime are live. [VERIFIED via the exact read-only production Request `1002788`/Test Homer row probe, main `ccb7e0c8`, Vercel `dpl_DjRmd4axNpUUpHAo6ZmeoBgumxTe`, and live HTTP checks] the legacy identity fallback is live. [VERIFIED via owner production smoke on Request `1002788`] the retry saved the extension and delivered the automatic deadline email. Its `Dear Test Homer,` greeting exposed the last copy defect. The admin body now requires `{{greeting}}`, the shared reviewer honorific helper renders `Dear Dr. Homer,`, and the live Dataverse setting matches the source default. [VERIFIED via main `6526a934`, Vercel `dpl_33KVRu3WmQhWBztd7RqDd2X6LBCr`, 610 suites / 7,717 tests, webpack build, and live HTTP 200] that correction is production-live; no second test email was sent.
 
@@ -518,16 +543,17 @@ ordinary declined rows read as reviewer responses, `no_response` reads as automa
 cycle close, and `declined` + `withdrew` reads as staff-recorded withdrawal. The bare
 timestamp must not be treated as proof that a reviewer responded.
 
-`wmkf_reviewreceivedat` is also not proof of a portal submission. `updateLifecycle`
-stamps it with the same `now` as `wmkf_completedat`, in one payload, on any transition
-to `reviewStatus=complete` where it is empty [VERIFIED via
-`lib/dataverse/adapters/reviewer-suggestion.js:1662-1670`]. A PD closing out a reviewer
-who never submitted therefore produces a receipt timestamp for a review that does not
-exist — the same false positive the adapter's own `aggregateReviewHistory` header (line
-341) and its S369 note (1641-1646) already warn about. The drawer decides this per row
-via `isSyntheticReceipt`, whose **only** test is identical receipt/close-out instants:
-both stamps come from one `now` in one payload, so a fabricated pair matches exactly and
-demotes the event to "Review recorded at close-out" with an explicit unproven note.
+`wmkf_reviewreceivedat` alone still does not prove a portal submission. The
+current source-built closeout contract requires an existing received-review
+timestamp; `updateLifecycle` never fabricates one when setting Complete
+**[VERIFIED via `lib/dataverse/adapters/reviewer-suggestion.js:1906-1926` at
+`c51fa34d`; deployment pending]**. Historical rows can retain equal receipt and
+completion timestamps from the older closeout behavior. The drawer retains
+`isSyntheticReceipt` as a legacy-data display heuristic: it returns true when
+both timestamps parse and are equal, and `reviewReceiptEvidence` labels that
+case “Review recorded at close-out” with an unproven note **[VERIFIED via
+`shared/components/reviewers/reviewer-activity-history.js:205-253`]**. Equal
+stamps alone do not establish the historical writer or submission provenance.
 
 **`reviewFilename`, `answers`, and `reviewUploadedByStaff` must never be used to
 strengthen an event's provenance** [VERIFIED via
@@ -542,9 +568,9 @@ the full list, `lib/dataverse/adapters/reviewer-suggestion.js:793-812`, 2026-08-
 a remove/re-add carries them forward and a stale file from a prior engagement would
 defeat the guard. The consequence
 is deliberate and accepted under the convenience scope above — there is now **no
-engagement-scoped way to affirmatively prove a genuine portal submission**, only to
-detect a same-instant fabrication, so the proven-receipt label was softened to the
-neutral "Review receipt recorded".
+engagement-scoped way in this drawer to affirmatively prove a genuine portal submission**;
+the equal-stamp heuristic flags possible legacy closeout ambiguity, so the
+proven-receipt label was softened to the neutral "Review receipt recorded".
 
 Found by Codex adversarial review 2026-08-12 against a first version that classified
 every receipt as proven; the general lesson is that **the actor who owns an event is not
@@ -1338,7 +1364,13 @@ returned zero eligible/enqueued/claimed/failed.** Plan doc:
   than ship a broken first-contact email. `InviteEmailModal` renders the "verify before retry" set
   and lists who was sent/failed/skipped; a terminal error no longer shows green success. Re-sendable
   templates keep their prior `failed[]` send semantics. Materials/followup/thankyou retain the
-  established post-loop best-effort lifecycle stamp; thank-you additionally refuses terminal rows.
+  post-loop best-effort bookkeeping. **[VERIFIED in source at `c51fa34d`;
+  Stage 1B source-built, deployment pending]** each bookkeeping attempt freshly
+  verifies the Request/reviewer bindings and exact ETag. Materials/followup
+  refuse closed/unknown/completed source state; manual thank-you records only
+  the courtesy timestamp, including after closeout, and never changes status,
+  completion, or eligibility. Only numeric 412 permits a bounded bookkeeping
+  retry (three attempts maximum); transport is never retried here.
   Durable per-dispatch deadline evidence is not part of the terminal-status branch and requires a
   separate design around ordered Dynamics email activities or an append-only dispatch entity.
   **This invitation-only gate now runs through the shared

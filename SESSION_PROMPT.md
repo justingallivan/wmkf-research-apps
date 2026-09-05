@@ -21,7 +21,7 @@ built the service/unit tests, and converted the F4 composed regressions.
   warnings and terminal result/complete events retain their existing shape.
   Inline invitations, capture and markAsSent behavior remain distinct.
 - No adapter, route, schema, enum, DTO, UI or email transport changed. F2 remains
-  fixed; F3 and F5 remain explicit known-defect characterizations. The Stage 1A
+  fixed; F3 and F5 were still known-defect characterizations at Stage 1B. The Stage 1A
   receipt is now visibly historical so its old F4 claim is not current guidance.
 
 ### Commits
@@ -74,7 +74,12 @@ The decision and preimplementation invariants are recorded in
    Stage 1C review for inherited full verification and isolation limits.
 2. **Stage 1D:** block generic invitation/response corrections on Complete,
    withdrew and released. Preserve dedicated closeout notes/eligibility
-   correction. Investigation precedes the service/adapter regression and fix.
+   correction. **Complete locally at `c51fa34d`**: same authorized Request and
+   exact fresh ETag protect the six fields, including false/null attempts;
+   rejection precedes token/person side effects. Full **770 suites / 10,291
+   tests**, all **59 distinct** sequential gates, webpack build and independent
+   review passed. Review added 591 passing tests/probes and detected eight
+   broken mutations. No source correction was required.
 3. **Stage 1E — honest UI mutation failure handling.**
    Evidence: `shared/components/reviewers/ReviewerManagePanel.js:updateStatus`
    still ignores HTTP/payload outcomes, and the rendered
@@ -85,16 +90,21 @@ The decision and preimplementation invariants are recorded in
    Update actual consumers; the application currently has a single-item status
    action and no batch status-edit screen. No new batch screen is requested.
 
-Stages 1A and 1B are implemented in this branch. Only the selected Stage 1B
-substage was executed in the prior session. Each next substage requires its own
+Stages 1A/1B/1D are implemented in this branch; Stage 1C confirmed existing
+receipt semantics. Stage 1E is next, followed by approved Stage 6A in place.
+Each next substage requires its own
 scope, regression proof and fresh-context review. No generic command extraction
 or file moves yet.
 
 ### Remaining Boundaries
 
-- The three policy choices are settled; their approval does not itself mean
-  Stage 1D or 6A is implemented. F3/F5 tests retain the old behavior until their
-  respective regression-and-fix stage.
+- The three policy choices are settled. F3 is now fixed and regression-tested;
+  F5's batch characterization and unchecked UI handler remain until Stage 1E/6A.
+- Stage 1E's fresh plan review requires per-reviewer pending ownership, an
+  operation token, irreversible request/mode/row invalidation and mounted
+  checks around every status continuation. Cleanup releases only its matching
+  token even after invalidation. Keep refresh failures distinct from confirmed
+  saves. The lock is instance-local; broader 6B is not complete.
 - Separate architectural boundaries: Request ownership/date changes are not
   locked by suggestion ETags. Remove/restore can reuse the same suggestion and
   Request/person bindings while resetting engagement history; the current row
@@ -134,6 +144,10 @@ flag from this application; BILL API reviewer onboarding.
   product authority and exact preimplementation invariants.
 - `docs/audits/REVIEWER_LIFECYCLE_STAGE1C_REVIEW_2026-09-04.md`: independent
   existing-receipt confirmation and test-isolation limits.
+- `docs/audits/REVIEWER_LIFECYCLE_STAGE1D_RECEIPT_2026-09-05.md`: protected
+  correction implementation, evidence and residual boundaries.
+- `docs/audits/REVIEWER_LIFECYCLE_STAGE1D_REVIEW_2026-09-05.md`: fresh independent
+  review at `c51fa34d`.
 - `docs/audits/REVIEWER_LIFECYCLE_STAGE1B_RECEIPT_2026-09-04.md`: implementation,
   contract, validation and operational limits.
 - `docs/audits/REVIEWER_LIFECYCLE_STAGE1B_REVIEW_2026-09-04.md`: independent
@@ -142,7 +156,7 @@ flag from this application; BILL API reviewer onboarding.
   post-send bookkeeping and preserved streaming/transport contract.
 - `tests/unit/send-emails-service.test.js`: error/partial-success complements.
 - `tests/integration/reviewer-engagement-races.test.js`: F2/F4 regressions and
-  remaining F3/F5 characterizations.
+  F3 closed-history regressions; F5 remains characterized.
 - `docs/audits/REVIEWER_LIFECYCLE_STAGE1A_RECEIPT_2026-09-04.md`: historical
   conditional-expiry implementation and its parent-date race limit.
 - `docs/audits/REVIEWER_LIFECYCLE_REFACTOR_REPORT_2026-09-04.md`: original

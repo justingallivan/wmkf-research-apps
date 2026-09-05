@@ -6,7 +6,7 @@ status: canonical
 summary: "If you're touching a service or utility, read its header before this catalog. If a header is sparse or stale, fix it in the same commit as your..."
 canonical: true
 cataloged: 2026-07-02
-last_verified: 2026-09-04
+last_verified: 2026-09-05
 owner: product-engineering
 related:
   - lib/services/
@@ -201,6 +201,14 @@ If you're touching a service or utility, read its header before this catalog. If
   canonical digest of the accepted identity decision after ingestion and must
   still match the current row at use time. Mutable address/affiliation fields
   are deliberately excluded.
+- **`reviewer-finder/my-candidates-service.js`** — Candidate reads and named
+  edit/restore/manual-invite operations. **[VERIFIED in source at `c51fa34d`,
+  Stage 1D; full-stage source validation passed; deployment pending]** generic invitation/response
+  corrections require a separately server-authorized Request binding, a fresh
+  non-excluded known-open row without a completed-at marker, and its exact ETag.
+  Conflicts stop without automatic retry before token follow-up or person edits;
+  successful `accepted:true` corrections retain nonfatal token follow-up before
+  person edits. Dedicated closeout owns eligibility/notes corrections.
 - **`reviewer-finder/save-candidates-service.js`** — Server-owned Find→Invite
   promotion boundary: canonical contact projection, contact-bound v3/v4 or
   staff authority,
