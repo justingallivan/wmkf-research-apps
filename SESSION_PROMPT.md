@@ -143,8 +143,15 @@ flag from this application; BILL API reviewer onboarding.
 
 ## Release Boundary
 
-This work remains on `codex/reviewer-lifecycle-stage0`; review, promotion and
-production verification are separate decisions. No DEVELOPMENT_LOG milestone
+This work remains on `codex/reviewer-lifecycle-stage0`. **Local-only backup
+status:** automatic approval review rejected the push, including a retry after
+GitHub verified that the public origin is owned by the authenticated user with
+ADMIN permission. It requires explicit authorization to publish the new tests,
+census and documents to `justingallivan/wmkf-research-apps`. No push occurred;
+this branch has no remote upstream yet. All work is committed locally. Obtain
+that public-publishing authorization before retrying the same branch push;
+never bypass the rejection. Promotion and production verification remain
+separate decisions. No DEVELOPMENT_LOG milestone
 entry is needed because no production capability or runtime architecture shipped.
 The claim-evidence pilot metadata report was unavailable because local state
 could not be read; no unsupported zero-advisory observation was recorded.
