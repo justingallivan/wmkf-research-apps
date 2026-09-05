@@ -120,3 +120,11 @@ this feature branch with the reviewed source. No DEVELOPMENT_LOG milestone
 entry is required because no production capability or architecture shipped.
 The claim-evidence pilot report was unavailable because local state could not
 be read; no unsupported observation row was invented.
+
+Remote publication is pending owner approval. Automatic approval review
+rejected `git push -u origin codex/reviewer-lifecycle-stage1a` before execution:
+the earlier public-repository authorization covered Stage 0, not this Stage 1A
+runtime fix, tests and handoff. Implementation `721f4f3d` and handoff `836a3772`
+are committed locally; this session has not published Stage 1A. The owner was
+asked explicitly to approve publication to the public configured GitHub
+repository. Resume only that branch push after approval; no merge to main.

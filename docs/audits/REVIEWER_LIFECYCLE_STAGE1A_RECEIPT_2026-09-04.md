@@ -183,3 +183,10 @@ No DEVELOPMENT_LOG milestone is required because no production capability or
 architecture shipped. The claim-evidence pilot report was unavailable; no
 observation row was invented.
 
+## Publication boundary
+
+Implementation `721f4f3d` and documentation/review `836a3772` are committed
+locally. Automatic approval review rejected the Stage 1A feature-branch push
+before execution because the earlier public-repository approval covered
+Stage 0 only. The owner has been asked to approve this new payload explicitly.
+Remote backup remains unconfirmed; no merge to main or deployment occurred.
