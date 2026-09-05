@@ -7,22 +7,9 @@ export const CLOSEOUT_DISPOSITION_LABELS = Object.freeze({
   unknown: 'Needs technical review',
 });
 
-const OPTIONS = [
-  {
-    value: 'eligible',
-    label: 'Eligible',
-    description: 'The completed review qualifies for the linked honorarium.',
-  },
-  {
-    value: 'not_eligible',
-    label: 'Not eligible',
-    description: 'The review was received and closed, but does not qualify for payment.',
-  },
-  {
-    value: 'not_applicable',
-    label: 'Not applicable',
-    description: 'No honorarium applies because the reviewer opted out or none is linked.',
-  },
+const PAYMENT_OPTIONS = [
+  { value: 'eligible', label: 'Yes' },
+  { value: 'not_eligible', label: 'No' },
 ];
 
 export function closeoutDispositionLabel(value) {
@@ -33,16 +20,26 @@ export function closeoutDispositionLabel(value) {
 function optionAllowed(option, reviewer) {
   const optedOut = reviewer?.honorariumOptOut === true;
   const hasHonorarium = Boolean(reviewer?.honorariumRequestId);
-  if (option === 'eligible') return !optedOut && hasHonorarium;
+  if (option === 'eligible' || option === 'not_eligible') return !optedOut && hasHonorarium;
   if (option === 'not_applicable') return optedOut || !hasHonorarium;
-  return option === 'not_eligible';
+  return false;
+}
+
+function honorariumApplies(reviewer) {
+  return reviewer?.honorariumOptOut !== true && Boolean(reviewer?.honorariumRequestId);
+}
+
+function initialCloseoutDisposition(reviewer) {
+  if (reviewer?.honorariumEligibility === 'unknown') return '';
+  if (!honorariumApplies(reviewer)) return 'not_applicable';
+  return reviewer?.honorariumEligibility === 'eligible'
+    || reviewer?.honorariumEligibility === 'not_eligible'
+    ? reviewer.honorariumEligibility
+    : '';
 }
 
 export default function ReviewerCloseoutModal({ isOpen, reviewer, proposal, onClose, onSaved }) {
-  const initialDisposition = CLOSEOUT_DISPOSITION_LABELS[reviewer?.honorariumEligibility]
-    && reviewer?.honorariumEligibility !== 'unknown'
-    ? reviewer.honorariumEligibility
-    : '';
+  const initialDisposition = initialCloseoutDisposition(reviewer);
   const [disposition, setDisposition] = useState(initialDisposition);
   const [notes, setNotes] = useState(reviewer?.notes || '');
   const [saving, setSaving] = useState(false);
@@ -62,6 +59,9 @@ export default function ReviewerCloseoutModal({ isOpen, reviewer, proposal, onCl
   if (!isOpen || !reviewer) return null;
 
   const editing = reviewer.reviewStatus === 'complete';
+  const paymentDecisionRequired = honorariumApplies(reviewer);
+  const notesRequired = disposition === 'not_eligible';
+  const missingRequiredNotes = notesRequired && !notes.trim();
   const handleSubmit = async (event) => {
     event.preventDefault();
     if (!disposition || !optionAllowed(disposition, reviewer) || savingRef.current) return;
@@ -119,17 +119,6 @@ export default function ReviewerCloseoutModal({ isOpen, reviewer, proposal, onCl
           </p>
         )}
 
-        <dl className="mt-4 grid grid-cols-2 gap-3 rounded-lg bg-gray-50 p-3 text-sm">
-          <div>
-            <dt className="text-gray-500">Honorarium request</dt>
-            <dd className="font-medium text-gray-900">{reviewer.honorariumRequestId ? 'Linked' : 'Not linked'}</dd>
-          </div>
-          <div>
-            <dt className="text-gray-500">Reviewer opted out</dt>
-            <dd className="font-medium text-gray-900">{reviewer.honorariumOptOut ? 'Yes' : 'No'}</dd>
-          </div>
-        </dl>
-
         {reviewer.honorariumEligibility === 'unknown' && (
           <p className="mt-3 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800" role="alert">
             The saved disposition is not recognized. Technical repair is required before it can be changed here.
@@ -137,41 +126,47 @@ export default function ReviewerCloseoutModal({ isOpen, reviewer, proposal, onCl
         )}
 
         <form className="mt-5" onSubmit={handleSubmit}>
-          <fieldset disabled={saving || reviewer.honorariumEligibility === 'unknown'}>
-            <legend className="text-sm font-semibold text-gray-900">Honorarium eligibility</legend>
-            <div className="mt-2 space-y-2">
-              {OPTIONS.map((option) => {
-                const allowed = optionAllowed(option.value, reviewer);
-                return (
+          {paymentDecisionRequired ? (
+            <fieldset disabled={saving || reviewer.honorariumEligibility === 'unknown'}>
+              <legend className="text-sm font-semibold text-gray-900">Should an honorarium be paid?</legend>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                {PAYMENT_OPTIONS.map((option) => (
                   <label
                     key={option.value}
-                    className={`flex gap-3 rounded-lg border p-3 ${allowed ? 'cursor-pointer border-gray-200 hover:border-gray-400' : 'cursor-not-allowed border-gray-100 bg-gray-50 opacity-60'}`}
+                    className={`flex min-h-11 cursor-pointer items-center justify-center rounded-lg border px-4 py-2 text-sm font-semibold transition-colors focus-within:ring-2 focus-within:ring-blue-600 focus-within:ring-offset-2 ${disposition === option.value ? 'border-blue-700 bg-blue-700 text-white' : 'border-gray-300 bg-white text-gray-800 hover:border-gray-500 hover:bg-gray-50'}`}
                   >
                     <input
                       type="radio"
                       name="closeout-disposition"
                       value={option.value}
                       checked={disposition === option.value}
-                      disabled={!allowed}
                       onChange={(event) => setDisposition(event.target.value)}
-                      className="mt-1"
+                      className="sr-only"
                     />
-                    <span>
-                      <span className="block text-sm font-medium text-gray-900">{option.label}</span>
-                      <span className="block text-xs leading-5 text-gray-500">{option.description}</span>
-                    </span>
+                    {option.label}
                   </label>
-                );
-              })}
-            </div>
-          </fieldset>
+                ))}
+              </div>
+            </fieldset>
+          ) : (
+            <p className="text-sm text-gray-600">
+              {reviewer.honorariumOptOut
+                ? 'The reviewer opted out, so no honorarium decision is needed.'
+                : 'No honorarium is linked, so no payment decision is needed.'}
+            </p>
+          )}
 
           <div className="mt-5">
             <label htmlFor="reviewer-closeout-notes" className="block text-sm font-semibold text-gray-900">
-              Closeout notes <span className="font-normal text-gray-500">(optional)</span>
+              Closeout notes{' '}
+              <span className={`font-normal ${notesRequired ? 'text-red-700' : 'text-gray-500'}`}>
+                ({notesRequired ? 'required' : 'optional'})
+              </span>
             </label>
             <p id="reviewer-closeout-notes-help" className="mt-1 text-xs leading-5 text-gray-500">
-              Record concerns about timeliness, review quality, or conduct for this review.
+              {notesRequired
+                ? 'Explain why an honorarium should not be paid.'
+                : 'Add context about timeliness, review quality, or conduct when useful.'}
             </p>
             <textarea
               id="reviewer-closeout-notes"
@@ -179,10 +174,12 @@ export default function ReviewerCloseoutModal({ isOpen, reviewer, proposal, onCl
               value={notes}
               onChange={(event) => setNotes(event.target.value)}
               maxLength={2000}
+              required={notesRequired}
+              aria-invalid={missingRequiredNotes ? 'true' : undefined}
               rows={3}
               disabled={saving || reviewer.honorariumEligibility === 'unknown'}
               className="mt-2 block w-full resize-y rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-600/20 disabled:bg-gray-100 disabled:text-gray-500"
-              placeholder="Add context only when follow-up may be useful"
+              placeholder={notesRequired ? 'Reason an honorarium should not be paid' : 'Add context when useful'}
             />
           </div>
 
@@ -199,7 +196,7 @@ export default function ReviewerCloseoutModal({ isOpen, reviewer, proposal, onCl
             </button>
             <button
               type="submit"
-              disabled={!disposition || !optionAllowed(disposition, reviewer) || saving || reviewer.honorariumEligibility === 'unknown'}
+              disabled={!disposition || !optionAllowed(disposition, reviewer) || missingRequiredNotes || saving || reviewer.honorariumEligibility === 'unknown'}
               className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-gray-300"
             >
               {saving ? 'Saving…' : editing ? 'Save closeout' : 'Complete closeout'}
@@ -211,4 +208,4 @@ export default function ReviewerCloseoutModal({ isOpen, reviewer, proposal, onCl
   );
 }
 
-export const _closeoutModalInternals = { optionAllowed };
+export const _closeoutModalInternals = { honorariumApplies, initialCloseoutDisposition, optionAllowed };

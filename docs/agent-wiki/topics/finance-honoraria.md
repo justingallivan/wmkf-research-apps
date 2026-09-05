@@ -41,6 +41,10 @@ source, Atlas, and the Power Automate owner before testing against production.
 **Reviewer closeout decision (owner-approved and source-built 2026-09-04;
 deployment pending):** a Program Director records `eligible`, `not_eligible`, or
 `not_applicable` on the reviewer engagement when closing a received review.
+For a linked honorarium where the reviewer did not opt out, the closeout UI asks
+only whether an honorarium should be paid: Yes maps to `eligible`, while No maps
+to `not_eligible` and requires a nonblank request-scoped reason. Opt-out or
+missing-link cases record `not_applicable` without presenting that question.
 That is not final authorization to pay. The application will not write
 `akoya_request.wmkf_authorizationtoremitpaymentflag`; Operations/Finance retains
 that control. Read-only Production probes found the flag explicitly false on all

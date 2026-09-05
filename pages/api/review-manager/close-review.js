@@ -1,6 +1,7 @@
 /**
  * POST /api/review-manager/close-review
  *   { suggestionId, disposition: 'eligible'|'not_eligible'|'not_applicable', notes?: string }
+ *   notes is required and nonblank when disposition is not_eligible.
  *
  * Dedicated one-reviewer human closeout. The authenticated actor must be the
  * request's lead Program Director or a superuser. All lifecycle eligibility is
@@ -40,6 +41,9 @@ export default async function handler(req, res) {
   }
   if (notes !== undefined && (typeof notes !== 'string' || notes.length > 2000)) {
     return res.status(400).json({ error: 'notes must be a string of 2000 characters or fewer' });
+  }
+  if (disposition === 'not_eligible' && (typeof notes !== 'string' || !notes.trim())) {
+    return res.status(400).json({ error: 'A closeout note is required when no honorarium should be paid' });
   }
 
   const actingUserSystemId = actorRefFromSession(access.session);

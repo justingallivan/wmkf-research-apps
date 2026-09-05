@@ -37,6 +37,11 @@ defined Complete as “review received and reviewer thanked.”
   payment eligibility.
 - [OWNER DECISION, 2026-09-04] Existing thank-you markers are not evidence of PD
   approval and must not be used for a backfill.
+- [OWNER DECISION, 2026-09-04] When an honorarium applies, the PD sees the plain
+  question **Should an honorarium be paid?** with **Yes** (`eligible`) and **No**
+  (`not_eligible`). No requires a nonblank closeout reason. Before a choice and
+  for Yes, notes remain optional. Opt-out or missing-link cases skip the payment
+  question and record `not_applicable` automatically.
 
 The deeper-green Complete badge remains approved as a presentation-only change.
 
@@ -89,9 +94,10 @@ application-build blocker.
   rejects Complete; `/api/review-manager/close-review` is the sole app closeout
   route and uses session-derived lead-PD/superuser authorization.
 - [VERIFIED via source and focused tests, 2026-09-04] first closeout performs one
-  ETag-bound suggestion update for status, completion time, and eligibility;
-  duplicate same-value requests write nothing and corrections write eligibility
-  only. Receipt evidence is never synthesized.
+  ETag-bound suggestion update for status, completion time, eligibility, and
+  supplied closeout notes; No requires a nonblank reason. Duplicate same-value
+  requests write nothing and corrections write only changed eligibility/notes.
+  Receipt evidence is never synthesized.
 - [VERIFIED via source and focused tests, 2026-09-04] both thank-you paths write
   only `wmkf_thankyousentat`; stored legacy `{{honorariumNote}}` tokens resolve
   to blank.
@@ -134,6 +140,7 @@ human decision.
 | Thank-you processing writes only its thank-you marker and never Complete or eligibility. | thank-you sweep; manual send compatibility path | Both paths use fixtures that would expose an accidental Complete/eligibility write. |
 | A restored/reused engagement does not inherit a prior closeout decision. | reviewer-suggestion reset set | Reset contract clears `wmkf_honorariumeligibility`; parity test derives the reset set. |
 | Unknown disposition values fail closed. | route; service; adapter maps and reverse maps | Invalid and unmapped values return 400/no write; all three valid values round-trip. |
+| The PD answers only the applicable payment question; No requires a reason. | closeout modal; route; close-review service | UI exposes Yes/No only for linked, non-opted-out engagements; blank No is blocked before authorization/read/write; service repeats the fail-closed guard. |
 | Existing Complete rows are not inferred or bulk-backfilled. | UI/read projection; deployment procedure | Null renders “Closeout disposition not recorded”; no migration updates rows. |
 | Complete remains visible and uses the approved deeper success green. | reviewer modes and Track table | Status partition and class tests remain total. |
 
@@ -155,7 +162,7 @@ Disposition-specific validation:
 | Disposition | Required server state | Invalid complement |
 | --- | --- | --- |
 | `eligible` | `wmkf_honorariumoptout` is not true **and** `wmkf_HonorariumRequest` is linked | Opt-out or missing link → 409, no write. |
-| `not_eligible` | Received-review prerequisites above | No honorarium link is required; this is still a human judgment about the completed engagement. |
+| `not_eligible` | Opt-out is not true, an honorarium request is linked, and `wmkf_notes` contains a nonblank reason | Opt-out, missing link, or missing reason → no write. |
 | `not_applicable` | Opt-out is true **or** no honorarium request is linked | Non-opt-out with a linked honorarium → 409; choose eligible/not eligible. |
 
 On success, one PATCH writes the mapped disposition, `reviewStatus='complete'`,
@@ -167,11 +174,12 @@ must already exist.
 - Two concurrent first-close requests can read the same row, but only one may win
   the ETag PATCH. The loser returns 409/reload-required; it does not retry with a
   fresh ETag.
-- Repeating the same disposition on an already Complete row returns an explicit
-  unchanged success and does not re-stamp `wmkf_completedat`.
+- Repeating the same disposition and normalized note on an already Complete row
+  returns an explicit unchanged success and does not re-stamp `wmkf_completedat`.
 - A lead PD or superuser may reopen the same modal as **Edit closeout** and change
-  only the disposition on an already Complete row. That correction is also
-  ETag-bound and leaves status and completion time unchanged.
+  the disposition and/or note on an already Complete row. That correction is
+  ETag-bound, writes only changed fields, and leaves status and completion time
+  unchanged. A Not eligible correction must still retain a nonblank reason.
 - Reopening a Complete engagement to an earlier lifecycle status is out of scope.
 
 This keeps corrections possible without using the generic status picker or
@@ -209,10 +217,10 @@ before runtime promotion, then rerun the preflight; do not recreate the field.
 ### 3. Dedicated service and route
 
 Add `POST /api/review-manager/close-review` with body
-`{ suggestionId, disposition }`:
+`{ suggestionId, disposition, notes? }`:
 
 1. `requireAppAccess('review-manager', 'reviewers')` before dispatch;
-2. GUID and exact-enum validation;
+2. GUID, exact-enum, bounded-note, and Not-eligible-reason validation;
 3. trusted DAL context and session-derived actor identity;
 4. `authorizeReviewerRequestMutation` for lead-PD/superuser ownership;
 5. one fresh server read of receipt/status/selection/acceptance/opt-out/link/
@@ -233,8 +241,10 @@ contract avoids the current sequential partial-success problem.
 - Exclude Complete from **Correct recorded status**, hide that generic control
   for an already Complete row, and keep the server rejection as the real guard.
 - For a `review_received` row, show **Close review**. The modal identifies the
-  reviewer/request, shows opt-out and linked-honorarium state, and requires one
-  disposition.
+  reviewer/request and, only when a linked honorarium applies, asks **Should an
+  honorarium be paid?** with **Yes** and **No** buttons. No makes closeout notes
+  required. Opt-out or missing-link cases explain that no decision is needed and
+  submit `not_applicable` automatically.
 - For a Complete row, show the disposition and **Edit closeout**.
 - Show null on legacy Complete rows as **Closeout disposition not recorded**;
   never infer it from receipt, thank-you, opt-out, or linked-request state.
@@ -270,6 +280,7 @@ do not compensate by writing `wmkf_authorizationtoremitpaymentflag`.
 Minimum discriminating coverage:
 
 - all three valid dispositions and invalid/unknown values;
+- Yes/No UI mapping, automatic Not applicable, and blank/whitespace No-reason rejection in both route and service;
 - missing receipt, wrong source status, unaccepted/unselected/excluded row;
 - eligible + opt-out and eligible + missing-link failures;
 - not-applicable complement rejection;

@@ -206,17 +206,26 @@ test('rejects invalid notes before reading or writing Dataverse', async () => {
   expect(updateLifecycle).not.toHaveBeenCalled();
 });
 
+test('requires a non-empty note for not eligible before reading or writing Dataverse', async () => {
+  await expect(closeReview({ ...args('not_eligible'), notes: '   ' })).rejects.toMatchObject({
+    httpStatus: 400,
+    body: { code: 'notes_required' },
+  });
+  expect(findById).not.toHaveBeenCalled();
+  expect(updateLifecycle).not.toHaveBeenCalled();
+});
+
 test('allows a legacy Complete row with null disposition to receive its first recorded disposition without restamping', async () => {
   findById.mockResolvedValue(row({
     wmkf_reviewstatus: 100000004,
     wmkf_completedat: '2026-09-04T13:00:00.000Z',
   }));
 
-  const result = await closeReview(args('not_eligible'));
+  const result = await closeReview({ ...args('not_eligible'), notes: 'Review quality concern' });
   expect(result.status).toBe('corrected');
   expect(updateLifecycle).toHaveBeenCalledWith(
     SUGGESTION,
-    { honorariumEligibility: 'not_eligible' },
+    { honorariumEligibility: 'not_eligible', notes: 'Review quality concern' },
     { actingUserSystemId: 'staff-1', ifMatch: 'W/"7"' },
   );
 });
@@ -238,20 +247,23 @@ test.each([
   ['eligible', { wmkf_honorariumoptout: true }, 'eligible_opted_out'],
   ['eligible', { _wmkf_honorariumrequest_value: null }, 'eligible_missing_honorarium'],
   ['not_applicable', { wmkf_honorariumoptout: false, _wmkf_honorariumrequest_value: HONORARIUM }, 'not_applicable_conflict'],
+  ['not_eligible', { wmkf_honorariumoptout: true }, 'not_eligible_not_applicable'],
+  ['not_eligible', { _wmkf_honorariumrequest_value: null }, 'not_eligible_not_applicable'],
 ])('rejects disposition %s when its persisted complement is invalid', async (disposition, overrides, code) => {
   findById.mockResolvedValue(row(overrides));
-  await expect(closeReview(args(disposition))).rejects.toMatchObject({ body: { code } });
+  await expect(closeReview({ ...args(disposition), notes: disposition === 'not_eligible' ? 'Reason' : undefined }))
+    .rejects.toMatchObject({ body: { code } });
   expect(updateLifecycle).not.toHaveBeenCalled();
 });
 
 test.each([
   ['not_eligible', { wmkf_honorariumoptout: false, _wmkf_honorariumrequest_value: HONORARIUM }],
-  ['not_eligible', { wmkf_honorariumoptout: true, _wmkf_honorariumrequest_value: null }],
   ['not_applicable', { wmkf_honorariumoptout: true }],
   ['not_applicable', { _wmkf_honorariumrequest_value: null }],
 ])('accepts valid disposition %s state', async (disposition, overrides) => {
   findById.mockResolvedValue(row(overrides));
-  await expect(closeReview(args(disposition))).resolves.toMatchObject({ status: 'closed', disposition });
+  await expect(closeReview({ ...args(disposition), notes: disposition === 'not_eligible' ? 'Reason' : undefined }))
+    .resolves.toMatchObject({ status: 'closed', disposition });
 });
 
 test('unknown request disposition and unknown persisted disposition fail closed', async () => {
@@ -262,7 +274,7 @@ test('unknown request disposition and unknown persisted disposition fail closed'
     wmkf_reviewstatus: 100000004,
     wmkf_honorariumeligibility: 100000099,
   }));
-  await expect(closeReview(args('not_eligible'))).rejects.toMatchObject({
+  await expect(closeReview({ ...args('not_eligible'), notes: 'Reason' })).rejects.toMatchObject({
     body: { code: 'unknown_existing_disposition' },
   });
   expect(updateLifecycle).not.toHaveBeenCalled();

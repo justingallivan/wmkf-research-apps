@@ -69,7 +69,7 @@ test('authorizes the session-derived actor and closes inside the DAL context', a
   expect(res.statusCode).toBe(200);
 });
 
-test.each(['eligible', 'not_eligible', 'not_applicable'])('accepts exact disposition %s', async (disposition) => {
+test.each(['eligible', 'not_applicable'])('accepts exact disposition %s without notes', async (disposition) => {
   const res = response();
   await handler({ method: 'POST', body: { suggestionId: SUGGESTION, disposition } }, res);
   expect(closeReview).toHaveBeenCalledWith(expect.objectContaining({ disposition }));
@@ -90,6 +90,20 @@ test('validates and forwards optional closeout notes', async () => {
     body: { suggestionId: SUGGESTION, disposition: 'not_eligible', notes: 'x'.repeat(2001) },
   }, invalid);
   expect(invalid.statusCode).toBe(400);
+});
+
+test('requires a non-empty closeout note when no honorarium should be paid', async () => {
+  for (const notes of [undefined, '', '   ']) {
+    const res = response();
+    await handler({
+      method: 'POST',
+      body: { suggestionId: SUGGESTION, disposition: 'not_eligible', ...(notes === undefined ? {} : { notes }) },
+    }, res);
+    expect(res.statusCode).toBe(400);
+    expect(res.body.error).toMatch(/note is required/i);
+  }
+  expect(authorizeReviewerRequestMutation).not.toHaveBeenCalled();
+  expect(closeReview).not.toHaveBeenCalled();
 });
 
 test('rejects malformed ids and unknown dispositions before authorization or service work', async () => {

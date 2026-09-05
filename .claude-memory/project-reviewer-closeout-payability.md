@@ -51,6 +51,12 @@ must not set Complete. No closeout path writes
 `akoya_request.wmkf_authorizationtoremitpaymentflag`; Operations/Finance retains
 that separate final authority.
 
+For a linked honorarium where the reviewer did not opt out, the UI asks only
+**Should an honorarium be paid?** and maps Yes/No to `eligible`/`not_eligible`.
+No requires a nonblank request-scoped note in the UI, route, and service. If the
+reviewer opted out or no honorarium is linked, the UI skips the question and
+records `not_applicable`; notes remain optional.
+
 **[VERIFIED via read-only Production metadata/runtime `$select` 2026-09-04]:**
 the manually created local Picklist `wmkf_honorariumeligibility` is
 published/readable, nullable, has no default, and has exact values
@@ -61,8 +67,8 @@ explicitly false, while a broader Research-request scan found 87 true values;
 the field is live elsewhere but is not the reviewer-closeout signal.
 
 Implementation contract:
-`docs/REVIEWER_COMPLETION_AND_HONORARIUM_DECISION_BRIEF.md`. Operations-facing
-The app route/UI and thank-you decoupling are source-built on
+`docs/REVIEWER_COMPLETION_AND_HONORARIUM_DECISION_BRIEF.md`. The app route/UI
+and thank-you decoupling are source-built on
 `codex/reviewer-closeout-eligibility-app`; deployment is pending. Operations has
 built the AkoyaGO system view but has not surfaced it. The owner accepted that
 interface step as a later follow-up; never compensate by writing the final remit
