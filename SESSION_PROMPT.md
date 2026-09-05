@@ -80,27 +80,30 @@ The decision and preimplementation invariants are recorded in
    tests**, all **59 distinct** sequential gates, webpack build and independent
    review passed. Review added 591 passing tests/probes and detected eight
    broken mutations. No source correction was required.
-3. **Stage 1E — honest UI mutation failure handling.**
-   Evidence: `shared/components/reviewers/ReviewerManagePanel.js:updateStatus`
-   still ignores HTTP/payload outcomes, and the rendered
-   `tests/unit/reviewer-status-mutation-characterization.test.js` preserves that
-   defect. Fix failure reporting before broader UI extraction.
+3. **Stage 1E — complete locally.** The actual status action now confirms HTTP
+   and payload success, identifies unconfirmed writes, and separates refresh
+   failure. A per-reviewer synchronous mutex and permanent context invalidation
+   prevent duplicate calls and stale feedback. Runtime `bab3adea` passed full
+   **770 suites / 10,481 tests**, build and **59 distinct** checks. Fresh review
+   required only a stronger persisted mutex test, committed as `77720b5a`;
+   re-review passed. Final focused **9 suites / 271 tests** cover the test-only
+   delta, including **200** status tests. No runtime correction was needed.
 4. **Stage 6A:** retain stop on first failure; return successful, failed and
    unattempted identifiers with whole-batch authorization before writes.
    Update actual consumers; the application currently has a single-item status
    action and no batch status-edit screen. No new batch screen is requested.
 
-Stages 1A/1B/1D are implemented in this branch; Stage 1C confirmed existing
-receipt semantics. Stage 1E is next, followed by approved Stage 6A in place.
+Stages 1A/1B/1D/1E are implemented in this branch; Stage 1C confirmed existing
+receipt semantics. Approved Stage 6A is next, in place.
 Each next substage requires its own
 scope, regression proof and fresh-context review. No generic command extraction
 or file moves yet.
 
 ### Remaining Boundaries
 
-- The three policy choices are settled. F3 is now fixed and regression-tested;
-  F5's batch characterization and unchecked UI handler remain until Stage 1E/6A.
-- Stage 1E's fresh plan review requires per-reviewer pending ownership, an
+- The three policy choices are settled. F3 and F5's unchecked UI response are
+  fixed and regression-tested; F5's missing batch outcomes remain for Stage 6A.
+- Stage 1E implements per-reviewer pending ownership, an
   operation token, irreversible request/mode/row invalidation and mounted
   checks around every status continuation. Cleanup releases only its matching
   token even after invalidation. Keep refresh failures distinct from confirmed
@@ -148,6 +151,10 @@ flag from this application; BILL API reviewer onboarding.
   correction implementation, evidence and residual boundaries.
 - `docs/audits/REVIEWER_LIFECYCLE_STAGE1D_REVIEW_2026-09-05.md`: fresh independent
   review at `c51fa34d`.
+- `docs/audits/REVIEWER_LIFECYCLE_STAGE1E_RECEIPT_2026-09-05.md`: UI contract,
+  validation and instance-local limits; its linked review closes the test gap.
+- `docs/audits/REVIEWER_LIFECYCLE_STAGE6A_RECEIPT_2026-09-05.md`: preimplementation
+  outcome contract and exact invariants; implementation remains pending.
 - `docs/audits/REVIEWER_LIFECYCLE_STAGE1B_RECEIPT_2026-09-04.md`: implementation,
   contract, validation and operational limits.
 - `docs/audits/REVIEWER_LIFECYCLE_STAGE1B_REVIEW_2026-09-04.md`: independent
@@ -156,7 +163,7 @@ flag from this application; BILL API reviewer onboarding.
   post-send bookkeeping and preserved streaming/transport contract.
 - `tests/unit/send-emails-service.test.js`: error/partial-success complements.
 - `tests/integration/reviewer-engagement-races.test.js`: F2/F4 regressions and
-  F3 closed-history regressions; F5 remains characterized.
+  F3 closed-history regressions; F5's batch outcome defect remains characterized.
 - `docs/audits/REVIEWER_LIFECYCLE_STAGE1A_RECEIPT_2026-09-04.md`: historical
   conditional-expiry implementation and its parent-date race limit.
 - `docs/audits/REVIEWER_LIFECYCLE_REFACTOR_REPORT_2026-09-04.md`: original

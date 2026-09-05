@@ -5,7 +5,7 @@ domain: reviewer-workbench
 status: in-progress
 canonical: false
 owner: product-engineering
-last_verified: 2026-09-04
+last_verified: 2026-09-05
 ---
 
 # Approved reviewer lifecycle decisions
@@ -56,8 +56,9 @@ receipt code is verification-only. Entry points: staff reviewer/candidate UI,
 their authenticated API routes and services. Persistence: existing Dataverse
 reviewer suggestions; no new store/field/enum. Consumers: existing reviewer DTOs,
 mutation responses and staff UI refresh/error handling. F1 is refuted for
-successful current producers. F3 is fixed at `c51fa34d`; F5 remains the UI/batch
-implementation target. Source fan-out and caller/adapter contracts were probed
+successful current producers. F3 is fixed at `c51fa34d`; F5's unchecked UI is
+fixed at `bab3adea`, while its batch outcomes remain the Stage 6A target.
+Source fan-out and caller/adapter contracts were probed
 before the separately verified implementations.
 
 | Invariant | Intended surface | Verification |
@@ -111,11 +112,18 @@ and composed races 185. These prove the six-field closed/complement matrix,
 Request/version races, no later side effects on rejection and retained named
 operations. Full evidence and limitations are tracked in
 [the Stage 1D receipt](REVIEWER_LIFECYCLE_STAGE1D_RECEIPT_2026-09-05.md).
-Stage 1E and 6A are still planned; policy approval is not runtime completion.
+Stage 1E is complete locally at runtime `bab3adea` and test correction
+`77720b5a`: full 770 suites / 10,481 tests, webpack build, 59 distinct checks,
+and independent review passed. The reviewer required a persisted live-DOM
+reentrant mutex test; its narrow re-review passed 200 status tests and proved
+mutex removal fails both new normal/StrictMode cases. Final focused coverage
+is 9 suites / 271 tests; the full run preceded that test-only correction.
+See the Stage 1E receipt for the frozen review and limits. Stage 6A is still
+planned; policy approval is not runtime completion.
 
-## Planned outcome contracts
+## Status feedback and planned batch outcome contracts
 
-Stage 1E will fix the existing single-reviewer status handler in place: require
+Stage 1E fixes the existing single-reviewer status handler in place: require
 both HTTP success and `success:true`, identify the reviewer when reporting
 failure, and refresh only after confirmed mutation success. A failure to refresh
 after a confirmed write must not be reported as a failed write. Status feedback
@@ -123,7 +131,7 @@ and callbacks must remain bound to the current request, reviewer, action and
 mounted context; no automatic retry or general action-framework extraction.
 The status-only stale-result protection does not claim to complete general 6B.
 
-The fresh Stage 1E planning review requires a synchronous per-reviewer pending
+The Stage 1E implementation supplies a synchronous per-reviewer pending
 lock plus an operation token. The lock persists until the attempt settles;
 request/mode changes, lost permission, row disappearance and unmount permanently
 invalidate that attempt's feedback. Returning to the same request or row does
