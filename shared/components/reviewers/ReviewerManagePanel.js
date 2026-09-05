@@ -45,6 +45,7 @@ import {
 } from './reviewer-modes';
 import { EMPTY_TEMPLATES, loadEmailTemplates, saveEmailTemplates } from './email-template-store';
 import { renderPreviewFailureMessage, RENDER_PREVIEW_NETWORK_MESSAGE } from './render-preview-failure';
+import { isGuid } from '../../../lib/utils/guid';
 
 // Pure status-pipeline / mode-bucketing logic lives in ./reviewer-modes
 // (React-free + unit-tested). Re-export the pipeline so existing importers of
@@ -1839,6 +1840,7 @@ export default function ReviewerManagePanel({
       requestId: context.requestId,
       epoch: context.epoch,
       reviewerLabel: row.name || row.email || suggestionId,
+      submittedIds: [suggestionId.trim().toLowerCase()],
       valid: true,
     };
     // Acquire synchronously; React state alone cannot block two same-tick events.
@@ -1853,9 +1855,12 @@ export default function ReviewerManagePanel({
         && current.reviewers.has(suggestionId)
         && statusOperationsRef.current.get(suggestionId)?.token === operation.token;
     };
-    const reportUnconfirmed = (detail) => {
+    const reviewerIdentity = `${operation.reviewerLabel} (${suggestionId})`;
+    const reportUnconfirmed = (detail, includeIdentity = false) => {
       if (isCurrent()) {
-        alert(`Could not confirm the status update for ${operation.reviewerLabel}. ${detail} Reload before trying again.`);
+        const label = includeIdentity ? reviewerIdentity : operation.reviewerLabel;
+        const recovery = includeIdentity ? ' Review the current status before submitting another update.' : '';
+        alert(`Could not confirm the status update for ${label}. ${detail} Reload before trying again.${recovery}`);
       }
     };
 
@@ -1881,9 +1886,39 @@ export default function ReviewerManagePanel({
         return;
       }
       if (!isCurrent()) return;
-      if (!response.ok || data?.success !== true) {
-        const detail = [data?.error, data?.message, data?.reason]
-          .find(value => typeof value === 'string' && value.trim());
+      const outcomeKeys = ['savedIds', 'failedIds', 'notAttemptedIds'];
+      const hasOutcomes = data != null && outcomeKeys.some(key => Object.hasOwn(data, key));
+      const isResponseObject = data !== null && typeof data === 'object' && !Array.isArray(data);
+      if (!isResponseObject) {
+        reportUnconfirmed('Invalid response from the server.', hasOutcomes);
+        return;
+      }
+      const detail = [data.error, data.message, data.reason]
+        .find(value => typeof value === 'string' && value.trim());
+      const hasError = Object.hasOwn(data, 'error');
+      if (hasOutcomes) {
+        // One own key opts into the entire protocol. Never salvage a claimed
+        // saved prefix from a malformed result or accept another row's outcome.
+        const hasArrays = outcomeKeys.every(key => Object.hasOwn(data, key) && Array.isArray(data[key]));
+        const returnedIds = hasArrays ? [...data.savedIds, ...data.failedIds, ...data.notAttemptedIds] : [];
+        const matchesSubmission = hasArrays && returnedIds.length === operation.submittedIds.length
+          && returnedIds.every((id, index) => isGuid(id) && id.trim().toLowerCase() === operation.submittedIds[index]);
+        const confirmed = matchesSubmission && response.status === 200 && response.ok
+          && data.success === true && !hasError
+          && data.savedIds.length === operation.submittedIds.length
+          && data.failedIds.length === 0 && data.notAttemptedIds.length === 0;
+        const uncertain = matchesSubmission && response.status === 500 && !response.ok
+          && data.success === false && data.failedIds.length === 1;
+        if (!confirmed && !uncertain) {
+          reportUnconfirmed('Invalid response: the reported outcomes do not confirm this status update.', true);
+          return;
+        }
+        if (uncertain) {
+          // A rejected adapter call may have committed before losing its reply.
+          reportUnconfirmed(detail?.trim() || 'The server could not confirm this update.', true);
+          return;
+        }
+      } else if (!response.ok || data.success !== true || hasError) {
         reportUnconfirmed(detail?.trim() || (response.ok
           ? 'Invalid response: the server did not confirm success.'
           : `The server returned HTTP ${response.status}.`));
@@ -1898,8 +1933,12 @@ export default function ReviewerManagePanel({
         await statusContextRef.current.onRefresh?.();
       } catch {
         if (isCurrent()) {
-          alert(`Status saved for ${operation.reviewerLabel}, but the reviewer list could not be refreshed. Reload to see the current status.`);
+          alert(`Status saved for ${hasOutcomes ? reviewerIdentity : operation.reviewerLabel}, but the reviewer list could not be refreshed. Reload to see the current status.`);
         }
+        return;
+      }
+      if (hasOutcomes && isCurrent()) {
+        alert(`Status saved for ${reviewerIdentity}.`);
       }
     } finally {
       if (statusOperationsRef.current.get(suggestionId)?.token === operation.token) {

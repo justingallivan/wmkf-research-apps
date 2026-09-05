@@ -1,7 +1,7 @@
 /**
  * @jest-environment jsdom
  *
- * Stage 1E: real rendered status actions replace the Stage 0 known-defect
+ * Stages 1E/6A: real rendered status actions replace the Stage 0 known-defect
  * assertions. Transport is isolated; the handler, menu and lifetime guards are real.
  */
 import { StrictMode } from 'react';
@@ -14,7 +14,7 @@ jest.mock('../../shared/components/Layout', () => ({
 }));
 
 const reviewer = {
-  suggestionId: '11111111-1111-4111-8111-111111111111',
+  suggestionId: 'aabbccdd-1111-4111-8111-111111111111',
   name: 'Dr. Baseline Reviewer',
   email: 'reviewer@example.org',
   reviewStatus: 'materials_sent',
@@ -35,6 +35,20 @@ function deferred() {
 
 function response(body = { success: true }, status = 200) {
   return { ok: status >= 200 && status < 300, status, json: jest.fn(async () => body) };
+}
+
+function outcomeBody(success = true, id = reviewer.suggestionId) {
+  return {
+    success,
+    savedIds: success ? [id] : [],
+    failedIds: success ? [] : [id],
+    notAttemptedIds: [],
+    ...(success ? {} : { error: 'Failed to update reviewer' }),
+  };
+}
+
+function outcomeResponse(success = true, id = reviewer.suggestionId) {
+  return response(outcomeBody(success, id), success ? 200 : 500);
 }
 
 function openStatus(row = reviewer) {
@@ -60,6 +74,9 @@ const lateOutcomes = [
   { name: 'invalid payload', settle: (job) => job.resolve(response({ success: false })) },
   { name: 'malformed JSON', settle: (job) => job.resolve({ ok: true, status: 200, json: async () => { throw new Error('bad JSON'); } }) },
   { name: 'network failure', settle: (job) => job.reject(new Error('offline')) },
+  { name: 'structured success', settle: (job) => job.resolve(outcomeResponse()) },
+  { name: 'structured uncertain failure', settle: (job) => job.resolve(outcomeResponse(false)) },
+  { name: 'malformed structured result', settle: (job) => job.resolve(response({ success: true, savedIds: [otherReviewer.suggestionId] })) },
 ];
 const contextChanges = ['request switch', 'request away and back', 'mode away and back', 'row disappears and returns', 'management permission away and back', 'read-only away and back', 'unmount'];
 
@@ -101,7 +118,7 @@ afterEach(() => {
   jest.restoreAllMocks();
 });
 
-describe.each([false, true])('Stage 1E rendered status contract (StrictMode: %s)', (strict) => {
+describe.each([false, true])('Stage 1E/6A rendered status contract (StrictMode: %s)', (strict) => {
   function renderPanel(overrides = {}) {
     let props = { proposal, reviewers: [reviewer], mode: 'track', onRefresh: jest.fn(), ...overrides };
     const element = () => strict ? <StrictMode><ReviewerManagePanel {...props} /></StrictMode> : <ReviewerManagePanel {...props} />;
@@ -213,7 +230,7 @@ describe.each([false, true])('Stage 1E rendered status contract (StrictMode: %s)
     expect(statusFetch).toHaveBeenCalledTimes(1);
   });
 
-  test.each(contextChanges.flatMap(change => ['success', 'invalid payload', 'rejected JSON'].map(outcome => ({ change, outcome }))))('pending JSON $outcome after $change never produces stale feedback', async ({ change, outcome }) => {
+  test.each(contextChanges.flatMap(change => ['success', 'invalid payload', 'rejected JSON', 'structured success', 'structured uncertain failure', 'malformed structured result'].map(outcome => ({ change, outcome }))))('pending JSON $outcome after $change never produces stale feedback', async ({ change, outcome }) => {
     const jsonJob = deferred();
     const json = jest.fn(() => jsonJob.promise);
     statusFetch.mockResolvedValue({ ok: true, status: 200, json });
@@ -225,6 +242,9 @@ describe.each([false, true])('Stage 1E rendered status contract (StrictMode: %s)
     invalidate(view, change);
     await act(async () => {
       if (outcome === 'rejected JSON') jsonJob.reject(new Error('late invalid JSON'));
+      else if (outcome === 'structured success') jsonJob.resolve(outcomeBody());
+      else if (outcome === 'structured uncertain failure') jsonJob.resolve(outcomeBody(false));
+      else if (outcome === 'malformed structured result') jsonJob.resolve({ success: true, savedIds: [otherReviewer.suggestionId] });
       else jsonJob.resolve({ success: outcome === 'success' });
     });
     expect(onRefresh).not.toHaveBeenCalled();
@@ -367,6 +387,178 @@ describe.each([false, true])('Stage 1E rendered status contract (StrictMode: %s)
     if (onRefresh) expect(onRefresh.mock.calls).toEqual([[]]);
     expect(window.alert).not.toHaveBeenCalled();
     expect(statusFetch).toHaveBeenCalledTimes(1);
+  });
+
+  test.each([reviewer.suggestionId, `  ${reviewer.suggestionId.toUpperCase()}  `])('structured success validates canonical ID %s and confirms only after current refresh settles', async (returnedId) => {
+    const refreshJob = deferred();
+    statusFetch.mockResolvedValue(outcomeResponse(true, returnedId));
+    const onRefresh = jest.fn(() => refreshJob.promise);
+    renderPanel({ onRefresh });
+    changeStatus();
+    await act(async () => {});
+    expect(onRefresh.mock.calls).toEqual([[]]);
+    expect(window.alert).not.toHaveBeenCalled();
+    expect(openStatus()).toBeDisabled();
+    await act(async () => refreshJob.resolve());
+    expect(window.alert.mock.calls).toEqual([[`Status saved for ${reviewer.name} (${reviewer.suggestionId}).`]]);
+    expect(screen.getByLabelText(`Correct status for ${reviewer.name}`)).toBeEnabled();
+    expect(statusFetch).toHaveBeenCalledTimes(1);
+  });
+
+  test('structured single failure identifies the submitted name and ID without claiming no write occurred', async () => {
+    statusFetch.mockResolvedValue(outcomeResponse(false, ` ${reviewer.suggestionId.toUpperCase()} `));
+    const onRefresh = jest.fn();
+    renderPanel({ onRefresh });
+    changeStatus();
+    await act(async () => {});
+    expectUnconfirmed(`${reviewer.name} (${reviewer.suggestionId})`, /Failed to update reviewer/);
+    expect(window.alert.mock.calls[0][0]).toMatch(/review the current status/i);
+    expect(onRefresh).not.toHaveBeenCalled();
+    expect(statusFetch).toHaveBeenCalledTimes(1);
+    expect(openStatus()).toBeEnabled();
+  });
+
+  const protocolKeys = ['savedIds', 'failedIds', 'notAttemptedIds'];
+  const malformedOutcomes = [
+    ...protocolKeys.map(key => ({ name: `only ${key}`, body: { success: true, [key]: key === 'savedIds' ? [reviewer.suggestionId] : [] } })),
+    ...protocolKeys.map(key => ({ name: `missing ${key}`, body: Object.fromEntries(Object.entries(outcomeBody()).filter(([name]) => name !== key)) })),
+    ...protocolKeys.flatMap(key => [null, undefined, 'not an array', {}, 7, false].map(value => ({ name: `${key}=${String(value)}`, body: { ...outcomeBody(), [key]: value } }))),
+    ...['', ' ', null, 7, {}, 'not-a-guid', 'aabbccdd-1111-4111-8111-111111111111/extra'].map(id => ({ name: `invalid ID ${String(id)}`, body: { ...outcomeBody(), savedIds: [id] } })),
+    { name: 'all empty', body: { success: true, savedIds: [], failedIds: [], notAttemptedIds: [] } },
+    { name: 'foreign saved ID', body: outcomeBody(true, otherReviewer.suggestionId) },
+    { name: 'duplicate saved ID', body: { ...outcomeBody(), savedIds: [reviewer.suggestionId, reviewer.suggestionId] } },
+    { name: 'case variant duplicate', body: { ...outcomeBody(), savedIds: [reviewer.suggestionId, ` ${reviewer.suggestionId.toUpperCase()} `] } },
+    { name: 'same ID in multiple categories', body: { ...outcomeBody(), failedIds: [reviewer.suggestionId] } },
+    { name: 'unsolicited partial batch', body: { success: false, savedIds: [reviewer.suggestionId], failedIds: [otherReviewer.suggestionId], notAttemptedIds: [] }, status: 500 },
+    { name: 'reordered foreign prefix', body: { success: false, savedIds: [otherReviewer.suggestionId], failedIds: [reviewer.suggestionId], notAttemptedIds: [] }, status: 500 },
+    { name: 'unattempted only', body: { success: false, savedIds: [], failedIds: [], notAttemptedIds: [reviewer.suggestionId] }, status: 500 },
+    { name: 'inherited required array', body: Object.assign(Object.create({ failedIds: [] }), { success: true, savedIds: [reviewer.suggestionId], notAttemptedIds: [] }) },
+    ...[false, undefined, 'true', 1, null].map(success => ({ name: `saved partition success=${success}`, body: { ...outcomeBody(), success } })),
+    { name: 'success with error', body: { ...outcomeBody(), error: 'Contradiction' } },
+  ];
+  test.each(malformedOutcomes)('malformed outcome $name never refreshes or partially trusts saved identities', async ({ body, status = 200 }) => {
+    statusFetch.mockResolvedValue(response(body, status));
+    const onRefresh = jest.fn();
+    renderPanel({ onRefresh });
+    changeStatus();
+    await act(async () => {});
+    expectUnconfirmed(`${reviewer.name} (${reviewer.suggestionId})`, /invalid response/i);
+    expect(window.alert.mock.calls[0][0]).not.toMatch(/Status saved/);
+    expect(window.alert.mock.calls[0][0]).not.toContain(otherReviewer.suggestionId);
+    expect(onRefresh).not.toHaveBeenCalled();
+    expect(statusFetch).toHaveBeenCalledTimes(1);
+    expect(openStatus()).toBeEnabled();
+  });
+
+  test.each([
+    [200, false, false], [500, true, true], [200, true, false],
+    [500, false, true], [207, true, true], [201, true, true],
+    [403, false, false], [409, false, false], [503, false, false],
+    [200, false, true], [500, true, false],
+  ])('structured HTTP %i ok=%s saved=%s must match the exact 200/500 contract', async (status, ok, saved) => {
+    statusFetch.mockResolvedValue({ ...response(outcomeBody(saved), status), ok });
+    const onRefresh = jest.fn();
+    renderPanel({ onRefresh });
+    changeStatus();
+    await act(async () => {});
+    expectUnconfirmed(`${reviewer.name} (${reviewer.suggestionId})`, /invalid response/i);
+    expect(onRefresh).not.toHaveBeenCalled();
+    expect(statusFetch).toHaveBeenCalledTimes(1);
+  });
+
+  test.each(['Rejected', {}, [], true, 1, null, false, ''])('legacy claimed success with own error=%s is contradictory', async (error) => {
+    statusFetch.mockResolvedValue(response({ success: true, error }));
+    const onRefresh = jest.fn();
+    renderPanel({ onRefresh });
+    changeStatus();
+    await act(async () => {});
+    expectUnconfirmed();
+    expect(onRefresh).not.toHaveBeenCalled();
+    expect(statusFetch).toHaveBeenCalledTimes(1);
+  });
+
+  test('an array with a success property is never accepted as a legacy object', async () => {
+    statusFetch.mockResolvedValue(response(Object.assign([], { success: true })));
+    const onRefresh = jest.fn();
+    renderPanel({ onRefresh });
+    changeStatus();
+    await act(async () => {});
+    expectUnconfirmed(reviewer.name, /invalid response/i);
+    expect(onRefresh).not.toHaveBeenCalled();
+  });
+
+  test.each(['throw', 'reject'])('structured confirmed save plus refresh %s retains name and ID in separate refresh failure', async (kind) => {
+    statusFetch.mockResolvedValue(outcomeResponse());
+    const onRefresh = jest.fn(() => {
+      if (kind === 'throw') throw new Error('refresh failed');
+      return Promise.reject(new Error('refresh failed'));
+    });
+    renderPanel({ onRefresh });
+    changeStatus();
+    await act(async () => {});
+    expect(window.alert).toHaveBeenCalledTimes(1);
+    expect(window.alert.mock.calls[0][0]).toContain(`Status saved for ${reviewer.name} (${reviewer.suggestionId}), but`);
+    expect(window.alert.mock.calls[0][0]).toMatch(/could not be refreshed/);
+    expect(window.alert.mock.calls[0][0]).not.toMatch(/Could not confirm/);
+    expect(onRefresh.mock.calls).toEqual([[]]);
+    expect(statusFetch).toHaveBeenCalledTimes(1);
+    expect(openStatus()).toBeEnabled();
+  });
+
+  test.each(contextChanges.flatMap(change => ['resolve', 'reject'].map(completion => ({ change, completion }))))('structured refresh $completion after $change suppresses new success and error feedback', async ({ change, completion }) => {
+    const refreshJob = deferred();
+    statusFetch.mockResolvedValue(outcomeResponse());
+    const onRefresh = jest.fn(() => refreshJob.promise);
+    const view = renderPanel({ onRefresh });
+    changeStatus();
+    await act(async () => {});
+    expect(onRefresh.mock.calls).toEqual([[]]);
+    invalidate(view, change);
+    await act(async () => completion === 'reject' ? refreshJob.reject(new Error('late read failure')) : refreshJob.resolve());
+    expect(window.alert).not.toHaveBeenCalled();
+    expect(statusFetch).toHaveBeenCalledTimes(1);
+    if (change !== 'unmount') expect(openStatus()).toBeEnabled();
+  });
+
+  test('structured result uses captured identity and current same-context callback', async () => {
+    const job = deferred();
+    statusFetch.mockReturnValue(job.promise);
+    const oldRefresh = jest.fn();
+    const newRefresh = jest.fn();
+    const view = renderPanel({ onRefresh: oldRefresh });
+    changeStatus();
+    view.update({ proposal: { ...proposal }, reviewers: [{ ...reviewer, name: 'New label' }], onRefresh: newRefresh });
+    await act(async () => job.resolve(outcomeResponse()));
+    expect(oldRefresh).not.toHaveBeenCalled();
+    expect(newRefresh.mock.calls).toEqual([[]]);
+    expect(window.alert.mock.calls).toEqual([[`Status saved for ${reviewer.name} (${reviewer.suggestionId}).`]]);
+  });
+
+  test('structured pending results keep independent locks, release invalidated work, and allow deliberate retry', async () => {
+    const first = deferred();
+    const second = deferred();
+    statusFetch.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise).mockResolvedValue(outcomeResponse());
+    const onRefresh = jest.fn();
+    const view = renderPanel({ reviewers: [reviewer, otherReviewer], onRefresh });
+    changeStatus();
+    changeStatus(otherReviewer);
+    await act(async () => second.resolve(outcomeResponse(false, otherReviewer.suggestionId)));
+    expectUnconfirmed(`${otherReviewer.name} (${otherReviewer.suggestionId})`);
+    window.alert.mockClear();
+    invalidate(view, 'request away and back');
+    expect(openStatus()).toBeDisabled();
+    fireEvent.change(screen.getByLabelText(`Correct status for ${reviewer.name}`), { target: { value: 'review_received' } });
+    expect(statusFetch).toHaveBeenCalledTimes(2);
+    await act(async () => first.resolve(outcomeResponse()));
+    expect(window.alert).not.toHaveBeenCalled();
+    expect(onRefresh).not.toHaveBeenCalled();
+    const select = screen.getByLabelText(`Correct status for ${reviewer.name}`);
+    expect(select).toBeEnabled();
+    fireEvent.change(select, { target: { value: 'under_review' } });
+    await act(async () => {});
+    expect(statusFetch).toHaveBeenCalledTimes(3);
+    expect(onRefresh.mock.calls).toEqual([[]]);
+    expect(window.alert.mock.calls).toEqual([[`Status saved for ${reviewer.name} (${reviewer.suggestionId}).`]]);
   });
 
   test('pending status preserves accepted selection and the open materials modal with its subset', async () => {

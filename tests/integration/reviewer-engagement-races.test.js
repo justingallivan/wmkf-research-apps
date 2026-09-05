@@ -2,11 +2,10 @@
  * @jest-environment node
  *
  * Composed reviewer races: Stage 1A expiry, Stage 1B email and Stage 1D correction
- * regressions plus the remaining Stage 0 characterizations. Services, adapters, DAL context,
+ * regressions and Stage 6A status outcomes. Services, adapters, DAL context,
  * Dynamics reads/writes, annotation processing and If-Match transport are real.
- * Only external email/token/question/SQL dependencies are replaced. A KNOWN
- * DEFECT assertion pins existing behavior for a later semantic change; it is
- * neither a desired invariant nor a skipped regression test.
+ * External email/token/question/SQL dependencies and authenticated entry/role
+ * lookups are replaced; the whole-batch request ownership policy is real.
  */
 jest.mock('@vercel/postgres', () => ({
   sql: jest.fn(() => { throw new Error('Unexpected Postgres access in race harness'); }),
@@ -36,6 +35,10 @@ jest.mock('../../lib/services/review-synthesis-job-service', () => ({
 jest.mock('../../lib/services/reviewer-acceptance-job-service', () => ({
   cancelReviewerAcceptanceJobsForSuggestion: jest.fn(async () => []),
 }));
+jest.mock('../../lib/utils/auth', () => ({
+  requireAppAccess: jest.fn(),
+  getUserRole: jest.fn(),
+}));
 
 import { createReviewerEngagementTransport } from '../helpers/reviewer-engagement-transport';
 import { DynamicsService } from '../../lib/services/dynamics-service';
@@ -52,6 +55,8 @@ import { REVIEW_STATUS_MAP, RESPONSE_TYPE_MAP } from '../../shared/config/review
 import { sql } from '@vercel/postgres';
 import { getReviewSynthesisJobState } from '../../lib/services/review-synthesis-job-service';
 import { ensureToken } from '../../lib/external/token-lifecycle';
+import reviewersHandler from '../../pages/api/review-manager/reviewers';
+import { requireAppAccess, getUserRole } from '../../lib/utils/auth';
 
 const SET = 'wmkf_appreviewersuggestions';
 const REQUESTS = 'akoya_requests';
@@ -81,6 +86,7 @@ const row = (overrides = {}) => ({
   wmkf_externaltokenrevoked: false,
   ...overrides,
 });
+
 const pending = (overrides = {}) => row({
   wmkf_accepted: false,
   wmkf_responsetype: null,
@@ -91,10 +97,12 @@ const pending = (overrides = {}) => row({
 
 let transport;
 let email;
+let expectedFetchRejections;
 const savedEnv = {};
 const originalFetch = global.fetch;
 beforeEach(() => {
   jest.clearAllMocks();
+  expectedFetchRejections = [];
   for (const key of ['DYNAMICS_URL', 'DATAVERSE_TARGET_INTERLOCK', 'REVIEWER_EMAIL_DELIVERY_MODE']) savedEnv[key] = process.env[key];
   process.env.DYNAMICS_URL = 'https://reviewer-harness.invalid';
   process.env.DATAVERSE_TARGET_INTERLOCK = 'off'; // Synthetic host; real DAL enforcement stays on.
@@ -120,7 +128,11 @@ afterEach(async () => {
   // URL rejected before the transport can append it to its request inventory.
   try {
     const fetchOutcomes = await Promise.allSettled(global.fetch.mock.results.map((result) => result.value));
-    expect(fetchOutcomes.filter((outcome) => outcome.status === 'rejected')).toEqual([]);
+    const rejectedFetches = fetchOutcomes.filter((outcome) => outcome.status === 'rejected');
+    // Only exact, deliberately injected network failures are allowed. A caught
+    // unknown fixture/URL failure still fails the isolation contract.
+    expect(rejectedFetches).toHaveLength(expectedFetchRejections.length);
+    rejectedFetches.forEach((outcome, index) => expect(outcome.reason).toBe(expectedFetchRejections[index]));
     expect(transport.unexpectedRequests).toEqual([]);
     expect(sql).not.toHaveBeenCalled();
     expect(getReviewSynthesisJobState).not.toHaveBeenCalled();
@@ -739,7 +751,7 @@ describe('F4 post-send bookkeeping races through the real adapter', () => {
   });
 });
 
-describe('F3 generic staff correction regressions and F5 batch baseline', () => {
+describe('F3 generic staff correction regressions', () => {
   const ACTOR = '77777777-7777-4777-8777-777777777777';
   let impersonationBefore;
   beforeEach(() => {
@@ -1033,30 +1045,239 @@ describe('F3 generic staff correction regressions and F5 batch baseline', () => 
   test.each(['complete', 'withdrew', 'released'])('the same adapter rejects a status-changing correction out of %s', async (status) => {
     transport.seed(SET, row({ wmkf_reviewstatus: REVIEW_STATUS_MAP[status] }));
     await expect(trusted(() => patchReviewers({ suggestionId: ID, lifecycle: { reviewStatus: 'under_review' } })))
-      .rejects.toThrow('closed review status');
+      .rejects.toMatchObject({
+        cause: expect.objectContaining({ message: expect.stringContaining('closed review status') }),
+        savedIds: [], failedIds: [ID], notAttemptedIds: [],
+      });
     expect(writes()).toEqual([]);
     expect(transport.get(SET, ID).wmkf_reviewstatus).toBe(REVIEW_STATUS_MAP[status]);
   });
 
-  test.each([0, 1, 2])('KNOWN DEFECT F5: batch failure at index %i preserves earlier commits and throws without outcome identifiers', async (failureIndex) => {
-    const ids = [ID, OTHER, THIRD];
-    ids.forEach((id, index) => transport.seed(SET, row({
-      wmkf_appreviewersuggestionid: id,
-      wmkf_applicantdisposition: index === failureIndex ? 100000001 : null,
-    })));
-    let failure;
-    try {
-      await trusted(() => patchReviewers({ suggestionIds: ids, reviewStatus: 'under_review' }));
-    } catch (error) { failure = error; }
+});
 
-    expect(failure).toBeInstanceOf(Error);
-    expect(failure.message).toContain('applicant-excluded');
-    expect(failure).not.toHaveProperty('results');
-    expect(failure).not.toHaveProperty('successfulIds');
-    expect(writes().map((request) => request.key)).toEqual(ids.slice(0, failureIndex));
-    ids.forEach((id, index) => expect(transport.get(SET, id).wmkf_reviewstatus)
-      .toBe(REVIEW_STATUS_MAP[index < failureIndex ? 'under_review' : 'accepted']));
-    const readIds = transport.requests.filter((request) => request.method === 'GET' && request.entitySet === SET).map((request) => request.key);
-    expect(readIds).toEqual(ids.slice(0, failureIndex + 1));
+describe('F5 Stage 6A route, real authorization and persisted status outcomes', () => {
+  const ACTOR = '77777777-7777-4777-8777-777777777777';
+  const CASE_ID = 'abcdef12-abcd-4abc-8abc-abcdefabcdef';
+  const ids = [ID, OTHER, THIRD];
+  let impersonationBefore;
+
+  beforeEach(() => {
+    impersonationBefore = process.env.DYNAMICS_IMPERSONATION_ENABLED;
+    process.env.DYNAMICS_IMPERSONATION_ENABLED = 'true';
+    requireAppAccess.mockResolvedValue({
+      profileId: 7, session: { user: { dynamicsSystemuserId: ACTOR } },
+    });
+    getUserRole.mockResolvedValue('read_write');
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    transport.patch(REQUESTS, REQUEST, { _wmkf_programdirector_value: ACTOR });
+  });
+  afterEach(() => {
+    if (impersonationBefore === undefined) delete process.env.DYNAMICS_IMPERSONATION_ENABLED;
+    else process.env.DYNAMICS_IMPERSONATION_ENABLED = impersonationBefore;
+  });
+
+  function seedTargets(targets = ids) {
+    targets.forEach(id => transport.seed(SET, row({ wmkf_appreviewersuggestionid: id })));
+    return new Map(targets.map(id => [id, transport.get(SET, id)]));
+  }
+
+  async function patchThroughRoute(body) {
+    const res = { status: jest.fn(), json: jest.fn() };
+    res.status.mockReturnValue(res);
+    res.json.mockReturnValue(res);
+    await reviewersHandler({ method: 'PATCH', body, query: {}, headers: {} }, res);
+    expect(res.status).toHaveBeenCalledTimes(1);
+    expect(res.json).toHaveBeenCalledTimes(1);
+    expect(requireAppAccess).toHaveBeenCalledWith(expect.any(Object), res, 'review-manager', 'reviewers');
+    expect(getUserRole).toHaveBeenCalledWith(7);
+    return { status: res.status.mock.calls[0][0], body: res.json.mock.calls[0][0] };
+  }
+
+  const guardReads = () => transport.requests.filter(request => request.method === 'GET'
+    && request.entitySet === SET && request.key !== null);
+  const patchCalls = () => global.fetch.mock.calls.filter(([url, options]) => options?.method === 'PATCH'
+    && new URL(url).pathname.startsWith(`/api/data/v9.2/${SET}(`));
+  const callId = ([url]) => new URL(url).pathname.match(/\(([^)]+)\)$/)[1];
+
+  function assertPatchBindings(before) {
+    for (const call of patchCalls()) {
+      const [url, options] = call;
+      const id = callId(call);
+      expect(new URL(url).origin).toBe('https://reviewer-harness.invalid');
+      expect(JSON.parse(options.body)).toEqual({ wmkf_reviewstatus: REVIEW_STATUS_MAP.under_review });
+      expect(options.headers).toMatchObject({ 'If-Match': before.get(id)._etag, MSCRMCallerID: ACTOR });
+    }
+    expect(writes().every(request => request.entitySet === SET)).toBe(true);
+    expect(email).not.toHaveBeenCalled();
+    expect(ensureToken).not.toHaveBeenCalled();
+  }
+
+  function assertPersisted(before, savedIds, racedId) {
+    for (const [id, initial] of before) {
+      const current = transport.get(SET, id);
+      expect({ ...current, _etag: initial._etag }).toEqual({
+        ...initial,
+        wmkf_reviewstatus: savedIds.includes(id) ? REVIEW_STATUS_MAP.under_review : initial.wmkf_reviewstatus,
+        ...(id === racedId ? { wmkf_notes: 'Concurrent writer wins before conditional PATCH' } : {}),
+      });
+      if (savedIds.includes(id) || id === racedId) expect(current._etag).not.toBe(initial._etag);
+      else expect(current._etag).toBe(initial._etag);
+    }
+  }
+
+  function assertAuthorizedBeforeWrites(targets) {
+    const authorizations = transport.requests.filter(request => request.method === 'GET' && request.key === null);
+    expect(authorizations.map(request => request.entitySet)).toEqual([SET, REQUESTS]);
+    expect(authorizations[0].params.get('$select')).toBe('wmkf_appreviewersuggestionid,_wmkf_request_value');
+    for (const id of targets) expect(authorizations[0].params.get('$filter')).toContain(`wmkf_appreviewersuggestionid eq ${id}`);
+    expect(authorizations[1].params.get('$select')).toBe('akoya_requestid,_wmkf_programdirector_value');
+    expect(transport.requests.indexOf(authorizations[1])).toBeLessThan(transport.requests.indexOf(guardReads()[0]));
+  }
+
+  test.each(['single', 'batch'])('F5 regression: %s confirms exact saved identities through real HTTP writes', async form => {
+    const targets = form === 'single' ? [ID] : ids;
+    const before = seedTargets(targets);
+    const result = await patchThroughRoute({
+      ...(form === 'single' ? { suggestionId: ID } : { suggestionIds: ids }),
+      reviewStatus: 'under_review', actingUserSystemId: THIRD,
+    });
+    expect(result).toEqual({ status: 200, body: {
+      success: true, message: form === 'single' ? 'Reviewer updated' : 'Updated 3 reviewers',
+      savedIds: targets, failedIds: [], notAttemptedIds: [],
+    } });
+    expect(patchCalls().map(callId)).toEqual(targets);
+    expect(guardReads().map(request => request.key)).toEqual(targets);
+    expect(writes().map(request => request.status)).toEqual(targets.map(() => 204));
+    assertAuthorizedBeforeWrites(targets);
+    assertPatchBindings(before);
+    assertPersisted(before, targets);
+  });
+
+  test.each(['excluded', 'read_failure', '412', 'transport_before_commit', 'commit_then_response_loss']
+    .flatMap(kind => [0, 1, 2].map(index => [kind, index])))(
+    'F5 regression: %s at index %i reports confirmed prefix, uncertain attempt and untouched suffix',
+    async (kind, failureIndex) => {
+      const failedId = ids[failureIndex];
+      if (kind === 'excluded') {
+        seedTargets();
+        transport.patch(SET, failedId, { wmkf_applicantdisposition: 100000001 });
+      } else seedTargets();
+      const before = new Map(ids.map(id => [id, transport.get(SET, id)]));
+      const injected = new Error(`Stage6A intentional ${kind}`);
+      if (['read_failure', 'transport_before_commit', 'commit_then_response_loss'].includes(kind)) {
+        global.fetch.mockImplementation(async (url, options = {}) => {
+          const method = options.method || 'GET';
+          const matches = new URL(url).pathname === `/api/data/v9.2/${SET}(${failedId})`;
+          if (matches && method === 'PATCH' && kind === 'transport_before_commit') {
+            // No server receives this request. Its real write-core payload and
+            // actor/If-Match headers are checked below through fetch.mock.calls.
+            expectedFetchRejections.push(injected);
+            throw injected;
+          }
+          const response = await transport.fetch(url, options);
+          if (matches && method === 'GET' && kind === 'read_failure') {
+            transport.requests.at(-1).status = 503;
+            return { ...response, ok: false, status: 503,
+              text: async () => JSON.stringify({ error: { message: injected.message } }) };
+          }
+          if (matches && method === 'PATCH' && kind === 'commit_then_response_loss') {
+            expect(response.status).toBe(204);
+            expectedFetchRejections.push(injected);
+            throw injected;
+          }
+          return response;
+        });
+      }
+      const pause = kind === '412' ? transport.pauseNext(request => request.method === 'PATCH'
+        && request.entitySet === SET && request.key === failedId) : null;
+      const pendingResult = patchThroughRoute({ suggestionIds: ids, reviewStatus: 'under_review' });
+      if (pause) {
+        await pause.reached;
+        transport.patch(SET, failedId, { wmkf_notes: 'Concurrent writer wins before conditional PATCH' });
+        pause.release();
+      }
+      const result = await pendingResult;
+      expect(result).toEqual({ status: 500, body: {
+        error: 'Failed to update reviewer', details: undefined, timestamp: expect.any(String),
+        success: false, savedIds: ids.slice(0, failureIndex), failedIds: [failedId],
+        notAttemptedIds: ids.slice(failureIndex + 1),
+      } });
+      const attempts = ids.slice(0, failureIndex + (['excluded', 'read_failure'].includes(kind) ? 0 : 1));
+      expect(patchCalls().map(callId)).toEqual(attempts);
+      // Whole-batch ownership reads intentionally precede all mutations. This
+      // asserts no later mutation guard-read, rather than forbidding preauth.
+      expect(guardReads().map(request => request.key)).toEqual(ids.slice(0, failureIndex + 1));
+      expect(writes().map(request => request.key)).toEqual(kind === 'transport_before_commit'
+        ? ids.slice(0, failureIndex) : attempts);
+      if (kind === '412') expect(writes().at(-1)).toMatchObject({ key: failedId, status: 412,
+        headers: { 'If-Match': before.get(failedId)._etag } });
+      const committed = ids.slice(0, failureIndex + (kind === 'commit_then_response_loss' ? 1 : 0));
+      assertAuthorizedBeforeWrites(ids);
+      assertPatchBindings(before);
+      assertPersisted(before, committed, kind === '412' ? failedId : undefined);
+    },
+  );
+
+  test.each([false, true])('F5 regression: trim/case duplicates run once in first-occurrence order (failure=%s)', async failing => {
+    const targets = [CASE_ID, OTHER, THIRD];
+    seedTargets(targets);
+    if (failing) transport.patch(SET, OTHER, { wmkf_applicantdisposition: 100000001 });
+    const before = new Map(targets.map(id => [id, transport.get(SET, id)]));
+    const result = await patchThroughRoute({
+      suggestionIds: [` ${CASE_ID.toUpperCase()} `, OTHER, CASE_ID, THIRD, ` ${OTHER} `],
+      reviewStatus: 'under_review',
+    });
+    expect(result.status).toBe(failing ? 500 : 200);
+    expect(result.body).toMatchObject({ success: !failing,
+      savedIds: failing ? [CASE_ID] : targets,
+      failedIds: failing ? [OTHER] : [], notAttemptedIds: failing ? [THIRD] : [],
+    });
+    if (!failing) expect(result.body.message).toBe('Updated 3 reviewers');
+    expect(patchCalls().map(callId)).toEqual(failing ? [CASE_ID] : targets);
+    expect(guardReads().map(request => request.key)).toEqual(failing ? [CASE_ID, OTHER] : targets);
+    assertAuthorizedBeforeWrites(targets);
+    assertPatchBindings(before);
+    assertPersisted(before, failing ? [CASE_ID] : targets);
+  });
+
+  test.each([
+    ['foreign', 403, 'Only the lead Program Director (or a superuser) can manage reviewer activity for this request.'],
+    ['missing_suggestion', 404, 'Reviewer suggestion was not found.'],
+    ['missing_request', 404, 'Request was not found.'],
+    ['suggestion_read_error', 502, 'Reviewer ownership could not be verified.'],
+    ['request_read_error', 502, 'Request ownership could not be verified.'],
+  ])('F5 regression: real whole-batch authorization rejects later %s before any lifecycle read/write', async (kind, status, error) => {
+    seedTargets(kind === 'missing_suggestion' ? [ID] : [ID, OTHER]);
+    if (kind !== 'missing_suggestion') transport.patch(SET, OTHER, { _wmkf_request_value: HONORARIUM });
+    if (kind !== 'missing_request') transport.seed(REQUESTS, {
+      akoya_requestid: HONORARIUM,
+      _wmkf_programdirector_value: kind === 'foreign' ? THIRD : ACTOR,
+    });
+    if (kind.endsWith('read_error')) {
+      const targetSet = kind === 'suggestion_read_error' ? SET : REQUESTS;
+      global.fetch.mockImplementation(async (url, options = {}) => {
+        const response = await transport.fetch(url, options);
+        if (new URL(url).pathname === `/api/data/v9.2/${targetSet}`) {
+          transport.requests.at(-1).status = 503;
+          return { ...response, ok: false, status: 503,
+            text: async () => JSON.stringify({ error: { message: 'Intentional ownership-read outage' } }) };
+        }
+        return response;
+      });
+    }
+    const before = transport.rows(SET);
+    const requestBefore = transport.rows(REQUESTS);
+    expect(await patchThroughRoute({ suggestionIds: [ID, OTHER], reviewStatus: 'under_review' }))
+      .toEqual({ status, body: { error } });
+    expect(guardReads()).toEqual([]);
+    expect(patchCalls()).toEqual([]);
+    expect(writes()).toEqual([]);
+    expect(transport.rows(SET)).toEqual(before);
+    expect(transport.rows(REQUESTS)).toEqual(requestBefore);
+    const authRead = transport.requests[0];
+    expect(authRead).toMatchObject({ method: 'GET', entitySet: SET, key: null });
+    expect(authRead.params.get('$filter')).toBe(`wmkf_appreviewersuggestionid eq ${ID} or wmkf_appreviewersuggestionid eq ${OTHER}`);
+    expect(email).not.toHaveBeenCalled();
+    expect(ensureToken).not.toHaveBeenCalled();
   });
 });

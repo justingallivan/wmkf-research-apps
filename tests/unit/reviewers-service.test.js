@@ -3,9 +3,8 @@
  * (Route→Service Consolidation Plan, Stage 2 wave).
  *
  * Adapters + resolvers mocked; covers the GET DTO early shapes and grouping,
- * and — critically — the PATCH batch SEQUENTIAL for…of: a midway failure
- * throws out with EARLIER updates already applied and later ids untouched
- * (no partial-success reporting, no parallelization).
+ * and PATCH sequential canonical-target outcomes. An attempted failure carries
+ * the confirmed prefix, uncertain attempt and unattempted suffix; no replay.
  */
 
 const updateLifecycle = jest.fn(async () => {});
@@ -72,10 +71,12 @@ const { TERMINAL_REVIEW_STATUS_VALUES } = require('../../shared/config/reviewerS
 
 let getReviewers;
 let patchReviewers;
+let ReviewerStatusMutationError;
 beforeAll(async () => {
   const mod = await import('../../lib/services/review-manager/reviewers-service');
   getReviewers = mod.getReviewers;
   patchReviewers = mod.patchReviewers;
+  ReviewerStatusMutationError = mod.ReviewerStatusMutationError;
 });
 
 beforeEach(() => {
@@ -91,47 +92,129 @@ afterEach(() => {
 });
 
 describe('patchReviewers', () => {
-  test('batch is a SEQUENTIAL loop in input order with per-id {reviewStatus} payloads', async () => {
+  function success(savedIds, message) {
+    return { success: true, message, savedIds, failedIds: [], notAttemptedIds: [] };
+  }
+
+  test('batch awaits each target in input order with actor and status payloads', async () => {
     const order = [];
     updateLifecycle.mockImplementation(async (id) => { order.push(id); });
     const out = await patchReviewers({ suggestionIds: IDS, reviewStatus: 'under_review', actingUserSystemId: 'su-1' });
     expect(order).toEqual(IDS);
-    expect(updateLifecycle).toHaveBeenCalledTimes(3);
-    for (const call of updateLifecycle.mock.calls) {
-      expect(call[1]).toEqual({ reviewStatus: 'under_review' });
-      expect(call[2]).toEqual({ actingUserSystemId: 'su-1' });
+    expect(updateLifecycle.mock.calls).toEqual(IDS.map(id => [id, { reviewStatus: 'under_review' }, { actingUserSystemId: 'su-1' }]));
+    expect(out).toEqual(success(IDS, 'Updated 3 reviewers'));
+  });
+
+  test.each([0, 1, 2])('failure at index %i carries exact confirmed/uncertain/unattempted partition and original cause', async (failureIndex) => {
+    const cause = new Error('dataverse 500');
+    updateLifecycle.mockImplementation(async id => {
+      if (id === IDS[failureIndex]) throw cause;
+    });
+    const error = await patchReviewers({ suggestionIds: IDS, reviewStatus: 'under_review', actingUserSystemId: null }).catch(e => e);
+    expect(error).toBeInstanceOf(ReviewerStatusMutationError);
+    expect(error.cause).toBe(cause);
+    expect(error.savedIds).toEqual(IDS.slice(0, failureIndex));
+    expect(error.failedIds).toEqual([IDS[failureIndex]]);
+    expect(error.notAttemptedIds).toEqual(IDS.slice(failureIndex + 1));
+    expect(updateLifecycle.mock.calls).toEqual(IDS.slice(0, failureIndex + 1).map(id => [id, { reviewStatus: 'under_review' }, { actingUserSystemId: null }]));
+  });
+
+  test('an unresolved first operation prevents the second operation and success result', async () => {
+    let resolveFirst;
+    const firstPending = new Promise(resolve => { resolveFirst = resolve; });
+    updateLifecycle.mockImplementationOnce(() => firstPending);
+    let settled = false;
+    const pending = patchReviewers({ suggestionIds: IDS, reviewStatus: 'accepted' }).then(out => {
+      settled = true;
+      return out;
+    });
+    await Promise.resolve();
+    expect(updateLifecycle.mock.calls.map(([id]) => id)).toEqual([IDS[0]]);
+    expect(settled).toBe(false);
+    resolveFirst();
+    expect(await pending).toEqual(success(IDS, 'Updated 3 reviewers'));
+    expect(updateLifecycle.mock.calls.map(([id]) => id)).toEqual(IDS);
+  });
+
+  test('single preserves the exact lifecycle object and submitted identity', async () => {
+    const lifecycle = { reviewStatus: 'under_review', notes: 'n', accepted: false };
+    const suggestionId = ' AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA ';
+    const out = await patchReviewers({ suggestionId, lifecycle, actingUserSystemId: 'su-1' });
+    expect(updateLifecycle).toHaveBeenCalledTimes(1);
+    expect(updateLifecycle.mock.calls[0]).toEqual([suggestionId, lifecycle, { actingUserSystemId: 'su-1' }]);
+    expect(updateLifecycle.mock.calls[0][1]).toBe(lifecycle);
+    expect(out).toEqual(success([suggestionId], 'Reviewer updated'));
+  });
+
+  test.each(['single', 'one-element batch'])('%s failure has no confirmed saves or unattempted targets', async form => {
+    const cause = new Error('write response lost');
+    updateLifecycle.mockRejectedValueOnce(cause);
+    const input = form === 'single'
+      ? { suggestionId: IDS[0], lifecycle: { reviewStatus: 'accepted' } }
+      : { suggestionIds: [IDS[0]], reviewStatus: 'accepted' };
+    const error = await patchReviewers(input).catch(e => e);
+    expect(error).toBeInstanceOf(ReviewerStatusMutationError);
+    expect(error).toMatchObject({ cause, savedIds: [], failedIds: [IDS[0]], notAttemptedIds: [] });
+    expect(updateLifecycle).toHaveBeenCalledTimes(1);
+  });
+
+  test('one-element batch retains batch message', async () => {
+    expect(await patchReviewers({ suggestionIds: [IDS[0]], reviewStatus: 'accepted' }))
+      .toEqual(success([IDS[0]], 'Updated 1 reviewers'));
+  });
+
+  test.each([false, true])('canonical duplicates are attempted once in first occurrence order (failure=%s)', async failing => {
+    const a = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    const b = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+    const c = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+    const suggestionIds = [` ${b.toUpperCase()} `, a, b, ` ${a.toUpperCase()} `, c, b];
+    const cause = new Error('failure after duplicate');
+    updateLifecycle.mockImplementation(async id => { if (failing && id === a) throw cause; });
+    const out = await patchReviewers({ suggestionIds, reviewStatus: 'accepted' }).catch(e => e);
+    expect(updateLifecycle.mock.calls.map(([id]) => id)).toEqual(failing ? [b, a] : [b, a, c]);
+    if (failing) {
+      expect(out).toBeInstanceOf(ReviewerStatusMutationError);
+      expect(out).toMatchObject({ cause, savedIds: [b], failedIds: [a], notAttemptedIds: [c] });
+    } else {
+      expect(out).toEqual(success([b, a, c], 'Updated 3 reviewers'));
     }
-    expect(out).toEqual({ success: true, message: 'Updated 3 reviewers' });
+    expect(suggestionIds).toEqual([` ${b.toUpperCase()} `, a, b, ` ${a.toUpperCase()} `, c, b]);
   });
 
-  test('midway batch failure: earlier updates already applied, later ids untouched, error propagates untyped', async () => {
-    updateLifecycle
-      .mockResolvedValueOnce(undefined)
-      .mockRejectedValueOnce(new Error('dataverse 500'));
-    const err = await patchReviewers({ suggestionIds: IDS, reviewStatus: 'under_review', actingUserSystemId: null })
-      .catch((e) => e);
-    expect(err.message).toBe('dataverse 500'); // shell maps to the PATCH 500 envelope
-    expect(updateLifecycle).toHaveBeenCalledTimes(2); // ids[0] applied, ids[1] failed, ids[2] never attempted
-    expect(updateLifecycle.mock.calls[0][0]).toBe(IDS[0]);
-    expect(updateLifecycle.mock.calls[1][0]).toBe(IDS[1]);
+  test.each([[], 'not-an-array', null, {}])('empty or nonarray batch selector %j uses single lifecycle', async suggestionIds => {
+    const lifecycle = { reviewStatus: 'accepted', notes: 'preserved' };
+    const out = await patchReviewers({ suggestionIds, suggestionId: IDS[0], lifecycle, reviewStatus: 'complete' });
+    expect(out).toEqual(success([IDS[0]], 'Reviewer updated'));
+    expect(updateLifecycle.mock.calls[0][1]).toBe(lifecycle);
   });
 
-  test('single update forwards the shell-built lifecycle object', async () => {
-    const out = await patchReviewers({ suggestionId: IDS[0], lifecycle: { reviewStatus: 'under_review', notes: 'n' }, actingUserSystemId: 'su-1' });
-    expect(updateLifecycle).toHaveBeenCalledWith(IDS[0], { reviewStatus: 'under_review', notes: 'n' }, { actingUserSystemId: 'su-1' });
-    expect(out).toEqual({ success: true, message: 'Reviewer updated' });
+  test('nonempty batch takes priority over single lifecycle and single target', async () => {
+    const out = await patchReviewers({ suggestionIds: [IDS[1]], suggestionId: IDS[0], reviewStatus: 'accepted', lifecycle: { reviewStatus: 'complete' } });
+    expect(out).toEqual(success([IDS[1]], 'Updated 1 reviewers'));
+    expect(updateLifecycle.mock.calls).toEqual([[IDS[1], { reviewStatus: 'accepted' }, { actingUserSystemId: undefined }]]);
   });
 
-  test.each([
-    'complete', ' Complete ', REVIEW_STATUS_MAP.complete,
-    'withdrew', 'released', TERMINAL_REVIEW_STATUS_VALUES.withdrew,
-  ])('generic PATCH service refuses dedicated status %s', async (reviewStatus) => {
-    await expect(patchReviewers({
-      suggestionId: IDS[0],
-      lifecycle: { reviewStatus },
-      actingUserSystemId: 'su-1',
-    })).rejects.toMatchObject({ httpStatus: 400 });
-    expect(updateLifecycle).not.toHaveBeenCalled();
+  const dedicatedStatuses = [
+    ['complete', 'Complete requires the dedicated reviewer closeout endpoint'],
+    [' Complete ', 'Complete requires the dedicated reviewer closeout endpoint'],
+    [REVIEW_STATUS_MAP.complete, 'Complete requires the dedicated reviewer closeout endpoint'],
+    ['withdrew', 'Terminal reviewer statuses require the dedicated transition endpoint'],
+    [' RELEASED ', 'Terminal reviewer statuses require the dedicated transition endpoint'],
+    [TERMINAL_REVIEW_STATUS_VALUES.withdrew, 'Terminal reviewer statuses require the dedicated transition endpoint'],
+    [TERMINAL_REVIEW_STATUS_VALUES.released, 'Terminal reviewer statuses require the dedicated transition endpoint'],
+  ];
+  describe.each(['single', 'batch', 'empty-array fallback'])('%s dedicated status precheck', form => {
+    test.each(dedicatedStatuses)('refuses %s before all writes with error-only service semantics', async (reviewStatus, message) => {
+      const input = form === 'batch'
+        ? { suggestionIds: IDS, reviewStatus, lifecycle: { reviewStatus: 'accepted' } }
+        : { suggestionIds: form === 'empty-array fallback' ? [] : undefined, suggestionId: IDS[0], lifecycle: { reviewStatus }, reviewStatus: 'accepted' };
+      const error = await patchReviewers(input).catch(e => e);
+      expect(error).toMatchObject({ name: 'ServiceHttpError', httpStatus: 400, message });
+      expect(error).not.toHaveProperty('savedIds');
+      expect(error).not.toHaveProperty('failedIds');
+      expect(error).not.toHaveProperty('notAttemptedIds');
+      expect(updateLifecycle).not.toHaveBeenCalled();
+    });
   });
 });
 
