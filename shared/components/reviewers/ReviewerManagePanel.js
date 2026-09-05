@@ -518,7 +518,7 @@ const emptyProposalDoc = () => ({
   pickedKey: null,
 });
 
-function ReleaseMaterialsModal({ isOpen, onClose, reviewers, proposalTitle, requestId, settings, onEmailsSent }) {
+function ReleaseMaterialsModal({ isOpen, onClose, reviewers, proposalTitle, requestId, settings, onEmailsSent, membershipCause }) {
   // This request-scoped entry point is intentionally materials-only. Review-due
   // nudges use ReviewReminderAction's fresh eligibility + atomic-claim path, and
   // thank-yous are handled by the dedicated sweep. Keeping those choices out of
@@ -571,6 +571,10 @@ function ReleaseMaterialsModal({ isOpen, onClose, reviewers, proposalTitle, requ
   // True whenever a preview render is queued or in flight — disables the
   // footer Preview button and the Retry button.
   const [rendering, setRendering] = useState(false);
+  // Declared here (not beside saveTemplate below) so the session-identity
+  // reconcile effect, which resets it on a new session, can reference the
+  // setter without a textual before-declaration lint warning.
+  const [templateSaved, setTemplateSaved] = useState(false);
 
   // Synchronous single-flight lock for handlePreview, keyed to the modal-session
   // epoch that was current when a render was started. A second call for the SAME
@@ -594,28 +598,130 @@ function ReleaseMaterialsModal({ isOpen, onClose, reviewers, proposalTitle, requ
   // means a hung render's tail blocks every later session until it times out.
   const activeRenderAbortRef = useRef(null);
 
-  // Reset email compose state when the modal opens or closes; bump the modal
-  // session on every transition so an in-flight response from a prior session
-  // can never mutate current state.
+  // Stage 6B3: modal session identity = isOpen + requestId + sorted selected-
+  // membership key, plus the one-use completion-cause consumption (see
+  // handleSend/onEmailsSent below). Compare stable membership (sorted
+  // suggestionId key), never array identity or reviewer display-object
+  // identity — a same-membership rerender with fresh row objects must not
+  // reset drafts/step. modalSessionRef (declared above) IS the epoch:
+  // handlePreview/handleSend already capture and compare against it.
+  const mountedRef = useRef(true);
+  const saveTimerRef = useRef(null);
+  const uploadAttemptRef = useRef(null);
+  // The most recently FINISHED send attempt (see handleSend), set only when
+  // its `complete` event lands. `onEmailsSent` is called with this exact
+  // object, so the panel hands the SAME object back as the `membershipCause`
+  // prop after it clears selection — the effect below matches the incoming
+  // prop's identity/fields against this ref to decide whether a prior→empty
+  // membership transition is the one THIS attempt caused (and so must not
+  // reset the just-completed summary), vs. any other membership change
+  // (which discards this ref and invalidates normally).
+  const lastSendAttemptRef = useRef(null);
+  const sessionContextRef = useRef({
+    isOpen: false,
+    requestId: undefined,
+    key: '',
+    onEmailsSent,
+  });
+
+  // Mount/unmount lifetime: unmounting (the modal renders under `canManage &&`
+  // at the panel call site, so permission loss is unmount here — see D2 in
+  // the 6B3 trace) permanently invalidates every in-flight attempt. This is a
+  // SEPARATE dimension from the committed-session reconcile effect below,
+  // mirroring the ReviewReminderAction/6B1 mount-effect pair.
   useEffect(() => {
-    modalSessionRef.current += 1;
-    // Abort any render still outstanding from the session that just ended —
-    // this modal stays mounted across close, so a wedged fetch would otherwise
-    // hold renderTailRef forever and block every future session's preview.
-    if (activeRenderAbortRef.current) {
-      activeRenderAbortRef.current.abort();
-      activeRenderAbortRef.current = null;
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      modalSessionRef.current += 1;
+      lastSendAttemptRef.current = null;
+      if (activeRenderAbortRef.current) {
+        activeRenderAbortRef.current.abort();
+        activeRenderAbortRef.current = null;
+      }
+      proposalLoadSeq.current += 1;
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = null;
+      }
+      uploadAttemptRef.current = null;
+    };
+  }, []);
+
+  // Committed-session reconciliation: no dependency array, no cleanup, so it
+  // runs on every commit (mirrors the Stage 6B1/6B2 committed-props effect
+  // pattern). Any change to isOpen, requestId or the sorted membership key
+  // bumps modalSessionRef, aborts the active render, and resets compose/
+  // preview/send scratch state back to a fresh 'compose' session — except
+  // when the transition is the one-use completion-cause exemption (a prior-
+  // membership→empty transition tagged by the just-finished send attempt),
+  // which updates the committed key WITHOUT bumping or resetting, preserving
+  // the just-completed 'sent' summary. Same-membership array/object churn
+  // (fresh reviewer objects, same ids) never bumps.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useLayoutEffect(() => {
+    const context = sessionContextRef.current;
+    const nextKey = reviewers.map(r => r.suggestionId).slice().sort().join(',');
+    const changed = context.isOpen !== isOpen || context.requestId !== requestId || context.key !== nextKey;
+
+    if (changed) {
+      // The one-use completion-cause exemption: this specific transition is
+      // priorKey→empty, the session/request are UNCHANGED (only membership
+      // moved), and the cause the panel handed back as a prop is exactly the
+      // attempt this modal's own last `complete` produced (same token),
+      // still unconsumed, still referring to the current epoch/request/prior
+      // membership. Any mismatch (untagged empty, a different membership,
+      // request/mode/permission change, an expired/reused/foreign cause, or
+      // a change that happened before completion) invalidates normally.
+      const attempt = lastSendAttemptRef.current;
+      const cause = membershipCause;
+      const isCompletionExemption = Boolean(
+        context.isOpen === isOpen
+          && context.requestId === requestId
+          && nextKey === ''
+          && attempt
+          && !attempt.consumed
+          && cause
+          && cause.token === attempt.token
+          && cause.session === modalSessionRef.current
+          && cause.requestId === requestId
+          && cause.priorKey === context.key
+      );
+
+      if (isCompletionExemption) {
+        attempt.consumed = true;
+        context.key = nextKey;
+      } else {
+        lastSendAttemptRef.current = null;
+        modalSessionRef.current += 1;
+        context.isOpen = isOpen;
+        context.requestId = requestId;
+        context.key = nextKey;
+        if (activeRenderAbortRef.current) {
+          activeRenderAbortRef.current.abort();
+          activeRenderAbortRef.current = null;
+        }
+        proposalLoadSeq.current += 1;
+        if (isOpen) {
+          setStep('compose');
+          setProgress({ current: 0, total: 0, message: '' });
+          setDrafts([]);
+          setSentResults({ sent: [], failed: [], skipped: [] });
+          setError(null);
+          setPreviewFailed(false);
+          setRendering(false);
+          setIsUploading(false);
+          uploadAttemptRef.current = null;
+          setTemplateSaved(false);
+          if (saveTimerRef.current) {
+            clearTimeout(saveTimerRef.current);
+            saveTimerRef.current = null;
+          }
+        }
+      }
     }
-    if (isOpen) {
-      setStep('compose');
-      setProgress({ current: 0, total: 0, message: '' });
-      setDrafts([]);
-      setSentResults({ sent: [], failed: [], skipped: [] });
-      setError(null);
-      setPreviewFailed(false);
-      setRendering(false);
-    }
-  }, [isOpen]);
+    context.onEmailsSent = onEmailsSent;
+  });
 
   // Read the attach-proposal-email setting fresh every time the modal opens
   // (never cached/build-time) so an admin toggle takes effect immediately.
@@ -774,37 +880,70 @@ function ReleaseMaterialsModal({ isOpen, onClose, reviewers, proposalTitle, requ
     } catch (e) { /* ignore */ }
   }, []);
 
-  const [templateSaved, setTemplateSaved] = useState(false);
-  const saveTemplate = useCallback(async () => {
+  // Plain function, not useCallback: it reads mountedRef/modalSessionRef
+  // (deliberately outside its "deps"), and it's used only as an onClick
+  // handler here — no downstream memoization depends on its identity.
+  const saveTemplate = async () => {
     // Templates → per-user Dataverse store (shared with the Workbench invite
     // flow + the EmailTemplatesModal). Email-fields + attachments stay local.
+    // Preference persistence itself (localStorage + saveEmailTemplates) is
+    // NEVER reverted by a departed session — only the "Saved ✓" feedback and
+    // its 1.5s timer are session/mounted-owned (Stage 6B3 D-save-template).
+    const epoch = modalSessionRef.current;
     try {
       localStorage.setItem(EMAIL_FIELDS_STORAGE_KEY, JSON.stringify(emailFields));
       localStorage.setItem(ATTACHMENTS_STORAGE_KEY, JSON.stringify(attachmentsByType));
     } catch (e) { /* ignore */ }
     const ok = await saveEmailTemplates(templates);
+    if (!mountedRef.current || modalSessionRef.current !== epoch) return;
     setTemplateSaved(ok);
-    if (ok) setTimeout(() => setTemplateSaved(false), 1500);
-  }, [templates, emailFields, attachmentsByType]);
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    if (ok) {
+      saveTimerRef.current = setTimeout(() => {
+        saveTimerRef.current = null;
+        if (mountedRef.current && modalSessionRef.current === epoch) setTemplateSaved(false);
+      }, 1500);
+    }
+  };
 
   const handleFileUpload = async (e) => {
     const files = Array.from(e.target.files);
     if (files.length === 0) return;
+    // Stage 6B3 D6: `isUploading` is released by attempt identity regardless
+    // of session epoch (the 6B2 lock pattern), but stale-session writes
+    // (attachments/localStorage/error) are suppressed. Already-started bytes
+    // may finish uploading — we never delete an uploaded blob or infer
+    // rollback — but a stale attempt does not start its NEXT file, and does
+    // not touch attachments/error for a departed session.
+    const epoch = modalSessionRef.current;
+    const attempt = {};
+    uploadAttemptRef.current = attempt;
+    const isCurrent = () => mountedRef.current && modalSessionRef.current === epoch;
     setIsUploading(true);
+    let stale = false;
     try {
       const { upload } = await import('@vercel/blob/client');
+      if (!isCurrent()) { stale = true; }
       for (const file of files) {
+        if (stale) break;
         const blob = await upload(file.name, file, {
           access: 'public',
           handleUploadUrl: '/api/upload-handler',
         });
+        if (!isCurrent()) { stale = true; break; }
         const newAttachment = { url: blob.url, filename: file.name, size: file.size };
         setAttachments((prev) => [...prev, newAttachment]);
       }
     } catch (err) {
-      setError(`Failed to upload: ${err.message}`);
+      if (isCurrent()) setError(`Failed to upload: ${err.message}`);
     } finally {
-      setIsUploading(false);
+      if (uploadAttemptRef.current === attempt) {
+        uploadAttemptRef.current = null;
+        if (mountedRef.current) setIsUploading(false);
+      }
       e.target.value = ''; // reset input
     }
   };
@@ -960,11 +1099,25 @@ function ReleaseMaterialsModal({ isOpen, onClose, reviewers, proposalTitle, requ
 
     // Captured before any async work: a response arriving after this modal
     // session closed/reopened must not mutate the current session's state.
+    // requestIdAtSend/priorKey are the COMMITTED identity at send start (not
+    // recomputed from props later) — this is what makes the completion-cause
+    // exemption's field comparisons in the session effect tautologically
+    // correct for this exact attempt.
     const epoch = modalSessionRef.current;
+    const requestIdAtSend = sessionContextRef.current.requestId;
+    const priorKey = sessionContextRef.current.key;
+    const sendToken = Symbol('send');
+    // Local mutable accumulator: the authoritative source for the completion
+    // summary, fed only by email_sent/email_failed/result — NOT a snapshot of
+    // (possibly stale/batched) React state. `finished` makes the attempt
+    // terminal: once true, no further event (a duplicate complete, or a
+    // trailing error/result in a later chunk) has any effect.
+    let results = { sent: [], failed: [], skipped: [] };
+    let finished = false;
     setStep('sending');
     setProgress({ current: 0, total: sendable.length, message: 'Starting...' });
     setError(null);
-    setSentResults({ sent: [], failed: [], skipped: [] });
+    setSentResults(results);
 
     try {
       // Attach-proposal-email OFF (default): never send attachmentUrls — the
@@ -1004,11 +1157,21 @@ function ReleaseMaterialsModal({ isOpen, onClose, reviewers, proposalTitle, requ
       const decoder = new TextDecoder();
       let buffer = '';
       let currentEvent = null;
+      // reader.cancel() is a best-effort client stream close, not a server
+      // rollback: it may be absent on a test double, and its promise
+      // rejection is observed everywhere it's called so it never surfaces as
+      // an unhandled rejection.
+      const cancelReader = () => {
+        try {
+          const p = reader.cancel();
+          if (p && typeof p.then === 'function') p.catch(() => {});
+        } catch (e) { /* best-effort */ }
+      };
 
-      while (true) {
+      while (!finished) {
         const { value, done } = await reader.read();
         if (modalSessionRef.current !== epoch) {
-          try { reader.cancel(); } catch (e) { /* best-effort */ }
+          cancelReader();
           return;
         }
         if (done) break;
@@ -1018,6 +1181,10 @@ function ReleaseMaterialsModal({ isOpen, onClose, reviewers, proposalTitle, requ
         buffer = lines.pop() || '';
 
         for (const line of lines) {
+          // A duplicate `complete`, or a trailing `error`/`result`, arriving
+          // in the SAME chunk right after this attempt already finished must
+          // also have no effect.
+          if (finished) break;
           if (line.startsWith('event: ')) {
             currentEvent = line.slice(7).trim();
           } else if (line.startsWith('data: ') && currentEvent) {
@@ -1026,18 +1193,45 @@ function ReleaseMaterialsModal({ isOpen, onClose, reviewers, proposalTitle, requ
               if (currentEvent === 'progress') {
                 setProgress(prev => ({ ...prev, ...data }));
               } else if (currentEvent === 'email_sent') {
-                setSentResults(prev => ({ ...prev, sent: [...prev.sent, data] }));
+                results = { ...results, sent: [...results.sent, data] };
+                setSentResults(results);
               } else if (currentEvent === 'email_failed') {
-                setSentResults(prev => ({ ...prev, failed: [...prev.failed, data] }));
+                results = { ...results, failed: [...results.failed, data] };
+                setSentResults(results);
               } else if (currentEvent === 'result') {
-                setSentResults({
+                results = {
                   sent: data.sent || [],
                   failed: data.failed || [],
                   skipped: data.skipped || [],
-                });
+                };
+                setSentResults(results);
               } else if (currentEvent === 'complete') {
+                // Mark this attempt finished BEFORE calling the parent — the
+                // finished flag is what makes a duplicate complete or a
+                // trailing error/result a no-op, and the recorded attempt is
+                // what lets the session effect recognize the exact
+                // membership-clear this callback is about to cause.
+                finished = true;
+                setSentResults(results);
                 setStep('sent');
-                if (onEmailsSent) onEmailsSent();
+                lastSendAttemptRef.current = {
+                  token: sendToken,
+                  session: epoch,
+                  requestId: requestIdAtSend,
+                  priorKey,
+                  consumed: false,
+                };
+                const cause = lastSendAttemptRef.current;
+                const latestOnEmailsSent = sessionContextRef.current.onEmailsSent;
+                if (latestOnEmailsSent) {
+                  try {
+                    const result = latestOnEmailsSent(cause);
+                    if (result && typeof result.then === 'function') result.catch(() => {});
+                  } catch (e) {
+                    // Swallow: confirmed send, callback/refresh failure only —
+                    // never relabel a confirmed mutation as failed.
+                  }
+                }
               } else if (currentEvent === 'error') {
                 setError(data.message);
                 setStep('preview');
@@ -1047,8 +1241,9 @@ function ReleaseMaterialsModal({ isOpen, onClose, reviewers, proposalTitle, requ
           }
         }
       }
+      if (finished) cancelReader();
     } catch (err) {
-      if (modalSessionRef.current !== epoch) return;
+      if (modalSessionRef.current !== epoch || finished) return;
       setError(err.message);
       setStep('preview');
     }
@@ -1695,6 +1890,13 @@ export default function ReviewerManagePanel({
   const [releaseModalOpen, setReleaseModalOpen] = useState(false);
   const [activityDrawerId, setActivityDrawerId] = useState(null); // suggestionId
   const [closeoutReviewerId, setCloseoutReviewerId] = useState(null); // suggestionId
+  // Stage 6B3: the one-use completion-cause the ReleaseMaterialsModal hands
+  // back after a send finishes, so its own session effect can recognize the
+  // selection-clear THIS attempt caused (and not reset the summary it just
+  // showed) while still invalidating for any other selection change. Set
+  // synchronously BEFORE the selection clear below; cleared in every OTHER
+  // selection setter path so a cause never outlives its own transition.
+  const selectionCauseRef = useRef(null);
 
   const allReviewers = reviewersProp || proposal?.reviewers || [];
   const reviewers = filterByMode(allReviewers, mode);
@@ -1803,6 +2005,7 @@ export default function ReviewerManagePanel({
   // Reset selection when the proposal OR the active mode changes — a
   // selection made under one sub-tab shouldn't leak into another's visible set.
   useEffect(() => {
+    selectionCauseRef.current = null;
     setSelectedReviewers(new Set());
   }, [proposal?.proposalId, mode]);
 
@@ -1835,6 +2038,7 @@ export default function ReviewerManagePanel({
   const tableMinWidth = showActionColumn ? 'min-w-[58rem]' : 'min-w-[48rem]';
 
   const toggleSelectAll = () => {
+    selectionCauseRef.current = null;
     if (allSelected) {
       setSelectedReviewers(new Set());
     } else {
@@ -1843,6 +2047,7 @@ export default function ReviewerManagePanel({
   };
 
   const toggleSelect = (id) => {
+    selectionCauseRef.current = null;
     setSelectedReviewers(prev => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
@@ -2319,6 +2524,7 @@ export default function ReviewerManagePanel({
                 const releaseTargets = selectedList.length > 0
                   ? selectedList
                   : acceptedReviewers;
+                selectionCauseRef.current = null;
                 setSelectedReviewers(new Set(releaseTargets.map(r => r.suggestionId)));
                 setReleaseModalOpen(true);
               }}
@@ -2542,7 +2748,20 @@ export default function ReviewerManagePanel({
               ...settings,
               reviewDueDate: proposal.reviewDeadline,
             }}
-            onEmailsSent={() => {
+            // Deliberate ref read during render (Stage 6B3 D4): the modal's
+            // session effect needs the LATEST committed cause at the moment
+            // this transition commits, not a value captured a render early
+            // via useState (which would itself need an extra commit and could
+            // race the very membership change it's meant to validate). The
+            // ref only carries plain data and never affects this component's
+            // own render output.
+            // eslint-disable-next-line react-hooks/refs
+            membershipCause={selectionCauseRef.current}
+            onEmailsSent={(cause) => {
+              // Tag the clear synchronously BEFORE it commits — see
+              // selectionCauseRef's declaration above and the modal's own
+              // session-effect consumption of this exact prop.
+              selectionCauseRef.current = cause;
               setSelectedReviewers(new Set());
               if (onRefresh) onRefresh();
             }}
