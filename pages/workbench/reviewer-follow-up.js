@@ -13,7 +13,6 @@ import Link from 'next/link';
 import Layout, { Card, PageHeader } from '../../shared/components/Layout';
 import RequireAppAccess from '../../shared/components/RequireAppAccess';
 import ReviewerManagePanel from '../../shared/components/reviewers/ReviewerManagePanel';
-import CampaignConfigModal from '../../shared/components/reviewers/CampaignConfigModal';
 import EmailTemplatesModal from '../../shared/components/reviewers/EmailTemplatesModal';
 import WorkbenchViewsNav from '../../shared/components/workbench/WorkbenchViewsNav';
 import {
@@ -28,7 +27,6 @@ import { classifyTarget } from '../../lib/dataverse/core/interlock';
 
 function ReviewerGroup({ proposal, previewReadOnly, onRefresh }) {
   const [open, setOpen] = useState(false);
-  const [campaignOpen, setCampaignOpen] = useState(false);
   const reviewers = proposal.reviewers || [];
   const activeCount = reviewers.filter(isOpenReviewer).length;
   const overdueCount = reviewers.filter((reviewer) => isReviewerOverdue(reviewer)).length;
@@ -37,6 +35,7 @@ function ReviewerGroup({ proposal, previewReadOnly, onRefresh }) {
     || reviewer.submitted
     || ['review_received', 'complete'].includes(reviewer.reviewStatus)
   )).length;
+  const waitingCount = Math.max(reviewers.length - receivedCount - overdueCount, 0);
   const canManage = !previewReadOnly && proposal.workbench?.canManage === true;
   const requestHref = `/workbench/${encodeURIComponent(proposal.proposalId)}?tab=reviewers&sub=track${
     proposal.requestNumber ? `&n=${encodeURIComponent(proposal.requestNumber)}` : ''
@@ -63,11 +62,22 @@ function ReviewerGroup({ proposal, previewReadOnly, onRefresh }) {
                 .filter(Boolean)
                 .join(' · ')}
             </p>
-            <p className="mt-2 text-xs tabular-nums text-gray-500">
-              {reviewers.length === 0
-                ? 'No reviewers are in the tracking stage.'
-                : `${activeCount} active · ${receivedCount} received${overdueCount ? ` · ${overdueCount} overdue` : ''}`}
-            </p>
+            {reviewers.length === 0 ? (
+              <p className="mt-2 text-xs text-gray-500">No reviewers are in the tracking stage.</p>
+            ) : (
+              <div className="mt-3 max-w-xl" aria-label={`Reviewer status: ${receivedCount} received, ${waitingCount} waiting, ${overdueCount} late`}>
+                <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-gray-200" role="img" aria-hidden="true">
+                  {receivedCount > 0 && <span className="bg-green-500" style={{ width: `${(receivedCount / reviewers.length) * 100}%` }} />}
+                  {waitingCount > 0 && <span className="bg-gray-400" style={{ width: `${(waitingCount / reviewers.length) * 100}%` }} />}
+                  {overdueCount > 0 && <span className="bg-red-500" style={{ width: `${(overdueCount / reviewers.length) * 100}%` }} />}
+                </div>
+                <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs tabular-nums">
+                  <span className="text-green-700"><strong>{receivedCount}</strong> received</span>
+                  <span className="text-gray-600"><strong>{waitingCount}</strong> waiting</span>
+                  <span className="text-red-700"><strong>{overdueCount}</strong> late</span>
+                </div>
+              </div>
+            )}
           </div>
           <div className="flex shrink-0 flex-wrap items-center gap-2 lg:justify-end">
             <button
@@ -76,23 +86,8 @@ function ReviewerGroup({ proposal, previewReadOnly, onRefresh }) {
               aria-expanded={open}
               className="min-h-9 rounded-lg bg-gray-900 px-3 py-2 text-sm font-semibold text-white hover:bg-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2"
             >
-              {open ? 'Hide reviewers' : 'Review'}
+              {open ? 'Hide reviewer activity' : 'Show reviewer activity'}
             </button>
-            <Link
-              href={requestHref}
-              className="inline-flex min-h-9 items-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 hover:border-gray-400 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500"
-            >
-              Open request
-            </Link>
-            {canManage && (
-              <button
-                type="button"
-                onClick={() => setCampaignOpen(true)}
-                className="min-h-9 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 hover:border-gray-400 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500"
-              >
-                Campaign settings
-              </button>
-            )}
           </div>
         </div>
       </header>
@@ -118,13 +113,6 @@ function ReviewerGroup({ proposal, previewReadOnly, onRefresh }) {
         </div>
       )}
 
-      {campaignOpen && canManage && (
-        <CampaignConfigModal
-          requestId={proposal.proposalId}
-          onClose={() => setCampaignOpen(false)}
-          onSaved={onRefresh}
-        />
-      )}
     </article>
   );
 }
