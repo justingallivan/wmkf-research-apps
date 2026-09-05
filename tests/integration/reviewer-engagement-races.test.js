@@ -157,7 +157,7 @@ describe('F2 stale invitation discovery versus newer state', () => {
     transport.patch(REQUESTS, REQUEST, { wmkf_meetingdate: '2020-02-01' });
   }
 
-  test('KNOWN DEFECT F2: real acceptance after discovery is overwritten by unconditional no_response', async () => {
+  test('F2 regression: real acceptance after discovery survives fresh eligibility revalidation', async () => {
     seedStale();
     const atParentRead = transport.pauseNext((request) => request.entitySet === REQUESTS && request.method === 'GET');
     const sweep = trusted(() => sweepStaleInvites());
@@ -172,28 +172,153 @@ describe('F2 stale invitation discovery versus newer state', () => {
       accepted = transport.get(SET, ID);
     } finally { atParentRead.release(); }
 
-    expect(await sweep).toMatchObject({ swept: 1, errors: [] });
+    expect(await sweep).toMatchObject({ swept: 0, skipped: 1, errors: [] });
     expect(accepted.wmkf_responsetype).toBe(RESPONSE_TYPE_MAP.accepted);
-    expect(transport.get(SET, ID)).toMatchObject({
-      wmkf_accepted: true, wmkf_declined: false, wmkf_responsetype: RESPONSE_TYPE_MAP.no_response,
-    });
-    expect(writes().at(-1).headers['If-Match']).toBeUndefined();
-    expect(transport.get(SET, ID).wmkf_responsereceivedat).not.toBe(RECEIVED);
+    expect(transport.get(SET, ID)).toEqual(accepted);
+    expect(writes()).toHaveLength(1); // Only the actual acceptance writer.
+    expect(transport.get(SET, ID).wmkf_responsereceivedat).toBe(RECEIVED);
   });
 
   test.each([
     ['removed', { wmkf_selected: false }],
-    ['excluded', { wmkf_selected: false, wmkf_applicantdisposition: 100000001 }],
-  ])('KNOWN DEFECT F2: a row %s after discovery still receives the sweep stamp', async (_name, mutation) => {
+    ['excluded', { wmkf_applicantdisposition: 100000001 }],
+  ])('F2 regression: a row %s after fresh eligibility wins the conditional PATCH race', async (_name, mutation) => {
     seedStale();
     const pause = transport.pauseNext((request) => request.method === 'PATCH');
     const sweep = trusted(() => sweepStaleInvites());
     await pause.reached;
-    transport.patch(SET, ID, mutation);
+    const winner = transport.patch(SET, ID, mutation);
     pause.release();
-    expect(await sweep).toMatchObject({ swept: 1 });
-    expect(transport.get(SET, ID)).toMatchObject({ ...mutation, wmkf_responsetype: RESPONSE_TYPE_MAP.no_response });
-    expect(writes()[0].headers['If-Match']).toBeUndefined();
+    expect(await sweep).toMatchObject({ swept: 0, skipped: 1, errors: [] });
+    expect(transport.get(SET, ID)).toEqual(winner);
+    expect(writes()).toHaveLength(1);
+    expect(writes()[0].headers['If-Match']).toEqual(expect.any(String));
+    expect(writes()[0].headers['If-Match']).not.toBe(winner._etag);
+    expect(writes()[0].status).toBe(412);
+  });
+
+  test('F2 regression: real acceptance after the fresh read wins at the HTTP If-Match boundary', async () => {
+    seedStale();
+    const pause = transport.pauseNext((request) => request.method === 'PATCH'
+      && request.body?.wmkf_responsetype === RESPONSE_TYPE_MAP.no_response);
+    const sweep = trusted(() => sweepStaleInvites());
+    const write = await pause.reached;
+    const authorizedVersion = transport.get(SET, ID)._etag;
+    let winner;
+    try {
+      await trusted(() => suggestionAdapter.applyStage2aResponse(ID, {
+        action: 'accept', acks: { coiVersionId: OTHER, aiUseVersionId: THIRD },
+        responseReceivedAt: RECEIVED,
+      }, { ifMatch: authorizedVersion }));
+      winner = transport.get(SET, ID);
+    } finally { pause.release(); }
+    expect(await sweep).toMatchObject({ swept: 0, skipped: 1, errors: [] });
+    expect(write.headers['If-Match']).toBe(authorizedVersion);
+    expect(write.status).toBe(412);
+    expect(transport.get(SET, ID)).toEqual(winner);
+    expect(transport.get(SET, ID)).toMatchObject({ wmkf_accepted: true, wmkf_responsetype: RESPONSE_TYPE_MAP.accepted, wmkf_responsereceivedat: RECEIVED });
+    expect(writes()).toHaveLength(2); // One refused expiry, one committed acceptance.
+  });
+
+  test.each([
+    ['removed', { wmkf_selected: false }],
+    ['excluded but still selected', { wmkf_applicantdisposition: 100000001 }],
+    ['invitation evidence cleared', { wmkf_emailsentat: null }],
+    ['response timestamp recorded', { wmkf_responsereceivedat: RECEIVED }],
+    ['review receipt recorded', { wmkf_reviewreceivedat: RECEIVED }],
+    ['completed', { wmkf_completedat: COMPLETED }],
+    ['unknown review status', { wmkf_reviewstatus: 999 }],
+  ])('F2 regression: %s before the fresh eligibility read is skipped without a write', async (_label, mutation) => {
+    seedStale();
+    const pause = transport.pauseNext((request) => request.entitySet === REQUESTS && request.method === 'GET');
+    const sweep = trusted(() => sweepStaleInvites());
+    await pause.reached;
+    const winner = transport.patch(SET, ID, mutation);
+    pause.release();
+    expect(await sweep).toMatchObject({ eligible: 1, swept: 0, skipped: 1, errors: [] });
+    expect(transport.get(SET, ID)).toEqual(winner);
+    expect(writes()).toHaveLength(0);
+  });
+
+  test('F2 regression: a suggestion deleted after discovery is skipped as a structured Dataverse not-found', async () => {
+    seedStale();
+    const pause = transport.pauseNext((request) => request.entitySet === REQUESTS && request.method === 'GET');
+    const sweep = trusted(() => sweepStaleInvites());
+    await pause.reached;
+    try { await trusted(() => DynamicsService.deleteRecord(SET, ID)); }
+    finally { pause.release(); }
+    expect(await sweep).toMatchObject({ eligible: 1, swept: 0, skipped: 1, errors: [] });
+    expect(transport.get(SET, ID)).toBeNull();
+    expect(writes().map((request) => request.method)).toEqual(['DELETE']);
+  });
+
+  test('F2 regression: reparented suggestion cannot borrow another expired request from discovery', async () => {
+    seedStale();
+    // Both requests are expired, so the negative assertion proves binding,
+    // not an incidental missing/future meeting date on the new request.
+    transport.seed(REQUESTS, { akoya_requestid: OTHER, wmkf_meetingdate: '2020-02-01' });
+    const pause = transport.pauseNext((request) => request.entitySet === REQUESTS && request.method === 'GET');
+    const sweep = trusted(() => sweepStaleInvites());
+    await pause.reached;
+    const moved = transport.patch(SET, ID, { _wmkf_request_value: OTHER });
+    pause.release();
+    expect(await sweep).toMatchObject({ swept: 0, skipped: 1, errors: [] });
+    expect(transport.get(SET, ID)).toEqual(moved);
+    expect(writes()).toHaveLength(0);
+  });
+
+  test('F2 regression: reparenting after fresh authorization cannot land an expiry on the new request', async () => {
+    seedStale();
+    transport.seed(REQUESTS, { akoya_requestid: OTHER, wmkf_meetingdate: '2020-02-01' });
+    const pause = transport.pauseNext((request) => request.method === 'PATCH');
+    const sweep = trusted(() => sweepStaleInvites());
+    const write = await pause.reached;
+    const moved = transport.patch(SET, ID, { _wmkf_request_value: OTHER });
+    pause.release();
+    expect(await sweep).toMatchObject({ swept: 0, skipped: 1, errors: [] });
+    expect(transport.get(SET, ID)).toEqual(moved);
+    expect(write.status).toBe(412);
+  });
+
+  test.each(['rescheduled', 'deleted'])('F2 regression: parent %s after discovery is freshly rechecked before expiry', async (change) => {
+    seedStale();
+    const pause = transport.pauseNext((request) => request.entitySet === SET && request.key === ID && request.method === 'GET');
+    const sweep = trusted(() => sweepStaleInvites());
+    await pause.reached;
+    try {
+      if (change === 'rescheduled') transport.patch(REQUESTS, REQUEST, { wmkf_meetingdate: '2099-02-01' });
+      else await trusted(() => DynamicsService.deleteRecord(REQUESTS, REQUEST));
+    } finally { pause.release(); }
+    expect(await sweep).toMatchObject({ eligible: 1, swept: 0, skipped: 1, errors: [] });
+    expect(transport.get(SET, ID).wmkf_responsetype).toBeNull();
+    expect(writes().filter((request) => request.entitySet === SET)).toHaveLength(0);
+  });
+
+  test('documented boundary: a suggestion ETag does not lock a parent meeting-date edit after its final recheck', async () => {
+    seedStale();
+    const pause = transport.pauseNext((request) => request.method === 'PATCH');
+    const sweep = trusted(() => sweepStaleInvites());
+    const write = await pause.reached;
+    const suggestionVersion = transport.get(SET, ID)._etag;
+    transport.patch(REQUESTS, REQUEST, { wmkf_meetingdate: '2099-02-01' });
+    pause.release();
+    expect(await sweep).toMatchObject({ swept: 1, skipped: 0, errors: [] });
+    expect(write.headers['If-Match']).toBe(suggestionVersion);
+    expect(write.status).toBe(204);
+    expect(transport.get(REQUESTS, REQUEST).wmkf_meetingdate).toBe('2099-02-01');
+    expect(transport.get(SET, ID).wmkf_responsetype).toBe(RESPONSE_TYPE_MAP.no_response);
+  });
+
+  test('conditional expiry followed by repeat performs no second write or response restamp', async () => {
+    seedStale();
+    const version = transport.get(SET, ID)._etag;
+    expect(await trusted(() => sweepStaleInvites())).toMatchObject({ swept: 1, skipped: 0, errors: [] });
+    const expired = transport.get(SET, ID);
+    expect(writes()[0].headers['If-Match']).toBe(version);
+    expect(expired.wmkf_responsereceivedat).toEqual(expect.any(String));
+    expect(await trusted(() => sweepStaleInvites())).toMatchObject({ scanned: 0, swept: 0, errors: [] });
+    expect(writes()).toHaveLength(1);
+    expect(transport.get(SET, ID)).toEqual(expired);
   });
 
   test('dry-run detects eligible invitation without writing; missing meeting date stays ineligible', async () => {

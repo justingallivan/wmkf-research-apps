@@ -248,7 +248,11 @@ export function createReviewerEngagementTransport(initial = {}, { origin = 'http
       }
       if (resource.key) {
         const row = table(resource.entitySet)[resource.key];
-        result = row ? response(200, project(row, resource.params)) : response(404, { error: { message: 'Fixture row not found' } });
+        result = row ? response(200, project(row, resource.params)) : response(404, {
+          // A known table with a missing record is ObjectDoesNotExist, not an
+          // arbitrary endpoint 404. Keep the real runtime classifier in play.
+          error: { code: '0x80040217', message: 'Fixture row not found' },
+        });
       } else {
         let rows = Object.values(table(resource.entitySet)).filter(filterPredicate(resource.params.get('$filter')));
         const count = rows.length;

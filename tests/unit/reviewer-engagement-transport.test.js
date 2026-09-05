@@ -61,6 +61,17 @@ test('wildcard requires an existing row; unknown target cannot silently upsert a
   expect((await transport.fetch(missing, { method: 'PATCH', body: '{}' })).status).toBe(404);
 });
 
+test('known-table missing GET has the Dataverse record-not-found code; invalid endpoints remain distinct', async () => {
+  const missing = `${BASE}${SET}(${OTHER})`;
+  const read = await transport.fetch(missing);
+  expect(read.status).toBe(404);
+  expect(await read.json()).toEqual({ error: { code: '0x80040217', message: 'Fixture row not found' } });
+  // A typo in the entity/path must never impersonate a disappeared row.
+  await expect(transport.fetch(`${BASE}unknown_entity(${OTHER})`)).rejects.toThrow('Unregistered fixture entity set');
+  await expect(transport.fetch(`${BASE}${SET}(${OTHER})/unexpected`)).rejects.toThrow('Unsupported fixture resource');
+  expect(transport.unexpectedRequests).toHaveLength(2);
+});
+
 test('batch failure after one existing-child mutation rolls back children, new children, and parent', async () => {
   transport.seed(ANSWERS, { wmkf_appreviewanswerid: OTHER, _wmkf_appreviewersuggestion_value: ID, wmkf_questionkey: 'riskLevel', wmkf_answervalue: 1 });
   const parentBefore = transport.get(SET, ID);
