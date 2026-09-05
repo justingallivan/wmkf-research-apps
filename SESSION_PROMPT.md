@@ -1,156 +1,145 @@
-# Session 486 Prompt: Build Reviewer Lifecycle Stage 6B
+# Session 487 Prompt: Build Reviewer Lifecycle Stage 6B2
 
-## Session 485 Summary
+## Session 486 Summary
 
-The owner selected Stage 6B for another agent to build in the next session.
-Codex coordinated parallel source investigations and prepared a bounded build
-plan and remaining-work assessment. **This handoff is planning only: no Stage 6B
-runtime implementation, extraction or new application test was added.**
-The source baseline for the assessment is main `d614de5c`.
+Stage 6B1 of the reviewer lifecycle work was built, exit-tested, independently
+reviewed and documented on branch `codex/reviewer-lifecycle-stage6b`.
+Claude (Fable) orchestrated; a Sonnet subagent held sole ownership of
+`ReviewerManagePanel.js`; an Opus fresh-context subagent reviewed.
+**Nothing from this session is merged to `main` or deployed.** Promotion is a
+separate, deliberate action under the release strategy.
 
 ### What Was Completed
 
-- A concrete Stage 6B plan sequences **6B1 token/removal/terminal actions → fresh
-  review → 6B2 reminder/closeout → fresh review → 6B3 materials-release modal**.
-  It specifies action identity, permanent invalidation, cleanup ownership,
-  post-await effects, preserved behavior and discriminating tests.
-- A readiness audit distinguishes ready first slices, dependent work and optional
-  abstractions across remaining Stages 2–7. The narrow raw-policy comparison
-  agreed in 30 cases; the imported generic-call inventory reported 19 calls.
-  Neither is a complete writer inventory or a new application-test run.
-- Current execution routing now selects 6B1. Frozen implementation reviews,
-  the original investigation and the completed release receipt remain historical
-  evidence. The planning review receipt records the independent plan assessment.
+1. **Stage 6B1 runtime (`9258115a`)** — regenerate-token, revoke-token,
+   remove-reviewer and terminal-transition feedback in
+   `shared/components/reviewers/ReviewerManagePanel.js` is bound to the UI context
+   that started it. A per-action/row attempt registry (`actionAttemptsRef`) is
+   invalidated by the existing unmount and committed-props layout effects, so
+   stale alerts, prompts, clipboard writes and `onRefresh` calls are suppressed
+   after request/mode/permission change, row absence or unmount and never revive.
+   Confirm dialogs revalidate before dispatch; the terminal payload uses the
+   captured requestId; the latest committed `onRefresh` is awaited and a refresh
+   failure after a confirmed mutation is reported separately. Payloads, success
+   predicates, existing alert text, the status mutex and 6A parsing are unchanged;
+   no server file changed. New `tests/unit/reviewer-action-lifetimes.test.js`
+   drives the real menu.
+2. **Independent review PASS with test-only corrections (`06725d6c`)** — the
+   reviewer refuted one builder disconfirmation figure and found two guards with
+   no test teeth; 70 discriminating cases were added (refresh-failure across seven
+   context changes; permission/read-only revalidation inside confirm; a mid-confirm
+   request switch that makes the captured requestId observable). Narrow re-review
+   PASS. No runtime change was required.
+3. **Exit battery at the final tree** — full suite 771 suites / 11,216 tests,
+   `check:types`, lint (0 errors), webpack build with no generated changes,
+   `git diff --check`, and the seven named gate pairs serially, all green.
+4. **Documentation (`cc6e05ef`, `01b9a316`, `b0faa956`)** — Stage 6B1 receipt
+   with the contract-reconcile invariant table, lifecycle/provenance trace,
+   corrected disconfirmation figures and both review verdicts; plan, approved
+   decisions, readiness audit and the workbench-lifecycle wiki topic now route
+   to 6B2. Doc gates and docs catalog green.
 
-### Existing Release and Commits
-
-[VERIFIED via the recorded release evidence] Stages 0, 1A–1E and 6A are shipped.
-Stage 1C confirmed receipt behavior already present. PR 149 merged as `c19a16d8`;
-its production deployment reached READY on 2026-09-05 at 17:40:20.139 UTC.
-The later documentation-only `d614de5c` deployment reached READY at
-17:52:37.434 UTC with all seven expected production aliases attached.
-All five push-main workflows for `d614de5c` were subsequently observed successful.
-
-- `c19a16d8` — Merge PR 149: protect reviewer lifecycle writes and report outcomes.
-- `d614de5c` — Document the production release and Session 485 handoff.
-- This session's documentation commit contains the next build plan, readiness
-  audit, plan-review receipt, decision routing update and this prompt; obtain its
-  exact hash from `git log` rather than treating the assessment baseline as HEAD.
-
-Final pre-release CI passed 770 suites / 10,850 tests, build, lint and 25 stock
-browser cases. The isolated local browser rehearsal passed 31 cases (25 stock
-plus six targeted status cases), with no external requests or sends. These are
-**previous release results**, not tests of planned Stage 6B. The release smoke
-was read-only, and its bounded log scan does not prove live lifecycle mutations,
-delivery, concurrency or every production workflow. See the release receipt.
+### Commits (branch `codex/reviewer-lifecycle-stage6b`, base `71ff2321`)
+- `9258115a` - Bind reviewer token, removal and terminal action feedback to current context (Stage 6B1)
+- `06725d6c` - Add discriminating lifetime tests for Stage 6B1 review findings
+- `cc6e05ef` - Record Stage 6B1 receipt and route Stage 6B plan to 6B2
+- `01b9a316` - Note Stage 6B1 completion in the remaining readiness audit
+- `b0faa956` - Fold the orchestrator trace and reviewer context into the Stage 6B1 receipt
+- Session handoff commit: obtain from `git log`.
 
 ## Next Items
 
-### Verified Open — Selected and Build Ready
+### Verified Open
 
-**Start Stage 6B1 using `docs/REVIEWER_LIFECYCLE_STAGE6B_BUILD_PLAN.md`.**
-[VERIFIED via CodeGraph and direct source/caller/test inspection at `d614de5c`]
-The existing regenerate-token/clipboard, revoke-token, remove-reviewer and
-terminal handlers still lack the shipped status handler's full context guards.
-The build plan is the execution contract; the readiness audit is broader routing.
-
-1. Run `/start`; verify branch, HEAD, dirty state and agent ownership. Read the
-   plan, its fresh review receipt and approved decisions before editing. Recheck
-   the named functions against current source so concurrent work is not rebuilt.
-2. Create an isolated `codex/` runtime branch under the existing release strategy.
-   The current main checkout contains the completed release and this Tier 0
-   documentation handoff. Future runtime work still requires deliberate promotion.
-3. Act as orchestrator and use native subagents for bounded investigation,
-   implementation and fresh independent review. Give one builder ownership of
-   `ReviewerManagePanel.js` at a time; do not run 6B slices or 6C edits in parallel
-   against that shared surface. Tests must exercise real rendered behavior.
-4. Complete 6B1, run the plan's applicable checks, freeze a working commit and
-   obtain a fresh independent review. Fix required findings before proceeding.
-   Repeat that checkpoint before 6B2 and 6B3. Preserve earlier slices' tests.
-5. Continue autonomously within the reviewed plan. Escalate a genuine new product
-   or architecture decision; ordinary implementation choices and already settled
-   policies do not require another confirmation. Do not deploy merely because
-   local build/review passed.
+1. **Build Stage 6B2** (reminder action and closeout modal lifetimes) per
+   `docs/REVIEWER_LIFECYCLE_STAGE6B_BUILD_PLAN.md` §6B2.
+   Evidence: plan status section now routes to 6B2; the Stage 6B1 receipt records
+   PASS; `ReviewReminderAction` (`ReviewerManagePanel.js`, unchanged region before
+   line 1651) and `ReviewerCloseoutModal.js` are untouched by 6B1.
+   Preflight: `/start` on this branch (do not pull main into it); confirm HEAD is
+   the handoff commit and the tree is clean; reread the plan's 6B2 section, the
+   6B1 receipt and approved decisions lines 130–175; reopen current source via
+   CodeGraph since 6B1 moved the handlers about sixty lines. Orchestration split
+   that worked: Fable orchestrates, one Sonnet builder owns the runtime file(s),
+   Opus reviews fresh-context; the reviewer must actually run tests and reproduce
+   guard removals. Give the builder the lifecycle/provenance trace up front.
+2. **After 6B2 PASS: Stage 6B3** (materials-release modal session identity and
+   asynchronous scratch state). Planned, not started.
+3. **Promotion of the branch** is a separate decision once the owner wants 6B
+   (or a completed subset) in production. Tier 1 runtime work: PR, CI, deliberate
+   merge; follow `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md`.
 
 ### Owner Decision Needed
 
-No unresolved product-policy decision blocks the selected 6B1 scope.
-A proposed server-contract change, broader lock, automatic retry/resend or
-reopening of the excluded policies below is outside this plan. Stop and explain
-that concrete scope change if it becomes necessary.
+None blocking 6B2. A server-contract change, broader lock, automatic retry or
+resend, or reopening the excluded policies below remains outside the plan; stop
+and explain if one becomes necessary.
 
-### Queued / Optional / Parked
+### Parked
 
-- **Queued within 6B:** 6B2 reminder/closeout and 6B3 materials context safety,
-  each after the prior slice's fresh review. They are planned, not implemented.
-- **Alternatives, not the next authorized build:** Stage 2 narrow shared policy,
-  Stage 3 closeout-command pilot and Stage 5 narrow pointer/thank-you operations
-  have source-backed first slices. Stage 3 expansion and Stage 7 depend on the
-  relevant migrations and proofs. Stage 6C extraction follows completed 6B and
-  an explicit state-ownership contract. See the readiness matrix for details.
-- **Optional:** Stage 4 adapter decomposition and a shared receipt-persistence
-  helper need demonstrated benefit and, for the helper, a narrow input design.
-- Previously parked product items remain parked: progress-pill alignment and
-  chronology, Ops eligibility view, automatic reviewer reminders and one-click
-  PDF conversion. They were not re-probed as current deployment claims; the
-  automatic-reminder hold remains protected by its existing gate.
+- Progress-pill alignment/chronology, Ops eligibility view, automatic reviewer
+  reminders (gate-protected hold), one-click PDF conversion. Not re-probed.
+- Stage 2 shared policy, Stage 3 closeout-command pilot, Stage 5 pointer/thank-you
+  operations, Stage 4 decomposition, Stage 6C extraction (after 6B), Stage 7.
+  See `docs/audits/REVIEWER_LIFECYCLE_REMAINING_READINESS_2026-09-05.md`.
 
-### Preserve These Contracts
+### Verify Before Acting
 
-- Shipped status ownership is synchronous and per reviewer within one mounted
-  panel, held until settlement. Context loss permanently invalidates feedback;
-  returning to the same identity must not revive it. Ordinary same-context
-  object/callback churn does not cancel a valid operation. Preserve its mutex,
-  outcome parsing and matching-token cleanup while adding the separate 6B paths.
-- Stage 6A returns canonical unique batch partitions, executes sequentially and
-  stops at first failure. Single submitted IDs retain their formatting. A failed
-  adapter operation may have committed or may have rejected before writing;
-  complete response loss reveals no partition. Never automatically replay it.
-  Historical Stage 3 wording must preserve this shipped contract.
-- A confirmed mutation followed by refresh or clipboard failure remains a
-  confirmed mutation. A void/self-catching host callback does not prove a fresh
-  successful read; UI currentness cannot undo a clipboard write already invoked.
-- Receipt declarations enter Review Received and lock normal resubmission;
-  closeout and honorarium eligibility remain separate. Generic six-field
-  invitation/response corrections reject closed sources and require exact fresh
-  ETags. Do not change open-row null/empty status policy during this work.
-- Stage 1B post-send retry repairs bookkeeping only. A delivered email is not
-  resent; warning feedback does not authorize resend. Preserve reminder holds,
-  existing eligibility, server authorization, ETags and action payloads.
-- The previous release's explicit exception for separate human UAT and a live
-  rollback drill was specific to that release, on an assumed permitting campaign
-  window. It is not standing deployment approval or verified campaign timing.
+1. Orchestration hazard: never run a test suite or build while a reviewer or
+   builder holds the working tree for temporary guard-removal mutations. This
+   session had to abort one background full-suite run for that reason; no residue.
+2. Two stashes (`stash@{0}`, `stash@{1}`, both July 2026, both
+   `docs/RECONCILIATION_REPORT.json`) predate this work and were left alone.
+3. Reviewer-named reachability limits, to remember when 6B2/6B3 introduce a
+   rejecting callback or a non-blocking dialog: the refresh-failure alert path is
+   unreachable today because both hosts swallow refresh errors; the
+   permission-during-confirm revalidation is unreachable while `window.confirm`
+   blocks the event loop. Both guards and their tests stay.
+4. The plan's 6B1 line citations refer to the `d614de5c` baseline; post-6B1 the
+   status handler starts near line 1969 and the four handlers near 1804–2155.
 
-### Do Not Reopen Without a New Decision
+### Do Not Reopen Without New Decision
 
 Automatic Complete from thank-you; writing the Operations/Finance final remit
 flag from this application; BILL API reviewer onboarding. No new schema, live
-lifecycle mutation, email send, cron invocation or backfill is authorized by this
-planning handoff. Local isolated tests are part of the build scope.
+lifecycle mutation, email send, cron invocation or backfill is authorized.
 
-## Key Files
+## Preserve These Contracts
 
-- `docs/REVIEWER_LIFECYCLE_STAGE6B_BUILD_PLAN.md` — exact next-build contract,
-  scope, tests, review checkpoints and independent-review brief.
-- `docs/audits/REVIEWER_LIFECYCLE_STAGE6B_PLAN_REVIEW_2026-09-05.md` — fresh
-  independent planning review, assessed revision and verification limits.
-- `docs/audits/REVIEWER_LIFECYCLE_REMAINING_READINESS_2026-09-05.md` — remaining
-  stage matrix, bounded probes and historical-plan corrections.
-- `docs/audits/REVIEWER_LIFECYCLE_APPROVED_DECISIONS_2026-09-04.md` — settled
-  receipt/correction/batch policies, shipped contracts and current routing.
-- `docs/audits/REVIEWER_LIFECYCLE_RELEASE_2026-09-05.md` — completed release,
-  exact source/deployment association, CI/browser evidence and accepted limits.
-- `docs/audits/REVIEWER_LIFECYCLE_REFACTOR_REPORT_2026-09-04.md` — historical
-  investigation; use the current plan and readiness audit for execution status.
-- Stage 1D, 1E and 6A receipt/review files in `docs/audits/` — frozen runtime
-  and independent-review evidence. Preserve Claude's original separate report
-  and its adjacent follow-up receipt unchanged.
+- Shipped status ownership: synchronous per-reviewer mutex within one mounted
+  panel, permanent invalidation, matching-token cleanup, 6A outcome parsing.
+  6B1 added separate feedback-ownership paths; it added no mutex and no disabled controls.
+- Stage 6A canonical batch partitions, sequential stop-at-first-failure, no replay.
+- A confirmed mutation followed by refresh or clipboard failure is still confirmed.
+  A regenerate URL returned to a stale context already exists server-side;
+  suppress display only. Terminal 409 `write_failed` may have partially committed.
+- Receipt, correction, reminder-hold, ETag and payload contracts as in Session 485's prompt.
+
+## Key Files Reference
+
+| File | Purpose |
+|------|---------|
+| `docs/REVIEWER_LIFECYCLE_STAGE6B_BUILD_PLAN.md` | Execution contract; status routes to 6B2 |
+| `docs/audits/REVIEWER_LIFECYCLE_STAGE6B1_RECEIPT_2026-09-05.md` | 6B1 invariants, trace, evidence, review verdicts, limits |
+| `docs/audits/REVIEWER_LIFECYCLE_STAGE6B_PLAN_REVIEW_2026-09-05.md` | Planning review (historical) |
+| `docs/audits/REVIEWER_LIFECYCLE_APPROVED_DECISIONS_2026-09-04.md` | Settled policies and current routing |
+| `docs/audits/REVIEWER_LIFECYCLE_REMAINING_READINESS_2026-09-05.md` | Remaining-stage matrix with 6B1 status note |
+| `shared/components/reviewers/ReviewerManagePanel.js` | 6B1 registry/helpers ~1664–1751; handlers ~1804–2155; status ~1969 |
+| `tests/unit/reviewer-action-lifetimes.test.js` | 366 rendered 6B1 lifetime cases |
+| `docs/agent-wiki/topics/reviewer-workbench-lifecycle.md` | Wiki topic with 6B1 paragraph |
+
+## Testing
+
+```sh
+# Retained UI selection plus 6B1 (all must stay green through 6B2/6B3)
+npm test -- --runInBand --watch=false --runTestsByPath tests/unit/reviewer-action-lifetimes.test.js tests/unit/reviewer-status-mutation-characterization.test.js tests/unit/reviewer-manage-actions-menu.test.js tests/unit/reviewer-closeout-modal.test.js tests/unit/manage-panel-preview-error-retry.test.js tests/unit/reviewer-manage-proposal-attachment.test.js tests/unit/reviewers-tab-stale-request.test.js tests/unit/reviewers-tab-post-send-refresh.test.js tests/unit/reviewer-follow-up.test.js
+# Slice exit
+npm test -- --runInBand --watch=false && npm run check:types && npm run lint && npm run build -- --webpack && git diff --check
+```
 
 ## Handoff and Milestone Determination
 
-The next agent begins 6B1; the completed lifecycle release requires no repeat
-implementation or release approval. `DEVELOPMENT_LOG.md` already records the
-Session 484 production milestone. This session prepared planning documents and
-requires **no additional milestone entry**. No CLAUDE.md, schema, API, environment
-or memory convention changed. The claim-evidence pilot command remained
-unavailable because local state could not be read; no observation row was invented.
+No production capability shipped; the branch is unmerged. **No DEVELOPMENT_LOG.md
+entry is required.** No CLAUDE.md, schema, API, environment or memory convention
+changed. The claim-evidence pilot report recorded no eligible plan/design edit
+for this session; no observation row was added.
