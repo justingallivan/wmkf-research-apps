@@ -1,181 +1,150 @@
-# Session 480 Prompt: Reviewer Lifecycle Contract Baseline and First Fixes
+# Session 481 Prompt: Reviewer Lifecycle In-place Fixes After Stage 0
 
-## Session 479 Summary
+## Session 480 Summary
 
-Session 479 completed and promoted the Program Director reviewer-closeout
-workflow, refined the reviewer follow-up table, preserved a read-only lifecycle
-refactor audit, cleaned obsolete worktrees/branches, and logged one deferred
-progress-pill consistency issue.
+Stage 0 established the reviewer lifecycle regression harness on
+`codex/reviewer-lifecycle-stage0`. Codex orchestrated separate receipt-harness,
+race/UI, and writer-inventory builders and a fresh-context review. This branch
+contains tests, an offline census script, and evidence/handoff documentation;
+no application runtime behavior, schema, deployment, email, or external records
+were changed.
 
 ### What Was Completed
 
-1. **Reviewer closeout and honorarium eligibility reached Production**
-   - [VERIFIED via source, focused tests, production build, and Ready Production
-     deployment] The lead PD or a superuser can close a received review and
-     answer **Should an honorarium be paid?** with Yes or No. No requires a
-     reason; notes remain optional otherwise.
-   - The ETag-bound write records Complete, the immutable first-completion
-     timestamp, notes, and the mapped eligibility disposition on the reviewer
-     suggestion row. A later eligibility correction does not restamp completion.
-   - Staff upload and partial/no-file receipt paths now atomically write Review
-     Received, so the closeout action is available after either receipt path.
-   - The application still does not write
-     `wmkf_authorizationtoremitpaymentflag`; Operations/Finance retains final
-     payment authority. Publishing the existing Ops view in akoyaGO is separate.
-   - Runtime/UI commits through `5e101861` reached Ready Production deployment
-     `dpl_2uJJQxY9TN4KcfHJGLRS2dW1QVge`.
+1. **Composed receipt and concurrency baseline**
+   - [VERIFIED via focused and full Jest] Six variants across four receipt
+     producer families execute real services/adapters/HTTP serialization,
+     reviewer DTOs and closeout, with explicit external dependency boundaries.
+   - Same-row ETags, parent/child rollback, competing submissions, receipt versus
+     withdrawal/release, request binding, immutable first completion, unknown
+     persisted values, and post-completion document/thank-you behavior are
+     covered. The fake has independent integrity tests and observes unsupported
+     requests even if a service catches their errors.
+   - F1 is refuted for current successful receipt writes: the status payload fix
+     already landed in `b318ede0`. Legacy receipt-plus-old-status rows remain a
+     separate characterization; no backfill is authorized.
 
-2. **Reviewer tracking UI was simplified**
-   - [VERIFIED via local browser inspection, 56 focused tests, and production
-     build] The compact table now combines status and link as Progress, removes
-     the wide Notes and Last Action columns, aligns follow-up controls, and
-     exposes Close out review directly for received reviews.
+2. **Current defects are reproducible without changing production semantics**
+   - [VERIFIED via real-service/real-adapter race tests] F2 stale-invite overwrite,
+     F3 closed-row generic response rewrite, F4 receipt regression/lost reminder
+     increment, and F5 partial batch/UI failure handling remain present.
+   - Existing terminal/412 protection, no transport resend, and first/middle/last
+     batch failure complements are also asserted. UI tests cover pending success
+     and failure across request switches and unmounts.
+   - Every known-defect test is named explicitly and remains green until the
+     corresponding deliberate semantic fix replaces its expectation.
 
-3. **Reviewer lifecycle refactor investigation was preserved**
-   - `docs/audits/REVIEWER_LIFECYCLE_REFACTOR_REPORT_2026-09-04.md` is tracked on
-     `main` at commit `b6aa318e`.
-   - The report is a proposed staged plan pinned to baseline `097b7f17`, not a
-     current-source implementation checklist. Its F1 receipt-status defect is
-     already partly superseded by `b318ede0`; every other finding must also be
-     relocated and reconfirmed before editing.
-
-4. **Obsolete worktrees and their branches were cleaned**
-   - [VERIFIED via `git worktree list`] Only the primary checkout remains.
-   - Five obsolete worktrees, five local branches, and four remote branches were
-     removed after ancestry and dirtiness checks.
-   - The detached historical branch `codex/reviewer-closeout-eligibility` still
-     exists locally and has diverged from `main` (10 branch-only and 14
-     main-only commits as of this handoff). Do not merge or delete it wholesale;
-     its relevant closeout implementation already landed through newer commits.
-
-5. **Deferred visual issue was logged**
-   - Commit `de79e413` records that Progress pills have inconsistent shapes and
-     alignment and that their vertical chronology reverses between active and
-     received rows. This is intentionally parked behind lifecycle correctness.
+3. **Test isolation and caller inventory**
+   - [VERIFIED via 23 focused tests] Reviewers-service explicitly mocks synthesis
+     job state and separately proves unavailable-state fallback/logging, with
+     SQL/fetch no-call assertions. F6's concrete isolation gap is fixed.
+   - [VERIFIED via census and source reads] 55 imported suggestion writer-export
+     call sites are separated from 99 reader/pure calls, plus distinct descriptor,
+     adapter-internal, raw script, token, reset/merge and administrative paths.
+     The read-only script scans 1,282 tracked source/script files on this branch;
+     173 recognized calls, zero recognized unresolved computed aliases and zero
+     parse errors. Its file-local/static limitations are explicit.
+   - Full-suite verification exposed a pre-existing Awardees Layout mock lacking
+     PageHeader. A separate minimal test-only repair preserves its five assertions.
 
 ### Commits
 
-- `2631c914` — Build reviewer closeout eligibility workflow
-- `75b8ffab` — Record reviewer closeout implementation
-- `601ddd3a` — Move reviewer notes into closeout
-- `097b7f17` — Simplify reviewer honorarium decision
-- `b318ede0` — Align staff receipt lifecycle with closeout
-- `b6aa318e` — Preserve reviewer lifecycle refactor investigation
-- `5e101861` — Refine reviewer follow-up table layout
-- `de79e413` — Log reviewer progress pill consistency issue
+- `ffc932b7` — Keep session start gate list current (startup maintenance)
+- `79434493` — Fix Awardees test fixture for PageHeader
+- `b2da65ac` — Establish reviewer lifecycle contract and race baseline
 
-## Primary Objective
+### Verification
 
-Begin addressing the issues in
-`docs/audits/REVIEWER_LIFECYCLE_REFACTOR_REPORT_2026-09-04.md` without treating
-its stale baseline or line numbers as current truth.
+- Full Jest: **770 suites / 9,834 tests passed**, no failures or skips.
+- All **61** check/self-test commands passed sequentially.
+- `npm run build -- --webpack` passed with existing build warnings; migration
+  manifest unchanged. Changed-file lint and diff checks passed.
+- Fresh review `/root/stage0_fresh_review`: **PASS**, no required corrections,
+  against `b2da65ac`; independently ran 119 changed/new and 188 retained tests.
+  The complete review is in the Stage 0 review document.
+- Full-suite legacy missing-connection-string diagnostics remain in other
+  intake/acceptance/coalescing tests; the Stage 0 suites enforce isolated
+  boundaries. A green full test suite is not proof of live Dataverse behavior.
+- No live/production probes or release were performed. The document-filing test
+  simulates the mandatory production-classified preflight entirely inside an
+  intercepted in-memory transport and restores its environment afterward.
 
-### Required First Slice: Stage 0 Only
+## Next Items
 
-1. Run `/start`, then `/contract-reconcile` in implementation mode.
-2. Create a fresh Tier 2 feature branch from current `main`; do not work on the
-   old divergent closeout branch and do not push runtime changes directly to
-   `main`.
-3. Relocate and confirm/refute F1–F6 against current source using CodeGraph first
-   and caller/consumer reads after it. Record F1 as already partly fixed, then
-   prove the complete producer → DTO → closeout path rather than assuming the
-   patch closed the contract.
-4. Implement the report's Stage 0 regression harness only:
-   - a stateful reviewer-engagement transport fake with row ETags, atomic batch
-     behavior, and controlled race pause points;
-   - composed contract and race tests beneath the real services/adapters;
-   - explicit synthesis-job mocking in `reviewers-service.test.js`, plus a
-     separate test for the unavailable dependency path;
-   - an alias-aware inventory of lifecycle writers and their intended command,
-     receipt-pointer, email-claim, projection, or administrative role.
-5. Keep Stage 0 green. Known-defect characterization may document existing
-   behavior, but semantic production fixes belong in separately reviewed Stage
-   1 commits.
-6. After Stage 0 passes, proceed only to independent, currently verified fixes:
-   Stage 1A (conditional stale-invite expiry), Stage 1B (version-safe post-send
-   bookkeeping), and Stage 1E (honest UI mutation failure handling), one
-   substage and fresh-context review at a time.
+### Verified Open
 
-### Owner Decisions Still Needed Before Their Substages
+1. **Stage 1A — conditional stale-invite expiry.**
+   Evidence: `lib/services/reviewer-suggestion-sweep.js:93` and the F2 race tests.
+   Re-read eligibility and write against that same suggestion version; handle
+   changed/missing versions and 412 without blind overwrite. A suggestion ETag
+   does not protect the parent Request's meeting date.
+2. **Stage 1B — version-safe post-send bookkeeping.**
+   Evidence: `lib/services/review-manager/send-emails-service.js:918` and F4 race
+   tests. Preserve delivery outcomes; re-evaluate bookkeeping on the version
+   written. Never resend email as a bookkeeping retry.
+3. **Stage 1E — honest UI mutation failure handling.**
+   Evidence: `shared/components/reviewers/ReviewerManagePanel.js:1788` and the
+   new status-mutation characterization suite. Fix HTTP/payload failure reporting
+   independently of later UI extraction and broader async state changes.
 
-- **Stage 1C:** confirm the intended semantics for partial/no-file receipt.
-  Current source advances it to Review Received, but the full four-producer
-  composed contract still needs proof; no historical backfill is authorized.
-- **Stage 1D:** define exactly which historical staff corrections remain allowed
-  on closed reviewer engagements.
-- **Stage 6A:** approve the additive successful/failed/unattempted batch outcome
-  response before changing the existing sequential-error contract.
+Execute only the selected authorized substage, replace its known-defect tests
+with desired regression assertions, keep it green, and obtain a new-context
+review before advancing. No file moves or generic command extraction yet.
 
-## Contract Guardrails
+### Owner Decision Needed
 
-- Preserve current routes, public DTOs, authentication, DAL context, and the
-  Dataverse/Postgres ownership split during Stage 0 and in-place fixes.
-- Do not combine semantic fixes with file moves.
-- Keep receipt, document-pointer, thank-you claim, withdrawal/release,
-  acceptance-job, reminder-claim, and invitation bookkeeping as distinct
-  operations. A single arbitrary lifecycle patch command is not the goal.
-- Preserve If-Match/version decisions through the actual write. A suggestion
-  ETag does not lock its parent Request row.
-- Do not resend an email to repair bookkeeping after a post-send conflict.
-- No schema migration, backfill, destructive data operation, production cron
-  invocation, or deployment is authorized by this handoff.
-- Run a new-context review after every numbered stage and semantic substage as
-  required by the audit. Do not substitute a paid or metered review product.
+- **Stage 1C semantics:** all current receipt families are now proven to write
+  Review Received and support closeout. Do not redo the old payload correction.
+  Any change to the meaning of partial/no-file receipt needs the owner's decision;
+  historical row backfill remains unauthorized.
+- **Stage 1D:** define allowed historical response corrections on closed
+  engagements before changing the generic staff correction contract.
+- **Stage 6A:** approve successful/failed/unattempted identifiers before revising
+  the existing sequential-error batch response.
+- Parent Request ownership changing during multi-record work remains an explicit
+  authority-policy question; Stage 0 adds no cross-record authorization lock.
 
-## Verify Before Acting
+### Parked
 
-1. The audit's evidence baseline is `097b7f17`; current `main` is newer. Relocate
-   symbols and rerun tests before repeating any finding as current fact.
-2. F1's cited payload mismatch changed in `b318ede0`; prove all four receipt
-   producer families through the real DTO and closeout service.
-3. `codex/reviewer-closeout-eligibility` is a divergent historical branch, not
-   the next-session workspace.
-4. Reviewers-service currently swallows synthesis-job read failure in its DTO
-   path. Stage 0 must isolate that dependency without merely hiding its error.
-5. Gate and self-test commands run sequentially. Read current
-   `docs/CI_GATES_REFERENCE.md` and `package.json` before choosing the exact set.
+Per the prior handoff, not re-probed as deployment claims this session:
+progress-pill alignment/chronology (`de79e413`), surfacing the Ops eligibility
+view, automatic review reminders, and one-click PDF conversion. The reminder
+scheduler hold is independently verified by its passing gate.
 
-## Parked
+### Verify Before Acting
 
-- Progress-pill shape/alignment and chronology, recorded in `de79e413`.
-- Publishing the reviewer eligibility view in akoyaGO; the app writer is live.
-- Automatic review-due reminder scheduling; the cron hold remains in force.
-- One-click PDF conversion of canonical review DOCX files.
+- Start from this branch and inspect its current HEAD/upstream; do not use the
+  divergent historical closeout branch as a workspace.
+- The original refactor audit is pinned to `097b7f17`; current implementation
+  evidence lives in the Stage 0 receipt and writer inventory. Reopen source
+  rather than using the original line numbers as current truth.
+- Review unknown dirty changes before editing. Gate/self-test batteries remain
+  serial. Census is an inventory, not a new enforcement gate.
+- No migration, backfill, destructive cleanup, production cron invocation,
+  merge to main, or deployment is authorized by this handoff.
 
-## Do Not Reopen Without a New Decision
+### Do Not Reopen Without a New Decision
 
-- Automatically marking a reviewer Complete from a thank-you path.
-- Writing `wmkf_authorizationtoremitpaymentflag` from this application.
-- BILL API reviewer onboarding.
+Automatic Complete from thank-you; writing the Operations/Finance final remit
+flag from this application; BILL API reviewer onboarding.
 
 ## Key Files
 
-| File | Purpose |
-| --- | --- |
-| `docs/audits/REVIEWER_LIFECYCLE_REFACTOR_REPORT_2026-09-04.md` | Baseline findings, staged plan, invariants, and review protocol. |
-| `docs/REVIEWER_COMPLETION_AND_HONORARIUM_DECISION_BRIEF.md` | Approved closeout/payment-authority contract. |
-| `lib/dataverse/adapters/reviewer-suggestion.js` | Current lifecycle reads/writes and conditional transport boundary. |
-| `lib/services/review-receipt-guard.js` | Shared receipt eligibility and same-row-version contract. |
-| `lib/services/reviewer-suggestion-sweep.js` | Stale-invitation expiry path (F2 / Stage 1A). |
-| `lib/services/review-manager/send-emails-service.js` | Post-send lifecycle bookkeeping (F4 / Stage 1B). |
-| `lib/services/reviewer-finder/my-candidates-service.js` | Generic staff correction path (F3 / Stage 1D). |
-| `lib/services/review-manager/reviewers-service.js` | Reviewer DTO and synthesis-job dependency (F1/F6). |
-| `shared/components/reviewers/ReviewerManagePanel.js` | Reviewer actions and UI mutation handling (F5 / Stage 1E). |
-| `lib/services/review-upload.js` | File receipt producer. |
-| `lib/services/review-manager/mark-received-no-file-service.js` | Partial/no-file receipt producer. |
-
-## Stage 0 Verification Baseline
-
-Confirm current script names before running. The report requires the existing
-focused suites first, followed by the new composed tests, relevant gates and
-self-tests sequentially, and a production build. At minimum preserve coverage
-for closeout service/route/modal, reviewers service, all four receipt producers,
-stale-invite sweep, email bookkeeping, terminal transitions, token flows,
-activity-history reset parity, and request-switch/unmount UI behavior.
+| Path | Purpose |
+|---|---|
+| `docs/audits/REVIEWER_LIFECYCLE_STAGE0_RECEIPT_2026-09-04.md` | Current evidence, baseline/final verification and fresh review. |
+| `docs/audits/REVIEWER_LIFECYCLE_WRITER_INVENTORY_2026-09-04.md` | Alias-aware writer/read matrix and bounded census reproduction. |
+| `docs/audits/REVIEWER_LIFECYCLE_REFACTOR_REPORT_2026-09-04.md` | Historical findings and staged plan; never a current-source checklist. |
+| `tests/helpers/reviewer-engagement-transport.js` | Stateful HTTP fake beneath real transport/service code. |
+| `tests/integration/reviewer-engagement-contract.test.js` | Receipt/DTO/closeout, atomic races and postreceipt contracts. |
+| `tests/integration/reviewer-engagement-races.test.js` | Current F2–F5 and protected complements. |
+| `tests/unit/reviewer-status-mutation-characterization.test.js` | Rendered UI failure/stale-callback baseline. |
+| `scripts/inventory-reviewer-lifecycle-writers.js` | Read-only static census; no application imports or live calls. |
 
 ## Release Boundary
 
-`main` is clean and synchronized with `origin/main` at `de79e413` at handoff.
-Reviewer closeout and the compact tracking UI are Production-live. The next
-session begins a separate Tier 2 refactor branch; implementation, review,
-promotion, and Production verification remain distinct decisions.
+This work remains on `codex/reviewer-lifecycle-stage0`; review, promotion and
+production verification are separate decisions. No DEVELOPMENT_LOG milestone
+entry is needed because no production capability or runtime architecture shipped.
+The claim-evidence pilot metadata report was unavailable because local state
+could not be read; no unsupported zero-advisory observation was recorded.
