@@ -99,16 +99,42 @@ function ReviewerGroup({ proposal, previewReadOnly, onRefresh }) {
               There are no accepted reviewers to track yet. Open the full reviewer panel to find or invite reviewers.
             </p>
           ) : (
-            <ReviewerManagePanel
-              proposal={proposal}
-              reviewers={reviewers}
-              onRefresh={onRefresh}
-              settings={{ reviewDueDate: proposal.reviewDeadline }}
-              mode="track"
-              canManage={canManage}
-              showReviewReminderAction={canManage || previewReadOnly}
-              previewReadOnly={previewReadOnly}
-            />
+            <div className="reviewer-activity-panel">
+              <ReviewerManagePanel
+                proposal={proposal}
+                reviewers={reviewers}
+                onRefresh={onRefresh}
+                settings={{ reviewDueDate: proposal.reviewDeadline }}
+                mode="track"
+                canManage={canManage}
+                showReviewReminderAction={canManage || previewReadOnly}
+                previewReadOnly={previewReadOnly}
+              />
+              <style jsx global>{`
+                .reviewer-activity-panel td span.rounded {
+                  border-radius: 9999px;
+                }
+                .reviewer-activity-panel table thead th:last-child::after {
+                  content: ' · More';
+                  color: #9ca3af;
+                  font-weight: 500;
+                  text-transform: none;
+                  letter-spacing: normal;
+                }
+                .reviewer-activity-panel button[aria-label^='Manage '] {
+                  min-width: 2.25rem;
+                  min-height: 2.25rem;
+                  border: 1px solid #d1d5db;
+                  border-radius: 0.5rem;
+                  color: #374151;
+                  background: #ffffff;
+                }
+                .reviewer-activity-panel button[aria-label^='Manage ']:hover {
+                  color: #111827;
+                  background: #f3f4f6;
+                }
+              `}</style>
+            </div>
           )}
         </div>
       )}
