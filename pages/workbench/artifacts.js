@@ -1,8 +1,8 @@
 /**
- * Initial Assessment pilot locator — cycle-wide governed artifact visibility.
+ * Initial Assessment cycle locator — cycle-wide governed artifact visibility.
  *
- * This is the approved draft-functional discovery slice, not the complete
- * Editor Dashboard contract (filters, preview, versions, Reviewed progress).
+ * This is the narrow cycle-wide discovery slice; the next-cycle workflow may
+ * grow it with staff progress and document context as those contracts settle.
  */
 
 import { useEffect, useRef, useState } from 'react';
@@ -49,6 +49,9 @@ function ArtifactDashboard() {
 
   useEffect(() => {
     if (!cycleCode) return;
+    if (cycleCode === 'D26') {
+      return;
+    }
     const sequence = ++requestSequence.current;
     (async () => {
       try {
@@ -72,10 +75,10 @@ function ArtifactDashboard() {
   }, [cycleCode]);
 
   return (
-    <Layout title="Initial Assessment Pilot Locator">
+    <Layout title="Initial assessments">
       <PageHeader
-        title="Initial Assessment Pilot Locator"
-        subtitle="Pilot cycle list for finding governed drafts and opening their canonical SharePoint files."
+        title="Initial assessments"
+        subtitle="Find governed Initial Assessments and open their canonical SharePoint files."
         icon="📝"
       />
       <WorkbenchViewsNav activeKey="initial-assessments" cycleCode={cycleCode} />
@@ -102,7 +105,12 @@ function ArtifactDashboard() {
           {error}
         </div>
       )}
-      {loading ? (
+      {cycleCode === 'D26' ? (
+        <Card hover={false}>
+          <p className="font-medium text-gray-900">Initial assessments are not part of the D26 dual-phase workflow.</p>
+          <p className="mt-1 text-sm text-gray-500">This workspace becomes available for J27, where every complete single-submission proposal receives an Initial Assessment before advancement.</p>
+        </Card>
+      ) : loading ? (
         <Card hover={false}><p className="text-gray-500">Loading artifacts…</p></Card>
       ) : artifacts.length === 0 ? (
         <Card hover={false}><p className="text-gray-500">No Initial Assessments for this cycle.</p></Card>
