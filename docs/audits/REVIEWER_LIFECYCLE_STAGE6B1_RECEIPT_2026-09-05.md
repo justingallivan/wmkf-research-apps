@@ -17,6 +17,8 @@ related:
 Branch: `codex/reviewer-lifecycle-stage6b`. Base: `71ff2321` (main, clean).
 Runtime is frozen at `9258115a`; the review-driven test-only correction is `06725d6c`, the slice's final commit. Orchestrated by Claude (Fable) with a
 Sonnet builder owning `ReviewerManagePanel.js` and an Opus fresh-context reviewer.
+Reviewer context: native Claude Code subagent, model Opus, label "Independent review of
+Stage 6B1", 2026-09-05, reviewing frozen `9258115a` and then `06725d6c`.
 
 ## Surface and preimplementation invariants (contract-reconcile Mode B)
 
@@ -42,7 +44,38 @@ Prior findings verified: the 6B plan's 6B1 gap list (plan review §"Independent 
 | Status mutex, 6A outcome parsing, pending tokens, materials selection untouched | updateStatus region unchanged | existing characterization suite green; diff excludes :1831–1958 |
 | Route payloads and success predicates unchanged; no server file in diff | routes read-only | git diff --stat shows only panel + new test |
 
-Lifecycle/provenance trace: see orchestrator trace (scratchpad `6b1-trace.md`, folded into this receipt below).
+### Lifecycle and provenance trace (orchestrator, pre-build)
+
+Line citations in this subsection refer to the `71ff2321` baseline panel (identical
+to `d614de5c` for this file); the handlers moved roughly sixty lines lower in the diff.
+
+### Axis 1 — lifecycle of stateful things
+
+statusContextRef (ReviewerManagePanel.js:1652) {mounted, epoch, requestId, mode, canManage, previewReadOnly, reviewers Map, onRefresh}
+- Arrives: mount layout effect :1655-1666 sets mounted=true. Committed-props layout effect :1669-1687 runs every render: epoch += 1 only when requestId/mode/canManage/previewReadOnly change; reviewers Map rebuilt from filtered `reviewers`; onRefresh replaced with the latest prop.
+- Transitions out: unmount cleanup :1660-1664 sets mounted=false, epoch+=1, and marks every status operation invalid. There is no reset of epoch downward; monotonic by design (A→B→A yields a new epoch, so a return never revives). StrictMode double-invoke: mount→cleanup→mount increments epoch once before any attempt exists — harmless.
+- Stale-on-identity: object/callback churn does NOT bump epoch (deliberate); row absence is detected via `context.reviewers.has(id)` in the loop :1683-1686 which marks *status* operations invalid. 6B1 attempts are NOT in that loop at baseline — so row absent→return would be missed for 6B1 unless the new registry is added to that loop. This is the reason the builder must extend both effects.
+
+statusOperationsRef (:1651) Map<suggestionId, operation>: set at :1847 before first await; deleted in finally :1944-1946 only if token matches; invalidated (valid=false) by both layout effects. Must remain untouched.
+
+pendingStatusTokens state (:1653): set :1848; cleared in finally :1949-1956 only when mounted and token matches. Untouched by 6B1.
+
+6B1 handlers at baseline hold NO state. Provenance hazards:
+- `onRefresh` closed over from the click-time render (:1762,:1781,:1824,:1983) — not the latest committed callback. Same-context churn will call the OLD callback.
+- `transitionTerminal` reads live `proposal.proposalId` at :1973 — captured at dispatch time (confirm is synchronous, so render-time), fine at baseline, but must be moved to captured requestId so the payload provably matches the click-time request.
+- No checkpoint after any await: fetch (:1745,:1770,:1810,:1969), json (:1750,:1775,:1815,:1978), clipboard (:1757), onRefresh — all continue into alert/prompt/refresh regardless of context.
+- A sync throw from onRefresh at :1762/:1781/:1824/:1983 falls into the outer catch and alerts "Network error…" — a confirmed mutation mislabeled as failure.
+
+Planned registry (actionAttemptsRef) lifecycle the builder must prove: entry created before first await (arrives); out via (a) own finally deletes only if token matches, (b) valid=false from both layout effects on epoch mismatch / row absence / unmount, (c) superseded when a newer attempt of same action+row takes the generation. Entries must be removed on settle even when invalid (no leak); an older finally must not remove a newer entry (token check). No component state is written for 6B1, so unmount-setState is not a risk unless the builder adds state — it must not.
+
+### Axis 2 — provenance & value-semantics of cross-layer contracts (routes reopened, unchanged)
+
+regenerate-token (pages/api/review-manager/regenerate-token.js): POST {suggestionId}. Success 200 {ok:true,url,expiresAt,jti} from service :52. Failures: 405/400/404/409/500 all {ok:false, reason} (service :53-54, route :38,:48,:53,:70) except ServiceHttpError path :67 which may return `{error}` without `ok` — client predicate `resp.ok && data.ok` correctly treats missing ok as failure; `data.reason || resp.status` degrades to status. mintAndStore runs before the URL is returned (:88) → a URL returned to a stale client means a NEW token already exists server-side; the client must simply not show/copy it (no rollback, no re-mint).
+revoke-token: POST {suggestionId}. 200 {ok:true} :85; 404 {ok:false,reason:'not_found'} :59; 400/405/500 {ok:false,reason}. Client `resp.ok && data.ok`. Note revoke also deletes review drafts :80 — a completed revoke whose feedback is suppressed still deleted drafts; correct, nothing to undo.
+my-candidates DELETE (handleDelete :157): body {suggestionId}. Success 200 with service result body (client ignores body, uses resp.ok only). Failures {error[,details]} via ServiceHttpError body or 400/500. Client reads JSON only on failure: `data.error || data.message || data.details || resp.status`. Removal revokes any live token first, then soft-deletes (:931-934 in my-candidates-service).
+terminal-transition: POST {requestId, suggestionIds:[id], terminalStatus}. Service returns {ok:true, transitioned, results:[{suggestionId,status,...}]} :155; route returns 200 if transitioned>0 else 409 :62. 400s return {error}. Client predicate `response.ok && data.transitioned === 1`; failure reason `data.results?.[0]?.status || data.error || response.status`. Value semantics: 409 + results[0].status in {not_found, wrong_request, <rejected>, changed_skipped, write_failed, read_failed} — 'write_failed' may have partially committed (postcommit effects :95-153 differ between withdrew/released); client must never replay. 200 + transitioned===1 is the only confirmed success.
+
+Checked whether any 200 response can carry a failure the client would mis-read as success: regenerate/revoke 200 always {ok:true}; terminal 200 requires transitioned>0 and the client further requires ===1 for its single ID; remove 200 = success by contract. None found.
 
 ## Implemented contract
 [VERIFIED via `git show 9258115a`] Only `shared/components/reviewers/ReviewerManagePanel.js`
@@ -88,7 +121,9 @@ of the planned order; the orchestrator records this rather than restating it as 
 
 - Baseline UI selection at `71ff2321` before edits: 8 suites / 528 tests passed.
 - New `reviewer-action-lifetimes.test.js` against unchanged runtime: 236 of 288
-  cases failed; the 52 current-context success/failure cases passed, as expected.
+  cases failed at an earlier test revision; the 52 current-context success/failure
+  cases passed, as expected. On the committed file the reviewer measured 244 of 296
+  failing against the baseline panel, and 316 of 366 after the review corrections.
 - Deliberate guard removals in a disposable copy, each restored and diffed empty:
   1. Builder reported: combined epoch+requestId binding in `isAttemptCurrent`
      removed → 136 assertion failures. **Refuted by the independent reviewer**
@@ -204,3 +239,4 @@ expressed for 6B2 or 6B3.**
 - A regenerate URL returned to a stale context corresponds to a token already minted server-side; the client suppresses display only. No rollback exists.
 - Terminal 409 `write_failed` may have partially committed; no replay is added.
 - No browser/live probe, deployment or human UAT ran for this slice.
+- Nothing from this slice is merged to `main` or deployed. Promotion follows the release strategy as a separate, deliberate action.
