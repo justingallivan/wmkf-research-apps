@@ -249,6 +249,14 @@ describe('ReviewerCloseoutModal lifetime', () => {
 
   describe.each(['fetch', 'json', 'reject'])('deferred %s', (stage) => {
     test.each(lifetimeContexts)('%s leaves a departed attempt silent and releases the lock', async (change) => {
+      // Owner decision: committed permission loss (canManage false or
+      // previewReadOnly true) closes the dialog outright via the latest
+      // onClose, synchronously on the rerender that loses permission — a
+      // distinct contract from every other row here, where the session
+      // change only invalidates in-flight feedback/callbacks and the modal
+      // stays open and editable.
+      const isPermissionLossContext = change === 'canManage false and back'
+        || change === 'previewReadOnly true and back';
       const staged = stagedFetch(stage);
       const onSaved = jest.fn();
       const onClose = jest.fn();
@@ -276,6 +284,8 @@ describe('ReviewerCloseoutModal lifetime', () => {
         rerender(<ReviewerCloseoutModal {...props} requestId="R2" />);
       } else if (change === 'canManage false and back') {
         rerender(<ReviewerCloseoutModal {...props} canManage={false} />);
+        // Permission was already committed lost and the dialog closed
+        // (asserted below); regaining it here must not call onClose again.
         rerender(<ReviewerCloseoutModal {...props} canManage />);
       } else if (change === 'previewReadOnly true and back') {
         rerender(<ReviewerCloseoutModal {...props} previewReadOnly />);
@@ -283,6 +293,11 @@ describe('ReviewerCloseoutModal lifetime', () => {
       } else {
         rerender(<ReviewerCloseoutModal {...props} isOpen={false} />);
         rerender(<ReviewerCloseoutModal {...props} isOpen />);
+      }
+
+      if (isPermissionLossContext) {
+        // Synchronous: the rerender that lost permission already closed it.
+        expect(onClose).toHaveBeenCalledTimes(1);
       }
 
       await act(async () => {
@@ -293,7 +308,12 @@ describe('ReviewerCloseoutModal lifetime', () => {
 
       expect(screen.queryByRole('alert')).not.toBeInTheDocument();
       expect(onSaved).not.toHaveBeenCalled();
-      expect(onClose).not.toHaveBeenCalled();
+      if (isPermissionLossContext) {
+        // The stale save's settle adds nothing beyond the one close call.
+        expect(onClose).toHaveBeenCalledTimes(1);
+      } else {
+        expect(onClose).not.toHaveBeenCalled();
+      }
 
       if (change === 'unmount') return;
 
@@ -345,20 +365,83 @@ describe('ReviewerCloseoutModal lifetime', () => {
     expect(screen.getByRole('radio', { name: 'No' })).toBeChecked();
   });
 
-  test('a management/read-only permission flip does not erase typed notes (ADVISORY-3)', () => {
+  test('a management/read-only permission flip closes via the latest onClose without erasing typed notes (ADVISORY-3)', () => {
+    const onCloseBefore = jest.fn();
+    const onCloseAfter = jest.fn();
     const { rerender } = render(
-      <ReviewerCloseoutModal isOpen reviewer={{ ...REVIEWER }} canManage onClose={jest.fn()} />,
+      <ReviewerCloseoutModal isOpen reviewer={{ ...REVIEWER }} canManage onClose={onCloseBefore} />,
     );
     fireEvent.change(screen.getByRole('textbox', { name: /Closeout notes/ }), {
       target: { value: 'A draft in progress' },
     });
     fireEvent.click(screen.getByRole('radio', { name: 'No' }));
-    // The permission flip still invalidates in-flight feedback (it bumps the
-    // epoch), but it must not reinitialize the form the way a reviewer/
-    // request/open-close identity change does.
-    rerender(<ReviewerCloseoutModal isOpen reviewer={{ ...REVIEWER }} canManage={false} onClose={jest.fn()} />);
+    // Owner decision: committed permission loss closes the dialog outright
+    // via the parent's LATEST onClose, but the form itself is not
+    // reinitialized by the flip (that stays the parent's job when it opens
+    // a genuinely new session) — so typed notes/disposition survive even
+    // though this component instance is about to be torn down.
+    rerender(<ReviewerCloseoutModal isOpen reviewer={{ ...REVIEWER }} canManage={false} onClose={onCloseAfter} />);
+    expect(onCloseAfter).toHaveBeenCalledTimes(1);
+    expect(onCloseBefore).not.toHaveBeenCalled();
     expect(screen.getByRole('textbox', { name: /Closeout notes/ })).toHaveValue('A draft in progress');
     expect(screen.getByRole('radio', { name: 'No' })).toBeChecked();
+  });
+
+  test.each(['canManage', 'previewReadOnly'])('%s permission loss closes the dialog exactly once synchronously; a pending save then settles silently', async (field) => {
+    const onSaved = jest.fn();
+    const onClose = jest.fn();
+    let resolveFetch;
+    global.fetch = jest.fn(() => new Promise((resolve) => { resolveFetch = resolve; }));
+    const lostProp = field === 'canManage' ? { canManage: false } : { previewReadOnly: true };
+
+    const { rerender } = render(
+      <ReviewerCloseoutModal isOpen reviewer={OPTOUT_REVIEWER} onSaved={onSaved} onClose={onClose} canManage previewReadOnly={false} />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Complete closeout' }));
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <ReviewerCloseoutModal
+        isOpen
+        reviewer={OPTOUT_REVIEWER}
+        onSaved={onSaved}
+        onClose={onClose}
+        canManage
+        previewReadOnly={false}
+        {...lostProp}
+      />,
+    );
+    // Synchronous: called on the rerender itself, before any settle.
+    expect(onClose).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveFetch({ ok: true, json: async () => ({ success: true }) });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(onSaved).not.toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  test.each(['canManage', 'previewReadOnly'])('%s: away-and-back calls onClose once per loss, never on regain', (field) => {
+    const onClose = jest.fn();
+    function permProps(lost) {
+      return field === 'canManage' ? { canManage: !lost } : { previewReadOnly: lost };
+    }
+    const { rerender } = render(
+      <ReviewerCloseoutModal isOpen reviewer={OPTOUT_REVIEWER} onClose={onClose} canManage previewReadOnly={false} {...permProps(false)} />,
+    );
+
+    rerender(<ReviewerCloseoutModal isOpen reviewer={OPTOUT_REVIEWER} onClose={onClose} canManage previewReadOnly={false} {...permProps(true)} />);
+    expect(onClose).toHaveBeenCalledTimes(1);
+
+    rerender(<ReviewerCloseoutModal isOpen reviewer={OPTOUT_REVIEWER} onClose={onClose} canManage previewReadOnly={false} {...permProps(false)} />);
+    expect(onClose).toHaveBeenCalledTimes(1);
+
+    rerender(<ReviewerCloseoutModal isOpen reviewer={OPTOUT_REVIEWER} onClose={onClose} canManage previewReadOnly={false} {...permProps(true)} />);
+    expect(onClose).toHaveBeenCalledTimes(2);
   });
 
   test('onSaved sync throw still closes the modal once, no error copy, one request', async () => {
@@ -486,7 +569,7 @@ describe('closeout lifetime wiring through the panel (D4)', () => {
     });
   }
 
-  test('flipping canManage during a pending closeout save does not refresh or close the stale modal', async () => {
+  test('flipping canManage during a pending closeout save closes the dialog immediately; the stale save adds nothing', async () => {
     let resolveCloseout;
     global.fetch = mockPanelFetch(() => new Promise((resolve) => { resolveCloseout = resolve; }));
     const onRefresh = jest.fn();
@@ -512,6 +595,10 @@ describe('closeout lifetime wiring through the panel (D4)', () => {
       />,
     );
 
+    // Owner decision: committed permission loss closes the dialog outright,
+    // synchronously on the rerender, before the pending save settles.
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
     await act(async () => {
       resolveCloseout({ ok: true, json: async () => ({ success: true }) });
       await Promise.resolve();
@@ -520,10 +607,10 @@ describe('closeout lifetime wiring through the panel (D4)', () => {
 
     expect(onRefresh).not.toHaveBeenCalled();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
-  test('flipping previewReadOnly during a pending closeout save does not refresh or close the stale modal', async () => {
+  test('flipping previewReadOnly during a pending closeout save closes the dialog immediately; the stale save adds nothing', async () => {
     let resolveCloseout;
     global.fetch = mockPanelFetch(() => new Promise((resolve) => { resolveCloseout = resolve; }));
     const onRefresh = jest.fn();
@@ -550,6 +637,10 @@ describe('closeout lifetime wiring through the panel (D4)', () => {
       />,
     );
 
+    // Owner decision: committed permission loss closes the dialog outright,
+    // synchronously on the rerender, before the pending save settles.
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
     await act(async () => {
       resolveCloseout({ ok: true, json: async () => ({ success: true }) });
       await Promise.resolve();
@@ -558,7 +649,7 @@ describe('closeout lifetime wiring through the panel (D4)', () => {
 
     expect(onRefresh).not.toHaveBeenCalled();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
   test('switching proposal.proposalId during a pending closeout save does not refresh or close the stale modal', async () => {

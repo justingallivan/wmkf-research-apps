@@ -71,6 +71,7 @@ export default function ReviewerCloseoutModal({
     onSaved,
     onClose,
     epoch: 0,
+    closedForPermission: false,
   });
 
   useLayoutEffect(() => {
@@ -96,10 +97,25 @@ export default function ReviewerCloseoutModal({
   // it bumps the epoch without resetting the form. Same-row refresh (same
   // suggestionId, new object, new callbacks) is ordinary refresh either
   // way: it updates the latest callbacks here without touching
-  // disposition/notes/error. This intentionally has no dependency array
-  // (session identity is a multi-field comparison, not a single prop) and
-  // conditionally calls setState, so react-hooks/exhaustive-deps cannot
-  // infer a correct dependency list here.
+  // disposition/notes/error.
+  //
+  // Committed permission loss is not a new form session either — it closes
+  // the dialog outright via the parent's LATEST onClose. A save already in
+  // flight when permission is lost still settles silently: the epoch bump
+  // above invalidates its onSaved/onClose checkpoints, and its finally
+  // releases the lock by generation match alone, so it never touches this
+  // (now unmounted, from the parent's perspective) dialog; the server
+  // outcome is reflected on the next roster load instead. `closedForPermission`
+  // tracks whether the CURRENT loss has already been acted on, so this fires
+  // exactly once per loss transition (and once on first commit if the modal
+  // is mounted already without permission), never on every commit while
+  // permission stays lost, and never loops when a test's onClose mock
+  // doesn't unmount the modal.
+  //
+  // This intentionally has no dependency array (session identity is a
+  // multi-field comparison, not a single prop) and conditionally calls
+  // setState/onClose, so react-hooks/exhaustive-deps cannot infer a correct
+  // dependency list here.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useLayoutEffect(() => {
     const context = contextRef.current;
@@ -126,6 +142,14 @@ export default function ReviewerCloseoutModal({
     context.previewReadOnly = previewReadOnly;
     context.onSaved = onSaved;
     context.onClose = onClose;
+
+    const permissionLost = !canManage || previewReadOnly;
+    if (isOpen && reviewer && permissionLost && !context.closedForPermission) {
+      context.closedForPermission = true;
+      if (context.onClose) context.onClose();
+    } else if (!permissionLost) {
+      context.closedForPermission = false;
+    }
   });
 
   if (!isOpen || !reviewer) return null;
