@@ -238,17 +238,20 @@ describe.each([false, true])('Stage 6B1 action lifetimes (StrictMode: %s)', (str
         expect(def.fetchMock()).not.toHaveBeenCalled();
       });
 
-      test('confirm returning true after context was invalidated inside the mock never dispatches a request', async () => {
+      test.each([
+        { name: 'the row becomes absent', patch: () => ({ reviewers: [] }) },
+        { name: 'management permission is revoked', patch: () => ({ canManage: false }) },
+        { name: 'preview read-only is enabled', patch: () => ({ previewReadOnly: true }) },
+      ])('confirm returning true after $name inside the mock never dispatches a request', async ({ patch }) => {
         const view = renderPanel();
-        // Leave the row genuinely absent (not restored) when confirm() returns,
-        // so beginAttempt's currentness gate — checked at that exact moment —
-        // must see it gone and refuse to dispatch.
+        // beginAttempt's currentness gate — checked at the exact moment
+        // confirm() returns — must see the change and refuse to dispatch.
         window.confirm.mockImplementation(() => {
           // window.confirm blocks synchronously in a real browser; force an
           // immediate commit here (bypassing React's automatic event-handler
           // batching) so the invalidated context is actually in place by the
           // time confirm() returns and beginAttempt reads it.
-          flushSync(() => { view.update({ reviewers: [] }); });
+          flushSync(() => { view.update(patch()); });
           return true;
         });
         def.trigger();
@@ -340,6 +343,24 @@ describe.each([false, true])('Stage 6B1 action lifetimes (StrictMode: %s)', (str
       expect(alerts.some(m => def.refreshFailAlertRe.test(m))).toBe(true);
       expect(alerts.some(m => def.networkAlertRe.test(m))).toBe(false);
       expect(alerts.some(m => def.failureAlertRe.test(m))).toBe(false);
+    });
+
+    test.each(contextChanges)('onRefresh rejection after %s produces no further alert at all, not even the refresh-failure alert', async (change) => {
+      def.fetchMock().mockResolvedValue(def.successResponse());
+      const refreshJob = deferred();
+      const onRefresh = jest.fn(() => refreshJob.promise);
+      const view = renderPanel({ onRefresh });
+      def.trigger();
+      await act(async () => {});
+      expect(onRefresh).toHaveBeenCalledTimes(1);
+      // Clear any feedback that legitimately fired while still current (e.g.
+      // regenerate's "Link copied" alert, which precedes the awaited
+      // refresh) — only feedback appearing AFTER invalidation is under test.
+      window.alert.mockClear();
+      invalidate(view, change);
+      await act(async () => refreshJob.reject(new Error('late refresh failure')));
+      expect(window.alert).not.toHaveBeenCalled();
+      expect(def.fetchMock()).toHaveBeenCalledTimes(1);
     });
 
     test('onRefresh void return follows the normal success path with no extra alert', async () => {
@@ -502,17 +523,49 @@ describe.each([false, true])('Stage 6B1 action lifetimes (StrictMode: %s)', (str
       expect(onRefresh.mock.calls).toEqual([[]]);
     });
 
-    test('payload requestId is the request captured at click time, not a later live proposal prop', async () => {
+    test('payload requestId is the request captured at click time; a post-dispatch request switch suppresses the refresh even on a success reply', async () => {
+      const job = deferred();
+      terminalFetch.mockReturnValue(job.promise);
+      const onRefresh = jest.fn();
+      const view = renderPanel({ onRefresh });
+      withdraw();
+      const sentBody = JSON.parse(terminalFetch.mock.calls[0][1].body);
+      expect(sentBody.requestId).toBe(proposal.proposalId);
+      // Switching the request after dispatch must not alter the in-flight
+      // payload (already sent) and must suppress feedback for the now-stale
+      // attempt even though the reply reports success.
+      view.update({ proposal: { ...proposal, proposalId: 'a-different-request' } });
+      await act(async () => job.resolve(response({ transitioned: 1 })));
+      expect(sentBody.requestId).toBe(proposal.proposalId);
+      expect(onRefresh).not.toHaveBeenCalled();
+    });
+
+    test('payload requestId reflects the committed context at beginAttempt time, not the outer closure\'s proposal prop frozen at click time', async () => {
+      // A real confirm() dialog blocks synchronously, so in production the
+      // request cannot switch while it is open. This forces exactly that,
+      // via the same flushSync technique used for the permission-gate tests
+      // above, to distinguish `attempt.requestId` (captured from the ref
+      // AFTER confirm() returns, i.e. current) from `proposal.proposalId`
+      // (the outer async function's argument, frozen at the moment this
+      // specific transitionTerminal call started executing, i.e. BEFORE
+      // confirm() was even invoked).
       const job = deferred();
       terminalFetch.mockReturnValue(job.promise);
       const view = renderPanel();
+      window.confirm.mockImplementation(() => {
+        flushSync(() => {
+          view.update({
+            proposal: { ...proposal, proposalId: 'switched-while-confirm-was-open' },
+            reviewers: [{ ...reviewer }],
+          });
+        });
+        return true;
+      });
       withdraw();
-      expect(JSON.parse(terminalFetch.mock.calls[0][1].body).requestId).toBe(proposal.proposalId);
-      // Switching the request after dispatch must not alter the in-flight
-      // payload and must suppress feedback for the now-invalid attempt.
-      view.update({ proposal: { ...proposal, proposalId: 'a-different-request' } });
+      expect(terminalFetch).toHaveBeenCalledTimes(1);
+      const sentBody = JSON.parse(terminalFetch.mock.calls[0][1].body);
+      expect(sentBody.requestId).toBe('switched-while-confirm-was-open');
       await act(async () => job.resolve(response({ transitioned: 1 })));
-      expect(window.alert).not.toHaveBeenCalled();
     });
 
     test('HTTP failure with a write_failed result reports it without replay', async () => {
