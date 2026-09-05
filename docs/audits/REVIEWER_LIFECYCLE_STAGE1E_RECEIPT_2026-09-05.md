@@ -118,4 +118,8 @@ reorganization remain separate.
 No live writes, emails, cron invocation, schema operation, public push, main
 merge or deployment is part of this stage. Stage 1E is complete locally; the
 subsequently completed Stage 6A has its separate receipt and frozen review at
-`5b9964c8`.
+`5b9964c8`. The subsequent owner-approved production release merged PR 149 as
+`c19a16d8` and reached READY with a passing staff read-smoke; see
+[the release receipt](REVIEWER_LIFECYCLE_RELEASE_2026-09-05.md) for final CI,
+deployment evidence and accepted limits. This later release does not expand
+the frozen Stage 1E verification scope.

@@ -182,7 +182,8 @@ system view exists but remains to be surfaced in AkoyaGO as a separate follow-up
 `docs/REVIEWER_COMPLETION_AND_HONORARIUM_DECISION_BRIEF.md`.
 
 **Generic invitation/response corrections (Stage 1D):** **[VERIFIED in source
-at `c51fa34d`, 2026-09-05; full-stage source validation passed; deployment pending]**
+at `c51fa34d`, 2026-09-05; shipped in Production at `c19a16d8` per the
+[release receipt](../../audits/REVIEWER_LIFECYCLE_RELEASE_2026-09-05.md)]**
 `PATCH /api/reviewer-finder/my-candidates` protects `invited`, `accepted`,
 `declined`, `emailSentAt`, `responseType`, and `responseReceivedAt` even when
 no review status is supplied. After lead-PD/superuser authorization, the route
@@ -206,7 +207,8 @@ operations. This protection does not turn the generic correction into a
 withdrawal command or extend its field set.
 
 **Generic recorded-status updates (Stages 1E/6A):** **[VERIFIED in local
-source at `5b9964c8` on 2026-09-05; deployment pending]**
+source at `5b9964c8` on 2026-09-05; shipped in Production at `c19a16d8` per the
+[release receipt](../../audits/REVIEWER_LIFECYCLE_RELEASE_2026-09-05.md)]**
 `PATCH /api/review-manager/reviewers` authorizes every target for the lead PD
 or superuser before calling `reviewers-service.patchReviewers` →
 `reviewer-suggestion.updateLifecycle`. Nonempty batches trim/lowercase and
@@ -584,7 +586,8 @@ timestamp must not be treated as proof that a reviewer responded.
 current source-built closeout contract requires an existing received-review
 timestamp; `updateLifecycle` never fabricates one when setting Complete
 **[VERIFIED via `lib/dataverse/adapters/reviewer-suggestion.js:1906-1926` at
-`c51fa34d`; deployment pending]**. Historical rows can retain equal receipt and
+`c51fa34d`; shipped in Production at `c19a16d8` per the
+[release receipt](../../audits/REVIEWER_LIFECYCLE_RELEASE_2026-09-05.md)]**. Historical rows can retain equal receipt and
 completion timestamps from the older closeout behavior. The drawer retains
 `isSyntheticReceipt` as a legacy-data display heuristic: it returns true when
 both timestamps parse and are equal, and `reviewReceiptEvidence` labels that
@@ -1402,7 +1405,8 @@ returned zero eligible/enqueued/claimed/failed.** Plan doc:
   and lists who was sent/failed/skipped; a terminal error no longer shows green success. Re-sendable
   templates keep their prior `failed[]` send semantics. Materials/followup/thankyou retain the
   post-loop best-effort bookkeeping. **[VERIFIED in source at `c51fa34d`;
-  Stage 1B source-built, deployment pending]** each bookkeeping attempt freshly
+  Stage 1B shipped in Production at `c19a16d8` per the
+  [release receipt](../../audits/REVIEWER_LIFECYCLE_RELEASE_2026-09-05.md)]** each bookkeeping attempt freshly
   verifies the Request/reviewer bindings and exact ETag. Materials/followup
   refuse closed/unknown/completed source state; manual thank-you records only
   the courtesy timestamp, including after closeout, and never changes status,

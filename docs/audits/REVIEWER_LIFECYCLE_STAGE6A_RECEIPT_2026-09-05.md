@@ -137,7 +137,10 @@ Artifacts: `/tmp/reviewer-stage6a-gates.json` and
 `/tmp/reviewer-stage6a-final-doc-gates.json`. Stage 6A is complete locally.
 Public branch publication was subsequently approved and completed on 2026-09-05;
 see [the release receipt](REVIEWER_LIFECYCLE_RELEASE_2026-09-05.md).
-Production promotion remains pending.
+The separately owner-approved production release subsequently merged PR 149
+as `c19a16d8`; its production deployment is READY and the staff read-smoke
+passed. The release receipt records final CI and the accepted absence of
+separate human UAT/rollback drill; the frozen Stage 6A evidence remains scoped below.
 
 ## Audit and operational limits
 
@@ -154,7 +157,7 @@ filled; authority remains source and the current approved decisions.
 
 Six claim groups are VERIFIED: all-batch authorization, canonical sequential
 batch partitions, preserved error hygiene, real consumer identity validation, guarded
-feedback/cleanup, and local completion with deployment pending. Independent
+feedback/cleanup, and local completion before the later release. Independent
 mutations and persisted-row counterexamples supply the disconfirming checks.
 Repeated scoped searches found zero remaining live stale claims in this bounded
 contract domain. The 59-command battery and final 11 documentation checks cover
@@ -162,7 +165,7 @@ the relevant registered constraints; they do not certify unrelated prose or live
 external state. Supporting read/patch/search evidence is retained in
 `/tmp/reviewer-stage1e6a-doc-sweep.md` and
 `/tmp/reviewer-stage6a-durable-report.md`. Verdict: **RECONCILED** for these local
-source/status claims; deployment is pending and excluded from this verification.
+source/status claims; the later deployment is excluded from this frozen verification.
 
 Whole flow is traced through the actual row action, route, ownership helper,
 service, adapter/HTTP write, response, guarded UI and host callbacks. Partial

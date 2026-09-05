@@ -29,9 +29,12 @@ implementation or historical-row repair remains for the approved Stage 1C policy
 
 The separate Stage 1D/1E/6A implementation is tracked in
 [the approved decisions](REVIEWER_LIFECYCLE_APPROVED_DECISIONS_2026-09-04.md).
-Public branch publication was approved and completed on 2026-09-05; production
-promotion and its validation remain separate. Current release status is tracked
-in [the release receipt](REVIEWER_LIFECYCLE_RELEASE_2026-09-05.md).
+Public publication and the separately owner-approved production release
+completed on 2026-09-05: PR 149 merged as `c19a16d8`, its production deployment
+is READY and the staff read-smoke passed. Exact release evidence and the accepted
+absence of separate human UAT/rollback drill are tracked in
+[the release receipt](REVIEWER_LIFECYCLE_RELEASE_2026-09-05.md); the frozen
+independent review below does not certify those later operations.
 
 The parent applied sweep Mode A to policy authority and the receipt meaning.
 Authoritative inputs were the owner's three approvals, the source paths and

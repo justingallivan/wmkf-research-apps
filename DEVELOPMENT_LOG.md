@@ -10,6 +10,20 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## September 2026 — Reviewer lifecycle safeguards reached Production (Session 484)
+
+**Milestone:** Conditional invitation expiry, post-send bookkeeping safeguards,
+closed-history protection and honest recorded-status outcomes shipped together.
+**Sessions:** 483–484 (implementation completion, publication, rehearsal and release).
+**Ship state:** PR #149 merged as `c19a16d8`; Production deployment
+`dpl_6tVnMbnSMtqwtss15bEdSzBz4ELj` reached READY on 2026-09-05 at 17:40:20.139 UTC.
+Final CI passed 770 suites / 10,850 tests and 25 browser cases; signed-in
+Workbench/Track Reviewers reads passed. No live lifecycle write or send was tested.
+**Why it matters:** Staff see confirmed versus unconfirmed status outcomes while
+late expiry/bookkeeping work and generic corrections preserve reviewer history.
+**Pointers:** [release and accepted verification limits](docs/audits/REVIEWER_LIFECYCLE_RELEASE_2026-09-05.md);
+[approved contracts](docs/audits/REVIEWER_LIFECYCLE_APPROVED_DECISIONS_2026-09-04.md).
+
 ## September 2026 — Reviewer closeout eligibility reached Production (Session 479)
 
 **Milestone:** Lead PDs can close a received review and record whether its linked

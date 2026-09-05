@@ -15,7 +15,8 @@ Owner: Codex orchestrator with separate contract investigation, service/unit-tes
 build, and composed-race build agents. The invariants below were recorded before
 source changes. Implementation is frozen at
 `087523643d27d0896efb16f374920417bde515b4`; focused/full tests, gates, build and
-independent review passed. No production release is claimed.
+independent review passed. This frozen implementation receipt excludes release
+verification; the subsequent production release is recorded under Current status below.
 
 ## Contract-reconcile scope and invariants
 
@@ -211,8 +212,8 @@ gate/self-test commands passed sequentially; exact results are recorded in
 stale implementation-status claims in the nine-document scope. Historical
 review-time markers remain inside frozen review boundaries. Verdict:
 **RECONCILED** for Stage 1B source/test status only; publication and production
-are separately stated below. No DEVELOPMENT_LOG milestone is
-required because no production capability or architecture shipped. The
+are separately stated below. No DEVELOPMENT_LOG milestone was required for
+that local implementation stage; the subsequent production release has its own entry. The
 claim-evidence pilot report was unavailable; no observation row was invented.
 
 ## Publication history and current release status
@@ -230,15 +231,17 @@ stage's fix, tests and handoff needs explicit owner approval before retrying;
 all source, tests, review and local handoff work is complete. No merge to main
 or production promotion was performed.
 
-### Current status — public publication approved (2026-09-05)
+### Current status — production release complete (2026-09-05)
 
 The owner explicitly approved release/publication after being told the configured
 GitHub repository is public. [VERIFIED via orchestrator push, upstream setup and
 matching `ls-remote`] This Stage 1B source and handoff were first published within
 `origin/codex/reviewer-lifecycle-approved-policies` at `d76b3bb5`.
-`origin/main` was `90053d11` at that check; no main merge or production deployment was
-performed. The historical publication block above is resolved. Release rehearsal
-and CI precede a deliberate production-merge decision; human rehearsal and
-production completion are not claimed. See
-[the release receipt](REVIEWER_LIFECYCLE_RELEASE_2026-09-05.md) for the exact PR,
-preview and deployment evidence.
+`origin/main` was `90053d11` at that first-publication check. The historical
+publication block above is resolved. The owner later explicitly approved
+deployment without separate human UAT or a live rollback drill. [VERIFIED via
+GitHub/Vercel metadata and authenticated browser reads] PR 149 merged as
+`c19a16d8`; deployment `dpl_6tVnMbnSMtqwtss15bEdSzBz4ELj` is READY Production
+and the staff read-smoke passed. No live lifecycle write/send test or rollback
+execution is claimed. See [the release receipt](REVIEWER_LIFECYCLE_RELEASE_2026-09-05.md)
+for final CI, deployment evidence and accepted limits.

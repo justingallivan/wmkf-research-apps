@@ -119,4 +119,7 @@ remaining live stale claims** in this domain. No unknown behavior is promoted
 to a live-state claim. Verdict: **RECONCILED** for this bounded documentation
 follow-up. Public branch publication was subsequently approved and completed on
 2026-09-05; see [the release receipt](REVIEWER_LIFECYCLE_RELEASE_2026-09-05.md).
-Main merge and production promotion remain pending.
+The later separately owner-approved release merged PR 149 as `c19a16d8` and
+reached READY Production with a passing staff read-smoke. The release receipt
+records final CI and accepted verification limits; this comment/doc follow-up
+does not certify those later operations or a live lifecycle write/send test.

@@ -163,5 +163,7 @@ completed at `bab3adea`/`77720b5a` and `5b9964c8`; their separate receipts and
 the approved decisions carry the later evidence. This receipt preserves the
 Stage 1D validation boundary. Public branch publication was approved and
 completed on 2026-09-05; see [the release receipt](REVIEWER_LIFECYCLE_RELEASE_2026-09-05.md).
-Production promotion remains pending; no main merge or production promotion
-occurred.
+The separately owner-approved production release subsequently merged PR 149
+as `c19a16d8`; its production deployment is READY and the staff read-smoke
+passed. The release receipt records final CI and the accepted absence of
+separate human UAT/rollback drill; these do not alter the frozen Stage 1D evidence.

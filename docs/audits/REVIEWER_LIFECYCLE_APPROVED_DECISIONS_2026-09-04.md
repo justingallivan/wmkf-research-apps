@@ -43,16 +43,18 @@ reviewed. Stage 6A's exact response/consumer contract was reviewed before edits.
 All approved local work is complete. Mechanical Stages 2–5 and wider 6B/6C
 work remain deferred; no general action framework or file moves were included.
 
-No live Dataverse lifecycle mutation, email, cron, schema operation, historical repair, main merge
-or production promotion is included. On 2026-09-05, after being told the configured
-repository is public, the owner explicitly approved release/publication,
-resolving the earlier automatic-review publication block. [VERIFIED via
-orchestrator push, upstream setup and matching `ls-remote`] The approved branch
-was first published at `d76b3bb5` on `origin/codex/reviewer-lifecycle-approved-policies`;
-`origin/main` was `90053d11` at that check. Release rehearsal and CI precede a deliberate
-production-merge decision; neither human rehearsal nor production
-completion is claimed. See [the release receipt](REVIEWER_LIFECYCLE_RELEASE_2026-09-05.md)
-for the exact PR, preview and deployment evidence.
+The local implementation scope included no live lifecycle mutation, email,
+cron, schema operation or historical repair. On 2026-09-05 the owner explicitly
+approved public publication, resolving the earlier automatic-review block;
+the first published branch revision was `d76b3bb5` while main was `90053d11`.
+The owner subsequently approved deployment without separate human UAT or a
+live rollback drill, with campaign timing permitting. [VERIFIED via GitHub/Vercel
+metadata and authenticated browser reads] PR 149 merged as `c19a16d8` and
+deployment `dpl_6tVnMbnSMtqwtss15bEdSzBz4ELj` reached READY Production; the
+staff Workbench/Track Reviewers read-smoke passed. Human UAT, live lifecycle
+write/send testing and rollback execution are not claimed. See
+[the release receipt](REVIEWER_LIFECYCLE_RELEASE_2026-09-05.md) for exact final
+CI, source/deployment evidence and accepted verification limits.
 
 ## Contract-reconcile invariants before implementation
 
@@ -87,7 +89,8 @@ resubmission locking; no executable receipt code changed.
 [VERIFIED via source, tests, build, gates and independent review] Stage 1D is
 complete at frozen `c51fa34d`: full 770 suites / 10,291 tests, 59 distinct
 sequential gate/self-tests, webpack build, and independent PASS (591 tests/probes
-and eight detected mutations). Deployment remains separate and pending.
+and eight detected mutations). Its subsequent production release is recorded
+in the release receipt above; that deployment does not expand the frozen test scope.
 Its contract is:
 
 - Protect defined invitation/response inputs (`invited`, `accepted`, `declined`,

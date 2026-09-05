@@ -1,11 +1,12 @@
-# Session 484 Prompt: Rehearse Published Reviewer Lifecycle Changes
+# Session 485 Prompt: Continue After Reviewer Lifecycle Production Release
 
-## Session 483 Summary
+## Sessions 483–484 Summary
 
 Codex orchestrated the owner-approved receipt, closed-history and batch-outcome
 work on `codex/reviewer-lifecycle-approved-policies`. Native subagents handled
 investigation, builds, composed regressions, full validation and independent
-reviews. All approved pre-push implementation is complete locally.
+reviews. Session 484 published, rehearsed and released the approved work to
+Production after the owner's explicit deployment decision.
 
 ### What Was Completed
 
@@ -82,35 +83,40 @@ scanner's 21 advisory findings remain documented in the Stage 1B handoff.
 
 ## Next Items
 
-### Release Rehearsal and Production Decision
+### Production Release Complete
 
-**Public publication is approved and the branch push succeeded.** On 2026-09-05,
-the owner explicitly approved release/publication after being told the configured
-GitHub repository is public. That approval resolved the earlier Stage 1B push
-block. Production promotion remains subject to the Tier 2 release checks and
-explicit disposition of any missing rehearsal evidence.
+[VERIFIED via GitHub merge metadata, Vercel inspection and fresh browser reads]
+[PR 149](https://github.com/justingallivan/wmkf-research-apps/pull/149) merged to
+`main` as `c19a16d8687a25226f3accb4059634acb92db073` on 2026-09-05 at
+17:39:40 UTC. Its tree exactly matches tested head `7a27d4b1`.
+Production deployment `dpl_6tVnMbnSMtqwtss15bEdSzBz4ELj` reached READY at
+17:40:20.139 UTC with all seven expected aliases attached. The authenticated
+Workbench list and an existing request's Track Reviewers view passed a read-only
+smoke. The bounded deployment log scan returned no error/warning/fatal/HTTP 5xx
+rows; this is an observation window, not proof of every lifecycle action.
 
-[VERIFIED via orchestrator push, upstream setup and matching `ls-remote`]
-The first publication was `d76b3bb5`; `origin/main` was `90053d11` at the
-pre-release check. Review head-specific CI on
-[PR 149](https://github.com/justingallivan/wmkf-research-apps/pull/149) before
-deliberate production promotion. Human rehearsal and production completion
-are not claimed. The
+The owner explicitly approved deployment without separate human UAT or a live
+rollback drill, on the stated assumption that campaign timing permits; no
+independent calendar verification was performed. Neither UAT nor the rollback
+drill was performed. The rollback reference remains `dpl_CxBa3Hc8niE6hLcryMMjhYfz54GL`
+at `90053d11`; rollback was not executed. The
 [release receipt](docs/audits/REVIEWER_LIFECYCLE_RELEASE_2026-09-05.md) records
-the exact PR, preview and deployment evidence as it becomes available.
+the approval, exact source/deployment association and verification limits.
 
 [VERIFIED via isolated browser run and independent test review] Release rehearsal
 passed **31/31 Chromium cases** (25 existing plus six targeted status scenarios),
 with no external requests or sends. The initial CI's two browser failures were
 stale staff ownership fixtures; `4576f559` corrects the synthetic session/PD
 identity, known GET mocks and existing materials wording. Independent review,
-lint and syntax checks passed; runtime source is unchanged. Initial GitHub Jest
-CI passed 770 suites / 10,850 tests, build and gates. Use PR 149 for the final
-published revision's CI, including the corrected browser cases.
+lint and syntax checks passed; runtime source is unchanged. Final GitHub CI at
+`7a27d4b1` passed all eight reported checks, including 770 suites / 10,850 tests,
+build, lint, 38 registered check steps and all 25 stock browser cases. Its
+automatic Claude workflow supplied no inspectable review verdict and is not
+counted as another independent PASS.
 
 ### Completed / Deferred
 
-Approved Stages 1C, 1D, 1E and 6A are implemented, verified and published; no unresolved policy choice
+Approved Stages 1C, 1D, 1E and 6A are implemented, verified and deployed; no unresolved policy choice
 or required implementation correction remains. Mechanical Stages 2–5 and wider
 6B/6C work remain deferred; no shared action framework or file moves were built.
 
@@ -138,10 +144,11 @@ one-click PDF conversion. The reminder hold remains protected by its gate.
   warning results are not resend instructions. No durable repair queue exists.
   Inline invitation post-delivery stamping and legacy generate-email markAsSent
   retain their separate boundaries.
-- No live Dataverse lifecycle mutation, Graph/email send, cron invocation,
-  migration, backfill, main merge or
-  production deployment was performed. Verify branch/HEAD/dirty state before further work;
-  retain the deliberate feature-branch release process.
+- The release smoke performed no lifecycle mutation, Graph/email send, cron
+  invocation, migration or backfill. Production reads do not prove live write,
+  delivery or concurrency behavior. The checkout was synced to `main` at the
+  release merge; verify branch/HEAD/dirty state before further work and retain
+  the deliberate feature-branch release process for future runtime changes.
 
 ### Do Not Reopen Without a New Decision
 
@@ -151,7 +158,7 @@ flag from this application; BILL API reviewer onboarding.
 ## Key Files
 
 - `docs/audits/REVIEWER_LIFECYCLE_RELEASE_2026-09-05.md`: public publication,
-  PR/CI/preview evidence and remaining production-release boundary.
+  PR/CI/preview evidence, completed production release and accepted evidence limits.
 - `docs/audits/REVIEWER_LIFECYCLE_APPROVED_DECISIONS_2026-09-04.md`: settled
   policy, implemented contracts and scope limits.
 - `docs/audits/REVIEWER_LIFECYCLE_CLAUDE_INDEPENDENT_REVIEW_2026-09-05.md`:
@@ -171,9 +178,10 @@ flag from this application; BILL API reviewer onboarding.
 
 ## Handoff
 
-Keep session evidence on `codex/reviewer-lifecycle-approved-policies` with its
-source. No DEVELOPMENT_LOG milestone entry is required: no production capability,
-cutover or new architecture shipped. The claim-evidence pilot command remained
-unavailable because local state could not be read; no observation row was
-invented. The published branch now proceeds through release rehearsal and CI;
-main merge and production promotion remain deliberate owner decisions.
+The approved lifecycle milestone is shipped; there is no remaining release
+approval or implementation blocker. `DEVELOPMENT_LOG.md` records the Session 484
+production milestone. Preserve the frozen stage reviews and release receipt.
+The earlier claim-evidence pilot command remained unavailable because local
+state could not be read; no observation row was invented. Continue only the next
+owner-selected work; deferred refactor stages and parked product items remain
+outside this completed release.
