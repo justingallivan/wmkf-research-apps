@@ -1,3 +1,27 @@
 {
-  "buildPath": "code"
+  "buildPath": "code",
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "overused-font",
+        "value": "arial",
+        "files": [
+          "lib/services/review-manager/send-emails-service.js"
+        ],
+        "createdAt": "2026-09-05T03:27:10.961Z",
+        "reason": "Agent: these five existing transactional-email declarations use Arial system-font fallbacks inside presentation tables with Outlook mso padding. Stage 1B leaves the email HTML unchanged; web-interface font novelty is not an appropriate requirement for this email renderer."
+      },
+      {
+        "rule": "design-system-font",
+        "value": "arial",
+        "files": [
+          "lib/services/review-manager/send-emails-service.js"
+        ],
+        "createdAt": "2026-09-05T03:27:43.816Z",
+        "reason": "Agent: DESIGN.md defines the browser interface typography. This unchanged transactional-email renderer deliberately uses Arial system-font fallbacks in presentation tables with Outlook mso padding; the browser font declaration is not its styling contract."
+      }
+    ]
+  }
 }

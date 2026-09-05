@@ -207,6 +207,8 @@ describe('GET', () => {
 
 describe('PATCH', () => {
   test('happy path (per-suggestion lifecycle edit): envelope pinned exactly', async () => {
+    authorizeReviewerRequestMutation.mockResolvedValueOnce({ requestIds: [REQUEST_ID], isSuperuser: false });
+    suggestionAdapter.findById.mockResolvedValueOnce({ _wmkf_request_value: REQUEST_ID, wmkf_reviewstatus: null, _etag: 'W/"route-happy-1"' });
     const req = {
       method: 'PATCH',
       query: {},
@@ -222,7 +224,7 @@ describe('PATCH', () => {
       updated: { suggestionId: SUGGESTION_ID, invited: true },
     });
     expect(suggestionAdapter.updateLifecycle).toHaveBeenCalledWith(
-      SUGGESTION_ID, { invited: true }, { actingUserSystemId: 'u-1' },
+      SUGGESTION_ID, { invited: true }, { actingUserSystemId: 'u-1', ifMatch: 'W/"route-happy-1"' },
     );
     expect(authorizeReviewerRequestMutation).toHaveBeenCalledWith({
       profileId: undefined,
@@ -479,5 +481,66 @@ describe('GET mode: removal-preflight', () => {
 
     expect(res.statusCode).toBe(400);
     expect(describeRemoval).not.toHaveBeenCalled();
+  });
+});
+
+describe('Stage 1D request authorization binding and conflict envelopes', () => {
+  const OTHER_REQUEST = '44444444-4444-4444-4444-444444444444';
+  beforeEach(() => {
+    authorizeReviewerRequestMutation.mockReset().mockResolvedValue({ requestIds: [REQUEST_ID], isSuperuser: false });
+    suggestionAdapter.findById.mockReset().mockResolvedValue({
+      _wmkf_request_value: REQUEST_ID, wmkf_reviewstatus: null,
+      wmkf_completedat: null, _etag: 'W/"route-1"',
+    });
+    suggestionAdapter.updateLifecycle.mockReset().mockResolvedValue(undefined);
+  });
+  test('uses server-derived binding and ignores a spoofed body binding', async () => {
+    const res = mockRes();
+    await handler({ method: 'PATCH', query: {}, body: {
+      suggestionId: SUGGESTION_ID, invited: true, authorizedRequestId: OTHER_REQUEST,
+    } }, res);
+    expect(res.statusCode).toBe(200);
+    expect(suggestionAdapter.updateLifecycle).toHaveBeenCalledWith(SUGGESTION_ID, { invited: true }, { actingUserSystemId: 'u-1', ifMatch: 'W/"route-1"' });
+  });
+  test('a body binding cannot authorize a suggestion reparented after the ownership check', async () => {
+    suggestionAdapter.findById.mockResolvedValue({ _wmkf_request_value: OTHER_REQUEST, wmkf_reviewstatus: null, _etag: 'W/"moved"' });
+    const res = mockRes();
+    await handler({ method: 'PATCH', query: {}, body: {
+      suggestionId: SUGGESTION_ID, invited: true, authorizedRequestId: OTHER_REQUEST,
+    } }, res);
+    expect(res.statusCode).toBe(409);
+    expect(res.body).toMatchObject({ code: 'correction_request_changed' });
+    expect(suggestionAdapter.updateLifecycle).not.toHaveBeenCalled();
+  });
+  test('authorization denial precedes the service lifecycle read and write', async () => {
+    const { ServiceHttpError } = require('../../lib/services/service-http-error');
+    authorizeReviewerRequestMutation.mockRejectedValueOnce(new ServiceHttpError('Forbidden', { httpStatus: 403 }));
+    const res = mockRes();
+    await handler({ method: 'PATCH', query: {}, body: { suggestionId: SUGGESTION_ID, invited: true } }, res);
+    expect(res.statusCode).toBe(403);
+    expect(suggestionAdapter.findById).not.toHaveBeenCalled();
+    expect(suggestionAdapter.updateLifecycle).not.toHaveBeenCalled();
+  });
+  test.each([
+    [{ wmkf_reviewstatus: 100000004 }, 'correction_closed'],
+    [{ wmkf_reviewstatus: undefined }, 'correction_state_unavailable'],
+    [{ _etag: '*' }, 'correction_version_unavailable'],
+  ])('returns service source/version failure as HTTP 409: %j', async (overrides, code) => {
+    suggestionAdapter.findById.mockResolvedValue({
+      _wmkf_request_value: REQUEST_ID, wmkf_reviewstatus: null, _etag: 'W/"route-1"', ...overrides,
+    });
+    const res = mockRes();
+    await handler({ method: 'PATCH', query: {}, body: { suggestionId: SUGGESTION_ID, accepted: true } }, res);
+    expect(res.statusCode).toBe(409);
+    expect(res.body).toMatchObject({ code });
+    expect(suggestionAdapter.updateLifecycle).not.toHaveBeenCalled();
+  });
+  test('maps rejected conditional write to HTTP 409 without retry', async () => {
+    suggestionAdapter.updateLifecycle.mockRejectedValueOnce(Object.assign(new Error('Precondition failed'), { status: 412 }));
+    const res = mockRes();
+    await handler({ method: 'PATCH', query: {}, body: { suggestionId: SUGGESTION_ID, invited: true } }, res);
+    expect(res.statusCode).toBe(409);
+    expect(res.body).toMatchObject({ code: 'correction_conflict' });
+    expect(suggestionAdapter.updateLifecycle).toHaveBeenCalledTimes(1);
   });
 });

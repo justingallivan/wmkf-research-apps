@@ -1197,3 +1197,109 @@ describe('closed engagements survive the other write paths', () => {
   });
 
 });
+
+describe('Stage 1D updateLifecycle invitation/response defense', () => {
+  const fields = [
+    ['invited', true], ['invited', false], ['invited', null],
+    ['accepted', true], ['accepted', false], ['accepted', null],
+    ['declined', true], ['declined', false], ['declined', null],
+    ['emailSentAt', '2026-09-04T12:00:00Z'], ['emailSentAt', null],
+    ['responseType', 'declined'], ['responseType', null],
+    ['responseReceivedAt', '2026-09-04T12:00:00Z'], ['responseReceivedAt', null],
+  ];
+  const open = (overrides = {}) => ({
+    wmkf_reviewstatus: null, wmkf_applicantdisposition: null,
+    wmkf_completedat: null, _etag: 'W/"guard-2"', ...overrides,
+  });
+  describe.each(['complete', 'withdrew', 'released'])('closed source %s', (status) => {
+    test.each(fields)('refuses defined %s=%s even with an explicit caller version', async (field, value) => {
+      DynamicsService.getRecord.mockResolvedValue(open({ wmkf_reviewstatus: REVIEW_STATUS_MAP[status] }));
+      await expect(updateLifecycle(SUGGESTION_ID, { [field]: value }, { ifMatch: 'W/"caller-1"' }))
+        .rejects.toMatchObject({ status: 409, code: 'correction_closed' });
+      expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
+    });
+  });
+  test.each([undefined, '', '100000000', false, 123])('rejects unknown/missing source %s for protected fields', async (status) => {
+    DynamicsService.getRecord.mockResolvedValue(open({ wmkf_reviewstatus: status }));
+    await expect(updateLifecycle(SUGGESTION_ID, { responseReceivedAt: null }))
+      .rejects.toMatchObject({ status: 409, code: 'correction_state_unavailable' });
+    expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
+  });
+  test('completion marker prevents rewrites despite open status', async () => {
+    DynamicsService.getRecord.mockResolvedValue(open({ wmkf_completedat: '2026-09-04T12:00:00Z' }));
+    await expect(updateLifecycle(SUGGESTION_ID, { invited: false }))
+      .rejects.toMatchObject({ status: 409, code: 'correction_closed' });
+    expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
+  });
+  test.each([undefined, null, '', '*', 'unquoted', ' W/"2"', 'W/""', 123])('refuses missing/malformed guard ETag %s when caller omitted it', async (_etag) => {
+    DynamicsService.getRecord.mockResolvedValue(open({ _etag }));
+    await expect(updateLifecycle(SUGGESTION_ID, { invited: true }))
+      .rejects.toMatchObject({ status: 409, code: 'correction_version_unavailable' });
+    expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
+  });
+  test.each([null, '', '*', 'unquoted', ' W/"1"', 'W/""', 123])('never replaces malformed caller ETag %s with the valid guard version', async (ifMatch) => {
+    DynamicsService.getRecord.mockResolvedValue(open());
+    await expect(updateLifecycle(SUGGESTION_ID, { accepted: true }, { ifMatch }))
+      .rejects.toMatchObject({ status: 409, code: 'correction_version_unavailable' });
+    expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
+  });
+  test.each([null, ...['accepted', 'materials_sent', 'under_review', 'review_received'].map((key) => REVIEW_STATUS_MAP[key])])('open source %s uses the guard version when caller omitted it', async (status) => {
+    DynamicsService.getRecord.mockResolvedValue(open({ wmkf_reviewstatus: status, wmkf_reviewreceivedat: '2026-09-03T12:00:00Z' }));
+    await updateLifecycle(SUGGESTION_ID, { invited: false, emailSentAt: null, responseType: null }, { actingUserSystemId: PR_ID });
+    expect(DynamicsService.updateRecord).toHaveBeenCalledWith('wmkf_appreviewersuggestions', SUGGESTION_ID,
+      { wmkf_invited: false, wmkf_emailsentat: null, wmkf_responsetype: null },
+      { actingUserSystemId: PR_ID, ifMatch: 'W/"guard-2"' });
+  });
+  test.each(['W/"caller-1"', '"strong-1"'])('preserves exact caller version %s instead of a newer read', async (ifMatch) => {
+    DynamicsService.getRecord.mockResolvedValue(open());
+    await updateLifecycle(SUGGESTION_ID, { accepted: true }, { ifMatch });
+    expect(DynamicsService.updateRecord.mock.calls[0][3].ifMatch).toBe(ifMatch);
+  });
+  test('does not retry or suppress transport conflicts', async () => {
+    DynamicsService.getRecord.mockResolvedValue(open());
+    const error = Object.assign(new Error('precondition failed'), { status: 412 });
+    DynamicsService.updateRecord.mockRejectedValue(error);
+    await expect(updateLifecycle(SUGGESTION_ID, { accepted: true }, { ifMatch: 'W/"caller-1"' })).rejects.toBe(error);
+    expect(DynamicsService.updateRecord).toHaveBeenCalledTimes(1);
+    expect(DynamicsService.getRecord).toHaveBeenCalledTimes(1);
+  });
+  test('valid invitation and pending withdrawal command payloads retain their mappings', async () => {
+    DynamicsService.getRecord.mockResolvedValue(open());
+    await updateLifecycle(SUGGESTION_ID, { invited: true, emailSentAt: '2026-09-04T12:00:00Z', respondReminderSentAt: null });
+    await updateLifecycle(SUGGESTION_ID, { responseType: 'withdrawn_sufficient', withdrawnSufficientAt: '2026-09-04T12:00:00Z', respondReminderSentAt: null }, { ifMatch: 'W/"pending-1"' });
+    expect(DynamicsService.updateRecord.mock.calls[1]).toEqual(['wmkf_appreviewersuggestions', SUGGESTION_ID, {
+      wmkf_responsetype: RESPONSE_TYPE_MAP.withdrawn_sufficient,
+      wmkf_withdrawnsufficientat: '2026-09-04T12:00:00Z', wmkf_respondremindersentat: null,
+    }, { actingUserSystemId: undefined, ifMatch: 'W/"pending-1"' }]);
+  });
+  test('a terminal target plus response fields remains valid from an open source', async () => {
+    DynamicsService.getRecord.mockResolvedValue(open({ wmkf_reviewstatus: REVIEW_STATUS_MAP.accepted }));
+    await updateLifecycle(SUGGESTION_ID, { reviewStatus: 'withdrew', accepted: false, declined: true, responseType: 'declined', externalTokenRevoked: true }, { ifMatch: 'W/"caller-1"' });
+    expect(DynamicsService.updateRecord.mock.calls[0][2]).toMatchObject({
+      wmkf_reviewstatus: REVIEW_STATUS_MAP.withdrew, wmkf_accepted: false,
+      wmkf_declined: true, wmkf_responsetype: RESPONSE_TYPE_MAP.declined, wmkf_externaltokenrevoked: true,
+    });
+  });
+  test.each([
+    { notes: 'Correction' },
+    { honorariumEligibility: 'not_eligible', notes: 'Reason' },
+    { thankYouSentAt: '2026-09-04T12:00:00Z' },
+    { reminderSentAt: '2026-09-04T12:00:00Z', reminderCount: 2 },
+    { grantCycleCode: 'D26', programArea: 'Science and Engineering Research' },
+    { selected: false },
+  ])('unprotected payload %j keeps its existing closed-row contract', async (updates) => {
+    DynamicsService.getRecord.mockResolvedValue(open({
+      wmkf_reviewstatus: REVIEW_STATUS_MAP.complete,
+      wmkf_completedat: '2026-09-03T12:00:00Z', _etag: undefined,
+    }));
+    await updateLifecycle(SUGGESTION_ID, updates);
+    expect(DynamicsService.updateRecord).toHaveBeenCalledTimes(1);
+    expect(DynamicsService.updateRecord.mock.calls[0][2]).not.toHaveProperty('wmkf_completedat');
+    expect(DynamicsService.updateRecord.mock.calls[0][2]).not.toHaveProperty('wmkf_reviewreceivedat');
+  });
+  test('undefined protected fields are ignored and do not restrict a notes-only write', async () => {
+    DynamicsService.getRecord.mockResolvedValue(open({ wmkf_reviewstatus: REVIEW_STATUS_MAP.complete, _etag: undefined }));
+    await updateLifecycle(SUGGESTION_ID, { invited: undefined, accepted: undefined, notes: 'Correction' });
+    expect(DynamicsService.updateRecord.mock.calls[0][2]).toEqual({ wmkf_notes: 'Correction' });
+  });
+});

@@ -121,12 +121,14 @@ async function handlePatch(req, res, access) {
   const body = req.body || {};
   const actingUserSystemId = actorRefFromSession(access.session);
   try {
+    let authorizedRequestId;
     if (isGuid(body.suggestionId)) {
-      await authorizeReviewerRequestMutation({
+      const authorization = await authorizeReviewerRequestMutation({
         profileId: access.profileId,
         callerSystemId: actingUserSystemId,
         suggestionIds: [body.suggestionId],
       });
+      authorizedRequestId = authorization?.requestIds?.[0];
     } else if (body.suggestionId === undefined && isGuid(body.proposalId)) {
       await authorizeReviewerRequestMutation({
         profileId: access.profileId,
@@ -137,6 +139,7 @@ async function handlePatch(req, res, access) {
     const result = await patchMyCandidates({
       body,
       actingUserSystemId,
+      authorizedRequestId,
     });
     return res.status(200).json(result);
   } catch (error) {

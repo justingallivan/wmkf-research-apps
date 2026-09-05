@@ -23,6 +23,12 @@
  * Data boundary: reads remain staff-shared. PATCH resolves every suggestion
  * to its request and permits only the lead PD or a superuser. Batch ownership
  * is verified in full before the first lifecycle write.
+ * PATCH 200 confirms all targets in savedIds: batches use canonical unique IDs;
+ * single updates preserve the submitted ID. An invoked adapter failure retains
+ * sanitized 500 with savedIds, one unconfirmed failedIds target and notAttemptedIds.
+ * This includes adapter validation/guard failures; it does not establish whether
+ * a database write began or committed. Route validation, authorization and service
+ * dedicated-target prechecks remain error-only, without outcome arrays.
  *
  * Thin route shell (Route→Service Consolidation Plan, Stage 2): auth guard
  * (BEFORE method dispatch — preserved from the original route) → one
@@ -38,7 +44,7 @@ import { actorRefFromSession } from '../../../lib/utils/actor-ref';
 import { isGuid, allGuids } from '../../../lib/utils/guid';
 import { withDalContext } from '../../../lib/dataverse/core/context';
 import { ServiceHttpError } from '../../../lib/services/service-http-error';
-import { getReviewers, patchReviewers } from '../../../lib/services/review-manager/reviewers-service';
+import { getReviewers, patchReviewers, ReviewerStatusMutationError } from '../../../lib/services/review-manager/reviewers-service';
 import { withRequestCorrelation, mintCorrelationId } from '../../../lib/observability/request-correlation';
 import { authorizeReviewerRequestMutation } from '../../../lib/services/reviewer-request-authorization';
 
@@ -148,11 +154,19 @@ async function handlePatch(req, res, access) {
     if (error instanceof ServiceHttpError) {
       return res.status(error.httpStatus).json(error.body ?? { error: error.message });
     }
-    console.error('Review Manager PATCH error:', error);
+    const mutationError = error instanceof ReviewerStatusMutationError ? error : null;
+    const originalError = mutationError ? mutationError.cause : error;
+    console.error('Review Manager PATCH error:', originalError);
     return res.status(500).json({
       error: 'Failed to update reviewer',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      details: process.env.NODE_ENV === 'development' ? originalError.message : undefined,
       timestamp: new Date().toISOString(),
+      ...(mutationError ? {
+        success: false,
+        savedIds: mutationError.savedIds,
+        failedIds: mutationError.failedIds,
+        notAttemptedIds: mutationError.notAttemptedIds,
+      } : {}),
     });
   }
 }
