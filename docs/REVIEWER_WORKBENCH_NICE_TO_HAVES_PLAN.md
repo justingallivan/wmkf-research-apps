@@ -18,7 +18,7 @@ related:
 
 Planning only. No feature code, migrations, API routes, or schema files were created for this pass.
 
-## Status Matrix (reconciled 2026-07-22)
+## Status Matrix (reconciled 2026-09-04)
 
 | Area | Status | Current routing |
 | --- | --- | --- |
@@ -26,6 +26,7 @@ Planning only. No feature code, migrations, API routes, or schema files were cre
 | Board-writeup identity capture | **Shipped** | Acceptance/staff repair behavior is documented in Reviewer Workbench & Lifecycle. |
 | Invite-card review history | **Shipped** | Use the current Invite Reviewers card behavior. |
 | Reviewer feedback, global flags, and searchable person notes | **Open decisions** | Retain this plan's scoped options pending product direction. |
+| Track Reviewers progress-pill consistency | **Deferred UI polish** | Normalize lifecycle/link pill geometry and make stacked event chronology consistent. |
 
 The historical detail below is retained for the remaining open decisions; do not
 read its pre-shipment export, identity-capture, or review-history proposals as active work.
@@ -354,6 +355,29 @@ M for derived counts and last-date display; L if staff need drill-down history r
 - [ASSUMED] Decide where the PD override is stored and whether override reasons are required.
 - [ASSUMED] Decide whether prior-review history is useful before invitation, or whether it belongs only in completed-review/reviewer-pool reporting.
 
+## 7. Track Reviewers Progress-Pill Geometry And Chronology
+
+**Issue recorded 2026-09-04 from the Production Track Reviewers table**
+
+- [VERIFIED via `shared/components/reviewers/ReviewerManagePanel.js:63-103`] Lifecycle badges use `px-2.5` plus `rounded-full`, while link-state badges use `px-2` plus `rounded`; this produces visibly different pill silhouettes and dimensions in the same Progress cell.
+- [VERIFIED via `shared/components/reviewers/ReviewerManagePanel.js:2024-2026`] The Progress cell always renders lifecycle status first and link activity second. That is category order, not event order.
+- [VERIFIED via the owner-supplied Production screenshot, Request `1002874`, 2026-09-04] The fixed category order reverses the apparent direction of time between rows: **Materials Sent** appears above the later **Active · opened** event, while the later **Review Received** event appears above **Active · opened**.
+
+**Deferred correction**
+
+- [PLANNED] Give lifecycle and link-state pills the same height, horizontal padding, border radius, and alignment rules when they share a Progress cell.
+- [PLANNED] Choose one explicit temporal direction for stacked progress events and apply it consistently across every lifecycle state; do not let component category determine the order.
+- [PLANNED] Preserve semantic hierarchy after ordering is settled: lifecycle state and link activity must remain distinguishable without relying on pill shape alone.
+- [PLANNED] Add row-level tests covering at least Materials Sent + opened and Review Received + opened so the chosen chronology cannot silently reverse between states.
+
+**Owner decision still needed before implementation**
+
+- [ASSUMED] Decide whether the Progress cell should read oldest-to-newest from top to bottom or show the newest/current event first. The current mixed direction is the defect; this log does not choose the replacement direction.
+
+**Rough Effort**
+
+S. Presentation and deterministic render-order work in the existing Track Reviewers table; no data-model or API change is expected.
+
 ## Suggested Sequencing
 
 **Quick Wins**
@@ -362,6 +386,7 @@ M for derived counts and last-date display; L if staff need drill-down history r
 2. [PLANNED] Keep candidate export columns scoped to invite-stage fields: contact, affiliation/COI evidence, rationale, provenance, metrics, and expertise.
 3. [PLANNED] Add existing `wmkf_keywords` to the workbook as an `Expertise tags` column if staff want that in the candidate export.
 4. [PLANNED] Document for staff that departmental affiliation/rank become reliable after reviewer acceptance, not during reviewer search.
+5. [PLANNED] Normalize Track Reviewers progress pills and apply the owner-selected chronological direction.
 
 **Acceptance-Stage Work**
 
