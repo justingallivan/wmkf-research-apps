@@ -86,6 +86,7 @@ Before reading any session context, run the project's CI gates to surface rubric
 Run **every** `check:*` gate, not a subset. Run each gate and its `:self-test` **sequentially, never in parallel** — the self-tests write synthetic fixtures into paths the main gate scans (CLAUDE.md "Operating rules"). The `&&` below pairs each gate with its self-test so a red gate skips its own self-test but the next gate still runs:
 ```bash
 npm run check:migrations-manifest                                              # migrations-manifest ↔ on-disk .sql files
+npm run check:reviewer-reminder-hold && npm run check:reviewer-reminder-hold:self-test # automatic reviewer reminder hold
 npm run check:agent-invariants                                                # local symlinks for CLAUDE/AGENTS and Codex skills
 npm run check:agent-invariants:ci                                             # tracked symlink invariant for CI
 npm run check:instruction-architecture                                        # CLAUDE.md/AGENTS.md invariants + lifecycle hooks + fresh-install guard
@@ -112,10 +113,12 @@ npm run check:odata-escape && npm run check:odata-escape:self-test            # 
 npm run check:dynamics-context-boundary && npm run check:dynamics-context-boundary:self-test # bypassDynamicsRestrictions import boundary + empty-restrictions withDynamicsContext + script-only-outside-scripts (LAW mode, S333 bypass-strip Stage 3)
 npm run check:route-lifecycle-auth && npm run check:route-lifecycle-auth:self-test # ROUTE_NAMESPACE_LIFECYCLE.guardAppKeys must match each route's real requireAppAccess args (fail-closed)
 npm run check:route-service-boundary && npm run check:route-service-boundary:self-test # pages/api routes reaching Dataverse adapters/dynamics-service directly (LAW mode since Route→Service Stage 7; no baseline)
+npm run check:request-document-writers && npm run check:request-document-writers:self-test # request-document writer boundaries
 npm run check:secret-scan && npm run check:secret-scan:self-test              # no real secret-shaped values in tracked files (GHAS-free push protection)
 npm run check:scaffolding-tokens && npm run check:scaffolding-tokens:self-test  # no leaked tool-call scaffolding tags (bare-line </content>/</invoke>/antml:*) in tracked files
 npm run check:harness-framing && npm run check:harness-framing:self-test        # active harness wording stays expert/procedural; rationale lives in sidecars/backups
 npm run check:memory-drift:no-write                                            # advisory: memory↔code drift (read-only)
+npm run check:memory-drift                                                     # advisory: default memory↔code drift check
 npm run check:memory-health                                                    # advisory: active-memory hygiene worklist (shadow-atlas/weak-basis/no-recall-rule/oversize/stale-routed); never fails
 npm run check:types                                                            # type check over the repo (no self-test)
 ```
