@@ -1,11 +1,11 @@
 /**
  * @jest-environment jsdom
  *
- * Stage 0 baseline: exercise the actual status handler through the rendered
- * ManagePanel. Tests named KNOWN DEFECT pin current behavior until Stage 1E/6B
- * deliberately replace it; they do not assert the desired fixed behavior.
+ * Stage 1E: real rendered status actions replace the Stage 0 known-defect
+ * assertions. Transport is isolated; the handler, menu and lifetime guards are real.
  */
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { StrictMode } from 'react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import ReviewerManagePanel from '../../shared/components/reviewers/ReviewerManagePanel';
 
 jest.mock('../../shared/components/Layout', () => ({
@@ -16,28 +16,82 @@ jest.mock('../../shared/components/Layout', () => ({
 const reviewer = {
   suggestionId: '11111111-1111-4111-8111-111111111111',
   name: 'Dr. Baseline Reviewer',
+  email: 'reviewer@example.org',
   reviewStatus: 'materials_sent',
   tokenState: 'active',
 };
-const proposal = { proposalId: '22222222-2222-4222-8222-222222222222' };
-let statusFetch;
+const otherReviewer = { ...reviewer, suggestionId: '33333333-3333-4333-8333-333333333333', name: 'Dr. Other Reviewer' };
+const proposal = { proposalId: '22222222-2222-4222-8222-222222222222', proposalTitle: 'Status test request' };
 const originalFetch = global.fetch;
+let statusFetch;
+let materialsRender;
 
-function changeStatus() {
-  fireEvent.click(screen.getByRole('button', { name: 'Manage Dr. Baseline Reviewer' }));
-  fireEvent.change(screen.getByLabelText('Correct status for Dr. Baseline Reviewer'), {
-    target: { value: 'under_review' },
-  });
+function deferred() {
+  let resolve;
+  let reject;
+  const promise = new Promise((yes, no) => { resolve = yes; reject = no; });
+  return { promise, resolve, reject };
+}
+
+function response(body = { success: true }, status = 200) {
+  return { ok: status >= 200 && status < 300, status, json: jest.fn(async () => body) };
+}
+
+function openStatus(row = reviewer) {
+  fireEvent.click(screen.getByRole('button', { name: `Manage ${row.name || 'reviewer'}` }));
+  return screen.getByLabelText(`Correct status for ${row.name || 'reviewer'}`);
+}
+
+function changeStatus(row = reviewer) {
+  fireEvent.change(openStatus(row), { target: { value: 'under_review' } });
+}
+
+function expectUnconfirmed(label = reviewer.name, detail) {
+  expect(window.alert).toHaveBeenCalledTimes(1);
+  const message = window.alert.mock.calls[0][0];
+  expect(message).toContain(`Could not confirm the status update for ${label}`);
+  expect(message).toMatch(/Reload before trying again/i);
+  if (detail) expect(message).toMatch(detail);
+}
+
+const lateOutcomes = [
+  { name: 'success', settle: (job) => job.resolve(response()) },
+  { name: 'HTTP failure', settle: (job) => job.resolve(response({ error: 'Conflict' }, 409)) },
+  { name: 'invalid payload', settle: (job) => job.resolve(response({ success: false })) },
+  { name: 'malformed JSON', settle: (job) => job.resolve({ ok: true, status: 200, json: async () => { throw new Error('bad JSON'); } }) },
+  { name: 'network failure', settle: (job) => job.reject(new Error('offline')) },
+];
+const contextChanges = ['request switch', 'request away and back', 'mode away and back', 'row disappears and returns', 'management permission away and back', 'read-only away and back', 'unmount'];
+
+function invalidate(view, change) {
+  if (change === 'unmount') view.unmount();
+  else if (change.startsWith('request')) {
+    view.update({ proposal: { ...proposal, proposalId: 'another-request' } });
+    if (change === 'request away and back') view.update({ proposal: { ...proposal } });
+  } else if (change === 'mode away and back') {
+    view.update({ mode: 'all' });
+    view.update({ mode: 'track' });
+  } else if (change === 'row disappears and returns') {
+    view.update({ reviewers: [] });
+    view.update({ reviewers: [{ ...reviewer }] });
+  } else if (change === 'management permission away and back') {
+    view.update({ canManage: false });
+    view.update({ canManage: true });
+  } else {
+    view.update({ previewReadOnly: true });
+    view.update({ previewReadOnly: false });
+  }
 }
 
 beforeEach(() => {
-  statusFetch = jest.fn();
+  statusFetch = jest.fn(() => { throw new Error('Unconfigured status PATCH'); });
+  materialsRender = jest.fn(() => response({ drafts: [] }));
   global.fetch = jest.fn((url, options) => {
-    if (url === '/api/review-manager/reviewers') return statusFetch(url, options);
-    // The mounted materials modal has two independent read-only loaders.
-    if (url === '/api/review-manager/release-settings' || url.startsWith('/api/review-manager/materials-preflight?')) {
-      return Promise.resolve({ ok: true, json: async () => ({}) });
-    }
+    if (url === '/api/review-manager/reviewers' && options?.method === 'PATCH') return statusFetch(url, options);
+    if (url === '/api/review-manager/release-settings') return Promise.resolve(response({ attachProposalEmail: false }));
+    if (url.startsWith('/api/review-manager/materials-preflight?')) return Promise.resolve(response({ ok: true, fileCount: 1 }));
+    if (url.startsWith('/api/user-preferences')) return Promise.resolve(response({}));
+    if (url === '/api/review-manager/render-emails') return Promise.resolve(materialsRender(url, options));
     throw new Error(`Unexpected UI request: ${url}`);
   });
   jest.spyOn(window, 'alert').mockImplementation(() => {});
@@ -47,79 +101,274 @@ afterEach(() => {
   jest.restoreAllMocks();
 });
 
-describe('Stage 0 status mutation outcome baseline', () => {
-  test.each([
-    [403, { error: 'Forbidden' }],
-    [500, { error: 'Persistence failed' }],
-    [200, { success: false, error: 'Rejected' }],
-  ])('KNOWN DEFECT F5: HTTP %i / rejected payload still refreshes with no failure notice', async (status, body) => {
-    const json = jest.fn(async () => body);
-    statusFetch.mockResolvedValue({ ok: status < 400, status, json });
-    const onRefresh = jest.fn();
-    render(<ReviewerManagePanel proposal={proposal} reviewers={[reviewer]} mode="track" onRefresh={onRefresh} />);
+describe.each([false, true])('Stage 1E rendered status contract (StrictMode: %s)', (strict) => {
+  function renderPanel(overrides = {}) {
+    let props = { proposal, reviewers: [reviewer], mode: 'track', onRefresh: jest.fn(), ...overrides };
+    const element = () => strict ? <StrictMode><ReviewerManagePanel {...props} /></StrictMode> : <ReviewerManagePanel {...props} />;
+    const view = render(element());
+    return { ...view, update: (patch) => { props = { ...props, ...patch }; view.rerender(element()); } };
+  }
 
+  test('exact success sends the existing single PATCH and refreshes once without overlay arguments', async () => {
+    const result = response();
+    statusFetch.mockResolvedValue(result);
+    const onRefresh = jest.fn();
+    renderPanel({ onRefresh });
     changeStatus();
     await act(async () => {});
-
-    expect(global.fetch).toHaveBeenCalledWith('/api/review-manager/reviewers', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+    expect(statusFetch).toHaveBeenCalledTimes(1);
+    expect(statusFetch).toHaveBeenCalledWith('/api/review-manager/reviewers', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ suggestionId: reviewer.suggestionId, reviewStatus: 'under_review' }),
     });
-    expect(onRefresh).toHaveBeenCalledTimes(1);
-    expect(json).not.toHaveBeenCalled();
+    expect(result.json).toHaveBeenCalledTimes(1);
+    expect(onRefresh.mock.calls).toEqual([[]]);
     expect(window.alert).not.toHaveBeenCalled();
+    expect(openStatus()).toBeEnabled();
   });
 
-  test('KNOWN DEFECT F5: rejected fetch only logs and gives no user-visible failure', async () => {
-    const failure = new Error('offline');
-    const errorLog = jest.spyOn(console, 'error').mockImplementation(() => {});
-    statusFetch.mockRejectedValue(failure);
+  test.each([
+    [403, { error: 'Forbidden' }, /Forbidden/],
+    [409, { message: 'Row changed' }, /Row changed/],
+    [500, { reason: 'Persistence failed' }, /Persistence failed/],
+    [500, { success: true }, /500/],
+    [403, { error: {}, message: 'Useful detail' }, /Useful detail/],
+    [409, { error: '  ', message: false, reason: 9 }, /409/],
+  ])('HTTP %i never refreshes and supplies useful failure detail', async (status, body, detail) => {
+    statusFetch.mockResolvedValue(response(body, status));
     const onRefresh = jest.fn();
-    render(<ReviewerManagePanel proposal={proposal} reviewers={[reviewer]} mode="track" onRefresh={onRefresh} />);
-
+    renderPanel({ onRefresh });
     changeStatus();
     await act(async () => {});
-
+    expectUnconfirmed(reviewer.name, detail);
     expect(onRefresh).not.toHaveBeenCalled();
-    expect(errorLog).toHaveBeenCalledWith('Failed to update status:', failure);
+    expect(statusFetch).toHaveBeenCalledTimes(1);
+    expect(openStatus()).toBeEnabled();
+  });
+
+  test.each([false, undefined, 'true', 1, null])('success=%s is not boolean confirmation', async (success) => {
+    statusFetch.mockResolvedValue(response({ success }));
+    const onRefresh = jest.fn();
+    renderPanel({ onRefresh });
+    changeStatus();
+    await act(async () => {});
+    expectUnconfirmed(reviewer.name, /response/i);
+    expect(onRefresh).not.toHaveBeenCalled();
+    expect(statusFetch).toHaveBeenCalledTimes(1);
+  });
+
+  test.each([null, true, 1, 'success', []])('body=%s cannot confirm a status update', async (body) => {
+    statusFetch.mockResolvedValue(response(body));
+    const onRefresh = jest.fn();
+    renderPanel({ onRefresh });
+    changeStatus();
+    await act(async () => {});
+    expectUnconfirmed(reviewer.name, /response/i);
+    expect(onRefresh).not.toHaveBeenCalled();
+    expect(statusFetch).toHaveBeenCalledTimes(1);
+  });
+
+  test.each([
+    { name: 'malformed JSON', result: () => ({ ok: true, status: 200, json: async () => { throw new Error('Unexpected token'); } }), detail: /invalid response/i },
+    { name: 'rejected fetch', result: () => Promise.reject(new Error('offline')), detail: /network.*offline/i },
+  ])('$name reports an unconfirmed outcome without retry', async ({ result, detail }) => {
+    statusFetch.mockImplementation(result);
+    const onRefresh = jest.fn();
+    renderPanel({ onRefresh });
+    changeStatus();
+    await act(async () => {});
+    expectUnconfirmed(reviewer.name, detail);
+    expect(onRefresh).not.toHaveBeenCalled();
+    expect(statusFetch).toHaveBeenCalledTimes(1);
+  });
+
+  test.each([
+    [{ ...reviewer, name: '' }, reviewer.email],
+    [{ ...reviewer, name: '', email: '' }, reviewer.suggestionId],
+    [{ ...reviewer, name: 'Dr. José 李 ' + 'A'.repeat(100) }, 'Dr. José 李 ' + 'A'.repeat(100)],
+  ])('failure identifies the captured reviewer using its name/email/id fallback', async (row, label) => {
+    const job = deferred();
+    statusFetch.mockReturnValue(job.promise);
+    const view = renderPanel({ reviewers: [row] });
+    changeStatus(row);
+    view.update({ reviewers: [{ ...row, name: 'Replacement label' }] });
+    await act(async () => job.resolve(response({ error: 'Denied' }, 403)));
+    expectUnconfirmed(label, /Denied/);
+  });
+
+  test.each(contextChanges.flatMap(change => lateOutcomes.map(outcome => ({ change, ...outcome }))))('$name after $change never alerts or refreshes any context', async ({ change, settle }) => {
+    const job = deferred();
+    statusFetch.mockReturnValue(job.promise);
+    const oldRefresh = jest.fn();
+    const newRefresh = jest.fn();
+    const view = renderPanel({ onRefresh: oldRefresh });
+    changeStatus();
+    expect(statusFetch).toHaveBeenCalledTimes(1);
+    invalidate(view, change);
+    if (change !== 'unmount') view.update({ onRefresh: newRefresh });
+    await act(async () => settle(job));
+    expect(window.alert).not.toHaveBeenCalled();
+    expect(oldRefresh).not.toHaveBeenCalled();
+    expect(newRefresh).not.toHaveBeenCalled();
+    expect(statusFetch).toHaveBeenCalledTimes(1);
+  });
+
+  test.each(contextChanges.flatMap(change => ['success', 'invalid payload', 'rejected JSON'].map(outcome => ({ change, outcome }))))('pending JSON $outcome after $change never produces stale feedback', async ({ change, outcome }) => {
+    const jsonJob = deferred();
+    const json = jest.fn(() => jsonJob.promise);
+    statusFetch.mockResolvedValue({ ok: true, status: 200, json });
+    const onRefresh = jest.fn();
+    const view = renderPanel({ onRefresh });
+    changeStatus();
+    await act(async () => {});
+    expect(json).toHaveBeenCalledTimes(1);
+    invalidate(view, change);
+    await act(async () => {
+      if (outcome === 'rejected JSON') jsonJob.reject(new Error('late invalid JSON'));
+      else jsonJob.resolve({ success: outcome === 'success' });
+    });
+    expect(onRefresh).not.toHaveBeenCalled();
     expect(window.alert).not.toHaveBeenCalled();
   });
 
-  test.each(['request-switch', 'unmount'])('KNOWN DEFECT async baseline: pending status success invokes the old refresh after %s', async (change) => {
-    let resolveFetch;
-    statusFetch.mockImplementation(() => new Promise((resolve) => { resolveFetch = resolve; }));
-    const oldRefresh = jest.fn();
-    const newRefresh = jest.fn();
-    const view = render(<ReviewerManagePanel proposal={proposal} reviewers={[reviewer]} mode="track" onRefresh={oldRefresh} />);
-    changeStatus();
-    expect(oldRefresh).not.toHaveBeenCalled();
-
-    if (change === 'unmount') view.unmount();
-    else view.rerender(<ReviewerManagePanel proposal={{ proposalId: 'another-request' }} reviewers={[]} mode="track" onRefresh={newRefresh} />);
-    await act(async () => resolveFetch({ ok: true, json: async () => ({ success: true }) }));
-
-    expect(oldRefresh).toHaveBeenCalledTimes(1);
-    expect(newRefresh).not.toHaveBeenCalled();
+  test('same-row changes before rerender and after reopening acquire only one pending operation', async () => {
+    const job = deferred();
+    statusFetch.mockReturnValue(job.promise);
+    renderPanel();
+    const select = openStatus();
+    act(() => {
+      fireEvent.change(select, { target: { value: 'under_review' } });
+      fireEvent.change(select, { target: { value: 'review_received' } });
+    });
+    const pending = openStatus();
+    expect(pending).toBeDisabled();
+    expect(screen.getByRole('status')).toHaveTextContent('Updating status…');
+    fireEvent.change(pending, { target: { value: 'review_received' } });
+    expect(statusFetch).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: 'Revoke link' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Regenerate link & copy' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Release from assignment' })).toBeEnabled();
+    await act(async () => job.resolve(response()));
+    expect(screen.getByLabelText(`Correct status for ${reviewer.name}`)).toBeEnabled();
+    expect(screen.queryByText('Updating status…')).not.toBeInTheDocument();
   });
 
-  test.each(['request-switch', 'unmount'])('pending status failure after %s still logs without refreshing either context', async (change) => {
-    let rejectFetch;
-    const failure = new Error('late network failure');
-    const errorLog = jest.spyOn(console, 'error').mockImplementation(() => {});
-    statusFetch.mockImplementation(() => new Promise((_resolve, reject) => { rejectFetch = reject; }));
+  test('different reviewers can proceed independently and one completion does not unlock the other', async () => {
+    const first = deferred();
+    const second = deferred();
+    statusFetch.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+    const onRefresh = jest.fn();
+    renderPanel({ reviewers: [reviewer, otherReviewer], onRefresh });
+    changeStatus();
+    changeStatus(otherReviewer);
+    expect(statusFetch).toHaveBeenCalledTimes(2);
+    await act(async () => second.resolve(response({ error: 'Other row conflict' }, 409)));
+    expectUnconfirmed(otherReviewer.name, /Other row conflict/);
+    expect(openStatus(otherReviewer)).toBeEnabled();
+    expect(openStatus()).toBeDisabled();
+    await act(async () => first.resolve(response()));
+    expect(onRefresh.mock.calls).toEqual([[]]);
+    expect(screen.getByLabelText(`Correct status for ${reviewer.name}`)).toBeEnabled();
+  });
+
+  test.each(contextChanges.filter(change => change.includes('back') || change.includes('returns')))('lock survives %s until its invalidated attempt settles, then explicit action can run', async (change) => {
+    const job = deferred();
+    statusFetch.mockReturnValueOnce(job.promise).mockResolvedValue(response());
+    const onRefresh = jest.fn();
+    const view = renderPanel({ onRefresh });
+    changeStatus();
+    invalidate(view, change);
+    const select = openStatus();
+    expect(select).toBeDisabled();
+    fireEvent.change(select, { target: { value: 'review_received' } });
+    expect(statusFetch).toHaveBeenCalledTimes(1);
+    await act(async () => job.resolve(response()));
+    expect(onRefresh).not.toHaveBeenCalled();
+    expect(window.alert).not.toHaveBeenCalled();
+    expect(screen.getByLabelText(`Correct status for ${reviewer.name}`)).toBeEnabled();
+    fireEvent.change(screen.getByLabelText(`Correct status for ${reviewer.name}`), { target: { value: 'under_review' } });
+    await act(async () => {});
+    expect(statusFetch).toHaveBeenCalledTimes(2);
+    expect(onRefresh.mock.calls).toEqual([[]]);
+  });
+
+  test('fresh same-context objects and callback retain validity and use only the current callback', async () => {
+    const job = deferred();
+    statusFetch.mockReturnValue(job.promise);
     const oldRefresh = jest.fn();
     const newRefresh = jest.fn();
-    const view = render(<ReviewerManagePanel proposal={proposal} reviewers={[reviewer]} mode="track" onRefresh={oldRefresh} />);
+    const view = renderPanel({ onRefresh: oldRefresh });
     changeStatus();
-
-    if (change === 'unmount') view.unmount();
-    else view.rerender(<ReviewerManagePanel proposal={{ proposalId: 'another-request' }} reviewers={[]} mode="track" onRefresh={newRefresh} />);
-    await act(async () => rejectFetch(failure));
-
-    expect(errorLog).toHaveBeenCalledWith('Failed to update status:', failure);
+    view.update({ proposal: { ...proposal }, reviewers: [{ ...reviewer }], onRefresh: newRefresh });
+    await act(async () => job.resolve(response()));
     expect(oldRefresh).not.toHaveBeenCalled();
-    expect(newRefresh).not.toHaveBeenCalled();
+    expect(newRefresh.mock.calls).toEqual([[]]);
     expect(window.alert).not.toHaveBeenCalled();
+  });
+
+  test.each(['throw', 'reject'])('confirmed save followed by callback %s reports a separate refresh failure', async (kind) => {
+    statusFetch.mockResolvedValue(response());
+    const onRefresh = jest.fn(() => {
+      if (kind === 'throw') throw new Error('refresh failed');
+      return Promise.reject(new Error('refresh failed'));
+    });
+    renderPanel({ onRefresh });
+    changeStatus();
+    await act(async () => {});
+    expect(onRefresh.mock.calls).toEqual([[]]);
+    expect(window.alert).toHaveBeenCalledTimes(1);
+    expect(window.alert.mock.calls[0][0]).toContain(`Status saved for ${reviewer.name}`);
+    expect(window.alert.mock.calls[0][0]).toMatch(/could not be refreshed.*Reload to see the current status/s);
+    expect(window.alert.mock.calls[0][0]).not.toMatch(/Could not confirm/);
+    expect(statusFetch).toHaveBeenCalledTimes(1);
+    expect(openStatus()).toBeEnabled();
+  });
+
+  test.each(contextChanges)('refresh rejection after %s stays silent and releases matching pending state', async (change) => {
+    const refreshJob = deferred();
+    statusFetch.mockResolvedValue(response());
+    const onRefresh = jest.fn(() => refreshJob.promise);
+    const view = renderPanel({ onRefresh });
+    changeStatus();
+    await act(async () => {});
+    expect(onRefresh).toHaveBeenCalledTimes(1);
+    invalidate(view, change);
+    await act(async () => refreshJob.reject(new Error('late refresh failure')));
+    expect(window.alert).not.toHaveBeenCalled();
+    expect(statusFetch).toHaveBeenCalledTimes(1);
+    if (change !== 'unmount') expect(openStatus()).toBeEnabled();
+  });
+
+  test.each(['void', 'absent', 'internally handled'])('%s callback does not fabricate a refresh failure', async (kind) => {
+    statusFetch.mockResolvedValue(response());
+    const onRefresh = kind === 'absent' ? undefined : jest.fn(() => kind === 'void' ? undefined : Promise.reject(new Error('caught by host')).catch(() => {}));
+    renderPanel({ onRefresh });
+    changeStatus();
+    await act(async () => {});
+    if (onRefresh) expect(onRefresh.mock.calls).toEqual([[]]);
+    expect(window.alert).not.toHaveBeenCalled();
+    expect(statusFetch).toHaveBeenCalledTimes(1);
+  });
+
+  test('pending status preserves accepted selection and the open materials modal with its subset', async () => {
+    const accepted = { ...reviewer, reviewStatus: 'accepted' };
+    const otherAccepted = { ...otherReviewer, reviewStatus: 'accepted' };
+    const job = deferred();
+    statusFetch.mockReturnValue(job.promise);
+    renderPanel({ reviewers: [accepted, otherAccepted] });
+    fireEvent.click(within(screen.getByText(accepted.name).closest('tr')).getByRole('checkbox'));
+    changeStatus(accepted);
+    expect(within(screen.getByText(accepted.name).closest('tr')).getByRole('checkbox')).toBeChecked();
+    expect(within(screen.getByText(otherAccepted.name).closest('tr')).getByRole('checkbox')).not.toBeChecked();
+    fireEvent.click(screen.getByRole('button', { name: /release proposal to reviewers \(1\)/i }));
+    await act(async () => {});
+    expect(screen.getByText(/Reviewers access materials via their secure portal link/i)).toBeInTheDocument();
+    await act(async () => job.resolve(response()));
+    expect(screen.getByText(/Reviewers access materials via their secure portal link/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /preview 1 email/i }));
+    await act(async () => {});
+    expect(materialsRender).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(materialsRender.mock.calls[0][1].body).suggestionIds).toEqual([accepted.suggestionId]);
+    expect(statusFetch).toHaveBeenCalledTimes(1);
   });
 });

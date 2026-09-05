@@ -28,7 +28,7 @@
  *                  by production Dataverse remains visibly fail-closed.
  */
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import ReviewerDueDateEditor from './ReviewerDueDateEditor';
 import ReviewerActivityDrawer from './ReviewerActivityDrawer';
@@ -231,6 +231,7 @@ export function TokenActionsMenu({
   onRevoke,
   onRemove,
   onStatusChange,
+  statusPending = false,
   onTransition,
   onCloseReview,
 }) {
@@ -339,13 +340,14 @@ export function TokenActionsMenu({
                 </span>
                 <select
                   value={reviewer.reviewStatus === 'accepted' ? '' : reviewer.reviewStatus}
+                  disabled={statusPending}
                   onChange={(event) => {
                     const newStatus = event.target.value;
-                    if (!newStatus) return;
+                    if (!newStatus || statusPending) return;
                     setOpen(false);
                     onStatusChange(newStatus);
                   }}
-                  className="w-full text-sm border border-gray-300 rounded-md px-2 py-1.5 text-gray-700 bg-white focus:ring-1 focus:ring-gray-400 focus:outline-none"
+                  className="w-full text-sm border border-gray-300 rounded-md px-2 py-1.5 text-gray-700 bg-white focus:ring-1 focus:ring-gray-400 focus:outline-none disabled:cursor-wait disabled:bg-gray-50"
                   aria-label={`Correct status for ${reviewer.name || 'reviewer'}`}
                 >
                   {reviewer.reviewStatus === 'accepted' && (
@@ -356,8 +358,8 @@ export function TokenActionsMenu({
                   ))}
                 </select>
               </label>
-              <p className="mt-1.5 text-xs leading-4 text-gray-500">
-                Use only to fix the recorded stage. No email is sent.
+              <p role={statusPending ? 'status' : undefined} className="mt-1.5 text-xs leading-4 text-gray-500">
+                {statusPending ? 'Updating status…' : 'Use only to fix the recorded stage. No email is sent.'}
               </p>
             </div>
           )}
@@ -1642,6 +1644,46 @@ export default function ReviewerManagePanel({
   const allReviewers = reviewersProp || proposal?.reviewers || [];
   const reviewers = filterByMode(allReviewers, mode);
 
+  // The mutex belongs to this mounted panel, not the server or other panels.
+  // Invalidating feedback never releases an in-flight write: A → B → A and a
+  // disappearing/returning row must still wait for the original attempt.
+  const statusOperationsRef = useRef(new Map());
+  const statusContextRef = useRef({ mounted: false, epoch: 0 });
+  const [pendingStatusTokens, setPendingStatusTokens] = useState(() => new Map());
+
+  useLayoutEffect(() => {
+    const context = statusContextRef.current;
+    const operations = statusOperationsRef.current;
+    context.mounted = true;
+    return () => {
+      context.mounted = false;
+      context.epoch += 1;
+      for (const operation of operations.values()) operation.valid = false;
+    };
+  }, []);
+
+  // Reconcile only committed props. Object/callback replacement is ordinary
+  // refresh behavior; request/mode/permission changes and observed row absence
+  // permanently invalidate feedback, even if those values later return.
+  useLayoutEffect(() => {
+    const context = statusContextRef.current;
+    if (context.requestId !== proposal?.proposalId || context.mode !== mode
+        || context.canManage !== canManage || context.previewReadOnly !== previewReadOnly) {
+      context.epoch += 1;
+    }
+    context.requestId = proposal?.proposalId;
+    context.mode = mode;
+    context.canManage = canManage;
+    context.previewReadOnly = previewReadOnly;
+    context.reviewers = new Map(reviewers.map(row => [row.suggestionId, row]));
+    context.onRefresh = onRefresh;
+    for (const operation of statusOperationsRef.current.values()) {
+      if (operation.epoch !== context.epoch || !context.reviewers.has(operation.suggestionId)) {
+        operation.valid = false;
+      }
+    }
+  });
+
   // Reset selection when the proposal OR the active mode changes — a
   // selection made under one sub-tab shouldn't leak into another's visible set.
   useEffect(() => {
@@ -1786,15 +1828,93 @@ export default function ReviewerManagePanel({
   };
 
   const updateStatus = async (suggestionId, newStatus) => {
+    const context = statusContextRef.current;
+    const row = context.reviewers.get(suggestionId);
+    if (!context.mounted || !context.canManage || context.previewReadOnly || !row
+        || statusOperationsRef.current.has(suggestionId)) return;
+
+    const operation = {
+      token: Symbol('reviewer-status'),
+      suggestionId,
+      requestId: context.requestId,
+      epoch: context.epoch,
+      reviewerLabel: row.name || row.email || suggestionId,
+      valid: true,
+    };
+    // Acquire synchronously; React state alone cannot block two same-tick events.
+    statusOperationsRef.current.set(suggestionId, operation);
+    setPendingStatusTokens(previous => new Map(previous).set(suggestionId, operation.token));
+
+    const isCurrent = () => {
+      const current = statusContextRef.current;
+      return current.mounted && operation.valid
+        && current.epoch === operation.epoch && current.requestId === operation.requestId
+        && current.canManage && !current.previewReadOnly
+        && current.reviewers.has(suggestionId)
+        && statusOperationsRef.current.get(suggestionId)?.token === operation.token;
+    };
+    const reportUnconfirmed = (detail) => {
+      if (isCurrent()) {
+        alert(`Could not confirm the status update for ${operation.reviewerLabel}. ${detail} Reload before trying again.`);
+      }
+    };
+
     try {
-      await fetch('/api/review-manager/reviewers', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ suggestionId, reviewStatus: newStatus }),
-      });
-      if (onRefresh) onRefresh();
-    } catch (err) {
-      console.error('Failed to update status:', err);
+      let response;
+      try {
+        response = await fetch('/api/review-manager/reviewers', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ suggestionId, reviewStatus: newStatus }),
+        });
+      } catch (error) {
+        reportUnconfirmed(`Network error${error?.message ? `: ${error.message}` : ''}.`);
+        return;
+      }
+      if (!isCurrent()) return;
+
+      let data;
+      try {
+        data = await response.json();
+      } catch {
+        reportUnconfirmed(`Invalid response from the server (HTTP ${response.status}).`);
+        return;
+      }
+      if (!isCurrent()) return;
+      if (!response.ok || data?.success !== true) {
+        const detail = [data?.error, data?.message, data?.reason]
+          .find(value => typeof value === 'string' && value.trim());
+        reportUnconfirmed(detail?.trim() || (response.ok
+          ? 'Invalid response: the server did not confirm success.'
+          : `The server returned HTTP ${response.status}.`));
+        return;
+      }
+
+      // A confirmed write and a failed host refresh are different outcomes.
+      // Void callbacks and hosts that catch their own read failures cannot
+      // certify successful reconciliation; keep their existing contracts.
+      if (!isCurrent()) return;
+      try {
+        await statusContextRef.current.onRefresh?.();
+      } catch {
+        if (isCurrent()) {
+          alert(`Status saved for ${operation.reviewerLabel}, but the reviewer list could not be refreshed. Reload to see the current status.`);
+        }
+      }
+    } finally {
+      if (statusOperationsRef.current.get(suggestionId)?.token === operation.token) {
+        statusOperationsRef.current.delete(suggestionId);
+      }
+      // Owned pending cleanup is allowed after invalidation, but never after
+      // unmount and never for a different operation's display token.
+      if (statusContextRef.current.mounted) {
+        setPendingStatusTokens(previous => {
+          if (previous.get(suggestionId) !== operation.token) return previous;
+          const next = new Map(previous);
+          next.delete(suggestionId);
+          return next;
+        });
+      }
     }
   };
 
@@ -2113,6 +2233,7 @@ export default function ReviewerManagePanel({
                                 onRevoke={() => handleRevokeToken(r.suggestionId)}
                                 onRemove={() => handleRemoveReviewer(r)}
                                 onStatusChange={(newStatus) => updateStatus(r.suggestionId, newStatus)}
+                                statusPending={pendingStatusTokens.has(r.suggestionId)}
                                 onTransition={(terminalStatus) => transitionTerminal(r, terminalStatus)}
                               />
                             </div>
