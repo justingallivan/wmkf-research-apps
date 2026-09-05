@@ -1,8 +1,8 @@
 ---
-title: Reviewer Lifecycle Stage 1A — Conditional Stale-invite Expiry
+title: Reviewer Lifecycle Stage 1A — Historical Conditional Expiry Receipt
 kind: audit
 domain: reviewer-workbench
-status: complete
+status: historical
 canonical: false
 owner: product-engineering
 last_verified: 2026-09-04
@@ -13,6 +13,12 @@ last_verified: 2026-09-04
 Branch: `codex/reviewer-lifecycle-stage1a`. Base: `a18f219b` (completed Stage 0).
 Owner: Codex orchestrator with separate contract investigation, service/unit-test
 build, and composed-race build agents. Status: Stage 1A complete in source/tests; no production release.
+
+This is the historical Stage 1A receipt at implementation `721f4f3d` and
+published handoff `4839444c`. Its findings and test counts retain that boundary.
+Later email-bookkeeping work is recorded in
+[the Stage 1B receipt](REVIEWER_LIFECYCLE_STAGE1B_RECEIPT_2026-09-04.md);
+`SESSION_PROMPT.md` owns the living forward handoff.
 
 ## Contract-reconcile scope and invariants
 
