@@ -478,13 +478,15 @@ describe('patchMyCandidates', () => {
   });
 
   test('single-suggestion dispatch: lifecycle edit calls updateLifecycle; accepted=true auto-mints token non-fatally', async () => {
+    suggestionAdapter.findById.mockResolvedValue({ _wmkf_request_value: REQUEST_ID, wmkf_reviewstatus: null, _etag: 'W/"generic-1"' });
     ensureToken.mockRejectedValue(new Error('mint failed'));
     const out = await patchMyCandidates({
       body: { suggestionId: SUGGESTION_ID, accepted: true },
       actingUserSystemId: SYS,
+      authorizedRequestId: REQUEST_ID,
     });
     expect(suggestionAdapter.updateLifecycle).toHaveBeenCalledWith(
-      SUGGESTION_ID, { accepted: true }, { actingUserSystemId: SYS },
+      SUGGESTION_ID, { accepted: true }, { actingUserSystemId: SYS, ifMatch: 'W/"generic-1"' },
     );
     expect(ensureToken).toHaveBeenCalledWith(SUGGESTION_ID, { actingUserSystemId: SYS });
     expect(out).toEqual({
@@ -865,9 +867,11 @@ describe('patchMyCandidates', () => {
   });
 
   test('non-duplicate adapter failures propagate untyped (shell owns the 500)', async () => {
+    suggestionAdapter.findById.mockResolvedValue({ _wmkf_request_value: REQUEST_ID, wmkf_reviewstatus: null, _etag: 'W/"generic-1"' });
     suggestionAdapter.updateLifecycle.mockRejectedValue(new Error('Dataverse down'));
     await expect(patchMyCandidates({
       body: { suggestionId: SUGGESTION_ID, invited: true },
+      authorizedRequestId: REQUEST_ID,
     })).rejects.toThrow('Dataverse down');
   });
 });
@@ -884,5 +888,156 @@ describe('deleteMyCandidates', () => {
   test('missing-row softDelete failure propagates untyped (caller keeps the row; shell 500s)', async () => {
     suggestionAdapter.softDelete.mockRejectedValue(new Error('row not found'));
     await expect(deleteMyCandidates({ suggestionId: SUGGESTION_ID })).rejects.toThrow('row not found');
+  });
+});
+
+describe('Stage 1D generic invitation/response corrections', () => {
+  const source = (overrides = {}) => ({
+    wmkf_appreviewersuggestionid: SUGGESTION_ID,
+    _wmkf_request_value: REQUEST_ID,
+    _wmkf_potentialreviewer_value: PERSON_ID,
+    wmkf_reviewstatus: null,
+    wmkf_completedat: null,
+    wmkf_applicantdisposition: null,
+    _etag: 'W/"correction-1"',
+    ...overrides,
+  });
+  const correct = (changes, args = {}) => patchMyCandidates({
+    body: { suggestionId: SUGGESTION_ID, ...changes },
+    actingUserSystemId: SYS,
+    authorizedRequestId: REQUEST_ID,
+    ...args,
+  });
+  const fields = [
+    ['invited', true], ['invited', false], ['invited', null],
+    ['accepted', true], ['accepted', false], ['accepted', null],
+    ['declined', true], ['declined', false], ['declined', null],
+    ['emailSentAt', 'now'], ['emailSentAt', null],
+    ['responseType', 'declined'], ['responseType', null],
+    ['responseReceivedAt', 'now'], ['responseReceivedAt', null],
+  ];
+  beforeEach(() => {
+    suggestionAdapter.findById.mockReset().mockResolvedValue(source());
+    suggestionAdapter.updateLifecycle.mockReset().mockResolvedValue(undefined);
+    potentialReviewerAdapter.update.mockReset().mockResolvedValue(undefined);
+    researcherAdapter.updateById.mockReset().mockResolvedValue(undefined);
+    ensureToken.mockReset().mockResolvedValue(undefined);
+  });
+  function noWrites() {
+    expect(suggestionAdapter.updateLifecycle).not.toHaveBeenCalled();
+    expect(ensureToken).not.toHaveBeenCalled();
+    expect(potentialReviewerAdapter.update).not.toHaveBeenCalled();
+    expect(researcherAdapter.updateById).not.toHaveBeenCalled();
+  }
+
+  describe.each([100000004, 100000005, 100000006])('closed source %s', (status) => {
+    test.each(fields)('rejects defined %s=%s before mixed person edits', async (field, value) => {
+      suggestionAdapter.findById.mockResolvedValue(source({ wmkf_reviewstatus: status }));
+      await expect(correct({ [field]: value, name: 'Must not save' }))
+        .rejects.toMatchObject({ httpStatus: 409, body: { code: 'correction_closed' } });
+      noWrites();
+    });
+  });
+
+  test.each([undefined, '', '100000000', 123, false])('fails closed for unsupported source status %s', async (status) => {
+    suggestionAdapter.findById.mockResolvedValue(source({ wmkf_reviewstatus: status }));
+    await expect(correct({ accepted: true, affiliation: 'Must not save' }))
+      .rejects.toMatchObject({ httpStatus: 409, body: { code: 'correction_state_unavailable' } });
+    noWrites();
+  });
+  test('a completion marker protects an otherwise open row', async () => {
+    suggestionAdapter.findById.mockResolvedValue(source({ wmkf_completedat: '2026-09-04T12:00:00Z' }));
+    await expect(correct({ responseType: null }))
+      .rejects.toMatchObject({ httpStatus: 409, body: { code: 'correction_closed' } });
+    noWrites();
+  });
+  test.each([undefined, null, '', '*', 'W/""', ' W/"1"', 'unquoted', 123])('requires a concrete authorizing ETag: %s', async (_etag) => {
+    suggestionAdapter.findById.mockResolvedValue(source({ _etag }));
+    await expect(correct({ invited: true }))
+      .rejects.toMatchObject({ httpStatus: 409, body: { code: 'correction_version_unavailable' } });
+    noWrites();
+  });
+  test.each([null, undefined, ''])('requires server-authorized request id %s', async (authorizedRequestId) => {
+    await expect(correct({ invited: true, authorizedRequestId: REQUEST_ID }, { authorizedRequestId }))
+      .rejects.toMatchObject({ httpStatus: 400, body: { code: 'correction_missing_authorized_request' } });
+    noWrites();
+  });
+  test.each([undefined, PERSON_ID])('rejects absent or changed request binding %s', async (requestId) => {
+    suggestionAdapter.findById.mockResolvedValue(source({ _wmkf_request_value: requestId }));
+    await expect(correct({ accepted: true }))
+      .rejects.toMatchObject({ httpStatus: 409, body: { code: 'correction_request_changed' } });
+    noWrites();
+  });
+  test.each([null, 100000000, 100000001, 100000002, 100000003])('preserves correction on allowed source %s, including received evidence', async (status) => {
+    suggestionAdapter.findById.mockResolvedValue(source({
+      wmkf_reviewstatus: status, wmkf_reviewreceivedat: '2026-09-03T12:00:00Z',
+    }));
+    const result = await correct({ accepted: true, declined: false, responseType: 'accepted', responseReceivedAt: 'now' });
+    expect(result).toMatchObject({ success: true, updated: { accepted: true, declined: false, responseType: 'accepted' } });
+    expect(suggestionAdapter.updateLifecycle).toHaveBeenCalledWith(SUGGESTION_ID, {
+      accepted: true, declined: false, responseType: 'accepted', responseReceivedAt: expect.any(String),
+    }, { actingUserSystemId: SYS, ifMatch: 'W/"correction-1"' });
+    expect(ensureToken).toHaveBeenCalledTimes(1);
+    expect(suggestionAdapter.updateLifecycle.mock.invocationCallOrder[0]).toBeLessThan(ensureToken.mock.invocationCallOrder[0]);
+  });
+  test('case-insensitive request binding and strong ETags stay supported', async () => {
+    suggestionAdapter.findById.mockResolvedValue(source({ _wmkf_request_value: 'ABCDEFAB-1111-1111-1111-111111111111', _etag: '"strong-1"' }));
+    await correct({ invited: false, emailSentAt: null, responseReceivedAt: null }, { authorizedRequestId: 'abcdefab-1111-1111-1111-111111111111' });
+    expect(suggestionAdapter.updateLifecycle).toHaveBeenCalledWith(SUGGESTION_ID,
+      { invited: false, emailSentAt: null, responseReceivedAt: null }, { actingUserSystemId: SYS, ifMatch: '"strong-1"' });
+  });
+  test('412 is a stable 409 with no retry or subsequent token/person writes', async () => {
+    suggestionAdapter.updateLifecycle.mockRejectedValue(Object.assign(new Error('precondition failed'), { status: 412 }));
+    await expect(correct({ accepted: true, name: 'Must not save' }))
+      .rejects.toMatchObject({ httpStatus: 409, body: { code: 'correction_conflict' } });
+    expect(suggestionAdapter.findById).toHaveBeenCalledTimes(1);
+    expect(suggestionAdapter.updateLifecycle).toHaveBeenCalledTimes(1);
+    expect(ensureToken).not.toHaveBeenCalled();
+    expect(potentialReviewerAdapter.update).not.toHaveBeenCalled();
+    expect(researcherAdapter.updateById).not.toHaveBeenCalled();
+  });
+  test.each(['correction_closed', 'correction_state_unavailable', 'correction_version_unavailable'])('maps adapter guard refusal %s without a retry', async (code) => {
+    suggestionAdapter.updateLifecycle.mockRejectedValue(Object.assign(new Error('Lifecycle changed'), { status: 409, code }));
+    await expect(correct({ accepted: true })).rejects.toMatchObject({ httpStatus: 409, body: { code } });
+    expect(suggestionAdapter.updateLifecycle).toHaveBeenCalledTimes(1);
+    expect(ensureToken).not.toHaveBeenCalled();
+  });
+  test('excluded read and intervening excluded write both become domain conflicts', async () => {
+    suggestionAdapter.findById.mockRejectedValueOnce(new Error('reviewer-suggestion.findById: refusing to act on an applicant-excluded suggestion'));
+    await expect(correct({ invited: true })).rejects.toMatchObject({ httpStatus: 409, body: { code: 'correction_excluded' } });
+    noWrites();
+    suggestionAdapter.updateLifecycle.mockRejectedValueOnce(new Error('reviewer-suggestion.updateLifecycle: refusing to mutate an applicant-excluded suggestion'));
+    await expect(correct({ invited: true })).rejects.toMatchObject({ httpStatus: 409, body: { code: 'correction_excluded' } });
+  });
+  test('only structured missing-record errors become not found', async () => {
+    suggestionAdapter.findById.mockRejectedValueOnce(Object.assign(new Error('gone'), {
+      serviceName: 'dataverse', status: 404, dataverseCode: '0x80040217',
+    }));
+    await expect(correct({ invited: true })).rejects.toMatchObject({ httpStatus: 404, body: { code: 'correction_not_found' } });
+    const error = Object.assign(new Error('bad entity-set'), { serviceName: 'dataverse', status: 404 });
+    suggestionAdapter.findById.mockRejectedValueOnce(error);
+    await expect(correct({ invited: true })).rejects.toBe(error);
+    noWrites();
+  });
+  test('a missing row fails before token or person side effects', async () => {
+    suggestionAdapter.findById.mockResolvedValueOnce(null);
+    await expect(correct({ accepted: true, name: 'Must not save' }))
+      .rejects.toMatchObject({ httpStatus: 404, body: { code: 'correction_not_found' } });
+    noWrites();
+  });
+  test('successful correction retains token-failure tolerance and later person-write order', async () => {
+    ensureToken.mockRejectedValueOnce(new Error('mint unavailable'));
+    await expect(correct({ accepted: true, name: 'Corrected name' })).resolves.toMatchObject({ success: true });
+    expect(potentialReviewerAdapter.update).toHaveBeenCalledWith(PERSON_ID, { name: 'Corrected name' }, { actingUserSystemId: SYS });
+    expect(suggestionAdapter.updateLifecycle.mock.invocationCallOrder[0]).toBeLessThan(ensureToken.mock.invocationCallOrder[0]);
+    expect(ensureToken.mock.invocationCallOrder[0]).toBeLessThan(potentialReviewerAdapter.update.mock.invocationCallOrder[0]);
+  });
+  test('person-only and restore actions keep their own prerequisites and ordering', async () => {
+    suggestionAdapter.findById.mockResolvedValue(source({ wmkf_reviewstatus: 100000004, _etag: undefined }));
+    await expect(correct({ name: 'Person edit' }, { authorizedRequestId: undefined })).resolves.toMatchObject({ success: true });
+    expect(potentialReviewerAdapter.update).toHaveBeenCalledTimes(1);
+    await expect(correct({ restore: true, accepted: true }, { authorizedRequestId: undefined })).resolves.toEqual({ success: true, message: 'Candidate restored' });
+    expect(suggestionAdapter.restore).toHaveBeenCalledTimes(1);
+    expect(suggestionAdapter.updateLifecycle).not.toHaveBeenCalled();
   });
 });

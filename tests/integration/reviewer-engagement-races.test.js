@@ -1,8 +1,8 @@
 /**
  * @jest-environment node
  *
- * Composed reviewer races: Stage 1A expiry and Stage 1B email regressions plus
- * the remaining Stage 0 characterizations. Services, adapters, DAL context,
+ * Composed reviewer races: Stage 1A expiry, Stage 1B email and Stage 1D correction
+ * regressions plus the remaining Stage 0 characterizations. Services, adapters, DAL context,
  * Dynamics reads/writes, annotation processing and If-Match transport are real.
  * Only external email/token/question/SQL dependencies are replaced. A KNOWN
  * DEFECT assertion pins existing behavior for a later semantic change; it is
@@ -739,38 +739,295 @@ describe('F4 post-send bookkeeping races through the real adapter', () => {
   });
 });
 
-describe('F3 generic staff response correction and F5 batch baseline', () => {
-  test.each(['complete', 'withdrew', 'released'])('KNOWN DEFECT F3: response-only staff correction rewrites a %s engagement without dedicated transition effects', async (status) => {
-    const withdrawn = status === 'withdrew';
-    const receipt = status === 'complete' ? RECEIVED : null;
-    const completion = status === 'complete' ? COMPLETED : null;
-    const honorarium = withdrawn ? null : HONORARIUM;
-    const selected = !withdrawn;
-    const tokenRevoked = status !== 'complete';
+describe('F3 generic staff correction regressions and F5 batch baseline', () => {
+  const ACTOR = '77777777-7777-4777-8777-777777777777';
+  let impersonationBefore;
+  beforeEach(() => {
+    impersonationBefore = process.env.DYNAMICS_IMPERSONATION_ENABLED;
+    process.env.DYNAMICS_IMPERSONATION_ENABLED = 'true';
+  });
+  afterEach(() => {
+    if (impersonationBefore === undefined) delete process.env.DYNAMICS_IMPERSONATION_ENABLED;
+    else process.env.DYNAMICS_IMPERSONATION_ENABLED = impersonationBefore;
+  });
+  const ORIGINAL_EMAIL_AT = '2026-08-01T12:00:00.000Z';
+  const CORRECTION_EMAIL_AT = '2026-08-02T12:00:00.000Z';
+  const CLOSED = ['complete', 'withdrew', 'released'];
+  const CORRECTIONS = [
+    ['invited', 'wmkf_invited', [false, null, true]],
+    ['accepted', 'wmkf_accepted', [false, null, true]],
+    ['declined', 'wmkf_declined', [true, null, false]],
+    ['emailSentAt', 'wmkf_emailsentat', ['now', null, ORIGINAL_EMAIL_AT]],
+    ['responseType', 'wmkf_responsetype', ['declined', null, 'accepted']],
+    ['responseReceivedAt', 'wmkf_responsereceivedat', ['now', null, RECEIVED]],
+  ];
+  const MIXED_CORRECTION = {
+    invited: false, accepted: true, declined: false,
+    emailSentAt: CORRECTION_EMAIL_AT, responseType: 'accepted', responseReceivedAt: 'now',
+    name: 'Correction must not leak into the person',
+  };
+
+  function seedCorrection(fields = {}) {
+    // The linked honorarium is deliberately PRESENT even on a historical
+    // withdrew row: refusing a correction must not perform terminal cleanup.
     transport.seed(SET, row({
-      wmkf_reviewstatus: REVIEW_STATUS_MAP[status], wmkf_reviewreceivedat: receipt,
-      wmkf_completedat: completion, _wmkf_honorariumrequest_value: honorarium,
-      wmkf_selected: selected, wmkf_externaltokenrevoked: tokenRevoked,
-      wmkf_accepted: !withdrawn, wmkf_declined: withdrawn,
-      wmkf_responsetype: RESPONSE_TYPE_MAP[withdrawn ? 'declined' : 'accepted'],
+      wmkf_invited: true, wmkf_emailsentat: ORIGINAL_EMAIL_AT,
+      wmkf_responsereceivedat: RECEIVED, _wmkf_honorariumrequest_value: HONORARIUM,
+      ...fields,
     }));
-    transport.seed(REQUESTS, { akoya_requestid: HONORARIUM, akoya_requestnum: 'HONORARIUM-UNCHANGED' });
-
-    expect(await trusted(() => patchMyCandidates({ body: {
-      suggestionId: ID, accepted: withdrawn, declined: !withdrawn,
-      responseType: withdrawn ? 'accepted' : 'declined', responseReceivedAt: 'now',
-    } }))).toMatchObject({ success: true });
-
-    expect(transport.get(SET, ID)).toMatchObject({
-      wmkf_reviewstatus: REVIEW_STATUS_MAP[status], wmkf_reviewreceivedat: receipt, wmkf_completedat: completion,
-      wmkf_accepted: withdrawn, wmkf_declined: !withdrawn,
-      wmkf_responsetype: RESPONSE_TYPE_MAP[withdrawn ? 'accepted' : 'declined'],
-      wmkf_selected: selected, wmkf_externaltokenrevoked: tokenRevoked, _wmkf_honorariumrequest_value: honorarium,
+    transport.seed(REQUESTS, {
+      akoya_requestid: HONORARIUM, akoya_requestnum: 'HONORARIUM-UNCHANGED',
+      wmkf_authorizationtoremitpaymentflag: false,
     });
-    expect(ensureToken).toHaveBeenCalledTimes(withdrawn ? 1 : 0);
-    expect(transport.get(REQUESTS, HONORARIUM)).not.toBeNull();
+    transport.seed(REQUESTS, {
+      akoya_requestid: OTHER, akoya_requestnum: 'SECOND-VALID-REQUEST',
+      wmkf_meetingdate: '2026-12-01',
+    });
+  }
+
+  function history() {
+    return {
+      suggestion: transport.get(SET, ID),
+      people: transport.rows(PEOPLE),
+      requests: transport.rows(REQUESTS),
+    };
+  }
+
+  function assertHistoryUnchanged(before) {
+    expect(transport.get(SET, ID)).toEqual(before.suggestion);
+    expect(transport.rows(PEOPLE)).toEqual(before.people);
+    expect(transport.rows(REQUESTS)).toEqual(before.requests);
+    expect(ensureToken).not.toHaveBeenCalled();
+    expect(email).not.toHaveBeenCalled();
+  }
+
+  const correct = (fields, options = {}) => trusted(() => patchMyCandidates({
+    body: { suggestionId: ID, ...fields },
+    actingUserSystemId: ACTOR,
+    authorizedRequestId: REQUEST,
+    ...options,
+  }));
+  const correctionWrites = () => writes().filter((request) => request.entitySet === SET
+    && request.body?.wmkf_emailsentat === CORRECTION_EMAIL_AT);
+
+  test.each(CLOSED.flatMap((status) => CORRECTIONS.flatMap(([field, _raw, values]) =>
+    values.map((value) => [status, field, value]))))(
+    'F3 regression: %s rejects defined %s=%p and leaves linked history and mixed person edits untouched',
+    async (status, field, value) => {
+      seedCorrection({
+        wmkf_reviewstatus: REVIEW_STATUS_MAP[status],
+        wmkf_reviewreceivedat: status === 'complete' ? RECEIVED : null,
+        wmkf_completedat: status === 'complete' ? COMPLETED : null,
+        wmkf_selected: status !== 'withdrew', wmkf_externaltokenrevoked: status !== 'complete',
+      });
+      const before = history();
+      await expect(correct({ [field]: value, name: MIXED_CORRECTION.name }))
+        .rejects.toMatchObject({ httpStatus: 409, body: { code: 'correction_closed' } });
+      expect(writes()).toEqual([]);
+      assertHistoryUnchanged(before);
+    },
+  );
+
+  test.each(CLOSED.flatMap((status) => CORRECTIONS.map(([field, raw, values]) =>
+    [status, field, raw, values[0]])))(
+    'F3 regression: the real adapter independently rejects %s source for %s (%s)',
+    async (status, field, _raw, value) => {
+      seedCorrection({ wmkf_reviewstatus: REVIEW_STATUS_MAP[status] });
+      const before = history();
+      await expect(trusted(() => suggestionAdapter.updateLifecycle(ID, { [field]: value }, {
+        actingUserSystemId: ACTOR,
+      }))).rejects.toMatchObject({ code: 'correction_closed' });
+      expect(writes()).toEqual([]);
+      assertHistoryUnchanged(before);
+    },
+  );
+
+  test.each([null, 'accepted', 'materials_sent', 'under_review', 'review_received'])(
+    'F3 regression: open source %s retains six-field mapping, exact version/actor and token-before-person order',
+    async (status) => {
+      seedCorrection({
+        wmkf_reviewstatus: status === null ? null : REVIEW_STATUS_MAP[status],
+        // These are deliberately not additional source gates. Receipt remains
+        // compatible with correction until the separate human closeout.
+        wmkf_selected: false, wmkf_accepted: false, wmkf_declined: true,
+        wmkf_reviewreceivedat: RECEIVED,
+      });
+      const before = history();
+      let stateAtToken;
+      ensureToken.mockImplementationOnce(async () => { stateAtToken = history(); });
+      const result = await correct({ ...MIXED_CORRECTION, emailSentAt: 'now' });
+      expect(result).toMatchObject({ success: true, message: 'Candidate updated', updated: {
+        suggestionId: ID, invited: false, accepted: true, declined: false, responseType: 'accepted',
+        name: MIXED_CORRECTION.name,
+      } });
+      expect(result.updated.emailSentAt).toEqual(expect.any(String));
+      expect(result.updated.emailSentAt).not.toBe('now');
+      expect(result.updated.responseReceivedAt).not.toBe('now');
+      const lifecycleWrite = writes()[0];
+      expect(lifecycleWrite.body).toEqual({
+        wmkf_invited: false, wmkf_accepted: true, wmkf_declined: false,
+        wmkf_emailsentat: result.updated.emailSentAt,
+        wmkf_responsetype: RESPONSE_TYPE_MAP.accepted,
+        wmkf_responsereceivedat: result.updated.responseReceivedAt,
+      });
+      expect(lifecycleWrite.headers['If-Match']).toBe(before.suggestion._etag);
+      expect(lifecycleWrite.headers.MSCRMCallerID).toBe(ACTOR);
+      expect(ensureToken).toHaveBeenCalledTimes(1);
+      expect(ensureToken).toHaveBeenCalledWith(ID, { actingUserSystemId: ACTOR });
+      expect(stateAtToken.people).toEqual(before.people);
+      expect(stateAtToken.suggestion).toMatchObject(lifecycleWrite.body);
+      expect(writes().map((request) => request.entitySet)).toEqual([SET, PEOPLE]);
+      expect(transport.get(PEOPLE, PERSON).wmkf_name).toBe(MIXED_CORRECTION.name);
+      expect(transport.rows(REQUESTS)).toEqual(before.requests);
+      expect(transport.get(SET, ID)).toMatchObject({
+        wmkf_selected: false, wmkf_reviewreceivedat: RECEIVED, wmkf_completedat: null,
+        wmkf_reviewstatus: before.suggestion.wmkf_reviewstatus,
+      });
+    },
+  );
+
+  test.each([
+    [{ wmkf_reviewstatus: 999 }, {}, 'correction_state_unavailable'],
+    [{ wmkf_reviewstatus: '100000000' }, {}, 'correction_state_unavailable'],
+    [{ wmkf_completedat: COMPLETED }, {}, 'correction_closed'],
+    [{ _wmkf_request_value: OTHER }, {}, 'correction_request_changed'],
+    [{ _wmkf_request_value: null }, {}, 'correction_request_changed'],
+    [{}, { authorizedRequestId: undefined }, 'correction_missing_authorized_request'],
+    ...[null, '*', '', 'W/" "', ' W/"12"', 'W/"12" ', 'malformed'].map((etag) =>
+      [{ _etag: etag }, {}, 'correction_version_unavailable']),
+  ])('F3 regression: invalid source %j / binding %j fails before token or mixed person effects (%s)', async (fields, options, code) => {
+    seedCorrection(fields);
+    const before = history();
+    // A body-provided binding is never authority, even when it matches the row
+    // that moved away from the Request authorized by the route.
+    await expect(correct({ ...MIXED_CORRECTION, authorizedRequestId: OTHER }, options))
+      .rejects.toMatchObject({ httpStatus: code === 'correction_missing_authorized_request' ? 400 : 409, body: { code } });
+    expect(writes()).toEqual([]);
+    assertHistoryUnchanged(before);
+  });
+
+  test('F3 regression: an omitted status projection is not silently treated as explicit null', async () => {
+    seedCorrection();
+    const before = history();
+    global.fetch.mockImplementation(async (url, options = {}) => {
+      const response = await transport.fetch(url, options);
+      if (url.includes(`${SET}(${ID})`) && (!options.method || options.method === 'GET')) {
+        return { ...response, json: async () => {
+          const data = await response.json();
+          delete data.wmkf_reviewstatus;
+          return data;
+        } };
+      }
+      return response;
+    });
+    await expect(correct(MIXED_CORRECTION))
+      .rejects.toMatchObject({ httpStatus: 409, body: { code: 'correction_state_unavailable' } });
+    expect(writes()).toEqual([]);
+    assertHistoryUnchanged(before);
+  });
+
+  test('F3 regression: a service request binding comparison remains case insensitive', async () => {
+    const mixedCaseRequest = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    seedCorrection({ _wmkf_request_value: mixedCaseRequest.toUpperCase() });
+    transport.seed(REQUESTS, { akoya_requestid: mixedCaseRequest, akoya_requestnum: 'CASE-BOUND' });
+    const version = transport.get(SET, ID)._etag;
+    await expect(correct({ declined: false }, { authorizedRequestId: mixedCaseRequest }))
+      .resolves.toMatchObject({ success: true });
+    expect(writes()[0].headers['If-Match']).toBe(version);
+  });
+
+  async function commitWinningChange(kind) {
+    if (kind === 'complete') {
+      await trusted(() => closeReview({
+        suggestionId: ID, disposition: 'eligible', authorizedRequestId: REQUEST, actingUserSystemId: ACTOR,
+      }));
+    } else if (kind === 'withdrew' || kind === 'released') {
+      await expect(trusted(() => transitionReviewersTerminal({
+        requestId: REQUEST, suggestionIds: [ID], terminalStatus: kind, actingUserSystemId: ACTOR,
+      }))).resolves.toMatchObject({ transitioned: 1 });
+    } else {
+      transport.patch(SET, ID, { _wmkf_request_value: OTHER, wmkf_notes: 'Authorized Request changed' });
+    }
+    return history();
+  }
+
+  test.each(['before_service_read', 'before_adapter_read', 'before_patch'].flatMap((window) =>
+    ['complete', 'withdrew', 'released', 'reparent'].map((winner) => [window, winner])))(
+    'F3 regression: %s / %s preserves the complete winning row with no correction retry, token or person effects',
+    async (window, winnerKind) => {
+      seedCorrection(winnerKind === 'complete' ? {
+        wmkf_reviewstatus: REVIEW_STATUS_MAP.review_received, wmkf_reviewreceivedat: RECEIVED,
+      } : {});
+      const originalVersion = transport.get(SET, ID)._etag;
+      const pause = transport.pauseNext((request) => {
+        if (request.entitySet !== SET || request.key !== ID) return false;
+        if (window === 'before_patch') return request.method === 'PATCH';
+        if (request.method !== 'GET') return false;
+        return window === 'before_service_read'
+          || !request.params.get('$select')?.split(',').includes('_wmkf_request_value');
+      });
+      const outcome = correct(MIXED_CORRECTION).then((value) => ({ value }), (error) => ({ error }));
+      const paused = await pause.reached;
+      let winner;
+      try { winner = await commitWinningChange(winnerKind); } finally { pause.release(); }
+      const { error } = await outcome;
+      const patchExpected = window === 'before_patch'
+        || (window === 'before_adapter_read' && winnerKind === 'reparent');
+      const code = patchExpected ? 'correction_conflict'
+        : winnerKind === 'reparent' ? 'correction_request_changed' : 'correction_closed';
+      expect(error).toMatchObject({ httpStatus: 409, body: { code } });
+      assertHistoryUnchanged(winner);
+      expect(writes().filter((request) => request.entitySet === PEOPLE)).toEqual([]);
+      expect(correctionWrites()).toHaveLength(patchExpected ? 1 : 0);
+      if (patchExpected) {
+        const rejected = correctionWrites()[0];
+        expect(rejected.status).toBe(412);
+        expect(rejected.headers['If-Match']).toBe(originalVersion);
+        expect(rejected.headers['If-Match']).not.toBe(winner.suggestion._etag);
+      }
+      if (window === 'before_patch') expect(paused).toBe(correctionWrites()[0]);
+    },
+  );
+
+  test('F3 regression: a nonterminal concurrent edit cannot upgrade the version captured by the service', async () => {
+    seedCorrection();
+    const originalVersion = transport.get(SET, ID)._etag;
+    const pause = transport.pauseNext((request) => request.method === 'GET'
+      && request.entitySet === SET && request.key === ID, { stage: 'after' });
+    const outcome = correct(MIXED_CORRECTION).then((value) => ({ value }), (error) => ({ error }));
+    await pause.reached;
+    transport.patch(SET, ID, { wmkf_notes: 'Another staff edit wins' });
+    const winner = history();
+    pause.release();
+    expect((await outcome).error).toMatchObject({ httpStatus: 409, body: { code: 'correction_conflict' } });
+    expect(correctionWrites()).toHaveLength(1);
+    expect(correctionWrites()[0]).toMatchObject({ status: 412, headers: { 'If-Match': originalVersion } });
+    assertHistoryUnchanged(winner);
+  });
+
+  test('F3 regression: direct protected adapter writes use the guard version when the caller omits one', async () => {
+    seedCorrection({ wmkf_reviewstatus: null, wmkf_accepted: false, wmkf_selected: false });
+    const before = transport.get(SET, ID);
+    await trusted(() => suggestionAdapter.updateLifecycle(ID, {
+      responseType: 'withdrawn_sufficient', withdrawnSufficientAt: COMPLETED, respondReminderSentAt: null,
+    }, { actingUserSystemId: ACTOR }));
     expect(writes()).toHaveLength(1);
-    expect(writes()[0].headers['If-Match']).toBeUndefined();
+    expect(writes()[0]).toMatchObject({ headers: { 'If-Match': before._etag, MSCRMCallerID: ACTOR }, body: {
+      wmkf_responsetype: RESPONSE_TYPE_MAP.withdrawn_sufficient,
+      wmkf_withdrawnsufficientat: COMPLETED, wmkf_respondremindersentat: null,
+    } });
+  });
+
+  test('F3 regression: an explicitly stale direct adapter version is never replaced by its newer guard read', async () => {
+    seedCorrection();
+    const stale = transport.get(SET, ID)._etag;
+    transport.patch(SET, ID, { wmkf_notes: 'Newer version must survive' });
+    const winner = history();
+    await expect(trusted(() => suggestionAdapter.updateLifecycle(ID, { accepted: false }, { ifMatch: stale })))
+      .rejects.toMatchObject({ status: 412 });
+    expect(writes()).toHaveLength(1);
+    expect(writes()[0]).toMatchObject({ status: 412, headers: { 'If-Match': stale } });
+    assertHistoryUnchanged(winner);
   });
 
   test.each(['complete', 'withdrew', 'released'])('the same adapter rejects a status-changing correction out of %s', async (status) => {
