@@ -29,7 +29,9 @@ implementation or historical-row repair remains for the approved Stage 1C policy
 
 The separate Stage 1D/1E/6A implementation is tracked in
 [the approved decisions](REVIEWER_LIFECYCLE_APPROVED_DECISIONS_2026-09-04.md).
-Public publication and production validation remain separate and unapproved.
+Public branch publication was approved and completed on 2026-09-05; production
+promotion and its validation remain separate. Current release status is tracked
+in [the release receipt](REVIEWER_LIFECYCLE_RELEASE_2026-09-05.md).
 
 The parent applied sweep Mode A to policy authority and the receipt meaning.
 Authoritative inputs were the owner's three approvals, the source paths and

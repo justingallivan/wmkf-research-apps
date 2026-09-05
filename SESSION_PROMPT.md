@@ -1,4 +1,4 @@
-# Session 484 Prompt: Publish Verified Reviewer Lifecycle Changes
+# Session 484 Prompt: Rehearse Published Reviewer Lifecycle Changes
 
 ## Session 483 Summary
 
@@ -45,7 +45,8 @@ reviews. All approved pre-push implementation is complete locally.
 
 The branch also includes the earlier locally completed Stage 1B source
 `08752364`, review/handoff and narrowly scoped email-font exceptions `2a792393`.
-Stage 1A was previously published. Later commits remain local.
+Stage 1A was previously published. The approved branch was first published
+through `d76b3bb5` to `origin/codex/reviewer-lifecycle-approved-policies`.
 
 ### Final Verification
 
@@ -81,19 +82,35 @@ scanner's 21 advisory findings remain documented in the Stage 1B handoff.
 
 ## Next Items
 
-### Owner Decision Needed
+### Release Rehearsal and Production Decision
 
-**Approve publishing this branch's local commits to the configured public
-GitHub repository.** Automatic approval review previously rejected the Stage 1B
-push because implementation authorization did not explicitly authorize public
-publication. The later policy approvals and continued local work do not override
-that block. Complete source, tests and handoff are now reviewable locally.
-Do not retry through another branch, tool or refspec without explicit public
-publication approval. Main merge/production promotion remains a separate action.
+**Public publication is approved and the branch push succeeded.** On 2026-09-05,
+the owner explicitly approved release/publication after being told the configured
+GitHub repository is public. That approval resolved the earlier Stage 1B push
+block. Production promotion remains subject to the Tier 2 release checks and
+explicit disposition of any missing rehearsal evidence.
+
+[VERIFIED via orchestrator push, upstream setup and matching `ls-remote`]
+The first publication was `d76b3bb5`; `origin/main` was `90053d11` at the
+pre-release check. Review head-specific CI on
+[PR 149](https://github.com/justingallivan/wmkf-research-apps/pull/149) before
+deliberate production promotion. Human rehearsal and production completion
+are not claimed. The
+[release receipt](docs/audits/REVIEWER_LIFECYCLE_RELEASE_2026-09-05.md) records
+the exact PR, preview and deployment evidence as it becomes available.
+
+[VERIFIED via isolated browser run and independent test review] Release rehearsal
+passed **31/31 Chromium cases** (25 existing plus six targeted status scenarios),
+with no external requests or sends. The initial CI's two browser failures were
+stale staff ownership fixtures; `4576f559` corrects the synthetic session/PD
+identity, known GET mocks and existing materials wording. Independent review,
+lint and syntax checks passed; runtime source is unchanged. Initial GitHub Jest
+CI passed 770 suites / 10,850 tests, build and gates. Use PR 149 for the final
+published revision's CI, including the corrected browser cases.
 
 ### Completed / Deferred
 
-Approved Stages 1C, 1D, 1E and 6A are complete locally; no unresolved policy choice
+Approved Stages 1C, 1D, 1E and 6A are implemented, verified and published; no unresolved policy choice
 or required implementation correction remains. Mechanical Stages 2–5 and wider
 6B/6C work remain deferred; no shared action framework or file moves were built.
 
@@ -121,8 +138,9 @@ one-click PDF conversion. The reminder hold remains protected by its gate.
   warning results are not resend instructions. No durable repair queue exists.
   Inline invitation post-delivery stamping and legacy generate-email markAsSent
   retain their separate boundaries.
-- No live Dataverse, Graph/email, cron, migration, backfill, main merge or
-  deployment was performed. Verify branch/HEAD/dirty state before further work;
+- No live Dataverse lifecycle mutation, Graph/email send, cron invocation,
+  migration, backfill, main merge or
+  production deployment was performed. Verify branch/HEAD/dirty state before further work;
   retain the deliberate feature-branch release process.
 
 ### Do Not Reopen Without a New Decision
@@ -132,6 +150,8 @@ flag from this application; BILL API reviewer onboarding.
 
 ## Key Files
 
+- `docs/audits/REVIEWER_LIFECYCLE_RELEASE_2026-09-05.md`: public publication,
+  PR/CI/preview evidence and remaining production-release boundary.
 - `docs/audits/REVIEWER_LIFECYCLE_APPROVED_DECISIONS_2026-09-04.md`: settled
   policy, implemented contracts and scope limits.
 - `docs/audits/REVIEWER_LIFECYCLE_CLAUDE_INDEPENDENT_REVIEW_2026-09-05.md`:
@@ -141,7 +161,7 @@ flag from this application; BILL API reviewer onboarding.
 - Stage 1D, 1E and 6A `RECEIPT` and `REVIEW` files dated 2026-09-05 in
   `docs/audits/`: exact commits, independent findings, validation and boundaries.
 - `docs/audits/REVIEWER_LIFECYCLE_STAGE1B_RECEIPT_2026-09-04.md` and its review:
-  earlier local post-send work and publication boundary.
+  frozen post-send work and the history of publication approval.
 - `docs/audits/REVIEWER_LIFECYCLE_REFACTOR_REPORT_2026-09-04.md`: historical
   investigation and original staged plan; not current implementation status.
 - `tests/integration/reviewer-engagement-races.test.js`: retained lifecycle races
@@ -155,4 +175,5 @@ Keep session evidence on `codex/reviewer-lifecycle-approved-policies` with its
 source. No DEVELOPMENT_LOG milestone entry is required: no production capability,
 cutover or new architecture shipped. The claim-evidence pilot command remained
 unavailable because local state could not be read; no observation row was
-invented. Publication is the remaining owner boundary, not unfinished local code.
+invented. The published branch now proceeds through release rehearsal and CI;
+main merge and production promotion remain deliberate owner decisions.

@@ -161,6 +161,7 @@ named source/policy claims, with deployment and unrelated history excluded.
 Stage 1D source work is complete. Its follow-up Stages 1E and 6A subsequently
 completed at `bab3adea`/`77720b5a` and `5b9964c8`; their separate receipts and
 the approved decisions carry the later evidence. This receipt preserves the
-Stage 1D validation boundary. Public publishing still awaits explicit owner
-approval after the earlier automatic-review rejection. No main merge or
-production promotion occurred.
+Stage 1D validation boundary. Public branch publication was approved and
+completed on 2026-09-05; see [the release receipt](REVIEWER_LIFECYCLE_RELEASE_2026-09-05.md).
+Production promotion remains pending; no main merge or production promotion
+occurred.

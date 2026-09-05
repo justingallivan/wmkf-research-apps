@@ -5,7 +5,7 @@ domain: reviewer-workbench
 status: complete
 canonical: false
 owner: product-engineering
-last_verified: 2026-09-04
+last_verified: 2026-09-05
 ---
 
 # Reviewer lifecycle Stage 1B receipt
@@ -215,7 +215,9 @@ are separately stated below. No DEVELOPMENT_LOG milestone is
 required because no production capability or architecture shipped. The
 claim-evidence pilot report was unavailable; no observation row was invented.
 
-## Publication boundary
+## Publication history and current release status
+
+### Historical block — Stage 1B push attempt (2026-09-04)
 
 Source and verification are complete on `codex/reviewer-lifecycle-stage1b`.
 Implementation `08752364` and review/handoff `e24597b7` are committed locally.
@@ -227,3 +229,16 @@ cover Stage 1B. No Stage 1B commit has been pushed. Public publication of this
 stage's fix, tests and handoff needs explicit owner approval before retrying;
 all source, tests, review and local handoff work is complete. No merge to main
 or production promotion was performed.
+
+### Current status — public publication approved (2026-09-05)
+
+The owner explicitly approved release/publication after being told the configured
+GitHub repository is public. [VERIFIED via orchestrator push, upstream setup and
+matching `ls-remote`] This Stage 1B source and handoff were first published within
+`origin/codex/reviewer-lifecycle-approved-policies` at `d76b3bb5`.
+`origin/main` was `90053d11` at that check; no main merge or production deployment was
+performed. The historical publication block above is resolved. Release rehearsal
+and CI precede a deliberate production-merge decision; human rehearsal and
+production completion are not claimed. See
+[the release receipt](REVIEWER_LIFECYCLE_RELEASE_2026-09-05.md) for the exact PR,
+preview and deployment evidence.

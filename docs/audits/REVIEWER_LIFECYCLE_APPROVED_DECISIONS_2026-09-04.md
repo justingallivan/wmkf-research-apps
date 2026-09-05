@@ -43,9 +43,16 @@ reviewed. Stage 6A's exact response/consumer contract was reviewed before edits.
 All approved local work is complete. Mechanical Stages 2–5 and wider 6B/6C
 work remain deferred; no general action framework or file moves were included.
 
-No live Dataverse, email, cron, schema operation, historical repair, main merge
-or production promotion is included. Public publication remains unapproved;
-the earlier automatic-review block is not overridden by these policy choices.
+No live Dataverse lifecycle mutation, email, cron, schema operation, historical repair, main merge
+or production promotion is included. On 2026-09-05, after being told the configured
+repository is public, the owner explicitly approved release/publication,
+resolving the earlier automatic-review publication block. [VERIFIED via
+orchestrator push, upstream setup and matching `ls-remote`] The approved branch
+was first published at `d76b3bb5` on `origin/codex/reviewer-lifecycle-approved-policies`;
+`origin/main` was `90053d11` at that check. Release rehearsal and CI precede a deliberate
+production-merge decision; neither human rehearsal nor production
+completion is claimed. See [the release receipt](REVIEWER_LIFECYCLE_RELEASE_2026-09-05.md)
+for the exact PR, preview and deployment evidence.
 
 ## Contract-reconcile invariants before implementation
 

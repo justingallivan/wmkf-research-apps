@@ -117,4 +117,6 @@ Source comments and unchanged tests agree with the clarified operation/identity
 contract. Repeated scoped searches and semantic comparison found **zero
 remaining live stale claims** in this domain. No unknown behavior is promoted
 to a live-state claim. Verdict: **RECONCILED** for this bounded documentation
-follow-up. Public push, main merge and deployment remain separate owner boundaries.
+follow-up. Public branch publication was subsequently approved and completed on
+2026-09-05; see [the release receipt](REVIEWER_LIFECYCLE_RELEASE_2026-09-05.md).
+Main merge and production promotion remain pending.

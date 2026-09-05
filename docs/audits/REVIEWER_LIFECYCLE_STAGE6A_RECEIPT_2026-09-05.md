@@ -134,8 +134,10 @@ zero runtime-error suites). See
 commands passed; duplicate CI/no-write aliases were excluded. The final durable
 handoff is also checked by the 11-command sequential documentation battery.
 Artifacts: `/tmp/reviewer-stage6a-gates.json` and
-`/tmp/reviewer-stage6a-final-doc-gates.json`. Stage 6A is complete locally;
-public publication and production promotion remain separate owner boundaries.
+`/tmp/reviewer-stage6a-final-doc-gates.json`. Stage 6A is complete locally.
+Public branch publication was subsequently approved and completed on 2026-09-05;
+see [the release receipt](REVIEWER_LIFECYCLE_RELEASE_2026-09-05.md).
+Production promotion remains pending.
 
 ## Audit and operational limits
 
