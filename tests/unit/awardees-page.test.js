@@ -11,6 +11,14 @@ jest.mock('../../shared/components/Layout', () => ({
   __esModule: true,
   default: ({ children }) => <div>{children}</div>,
   Card: ({ children }) => <div>{children}</div>,
+  PageHeader: ({ title, subtitle, icon, children }) => (
+    <div>
+      {icon && <span>{icon}</span>}
+      <h1>{title}</h1>
+      {subtitle && <p>{subtitle}</p>}
+      {children}
+    </div>
+  ),
 }));
 jest.mock('../../shared/components/RequireAppAccess', () => ({
   __esModule: true,
