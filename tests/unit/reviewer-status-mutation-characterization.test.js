@@ -253,6 +253,25 @@ describe.each([false, true])('Stage 1E rendered status contract (StrictMode: %s)
     expect(screen.queryByText('Updating status…')).not.toBeInTheDocument();
   });
 
+  test('synchronous reentrant live DOM status events acquire only one mutex', async () => {
+    const job = deferred();
+    let select;
+    statusFetch.mockImplementationOnce(() => {
+      // Reenter before the first event can commit its closed/pending menu.
+      expect(select).toBeInTheDocument();
+      expect(select).toBeEnabled();
+      fireEvent.change(select, { target: { value: 'review_received' } });
+      return job.promise;
+    }).mockReturnValue(job.promise);
+    const onRefresh = jest.fn();
+    renderPanel({ onRefresh });
+    select = openStatus();
+    fireEvent.change(select, { target: { value: 'under_review' } });
+    expect(statusFetch).toHaveBeenCalledTimes(1);
+    await act(async () => job.resolve(response()));
+    expect(onRefresh.mock.calls).toEqual([[]]);
+  });
+
   test('different reviewers can proceed independently and one completion does not unlock the other', async () => {
     const first = deferred();
     const second = deferred();
