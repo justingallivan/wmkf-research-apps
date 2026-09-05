@@ -1,7 +1,8 @@
 /**
  * @jest-environment node
  *
- * Stage 0 composed race baseline. Reviewer services, adapters, DAL context,
+ * Composed reviewer races: Stage 1A expiry and Stage 1B email regressions plus
+ * the remaining Stage 0 characterizations. Services, adapters, DAL context,
  * Dynamics reads/writes, annotation processing and If-Match transport are real.
  * Only external email/token/question/SQL dependencies are replaced. A KNOWN
  * DEFECT assertion pins existing behavior for a later semantic change; it is
@@ -46,6 +47,7 @@ import { patchMyCandidates } from '../../lib/services/reviewer-finder/my-candida
 import { patchReviewers } from '../../lib/services/review-manager/reviewers-service';
 import { markReceivedNoFile } from '../../lib/services/review-manager/mark-received-no-file-service';
 import { transitionReviewersTerminal } from '../../lib/services/review-manager/terminal-transition-service';
+import { closeReview } from '../../lib/services/review-manager/close-review-service';
 import { REVIEW_STATUS_MAP, RESPONSE_TYPE_MAP } from '../../shared/config/reviewerLifecycle';
 import { sql } from '@vercel/postgres';
 import { getReviewSynthesisJobState } from '../../lib/services/review-synthesis-job-service';
@@ -135,20 +137,27 @@ afterEach(async () => {
 function writes() { return transport.requests.filter((request) => request.method !== 'GET'); }
 function send(templateType = 'followup') {
   const events = [];
-  const body = templateType === 'materials'
+  const needsLink = templateType === 'materials' || templateType === 'invitation';
+  const body = needsLink
     ? 'Dear Reviewer,\n\nPlease review:\nhttps://reviews.example.org/external/review/aaa.bbb.ccc\n\nThank you.'
     : 'Dear Reviewer,\n\nA reminder about your review.\n\nThank you.';
   const promise = trusted(() => sendEmails({
     requestBody: { templateType, drafts: [{ suggestionId: ID, subject: 'Reviewer message', body,
-      externalLinkExpected: templateType === 'materials' }] },
+      externalLinkExpected: needsLink }] },
     fromEmail: 'staff@example.org',
   }, (event) => events.push(event)));
   return { promise, events };
 }
 function assertSent(events, count = 1) {
   expect(events.filter((event) => event.event === 'email_sent')).toHaveLength(count);
-  expect(events.find((event) => event.event === 'result').data.sent).toHaveLength(count);
+  const result = events.find((event) => event.event === 'result').data;
+  expect(result.sent).toHaveLength(count);
+  expect(result.sent).toEqual(expect.arrayContaining([expect.objectContaining({ suggestionId: ID, emailId: expect.any(String) })]));
+  expect(result.sent).toEqual(events.filter((event) => event.event === 'email_sent').map((event) => event.data));
+  expect(result).toMatchObject({ failed: [], skipped: [], unconfirmed: [], stats: { sent: count, failed: 0, skipped: 0, unconfirmed: 0 } });
+  expect(events.filter((event) => ['email_failed', 'email_unconfirmed', 'error'].includes(event.event))).toEqual([]);
   expect(events.slice(-2).map((event) => event.event)).toEqual(['result', 'complete']);
+  expect(events.at(-1).data).toMatchObject({ sent: count, failed: 0, skipped: 0, unconfirmed: 0 });
 }
 
 describe('F2 stale invitation discovery versus newer state', () => {
@@ -345,7 +354,34 @@ describe('F2 stale invitation discovery versus newer state', () => {
 });
 
 describe('F4 post-send bookkeeping races through the real adapter', () => {
-  test.each(['materials', 'followup'])('KNOWN DEFECT F4: %s bookkeeping borrows the receipt version and regresses Review Received', async (templateType) => {
+  async function makeTerminal(status) {
+    if (status === 'complete') {
+      await trusted(() => markReceivedNoFile({ suggestionId: ID }));
+      expect(await trusted(() => closeReview({
+        suggestionId: ID, disposition: 'not_applicable', authorizedRequestId: REQUEST,
+      }))).toMatchObject({ status: 'closed' });
+    } else {
+      expect(await trusted(() => transitionReviewersTerminal({
+        requestId: REQUEST, suggestionIds: [ID], terminalStatus: status,
+      }))).toMatchObject({ transitioned: 1 });
+    }
+    return transport.get(SET, ID);
+  }
+
+  function assertBookkeepingWarning(events) {
+    assertSent(events);
+    expect(events).toContainEqual({ event: 'progress', data: expect.objectContaining({
+      stage: 'updating_lifecycle', message: expect.stringContaining('Warning: lifecycle update failed'),
+    }) });
+  }
+
+  function assertDeliveryStamp(templateType, expectedCount = 1) {
+    const current = transport.get(SET, ID);
+    if (templateType === 'materials') expect(current.wmkf_materialssentat).toEqual(expect.any(String));
+    else expect(current).toMatchObject({ wmkf_remindersentat: expect.any(String), wmkf_remindercount: expectedCount });
+  }
+
+  test.each(['materials', 'followup'])('F4 regression: %s bookkeeping preserves Review Received after delivery', async (templateType) => {
     const originalVersion = transport.get(SET, ID)._etag;
     let receiptVersion;
     email.mockImplementationOnce(async () => {
@@ -362,36 +398,36 @@ describe('F4 post-send bookkeeping races through the real adapter', () => {
     expect(receiptVersion).not.toBe(originalVersion);
     expect(writes().at(-1).headers['If-Match']).toBe(receiptVersion);
     expect(transport.get(SET, ID)).toMatchObject({
-      wmkf_reviewstatus: REVIEW_STATUS_MAP[templateType === 'materials' ? 'materials_sent' : 'under_review'],
+      wmkf_reviewstatus: REVIEW_STATUS_MAP.review_received,
       wmkf_reviewreceivedat: expect.any(String), wmkf_reviewuploadedbystaff: true,
     });
+    expect(writes().at(-1).body).not.toHaveProperty('wmkf_reviewstatus');
+    assertDeliveryStamp(templateType);
   });
 
-  test('terminal transition during send is preserved and emits a bookkeeping warning after successful delivery', async () => {
+  test.each(['materials', 'followup'].flatMap((template) => ['complete', 'withdrew', 'released'].map((status) => [template, status])))('%s bookkeeping preserves %s committed during delivery and warns after the successful send', async (templateType, status) => {
     const log = jest.spyOn(console, 'error').mockImplementation(() => {});
+    let winner;
     email.mockImplementationOnce(async () => {
-      const terminal = await transitionReviewersTerminal({ requestId: REQUEST, suggestionIds: [ID], terminalStatus: 'released' });
-      expect(terminal.transitioned).toBe(1);
+      winner = await makeTerminal(status);
       return { emailId: 'sent-before-close' };
     });
-    const run = send();
+    const run = send(templateType);
     await run.promise;
 
-    assertSent(run.events);
+    assertBookkeepingWarning(run.events);
     expect(email).toHaveBeenCalledTimes(1);
-    expect(transport.get(SET, ID)).toMatchObject({
-      wmkf_reviewstatus: REVIEW_STATUS_MAP.released, wmkf_externaltokenrevoked: true, wmkf_remindercount: 0,
-    });
-    expect(writes()).toHaveLength(1);
-    expect(run.events).toContainEqual({ event: 'progress', data: expect.objectContaining({ message: expect.stringContaining('Warning: lifecycle update failed') }) });
-    expect(log).toHaveBeenCalledWith(expect.stringContaining('email already sent'), expect.stringContaining('closed review status'));
+    expect(transport.get(SET, ID)).toEqual(winner);
+    expect(writes().filter((request) => request.body?.wmkf_remindercount !== undefined || request.body?.wmkf_materialssentat)).toHaveLength(0);
+    expect(log).toHaveBeenCalledWith(expect.stringContaining('email already sent'), expect.any(String));
   });
 
-  test('412 after bookkeeping guard preserves the competing receipt and never resends transport', async () => {
+  test.each(['materials', 'followup'])('F4 regression: 412 after the %s bookkeeping read preserves the receipt and retries only the delivered stamp', async (templateType) => {
     jest.spyOn(console, 'error').mockImplementation(() => {});
-    const pause = transport.pauseNext((request) => request.method === 'PATCH' && request.body?.wmkf_remindercount === 1);
-    const run = send();
-    await pause.reached;
+    const stampField = templateType === 'materials' ? 'wmkf_materialssentat' : 'wmkf_remindersentat';
+    const pause = transport.pauseNext((request) => request.method === 'PATCH' && request.body?.[stampField]);
+    const run = send(templateType);
+    const staleWrite = await pause.reached;
     let winner;
     try {
       await trusted(() => markReceivedNoFile({ suggestionId: ID }));
@@ -401,12 +437,23 @@ describe('F4 post-send bookkeeping races through the real adapter', () => {
 
     assertSent(run.events);
     expect(email).toHaveBeenCalledTimes(1);
-    expect(transport.get(SET, ID)).toEqual(winner);
-    expect(writes().find((request) => request.body?.wmkf_remindercount === 1).status).toBe(412);
-    expect(run.events.some((event) => event.data?.message?.includes('Warning: lifecycle update failed'))).toBe(true);
+    expect(transport.get(SET, ID)).toMatchObject({
+      wmkf_reviewstatus: winner.wmkf_reviewstatus,
+      wmkf_reviewreceivedat: winner.wmkf_reviewreceivedat,
+      wmkf_reviewuploadedbystaff: winner.wmkf_reviewuploadedbystaff,
+    });
+    expect(staleWrite.status).toBe(412);
+    const retry = writes().at(-1);
+    expect(retry.status).toBe(204);
+    expect(retry.headers['If-Match']).toBe(winner._etag);
+    expect(retry.body).not.toHaveProperty('wmkf_reviewstatus');
+    expect(retry.body[stampField]).toBe(staleWrite.body[stampField]);
+    expect(writes()).toHaveLength(3);
+    assertDeliveryStamp(templateType);
+    expect(run.events.some((event) => event.data?.message?.includes('Warning: lifecycle update failed'))).toBe(false);
   });
 
-  test.each(['accepted', 'under_review'])('KNOWN DEFECT F4: concurrent reminders from %s each send but persist only one increment', async (sourceStatus) => {
+  test.each(['accepted', 'under_review'])('F4 regression: concurrent reminders from %s each persist an increment', async (sourceStatus) => {
     transport.seed(SET, row({ wmkf_reviewstatus: REVIEW_STATUS_MAP[sourceStatus], wmkf_remindercount: 7 }));
     let releaseFirst;
     let firstReached;
@@ -432,18 +479,263 @@ describe('F4 post-send bookkeeping races through the real adapter', () => {
     expect(writes()).toHaveLength(2);
     expect(writes().every((request) => request.status === 204)).toBe(true);
     expect(secondRow.wmkf_remindercount).toBe(8);
-    expect(writes().at(-1).headers['If-Match']).toBe(sourceStatus === 'accepted' ? secondRow._etag : undefined);
-    expect(transport.get(SET, ID).wmkf_remindercount).toBe(8);
+    expect(writes().at(-1).headers['If-Match']).toBe(secondRow._etag);
+    expect(transport.get(SET, ID).wmkf_remindercount).toBe(9);
   });
 
-  test('KNOWN DEFECT F4: status bookkeeping with missing guard ETag falls through to an unconditional write', async () => {
-    transport.seed(SET, row({ _etag: null }));
+  test.each(['accepted', 'under_review'])('F4 regression: same-version %s reminder PATCHes retry only bookkeeping with the fresh count and ETag', async (sourceStatus) => {
+    transport.seed(SET, row({ wmkf_reviewstatus: REVIEW_STATUS_MAP[sourceStatus], wmkf_remindercount: 7 }));
+    const sharedVersion = transport.get(SET, ID)._etag;
+    const firstWritePause = transport.pauseNext((request) => request.method === 'PATCH' && request.body?.wmkf_remindercount === 8);
+    const first = send();
+    const firstWrite = await firstWritePause.reached;
+    const secondWritePause = transport.pauseNext((request) => request.method === 'PATCH' && request.body?.wmkf_remindercount === 8);
+    const second = send();
+    const secondWrite = await secondWritePause.reached;
+    let secondRow;
+    try {
+      secondWritePause.release();
+      await second.promise;
+      secondRow = transport.get(SET, ID);
+    } finally {
+      secondWritePause.release();
+      firstWritePause.release();
+    }
+    await first.promise;
+
+    assertSent(first.events);
+    assertSent(second.events);
+    expect(firstWrite.headers['If-Match']).toBe(sharedVersion);
+    expect(secondWrite.headers['If-Match']).toBe(sharedVersion);
+    expect(secondRow.wmkf_remindercount).toBe(8);
+    expect(email).toHaveBeenCalledTimes(2);
+    expect(writes()).toHaveLength(3);
+    expect(firstWrite.status).toBe(412);
+    expect(secondWrite.status).toBe(204);
+    const retriedWrite = writes().at(-1);
+    expect(retriedWrite).toMatchObject({ status: 204, body: { wmkf_remindercount: 9 } });
+    expect(retriedWrite.headers['If-Match']).toBe(secondRow._etag);
+    expect(retriedWrite.headers['If-Match']).not.toBe(sharedVersion);
+    const retryRequests = transport.requests.slice(transport.requests.indexOf(secondWrite) + 1);
+    expect(retryRequests.some((request) => request.method === 'GET' && request.entitySet === SET && request.key === ID)).toBe(true);
+    expect(transport.get(SET, ID)).toMatchObject({ wmkf_reviewstatus: REVIEW_STATUS_MAP.under_review, wmkf_remindercount: 9 });
+    expect([...first.events, ...second.events].some((event) => event.data?.message?.includes('Warning: lifecycle update failed'))).toBe(false);
+  });
+
+  test.each(['materials', 'followup'].flatMap((template) => ['complete', 'withdrew', 'released'].map((status) => [template, status])))('F4 regression: %s bookkeeping retries after %s wins the write race without resending delivery', async (templateType, status) => {
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    const stampField = templateType === 'materials' ? 'wmkf_materialssentat' : 'wmkf_remindersentat';
+    const pause = transport.pauseNext((request) => request.method === 'PATCH' && request.body?.[stampField]);
+    const run = send(templateType);
+    const pendingWrite = await pause.reached;
+    let winner;
+    try { winner = await makeTerminal(status); }
+    finally { pause.release(); }
+    await run.promise;
+
+    assertBookkeepingWarning(run.events);
+    expect(email).toHaveBeenCalledTimes(1);
+    expect(pendingWrite.status).toBe(412);
+    expect(transport.get(SET, ID)).toEqual(winner);
+    expect(writes().filter((request) => request.body?.[stampField])).toHaveLength(1);
+  });
+
+  test.each(['materials', 'followup'])('F4 regression: %s preserves a receipt timestamp on an older accepted status while recording delivery', async (templateType) => {
+    let receipt;
+    email.mockImplementationOnce(async () => {
+      // Legacy receipt producers could leave status at accepted. The receipt
+      // timestamp itself must suppress an otherwise eligible status advance.
+      receipt = transport.patch(SET, ID, { wmkf_reviewreceivedat: RECEIVED });
+      return { emailId: 'receipt-timestamp-winner' };
+    });
+    const run = send(templateType);
+    await run.promise;
+    assertSent(run.events);
+    expect(email).toHaveBeenCalledTimes(1);
+    expect(writes()).toHaveLength(1);
+    expect(writes()[0].headers['If-Match']).toBe(receipt._etag);
+    expect(writes()[0].body).not.toHaveProperty('wmkf_reviewstatus');
+    expect(transport.get(SET, ID)).toMatchObject({ wmkf_reviewstatus: REVIEW_STATUS_MAP.accepted, wmkf_reviewreceivedat: RECEIVED });
+    assertDeliveryStamp(templateType);
+  });
+
+  test.each([
+    [null, null],
+    [REVIEW_STATUS_MAP.accepted, REVIEW_STATUS_MAP.under_review],
+    [REVIEW_STATUS_MAP.materials_sent, REVIEW_STATUS_MAP.under_review],
+    [REVIEW_STATUS_MAP.under_review, REVIEW_STATUS_MAP.under_review],
+    [REVIEW_STATUS_MAP.review_received, REVIEW_STATUS_MAP.review_received],
+  ])('followup status %s advances only to %s and always records its delivered increment conditionally', async (sourceStatus, expectedStatus) => {
+    transport.seed(SET, row({ wmkf_reviewstatus: sourceStatus }));
+    const version = transport.get(SET, ID)._etag;
     const run = send();
     await run.promise;
     assertSent(run.events);
     expect(writes()).toHaveLength(1);
-    expect(writes()[0].headers['If-Match']).toBeUndefined();
-    expect(transport.get(SET, ID).wmkf_reviewstatus).toBe(REVIEW_STATUS_MAP.under_review);
+    expect(writes()[0].headers['If-Match']).toBe(version);
+    expect(transport.get(SET, ID).wmkf_reviewstatus).toBe(expectedStatus);
+    assertDeliveryStamp('followup');
+  });
+
+  test.each([
+    ['completion timestamp without terminal status', { wmkf_completedat: COMPLETED }],
+    ['unknown nonnull status', { wmkf_reviewstatus: 999 }],
+    ['changed request binding', { _wmkf_request_value: OTHER }],
+    ['changed reviewer binding', { _wmkf_potentialreviewer_value: OTHER }],
+    ['missing request binding', { _wmkf_request_value: null }],
+    ['missing reviewer binding', { _wmkf_potentialreviewer_value: null }],
+  ])('F4 regression: %s after delivery warns and performs no bookkeeping write', async (_label, mutation) => {
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    let winner;
+    email.mockImplementationOnce(async () => {
+      winner = transport.patch(SET, ID, mutation);
+      return { emailId: 'delivered-before-state-changed' };
+    });
+    const run = send();
+    await run.promise;
+    assertBookkeepingWarning(run.events);
+    expect(email).toHaveBeenCalledTimes(1);
+    expect(writes()).toEqual([]);
+    expect(transport.get(SET, ID)).toEqual(winner);
+  });
+
+  test.each([
+    ['request binding', { _wmkf_request_value: OTHER }],
+    ['reviewer binding', { _wmkf_potentialreviewer_value: OTHER }],
+    ['completion timestamp', { wmkf_completedat: COMPLETED }],
+    ['unknown status', { wmkf_reviewstatus: 999 }],
+  ])('F4 regression: changed %s after the read wins the PATCH and stops bookkeeping retry', async (_label, mutation) => {
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    const pause = transport.pauseNext((request) => request.method === 'PATCH' && request.body?.wmkf_remindercount === 1);
+    const run = send();
+    const staleWrite = await pause.reached;
+    const winner = transport.patch(SET, ID, mutation);
+    pause.release();
+    await run.promise;
+    assertBookkeepingWarning(run.events);
+    expect(email).toHaveBeenCalledTimes(1);
+    expect(writes()).toHaveLength(1);
+    expect(staleWrite.status).toBe(412);
+    expect(transport.get(SET, ID)).toEqual(winner);
+  });
+
+  test('post-send bookkeeping does not invent accepted, selected, response or token gates for an otherwise known status', async () => {
+    const changed = { wmkf_accepted: false, wmkf_selected: false, wmkf_declined: true,
+      wmkf_responsetype: RESPONSE_TYPE_MAP.declined, wmkf_externaltokenrevoked: true };
+    email.mockImplementationOnce(async () => {
+      transport.patch(SET, ID, changed);
+      return { emailId: 'delivered-with-legacy-state' };
+    });
+    const run = send();
+    await run.promise;
+    assertSent(run.events);
+    expect(writes()).toHaveLength(1);
+    expect(transport.get(SET, ID)).toMatchObject(changed);
+    assertDeliveryStamp('followup');
+  });
+
+  test.each(['read', 'write'])('F4 regression: a non-412 bookkeeping %s error keeps the delivery sent and never retries transport', async (phase) => {
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    const rejected = [];
+    const before = transport.get(SET, ID);
+    email.mockImplementationOnce(async () => {
+      global.fetch.mockImplementation(async (url, options = {}) => {
+        const method = options.method || 'GET';
+        if (url.includes(`${SET}(${ID})`) && method === (phase === 'read' ? 'GET' : 'PATCH')) {
+          rejected.push({ url, options });
+          // Text containing 412 must not turn a different HTTP error into a
+          // concurrency retry. This is a modeled HTTP response, not a rejected
+          // transport promise swallowed by the harness.
+          const body = { error: { message: 'Fixture forbidden; reference 412 is not the HTTP status' } };
+          return { ok: false, status: 403, headers: { get: () => 'application/json' },
+            text: async () => JSON.stringify(body), json: async () => body };
+        }
+        return transport.fetch(url, options);
+      });
+      return { emailId: 'sent-before-bookkeeping-error' };
+    });
+    const run = send();
+    await run.promise;
+    assertBookkeepingWarning(run.events);
+    expect(email).toHaveBeenCalledTimes(1);
+    expect(rejected).toHaveLength(1);
+    expect(transport.get(SET, ID)).toEqual(before);
+    expect(writes()).toHaveLength(0);
+    if (phase === 'write') expect(rejected[0].options.headers['If-Match']).toBe(before._etag);
+  });
+
+  test('F4 regression: three actual 412 conflicts exhaust bookkeeping without an unconditional fallback or another delivery', async () => {
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    let conflicts = 0;
+    email.mockImplementationOnce(async () => {
+      global.fetch.mockImplementation(async (url, options = {}) => {
+        if (url.includes(`${SET}(${ID})`) && options.method === 'PATCH') {
+          conflicts += 1;
+          transport.patch(SET, ID, { wmkf_notes: `Competing writer ${conflicts}` });
+        }
+        return transport.fetch(url, options);
+      });
+      return { emailId: 'sent-before-repeated-conflict' };
+    });
+    const run = send();
+    await run.promise;
+    assertBookkeepingWarning(run.events);
+    expect(email).toHaveBeenCalledTimes(1);
+    expect(conflicts).toBe(3);
+    expect(writes()).toHaveLength(3);
+    expect(writes().every((request) => request.status === 412 && request.headers['If-Match'])).toBe(true);
+    expect(new Set(writes().map((request) => request.headers['If-Match'])).size).toBe(3);
+    expect(transport.get(SET, ID)).toMatchObject({ wmkf_reviewstatus: REVIEW_STATUS_MAP.accepted, wmkf_remindercount: 0, wmkf_notes: 'Competing writer 3' });
+    expect(transport.get(SET, ID)).not.toHaveProperty('wmkf_remindersentat');
+  });
+
+  test.each([null, '*', 'W/" "', ' W/"12"', 'W/"12" ', 'malformed'])('F4 regression: bookkeeping with invalid ETag %p never writes unconditionally', async (etag) => {
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    transport.seed(SET, row({ _etag: etag }));
+    const run = send();
+    await run.promise;
+    assertBookkeepingWarning(run.events);
+    expect(email).toHaveBeenCalledTimes(1);
+    expect(writes()).toHaveLength(0);
+    expect(transport.get(SET, ID).wmkf_reviewstatus).toBe(REVIEW_STATUS_MAP.accepted);
+  });
+
+  test('invitation stamping remains inline before email_sent and never enters post-loop bookkeeping', async () => {
+    transport.seed(SET, pending({ wmkf_invited: false, wmkf_emailsentat: null }));
+    transport.patch(REQUESTS, REQUEST, { _wmkf_programdirector_value: OTHER });
+    transport.seed('systemusers', { systemuserid: OTHER, fullname: 'Program Director',
+      internalemailaddress: 'pd@example.org', isdisabled: false });
+    const pause = transport.pauseNext((request) => request.method === 'PATCH' && request.body?.wmkf_invited === true);
+    const run = send('invitation');
+    await pause.reached;
+    const eventsWhileStampPending = run.events.map((event) => event.event);
+    pause.release();
+    await run.promise;
+
+    assertSent(run.events);
+    expect(email).toHaveBeenCalledTimes(1);
+    expect(eventsWhileStampPending).not.toContain('email_sent');
+    expect(writes()).toHaveLength(1);
+    expect(writes()[0].body).toMatchObject({ wmkf_invited: true, wmkf_emailsentat: expect.any(String), wmkf_respondremindersentat: null });
+    expect(run.events.find((event) => event.event === 'email_sent').data.inviteRecorded).toBe(true);
+    expect(run.events.some((event) => event.data?.stage === 'updating_lifecycle')).toBe(false);
+  });
+
+  test.each(['accepted', 'complete', 'withdrew', 'released'])('manual thankyou remains a separate delivery-only stamp for %s', async (status) => {
+    const before = status === 'accepted' ? transport.get(SET, ID) : await makeTerminal(status);
+    const run = send('thankyou');
+    await run.promise;
+
+    assertSent(run.events);
+    expect(email).toHaveBeenCalledTimes(1);
+    const thankyouWrites = writes().filter((request) => request.body?.wmkf_thankyousentat);
+    expect(thankyouWrites).toHaveLength(1);
+    expect(thankyouWrites[0].headers['If-Match']).toBe(before._etag);
+    expect(thankyouWrites[0].body).toEqual({ wmkf_thankyousentat: expect.any(String) });
+    const existingFields = { ...before };
+    delete existingFields._etag;
+    expect(transport.get(SET, ID)).toMatchObject(existingFields);
+    expect(run.events.some((event) => event.data?.message?.includes('Warning: lifecycle update failed'))).toBe(false);
   });
 });
 

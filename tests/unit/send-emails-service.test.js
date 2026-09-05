@@ -168,6 +168,12 @@ const draft = (id) => ({
   body: `B\nhttps://reviews.example.org/external/review/${TOKEN}`,
   externalLinkExpected: true,
 });
+const followupDraft = (id) => ({
+  suggestionId: id,
+  subject: 'Reminder',
+  body: 'Please use your original materials-email link.',
+  externalLinkExpected: false,
+});
 
 describe('send-emails-service — fail-closed templateType', () => {
   test('unknown templateType: ONE error event, resolves, no result/complete, no adapter work', async () => {
@@ -341,6 +347,343 @@ describe('send-emails-service — lifecycle-after-send ordering', () => {
   });
 });
 
+describe('send-emails-service — fresh post-send bookkeeping', () => {
+  test('a receipt committed during materials transport is not regressed to materials_sent', async () => {
+    SUGGESTIONS[SUG_OK] = suggestion(SUG_OK, {
+      wmkf_accepted: true,
+      wmkf_reviewstatus: 100000000,
+    });
+    createAndSendEmail.mockImplementationOnce(async () => {
+      SUGGESTIONS[SUG_OK] = suggestion(SUG_OK, {
+        wmkf_accepted: true,
+        wmkf_reviewstatus: 100000003,
+        wmkf_reviewreceivedat: '2026-09-04T18:00:00.000Z',
+        _etag: 'W/"2"',
+      });
+      return { emailId: 'email-receipt-race' };
+    });
+
+    const emitted = await run({ drafts: [draft(SUG_OK)], templateType: 'materials' });
+
+    expect(updateLifecycle).toHaveBeenCalledWith(
+      SUG_OK,
+      { materialsSentAt: expect.any(String) },
+      { actingUserSystemId: 'u-1', ifMatch: 'W/"2"' },
+    );
+    expect(createAndSendEmail).toHaveBeenCalledTimes(1);
+    expect(resultOf(emitted).stats).toMatchObject({ sent: 1, failed: 0 });
+    expect(names(emitted).slice(-2)).toEqual(['result', 'complete']);
+  });
+
+  test('a follow-up increments the count read after delivery and writes that exact version', async () => {
+    SUGGESTIONS[SUG_OK] = suggestion(SUG_OK, {
+      wmkf_accepted: true,
+      wmkf_reviewstatus: 100000001,
+      wmkf_remindercount: 7,
+    });
+    createAndSendEmail.mockImplementationOnce(async () => {
+      SUGGESTIONS[SUG_OK] = { ...SUGGESTIONS[SUG_OK], wmkf_remindercount: 8, _etag: 'W/"2"' };
+      return { emailId: 'email-count-race' };
+    });
+
+    const emitted = await run({
+      drafts: [followupDraft(SUG_OK)],
+      templateType: 'followup',
+    });
+
+    expect(updateLifecycle).toHaveBeenCalledWith(
+      SUG_OK,
+      { reminderSentAt: expect.any(String), reminderCount: 9, reviewStatus: 'under_review' },
+      { actingUserSystemId: 'u-1', ifMatch: 'W/"2"' },
+    );
+    expect(createAndSendEmail).toHaveBeenCalledTimes(1);
+    expect(resultOf(emitted).stats).toMatchObject({ sent: 1, failed: 0 });
+    expect(names(emitted).slice(-2)).toEqual(['result', 'complete']);
+  });
+
+  test('numeric 412 re-reads and recomputes bookkeeping without another transport send', async () => {
+    SUGGESTIONS[SUG_OK] = suggestion(SUG_OK, {
+      wmkf_accepted: true,
+      wmkf_reviewstatus: 100000001,
+      wmkf_remindercount: 7,
+    });
+    updateLifecycle.mockImplementationOnce(async () => {
+      SUGGESTIONS[SUG_OK] = {
+        ...SUGGESTIONS[SUG_OK],
+        wmkf_remindercount: 8,
+        wmkf_reviewstatus: 100000003,
+        wmkf_reviewreceivedat: '2026-09-04T18:00:00.000Z',
+        _etag: 'W/"2"',
+      };
+      throw Object.assign(new Error('concurrent write'), { status: 412 });
+    });
+
+    const emitted = await run({ drafts: [followupDraft(SUG_OK)], templateType: 'followup' });
+
+    expect(updateLifecycle).toHaveBeenCalledTimes(2);
+    expect(updateLifecycle).toHaveBeenNthCalledWith(1, SUG_OK,
+      { reminderSentAt: expect.any(String), reminderCount: 8, reviewStatus: 'under_review' },
+      { actingUserSystemId: 'u-1', ifMatch: 'W/"1"' });
+    expect(updateLifecycle).toHaveBeenNthCalledWith(2, SUG_OK,
+      { reminderSentAt: expect.any(String), reminderCount: 9 },
+      { actingUserSystemId: 'u-1', ifMatch: 'W/"2"' });
+    expect(createAndSendEmail).toHaveBeenCalledTimes(1);
+    expect(mintAndStore).not.toHaveBeenCalled();
+    expect(resultOf(emitted).stats).toMatchObject({ sent: 1, failed: 0 });
+    expect(names(emitted).slice(-2)).toEqual(['result', 'complete']);
+  });
+
+  test.each([
+    ['missing ETag', { _etag: undefined }],
+    ['empty ETag', { _etag: '' }],
+    ['wildcard ETag', { _etag: '*' }],
+    ['non-string ETag', { _etag: 2 }],
+    ['unquoted ETag', { _etag: '2' }],
+    ['newline ETag', { _etag: 'W/"2"\n' }],
+    ['empty quoted ETag', { _etag: 'W/""' }],
+    ['changed request', { _wmkf_request_value: SUG_MISSING }],
+    ['changed person', { _wmkf_potentialreviewer_value: 'other-person' }],
+    ['missing request', { _wmkf_request_value: null }],
+    ['missing person', { _wmkf_potentialreviewer_value: null }],
+  ])('%s after delivery warns without a lifecycle write or transport resend', async (_label, patch) => {
+    SUGGESTIONS[SUG_OK] = suggestion(SUG_OK, { wmkf_accepted: true });
+    createAndSendEmail.mockImplementationOnce(async () => {
+      SUGGESTIONS[SUG_OK] = { ...SUGGESTIONS[SUG_OK], ...patch };
+      return { emailId: 'email-already-sent' };
+    });
+
+    const emitted = await run({ drafts: [draft(SUG_OK)], templateType: 'materials' });
+
+    expect(updateLifecycle).not.toHaveBeenCalled();
+    expect(createAndSendEmail).toHaveBeenCalledTimes(1);
+    expect(emitted).toContainEqual({ event: 'progress', data: {
+      stage: 'updating_lifecycle', message: expect.stringContaining('Warning: lifecycle update failed'),
+    } });
+    expect(resultOf(emitted).stats).toMatchObject({ sent: 1, failed: 0 });
+    expect(names(emitted).slice(-2)).toEqual(['result', 'complete']);
+  });
+
+  test.each([400, 404, 409, 429, 500, '412', undefined])('write error status %s is not retried', async (status) => {
+    updateLifecycle.mockRejectedValueOnce(Object.assign(new Error('write failed'), { status }));
+
+    const emitted = await run({ drafts: [followupDraft(SUG_OK)], templateType: 'followup' });
+
+    expect(updateLifecycle).toHaveBeenCalledTimes(1);
+    expect(createAndSendEmail).toHaveBeenCalledTimes(1);
+    expect(resultOf(emitted).stats).toMatchObject({ sent: 1, failed: 0 });
+    expect(names(emitted).slice(-2)).toEqual(['result', 'complete']);
+  });
+
+  test('numeric 412 contention is bounded to three bookkeeping attempts', async () => {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      updateLifecycle.mockRejectedValueOnce(Object.assign(new Error('concurrent write'), { status: 412 }));
+    }
+
+    const emitted = await run({ drafts: [followupDraft(SUG_OK)], templateType: 'followup' });
+
+    expect(updateLifecycle).toHaveBeenCalledTimes(3);
+    expect(findById).toHaveBeenCalledTimes(4); // Hydration plus one fresh read per attempt.
+    expect(createAndSendEmail).toHaveBeenCalledTimes(1);
+    expect(resultOf(emitted).stats).toMatchObject({ sent: 1, failed: 0 });
+    expect(names(emitted).slice(-2)).toEqual(['result', 'complete']);
+  });
+
+  test.each([
+    ['receipt with accepted status', { wmkf_reviewstatus: 100000000, wmkf_reviewreceivedat: '2026-09-04T18:00:00.000Z' }],
+    ['received status without timestamp', { wmkf_reviewstatus: 100000003 }],
+  ])('follow-up %s records delivery without status advancement', async (_label, patch) => {
+    SUGGESTIONS[SUG_OK] = suggestion(SUG_OK, { ...patch, wmkf_remindercount: 2 });
+
+    await run({ drafts: [followupDraft(SUG_OK)], templateType: 'followup' });
+
+    expect(updateLifecycle).toHaveBeenCalledWith(SUG_OK,
+      { reminderSentAt: expect.any(String), reminderCount: 3 },
+      { actingUserSystemId: 'u-1', ifMatch: 'W/"1"' });
+  });
+
+  test.each([null, undefined, 100000000, 100000001, 100000002, 100000003])(
+    'follow-up known open/received review status %s preserves its advancement rule', async (status) => {
+      SUGGESTIONS[SUG_OK] = suggestion(SUG_OK, { wmkf_reviewstatus: status });
+
+      await run({ drafts: [followupDraft(SUG_OK)], templateType: 'followup' });
+
+      expect(updateLifecycle).toHaveBeenCalledWith(SUG_OK, {
+        reminderSentAt: expect.any(String), reminderCount: 1,
+        ...([100000000, 100000001].includes(status) ? { reviewStatus: 'under_review' } : {}),
+      }, { actingUserSystemId: 'u-1', ifMatch: 'W/"1"' });
+    },
+  );
+
+  test.each([
+    ['complete', { wmkf_reviewstatus: 100000004 }],
+    ['withdrew', { wmkf_reviewstatus: 100000005 }],
+    ['released', { wmkf_reviewstatus: 100000006 }],
+    ['unknown status', { wmkf_reviewstatus: 199999999 }],
+    ['numeric-string status', { wmkf_reviewstatus: '100000000' }],
+    ['empty status', { wmkf_reviewstatus: '' }],
+    ['completed timestamp with old status', { wmkf_completedat: '2026-09-04T18:00:00.000Z' }],
+  ])('%s after transport receives no materials/follow-up bookkeeping', async (_label, patch) => {
+    for (const templateType of ['materials', 'followup']) {
+      SUGGESTIONS[SUG_OK] = suggestion(SUG_OK, { wmkf_accepted: true });
+      createAndSendEmail.mockImplementationOnce(async () => {
+        SUGGESTIONS[SUG_OK] = { ...SUGGESTIONS[SUG_OK], ...patch, _etag: 'W/"2"' };
+        return { emailId: 'email-closed-race' };
+      });
+
+      const emitted = await run({ drafts: [templateType === 'materials' ? draft(SUG_OK) : followupDraft(SUG_OK)], templateType });
+
+      expect(updateLifecycle).not.toHaveBeenCalled();
+      expect(resultOf(emitted).stats).toMatchObject({ sent: 1, failed: 0 });
+      expect(emitted).toContainEqual({ event: 'progress', data: {
+        stage: 'updating_lifecycle', message: expect.stringContaining('Warning: lifecycle update failed'),
+      } });
+      expect(names(emitted).slice(-2)).toEqual(['result', 'complete']);
+    }
+    expect(createAndSendEmail).toHaveBeenCalledTimes(2);
+  });
+
+  test.each([-1, 1.5, '2', '', NaN, Infinity, 2147483647])('invalid/overflow reminder count %s is not overwritten', async (count) => {
+    SUGGESTIONS[SUG_OK] = suggestion(SUG_OK, { wmkf_remindercount: count });
+
+    const emitted = await run({ drafts: [followupDraft(SUG_OK)], templateType: 'followup' });
+
+    expect(updateLifecycle).not.toHaveBeenCalled();
+    expect(createAndSendEmail).toHaveBeenCalledTimes(1);
+    expect(resultOf(emitted).stats).toMatchObject({ sent: 1, failed: 0 });
+    expect(names(emitted).slice(-2)).toEqual(['result', 'complete']);
+  });
+
+  test.each(['materials', 'followup', 'thankyou'])('markAsSent:false skips all %s bookkeeping reads and writes', async (templateType) => {
+    SUGGESTIONS[SUG_OK] = suggestion(SUG_OK, { wmkf_accepted: true });
+
+    const emitted = await run({
+      drafts: [templateType === 'materials' ? draft(SUG_OK) : followupDraft(SUG_OK)],
+      templateType, markAsSent: false,
+    });
+
+    expect(findById).toHaveBeenCalledTimes(1);
+    expect(updateLifecycle).not.toHaveBeenCalled();
+    expect(createAndSendEmail).toHaveBeenCalledTimes(1);
+    expect(resultOf(emitted).stats).toMatchObject({ sent: 1, failed: 0 });
+  });
+
+  test.each([null, Object.assign(new Error('read missing'), { status: 404 }), Object.assign(new Error('read failed'), { status: 412 })])(
+    'missing/failed fresh row %s leaves delivery successful and does not retry the read', async (freshResult) => {
+      findById.mockResolvedValueOnce(SUGGESTIONS[SUG_OK]);
+      if (freshResult instanceof Error) findById.mockRejectedValueOnce(freshResult);
+      else findById.mockResolvedValueOnce(freshResult);
+
+      const emitted = await run({ drafts: [followupDraft(SUG_OK)], templateType: 'followup' });
+
+      expect(findById).toHaveBeenCalledTimes(2);
+      expect(updateLifecycle).not.toHaveBeenCalled();
+      expect(createAndSendEmail).toHaveBeenCalledTimes(1);
+      expect(resultOf(emitted).stats).toMatchObject({ sent: 1, failed: 0 });
+      expect(names(emitted).slice(-2)).toEqual(['result', 'complete']);
+    },
+  );
+
+  test.each([
+    ['receipt status', { wmkf_reviewstatus: 100000003 }],
+    ['receipt timestamp only', { wmkf_reviewreceivedat: '2026-09-04T18:00:00.000Z' }],
+  ])('materials %s arriving before the first conditional PATCH is preserved on retry', async (_label, receipt) => {
+    SUGGESTIONS[SUG_OK] = suggestion(SUG_OK, { wmkf_accepted: true });
+    updateLifecycle.mockImplementationOnce(async () => {
+      SUGGESTIONS[SUG_OK] = { ...SUGGESTIONS[SUG_OK], ...receipt, _etag: 'W/"2"' };
+      throw Object.assign(new Error('receipt won'), { status: 412 });
+    });
+
+    const emitted = await run({ drafts: [draft(SUG_OK)], templateType: 'materials' });
+
+    expect(updateLifecycle).toHaveBeenCalledTimes(2);
+    expect(updateLifecycle).toHaveBeenLastCalledWith(SUG_OK,
+      { materialsSentAt: expect.any(String) },
+      { actingUserSystemId: 'u-1', ifMatch: 'W/"2"' });
+    expect(mintAndStore).toHaveBeenCalledTimes(1);
+    expect(createAndSendEmail).toHaveBeenCalledTimes(1);
+    expect(resultOf(emitted).stats).toMatchObject({ sent: 1, failed: 0 });
+  });
+
+  test('a retry increments the fresh count without moving a newer reminder timestamp backwards', async () => {
+    let newerTimestamp;
+    updateLifecycle.mockImplementationOnce(async (_id, patch) => {
+      newerTimestamp = new Date(Date.parse(patch.reminderSentAt) + 1000).toISOString();
+      SUGGESTIONS[SUG_OK] = {
+        ...SUGGESTIONS[SUG_OK], wmkf_remindercount: 1,
+        wmkf_remindersentat: newerTimestamp, _etag: 'W/"2"',
+      };
+      throw Object.assign(new Error('another reminder won'), { status: 412 });
+    });
+
+    await run({ drafts: [followupDraft(SUG_OK)], templateType: 'followup' });
+
+    expect(updateLifecycle).toHaveBeenCalledTimes(2);
+    expect(updateLifecycle).toHaveBeenLastCalledWith(SUG_OK,
+      { reminderSentAt: newerTimestamp, reminderCount: 2 },
+      { actingUserSystemId: 'u-1', ifMatch: 'W/"2"' });
+    expect(createAndSendEmail).toHaveBeenCalledTimes(1);
+  });
+
+  test('case-insensitive original bindings and a strong ETag remain usable', async () => {
+    SUGGESTIONS[SUG_OK]._wmkf_request_value = 'abcd4444-4444-4444-8444-444444444444';
+    createAndSendEmail.mockImplementationOnce(async () => {
+      SUGGESTIONS[SUG_OK] = {
+        ...SUGGESTIONS[SUG_OK],
+        _wmkf_request_value: SUGGESTIONS[SUG_OK]._wmkf_request_value.toUpperCase(),
+        _wmkf_potentialreviewer_value: SUGGESTIONS[SUG_OK]._wmkf_potentialreviewer_value.toUpperCase(),
+        _etag: '"2"',
+      };
+      return { emailId: 'email-case' };
+    });
+
+    await run({ drafts: [followupDraft(SUG_OK)], templateType: 'followup' });
+
+    expect(updateLifecycle).toHaveBeenCalledWith(SUG_OK,
+      { reminderSentAt: expect.any(String), reminderCount: 1 },
+      { actingUserSystemId: 'u-1', ifMatch: '"2"' });
+  });
+
+  test('capture mode performs conditional bookkeeping without calling email transport', async () => {
+    process.env.REVIEWER_EMAIL_DELIVERY_MODE = 'capture';
+
+    const emitted = await run({ drafts: [followupDraft(SUG_OK)], templateType: 'followup' });
+
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+    expect(updateLifecycle).toHaveBeenCalledWith(SUG_OK,
+      { reminderSentAt: expect.any(String), reminderCount: 1 },
+      { actingUserSystemId: 'u-1', ifMatch: 'W/"1"' });
+    expect(resultOf(emitted).sent[0]).toMatchObject({ deliveryMode: 'capture', capturedEmail: expect.any(Object) });
+    expect(names(emitted).slice(-2)).toEqual(['result', 'complete']);
+  });
+
+  test('one failed bookkeeping row does not stop a successfully delivered sibling', async () => {
+    SUGGESTIONS[SUG_NO_EMAIL] = suggestion(SUG_NO_EMAIL);
+    PERSONS[`person-${SUG_NO_EMAIL}`] = person(`person-${SUG_NO_EMAIL}`);
+    updateLifecycle.mockRejectedValueOnce(Object.assign(new Error('bookkeeping failed'), { status: 500 }));
+
+    const emitted = await run({ drafts: [followupDraft(SUG_OK), followupDraft(SUG_NO_EMAIL)], templateType: 'followup' });
+
+    expect(createAndSendEmail).toHaveBeenCalledTimes(2);
+    expect(updateLifecycle).toHaveBeenCalledTimes(2);
+    expect(updateLifecycle).toHaveBeenLastCalledWith(SUG_NO_EMAIL,
+      { reminderSentAt: expect.any(String), reminderCount: 1 },
+      { actingUserSystemId: 'u-1', ifMatch: 'W/"1"' });
+    expect(resultOf(emitted).sent.map((sent) => sent.suggestionId)).toEqual([SUG_OK, SUG_NO_EMAIL]);
+    expect(resultOf(emitted).stats).toMatchObject({ sent: 2, failed: 0 });
+    expect(names(emitted).slice(-2)).toEqual(['result', 'complete']);
+  });
+
+  test('the largest incrementable Dataverse reminder count reaches the field maximum', async () => {
+    SUGGESTIONS[SUG_OK].wmkf_remindercount = 2147483646;
+
+    await run({ drafts: [followupDraft(SUG_OK)], templateType: 'followup' });
+
+    expect(updateLifecycle).toHaveBeenCalledWith(SUG_OK,
+      { reminderSentAt: expect.any(String), reminderCount: 2147483647 },
+      { actingUserSystemId: 'u-1', ifMatch: 'W/"1"' });
+  });
+});
+
 describe('send-emails-service — one-time materials delivery', () => {
   test('a recorded materials receipt skips before token mint or transport', async () => {
     SUGGESTIONS[SUG_OK] = suggestion(SUG_OK, {
@@ -434,7 +777,7 @@ describe('send-emails-service — one-time materials delivery', () => {
 });
 
 describe('send-emails-service — thank-you is independent from closeout', () => {
-  test.each([100000003, 100000004, 100000005, 100000006])('thank-you stamps only delivery for status %s', async (statusValue) => {
+  test.each([null, 100000003, 100000004, 100000005, 100000006, 199999999])('thank-you stamps only delivery for status %s', async (statusValue) => {
     SUGGESTIONS[SUG_OK] = suggestion(SUG_OK, { wmkf_accepted: true, wmkf_reviewstatus: statusValue });
     await run({
       drafts: [{
@@ -448,8 +791,32 @@ describe('send-emails-service — thank-you is independent from closeout', () =>
     expect(updateLifecycle).toHaveBeenCalledWith(
       SUG_OK,
       { thankYouSentAt: expect.any(String) },
-      { actingUserSystemId: 'u-1' },
+      { actingUserSystemId: 'u-1', ifMatch: 'W/"1"' },
     );
+  });
+
+  test('manual thank-you retries a conflict with only a delivery stamp even after closeout', async () => {
+    updateLifecycle.mockImplementationOnce(async () => {
+      SUGGESTIONS[SUG_OK] = {
+        ...SUGGESTIONS[SUG_OK], wmkf_reviewstatus: 100000004,
+        wmkf_completedat: '2026-09-04T18:00:00.000Z', _etag: 'W/"2"',
+      };
+      throw Object.assign(new Error('closeout won'), { status: 412 });
+    });
+
+    const emitted = await run({
+      drafts: [{ suggestionId: SUG_OK, subject: 'Thank you', body: 'Thank you.', externalLinkExpected: false }],
+      templateType: 'thankyou',
+    });
+
+    expect(updateLifecycle).toHaveBeenCalledTimes(2);
+    expect(updateLifecycle).toHaveBeenLastCalledWith(SUG_OK,
+      { thankYouSentAt: expect.any(String) },
+      { actingUserSystemId: 'u-1', ifMatch: 'W/"2"' });
+    expect(createAndSendEmail).toHaveBeenCalledTimes(1);
+    expect(mintAndStore).not.toHaveBeenCalled();
+    expect(resultOf(emitted).stats).toMatchObject({ sent: 1, failed: 0 });
+    expect(names(emitted).slice(-2)).toEqual(['result', 'complete']);
   });
 });
 
