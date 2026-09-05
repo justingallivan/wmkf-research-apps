@@ -125,11 +125,32 @@ describe('ReviewerCloseoutModal', () => {
     expect(screen.getByText('(optional)')).toBeInTheDocument();
   });
 
+  test('No submits not eligible with the required reason', async () => {
+    global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ success: true }) }));
+    render(<ReviewerCloseoutModal isOpen reviewer={{ ...REVIEWER, notes: '' }} onClose={jest.fn()} />);
+
+    fireEvent.click(screen.getByRole('radio', { name: 'No' }));
+    fireEvent.change(screen.getByRole('textbox', { name: /Closeout notes/ }), {
+      target: { value: 'The review did not address the proposal.' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Complete closeout' }));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith('/api/review-manager/close-review', expect.objectContaining({
+        body: JSON.stringify({
+          suggestionId: REVIEWER.suggestionId,
+          disposition: 'not_eligible',
+          notes: 'The review did not address the proposal.',
+        }),
+      }));
+    });
+  });
+
   test('opt-out skips the payment question and records not applicable automatically', async () => {
     global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ success: true }) }));
     render(<ReviewerCloseoutModal
       isOpen
-      reviewer={{ ...REVIEWER, honorariumOptOut: true, honorariumRequestId: null, notes: '' }}
+      reviewer={{ ...REVIEWER, honorariumOptOut: true, notes: '' }}
       onClose={jest.fn()}
     />);
 

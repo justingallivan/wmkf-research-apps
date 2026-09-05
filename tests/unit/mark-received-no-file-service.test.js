@@ -45,6 +45,7 @@ jest.mock('../../lib/dataverse/core/changeset', () => ({
 
 const SUG = '22222222-2222-4222-8222-222222222222';
 const ACTOR = 'su-1';
+const { REVIEW_STATUS_MAP } = require('../../shared/config/reviewerLifecycle');
 const QUESTIONS = [
   { key: 'riskLevel', type: 'picklist' },
   { key: 'impactAreas', type: 'multiselect' },
@@ -85,6 +86,7 @@ test('0 rating rows → single patchReviewReceipt PATCH, no changeset', async ()
   expect(id).toBe(SUG);
   expect(patch.wmkf_reviewuploadedbystaff).toBe(true);
   expect(typeof patch.wmkf_reviewreceivedat).toBe('string');
+  expect(patch.wmkf_reviewstatus).toBe(REVIEW_STATUS_MAP.review_received);
   expect(opts).toEqual({ actingUserSystemId: ACTOR, ifMatch: 'W/"receipt-1"' });
   expect(runChangeset).not.toHaveBeenCalled();
 });
@@ -109,6 +111,7 @@ test('≥1 rating row → ONE atomic changeset (parent PATCH + answer upserts), 
     ifMatch: 'W/"receipt-1"',
   });
   expect(atomicArg.parent.body.wmkf_affiliation).toBe(1);
+  expect(atomicArg.parent.body.wmkf_reviewstatus).toBe(REVIEW_STATUS_MAP.review_received);
   expect(atomicArg.children).toEqual([{ upsertFor: 'riskLevel' }]);
   // snapshotKeys = all persisted question types from the live question set
   const snapshotKeys = answerUpsertDescriptor.mock.calls[0][2];

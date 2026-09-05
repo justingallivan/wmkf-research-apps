@@ -22,6 +22,7 @@ import { bypassDynamicsRestrictions } from '../../lib/services/dynamics-context.
 import NotificationService from '../../lib/services/notification-service.js';
 import { clearResolverCache } from '../../lib/services/program-director-resolver.js';
 import { writeReviewFiles as writeReviewFilesReal, buildReviewerSubfolder } from '../../lib/services/review-upload.js';
+import { REVIEW_STATUS_MAP } from '../../shared/config/reviewerLifecycle.js';
 
 // `installMocks` (below) replaces `DynamicsService.executeChangeset` directly
 // with a bare jest.fn(), but the rating-row write path still goes through the
@@ -285,6 +286,7 @@ describe('writeReviewFiles — happy paths', () => {
     expect(patch.wmkf_reviewerrisk).toBeUndefined();
     expect(patch.wmkf_revieweroverallrating).toBeUndefined();
     expect(patch.wmkf_reviewreceivedat).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    expect(patch.wmkf_reviewstatus).toBe(REVIEW_STATUS_MAP.review_received);
     // The changeset carries the multiselect plus two rating snapshot rows,
     // addressed by alternate key and byte-identical to reviewer-written rows.
     const [ops] = DynamicsService.executeChangeset.mock.calls[0];
@@ -312,6 +314,7 @@ describe('writeReviewFiles — happy paths', () => {
     }));
     expect(r.ok).toBe(true);
     expect(parentPatch().wmkf_reviewuploadedbystaff).toBe(true);
+    expect(parentPatch().wmkf_reviewstatus).toBe(REVIEW_STATUS_MAP.review_received);
   });
 
   test('multi-file upload writes each file in order', async () => {

@@ -39,6 +39,7 @@ jest.mock('../../lib/external/review-question-fetcher', () => {
 });
 
 const SUGGESTION_ID = '11111111-1111-1111-1111-111111111111';
+const { REVIEW_STATUS_MAP } = require('../../shared/config/reviewerLifecycle');
 
 let handler;
 beforeAll(async () => {
@@ -120,6 +121,7 @@ test('structured answers present → atomic changeset with 2 ratings + multisele
   expect(parentOp.body.wmkf_reviewerrisk).toBeUndefined();
   expect(parentOp.body.wmkf_revieweroverallrating).toBeUndefined();
   expect(parentOp.body.wmkf_reviewreceivedat).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  expect(parentOp.body.wmkf_reviewstatus).toBe(REVIEW_STATUS_MAP.review_received);
 });
 
 test('informal feedback (no structuredData) → parent-only updateRecord, NO snapshot rows', async () => {
@@ -132,6 +134,7 @@ test('informal feedback (no structuredData) → parent-only updateRecord, NO sna
   expect(DynamicsService.updateRecord).toHaveBeenCalledTimes(1);
   const [, , patch] = DynamicsService.updateRecord.mock.calls[0];
   expect(patch.wmkf_reviewuploadedbystaff).toBe(true);
+  expect(patch.wmkf_reviewstatus).toBe(REVIEW_STATUS_MAP.review_received);
   expect(patch.wmkf_reviewerimpact).toBeUndefined();
 });
 

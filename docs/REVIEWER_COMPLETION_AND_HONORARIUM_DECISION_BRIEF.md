@@ -110,7 +110,7 @@ application-build blocker.
 
 | Event | Authority | Durable state | Meaning |
 | --- | --- | --- | --- |
-| Review received | Reviewer portal or authorized staff receipt path | `wmkf_reviewreceivedat`; status `review_received` | Review material exists and awaits PD judgment. |
+| Review received | Reviewer portal or authorized staff receipt path | `wmkf_reviewreceivedat`; status `review_received`, written together | Review material exists and awaits PD judgment. |
 | Thank-you processed | Automated sweep or retained compatibility sender | `wmkf_thankyousentat` | Courtesy workflow was claimed; it is not approval or guaranteed delivery. |
 | Review closed | Lead PD or superuser | status `complete`; `wmkf_completedat`; `wmkf_honorariumeligibility` | The human closeout decision was recorded. |
 | Authorization to remit | Operations/Finance | honorarium request's `wmkf_authorizationtoremitpaymentflag` | Separate financial control outside this application. |
