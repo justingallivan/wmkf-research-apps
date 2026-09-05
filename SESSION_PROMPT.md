@@ -1,127 +1,97 @@
-# Session 481 Prompt: Reviewer Lifecycle In-place Fixes After Stage 0
+# Session 482 Prompt: Reviewer Lifecycle After Conditional Invitation Expiry
 
-## Session 480 Summary
+## Session 481 Summary
 
-Stage 0 established the reviewer lifecycle regression harness on
-`codex/reviewer-lifecycle-stage0`. Codex orchestrated separate receipt-harness,
-race/UI, and writer-inventory builders and a fresh-context review. This branch
-contains tests, an offline census script, and evidence/handoff documentation;
-no application runtime behavior, schema, deployment, email, or external records
-were changed.
+Codex orchestrated Stage 1A on `codex/reviewer-lifecycle-stage1a`, based on
+completed Stage 0 commit `a18f219b`. Separate agents investigated the contract,
+built the sweep/unit tests, and converted the F2 composed regressions.
 
 ### What Was Completed
 
-1. **Composed receipt and concurrency baseline**
-   - [VERIFIED via focused and full Jest] Six variants across four receipt
-     producer families execute real services/adapters/HTTP serialization,
-     reviewer DTOs and closeout, with explicit external dependency boundaries.
-   - Same-row ETags, parent/child rollback, competing submissions, receipt versus
-     withdrawal/release, request binding, immutable first completion, unknown
-     persisted values, and post-completion document/thank-you behavior are
-     covered. The fake has independent integrity tests and observes unsupported
-     requests even if a service catches their errors.
-   - F1 is refuted for current successful receipt writes: the status payload fix
-     already landed in `b318ede0`. Legacy receipt-plus-old-status rows remain a
-     separate characterization; no backfill is authorized.
-
-2. **Current defects are reproducible without changing production semantics**
-   - [VERIFIED via real-service/real-adapter race tests] F2 stale-invite overwrite,
-     F3 closed-row generic response rewrite, F4 receipt regression/lost reminder
-     increment, and F5 partial batch/UI failure handling remain present.
-   - Existing terminal/412 protection, no transport resend, and first/middle/last
-     batch failure complements are also asserted. UI tests cover pending success
-     and failure across request switches and unmounts.
-   - Every known-defect test is named explicitly and remains green until the
-     corresponding deliberate semantic fix replaces its expectation.
-
-3. **Test isolation and caller inventory**
-   - [VERIFIED via 23 focused tests] Reviewers-service explicitly mocks synthesis
-     job state and separately proves unavailable-state fallback/logging, with
-     SQL/fetch no-call assertions. F6's concrete isolation gap is fixed.
-   - [VERIFIED via census and source reads] 55 imported suggestion writer-export
-     call sites are separated from 99 reader/pure calls, plus distinct descriptor,
-     adapter-internal, raw script, token, reset/merge and administrative paths.
-     The read-only script scans 1,282 tracked source/script files on this branch;
-     173 recognized calls, zero recognized unresolved computed aliases and zero
-     parse errors. Its file-local/static limitations are explicit.
-   - Full-suite verification exposed a pre-existing Awardees Layout mock lacking
-     PageHeader. A separate minimal test-only repair preserves its five assertions.
+- [VERIFIED via source and isolated tests] Stale-invite expiry now rereads the
+  suggestion, checks pending eligibility and Request binding, rereads the
+  parent's meeting date, and patches with that suggestion's exact ETag.
+  Newer acceptance, exclusion, removal, receipt/completion state, missing or
+  malformed versions and 412 conflicts cannot be blindly overwritten.
+- The existing result envelope, bounded attempts, discovery-only dry-run,
+  actor forwarding and per-row operational-error continuation remain intact.
+  `eligible` is a discovery count; `skipped` includes overflow and safe
+  no-write outcomes. No adapter, route, schema or email-transport code changed.
+- The transport fixture now distinguishes a structured missing-record GET
+  from invalid endpoints. F3/F4/F5 retain their known-defect assertions.
+  Stage 0 receipts and inventory are explicitly historical snapshots.
 
 ### Commits
 
-- `ffc932b7` — Keep session start gate list current (startup maintenance)
-- `79434493` — Fix Awardees test fixture for PageHeader
-- `b2da65ac` — Establish reviewer lifecycle contract and race baseline
+- `721f4f3d` — Make stale reviewer invitation expiry conditional on fresh state.
 
 ### Verification
 
-- Full Jest: **770 suites / 9,834 tests passed**, no failures or skips.
-- All **61** check/self-test commands passed sequentially.
-- `npm run build -- --webpack` passed with existing build warnings; migration
-  manifest unchanged. Changed-file lint and diff checks passed.
-- Fresh review `/root/stage0_fresh_review`: **PASS**, no required corrections,
-  against `b2da65ac`; independently ran 119 changed/new and 188 retained tests.
-  The complete review is in the Stage 0 review document.
-- Full-suite legacy missing-connection-string diagnostics remain in other
-  intake/acceptance/coalescing tests; the Stage 0 suites enforce isolated
-  boundaries. A green full test suite is not proof of live Dataverse behavior.
-- No live/production probes or release were performed. The document-filing test
-  simulates the mandatory production-classified preflight entirely inside an
-  intercepted in-memory transport and restores its environment afterward.
+- [VERIFIED via Jest JSON] Full suite: **770 suites / 9,913 tests passed**,
+  zero failures or skips.
+- Focused sweep/race/helper/receipt coverage: **4 suites / 159 tests passed**.
+  Three F2 regressions and the expanded unit suite failed against the old
+  implementation before the fix. Changed-file lint and diff checks passed.
+- All **59 distinct** gate/self-test commands passed sequentially (duplicate
+  CI/no-write aliases excluded). `npm run build -- --webpack` passed, with
+  existing warnings and no migration-manifest or generated tracked diff.
+- Fresh-context review `/root/stage1a_fresh_review`: **PASS** at `721f4f3d`,
+  no required runtime corrections; independently reran 159 focused tests and
+  performed three discriminating in-memory mutation checks.
+- The explicit boundary test proves that a parent meeting-date edit after its
+  final read remains outside the suggestion ETag's protection. No cross-record
+  lock or Request ownership-policy change was introduced.
+- No live Dataverse probe, production cron call, migration, backfill, email,
+  merge to main or deployment was performed. Existing full-suite diagnostic
+  warnings outside this harness remain baseline debt, not live-I/O proof.
 
 ## Next Items
 
 ### Verified Open
 
-1. **Stage 1A — conditional stale-invite expiry.**
-   Evidence: `lib/services/reviewer-suggestion-sweep.js:93` and the F2 race tests.
-   Re-read eligibility and write against that same suggestion version; handle
-   changed/missing versions and 412 without blind overwrite. A suggestion ETag
-   does not protect the parent Request's meeting date.
-2. **Stage 1B — version-safe post-send bookkeeping.**
-   Evidence: `lib/services/review-manager/send-emails-service.js:918` and F4 race
-   tests. Preserve delivery outcomes; re-evaluate bookkeeping on the version
-   written. Never resend email as a bookkeeping retry.
-3. **Stage 1E — honest UI mutation failure handling.**
-   Evidence: `shared/components/reviewers/ReviewerManagePanel.js:1788` and the
-   new status-mutation characterization suite. Fix HTTP/payload failure reporting
-   independently of later UI extraction and broader async state changes.
+1. **Stage 1B — version-safe post-send bookkeeping.**
+   Evidence: `lib/services/review-manager/send-emails-service.js` and retained
+   F4 race tests. Reevaluate status/count on the exact version written after
+   delivery. Preserve delivery outcomes; never resend email as a stamp retry.
+2. **Stage 1E — honest UI mutation failure handling.**
+   Evidence: `shared/components/reviewers/ReviewerManagePanel.js:updateStatus`
+   and `tests/unit/reviewer-status-mutation-characterization.test.js`.
+   Fix HTTP/payload failure reporting before broader UI extraction.
 
-Execute only the selected authorized substage, replace its known-defect tests
-with desired regression assertions, keep it green, and obtain a new-context
-review before advancing. No file moves or generic command extraction yet.
+Stage 1A is complete in this branch. Only the selected substage was
+executed. Each subsequent substage requires its own deliberate scope,
+regression proof and fresh-context review. No generic command extraction or
+file moves yet.
 
 ### Owner Decision Needed
 
-- **Stage 1C semantics:** all current receipt families are now proven to write
-  Review Received and support closeout. Do not redo the old payload correction.
-  Any change to the meaning of partial/no-file receipt needs the owner's decision;
-  historical row backfill remains unauthorized.
-- **Stage 1D:** define allowed historical response corrections on closed
-  engagements before changing the generic staff correction contract.
-- **Stage 6A:** approve successful/failed/unattempted identifiers before revising
-  the existing sequential-error batch response.
-- Parent Request ownership changing during multi-record work remains an explicit
-  authority-policy question; Stage 0 adds no cross-record authorization lock.
+- Stage 1C: F1 is refuted for current successful receipt producers. Do not
+  repeat the old payload fix. Changing partial/no-file receipt meaning or
+  backfilling historical rows requires an owner decision.
+- Stage 1D: define permitted historical response corrections on closed
+  engagements before changing the generic correction contract.
+- Stage 6A: approve successful/failed/unattempted identifiers before changing
+  the sequential-error batch response.
+- Cross-record Request ownership and meeting-date locking remain separate
+  policy/architecture questions.
 
 ### Parked
 
-Per the prior handoff, not re-probed as deployment claims this session:
-progress-pill alignment/chronology (`de79e413`), surfacing the Ops eligibility
-view, automatic review reminders, and one-click PDF conversion. The reminder
-scheduler hold is independently verified by its passing gate.
+Prior parked items were not re-probed as deployment claims: progress-pill
+alignment/chronology (`de79e413`), Ops eligibility view, automatic reviewer
+reminders and one-click PDF conversion. The reminder scheduler hold remains
+covered by its repository gate.
 
 ### Verify Before Acting
 
-- Start from this branch and inspect its current HEAD/upstream; do not use the
-  divergent historical closeout branch as a workspace.
-- The original refactor audit is pinned to `097b7f17`; current implementation
-  evidence lives in the Stage 0 receipt and writer inventory. Reopen source
-  rather than using the original line numbers as current truth.
-- Review unknown dirty changes before editing. Gate/self-test batteries remain
-  serial. Census is an inventory, not a new enforcement gate.
-- No migration, backfill, destructive cleanup, production cron invocation,
-  merge to main, or deployment is authorized by this handoff.
+- Check branch, HEAD/upstream and dirty work before edits. This branch includes
+  the Stage 0 baseline; do not switch to the divergent historical closeout
+  branch or treat historical audit line numbers as current source.
+- Reopen source and the Stage 1A receipt for present behavior. Stage 0's
+  inventory remains useful as a frozen comparison, not a current writer list.
+- Keep all fixture-writing gates and their self-tests sequential.
+- Production promotion, live cron invocation, backfill and schema operations
+  are separate from this completed source change.
 
 ### Do Not Reopen Without a New Decision
 
@@ -130,26 +100,23 @@ flag from this application; BILL API reviewer onboarding.
 
 ## Key Files
 
-| Path | Purpose |
-|---|---|
-| `docs/audits/REVIEWER_LIFECYCLE_STAGE0_RECEIPT_2026-09-04.md` | Current evidence, baseline/final verification and fresh review. |
-| `docs/audits/REVIEWER_LIFECYCLE_WRITER_INVENTORY_2026-09-04.md` | Alias-aware writer/read matrix and bounded census reproduction. |
-| `docs/audits/REVIEWER_LIFECYCLE_REFACTOR_REPORT_2026-09-04.md` | Historical findings and staged plan; never a current-source checklist. |
-| `tests/helpers/reviewer-engagement-transport.js` | Stateful HTTP fake beneath real transport/service code. |
-| `tests/integration/reviewer-engagement-contract.test.js` | Receipt/DTO/closeout, atomic races and postreceipt contracts. |
-| `tests/integration/reviewer-engagement-races.test.js` | Current F2–F5 and protected complements. |
-| `tests/unit/reviewer-status-mutation-characterization.test.js` | Rendered UI failure/stale-callback baseline. |
-| `scripts/inventory-reviewer-lifecycle-writers.js` | Read-only static census; no application imports or live calls. |
+- `docs/audits/REVIEWER_LIFECYCLE_STAGE1A_RECEIPT_2026-09-04.md`: implementation,
+  contract, test evidence and operational limits.
+- `docs/audits/REVIEWER_LIFECYCLE_STAGE1A_REVIEW_2026-09-04.md`: independent
+  review, tests and mutation evidence.
+- `lib/services/reviewer-suggestion-sweep.js`: conditional expiry.
+- `tests/unit/reviewer-suggestion-sweep.test.js`: eligibility/error/boundary cases.
+- `tests/integration/reviewer-engagement-races.test.js`: F2 regressions and
+  retained F3/F4/F5 characterizations.
+- `docs/audits/REVIEWER_LIFECYCLE_REFACTOR_REPORT_2026-09-04.md`: original
+  historical investigation and staged plan.
 
-## Release Boundary
+## Release and Handoff Boundary
 
-[VERIFIED via successful branch push] After the owner explicitly authorized
-publication to the public repository, `codex/reviewer-lifecycle-stage0` was
-pushed to `origin` and now tracks `origin/codex/reviewer-lifecycle-stage0`.
-The earlier automatic-review publication block is resolved. All Stage 0 work
-and the handoff are backed up on that feature branch. No merge to main or
-production deployment was performed. Promotion and production verification
-remain separate decisions. No DEVELOPMENT_LOG milestone entry is needed
-because no production capability or runtime architecture shipped.
-The claim-evidence pilot metadata report was unavailable because local state
-could not be read; no unsupported zero-advisory observation was recorded.
+Owner: Codex. Branch: `codex/reviewer-lifecycle-stage1a`. Implementation
+`721f4f3d` passed focused/full tests, gates, build and fresh-context review.
+No merge to main or production deployment occurred. Keep session evidence on
+this feature branch with the reviewed source. No DEVELOPMENT_LOG milestone
+entry is required because no production capability or architecture shipped.
+The claim-evidence pilot report was unavailable because local state could not
+be read; no unsupported observation row was invented.

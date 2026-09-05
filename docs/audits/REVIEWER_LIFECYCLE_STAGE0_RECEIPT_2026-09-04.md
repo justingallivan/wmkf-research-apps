@@ -1,8 +1,8 @@
 ---
-title: Reviewer Lifecycle Stage 0 — Regression Harness and Current Baseline
+title: Reviewer Lifecycle Stage 0 — Historical Regression Baseline
 kind: audit
 domain: reviewer-workbench
-status: active
+status: historical
 canonical: false
 owner: product-engineering
 last_verified: 2026-09-04
@@ -43,7 +43,13 @@ implementers. Prior findings being reverified: F1–F6.
 | Unexpected SQL or unsupported fixture calls cannot be swallowed into a pass | Test boundaries | Explicit mocks and no-call/error assertions |
 | The census follows aliases and separates writes from reads | Writer matrix | Reproducible searches and caller/source inspection |
 
-## Current findings
+## Historical findings at Stage 0
+
+This section and the validation below preserve reviewed implementation
+`b2da65ac`. Subsequent source changes do not rewrite that baseline. Current
+Stage 1A implementation evidence is recorded in
+[the Stage 1A receipt](REVIEWER_LIFECYCLE_STAGE1A_RECEIPT_2026-09-04.md);
+`SESSION_PROMPT.md` owns the current next-step guidance.
 
 - **F1 — [VERIFIED via six composed receipt variants] refuted for current
   successful receipt writes.** `b318ede0` already corrected the old payloads.
@@ -102,7 +108,7 @@ implementers. Prior findings being reverified: F1–F6.
   and workbench-coalescing tests). These are retained as baseline isolation
   debt. The new focused harness must have explicit external boundaries.
 
-## Limits and next-stage decisions
+## Historical limits and next-stage decisions at Stage 0
 
 The fake models the exercised HTTP/OData subset; it is not a live Dataverse
 server, a proof of server atomicity, or a concurrency lock on a separate parent

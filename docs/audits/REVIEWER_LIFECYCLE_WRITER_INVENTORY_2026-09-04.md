@@ -2,13 +2,19 @@
 title: Reviewer Lifecycle Stage 0 — Alias-aware Writer Inventory
 kind: audit
 domain: reviewer-workbench
-status: active
+status: historical
 canonical: false
 owner: product-engineering
 last_verified: 2026-09-04
 ---
 
 # Stage 0 reviewer lifecycle writer census (2026-09-04 PDT)
+
+Historical source baseline: all counts, line numbers, and observed writer
+semantics below describe Stage 0. Rerun the census against the target commit
+before using it as a current inventory. Stage 1A changes the expiry writer;
+its implementation evidence is in
+[the Stage 1A receipt](REVIEWER_LIFECYCLE_STAGE1A_RECEIPT_2026-09-04.md).
 
 [VERIFIED via source + commands below] Repo `/Users/gallivan/Code/WMKF_Apps`, baseline `ffc932b7`, branch `codex/reviewer-lifecycle-stage0`. Inventory-only: no live services, scripts, SQL, network, schema operations, or deployments invoked. This is a source census, not a claim about deployed writers or external Power Automate flows.
 
