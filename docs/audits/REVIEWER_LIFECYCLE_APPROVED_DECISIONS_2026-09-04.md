@@ -44,10 +44,12 @@ All work in that released milestone is complete; no general action framework
 or file moves were included. On 2026-09-05 the owner selected **Stage 6B for
 the next session**, starting with token/removal/terminal actions (6B1), then
 reminder/closeout (6B2) and materials context safety (6B3), with fresh review
-between slices. **6B1 is complete on branch `codex/reviewer-lifecycle-stage6b`
-(`9258115a` runtime, `06725d6c` test correction) with an independent PASS; see the
-[Stage 6B1 receipt](REVIEWER_LIFECYCLE_STAGE6B1_RECEIPT_2026-09-05.md). It is not
-merged or deployed. 6B2 and 6B3 remain planned, not implemented.**
+between slices. **6B1 (`9258115a` runtime, `06725d6c` test correction) and 6B2
+(`b08c16f6` runtime, `d3ec406a` review correction) are complete on branch
+`codex/reviewer-lifecycle-stage6b` with independent PASS verdicts; see the
+[Stage 6B1 receipt](REVIEWER_LIFECYCLE_STAGE6B1_RECEIPT_2026-09-05.md) and the
+[Stage 6B2 receipt](REVIEWER_LIFECYCLE_STAGE6B2_RECEIPT_2026-09-05.md). Neither is
+merged or deployed. 6B3 remains planned, not implemented.**
 Use the [Stage 6B build plan](../REVIEWER_LIFECYCLE_STAGE6B_BUILD_PLAN.md) and
 [remaining readiness audit](REVIEWER_LIFECYCLE_REMAINING_READINESS_2026-09-05.md).
 Stages 2–5, 6C and 7 remain outside the selected next build; their dependencies

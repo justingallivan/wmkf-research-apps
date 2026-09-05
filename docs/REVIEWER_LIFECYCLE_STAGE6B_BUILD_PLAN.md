@@ -3,12 +3,13 @@ title: Reviewer Lifecycle Stage 6B — Build Handoff
 domain: reviewer-workbench
 kind: plan
 status: active
-summary: Sequential in-place action lifetime fixes; 6B1 token/removal/terminal feedback is complete on a branch, 6B2 reminder/closeout is next.
+summary: Sequential in-place action lifetime fixes; 6B1 and 6B2 are complete on a branch, 6B3 materials-modal lifetime is next.
 canonical: false
 owner: product-engineering
 last_verified: 2026-09-05
 related:
   - docs/audits/REVIEWER_LIFECYCLE_STAGE6B1_RECEIPT_2026-09-05.md
+  - docs/audits/REVIEWER_LIFECYCLE_STAGE6B2_RECEIPT_2026-09-05.md
   - docs/audits/REVIEWER_LIFECYCLE_REFACTOR_REPORT_2026-09-04.md
   - docs/audits/REVIEWER_LIFECYCLE_APPROVED_DECISIONS_2026-09-04.md
   - docs/audits/REVIEWER_LIFECYCLE_RELEASE_2026-09-05.md
@@ -24,9 +25,15 @@ on branch `codex/reviewer-lifecycle-stage6b`: runtime `9258115a`, test-only revi
 correction `06725d6c`, full suite 771 suites / 11,216 tests, webpack build, seven
 gate pairs and an independent PASS. See the
 [Stage 6B1 receipt](audits/REVIEWER_LIFECYCLE_STAGE6B1_RECEIPT_2026-09-05.md).
-It is not merged or deployed; promotion is a separate action.
-[PLANNED] **Build 6B2 next**, after its preflight. Proceed to 6B3 only after
-6B2's checks and independent review.
+[VERIFIED via frozen commits, tests and independent review] **6B2 is complete**
+on the same branch: runtime `b08c16f6`, review-driven correction `d3ec406a`, full
+suite 771 suites / 11,271 tests, webpack build, seven gate pairs and an independent
+PASS after one BLOCK round. See the
+[Stage 6B2 receipt](audits/REVIEWER_LIFECYCLE_STAGE6B2_RECEIPT_2026-09-05.md).
+Neither slice is merged or deployed; promotion is a separate action.
+[PLANNED] **Build 6B3 next**, after its preflight and a fresh read of the 6B2
+receipt's limits (callback promises are observed, not awaited; no post-close
+refresh-failure surface exists for the reminder or closeout components).
 These are subdivisions of original Stage 6B, not additional product features.
 Stage 6C extraction is outside this handoff.
 
