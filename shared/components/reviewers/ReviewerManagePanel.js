@@ -1651,15 +1651,28 @@ export default function ReviewerManagePanel({
   const statusOperationsRef = useRef(new Map());
   const statusContextRef = useRef({ mounted: false, epoch: 0 });
   const [pendingStatusTokens, setPendingStatusTokens] = useState(() => new Map());
+  // Stage 6B1: feedback-ownership registry for the token/removal/terminal
+  // actions below. One entry per `${kind}:${suggestionId}` key holding the
+  // latest attempt for that action+row; a newer call for the same key simply
+  // replaces the map entry, which is how an older attempt gets superseded
+  // (checked via token identity in isAttemptCurrent) without cancelling or
+  // repeating its already-dispatched request. `valid` is flipped permanently
+  // false by the two layout effects below on unmount or observed row absence,
+  // the same way statusOperationsRef's operations are — this is required
+  // because a row that disappears and returns would otherwise look current
+  // again by the time an attempt settles.
+  const actionAttemptsRef = useRef(new Map());
 
   useLayoutEffect(() => {
     const context = statusContextRef.current;
     const operations = statusOperationsRef.current;
+    const attempts = actionAttemptsRef.current;
     context.mounted = true;
     return () => {
       context.mounted = false;
       context.epoch += 1;
       for (const operation of operations.values()) operation.valid = false;
+      for (const attempt of attempts.values()) attempt.valid = false;
     };
   }, []);
 
@@ -1683,7 +1696,55 @@ export default function ReviewerManagePanel({
         operation.valid = false;
       }
     }
+    for (const attempt of actionAttemptsRef.current.values()) {
+      if (attempt.epoch !== context.epoch || !context.reviewers.has(attempt.suggestionId)) {
+        attempt.valid = false;
+      }
+    }
   });
+
+  // Capture stable requestId/suggestionId/kind/epoch and a unique attempt
+  // token BEFORE the caller's first await. Returns null (caller must no-op)
+  // when the row is already gone or the committed context cannot currently
+  // accept a mutation — this is the "revalidate after confirm() before
+  // dispatch" checkpoint for revoke/remove/terminal, since beginAttempt is
+  // always called only after confirm() has returned.
+  const beginAttempt = (kind, suggestionId) => {
+    const context = statusContextRef.current;
+    const row = context.reviewers.get(suggestionId);
+    if (!context.mounted || !context.canManage || context.previewReadOnly || !row) return null;
+    const attempt = {
+      token: Symbol(kind),
+      kind,
+      suggestionId,
+      requestId: context.requestId,
+      epoch: context.epoch,
+      valid: true,
+    };
+    actionAttemptsRef.current.set(`${kind}:${suggestionId}`, attempt);
+    return attempt;
+  };
+
+  // Currentness checkpoint: same-context row/callback replacement stays
+  // valid; request/mode/permission change (epoch bump), observed row
+  // absence (attempt.valid flipped by the effects above) and a superseding
+  // later attempt for the same action+row (token mismatch in the registry)
+  // all invalidate.
+  const isAttemptCurrent = (attempt) => {
+    const context = statusContextRef.current;
+    return Boolean(attempt) && attempt.valid && context.mounted
+      && context.epoch === attempt.epoch && context.requestId === attempt.requestId
+      && context.canManage && !context.previewReadOnly
+      && context.reviewers.has(attempt.suggestionId)
+      && actionAttemptsRef.current.get(`${attempt.kind}:${attempt.suggestionId}`)?.token === attempt.token;
+  };
+
+  const finishAttempt = (attempt) => {
+    const key = `${attempt.kind}:${attempt.suggestionId}`;
+    if (actionAttemptsRef.current.get(key)?.token === attempt.token) {
+      actionAttemptsRef.current.delete(key);
+    }
+  };
 
   // Reset selection when the proposal OR the active mode changes — a
   // selection made under one sub-tab shouldn't leak into another's visible set.
@@ -1741,46 +1802,102 @@ export default function ReviewerManagePanel({
   // suggestion has never had a token minted (regenerate is the entry point);
   // revoke + mark-received are 404-tolerant on the backend.
   const handleRegenerateToken = async (suggestionId) => {
+    const attempt = beginAttempt('regenerate', suggestionId);
+    if (!attempt) return;
+    const isCurrent = () => isAttemptCurrent(attempt);
     try {
-      const resp = await fetch('/api/review-manager/regenerate-token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ suggestionId }),
-      });
+      let resp;
+      try {
+        resp = await fetch('/api/review-manager/regenerate-token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ suggestionId }),
+        });
+      } catch (err) {
+        if (isCurrent()) alert(`Network error generating link: ${err.message}`);
+        return;
+      }
+      if (!isCurrent()) return;
       const data = await resp.json().catch(() => ({}));
+      if (!isCurrent()) return;
       if (!resp.ok || !data.ok) {
         alert(`Could not generate a new link: ${data.reason || resp.status}`);
         return;
       }
+      // A new token already exists server-side at this point (mintAndStore
+      // persists before the route responds). If we've gone stale, we must
+      // never copy or display it — but there is nothing to roll back either.
+      if (!isCurrent()) return;
+      let copied = false;
       try {
         await navigator.clipboard.writeText(data.url);
-        alert(`Link copied to clipboard. Expires ${new Date(data.expiresAt).toLocaleDateString()}.`);
+        copied = true;
       } catch {
         // Clipboard can fail on insecure contexts — show the URL anyway.
+        copied = false;
+      }
+      // A copy that already started cannot be cancelled by navigation, but we
+      // can still suppress the alert/prompt/refresh that would follow it.
+      if (!isCurrent()) return;
+      if (copied) {
+        alert(`Link copied to clipboard. Expires ${new Date(data.expiresAt).toLocaleDateString()}.`);
+      } else {
         prompt('Reviewer link (copy manually):', data.url);
       }
-      if (onRefresh) onRefresh();
-    } catch (err) {
-      alert(`Network error generating link: ${err.message}`);
+      const currentOnRefresh = statusContextRef.current.onRefresh;
+      if (currentOnRefresh) {
+        try {
+          await currentOnRefresh();
+        } catch {
+          if (isCurrent()) {
+            alert('The link was generated, but the reviewer list could not be refreshed. Reload to see the current list.');
+          }
+        }
+      }
+    } finally {
+      finishAttempt(attempt);
     }
   };
 
   const handleRevokeToken = async (suggestionId) => {
     if (!confirm('Revoke this reviewer\'s magic link? They will no longer be able to use it.')) return;
+    // Revalidate after confirm() and before dispatch: beginAttempt reads the
+    // current committed context, so a row/permission/request change while the
+    // confirm dialog was open makes it return null and we no-op.
+    const attempt = beginAttempt('revoke', suggestionId);
+    if (!attempt) return;
+    const isCurrent = () => isAttemptCurrent(attempt);
     try {
-      const resp = await fetch('/api/review-manager/revoke-token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ suggestionId }),
-      });
+      let resp;
+      try {
+        resp = await fetch('/api/review-manager/revoke-token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ suggestionId }),
+        });
+      } catch (err) {
+        if (isCurrent()) alert(`Network error: ${err.message}`);
+        return;
+      }
+      if (!isCurrent()) return;
       const data = await resp.json().catch(() => ({}));
+      if (!isCurrent()) return;
       if (!resp.ok || !data.ok) {
         alert(`Revoke failed: ${data.reason || resp.status}`);
         return;
       }
-      if (onRefresh) onRefresh();
-    } catch (err) {
-      alert(`Network error: ${err.message}`);
+      const currentOnRefresh = statusContextRef.current.onRefresh;
+      if (currentOnRefresh) {
+        try {
+          await currentOnRefresh();
+        } catch {
+          if (isCurrent()) {
+            alert('The link was revoked, but the reviewer list could not be refreshed. Reload to see the current list.');
+          }
+        }
+      }
+    } finally {
+      finishAttempt(attempt);
     }
   };
 
@@ -1810,21 +1927,42 @@ export default function ReviewerManagePanel({
       + 'Their reviewer record and any review history are preserved.';
     if (!confirm(msg)) return;
 
+    // Revalidate after confirm() and before dispatch (see handleRevokeToken).
+    const attempt = beginAttempt('remove', reviewer.suggestionId);
+    if (!attempt) return;
+    const isCurrent = () => isAttemptCurrent(attempt);
     try {
-      const resp = await fetch('/api/reviewer-finder/my-candidates', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ suggestionId: reviewer.suggestionId }),
-      });
+      let resp;
+      try {
+        resp = await fetch('/api/reviewer-finder/my-candidates', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ suggestionId: reviewer.suggestionId }),
+        });
+      } catch (err) {
+        if (isCurrent()) alert(`Network error removing reviewer: ${err.message}`);
+        return;
+      }
+      if (!isCurrent()) return;
       if (!resp.ok) {
         const data = await resp.json().catch(() => ({}));
+        if (!isCurrent()) return;
         const detail = data.error || data.message || data.details || resp.status;
         alert(`Could not remove the reviewer: ${detail}`);
         return;
       }
-      if (onRefresh) onRefresh();
-    } catch (err) {
-      alert(`Network error removing reviewer: ${err.message}`);
+      const currentOnRefresh = statusContextRef.current.onRefresh;
+      if (currentOnRefresh) {
+        try {
+          await currentOnRefresh();
+        } catch {
+          if (isCurrent()) {
+            alert('The reviewer was removed, but the reviewer list could not be refreshed. Reload to see the current list.');
+          }
+        }
+      }
+    } finally {
+      finishAttempt(attempt);
     }
   };
 
@@ -1965,25 +2103,53 @@ export default function ReviewerManagePanel({
       ? 'This changes their response to declined, updates reviewer counts, revokes their portal link, and removes any linked honorarium request.'
       : 'This ends the engagement and revokes their portal link.';
     if (!confirm(`Confirm that ${reviewer.name || 'this reviewer'} ${outcome}?\n\n${consequence}`)) return;
+    // Revalidate after confirm() and before dispatch (see handleRevokeToken).
+    // Both terminal choices for a given row share one generation, since only
+    // one of them can meaningfully be in flight for that row at a time.
+    const attempt = beginAttempt('terminal', reviewer.suggestionId);
+    if (!attempt) return;
+    const isCurrent = () => isAttemptCurrent(attempt);
+    // Captured at dispatch time, not read live from `proposal` later — a
+    // request switch after this point must not relabel this payload.
+    const requestId = attempt.requestId;
     try {
-      const response = await fetch('/api/review-manager/terminal-transition', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          requestId: proposal.proposalId,
-          suggestionIds: [reviewer.suggestionId],
-          terminalStatus,
-        }),
-      });
+      let response;
+      try {
+        response = await fetch('/api/review-manager/terminal-transition', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            requestId,
+            suggestionIds: [reviewer.suggestionId],
+            terminalStatus,
+          }),
+        });
+      } catch (transitionError) {
+        if (isCurrent()) alert(`Network error ending engagement: ${transitionError.message}`);
+        return;
+      }
+      if (!isCurrent()) return;
       const data = await response.json().catch(() => ({}));
+      if (!isCurrent()) return;
       if (!response.ok || data.transitioned !== 1) {
+        // A 409 with results[0].status === 'write_failed' may have partially
+        // committed server-side; there is no client-side replay or repair.
         const reason = data.results?.[0]?.status || data.error || response.status;
         alert(`Could not end the engagement: ${reason}. Reload and try again.`);
         return;
       }
-      if (onRefresh) onRefresh();
-    } catch (transitionError) {
-      alert(`Network error ending engagement: ${transitionError.message}`);
+      const currentOnRefresh = statusContextRef.current.onRefresh;
+      if (currentOnRefresh) {
+        try {
+          await currentOnRefresh();
+        } catch {
+          if (isCurrent()) {
+            alert('The engagement change was recorded, but the reviewer list could not be refreshed. Reload to see the current status.');
+          }
+        }
+      }
+    } finally {
+      finishAttempt(attempt);
     }
   };
 
