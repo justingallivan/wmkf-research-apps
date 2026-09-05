@@ -196,16 +196,17 @@ M if Stage 2a splits institution from department on the engagement row; L if nor
 - [ASSUMED] Decide whether official writeups also need a full display affiliation string in addition to institution-only plus department.
 - [VERIFIED via `lib/services/auto-link-reviewer-contact-account.js`] The owner approved a narrow acceptance-time subset and it is **live in production since 2026-08-10 (S412, merge `42abd72a`)**: fill only an empty Contact parent when the accepted affiliation has exactly one active normalized exact CRM Account label match; preserve existing parents and alert on ambiguous/unmatched residuals.
 
-## 4. Positive / Negative Flag And Searchable Notes After Reviewer Is Added
+## 4. Closeout Notes And Future Reviewer Memory
 
 **Current State**
 
 - [VERIFIED via `docs/atlas/dataverse-wmkf-appreviewersuggestion.md:24-32`] `wmkf_appreviewersuggestion` has `wmkf_notes`, but it is on the per-request junction.
 - [VERIFIED via `lib/dataverse/adapters/reviewer-suggestion.js:15-40`] The suggestion adapter selects `wmkf_notes`.
 - [VERIFIED via `lib/dataverse/adapters/reviewer-suggestion.js:870-893`] `updateLifecycle` maps `notes` to `wmkf_notes`.
-- [VERIFIED via `pages/api/review-manager/reviewers.js:208-218`] Track Reviewers reads `notes` from `wmkf_notes`.
-- [VERIFIED via `shared/components/reviewers/ReviewerManagePanel.js:1180-1195`] Track Reviewers can save notes through `PATCH /api/review-manager/reviewers`.
-- [VERIFIED via `shared/components/reviewers/ReviewerManagePanel.js:1390-1464`] Track Reviewers renders editable notes in its table.
+- [VERIFIED via `lib/services/review-manager/reviewers-service.js`] Track Reviewers reads `notes` from `wmkf_notes` so existing context can preload the closeout form.
+- [VERIFIED via `shared/components/reviewers/ReviewerCloseoutModal.js`] Request-scoped notes are now optional closeout context, alongside the PD's honorarium-eligibility decision.
+- [VERIFIED via `lib/services/review-manager/close-review-service.js`] First closeout saves supplied notes with status, completion time, and eligibility in one ETag-bound write; edits update only changed eligibility/notes fields without restamping completion.
+- [VERIFIED via `shared/components/reviewers/ReviewerManagePanel.js`] The tracking table no longer dedicates a column or independent inline editor to Notes.
 - [VERIFIED via `docs/atlas/dataverse-wmkf-potentialreviewers.md:21-42`] The documented person fields do not include a reviewer-level positive/negative flag or reviewer-level staff notes field.
 - [VERIFIED via `lib/dataverse/adapters/potential-reviewer.js:14-27`] The normal person adapter select does not include any flag or person-note field.
 
@@ -218,8 +219,8 @@ M if Stage 2a splits institution from department on the engagement row; L if nor
 **Proposed Approach**
 
 - [PLANNED] Do not make global reviewer flag/notes a candidate-export requirement.
-- [PLANNED] Keep `wmkf_appreviewersuggestion.wmkf_notes` for request-specific Track Reviewers notes during the active review cycle.
-- [PLANNED] Trigger optional PD feedback after review closeout, not during candidate identification or acceptance.
+- [VERIFIED] Keep `wmkf_appreviewersuggestion.wmkf_notes` request-scoped and collect it during reviewer closeout, not during candidate identification, acceptance, or routine active-cycle tracking.
+- [VERIFIED] Closeout notes remain optional because they are primarily exception context (for example timeliness, review quality, or conduct), not a required review artifact.
 - [PLANNED] Do not gate review closeout, candidate export, or future reviewer use on whether a PD completes this feedback.
 - [PLANNED] Capture a flag with the plain business meaning "would you ask this reviewer to help us again?" plus a required notes field when the PD chooses to submit feedback.
 - [PLANNED] Let PDs judge whether their note is useful rather than providing a "not applicable" path.
@@ -229,20 +230,20 @@ M if Stage 2a splits institution from department on the engagement row; L if nor
 **Where It Plugs In**
 
 - [VERIFIED via `lib/dataverse/adapters/potential-reviewer.js:259-300`] Existing person-level PATCH adapter pattern can update a subset of person fields.
-- [VERIFIED via `shared/components/reviewers/ReviewerManagePanel.js:1300-1306`] Track Reviewers already updates review status through `PATCH /api/review-manager/reviewers`.
-- [VERIFIED via `pages/api/review-manager/reviewers.js:330-337`] The `reviewStatus=complete` closeout path already centralizes complete stamps before a post-closeout feedback prompt could fire.
-- [VERIFIED via `shared/components/reviewers/ReviewerManagePanel.js:1452-1464`] Track Reviewers already has request-note editing, which should remain distinct from global reviewer notes.
+- [VERIFIED via `shared/components/reviewers/ReviewerCloseoutModal.js`] The dedicated closeout modal is the sole Workbench note-entry surface for tracked reviewers.
+- [VERIFIED via `pages/api/review-manager/close-review.js`] The closeout route accepts bounded optional notes and retains the existing lead-PD/superuser authorization boundary.
+- [VERIFIED via `lib/services/review-manager/close-review-service.js`] Request notes and the eligibility disposition share the same fresh-read, ETag-conditional closeout write.
 
 **Rough Effort**
 
-M if using two new reviewer-memory columns and simple filters; L if adding full-text search, audit history, or reusable reviewer-pool browsing. Candidate export remains S/no-op because this is post-closeout feedback.
+Shipped for request-scoped closeout notes using the existing field. M if later adding two global reviewer-memory columns and simple filters; L if adding full-text search, audit history, or reusable reviewer-pool browsing.
 
 **Open Decisions For Justin/Connor**
 
-- [PLANNED] PDs own reviewer feedback entry.
-- [PLANNED] Feedback is optional and triggered after closeout.
+- [VERIFIED] PDs own request-scoped reviewer note entry inside closeout.
+- [VERIFIED] Request-scoped notes are optional and saved as part of closeout.
 - [PLANNED] Flag shape is the business question "would you ask this reviewer to help us again?" plus notes.
-- [ASSUMED] Decide exact storage scope: global person-level reviewer memory, per-engagement closeout feedback, or both with an aggregate current flag.
+- [VERIFIED] Current notes are per-engagement closeout context; a future global person-level reviewer-memory flag remains a separate decision.
 - [ASSUMED] Decide whether notes are searchable by all staff and whether Dataverse auditing should be enabled for changes.
 
 ## 5. Expertise Keywords / Tags
@@ -375,7 +376,7 @@ M for derived counts and last-date display; L if staff need drill-down history r
    (`wmkf_reviewduedateoverride ?? wmkf_reviewduedate`) and review
    receipt/submission date, with PD override during notes entry.
 3. [PLANNED] Add optional review-history workbook/report columns after defining "completed review."
-4. [PLANNED] Add optional PD closeout feedback: "would ask again?" flag plus required notes.
+4. [PARTIAL] Request-scoped optional PD notes now live in closeout; a global "would ask again?" flag and any required global rationale remain unbuilt decisions.
 5. [PLANNED] Add controlled expertise-tag tables only if free tags in `wmkf_keywords` are insufficient.
 
 ## Contract-Reconcile Notes

@@ -1,6 +1,6 @@
 /**
  * POST /api/review-manager/close-review
- *   { suggestionId, disposition: 'eligible'|'not_eligible'|'not_applicable' }
+ *   { suggestionId, disposition: 'eligible'|'not_eligible'|'not_applicable', notes?: string }
  *
  * Dedicated one-reviewer human closeout. The authenticated actor must be the
  * request's lead Program Director or a superuser. All lifecycle eligibility is
@@ -29,6 +29,7 @@ export default async function handler(req, res) {
     ? req.body.suggestionId.trim()
     : '';
   const disposition = req.body?.disposition;
+  const notes = req.body?.notes;
   if (!isGuid(suggestionId)) {
     return res.status(400).json({ error: 'suggestionId must be a valid GUID' });
   }
@@ -36,6 +37,9 @@ export default async function handler(req, res) {
     return res.status(400).json({
       error: 'disposition must be eligible, not_eligible, or not_applicable',
     });
+  }
+  if (notes !== undefined && (typeof notes !== 'string' || notes.length > 2000)) {
+    return res.status(400).json({ error: 'notes must be a string of 2000 characters or fewer' });
   }
 
   const actingUserSystemId = actorRefFromSession(access.session);
@@ -49,6 +53,7 @@ export default async function handler(req, res) {
       const result = await closeReview({
         suggestionId,
         disposition,
+        ...(notes !== undefined ? { notes } : {}),
         actingUserSystemId,
         authorizedRequestId: authorization.requestIds[0],
       });

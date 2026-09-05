@@ -505,6 +505,17 @@ describe('patchMyCandidates', () => {
     expect(suggestionAdapter.updateLifecycle).not.toHaveBeenCalled();
   });
 
+  test('the generic candidate PATCH cannot bypass closeout note entry', async () => {
+    await expect(patchMyCandidates({
+      body: { suggestionId: SUGGESTION_ID, notes: 'Slow and incomplete review' },
+      actingUserSystemId: SYS,
+    })).rejects.toMatchObject({
+      httpStatus: 400,
+      message: 'No supported fields to update',
+    });
+    expect(suggestionAdapter.updateLifecycle).not.toHaveBeenCalled();
+  });
+
   test('restore: true re-selects via restore() and returns the restore envelope', async () => {
     const out = await patchMyCandidates({
       body: { suggestionId: SUGGESTION_ID, restore: true },

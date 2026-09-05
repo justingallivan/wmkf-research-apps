@@ -13,7 +13,7 @@
  *     ?status=<reviewStatus> post-filter (e.g. 'materials_sent', 'complete')
  *
  * PATCH /api/review-manager/reviewers
- *   Single  : { suggestionId, reviewStatus?, notes? }
+ *   Single  : { suggestionId, reviewStatus }
  *   Batch   : { suggestionIds: [...], reviewStatus }
  *
  * Note: suggestionId values are Dataverse GUIDs (strings). reviewStatus values
@@ -100,7 +100,6 @@ async function handlePatch(req, res, access) {
       suggestionId,
       suggestionIds,
       reviewStatus,
-      notes,
     } = req.body || {};
 
     // Batch: status change across multiple suggestions
@@ -133,7 +132,6 @@ async function handlePatch(req, res, access) {
 
     const lifecycle = {};
     if (reviewStatus !== undefined) lifecycle.reviewStatus = reviewStatus;
-    if (notes !== undefined) lifecycle.notes = notes;
 
     if (Object.keys(lifecycle).length === 0) {
       return res.status(400).json({ error: 'No supported fields to update' });

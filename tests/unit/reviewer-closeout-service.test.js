@@ -35,6 +35,7 @@ function row(overrides = {}) {
     wmkf_reviewreceivedat: '2026-09-04T12:00:00.000Z',
     wmkf_completedat: null,
     wmkf_honorariumeligibility: null,
+    wmkf_notes: null,
     wmkf_honorariumoptout: false,
     _wmkf_honorariumrequest_value: HONORARIUM,
     _etag: 'W/"7"',
@@ -104,6 +105,21 @@ test('closes one received review with status, timestamp, and disposition in one 
   expect(payload).not.toHaveProperty('honorariumRequest');
 });
 
+test('trims closeout notes into the same ETag-bound first-closeout write', async () => {
+  const result = await closeReview({ ...args(), notes: '  Review was late but useful.  ' });
+
+  expect(updateLifecycle).toHaveBeenCalledWith(
+    SUGGESTION,
+    {
+      reviewStatus: 'complete',
+      completedAt: result.completedAt,
+      honorariumEligibility: 'eligible',
+      notes: 'Review was late but useful.',
+    },
+    { actingUserSystemId: 'staff-1', ifMatch: 'W/"7"' },
+  );
+});
+
 test('repeat of the same completed disposition is an unchanged success with no restamp', async () => {
   findById.mockResolvedValue(row({
     wmkf_reviewstatus: 100000004,
@@ -141,6 +157,53 @@ test('corrects only the disposition on an already-complete row and preserves com
     { honorariumEligibility: 'eligible' },
     { actingUserSystemId: 'staff-1', ifMatch: 'W/"7"' },
   );
+});
+
+test('updates changed notes without restamping or rewriting an unchanged disposition', async () => {
+  findById.mockResolvedValue(row({
+    wmkf_reviewstatus: 100000004,
+    wmkf_completedat: '2026-09-04T13:00:00.000Z',
+    wmkf_honorariumeligibility: 100000000,
+    wmkf_notes: 'Old note',
+  }));
+
+  const result = await closeReview({ ...args(), notes: 'New closeout note' });
+  expect(result).toMatchObject({ status: 'corrected', completedAt: '2026-09-04T13:00:00.000Z' });
+  expect(updateLifecycle).toHaveBeenCalledWith(
+    SUGGESTION,
+    { notes: 'New closeout note' },
+    { actingUserSystemId: 'staff-1', ifMatch: 'W/"7"' },
+  );
+});
+
+test('treats normalized matching notes as unchanged and supports an explicit clear', async () => {
+  findById.mockResolvedValue(row({
+    wmkf_reviewstatus: 100000004,
+    wmkf_completedat: '2026-09-04T13:00:00.000Z',
+    wmkf_honorariumeligibility: 100000000,
+    wmkf_notes: 'Existing note',
+  }));
+
+  await expect(closeReview({ ...args(), notes: '  Existing note  ' }))
+    .resolves.toMatchObject({ status: 'unchanged' });
+  expect(updateLifecycle).not.toHaveBeenCalled();
+
+  await expect(closeReview({ ...args(), notes: '   ' }))
+    .resolves.toMatchObject({ status: 'corrected' });
+  expect(updateLifecycle).toHaveBeenCalledWith(
+    SUGGESTION,
+    { notes: null },
+    { actingUserSystemId: 'staff-1', ifMatch: 'W/"7"' },
+  );
+});
+
+test('rejects invalid notes before reading or writing Dataverse', async () => {
+  await expect(closeReview({ ...args(), notes: 'x'.repeat(2001) })).rejects.toMatchObject({
+    httpStatus: 400,
+    body: { code: 'invalid_notes' },
+  });
+  expect(findById).not.toHaveBeenCalled();
+  expect(updateLifecycle).not.toHaveBeenCalled();
 });
 
 test('allows a legacy Complete row with null disposition to receive its first recorded disposition without restamping', async () => {

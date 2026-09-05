@@ -65,7 +65,7 @@ test('wrong method (not GET/PATCH) returns 405 with no Allow header set', async 
 
 test('PATCH single-suggestion success returns the full envelope and forwards actingUserSystemId', async () => {
   suggestionAdapter.updateLifecycle.mockResolvedValue(undefined);
-  const { req, res } = call('PATCH', { suggestionId: SUGGESTION_ID, reviewStatus: 'accepted', notes: 'looks good' });
+  const { req, res } = call('PATCH', { suggestionId: SUGGESTION_ID, reviewStatus: 'accepted' });
   await handler(req, res);
 
   expect(res.statusCode).toBe(200);
@@ -73,7 +73,7 @@ test('PATCH single-suggestion success returns the full envelope and forwards act
   expect(suggestionAdapter.updateLifecycle).toHaveBeenCalledTimes(1);
   expect(suggestionAdapter.updateLifecycle).toHaveBeenCalledWith(
     SUGGESTION_ID,
-    { reviewStatus: 'accepted', notes: 'looks good' },
+    { reviewStatus: 'accepted' },
     { actingUserSystemId: ACTING_USER_ID },
   );
   expect(authorizeReviewerRequestMutation).toHaveBeenCalledWith({
@@ -81,6 +81,16 @@ test('PATCH single-suggestion success returns the full envelope and forwards act
     callerSystemId: ACTING_USER_ID,
     suggestionIds: [SUGGESTION_ID],
   });
+});
+
+test('PATCH rejects notes outside the dedicated closeout route', async () => {
+  const { req, res } = call('PATCH', { suggestionId: SUGGESTION_ID, notes: 'looks good' });
+  await handler(req, res);
+
+  expect(res.statusCode).toBe(400);
+  expect(res._data).toEqual({ error: 'No supported fields to update' });
+  expect(suggestionAdapter.updateLifecycle).not.toHaveBeenCalled();
+  expect(authorizeReviewerRequestMutation).not.toHaveBeenCalled();
 });
 
 test('PATCH rejects a foreign request before the first lifecycle write', async () => {

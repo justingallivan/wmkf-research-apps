@@ -130,7 +130,7 @@ describe('reviewer table geometry', () => {
     reviewDueReminderEligibility: 'eligible',
   };
 
-  test('uses a fixed six-column grid in read-only mode regardless of affiliation length', async () => {
+  test('uses a fixed five-column grid in read-only mode regardless of affiliation length', async () => {
     let container;
     await act(async () => {
       ({ container } = render(
@@ -145,13 +145,14 @@ describe('reviewer table geometry', () => {
     });
 
     const table = container.querySelector('table');
-    expect(table).toHaveClass('table-fixed', 'min-w-[64rem]');
-    expect(table.querySelectorAll('colgroup col')).toHaveLength(6);
+    expect(table).toHaveClass('table-fixed', 'min-w-[56rem]');
+    expect(table.querySelectorAll('colgroup col')).toHaveLength(5);
+    expect(screen.queryByRole('columnheader', { name: 'Notes' })).not.toBeInTheDocument();
     expect(screen.getByText(longAffiliation)).toHaveClass('line-clamp-2', 'break-words');
     expect(screen.getByText(reviewer.email)).toHaveClass('truncate');
   });
 
-  test('uses the corresponding seven-column grid when management controls are present without a release selection', async () => {
+  test('uses the corresponding six-column grid when management controls are present without a release selection', async () => {
     let container;
     await act(async () => {
       ({ container } = render(
@@ -166,8 +167,8 @@ describe('reviewer table geometry', () => {
     });
 
     const table = container.querySelector('table');
-    expect(table).toHaveClass('table-fixed', 'min-w-[76rem]');
-    expect(table.querySelectorAll('colgroup col')).toHaveLength(7);
+    expect(table).toHaveClass('table-fixed', 'min-w-[68rem]');
+    expect(table.querySelectorAll('colgroup col')).toHaveLength(6);
   });
 
   test('separates follow-up and action controls into aligned labeled columns', async () => {
@@ -186,8 +187,8 @@ describe('reviewer table geometry', () => {
     });
 
     const table = container.querySelector('table');
-    expect(table).toHaveClass('table-fixed', 'min-w-[80rem]');
-    expect(table.querySelectorAll('colgroup col')).toHaveLength(8);
+    expect(table).toHaveClass('table-fixed', 'min-w-[72rem]');
+    expect(table.querySelectorAll('colgroup col')).toHaveLength(7);
     expect(screen.getByRole('columnheader', { name: 'Follow up' })).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: 'Actions' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Send reminder to Joshua Rosenthal' })).toBeInTheDocument();

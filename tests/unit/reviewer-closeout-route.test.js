@@ -75,6 +75,23 @@ test.each(['eligible', 'not_eligible', 'not_applicable'])('accepts exact disposi
   expect(closeReview).toHaveBeenCalledWith(expect.objectContaining({ disposition }));
 });
 
+test('validates and forwards optional closeout notes', async () => {
+  const res = response();
+  await handler({
+    method: 'POST',
+    body: { suggestionId: SUGGESTION, disposition: 'not_eligible', notes: 'Review quality concern' },
+  }, res);
+  expect(res.statusCode).toBe(200);
+  expect(closeReview).toHaveBeenCalledWith(expect.objectContaining({ notes: 'Review quality concern' }));
+
+  const invalid = response();
+  await handler({
+    method: 'POST',
+    body: { suggestionId: SUGGESTION, disposition: 'not_eligible', notes: 'x'.repeat(2001) },
+  }, invalid);
+  expect(invalid.statusCode).toBe(400);
+});
+
 test('rejects malformed ids and unknown dispositions before authorization or service work', async () => {
   const badId = response();
   await handler({ method: 'POST', body: { suggestionId: 'bad', disposition: 'eligible' } }, badId);

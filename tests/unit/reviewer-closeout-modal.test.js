@@ -14,6 +14,7 @@ const REVIEWER = {
   honorariumEligibility: null,
   honorariumOptOut: false,
   honorariumRequestId: 'honorarium-1',
+  notes: 'Existing context',
 };
 
 describe('ReviewerCloseoutModal', () => {
@@ -39,7 +40,11 @@ describe('ReviewerCloseoutModal', () => {
       onSaved={onSaved}
     />);
     expect(screen.getByText('R-1001 · A Proposal')).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: /Closeout notes/ })).toHaveValue('Existing context');
     expect(screen.getByRole('radio', { name: /^Not applicable/ })).toBeDisabled();
+    fireEvent.change(screen.getByRole('textbox', { name: /Closeout notes/ }), {
+      target: { value: 'Slow response; useful review.' },
+    });
     fireEvent.click(screen.getByRole('radio', { name: /^Eligible/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Complete closeout' }));
 
@@ -47,7 +52,11 @@ describe('ReviewerCloseoutModal', () => {
     expect(global.fetch).toHaveBeenCalledWith('/api/review-manager/close-review', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ suggestionId: REVIEWER.suggestionId, disposition: 'eligible' }),
+      body: JSON.stringify({
+        suggestionId: REVIEWER.suggestionId,
+        disposition: 'eligible',
+        notes: 'Slow response; useful review.',
+      }),
     });
     expect(onSaved).toHaveBeenCalledWith({ success: true, changed: true });
     expect(onClose).toHaveBeenCalledTimes(1);
@@ -93,6 +102,7 @@ describe('ReviewerCloseoutModal', () => {
       />,
     );
     expect(screen.getByRole('alert')).toHaveTextContent('Technical repair is required');
-    expect(screen.getByRole('button', { name: 'Save disposition' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Save closeout' })).toBeDisabled();
+    expect(screen.getByRole('textbox', { name: /Closeout notes/ })).toBeDisabled();
   });
 });

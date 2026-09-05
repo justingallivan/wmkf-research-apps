@@ -1636,19 +1636,16 @@ export default function ReviewerManagePanel({
 }) {
   const [selectedReviewers, setSelectedReviewers] = useState(new Set());
   const [releaseModalOpen, setReleaseModalOpen] = useState(false);
-  const [editingNotes, setEditingNotes] = useState(null); // { suggestionId, value }
-  const [savingNotes, setSavingNotes] = useState(false);
   const [activityDrawerId, setActivityDrawerId] = useState(null); // suggestionId
   const [closeoutReviewerId, setCloseoutReviewerId] = useState(null); // suggestionId
 
   const allReviewers = reviewersProp || proposal?.reviewers || [];
   const reviewers = filterByMode(allReviewers, mode);
 
-  // Reset selection / notes when the proposal OR the active mode changes — a
+  // Reset selection when the proposal OR the active mode changes — a
   // selection made under one sub-tab shouldn't leak into another's visible set.
   useEffect(() => {
     setSelectedReviewers(new Set());
-    setEditingNotes(null);
   }, [proposal?.proposalId, mode]);
 
   // The open drawer is a pure projection of the CURRENT row, looked up fresh each
@@ -1675,15 +1672,15 @@ export default function ReviewerManagePanel({
   const showActionsColumn = canManage;
   const combinedControls = showFollowUpColumn && showActionsColumn;
   const reviewerColumnWidth = combinedControls
-    ? showSelectionColumn ? 'w-[22%]' : 'w-[26%]'
+    ? showSelectionColumn ? 'w-[27%]' : 'w-[31%]'
     : showActionsColumn
-      ? showSelectionColumn ? 'w-[24%]' : 'w-[28%]'
-      : showFollowUpColumn ? 'w-[29%]' : 'w-[32%]';
+      ? showSelectionColumn ? 'w-[30%]' : 'w-[34%]'
+      : showFollowUpColumn ? 'w-[33%]' : 'w-[36%]';
   const tableMinWidth = combinedControls
-    ? 'min-w-[80rem]'
+    ? 'min-w-[72rem]'
     : showFollowUpColumn || showActionsColumn
-      ? 'min-w-[76rem]'
-      : 'min-w-[64rem]';
+      ? 'min-w-[68rem]'
+      : 'min-w-[56rem]';
 
   const toggleSelectAll = () => {
     if (allSelected) {
@@ -1700,23 +1697,6 @@ export default function ReviewerManagePanel({
       else next.add(id);
       return next;
     });
-  };
-
-  const saveNotes = async (suggestionId, notes) => {
-    setSavingNotes(true);
-    try {
-      await fetch('/api/review-manager/reviewers', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ suggestionId, notes }),
-      });
-      setEditingNotes(null);
-      if (onRefresh) onRefresh();
-    } catch (err) {
-      console.error('Failed to save notes:', err);
-    } finally {
-      setSavingNotes(false);
-    }
   };
 
   // ── External-link lifecycle actions ─────────────────────────────────────
@@ -1994,10 +1974,9 @@ export default function ReviewerManagePanel({
               <col className={combinedControls ? 'w-[11%]' : canManage ? 'w-[12%]' : showFollowUpColumn ? 'w-[14%]' : 'w-[16%]'} />
               <col className={combinedControls ? 'w-[9%]' : canManage ? 'w-[10%]' : showFollowUpColumn ? 'w-[12%]' : 'w-[14%]'} />
               <col className={combinedControls ? 'w-[10%]' : canManage ? 'w-[11%]' : showFollowUpColumn ? 'w-[13%]' : 'w-[14%]'} />
-              <col className={combinedControls ? 'w-[12%]' : canManage ? 'w-[13%]' : showFollowUpColumn ? 'w-[14%]' : 'w-[16%]'} />
-              <col className={combinedControls ? 'w-[11%]' : canManage ? 'w-[13%]' : showFollowUpColumn ? 'w-[7%]' : 'w-[8%]'} />
-              {showFollowUpColumn && <col className={canManage ? 'w-[13%]' : 'w-[11%]'} />}
-              {showActionsColumn && <col className={showFollowUpColumn ? 'w-[8%]' : 'w-[13%]'} />}
+              <col className={combinedControls ? 'w-[15%]' : canManage ? 'w-[17%]' : showFollowUpColumn ? 'w-[16%]' : 'w-[20%]'} />
+              {showFollowUpColumn && <col className={canManage ? 'w-[15%]' : 'w-[12%]'} />}
+              {showActionsColumn && <col className={showFollowUpColumn ? 'w-[9%]' : 'w-[16%]'} />}
             </colgroup>
             <thead className="bg-gray-50">
               <tr>
@@ -2017,7 +1996,6 @@ export default function ReviewerManagePanel({
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Link</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Due date</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Action</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Notes</th>
                 {showFollowUpColumn && (
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Follow up
@@ -2032,7 +2010,6 @@ export default function ReviewerManagePanel({
             </thead>
             <tbody className="divide-y divide-gray-100">
               {reviewers.map(r => {
-                const isEditing = editingNotes?.suggestionId === r.suggestionId;
                 // Terminal status has no guaranteed timestamp, so it takes precedence
                 // without being fabricated as a dated timeline event.
                 const lastEvent = latestActivitySummary(r);
@@ -2102,42 +2079,6 @@ export default function ReviewerManagePanel({
                       >
                         History
                       </button>
-                    </td>
-                    <td className="px-4 py-3 align-top">
-                      {canManage && isEditing ? (
-                        <div className="flex items-center gap-1">
-                          <input
-                            type="text"
-                            value={editingNotes.value}
-                            onChange={e => setEditingNotes({ ...editingNotes, value: e.target.value })}
-                            className="w-32 px-2 py-1 text-xs border border-gray-300 rounded"
-                            onKeyDown={e => {
-                              if (e.key === 'Enter') saveNotes(r.suggestionId, editingNotes.value);
-                              if (e.key === 'Escape') setEditingNotes(null);
-                            }}
-                            autoFocus
-                          />
-                          <button
-                            onClick={() => saveNotes(r.suggestionId, editingNotes.value)}
-                            disabled={savingNotes}
-                            className="text-xs text-blue-600 hover:text-blue-800"
-                          >
-                            Save
-                          </button>
-                        </div>
-                      ) : canManage ? (
-                        <button
-                          onClick={() => setEditingNotes({ suggestionId: r.suggestionId, value: r.notes || '' })}
-                          className="text-xs text-gray-500 hover:text-gray-700 max-w-[150px] truncate block"
-                          title={r.notes || 'Click to add notes'}
-                        >
-                          {r.notes || <span className="italic text-gray-300">Add notes</span>}
-                        </button>
-                      ) : (
-                        <span className="text-xs text-gray-500 max-w-[150px] truncate block" title={r.notes || ''}>
-                          {r.notes || <span className="italic text-gray-300">—</span>}
-                        </span>
-                      )}
                     </td>
                     {showFollowUpColumn && (
                       <td className="px-4 py-3 align-top">

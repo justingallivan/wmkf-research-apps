@@ -44,6 +44,7 @@ export default function ReviewerCloseoutModal({ isOpen, reviewer, proposal, onCl
     ? reviewer.honorariumEligibility
     : '';
   const [disposition, setDisposition] = useState(initialDisposition);
+  const [notes, setNotes] = useState(reviewer?.notes || '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const savingRef = useRef(false);
@@ -75,6 +76,7 @@ export default function ReviewerCloseoutModal({ isOpen, reviewer, proposal, onCl
         body: JSON.stringify({
           suggestionId: reviewer.suggestionId,
           disposition,
+          notes,
         }),
       });
       const data = await response.json().catch(() => ({}));
@@ -164,6 +166,26 @@ export default function ReviewerCloseoutModal({ isOpen, reviewer, proposal, onCl
             </div>
           </fieldset>
 
+          <div className="mt-5">
+            <label htmlFor="reviewer-closeout-notes" className="block text-sm font-semibold text-gray-900">
+              Closeout notes <span className="font-normal text-gray-500">(optional)</span>
+            </label>
+            <p id="reviewer-closeout-notes-help" className="mt-1 text-xs leading-5 text-gray-500">
+              Record concerns about timeliness, review quality, or conduct for this review.
+            </p>
+            <textarea
+              id="reviewer-closeout-notes"
+              aria-describedby="reviewer-closeout-notes-help"
+              value={notes}
+              onChange={(event) => setNotes(event.target.value)}
+              maxLength={2000}
+              rows={3}
+              disabled={saving || reviewer.honorariumEligibility === 'unknown'}
+              className="mt-2 block w-full resize-y rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-600/20 disabled:bg-gray-100 disabled:text-gray-500"
+              placeholder="Add context only when follow-up may be useful"
+            />
+          </div>
+
           {error && <p className="mt-3 text-sm text-red-700" role="alert">{error}</p>}
 
           <div className="mt-6 flex justify-end gap-2">
@@ -180,7 +202,7 @@ export default function ReviewerCloseoutModal({ isOpen, reviewer, proposal, onCl
               disabled={!disposition || !optionAllowed(disposition, reviewer) || saving || reviewer.honorariumEligibility === 'unknown'}
               className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-gray-300"
             >
-              {saving ? 'Saving…' : editing ? 'Save disposition' : 'Complete closeout'}
+              {saving ? 'Saving…' : editing ? 'Save closeout' : 'Complete closeout'}
             </button>
           </div>
         </form>
