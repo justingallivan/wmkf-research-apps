@@ -114,8 +114,21 @@ function ReviewerGroup({ proposal, previewReadOnly, onRefresh }) {
                 .reviewer-activity-panel td span.rounded {
                   border-radius: 9999px;
                 }
+                .reviewer-activity-panel td:nth-child(2) > div:first-child > span {
+                  min-height: 2rem;
+                  padding: 0.375rem 0.75rem;
+                  line-height: 1.25rem;
+                }
+                .reviewer-activity-panel table thead th:last-child {
+                  position: relative;
+                  padding-right: 5rem;
+                }
                 .reviewer-activity-panel table thead th:last-child::after {
-                  content: ' · More';
+                  content: 'More';
+                  position: absolute;
+                  top: 50%;
+                  right: 1rem;
+                  transform: translateY(-50%);
                   color: #9ca3af;
                   font-weight: 500;
                   text-transform: none;
