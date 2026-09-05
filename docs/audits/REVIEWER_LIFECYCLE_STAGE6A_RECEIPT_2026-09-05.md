@@ -29,12 +29,12 @@ exists in the inspected application callers; materials selection is separate.
 
 | Invariant | Files likely touched | Verification |
 |---|---|---|
-| Entire raw batch validates and authorizes before any write | Existing reviewers route and authorization composition | Invalid/foreign later ID yields zero writes; existing error envelopes retained |
+| Entire raw batch receives route GUID/presence checks and authorization before any write | Existing reviewers route and authorization composition | Invalid/foreign later ID yields zero writes; existing error envelopes retained |
 | Canonical unique batch targets retain first-occurrence order | Reviewers service | Trim/case duplicates, unique count and failure after duplicates |
 | One nonempty-batch discriminator controls precheck and execution | Reviewers service | Empty-array single fallback still enforces dedicated closeout/terminal endpoint policy |
 | Sequential awaited writes stop at first rejection | Reviewers service and real adapter composition | Suspended first write, first/middle/last failure, no later read/write/replay |
-| Outcomes describe the exact confirmed prefix, uncertain attempt and untouched suffix | Service error carrier and route | Exact arrays and persisted rows, including commit-then-response-loss |
-| Pre-write errors and sanitized 200/500 behavior remain intact | Route | Auth/validation errors have no outcomes; raw 412 still maps to existing 500; development-only details |
+| Outcomes describe the exact confirmed prefix, unconfirmed adapter operation and untouched suffix | Service error carrier and route | Exact arrays and persisted rows, including commit-then-response-loss |
+| Route/auth and service dedicated-target prechecks remain error-only; adapter failures carry outcomes | Route | Precheck errors have no outcomes; adapter validation and raw 412 retain sanitized 500 with outcomes; development-only details |
 | Any outcome key requires the complete protocol and matching submitted identities | Actual ManagePanel handler | Missing keys, malformed/duplicate/foreign IDs, ordering and HTTP/body contradictions fail unconfirmed |
 | Confirmed saves and uncertain outcomes are visible without automatic replay | Existing row action | Returned identity, refresh only on confirmed save, distinct refresh failure and no second PATCH |
 | All Stage 1E operation ownership and stale-feedback guards survive | ManagePanel and rendered tests | Duplicate calls, deferred JSON, context away/back, row removal, unmount and callback failure |
@@ -44,9 +44,11 @@ exists in the inspected application callers; materials selection is separate.
 Success retains HTTP 200 and `success:true`, adding `savedIds`, `failedIds:[]`
 and `notAttemptedIds:[]`. An attempted adapter failure retains sanitized HTTP
 500 and adds `success:false` with the resolved prefix in `savedIds`, exactly
-one attempted but unconfirmed `failedIds` element, and the remaining suffix in
+one unconfirmed adapter-operation `failedIds` element, and the remaining suffix in
 `notAttemptedIds`. A narrow internal error carrier preserves the original cause.
-Existing pre-write typed errors remain outside this attempted-write envelope.
+Route validation, authorization and service dedicated-target prechecks remain
+error-only, outside this adapter-operation envelope. Adapter validation, guard
+and read failures are included even when no database write begins.
 
 The consumer distinguishes legacy responses with no outcome keys from the
 new protocol. Any present key requires all three arrays, strict success/HTTP
@@ -149,7 +151,7 @@ completed follow-ups. Missing generic status writer/catalog/wiki contracts were
 filled; authority remains source and the current approved decisions.
 
 Six claim groups are VERIFIED: all-batch authorization, canonical sequential
-partitions, preserved error hygiene, real consumer identity validation, guarded
+batch partitions, preserved error hygiene, real consumer identity validation, guarded
 feedback/cleanup, and local completion with deployment pending. Independent
 mutations and persisted-row counterexamples supply the disconfirming checks.
 Repeated scoped searches found zero remaining live stale claims in this bounded
@@ -170,11 +172,17 @@ catalog/Atlas/wiki surfaces are reconciled separately from historical reports.
 Planning probes alone used extracted source/stubs; the later composed tests
 exercise real application code against isolated fake persistence.
 
-Failed means attempted and unconfirmed: a write may have committed before its
-response was lost. Complete response loss reveals no server partition. No
+Failed means an invoked adapter operation did not confirm success: it may have
+rejected before any write, or a write may have committed before its response was
+lost. Complete response loss reveals no server partition. No
 rollback, automatic replay, durable idempotency or enforced cross-tab reload
 lock is claimed. Whole-batch authorization does not lock later Request ownership.
 The existing status-only adapter's missing-version behavior is unchanged by
 this scope. Host callbacks do not certify successful fresh reads. No live
 Dataverse/email/cron/schema operation, public push, main merge or deployment is
 authorized by this local implementation.
+
+The 2026-09-05 [Claude review follow-up](REVIEWER_LIFECYCLE_CLAUDE_REVIEW_FOLLOWUP_2026-09-05.md)
+clarifies this operation boundary and single/batch ID formatting without changing
+executable behavior. Its documentation checks are separate from the frozen
+implementation validation above; existing status-input/clearing policy remains.

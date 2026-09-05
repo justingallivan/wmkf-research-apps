@@ -158,16 +158,21 @@ framework or alter host loaders in Stage 1E.
 The Stage 6A probe found one application PATCH caller, always single-item.
 The service supports batches, and its additive response uses
 `savedIds`, `failedIds`, and `notAttemptedIds` for both forms. It preserves HTTP 200
-for full success, existing typed pre-write errors, and HTTP 500 for unknown
-persistence failures. `success:true` requires every submitted target to have
-confirmed success. A failed id denotes an attempted, unconfirmed outcome; it
-does not prove the server made no write. Lost responses require reviewing fresh
-state before a deliberate retry. No automatic replay or rollback is included.
+for full success and the existing error-only envelopes for route validation,
+authorization and service dedicated-target prechecks. Every failure from an
+invoked adapter operation retains sanitized HTTP 500 with outcome arrays,
+including adapter validation/guard failures before a write. `success:true`
+requires every submitted target to have confirmed success. A failed id identifies
+an unconfirmed adapter operation; it proves neither that a database write began
+nor that it did not commit. Lost responses require reviewing fresh state before
+a deliberate retry. No automatic replay or rollback is included.
 
 For a nonempty batch, the service normalizes GUID identity using the authorization
 helper's existing trim/lowercase convention and deduplicates in first-occurrence
-order. The three arrays partition those unique targets. Existing empty-array
-HTTP fallback remains; the service now uses the same nonempty discriminator for
+order. The three arrays partition those unique targets. Single calls preserve
+the submitted ID and lifecycle object; the UI compares canonical GUID identities
+for either ID format. Existing empty-array HTTP fallback remains; the service
+now uses the same nonempty discriminator for
 that fallback's dedicated-status precheck. Complete authorization of all
 targets still precedes all writes; authorization failures retain their existing
 error-only envelope and disclose no per-target authorization results. The actual
@@ -176,3 +181,10 @@ malformed/foreign/contradictory results, refreshes confirmed saves and identifie
 the reviewer in outcome feedback. The current single-item action cannot receive
 a valid multi-row partition. Its materials-release selection remains unrelated. No new batch screen,
 207 status, queue, schema, or cross-request idempotency protocol is introduced.
+
+The owner approved documentation-only follow-up to Claude's independent review
+on 2026-09-05. Existing null/empty status clearing on open rows remains; closed
+source guards still apply. Stricter status validation and error classification
+would be a separate input-policy change, not a required pre-push correction.
+See [the review follow-up](REVIEWER_LIFECYCLE_CLAUDE_REVIEW_FOLLOWUP_2026-09-05.md)
+for the independently checked findings and unchanged-runtime evidence.

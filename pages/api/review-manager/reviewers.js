@@ -23,9 +23,12 @@
  * Data boundary: reads remain staff-shared. PATCH resolves every suggestion
  * to its request and permits only the lead PD or a superuser. Batch ownership
  * is verified in full before the first lifecycle write.
- * PATCH 200 confirms every canonical unique target in savedIds. An attempted
- * failure retains sanitized 500 and reports savedIds, one uncertain failedIds
- * target, and notAttemptedIds. Pre-write validation/auth errors stay error-only.
+ * PATCH 200 confirms all targets in savedIds: batches use canonical unique IDs;
+ * single updates preserve the submitted ID. An invoked adapter failure retains
+ * sanitized 500 with savedIds, one unconfirmed failedIds target and notAttemptedIds.
+ * This includes adapter validation/guard failures; it does not establish whether
+ * a database write began or committed. Route validation, authorization and service
+ * dedicated-target prechecks remain error-only, without outcome arrays.
  *
  * Thin route shell (Route→Service Consolidation Plan, Stage 2): auth guard
  * (BEFORE method dispatch — preserved from the original route) → one

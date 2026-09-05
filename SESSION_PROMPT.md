@@ -27,10 +27,11 @@ reviews. All approved pre-push implementation is complete locally.
   passed narrow re-review and final 271 focused tests.
 - **Stage 6A — explicit mutation outcomes.** Canonical unique batches execute
   sequentially and stop on first failure. Success and attempted-failure responses
-  identify confirmed saves, the uncertain attempt and unattempted suffix. Raw
-  validation and all-batch authorization precede every write. The real single-row
-  UI validates complete identity/HTTP partitions and displays confirmed or
-  unconfirmed results without automatic replay. No batch screen was added.
+  identify confirmed saves, the unconfirmed adapter operation and unattempted
+  suffix. Raw GUID/presence checks and all-batch authorization precede every
+  write. The real single-row UI validates complete identity/HTTP partitions and
+  displays confirmed or unconfirmed results without automatic replay. No batch
+  screen was added.
 
 ### Runtime and Evidence Commits
 
@@ -64,6 +65,14 @@ regressions remain green. Source headers, Atlas, catalog, wiki, decisions and
 receipts were reconciled for the changed contracts. Final documentation checks
 are recorded in the Stage 6A receipt.
 
+[VERIFIED via supplied report and independent finding triage] Claude's separate
+review at `ca6f933e` returned **PASS with Low findings**, reporting 10,850 tests,
+build and 38 gates passed. The owner approved a documentation-only follow-up:
+clarify the adapter-operation failure boundary and single/batch ID formatting;
+preserve runtime and existing null/empty clearing policy. Base/HEAD triage passed
+52 bounded cases and the exact single-ID preservation regression. See the
+follow-up receipt for final comment/doc checks and the review-method limitation.
+
 Changed-file lint passed with nine unchanged panel warnings. Impeccable passed
 for the UI with no new exceptions. Existing Arial exceptions remain limited to
 transactional HTML in `send-emails-service.js` for `overused-font` and
@@ -94,9 +103,14 @@ one-click PDF conversion. The reminder hold remains protected by its gate.
 
 ### Preserve These Boundaries
 
-- A failed ID is attempted and unconfirmed; it may have committed. Complete
-  response loss reveals no partition. Reload/review guidance is not an enforced
-  freshness or cross-tab idempotency lock. Never automatically replay saves.
+- A failed ID identifies an invoked adapter operation without confirmed success;
+  adapter validation may reject before any write, or a write may have committed.
+  Complete response loss reveals no partition. Reload/review guidance is not an
+  enforced freshness or cross-tab idempotency lock. Never automatically replay saves.
+- Route validation, authorization and service dedicated-target prechecks remain
+  error-only; adapter failures carry outcome arrays. Batch IDs are canonical and
+  unique; single IDs retain submitted formatting, with canonical UI comparison.
+  Stricter status-input validation is a separate optional policy change.
 - Status ownership is local to one mounted panel. Remounts, other tabs, other
   action types and unobserved remove/restore generations remain independent.
   Void or self-catching host callbacks do not certify successful fresh reads.
@@ -120,6 +134,9 @@ flag from this application; BILL API reviewer onboarding.
 
 - `docs/audits/REVIEWER_LIFECYCLE_APPROVED_DECISIONS_2026-09-04.md`: settled
   policy, implemented contracts and scope limits.
+- `docs/audits/REVIEWER_LIFECYCLE_CLAUDE_INDEPENDENT_REVIEW_2026-09-05.md`:
+  original independent report, preserved unchanged; the adjacent
+  `REVIEWER_LIFECYCLE_CLAUDE_REVIEW_FOLLOWUP_2026-09-05.md` records disposition.
 - `docs/audits/REVIEWER_LIFECYCLE_STAGE1C_REVIEW_2026-09-04.md`: receipt evidence.
 - Stage 1D, 1E and 6A `RECEIPT` and `REVIEW` files dated 2026-09-05 in
   `docs/audits/`: exact commits, independent findings, validation and boundaries.

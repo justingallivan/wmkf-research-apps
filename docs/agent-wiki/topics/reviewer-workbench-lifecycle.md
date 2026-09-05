@@ -210,19 +210,25 @@ source at `5b9964c8` on 2026-09-05; deployment pending]**
 `PATCH /api/review-manager/reviewers` authorizes every target for the lead PD
 or superuser before calling `reviewers-service.patchReviewers` →
 `reviewer-suggestion.updateLifecycle`. Nonempty batches trim/lowercase and
-deduplicate GUIDs in first-occurrence order, await writes sequentially, and
-stop at the first failure. `savedIds`, `failedIds`, and `notAttemptedIds`
-partition those targets: HTTP 200/`success:true` confirms all; an attempted
-failure returns HTTP 500/`success:false` with the confirmed prefix, one
-uncertain attempt, and the unattempted suffix. A failed id may have committed
-before its response was lost; earlier saves remain applied. Pre-write
-validation/authorization errors retain their error-only responses. Complete,
-withdrew, and released still require their dedicated workflows. No rollback or
-automatic retry is introduced.
+deduplicate GUIDs in first-occurrence order, await adapter operations
+sequentially, and stop at the first failure. The single path preserves the
+submitted ID and lifecycle object, including the ID returned in outcomes.
+`savedIds`, `failedIds`, and `notAttemptedIds` partition those targets:
+HTTP 200/`success:true` confirms all; a failed adapter operation returns
+HTTP 500/`success:false` with the confirmed prefix, one unconfirmed adapter
+operation, and the unattempted suffix. This includes `mapPicklist` validation
+failure before the adapter's lifecycle guard read or write. `failedIds` does
+not prove that a Dataverse HTTP write began or committed; a transport failure
+may follow a commit. Earlier saves remain applied. Route validation and
+authorization, plus the service's dedicated-target prechecks, retain error-only
+responses. Complete, withdrew, and released still require dedicated workflows.
+Existing null/empty-string status clearing on open rows remains supported,
+with closed-source protection intact; Stage 6A adds no status-validation policy.
+No rollback or automatic retry is introduced.
 
 The existing `ReviewerManagePanel.updateStatus` UI submits one reviewer only.
-It validates returned outcome arrays against that identity, refreshes only a
-confirmed save, and identifies the reviewer/id in explicit outcome feedback.
+It trims/lowercases submitted and returned IDs for outcome comparison, refreshes
+only a confirmed save, and identifies the reviewer/id in explicit feedback.
 For malformed or unconfirmed outcomes, feedback asks staff to reload and
 review current status before a deliberate retry; a confirmed write with a
 rejecting refresh callback instead reports saved but unable to refresh. Legacy responses without outcome keys still require HTTP
