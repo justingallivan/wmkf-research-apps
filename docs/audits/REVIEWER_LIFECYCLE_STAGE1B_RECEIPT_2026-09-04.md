@@ -214,6 +214,12 @@ claim-evidence pilot report was unavailable; no observation row was invented.
 ## Publication boundary
 
 Source and verification are complete on `codex/reviewer-lifecycle-stage1b`.
-The reviewed implementation is committed locally; remote publication of this
-stage and its handoff remains pending. No merge to main or production promotion
-was performed.
+Implementation `08752364` and review/handoff `e24597b7` are committed locally.
+Automatic approval review rejected `git push -u origin
+codex/reviewer-lifecycle-stage1b` because the owner authorized implementation
+but had not explicitly approved publishing this new payload to the public
+configured GitHub repository. The prior Stage 1A publication approval does not
+cover Stage 1B. No Stage 1B commit has been pushed. Public publication of this
+stage's fix, tests and handoff needs explicit owner approval before retrying;
+all source, tests, review and local handoff work is complete. No merge to main
+or production promotion was performed.

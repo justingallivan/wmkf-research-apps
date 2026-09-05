@@ -128,7 +128,13 @@ flag from this application; BILL API reviewer onboarding.
 
 Owner: Codex. Branch: `codex/reviewer-lifecycle-stage1b`. Implementation
 `08752364` passed focused/full tests, gates, build and fresh-context review.
-Remote publication of Stage 1B and its handoff remains pending.
+The implementation and handoff (`e24597b7`) are committed locally. Automatic
+approval review rejected publishing this new Stage 1B payload to the public
+configured GitHub repository: the current authorization covers implementation
+but does not explicitly cover public publication. The owner must approve
+publishing Stage 1B's fix, tests and handoff on this branch before retrying the
+push. Stage 1A's earlier publication approval did not cover this payload.
+No Stage 1B commit has been pushed; local work is complete and preserved.
 No merge to main or production deployment occurred. Keep session evidence on
 this deliberate feature branch with its source. No DEVELOPMENT_LOG milestone
 is required because no production capability or architecture shipped.
