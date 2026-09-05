@@ -63,7 +63,7 @@ export { STATUS_PIPELINE, MODE_STATUSES, MODE_WORK_REMAINING, filterByMode } fro
 export function StatusBadge({ status }) {
   const info = getStatusInfo(status);
   return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${info.color}`}>
+    <span className={`inline-flex items-center whitespace-nowrap px-2.5 py-0.5 rounded-full text-xs font-medium ${info.color}`}>
       {info.label}
     </span>
   );
@@ -93,7 +93,7 @@ export function TokenStateBadge({ state, expiresAt, firstAccessedAt }) {
   ].filter(Boolean).join(' · ');
   return (
     <span
-      className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${info.color}`}
+      className={`inline-flex items-center whitespace-nowrap px-2 py-0.5 rounded text-xs font-medium ${info.color}`}
       title={tooltip || undefined}
     >
       {info.label}
@@ -1670,17 +1670,11 @@ export default function ReviewerManagePanel({
     && acceptedReviewers.every(r => selectedReviewers.has(r.suggestionId));
   const showFollowUpColumn = showReviewReminderAction;
   const showActionsColumn = canManage;
-  const combinedControls = showFollowUpColumn && showActionsColumn;
-  const reviewerColumnWidth = combinedControls
-    ? showSelectionColumn ? 'w-[27%]' : 'w-[31%]'
-    : showActionsColumn
-      ? showSelectionColumn ? 'w-[30%]' : 'w-[34%]'
-      : showFollowUpColumn ? 'w-[33%]' : 'w-[36%]';
-  const tableMinWidth = combinedControls
-    ? 'min-w-[72rem]'
-    : showFollowUpColumn || showActionsColumn
-      ? 'min-w-[68rem]'
-      : 'min-w-[56rem]';
+  const showActionColumn = showFollowUpColumn || showActionsColumn;
+  const reviewerColumnWidth = showActionColumn
+    ? showSelectionColumn ? 'w-[30%]' : 'w-[34%]'
+    : 'w-[38%]';
+  const tableMinWidth = showActionColumn ? 'min-w-[58rem]' : 'min-w-[48rem]';
 
   const toggleSelectAll = () => {
     if (allSelected) {
@@ -1964,19 +1958,17 @@ export default function ReviewerManagePanel({
       ) : (
         <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
           <table className={`w-full table-fixed divide-y divide-gray-200 ${tableMinWidth}`}>
-            {/* Every proposal uses the same column geometry. Without an explicit
-                grid, a long affiliation in one proposal changes that table's
-                auto-sized columns and breaks vertical scanning across the
-                consolidated follow-up page. */}
+            {/* Status and link form one progress signal; reminders, closeout,
+                downloads, and secondary controls share one action lane. This
+                keeps the table scannable without pushing core controls beyond
+                the visible card edge. */}
             <colgroup>
               {showSelectionColumn && <col className="w-[4%]" />}
               <col className={reviewerColumnWidth} />
-              <col className={combinedControls ? 'w-[11%]' : canManage ? 'w-[12%]' : showFollowUpColumn ? 'w-[14%]' : 'w-[16%]'} />
-              <col className={combinedControls ? 'w-[9%]' : canManage ? 'w-[10%]' : showFollowUpColumn ? 'w-[12%]' : 'w-[14%]'} />
-              <col className={combinedControls ? 'w-[10%]' : canManage ? 'w-[11%]' : showFollowUpColumn ? 'w-[13%]' : 'w-[14%]'} />
-              <col className={combinedControls ? 'w-[15%]' : canManage ? 'w-[17%]' : showFollowUpColumn ? 'w-[16%]' : 'w-[20%]'} />
-              {showFollowUpColumn && <col className={canManage ? 'w-[15%]' : 'w-[12%]'} />}
-              {showActionsColumn && <col className={showFollowUpColumn ? 'w-[9%]' : 'w-[16%]'} />}
+              <col className={showActionColumn ? 'w-[17%]' : 'w-[20%]'} />
+              <col className={showActionColumn ? 'w-[14%]' : 'w-[17%]'} />
+              <col className={showActionColumn ? 'w-[17%]' : 'w-[25%]'} />
+              {showActionColumn && <col className="w-[18%]" />}
             </colgroup>
             <thead className="bg-gray-50">
               <tr>
@@ -1992,18 +1984,12 @@ export default function ReviewerManagePanel({
                   </th>
                 )}
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reviewer</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Link</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Progress</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Due date</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Action</th>
-                {showFollowUpColumn && (
+                {showActionColumn && (
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Follow up
-                  </th>
-                )}
-                {showActionsColumn && (
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
+                    Next action
                   </th>
                 )}
               </tr>
@@ -2035,7 +2021,10 @@ export default function ReviewerManagePanel({
                       {r.email && <p className="truncate text-xs leading-5 text-gray-400" title={r.email}>{r.email}</p>}
                     </td>
                     <td className="px-4 py-3 align-top">
-                      <StatusBadge status={r.reviewStatus} />
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <StatusBadge status={r.reviewStatus} />
+                        <TokenStateBadge state={r.tokenState} expiresAt={r.tokenExpiresAt} firstAccessedAt={r.proposalFirstAccessedAt} />
+                      </div>
                       {r.reviewStatus === 'complete' && (
                         <span className="mt-1 block text-xs leading-4 text-gray-600">
                           {closeoutDispositionLabel(r.honorariumEligibility)}
@@ -2044,9 +2033,6 @@ export default function ReviewerManagePanel({
                       {r.reminderCount > 0 && (
                         <span className="text-xs text-gray-400 ml-1">({r.reminderCount} reminder{r.reminderCount !== 1 ? 's' : ''})</span>
                       )}
-                    </td>
-                    <td className="px-4 py-3 align-top">
-                      <TokenStateBadge state={r.tokenState} expiresAt={r.tokenExpiresAt} firstAccessedAt={r.proposalFirstAccessedAt} />
                     </td>
                     <td className="px-4 py-3 align-top">
                       <ReviewerDueDateEditor
@@ -2080,41 +2066,57 @@ export default function ReviewerManagePanel({
                         History
                       </button>
                     </td>
-                    {showFollowUpColumn && (
+                    {showActionColumn && (
                       <td className="px-4 py-3 align-top">
-                        <ReviewReminderAction
-                          requestId={proposal.proposalId}
-                          reviewer={r}
-                          onSent={onRefresh}
-                          previewReadOnly={previewReadOnly || !canManage}
-                        />
-                      </td>
-                    )}
-                    {showActionsColumn && (
-                      <td className="px-4 py-3 align-top">
-                        <div className="flex items-center gap-1">
-                          {/* Download received review from SharePoint via Graph. */}
-                          {r.reviewSharePointFolder && (
-                            <a
-                              href={`/api/review-manager/download-review?suggestionId=${encodeURIComponent(r.suggestionId)}`}
-                              className="p-1.5 text-green-600 hover:text-green-800 rounded-lg hover:bg-green-50"
-                              title={`Download: ${r.reviewFilename || 'review'}`}
-                            >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                              </svg>
-                            </a>
+                        <div className="flex min-h-9 items-start justify-between gap-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            {showFollowUpColumn
+                              && ['materials_sent', 'under_review'].includes(r.reviewStatus)
+                              && !r.reviewReceivedAt
+                              && r.submitted !== true && (
+                              <ReviewReminderAction
+                                requestId={proposal.proposalId}
+                                reviewer={r}
+                                onSent={onRefresh}
+                                previewReadOnly={previewReadOnly || !canManage}
+                              />
+                            )}
+                            {showActionsColumn && ['review_received', 'complete'].includes(r.reviewStatus) && (
+                              <button
+                                type="button"
+                                onClick={() => setCloseoutReviewerId(r.suggestionId)}
+                                className="min-h-9 whitespace-nowrap rounded-lg bg-gray-900 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2"
+                              >
+                                {r.reviewStatus === 'complete' ? 'Edit closeout' : 'Close review'}
+                              </button>
+                            )}
+                          </div>
+                          {showActionsColumn && (
+                            <div className="flex shrink-0 items-center gap-1">
+                              {/* Download received review from SharePoint via Graph. */}
+                              {r.reviewSharePointFolder && (
+                                <a
+                                  href={`/api/review-manager/download-review?suggestionId=${encodeURIComponent(r.suggestionId)}`}
+                                  className="rounded-lg p-1.5 text-green-600 hover:bg-green-50 hover:text-green-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-600"
+                                  title={`Download: ${r.reviewFilename || 'review'}`}
+                                  aria-label={`Download review from ${r.name || 'reviewer'}`}
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                  </svg>
+                                </a>
+                              )}
+                              {/* Secondary magic-link and lifecycle actions. */}
+                              <TokenActionsMenu
+                                reviewer={r}
+                                onRegenerate={() => handleRegenerateToken(r.suggestionId)}
+                                onRevoke={() => handleRevokeToken(r.suggestionId)}
+                                onRemove={() => handleRemoveReviewer(r)}
+                                onStatusChange={(newStatus) => updateStatus(r.suggestionId, newStatus)}
+                                onTransition={(terminalStatus) => transitionTerminal(r, terminalStatus)}
+                              />
+                            </div>
                           )}
-                          {/* Magic-link actions menu */}
-                          <TokenActionsMenu
-                            reviewer={r}
-                            onRegenerate={() => handleRegenerateToken(r.suggestionId)}
-                            onRevoke={() => handleRevokeToken(r.suggestionId)}
-                            onRemove={() => handleRemoveReviewer(r)}
-                            onStatusChange={(newStatus) => updateStatus(r.suggestionId, newStatus)}
-                            onTransition={(terminalStatus) => transitionTerminal(r, terminalStatus)}
-                            onCloseReview={() => setCloseoutReviewerId(r.suggestionId)}
-                          />
                         </div>
                       </td>
                     )}

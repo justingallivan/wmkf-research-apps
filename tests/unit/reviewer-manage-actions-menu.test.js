@@ -130,7 +130,7 @@ describe('reviewer table geometry', () => {
     reviewDueReminderEligibility: 'eligible',
   };
 
-  test('uses a fixed five-column grid in read-only mode regardless of affiliation length', async () => {
+  test('uses a compact four-column grid in read-only mode regardless of affiliation length', async () => {
     let container;
     await act(async () => {
       ({ container } = render(
@@ -145,14 +145,17 @@ describe('reviewer table geometry', () => {
     });
 
     const table = container.querySelector('table');
-    expect(table).toHaveClass('table-fixed', 'min-w-[56rem]');
-    expect(table.querySelectorAll('colgroup col')).toHaveLength(5);
+    expect(table).toHaveClass('table-fixed', 'min-w-[48rem]');
+    expect(table.querySelectorAll('colgroup col')).toHaveLength(4);
+    expect(screen.getByRole('columnheader', { name: 'Progress' })).toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: 'Status' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: 'Link' })).not.toBeInTheDocument();
     expect(screen.queryByRole('columnheader', { name: 'Notes' })).not.toBeInTheDocument();
     expect(screen.getByText(longAffiliation)).toHaveClass('line-clamp-2', 'break-words');
     expect(screen.getByText(reviewer.email)).toHaveClass('truncate');
   });
 
-  test('uses the corresponding six-column grid when management controls are present without a release selection', async () => {
+  test('uses the corresponding five-column grid when management controls are present', async () => {
     let container;
     await act(async () => {
       ({ container } = render(
@@ -167,11 +170,12 @@ describe('reviewer table geometry', () => {
     });
 
     const table = container.querySelector('table');
-    expect(table).toHaveClass('table-fixed', 'min-w-[68rem]');
-    expect(table.querySelectorAll('colgroup col')).toHaveLength(6);
+    expect(table).toHaveClass('table-fixed', 'min-w-[58rem]');
+    expect(table.querySelectorAll('colgroup col')).toHaveLength(5);
+    expect(screen.getByRole('columnheader', { name: 'Next action' })).toBeInTheDocument();
   });
 
-  test('separates follow-up and action controls into aligned labeled columns', async () => {
+  test('combines follow-up and secondary controls into one aligned action lane', async () => {
     let container;
     await act(async () => {
       ({ container } = render(
@@ -187,12 +191,36 @@ describe('reviewer table geometry', () => {
     });
 
     const table = container.querySelector('table');
-    expect(table).toHaveClass('table-fixed', 'min-w-[72rem]');
-    expect(table.querySelectorAll('colgroup col')).toHaveLength(7);
-    expect(screen.getByRole('columnheader', { name: 'Follow up' })).toBeInTheDocument();
-    expect(screen.getByRole('columnheader', { name: 'Actions' })).toBeInTheDocument();
+    expect(table).toHaveClass('table-fixed', 'min-w-[58rem]');
+    expect(table.querySelectorAll('colgroup col')).toHaveLength(5);
+    expect(screen.queryByRole('columnheader', { name: 'Follow up' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: 'Actions' })).not.toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Next action' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Send reminder to Joshua Rosenthal' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Manage Joshua Rosenthal' })).toBeInTheDocument();
+  });
+
+  test('surfaces closeout as the primary row action instead of burying it in the menu', async () => {
+    await act(async () => {
+      render(
+        <ReviewerManagePanel
+          proposal={proposal}
+          reviewers={[{
+            ...reviewer,
+            reviewStatus: 'review_received',
+            reviewReceivedAt: '2026-09-04T12:00:00.000Z',
+          }]}
+          canManage
+          mode="track"
+          showReviewReminderAction
+        />,
+      );
+      await Promise.resolve();
+    });
+
+    expect(screen.getByRole('button', { name: 'Close review' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Manage Joshua Rosenthal' }));
+    expect(screen.queryAllByRole('button', { name: 'Close review' })).toHaveLength(1);
   });
 });
 
