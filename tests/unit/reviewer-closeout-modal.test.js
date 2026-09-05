@@ -225,6 +225,12 @@ describe('ReviewerCloseoutModal lifetime', () => {
       global.fetch = jest.fn(() => promise);
       return { settle: () => resolve({ ok: true, json: async () => ({ success: true }) }) };
     }
+    if (stage === 'reject') {
+      let reject;
+      const promise = new Promise((_, r) => { reject = r; });
+      global.fetch = jest.fn(() => promise);
+      return { settle: () => reject(new Error('offline')) };
+    }
     let resolve;
     const jsonPromise = new Promise((r) => { resolve = r; });
     global.fetch = jest.fn(() => Promise.resolve({ ok: true, json: () => jsonPromise }));
@@ -241,7 +247,7 @@ describe('ReviewerCloseoutModal lifetime', () => {
     'unmount',
   ];
 
-  describe.each(['fetch', 'json'])('deferred %s', (stage) => {
+  describe.each(['fetch', 'json', 'reject'])('deferred %s', (stage) => {
     test.each(lifetimeContexts)('%s leaves a departed attempt silent and releases the lock', async (change) => {
       const staged = stagedFetch(stage);
       const onSaved = jest.fn();
@@ -336,6 +342,22 @@ describe('ReviewerCloseoutModal lifetime', () => {
     fireEvent.click(screen.getByRole('radio', { name: 'No' }));
     rerender(<ReviewerCloseoutModal isOpen reviewer={{ ...REVIEWER }} onClose={jest.fn()} />);
     expect(screen.getByRole('textbox', { name: /Closeout notes/ })).toHaveValue('My draft note');
+    expect(screen.getByRole('radio', { name: 'No' })).toBeChecked();
+  });
+
+  test('a management/read-only permission flip does not erase typed notes (ADVISORY-3)', () => {
+    const { rerender } = render(
+      <ReviewerCloseoutModal isOpen reviewer={{ ...REVIEWER }} canManage onClose={jest.fn()} />,
+    );
+    fireEvent.change(screen.getByRole('textbox', { name: /Closeout notes/ }), {
+      target: { value: 'A draft in progress' },
+    });
+    fireEvent.click(screen.getByRole('radio', { name: 'No' }));
+    // The permission flip still invalidates in-flight feedback (it bumps the
+    // epoch), but it must not reinitialize the form the way a reviewer/
+    // request/open-close identity change does.
+    rerender(<ReviewerCloseoutModal isOpen reviewer={{ ...REVIEWER }} canManage={false} onClose={jest.fn()} />);
+    expect(screen.getByRole('textbox', { name: /Closeout notes/ })).toHaveValue('A draft in progress');
     expect(screen.getByRole('radio', { name: 'No' })).toBeChecked();
   });
 
@@ -524,6 +546,43 @@ describe('closeout lifetime wiring through the panel (D4)', () => {
         mode="track"
         canManage
         previewReadOnly
+        onRefresh={onRefresh}
+      />,
+    );
+
+    await act(async () => {
+      resolveCloseout({ ok: true, json: async () => ({ success: true }) });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(onRefresh).not.toHaveBeenCalled();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+
+  test('switching proposal.proposalId during a pending closeout save does not refresh or close the stale modal', async () => {
+    let resolveCloseout;
+    global.fetch = mockPanelFetch(() => new Promise((resolve) => { resolveCloseout = resolve; }));
+    const onRefresh = jest.fn();
+    const { rerender } = render(
+      <ReviewerManagePanel
+        proposal={proposal}
+        reviewers={[reviewer]}
+        mode="track"
+        canManage
+        onRefresh={onRefresh}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Close review' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Complete closeout' }));
+
+    rerender(
+      <ReviewerManagePanel
+        proposal={{ ...proposal, proposalId: 'P2' }}
+        reviewers={[reviewer]}
+        mode="track"
+        canManage
         onRefresh={onRefresh}
       />,
     );

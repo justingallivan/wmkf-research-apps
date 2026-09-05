@@ -340,6 +340,12 @@ describe('direct review follow-up action', () => {
       global.fetch = jest.fn(() => promise);
       return { settle: () => resolve({ ok: true, json: async () => ({ ok: true }) }) };
     }
+    if (stage === 'reject') {
+      let reject;
+      const promise = new Promise((_, r) => { reject = r; });
+      global.fetch = jest.fn(() => promise);
+      return { settle: () => reject(new Error('offline')) };
+    }
     let resolve;
     const jsonPromise = new Promise((r) => { resolve = r; });
     global.fetch = jest.fn(() => Promise.resolve({ ok: true, json: () => jsonPromise }));
@@ -355,7 +361,7 @@ describe('direct review follow-up action', () => {
     'unmount',
   ];
 
-  describe.each(['fetch', 'json'])('reminder lifetime: deferred %s', (stage) => {
+  describe.each(['fetch', 'json', 'reject'])('reminder lifetime: deferred %s', (stage) => {
     test.each(lifetimeContexts)('%s leaves a departed attempt silent and releases the lock', async (change) => {
       const onSent = jest.fn();
       const staged = stagedFetch(stage);
@@ -387,7 +393,10 @@ describe('direct review follow-up action', () => {
         await Promise.resolve();
       });
 
-      expect(screen.queryByText('Reminder sent.')).not.toBeInTheDocument();
+      // Neither success ("Reminder sent.") nor a rejection's error copy may
+      // reach a departed session: both render via the same role="status"
+      // element, so a departed context must show none of it at all.
+      expect(screen.queryByRole('status')).not.toBeInTheDocument();
       expect(onSent).not.toHaveBeenCalled();
 
       if (change === 'unmount') return;
@@ -458,6 +467,26 @@ describe('direct review follow-up action', () => {
     // No timer advance, no additional awaiting of the never-resolving promise:
     // the lock must already be released and the button re-enabled.
     expect(screen.getByRole('button', { name: 'Send reminder to Ada Reviewer' })).toBeEnabled();
+  });
+
+  test('a reviewer switch clears confirmed feedback from the departed session', async () => {
+    global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ ok: true }) }));
+    const { rerender } = render(<ReviewReminderAction requestId="P1" reviewer={reviewer} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Send reminder to Ada Reviewer' }));
+    expect(await screen.findByText('Reminder sent.')).toBeInTheDocument();
+
+    rerender(<ReviewReminderAction requestId="P1" reviewer={otherReviewer} />);
+    expect(screen.queryByText('Reminder sent.')).not.toBeInTheDocument();
+  });
+
+  test('a request switch clears a confirmed failure message from the departed session', async () => {
+    global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ ok: false, reason: 'not_found' }) }));
+    const { rerender } = render(<ReviewReminderAction requestId="P1" reviewer={reviewer} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Send reminder to Ada Reviewer' }));
+    expect(await screen.findByText('This reviewer is no longer available. Refresh the list.')).toBeInTheDocument();
+
+    rerender(<ReviewReminderAction requestId="P2" reviewer={reviewer} />);
+    expect(screen.queryByText('This reviewer is no longer available. Refresh the list.')).not.toBeInTheDocument();
   });
 });
 

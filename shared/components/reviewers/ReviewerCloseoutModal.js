@@ -57,8 +57,9 @@ export default function ReviewerCloseoutModal({
   // Per-attempt supersession token: bumped only by a new save and unmount.
   // Separate from the committed-context epoch below, so a stale attempt's
   // finally can still release the save lock by generation match alone even
-  // when its epoch no longer matches (see Stage 6B1 registry precedent,
-  // ReviewerManagePanel.js:1706-1747).
+  // when its epoch no longer matches (see the Stage 6B1 action-lifetime
+  // registry's beginAttempt/isAttemptCurrent/finishAttempt precedent in
+  // ReviewerManagePanel.js).
   const generationRef = useRef(0);
   const mountedRef = useRef(false);
   const contextRef = useRef({
@@ -83,16 +84,22 @@ export default function ReviewerCloseoutModal({
   }, []);
 
   // Committed session reconciliation: no dependency array, no cleanup, runs
-  // on every commit (mirrors the reminder action and the Stage 6B1 registry
-  // pattern). A new session (open/close, reviewer/request identity, or
-  // parent management/read-only context) bumps the epoch and reinitializes
-  // the form from the CURRENT row, clearing any prior error. Same-row
-  // refresh (same suggestionId, new object, new callbacks) is ordinary
-  // refresh: it updates the latest callbacks here without touching
-  // disposition/notes/error, so unsaved typed notes survive. This
-  // intentionally has no dependency array (session identity is a multi-field
-  // comparison, not a single prop) and conditionally calls setState, so
-  // react-hooks/exhaustive-deps cannot infer a correct dependency list here.
+  // on every commit (mirrors the reminder action's committed-props effect
+  // and the Stage 6B1 registry pattern). The EPOCH bump is the full session
+  // identity: open/close, reviewer/request identity, AND parent
+  // management/read-only context all invalidate in-flight feedback/
+  // callbacks, since a permission or preview-mode change means the attempt
+  // was started under context that's no longer current. FORM REINIT is
+  // narrower — only isOpen/reviewer identity/request identity reinitialize
+  // disposition/notes/error from the CURRENT row. A management/read-only
+  // flip alone must invalidate feedback but must NOT erase typed notes, so
+  // it bumps the epoch without resetting the form. Same-row refresh (same
+  // suggestionId, new object, new callbacks) is ordinary refresh either
+  // way: it updates the latest callbacks here without touching
+  // disposition/notes/error. This intentionally has no dependency array
+  // (session identity is a multi-field comparison, not a single prop) and
+  // conditionally calls setState, so react-hooks/exhaustive-deps cannot
+  // infer a correct dependency list here.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useLayoutEffect(() => {
     const context = contextRef.current;
@@ -101,11 +108,16 @@ export default function ReviewerCloseoutModal({
       || context.requestId !== requestId
       || context.canManage !== canManage
       || context.previewReadOnly !== previewReadOnly;
+    const formSessionChanged = context.isOpen !== isOpen
+      || context.suggestionId !== reviewer?.suggestionId
+      || context.requestId !== requestId;
     if (sessionChanged) {
       context.epoch += 1;
+      setError(null);
+    }
+    if (formSessionChanged) {
       setDisposition(initialCloseoutDisposition(reviewer));
       setNotes(reviewer?.notes || '');
-      setError(null);
     }
     context.isOpen = isOpen;
     context.suggestionId = reviewer?.suggestionId;

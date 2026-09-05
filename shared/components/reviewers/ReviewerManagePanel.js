@@ -153,18 +153,25 @@ export function ReviewReminderAction({
     };
   }, []);
 
-  // Committed-props reconciliation, mirroring the Stage 6B1 registry
-  // pattern (ReviewerManagePanel.js:1678-1704): no dependency array, no
-  // cleanup, so it runs on every commit. Only request/suggestionId/
-  // read-only identity bumps the epoch; object/callback replacement is
-  // ordinary refresh and is tracked here (for the latest-callback rule)
-  // without invalidating anything.
+  // Committed-props reconciliation, mirroring the Stage 6B1 registry effect
+  // pair (mount/unmount effect above, committed-props effect here): no
+  // dependency array, no cleanup, so it runs on every commit. Only
+  // request/suggestionId/read-only identity bumps the epoch; object/
+  // callback replacement is ordinary refresh and is tracked here (for the
+  // latest-callback rule) without invalidating anything. A departed
+  // session's feedback must not linger for the new one, so the epoch bump
+  // also clears it — this intentionally has no dependency array (identity
+  // is a multi-field comparison, not a single prop) and conditionally calls
+  // setState, so react-hooks/exhaustive-deps cannot infer a correct
+  // dependency list here.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useLayoutEffect(() => {
     const context = contextRef.current;
     if (context.requestId !== requestId
       || context.suggestionId !== reviewer?.suggestionId
       || context.previewReadOnly !== previewReadOnly) {
       context.epoch += 1;
+      setFeedback(null);
     }
     context.requestId = requestId;
     context.suggestionId = reviewer?.suggestionId;
