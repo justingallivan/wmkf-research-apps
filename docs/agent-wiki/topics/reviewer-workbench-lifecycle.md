@@ -240,7 +240,7 @@ confirmed mutation is reported separately. Payloads, success predicates and the
 status mutex are unchanged. Tests: `tests/unit/reviewer-action-lifetimes.test.js`.
 Receipt: `docs/audits/REVIEWER_LIFECYCLE_STAGE6B1_RECEIPT_2026-09-05.md`.
 
-Stage 6B2 (same branch, `b08c16f6`/`d3ec406a`, not merged): `ReviewReminderAction` in
+Stage 6B2 (same branch, `b08c16f6`/`d3ec406a`/`039d5d8e`, not merged): `ReviewReminderAction` in
 `ReviewerManagePanel.js` and `ReviewerCloseoutModal.js` observe committed request/reviewer
 identity and parent read-only/management context through a no-deps layout effect and a
 monotonic epoch, separate from the per-attempt generation token. A stale attempt keeps its
@@ -250,7 +250,10 @@ the modal clears its error when the session changes. Callbacks run through the l
 committed reference in their own try; a throw or rejected promise never relabels a confirmed
 mutation and is observed without awaiting, so the dialog closes and the lock releases without
 waiting for a host reload. The modal reinitializes disposition/notes only on open/close or
-reviewer/request identity change; a permission flip preserves typed notes. The panel passes
+reviewer/request identity change; a permission flip preserves typed notes but, since
+`039d5d8e` (owner decision after a Codex adversarial review), closes the modal through the
+parent's latest `onClose` once per loss transition while any pending save settles silently.
+The panel passes
 `requestId`, `canManage` and `previewReadOnly` to the modal. Payloads, predicates, eligibility
 rules and copy are unchanged. Tests: the lifetime describes in
 `tests/unit/reviewer-manage-actions-menu.test.js` and `tests/unit/reviewer-closeout-modal.test.js`.

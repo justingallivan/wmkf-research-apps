@@ -13,7 +13,7 @@ last_verified: 2026-09-05
 Assessment baseline: main `d614de5cf60baeaec8cf21ca8e4dd3c2489d2f7a`.
 The owner selected **Stage 6B as the next build**, starting with **6B1**.
 **Status update, 2026-09-05 (later sessions):** 6B1 (`9258115a`/`06725d6c`) and
-6B2 (`b08c16f6`/`d3ec406a`) are complete on branch `codex/reviewer-lifecycle-stage6b`
+6B2 (`b08c16f6`/`d3ec406a`/`039d5d8e`) are complete on branch `codex/reviewer-lifecycle-stage6b`
 with independent PASS verdicts, not merged; see the
 [Stage 6B1 receipt](REVIEWER_LIFECYCLE_STAGE6B1_RECEIPT_2026-09-05.md) and the
 [Stage 6B2 receipt](REVIEWER_LIFECYCLE_STAGE6B2_RECEIPT_2026-09-05.md).

@@ -15,12 +15,17 @@ related:
 # Stage 6B2 implementation receipt
 
 Branch: `codex/reviewer-lifecycle-stage6b`. Base for this slice: `dcd58b32` (the
-Session 486 handoff commit; 6B1 complete). Runtime is frozen at `b08c16f6`; the review-driven correction is `d3ec406a`, the slice's final commit.
+Session 486 handoff commit; 6B1 complete). Runtime is frozen at `b08c16f6`; the review-driven correction is `d3ec406a`; the
+owner-decided permission-loss close after a Codex adversarial review is `039d5d8e`, the
+slice's final runtime commit.
 Orchestrated by Claude (Fable) with a Sonnet builder owning the `ReviewReminderAction`
 component and closeout render site in `ReviewerManagePanel.js`, `ReviewerCloseoutModal.js`
 and the two test files, and an Opus fresh-context reviewer.
 Reviewer context: native Claude Code subagent, model Opus, label "Independent review of
-Stage 6B2", 2026-09-05, reviewing frozen `b08c16f6` and then `d3ec406a`.
+Stage 6B2", 2026-09-05, reviewing frozen `b08c16f6`, then `d3ec406a`, then `039d5d8e`.
+Adversarial reviewer: Codex (subscription CLI via the codex-companion plugin, no metered
+product), read-only over `git diff dcd58b32..1147ce5d`, verdict needs-attention with one
+high finding, resolved at `039d5d8e`.
 
 ## Surface and preimplementation invariants (contract-reconcile Mode B)
 
@@ -72,7 +77,7 @@ data.success`; error copy `data.error || default`. No 200 body carries a failure
 misreads.
 
 ## Implemented contract
-[VERIFIED via `git show b08c16f6` and `git show d3ec406a`] Four files changed (+700/−25 at `b08c16f6`, +129/−22 at `d3ec406a`): `ReviewerManagePanel.js`
+[VERIFIED via `git show b08c16f6`, `git show d3ec406a` and `git show 039d5d8e`] Four files changed (+700/−25 at `b08c16f6`, +129/−22 at `d3ec406a`, +130/−15 at `039d5d8e` in the modal and its test only): `ReviewerManagePanel.js`
 (+78/−… in `ReviewReminderAction` and the closeout render site only),
 `ReviewerCloseoutModal.js`, `tests/unit/reviewer-manage-actions-menu.test.js`,
 `tests/unit/reviewer-closeout-modal.test.js`. No server, route or host file is in the diff.
@@ -105,6 +110,13 @@ misreads.
   The modal's form reinit is narrower than its epoch bump: `isOpen`, reviewer identity and
   `requestId` reinitialize `disposition`/`notes`; a `canManage`/`previewReadOnly` flip bumps
   the epoch and clears `error` but preserves typed notes (review ADVISORY-3).
+- Committed permission loss closes the modal (`039d5d8e`, owner decision after the Codex
+  finding below). When `!canManage || previewReadOnly` becomes true while the modal is open,
+  the session effect calls the parent's latest `onClose` once per loss transition, tracked by
+  a `closedForPermission` flag that resets when permission returns. A save already in flight
+  still settles silently and releases its lock by generation; `onSaved` is not invoked for it,
+  so the server outcome appears on the next roster load. No submit-handler check or disabled
+  control was added; `handleSubmit` and the render are byte-identical to `d3ec406a`.
 - One `eslint-disable-next-line react-hooks/exhaustive-deps` sits on each no-deps session
   effect; the rule otherwise demands a dependency list that would re-fire on same-row object
   churn and erase drafts. Both verified necessary and minimal by the reviewer (removing either
@@ -134,12 +146,12 @@ correction: observe rejection without awaiting. Two discriminating tests (never-
   All assertion failures, no crashes.
 
 ## Verification
-[VERIFIED via orchestrator-run commands at frozen `d3ec406a`; the earlier full run at `b08c16f6` was 771 suites / 11,255 tests]
+[VERIFIED via orchestrator-run commands at frozen `039d5d8e`; the log records HEAD `039d5d8e` at start and end. Earlier full runs: 771 / 11,255 at `b08c16f6`, 771 / 11,271 at `d3ec406a`. A first run at `039d5d8e` was voided because a separate Codex session checked out `main` in the shared working tree mid-run; it is not cited.]
 
 | Command | Result |
 |---|---|
-| nine-suite UI selection (plan's eight plus `reviewer-action-lifetimes`) | 9 suites / 949 tests pass (933 at `b08c16f6`) |
-| `npm test -- --runInBand --watch=false` | 771 suites / 11,271 tests pass |
+| nine-suite UI selection (plan's eight plus `reviewer-action-lifetimes`) | 9 suites / 953 tests pass (933 at `b08c16f6`, 949 at `d3ec406a`) |
+| `npm test -- --runInBand --watch=false` | 771 suites / 11,275 tests pass |
 | `npm run check:types` | pass |
 | `npm run lint` | 0 errors, 76 warnings repo-wide (the pre-existing set); the four changed files carry the identical nine pre-existing warnings shifted by the added lines (compared by rule and line against `dcd58b32`) |
 | `git diff --check` | clean |
@@ -210,6 +222,31 @@ produced under a context that no longer exists.
 **Verdict: PASS for Stage 6B2 at `d3ec406a`. No remaining required change. No approval is
 expressed for 6B3.**
 
+### Codex adversarial review and the permission-loss close
+The owner then requested a Codex adversarial review of the branch diff against `dcd58b32`.
+Verdict needs-attention, one high finding (`ReviewerCloseoutModal.js:159–190`): when
+`canManage` becomes false or `previewReadOnly` becomes true while a save is pending, the
+epoch mismatch suppresses `onSaved` and `onClose`, the generation-only finally releases the
+lock, and the modal stays open and editable with no signal that the server committed the
+closeout, an ambiguous-success path. The Opus reviewer had probed this exact scenario and
+judged it acceptable because suppression held; Codex judged the resulting user state. The
+orchestrator agreed the finding was real and a consequence of the plan's "no new disabled
+controls / no eligibility change" constraint, and escalated. Owner decision: close the modal
+on committed permission loss. Implemented at `039d5d8e` (builder red-before-fix: 13
+assertion failures without the close block; two suites 85/85; nine-suite 9 / 953).
+
+Narrow re-review of `039d5d8e` by the Opus reviewer (HEAD and blob md5 verified before any
+run; the tree had been restored after the external checkout): two suites 85/85; nine-suite
+9 / 953; mutations: whole close block 13, once-guard 2, reset arm 2, render-closure `onClose`
+instead of the committed ref 0 (structural: assigned immediately above in the same effect);
+the `queryByRole('dialog')` negatives render the full open dialog when the block is removed,
+so they assert exclusion; five probes 5/5 including StrictMode mount-without-permission
+(one close, no update-depth error), StrictMode loss→regain→loss (1, 1, 2) and the real
+panel (close, no loop, no double close, `onRefresh` not called, dialog absent after the
+stale settle); eslint unchanged with no unused disable directive; `handleSubmit` and the
+render byte-identical to `d3ec406a`.
+**Verdict: PASS for Stage 6B2 at `039d5d8e`. No approval is expressed for 6B3.**
+
 Reviewer limits: full suite, build and gates were orchestrator-run, not independently rerun;
 StrictMode coverage is a jsdom proxy; cross-reviewer and cross-request cases are
 component-contract-only in production because rows are keyed by `suggestionId` and hosts
@@ -221,4 +258,7 @@ remount per request.
   implemented for these two components. Neither has a post-close reporting surface and both hosts swallow refresh errors (`ReviewersTab.js:139–161,256–265`; `reviewer-follow-up.js:172–205`), so a refresh failure after a confirmed send or closeout is observed but not reported. This is a stated limit, not a defect.
 - `closeoutReviewerId` is not cleared by the panel when the closeout row vanishes (the activity drawer's `:1766–1768` does this); a mode away-and-back therefore reopens a fresh modal. Pre-existing, out of 6B2 scope, recorded as an observation.
 - A `canManage`/`previewReadOnly` flip while the modal is open bumps the epoch and clears a displayed server error but preserves typed notes; the realistic trigger is the follow-up host recomputing `proposal.workbench?.canManage` on reload (`reviewer-follow-up.js:40`).
+- The auto-close is a deliberate owner-decided scope expansion beyond "feedback ownership": the modal now closes itself while `saving` is true, although its own Cancel button is disabled then. The plan's "no new disabled controls" non-goal holds literally.
+- Residual (reviewer probe P5, pre-existing, not introduced by 6B2): permission lost → auto-close → the save commits with `onSaved` suppressed and no roster refresh → permission regained without a roster reload → the row still offers "Close review" and a second close-review POST is reachable. On the follow-up host permission changes only via `loadProposals`, which also refetches the roster, so the path is closed there; on the workbench host the only trigger is a transient session refetch lacking `dynamicsSystemuserId` (`pages/workbench/[requestId].js:115`). The service's handling of a second close for an already-closed suggestion is [ASSUMED] from the modal's editing branch, not verified. A refresh-on-permission-loss would need a new panel signal because `onClose` cannot distinguish auto-close from Cancel; recorded for later, not for 6B2.
+- Component-contract gap (reviewer probe P3): after a permission-loss close, a reviewer switch while permission stays lost does not re-close, because `closedForPermission` resets only when permission returns. Reachable only if the parent ignores `onClose`; the real panel always unmounts. One-line hardening (also reset the flag when the form session changes) is available if wanted.
 - No browser/live probe, deployment or human UAT ran for this slice. Nothing is merged to `main` or deployed; promotion is a separate, deliberate action under the release strategy.

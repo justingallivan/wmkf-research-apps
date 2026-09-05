@@ -26,14 +26,16 @@ correction `06725d6c`, full suite 771 suites / 11,216 tests, webpack build, seve
 gate pairs and an independent PASS. See the
 [Stage 6B1 receipt](audits/REVIEWER_LIFECYCLE_STAGE6B1_RECEIPT_2026-09-05.md).
 [VERIFIED via frozen commits, tests and independent review] **6B2 is complete**
-on the same branch: runtime `b08c16f6`, review-driven correction `d3ec406a`, full
-suite 771 suites / 11,271 tests, webpack build, seven gate pairs and an independent
+on the same branch: runtime `b08c16f6`, review-driven correction `d3ec406a`,
+owner-decided permission-loss close `039d5d8e` after a Codex adversarial review, full
+suite 771 suites / 11,275 tests, webpack build, seven gate pairs and an independent
 PASS after one BLOCK round. See the
 [Stage 6B2 receipt](audits/REVIEWER_LIFECYCLE_STAGE6B2_RECEIPT_2026-09-05.md).
 Neither slice is merged or deployed; promotion is a separate action.
 [PLANNED] **Build 6B3 next**, after its preflight and a fresh read of the 6B2
 receipt's limits (callback promises are observed, not awaited; no post-close
-refresh-failure surface exists for the reminder or closeout components).
+refresh-failure surface exists for the reminder or closeout components; the closeout
+modal closes itself on committed permission loss and a pending save then settles silently).
 These are subdivisions of original Stage 6B, not additional product features.
 Stage 6C extraction is outside this handoff.
 

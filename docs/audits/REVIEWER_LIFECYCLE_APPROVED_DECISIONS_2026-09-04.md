@@ -45,7 +45,8 @@ or file moves were included. On 2026-09-05 the owner selected **Stage 6B for
 the next session**, starting with token/removal/terminal actions (6B1), then
 reminder/closeout (6B2) and materials context safety (6B3), with fresh review
 between slices. **6B1 (`9258115a` runtime, `06725d6c` test correction) and 6B2
-(`b08c16f6` runtime, `d3ec406a` review correction) are complete on branch
+(`b08c16f6` runtime, `d3ec406a` review correction, `039d5d8e` owner-decided
+permission-loss close after a Codex adversarial review) are complete on branch
 `codex/reviewer-lifecycle-stage6b` with independent PASS verdicts; see the
 [Stage 6B1 receipt](REVIEWER_LIFECYCLE_STAGE6B1_RECEIPT_2026-09-05.md) and the
 [Stage 6B2 receipt](REVIEWER_LIFECYCLE_STAGE6B2_RECEIPT_2026-09-05.md). Neither is
