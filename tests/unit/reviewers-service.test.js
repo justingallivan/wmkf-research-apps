@@ -47,6 +47,19 @@ const getActiveQuestionSet = jest.fn(async () => []);
 jest.mock('../../lib/external/review-question-fetcher', () => ({
   getActiveQuestionSet: (...a) => getActiveQuestionSet(...a),
 }));
+const getReviewSynthesisJobState = jest.fn();
+jest.mock('../../lib/services/review-synthesis-job-service', () => ({
+  getReviewSynthesisJobState: (...a) => getReviewSynthesisJobState(...a),
+}));
+// A swallowed dependency error must still fail isolation checks if SQL leaks.
+const unexpectedSql = jest.fn(() => { throw new Error('Unexpected SQL in reviewers-service unit test'); });
+jest.mock('@vercel/postgres', () => ({ sql: (...a) => unexpectedSql(...a) }));
+
+const synthesisNotStarted = {
+  current: false, status: 'not_started', mode: null, runId: null, attempts: 0,
+  lastError: null, createdAt: null, updatedAt: null, startedAt: null,
+  completedAt: null, currentRunId: null, currentCompletedAt: null,
+};
 
 const REQ = '11111111-1111-4111-8111-111111111111';
 const IDS = [
@@ -69,6 +82,12 @@ beforeEach(() => {
   jest.clearAllMocks();
   updateLifecycle.mockImplementation(async () => {});
   findAcceptedByCycle.mockResolvedValue({ suggestions: [], requestById: {} });
+  getReviewSynthesisJobState.mockResolvedValue({ ...synthesisNotStarted });
+});
+
+afterEach(() => {
+  expect(unexpectedSql).not.toHaveBeenCalled();
+  expect(fetch).not.toHaveBeenCalled();
 });
 
 describe('patchReviewers', () => {
@@ -187,6 +206,45 @@ describe('getReviewers', () => {
     });
     expect(out.proposals[0].statusSummary).toEqual({ materials_sent: 1 });
     expect(out.liveQuestions).toEqual([{ key: 'impact', order: 1, text: 'Impact?', type: 'picklist' }]);
+    expect(getReviewSynthesisJobState).toHaveBeenCalledWith(REQ, expect.stringMatching(/^[0-9a-f]{64}$/));
+    expect(out.proposals[0].reviewSynthesisState).toMatchObject(synthesisNotStarted);
+  });
+
+  test('unavailable synthesis dependency preserves reviewer DTO and returns the logged fallback without SQL or network', async () => {
+    getRequestById.mockResolvedValueOnce({
+      akoya_requestid: REQ, akoya_requestnum: 'R-1001', akoya_title: 'T',
+      wmkf_reviewsynthesisjson: JSON.stringify({ overall: 'Previously stored synthesis' }),
+    });
+    findByRequest.mockResolvedValueOnce([{
+      wmkf_appreviewersuggestionid: IDS[0], _wmkf_request_value: REQ,
+      wmkf_selected: true, wmkf_accepted: true,
+      wmkf_reviewstatus: REVIEW_STATUS_MAP.materials_sent,
+    }]);
+    const unavailable = new Error('Synthesis job dependency unavailable');
+    getReviewSynthesisJobState.mockRejectedValueOnce(unavailable);
+    const errorLog = jest.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const out = await getReviewers({ proposalId: REQ, azureEmail: 'pd@wmkeck.org' });
+
+      expect(out.success).toBe(true);
+      expect(out.totalReviewers).toBe(1);
+      expect(out.proposals[0].reviewers[0]).toMatchObject({
+        suggestionId: IDS[0], reviewStatus: 'materials_sent', answers: [],
+      });
+      expect(out.proposals[0].reviewSynthesis).toMatchObject({ overall: 'Previously stored synthesis' });
+      expect(out.proposals[0].reviewSynthesisState).toEqual({
+        ...synthesisNotStarted,
+        ready: false, canRunManually: false, participantCount: 1,
+        submittedCount: 0, resolvedCount: 0, blockingCount: 1,
+        status: 'unavailable', lastError: 'Synthesis status is temporarily unavailable.',
+      });
+      expect(getReviewSynthesisJobState).toHaveBeenCalledTimes(1);
+      expect(getReviewSynthesisJobState).toHaveBeenCalledWith(REQ, expect.stringMatching(/^[0-9a-f]{64}$/));
+      expect(errorLog).toHaveBeenCalledTimes(1);
+      expect(errorLog).toHaveBeenCalledWith('[review-manager reviewers] synthesis job state unavailable:', unavailable);
+    } finally {
+      errorLog.mockRestore();
+    }
   });
 
   test('default PD scope carries the request review deadline into the proposal DTO', async () => {
