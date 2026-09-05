@@ -185,8 +185,10 @@ observation row was invented.
 
 ## Publication boundary
 
-Implementation `721f4f3d` and documentation/review `836a3772` are committed
-locally. Automatic approval review rejected the Stage 1A feature-branch push
-before execution because the earlier public-repository approval covered
-Stage 0 only. The owner has been asked to approve this new payload explicitly.
-Remote backup remains unconfirmed; no merge to main or deployment occurred.
+[VERIFIED via successful branch push] After explicit owner approval, the
+Stage 1A runtime fix, tests and handoff were published to the public configured
+GitHub repository on `codex/reviewer-lifecycle-stage1a`, with its origin
+upstream set. Implementation `721f4f3d`, documentation/review `836a3772` and
+approval-boundary record `4fddc9a9` are backed up remotely. The earlier
+automatic-review publication block is resolved. No merge to main or
+production promotion was performed.

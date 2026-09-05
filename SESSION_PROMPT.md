@@ -121,10 +121,10 @@ entry is required because no production capability or architecture shipped.
 The claim-evidence pilot report was unavailable because local state could not
 be read; no unsupported observation row was invented.
 
-Remote publication is pending owner approval. Automatic approval review
-rejected `git push -u origin codex/reviewer-lifecycle-stage1a` before execution:
-the earlier public-repository authorization covered Stage 0, not this Stage 1A
-runtime fix, tests and handoff. Implementation `721f4f3d` and handoff `836a3772`
-are committed locally; this session has not published Stage 1A. The owner was
-asked explicitly to approve publication to the public configured GitHub
-repository. Resume only that branch push after approval; no merge to main.
+[VERIFIED via successful branch push] The owner explicitly approved publishing
+the Stage 1A runtime fix, tests and handoff to the public configured GitHub
+repository. `codex/reviewer-lifecycle-stage1a` was pushed to `origin` and now
+tracks `origin/codex/reviewer-lifecycle-stage1a`. The earlier automatic-review
+publication block is resolved. Implementation `721f4f3d`, handoff `836a3772`
+and the approval-boundary record `4fddc9a9` are backed up remotely. No merge
+to main or production promotion was performed.
