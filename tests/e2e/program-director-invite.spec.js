@@ -52,6 +52,8 @@ async function installStaffSession(context, baseURL) {
       email: PROGRAM_DIRECTOR_EMAIL,
       azureId: 'pd-e2e-azure-id',
       userType: 'staff',
+      profileId: 1,
+      dynamicsSystemuserId: PROGRAM_DIRECTOR_SYSTEMUSER_ID,
       lastActivity: Date.now(),
       iat: Math.floor(Date.now() / 1000),
       exp: expires,
@@ -137,7 +139,21 @@ async function installInviteMocks(context, baseURL, {
   await context.route('**/api/auth/status', (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ enabled: false }) }));
   await context.route('**/api/auth/session', (route) =>
-    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({}) }));
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        user: {
+          name: 'Program Director',
+          email: PROGRAM_DIRECTOR_EMAIL,
+          azureId: 'pd-e2e-azure-id',
+          userType: 'staff',
+          profileId: 1,
+          dynamicsSystemuserId: PROGRAM_DIRECTOR_SYSTEMUSER_ID,
+        },
+        expires: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+      }),
+    }));
   await context.route('**/api/app-access', (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ apps: ['reviewers'], isSuperuser: false }) }));
   await context.route('**/api/user-profiles', (route) =>
@@ -179,9 +195,30 @@ async function installInviteMocks(context, baseURL, {
         cycleLabel: 'J26',
         grantProgram: 'Research',
         institution: 'Example University',
-        programDirectorId: null,
+        programDirectorId: PROGRAM_DIRECTOR_SYSTEMUSER_ID,
       }),
     }));
+  const readMocks = {
+    '/api/review-manager/reviewer-vip-flags': {
+      pdSystemUserId: PROGRAM_DIRECTOR_SYSTEMUSER_ID,
+      flaggedPotentialReviewerIds: [],
+    },
+    '/api/email-defaults/reviewer-templates': {
+      templates: Object.fromEntries(['invitation', 'materials', 'followup', 'thankyou']
+        .map((type) => [type, { subject: '', body: '' }])),
+      configured: false,
+      unavailable: false,
+    },
+    '/api/workbench/decline-referrals': { success: true, referrals: [] },
+    '/api/review-manager/release-settings': { attachProposalEmail: false },
+    '/api/review-manager/materials-preflight': { ok: true, fileCount: 1 },
+  };
+  for (const [pathname, body] of Object.entries(readMocks)) {
+    await context.route(`**${pathname}**`, (route) => {
+      expect(route.request().method()).toBe('GET');
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+    });
+  }
   await context.route('**/api/review-manager/reviewers**', (route) =>
     route.fulfill({
       status: 200,
@@ -562,14 +599,14 @@ test.describe('Program Director reviewer invitation flow', () => {
     await page.goto(workbenchUrl(baseURL, 'invite'));
     await expect(page.getByText('Dr. Accepted Reviewer')).toBeVisible();
     await page.getByRole('button', { name: /release proposal to reviewers \(1\)/i }).click();
-    await expect(page.getByText('Generate Materials Emails')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Release proposal to reviewers', exact: true })).toBeVisible();
 
     await page.getByRole('button', { name: /preview 1 email/i }).click();
     await expect(page.getByText(/review and personalize each email/i)).toBeVisible();
     await expect(page.locator('input[placeholder="Subject"]')).toHaveValue('Reviewer materials for Request 1002788');
 
     page.once('dialog', async (dialog) => {
-      expect(dialog.message()).toContain('Send 1 email now via Dynamics?');
+      expect(dialog.message()).toBe('Release the proposal to 1 reviewer now? This will send the materials email through Dynamics and cannot be undone.');
       await dialog.accept();
     });
     await page.getByRole('button', { name: /send 1 email/i }).click();
