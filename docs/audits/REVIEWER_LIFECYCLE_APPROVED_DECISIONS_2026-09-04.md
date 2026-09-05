@@ -2,7 +2,7 @@
 title: Reviewer Lifecycle — Approved Receipt, Correction and Batch Policies
 kind: decision
 domain: reviewer-workbench
-status: in-progress
+status: complete
 canonical: false
 owner: product-engineering
 last_verified: 2026-09-05
@@ -37,13 +37,11 @@ The original refactor report remains a historical investigation.
 
 ## Execution scope
 
-Stage 1C receives independent confirmation of existing behavior. Stage 1D is
-the first runtime implementation, followed by necessary Stage 1E failure
-handling and approved Stage 6A outcomes in place. Each runtime substage is
-separately committed, tested, built and independently reviewed. Stage 6A does
-not require the mechanical moves of Stages 2–5 to represent outcomes honestly;
-no such moves are included here. Its exact response/consumer contract will be
-verified before edits, while Stage 1D is being completed.
+Stage 1C independently confirmed existing behavior. Stages 1D, 1E and 6A were
+implemented in place, separately committed, tested, built and independently
+reviewed. Stage 6A's exact response/consumer contract was reviewed before edits.
+All approved local work is complete. Mechanical Stages 2–5 and wider 6B/6C
+work remain deferred; no general action framework or file moves were included.
 
 No live Dataverse, email, cron, schema operation, historical repair, main merge
 or production promotion is included. Public publication remains unapproved;
@@ -57,7 +55,7 @@ their authenticated API routes and services. Persistence: existing Dataverse
 reviewer suggestions; no new store/field/enum. Consumers: existing reviewer DTOs,
 mutation responses and staff UI refresh/error handling. F1 is refuted for
 successful current producers. F3 is fixed at `c51fa34d`; F5's unchecked UI is
-fixed at `bab3adea`, while its batch outcomes remain the Stage 6A target.
+fixed at `bab3adea`, and its batch outcomes are fixed at `5b9964c8`.
 Source fan-out and caller/adapter contracts were probed
 before the separately verified implementations.
 
@@ -106,9 +104,9 @@ Its contract is:
   separate Request ownership changes, restore generations and postcommit token
   or person failure remain distinct existing boundaries.
 
-Regressions failed against unchanged runtime before implementation. The complete
-focused service/route/adapter suites now pass 301 tests, compatibility suites 309,
-and composed races 185. These prove the six-field closed/complement matrix,
+Regressions failed against unchanged runtime before implementation. At Stage 1D,
+the complete focused service/route/adapter suites passed 301 tests, compatibility
+suites 309, and composed races 185. These proved the six-field closed/complement matrix,
 Request/version races, no later side effects on rejection and retained named
 operations. Full evidence and limitations are tracked in
 [the Stage 1D receipt](REVIEWER_LIFECYCLE_STAGE1D_RECEIPT_2026-09-05.md).
@@ -118,10 +116,19 @@ and independent review passed. The reviewer required a persisted live-DOM
 reentrant mutex test; its narrow re-review passed 200 status tests and proved
 mutex removal fails both new normal/StrictMode cases. Final focused coverage
 is 9 suites / 271 tests; the full run preceded that test-only correction.
-See the Stage 1E receipt for the frozen review and limits. Stage 6A is still
-planned; policy approval is not runtime completion.
+See the Stage 1E receipt for the frozen review and limits.
 
-## Status feedback and planned batch outcome contracts
+[VERIFIED via frozen source, tests, build, gates and independent review] Stage 6A
+is complete locally at `5b9964c8`: full **770 suites / 10,850 tests**, webpack
+build, **59 distinct** sequential gate/self-tests, and independent PASS with
+**841 tests across nine suites**. All **15** deliberately broken source variants
+were detected, producing 60 expected assertion failures and zero runtime errors.
+No implementation correction was required. The actual composed tests preserve
+the prior lifecycle regressions and prove authorization-before-write, exact
+partial outcomes and committed-but-unconfirmed response loss. See
+[the Stage 6A receipt](REVIEWER_LIFECYCLE_STAGE6A_RECEIPT_2026-09-05.md).
+
+## Implemented status feedback and batch outcome contracts
 
 Stage 1E fixes the existing single-reviewer status handler in place: require
 both HTTP success and `success:true`, identify the reviewer when reporting
@@ -149,20 +156,23 @@ successful refresh. These limits are not reasons to introduce a shared mutation
 framework or alter host loaders in Stage 1E.
 
 The Stage 6A probe found one application PATCH caller, always single-item.
-The service still supports batches, so its additive response will use
-`savedIds`, `failedIds`, and `notAttemptedIds` for both forms. Preserve HTTP 200
+The service supports batches, and its additive response uses
+`savedIds`, `failedIds`, and `notAttemptedIds` for both forms. It preserves HTTP 200
 for full success, existing typed pre-write errors, and HTTP 500 for unknown
 persistence failures. `success:true` requires every submitted target to have
 confirmed success. A failed id denotes an attempted, unconfirmed outcome; it
 does not prove the server made no write. Lost responses require reviewing fresh
 state before a deliberate retry. No automatic replay or rollback is included.
 
-For a nonempty batch, normalize GUID identity using the authorization helper's
-existing trim/lowercase convention and deduplicate in first-occurrence order.
-The three arrays must partition those unique targets. Keep current empty-array
-validation/fallback behavior and characterize it. Complete authorization of all
+For a nonempty batch, the service normalizes GUID identity using the authorization
+helper's existing trim/lowercase convention and deduplicates in first-occurrence
+order. The three arrays partition those unique targets. Existing empty-array
+HTTP fallback remains; the service now uses the same nonempty discriminator for
+that fallback's dedicated-status precheck. Complete authorization of all
 targets still precedes all writes; authorization failures retain their existing
 error-only envelope and disclose no per-target authorization results. The actual
-UI will check returned identities, refresh confirmed saves and describe remaining
-outcomes. Its materials-release selection remains unrelated. No new batch screen,
+UI checks all three own arrays whenever any outcome key is present, rejects
+malformed/foreign/contradictory results, refreshes confirmed saves and identifies
+the reviewer in outcome feedback. The current single-item action cannot receive
+a valid multi-row partition. Its materials-release selection remains unrelated. No new batch screen,
 207 status, queue, schema, or cross-request idempotency protocol is introduced.

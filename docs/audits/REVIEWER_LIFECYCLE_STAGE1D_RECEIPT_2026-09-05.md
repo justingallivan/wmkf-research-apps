@@ -84,8 +84,8 @@ with 78 retained tests unselected. Neither red run had a runtime-error suite.
 After implementation, the three complete focused suites passed **301 tests**,
 14 compatibility suites passed **309 tests**, and the entire composed race
 suite passed **185 tests**, all without failures/skips. The race suite has 107
-new F3 cases plus 78 unchanged retained tests. F2/F4 and the old F5 batch
-characterization remain intact. Exact saved artifacts:
+new F3 cases plus 78 unchanged retained tests. At this frozen Stage 1D commit,
+F2/F4 and the old F5 batch characterization remained intact. Exact saved artifacts:
 
 - `/tmp/reviewer-stage1d-focused-{red,green}.{json,log}`
 - `/tmp/reviewer-stage1d-compatibility.{json,log}`
@@ -158,7 +158,9 @@ all 11 final documentation gate/self-test commands passed sequentially
 (`/tmp/reviewer-stage1d-final-doc-gates.json`). Verdict: **RECONCILED** for the
 named source/policy claims, with deployment and unrelated history excluded.
 
-Stage 1D source work is complete; Stage 1E and Stage 6A remain separate next
-implementations. Public publishing still awaits explicit owner approval after
-the earlier automatic-review rejection. No main merge or production promotion
-occurred.
+Stage 1D source work is complete. Its follow-up Stages 1E and 6A subsequently
+completed at `bab3adea`/`77720b5a` and `5b9964c8`; their separate receipts and
+the approved decisions carry the later evidence. This receipt preserves the
+Stage 1D validation boundary. Public publishing still awaits explicit owner
+approval after the earlier automatic-review rejection. No main merge or
+production promotion occurred.

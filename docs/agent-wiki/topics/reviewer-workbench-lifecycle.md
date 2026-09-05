@@ -13,6 +13,8 @@ source_files:
   - lib/seed/email-defaults/reviewer-templates.js
   - shared/components/reviewers/ReviewersTab.js
   - shared/components/reviewers/ReviewerManagePanel.js
+  - pages/api/review-manager/reviewers.js
+  - lib/services/review-manager/reviewers-service.js
   - pages/api/workbench/decline-referrals.js
   - lib/services/workbench/decline-referrals-service.js
   - lib/dataverse/adapters/reviewer-suggestion.js
@@ -202,6 +204,35 @@ without restamping completion. Named manual-invitation recording, restore,
 person-only edits, and bulk cycle/program-area assignment remain distinct
 operations. This protection does not turn the generic correction into a
 withdrawal command or extend its field set.
+
+**Generic recorded-status updates (Stages 1E/6A):** **[VERIFIED in local
+source at `5b9964c8` on 2026-09-05; deployment pending]**
+`PATCH /api/review-manager/reviewers` authorizes every target for the lead PD
+or superuser before calling `reviewers-service.patchReviewers` →
+`reviewer-suggestion.updateLifecycle`. Nonempty batches trim/lowercase and
+deduplicate GUIDs in first-occurrence order, await writes sequentially, and
+stop at the first failure. `savedIds`, `failedIds`, and `notAttemptedIds`
+partition those targets: HTTP 200/`success:true` confirms all; an attempted
+failure returns HTTP 500/`success:false` with the confirmed prefix, one
+uncertain attempt, and the unattempted suffix. A failed id may have committed
+before its response was lost; earlier saves remain applied. Pre-write
+validation/authorization errors retain their error-only responses. Complete,
+withdrew, and released still require their dedicated workflows. No rollback or
+automatic retry is introduced.
+
+The existing `ReviewerManagePanel.updateStatus` UI submits one reviewer only.
+It validates returned outcome arrays against that identity, refreshes only a
+confirmed save, and identifies the reviewer/id in explicit outcome feedback.
+For malformed or unconfirmed outcomes, feedback asks staff to reload and
+review current status before a deliberate retry; a confirmed write with a
+rejecting refresh callback instead reports saved but unable to refresh. Legacy responses without outcome keys still require HTTP
+success, exact `success:true`, and no error field. The mounted panel's
+synchronous per-reviewer lock survives request/mode/permission changes and
+observed row disappearance until settlement; those changes and unmount
+permanently invalidate late feedback. Ordinary object/callback replacement
+remains valid. This does not serialize other panels/tabs or certify refresh
+success when a host returns void or catches its own read errors. Materials
+selection and confirmed-invitation overlays retain their separate contracts.
 
 **Per-reviewer extension workflow (Wave 18 production-live 2026-08-11):** eligible accepted rows in **Track Reviewers** expose Grant/Change extension. The dedicated `/api/review-manager/review-due-extension` route freshly enforces accepted/non-terminal/no-receipt state, requires a date strictly after the request default (and current/future Pacific date) with no maximum, and permits null to restore the original. It first validates the admin body, Dynamics impersonation setting, assigned sender, confirmed recipient, signature, and calendar. Confirmed engagement snapshot name/email take precedence; legacy missing values fall back field-by-field to the server-read linked reviewer person, and absence from both sources still fails before the write. It then ETag-saves and automatically dispatches the fixed-subject message with the assigned-PD signature and stable-UID calendar update. Only an actual Dynamics dispatch failure preserves the date without the notice. The open modal offers a server-fresh retry, and an existing extension always offers Resend deadline email without another date write; there is no durable notification-owed marker for a failed restore send. Invite Reviewers and generic `my-candidates` PATCH cannot write the field. The 90-day accepted-token cushion remains intentional and saving does not rotate a delivered token. [VERIFIED via production create/publish/exact/runtime-select probes, the non-clobbering admin-body seed, main `8647af33`, Vercel `dpl_AbTvWvMYb5inwPnYKTK2mkrkNXZz`, and live HTTP checks on 2026-08-11 / 2026-08-12 UTC] the column and runtime are live. [VERIFIED via the exact read-only production Request `1002788`/Test Homer row probe, main `ccb7e0c8`, Vercel `dpl_DjRmd4axNpUUpHAo6ZmeoBgumxTe`, and live HTTP checks] the legacy identity fallback is live. [VERIFIED via owner production smoke on Request `1002788`] the retry saved the extension and delivered the automatic deadline email. Its `Dear Test Homer,` greeting exposed the last copy defect. The admin body now requires `{{greeting}}`, the shared reviewer honorific helper renders `Dear Dr. Homer,`, and the live Dataverse setting matches the source default. [VERIFIED via main `6526a934`, Vercel `dpl_33KVRu3WmQhWBztd7RqDd2X6LBCr`, 610 suites / 7,717 tests, webpack build, and live HTTP 200] that correction is production-live; no second test email was sent.
 

@@ -96,11 +96,10 @@ The whole-file read-only sweep checked the lifecycle wiki, Atlas, service
 catalog, completion brief, engagement specification, terminal-status plan and
 invitation memory. Current unrelated contracts agree or remain unrelated; the
 completion brief's old unchecked-handler text is explicitly historical. No
-additional live stale Stage 1E assertion was found in those targets. A compact
-wiki summary is optional and will be combined with Stage 6A's outcome contract;
-the current receipt and decisions already preserve the exact UI guarantee.
-The Atlas's existing missing generic-status writer and absent catalog entry
-belong to that next service-contract reconciliation. Search evidence and limits:
+additional live stale Stage 1E assertion was found in those targets. The later
+Stage 6A reconciliation combined the wiki summary with its outcome contract and
+filled the Atlas's missing generic-status writer and absent catalog entry.
+This receipt preserves the earlier Stage 1E validation boundary. Search evidence and limits:
 `/tmp/reviewer-stage1e6a-doc-sweep.md`. Final checks use the 11-command sequential
 documentation gate battery; this is a bounded changed-fact audit, not a claim
 that unrelated repository prose or live deployments were audited.
@@ -117,5 +116,6 @@ general Stage 6B. Batch response arrays, extraction and broader lifecycle
 reorganization remain separate.
 
 No live writes, emails, cron invocation, schema operation, public push, main
-merge or deployment is part of this stage. Stage 1E is complete locally;
-approved Stage 6A remains a separate implementation and verification boundary.
+merge or deployment is part of this stage. Stage 1E is complete locally; the
+subsequently completed Stage 6A has its separate receipt and frozen review at
+`5b9964c8`.
