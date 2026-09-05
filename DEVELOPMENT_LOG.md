@@ -10,6 +10,22 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## September 2026 — Reviewer closeout eligibility reached Production (Session 479)
+
+**Milestone:** Lead PDs can close a received review and record whether its linked
+honorarium should be paid, with a required reason for a No decision.
+**Sessions:** 478–479 (contract decision, implementation, adversarial review,
+receipt-path repair, UI refinement, promotion, and Production deployment).
+**Ship state:** runtime/UI commit `5e101861` is live in Ready Production
+deployment `dpl_2uJJQxY9TN4KcfHJGLRS2dW1QVge`; staff upload and partial/no-file
+receipt paths now advance to Review Received before closeout.
+**Why it matters:** Program Directors can record the disposition Operations
+needs without the app taking over final payment authority; the app still never
+writes `wmkf_authorizationtoremitpaymentflag`.
+**Pointers:** `docs/REVIEWER_COMPLETION_AND_HONORARIUM_DECISION_BRIEF.md`;
+`docs/audits/REVIEWER_LIFECYCLE_REFACTOR_REPORT_2026-09-04.md`; commits
+`2631c914`, `b318ede0`, and `5e101861`.
+
 ## September 2026 — Historical Workbench request locator shipped (Session 477)
 
 **Milestone:** Staff can now locate historical requests from the Workbench by
