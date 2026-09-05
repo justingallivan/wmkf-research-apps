@@ -12,6 +12,10 @@ last_verified: 2026-09-05
 
 Assessment baseline: main `d614de5cf60baeaec8cf21ca8e4dd3c2489d2f7a`.
 The owner selected **Stage 6B as the next build**, starting with **6B1**.
+**Status update, 2026-09-05 (later session):** 6B1 is complete on branch
+`codex/reviewer-lifecycle-stage6b` (`9258115a`/`06725d6c`, independent PASS, not
+merged); see the [Stage 6B1 receipt](REVIEWER_LIFECYCLE_STAGE6B1_RECEIPT_2026-09-05.md).
+Routing below that says the next agent starts 6B1 is historical; 6B2 is next.
 Use [the Stage 6B build plan](../REVIEWER_LIFECYCLE_STAGE6B_BUILD_PLAN.md)
 for the exact implementation contract, verification and review checkpoints.
 Complete and freshly review each slice before starting the next dependent slice.
