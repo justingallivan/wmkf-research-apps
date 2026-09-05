@@ -20,10 +20,12 @@
  *
  * Side effects (always):
  *   - wmkf_reviewreceivedat = now()
+ *   - wmkf_reviewstatus = Review Received
  *   - wmkf_reviewuploadedbystaff = true
  *
- * Does NOT revoke the token — reviewer might still want to send the actual
- * file later, and the link's other expiry rules apply normally.
+ * Receipt locks another normal submission, including an upload through the
+ * existing token. The token is not revoked; its other expiry rules still apply.
+ * Human closeout and honorarium eligibility remain separate actions.
  *
  * Thin route shell (Route→Service Consolidation Plan, Stage 2): method
  * dispatch → auth guard → input validation → withDalContext → one service

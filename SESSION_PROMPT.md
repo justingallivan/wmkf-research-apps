@@ -1,4 +1,4 @@
-# Session 483 Prompt: Reviewer Lifecycle After Version-safe Email Bookkeeping
+# Session 483 Prompt: Approved Reviewer Lifecycle Policies
 
 ## Session 482 Summary
 
@@ -58,29 +58,43 @@ built the service/unit tests, and converted the F4 composed regressions.
 
 ## Next Items
 
-### Verified Open
+### Approved Local Work
 
-1. **Stage 1E — honest UI mutation failure handling.**
+The owner approved all three recommendations on 2026-09-04. Active branch:
+`codex/reviewer-lifecycle-approved-policies`, based on `2a792393`.
+The decision and preimplementation invariants are recorded in
+`docs/audits/REVIEWER_LIFECYCLE_APPROVED_DECISIONS_2026-09-04.md`.
+
+1. **Stage 1C:** preserve existing receipt meaning, including partial/no-file
+   staff declarations. Receipt enters Review Received and prevents another
+   normal submission; human closeout and honorarium eligibility stay separate.
+   Independent verification passed at `2a792393`: 240 clean core tests plus
+   27 targeted upload receipt tests. Only the stale no-file route header needed
+   correction; no replacement payload fix or backfill is authorized. See the
+   Stage 1C review for inherited full verification and isolation limits.
+2. **Stage 1D:** block generic invitation/response corrections on Complete,
+   withdrew and released. Preserve dedicated closeout notes/eligibility
+   correction. Investigation precedes the service/adapter regression and fix.
+3. **Stage 1E — honest UI mutation failure handling.**
    Evidence: `shared/components/reviewers/ReviewerManagePanel.js:updateStatus`
    still ignores HTTP/payload outcomes, and the rendered
    `tests/unit/reviewer-status-mutation-characterization.test.js` preserves that
    defect. Fix failure reporting before broader UI extraction.
+4. **Stage 6A:** retain stop on first failure; return successful, failed and
+   unattempted identifiers with whole-batch authorization before writes.
+   Update actual consumers; the application currently has a single-item status
+   action and no batch status-edit screen. No new batch screen is requested.
 
 Stages 1A and 1B are implemented in this branch. Only the selected Stage 1B
-substage was executed in this session. Each next substage requires its own
+substage was executed in the prior session. Each next substage requires its own
 scope, regression proof and fresh-context review. No generic command extraction
 or file moves yet.
 
-### Owner Decision Needed
+### Remaining Boundaries
 
-- Stage 1C: F1 remains refuted for current successful receipt producers by the
-  contract suite. Changing partial/no-file meaning or backfilling historical
-  rows requires an owner decision; do not repeat the old payload fix.
-- Stage 1D: define allowed historical response corrections on closed
-  engagements before changing the generic contract. F3 tests retain the current
-  response-only rewrite behavior.
-- Stage 6A: approve successful/failed/unattempted identifiers before changing
-  the sequential-error batch response retained by F5 tests.
+- The three policy choices are settled; their approval does not itself mean
+  Stage 1D or 6A is implemented. F3/F5 tests retain the old behavior until their
+  respective regression-and-fix stage.
 - Separate architectural boundaries: Request ownership/date changes are not
   locked by suggestion ETags. Remove/restore can reuse the same suggestion and
   Request/person bindings while resetting engagement history; the current row
@@ -116,6 +130,10 @@ flag from this application; BILL API reviewer onboarding.
 
 ## Key Files
 
+- `docs/audits/REVIEWER_LIFECYCLE_APPROVED_DECISIONS_2026-09-04.md`: current
+  product authority and exact preimplementation invariants.
+- `docs/audits/REVIEWER_LIFECYCLE_STAGE1C_REVIEW_2026-09-04.md`: independent
+  existing-receipt confirmation and test-isolation limits.
 - `docs/audits/REVIEWER_LIFECYCLE_STAGE1B_RECEIPT_2026-09-04.md`: implementation,
   contract, validation and operational limits.
 - `docs/audits/REVIEWER_LIFECYCLE_STAGE1B_REVIEW_2026-09-04.md`: independent
@@ -132,7 +150,8 @@ flag from this application; BILL API reviewer onboarding.
 
 ## Release and Handoff Boundary
 
-Owner: Codex. Branch: `codex/reviewer-lifecycle-stage1b`. Implementation
+Owner: Codex. Active branch: `codex/reviewer-lifecycle-approved-policies`.
+Stage 1B implementation
 `08752364` passed focused/full tests, gates, build and fresh-context review.
 The implementation and handoff (`e24597b7`) are committed locally. Automatic
 approval review rejected publishing this new Stage 1B payload to the public
@@ -140,7 +159,8 @@ configured GitHub repository: the current authorization covers implementation
 but does not explicitly cover public publication. The owner must approve
 publishing Stage 1B's fix, tests and handoff on this branch before retrying the
 push. Stage 1A's earlier publication approval did not cover this payload.
-No Stage 1B commit has been pushed; local work is complete and preserved.
+No Stage 1B commit has been pushed; its local work is complete and preserved.
+The new policy approvals authorize local implementation, not public publication.
 No merge to main or production deployment occurred. Keep session evidence on
 this deliberate feature branch with its source. No DEVELOPMENT_LOG milestone
 is required because no production capability or architecture shipped.

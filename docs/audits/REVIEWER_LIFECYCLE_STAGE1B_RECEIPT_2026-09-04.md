@@ -146,7 +146,7 @@ wording correction about the adapter's internal guard-GET 412, now recorded in
 the policy/limits here and verified by rereading. See
 [the complete review](REVIEWER_LIFECYCLE_STAGE1B_REVIEW_2026-09-04.md).
 
-## Limits and remaining decisions
+## Limits and subsequent policy decisions
 
 No live Dataverse calls, email, cron, migration, main merge or production promotion
 are part of this stage. Cross-record parent ownership locking and ambiguous
@@ -170,10 +170,14 @@ exactly-once email protocol. The existing manual-post-send versus automated
 claim-before-send duplicate-nudge limit in the suggestion Atlas remains valid.
 
 F2 remains covered by Stage 1A regressions. F4's stale status/count defects are
-fixed in this implementation; F3 and F5 remain explicitly characterized. F1's
-successful receipt-producer finding remains refuted by the existing contract
-suite. Partial/no-file semantics, closed historical corrections and additive
-batch outcomes remain separate owner decisions.
+fixed in this implementation; F3 and F5 remain explicitly characterized at the
+frozen Stage 1B commit. F1's successful receipt-producer finding remains refuted
+by the existing contract suite. The owner subsequently approved preserving
+partial/no-file receipt semantics, blocking closed generic invitation/response
+corrections, and returning additive batch outcomes. Their implementation is
+tracked separately in
+[the approved decisions](REVIEWER_LIFECYCLE_APPROVED_DECISIONS_2026-09-04.md);
+it is not part of this frozen Stage 1B receipt.
 
 ## Bounded durable-fact reconciliation
 
