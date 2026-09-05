@@ -49,6 +49,12 @@ built the service/unit tests, and converted the F4 composed regressions.
 - No live Dataverse probe, production cron call, migration, backfill, email,
   merge to main or deployment was performed. Existing full-suite diagnostic
   warnings outside the isolated harness remain baseline debt.
+- [VERIFIED via diff and detector] Stop-hook font findings were in unchanged
+  email HTML. Shared Impeccable exceptions now permit Arial for `overused-font`
+  and `design-system-font` only in `send-emails-service.js`, with reasons in
+  `.impeccable/config.json`. The five overused-font warnings and corresponding
+  browser-design font warnings are absent; 21 existing style advisories remain
+  visible. Runtime code and its frozen review were unchanged.
 
 ## Next Items
 
