@@ -3,11 +3,12 @@ title: Reviewer Lifecycle Stage 6B — Build Handoff
 domain: reviewer-workbench
 kind: plan
 status: active
-summary: Sequential in-place action lifetime fixes, beginning with token, removal, and terminal feedback while preserving shipped status and server contracts.
+summary: Sequential in-place action lifetime fixes; 6B1 token/removal/terminal feedback is complete on a branch, 6B2 reminder/closeout is next.
 canonical: false
 owner: product-engineering
 last_verified: 2026-09-05
 related:
+  - docs/audits/REVIEWER_LIFECYCLE_STAGE6B1_RECEIPT_2026-09-05.md
   - docs/audits/REVIEWER_LIFECYCLE_REFACTOR_REPORT_2026-09-04.md
   - docs/audits/REVIEWER_LIFECYCLE_APPROVED_DECISIONS_2026-09-04.md
   - docs/audits/REVIEWER_LIFECYCLE_RELEASE_2026-09-05.md
@@ -18,8 +19,14 @@ related:
 
 ## Status and first action
 
-[PLANNED] **Build 6B1 first**, after the preflight below. Proceed to 6B2 and
-6B3 sequentially only after the preceding slice's checks and independent review.
+[VERIFIED via frozen commits, tests and independent review] **6B1 is complete**
+on branch `codex/reviewer-lifecycle-stage6b`: runtime `9258115a`, test-only review
+correction `06725d6c`, full suite 771 suites / 11,216 tests, webpack build, seven
+gate pairs and an independent PASS. See the
+[Stage 6B1 receipt](audits/REVIEWER_LIFECYCLE_STAGE6B1_RECEIPT_2026-09-05.md).
+It is not merged or deployed; promotion is a separate action.
+[PLANNED] **Build 6B2 next**, after its preflight. Proceed to 6B3 only after
+6B2's checks and independent review.
 These are subdivisions of original Stage 6B, not additional product features.
 Stage 6C extraction is outside this handoff.
 
@@ -108,6 +115,9 @@ Keep external callback arguments and invocation count unchanged. Only the local
 6B3 modal/panel handshake may carry the completion-cause metadata defined below.
 
 ## 6B1 — token, removal and terminal outcomes
+
+[VERIFIED] Implemented at `9258115a`/`06725d6c`; the requirements below are the
+contract that was built and reviewed. Line citations are to the `d614de5c` baseline.
 
 Runtime ownership: only relevant regions of
 `shared/components/reviewers/ReviewerManagePanel.js`.

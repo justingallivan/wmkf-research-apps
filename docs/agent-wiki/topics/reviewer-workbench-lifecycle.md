@@ -228,6 +228,17 @@ Existing null/empty-string status clearing on open rows remains supported,
 with closed-source protection intact; Stage 6A adds no status-validation policy.
 No rollback or automatic retry is introduced.
 
+Stage 6B1 (branch `codex/reviewer-lifecycle-stage6b`, `9258115a`/`06725d6c`, not
+merged): the regenerate-token, revoke-token, remove-reviewer and terminal-transition
+handlers in `ReviewerManagePanel.js` bind their alerts, prompt, clipboard write and
+`onRefresh` call to the UI context that started them through a per-action/row
+attempt registry invalidated by the existing layout effects. Stale outcomes after
+request/mode/permission change, row absence or unmount are suppressed and never
+revived; confirm dialogs revalidate before dispatch; a refresh failure after a
+confirmed mutation is reported separately. Payloads, success predicates and the
+status mutex are unchanged. Tests: `tests/unit/reviewer-action-lifetimes.test.js`.
+Receipt: `docs/audits/REVIEWER_LIFECYCLE_STAGE6B1_RECEIPT_2026-09-05.md`.
+
 The existing `ReviewerManagePanel.updateStatus` UI submits one reviewer only.
 It trims/lowercases submitted and returned IDs for outcome comparison, refreshes
 only a confirmed save, and identifies the reviewer/id in explicit feedback.
