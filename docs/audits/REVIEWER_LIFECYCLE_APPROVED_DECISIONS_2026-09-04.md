@@ -40,8 +40,15 @@ The original refactor report remains a historical investigation.
 Stage 1C independently confirmed existing behavior. Stages 1D, 1E and 6A were
 implemented in place, separately committed, tested, built and independently
 reviewed. Stage 6A's exact response/consumer contract was reviewed before edits.
-All approved local work is complete. Mechanical Stages 2–5 and wider 6B/6C
-work remain deferred; no general action framework or file moves were included.
+All work in that released milestone is complete; no general action framework
+or file moves were included. On 2026-09-05 the owner selected **Stage 6B for
+the next session**, starting with token/removal/terminal actions (6B1), then
+reminder/closeout (6B2) and materials context safety (6B3), with fresh review
+between slices. **This is planned work, not another implemented milestone.**
+Use the [Stage 6B build plan](../REVIEWER_LIFECYCLE_STAGE6B_BUILD_PLAN.md) and
+[remaining readiness audit](REVIEWER_LIFECYCLE_REMAINING_READINESS_2026-09-05.md).
+Stages 2–5, 6C and 7 remain outside the selected next build; their dependencies
+and optional portions are classified in that audit.
 
 The local implementation scope included no live lifecycle mutation, email,
 cron, schema operation or historical repair. On 2026-09-05 the owner explicitly

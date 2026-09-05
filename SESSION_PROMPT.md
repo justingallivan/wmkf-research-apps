@@ -1,187 +1,156 @@
-# Session 485 Prompt: Continue After Reviewer Lifecycle Production Release
+# Session 486 Prompt: Build Reviewer Lifecycle Stage 6B
 
-## Sessions 483–484 Summary
+## Session 485 Summary
 
-Codex orchestrated the owner-approved receipt, closed-history and batch-outcome
-work on `codex/reviewer-lifecycle-approved-policies`. Native subagents handled
-investigation, builds, composed regressions, full validation and independent
-reviews. Session 484 published, rehearsed and released the approved work to
-Production after the owner's explicit deployment decision.
+The owner selected Stage 6B for another agent to build in the next session.
+Codex coordinated parallel source investigations and prepared a bounded build
+plan and remaining-work assessment. **This handoff is planning only: no Stage 6B
+runtime implementation, extraction or new application test was added.**
+The source baseline for the assessment is main `d614de5c`.
 
 ### What Was Completed
 
-- **Stage 1C — existing receipt semantics confirmed.** Staff declarations,
-  including partial/no-file receipt, enter Review Received and lock normal
-  resubmission. Human closeout and honorarium eligibility remain separate.
-  Independent confirmation passed 240 clean core tests plus 27 targeted upload
-  cases. Only a stale no-file route header changed; no payload rewrite/backfill.
-- **Stage 1D — closed invitation/response history protected.** Generic six-field
-  corrections require the same authorized Request, recognized open source and
-  exact fresh ETag. Complete/withdrew/released reject before token/person work.
-  Dedicated closeout correction and named lifecycle operations remain intact.
-  Full 770 suites / 10,291 tests, 59 checks, build and fresh review passed.
-- **Stage 1E — honest status feedback and pending ownership.** The real row
-  action confirms HTTP/payload success, reports unconfirmed outcomes, separates
-  refresh failure, and suppresses stale feedback. Its per-reviewer mutex is
-  synchronous and held until settlement. Full 770 suites / 10,481 tests, build
-  and 59 checks passed; fresh review required one test-only mutex proof, which
-  passed narrow re-review and final 271 focused tests.
-- **Stage 6A — explicit mutation outcomes.** Canonical unique batches execute
-  sequentially and stop on first failure. Success and attempted-failure responses
-  identify confirmed saves, the unconfirmed adapter operation and unattempted
-  suffix. Raw GUID/presence checks and all-batch authorization precede every
-  write. The real single-row UI validates complete identity/HTTP partitions and
-  displays confirmed or unconfirmed results without automatic replay. No batch
-  screen was added.
+- A concrete Stage 6B plan sequences **6B1 token/removal/terminal actions → fresh
+  review → 6B2 reminder/closeout → fresh review → 6B3 materials-release modal**.
+  It specifies action identity, permanent invalidation, cleanup ownership,
+  post-await effects, preserved behavior and discriminating tests.
+- A readiness audit distinguishes ready first slices, dependent work and optional
+  abstractions across remaining Stages 2–7. The narrow raw-policy comparison
+  agreed in 30 cases; the imported generic-call inventory reported 19 calls.
+  Neither is a complete writer inventory or a new application-test run.
+- Current execution routing now selects 6B1. Frozen implementation reviews,
+  the original investigation and the completed release receipt remain historical
+  evidence. The planning review receipt records the independent plan assessment.
 
-### Runtime and Evidence Commits
+### Existing Release and Commits
 
-- `95690c75` — Approved policies, Stage 1C confirmation and no-file header.
-- `c51fa34d` — Closed generic invitation/response history protection.
-- `f4ec249e` — Stage 1D review and handoff.
-- `bab3adea` — Status confirmation, pending ownership and stale-feedback guards.
-- `77720b5a` — Persisted live-DOM reentrant mutex regression.
-- `ddf19416` — Verified Stage 1E handoff and reviewed batch invariants.
-- `5b9964c8` — Stage 6A service/route/UI outcomes and regressions.
+[VERIFIED via the recorded release evidence] Stages 0, 1A–1E and 6A are shipped.
+Stage 1C confirmed receipt behavior already present. PR 149 merged as `c19a16d8`;
+its production deployment reached READY on 2026-09-05 at 17:40:20.139 UTC.
+The later documentation-only `d614de5c` deployment reached READY at
+17:52:37.434 UTC with all seven expected production aliases attached.
+All five push-main workflows for `d614de5c` were subsequently observed successful.
 
-The branch also includes the earlier locally completed Stage 1B source
-`08752364`, review/handoff and narrowly scoped email-font exceptions `2a792393`.
-Stage 1A was previously published. The approved branch was first published
-through `d76b3bb5` to `origin/codex/reviewer-lifecycle-approved-policies`.
+- `c19a16d8` — Merge PR 149: protect reviewer lifecycle writes and report outcomes.
+- `d614de5c` — Document the production release and Session 485 handoff.
+- This session's documentation commit contains the next build plan, readiness
+  audit, plan-review receipt, decision routing update and this prompt; obtain its
+  exact hash from `git log` rather than treating the assessment baseline as HEAD.
 
-### Final Verification
-
-[VERIFIED via frozen JSON/build/gate receipts at `5b9964c8`]
-**770 suites / 10,850 tests passed**, zero failures, skips, TODOs or runtime-error
-suites. Webpack production build passed; source/tests and generated migration
-manifest were unchanged. All **59 distinct** gate/self-test commands passed
-sequentially. Existing diagnostic warning counts match the prior Stage 1E run;
-these results are not live Dataverse or clean-console proof.
-
-[VERIFIED via independent review] Stage 6A **PASS**, no required correction:
-**841 tests across nine suites**, all **15** actual-source mutations detected,
-with 60 expected assertion failures and zero runtime-error suites. Real composed
-cases cover all-batch ownership denial, conditional 412, first/middle/last
-failures and writes committed before their response is lost. All prior F2/F3/F4
-regressions remain green. Source headers, Atlas, catalog, wiki, decisions and
-receipts were reconciled for the changed contracts. Final documentation checks
-are recorded in the Stage 6A receipt.
-
-[VERIFIED via supplied report and independent finding triage] Claude's separate
-review at `ca6f933e` returned **PASS with Low findings**, reporting 10,850 tests,
-build and 38 gates passed. The owner approved a documentation-only follow-up:
-clarify the adapter-operation failure boundary and single/batch ID formatting;
-preserve runtime and existing null/empty clearing policy. Base/HEAD triage passed
-52 bounded cases and the exact single-ID preservation regression. See the
-follow-up receipt for final comment/doc checks and the review-method limitation.
-
-Changed-file lint passed with nine unchanged panel warnings. Impeccable passed
-for the UI with no new exceptions. Existing Arial exceptions remain limited to
-transactional HTML in `send-emails-service.js` for `overused-font` and
-`design-system-font`; browser typography was not changed. The prior email
-scanner's 21 advisory findings remain documented in the Stage 1B handoff.
+Final pre-release CI passed 770 suites / 10,850 tests, build, lint and 25 stock
+browser cases. The isolated local browser rehearsal passed 31 cases (25 stock
+plus six targeted status cases), with no external requests or sends. These are
+**previous release results**, not tests of planned Stage 6B. The release smoke
+was read-only, and its bounded log scan does not prove live lifecycle mutations,
+delivery, concurrency or every production workflow. See the release receipt.
 
 ## Next Items
 
-### Production Release Complete
+### Verified Open — Selected and Build Ready
 
-[VERIFIED via GitHub merge metadata, Vercel inspection and fresh browser reads]
-[PR 149](https://github.com/justingallivan/wmkf-research-apps/pull/149) merged to
-`main` as `c19a16d8687a25226f3accb4059634acb92db073` on 2026-09-05 at
-17:39:40 UTC. Its tree exactly matches tested head `7a27d4b1`.
-Production deployment `dpl_6tVnMbnSMtqwtss15bEdSzBz4ELj` reached READY at
-17:40:20.139 UTC with all seven expected aliases attached. The authenticated
-Workbench list and an existing request's Track Reviewers view passed a read-only
-smoke. The bounded deployment log scan returned no error/warning/fatal/HTTP 5xx
-rows; this is an observation window, not proof of every lifecycle action.
+**Start Stage 6B1 using `docs/REVIEWER_LIFECYCLE_STAGE6B_BUILD_PLAN.md`.**
+[VERIFIED via CodeGraph and direct source/caller/test inspection at `d614de5c`]
+The existing regenerate-token/clipboard, revoke-token, remove-reviewer and
+terminal handlers still lack the shipped status handler's full context guards.
+The build plan is the execution contract; the readiness audit is broader routing.
 
-The owner explicitly approved deployment without separate human UAT or a live
-rollback drill, on the stated assumption that campaign timing permits; no
-independent calendar verification was performed. Neither UAT nor the rollback
-drill was performed. The rollback reference remains `dpl_CxBa3Hc8niE6hLcryMMjhYfz54GL`
-at `90053d11`; rollback was not executed. The
-[release receipt](docs/audits/REVIEWER_LIFECYCLE_RELEASE_2026-09-05.md) records
-the approval, exact source/deployment association and verification limits.
+1. Run `/start`; verify branch, HEAD, dirty state and agent ownership. Read the
+   plan, its fresh review receipt and approved decisions before editing. Recheck
+   the named functions against current source so concurrent work is not rebuilt.
+2. Create an isolated `codex/` runtime branch under the existing release strategy.
+   The current main checkout contains the completed release and this Tier 0
+   documentation handoff. Future runtime work still requires deliberate promotion.
+3. Act as orchestrator and use native subagents for bounded investigation,
+   implementation and fresh independent review. Give one builder ownership of
+   `ReviewerManagePanel.js` at a time; do not run 6B slices or 6C edits in parallel
+   against that shared surface. Tests must exercise real rendered behavior.
+4. Complete 6B1, run the plan's applicable checks, freeze a working commit and
+   obtain a fresh independent review. Fix required findings before proceeding.
+   Repeat that checkpoint before 6B2 and 6B3. Preserve earlier slices' tests.
+5. Continue autonomously within the reviewed plan. Escalate a genuine new product
+   or architecture decision; ordinary implementation choices and already settled
+   policies do not require another confirmation. Do not deploy merely because
+   local build/review passed.
 
-[VERIFIED via isolated browser run and independent test review] Release rehearsal
-passed **31/31 Chromium cases** (25 existing plus six targeted status scenarios),
-with no external requests or sends. The initial CI's two browser failures were
-stale staff ownership fixtures; `4576f559` corrects the synthetic session/PD
-identity, known GET mocks and existing materials wording. Independent review,
-lint and syntax checks passed; runtime source is unchanged. Final GitHub CI at
-`7a27d4b1` passed all eight reported checks, including 770 suites / 10,850 tests,
-build, lint, 38 registered check steps and all 25 stock browser cases. Its
-automatic Claude workflow supplied no inspectable review verdict and is not
-counted as another independent PASS.
+### Owner Decision Needed
 
-### Completed / Deferred
+No unresolved product-policy decision blocks the selected 6B1 scope.
+A proposed server-contract change, broader lock, automatic retry/resend or
+reopening of the excluded policies below is outside this plan. Stop and explain
+that concrete scope change if it becomes necessary.
 
-Approved Stages 1C, 1D, 1E and 6A are implemented, verified and deployed; no unresolved policy choice
-or required implementation correction remains. Mechanical Stages 2–5 and wider
-6B/6C work remain deferred; no shared action framework or file moves were built.
+### Queued / Optional / Parked
 
-Prior parked items were not re-probed as deployment claims: progress-pill
-alignment/chronology, Ops eligibility view, automatic reviewer reminders and
-one-click PDF conversion. The reminder hold remains protected by its gate.
+- **Queued within 6B:** 6B2 reminder/closeout and 6B3 materials context safety,
+  each after the prior slice's fresh review. They are planned, not implemented.
+- **Alternatives, not the next authorized build:** Stage 2 narrow shared policy,
+  Stage 3 closeout-command pilot and Stage 5 narrow pointer/thank-you operations
+  have source-backed first slices. Stage 3 expansion and Stage 7 depend on the
+  relevant migrations and proofs. Stage 6C extraction follows completed 6B and
+  an explicit state-ownership contract. See the readiness matrix for details.
+- **Optional:** Stage 4 adapter decomposition and a shared receipt-persistence
+  helper need demonstrated benefit and, for the helper, a narrow input design.
+- Previously parked product items remain parked: progress-pill alignment and
+  chronology, Ops eligibility view, automatic reviewer reminders and one-click
+  PDF conversion. They were not re-probed as current deployment claims; the
+  automatic-reminder hold remains protected by its existing gate.
 
-### Preserve These Boundaries
+### Preserve These Contracts
 
-- A failed ID identifies an invoked adapter operation without confirmed success;
-  adapter validation may reject before any write, or a write may have committed.
-  Complete response loss reveals no partition. Reload/review guidance is not an
-  enforced freshness or cross-tab idempotency lock. Never automatically replay saves.
-- Route validation, authorization and service dedicated-target prechecks remain
-  error-only; adapter failures carry outcome arrays. Batch IDs are canonical and
-  unique; single IDs retain submitted formatting, with canonical UI comparison.
-  Stricter status-input validation is a separate optional policy change.
-- Status ownership is local to one mounted panel. Remounts, other tabs, other
-  action types and unobserved remove/restore generations remain independent.
-  Void or self-catching host callbacks do not certify successful fresh reads.
-- Suggestion ETags do not lock later Request ownership/date changes. The existing
-  status-only adapter's missing-version behavior is unchanged; Stage 1D's strict
-  ETag requirement is scoped to the six invitation/response fields.
-- Stage 1B post-send retry is bookkeeping only. Delivered email is not resent;
-  warning results are not resend instructions. No durable repair queue exists.
-  Inline invitation post-delivery stamping and legacy generate-email markAsSent
-  retain their separate boundaries.
-- The release smoke performed no lifecycle mutation, Graph/email send, cron
-  invocation, migration or backfill. Production reads do not prove live write,
-  delivery or concurrency behavior. The checkout was synced to `main` at the
-  release merge; verify branch/HEAD/dirty state before further work and retain
-  the deliberate feature-branch release process for future runtime changes.
+- Shipped status ownership is synchronous and per reviewer within one mounted
+  panel, held until settlement. Context loss permanently invalidates feedback;
+  returning to the same identity must not revive it. Ordinary same-context
+  object/callback churn does not cancel a valid operation. Preserve its mutex,
+  outcome parsing and matching-token cleanup while adding the separate 6B paths.
+- Stage 6A returns canonical unique batch partitions, executes sequentially and
+  stops at first failure. Single submitted IDs retain their formatting. A failed
+  adapter operation may have committed or may have rejected before writing;
+  complete response loss reveals no partition. Never automatically replay it.
+  Historical Stage 3 wording must preserve this shipped contract.
+- A confirmed mutation followed by refresh or clipboard failure remains a
+  confirmed mutation. A void/self-catching host callback does not prove a fresh
+  successful read; UI currentness cannot undo a clipboard write already invoked.
+- Receipt declarations enter Review Received and lock normal resubmission;
+  closeout and honorarium eligibility remain separate. Generic six-field
+  invitation/response corrections reject closed sources and require exact fresh
+  ETags. Do not change open-row null/empty status policy during this work.
+- Stage 1B post-send retry repairs bookkeeping only. A delivered email is not
+  resent; warning feedback does not authorize resend. Preserve reminder holds,
+  existing eligibility, server authorization, ETags and action payloads.
+- The previous release's explicit exception for separate human UAT and a live
+  rollback drill was specific to that release, on an assumed permitting campaign
+  window. It is not standing deployment approval or verified campaign timing.
 
 ### Do Not Reopen Without a New Decision
 
 Automatic Complete from thank-you; writing the Operations/Finance final remit
-flag from this application; BILL API reviewer onboarding.
+flag from this application; BILL API reviewer onboarding. No new schema, live
+lifecycle mutation, email send, cron invocation or backfill is authorized by this
+planning handoff. Local isolated tests are part of the build scope.
 
 ## Key Files
 
-- `docs/audits/REVIEWER_LIFECYCLE_RELEASE_2026-09-05.md`: public publication,
-  PR/CI/preview evidence, completed production release and accepted evidence limits.
-- `docs/audits/REVIEWER_LIFECYCLE_APPROVED_DECISIONS_2026-09-04.md`: settled
-  policy, implemented contracts and scope limits.
-- `docs/audits/REVIEWER_LIFECYCLE_CLAUDE_INDEPENDENT_REVIEW_2026-09-05.md`:
-  original independent report, preserved unchanged; the adjacent
-  `REVIEWER_LIFECYCLE_CLAUDE_REVIEW_FOLLOWUP_2026-09-05.md` records disposition.
-- `docs/audits/REVIEWER_LIFECYCLE_STAGE1C_REVIEW_2026-09-04.md`: receipt evidence.
-- Stage 1D, 1E and 6A `RECEIPT` and `REVIEW` files dated 2026-09-05 in
-  `docs/audits/`: exact commits, independent findings, validation and boundaries.
-- `docs/audits/REVIEWER_LIFECYCLE_STAGE1B_RECEIPT_2026-09-04.md` and its review:
-  frozen post-send work and the history of publication approval.
-- `docs/audits/REVIEWER_LIFECYCLE_REFACTOR_REPORT_2026-09-04.md`: historical
-  investigation and original staged plan; not current implementation status.
-- `tests/integration/reviewer-engagement-races.test.js`: retained lifecycle races
-  and real route/authorization/adapter/transport outcome regressions.
-- `tests/unit/reviewer-status-mutation-characterization.test.js`: actual rendered
-  status behavior in normal/StrictMode, including discriminating mutex proof.
+- `docs/REVIEWER_LIFECYCLE_STAGE6B_BUILD_PLAN.md` — exact next-build contract,
+  scope, tests, review checkpoints and independent-review brief.
+- `docs/audits/REVIEWER_LIFECYCLE_STAGE6B_PLAN_REVIEW_2026-09-05.md` — fresh
+  independent planning review, assessed revision and verification limits.
+- `docs/audits/REVIEWER_LIFECYCLE_REMAINING_READINESS_2026-09-05.md` — remaining
+  stage matrix, bounded probes and historical-plan corrections.
+- `docs/audits/REVIEWER_LIFECYCLE_APPROVED_DECISIONS_2026-09-04.md` — settled
+  receipt/correction/batch policies, shipped contracts and current routing.
+- `docs/audits/REVIEWER_LIFECYCLE_RELEASE_2026-09-05.md` — completed release,
+  exact source/deployment association, CI/browser evidence and accepted limits.
+- `docs/audits/REVIEWER_LIFECYCLE_REFACTOR_REPORT_2026-09-04.md` — historical
+  investigation; use the current plan and readiness audit for execution status.
+- Stage 1D, 1E and 6A receipt/review files in `docs/audits/` — frozen runtime
+  and independent-review evidence. Preserve Claude's original separate report
+  and its adjacent follow-up receipt unchanged.
 
-## Handoff
+## Handoff and Milestone Determination
 
-The approved lifecycle milestone is shipped; there is no remaining release
-approval or implementation blocker. `DEVELOPMENT_LOG.md` records the Session 484
-production milestone. Preserve the frozen stage reviews and release receipt.
-The earlier claim-evidence pilot command remained unavailable because local
-state could not be read; no observation row was invented. Continue only the next
-owner-selected work; deferred refactor stages and parked product items remain
-outside this completed release.
+The next agent begins 6B1; the completed lifecycle release requires no repeat
+implementation or release approval. `DEVELOPMENT_LOG.md` already records the
+Session 484 production milestone. This session prepared planning documents and
+requires **no additional milestone entry**. No CLAUDE.md, schema, API, environment
+or memory convention changed. The claim-evidence pilot command remained
+unavailable because local state could not be read; no observation row was invented.
