@@ -72,7 +72,7 @@ data.success`; error copy `data.error || default`. No 200 body carries a failure
 misreads.
 
 ## Implemented contract
-[VERIFIED via `git show b08c16f6`] Four files changed (+700/−25 at `b08c16f6`, +129/−22 at `d3ec406a`): `ReviewerManagePanel.js`
+[VERIFIED via `git show b08c16f6` and `git show d3ec406a`] Four files changed (+700/−25 at `b08c16f6`, +129/−22 at `d3ec406a`): `ReviewerManagePanel.js`
 (+78/−… in `ReviewReminderAction` and the closeout render site only),
 `ReviewerCloseoutModal.js`, `tests/unit/reviewer-manage-actions-menu.test.js`,
 `tests/unit/reviewer-closeout-modal.test.js`. No server, route or host file is in the diff.
@@ -119,9 +119,9 @@ correction: observe rejection without awaiting. Two discriminating tests (never-
 `onSent`/`onSaved`) fail against the awaiting version and pass at `b08c16f6`.
 
 ## Red-before-code evidence
-- Baseline nine-suite UI selection at `dcd58b32`: 9 suites / 894 tests passed (builder, then orchestrator).
-- New cases against unchanged runtime (builder): reminder suite 12 of 32 failing, closeout
-  suite 20 of 31 failing; every current-context case passed and every lifetime/callback case
+- Baseline nine-suite UI selection at `dcd58b32`: 9 suites / 894 tests passed (builder-run this session; the Session 486 receipt recorded the same figure at the identical test tree).
+- New cases against unchanged runtime: reminder suite 12 of 33 failing, closeout suite 20 of
+  32 failing (reviewer-measured; the builder reported totals one lower per suite with identical failure counts); every current-context case passed and every lifetime/callback case
   failed. The unmount cases and the same-row draft-preservation case already passed at
   baseline and are retained regression evidence, not discriminating cases.
 - Builder guard removals in the working tree, each reverted and diffed back:
@@ -141,7 +141,7 @@ correction: observe rejection without awaiting. Two discriminating tests (never-
 | nine-suite UI selection (plan's eight plus `reviewer-action-lifetimes`) | 9 suites / 949 tests pass (933 at `b08c16f6`) |
 | `npm test -- --runInBand --watch=false` | 771 suites / 11,271 tests pass |
 | `npm run check:types` | pass |
-| `npm run lint` | 0 errors, 12 warnings repo-wide; the four changed files carry the identical nine pre-existing warnings shifted by the added lines (compared by rule and line against `dcd58b32`) |
+| `npm run lint` | 0 errors, 76 warnings repo-wide (the pre-existing set); the four changed files carry the identical nine pre-existing warnings shifted by the added lines (compared by rule and line against `dcd58b32`) |
 | `git diff --check` | clean |
 | `npm run build -- --webpack` | pass; no generated file changes in `git status` |
 | Gate pairs, serial, gate then self-test: dataverse-access-layer, route-service-boundary, dynamics-context-boundary, api-routes, route-lifecycle-auth, trust-boundary-guid, status-enum-parity | all 14 pass |
