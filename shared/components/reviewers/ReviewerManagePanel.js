@@ -132,8 +132,46 @@ export function ReviewReminderAction({
   const [sending, setSending] = useState(false);
   const [feedback, setFeedback] = useState(null);
   const mountedRef = useRef(true);
+  // The per-attempt supersession token: bumped only by a new send and by
+  // unmount. A committed-context epoch (below) is a SEPARATE dimension —
+  // request/reviewer identity/read-only changes bump epoch without bumping
+  // generation, so a stale attempt's finally can still find its own
+  // generation match and release the send lock even though its feedback/
+  // callback checkpoints (which also require epoch match) stay suppressed.
   const generationRef = useRef(0);
   const sendingRef = useRef(false);
+  const contextRef = useRef({ requestId, suggestionId: reviewer?.suggestionId, previewReadOnly, onSent, epoch: 0 });
+
+  useLayoutEffect(() => {
+    const context = contextRef.current;
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      generationRef.current += 1;
+      sendingRef.current = false;
+      context.epoch += 1;
+    };
+  }, []);
+
+  // Committed-props reconciliation, mirroring the Stage 6B1 registry
+  // pattern (ReviewerManagePanel.js:1678-1704): no dependency array, no
+  // cleanup, so it runs on every commit. Only request/suggestionId/
+  // read-only identity bumps the epoch; object/callback replacement is
+  // ordinary refresh and is tracked here (for the latest-callback rule)
+  // without invalidating anything.
+  useLayoutEffect(() => {
+    const context = contextRef.current;
+    if (context.requestId !== requestId
+      || context.suggestionId !== reviewer?.suggestionId
+      || context.previewReadOnly !== previewReadOnly) {
+      context.epoch += 1;
+    }
+    context.requestId = requestId;
+    context.suggestionId = reviewer?.suggestionId;
+    context.previewReadOnly = previewReadOnly;
+    context.onSent = onSent;
+  });
+
   const lifecycleEligible = Boolean(
     requestId
     && reviewer?.suggestionId
@@ -144,21 +182,15 @@ export function ReviewReminderAction({
   const reminderEligibility = reviewer?.reviewDueReminderEligibility;
   const canSend = lifecycleEligible && reminderEligibility === 'eligible';
 
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-      generationRef.current += 1;
-      sendingRef.current = false;
-    };
-  }, []);
-
   if (!lifecycleEligible) return <span className="text-xs text-gray-300">—</span>;
+
+  const isCurrent = (epoch) => mountedRef.current && epoch === contextRef.current.epoch;
 
   const handleSend = async () => {
     if (previewReadOnly || !canSend || sendingRef.current) return;
     const generation = generationRef.current + 1;
     generationRef.current = generation;
+    const epoch = contextRef.current.epoch;
     sendingRef.current = true;
     setSending(true);
     setFeedback(null);
@@ -172,7 +204,7 @@ export function ReviewReminderAction({
         }),
       });
       const data = await response.json().catch(() => ({}));
-      if (!mountedRef.current || generation !== generationRef.current) return;
+      if (generation !== generationRef.current || !isCurrent(epoch)) return;
       if (!response.ok || !data.ok) {
         setFeedback({
           ok: false,
@@ -181,9 +213,24 @@ export function ReviewReminderAction({
         return;
       }
       setFeedback({ ok: true, message: 'Reminder sent.' });
-      if (onSent) onSent();
+      // "Reminder sent." feedback is retained regardless of what the
+      // callback does: a throw/rejection here is a refresh failure, not a
+      // failed send, and must never relabel a confirmed mutation as failed
+      // or trigger a resend. The callback's returned promise is observed
+      // (so a rejection never becomes an unhandled rejection) but NOT
+      // awaited: a slow/never-resolving refresh must not hold the send
+      // lock or the UI feedback hostage.
+      const latestOnSent = contextRef.current.onSent;
+      if (latestOnSent) {
+        try {
+          const result = latestOnSent();
+          if (result && typeof result.then === 'function') result.catch(() => {});
+        } catch {
+          // Swallow: confirmed send, callback/refresh failure only.
+        }
+      }
     } catch (error) {
-      if (mountedRef.current && generation === generationRef.current) {
+      if (generation === generationRef.current && isCurrent(epoch)) {
         setFeedback({ ok: false, message: error.message || 'The reminder could not be sent.' });
       }
     } finally {
@@ -2467,10 +2514,11 @@ export default function ReviewerManagePanel({
           isOpen
           reviewer={closeoutReviewer}
           proposal={proposal}
+          requestId={proposal?.proposalId}
+          canManage={canManage}
+          previewReadOnly={previewReadOnly}
           onClose={() => setCloseoutReviewerId(null)}
-          onSaved={() => {
-            if (onRefresh) onRefresh();
-          }}
+          onSaved={() => (onRefresh ? onRefresh() : undefined)}
         />
       )}
 

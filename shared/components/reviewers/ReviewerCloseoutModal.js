@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 
 export const CLOSEOUT_DISPOSITION_LABELS = Object.freeze({
   eligible: 'Eligible',
@@ -38,25 +38,87 @@ function initialCloseoutDisposition(reviewer) {
     : '';
 }
 
-export default function ReviewerCloseoutModal({ isOpen, reviewer, proposal, onClose, onSaved }) {
+export default function ReviewerCloseoutModal({
+  isOpen,
+  reviewer,
+  proposal,
+  requestId,
+  canManage = true,
+  previewReadOnly = false,
+  onClose,
+  onSaved,
+}) {
   const initialDisposition = initialCloseoutDisposition(reviewer);
   const [disposition, setDisposition] = useState(initialDisposition);
   const [notes, setNotes] = useState(reviewer?.notes || '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const savingRef = useRef(false);
+  // Per-attempt supersession token: bumped only by a new save and unmount.
+  // Separate from the committed-context epoch below, so a stale attempt's
+  // finally can still release the save lock by generation match alone even
+  // when its epoch no longer matches (see Stage 6B1 registry precedent,
+  // ReviewerManagePanel.js:1706-1747).
   const generationRef = useRef(0);
   const mountedRef = useRef(false);
+  const contextRef = useRef({
+    isOpen,
+    suggestionId: reviewer?.suggestionId,
+    requestId,
+    canManage,
+    previewReadOnly,
+    onSaved,
+    onClose,
+    epoch: 0,
+  });
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    const context = contextRef.current;
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
       generationRef.current += 1;
+      context.epoch += 1;
     };
   }, []);
 
+  // Committed session reconciliation: no dependency array, no cleanup, runs
+  // on every commit (mirrors the reminder action and the Stage 6B1 registry
+  // pattern). A new session (open/close, reviewer/request identity, or
+  // parent management/read-only context) bumps the epoch and reinitializes
+  // the form from the CURRENT row, clearing any prior error. Same-row
+  // refresh (same suggestionId, new object, new callbacks) is ordinary
+  // refresh: it updates the latest callbacks here without touching
+  // disposition/notes/error, so unsaved typed notes survive. This
+  // intentionally has no dependency array (session identity is a multi-field
+  // comparison, not a single prop) and conditionally calls setState, so
+  // react-hooks/exhaustive-deps cannot infer a correct dependency list here.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useLayoutEffect(() => {
+    const context = contextRef.current;
+    const sessionChanged = context.isOpen !== isOpen
+      || context.suggestionId !== reviewer?.suggestionId
+      || context.requestId !== requestId
+      || context.canManage !== canManage
+      || context.previewReadOnly !== previewReadOnly;
+    if (sessionChanged) {
+      context.epoch += 1;
+      setDisposition(initialCloseoutDisposition(reviewer));
+      setNotes(reviewer?.notes || '');
+      setError(null);
+    }
+    context.isOpen = isOpen;
+    context.suggestionId = reviewer?.suggestionId;
+    context.requestId = requestId;
+    context.canManage = canManage;
+    context.previewReadOnly = previewReadOnly;
+    context.onSaved = onSaved;
+    context.onClose = onClose;
+  });
+
   if (!isOpen || !reviewer) return null;
+
+  const isCurrent = (epoch) => mountedRef.current && epoch === contextRef.current.epoch;
 
   const editing = reviewer.reviewStatus === 'complete';
   const paymentDecisionRequired = honorariumApplies(reviewer);
@@ -65,7 +127,9 @@ export default function ReviewerCloseoutModal({ isOpen, reviewer, proposal, onCl
   const handleSubmit = async (event) => {
     event.preventDefault();
     if (!disposition || !optionAllowed(disposition, reviewer) || savingRef.current) return;
-    const generation = generationRef.current;
+    const generation = generationRef.current + 1;
+    generationRef.current = generation;
+    const epoch = contextRef.current.epoch;
     savingRef.current = true;
     setSaving(true);
     setError(null);
@@ -80,21 +144,38 @@ export default function ReviewerCloseoutModal({ isOpen, reviewer, proposal, onCl
         }),
       });
       const data = await response.json().catch(() => ({}));
-      if (generation !== generationRef.current || !mountedRef.current) return;
+      if (generation !== generationRef.current || !isCurrent(epoch)) return;
       if (!response.ok || !data.success) {
         setError(data.error || 'The reviewer closeout could not be saved. Reload and try again.');
         return;
       }
-      if (onSaved) onSaved(data);
-      onClose();
+      // A confirmed save is never relabeled failed by what happens next.
+      // Call the LATEST committed onSaved, observe a returned promise's
+      // rejection (without surfacing request-error copy) but do NOT await
+      // it: a slow/never-resolving refresh must not hold the modal open or
+      // the save lock. Recheck currentness synchronously (a sync onSaved
+      // may still have switched the session or unmounted), then call the
+      // latest committed onClose only while still current.
+      const latestOnSaved = contextRef.current.onSaved;
+      if (latestOnSaved) {
+        try {
+          const result = latestOnSaved(data);
+          if (result && typeof result.then === 'function') result.catch(() => {});
+        } catch {
+          // Swallow: confirmed save, callback/refresh failure only.
+        }
+      }
+      if (!isCurrent(epoch)) return;
+      const latestOnClose = contextRef.current.onClose;
+      if (latestOnClose) latestOnClose();
     } catch (requestError) {
-      if (generation === generationRef.current && mountedRef.current) {
+      if (generation === generationRef.current && isCurrent(epoch)) {
         setError(requestError.message || 'The reviewer closeout could not be saved.');
       }
     } finally {
-      if (generation === generationRef.current && mountedRef.current) {
+      if (generation === generationRef.current) {
         savingRef.current = false;
-        setSaving(false);
+        if (mountedRef.current) setSaving(false);
       }
     }
   };
