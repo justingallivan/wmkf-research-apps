@@ -181,7 +181,10 @@ grantRequestAdapter.queryAllRequests({
   the list ran out; newest cycle shown empty), or `'explicit'` (caller supplied `cycleCode`; never
   walks back). The client uses `'visible'` plus `selected !== available[0].code` to say "Nothing
   awaits you in <newest>; showing <selected>", and `'exhausted'` to say "Nothing awaits your review
-  in the <n> most recent cycles"; both are rendered from the response, never inferred.
+  in the <n> most recent cycles"; both are rendered from the response, never inferred. The `none`
+  sentinel is never a walk-back candidate: `available` holds real cycle codes only, so a viewer
+  whose only visible rows have no meeting date resolves `exhausted` and reaches them through the
+  explicit **No cycle** option.
 - **Oversized cycle during default resolution fails closed (Codex third-pass finding 2).** Each
   candidate read is the same scoped loader, which throws `final_writeups_dashboard_scope_exceeded`
   when a cycle exceeds `FINAL_WRITEUPS_DASHBOARD_MAX_ROWS` (`dashboard-service.js:118-134`). The
