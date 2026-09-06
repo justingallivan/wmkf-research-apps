@@ -1590,6 +1590,12 @@ returned zero eligible/enqueued/claimed/failed.** Plan doc:
   `degraded={Boolean(error)}` (pinned by `reviewers-tab-stale-request.test.js`); status pills
   across Status, Staff Deliberations, Final writeups and the request locator gained a uniform
   min-height. Change record: `docs/plans/UI_FEATURES_CODEX_HANDOFF_2026-09-05.md`.
+- **Named lifecycle commands live in `lib/services/reviewer-engagement/` (reviewer lifecycle
+  Stage 3, from 2026-09-05).** 3A moved the closeout command there (`close-review.js`, PR #154);
+  the old `review-manager/close-review-service.js` is a pure re-export and routes keep their import
+  paths. Each move is byte-identical and pinned by a both-paths identity test plus a caller census
+  (`tests/unit/reviewer-engagement-census.test.js`) that records every importer of the legacy path,
+  so a new bypass must be recorded deliberately. Plan: `docs/REVIEWER_LIFECYCLE_STAGE3_BUILD_PLAN.md`.
 - **Route→Service layout (Stage 7, 2026-07-05): every workbench and
   review-manager route is a thin shell; the lifecycle/business logic lives in
   `lib/services/workbench/` (incl. `grantee-deliverables/`) and
