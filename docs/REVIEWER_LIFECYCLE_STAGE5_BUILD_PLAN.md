@@ -112,6 +112,23 @@ prerequisite rather than a Stage 5 helper.
   than manufactured. `check:dataverse-access-layer` is a violation detector with no export-count
   ratchet, so new named exports do not trip it.
 
+- **Build complete `749ac1c3`:** 11 suites / 380 tests; full suite 778 / 11,409; types, lint 0
+  errors, `check:dataverse-access-layer`, `check:request-document-writers` + self-test, build,
+  `git diff --check` green. Mutations (a) drop the ifMatch requirement → op test red (6/9); (b) stray
+  pointer field → red (2); (c) route the sweep back through `patchReviewReceipt` → **caught by no
+  test** (recorded; addressed by the wiring test below).
+- **Codex adversarial round 1 (`749ac1c3`): needs-attention.** (1) **High — `requireIfMatch` accepts
+  `*`, whitespace, unquoted and `W/""`; `If-Match: *` is a wildcard and would defeat the
+  at-most-once fence. Accepted:** validate the concrete-ETag syntax already used at
+  `my-candidates-service.js:704–706` and `reviewer-suggestion-sweep.js:130–133` (accept `"…"` and
+  `W/"…"`, reject `*`, `W/""`, whitespace, unquoted, control chars), shared via one helper; both
+  live callers pass Dataverse ETags so no reachable behavior changes. (2) **Medium — the forwarding
+  shims let the caller suites pass even if a service is routed back through the generic patch.
+  Accepted in scope-limited form:** keep the shims (existing assertions untouched) and add a NEW
+  caller-level wiring test per service that mocks the adapter with independent `jest.fn()`s and
+  asserts the named op is invoked with `ifMatch`, and that the generic patch is NOT called — this
+  is the discriminating test mutation (c) lacked.
+
 ## Review checkpoints
 
 Opus: confirm byte-identical transport call per site; confirm the pointer path's ETag provenance;
