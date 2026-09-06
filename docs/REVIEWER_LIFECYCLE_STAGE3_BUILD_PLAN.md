@@ -203,6 +203,28 @@ builders on that file concurrently.
   omitting a census row for `errors.js` is acceptable because it is a shared leaf, not an extracted
   command boundary. Cap reached.
 
+## 3E build and review record
+
+- **Build (Sonnet, 2026-09-06 UTC): `41a7b2de`** on `claude/reviewer-lifecycle-stage3e` (cut from
+  main `f5e0ec79`, after 6D). `recordDeliveredEmail` + comment (main `send-emails-service.js:136–211`)
+  and `POST_SEND_OPEN_REVIEW_STATUSES` (`:129–134`, used only there) moved to
+  `reviewer-engagement/record-email-outcome.js`; call site unchanged; not re-exported (only the route
+  imports the old module, only `sendEmails`). The sweep's per-row try body (main
+  `reviewer-suggestion-sweep.js:124–154`) became `expireInvitation({ suggestion, cutoffIso, nowIso,
+  actingUserSystemId })` → `{ outcome }` in `reviewer-engagement/expire-invitation.js`; the sweep's
+  catch and counters stay; `EXPIRY_SELECT`/`isPendingInvitation` moved private, `isPastCutoff` moved
+  and exported back. Three census rows (sweep → cron route; each new module → its single caller). New
+  suites `record-email-outcome.test.js` (30) and `expire-invitation.test.js` (15). No mock seam needed
+  (all mocks target canonical adapters). Full suite 788 / 11,544; types, lint 0 errors, boundary and
+  parity gates + self-tests, build, `git diff --check` green. Mutations: parent revalidation after the
+  patch → red; drop `ifMatch` → 9/30 red; swallow 412 → red.
+- **Codex adversarial round 1 (`41a7b2de`): needs-attention, one medium, accepted.** Neither caller
+  is pinned to delegate: a faithful inline reimplementation in either old file (keeping the unused
+  import for the census) would pass all 45 direct tests. Correction: delegation tests that mock the
+  extracted module and assert the sweep calls `expireInvitation` and maps `swept`/`skipped`/thrown
+  412/not-found to the counters, and that the send loop calls `recordDeliveredEmail` with the existing
+  arguments at the same point relative to the SSE events (the 3D paths-test pattern). Opus pending.
+
 ## Rules for every slice
 
 Move verbatim; wrappers re-export the same objects (no re-wrapping that breaks `instanceof`); no
