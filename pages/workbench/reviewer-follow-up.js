@@ -24,7 +24,7 @@ import {
 } from '../../shared/utils/reviewer-follow-up';
 import { classifyTarget } from '../../lib/dataverse/core/interlock';
 
-function ReviewerGroup({ proposal, previewReadOnly, onRefresh }) {
+function ReviewerGroup({ proposal, previewReadOnly, onRefresh, degraded }) {
   const [open, setOpen] = useState(false);
   const reviewers = proposal.reviewers || [];
   const activeCount = reviewers.filter(isOpenReviewer).length;
@@ -108,6 +108,7 @@ function ReviewerGroup({ proposal, previewReadOnly, onRefresh }) {
                 canManage={canManage}
                 showReviewReminderAction={canManage || previewReadOnly}
                 previewReadOnly={previewReadOnly}
+                degraded={degraded}
               />
               <style jsx global>{`
                 .reviewer-activity-panel td span.rounded,
@@ -225,7 +226,6 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
     } catch (loadError) {
       if (requestIdRef.current !== requestId) return;
       setError(loadError.message);
-      setProposals([]);
     } finally {
       if (requestIdRef.current === requestId) setLoadingProposals(false);
     }
@@ -377,8 +377,18 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
 
       {error && (
         <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900" role="alert">
-          <p className="font-semibold">Reviewer follow-up could not be loaded</p>
-          <p className="mt-1">{error}</p>
+          {proposals.length > 0 ? (
+            <>
+              <p className="font-semibold">Reviewer follow-up could not be refreshed</p>
+              <p className="mt-1">Showing the last loaded results. Retry before making changes.</p>
+              <p className="mt-1">{error}</p>
+            </>
+          ) : (
+            <>
+              <p className="font-semibold">Reviewer follow-up could not be loaded</p>
+              <p className="mt-1">{error}</p>
+            </>
+          )}
           {cycleCode && (
             <button
               type="button"
@@ -410,7 +420,7 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
               : 'Change the cycle, search, or set-aside filter.'}
           </p>
         </Card>
-      ) : !error ? (
+      ) : visibleProposals.length > 0 ? (
         <div className="space-y-4">
           {visibleProposals.map((proposal) => (
             <ReviewerGroup
@@ -418,6 +428,7 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
               proposal={proposal}
               previewReadOnly={previewReadOnly}
               onRefresh={() => loadProposals(cycleCode, scope)}
+              degraded={Boolean(error)}
             />
           ))}
         </div>
