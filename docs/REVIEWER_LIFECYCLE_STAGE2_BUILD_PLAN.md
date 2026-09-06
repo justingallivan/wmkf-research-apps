@@ -78,6 +78,28 @@ No other file changes. No new map values. No server imports into the shared modu
 - Slice exit: retained reviewer selection (13 suites from the 6C plan) + full suite, `check:types`,
   lint, build, `git diff --check`, `check:dataverse-access-layer`.
 
+## Build and review record
+
+- **Build (Sonnet, 2026-09-05): `85aec404`** on `claude/reviewer-lifecycle-stage2`. Four files.
+  Builder-found deviation from this plan's citation: the adapter had **four** read sites of the old
+  sets, not two. The two `updateLifecycle` invitation-response guards use the row predicates; the
+  "refuse to leave a closed status" guard later in `updateLifecycle` and `softDelete`'s terminal
+  guard historically checked only `wmkf_reviewstatus` (never `wmkf_completedat`), so they consume
+  the closed set status-only to stay byte-identical. Six-suite selection 590 tests; full suite
+  774 / 11,372; types, lint 0 errors, build, `check:dataverse-access-layer`, `git diff --check`
+  green. Mutations (a)/(b)/(c) each red across 4–5 suites.
+- **Codex adversarial round 1 (`85aec404`): needs-attention.** (1) **High — `softDelete` ignores
+  `wmkf_completedat`, so a completion-stamped row with a non-terminal status can be removed and
+  its engagement fields cleared. Declined for Stage 2, recorded as a follow-up:** that is the
+  pre-existing behavior at `reviewer-suggestion.js` `softDelete` (main), and the refactor report
+  scopes Stage 2 to consolidating duplicated policy without behavior change. Tightening `softDelete`
+  is a real hardening candidate (select `wmkf_completedat`, gate with `isClosedEngagementRow`) with
+  a staff-visible effect (Remove refuses such rows) — owner decision, tracked in `SESSION_PROMPT.md`.
+  (2) **Medium — exported mutable Sets and a two-flavor API. Accepted:** make the Sets
+  module-private; export `isClosedEngagementStatus(status)` (status-only, for the two historical
+  status-only sites) alongside the two row predicates; the adapter's status-only sites call that
+  predicate instead of `.has()`. Add a test that the module exports no `Set` instance.
+
 ## Review checkpoints
 
 Opus: confirm the predicates are the only behavior source now (grep for the old set names →
