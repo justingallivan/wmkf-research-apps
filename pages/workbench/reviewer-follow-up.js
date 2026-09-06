@@ -14,7 +14,6 @@ import Layout, { Card, PageHeader } from '../../shared/components/Layout';
 import RequireAppAccess from '../../shared/components/RequireAppAccess';
 import ReviewerManagePanel from '../../shared/components/reviewers/ReviewerManagePanel';
 import EmailTemplatesModal from '../../shared/components/reviewers/EmailTemplatesModal';
-import WorkbenchViewsNav from '../../shared/components/workbench/WorkbenchViewsNav';
 import {
   filterReviewerFollowUpProposals,
   isOpenReviewer,
@@ -255,12 +254,6 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
         title="Reviewer follow-up"
         subtitle="A focused queue for requests that need reviewer action."
       />
-      <WorkbenchViewsNav
-        activeKey="reviewer-follow-up"
-        cycleCode={cycleCode}
-        counts={{ 'reviewer-follow-up': summary.attentionRequests }}
-      />
-
       {previewReadOnly && (
         <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-950" role="status">
           <span className="font-semibold">Preview is read-only.</span>{' '}
