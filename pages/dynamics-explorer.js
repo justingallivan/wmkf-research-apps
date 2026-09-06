@@ -108,12 +108,19 @@ function renderMarkdownText(text) {
 
 // ─── Example query chips ───
 
-const EXAMPLE_QUERIES = [
-  'How many proposals are there?',
-  'Show me the 10 most recent proposals',
-  'What tables are available?',
-  'What fields does akoya_request have?',
-  'Find emails related to proposal 1002386',
+const EXAMPLE_QUERY_GROUPS = [
+  {
+    label: 'Explore records',
+    queries: ['How many proposals are there?', 'Show me the 10 most recent proposals'],
+  },
+  {
+    label: 'Understand the data',
+    queries: ['What tables are available?', 'What fields does akoya_request have?'],
+  },
+  {
+    label: 'Find related information',
+    queries: ['Find emails related to proposal 1002386'],
+  },
 ];
 
 // ─── Main Page ───
@@ -665,15 +672,22 @@ function WelcomeMessage({ onExampleClick }) {
       <p className="text-gray-600 mb-6 max-w-md mx-auto">
         Ask questions about your CRM data in natural language. I'll query the Dynamics 365 system and present the results.
       </p>
-      <div className="flex flex-wrap justify-center gap-2 max-w-lg mx-auto">
-        {EXAMPLE_QUERIES.map((q, i) => (
-          <button
-            key={i}
-            onClick={() => onExampleClick(q)}
-            className="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-full transition-colors"
-          >
-            {q}
-          </button>
+      <div className="mx-auto max-w-2xl space-y-4 text-left">
+        {EXAMPLE_QUERY_GROUPS.map((group) => (
+          <div key={group.label}>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">{group.label}</p>
+            <div className="flex flex-wrap gap-2">
+              {group.queries.map((q) => (
+                <button
+                  key={q}
+                  onClick={() => onExampleClick(q)}
+                  className="rounded-full bg-gray-100 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                >
+                  {q}
+                </button>
+              ))}
+            </div>
+          </div>
         ))}
       </div>
     </div>
