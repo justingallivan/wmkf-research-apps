@@ -144,7 +144,7 @@ prerequisite rather than a Stage 5 helper.
   §7). Types/build not run by the reviewer; builder ran them.
 
 - **Corrections `c64bdd8c`** (rebased as `6a70890f` on `087d71d6`; PR #157): `lib/utils/etag.js`
-  `isConcreteEtag` (same regex as the four inline sites, which stay as a follow-up); `requireIfMatch`
+  `isConcreteEtag` (same regex as the four inline sites — consolidated onto the helper 2026-09-06, S490 — which at the time stayed as a follow-up); `requireIfMatch`
   uses it; negative cases for both ops + `tests/unit/etag.test.js`; third shim in
   `notification-trust-model-pushup.test.js`; shims wrapped in `jest.fn` with `toHaveBeenCalled` pins;
   mutation (c) now red at `reviewer-thankyou-sweep.test.js:135`. 11 suites / 399; full suite

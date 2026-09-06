@@ -24,7 +24,8 @@
  * reuses the proposal loaded here + the applicant exclude list and chains the
  * reviewer-finder endpoints (analyze → discover → enrich → save), so saved
  * candidates land in this request's pool alongside the applicant recommendations.
- * (`summaryPages`/PDF-upload are not used — the proposal is auto-loaded.)
+ * (PDF upload is not used — the proposal is auto-loaded; summary-page
+ * extraction was removed from analyze 2026-09-06.)
  *
  * Props:
  *   - requestId      : the akoya_request GUID (always present)

@@ -295,6 +295,14 @@ onboarding, the post-cycle reviewer-reminders ledger, invitation-link
 strictness, and broader reviewer cleanup retain their dependency, cycle, or
 owner gates. None is an implied next step.
 
+**Scheduled, not started (owner-directed 2026-09-06):** the automated
+materials-on-acceptance email. For the December 2026 cycle, review materials
+will be in hand at request time, and on acceptance plus onboarding the system
+will email the reviewer a link to the materials with no PD action. Today
+materials go out only through the PD-driven release modal. Plan first, build
+when the current campaigns settle, live before the first D26 acceptance;
+sequence and boundary in `docs/CURRENT_WORK_QUEUE.md` item 5.
+
 ---
 
 ## The Grant Cycle Redesign

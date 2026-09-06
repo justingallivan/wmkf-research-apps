@@ -10,9 +10,10 @@
  * `outputs/reviewer-activity-history-opus-review-2026-08-11.md` findings 3 and 11.
  *
  * Evidence tiers (finding 4). Several staff-side stamps are claimed BEFORE dispatch
- * and are not rolled back when the send fails — `reviewer-reminder-sweep.js:261-317`
- * and `reviewer-thankyou-sweep.js:86-139` claim-then-send, and invitation dispatch
- * can finish `unconfirmed` (`send-emails-service.js:747-800`). Those events are
+ * and are not rolled back when the send fails — `reviewer-reminder-sweep.js`
+ * `sendOneReminder` and `reviewer-thankyou-sweep.js` `sendOneThankYou` claim-then-send,
+ * and invitation dispatch in `send-emails-service.js` `sendEmails` can finish
+ * `email_unconfirmed`. Those events are
  * therefore labeled "recorded" and carry `deliveryProven: false`; the wording must
  * never assert that mail reached the reviewer. Reviewer-originated portal access is
  * proof of the thing it names. Response stamps are classified from the current

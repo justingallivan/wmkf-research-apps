@@ -5,7 +5,7 @@
  * (Reviewer Lifecycle Stage 3E correction round, Codex round 1 medium).
  *
  * Mocks the EXTRACTED module (`reviewer-engagement/expire-invitation`)
- * wholesale (real `isPastCutoff` via jest.requireActual, since the sweep's
+ * wholesale (`isPastCutoff` is unmocked — it lives in lib/utils/past-cutoff.js — since the sweep's
  * own discovery pass still calls it) and drives the legacy caller
  * (`sweepStaleInvites`) to pin: it calls `expireInvitation` once per
  * eligible row with exactly `{ suggestion, cutoffIso, nowIso,
@@ -20,7 +20,6 @@ const actualExpireInvitation = jest.requireActual('../../lib/services/reviewer-e
 const expireInvitation = jest.fn();
 jest.mock('../../lib/services/reviewer-engagement/expire-invitation.js', () => ({
   __esModule: true,
-  isPastCutoff: jest.requireActual('../../lib/services/reviewer-engagement/expire-invitation.js').isPastCutoff,
   expireInvitation: (...a) => expireInvitation(...a),
 }));
 
@@ -54,9 +53,9 @@ function candidateRow(id, requestId) {
 beforeEach(() => {
   jest.clearAllMocks();
   jest.useFakeTimers().setSystemTime(NOW);
-  // Sanity: the mocked module still surfaces the REAL isPastCutoff so the
-  // sweep's own discovery-pass filtering behaves exactly as before.
-  expect(typeof actualExpireInvitation.isPastCutoff).toBe('function');
+  // Sanity: isPastCutoff now lives in lib/utils/past-cutoff.js (unmocked), so
+  // the sweep's own discovery-pass filtering runs the real helper.
+  expect(typeof actualExpireInvitation.expireInvitation).toBe('function');
 });
 afterEach(() => {
   jest.useRealTimers();

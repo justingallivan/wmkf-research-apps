@@ -110,8 +110,8 @@ const CENSUS = [
   {
     name: 'reviewer-engagement/expire-invitation',
     // New in Stage 3E (expireInvitation, extracted from
-    // reviewer-suggestion-sweep.js). Only the sweep imports it — also
-    // importing back isPastCutoff for its own discovery-pass filtering.
+    // reviewer-suggestion-sweep.js). Only the sweep imports it (isPastCutoff
+    // moved to lib/utils/past-cutoff.js 2026-09-06).
     pattern: /reviewer-engagement\/expire-invitation/,
     expected: [
       'lib/services/reviewer-suggestion-sweep.js',

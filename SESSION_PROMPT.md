@@ -1,217 +1,187 @@
-# Session 490 Prompt: Owner Review of the Overnight Lifecycle Campaign
+# Session 491 Prompt: Merge the Session 490 Decision Stack, Then Plan Materials-on-Acceptance
 
-## Session 489 Summary
+## Session 490 Summary
 
-Under the owner's evening autonomy grant ("keep working on the next items in the queue
-(2-5, then 7)… I'll check on your progress in the morning"), the architect ran the
-plan → Sonnet build → Opus review → Codex adversarial (≤2 rounds) cycle on every remaining
-reviewer-lifecycle stage. Eighteen PRs merged to `main` overnight (seventeen lifecycle stages plus one gate-fix follow-up) (2026-09-06 PT); every
-elective and boundary stage of the lifecycle plan is now shipped. Production deployment
-of the final docs push is Ready (built 37s). **No browser smoke ran on any of tonight's
-merges**; 6D is the only user-visible contract change. This checkout is on `main`.
+The owner reviewed the overnight lifecycle campaign and resolved every open decision. Work
+landed as a **four-PR stack, unmerged at handoff**, each PR based on the one before it so the
+shared Stage 7 plan rows and this file never conflict. Merge in order; GitHub retargets each
+child to `main` as its parent merges. This checkout is on `claude/open-items-cycles-retry-hygiene`
+(the top of the stack); the handoff commit lands there by owner choice.
+
+| PR | Branch | Head | What |
+|---|---|---|---|
+| #170 | `claude/reviewer-lifecycle-d0-d3-tightenings` | `456d5029` | D0 taken (softDelete row-aware guard), D3 taken (repair op requires concrete ETag). All checks green incl. claude-review. |
+| #171 | `claude/retire-generate-emails-and-proposal-wide-patch` | `d1810a24` | D2: generate-emails route/service/prompt/`markInvitationGenerated`/`patchFields` alias retired. D4: proposal-wide my-candidates PATCH + `setRequestMetadata` removed. All checks green. |
+| #172 | `claude/acceptance-etag-d5-scripts-6d-decisions` | `06fe1253` | Accept/decline writes require a concrete ETag; D5: three raw-fetch one-offs archived + new LAW gate `check:script-suggestion-writers`; 6D-1 confirmed, 6D-2 parked. All checks green. |
+| #173 | `claude/open-items-cycles-retry-hygiene` | `9b60cea5` + handoff | Follow-up cycles-load retry fix; four inline ETag regexes → `isConcreteEtag`; `isPastCutoff` → `lib/utils/past-cutoff.js`; reviewer leftovers; summary-blob extraction + `wmkf_summarypages` mapping removed; queue item 5 documented. CI was still running at handoff. |
 
 ### What Was Completed
 
-1. **Reviewer follow-up refetch fix (PR #152 → `e9909e91`)** — host keeps last-known-good
-   proposals on a refetch failure and shows Retry.
-2. **Stage 6C (PR #153 → `3b2b34d5`)** — pure extraction of `ReleaseMaterialsModal.js`,
-   `TokenActionsMenu.js`, `ReviewReminderAction.js`, `reviewer-draft-keys.js` out of
-   `ReviewerManagePanel.js`; re-exports preserved and pinned.
-3. **Stage 6D (PR #159 → `6606cc30`)** — server-side draft fingerprint: render-emails
-   returns `draftFingerprint`; send-emails recomputes and skips `draft_stale` /
-   `draft_fingerprint_missing` per reviewer (new skip-reason VALUES, no new SSE event).
-   Uniform across all four template types (architect decision under the grant; both
-   reviewers recommended it). Select-honoring mocks + projection-divergence test added.
-4. **Stage 2 (PR #155 → `716bc558`)** — narrow shared engagement policy module.
-5. **Stage 3, all eleven slices** — commands extracted to `lib/services/reviewer-engagement/`
-   with delegation pins on every legacy caller: 3A closeout (#154 `b7a04cd6`), 3B terminal
-   transition (#156 `4e7c378c`), 3C status correction (#158 `1c24e56f`), 3D response
-   correction + neutral `errors.js` (#160 `081d558b`), 3E invitation expiry + post-send
-   bookkeeping + `lib/utils/etag.js` (#161 `01072571`), 3G reminder claim (#162 `ec74c0d4`),
-   3H deadline override (#163 `81fdac43`), 3I pending-invitation withdrawal (#164 `d47b07be`),
-   3F three invitation-record passthroughs (#165 `68198b2f`), 3J narrow
-   `deselectLegacyDeclinedSuggestion` op (#166 `3b8dca2b`), 3K whitelisted
-   `setRequestMetadata` replaces the picker's `bulkUpdateByRequest` (#167 `19955148`).
-6. **Stage 5 (PR #157 → `21cc221b`)** — narrow document-pointer and thank-you adapter ops.
-7. **Stage 7 (PR #168 → `790ba3a1`)** — new LAW-mode CI gate
-   `check:reviewer-engagement-boundary` (+ self-test, workflow step, CI reference rows,
-   `/start` list): generic writers `updateLifecycle`/`patchFields`/`patchReviewReceipt` from
-   the reviewer-suggestion adapter allowed only under `lib/services/reviewer-engagement/`,
-   the adapter itself, or a tracked `RECORDED_IMPORTERS` set (two receipt sinks) whose growth
-   is pinned by `tests/unit/reviewer-engagement-boundary-recorded-set.test.js`; AST fixpoint
-   resolves aliases, barrels, class-held adapters and dynamic imports; computed members fail
-   closed. `bulkUpdateByRequest` deleted (zero-reference pin). Named op
-   `expireInvitationResponse` added. Live census: 14 exempt bindings / 0 violations / 0 stale.
-8. **Docs reconciled after each merge** — Stage 3/5/6D/7 plans marked historical; readiness
-   audit rows 2, 3, 5, 6C, 6D, 7 COMPLETE; catalog entries for every new module; wiki topic
-   pages; security matrix rows for render/send-emails. All 33 gate/self-test pairs green on
-   final `main` (`e287a174`).
+1. **Owner decisions D0–D5 + 6D-1/6D-2 all resolved** (table below). D1 preserved by decision;
+   everything else taken, removed, confirmed or parked. Each taken item has a mutation-checked test.
+2. **Four idle worktrees removed** (`../WMKF_Apps-6c`, `-s2`, `-s3`, `-s4`), each verified clean and
+   ancestor-of-main first.
+3. **D2 investigation** [VERIFIED via `git grep` + `git log -S`]: the only client of
+   `/api/reviewer-finder/generate-emails` (`EmailGeneratorModal`) was deleted 2026-06-21 (`9114adeb`);
+   no page/component/script referenced the route since; the route never wrote `api_usage_log` and the
+   Vercel CLI exposes no historical request log, so runtime zero-hit is unverified (dashboard glance
+   optional before merging #171). The `email-reviewer.js` prompt had that route as its sole caller.
+4. **D4 investigation**: the proposal-wide PATCH served the standalone Reviewer Finder page's
+   per-proposal Program Area / Grant Cycle dropdowns, deleted 2026-06-16 (`94bbbce4`); the Workbench
+   never rebuilt them. Owner first chose (a) per-row results, then reversed to removal. **Explicit
+   capability drop:** no post-save correction path for `wmkf_grantcyclecode`/`wmkf_programarea` on
+   suggestion rows.
+5. **D5 gate census**: 13 `scripts/` writers recorded (five more than the Stage 7 plan's grep census —
+   alias resolution + fail-closed unresolved targets caught them); growth pinned by
+   `tests/unit/script-suggestion-writers-recorded-set.test.js`. Documented limit: raw POST creates
+   via fetch are not detected (every script's token call is a POST).
+6. **Acceptance-write tightening** (follow-on to D3, owner-approved): accept requires a concrete
+   `If-Match` checked BEFORE the acceptance job is enqueued; decline requires header or verifier-row
+   `_etag`; missing → 412 `concurrent_modification` (client already maps to "refresh and try again").
+   Consequence: a `/context` that returned `etag: null` now yields a reload prompt, not an unlocked write.
+7. **Summary blob chain removed (option a)**: `analyze` no longer extracts/uploads; `save-candidates`
+   no longer accepts `summaryBlobUrl`; `pdf-extractor.js` deleted; `wmkf_summarypages` no longer
+   selected/mapped/written/defaulted. The Workbench client never requested extraction, so no live
+   behavior changed. Dataverse attributes `wmkf_summarybloburl`/`wmkf_summarypages` and the drain-only
+   PG columns stay (schema drops are separate decisions).
+8. **Owner clarified the December 2026 flow** and it is documented as **work queue item 5**
+   (`docs/CURRENT_WORK_QUEUE.md`), in `docs/STRATEGY.md` current execution, the strategy wiki router,
+   and `project-accepted-awaiting-materials-is-transient`: materials in hand at request time; on
+   acceptance + onboarding the system AUTOMATICALLY emails the reviewer a materials link. Not built;
+   nothing in the acceptance job/drain sends materials today [VERIFIED]. Build when campaigns settle;
+   plan before D26 invitations; live before the first D26 acceptance.
+9. **Owner-run read-only probe** (scratchpad, not tracked): 0 rows in the accepted-awaiting-materials
+   state; 7 null-status accepted rows are May–July test residue. The probe's request lookups 400'd
+   because it selected `wmkf_grantcyclecode` on `akoya_requests` (column lives on the suggestion);
+   fix the select before any rerun.
 
-### Review-protocol deviation (read this)
+### Decisions table (final state)
 
-Stage 7's final correction (`4e471c94`: class-held, renamed CJS re-export and direct
-dynamic-import shapes) landed after the two-round Codex cap on the architect's own
-verification (gate + self-test green, scratch `--root` fixture tree with all three shapes
-reported as violations, five real-file false positives from the builder's first catch-all
-removed by narrowing rather than exemptions). A post-merge read-only Opus review of that
-commit ran at close and found one fail-open and one CI false-positive risk; both were fixed
-the same night with pinned fixtures (see the "Opus post-merge verdict" line at the end of this
-file and the Stage 7 plan). Stage 3K also hit the cap (round-2 masking finding resolved by
-the Stage 7B zero-reference pin instead of a third round).
+| # | Outcome | Where |
+|---|---|---|
+| D0 | TAKEN — `softDelete` selects `wmkf_completedat`, gates with `isClosedEngagementRow` | #170 |
+| D1 | PRESERVE — post-send invitation stamp stays unconditional (the fact recorded is "email left") | — |
+| D2 | RETIRED — route, service, prompt, generation mark, `patchFields` alias | #171 |
+| D3 | TAKEN — repair op requires concrete ETag; follow-on: accept/decline writes too | #170, #172 |
+| D4 | REMOVED — proposal-wide PATCH branch + `setRequestMetadata` (owner reversed from (a) on the orphan finding) | #171 |
+| D5 | TAKEN — archive executed one-offs, gate the rest (`check:script-suggestion-writers`) | #172 |
+| 6D-1 | CONFIRMED — uniform fingerprint enforcement | #172 (record) |
+| 6D-2 | PARKED — revisit only on an observed stale send | #172 (record) |
 
-### Commits (all on `main`)
-Merges: `e9909e91` #152, `3b2b34d5` #153, `b7a04cd6` #154, `716bc558` #155, `4e7c378c` #156,
-`21cc221b` #157, `1c24e56f` #158, `6606cc30` #159, `081d558b` #160, `01072571` #161,
-`ec74c0d4` #162, `81fdac43` #163, `d47b07be` #164, `68198b2f` #165, `3b8dca2b` #166,
-`19955148` #167, `790ba3a1` #168, `4d777aad` #169 (gate fixes after the post-merge Opus review). Docs: `e287a174` (Stage 7 promotion record) and the
-per-stage "Record the … promotion" commits between merges. Session handoff commit: `git log`.
+### Commits (this session, all on the stack; `git log --oneline main..claude/open-items-cycles-retry-hygiene`)
+`2a7c9397` D0+D3 · `456d5029` D0/D3 restatements · `7fe51c53` D2 · `d1810a24` D4 · `582f0f6a`
+accept/decline ETag + 6D records · `06fe1253` D5 archive + gate · `06bab592` cycles retry ·
+`adad6107` ETag consolidation + leftovers · `c8f95dcb` #151 check + blob decision · `c4e83b84`
+summary-blob extraction removed · `2531d2bc` `wmkf_summarypages` dropped from service · `268c19ef`
+materials-on-acceptance clarification · `9b60cea5` queue item 5 · handoff: `git log -1`.
 
 ## Next Items
 
-### Owner Decision Needed (the morning ask)
-
-Every tightening below was found during the campaign and deliberately NOT taken: each
-changes what staff see or what a failure does. Current behavior is preserved
-behavior-for-behavior. Evidence for D1–D5: `docs/REVIEWER_LIFECYCLE_STAGE7_BUILD_PLAN.md`
-decisions table; D0: Stage 2 plan build record; 6D items: Stage 6D plan.
-
-| # | Where | Current behavior | Tightening available | Staff-visible effect if tightened |
-|---|---|---|---|---|
-| D0 | `reviewer-suggestion.js` `softDelete` | **TAKEN S490 (branch `claude/reviewer-lifecycle-d0-d3-tightenings`)**: selects `wmkf_completedat`, gates with `isClosedEngagementRow` | — | Remove refuses completion-stamped rows (legacy/hand-edited data only) |
-| D1 | send-emails post-send invitation stamp | **PRESERVE (decided S490)**: unconditional write, no `ifMatch`; failure → `inviteRecorded:false` | — | n/a |
-| D2 | generate-emails draft generation mark | **RETIRED S490 (route + service + `email-reviewer.js` prompt + `markInvitationGenerated` + `patchFields` alias deleted; branch `claude/retire-generate-emails-and-proposal-wide-patch`, stacked on the D0/D3 branch).** Only client ever was deleted 2026-06-21; runtime zero-hit unverified (no CLI request log). | — | none in-app |
-| D3 | respond-service legacy-decline repair + (follow-on, S490) the accept/decline response writes | **TAKEN S490**: repair op requires a concrete ETag (PR #170); accept/decline writes require one too — accept checked before the acceptance job is enqueued, decline falls back to the verifier row `_etag` (branch `claude/acceptance-etag-d5-scripts-6d-decisions`) | — | a reviewer whose `/context` returned `etag: null` now gets "refresh and try again" instead of an unlocked write |
-| D4 | proposal-wide my-candidates PATCH (`setRequestMetadata`) | **REMOVED S490 (same branch as D2).** Only client was the standalone page's per-proposal dropdowns, deleted 2026-06-16. `proposalId`-only PATCH is now a plain 400. Capability drop: no post-save correction path for cycle/program area on suggestion rows. | — | none |
-| D5 | scripts writing `wmkf_appreviewersuggestions` raw | **TAKEN S490 (branch `claude/acceptance-etag-d5-scripts-6d-decisions`, stacked on the D2/D4 branch)**: three executed raw-fetch one-offs archived to `_archived/scripts/`; new LAW gate `check:script-suggestion-writers` records the remaining 13 writers with a pinned recorded set | — | none at runtime |
-| 6D-1 | send-emails fingerprint enforcement | **CONFIRMED S490**: uniform across all four template types | — | none |
-| 6D-2 | 6D accepted limits | **PARKED S490**: batch-start hydration and Admin template drift stay outside the fingerprint; revisit only on an observed stale send | — | none |
-
-**Expected first-morning behavior:** any PD whose preview was rendered before the 6D deploy
-sees `draft_fingerprint_missing` on send and must re-render. By design; say so before a
-colleague reports it.
-
 ### Verified Open
 
-1. **Four inline concrete-ETag regexes remain** alongside `lib/utils/etag.js`
-   `isConcreteEtag`: the adapter (imports the util but keeps one literal), `correct-response.js`,
-   `expire-invitation.js`, `record-email-outcome.js`. Consolidation is mechanical; not done to
-   keep slices behavior-preserving. Evidence: `grep -rln 'W\\/)?"\[' lib/ pages/ shared/`.
-2. **Small leftovers flagged by reviewers:** `isPastCutoff` lives in a command module
-   (`expire-invitation.js`) rather than a util; `[my-candidates]` log prefix is emitted from
-   `reviewer-engagement/`; `SUGGESTION_SET` exported but unused in the reminder sweep; stale
-   line refs at `reviewer-activity-history.js:15` and `grant-request.js:169` (A6). Evidence:
-   Stage 3/7 plan review records.
-3. **Reviewer-follow-up cycles-load failure** (pre-existing, out of #152's scope): sets
-   `error` while `cycleCode` is empty, so the banner has no Try again and the proposals
-   effect never runs. Evidence: `docs/plans/REVIEWER_FOLLOW_UP_REFETCH_RESILIENCE_2026-09-05.md`.
-4. **Wiki coverage of Codex's UI changes (PR #151)** — still unchecked. Evidence:
-   `git diff --stat 600cc972..3fc0a936`.
-5. **Production smoke** of 6B release-materials modal (needs an accepted reviewer) and of
-   any 6D send. Not run.
+1. **Merge the stack in order: #170 → #171 → #172 → #173.** Evidence: `gh pr checks <n>`; #170–#172
+   were fully green at handoff, #173 CI was running after the last push. Each child retargets to
+   `main` automatically. After #173 merges: confirm the Production deployment is Ready (`vercel inspect`,
+   not a `vercel ls` grep), delete the four branches, and **add the DEVELOPMENT_LOG.md entry** — this
+   session deliberately did not write one because nothing has reached `main`/Production yet (see
+   Milestone Determination). Then re-run `/start` gates on `main`.
+2. **Plan the automated materials-on-acceptance email (queue item 5).** Evidence:
+   `docs/CURRENT_WORK_QUEUE.md` item 5 lists the design questions (precondition the drain can verify,
+   accept-before-materials, idempotency across drain retries, PD visibility/override, manual modal as
+   fallback). Plan-first; `/contract-reconcile` triggers apply. Timing: when campaigns settle, before
+   D26 invitations go out.
+3. **6D fingerprint smoke at the first D26 invitation batch.** Evidence: invitations are fingerprinted
+   (6D-1 confirmed); no acceptance needed. Render → change a proposal detail in CRM → send → observe
+   `draft_stale` skip → re-render → send. Write the PD checklist beforehand.
+4. **Release-materials modal smoke** only if item 2 does not ship before the first D26 acceptance.
+   Evidence: `project-accepted-awaiting-materials-is-transient`.
+
+### Owner Decision Needed
+
+1. **Dataverse attribute drops**: `wmkf_appreviewersuggestion.wmkf_summarybloburl` and
+   `wmkf_appgrantcycle.wmkf_summarypages` are deployed but unused (both Atlas pages say so). Dropping
+   is a schema change with its own pre-flight; historical values exist. Not urgent.
+2. **Runtime zero-hit for generate-emails** (before merging #171, optional): a glance at the Vercel
+   dashboard request logs for `/api/reviewer-finder/generate-emails`. Code evidence is decisive for
+   in-app use; this is the one signal not obtainable from the CLI.
 
 ### Parked
 
-- Stage 4 of the lifecycle plan (readiness audit: optional, benefit not established).
-- Progress-pill alignment/chronology, Ops eligibility view, automatic reviewer reminders
-  (gate-protected hold), one-click PDF conversion. Not re-probed.
+- 6D-2 fingerprint coverage extension (batch-start hydration, Admin template drift) — reopen only on
+  an observed stale send.
+- Stage 4 of the lifecycle plan; progress-pill alignment/chronology; Ops eligibility view; automatic
+  reviewer reminders (gate-protected hold); one-click PDF conversion. Not re-probed.
 - Five stale one-off Preview callbacks in the Entra app registration. Owner cleanup.
 
 ### Verify Before Acting
 
-1. **Four idle worktrees exist**, all detached and clean: `../WMKF_Apps-6c` (`790ba3a1`),
-   `-s2` (`19955148`), `-s3` (`68198b2f`), `-s4` (`d47b07be`; created tonight with its own
-   `npm ci`, `.env.local` and `.agents/skills` symlinks). Left for the owner; remove with
-   `git worktree remove <path>` when convenient. All feature branches are deleted locally and
-   on origin.
-2. **Two stashes** (`stash@{0}` on main, `stash@{1}` on
-   `codex/reviewer-promotion-remediation`, July 2026 reports) predate this work; untouched.
-3. **`gh pr merge` worked from this session** for all 17 PRs (the classifier that blocked
-   it in S488 did not fire). Merges still require all checks green.
-4. **Codex adversarial review from a worktree:** always instruct the three-dot diff
-   `main...HEAD` and rebase first, or Codex reviews a two-dot artifact. Codex's sandbox never
-   ran Jest or created fixtures; all test evidence tonight is builder/Opus/architect.
-5. **Local browser smoke:** Claude-in-Chrome could not reach localhost from this machine
-   (S488); unchanged.
+1. **Two stashes** (`stash@{0}` on main, `stash@{1}` on `codex/reviewer-promotion-remediation`, July
+   2026 reports) predate this work; untouched.
+2. **Both recorded-set pins are LAW**: growing `RECORDED_IMPORTERS` (boundary gate) or
+   `RECORDED_SCRIPT_WRITERS` (scripts gate) requires editing the matching
+   `tests/unit/*-recorded-set.test.js` in the same PR; stale entries fail the gate itself.
+3. **`bulkUpdateByRequest` removal pin** (`tests/unit/reviewer-suggestion-bulk-update-importers.test.js`)
+   now carves out three gate scripts by name; a new file naming the identifier anywhere in
+   lib/pages/shared/modules/scripts still fails.
+4. **Merge-conflict hazard**: every stacked PR edits `SESSION_PROMPT.md` and the Stage 7 plan. Merge in
+   order; do not cherry-pick a child ahead of its parent.
+5. **Probe select bug** (item 9 above) before rerunning the scratchpad probe; and production Dataverse
+   reads remain owner-run only (`feedback-never-self-authorize-prod-dataverse-reads`).
 
 ### Do Not Reopen Without New Decision
 
-Automatic Complete from thank-you; writing the Operations/Finance final remit flag from
-this application; BILL API reviewer onboarding. No new schema, live lifecycle mutation,
-email send, cron invocation or backfill is authorized. Accepted-awaiting-materials is
-transient (no dashboard change; release-modal smoke deferred to first real acceptance).
-D26 hide of Initial Assessments is intended. Stage 4 skipped per audit. The owner chose to
-promote 6B without a browser smoke.
+Automatic Complete from thank-you; Operations/Finance final remit flag from this application; BILL
+API reviewer onboarding. No new schema, live lifecycle mutation, email send, cron invocation or
+backfill is authorized. D1 stays unconditional by owner decision. D4's capability drop (no post-save
+cycle/program-area correction) is accepted. D26 hide of Initial Assessments is intended.
 
 ## Preserve These Contracts
 
-- Shipped status ownership: synchronous per-reviewer mutex within one mounted panel,
-  permanent invalidation, matching-token cleanup, 6A outcome parsing.
-- Materials modal session identity = isOpen + requestId + `membershipKeyFor` +
-  signature/reviewDueDate + `proposalKeyFor`, by VALUE (now in `reviewer-draft-keys.js`).
-- `ReviewersTab` passes `degraded={Boolean(error)}`; `reviewers-tab-stale-request.test.js` pins it.
-- Send transmits the previewed body verbatim; the server recomputes only the draft
-  fingerprint and the destination address (6D). `draft_stale` / `draft_fingerprint_missing`
-  are skip-reason values, not new SSE events.
-- Every extracted command is invoked by its legacy caller with the same args and every
-  outcome mapped; the delegation-pin suites make an inline reimplementation red.
-- `check:reviewer-engagement-boundary` is LAW: a new importer of a generic writer outside
-  `lib/services/reviewer-engagement/` fails CI; growing `RECORDED_IMPORTERS` requires editing
-  the tracked recorded-set pin test in the same PR.
-
-## Orchestration Lessons (one line each)
-
-- Census-table rows in a shared plan conflict on every rebase; append at the end and keep
-  all rows when resolving.
-- Add the delegation-pin rule to the plan before slice one, not after a reviewer asks (3E).
-- A "gate turns red when X grows" claim needs a tracked pin test, not a script constant.
-- Builder catch-alls false-positive on real code (`adapter.CONST[key]`, `.findById().catch`);
-  narrow the rule, never add exemptions.
-- Sequence worktrees so parallel builders never share a file; rebase stacked branches after
-  each merge and relaunch CI watchers after every force-push.
+- Every taken decision has a mutation-checked test; reverting the guard turns a named test red
+  (D0: `reviewer-suggestion-disposition`; D3: `reviewer-suggestion-deselect-legacy-declined`;
+  accept/decline ETag: `external-review-services` + `external-review-routes`; cycles retry:
+  `reviewer-follow-up`).
+- `isConcreteEtag` (`lib/utils/etag.js`) is the single concrete-ETag rule; no inline copies remain.
+- `check:reviewer-engagement-boundary` and `check:script-suggestion-writers` are both LAW with pinned
+  recorded sets.
+- Send transmits the previewed body verbatim; the server recomputes only the fingerprint and
+  destination (6D, uniform across all four template types).
+- Materials modal session identity by VALUE (`reviewer-draft-keys.js`); `ReviewersTab` passes
+  `degraded={Boolean(error)}`.
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `docs/REVIEWER_LIFECYCLE_STAGE7_BUILD_PLAN.md` | 18-site census, D0–D5 decisions, gate shape, all review records |
-| `docs/REVIEWER_LIFECYCLE_STAGE3_BUILD_PLAN.md` | 3A–3K records; delegation-pin rule |
-| `docs/REVIEWER_LIFECYCLE_STAGE6D_BUILD_PLAN.md` | fingerprint contract, uniform-enforcement decision, accepted limits |
-| `docs/audits/REVIEWER_LIFECYCLE_REMAINING_READINESS_2026-09-05.md` | every row COMPLETE except optional Stage 4 |
-| `lib/services/reviewer-engagement/` | extracted commands (close-review, terminal-transition, correct-status, correct-response, expire-invitation, record-email-outcome, claim-reminder, change-review-deadline, withdraw-pending-invitation, record-invitation, errors) |
-| `scripts/check-reviewer-engagement-boundary.js` | Stage 7 LAW gate; `RECORDED_IMPORTERS` |
-| `tests/unit/reviewer-engagement-boundary-recorded-set.test.js` | tracked pin on the recorded set |
-| `lib/dataverse/adapters/reviewer-suggestion.js` | named ops incl. `setRequestMetadata`, `deselectLegacyDeclinedSuggestion`, `expireInvitationResponse` |
-| `shared/components/reviewers/ReleaseMaterialsModal.js` | 6C-extracted modal carrying the 6D `draftFingerprint` |
-| `.claude-memory/project-reviewer-lifecycle-autonomy-directive-2026-09-05.md` | the grant and its completion |
+| `docs/REVIEWER_LIFECYCLE_STAGE7_BUILD_PLAN.md` | D0–D5 decisions table with final outcomes and evidence |
+| `docs/CURRENT_WORK_QUEUE.md` | item 5: automated materials-on-acceptance email (plan-first) |
+| `scripts/check-script-suggestion-writers.js` | D5 LAW gate; `RECORDED_SCRIPT_WRITERS` (13) |
+| `tests/unit/script-suggestion-writers-recorded-set.test.js` | growth pin for the recorded set |
+| `lib/services/external-review/respond-service.js` | accept/decline ETag requirement |
+| `lib/dataverse/adapters/reviewer-suggestion.js` | D0 guard, D3 op; `setRequestMetadata` + `patchFields` gone |
+| `pages/workbench/reviewer-follow-up.js` | retryable `loadCycles` |
+| `lib/utils/past-cutoff.js` | `isPastCutoff` (moved from expire-invitation) |
+| `_archived/scripts/` + `_archived/README.md` | the three archived raw-fetch scripts with execution evidence |
+| `.claude-memory/project-accepted-awaiting-materials-is-transient.md` | December-cycle flow clarification |
 
 ## Testing
 
 ```sh
-# Stage 7 gate pair (sequential)
-npm run check:reviewer-engagement-boundary && npm run check:reviewer-engagement-boundary:self-test
-node scripts/check-reviewer-engagement-boundary.js --report
-# Delegation pins + boundary pins
-npm test -- --runInBand --watch=false --testPathPattern 'reviewer-engagement|reviewer-suggestion-(bulk-update|receipt)|draft-fingerprint|send-emails-fingerprint'
-# Slice exit
+# New gate pair (sequential) + census
+npm run check:script-suggestion-writers && npm run check:script-suggestion-writers:self-test
+node scripts/check-script-suggestion-writers.js --report
+# Decision pins
+npm test -- --runInBand --watch=false --testPathPattern 'reviewer-suggestion-disposition|deselect-legacy-declined|external-review-(services|routes)|reviewer-follow-up|script-suggestion-writers|my-candidates'
+# Branch exit (all green at handoff on 9b60cea5)
 npm test -- --runInBand --watch=false && npm run check:types && npm run lint && npm run build -- --webpack && git diff --check
 ```
 
 ## Handoff and Milestone Determination
 
-Production cutover shipped: the full reviewer-lifecycle elective and boundary program
-(Stages 2, 3, 5, 6C, 6D, 7) is live with a new CI gate and a deleted adapter export.
-**A DEVELOPMENT_LOG.md entry was added (Session 489).** A new `check:*` gate was added to
-CI, the `/start` list and `docs/CI_GATES_REFERENCE.md`; no CLAUDE.md, schema or environment
-change. The claim-evidence pilot report recorded one eligible advisory (count shape on the
-Stage 7 plan) and one observation row was added to the pilot directive.
-
-**Opus post-merge verdict on `4e471c94`:** DEFECT + 4 advisories, none affecting the real
-tree (gate green, 0 false positives on the 75 live adapter usages, 0.6s). Fixed the same night
-in PR #169 (`4d777aad`, all checks green), recorded in the Stage 7 plan's "Post-merge Opus review" section: (D1
-fail-open) `const a = this.adapter; a.updateLifecycle()` and `helper(this.adapter).writer()`
-bypassed the class-field handling; (A1, CI false-positive risk) `(await import(p)).anything`
-hard-failed the gate on unrelated code; (A2) inline `require('<adapter>').findById` was a
-violation while its `import()` twin was green; (A3) `this.<field>` key is file-scoped, now
-documented as a closed over-approximation; CI reference rows had not been updated for the
-second correction round. Each fix has a self-test fixture; the old gate fails the new
-self-test.
+**No DEVELOPMENT_LOG.md entry this session.** Everything shipped is on four unmerged PRs; nothing
+reached `main` or Production. The retirement of the generate-emails route, the D4 capability drop,
+and the new `check:script-suggestion-writers` gate ARE milestone-worthy — write the entry in Session
+491 once the stack merges and the deployment is Ready. No CLAUDE.md, schema or environment change.
+A new `check:*` gate was added to CI, the `/start` list and `docs/CI_GATES_REFERENCE.md`. The
+claim-evidence pilot report recorded no eligible plan/design edit for this session; no observation
+row added.

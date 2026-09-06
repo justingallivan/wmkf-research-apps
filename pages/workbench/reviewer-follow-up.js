@@ -173,31 +173,41 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
   const requestIdRef = useRef(0);
   const lastLoadedParamsRef = useRef(null);
 
-  useEffect(() => {
-    let active = true;
-    (async () => {
-      try {
-        const response = await fetch('/api/workbench/dashboard');
-        const body = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(body.error || `Failed to load cycles (${response.status})`);
-        if (!active) return;
-        const availableCycles = body.cycles || [];
-        const requestedCycle = new URLSearchParams(window.location.search)
-          .get('cycleCode')?.trim().toUpperCase();
-        setCycles(availableCycles);
-        setCycleCode(
-          availableCycles.some((cycle) => cycle.code === requestedCycle)
-            ? requestedCycle
-            : body.defaultCycleCode || availableCycles[0]?.code || '',
-        );
-      } catch (loadError) {
-        if (active) setError(loadError.message);
-      } finally {
-        if (active) setLoadingCycles(false);
-      }
-    })();
-    return () => { active = false; };
+  // Cycles load is retryable on its own: a failure here leaves `cycleCode`
+  // empty, so the proposals effect never runs and the proposals Retry (which
+  // needs a cycle) cannot help. The banner's Try again calls this instead in
+  // that state (S490 fix; recorded pre-existing in the 6B3d refetch plan).
+  const activeCyclesLoadRef = useRef(0);
+  const loadCycles = useCallback(async () => {
+    const token = activeCyclesLoadRef.current + 1;
+    activeCyclesLoadRef.current = token;
+    setLoadingCycles(true);
+    try {
+      const response = await fetch('/api/workbench/dashboard');
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error || `Failed to load cycles (${response.status})`);
+      if (activeCyclesLoadRef.current !== token) return;
+      const availableCycles = body.cycles || [];
+      const requestedCycle = new URLSearchParams(window.location.search)
+        .get('cycleCode')?.trim().toUpperCase();
+      setCycles(availableCycles);
+      setError(null);
+      setCycleCode(
+        availableCycles.some((cycle) => cycle.code === requestedCycle)
+          ? requestedCycle
+          : body.defaultCycleCode || availableCycles[0]?.code || '',
+      );
+    } catch (loadError) {
+      if (activeCyclesLoadRef.current === token) setError(loadError.message);
+    } finally {
+      if (activeCyclesLoadRef.current === token) setLoadingCycles(false);
+    }
   }, []);
+
+  useEffect(() => {
+    void loadCycles();
+    return () => { activeCyclesLoadRef.current += 1; };
+  }, [loadCycles]);
 
   const loadProposals = useCallback(async (selectedCycle, selectedScope) => {
     if (!selectedCycle) return;
@@ -400,7 +410,7 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
               <p className="mt-1">{error}</p>
             </>
           )}
-          {cycleCode && (
+          {cycleCode ? (
             <button
               type="button"
               onClick={() => void loadProposals(cycleCode, scope)}
@@ -408,6 +418,15 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
               className="mt-3 min-h-10 rounded-lg bg-gray-900 px-3 py-2 font-semibold text-white hover:bg-gray-800 disabled:opacity-50"
             >
               {loadingProposals ? 'Retrying…' : 'Try again'}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => void loadCycles()}
+              disabled={loadingCycles}
+              className="mt-3 min-h-10 rounded-lg bg-gray-900 px-3 py-2 font-semibold text-white hover:bg-gray-800 disabled:opacity-50"
+            >
+              {loadingCycles ? 'Retrying…' : 'Try again'}
             </button>
           )}
         </div>
