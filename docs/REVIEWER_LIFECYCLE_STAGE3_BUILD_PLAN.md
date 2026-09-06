@@ -153,6 +153,31 @@ builders on that file concurrently.
   `c73bf12e`). PR #158 merged `1c24e56f` (2026-09-06, seven checks green). Codex round 2 not spent: both round-1 findings were documentation
   fixes verified directly by the architect (catalog on main, header in the branch).
 
+## 3D build and review record
+
+- **Build (Sonnet, 2026-09-06 UTC): `49080321` + `08617c6a`** on `claude/reviewer-lifecycle-stage3d`
+  (cut from main `21cc221b`, fast-forwarded to `e31ae434`). The `if (hasLifecycle)` body (main
+  `my-candidates-service.js:674–731`) moved to `reviewer-engagement/correct-response.js:64–121` as
+  `correctResponse({ suggestionId, lifecycle, authorizedRequestId, actingUserSystemId })`, verified
+  byte-identical by `sed`+`diff` after the 6→2-space dedent; `correctionError` (all 11 call sites
+  were inside the block) and `MyCandidatesError` moved with it, the class re-exported from the old
+  file. Unused imports removed from the old service. Census rows: importers of the old service =
+  the `my-candidates` route only; importers of `correct-response` = the old service only. New
+  suites `correct-response.test.js` (23, incl. a deferred-promise write-before-token ordering proof)
+  and `reviewer-engagement-correct-response-paths.test.js` (3). Zero existing test edits (Jest
+  resolves mocks by absolute path). Full suite 783 / 11,468; types, lint 0 errors,
+  `check:route-service-boundary`, `check:dataverse-access-layer`, `check:trust-boundary-guid` (+
+  self-tests), build, `git diff --check` green. Mutations: faithful inline reimplementation → paths
+  delegation test red; `ensureToken` before `updateLifecycle` → ordering test red; drop `ifMatch` →
+  args test red.
+- **Codex adversarial round 1 (`08617c6a`): needs-attention, one medium, accepted.** Moving
+  `MyCandidatesError` into the command module makes the whole finder service (GET, manual invite,
+  restore, person edits) import `correct-response.js` — and through it the adapters and token
+  lifecycle — just to obtain its error class, inverting the boundary the earlier slices protected.
+  Correction: give the class a neutral leaf owner (`lib/services/reviewer-engagement/errors.js`,
+  imports nothing from services) imported by both files; the old file keeps its re-export; the paths
+  test pins identity across all three. Opus review pending at the time of this entry.
+
 ## Rules for every slice
 
 Move verbatim; wrappers re-export the same objects (no re-wrapping that breaks `instanceof`); no
