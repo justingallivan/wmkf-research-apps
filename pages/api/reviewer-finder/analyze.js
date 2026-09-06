@@ -135,12 +135,13 @@ export default async function handler(req, res) {
             // Upload extracted pages to Vercel Blob
             const timestamp = Date.now();
             summaryFilename = `summary_${timestamp}.pdf`;
-            // Public access: the generate-emails flow fetches the URL via raw
-            // HTTP to attach the summary PDF to outreach emails, and W5 step 3
+            // Public access: historically the generate-emails flow fetched the
+            // URL via raw HTTP to attach the summary PDF, and W5 step 3
             // (2026-05-12) wired save-candidates to persist `summaryBlobUrl` to
-            // Dataverse `wmkf_summarybloburl` so generate-emails can read it
-            // per-candidate. Private blobs would 401 against the unauthenticated
-            // fetch path used there.
+            // Dataverse `wmkf_summarybloburl` for it. That route was retired
+            // 2026-09-06 (owner decision D2); the live send path does not read
+            // this column. Whether this blob can move to private access is a
+            // recorded follow-up — not changed here.
             const blob = await put(summaryFilename, extraction.buffer, {
               access: 'public',
               contentType: 'application/pdf'

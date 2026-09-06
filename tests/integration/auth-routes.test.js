@@ -85,9 +85,6 @@ jest.mock('../../lib/utils/email-generator', () => ({
 }));
 
 // Email personalization prompt
-jest.mock('../../shared/config/prompts/email-reviewer', () => ({
-  createPersonalizationPrompt: jest.fn(() => 'test prompt'),
-}));
 
 // Safe fetch
 jest.mock('../../lib/utils/safe-fetch', () => ({
@@ -168,13 +165,6 @@ const routeSpecs = [
     appKey: 'reviewer-finder',
     method: 'POST',
     body: { text: 'test proposal' },
-  },
-  {
-    name: '/api/reviewer-finder/generate-emails',
-    importPath: '../../pages/api/reviewer-finder/generate-emails',
-    appKey: 'reviewer-finder',
-    method: 'POST',
-    body: { candidates: [], template: { subject: 's', body: 'b' }, settings: { senderEmail: 'a@b.com' } },
   },
   {
     name: '/api/review-manager/send-emails',

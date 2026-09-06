@@ -64,7 +64,7 @@ written by an external reviewer/staff; `U-EXT` = external API result;
 | 19 | `/api/phase-i-dynamics/summarize` (**legacy**) | direct summarization (`summarize.js:173`) | U-FILE / U-SP report | No | **direct writeback to `akoya_request.wmkf_ai_summary`** |
 | 20 | `lib/services/execute-prompt.js` (Executor) | `executePrompt()` — interpolates caller vars into **both system and user** bodies (`:382`); prompt text lives in **Dataverse** `wmkf_ai_prompts`, seeded by scripts | caller-supplied | No tagging primitive | required-key check only (`:447`,`:525`) — persists arbitrary values |
 | 21 | `lib/services/contact-enrichment-service.js` | direct Anthropic web-search call (`:565`); prompt is **service-local** (`:592`) | U-EXT candidate name/affiliation | No | `JSON.parse` |
-| 22 | `/api/reviewer-finder/generate-emails` | `email-reviewer.js:16` prompt — candidate data, **prior LLM reasoning**, proposal info, email body all sent to Claude (`generate-emails.js:520`) | U-FILE + U-EXT + re-fed LLM output | No | raw email body |
+| 22 | ~~`/api/reviewer-finder/generate-emails`~~ **RETIRED 2026-09-06 (owner decision D2)** — route, `email-reviewer.js` prompt, and gate surface `reviewer-finder-emails` deleted; row kept for inventory continuity | — | — | — | — |
 | 23 | `/api/dynamics-explorer/chat` — **AI export pass** | batch export AI processing (`chat.js:1786`); re-feeds CRM records + user instruction; **prompt is route-local** (`chat.js:1787`) | U-EXT/CRM records + U-FORM instruction | No | `JSON.parse` (arbitrary) |
 | 24 | `/api/cron/log-analysis` | `cron/log-analysis` | log text (internal, lower risk) | No | internal |
 

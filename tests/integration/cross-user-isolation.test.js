@@ -1,21 +1,10 @@
 /**
  * Cross-user data isolation tests.
  *
- * Two routes, the same post-cutover isolation model: both are now fully
- * Dataverse-backed, so the original Postgres "user_profile_id filter" property
- * no longer exists for either.
- *
- * - /api/reviewer-finder/generate-emails — Dataverse-backed: proposal info is
- *   looked up via the suggestion adapter (`findById`) + `DynamicsService`, and
- *   markAsSent persists through `DynamicsService.updateRecord` on the
- *   request-scoped `wmkf_appreviewersuggestion` record (NOT a per-user Postgres
- *   row). There is no per-user scoping at this layer — suggestions are
- *   request-scoped and any reviewer-finder staff may act on them (same model as
- *   send-emails below). The meaningful property is therefore that the write
- *   targets the Dataverse suggestion by id, with no client-supplied
- *   `user_profile_id` path — which is what we assert. (The stale pre-cutover
- *   assertion — "User B's user_profile_id-filtered query returns no rows" —
- *   was removed: that Postgres path no longer exists, so it asserted nothing.)
+ * One route (post-cutover isolation model, fully Dataverse-backed, so the
+ * original Postgres "user_profile_id filter" property no longer exists).
+ * The generate-emails block that used to sit alongside it was removed with
+ * that route on 2026-09-06 (owner decision D2).
  *
  * - /api/review-manager/send-emails — fully Dataverse-backed since Session 118.
  *   Reviewer data is fetched via the suggestion adapter (`findById`), which
@@ -80,9 +69,6 @@ jest.mock('../../lib/utils/email-generator', () => ({
   createFilename: jest.fn((name) => `${name}.eml`),
 }));
 
-jest.mock('../../shared/config/prompts/email-reviewer', () => ({
-  createPersonalizationPrompt: jest.fn(() => 'test prompt'),
-}));
 
 jest.mock('../../lib/utils/safe-fetch', () => ({
   safeFetch: jest.fn(() => Promise.resolve({ ok: true, arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)) })),
@@ -104,7 +90,7 @@ jest.mock('../../lib/external/token-lifecycle', () => ({
 // ---------------------------------------------------------------------------
 const USER_A_PROFILE = 1;
 const USER_B_PROFILE = 2;
-// generate-emails / send-emails GUID-validate each candidate suggestionId before
+// send-emails GUID-validates each candidate suggestionId before
 // it reaches a record-id selector (S259 trust-boundary hardening), so this must
 // be GUID-shaped or the route 400s before the isolation logic under test runs.
 const SUGGESTION_OWNED_BY_A = '33333333-3333-4333-8333-333333333333';
@@ -161,100 +147,5 @@ describe('/api/review-manager/send-emails cross-user isolation', () => {
     expect(res._data).toMatchObject({
       error: expect.stringMatching(/sender email/i),
     });
-  });
-});
-
-// ---------------------------------------------------------------------------
-// /api/reviewer-finder/generate-emails — cross-user isolation
-// ---------------------------------------------------------------------------
-describe('/api/reviewer-finder/generate-emails cross-user isolation', () => {
-  let handler;
-  // Dataverse-layer spies. The route reads/writes Dataverse, not Postgres, so the
-  // isolation property is asserted on these — not on a (now non-existent) sql path.
-  // resetModules + doMock gives this block its OWN dynamics-service mock shape,
-  // distinct from the send-emails block above (which doMocks a different shape).
-  let findById;
-  let getRecord;
-  let updateRecord;
-
-  beforeAll(async () => {
-    jest.resetModules();
-    // resetModules drops the top-level mocks for this block's re-import, so
-    // re-establish the baseConfig no-op (the route calls loadModelOverrides at
-    // entry — without this it runs the real model resolver and logs noise).
-    jest.doMock('../../shared/config/baseConfig', () => ({
-      BASE_CONFIG: { ERROR_MESSAGES: {} },
-      getModelForApp: jest.fn(() => 'claude-sonnet-4-20250514'),
-      getFallbackModelForApp: jest.fn(() => 'claude-haiku-4-5-20251001'),
-      loadModelOverrides: jest.fn(() => Promise.resolve()),
-      _setModelResolver: jest.fn(),
-      _setOverridesCache: jest.fn(),
-      _shouldReloadOverrides: jest.fn(() => false),
-      clearModelOverridesCache: jest.fn(),
-    }));
-    findById = jest.fn(async () => ({
-      wmkf_appreviewersuggestionid: SUGGESTION_OWNED_BY_A,
-      _wmkf_request_value: REQUEST_OWNED_BY_A,
-    }));
-    getRecord = jest.fn(async () => ({ akoya_requestid: REQUEST_OWNED_BY_A, akoya_title: 'Proposal A' }));
-    updateRecord = jest.fn(async () => {});
-    jest.doMock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
-      findById: (...a) => findById(...a),
-      // patchFields is a thin DynamicsService.updateRecord passthrough
-      // (data-access-layer conversion, Stages 3-6) — forward through the
-      // ALSO-mocked updateRecord below so the existing assertion on it holds.
-      patchFields: (id, payload, opts = {}) => updateRecord('wmkf_appreviewersuggestions', id, payload, opts),
-    }));
-    jest.doMock('../../lib/services/dynamics-service', () => ({
-      DynamicsService: {
-        getRecord: (...a) => getRecord(...a),
-        queryRecords: jest.fn(async () => ({ records: [] })),
-        updateRecord: (...a) => updateRecord(...a),
-      },
-    }));
-    const mod = await import('../../pages/api/reviewer-finder/generate-emails');
-    handler = mod.default;
-  });
-
-  afterAll(() => {
-    jest.resetModules();
-  });
-
-  it('markAsSent writes to the request-scoped Dataverse suggestion by id — no per-user (user_profile_id) path', async () => {
-    // User B (NOT the suggestion's "owner") drives the route. Post-cutover there
-    // is no per-user scoping: the suggestion is request-scoped and the write goes
-    // straight to the Dataverse record by id (staff-shared model). The isolation
-    // property we assert is that the persistence is the Dataverse updateRecord
-    // keyed only by suggestionId — there is no client-supplied user_profile_id
-    // filter to spoof. (The old Postgres user_profile_id assertion was removed:
-    // that path no longer exists, so it asserted nothing.)
-    mockAuthenticatedUser(USER_B_PROFILE, ['reviewer-finder']);
-
-    const req = createMockReq({
-      method: 'POST',
-      body: {
-        candidates: [
-          { name: 'Dr. Test', email: 'test@example.com', suggestionId: SUGGESTION_OWNED_BY_A },
-        ],
-        template: { subject: 'Invitation', body: 'Dear {{candidateName}}' },
-        settings: { senderEmail: 'sender@wmkeck.org', senderName: 'Sender' },
-        options: { markAsSent: true },
-      },
-    });
-    const res = createMockRes();
-
-    await handler(req, res);
-
-    const writeCalls = res.write.mock.calls.map(c => c[0]).join('');
-    expect(writeCalls).toContain('result');
-
-    // The durable side effect is a Dataverse write on the request-scoped record,
-    // keyed only by suggestionId — proving there is no per-user Postgres path.
-    expect(updateRecord).toHaveBeenCalledWith(
-      'wmkf_appreviewersuggestions',
-      SUGGESTION_OWNED_BY_A,
-      { wmkf_emailsentat: expect.any(String), wmkf_invited: true },
-      {},
-    );
   });
 });

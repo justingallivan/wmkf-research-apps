@@ -1610,8 +1610,9 @@ returned zero eligible/enqueued/claimed/failed.** Plan doc:
   reminder claim (`claim-reminder.js`, PR #162), 3H the due-date override write
   (`change-review-deadline.js`, PR #163), 3I the pending-invitation withdrawal write
   (`withdraw-pending-invitation.js`, PR #164), 3F the three invitation-record writers
-  (`record-invitation.js`, PR #165; the post-send stamp stays unconditional and the generation mark
-  stays raw pending owner decisions D1/D2 in `docs/REVIEWER_LIFECYCLE_STAGE7_BUILD_PLAN.md`), 3J a
+  (`record-invitation.js`, PR #165; the post-send stamp stays unconditional — D1 preserved by owner
+  decision 2026-09-06 — and the generation mark was retired with the generate-emails route the same day
+  under D2; see `docs/REVIEWER_LIFECYCLE_STAGE7_BUILD_PLAN.md`), 3J a
   narrow adapter op for the external decline repair (`deselectLegacyDeclinedSuggestion`, PR #166; D3 taken
   2026-09-06 — concrete ETag now required),
   3K the whitelisted `setRequestMetadata` adapter op behind the picker's proposal-wide cycle/program
