@@ -13,6 +13,7 @@ import { DynamicsService } from '../../lib/services/dynamics-service.js';
 import {
   deselectLegacyDeclinedSuggestion,
   updateLifecycle,
+  APPLICANT_DISPOSITION_EXCLUDED,
 } from '../../lib/dataverse/adapters/reviewer-suggestion.js';
 
 afterEach(() => jest.restoreAllMocks());
@@ -27,16 +28,33 @@ function mockCleanGuardRead() {
   });
 }
 
+function mockExcludedGuardRead() {
+  return jest.spyOn(DynamicsService, 'getRecord').mockResolvedValue({
+    wmkf_applicantdisposition: APPLICANT_DISPOSITION_EXCLUDED,
+    wmkf_completedat: null,
+    wmkf_reviewreceivedat: null,
+    wmkf_reviewstatus: null,
+    wmkf_honorariumeligibility: null,
+  });
+}
+
 describe('deselectLegacyDeclinedSuggestion', () => {
   test('with a concrete ETag: same transport call/payload as updateLifecycle(id, { selected: false }, opts)', async () => {
-    mockCleanGuardRead();
+    const getRecord = mockCleanGuardRead();
     const patch = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue(undefined);
 
     await deselectLegacyDeclinedSuggestion('sug-1', { ifMatch: 'W/"1"' });
+    // Guard against a vacuous pass: prove both sides actually reached the
+    // transport (and its guard read) exactly once before comparing args.
+    expect(getRecord).toHaveBeenCalledTimes(1);
+    expect(patch).toHaveBeenCalledTimes(1);
     const opCallArgs = patch.mock.calls[0];
 
+    getRecord.mockClear();
     patch.mockClear();
     await updateLifecycle('sug-1', { selected: false }, { ifMatch: 'W/"1"' });
+    expect(getRecord).toHaveBeenCalledTimes(1);
+    expect(patch).toHaveBeenCalledTimes(1);
     const directCallArgs = patch.mock.calls[0];
 
     expect(opCallArgs).toEqual(directCallArgs);
@@ -47,34 +65,48 @@ describe('deselectLegacyDeclinedSuggestion', () => {
   });
 
   test('with ifMatch: undefined, the same fallback behavior as updateLifecycle today (equality, not a specific policy)', async () => {
-    mockCleanGuardRead();
+    const getRecord = mockCleanGuardRead();
     const patch = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue(undefined);
 
     await deselectLegacyDeclinedSuggestion('sug-2', { ifMatch: undefined });
+    expect(getRecord).toHaveBeenCalledTimes(1);
+    expect(patch).toHaveBeenCalledTimes(1);
     const opCallArgs = patch.mock.calls[0];
 
+    getRecord.mockClear();
     patch.mockClear();
     await updateLifecycle('sug-2', { selected: false }, { ifMatch: undefined });
+    expect(getRecord).toHaveBeenCalledTimes(1);
+    expect(patch).toHaveBeenCalledTimes(1);
     const directCallArgs = patch.mock.calls[0];
 
     expect(opCallArgs).toEqual(directCallArgs);
+    // The specific fallback policy (no ifMatch supplied → no key on this
+    // non-status, non-invitation-response payload) is updateLifecycle's to
+    // define; this only pins that the op did not add one of its own.
+    expect(opCallArgs[3]).not.toHaveProperty('ifMatch');
   });
 
   test('actingUserSystemId is forwarded to the same transport call as updateLifecycle', async () => {
-    mockCleanGuardRead();
+    const getRecord = mockCleanGuardRead();
     const patch = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue(undefined);
 
     await deselectLegacyDeclinedSuggestion('sug-3', {
       ifMatch: 'W/"3"',
       actingUserSystemId: 'user-9',
     });
+    expect(getRecord).toHaveBeenCalledTimes(1);
+    expect(patch).toHaveBeenCalledTimes(1);
     const opCallArgs = patch.mock.calls[0];
 
+    getRecord.mockClear();
     patch.mockClear();
     await updateLifecycle('sug-3', { selected: false }, {
       ifMatch: 'W/"3"',
       actingUserSystemId: 'user-9',
     });
+    expect(getRecord).toHaveBeenCalledTimes(1);
+    expect(patch).toHaveBeenCalledTimes(1);
     const directCallArgs = patch.mock.calls[0];
 
     expect(opCallArgs).toEqual(directCallArgs);
@@ -88,5 +120,14 @@ describe('deselectLegacyDeclinedSuggestion', () => {
 
     await expect(deselectLegacyDeclinedSuggestion('sug-4', { ifMatch: 'W/"stale"' }))
       .rejects.toMatchObject({ status: 412 });
+  });
+
+  test('inherits the excluded-row refusal: an applicant-excluded row rejects without a PATCH', async () => {
+    mockExcludedGuardRead();
+    const patch = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue(undefined);
+
+    await expect(deselectLegacyDeclinedSuggestion('sug-5', { ifMatch: 'W/"5"' }))
+      .rejects.toThrow(/refusing to mutate an applicant-excluded suggestion/);
+    expect(patch).not.toHaveBeenCalled();
   });
 });
