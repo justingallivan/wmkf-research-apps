@@ -93,6 +93,7 @@ If you're touching a service or utility, read its header before this catalog. If
 
 ### Reviewer / honorarium
 
+- **`review-manager/draft-fingerprint.js`** — Stage 6D (PR #159, `6606cc30`, 2026-09-06): `buildDraftFingerprintInputs` and `computeDraftFingerprint` — a sha256 over a stable-stringified record of the server-observed email body inputs (template type, lower-cased suggestion id, candidate name/affiliation, proposal title/abstract/honorific-stripped authors/institution/ordered co-PIs, due-date override, request due/meeting dates, cycle program name/deadline/raw custom fields, honorarium amount or null). `render-emails-service.js` stamps each draft; `send-emails-service.js` recomputes from fresh reads and skips `draft_stale` / `draft_fingerprint_missing` before any write. Golden vectors in `tests/unit/draft-fingerprint.test.js` pin the hashes; `tests/helpers/draft-fingerprint.js` is a deliberately independent reimplementation.
 - **`auto-link-reviewer-contact-account.js`** — Acceptance-only Contact parent-Account enrichment. It requires a complete active Account scan and fills an empty `contact.parentcustomerid` only when the accepted self-reported affiliation has exactly one normalized exact match across Account name/AKA/legal/DC-AKA labels; existing parents, ambiguity, and misses abstain. Target freshness plus an ETag-conditional fill-only Contact write prevent stale or racing overwrites. Transient operational failures retry through `reviewer_acceptance_jobs`; a capped/incomplete scan instead abstains, raises one deduplicated operations warning, and preserves the reviewer-specific mismatch check. Successful/already-correct links auto-resolve the reviewer's standing mismatch warning.
 - **`review-receipt-guard.js`** — Shared terminal/finality/accepted/ETag authorization for every request-time review-receipt sink; classifiers turn a lost If-Match race into `engagement_ended`, `review_received_locked`, or `conflict`.
 - **`reviewer-engagement/correct-status.js`** — Stage 3C (PR #158 → `1c24e56f`, 2026-09-06): `patchReviewers` and `ReviewerStatusMutationError`, extracted byte-identically from `review-manager/reviewers-service.js`, which keeps `getReviewers` and re-exports both symbols so the route import is unchanged. Preserves the shipped 6A contract described below.
@@ -367,6 +368,7 @@ If you're touching a service or utility, read its header before this catalog. If
 
 ## `shared/utils/` — lifecycle policy (browser-safe)
 
+- **`shared/utils/reviewer-send-skip-reasons.js`** — Stage 6D: `SEND_SKIP_REASON` (the complete `skipped[].reason` vocabulary emitted by `send-emails-service.js`, every literal replaced; a grep test forbids bare literals) and `SEND_SKIP_REASON_LABEL` (staff copy rendered by `ReleaseMaterialsModal` and `InviteEmailModal`). `check:status-enum-parity` entry #5 requires every produced reason to have a label.
 - **`shared/utils/reviewer-engagement-policy.js`** — Stage 2 (PR #155, `716bc558`, 2026-09-05): the
   one home for the duplicated invitation-correction policy. Exports three predicates over raw
   suggestion rows — `isClosedEngagementStatus(status)` (status-only), `isClosedEngagementRow(row)`

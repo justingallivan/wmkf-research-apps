@@ -2,11 +2,11 @@
 title: Reviewer Lifecycle Stage 6D — server-side draft fingerprint
 kind: plan
 domain: reviewer-workbench
-status: draft
+status: historical
 canonical: false
 owner: product-engineering
-last_verified: 2026-09-05
-summary: render-emails stamps each draft with a fingerprint of server-observed inputs; send-emails recomputes it and refuses stale drafts with a labelled skipped reason.
+last_verified: 2026-09-06
+summary: Shipped 2026-09-06 (PR #159). render-emails stamps a server-side draft fingerprint; send-emails recomputes it and refuses stale drafts as draft_stale.
 ---
 
 # Stage 6D — server-side draft fingerprint

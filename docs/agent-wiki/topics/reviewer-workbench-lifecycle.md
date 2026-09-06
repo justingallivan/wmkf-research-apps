@@ -282,8 +282,17 @@ returns to compose while the server-side one-time materials gate bounds a duplic
 deadline change with a customized field still resets drafts even though the render would be
 identical; the global localStorage due-date key makes a restored value read as customized
 (pre-existing); co-investigators are not carried by any host and edits the panel has not
-refetched are invisible to any client key — both deferred to the queued Stage 6D server-side
-draft fingerprint. Host side (6B3d): `ReviewersTab` keeps the same-request proposal when a
+refetched are invisible to any client key — both closed by Stage 6D (PR #159 → `6606cc30`,
+2026-09-06): `render-emails` stamps each draft with a server-side `draftFingerprint`
+(`lib/services/review-manager/draft-fingerprint.js`: template type, suggestion, candidate name and
+affiliation, proposal title/abstract/authors/institution/co-PIs, due-date override, request dates,
+cycle program/deadline/raw custom fields, honorarium amount), `send-emails` recomputes it from
+fresh reads before any write and skips the recipient as `draft_stale` (pre-6D drafts:
+`draft_fingerprint_missing`); both modals forward the field and render labels from
+`shared/utils/reviewer-send-skip-reasons.js` (`SEND_SKIP_REASON`, parity gate entry #5). Accepted
+limits: inputs are hydrated once per send batch, and template text edited in Admin between preview
+and send is not detected. Plan and review record: `docs/REVIEWER_LIFECYCLE_STAGE6D_BUILD_PLAN.md`.
+Host side (6B3d): `ReviewersTab` keeps the same-request proposal when a
 reviewers refetch fails (case-insensitive GUID match) so a transient error after a confirmed send
 no longer flips the modal's keys and erases the sent summary; while that banner shows, the panel
 runs degraded (`degraded` prop): release, row actions, reminder send, closeout trigger and the

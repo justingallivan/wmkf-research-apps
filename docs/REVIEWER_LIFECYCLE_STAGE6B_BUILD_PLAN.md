@@ -3,7 +3,7 @@ title: Reviewer Lifecycle Stage 6B — Build Handoff
 domain: reviewer-workbench
 kind: plan
 status: active
-summary: Sequential in-place action lifetime fixes; 6B1–6B3 reviewed, promoted to main (600cc972) and production 2026-09-05; elective stages 6C/6D are next.
+summary: Sequential in-place action lifetime fixes; 6B1–6B3 promoted to main (600cc972) 2026-09-05; 6C (PR #153) and 6D (PR #159) followed and are complete.
 canonical: false
 owner: product-engineering
 last_verified: 2026-09-05
@@ -46,8 +46,8 @@ fifth; the reviewed amendments have independent PASS verdicts, the last full sui
 the receipt. See the
 [Stage 6B3 receipt](audits/REVIEWER_LIFECYCLE_STAGE6B3_RECEIPT_2026-09-05.md).
 **Stage 6B is therefore complete and promoted.** **Promoted 2026-09-05:** PR #150 merged to `main` as `600cc972` after all eight CI checks passed; Vercel production deployment `dpl_4Jjwwou9LKd3z29KqgXaLmZMaWQw` reached Ready. No signed-in browser smoke of the 6B surfaces ran before the merge (Chrome automation could not reach a local server; the owner chose to promote on unit tests, reviews and CI). A partial production smoke on 2026-09-05 (Session 489) verified the closeout modal open/cancel and the "Send reminder" affordance; the release-materials modal had no eligible `accepted` reviewer to target and remains unsmoked — see the 6B3 receipt Promotion section. Codex's `codex/ui-features` (PR #151, `3fc0a936`, deployment `dpl_3hiiDPpWN1Zt1yAWcQnVXPURQfL8`) was rebased onto it the same day; the one `ReviewersTab.js` conflict was resolved by carrying `degraded={Boolean(error)}` into Codex's `request-reviewer-table` wrapper, verified by a 10-suite / 534-test run and a guard removal that turns `reviewers-tab-stale-request.test.js` red.
-The next owner decision is which elective stage (6C extraction, 6D draft fingerprint,
-or the parked stages) to plan. The three receipts carry the accepted limits that a later
+Both elective UI stages have since shipped: 6C extraction (PR #153 → `3b2b34d5`, 2026-09-05)
+and 6D draft fingerprint (PR #159 → `6606cc30`, 2026-09-06). The three receipts carry the accepted limits that a later
 stage inherits: callback promises are observed, not awaited; no post-close
 refresh-failure surface exists for the reminder, closeout or materials components; the
 closeout modal closes itself on committed permission loss; a membership change during an
@@ -60,14 +60,14 @@ for Stage 6D.
 These are subdivisions of original Stage 6B, not additional product features.
 Stage 6C extraction is outside this handoff.
 
-[PLANNED, owner-queued 2026-09-05] **Stage 6D — server-side draft fingerprint.** The
+**Stage 6D — server-side draft fingerprint (COMPLETE 2026-09-06, PR #159 → `6606cc30`; see `REVIEWER_LIFECYCLE_STAGE6D_BUILD_PLAN.md`).** Original queue note (2026-09-05): The
 materials-modal session key (6B3a–6B3c) can only detect changes the panel has refetched and
 cannot see co-investigators at all, because no host carries them. A third Codex adversarial
 review asked for a defensible boundary; the owner chose the client key now and queued this
 slice: render-emails returns a per-draft fingerprint of every body input (recipient, proposal
 including co-PIs, settings); send-emails recomputes it and refuses a stale draft with a new
 `skipped` code the modal renders. This changes the render and send contracts and the SSE
-vocabulary, so it is a separately planned and reviewed slice, not a 6B amendment. Not started.
+vocabulary, so it was a separately planned and reviewed slice, not a 6B amendment.
 
 [VERIFIED via source reads and git commands] Source baseline:
 `d614de5cf60baeaec8cf21ca8e4dd3c2489d2f7a`, `main`, initially clean.

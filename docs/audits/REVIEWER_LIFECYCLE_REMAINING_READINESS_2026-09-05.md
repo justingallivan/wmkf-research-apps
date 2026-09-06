@@ -85,7 +85,7 @@ serialization, abort/timeout and SSE completion while binding preview/send and
 template/upload results to the relevant context. Do not replace existing guards
 with a less specific universal action abstraction.
 
-[PLANNED, owner-queued 2026-09-05] **6D** server-side draft fingerprint (render returns, send verifies; refuses stale drafts) — closes the co-investigator and unrefetched-edit gaps the client key cannot; contract change, separately planned. See the build plan status section.
+**6D COMPLETE 2026-09-06 (PR #159 → `6606cc30`; contract-reconcile Mode A, Opus PASS with one required item built, Codex two rounds; plan `../REVIEWER_LIFECYCLE_STAGE6D_BUILD_PLAN.md`).** `render-emails` stamps each draft with a server-side fingerprint; `send-emails` recomputes it from fresh reads and refuses stale drafts as `draft_stale` before any write. Accepted limits (batch-start hydration; Admin template edits) are recorded in the plan.
 
 The Workbench keys the reviewer subtree by request id
 (`pages/workbench/[requestId].js:181`). This is a real disconfirming boundary:
