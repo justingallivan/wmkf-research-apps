@@ -1611,7 +1611,10 @@ returned zero eligible/enqueued/claimed/failed.** Plan doc:
   (`change-review-deadline.js`, PR #163), 3I the pending-invitation withdrawal write
   (`withdraw-pending-invitation.js`, PR #164), 3F the three invitation-record writers
   (`record-invitation.js`, PR #165; the post-send stamp stays unconditional and the generation mark
-  stays raw pending owner decisions D1/D2 in `docs/REVIEWER_LIFECYCLE_STAGE7_BUILD_PLAN.md`);
+  stays raw pending owner decisions D1/D2 in `docs/REVIEWER_LIFECYCLE_STAGE7_BUILD_PLAN.md`), 3J a
+  narrow adapter op for the external decline repair (`deselectLegacyDeclinedSuggestion`, PR #166; D3),
+  3K the whitelisted `setRequestMetadata` adapter op behind the picker's proposal-wide cycle/program
+  edit (PR #167; the sequential no-`ifMatch` write is open decision D4);
   the old `review-manager/close-review-service.js` is a pure re-export and routes keep their import
   paths. Each move is byte-identical and pinned by a both-paths identity test plus a caller census
   (`tests/unit/reviewer-engagement-census.test.js`) that records every importer of the legacy path,

@@ -42,7 +42,7 @@ re-gate that; scripts are outside that gate and are recorded, not gated, here to
 | 11 | `reviewer-engagement/change-review-deadline.js` (3H, PR #163; was `reviewer-due-extension.js:312`) | updateLifecycle | yes | deadline override write | done |
 | 12 | `reviewer-engagement/withdraw-pending-invitation.js` (3I, PR #164; was `withdraw-sufficient-service.js:265`) | updateLifecycle | yes | pending-invitation withdrawal | done |
 | 13 | adapter op `deselectLegacyDeclinedSuggestion` (3J, PR #166) called from `external-review/respond-service.js` | updateLifecycle (inside the op) | `_etag \|\| undefined` | legacy declined-row deselection repair | done; optional version preserved (decision D3) |
-| 14 | `reviewer-finder/my-candidates-service.js:549` → adapter `bulkUpdateByRequest:2320` | bulk updateLifecycle | **no** | proposal-wide cycle/program metadata | 3K → adapter op `setRequestMetadata(requestId, {grantCycleCode, programArea}, opts)` with a field whitelist; sequential no-`ifMatch` behavior preserved (decision D4) |
+| 14 | adapter op `setRequestMetadata` (3K, PR #167) called from `reviewer-finder/my-candidates-service.js`; `bulkUpdateByRequest` is a compatibility export until Stage 7B deletes it | bulk updateLifecycle (inside the op) | **no** | proposal-wide cycle/program metadata | done; whitelist added; sequential no-`ifMatch` behavior preserved (decision D4) |
 | 15 | `review-manager/mark-received-no-file-service.js:122` | patchReviewReceipt | yes | receipt sink (in-scope use of the receipt op) | keep (5B skip decision) |
 | 16 | `review-upload.js:293` | patchReviewReceipt | yes | receipt sink | keep (5B) |
 | 17 | `scripts/backfill-postgres-to-dataverse.js:243` | updateLifecycle | no | administrative backfill | recorded, not gated |
@@ -306,7 +306,7 @@ or backfill.
   header calls itself interim: Stage 7B deletes `bulkUpdateByRequest` and rewrites this test as a
   zero-reference pin (no expected set to hide behind), and Stage 7A's AST binding-resolved gate is the
   deletion authority Codex asks for. 3K itself does not delete anything, so it merges on this basis;
-  cap reached.
+  cap reached. PR #167 merged `19955148` (2026-09-06, seven checks green).
 
 - **Stage 7 build launched (2026-09-06)** on `claude/reviewer-lifecycle-stage7`, branched from the
   3K branch (PR #167 awaiting CI) to avoid waiting; rebases onto main once 3K merges. Three commits:
