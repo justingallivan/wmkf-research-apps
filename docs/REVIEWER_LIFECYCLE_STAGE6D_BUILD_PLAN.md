@@ -230,6 +230,16 @@ and send in one server pass and have no stale-draft window).
 
 ## Tests
 
+**Independence from the production helper (Codex round 1, accepted):** the test helper that stamps
+fixtures must NOT import `draft-fingerprint.js`. It builds the canonical input object from literal
+fixture values and hashes with Node `crypto` directly, and `tests/unit/draft-fingerprint.test.js`
+carries hard-coded golden hashes for the normalisation cases (sorted keys, trimmed strings, null vs
+missing, co-PI order) computed once by hand and committed as literals. Add one
+projection-divergence test: install render mocks and send mocks that differ in exactly one input
+(e.g. send's request read returns a different `akoya_title`) and assert `draft_stale`; then make
+them agree and assert sent. That proves the two sides read the same projection rather than the same
+helper.
+
 **Fixture migration (budget this):** every existing send fixture lacks `draftFingerprint`, so under
 uniform enforcement all flip to `draft_fingerprint_missing`: 71 `drafts:` fixtures in
 `tests/unit/send-emails-service.test.js`, 31 in `tests/integration/send-emails-route.test.js`, 1 in
@@ -334,10 +344,22 @@ drop `honorariumOptOut` (not a body input); fix the `readById` citation; widen s
 and a shared fingerprint test helper; define honorarium read-failure symmetry; `null` fingerprint on
 render's skipped rows; pre-6C line note; recorded facts (constant `recipientExpertise`, implied
 co-PI count, deterministic co-PI order, `ReleaseEmailModal` not a client); recommend uniform
-enforcement. Codex round 1 recorded below when complete.
+enforcement. ### Codex adversarial round 1 (2026-09-05, plan at `de6cca73`)
+
+**needs-attention**, two findings. (1) **High — template/composer drift not fingerprinted.
+Declined, recorded as an accepted limit.** Composer settings are covered by the 6B3a client key
+(signature and review due date reset the modal session); the template text is the body the PD
+previewed and may have edited, and the preserved contract is "send transmits the previewed body
+verbatim; only the destination address is re-resolved". Refusing a PD-approved draft because Admin
+edited the template afterwards would invert that contract. 6D's scope is the CRM inputs the client
+cannot observe. Follow-up candidate, not in 6D: a server template digest (send would have to
+re-load the org/PD template for the type). (2) **Medium — fixture helper could test the
+implementation against itself. Accepted**; see "Independence from the production helper" above.
+Round 2 is spent on the build.
 
 ## Accepted limits (to record in the receipt)
 
-Composer settings and template text are outside the fingerprint (client key covers settings;
+Template text edited in Admin between preview and send is not detected (Codex round 1 high,
+declined — see the planning record). Composer settings and template text are outside the fingerprint (client key covers settings;
 template is what the PD previewed). Not an HMAC. A preview rendered before the deploy is
 refused once at send and must be re-rendered. Co-PI order changes count as stale.
