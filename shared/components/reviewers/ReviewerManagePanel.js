@@ -701,7 +701,13 @@ function ReleaseMaterialsModal({ isOpen, onClose, reviewers, proposalTitle, requ
           activeRenderAbortRef.current.abort();
           activeRenderAbortRef.current = null;
         }
-        proposalLoadSeq.current += 1;
+        // proposalLoadSeq is NOT bumped here: loadProposal posts only
+        // {requestId, fileKey} — membership is irrelevant to which document
+        // loads, so a membership-only change must not orphan a non-stale
+        // load. The two resetProposalDoc effects below already invalidate it
+        // on isOpen and requestId changes, and the unmount cleanup covers
+        // unmount; this branch also fires for pure membership changes, which
+        // must leave a pending proposal load alone.
         if (isOpen) {
           setStep('compose');
           setProgress({ current: 0, total: 0, message: '' });

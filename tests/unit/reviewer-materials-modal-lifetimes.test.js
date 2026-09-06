@@ -250,22 +250,42 @@ describe('preview (deferred render-emails) invalidation', () => {
     expect(screen.getByRole('button', { name: /preview 1 email/i })).toBeTruthy();
   });
 
-  test('unmount (canManage loss) invalidates a pending preview with no crash', async () => {
+  test('unmount aborts a pending preview render and a fresh remount is a clean compose', async () => {
+    // A "modal gone" assertion alone doesn't discriminate the unmount guard —
+    // React already no-ops a captured setState call on an unmounted
+    // component regardless of any epoch check (verified: no warning, no
+    // crash, no effect). The unmount cleanup's OWN observable behavior is
+    // that it aborts the outstanding render's AbortController, which we can
+    // assert directly via the signal handed to fetch.
     const first = deferred();
-    renderEmailsBehavior = () => first.promise;
+    let capturedSignal;
+    renderEmailsBehavior = (init) => { capturedSignal = init.signal; return first.promise; };
     const { rerender } = renderPanel({ reviewers: [REVIEWER_A] });
     openReleaseModal(1);
     await preview(1);
     await waitFor(() => expect(renderCalls().length).toBe(1));
+    expect(capturedSignal.aborted).toBe(false);
 
     rerender(
       <ReviewerManagePanel proposal={PROPOSAL} reviewers={[REVIEWER_A]} settings={{ signature: 'PD' }} canManage={false} />,
     );
 
+    // Discriminates the unmount cleanup: without it, the controller is never
+    // aborted here.
+    expect(capturedSignal.aborted).toBe(true);
+
+    // The stale promise settling after unmount must not throw.
     first.resolve(mockJson({ drafts: [draftFor(REVIEWER_A)] }));
     await act(async () => { await Promise.resolve(); await Promise.resolve(); });
-    // No throw, and the modal/its controls are gone.
     expect(screen.queryByRole('button', { name: /send 1 email/i })).toBeNull();
+
+    // A fresh remount (canManage regained) is a clean compose: no stale
+    // drafts, no stuck rendering lock.
+    rerender(
+      <ReviewerManagePanel proposal={PROPOSAL} reviewers={[REVIEWER_A]} settings={{ signature: 'PD' }} canManage />,
+    );
+    openReleaseModal(1);
+    expect(screen.getByRole('button', { name: /preview 1 email/i })).not.toBeDisabled();
   });
 
   test('membership A→B→A: returning to the original membership does not revive a stale attempt', async () => {
@@ -336,20 +356,27 @@ describe('send (deferred SSE stream) invalidation', () => {
     const sse = controlledSse();
     renderEmailsBehavior = () => mockJson({ drafts: [draftFor(REVIEWER_A)] });
     sendEmailsBehavior = () => sse.response;
-    const { rerender } = renderPanel({ reviewers: [REVIEWER_A] });
+    // onRefresh is a plain JS callback, not React state — React's unmount
+    // no-op protection does NOT cover it. Whether handleSend still invokes
+    // the parent's onEmailsSent (and therefore onRefresh) after unmount
+    // depends entirely on our own epoch check, so this IS discriminating.
+    const onRefresh = jest.fn();
+    const { rerender } = renderPanel({ reviewers: [REVIEWER_A], onRefresh });
     openReleaseModal(1);
     await preview(1);
     await send(1);
     await waitFor(() => expect(sendCalls().length).toBe(1));
 
     rerender(
-      <ReviewerManagePanel proposal={PROPOSAL} reviewers={[REVIEWER_A]} settings={{ signature: 'PD' }} canManage={false} />,
+      <ReviewerManagePanel proposal={PROPOSAL} reviewers={[REVIEWER_A]} settings={{ signature: 'PD' }} canManage={false} onRefresh={onRefresh} />,
     );
 
     sse.push(sseChunk('complete', { message: 'done' }));
     sse.finish();
     await act(async () => { await Promise.resolve(); await Promise.resolve(); });
-    // No throw; nothing to assert on a departed UI beyond it not crashing.
+    // No throw, and the parent callback is never invoked for a send whose
+    // session ended before it completed.
+    expect(onRefresh).not.toHaveBeenCalled();
   });
 
   test('close/reopen during an in-flight send invalidates it', async () => {
@@ -474,7 +501,12 @@ describe('load-proposal (deferred) invalidation', () => {
     return renderPanel({ reviewers });
   }
 
-  test('membership change during a pending proposal load does not write a stale proposalDoc', async () => {
+  // REQUIRED-1 (reviewer BLOCK on a6a27ce8): loadProposal posts only
+  // {requestId, fileKey} — membership is irrelevant to which document loads.
+  // A membership-only change during a pending load must NOT orphan it: the
+  // document is not stale, so it must still land (attachment shown, spinner
+  // gone). This inverts the original (wrong) assertion.
+  test('membership change during a pending proposal load does not orphan a non-stale load', async () => {
     const first = deferred();
     loadProposalBehavior = () => first.promise;
     withAttachProposal([REVIEWER_A, REVIEWER_B]);
@@ -484,26 +516,23 @@ describe('load-proposal (deferred) invalidation', () => {
 
     fireEvent.click(checkboxForRow('Accepted A'));
 
-    first.resolve(mockJson({ success: true, blobUrl: 'https://blob.example/stale.pdf', filename: 'stale.pdf', allFiles: [] }));
+    first.resolve(mockJson({ success: true, blobUrl: 'https://blob.example/current.pdf', filename: 'current.pdf', allFiles: [] }));
     await act(async () => { await Promise.resolve(); await Promise.resolve(); });
-    expect(screen.queryByText('stale.pdf')).toBeNull();
+    expect(await screen.findByText('current.pdf')).toBeTruthy();
+    expect(screen.queryByText(/Loading the request.s proposal from SharePoint/)).toBeNull();
   });
 
-  test('unmount during a pending proposal load never becomes the current attachment', async () => {
-    const first = deferred();
-    loadProposalBehavior = () => first.promise;
-    const { rerender } = withAttachProposal([REVIEWER_A]);
-    openReleaseModal(1);
-    await screen.findByText('Proposal document');
-
-    rerender(
-      <ReviewerManagePanel proposal={PROPOSAL} reviewers={[REVIEWER_A]} settings={{ signature: 'PD' }} canManage={false} />,
-    );
-
-    first.resolve(mockJson({ success: true, blobUrl: 'https://blob.example/stale.pdf', filename: 'stale.pdf', allFiles: [] }));
-    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
-    // No throw; nothing observable to assert on a departed UI.
-  });
+  // ADVISORY-3(ii): the prior "unmount ... never becomes the current
+  // attachment" test asserted nothing. It cannot be made discriminating —
+  // verified empirically (a standalone probe: mount, trigger a deferred
+  // setState via effect, unmount, then resolve) that React 18 silently
+  // no-ops a captured setState call on an already-unmounted function
+  // component: no warning, no crash, no state change, regardless of any
+  // application-level guard. loadProposal has no AbortController and calls
+  // no external callback, so there is no plain-JS side effect (unlike
+  // handleSend's onEmailsSent, covered by the send/unmount test above) left
+  // to observe post-unmount. Dropped rather than kept as a non-discriminating
+  // fixture.
 });
 
 describe('save-template (deferred) invalidation', () => {
@@ -597,6 +626,36 @@ describe('send completion handshake (real parent onRefresh/selection)', () => {
     sse.finish();
     await act(async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); });
     expect(await screen.findByText('1 sent')).toBeTruthy();
+  });
+
+  // ADVISORY-2: the same-chunk `if (finished) break;` guard (immediately
+  // after a `complete` in the SAME chunk, not just a later one) had zero
+  // pins. result + complete + complete + error all in ONE chunk must still
+  // behave as exactly one completion: one onRefresh call, the summary intact,
+  // step 'sent', and no error banner from the trailing same-chunk `error`.
+  test('result + complete + complete + error in ONE chunk: one callback, summary intact, no error banner', async () => {
+    const sse = controlledSse();
+    setup([REVIEWER_A]);
+    sendEmailsBehavior = () => sse.response;
+    const onRefresh = jest.fn();
+    renderPanel({ reviewers: [REVIEWER_A], onRefresh });
+    openReleaseModal(1);
+    await preview(1);
+    await send(1);
+    await waitFor(() => expect(sendCalls().length).toBe(1));
+
+    sse.push(
+      sseChunk('result', { sent: [{ suggestionId: REVIEWER_A.suggestionId, candidateName: REVIEWER_A.name, candidateEmail: REVIEWER_A.email }], failed: [], skipped: [] })
+      + sseChunk('complete', { message: 'done' })
+      + sseChunk('complete', { message: 'done-again' })
+      + sseChunk('error', { message: 'late failure' }),
+    );
+    sse.finish();
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); });
+
+    expect(await screen.findByText('1 sent')).toBeTruthy();
+    expect(screen.queryByText('late failure')).toBeNull();
+    expect(onRefresh).toHaveBeenCalledTimes(1);
   });
 
   test('all-failed result then complete preserves the all-failed summary', async () => {
