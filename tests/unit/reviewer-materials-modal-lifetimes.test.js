@@ -1004,6 +1004,21 @@ describe('settings identity (signature / review deadline)', () => {
     expect(screen.queryByText('1 sent')).toBeNull();
     expect(screen.getByRole('button', { name: /preview 0 email/i })).toBeTruthy();
   });
+
+  test('a null proposal reviewDeadline (host reviewers-fetch failure) leaves the due date field controlled and empty, not "null"', async () => {
+    const { rerender } = renderPanel({ proposal: PROPOSAL, reviewers: [REVIEWER_A], settings: { signature: 'PD' } });
+    openReleaseModal(1);
+    expect(reviewDueDateInput().value).toBe(PROPOSAL.reviewDeadline);
+
+    // ReviewersTab nulls `proposal` on a reviewers-fetch failure and its panel
+    // proposal then carries reviewDeadline: null. The follow rule must
+    // normalize that to '' — a null would make the controlled input uncontrolled.
+    rerender(
+      <ReviewerManagePanel proposal={{ ...PROPOSAL, reviewDeadline: null }} reviewers={[REVIEWER_A]} settings={{ signature: 'PD' }} />,
+    );
+    expect(reviewDueDateInput().value).toBe('');
+    expect(reviewDueDateInput().value).not.toBe('null');
+  });
 });
 
 // ── Payload equality ─────────────────────────────────────────────────────
