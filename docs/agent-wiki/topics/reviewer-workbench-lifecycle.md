@@ -301,7 +301,10 @@ reviewer-follow-up workbench host received the same treatment in PR #152 (`e9909
 it keeps the last loaded list under a "could not be refreshed" banner, passes `degraded` and
 `loading` to every mounted panel, keeps groups mounted during a retry, and unconditionally
 supersedes any in-flight load on a cycle/scope change so no response can commit rows from a
-different cycle or scope. Plan with the full review record:
+different cycle or scope. The one gap that plan recorded as pre-existing — a cycles-load failure
+left `cycleCode` empty, so the banner had no Try again and the proposals effect never ran — was
+closed 2026-09-06 (S490): the cycles load is a retryable `loadCycles` callback and the banner's Try
+again reloads cycles when no cycle is selected yet. Plan with the full review record:
 `docs/plans/REVIEWER_FOLLOW_UP_REFETCH_RESILIENCE_2026-09-05.md`. Tests: `tests/unit/reviewer-materials-modal-lifetimes.test.js`.
 Receipt: `docs/audits/REVIEWER_LIFECYCLE_STAGE6B3_RECEIPT_2026-09-05.md`.
 

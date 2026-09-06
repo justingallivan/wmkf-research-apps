@@ -296,6 +296,37 @@ describe('reviewer follow-up refetch resilience', () => {
     expect(screen.queryByText(/No .* requests match this view\./)).not.toBeInTheDocument();
   });
 
+  test('cycles-load failure shows a Try again that reloads cycles, then the proposals load runs (S490)', async () => {
+    let cyclesShouldFail = true;
+    global.fetch = jest.fn(async (url) => {
+      if (url === '/api/workbench/dashboard') {
+        if (cyclesShouldFail) return { ok: false, status: 503, json: async () => ({ error: 'cycles down' }) };
+        return { ok: true, json: async () => cycleResponse };
+      }
+      if (String(url).startsWith('/api/workbench/dashboard?')) {
+        return { ok: true, json: async () => ({ requests: [] }) };
+      }
+      return { ok: true, json: async () => ({ proposals: [] }) };
+    });
+
+    render(<ReviewerFollowUpDashboard />);
+
+    expect(await screen.findByText('Reviewer follow-up could not be loaded')).toBeInTheDocument();
+    expect(screen.getByText('cycles down')).toBeInTheDocument();
+    // Pre-fix: no cycleCode → no button at all, and the proposals effect never ran.
+    const retry = screen.getByRole('button', { name: 'Try again' });
+    expect(global.fetch.mock.calls.filter(([u]) => String(u).startsWith('/api/review-manager/reviewers'))).toHaveLength(0);
+
+    cyclesShouldFail = false;
+    fireEvent.click(retry);
+
+    await waitFor(() => expect(screen.queryByText('Reviewer follow-up could not be loaded')).not.toBeInTheDocument());
+    await waitFor(() => expect(
+      global.fetch.mock.calls.filter(([u]) => String(u).startsWith('/api/review-manager/reviewers')),
+    ).toHaveLength(1));
+    expect(screen.getByRole('combobox', { name: /cycle/i })).toHaveValue('D26');
+  });
+
   test('refetch failure keeps the list and degrades the panel', async () => {
     let reviewersShouldFail = false;
     global.fetch = jest.fn(async (url) => {
