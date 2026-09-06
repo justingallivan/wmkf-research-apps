@@ -359,7 +359,8 @@ describe('a confirmed materials send followed by a failing reviewers refetch', (
             proposals: [{ ...PROPOSAL_TRACK, reviewers: [REVIEWER_A] }],
           }));
         }
-        return Promise.resolve(mockJson({ success: false, error: 'boom' }, false, 500));
+        if (reviewersCall === 2) return Promise.resolve(mockJson({ success: false, error: 'boom' }, false, 500));
+        return Promise.resolve(mockJson({ success: true, proposals: [{ ...PROPOSAL_TRACK, reviewers: [REVIEWER_A] }] }));
       }
       if (u.includes('/api/reviewer-finder/my-candidates')) {
         return Promise.resolve(mockJson({ proposals: [] }));
@@ -416,5 +417,13 @@ describe('a confirmed materials send followed by a failing reviewers refetch', (
 
     expect(screen.getByText('1 sent')).toBeTruthy();
     expect(screen.queryByRole('button', { name: /preview 0 email/i })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: /release proposal to reviewers \(1\)/i })).toBeDisabled();
+    expect(screen.getAllByRole('button', { name: /manage /i })[0]).toBeDisabled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull());
+    expect(screen.getByRole('button', { name: /release proposal to reviewers \(1\)/i })).toBeEnabled();
+    expect(screen.getByText('1 sent')).toBeInTheDocument();
   });
 });

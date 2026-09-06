@@ -128,6 +128,7 @@ export function ReviewReminderAction({
   reviewer,
   onSent,
   previewReadOnly = false,
+  degraded = false,
 }) {
   const [sending, setSending] = useState(false);
   const [feedback, setFeedback] = useState(null);
@@ -194,7 +195,7 @@ export function ReviewReminderAction({
   const isCurrent = (epoch) => mountedRef.current && epoch === contextRef.current.epoch;
 
   const handleSend = async () => {
-    if (previewReadOnly || !canSend || sendingRef.current) return;
+    if (previewReadOnly || degraded || !canSend || sendingRef.current) return;
     const generation = generationRef.current + 1;
     generationRef.current = generation;
     const epoch = contextRef.current.epoch;
@@ -259,8 +260,8 @@ export function ReviewReminderAction({
       <button
         type="button"
         onClick={handleSend}
-        disabled={previewReadOnly || !canSend || sending}
-        title={previewReadOnly ? previewTitle : eligibilityTitle}
+        disabled={previewReadOnly || degraded || !canSend || sending}
+        title={degraded ? 'Reviewer data could not be refreshed - retry before making changes' : (previewReadOnly ? previewTitle : eligibilityTitle)}
         aria-label={`Send reminder to ${reviewer.name || 'reviewer'}${previewReadOnly ? ' (disabled in read-only Preview)' : ''}`}
         className="min-h-9 whitespace-nowrap rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-gray-700 hover:border-gray-400 hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400"
       >
@@ -289,6 +290,7 @@ export function TokenActionsMenu({
   statusPending = false,
   onTransition,
   onCloseReview,
+  degraded = false,
 }) {
   const [open, setOpen] = useState(false);
   const [coords, setCoords] = useState(null); // { left, top } in viewport px, or null
@@ -320,6 +322,7 @@ export function TokenActionsMenu({
       && reviewer.reviewStatus !== 'complete'
       && !TERMINAL_REVIEW_STATUSES.includes(reviewer.reviewStatus),
   );
+  const degradedTitle = 'Reviewer data could not be refreshed - retry before making changes';
   // The estimate drives the upward flip so the portalled menu never opens
   // off-screen. Status correction and terminal actions are taller sections;
   // the remaining items are standard 40px menu rows.
@@ -373,8 +376,9 @@ export function TokenActionsMenu({
       <button
         ref={btnRef}
         onClick={() => setOpen(o => !o)}
+        disabled={degraded}
         className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
-        title="Manage reviewer"
+        title={degraded ? degradedTitle : 'Manage reviewer'}
         aria-label={`Manage ${reviewer.name || 'reviewer'}`}
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -395,7 +399,8 @@ export function TokenActionsMenu({
                 </span>
                 <select
                   value={reviewer.reviewStatus === 'accepted' ? '' : reviewer.reviewStatus}
-                  disabled={statusPending}
+                  disabled={statusPending || degraded}
+                  title={degraded ? degradedTitle : undefined}
                   onChange={(event) => {
                     const newStatus = event.target.value;
                     if (!newStatus || statusPending) return;
@@ -425,6 +430,8 @@ export function TokenActionsMenu({
               </p>
               <button
                 type="button"
+                disabled={degraded}
+                title={degraded ? degradedTitle : undefined}
                 onClick={() => { setOpen(false); onTransition('withdrew'); }}
                 className="w-full text-left px-3 py-2 hover:bg-red-50 text-red-700"
               >
@@ -432,6 +439,8 @@ export function TokenActionsMenu({
               </button>
               <button
                 type="button"
+                disabled={degraded}
+                title={degraded ? degradedTitle : undefined}
                 onClick={() => { setOpen(false); onTransition('released'); }}
                 className="w-full text-left px-3 py-2 hover:bg-gray-50 text-gray-700"
               >
@@ -446,6 +455,8 @@ export function TokenActionsMenu({
               </p>
               <button
                 type="button"
+                disabled={degraded}
+                title={degraded ? degradedTitle : undefined}
                 onClick={() => { setOpen(false); onCloseReview(); }}
                 className="w-full text-left px-3 py-2 hover:bg-green-50 text-green-800"
               >
@@ -458,6 +469,8 @@ export function TokenActionsMenu({
           </p>
           {canRegenerate && (
             <button
+              disabled={degraded}
+              title={degraded ? degradedTitle : undefined}
               onClick={() => { setOpen(false); onRegenerate(); }}
               className="w-full text-left px-3 py-2 hover:bg-gray-50"
             >
@@ -471,6 +484,8 @@ export function TokenActionsMenu({
           )}
           {canRevoke && (
             <button
+              disabled={degraded}
+              title={degraded ? degradedTitle : undefined}
               onClick={() => { setOpen(false); onRevoke(); }}
               className="w-full text-left px-3 py-2 hover:bg-gray-50 text-red-700"
             >
@@ -479,6 +494,8 @@ export function TokenActionsMenu({
           )}
           {canRemove && (
             <button
+              disabled={degraded}
+              title={degraded ? degradedTitle : undefined}
               onClick={() => { setOpen(false); onRemove(); }}
               className="w-full text-left px-3 py-2 hover:bg-gray-50 text-red-700 border-t border-gray-100"
             >
@@ -578,7 +595,7 @@ function proposalKeyFor(proposal) {
   ].map(v => v || '').join(MEMBERSHIP_KEY_FIELD_SEP);
 }
 
-function ReleaseMaterialsModal({ isOpen, onClose, reviewers, proposalTitle, proposalKey, requestId, settings, onEmailsSent, membershipCause }) {
+function ReleaseMaterialsModal({ isOpen, onClose, reviewers, proposalTitle, proposalKey, requestId, settings, onEmailsSent, membershipCause, degraded = false }) {
   // This request-scoped entry point is intentionally materials-only. Review-due
   // nudges use ReviewReminderAction's fresh eligibility + atomic-claim path, and
   // thank-yous are handled by the dedicated sweep. Keeping those choices out of
@@ -1802,7 +1819,7 @@ function ReleaseMaterialsModal({ isOpen, onClose, reviewers, proposalTitle, prop
                 >
                   Back
                 </button>
-                <Button onClick={handleSend}>
+                <Button onClick={handleSend} disabled={degraded} title={degraded ? 'Reviewer data could not be refreshed - retry before making changes' : undefined}>
                   Send {drafts.filter(d => !d.skipped).length} Email{drafts.filter(d => !d.skipped).length !== 1 ? 's' : ''}
                 </Button>
               </>
@@ -2016,6 +2033,7 @@ export default function ReviewerManagePanel({
   canManage = true,
   showReviewReminderAction = false,
   previewReadOnly = false,
+  degraded = false,
   declineReferrals = [],
   referralActions = {},
   onAddReferral,
@@ -2666,6 +2684,8 @@ export default function ReviewerManagePanel({
                 setSelectedReviewers(new Set(releaseTargets.map(r => r.suggestionId)));
                 setReleaseModalOpen(true);
               }}
+              disabled={degraded}
+              title={degraded ? 'Reviewer data could not be refreshed - retry before making changes' : undefined}
             >
               Release proposal to reviewers ({selectedList.length > 0 ? selectedList.length : acceptedReviewers.length})
             </Button>
@@ -2802,12 +2822,15 @@ export default function ReviewerManagePanel({
                                 reviewer={r}
                                 onSent={onRefresh}
                                 previewReadOnly={previewReadOnly || !canManage}
+                                degraded={degraded}
                               />
                             )}
                             {showActionsColumn && ['review_received', 'complete'].includes(r.reviewStatus) && (
                               <button
                                 type="button"
                                 onClick={() => setCloseoutReviewerId(r.suggestionId)}
+                                disabled={degraded}
+                                title={degraded ? 'Reviewer data could not be refreshed - retry before making changes' : undefined}
                                 className="min-h-9 whitespace-nowrap rounded-lg bg-gray-900 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2"
                               >
                                 {r.reviewStatus === 'complete' ? 'Edit closeout' : 'Close review'}
@@ -2838,6 +2861,7 @@ export default function ReviewerManagePanel({
                                 onStatusChange={(newStatus) => updateStatus(r.suggestionId, newStatus)}
                                 statusPending={pendingStatusTokens.has(r.suggestionId)}
                                 onTransition={(terminalStatus) => transitionTerminal(r, terminalStatus)}
+                                degraded={degraded}
                               />
                             </div>
                           )}
@@ -2900,6 +2924,7 @@ export default function ReviewerManagePanel({
             // own render output.
             // eslint-disable-next-line react-hooks/refs
             membershipCause={selectionCauseRef.current}
+            degraded={degraded}
             onEmailsSent={(cause) => {
               // Tag the clear synchronously BEFORE it commits — see
               // selectionCauseRef's declaration above and the modal's own

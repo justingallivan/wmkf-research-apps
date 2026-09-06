@@ -513,7 +513,10 @@ export default function ReviewersTab({
 
       {error && (
         <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">
-          Couldn’t load reviewers: {error}
+          Couldn’t load reviewers: {error}{' '}
+          <button type="button" onClick={loadReviewers} disabled={loading} className="underline">
+            Retry
+          </button>
         </div>
       )}
 
@@ -556,6 +559,7 @@ export default function ReviewersTab({
           canManage={canEdit}
           showReviewReminderAction={current === 'track'}
           previewReadOnly={previewReadOnly}
+          degraded={Boolean(error)}
           declineReferrals={declineReferrals}
           referralActions={referralActions}
           onAddReferral={addReferralCandidate}

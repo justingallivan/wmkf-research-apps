@@ -21,6 +21,7 @@ jest.mock('../../shared/components/reviewers/ReviewerManagePanel', () => functio
       data-testid="manage-panel"
       data-referrals={JSON.stringify(props.declineReferrals || [])}
       data-reviewers={JSON.stringify(props.reviewers || [])}
+      data-degraded={String(props.degraded)}
     >
       <button type="button" onClick={() => props.onRefresh && props.onRefresh()}>stub-refresh</button>
     </div>
@@ -63,6 +64,10 @@ function referralsOf() {
 
 function reviewersOf() {
   return JSON.parse(screen.getByTestId('manage-panel').getAttribute('data-reviewers'));
+}
+
+function degradedOf() {
+  return screen.getByTestId('manage-panel').getAttribute('data-degraded');
 }
 
 afterEach(() => {
@@ -194,6 +199,16 @@ test('a same-request refetch error keeps the proposal even when the URL GUID is 
   });
   await waitFor(() => expect(screen.getByText(/Couldn.t load reviewers: boom/)).toBeInTheDocument());
   expect(reviewersOf()).toEqual([REVIEWER_A_ROW]);
+  expect(degradedOf()).toBe('true');
+
+  global.fetch.mockImplementation((url) => {
+    const u = String(url);
+    if (u.includes('/api/review-manager/reviewers')) return Promise.resolve({ ok: true, json: async () => ({ success: true, proposals: [{ proposalId: REQ_A, reviewers: [REVIEWER_A_ROW] }] }) });
+    if (u.includes('/api/reviewer-finder/my-candidates') || u.includes('/api/workbench/decline-referrals')) return Promise.resolve({ ok: true, json: async () => ({ proposals: [], referrals: [] }) });
+    throw new Error(`unexpected fetch ${u}`);
+  });
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'stub-refresh' })); });
+  await waitFor(() => expect(degradedOf()).toBe('false'));
 });
 
 test("a refetch error after switching requests still drops the other request's proposal", async () => {
@@ -238,4 +253,5 @@ test("a refetch error after switching requests still drops the other request's p
   await waitFor(() => expect(screen.getByText(/Couldn.t load reviewers: boom/)).toBeInTheDocument());
   expect(reviewersOf()).toEqual([]);
   expect(reviewersOf()).not.toContainEqual(REVIEWER_A_ROW);
+  expect(degradedOf()).toBe('true');
 });
