@@ -149,7 +149,10 @@ or backfill.
   `classifySaveError`, validation, `_etag` check, `prepareNotification` stay. Direct tests (4, incl.
   `null` pass-through), delegation pins (2), census row; no existing test edits. Full suite 790 /
   11,532; gates green. Mutations: inline keeping the import → 2/2 pins red; drop `ifMatch` → 2/4
-  direct red. Opus and Codex round 1 pending.
+  direct red.
+- **3H Codex adversarial round 1 (`4b0fbea2`): approve** — exact override (incl. `null`), ETag and
+  actor forwarded; notification prepared first, write before dispatch, 412/error classification
+  preserved. Opus pending.
 - **3I build (Sonnet, 2026-09-06): `87edb12b`** on `claude/reviewer-lifecycle-stage3i` (new
   worktree `../WMKF_Apps-s4`). The withdrawal write (main `withdraw-sufficient-service.js:264–274`)
   moved verbatim to `reviewer-engagement/withdraw-pending-invitation.js` `withdrawPendingInvitation`;
