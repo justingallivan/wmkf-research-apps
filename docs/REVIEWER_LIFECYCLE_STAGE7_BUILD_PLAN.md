@@ -359,6 +359,15 @@ or backfill.
   (A2 = Codex 1b); CI-reference row overclaims the hop (A3); only one of three fail-closed shapes is
   fixtured (A4); dead `unresolved` array (A5); stale test pointer (A6); harmless error-text change
   in 7B (A7). All folded into the correction round with the Codex highs.
+- **Stage 7 correction `bd2e8e72`** (rebased on `5cda2e37`): binding resolution rewritten as a
+  monotonic fixpoint (alias chains, extracted methods, destructure off a local, transitive barrels
+  incl. `export *` / whole and spread CJS re-publish, computed members fail closed); the non-literal
+  fail-closed check runs its own alias closure; self-test gains an alias-barrel group and six
+  unresolved shapes (8 groups PASS); dead `unresolved` array removed; stale test pointer fixed;
+  `tests/unit/reviewer-engagement-boundary-recorded-set.test.js` pins the two-entry map and a real
+  non-stale addition turns it red; docblock and CI-reference wording corrected. Live census unchanged:
+  14 exempt bindings, 0 violations. Full suite 807 / 11,652; all gate pairs green. Architect re-ran
+  the gate, self-test and four suites (45 tests) on the branch. PR opened; Codex round 2 running.
 
 ## Docs (after each merge)
 
