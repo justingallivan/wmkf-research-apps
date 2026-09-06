@@ -15,8 +15,7 @@ summary: render-emails stamps each draft with a fingerprint of server-observed i
 **Adversarial:** Codex, at most two rounds. **Tier:** 1–2 (route/service contract change on a
 live email path) — branch `claude/reviewer-lifecycle-stage6d`, PR, owner merge; **promotion
 timing chosen by the owner outside an active send window** (a browser tab holding a preview
-rendered before the deploy will be refused at send until it re-renders). **[OWNER DECISION PENDING]** uniform enforcement across all four template types versus exempting
-`invitation` in the first cut. Architect and Opus recommend **uniform**: this route already fails a
+rendered before the deploy will be refused at send until it re-renders). **[DECIDED under the owner's 2026-09-05 autonomy grant — flagged for owner review]** uniform enforcement across all four template types (not exempting `invitation`). Architect and Opus recommend **uniform**: this route already fails a
 pre-deploy draft closed rather than guessing (`external_link_expectation_missing`,
 `send-emails-service.js:779–782`, pinned by tests), and the invitation is the one body that carries
 the full proposal-details block with co-PIs, so exempting it would fail open on the send this stage

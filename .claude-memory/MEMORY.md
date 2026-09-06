@@ -41,6 +41,7 @@
 - Contact promotion / lifecycle: ../docs/REVIEWER_CONTACT_PROMOTION_AND_ADDRESS_LIFECYCLE.md; ../docs/REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md
 - Reviewer address trust: ../docs/REVIEWER_ADDRESS_TRUST_AND_CONFLICT_RESOLUTION_PLAN.md; ../docs/REVIEWER_EMAIL_CONFLICT_SELF_SERVICE_PLAN.md
 - Reviewer workbench / lifecycle / roster / referral: ../docs/agent-wiki/topics/reviewer-workbench-lifecycle.md; project-workbench-consolidation-rollout.md
+- Lifecycle Stages 2/3/5/7 autonomy grant + orchestration cycle (S489): project-reviewer-lifecycle-autonomy-directive-2026-09-05.md
 - Accepted-awaiting-materials is transient / release-modal smoke deferred to first real acceptance: project-accepted-awaiting-materials-is-transient.md
 - Candidate-card simplification / matching-layer sequencing / COI split: project-reviewer-card-simplification-direction.md; feedback-affordance-consistency-beats-deduplication.md
 - Reviewer workflow stabilization / Request 1002912: ../docs/REVIEWER_WORKFLOW_STABILIZATION_DIRECTIVE.md; ../outputs/reviewer-workflow-stabilization-fable-assessment.md
