@@ -356,7 +356,36 @@ re-load the org/PD template for the type). (2) **Medium — fixture helper could
 implementation against itself. Accepted**; see "Independence from the production helper" above.
 Round 2 is spent on the build.
 
+## Build and review record
+
+- **Build (Sonnet, 2026-09-06 UTC): `edf68893`, `39b848e7`, `4354c755`, `2264b1bd`** on
+  `claude/reviewer-lifecycle-stage6d` (cut from main `3b2b34d5`, post-6C). 18 files. Golden-hash
+  vectors (base + 17 single-field flips + 2 normalisation cases) committed as literals; send-service
+  cases (a)–(e) incl. ordering (d)/(d2); route case; modal forward/label tests; bare-literal grep
+  test; parity entry #5. Fixture strategy deviation: instead of stamping ~103 fixtures, each send test
+  file got a choke-point wrapper that auto-stamps a matching fingerprint from the file's mock state via
+  the independent helper; `tests/unit/reviewer-email-token-authority.test.js` needed a one-line fix.
+  Full suite 777 / 11,393; all listed gates green. Mutations: remove `continue` after `draft_stale` →
+  3 red; drop `coInvestigators` → 24/29 golden/table red (send test (e) alone not discriminating,
+  builder-flagged); drop client forward → red; delete a label → parity gate red.
+- **Codex adversarial round 2 (final, build): needs-attention.** (1) **High — inputs are hydrated
+  once at batch start, so a CRM edit mid-batch could send a later recipient's draft unrefreshed.
+  Declined, recorded as an accepted limit:** the fingerprint protects the preview→send gap; every
+  existing skip gate in the loop (`materials_already_sent`, address trust, `already_invited`) reads
+  the same batch-start hydration, and re-reading five projections per recipient on a live email path
+  is out of proportion to a seconds-long window. (2) **Medium — the wrapper stamps from the send
+  mock's state, and mocks ignore `$select`, so a dropped send-side projection field is not caught.
+  Accepted in narrow form:** add a test asserting the send service's request/person selects and
+  cycle `fields` map request every fingerprinted field and that `fetchCoPIs`/`getHonorariumAmount`
+  are called; add one integration case that renders with non-default values, then sends with a
+  request read that omits `wmkf_abstract` → `draft_stale`. Keep the wrapper for the migrated
+  fixtures. Cap reached; Opus verifies the correction.
+
 ## Accepted limits (to record in the receipt)
+
+Fingerprint inputs are hydrated once per send batch; a CRM edit between hydration and a later
+recipient's dispatch within the same batch is not detected (Codex round 2 high, declined — see the
+record).
 
 Template text edited in Admin between preview and send is not detected (Codex round 1 high,
 declined — see the planning record). Composer settings and template text are outside the fingerprint (client key covers settings;
