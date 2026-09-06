@@ -116,15 +116,29 @@ each check.
    click Try again with a slow failing fetch, assert the mock panel stays mounted and open
    throughout and the button is disabled mid-flight. [Codex round 1, medium — accepted.]
 
+7. **Filtered-empty under error shows the filter card.** The empty-state card guard becomes
+   `visibleProposals.length === 0 && (!error || proposals.length > 0)`: with a retained list
+   and a view/search filter matching nothing, the "No … requests match this view." card renders
+   under the "could not be refreshed" banner; a first-load failure still shows the banner alone.
+   Test 7. [Opus round 1, advisory — accepted.]
+8. **No empty-state flash on parameter change.** The clearing block also sets
+   `loadingProposals` true so the empty card and zero metrics do not paint between the clear and
+   the deferred load. Test 3's banner-absence assertion moves after the list remount so it cannot
+   pass before the retry resolves. [Opus round 1, advisories — accepted.]
+
+Opus round 1 verdict at `8fb1f47f`: BLOCK, one required item (the superseded-load race, same as
+Codex's high) and four advisories, all accepted above. Mutation checks (a)–(d) executed by the
+reviewer: all discriminating.
+
 **Declined (recorded):** Codex round 1 asked for a real-panel test proving mutating controls are
 disabled while `degraded`. That contract is already pinned by
 `tests/unit/reviewer-manage-degraded.test.js` (6B3e) against the real panel; the host tests here
 prove the host passes the prop, the same composition `reviewers-tab-stale-request.test.js` uses
 for `ReviewersTab`. Adding a second real-panel test would duplicate 6B3e's teeth.
 
-Mutation checks now number six: (a)–(c) above; (d) remove the clearing block in the effect →
+Mutation checks now number seven: (a)–(c) above; (d) remove the clearing block in the effect →
 test 4 red; (e) remove the synchronous `requestIdRef` bump → test 5 red; (f) restore the
-unconditional loading placeholder → test 6 red.
+unconditional loading placeholder → test 6 red; (g) revert the empty-card guard → test 7 red.
 
 ## Verification the builder runs
 
