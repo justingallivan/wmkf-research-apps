@@ -6,7 +6,7 @@ status: canonical
 summary: "Canonical Workbench sequence; current cross-request lifecycle navigation and reviewer follow-up work are tracked here."
 canonical: true
 cataloged: 2026-07-26
-last_verified: 2026-09-04
+last_verified: 2026-09-06
 owner: product-engineering
 related:
   - docs/audits/AUDIT_REQUEST_WORKBENCH_TRUTH_2026-07-26.md
@@ -225,15 +225,27 @@ Allison historically reviewed and edited writeups from one designated
 SharePoint folder. Removing that folder-browsing workflow must not force her to
 open each request separately in the Workbench.
 
-The planned replacement is a staff-wide **Final Writeups Dashboard**, not the
-broader historical “Executive Dashboard” proposal. The approved audience is
-all PDs, PCs, the CSO, and the President. Its minimum contract is:
+The replacement is the staff-wide **Final Writeups Dashboard**
+(`/workbench/final-writeups`), not the broader historical “Executive Dashboard”
+proposal. **[STATUS 2026-09-06, VERIFIED via source]:** the dashboard is
+Production-live and delivers the list, Open in Word, per-editor Reviewed
+marker, personal state/history, persona queues, and the coordinator matrix for
+Final artifacts. Still open, planned as Slice 6 of
+`docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md`: cycle scoping (the list
+currently spans all cycles under one 100-row cap), the filters, current-version
+context, the "has edits" hint, and whether earlier writeup stages get a
+cycle-wide list. Inline preview was retired from this contract by owner
+decision on 2026-09-06 (Word opens outside the Workbench). The approved
+audience is all PDs, PCs, the CSO, and the President. Its minimum contract is:
 
 - one cycle-scoped list of registered writeup artifacts, with request,
-  institution, program/PD, artifact stage, lifecycle state, and last-modified
-  context;
-- direct preview and **Open in Word** against the canonical SharePoint file;
-- filters for cycle, program/PD, artifact stage, and editing/review state;
+  institution, program/PD, artifact stage, lifecycle state, current
+  publication version, and last-modified context;
+- **Open in Word** against the canonical SharePoint file (inline preview
+  retired 2026-09-06);
+- filters for cycle, program/PD, artifact stage, and editing/review state
+  (owner-confirmed 2026-09-06 as a standing requirement; navigation-only, no
+  denominators or compliance reading);
 - an explicit per-editor **Reviewed** marker to distinguish “reviewed; no
   changes needed” from “not yet reviewed”; and
 - personal review state and reviewed history; and
@@ -936,9 +948,10 @@ Explicit non-goals during design freeze:
 > retry/recovery contract, Workbench Initial Assessment panel, and a cycle-wide
 > **pilot locator** under the existing `reviewers` app grant. The locator
 > supports the August 10 discovery/Open-in-Word path only; it is not the full
-> Editor Dashboard minimum contract above and does not yet provide program/PD,
-> stage, or editing-state filters, preview, current-version detail, or
-> per-editor Reviewed progress. Unit tests prove Ready-row no-overwrite,
+> Editor Dashboard minimum contract above and does not provide program/PD,
+> stage, or editing-state filters, current-version detail, or per-editor
+> Reviewed progress (those now live on the Final writeups dashboard for Final
+> artifacts; Initial Assessments remain locator-only). Unit tests prove Ready-row no-overwrite,
 > atomic replacement-Ready/prior-supersession, exact-input reactivation, exact
 > request-pointer fencing across concurrent first-time activations,
 > approved path with a positively resolved request-library parent, claim-lost
@@ -1022,9 +1035,10 @@ independently of later working edits.
   regeneration or create an editable sibling.
 - **Initial Assessment scale-out:** after the designated pilot, extend the
   proven path to every in-scope J27 proposal before staff/Board advancement.
-- **Editor Dashboard:** reuse the typed registry and artifact read contract to
-  provide the cycle-wide list, direct Word entry, and per-editor Reviewed
-  tracking once its deadline and access contract are approved.
+- **Editor Dashboard:** delivered for Final artifacts as the Final writeups
+  dashboard (cycle-wide list, direct Word entry, per-editor Reviewed tracking,
+  persona queues, coordinator matrix). Remaining: Slice 6 cycle scoping,
+  filters, and residuals in `docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md`.
 - **Overview:** add next-action/writeup signals only after their underlying state exists.
 
 Do not parallelize these dependent slices merely to fill tabs. A proven shared writeup

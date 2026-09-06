@@ -232,7 +232,10 @@ document inventory, and individual implementation plans do not establish priorit
   and hazards in `project-reviewer-card-simplification-direction`; S395 scope-accretion
   caution applies; high-risk automation stays review-only until the representative
   benchmark exists.
-- Current priorities: `docs/CURRENT_WORK_QUEUE.md`. **Queue item 5 added 2026-09-06
+- Current priorities: `docs/CURRENT_WORK_QUEUE.md`. **Queue item 5 (added 2026-09-06, owner-directed,
+  prioritized first): Final writeups dashboard completion — build the Editor Dashboard contract
+  filters and server-side cycle scoping, retire inline preview, keep residuals; Slice 6 of
+  `docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md`.** **Queue item 6 added 2026-09-06
   (owner-directed, not started, plan-first): automated materials-on-acceptance email for
   the December 2026 cycle** — on acceptance + onboarding the system emails the reviewer a
   materials link; nothing does this today (materials go out only via the PD release modal).

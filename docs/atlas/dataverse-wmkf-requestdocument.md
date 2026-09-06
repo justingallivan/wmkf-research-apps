@@ -28,7 +28,10 @@ related:
 
 **[VERIFIED 2026-07-29 via repository source]** Schema-as-code, adapter, producer,
 read API, Workbench panel, and cycle-wide pilot locator are implemented on the
-Initial Assessment pilot branch. The full Editor Dashboard remains planned.
+Initial Assessment pilot branch. **[UPDATED 2026-09-06]** The Editor Dashboard
+is delivered for Final artifacts as the Production-live Final writeups
+dashboard; cycle scoping and filters remain planned (Slice 6 of
+`docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md`).
 
 **[PRODUCTION-PROVED 2026-08-30 PT / 2026-08-31 UTC]** Wave 22 defines explicit group/leadership transition actor/time fields, and `FINAL_WRITEUP_SCHEMA_READY` conditionally extends the adapter projection. The owner-authorized apply/readback reported 4 exact / 0 absent / 0 divergent; Production readiness is now literal `on` in Ready deployment `dpl_7kzQ1v7XGtyNx4Fady2JxMrTxQEJ` on `ebb147bb`. The Slice 1 service and route create/reclaim one deterministic Final row over the exact same SharePoint drive/item, then atomically move the source lifecycle to Final, ready the Final row in Review, store the explicit group-review actor/time, retain `wmkf_CurrentPreSiteVisit`, and set `wmkf_CurrentFinalWriteup`. Authorized Request `1002788` proved this contract: current Final row `b6d6220b-f0a4-f111-b8dd-70a8a59cded0` points to source/current Pre-Site row `7b059a2f-19a3-f111-b8dd-000d3a5bbe46`; both reference the same SharePoint item/version/hash/size and the Final row records Justin Gallivan at `2026-08-31T03:57:20Z`. No Graph copy/upload occurred.
 
@@ -285,8 +288,8 @@ Production Request Document row was created by this release smoke.
   `wmkf_milestonecreatedat` on the same row. Exact completed retries are
   idempotent; no SharePoint copy or mutation occurs.
 - Workbench and the pilot locator consume the same registry row; neither joins
-  by filename. The planned full Editor Dashboard will reuse this identity
-  contract.
+  by filename. The Final writeups dashboard reuses this identity contract
+  today; the planned Slice 6 cycle scoping and filters keep it.
 
 ## Initial Assessment pilot contract
 

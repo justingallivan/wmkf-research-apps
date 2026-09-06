@@ -578,7 +578,9 @@ non-superseded lifecycle.
    fields on the Final row; `modifiedby` is not authoritative. Group-review
    attribution is Production-proved; leadership fields remain reserved for the
    later leadership slice.
-4. Add Editor Dashboard Reviewed acknowledgements as a separate child entity.
+4. **Completed and Production-proved 2026-08-31 (Wave 23
+   `wmkf_finalwriteupreviewacknowledgement`):** Editor Dashboard Reviewed
+   acknowledgements are a separate child entity.
    They are version-aware tracking, not document lifecycle or approval fields.
    The full coordinator matrix is a read model over those rows and each
    request's configured broad Grant Program reviewer audience, with no required
@@ -946,7 +948,7 @@ strategy; this plan itself performs no deployment.
 - Retrying an identical operation creates no duplicate current artifact.
 - Later edits and recovery use the same Ready Word item and native SharePoint
   version history; first-release Final regeneration is not exposed.
-- Overview and the future Editor Dashboard can derive the current Pre-Site and
+- Overview and the Final writeups dashboard can derive the current Pre-Site and
   Final documents from Request lookups without filename or folder joins.
 - Staff who rely on AkoyaGo and approved Power Automate consumers can resolve
   the intended published representation through a tested contract, while the

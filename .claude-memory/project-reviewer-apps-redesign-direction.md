@@ -5,7 +5,7 @@ metadata:
   type: project
   status: active
   scope: reviewer
-  last_verified: 2026-09-04 via source/tests, live Dataverse/Graph reads, Ready Production deployment, and persona projection smoke
+  last_verified: 2026-09-06 via source (Final writeups dashboard service/views) and owner decision
 ---
 
 ## Recall Rule
@@ -49,8 +49,13 @@ on 2026-09-03 PT. [OWNER-REPORTED 2026-09-04] Duncan Spore then found Request
 user for the Editor lens. The target contract preserves the former
 single-folder workflow as a staff-wide cycle Editor Dashboard with direct entry
 to the canonical SharePoint Word files and explicit per-editor Reviewed
-tracking. A narrower pilot locator with a cycle list and direct Word entry is
-implemented in source under the existing `reviewers` app grant. All PDs are expected eventually to
+tracking. **[UPDATED 2026-09-06]** That contract is delivered for Final artifacts
+as the Production-live Final writeups dashboard (`/workbench/final-writeups`);
+the owner confirmed on 2026-09-06 that the contract filters (cycle, program/PD,
+stage, review state) are still required, retired inline preview, and kept the
+residuals (cycle scoping before D26 Finals, current-version context, "has edits"
+hint, other stages) as Slice 6 of `docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md`.
+The narrower Initial Assessment locator remains a separate cycle list. All PDs are expected eventually to
 evaluate the materials, and designated staff proofreaders also need access.
 Final acknowledgements key to the Final artifact and observed SharePoint
 publication version. The global role-eligible audience is all PDs, PCs, CSO,
@@ -410,7 +415,7 @@ S194 set direction (replace Finder + Manager with Reviewer Workbench + Reviewer 
     2026-08-18, with up to ~300 full proposals and most never reviewed; winnows
     to the pursue-set (≈ [[project-staged-review-pipeline]]). Replaces the
     triage spreadsheet.
-  - **Editor lens** (future) = writeup **"Reviewed"** tracker for the writeup-collaborator set (PDs + CSO + President). Per-person ("reviewed N of M"); same shape as the reviewer "Completed" tab but for editors. The President only looks at writeups, so this is effectively her whole cycle view. **Tracking, NOT a gate (Justin 2026-05-31)** — sign-off was never rigorously enforced (often just a "I looked at your writeups" email). Its real job is to **resolve the silent case**: writeups use track-changes, so "has edits" is visible, but *no edits* is ambiguous (reviewed-nothing-to-change vs not-yet-looked). So: an **explicit per-editor "Reviewed" marker** (the signal track-changes can't give) + **track-changes presence as a secondary auto-hint** ("has edits", derived from the SharePoint Word doc, not stored). Row per editor: untouched / has edits / reviewed. "Reviewed" reads truer than "Sign-off" (not an approval gate). NEW data: the marker is per-`(editor, writeup)` (new Dataverse child/records). STILL OPEN: granularity (per request vs writeup-stage); personal view vs a who-reviewed-what matrix (Sarah).
+  - **Editor lens** (SHIPPED as the Final writeups dashboard; Slice 6 filters/cycle scoping planned) = writeup **"Reviewed"** tracker for the writeup-collaborator set (PDs + CSO + President). Per-person ("reviewed N of M"); same shape as the reviewer "Completed" tab but for editors. The President only looks at writeups, so this is effectively her whole cycle view. **Tracking, NOT a gate (Justin 2026-05-31)** — sign-off was never rigorously enforced (often just a "I looked at your writeups" email). Its real job is to **resolve the silent case**: writeups use track-changes, so "has edits" is visible, but *no edits* is ambiguous (reviewed-nothing-to-change vs not-yet-looked). So: an **explicit per-editor "Reviewed" marker** (the signal track-changes can't give) + **track-changes presence as a secondary auto-hint** ("has edits", derived from the SharePoint Word doc, not stored). Row per editor: untouched / has edits / reviewed. "Reviewed" reads truer than "Sign-off" (not an approval gate). NEW data: the marker is per-`(editor, writeup)` (new Dataverse child/records). STILL OPEN: granularity (per request vs writeup-stage); personal view vs a who-reviewed-what matrix (Sarah).
   - Flow: triage → winnow → reviewer (manage reviewers) → … → editor (writeup "Reviewed" tracking) → board.
   - **The winnowing is a concrete staff funnel, currently a SPREADSHEET (Justin 2026-05-31).** D26 example: Phase I long list **~200 → ~32 → ~28** intended to invite to Phase II; the final set is advanced AS A GROUP. So the J27 triage dashboard's core job is precise: **replace that spreadsheet** — long list → short list → final list, ending in an **advance-the-group** action (which in J27 is the real phase trigger that hands the set to the reviewer dashboard). Note volumes differ by cycle: D26 Phase I long list ≈ 200; J27 single-submission inflow up to ~300. Consequence for the #2 actionability work: the reviewer dashboard's rows stay **reviewer-centric** (find→invite→track→approve&pay); the 300-proposal triage actionability is a SEPARATE future design, do not jam it into the reviewer dashboard.
 - **D26 (current, dual-phase) temporary patch.** D26 is the current cycle; Phase I→II flip ~mid-June 2026 (single-submission begins J27). In the dual-phase model, Phase II = the already-winnowed set (Phase I committee advanced them), so the reviewer dashboard fits D26 **as-is** — no triage dashboard needed for D26. Plan: ship the reviewer dashboard for D26 as a fenced, throwaway-OK patch, and **populate PD dashboards before mid-June** so PDs start finding reviewers at-risk (board recommendations known early; overturns rare).

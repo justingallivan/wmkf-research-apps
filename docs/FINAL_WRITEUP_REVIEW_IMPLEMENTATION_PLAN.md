@@ -3,10 +3,10 @@ title: Final Writeup Review — Implementation Plan
 domain: workbench
 kind: plan
 status: active
-summary: "Final runtime, v2 staffing, and explicit persona dashboard lenses are Production-live; stage-transition and signed-in persona observation work remain."
+summary: "Final runtime, v2 staffing, and explicit persona dashboard lenses are Production-live; stage transitions and the Slice 6 dashboard filters/cycle scoping remain."
 canonical: false
 cataloged: 2026-08-28
-last_verified: 2026-09-04
+last_verified: 2026-09-06
 owner: product-engineering
 related:
   - docs/audits/final-writeup-review-fable-review-2026-08-28.md
@@ -461,7 +461,10 @@ Leadership review.
 ### Final Writeups dashboard
 
 - New route and navigation entry for the approved audience.
-- One search field; no filter forest.
+- ~~One search field; no filter forest.~~ **SUPERSEDED BY OWNER DECISION 2026-09-06:** the
+  shipped queue-only shape is not the end state. Keep the single search field and the persona
+  queues, and ADD the contract filters (cycle, program/PD, artifact stage, editing/review state)
+  as navigation-only controls; see Slice 6. Inline document preview is retired from the contract.
 - Primary and secondary lists derive from the server-resolved persona.
 - Row default for every non-owner: **Open review**.
 - Responsible-PD rows, if shown in a stewardship context, use **Edit in Word**.
@@ -635,6 +638,65 @@ This slice can ship before the PC/leadership persona model because responsible-P
 - Prove a routine Word edit changes the personal label without requeueing leadership.
 - **Complete for President and PC:** **[OWNER-REPORTED 2026-09-03]** Representative Word access is proved: President Allison Keller (Leadership) opened the canonical Word item through the signed-in Final Writeups experience and marked it reviewed on 2026-09-03, and Program Coordinators Duncan Spore and Sarah Hibler did the same (dates not recorded). The owner saw Allison's acknowledgement on the dashboard; no independent Dataverse readback was run. CSO access is not yet separately proved.
 - Stop before board-package generation or Power Automate integration.
+
+### Slice 6 — cycle scoping, filters, and dashboard residuals
+
+**[OWNER-DIRECTED 2026-09-06; PLANNED, NOT BUILT.]** On 2026-09-06 the owner reviewed the
+Editor Dashboard contract (`docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md` "Final Writeups
+Dashboard" and `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` "Cycle-wide Editor Dashboard contract")
+against the shipped Final writeups dashboard and decided: **keep the filters requirement and build
+it; retire inline "direct preview" from the contract; keep the remaining residuals as tracked work.**
+This supersedes the earlier "one search field; no filter forest" line above.
+
+Current-state boundary [VERIFIED 2026-09-06 via source]:
+
+- `lib/services/final-writeup/dashboard-service.js` loads **every** request with a current Final
+  across all cycles (`_wmkf_currentfinalwriteup_value ne null`, no cycle constraint) and throws
+  `final_writeups_dashboard_scope_exceeded` (503) once more than
+  `FINAL_WRITEUPS_DASHBOARD_MAX_ROWS` (100) current rows exist. Each row already carries
+  `cycleCode`/`cycleLabel`, `stage`, `responsibleProgramDirector`, `bucket`, `personalState`, and
+  `document.publicationVersionId`/`lastModified`.
+- `shared/components/final-writeups/FinalWriteupsViews.js` renders one free-text search over
+  request number, title, institution, project leader, and PD name; it renders neither the cycle nor
+  the publication version and offers no filter controls. Its header comment records the superseded
+  "review queue replaces a metrics-and-filters dashboard" thesis.
+- No "has edits" hint exists anywhere in the Final Writeup service or components.
+- Pre-Site / Site Visit documents have no cycle-wide list; the Initial Assessment locator
+  (`/workbench/artifacts`) is a separate cycle-scoped list without Reviewed tracking.
+
+Build order (each step reviewable on its own; `/contract-reconcile` applies to 6A because the
+read model's scope, cap, and fail-closed behavior change):
+
+- **6A — server-side cycle scoping (dated: before D26 Final writeups exist).** The 100-row cap is
+  global, so a second cycle of Finals eventually takes the whole dashboard down rather than
+  degrading. Scope the request query by the selected cycle (artifact-cycle query from the current
+  Final rows' requests, per the persona section above — not the lead-PD-derived picker), return the
+  available cycle list with the payload, default to the newest cycle with any current Final, and
+  keep the per-cycle cap and fail-closed behavior. The cycle selector is the first filter and lives
+  in the API contract; add `cycleCode` validation to the GET route and the route-security matrix
+  row. The persona queues, matrix, and focused page keep their semantics inside the selected cycle.
+- **6B — client-side filters over the loaded cycle.** Program/PD (responsible PD), artifact stage
+  (Group review / Leadership review), and editing/review state (Not reviewed / Reviewed / Updated
+  since review / My writeups) as navigation-only controls beside the search field, applied to the
+  open, history, and stewardship queues and to the coordinator matrix. Counts shown on a filter
+  are navigation counts, never denominators; no program-taxonomy grouping or authorization branch
+  (contract rows "coordinator matrix is complete without becoming a compliance scorecard" and
+  "program taxonomy does not control access or primary grouping" still hold). Filters persist in
+  the URL query so a filtered view is bookmarkable. Replace the header thesis comment in
+  `FinalWriteupsViews.js` with the amended direction.
+- **6C — current-version context.** Preview is retired; in its place render the observed
+  SharePoint publication version that acknowledgements key to, next to last-modified, so
+  "Updated since review" is explainable without opening Word. No embedded editor, no iframe.
+- **6D — "has edits" secondary hint (product call, unscheduled).** SharePoint revision or
+  tracked-changes evidence as a secondary hint only; it never replaces the explicit Reviewed
+  marker. Requires a Graph read contract and a freshness posture before build.
+- **6E — other writeup stages (product call, unscheduled).** Decide whether Pre-Site / Site Visit
+  documents need a cycle-wide list or the per-request Staff Deliberations tab suffices; the Initial
+  Assessment locator stays separate unless that decision says otherwise.
+
+Explicitly unchanged: no approval gates, denominators, due dates, or leadership ordering; Word
+opens outside the Workbench; the responsible PD does not self-acknowledge; PC backup and the
+Leadership-stage transition remain the separate slices named above.
 
 ## Likely file surface
 

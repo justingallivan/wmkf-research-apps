@@ -301,7 +301,15 @@ will be in hand at request time, and on acceptance plus onboarding the system
 will email the reviewer a link to the materials with no PD action. Today
 materials go out only through the PD-driven release modal. Plan first, build
 when the current campaigns settle, live before the first D26 acceptance;
-sequence and boundary in `docs/CURRENT_WORK_QUEUE.md` item 5.
+sequence and boundary in `docs/CURRENT_WORK_QUEUE.md` item 6.
+
+**Prioritized ahead of it (owner-directed 2026-09-06):** completing the Final
+writeups dashboard against the Editor Dashboard contract. The dashboard is
+Production-live for Final artifacts; the owner kept the filters requirement
+(cycle, program/PD, stage, review state), retired inline preview, and kept the
+residuals. Cycle scoping is dated before D26 Final writeups exist because the
+list spans all cycles under one hard 100-row cap. Plan: Slice 6 of
+`docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md`; queue item 5.
 
 ---
 

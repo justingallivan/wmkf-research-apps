@@ -117,9 +117,11 @@ hood.
 - **Initial Assessment pilot locator (deployed and exercised):** queries the
   same typed registry across a cycle so approved
   collaborators can find and open the canonical Word files without visiting
-  every request separately. This narrow cycle list does not yet implement the
-  full Editor Dashboard filters, preview/version context, or Reviewed progress
-  contract below.
+  every request separately. This narrow cycle list does not implement the
+  Editor Dashboard filters, version context, or Reviewed progress contract
+  below; for Final artifacts those live on the Final writeups dashboard
+  (Reviewed progress live; filters, cycle scoping, and version context planned
+  as Slice 6 of `docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md`).
 - **Current metadata readback (deployed and live-verified 2026-07-30 local /
   2026-07-31 UTC):** native
   Word editing preserves stable item identity, while Dataverse intentionally
@@ -777,7 +779,13 @@ writeups—without copying the files or rebuilding Word editing.
 
 It should list the registered artifacts by cycle and expose request identity,
 institution, program/PD, artifact type/stage, lifecycle state, current version,
-last modified, preview, and **Open in Word**. The earlier design also established
+last modified, and **Open in Word** (inline preview retired by owner decision
+2026-09-06; Word opens outside the Workbench). Filters for cycle, program/PD,
+stage, and editing/review state are a standing requirement (owner-confirmed
+2026-09-06). **[STATUS 2026-09-06]:** the Final writeups dashboard is
+Production-live for Final artifacts; cycle scoping, the filters, and
+current-version display are planned as Slice 6 of
+`docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md`. The earlier design also established
 an explicit per-editor **Reviewed** marker and personal “N of M” progress.
 That marker is tracking, not approval; SharePoint “has edits” evidence is only
 a secondary hint because no edits can mean either “reviewed; no changes” or
