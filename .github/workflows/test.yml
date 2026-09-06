@@ -46,6 +46,8 @@ jobs:
       - run: npm run check:dynamics-context-boundary:self-test
       - run: npm run check:route-service-boundary
       - run: npm run check:route-service-boundary:self-test
+      - run: npm run check:reviewer-engagement-boundary
+      - run: npm run check:reviewer-engagement-boundary:self-test
       - run: npm run check:route-lifecycle-auth
       - run: npm run check:route-lifecycle-auth:self-test
       - run: npm run check:secret-scan

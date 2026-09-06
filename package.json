@@ -89,6 +89,8 @@
     "check:route-lifecycle-auth:self-test": "node scripts/check-route-lifecycle-auth-self-test.js",
     "check:route-service-boundary": "node scripts/check-route-service-boundary.js",
     "check:route-service-boundary:self-test": "node scripts/check-route-service-boundary-self-test.js",
+    "check:reviewer-engagement-boundary": "node scripts/check-reviewer-engagement-boundary.js",
+    "check:reviewer-engagement-boundary:self-test": "node scripts/check-reviewer-engagement-boundary-self-test.js",
     "check:request-document-writers": "node scripts/check-request-document-writers.js",
     "check:request-document-writers:self-test": "node scripts/check-request-document-writers.js --self-test",
     "probe:request-document-explicit-actor-census:self-test": "node scripts/probe-request-document-explicit-actor-census.js --self-test",
