@@ -292,7 +292,13 @@ or backfill.
   Advisories folded into the correction: scan `shared/`/`modules/` too (same as Codex); two stale
   caller comments; a normalization-discriminating fixture. Noted, no action: `{ grantCycleCode:
   undefined }` yields a count with zero writes (pre-existing `bulkUpdateByRequest` behavior,
-  unreachable from the caller); the whitelist throws a plain `Error` like its sibling. Correction sent.
+  unreachable from the caller); the whitelist throws a plain `Error` like its sibling.
+- **3K correction `c07902cc`** (rebased on `4c4f2c39`; PR #167): importers census scans all five
+  production roots for the bare identifier with a recorded three-file set (adapter; my-candidates
+  comment-only mentions; gate script table/docblock) and an interim-census header; spaced call under
+  `shared/` proved red; stale caller comments renamed; transport-identity test uses
+  `'Medical Research Program'` → `'Medical Research'` and asserts the normalized payload. 806 / 11,641;
+  gates green. Codex round 2 running on the census fix.
 
 ## Docs (after each merge)
 
