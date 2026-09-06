@@ -1580,7 +1580,9 @@ returned zero eligible/enqueued/claimed/failed.** Plan doc:
   calling the initial-assessment API; `WorkbenchViewsNav` hides that view for D26. The
   D26-pilot records in `docs/INITIAL_ASSESSMENT_CONTROLLED_PILOT_2026-07-30.md` and the
   requestdocument Atlas page are historical and no longer reproducible through that view for
-  D26. (c) `ReviewersTab` wraps the panel in a `request-reviewer-table` container carrying
+  D26. **Owner-confirmed 2026-09-05 (S489):** the D26 pilot existed to prove the plumbing;
+  its output is not used by D26 business processes, so hiding the view is intended. Initial
+  Assessments return in J27 as a real feature, not a test — do not "restore" the D26 view. (c) `ReviewersTab` wraps the panel in a `request-reviewer-table` container carrying
   `degraded={Boolean(error)}` (pinned by `reviewers-tab-stale-request.test.js`); status pills
   across Status, Staff Deliberations, Final writeups and the request locator gained a uniform
   min-height. Change record: `docs/plans/UI_FEATURES_CODEX_HANDOFF_2026-09-05.md`.
