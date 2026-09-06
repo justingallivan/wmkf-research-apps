@@ -54,8 +54,8 @@ permission-loss close after a Codex adversarial review) are complete on branch
 settings-identity widening after a Codex adversarial review, `0a4eafd6` advisory test, `9a790c64`/`529ee426` 6B3b recipient-field widening after a second, `2622dfc7` 6B3c proposal-field widening after a third, `be76760f` 6B3d host refetch-error fix after a fourth, `5b57991d` 6B3e degraded mode built by Codex and reviewed by Claude after a fifth) is also
 complete with independent PASS verdicts; see the
 [Stage 6B3 receipt](REVIEWER_LIFECYCLE_STAGE6B3_RECEIPT_2026-09-05.md).
-Stage 6B is complete on the branch. Nothing is merged or deployed; promotion is the
-next owner decision.** On 2026-09-05 the owner also decided, after a third Codex adversarial
+Stage 6B is complete and was promoted on 2026-09-05: PR #150 merged as `600cc972`, production
+deployment `dpl_4Jjwwou9LKd3z29KqgXaLmZMaWQw` Ready, without a browser smoke (owner decision).** On 2026-09-05 the owner also decided, after a third Codex adversarial
 review of the materials modal: key the modal session on the proposal fields the panel carries
 now (6B3c), and queue a server-side draft fingerprint (Stage 6D) for the co-investigator and
 unrefetched-edit gaps rather than accept them as a product limit.

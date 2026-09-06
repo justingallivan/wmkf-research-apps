@@ -3,7 +3,7 @@ title: Reviewer Lifecycle Stage 6B — Build Handoff
 domain: reviewer-workbench
 kind: plan
 status: active
-summary: Sequential in-place action lifetime fixes; 6B1, 6B2 and 6B3 are all complete on a branch with independent PASS verdicts; promotion is the next decision.
+summary: Sequential in-place action lifetime fixes; 6B1–6B3 reviewed, promoted to main (600cc972) and production 2026-09-05; elective stages 6C/6D are next.
 canonical: false
 owner: product-engineering
 last_verified: 2026-09-05
@@ -45,9 +45,9 @@ proposal title, abstract, PI and institution after a third, and 6B3d (`be76760f`
 fifth; the reviewed amendments have independent PASS verdicts, the last full suite is recorded in
 the receipt. See the
 [Stage 6B3 receipt](audits/REVIEWER_LIFECYCLE_STAGE6B3_RECEIPT_2026-09-05.md).
-**Stage 6B is therefore complete on `codex/reviewer-lifecycle-stage6b`.** Nothing is
-merged or deployed; promotion (PR, CI, deliberate merge under the release strategy) is
-the next owner decision. The three receipts carry the accepted limits that a later
+**Stage 6B is therefore complete and promoted.** **Promoted 2026-09-05:** PR #150 merged to `main` as `600cc972` after all eight CI checks passed; Vercel production deployment `dpl_4Jjwwou9LKd3z29KqgXaLmZMaWQw` reached Ready. No signed-in browser smoke of the 6B surfaces ran before or after the merge (Chrome automation could not reach a local server; the owner chose to promote on unit tests, reviews and CI). Codex's `codex/ui-features` (PR #151, `3fc0a936`, deployment `dpl_3hiiDPpWN1Zt1yAWcQnVXPURQfL8`) was rebased onto it the same day; the one `ReviewersTab.js` conflict was resolved by carrying `degraded={Boolean(error)}` into Codex's `request-reviewer-table` wrapper, verified by a 10-suite / 534-test run and a guard removal that turns `reviewers-tab-stale-request.test.js` red.
+The next owner decision is which elective stage (6C extraction, 6D draft fingerprint,
+or the parked stages) to plan. The three receipts carry the accepted limits that a later
 stage inherits: callback promises are observed, not awaited; no post-close
 refresh-failure surface exists for the reminder, closeout or materials components; the
 closeout modal closes itself on committed permission loss; a membership change during an

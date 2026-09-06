@@ -48,6 +48,8 @@ Azure redirect URI. Do NOT assume `.env.local` already has Azure AD + NextAuth c
 (S346: that file had none — see [[project-local-dev-auth-setup]] for the full checklist:
 Azure AD vars, `AUTH_REQUIRED=true`, `EXTERNAL_LINK_SECRET`).
 
+**NOTED 2026-09-05 (Session 488):** two local-smoke facts. (1) Claude-in-Chrome automation could not load `http://localhost:3000`, `localhost:3001` or `127.0.0.1:3001` from this machine (error page, zero hits in the dev-server log) while a public site loaded in the same tab group [VERIFIED]; a browser-driven local smoke needs the owner's own browser or a fix to the extension's site access. (2) Microsoft's documented localhost exception ignores the port for `http://localhost` redirect URIs, so a `next dev -p 3001` server with `NEXTAUTH_URL=http://localhost:3001` should authenticate against the registered `:3000` callback [ASSUMED per Microsoft docs; the sign-in was never completed because of (1)]. The port-3000 slot may be occupied by the Codex worktree's own dev server; do not kill another agent's server to free it.
+
 **VERIFIED 2026-08-02:** a non-main branch push created a Git-integrated Preview
 with a stable branch alias. A normal Microsoft staff sign-in succeeded only after
 that exact alias callback was temporarily added to the Entra app; the callback was

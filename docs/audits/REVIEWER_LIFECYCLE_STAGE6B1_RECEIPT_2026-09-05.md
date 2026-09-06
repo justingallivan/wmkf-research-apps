@@ -239,4 +239,4 @@ expressed for 6B2 or 6B3.**
 - A regenerate URL returned to a stale context corresponds to a token already minted server-side; the client suppresses display only. No rollback exists.
 - Terminal 409 `write_failed` may have partially committed; no replay is added.
 - No browser/live probe, deployment or human UAT ran for this slice.
-- Nothing from this slice is merged to `main` or deployed. Promotion follows the release strategy as a separate, deliberate action.
+- Promoted to `main` 2026-09-05 as part of PR #150 (`600cc972`); see the Stage 6B3 receipt's Promotion section.

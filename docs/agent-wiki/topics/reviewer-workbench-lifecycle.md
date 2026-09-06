@@ -229,8 +229,8 @@ Existing null/empty-string status clearing on open rows remains supported,
 with closed-source protection intact; Stage 6A adds no status-validation policy.
 No rollback or automatic retry is introduced.
 
-Stage 6B1 (branch `codex/reviewer-lifecycle-stage6b`, `9258115a`/`06725d6c`, not
-merged): the regenerate-token, revoke-token, remove-reviewer and terminal-transition
+Stage 6B1 (branch `codex/reviewer-lifecycle-stage6b`, `9258115a`/`06725d6c`, merged to
+`main` 2026-09-05 as `600cc972`, production-live): the regenerate-token, revoke-token, remove-reviewer and terminal-transition
 handlers in `ReviewerManagePanel.js` bind their alerts, prompt, clipboard write and
 `onRefresh` call to the UI context that started them through a per-action/row
 attempt registry invalidated by the existing layout effects. Stale outcomes after
@@ -240,7 +240,7 @@ confirmed mutation is reported separately. Payloads, success predicates and the
 status mutex are unchanged. Tests: `tests/unit/reviewer-action-lifetimes.test.js`.
 Receipt: `docs/audits/REVIEWER_LIFECYCLE_STAGE6B1_RECEIPT_2026-09-05.md`.
 
-Stage 6B2 (same branch, `b08c16f6`/`d3ec406a`/`039d5d8e`, not merged): `ReviewReminderAction` in
+Stage 6B2 (same branch, `b08c16f6`/`d3ec406a`/`039d5d8e`, merged with 6B1): `ReviewReminderAction` in
 `ReviewerManagePanel.js` and `ReviewerCloseoutModal.js` observe committed request/reviewer
 identity and parent read-only/management context through a no-deps layout effect and a
 monotonic epoch, separate from the per-attempt generation token. A stale attempt keeps its
@@ -261,7 +261,7 @@ Receipt: `docs/audits/REVIEWER_LIFECYCLE_STAGE6B2_RECEIPT_2026-09-05.md`.
 
 Stage 6B3 (same branch, `a6a27ce8`/`b163172a`, amended by 6B3a `3a4bcbbe`/`0a4eafd6`, 6B3b
 `9a790c64`/`529ee426`, 6B3c `2622dfc7`, 6B3d `be76760f` (host) and 6B3e `5b57991d` (degraded
-mode), not merged): the nested materials-release modal's
+mode), merged with 6B1): the nested materials-release modal's
 session is open state, request id, the sorted selected membership with each reviewer's name,
 email and affiliation by value (`membershipKeyFor`), the proposal title, abstract, PI and
 institution by value (`proposalKeyFor`, passed as the `proposalKey` string prop), and the

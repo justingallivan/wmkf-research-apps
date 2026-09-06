@@ -210,7 +210,7 @@ browser-verified.
 - Note for Stage 6C: the unmount `proposalLoadSeq` bump has no discriminating assertion as long as `loadProposal`'s continuations are setState-only; if extraction adds an abort controller, an external callback or a storage write there, pin it.
 - Structural zeros retained as defense in depth: the preview finally double-epoch check (pre-existing, unpinned anywhere), the prior-key/session/consumed checks in the completion exemption, the post-import upload checkpoint.
 - The `email_unconfirmed` stream event exists in the service vocabulary with no modal branch; pre-existing, not investigated.
-- No browser/live probe, deployment or human UAT ran for this slice. Nothing is merged to `main` or deployed; promotion is a separate, deliberate action under the release strategy.
+- No browser/live probe, deployment or human UAT ran for this slice at the time of the review. Promoted afterwards; see the Promotion section at the end of this receipt.
 
 ## Amendment 6B3a — settings folded into the session identity (2026-09-05)
 
@@ -454,3 +454,15 @@ Nine-suite selection 9 / 522 at commit. Full battery at `5b57991d` (orchestrator
 Accepted limits: the gate is client-side and advisory (server guards remain authoritative); the
 retry re-enables controls optimistically while loading; the reviewer-follow-up host has no
 equivalent and still unmounts its panel on error (pre-existing).
+
+## Promotion (2026-09-05)
+
+**Promoted 2026-09-05:** PR #150 merged to `main` as `600cc972` after all eight CI checks passed; Vercel production deployment `dpl_4Jjwwou9LKd3z29KqgXaLmZMaWQw` reached Ready. No signed-in browser smoke of the 6B surfaces ran before or after the merge (Chrome automation could not reach a local server; the owner chose to promote on unit tests, reviews and CI). Codex's `codex/ui-features` (PR #151, `3fc0a936`, deployment `dpl_3hiiDPpWN1Zt1yAWcQnVXPURQfL8`) was rebased onto it the same day; the one `ReviewersTab.js` conflict was resolved by carrying `degraded={Boolean(error)}` into Codex's `request-reviewer-table` wrapper, verified by a 10-suite / 534-test run and a guard removal that turns `reviewers-tab-stale-request.test.js` red.
+
+Correction recorded for the orchestrator: a first conflict check between the two branches used the
+legacy `git merge-tree` output and grepped for conflict markers, reporting zero conflicts; `git merge-tree
+--write-tree` reported the real content conflict. Use the write-tree form for merge preflights.
+
+Open after promotion: the reviewer-follow-up host refetch-error behavior (now on Codex's rewritten
+`pages/workbench/reviewer-follow-up.js`); a manual smoke of the release-materials, closeout and reminder
+affordances on production remains the cheapest missing evidence.
