@@ -139,6 +139,13 @@ items confirmed resolved; tests 5 and 8 confirmed to exercise pending fetches ra
 cancellation. Codex's sandbox could not run Jest (EPERM on the haste map); the slice-exit test
 evidence below is orchestrator-run.
 
+**Merged and smoked:** PR #152 → `e9909e91` (2026-09-05 PT), production deployment success.
+Signed-in production smoke (S489): `/workbench/reviewer-follow-up?cycleCode=D26` loaded 10 assigned
+requests with no banner; "Show reviewer activity" mounted the panel; toggling to All requests
+cleared the list to the loading placeholder (no stale cards) and reloaded 44 cycle requests / 67
+active reviewers with no banner. The failure paths are covered by tests only (not provokable on
+production).
+
 **Declined (recorded):** Codex round 1 asked for a real-panel test proving mutating controls are
 disabled while `degraded`. That contract is already pinned by
 `tests/unit/reviewer-manage-degraded.test.js` (6B3e) against the real panel; the host tests here
