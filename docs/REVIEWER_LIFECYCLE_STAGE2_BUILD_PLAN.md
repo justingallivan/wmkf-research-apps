@@ -95,6 +95,8 @@ No other file changes. No new map values. No server imports into the shared modu
   scopes Stage 2 to consolidating duplicated policy without behavior change. Tightening `softDelete`
   is a real hardening candidate (select `wmkf_completedat`, gate with `isClosedEngagementRow`) with
   a staff-visible effect (Remove refuses such rows) — owner decision, tracked in `SESSION_PROMPT.md`.
+  **Resolved 2026-09-06 (S490, decision D0 taken):** `softDelete` now selects `wmkf_completedat` and gates
+  with `isClosedEngagementRow`; the discriminating fixture below is in `reviewer-suggestion-disposition.test.js`.
   (2) **Medium — exported mutable Sets and a two-flavor API. Accepted:** make the Sets
   module-private; export `isClosedEngagementStatus(status)` (status-only, for the two historical
   status-only sites) alongside the two row predicates; the adapter's status-only sites call that
