@@ -3,6 +3,7 @@ import { Button } from '../Layout';
 import { EMPTY_TEMPLATES, loadEmailTemplates, saveEmailTemplates } from './email-template-store';
 import { renderPreviewFailureMessage, RENDER_PREVIEW_NETWORK_MESSAGE } from './render-preview-failure';
 import { membershipKeyFor } from './reviewer-draft-keys';
+import { SEND_SKIP_REASON_LABEL } from '../../utils/reviewer-send-skip-reasons';
 
 // ─── Email Modal ────────────────────────────────────────────────────────────
 
@@ -728,6 +729,7 @@ export default function ReleaseMaterialsModal({ isOpen, onClose, reviewers, prop
             subject: d.subject,
             body: d.body,
             externalLinkExpected: d.externalLinkExpected,
+            draftFingerprint: d.draftFingerprint,
           })),
           templateType,
           attachmentUrls,
@@ -1214,7 +1216,7 @@ export default function ReleaseMaterialsModal({ isOpen, onClose, reviewers, prop
                   <div key={`sk-${s.suggestionId}`} className="flex items-center gap-2 p-2 bg-gray-50 rounded text-sm text-gray-600">
                     <span>—</span>
                     <span className="font-medium">{s.candidateName}</span>
-                    <span className="text-xs">skipped ({s.reason || 'not sent'})</span>
+                    <span className="text-xs">skipped ({SEND_SKIP_REASON_LABEL[s.reason] || s.reason || 'not sent'})</span>
                   </div>
                 ))}
               </div>
