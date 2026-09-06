@@ -1021,6 +1021,111 @@ describe('settings identity (signature / review deadline)', () => {
   });
 });
 
+// ── Recipient identity (Stage 6B3b) ──────────────────────────────────────
+//
+// The rendered draft body (candidate.name / candidate.email /
+// candidate.affiliation — see email-generator.js buildTemplateContext) is
+// sent VERBATIM; the server only re-resolves the destination address at
+// send time. So a same-id change to a selected reviewer's name/email/
+// affiliation after a preview must invalidate the modal session exactly
+// like a membership change, or the sent body shows a stale greeting/
+// affiliation. The reviewers-service projection this panel's rows come from
+// (lib/services/review-manager/reviewers-service.js) does not carry an
+// expertiseAreas/expertise field at all, so there is nothing to fold into
+// the key for it (see membershipKeyFor in ReviewerManagePanel.js).
+describe('recipient identity (name / email / affiliation)', () => {
+  test('a reviewer name change (same id) during a pending preview invalidates it back to compose', async () => {
+    const first = deferred();
+    renderEmailsBehavior = () => first.promise;
+    const { rerender } = renderPanel({ reviewers: [REVIEWER_A, REVIEWER_B] });
+    fireEvent.click(checkboxForRow('Accepted A'));
+    openReleaseModal(1);
+    await preview(1);
+    await waitFor(() => expect(renderCalls().length).toBe(1));
+
+    rerender(
+      <ReviewerManagePanel
+        proposal={PROPOSAL}
+        reviewers={[{ ...REVIEWER_A, name: 'Renamed A' }, REVIEWER_B]}
+        settings={{ signature: 'PD' }}
+      />,
+    );
+
+    first.resolve(mockJson({ drafts: [draftFor(REVIEWER_A)] }));
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+
+    expect(screen.queryByRole('button', { name: /send 1 email/i })).toBeNull();
+    expect(renderCalls().length).toBe(1);
+  });
+
+  test('a reviewer affiliation change after a completed preview invalidates back to compose, and Preview again re-renders for the same membership', async () => {
+    renderEmailsBehavior = () => mockJson({ drafts: [draftFor(REVIEWER_A)] });
+    const { rerender } = renderPanel({ proposal: PROPOSAL, reviewers: [{ ...REVIEWER_A, affiliation: 'Old Univ' }] });
+    openReleaseModal(1);
+    await preview(1);
+    await screen.findByRole('button', { name: /send 1 email/i });
+    expect(renderCalls().length).toBe(1);
+
+    rerender(
+      <ReviewerManagePanel
+        proposal={PROPOSAL}
+        reviewers={[{ ...REVIEWER_A, affiliation: 'New Univ' }]}
+        settings={{ signature: 'PD' }}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: /send 1 email/i })).toBeNull();
+    expect(screen.getByRole('button', { name: /preview 1 email/i })).toBeTruthy();
+
+    await preview(1);
+    await waitFor(() => expect(renderCalls().length).toBe(2));
+    const [, init] = renderCalls()[1];
+    const payload = JSON.parse(init.body);
+    expect(payload.suggestionIds).toEqual([REVIEWER_A.suggestionId]);
+  });
+
+  test('a reviewer email change (same id) during a pending preview invalidates it back to compose', async () => {
+    const first = deferred();
+    renderEmailsBehavior = () => first.promise;
+    const { rerender } = renderPanel({ reviewers: [REVIEWER_A, REVIEWER_B] });
+    fireEvent.click(checkboxForRow('Accepted A'));
+    openReleaseModal(1);
+    await preview(1);
+    await waitFor(() => expect(renderCalls().length).toBe(1));
+
+    rerender(
+      <ReviewerManagePanel
+        proposal={PROPOSAL}
+        reviewers={[{ ...REVIEWER_A, email: 'renamed-a@example.org' }, REVIEWER_B]}
+        settings={{ signature: 'PD' }}
+      />,
+    );
+
+    first.resolve(mockJson({ drafts: [draftFor(REVIEWER_A)] }));
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+
+    expect(screen.queryByRole('button', { name: /send 1 email/i })).toBeNull();
+    expect(renderCalls().length).toBe(1);
+  });
+
+  // Same-membership, same-recipient-fields object churn (fresh row objects,
+  // identical name/email/affiliation) must still NOT bump — already covered
+  // by the top-level 'same-membership object churn' test above (REVIEWER_A/
+  // REVIEWER_B there carry no affiliation field either before or after the
+  // churn, so `undefined || '' === undefined || ''` in membershipKeyFor;
+  // that test stays green unmodified with the widened key).
+
+  // No completion-handshake test for recipient fields: after the post-send
+  // selection clear the modal's `reviewers` prop is empty, so `nextKey` is ''
+  // regardless of any reviewer's name/email/affiliation, and both
+  // `cause.priorKey` and `context.key` were computed before the clear. A
+  // recipient change landing with or after the clear is therefore
+  // unobservable by the exemption by construction (the send has completed;
+  // the summary describes what was sent). Unlike settingsKey, which is
+  // compared independent of selection. Asserting either outcome here would
+  // be vacuous; recorded as a by-design limit in the 6B3 receipt.
+});
+
 // ── Payload equality ─────────────────────────────────────────────────────
 
 test('send-emails payload is unchanged shape: drafts fields, templateType, attachmentUrls, markAsSent', async () => {

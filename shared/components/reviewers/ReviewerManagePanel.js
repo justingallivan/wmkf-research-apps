@@ -518,6 +518,44 @@ const emptyProposalDoc = () => ({
   pickedKey: null,
 });
 
+// Stage 6B3b: the modal session's membership key, by VALUE, over the fields
+// the rendered draft body actually consumes for a given reviewer (see
+// email-generator.js buildTemplateContext: candidate.name, candidate.email,
+// candidate.affiliation — candidate.expertiseAreas is also read there, but
+// the reviewers-service projection this panel's rows come from
+// (lib/services/review-manager/reviewers-service.js) never sets an
+// expertiseAreas/expertise field, so there is nothing to fold in for it).
+// A same-id change to any of these after a preview leaves the rendered body
+// (sent verbatim; the server only re-resolves the destination address)
+// showing a stale greeting/affiliation, so it must invalidate the session
+// exactly like a membership change. Per-reviewer strings are sorted (not
+// keyed by array order) and joined with U+0001 (a control character that
+// cannot appear in these fields), each field within a reviewer's string
+// joined with U+0000 (same non-collision rationale as the settings key
+// below) — so no combination of name/email/affiliation values across two
+// different reviewers can collide into the same overall key. An empty
+// `reviewers` array must still produce '' (the completion exemption's
+// `nextKey === ''` check depends on it). Used both by the committed-session
+// effect below AND by handleSend's `priorKey` capture (which reads
+// sessionContextRef.current.key, always assigned from this same function's
+// output — see the effect), so there is only one computation to keep in
+// sync.
+// Field/row separators built at runtime (String.fromCharCode) rather than
+// written as literal control characters in this source file: U+0000 cannot
+// appear in name/email/affiliation, and U+0001 cannot appear in any
+// suggestionId GUID, so no combination of per-reviewer field values or
+// per-reviewer joined strings can collide across the separators.
+const MEMBERSHIP_KEY_FIELD_SEP = String.fromCharCode(0);
+const MEMBERSHIP_KEY_ROW_SEP = String.fromCharCode(1);
+
+function membershipKeyFor(reviewers) {
+  return reviewers
+    .map(r => [r.suggestionId, r.name || '', r.email || '', r.affiliation || ''].join(MEMBERSHIP_KEY_FIELD_SEP))
+    .slice()
+    .sort()
+    .join(MEMBERSHIP_KEY_ROW_SEP);
+}
+
 function ReleaseMaterialsModal({ isOpen, onClose, reviewers, proposalTitle, requestId, settings, onEmailsSent, membershipCause }) {
   // This request-scoped entry point is intentionally materials-only. Review-due
   // nudges use ReviewReminderAction's fresh eligibility + atomic-claim path, and
@@ -598,18 +636,26 @@ function ReleaseMaterialsModal({ isOpen, onClose, reviewers, proposalTitle, requ
   // means a hung render's tail blocks every later session until it times out.
   const activeRenderAbortRef = useRef(null);
 
-  // Stage 6B3: modal session identity = isOpen + requestId + sorted selected-
-  // membership key, plus the one-use completion-cause consumption (see
-  // handleSend/onEmailsSent below). Compare stable membership (sorted
-  // suggestionId key), never array identity or reviewer display-object
-  // identity — a same-membership rerender with fresh row objects must not
-  // reset drafts/step. modalSessionRef (declared above) IS the epoch:
-  // handlePreview/handleSend already capture and compare against it.
+  // Stage 6B3: modal session identity = isOpen + requestId + a per-reviewer
+  // membership+recipient key, plus the one-use completion-cause consumption
+  // (see handleSend/onEmailsSent below). Compare stable membership BY VALUE
+  // (see membershipKeyFor above), never array identity or reviewer
+  // display-object identity — a same-membership, same-field-values rerender
+  // with fresh row objects must not reset drafts/step. modalSessionRef
+  // (declared above) IS the epoch: handlePreview/handleSend already capture
+  // and compare against it.
   // Stage 6B3a: identity also folds in a settings-by-VALUE key (signature +
   // reviewDueDate — the only two `settings` fields consumed anywhere, see
   // snapshotSettings in handlePreview) — never the whole `settings` object,
   // which the panel call site rebuilds fresh every render ({...settings,
   // reviewDueDate}) and which can carry unrelated host keys.
+  // Stage 6B3b: the membership key itself widened from suggestionId-only to
+  // suggestionId+name+email+affiliation (membershipKeyFor) — the rendered
+  // draft body is sent verbatim (the server only re-resolves the destination
+  // address at send time), so a same-id change to a recipient's rendered
+  // fields after preview must invalidate the session exactly like a
+  // membership change, not just leave a stale greeting/affiliation in the
+  // sent body.
   const mountedRef = useRef(true);
   const saveTimerRef = useRef(null);
   const uploadAttemptRef = useRef(null);
@@ -659,20 +705,22 @@ function ReleaseMaterialsModal({ isOpen, onClose, reviewers, proposalTitle, requ
 
   // Committed-session reconciliation: no dependency array, no cleanup, so it
   // runs on every commit (mirrors the Stage 6B1/6B2 committed-props effect
-  // pattern). Any change to isOpen, requestId, the sorted membership key, or
-  // the settings-by-value key (Stage 6B3a) bumps modalSessionRef, aborts the
-  // active render, and resets compose/preview/send scratch state back to a
-  // fresh 'compose' session — except when the transition is the one-use
-  // completion-cause exemption (a prior-membership→empty transition tagged
-  // by the just-finished send attempt, with settings ALSO unchanged), which
-  // updates the committed key WITHOUT bumping or resetting, preserving the
-  // just-completed 'sent' summary. Same-membership array/object churn (fresh
-  // reviewer objects, same ids; a fresh `settings` object with the same
-  // signature/reviewDueDate values) never bumps.
+  // pattern). Any change to isOpen, requestId, the membership+recipient key
+  // (Stage 6B3b — see membershipKeyFor above), or the settings-by-value key
+  // (Stage 6B3a) bumps modalSessionRef, aborts the active render, and resets
+  // compose/preview/send scratch state back to a fresh 'compose' session —
+  // except when the transition is the one-use completion-cause exemption (a
+  // prior-membership→empty transition tagged by the just-finished send
+  // attempt, with settings ALSO unchanged), which updates the committed key
+  // WITHOUT bumping or resetting, preserving the just-completed 'sent'
+  // summary. Same-membership, same-recipient-fields array/object churn
+  // (fresh reviewer objects, same ids and same name/email/affiliation; a
+  // fresh `settings` object with the same signature/reviewDueDate values)
+  // never bumps.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useLayoutEffect(() => {
     const context = sessionContextRef.current;
-    const nextKey = reviewers.map(r => r.suggestionId).slice().sort().join(',');
+    const nextKey = membershipKeyFor(reviewers);
     // Settings identity by VALUE, not object identity: the panel call site
     // rebuilds `settings` fresh every render ({...settings, reviewDueDate:
     // proposal.reviewDeadline}), so comparing the object (or JSON.stringify
