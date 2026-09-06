@@ -1,10 +1,10 @@
 ---
 name: project-reviewer-lifecycle-autonomy-directive-2026-09-05
-description: Owner directive (2026-09-05 evening) to build lifecycle Stages 2, 3, 5, 7 autonomously with the plan→Sonnet→Opus→Codex(≤2) cycle; COMPLETED 2026-09-06 (17 PRs). Owner reviewed D0–D5 on 2026-09-06 (D0/D3 taken in PR #170, D1 preserved, D4(a) chosen, D2/D5 + two 6D items open) — Stage 7 plan decisions table is authoritative.
+description: Owner directive (2026-09-05 evening) to build lifecycle Stages 2, 3, 5, 7 autonomously with the plan→Sonnet→Opus→Codex(≤2) cycle; COMPLETED 2026-09-06 (17 PRs). Owner resolved D0–D5 on 2026-09-06 (D0/D3/D5 taken, D1 preserved, D2/D4 removed, 6D-1 confirmed, 6D-2 parked); PRs #170–#173 merged to Production 2026-09-06 (S491) — Stage 7 plan decisions table is authoritative.
 metadata:
   type: project
   status: closed
-  last_verified: 2026-09-06 via S489 close
+  last_verified: 2026-09-06 via S491 stack merge
 ---
 
 On 2026-09-05 (Session 489, evening) Justin granted autonomy for the remaining reviewer
@@ -38,7 +38,9 @@ both were closed by architect verification rather than a third round, recorded i
 Every tightening surfaced during the campaign (D0–D5, 6D uniform enforcement, 6D accepted limits)
 was preserved behavior-for-behavior and tabled for the owner in `SESSION_PROMPT.md`; nothing was
 tightened under the grant except the 6D uniform-enforcement call already flagged above. The owner's
-morning review (S490, 2026-09-06) took D0 and D3 (PR #170), preserved D1, chose D4(a) pending the
-orphaned-branch finding, and left D2/D5/6D open — the Stage 7 plan table records each. The cycle
+morning review (S490, 2026-09-06) took D0, D3 (plus the accept/decline ETag follow-on) and D5,
+preserved D1, retired D2 and removed D4 (after first choosing (a), reversed on the orphan finding),
+confirmed 6D-1 and parked 6D-2 — the Stage 7 plan table records each; the four-PR stack #170–#173
+merged to Production in S491 (`7389e489`). The cycle
 itself (delegation-pin rule from slice one, three-dot Codex diffs, worktree sequencing) is the
 reusable part; see [[project-closed-work-archive]].

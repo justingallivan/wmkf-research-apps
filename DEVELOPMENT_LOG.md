@@ -10,6 +10,31 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## September 2026 — Owner lifecycle decisions D0–D5 reached Production; generate-emails retired (Sessions 490–491)
+
+**Milestone:** The owner resolved every decision the Session 489 campaign tabled. Taken: `softDelete`
+refuses completion-stamped rows (D0); the legacy-decline repair op and the accept/decline response
+writes all require a concrete ETag, refusing with 412 `concurrent_modification` (D3 + follow-on);
+three executed raw-fetch one-off scripts archived and a new LAW gate `check:script-suggestion-writers`
+pins the 13 remaining `scripts/` writers (D5). Removed: the orphaned `/api/reviewer-finder/generate-emails`
+route, its service, prompt and `patchFields` alias (D2); the proposal-wide my-candidates PATCH and
+`setRequestMetadata` (D4, explicit capability drop: no post-save cycle/program-area correction on a
+suggestion row); the never-requested summary-blob extraction chain and `wmkf_summarypages` mapping.
+Preserved by decision: the unconditional post-send invitation stamp (D1). 6D-1 confirmed, 6D-2 parked.
+**Sessions:** 490 (decisions, build, four-PR stack) → 491 (merge and promotion).
+**Ship state:** PRs #170–#173 merged in order 2026-09-06 PT, final `7389e489`; Production deployment
+`dpl_5TumDGL8vbawUjbQW12TvU16DQG2` Ready. CI on the stack head: 802 suites / 11,629 tests; all gate and
+self-test pairs green on `main` after merge. No browser smoke; the only user-visible change is that an
+accept/decline whose `/context` returned `etag: null` now prompts a reload instead of writing unlocked.
+Dataverse attributes `wmkf_summarybloburl` / `wmkf_summarypages` remain deployed but unused (drop is a
+separate owner decision).
+**Why it matters:** Every reviewer-suggestion write from routes, UI, and scripts is now either ETag-bound
+or recorded in a tracked, pinned set, and the two orphaned surfaces that survived the June page deletions
+are gone rather than guarded.
+**Pointers:** [Stage 7 plan decisions table](docs/REVIEWER_LIFECYCLE_STAGE7_BUILD_PLAN.md);
+[work queue item 5 (materials-on-acceptance, next)](docs/CURRENT_WORK_QUEUE.md);
+[`_archived/README.md`](_archived/README.md).
+
 ## September 2026 — Reviewer lifecycle elective and boundary program reached Production (Session 489)
 
 **Milestone:** Every remaining stage of the reviewer lifecycle plan shipped overnight under an
