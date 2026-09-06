@@ -603,7 +603,8 @@ function DynamicsExplorer() {
                 placeholder="Ask a question about your CRM data..."
                 disabled={isProcessing}
                 rows={1}
-                className="flex-1 resize-none border border-gray-300 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent disabled:bg-gray-50 disabled:text-gray-400"
+                wrap="soft"
+                className="flex-1 resize-none overflow-x-hidden overflow-y-auto border border-gray-300 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent disabled:bg-gray-50 disabled:text-gray-400"
                 style={{ maxHeight: '200px' }}
               />
               <Button
