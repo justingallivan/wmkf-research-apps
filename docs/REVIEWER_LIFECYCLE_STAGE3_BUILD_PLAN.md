@@ -141,7 +141,15 @@ builders on that file concurrently.
   still claims "ALL business logic for GET/PATCH" and documents the correction contract as living
   there — the builder's `bcb9bbb1` wording fix was insufficient; header rewritten to "owns
   `getReviewers`; compatibility re-exports only; correction contract lives in `correct-status.js`"
-  in the correction commit. Opus review recorded below.
+  in the correction commit.
+- **Opus review (`bcb9bbb1`): PASS WITH ADVISORIES, zero required.** Byte-identical body confirmed
+  (md5 match on main `:462–538` vs `correct-status.js:17–93`); no local helper of the old file is
+  used by the moved code; `REVIEW_STATUS_BY_VALUE` stays and the parity gate still reads it there;
+  6A contract located verbatim (arrays `:24–33`, sequential loop with throw-on-first-failure
+  `:75–85`); re-exports exact; census expected list independently confirmed; 13 suites / 884 tests
+  and the auth-routes integration suite green. `bcb9bbb1` changed one line of NEW header prose in
+  `correct-status.js` (a wording that briefly conflated 3D scope), within discipline. Advisory:
+  legacy header stale (same as Codex) — rewritten in the final commit.
 
 ## Rules for every slice
 
