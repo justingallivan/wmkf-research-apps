@@ -209,6 +209,28 @@ test('same-membership object churn (fresh reviewer objects, same ids) does not r
   expect(renderCalls().length).toBe(1);
 });
 
+test('same membership in reversed row order does not reset a preview in progress (key is sorted, not array-ordered)', async () => {
+  const first = deferred();
+  renderEmailsBehavior = () => first.promise;
+  const { rerender } = renderPanel({ reviewers: [REVIEWER_A, REVIEWER_B] });
+  openReleaseModal(2);
+  await preview(2);
+  await waitFor(() => expect(renderCalls().length).toBe(1));
+
+  // Same two selected reviewers, parent now lists them in the opposite order.
+  rerender(
+    <ReviewerManagePanel
+      proposal={PROPOSAL}
+      reviewers={[{ ...REVIEWER_B }, { ...REVIEWER_A }]}
+      settings={{ signature: 'PD' }}
+    />,
+  );
+
+  first.resolve(mockJson({ drafts: [draftFor(REVIEWER_A), draftFor(REVIEWER_B)] }));
+  await screen.findByRole('button', { name: /send 2 email/i });
+  expect(renderCalls().length).toBe(1);
+});
+
 // ── Session identity x deferred continuation x invalidation classes ─────
 
 describe('preview (deferred render-emails) invalidation', () => {
