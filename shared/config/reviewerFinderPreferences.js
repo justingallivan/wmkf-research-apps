@@ -90,7 +90,6 @@ export const DEFAULT_VALUES = {
   GRANT_CYCLE_SETTINGS: {
     programName: 'W. M. Keck Foundation',
     reviewDeadline: '',
-    summaryPages: '2',
     customFields: [],
     attachments: {
       reviewTemplate: null,

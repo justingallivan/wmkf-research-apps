@@ -110,8 +110,10 @@ colleague reports it.
    `summaryBlobUrl`; `lib/utils/pdf-extractor.js` (sole user: that branch) deleted. The Workbench client
    had never requested extraction, so no live behavior changed. `wmkf_summarybloburl` rows/blobs stay
    historical; the maintenance sweep still keeps them alive; the GET DTO still surfaces old values.
-   **Small residual for the owner:** the grant-cycle "summary pages" setting (`wmkf_summarypages`,
-   editable in the cycle editor) now feeds nothing — remove from the editor or leave inert.
+   **Residual removed too (owner: "remove the setting residual"):** `grant-cycles-dataverse.js` no
+   longer selects, maps, writes or defaults `wmkf_summarypages`, and the preference default is gone.
+   No UI ever exposed the field (the standalone editor that did was retired in June). The Dataverse
+   attribute and the drain-only Postgres column stay; dropping them is a separate schema change.
 
 ### Parked
 

@@ -52,7 +52,7 @@ Live data: J23–J27, D23–D27 cycles; some duplicates (id 11–13 are inactive
 | `short_code` | Patched 2026-05-12 → `wmkf_shortcode` (alt-key) |
 | `program_name` | Patched 2026-05-12 → `wmkf_programname` |
 | `review_deadline` | `wmkf_reviewreturndeadline` (note rename) |
-| `summary_pages` | `wmkf_summarypages` |
+| `summary_pages` | `wmkf_summarypages` (unused since 2026-09-06; no longer selected/written) |
 | `review_template_blob_url` | `wmkf_reviewtemplateurl` |
 | `review_template_filename` | `wmkf_reviewtemplatefilename` |
 | `additional_attachments` | `wmkf_additionalattachments` |
