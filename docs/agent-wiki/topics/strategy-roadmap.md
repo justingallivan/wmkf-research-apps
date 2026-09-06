@@ -232,7 +232,11 @@ document inventory, and individual implementation plans do not establish priorit
   and hazards in `project-reviewer-card-simplification-direction`; S395 scope-accretion
   caution applies; high-risk automation stays review-only until the representative
   benchmark exists.
-- Current priorities: `docs/CURRENT_WORK_QUEUE.md`. **Review-DOCX release complete
+- Current priorities: `docs/CURRENT_WORK_QUEUE.md`. **Queue item 5 added 2026-09-06
+  (owner-directed, not started, plan-first): automated materials-on-acceptance email for
+  the December 2026 cycle** — on acceptance + onboarding the system emails the reviewer a
+  materials link; nothing does this today (materials go out only via the PD release modal).
+  Decision context: `project-accepted-awaiting-materials-is-transient`. **Review-DOCX release complete
   2026-09-03:** the formatting work is Production-live at `3101f067` in Ready
   deployment `dpl_AjT5FeDh5wkdeFSoZWJsVDM5oBqs`.
   The existing Reviews-tab action remains one combined, server-authoritative
