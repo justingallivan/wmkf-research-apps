@@ -57,7 +57,7 @@ function RetractionMatchCard({ match, onDismiss }) {
 
       <div className="p-4 space-y-2">
         {match.retractionNature && (
-          <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded ${
+            <span className={`inline-flex min-h-6 items-center px-2 py-0.5 text-xs font-medium rounded-full ${
             match.retractionNature.toLowerCase().includes('retraction')
               ? 'bg-red-100 text-red-800'
               : 'bg-yellow-100 text-yellow-800'
@@ -73,7 +73,7 @@ function RetractionMatchCard({ match, onDismiss }) {
         {match.reasons && match.reasons.length > 0 && (
           <div className="flex flex-wrap gap-1">
             {match.reasons.map((reason, i) => (
-              <span key={i} className="inline-flex px-2 py-0.5 text-xs bg-red-50 text-red-700 rounded">
+              <span key={i} className="inline-flex min-h-6 items-center px-2 py-0.5 text-xs bg-red-50 text-red-700 rounded-full">
                 {reason}
               </span>
             ))}
@@ -201,7 +201,7 @@ function ApplicantResultCard({ result, onDismiss }) {
             <div className="flex items-center gap-2 flex-wrap">
               <h3 className="text-lg font-semibold text-gray-900">{result.name}</h3>
               {result.isCommonName && (
-                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-blue-100 text-blue-700">
+                <span className="inline-flex min-h-6 items-center px-2 py-0.5 rounded-full text-xs bg-blue-100 text-blue-700">
                   Common Name
                 </span>
               )}
@@ -213,11 +213,11 @@ function ApplicantResultCard({ result, onDismiss }) {
 
           <div className="flex items-center gap-3">
             {result.hasConcerns ? (
-              <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800 border border-yellow-300">
+              <span className="inline-flex min-h-7 items-center px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800 border border-yellow-300">
                 {result.matchCount} item{result.matchCount !== 1 ? 's' : ''} for review
               </span>
             ) : (
-              <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800 border border-green-300">
+              <span className="inline-flex min-h-7 items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800 border border-green-300">
                 No concerns
               </span>
             )}
