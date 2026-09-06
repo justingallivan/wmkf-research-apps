@@ -6,9 +6,9 @@
  *           ?cycleCode narrowing; mode=proposals distinct request list;
  *           mode=removal-preflight&suggestionId=<guid> — "Remove entirely"
  *           disclosure, see docs/REVIEWER_REMOVE_ENTIRELY_BUILD_PLAN.md).
- * PATCH  — Per-suggestion lifecycle/researcher/person edits, restore,
- *           confirmed manual-invitation recording, or bulk-by-request updates
- *           (programArea, grantCycleCode).
+ * PATCH  — Per-suggestion lifecycle/researcher/person edits, restore, or
+ *           confirmed manual-invitation recording (the proposal-wide
+ *           cycle/program-area fan-out was removed 2026-09-06, owner decision D4).
  * DELETE — Soft-delete a single suggestion (sets wmkf_selected = false), or
  *           (mode:'hard' in the body) PERMANENTLY remove it — one required atomic
  *           Dataverse changeset (honorarium akoya_request + review-answer
@@ -129,12 +129,6 @@ async function handlePatch(req, res, access) {
         suggestionIds: [body.suggestionId],
       });
       authorizedRequestId = authorization?.requestIds?.[0];
-    } else if (body.suggestionId === undefined && isGuid(body.proposalId)) {
-      await authorizeReviewerRequestMutation({
-        profileId: access.profileId,
-        callerSystemId: actingUserSystemId,
-        requestIds: [body.proposalId],
-      });
     }
     const result = await patchMyCandidates({
       body,

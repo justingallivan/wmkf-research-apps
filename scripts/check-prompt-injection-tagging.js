@@ -330,16 +330,9 @@ const SURFACES = [
     status: 'migrated',
     callSiteFiles: ['lib/services/contact-enrichment/search-tiers.js'],
   },
-  {
-    id: 'reviewer-finder-emails',
-    inv: 22,
-    status: 'migrated',
-    // email-reviewer.js wraps its own untrusted blocks in-builder (candidate
-    // context is assembled inside the builder), so both markers live there.
-    promptFiles: ['shared/config/prompts/email-reviewer.js'],
-    callSiteFiles: ['pages/api/reviewer-finder/generate-emails.js'],
-    builders: ['createPersonalizationPrompt', 'createSubjectPrompt'],
-  },
+  // inv 22 (`reviewer-finder-emails`, /api/reviewer-finder/generate-emails +
+  // shared/config/prompts/email-reviewer.js) was retired with that route on
+  // 2026-09-06 (owner decision D2); the surface no longer exists.
   {
     id: 'dynamics-explorer-export',
     inv: 23,

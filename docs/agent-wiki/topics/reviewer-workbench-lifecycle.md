@@ -1610,12 +1610,15 @@ returned zero eligible/enqueued/claimed/failed.** Plan doc:
   reminder claim (`claim-reminder.js`, PR #162), 3H the due-date override write
   (`change-review-deadline.js`, PR #163), 3I the pending-invitation withdrawal write
   (`withdraw-pending-invitation.js`, PR #164), 3F the three invitation-record writers
-  (`record-invitation.js`, PR #165; the post-send stamp stays unconditional and the generation mark
-  stays raw pending owner decisions D1/D2 in `docs/REVIEWER_LIFECYCLE_STAGE7_BUILD_PLAN.md`), 3J a
+  (`record-invitation.js`, PR #165; the post-send stamp stays unconditional — D1 preserved by owner
+  decision 2026-09-06 — and the generation mark was retired with the generate-emails route the same day
+  under D2; see `docs/REVIEWER_LIFECYCLE_STAGE7_BUILD_PLAN.md`), 3J a
   narrow adapter op for the external decline repair (`deselectLegacyDeclinedSuggestion`, PR #166; D3 taken
   2026-09-06 — concrete ETag now required),
-  3K the whitelisted `setRequestMetadata` adapter op behind the picker's proposal-wide cycle/program
-  edit (PR #167; the sequential no-`ifMatch` write is open decision D4). **Stage 7 (PR #168,
+  3K the whitelisted `setRequestMetadata` adapter op behind the proposal-wide cycle/program edit
+  (PR #167) — **removed 2026-09-06 under owner decision D4** together with the my-candidates
+  proposal-wide PATCH branch, which had no client since the standalone page's retirement
+  (2026-06-16); cycle/program area are set at save time only. **Stage 7 (PR #168,
   2026-09-06) closes the boundary:** `check:reviewer-engagement-boundary` (LAW mode, AST-resolved incl.
   alias chains, barrels, class fields, dynamic imports) fails any binding of `updateLifecycle` /
   `patchFields` / `patchReviewReceipt` from the suggestion adapter in `lib/pages/shared/modules`

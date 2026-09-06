@@ -22,12 +22,9 @@ jest.mock('../../lib/dataverse/adapters/account', () => ({
   queryAccounts: jest.fn(async () => ({ records: [] })),
 }));
 jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => {
-  // bulkUpdateByRequest stays mocked directly (nothing in this suite calls
-  // the real Stage 3K op's implementation); setRequestMetadata forwards to
-  // it so the existing bulkUpdateByRequest-shaped assertions below (bulk-by-
-  // request dispatch) stay byte-unchanged now that the service calls the
-  // whitelisted op instead.
-  const bulkUpdateByRequest = jest.fn(async () => 0);
+  // The former bulkUpdateByRequest / setRequestMetadata mock pair was removed
+  // with the proposal-wide PATCH branch under owner decision D4 (2026-09-06);
+  // the mock deliberately exposes neither name so a reintroduced call fails.
   return {
     __esModule: true,
     findByRequest: jest.fn(async () => []),
@@ -38,8 +35,6 @@ jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => {
     updateLifecycle: jest.fn(async () => {}),
     restore: jest.fn(async () => {}),
     softDelete: jest.fn(async () => {}),
-    bulkUpdateByRequest,
-    setRequestMetadata: jest.fn((requestId, updates, opts) => bulkUpdateByRequest(requestId, updates, opts)),
     APPLICANT_DISPOSITION_MAP: { recommended: 100000000 },
     RESPONSE_TYPE_BY_VALUE: { 100000000: 'accepted', 100000001: 'declined' },
   };
@@ -457,33 +452,17 @@ describe('getMyCandidates', () => {
 });
 
 describe('patchMyCandidates', () => {
-  test('bulk-by-request dispatch: proposalId without suggestionId → bulkUpdateByRequest, bulk envelope', async () => {
-    suggestionAdapter.bulkUpdateByRequest.mockResolvedValue(3);
-    const out = await patchMyCandidates({
-      body: { proposalId: REQUEST_ID, programArea: 'Science' },
-      actingUserSystemId: SYS,
-    });
-    expect(out).toEqual({
-      success: true,
-      message: 'Proposal updated',
-      updated: { proposalId: REQUEST_ID, programArea: 'Science', suggestionsUpdated: 3 },
-    });
-    expect(suggestionAdapter.updateLifecycle).not.toHaveBeenCalled();
-  });
-
-  test('bulk rejected fields (PI/institution) → 400 with rejectedFields + hint body', async () => {
+  test('D4 (2026-09-06): proposalId without suggestionId is a 400, never a fan-out write', async () => {
     const err = await patchMyCandidates({
-      body: { proposalId: REQUEST_ID, proposalAuthors: 'X', grantCycleCode: 'J26' },
+      body: { proposalId: REQUEST_ID, programArea: 'Science' },
       actingUserSystemId: SYS,
     }).catch((e) => e);
     expect(err).toBeInstanceOf(MyCandidatesError);
     expect(err.httpStatus).toBe(400);
-    expect(err.body).toEqual({
-      error: 'Editing PI / institution is not supported here',
-      rejectedFields: ['proposalAuthors'],
-      hint: 'These fields belong on akoya_request and are managed in CRM.',
-    });
-    expect(suggestionAdapter.bulkUpdateByRequest).not.toHaveBeenCalled();
+    expect(err.message).toBe('suggestionId is required');
+    expect(suggestionAdapter.updateLifecycle).not.toHaveBeenCalled();
+    expect(suggestionAdapter.findByRequest).not.toHaveBeenCalled();
+    expect(suggestionAdapter.setRequestMetadata).toBeUndefined();
   });
 
   test('single-suggestion dispatch: lifecycle edit calls updateLifecycle; accepted=true auto-mints token non-fatally', async () => {
@@ -665,8 +644,9 @@ describe('patchMyCandidates', () => {
   });
 
   test('validation: neither id → 400; bad GUIDs → 400; no supported fields → 400; missing person link → 404', async () => {
-    await expect(patchMyCandidates({ body: {} })).rejects.toMatchObject({ httpStatus: 400, message: 'suggestionId or proposalId is required' });
-    await expect(patchMyCandidates({ body: { proposalId: 'nope', programArea: 'x' } })).rejects.toMatchObject({ httpStatus: 400, message: 'proposalId is not a valid GUID' });
+    await expect(patchMyCandidates({ body: {} })).rejects.toMatchObject({ httpStatus: 400, message: 'suggestionId is required' });
+    // proposalId is no longer a dispatch key (D4, 2026-09-06): with no suggestionId it is the same 400.
+    await expect(patchMyCandidates({ body: { proposalId: 'nope', programArea: 'x' } })).rejects.toMatchObject({ httpStatus: 400, message: 'suggestionId is required' });
     await expect(patchMyCandidates({ body: { suggestionId: 'nope', invited: true } })).rejects.toMatchObject({ httpStatus: 400, message: 'suggestionId is not a valid GUID' });
     await expect(patchMyCandidates({ body: { suggestionId: SUGGESTION_ID } })).rejects.toMatchObject({ httpStatus: 400, message: 'No supported fields to update' });
     suggestionAdapter.findById.mockResolvedValue({ _wmkf_potentialreviewer_value: null });

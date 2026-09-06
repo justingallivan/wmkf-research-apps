@@ -37,7 +37,7 @@ Alternate key:
 
 - `pages/api/reviewer-finder/contact-history.js` — UNION-read endpoint for a single contact's PI/co-PI history. Pulls junction filtered at source to `wmkf_role IN (PI, Co-PI)` (post-2026-05-14; before that, the source filter was "any role"; tightened so Senior/Key/Other intake-portal roster rows don't pollute reviewer history) + projectleader-field rows in parallel via `queryAllRecords`, dedupes on `(requestId, role)`, returns per-row `sources: ['junction'|'projectleader'|both]` provenance. Both source queries paginate via `@odata.nextLink` (5000 cap) — see commit history for the original `top:100` truncation bug.
 - `pages/api/external/review/[token]/context.js` (S144) — co-PI display list for Stage 2a's proposal summary card. Junction-only read (role=Co-PI), expand on `wmkf_Contact($select=fullname,firstname,lastname)`, ordered by `wmkf_authorposition asc,createdon asc`, dedup by contact GUID. The legacy `_wmkf_copi1..5_value` slot fields are NOT consulted here — see "Migration disposition" below.
-- `pages/api/reviewer-finder/generate-emails.js` — reads `wmkf_role eq ${ROLE_COPI}` rows for an `akoya_request` to populate the Co-PI line in invitation emails. Co-PI-only filter at source; not affected by the 2026-05-14 role-enum expansion.
+- ~~`pages/api/reviewer-finder/generate-emails.js`~~ — **retired 2026-09-06 (owner decision D2)**; it read the Co-PI rows for the invitation Co-PI line. The live render/send path reads Co-PIs through the adapter instead.
 - `scripts/acceptance-w4.js` — smoke benchmark; mirrors `contact-history.js`'s UNION read. Filters `role IN (PI, Co-PI)` as of 2026-05-14.
 
 ## Write paths

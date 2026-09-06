@@ -34,12 +34,8 @@ jest.mock('../../lib/dataverse/adapters/account', () => ({
   queryAccounts: jest.fn(async () => ({ records: [] })),
 }));
 jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => {
-  // bulkUpdateByRequest stays mocked directly (nothing in this suite calls
-  // the real Stage 3K op's implementation); setRequestMetadata forwards to
-  // it so the existing bulkUpdateByRequest-shaped assertion below (bulk-by-
-  // request happy path) stays byte-unchanged now that the route's service
-  // calls the whitelisted op instead.
-  const bulkUpdateByRequest = jest.fn(async () => 0);
+  // The former bulkUpdateByRequest / setRequestMetadata mock pair was removed
+  // with the proposal-wide PATCH branch (owner decision D4, 2026-09-06).
   return {
     __esModule: true,
     findByRequest: jest.fn(async () => []),
@@ -50,8 +46,6 @@ jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => {
     updateLifecycle: jest.fn(async () => {}),
     restore: jest.fn(async () => {}),
     softDelete: jest.fn(async () => {}),
-    bulkUpdateByRequest,
-    setRequestMetadata: jest.fn((requestId, updates, opts) => bulkUpdateByRequest(requestId, updates, opts)),
     APPLICANT_DISPOSITION_MAP: { recommended: 100000000 },
     RESPONSE_TYPE_BY_VALUE: {},
   };
@@ -242,8 +236,7 @@ describe('PATCH', () => {
     });
   });
 
-  test('happy path (bulk-by-request edit): envelope pinned exactly', async () => {
-    suggestionAdapter.bulkUpdateByRequest.mockResolvedValue(3);
+  test('D4 (2026-09-06): proposalId-only PATCH is a 400 with no authorization call and no write', async () => {
     const req = {
       method: 'PATCH',
       query: {},
@@ -252,26 +245,20 @@ describe('PATCH', () => {
     const res = mockRes();
     await handler(req, res);
 
-    expect(res.statusCode).toBe(200);
-    expect(res.body).toEqual({
-      success: true,
-      message: 'Proposal updated',
-      updated: { proposalId: REQUEST_ID, programArea: 'Science', suggestionsUpdated: 3 },
-    });
-    expect(authorizeReviewerRequestMutation).toHaveBeenCalledWith({
-      profileId: undefined,
-      callerSystemId: 'u-1',
-      requestIds: [REQUEST_ID],
-    });
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toEqual({ error: 'suggestionId is required' });
+    expect(authorizeReviewerRequestMutation).not.toHaveBeenCalled();
+    expect(suggestionAdapter.updateLifecycle).not.toHaveBeenCalled();
+    expect(suggestionAdapter.setRequestMetadata).toBeUndefined();
   });
 
-  test('domain error: neither suggestionId nor proposalId → 400', async () => {
+  test('domain error: no suggestionId → 400', async () => {
     const req = { method: 'PATCH', query: {}, body: {} };
     const res = mockRes();
     await handler(req, res);
 
     expect(res.statusCode).toBe(400);
-    expect(res.body).toEqual({ error: 'suggestionId or proposalId is required' });
+    expect(res.body).toEqual({ error: 'suggestionId is required' });
     expect(suggestionAdapter.updateLifecycle).not.toHaveBeenCalled();
   });
 

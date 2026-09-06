@@ -15,7 +15,6 @@ import { getByIdWithSelect, queryReviewers } from '../../lib/dataverse/adapters/
 import {
   findReviewDocxBackfillPopulation,
   findReviewDocxFilingCandidates,
-  patchFields,
   queryAllSuggestions,
 } from '../../lib/dataverse/adapters/reviewer-suggestion.js';
 import { queryAllAnswers } from '../../lib/dataverse/adapters/review-answer.js';
@@ -44,15 +43,6 @@ describe('potential-reviewer.queryReviewers', () => {
     const options = { select: 'wmkf_name', filter: 'wmkf_potentialreviewersid eq 1', top: 500 };
     await queryReviewers(options);
     expect(spy).toHaveBeenCalledWith('wmkf_potentialreviewerses', options);
-  });
-});
-
-describe('reviewer-suggestion.patchFields', () => {
-  it('is the same passthrough as patchReviewReceipt (forwards payload+opts unchanged)', async () => {
-    const spy = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue({});
-    const payload = { wmkf_emailsentat: '2026-07-04T00:00:00.000Z', wmkf_invited: true };
-    await patchFields(ID, payload);
-    expect(spy).toHaveBeenCalledWith('wmkf_appreviewersuggestions', ID, payload, {});
   });
 });
 

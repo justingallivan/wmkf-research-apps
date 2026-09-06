@@ -33,7 +33,7 @@ Ground truth: `shared/components/reviewers/ReviewerFindPanel.js`, `pages/api/rev
 - `pages/api/reviewer-finder/researchers.js` — **deleted W6 step 1 2026-05-12** (per `docs/atlas/postgres-researchers.md:51,59,70`).
 - `pages/api/reviewer-finder/extract-summary.js` — **retired W5 step 5 2026-05-12** (per `docs/atlas/postgres-other-reviewer-tables.md:23`).
 - `pages/api/reviewer-finder/grant-cycles.js` — **Dataverse-only since W3 cutover 2026-05-12** (header at `pages/api/reviewer-finder/grant-cycles.js:9` reads "W3 cutover (2026-05-12) — Dataverse-only"; `wmkf_appgrantcycles` has 10 rows live per audit 2026-05-14).
-- `pages/api/reviewer-finder/generate-emails.js` — zero `@vercel/postgres` imports (verified 2026-05-14).
+- `generate-emails` route — was Postgres-free by 2026-05-14; **retired entirely 2026-09-06 (owner decision D2, S490)** along with its service and the `email-reviewer.js` prompt; zero client callers since the standalone page's `EmailGeneratorModal` was deleted 2026-06-21.
 - `pages/api/reviewer-finder/my-proposals.js` — Dataverse-only, builds OData filter on `akoya_request`.
 
 **How to apply:** when planning reviewer-finder API work, do not rebuild save-candidates writeback — it's done. The standalone page is retired; use Workbench reviewer components for staff UI context. The reviewer-finder Postgres tables (`researchers`, `researcher_keywords`, `publications`, `proposal_searches`, `reviewer_suggestions`) were DROPPED 2026-06-04 via migration `018_drop_reviewer_finder_postgres_tables.sql` (done early at Justin's direction; see `project-w6-table-drop-closed.md`). `search_cache` was kept (live literature-search cache). Don't reference the dropped tables as live.

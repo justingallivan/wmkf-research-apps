@@ -149,14 +149,14 @@ const CENSUS = [
   },
   {
     name: 'reviewer-engagement/record-invitation',
-    // New in Stage 3F (recordDeliveredInvitation, recordManualInvitation,
-    // markInvitationGenerated — three separately exported functions, each a
-    // verbatim move of exactly one write call from its own caller). All
-    // three importers are new direct callers of this one module.
+    // New in Stage 3F (recordDeliveredInvitation, recordManualInvitation —
+    // separately exported functions, each a verbatim move of exactly one
+    // write call from its own caller). The third 3F importer,
+    // generate-emails-service.js (markInvitationGenerated), was retired with
+    // its route 2026-09-06 under owner decision D2.
     pattern: /reviewer-engagement\/record-invitation/,
     expected: [
       'lib/services/review-manager/send-emails-service.js',
-      'lib/services/reviewer-finder/generate-emails-service.js',
       'lib/services/reviewer-finder/my-candidates-service.js',
     ],
   },
