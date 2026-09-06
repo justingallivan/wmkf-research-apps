@@ -280,7 +280,19 @@ or backfill.
   any `\bbulkUpdateByRequest\b` reference (not just the call form), with the expected set becoming
   the adapter plus the trust-boundary gate script's sink-table entry; the AST binding-resolved census
   is Stage 7's gate, not this interim test — stated in the test header. Runtime delegation and D4
-  judged behavior-preserving. Opus pending.
+  judged behavior-preserving.
+- **3K Opus review (`54de3d3b`): PASS WITH ADVISORIES, zero required.** All architect traces
+  confirmed; `programArea` normalization and `grantCycleCode` mapping inherited through delegation;
+  `effectiveIfMatch` cannot engage for these keys so options are `{ actingUserSystemId }` exactly;
+  D4 docblock disclaims "safer" and frames the decision as open; trust-boundary gate green (189
+  routes) with the self-test exercising the sink table generically, not the new name; shims are
+  load-bearing for return-value flow while arg flow is pinned exclusively by the independent-mock
+  delegation test (two independent assertions go red on a direct call); the census test would go red
+  on a new caller and scans `.mjs`. 9 + 8 + 6 suites (611 tests) and both boundary gates green.
+  Advisories folded into the correction: scan `shared/`/`modules/` too (same as Codex); two stale
+  caller comments; a normalization-discriminating fixture. Noted, no action: `{ grantCycleCode:
+  undefined }` yields a count with zero writes (pre-existing `bulkUpdateByRequest` behavior,
+  unreachable from the caller); the whitelist throws a plain `Error` like its sibling. Correction sent.
 
 ## Docs (after each merge)
 
