@@ -134,6 +134,30 @@ recorded), and delete `bulkUpdateByRequest` if the census is empty.
 **Not in Stage 7:** any tightening in D1–D4; deleting scripts; a universal patch command; schema
 or backfill.
 
+## Build and review record
+
+- **3G build (Sonnet, 2026-09-06): `eed4f377`** on `claude/reviewer-lifecycle-stage3g`. The
+  review-due `else` branch (main `reviewer-reminder-sweep.js:415–419`) moved verbatim to
+  `reviewer-engagement/claim-reminder.js` `claimReviewDueReminder`; respond-kind `mintAndStore` claim
+  and the sweep's catch untouched; `updateLifecycle` import dropped from the sweep. Direct tests (4),
+  delegation pins (4, incl. respond-kind never calls it), census row. Mock seams: both existing
+  suites mock the adapter path, no edits. Full suite 790 / 11,534; gates green. Mutations: inline
+  keeping the import → 3/4 pins red; drop `ifMatch` → direct test red. Opus and Codex round 1 pending.
+- **3H build (Sonnet, 2026-09-06): `4b0fbea2`** on `claude/reviewer-lifecycle-stage3h`. The
+  override write (main `reviewer-due-extension.js:312`) moved verbatim to
+  `reviewer-engagement/change-review-deadline.js` `changeReviewDeadline`; try/catch,
+  `classifySaveError`, validation, `_etag` check, `prepareNotification` stay. Direct tests (4, incl.
+  `null` pass-through), delegation pins (2), census row; no existing test edits. Full suite 790 /
+  11,532; gates green. Mutations: inline keeping the import → 2/2 pins red; drop `ifMatch` → 2/4
+  direct red. Opus and Codex round 1 pending.
+- **3I build (Sonnet, 2026-09-06): `87edb12b`** on `claude/reviewer-lifecycle-stage3i` (new
+  worktree `../WMKF_Apps-s4`). The withdrawal write (main `withdraw-sufficient-service.js:264–274`)
+  moved verbatim to `reviewer-engagement/withdraw-pending-invitation.js` `withdrawPendingInvitation`;
+  result mapping, counter, courtesy email and checks stay. Direct tests (4), delegation pins (4),
+  census row; no existing test edits (one route suite mocks the whole service as a black box, others
+  mock adapters). Full suite 790 / 11,534; gates green. Mutations: inline keeping the import → 4/4
+  pins red; drop `ifMatch` → 1/4 red; write after send → 3/4 pins red. Opus and Codex round 1 pending.
+
 ## Docs (after each merge)
 
 Readiness audit rows 3/7; service catalog; `reviewer-workbench-lifecycle.md` Stage 3 bullet;
