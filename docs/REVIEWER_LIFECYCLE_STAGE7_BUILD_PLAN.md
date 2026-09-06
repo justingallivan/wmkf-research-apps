@@ -258,6 +258,22 @@ or backfill.
   (5 op tests), docblock reworded. Full suite 803 / 11,629; gates green. PR #166 merged `3b8dca2b`
   (2026-09-06, seven checks green).
 
+- **3K build (Sonnet, 2026-09-06): `54de3d3b`** on `claude/reviewer-lifecycle-stage3k` (rebased
+  past 3J, no adapter conflict). `setRequestMetadata(requestId, updates, { actingUserSystemId })`
+  placed after `bulkUpdateByRequest`: whitelist `grantCycleCode`/`programArea` (other keys or `{}`
+  throw), then `return bulkUpdateByRequest(...)` unchanged — sequential `updateLifecycle` per selected
+  row, no `ifMatch`, no try/catch (D4 preserved, documented as open). `my-candidates-service.js:553`
+  calls it; GUID check, rejected fields, empty-updates 400 and response verbatim [architect trace:
+  `:530-551`]. `check-trust-boundary-guid.js` SINKS gains `['setRequestMetadata', 0]`. Forwarding
+  shims in the unit and route suites (assertions byte-unchanged), plain `jest.fn` in one delegation
+  suite. New: op suite (transport identity incl. normalization, 4 whitelist rejections, D4 test with
+  3 rows / 2nd rejects / `updateRecord` ×2, actor forwarding), independent-mock delegation pin,
+  `reviewer-suggestion-bulk-update-importers.test.js` (scan `lib/pages/scripts` for
+  `\bbulkUpdateByRequest\(` → adapter only; the gate script's table entry has no `(` so it does not
+  match). Full suite 806 / 11,641; all gates green. Mutations: service calls `bulkUpdateByRequest`
+  directly → independent pin red (the shimmed suites alone would not catch it); whitelist removed →
+  4/4 red; try/catch added → D4 test red. Opus and Codex round 1 pending.
+
 ## Docs (after each merge)
 
 Readiness audit rows 3/7; service catalog; `reviewer-workbench-lifecycle.md` Stage 3 bullet;
