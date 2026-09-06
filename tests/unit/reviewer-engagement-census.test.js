@@ -85,6 +85,37 @@ const CENSUS = [
       'lib/services/reviewer-finder/my-candidates-service.js',
     ],
   },
+  {
+    name: 'reviewer-suggestion-sweep',
+    // Stage 3E extracted the sweep's per-row expire body internally
+    // (to reviewer-engagement/expire-invitation.js); the sweep module
+    // itself is unmoved and keeps its sole exported sweepStaleInvites, so
+    // this row records the module's own callers, not a migration boundary.
+    pattern: /reviewer-suggestion-sweep/,
+    expected: [
+      'pages/api/cron/sweep-stale-invites.js',
+    ],
+  },
+  {
+    name: 'reviewer-engagement/record-email-outcome',
+    // New in Stage 3E (recordDeliveredEmail, extracted from
+    // send-emails-service.js). Not re-exported from the old module — no
+    // other production caller needed it.
+    pattern: /reviewer-engagement\/record-email-outcome/,
+    expected: [
+      'lib/services/review-manager/send-emails-service.js',
+    ],
+  },
+  {
+    name: 'reviewer-engagement/expire-invitation',
+    // New in Stage 3E (expireInvitation, extracted from
+    // reviewer-suggestion-sweep.js). Only the sweep imports it — also
+    // importing back isPastCutoff for its own discovery-pass filtering.
+    pattern: /reviewer-engagement\/expire-invitation/,
+    expected: [
+      'lib/services/reviewer-suggestion-sweep.js',
+    ],
+  },
 ];
 
 // Hoisted: every production file under SCAN_DIRS is read exactly once, up
