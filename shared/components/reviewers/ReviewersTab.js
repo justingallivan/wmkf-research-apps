@@ -158,7 +158,11 @@ export default function ReviewersTab({
         // open materials-modal session for the same request (Stage 6B3d) — keep
         // the last committed proposal when it belongs to this request. A
         // proposal from another request is still dropped.
-        setProposal((prev) => (prev && prev.proposalId === rid ? prev : null));
+        // GUID compare is case-insensitive: the URL param may be mis-cased while
+        // Dataverse returns lowercase ids.
+        setProposal((prev) => (
+          prev && String(prev.proposalId).toLowerCase() === String(rid).toLowerCase() ? prev : null
+        ));
       }
     } finally {
       if (isCurrent()) setLoading(false);

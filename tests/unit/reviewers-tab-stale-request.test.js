@@ -13,7 +13,7 @@
  * declineReferrals prop it receives so we can assert what the Track callout
  * would show.
  */
-import { render, screen, waitFor, act } from '@testing-library/react';
+import { render, screen, waitFor, act, fireEvent } from '@testing-library/react';
 
 jest.mock('../../shared/components/reviewers/ReviewerManagePanel', () => function ManagePanelStub(props) {
   return (
@@ -21,7 +21,9 @@ jest.mock('../../shared/components/reviewers/ReviewerManagePanel', () => functio
       data-testid="manage-panel"
       data-referrals={JSON.stringify(props.declineReferrals || [])}
       data-reviewers={JSON.stringify(props.reviewers || [])}
-    />
+    >
+      <button type="button" onClick={() => props.onRefresh && props.onRefresh()}>stub-refresh</button>
+    </div>
   );
 });
 jest.mock('../../shared/components/reviewers/ReviewerFindPanel', () => function FindPanelStub() {
@@ -155,6 +157,45 @@ test('referrals are cleared immediately on request change (no stale flash)', asy
 // the (wrong) simplification `setProposal(prev => prev)`, which would leak
 // request A's proposal — and therefore its reviewer rows — across a request
 // switch whose own load fails.
+test('a same-request refetch error keeps the proposal even when the URL GUID is mis-cased', async () => {
+  const REVIEWER_A_ROW = { suggestionId: 's-a-reviewer', name: 'A Reviewer' };
+  let reviewersCalls = 0;
+  global.fetch = jest.fn((url) => {
+    const u = String(url);
+    if (u.includes('/api/review-manager/reviewers')) {
+      reviewersCalls += 1;
+      if (reviewersCalls === 1) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            success: true,
+            // Dataverse returns the lowercase id; the URL param below is upper-cased.
+            proposals: [{ proposalId: REQ_A, proposalTitle: 'Request A', reviewDeadline: null, reviewers: [REVIEWER_A_ROW] }],
+          }),
+        });
+      }
+      return Promise.resolve({ ok: false, status: 500, json: async () => ({ success: false, error: 'boom' }) });
+    }
+    if (u.includes('/api/reviewer-finder/my-candidates')) {
+      return Promise.resolve({ ok: true, json: async () => ({ proposals: [] }) });
+    }
+    if (u.includes('/api/workbench/decline-referrals')) {
+      return Promise.resolve({ ok: true, json: async () => ({ referrals: [] }) });
+    }
+    throw new Error(`unexpected fetch ${u}`);
+  });
+
+  render(<ReviewersTab requestId={REQ_A.toUpperCase()} />);
+  await waitFor(() => expect(reviewersOf()).toEqual([REVIEWER_A_ROW]));
+
+  // Same-request reload through the panel's onRefresh (no remount); it fails.
+  await act(async () => {
+    fireEvent.click(screen.getByRole('button', { name: 'stub-refresh' }));
+  });
+  await waitFor(() => expect(screen.getByText(/Couldn.t load reviewers: boom/)).toBeInTheDocument());
+  expect(reviewersOf()).toEqual([REVIEWER_A_ROW]);
+});
+
 test("a refetch error after switching requests still drops the other request's proposal", async () => {
   const REVIEWER_A_ROW = { suggestionId: 's-a-reviewer', name: 'A Reviewer' };
   global.fetch = jest.fn((url) => {
