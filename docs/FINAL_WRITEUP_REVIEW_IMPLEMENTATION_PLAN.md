@@ -667,7 +667,9 @@ Current-state boundary [VERIFIED 2026-09-06 via source]:
 Build order (each step reviewable on its own; `/contract-reconcile` applies to 6A because the
 read model's scope, cap, and fail-closed behavior change):
 
-- **6A — server-side cycle scoping (dated: before D26 Final writeups exist).** The 100-row cap is
+- **6A — server-side cycle scoping (dated: before D26 Final writeups exist). PLANNED 2026-09-06 in
+  `docs/FINAL_WRITEUPS_DASHBOARD_CYCLE_SCOPING_PLAN.md` (contract-reconcile trace, invariant table,
+  tests); not built.** The 100-row cap is
   global, so a second cycle of Finals eventually takes the whole dashboard down rather than
   degrading. Scope the request query by the selected cycle (artifact-cycle query from the current
   Final rows' requests, per the persona section above — not the lead-PD-derived picker), return the
