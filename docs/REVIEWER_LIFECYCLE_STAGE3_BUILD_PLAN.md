@@ -198,6 +198,10 @@ builders on that file concurrently.
   No census row for `reviewer-engagement/errors`: the bare `./errors` specifier and the generic
   fragment collide with `dataverse/core/errors` consumers (builder judgment, sent to Codex round 2).
   Full suite 788 / 11,525; gates green; no `reviewer-engagement/` file imports from `reviewer-finder/`.
+- **Codex adversarial round 2 (final, `3aee6d0a`): approve.** Round-1 ownership item resolved (both
+  services import the same neutral-leaf class; delegation enforced by the paths test and census);
+  omitting a census row for `errors.js` is acceptable because it is a shared leaf, not an extracted
+  command boundary. Cap reached.
 
 ## Rules for every slice
 
