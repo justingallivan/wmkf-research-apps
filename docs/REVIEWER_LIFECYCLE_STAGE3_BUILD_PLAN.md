@@ -231,6 +231,10 @@ Move verbatim; wrappers re-export the same objects (no re-wrapping that breaks `
 route path changes; no new trusted DAL context minted below the route; each command still delegates
 persistence to the adapter; no universal patch command. "Do not progress on wrapper-only passing
 tests": each slice adds at least one direct new-path test that executes the implementation.
+**Delegation pin (mandatory from 3E on; 3D had one, 3E did not until Codex asked):** each slice also
+adds a test that mocks the extracted module and asserts the legacy caller invokes the named export
+with the existing arguments and maps every outcome/thrown class exactly as before, so a faithful
+inline reimplementation that keeps the import for the census still goes red.
 
 ## Review checkpoints
 
