@@ -34,7 +34,7 @@ localStorage mirror, proposal document, the panel's selection and `onRefresh`, t
 | Invariant | Files touched | Verification |
 |---|---|---|
 | Session identity is open state + request + sorted selected-membership key + mounted; any change bumps the monotonic epoch; returning never revives | modal session ref, one no-deps layout effect, unmount cleanup | deferred preview/send/upload/proposal/save × request switch, membership change, close/reopen, unmount, A→B→A |
-| A new session resets drafts/results/error/step to compose, aborts the active render and invalidates proposal loading; same-membership object churn does not | same | fresh reviewer objects with the same ids keep a preview in progress |
+| A new session resets drafts/results/error/step to compose and aborts the active render; same-membership object churn does not. [Corrected by review REQUIRED-1: proposal loading is invalidated by open/close, request change and unmount only, never by a membership-only change] | same | fresh reviewer objects with the same ids keep a preview in progress |
 | Preview single-flight, snapshot-before-queue, tail serialization, per-render controller and timeout are untouched | handlePreview core unchanged | existing preview-retry pins green and unmodified |
 | Every stream read and event is checkpointed; after `complete` the attempt is finished and later events have no effect | handleSend | duplicate complete → one callback; trailing error → summary and step unchanged |
 | The completion summary comes from the attempt's own accumulated stream data | local accumulator | result+complete in one chunk; mixed and all-failed results survive |
@@ -107,14 +107,14 @@ closeout, 6B1-registry or status-handler line changed.
 
 ## Red-before-code evidence
 - Baseline nine-suite selection at `489e07f2`: 9 suites / 953 tests (builder-run).
-- New file against unchanged runtime: 12 of 26 failed, 14 passed (the current-context cases).
+- New file against unchanged runtime: 13 of 26 failed, 13 passed (reviewer-measured; the builder reported 12 / 14; the passing cases are the current-context cases).
 - Builder guard removals in the working tree, each restored byte-identical:
   (a) membership key removed from the session comparison → 9 assertion failures;
   (b) old-finally double epoch check reduced to a single check → 0 (structural with the current
   guards; retained as defense in depth, same class as 6B1 REQUIRED-1 and 6B2 mutation (c));
-  (c) prior-key binding removed from cause consumption → 0 (every UI path clears the ref or the
-  consumed flag first; retained for the stated invariant; reviewer asked to construct a
-  discriminating case or prove none exists);
+  (c) prior-key binding removed from cause consumption → 0 (structural: the invalidation branch
+  nulls the last finished attempt before any exemption field is compared, the same shared reason
+  the reviewer found for the session and consumed checks; all three retained as defense in depth);
   (d) finished guard neutralized → 2; (e) post-upload checkpoint removed → 2; (f) unmount
   cleanup emptied → 2. All assertion failures, no crashes.
 
