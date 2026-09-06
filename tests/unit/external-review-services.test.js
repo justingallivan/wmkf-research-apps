@@ -14,14 +14,24 @@
 jest.mock('../../lib/dataverse/core/context', () => ({
   withDalContext: jest.fn((label, fn) => fn()),
 }));
-jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
-  applyStage2aResponse: jest.fn(async () => ({})),
-  updateLifecycle: jest.fn(async () => ({})),
-  getForEtagRefresh: jest.fn(async () => ({ _etag: 'W/"2"' })),
-  stampProposalFirstAccessed: jest.fn(async () => ({})),
-  getForSubmitFinalityCheck: jest.fn(async () => ({ _etag: 'W/"fresh"', wmkf_reviewreceivedat: null })),
-  ENTITY_SET_NAME: 'wmkf_appreviewersuggestions',
-}));
+jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => {
+  // updateLifecycle stays mocked directly (nothing in this suite calls the
+  // real 3J op's implementation); deselectLegacyDeclinedSuggestion forwards
+  // to it so the existing updateLifecycle-shaped assertions below (repeat
+  // decline repairs a legacy row) stay byte-unchanged while a new pin also
+  // asserts the op itself was invoked and updateLifecycle was not called
+  // directly by the service.
+  const updateLifecycle = jest.fn(async () => ({}));
+  return {
+    applyStage2aResponse: jest.fn(async () => ({})),
+    updateLifecycle,
+    deselectLegacyDeclinedSuggestion: jest.fn((id, opts) => updateLifecycle(id, { selected: false }, opts)),
+    getForEtagRefresh: jest.fn(async () => ({ _etag: 'W/"2"' })),
+    stampProposalFirstAccessed: jest.fn(async () => ({})),
+    getForSubmitFinalityCheck: jest.fn(async () => ({ _etag: 'W/"fresh"', wmkf_reviewreceivedat: null })),
+    ENTITY_SET_NAME: 'wmkf_appreviewersuggestions',
+  };
+});
 jest.mock('../../lib/dataverse/adapters/contact', () => ({
   getByIdWithSelect: jest.fn(async () => null),
 }));
@@ -80,6 +90,7 @@ import {
   applyStage2aResponse,
   getForSubmitFinalityCheck,
   updateLifecycle,
+  deselectLegacyDeclinedSuggestion,
 } from '../../lib/dataverse/adapters/reviewer-suggestion';
 import { getByIdWithSelect as getSystemUserByIdWithSelect } from '../../lib/dataverse/adapters/system-user';
 import { runChangeset } from '../../lib/dataverse/core/changeset';
@@ -400,7 +411,70 @@ describe('applyReviewerResponse', () => {
       { selected: false },
       { ifMatch: 'W/"legacy"' },
     );
+    expect(deselectLegacyDeclinedSuggestion).toHaveBeenCalledTimes(1);
+    expect(deselectLegacyDeclinedSuggestion).toHaveBeenCalledWith(
+      expect.any(String),
+      { ifMatch: 'W/"legacy"' },
+    );
     expect(result).toMatchObject({ ok: true, idempotent: true });
+  });
+
+  it('repeat-decline legacy repair calls the narrow op, not updateLifecycle directly', async () => {
+    updateLifecycle.mockClear();
+    deselectLegacyDeclinedSuggestion.mockClear();
+    await applyReviewerResponse({
+      suggestion: baseSuggestion({
+        wmkf_declined: true,
+        wmkf_selected: true,
+        _etag: 'W/"legacy2"',
+      }),
+      request,
+      reviewer,
+      body: { action: 'decline', decline: {} },
+    });
+
+    expect(deselectLegacyDeclinedSuggestion).toHaveBeenCalledTimes(1);
+    expect(deselectLegacyDeclinedSuggestion).toHaveBeenCalledWith(
+      expect.any(String),
+      { ifMatch: 'W/"legacy2"' },
+    );
+  });
+
+  it('repeat-decline 412 from the legacy repair op maps to concurrent_modification', async () => {
+    deselectLegacyDeclinedSuggestion.mockRejectedValueOnce(
+      Object.assign(new Error('Dataverse returned 412'), { status: 412 }),
+    );
+    await expect(applyReviewerResponse({
+      suggestion: baseSuggestion({
+        wmkf_declined: true,
+        wmkf_selected: true,
+        _etag: 'W/"legacy3"',
+      }),
+      request,
+      reviewer,
+      body: { action: 'decline', decline: {} },
+    })).rejects.toMatchObject({
+      httpStatus: 412,
+      body: { ok: false, reason: 'concurrent_modification' },
+    });
+  });
+
+  it('already-deselected legacy row (wmkf_selected falsy) never calls the repair op', async () => {
+    deselectLegacyDeclinedSuggestion.mockClear();
+    updateLifecycle.mockClear();
+    await applyReviewerResponse({
+      suggestion: baseSuggestion({
+        wmkf_declined: true,
+        wmkf_selected: false,
+        _etag: 'W/"already-clean"',
+      }),
+      request,
+      reviewer,
+      body: { action: 'decline', decline: {} },
+    });
+
+    expect(deselectLegacyDeclinedSuggestion).not.toHaveBeenCalled();
+    expect(updateLifecycle).not.toHaveBeenCalled();
   });
 });
 
