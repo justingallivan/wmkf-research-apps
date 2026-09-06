@@ -86,6 +86,9 @@ describe('import-census scanner: adversarial fixture', () => {
     write('typed-component.tsx', `import target from './target-module';\nexport default function C() { return target; }\n`);
     write('non-literal-require.js', `const modName = './target-module';\nconst thing = require(modName);\nmodule.exports = thing;\n`);
     write('unrelated.js', `import other from './something-else';\nexport default other;\n`);
+    write('commented-static-import.js', `import target from /* eslint-disable-next-line */ './target-module';\nexport default target;\n`);
+    write('commented-require.js', `const thing = require(/* c */ './target-module');\nmodule.exports = thing;\n`);
+    write('commented-dynamic-import.js', `export async function load() {\n  return import(/* webpackChunkName: "x" */ './target-module.js');\n}\n`);
   });
 
   afterAll(() => {
@@ -97,6 +100,9 @@ describe('import-census scanner: adversarial fixture', () => {
     const matched = findImporters(files, PATTERN);
 
     const expectedDetected = [
+      'commented-dynamic-import.js',
+      'commented-require.js',
+      'commented-static-import.js',
       'commonjs-file.cjs',
       'dynamic-import.js',
       'export-from.js',

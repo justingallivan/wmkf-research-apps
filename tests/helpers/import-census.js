@@ -71,14 +71,20 @@ function readSourceFiles(roots, options = {}) {
  * source fragment, e.g. "close-review-service") inside a module specifier
  * string, across static import / export-from, require(), and dynamic
  * import() forms.
+ *
+ * The gap between `from`/`require(`/`import(` and the literal specifier
+ * tolerates not just whitespace but an interleaved block or line comment
+ * (e.g. `import x from /* c *\/ './target'` or `require(/* c *\/ './target')`)
+ * — a bare `\s*` gap would miss those.
  */
 function buildImportRegex(patternSource) {
   const spec = `['"][^'"]*${patternSource}[^'"]*['"]`;
+  const gap = '(?:\\s|/\\*[\\s\\S]*?\\*/|//[^\\n]*\\n)*';
   return new RegExp(
     [
-      `from\\s+${spec}`, // covers both `import ... from '...'` and `export ... from '...'`
-      `require\\(\\s*${spec}\\s*\\)`,
-      `import\\(\\s*${spec}\\s*\\)`,
+      `from${gap}${spec}`, // covers both `import ... from '...'` and `export ... from '...'`
+      `require\\(${gap}${spec}${gap}\\)`,
+      `import\\(${gap}${spec}${gap}\\)`,
     ].join('|'),
   );
 }
