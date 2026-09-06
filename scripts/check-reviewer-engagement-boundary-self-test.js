@@ -445,6 +445,145 @@ function runAliasAndBarrelAssertions() {
   console.log('PASS alias-chain / extracted-method / export-* barrel (incl. transitive) / CJS whole-republish / computed-member assertions');
 }
 
+// Stage 7 SECOND correction round (Codex round 2): class-held adapters,
+// renamed CJS/ESM member re-exports, direct dynamic-import member access,
+// and the generic fail-closed catch-all for any other complex object shape.
+function setupClassBarrelDynamicImportFixtures() {
+  cleanup();
+  writeAdapterAndRecordedSinks(true);
+
+  // (1) Class instance field holding the adapter (ClassProperty initializer),
+  // accessed via \`this.field.writer\`.
+  write(tempRoot, 'lib/services/red-class-field-direct-require.js', `
+    class Runner {
+      adapter = require('../dataverse/adapters/reviewer-suggestion.js');
+      run(id) { return this.adapter.updateLifecycle(id, {}, {}); }
+    }
+    module.exports = { Runner };
+  `);
+  // (1') The same field bound via a CONSTRUCTOR assignment instead of a
+  // ClassProperty initializer -- \`this.adapter = require(...)\`.
+  write(tempRoot, 'lib/services/red-class-field-constructor-assign.js', `
+    class Runner {
+      constructor() {
+        this.adapter = require('../dataverse/adapters/reviewer-suggestion.js');
+      }
+      run(id) { return this.adapter.patchReviewReceipt(id, {}, {}); }
+    }
+    module.exports = { Runner };
+  `);
+
+  // (2) Renamed CJS object-literal member re-export.
+  write(tempRoot, 'lib/wrappers/cjs-renamed-object-wrapper.js', `
+    const adapter = require('../dataverse/adapters/reviewer-suggestion.js');
+    module.exports = { mutate: adapter.updateLifecycle };
+  `);
+  write(tempRoot, 'lib/services/red-cjs-renamed-object-consumer.js', `
+    const { mutate } = require('../wrappers/cjs-renamed-object-wrapper.js');
+    module.exports = { run: (id) => mutate(id, {}, {}) };
+  `);
+
+  // (2') Renamed CJS \`exports.name = \` member re-export.
+  write(tempRoot, 'lib/wrappers/cjs-renamed-exports-wrapper.js', `
+    const adapter = require('../dataverse/adapters/reviewer-suggestion.js');
+    exports.mutate = adapter.patchReviewReceipt;
+  `);
+  write(tempRoot, 'lib/services/red-cjs-renamed-exports-consumer.js', `
+    const { mutate } = require('../wrappers/cjs-renamed-exports-wrapper.js');
+    module.exports = { run: (id) => mutate(id, {}, {}) };
+  `);
+
+  // (2'') ESM renamed member re-export: \`export const mutate = adapter.updateLifecycle;\`
+  write(tempRoot, 'lib/wrappers/esm-renamed-const-wrapper.js', `
+    import * as adapter from '../dataverse/adapters/reviewer-suggestion.js';
+    export const mutate = adapter.bulkUpdateByRequest;
+  `);
+  write(tempRoot, 'lib/services/red-esm-renamed-const-consumer.js', `
+    import { mutate } from '../wrappers/esm-renamed-const-wrapper.js';
+    export async function run(id) { return mutate(id, {}, {}); }
+  `);
+
+  // (3) Direct dynamic-import member access, no intermediate variable.
+  write(tempRoot, 'lib/services/red-direct-dynamic-import-member.js', `
+    export async function run(id) {
+      return (await import('../dataverse/adapters/reviewer-suggestion.js')).updateLifecycle(id, {}, {});
+    }
+  `);
+
+  // GREEN: the exact real-repo false-positive class this round's narrowing
+  // fixes -- a dynamic-keyed lookup into a STATICALLY NAMED, non-writer
+  // sub-export of the adapter (must NOT be flagged), and a chained method
+  // call off the adapter whose outer property is not a writer (also green).
+  write(tempRoot, 'lib/services/green-adapter-constant-lookup.js', `
+    import * as adapter from '../dataverse/adapters/reviewer-suggestion.js';
+    export function label(row) {
+      return adapter.RESPONSE_TYPE_BY_VALUE[row.wmkf_responsetype] ?? null;
+    }
+    export async function lookup(id) {
+      return adapter.findById(id).catch(() => null);
+    }
+  `);
+}
+
+function runClassBarrelDynamicImportAssertions() {
+  setupClassBarrelDynamicImportFixtures();
+
+  const run = runGate(['--json']);
+  expect(run.status === 0, `--json exited ${run.status}\n${run.output}`);
+  const entries = JSON.parse(run.output);
+  const violations = entries.filter((e) => !e.exempt);
+  const byFile = new Map();
+  for (const v of violations) {
+    if (!byFile.has(v.file)) byFile.set(v.file, []);
+    byFile.get(v.file).push(v);
+  }
+
+  // (1) class field access via this.field (ClassProperty initializer and,
+  // separately, a constructor assignment).
+  expect(byFile.has('lib/services/red-class-field-direct-require.js'),
+    `(1) class-field file not flagged\nviolations: ${JSON.stringify(violations, null, 2)}`);
+  expect(byFile.get('lib/services/red-class-field-direct-require.js').some((v) => v.writer === 'updateLifecycle'),
+    `(1) class-field violation did not resolve to updateLifecycle: ${JSON.stringify(byFile.get('lib/services/red-class-field-direct-require.js'))}`);
+  expect(byFile.has('lib/services/red-class-field-constructor-assign.js'),
+    `(1') constructor-assigned class-field file not flagged\nviolations: ${JSON.stringify(violations, null, 2)}`);
+  expect(byFile.get('lib/services/red-class-field-constructor-assign.js').some((v) => v.writer === 'patchReviewReceipt'),
+    `(1') constructor-assigned class-field violation did not resolve to patchReviewReceipt: ${JSON.stringify(byFile.get('lib/services/red-class-field-constructor-assign.js'))}`);
+
+  // (2) renamed CJS object-literal member re-export.
+  expect(byFile.has('lib/services/red-cjs-renamed-object-consumer.js'),
+    `(2) renamed-object consumer not flagged\nviolations: ${JSON.stringify(violations, null, 2)}`);
+  const renamedObjectConsumer = byFile.get('lib/services/red-cjs-renamed-object-consumer.js').find((v) => v.writer === 'updateLifecycle');
+  expect(renamedObjectConsumer && renamedObjectConsumer.wrapper === 'lib/wrappers/cjs-renamed-object-wrapper.js',
+    `(2) renamed-object consumer violation did not name the wrapper: ${JSON.stringify(renamedObjectConsumer)}`);
+
+  // (2') renamed CJS exports.name member re-export.
+  expect(byFile.has('lib/services/red-cjs-renamed-exports-consumer.js'),
+    `(2') renamed-exports consumer not flagged\nviolations: ${JSON.stringify(violations, null, 2)}`);
+  const renamedExportsConsumer = byFile.get('lib/services/red-cjs-renamed-exports-consumer.js').find((v) => v.writer === 'patchReviewReceipt');
+  expect(renamedExportsConsumer && renamedExportsConsumer.wrapper === 'lib/wrappers/cjs-renamed-exports-wrapper.js',
+    `(2') renamed-exports consumer violation did not name the wrapper: ${JSON.stringify(renamedExportsConsumer)}`);
+
+  // (2'') ESM renamed member re-export.
+  expect(byFile.has('lib/services/red-esm-renamed-const-consumer.js'),
+    `(2'') ESM renamed-const consumer not flagged\nviolations: ${JSON.stringify(violations, null, 2)}`);
+  const renamedConstConsumer = byFile.get('lib/services/red-esm-renamed-const-consumer.js').find((v) => v.writer === 'bulkUpdateByRequest');
+  expect(renamedConstConsumer && renamedConstConsumer.wrapper === 'lib/wrappers/esm-renamed-const-wrapper.js',
+    `(2'') ESM renamed-const consumer violation did not name the wrapper: ${JSON.stringify(renamedConstConsumer)}`);
+
+  // (3) direct dynamic-import member access.
+  expect(byFile.has('lib/services/red-direct-dynamic-import-member.js'),
+    `(3) direct dynamic-import member file not flagged\nviolations: ${JSON.stringify(violations, null, 2)}`);
+  expect(byFile.get('lib/services/red-direct-dynamic-import-member.js').some((v) => v.writer === 'updateLifecycle' && v.form === 'dynamic-import-member'),
+    `(3) direct dynamic-import member violation did not resolve to updateLifecycle: ${JSON.stringify(byFile.get('lib/services/red-direct-dynamic-import-member.js'))}`);
+
+  // GREEN: the narrowed false-positive class (constant lookup + chained call).
+  const allFiles = new Set(entries.map((e) => e.file));
+  expect(!allFiles.has('lib/services/green-adapter-constant-lookup.js'),
+    'dynamic-keyed constant lookup / chained non-writer call off the adapter wrongly flagged');
+
+  console.log('PASS class-held adapter / renamed CJS+ESM member re-export / direct dynamic-import member assertions (with the narrowed-catch-all green)');
+}
+
 function runStaleRecordedImporterAssertions() {
   cleanup();
   writeAdapterAndRecordedSinks(false);
@@ -549,6 +688,22 @@ function runUnresolvedFailClosedAssertions() {
     }
   `);
 
+  // Stage 7 SECOND correction round (Codex round 2, item 3): a direct dynamic
+  // import member access whose SOURCE is non-literal cannot be ruled out as
+  // the adapter, so it fails closed regardless of the property name.
+  write(tempRoot, 'lib/services/red-unresolved-dynamic-import-member.js', `
+    export async function run(modPath, id) {
+      return (await import(modPath)).updateLifecycle(id, {}, {});
+    }
+  `);
+  // ...and the same for a non-literal (dynamic) PROPERTY on an otherwise
+  // literal, adapter-matching dynamic import.
+  write(tempRoot, 'lib/services/red-unresolved-dynamic-import-computed-property.js', `
+    export async function run(key, id) {
+      return (await import('../dataverse/adapters/reviewer-suggestion.js'))[key](id, {}, {});
+    }
+  `);
+
   // GREEN: lazy-backend shape -- non-literal require() held in a module-scope
   // local, only OWN functions exported. Must not trip fail-closed.
   write(tempRoot, 'lib/services/green-lazy-backend.js', `
@@ -574,9 +729,13 @@ function runUnresolvedFailClosedAssertions() {
     `expected file:line for the ALIASED unresolved identity re-export, got:\n${run.output}`);
   expect(/red-unresolved-destructure-from-identifier\.js:\d+/.test(run.output),
     `expected file:line for the destructure-from-identifier unresolved case, got:\n${run.output}`);
+  expect(/red-unresolved-dynamic-import-member\.js:\d+/.test(run.output),
+    `expected file:line for the non-literal dynamic-import member access, got:\n${run.output}`);
+  expect(/red-unresolved-dynamic-import-computed-property\.js:\d+/.test(run.output),
+    `expected file:line for the dynamic-import computed-property access, got:\n${run.output}`);
   expect(!run.output.includes('green-lazy-backend.js'),
     `lazy-backend GREEN fixture wrongly tripped fail-closed:\n${run.output}`);
-  console.log('PASS non-literal source fails closed for every documented writer-shaped use (destructure, member access, identity re-export, each direct and aliased); lazy-backend green');
+  console.log('PASS non-literal source fails closed for every documented writer-shaped use (destructure, member access, identity re-export, each direct and aliased, plus dynamic-import member/computed-property); lazy-backend green');
 }
 
 // LAW MODE: the default run fails closed on every red binding and every
@@ -641,7 +800,7 @@ function parseMode(argv) {
   const modeIndex = argv.indexOf('--mode');
   if (modeIndex === -1) return 'all';
   const mode = argv[modeIndex + 1];
-  if (!mode) throw new Error('--mode requires one of: all, detection, alias-barrel, stale, missing, unresolved, law, report, live');
+  if (!mode) throw new Error('--mode requires one of: all, detection, alias-barrel, class-barrel-dynamic-import, stale, missing, unresolved, law, report, live');
   return mode;
 }
 
@@ -649,6 +808,7 @@ function runMode(mode) {
   if (mode === 'all') {
     runDetectionAssertions();
     runAliasAndBarrelAssertions();
+    runClassBarrelDynamicImportAssertions();
     runStaleRecordedImporterAssertions();
     runMissingRecordedImporterFileAssertions();
     runUnresolvedFailClosedAssertions();
@@ -659,6 +819,7 @@ function runMode(mode) {
   }
   if (mode === 'detection') return runDetectionAssertions();
   if (mode === 'alias-barrel') return runAliasAndBarrelAssertions();
+  if (mode === 'class-barrel-dynamic-import') return runClassBarrelDynamicImportAssertions();
   if (mode === 'stale') return runStaleRecordedImporterAssertions();
   if (mode === 'missing') return runMissingRecordedImporterFileAssertions();
   if (mode === 'unresolved') return runUnresolvedFailClosedAssertions();

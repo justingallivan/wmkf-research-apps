@@ -50,7 +50,39 @@
  *     (`adapter['update' + 'Lifecycle']`, `adapter[name]`) fails CLOSED as an
  *     unresolvable-member violation UNLESS the computed key is a string
  *     literal that resolves to a name that is NOT one of the four writers
- *     (in which case it is simply not a writer binding at all).
+ *     (in which case it is simply not a writer binding at all);
+ *   - a CLASS INSTANCE FIELD holding the adapter (`class X { adapter =
+ *     require('<adapter>'); run() { return this.adapter.updateLifecycle(...);
+ *     } }`, or the same field set via `this.field = require(...)`/an awaited
+ *     dynamic import in the constructor) -- bound under a synthetic
+ *     `this.<field>` key that flows through the SAME fixpoint a normal local
+ *     does;
+ *   - a RENAMED member re-export -- `module.exports = { mutate:
+ *     adapter.updateLifecycle }`, `exports.mutate = adapter.updateLifecycle`,
+ *     or ESM `export const mutate = adapter.updateLifecycle;` -- publishes a
+ *     writer under a NEW name, resolved the same way an extracted-method
+ *     reference is (a virtual local method-bound to the writer, exported
+ *     under the renamed key) so a consumer importing `mutate` is classified
+ *     exactly like one importing `updateLifecycle` directly;
+ *   - a DIRECT dynamic-import member access -- `(await
+ *     import('<adapter>')).updateLifecycle(...)` (parenthesized/optional
+ *     forms too) -- classified like a namespace member without needing an
+ *     intermediate variable; a non-literal import source, or a non-literal
+ *     computed property on the result, fails CLOSED instead;
+ *   - a GENERIC CATCH-ALL for any OTHER member-access object shape this gate
+ *     does not otherwise resolve (e.g. a function call's return value): fails
+ *     CLOSED, naming the file:line as an "unsupported adapter-bearing shape",
+ *     ONLY when (a) the outer property this access itself names IS one of the
+ *     four writers AND the object's subtree references an identifier this
+ *     file's fixpoint resolved to an adapter/writer binding, OR (b) the
+ *     object's subtree contains a literal adapter require()/import() ANYWHERE,
+ *     regardless of the outer property. A dynamic (non-literal) computed
+ *     property on such an unresolvable object is NOT, by itself, sufficient --
+ *     narrowed against a real false-positive class found in this repo
+ *     (`suggestionAdapter.HONORARIUM_ELIGIBILITY_BY_VALUE[row.x]`: a
+ *     dynamic-keyed lookup into a STATICALLY NAMED, definitely-not-a-writer
+ *     sub-export of the adapter can never yield one of the four writers,
+ *     regardless of the runtime key, so it is not recorded at all).
  * Non-literal require()/import() sources reachable in scope fail CLOSED ONLY
  * when they could plausibly be laundering a generic-writer binding -- a
  * destructure whose key names a writer directly off the require()/import()
@@ -206,6 +238,33 @@ function resolvedPropertyName(node) {
   return { kind: 'dynamic', name: null };
 }
 
+// Resolves a node to a "bindable key" usable everywhere a plain local-variable
+// name is used elsewhere in this file (importedBindings / namespaceBinding /
+// writerBinding / aliasEdges / memberAccesses.object / methodBindings.object):
+//   - a plain Identifier -> its name, as always;
+//   - `this.<field>` (non-computed) -> a synthetic per-field key, so a class
+//     instance field holding the adapter (`adapter = require('<adapter>')` as
+//     a ClassProperty, or `this.adapter = require(...)` in the constructor)
+//     resolves through the SAME fixpoint a normal local does (Stage 7 second
+//     correction round, Codex round 2 item 1).
+// Returns null for anything else (a call result, another member chain, etc.)
+// -- those fall through to the dynamic-import-member or generic fail-closed
+// handling below.
+function thisFieldKey(fieldName) {
+  return `__this_field__${fieldName}`;
+}
+function bindableKeyOf(node) {
+  if (!node) return null;
+  if (node.type === 'Identifier') return node.name;
+  if ((node.type === 'MemberExpression' || node.type === 'OptionalMemberExpression')
+    && !node.computed
+    && node.object.type === 'ThisExpression') {
+    const field = propName(node.property);
+    return field ? thisFieldKey(field) : null;
+  }
+  return null;
+}
+
 // Everything about a file the boundary analysis needs:
 //   - importedBindings: local name -> { spec, imported, line } for every
 //     binding introduced by a static import, `const x = require('<spec>')`
@@ -258,18 +317,25 @@ function collectFileInfo(ast) {
   const methodBindings = [];
   const memberAccesses = [];
   const computedDynamicAccesses = [];
+  const dynamicImportMemberUnresolved = [];
+  const directDynamicImportWriterAccesses = [];
+  const complexMemberAccesses = [];
   const unresolvedBindings = new Map();
   const unresolvedWriterDestructures = [];
   const parentMap = buildParentMap(ast);
 
+  // `name = require(...)` / `name = await import(...)` (late assignment) OR
+  // `this.field = require(...)` / `this.field = await import(...)` (a
+  // constructor binding a class instance field to the adapter -- Stage 7
+  // second correction round, Codex round 2 item 1). bindableKeyOf resolves
+  // both shapes to the same kind of key used everywhere else in this file.
   function assignedIdentifierTarget(callNode) {
     const climbed = climbExpressionWrappers(callNode, parentMap);
     const parent = parentMap.get(climbed);
     if (parent && parent.type === 'AssignmentExpression'
       && parent.operator === '='
-      && parent.right === climbed
-      && parent.left.type === 'Identifier') {
-      return parent.left.name;
+      && parent.right === climbed) {
+      return bindableKeyOf(parent.left);
     }
     return null;
   }
@@ -339,8 +405,10 @@ function collectFileInfo(ast) {
 
   // `const local = <expr>` / `local = <expr>` where <expr> (after unwrapping
   // parens/await/TS casts) is either a bare Identifier (alias edge) or a
-  // MemberExpression on an Identifier object (method-binding candidate).
-  // Shared by the VariableDeclarator and AssignmentExpression walkers below.
+  // MemberExpression on an Identifier OR `this.<field>` object (method-binding
+  // candidate -- e.g. `const u = adapter.updateLifecycle` or `const u =
+  // this.adapter.updateLifecycle`). Shared by the VariableDeclarator and
+  // AssignmentExpression walkers below.
   function captureIdentifierRhs(localName, rhsNode, line) {
     const rhs = unwrapExpression(rhsNode);
     if (!rhs) return;
@@ -348,11 +416,12 @@ function collectFileInfo(ast) {
       aliasEdges.push({ from: rhs.name, to: localName });
       return;
     }
-    if ((rhs.type === 'MemberExpression' || rhs.type === 'OptionalMemberExpression')
-      && rhs.object.type === 'Identifier') {
+    if (rhs.type === 'MemberExpression' || rhs.type === 'OptionalMemberExpression') {
+      const objKey = bindableKeyOf(rhs.object);
+      if (!objKey) return;
       const { kind, name } = resolvedPropertyName(rhs);
       if (kind === 'static' && name && GENERIC_WRITERS_SET.has(name)) {
-        methodBindings.push({ local: localName, object: rhs.object.name, property: name, line });
+        methodBindings.push({ local: localName, object: objKey, property: name, line });
       }
     }
   }
@@ -410,7 +479,11 @@ function collectFileInfo(ast) {
       return;
     }
     // `export { local }` / `export { local as external }` (no source).
-    if (node.type === 'ExportNamedDeclaration' && !node.source && node.specifiers) {
+    // NOTE: `export const x = ...` also parses as ExportNamedDeclaration with
+    // NO source, but `specifiers` is an EMPTY ARRAY (truthy!) rather than
+    // absent -- `.length` guards this branch so that shape falls through to
+    // the declaration-export handling below instead of returning early here.
+    if (node.type === 'ExportNamedDeclaration' && !node.source && node.specifiers && node.specifiers.length > 0) {
       for (const spec of node.specifiers) {
         if (spec.type === 'ExportSpecifier' && spec.local && spec.local.name) {
           const external = spec.exported ? (spec.exported.name || spec.exported.value) : spec.local.name;
@@ -429,7 +502,13 @@ function collectFileInfo(ast) {
     // and the INLINE whole-namespace re-publish `module.exports =
     // require('<spec>')` (no intermediate variable -- HIGH 1(b'), Stage 7
     // correction round: synthesize a virtual local exactly like the
-    // export-from cases above so it feeds the same fixpoint).
+    // export-from cases above so it feeds the same fixpoint). ALSO a RENAMED
+    // member re-export -- `module.exports = { mutate: adapter.updateLifecycle
+    // }` / `exports.mutate = adapter.updateLifecycle` -- publishes a writer
+    // under a NEW name (Stage 7 second correction round, Codex round 2 item
+    // 2): synthesize a virtual local bound via methodBindings (exactly like
+    // `const v = adapter.updateLifecycle` would) and export it under the
+    // renamed key, so the SAME method-extraction + export fixpoint resolves it.
     if (node.type === 'AssignmentExpression' && isCommonJsExportTarget(node.left)) {
       const right = node.right;
       const targetProp = node.left.type !== 'Identifier' && propName(node.left.property);
@@ -441,6 +520,16 @@ function collectFileInfo(ast) {
           if (prop.type === 'ObjectProperty' && prop.value && prop.value.type === 'Identifier') {
             const external = propName(prop.key);
             if (external) exportedBindings.set(external, prop.value.name);
+          } else if (prop.type === 'ObjectProperty' && prop.value
+            && (prop.value.type === 'MemberExpression' || prop.value.type === 'OptionalMemberExpression')) {
+            const external = propName(prop.key);
+            const objKey = bindableKeyOf(prop.value.object);
+            const { kind, name } = resolvedPropertyName(prop.value);
+            if (external && objKey && kind === 'static' && name && GENERIC_WRITERS_SET.has(name)) {
+              const virtualLocal = nextVirtualLocal();
+              methodBindings.push({ local: virtualLocal, object: objKey, property: name, line: nodeLine(prop) });
+              exportedBindings.set(external, virtualLocal);
+            }
           } else if (prop.type === 'SpreadElement' && prop.argument && prop.argument.type === 'Identifier') {
             // `module.exports = { ...adapter }` -- a shallow spread copies
             // every enumerable property (including function references)
@@ -461,8 +550,54 @@ function collectFileInfo(ast) {
           importedBindings.set(virtualLocal, { spec: inlineSpec, imported: '*', line: nodeLine(node) });
           exportsWholeNamespace.add(virtualLocal);
         }
+      } else if (targetProp
+        && (right.type === 'MemberExpression' || right.type === 'OptionalMemberExpression')) {
+        // `exports.mutate = adapter.updateLifecycle;`
+        const objKey = bindableKeyOf(right.object);
+        const { kind, name } = resolvedPropertyName(right);
+        if (objKey && kind === 'static' && name && GENERIC_WRITERS_SET.has(name)) {
+          const virtualLocal = nextVirtualLocal();
+          methodBindings.push({ local: virtualLocal, object: objKey, property: name, line: nodeLine(node) });
+          exportedBindings.set(targetProp, virtualLocal);
+        }
       }
       return;
+    }
+    // `const mutate = adapter.updateLifecycle; export { mutate };` is already
+    // covered generically (VariableDeclarator + the no-source `export {}`
+    // branch above), but `export const mutate = adapter.updateLifecycle;`
+    // exports the variable BY DECLARATION -- register the identity mapping
+    // here so the VariableDeclarator capture below (which runs on the SAME
+    // node via the normal walk) has something to publish through.
+    if (node.type === 'ExportNamedDeclaration' && !node.source && node.declaration
+      && node.declaration.type === 'VariableDeclaration') {
+      for (const decl of node.declaration.declarations || []) {
+        if (decl.id && decl.id.type === 'Identifier') exportedBindings.set(decl.id.name, decl.id.name);
+      }
+    }
+    // Class instance field holding the adapter: `class X { adapter =
+    // require('<adapter>'); }` (or an awaited dynamic import) -- bound under
+    // the SAME synthetic `this.<field>` key a constructor assignment or a
+    // `this.field.writer` member access uses (Stage 7 second correction
+    // round, Codex round 2 item 1).
+    if ((node.type === 'ClassProperty' || node.type === 'PropertyDefinition')
+      && !node.computed && node.key && node.key.type === 'Identifier' && node.value) {
+      const val = unwrapExpression(node.value);
+      const fieldKey = thisFieldKey(node.key.name);
+      const line = nodeLine(node);
+      if (val && val.type === 'CallExpression' && val.callee.type === 'Identifier'
+        && val.callee.name === 'require' && val.arguments.length > 0) {
+        const spec = stringLiteralValue(val.arguments[0]);
+        if (spec != null) importedBindings.set(fieldKey, { spec, imported: '*', line });
+        else unresolvedBindings.set(fieldKey, line);
+      } else {
+        const dynSrc = val && importCallSourceNode(val);
+        if (dynSrc) {
+          const spec = stringLiteralValue(dynSrc);
+          if (spec != null) importedBindings.set(fieldKey, { spec, imported: '*', line });
+          else unresolvedBindings.set(fieldKey, line);
+        }
+      }
     }
     // Same-file alias edge / extracted-method binding: `const b = a` or
     // `const u = adapter.updateLifecycle`; or a writer destructured directly
@@ -470,9 +605,9 @@ function collectFileInfo(ast) {
     if (node.type === 'VariableDeclarator' && node.id.type === 'Identifier' && node.init) {
       captureIdentifierRhs(node.id.name, node.init, nodeLine(node));
     } else if (node.type === 'VariableDeclarator' && node.id.type === 'ObjectPattern' && node.init) {
-      const initId = unwrapExpression(node.init);
-      if (initId && initId.type === 'Identifier') {
-        captureObjectPatternFromIdentifier(node.id, initId.name, nodeLine(node));
+      const initKey = bindableKeyOf(unwrapExpression(node.init));
+      if (initKey) {
+        captureObjectPatternFromIdentifier(node.id, initKey, nodeLine(node));
       }
     }
     // `b = a` / `u = adapter.updateLifecycle` (plain assignment).
@@ -502,17 +637,74 @@ function collectFileInfo(ast) {
       return;
     }
     // Member access naming a generic writer: `x.updateLifecycle`,
-    // `x?.patchFields`, or `x['patchReviewReceipt']`. A computed access whose
-    // key is NOT a string literal (`x[name]`, `x['a' + 'b']`) cannot be
-    // resolved statically -- tracked separately so it can fail CLOSED if `x`
-    // turns out to be namespace-bound (see analyzeRoot).
+    // `x?.patchFields`, `x['patchReviewReceipt']`, or `this.field.writer`. A
+    // computed access whose key is NOT a string literal (`x[name]`,
+    // `x['a' + 'b']`) cannot be resolved statically -- tracked separately so
+    // it can fail CLOSED if `x` turns out to be namespace-bound (analyzeRoot).
     if (node.type === 'MemberExpression' || node.type === 'OptionalMemberExpression') {
-      if (node.object.type !== 'Identifier') return;
-      const { kind, name } = resolvedPropertyName(node);
-      if (kind === 'dynamic') {
-        computedDynamicAccesses.push({ object: node.object.name, line: nodeLine(node) });
-      } else if (name && GENERIC_WRITERS_SET.has(name)) {
-        memberAccesses.push({ object: node.object.name, property: name, line: nodeLine(node) });
+      const objKey = bindableKeyOf(node.object);
+      if (objKey) {
+        const { kind, name } = resolvedPropertyName(node);
+        if (kind === 'dynamic') {
+          computedDynamicAccesses.push({ object: objKey, line: nodeLine(node) });
+        } else if (name && GENERIC_WRITERS_SET.has(name)) {
+          memberAccesses.push({ object: objKey, property: name, line: nodeLine(node) });
+        }
+        return;
+      }
+      // Direct (possibly awaited/parenthesized) dynamic-import member access:
+      // `(await import('<adapter>')).updateLifecycle(...)` (Stage 7 second
+      // correction round, Codex round 2 item 3).
+      const unwrappedObj = unwrapExpression(node.object);
+      const dynSrc = unwrappedObj && importCallSourceNode(unwrappedObj);
+      if (dynSrc) {
+        const spec = stringLiteralValue(dynSrc);
+        const line = nodeLine(node);
+        if (spec == null) {
+          dynamicImportMemberUnresolved.push({ line });
+        } else if (ADAPTER_SOURCE_RE.test(spec)) {
+          const { kind, name } = resolvedPropertyName(node);
+          if (kind === 'dynamic') {
+            dynamicImportMemberUnresolved.push({ line });
+          } else if (name && GENERIC_WRITERS_SET.has(name)) {
+            directDynamicImportWriterAccesses.push({ writer: name, line });
+          }
+        }
+        return;
+      }
+      // Generic fail-closed catch-all (item 1, second sentence, Stage 7
+      // second correction round): any OTHER member access whose object
+      // cannot be resolved to a known key at all. NARROWED against the real
+      // tree: a raw "dynamic key anywhere near an adapter-bound identifier"
+      // reading false-positived on ordinary constant-lookup code --
+      // `suggestionAdapter.HONORARIUM_ELIGIBILITY_BY_VALUE[row.x]` -- where
+      // the OUTER access is a dynamic-keyed lookup into a STATICALLY NAMED,
+      // definitely-not-a-writer sub-property (`HONORARIUM_ELIGIBILITY_BY_VALUE`
+      // is a resolved, distinct export of the adapter, not one of the four
+      // writers, so indexing into IT can never yield `updateLifecycle`
+      // etc. regardless of the key). A dynamic computed key is therefore
+      // recorded here ONLY when the object subtree contains a LITERAL
+      // adapter require()/import() (a rare, independently suspicious signal
+      // regardless of the outer property name) -- not merely because some
+      // adapter-bound identifier appears anywhere in the chain. A STATIC
+      // outer property that IS one of the four writers is always recorded
+      // (the intended catch: `something.updateLifecycle(...)` where
+      // `something` cannot be resolved -- e.g. `getHelper(adapter).
+      // updateLifecycle()`); a static property that is provably NOT a writer
+      // (`.catch`, `.complete`, a lookup-table index) is never recorded at
+      // all, regardless of the object. Resolved in analyzeRoot once the
+      // fixpoint knows which identifiers in THIS file are adapter-bound.
+      {
+        const { name } = resolvedPropertyName(node);
+        const isWriterName = name && GENERIC_WRITERS_SET.has(name);
+        const hasLiteralAdapterSource = subtreeHasLiteralAdapterSource(node.object);
+        if (isWriterName || hasLiteralAdapterSource) {
+          complexMemberAccesses.push({
+            line: nodeLine(node),
+            hasLiteralAdapterSource,
+            identifierRefs: collectIdentifierReferences(node.object),
+          });
+        }
       }
     }
   });
@@ -537,8 +729,58 @@ function collectFileInfo(ast) {
 
   return {
     importedBindings, exportedBindings, exportsWholeNamespace, aliasEdges, methodBindings,
-    memberAccesses, computedDynamicAccesses, unresolvedBindings, unresolvedWriterDestructures,
+    memberAccesses, computedDynamicAccesses, dynamicImportMemberUnresolved,
+    directDynamicImportWriterAccesses, complexMemberAccesses,
+    unresolvedBindings, unresolvedWriterDestructures,
   };
+}
+
+// Does ANY node in `node`'s subtree contain a literal require()/import() of
+// the adapter? (Item 1, second sentence, Stage 7 second correction round --
+// part of the generic fail-closed catch-all for a member-access object shape
+// this gate does not otherwise recognize.) A raw ADAPTER_SOURCE_RE test
+// (rather than resolving the relative path) is deliberate: this runs inside
+// collectFileInfo, before analyzeRoot has a fileSet/rel context to resolve
+// against, and the raw pattern already matches every real adapter import in
+// this repo (all relative, ending in the adapter's filename).
+function subtreeHasLiteralAdapterSource(node) {
+  let found = false;
+  walkAst(node, (n) => {
+    if (found) return false;
+    if (n.type === 'CallExpression' && n.callee.type === 'Identifier'
+      && n.callee.name === 'require' && n.arguments.length > 0) {
+      const spec = stringLiteralValue(n.arguments[0]);
+      if (spec && ADAPTER_SOURCE_RE.test(spec)) { found = true; return false; }
+    }
+    const dynSrc = importCallSourceNode(n);
+    if (dynSrc) {
+      const spec = stringLiteralValue(dynSrc);
+      if (spec && ADAPTER_SOURCE_RE.test(spec)) { found = true; return false; }
+    }
+    return undefined;
+  });
+  return found;
+}
+
+// Every Identifier NAME referenced as a VALUE (not a property/key name)
+// anywhere in `node`'s subtree -- used by the generic fail-closed catch-all
+// to test, post-fixpoint, whether the object subtree of an unrecognized
+// member-access shape mentions any identifier this file already knows is
+// adapter-bound.
+function collectIdentifierReferences(node) {
+  const out = new Set();
+  walkAst(node, (n, parent) => {
+    if (n.type !== 'Identifier') return;
+    if (parent) {
+      if ((parent.type === 'MemberExpression' || parent.type === 'OptionalMemberExpression')
+        && parent.property === n && !parent.computed) return;
+      if (parent.type === 'ObjectProperty' && parent.key === n && !parent.computed) return;
+      if ((parent.type === 'ClassProperty' || parent.type === 'PropertyDefinition' || parent.type === 'ClassMethod' || parent.type === 'ObjectMethod')
+        && parent.key === n && !parent.computed) return;
+    }
+    out.add(n.name);
+  });
+  return out;
 }
 
 function isModuleExportsRoot(target) {
@@ -770,6 +1012,14 @@ function analyzeRoot(root) {
         unresolvedFailures.push(`${rel}:${info.unresolvedBindings.get(local)} (non-literal-source local '${local}' re-published by identity)`);
       }
     }
+    // A dynamic-import member access whose source is non-literal, OR whose
+    // property could not be resolved statically -- `(await import(p)).x` or
+    // `(await import('<adapter>'))[dynamicKey]` -- cannot be ruled out as a
+    // generic-writer binding (Stage 7 second correction round, Codex round 2
+    // item 3).
+    for (const d of info.dynamicImportMemberUnresolved) {
+      unresolvedFailures.push(`${rel}:${d.line} (member access on a dynamic import() with a non-literal source or non-literal property)`);
+    }
   }
   if (unresolvedFailures.length > 0) {
     throw new Error(
@@ -815,6 +1065,27 @@ function analyzeRoot(root) {
       if (st.namespaceBinding.has(access.object)) {
         const origin = st.namespaceBinding.get(access.object);
         push(null, access.line, 'namespace-computed-member-unresolvable', origin.wrapper);
+      }
+    }
+    // Direct dynamic-import member access resolved at collect time --
+    // `(await import('<adapter>')).updateLifecycle(...)` (item 3).
+    for (const access of info.directDynamicImportWriterAccesses) {
+      push(access.writer, access.line, 'dynamic-import-member', null);
+    }
+    // Generic fail-closed catch-all (item 1): a member-access object shape
+    // this gate does not otherwise recognize, whose subtree either contains
+    // a literal adapter require()/import() or references an identifier this
+    // file's fixpoint resolved to a namespace or writer binding.
+    const boundNames = new Set([...st.namespaceBinding.keys(), ...st.writerBinding.keys()]);
+    for (const cm of info.complexMemberAccesses) {
+      let adapterBearing = cm.hasLiteralAdapterSource;
+      if (!adapterBearing) {
+        for (const id of cm.identifierRefs) {
+          if (boundNames.has(id)) { adapterBearing = true; break; }
+        }
+      }
+      if (adapterBearing) {
+        push(null, cm.line, 'unsupported-adapter-bearing-shape', null);
       }
     }
   }
