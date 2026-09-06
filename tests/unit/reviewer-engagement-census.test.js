@@ -40,6 +40,15 @@ const CENSUS = [
       'pages/api/review-manager/close-review.js',
     ],
   },
+  {
+    name: 'review-manager/terminal-transition-service',
+    // Matches static import, export-from, require(), and dynamic import()
+    // of any specifier containing this fragment.
+    pattern: /terminal-transition-service/,
+    expected: [
+      'pages/api/review-manager/terminal-transition.js',
+    ],
+  },
 ];
 
 // Hoisted: every production file under SCAN_DIRS is read exactly once, up
