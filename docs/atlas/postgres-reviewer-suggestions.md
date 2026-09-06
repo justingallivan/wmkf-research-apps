@@ -33,7 +33,8 @@ External-reviewer intake: `proposal_url` (16/5%), `proposal_password` (16/5%).
 Blob attachments: `summary_blob_url` (184/337 = 55% populated) — historical
 Vercel Blob URL of extracted summary pages. It was written by the retired
 `extract-summary` route and was load-bearing for the `generate-emails` flow,
-itself retired 2026-09-06 (owner decision D2). It has no current persistence contract.
+itself retired 2026-09-06 (owner decision D2); the same day `analyze` stopped extracting
+and uploading summaries, so `wmkf_summarybloburl` is historical-only. It has no current persistence contract.
 
 User scoping: `user_profile_id` (337/100%), `program_area` (337/100%), `grant_cycle_id` (337/100%, FK grant_cycles.id).
 

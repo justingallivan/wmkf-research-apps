@@ -104,16 +104,14 @@ colleague reports it.
    expense reporter has no wiki topic and does not need one for copy edits.
 5. **Production smoke** of 6B release-materials modal (needs an accepted reviewer) and of
    any 6D send. Not run; waits for the first real acceptance.
-6. **Summary blob is public with no remaining reader (owner decision needed).** `analyze.js` still
-   extracts summary pages and uploads them with `access: 'public'`, and `save-candidates` persists
-   the URL to `wmkf_summarybloburl`, but since the D2 retirement nothing reads it: no client component
-   consumes `summaryBlobUrl` [VERIFIED via `git grep` over `shared/` and `pages/` 2026-09-06], the
-   live send path attaches cycle materials and client-chosen attachments instead, and the only server
-   reader is the maintenance orphan-blob sweep, which keeps referenced blobs alive. Options: (a) stop
-   extracting/uploading the summary in `analyze.js` and stop persisting the column (removes the public
-   blob surface outright; `summaryExtracted` leaves the analyze response), or (b) keep the upload but
-   move it to a private store. (a) is simpler and removes dead work; either way the existing
-   `wmkf_summarybloburl` rows and blobs are history, not a cleanup target this session.
+6. ~~Summary blob is public with no remaining reader~~ **DONE S490, option (a) (same branch as the
+   hygiene PR):** `analyze` no longer extracts summary pages or uploads a public Blob, and no longer
+   returns `summaryBlobUrl`/`summaryFilename`/`summaryExtracted`; `save-candidates` no longer accepts
+   `summaryBlobUrl`; `lib/utils/pdf-extractor.js` (sole user: that branch) deleted. The Workbench client
+   had never requested extraction, so no live behavior changed. `wmkf_summarybloburl` rows/blobs stay
+   historical; the maintenance sweep still keeps them alive; the GET DTO still surfaces old values.
+   **Small residual for the owner:** the grant-cycle "summary pages" setting (`wmkf_summarypages`,
+   editable in the cycle editor) now feeds nothing — remove from the editor or leave inert.
 
 ### Parked
 

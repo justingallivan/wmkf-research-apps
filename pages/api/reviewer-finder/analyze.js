@@ -6,12 +6,14 @@
  * Accepts a proposal (via Vercel Blob URL or direct text) and returns:
  * - Proposal metadata
  * - Reviewer suggestions with reasoning
- * - Summary page extraction (if PDF and summaryPages specified)
+ *
+ * (Summary-page extraction + public Blob upload was removed 2026-09-06: the
+ * Workbench client never requested it and its only consumer, generate-emails,
+ * was retired the same day. Historical `wmkf_summarybloburl` rows/blobs stay.)
  *
  * Uses streaming SSE for real-time progress updates.
  */
 
-import { put } from '@vercel/blob';
 import { requireAppAccess } from '../../../lib/utils/auth';
 import { nextRateLimiter } from '../../../shared/api/middleware/rateLimiter';
 import { BASE_CONFIG } from '../../../shared/config/baseConfig';
@@ -74,10 +76,6 @@ export default async function handler(req, res) {
     }
   }, 20000);
 
-  // Track extracted summary info
-  let summaryBlobUrl = null;
-  let summaryFilename = null;
-
   // Admin-configurable wall-clock budget for the whole search (default 600s,
   // clamped [120,800]). A fired deadline aborts the Claude call gracefully so we
   // surface a clear timeout instead of the platform 504-ing at maxDuration.
@@ -86,7 +84,7 @@ export default async function handler(req, res) {
   let budgetSeconds = null;
 
   try {
-    const { proposalText, blobUrl, additionalNotes, excludedNames, reviewerCount, summaryPages, requestId } = req.body;
+    const { proposalText, blobUrl, additionalNotes, excludedNames, reviewerCount, requestId } = req.body;
     const trimmedRequestId = String(requestId || '').trim();
 
     const apiKey = process.env.CLAUDE_API_KEY;
@@ -104,7 +102,6 @@ export default async function handler(req, res) {
 
     // Get proposal text
     let text = proposalText;
-    let pdfBuffer = null;
 
     if (!text && blobUrl) {
       sendEvent('progress', { stage: 'upload', message: 'Fetching uploaded file...' });
@@ -121,48 +118,10 @@ export default async function handler(req, res) {
         // Parse PDF
         sendEvent('progress', { stage: 'processing', message: 'Extracting text from PDF...' });
         const pdfParse = (await import('pdf-parse')).default;
-        pdfBuffer = Buffer.from(await blobResponse.arrayBuffer());
+        const pdfBuffer = Buffer.from(await blobResponse.arrayBuffer());
         const pdfData = await pdfParse(pdfBuffer);
         text = pdfData.text;
 
-        // Extract summary pages if specified and we have a PDF buffer
-        if (summaryPages && pdfBuffer) {
-          try {
-            sendEvent('progress', { stage: 'extraction', message: `Extracting summary page(s): ${summaryPages}...` });
-            const { extractPages } = require('../../../lib/utils/pdf-extractor');
-            const extraction = await extractPages(pdfBuffer, summaryPages);
-
-            // Upload extracted pages to Vercel Blob
-            const timestamp = Date.now();
-            summaryFilename = `summary_${timestamp}.pdf`;
-            // Public access: historically the generate-emails flow fetched the
-            // URL via raw HTTP to attach the summary PDF, and W5 step 3
-            // (2026-05-12) wired save-candidates to persist `summaryBlobUrl` to
-            // Dataverse `wmkf_summarybloburl` for it. That route was retired
-            // 2026-09-06 (owner decision D2); the live send path does not read
-            // this column. Whether this blob can move to private access is a
-            // recorded follow-up — not changed here.
-            const blob = await put(summaryFilename, extraction.buffer, {
-              access: 'public',
-              contentType: 'application/pdf'
-            });
-            summaryBlobUrl = blob.url;
-
-            sendEvent('progress', {
-              stage: 'extraction',
-              message: `Extracted ${extraction.pageCount} page(s) from ${extraction.totalSourcePages}-page document`,
-              summaryBlobUrl
-            });
-          } catch (extractError) {
-            console.error('Summary extraction error:', extractError);
-            sendEvent('progress', {
-              stage: 'extraction',
-              message: `Warning: Could not extract summary pages: ${extractError.message}`,
-              error: true
-            });
-            // Continue with analysis even if extraction fails
-          }
-        }
       } else {
         // Plain text
         text = await blobResponse.text();
@@ -250,19 +209,15 @@ export default async function handler(req, res) {
       return res.end();
     }
 
-    // Send results (include summary blob URL if extraction succeeded)
     sendEvent('result', {
       proposalInfo: result.proposalInfo,
       reviewerSuggestions: result.reviewerSuggestions,
       validation: result.validation,
-      summaryBlobUrl: summaryBlobUrl,
-      summaryFilename: summaryFilename
     });
 
     sendEvent('complete', {
       message: 'Analysis complete',
       suggestionCount: result.reviewerSuggestions?.length || 0,
-      summaryExtracted: !!summaryBlobUrl
     });
 
   } catch (error) {
