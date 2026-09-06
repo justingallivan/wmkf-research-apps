@@ -149,7 +149,9 @@ builders on that file concurrently.
   `:75–85`); re-exports exact; census expected list independently confirmed; 13 suites / 884 tests
   and the auth-routes integration suite green. `bcb9bbb1` changed one line of NEW header prose in
   `correct-status.js` (a wording that briefly conflated 3D scope), within discipline. Advisory:
-  legacy header stale (same as Codex) — rewritten in the final commit.
+  legacy header stale (same as Codex) — rewritten in the final commit (`b3e2ee7d`, rebased as
+  `c73bf12e`). PR #158 opened. Codex round 2 not spent: both round-1 findings were documentation
+  fixes verified directly by the architect (catalog on main, header in the branch).
 
 ## Rules for every slice
 
