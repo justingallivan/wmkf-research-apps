@@ -284,7 +284,7 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
 
       <div className="mb-5 rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
         <div className="flex flex-col gap-3.5">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <label className="flex flex-col gap-1 text-sm font-medium text-gray-700">
             <span>Cycle</span>
             <select
@@ -357,7 +357,7 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
             Show set aside
           </label>
           </div>
-          <div className="flex flex-col gap-3 border-t border-gray-100 pt-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-3 border-t border-gray-100 pt-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="flex min-w-0 flex-1 flex-col gap-1">
               <label htmlFor="reviewer-follow-up-search" className="sr-only">Search requests and reviewers</label>
               <input
