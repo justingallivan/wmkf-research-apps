@@ -25,12 +25,16 @@ jest.mock('../../shared/components/Layout', () => {
 
 jest.mock('../../shared/components/reviewers/ReviewerManagePanel', () => {
   const React = require('react');
-  return function MockReviewerManagePanel({ canManage, degraded }) {
-    return React.createElement('div', {
-      'data-testid': 'reviewer-manage-panel',
-      'data-can-manage': String(canManage),
-      'data-degraded': degraded ? 'true' : 'false',
-    });
+  return function MockReviewerManagePanel({ canManage, degraded, onRefresh }) {
+    return React.createElement(
+      'div',
+      {
+        'data-testid': 'reviewer-manage-panel',
+        'data-can-manage': String(canManage),
+        'data-degraded': degraded ? 'true' : 'false',
+      },
+      React.createElement('button', { type: 'button', onClick: onRefresh }, 'Mock refresh'),
+    );
   };
 });
 
@@ -316,11 +320,12 @@ describe('reviewer follow-up refetch resilience', () => {
     expect(screen.getByTestId('reviewer-manage-panel')).toHaveAttribute('data-degraded', 'false');
 
     reviewersShouldFail = true;
-    fireEvent.click(screen.getByRole('button', { name: 'All requests' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Mock refresh' }));
 
     expect(await screen.findByText('Reviewer follow-up could not be refreshed')).toBeInTheDocument();
     expect(screen.getByText('Showing the last loaded results. Retry before making changes.')).toBeInTheDocument();
     expect(screen.getByText('Active proposal')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Show reviewer activity' }));
     expect(screen.getByTestId('reviewer-manage-panel')).toHaveAttribute('data-degraded', 'true');
   });
 
@@ -349,8 +354,9 @@ describe('reviewer follow-up refetch resilience', () => {
     expect(screen.getByTestId('reviewer-manage-panel')).toHaveAttribute('data-degraded', 'false');
 
     reviewersShouldFail = true;
-    fireEvent.click(screen.getByRole('button', { name: 'All requests' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Mock refresh' }));
     expect(await screen.findByText('Reviewer follow-up could not be refreshed')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Show reviewer activity' }));
     expect(screen.getByTestId('reviewer-manage-panel')).toHaveAttribute('data-degraded', 'true');
 
     reviewersShouldFail = false;
@@ -362,6 +368,40 @@ describe('reviewer follow-up refetch resilience', () => {
     expect(await screen.findByText('Active proposal')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Show reviewer activity' }));
     expect(screen.getByTestId('reviewer-manage-panel')).toHaveAttribute('data-degraded', 'false');
+  });
+
+  test('a scope change clears the previous last-known-good data on failure', async () => {
+    let proposalsShouldFail = false;
+    global.fetch = jest.fn(async (url) => {
+      if (url === '/api/workbench/dashboard') {
+        return { ok: true, json: async () => cycleResponse };
+      }
+      if (String(url).startsWith('/api/workbench/dashboard?')) {
+        if (proposalsShouldFail) {
+          return { ok: false, json: async () => ({ error: 'boom' }) };
+        }
+        return { ok: true, json: async () => ({ proposals: dashboardProposals }) };
+      }
+      if (String(url).startsWith('/api/review-manager/reviewers')) {
+        if (proposalsShouldFail) {
+          return { ok: false, json: async () => ({ error: 'boom' }) };
+        }
+        return { ok: true, json: async () => ({ proposals: reviewerProposals }) };
+      }
+      return { ok: true, json: async () => ({ proposals: [] }) };
+    });
+
+    render(<ReviewerFollowUpDashboard />);
+
+    expect(await screen.findByText('Active proposal')).toBeInTheDocument();
+
+    proposalsShouldFail = true;
+    fireEvent.click(screen.getByRole('button', { name: 'All requests' }));
+
+    expect(await screen.findByText('Reviewer follow-up could not be loaded')).toBeInTheDocument();
+    expect(screen.queryByText('Reviewer follow-up could not be refreshed')).not.toBeInTheDocument();
+    expect(screen.queryByText('Active proposal')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('reviewer-manage-panel')).not.toBeInTheDocument();
   });
 });
 

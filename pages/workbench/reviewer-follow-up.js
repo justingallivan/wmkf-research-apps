@@ -170,6 +170,7 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
   const [loadingProposals, setLoadingProposals] = useState(false);
   const [error, setError] = useState(null);
   const requestIdRef = useRef(0);
+  const lastLoadedParamsRef = useRef(null);
 
   useEffect(() => {
     let active = true;
@@ -223,6 +224,7 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
         dashboardBody.proposals || [],
         reviewerBody.proposals || [],
       ));
+      lastLoadedParamsRef.current = `${selectedCycle}|${requestScope}`;
     } catch (loadError) {
       if (requestIdRef.current !== requestId) return;
       setError(loadError.message);
@@ -233,6 +235,12 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
 
   useEffect(() => {
     if (!cycleCode) return undefined;
+    const requestScope = scope === 'all' ? 'all' : 'my';
+    const currentParams = `${cycleCode}|${requestScope}`;
+    if (lastLoadedParamsRef.current !== null && lastLoadedParamsRef.current !== currentParams) {
+      setProposals([]);
+      setError(null);
+    }
     const timer = window.setTimeout(() => { void loadProposals(cycleCode, scope); }, 0);
     return () => window.clearTimeout(timer);
   }, [cycleCode, loadProposals, scope]);
