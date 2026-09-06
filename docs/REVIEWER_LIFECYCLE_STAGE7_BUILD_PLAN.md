@@ -35,12 +35,12 @@ re-gate that; scripts are outside that gate and are recorded, not gated, here to
 | 4 | `reviewer-engagement/correct-response.js:78` | updateLifecycle | yes | named command (3D) | keep |
 | 5 | `reviewer-engagement/record-email-outcome.js` (3E, PR #161 → `01072571`; was `send-emails-service.js:200`) | updateLifecycle | yes | post-send bookkeeping (3E) | keep |
 | 6 | `reviewer-engagement/expire-invitation.js` (3E, PR #161; was `reviewer-suggestion-sweep.js:150`) | patchFields | yes | invitation expiry (one site, two locations in time) | Stage 7: replace the alias call with adapter op `expireInvitationResponse(id, nowIso, {ifMatch})` (raw fields `wmkf_responsetype=no_response`, `wmkf_responsereceivedat`) |
-| 7 | `review-manager/send-emails-service.js:1012` | updateLifecycle | **no** | inline post-send invitation stamp | 3F → `record-invitation.js` `recordDeliveredInvitation`; unconditional write preserved (decision D1) |
-| 8 | `reviewer-finder/my-candidates-service.js:631` | updateLifecycle | yes | manual verified-link invite record | 3F → `record-invitation.js` `recordManualInvitation` |
-| 9 | `reviewer-finder/generate-emails-service.js:501` | patchFields | **no** | legacy generation mark-as-sent (raw fields) | 3F → `record-invitation.js` `markInvitationGenerated`; preserved verbatim (decision D2) |
-| 10 | `reviewer-reminder-sweep.js:415` (+ `mintAndStore` claim `:405`) | updateLifecycle | yes | pre-send review-due reminder claim | 3G → `claim-reminder.js`; respond-kind claim stays coupled to `mintAndStore` |
-| 11 | `reviewer-due-extension.js:312` | updateLifecycle | yes | deadline override write | 3H → `change-review-deadline.js` |
-| 12 | `review-manager/withdraw-sufficient-service.js:265` | updateLifecycle | yes | pending-invitation withdrawal | 3I → `withdraw-pending-invitation.js` |
+| 7 | `reviewer-engagement/record-invitation.js` `recordDeliveredInvitation` (3F, PR #165; was `send-emails-service.js` inline stamp) | updateLifecycle | **no** | post-send invitation stamp | done; unconditional write preserved (decision D1) |
+| 8 | `reviewer-engagement/record-invitation.js` `recordManualInvitation` (3F; was `my-candidates-service.js:631`) | updateLifecycle | yes | manual verified-link invite record | done |
+| 9 | `reviewer-engagement/record-invitation.js` `markInvitationGenerated` (3F; was `generate-emails-service.js:501`) | patchFields | **no** | legacy generation mark-as-sent (raw fields) | done; preserved verbatim (decision D2); Stage 7 records this `patchFields` use |
+| 10 | `reviewer-engagement/claim-reminder.js` (3G, PR #162; was `reviewer-reminder-sweep.js:415`) | updateLifecycle | yes | review-due reminder claim | done; respond-kind claim stays coupled to `mintAndStore` in the sweep |
+| 11 | `reviewer-engagement/change-review-deadline.js` (3H, PR #163; was `reviewer-due-extension.js:312`) | updateLifecycle | yes | deadline override write | done |
+| 12 | `reviewer-engagement/withdraw-pending-invitation.js` (3I, PR #164; was `withdraw-sufficient-service.js:265`) | updateLifecycle | yes | pending-invitation withdrawal | done |
 | 13 | `external-review/respond-service.js:263` | updateLifecycle | `_etag \|\| undefined` | legacy declined-row deselection repair | 3J → adapter op `deselectLegacyDeclinedSuggestion(id, {ifMatch})`; optional version preserved (decision D3) |
 | 14 | `reviewer-finder/my-candidates-service.js:549` → adapter `bulkUpdateByRequest:2320` | bulk updateLifecycle | **no** | proposal-wide cycle/program metadata | 3K → adapter op `setRequestMetadata(requestId, {grantCycleCode, programArea}, opts)` with a field whitelist; sequential no-`ifMatch` behavior preserved (decision D4) |
 | 15 | `review-manager/mark-received-no-file-service.js:122` | patchReviewReceipt | yes | receipt sink (in-scope use of the receipt op) | keep (5B skip decision) |
@@ -223,7 +223,8 @@ or backfill.
 - **3F correction `befc9fb3`** (rebased on `8ff86aad`): headers fixed in send-emails and
   my-candidates; D1/D2 reworded as open decisions with one copy of the rationale; generate-emails pin
   asserts one batch timestamp plus a `markAsSent:false` never-calls case; my-candidates pin gains the
-  token-hash-mismatch case. 26 scoped suites / 727; full suite 802 / 11,621; gates green. PR #165.
+  token-hash-mismatch case. 26 scoped suites / 727; full suite 802 / 11,621; gates green. PR #165
+  merged `68198b2f` (2026-09-06, seven checks green).
 
 - **3J build (Sonnet, 2026-09-06): `ef83bb9a`** on `claude/reviewer-lifecycle-stage3j`. Adapter op
   `deselectLegacyDeclinedSuggestion(suggestionId, { ifMatch, ...opts })` next to the Stage 5 ops,
