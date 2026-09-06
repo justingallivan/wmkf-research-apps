@@ -65,25 +65,26 @@ the whole numbered stage or waive its tests, review, build or release requiremen
 
 ## Concrete Stage 6B routing
 
-[PLANNED] **6B1** changes only the existing panel action ownership and feedback
+[COMPLETE 2026-09-05, `9258115a`; routing text kept for history] **6B1** changes only the existing panel action ownership and feedback
 needed for regenerate/clipboard, revoke, remove and terminal transitions, plus
 their focused tests. Follow the build plan's exact same-reviewer pending contract.
 Keep confirmed writes distinct from refresh or clipboard failures; never replay
 server mutations to recover UI feedback. Preserve the shipped status handler.
 
-[PLANNED] **6B2** follows a fresh 6B1 review: reminder action and closeout modal.
+[COMPLETE 2026-09-05, `b08c16f6`/`d3ec406a`/`039d5d8e`; routing text kept for history] **6B2** follows a fresh 6B1 review: reminder action and closeout modal.
 `ReviewReminderAction` has mount/send-generation checks but no full prop-context
 binding (`ReviewerManagePanel.js:126`); closeout initializes fields once and only
 invalidates generation at unmount (`ReviewerCloseoutModal.js:41`). Cover changed
 reviewer/request/permissions while mounted, close/reopen and every post-await path.
 
-[PLANNED] **6B3** follows a fresh 6B2 review: materials-release modal context.
-[PLANNED, owner-queued 2026-09-05] **6D** server-side draft fingerprint (render returns, send verifies; refuses stale drafts) — closes the co-investigator and unrefetched-edit gaps the client key cannot; contract change, separately planned. See the build plan status section.
+[COMPLETE 2026-09-05, `a6a27ce8`/`b163172a` plus amendments 6B3a–6B3e; routing text kept for history] **6B3** follows a fresh 6B2 review: materials-release modal context.
 Its session currently changes on `isOpen` (`ReviewerManagePanel.js:531`), while
 proposal loading separately reacts to request changes (`:669`). Preserve queue
 serialization, abort/timeout and SSE completion while binding preview/send and
 template/upload results to the relevant context. Do not replace existing guards
 with a less specific universal action abstraction.
+
+[PLANNED, owner-queued 2026-09-05] **6D** server-side draft fingerprint (render returns, send verifies; refuses stale drafts) — closes the co-investigator and unrefetched-edit gaps the client key cannot; contract change, separately planned. See the build plan status section.
 
 The Workbench keys the reviewer subtree by request id
 (`pages/workbench/[requestId].js:181`). This is a real disconfirming boundary:
