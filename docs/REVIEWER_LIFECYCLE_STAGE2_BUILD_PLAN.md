@@ -41,19 +41,19 @@ New browser-safe module `shared/utils/reviewer-engagement-policy.js` (imports on
 `shared/config/`):
 
 ```js
-export const INVITATION_CORRECTION_SOURCE_STATUSES = new Set([null, accepted, materials_sent, under_review, review_received]);
-export const CLOSED_ENGAGEMENT_STATUSES = new Set([complete, ...Object.values(TERMINAL_REVIEW_STATUS_VALUES)]);
-export function isClosedEngagementRow(row)            // row.wmkf_completedat truthy OR CLOSED has row.wmkf_reviewstatus
-export function isInvitationCorrectionSourceRow(row)  // SOURCE has row.wmkf_reviewstatus (null/undefined → treated as null → true)
+// module-private: SOURCE = {null, accepted, materials_sent, under_review, review_received};
+//                 CLOSED = {complete, ...Object.values(TERMINAL_REVIEW_STATUS_VALUES)}
+export function isClosedEngagementStatus(status)      // status-only membership (the two historical status-only adapter sites)
+export function isClosedEngagementRow(row)            // row.wmkf_completedat truthy OR isClosedEngagementStatus(row.wmkf_reviewstatus)
+export function isInvitationCorrectionSourceRow(row)  // undefined → false (explicit guard), else SOURCE has row.wmkf_reviewstatus
 ```
 
 Raw-row input only. No DTO variant is added (no DTO caller exists for this predicate; adding one
-would violate "keep distinct input functions"). `undefined` status normalises to `null` exactly as
-`Set.has(undefined)` would NOT — the builder must write the normalisation explicitly and test it,
-because today `CORRECTION_SOURCE_STATUSES.has(undefined)` is `false` in the service. **Preserve
-that:** the predicate must return `false` for `undefined` unless a table-driven test proves both
-callers never see `undefined` (they read a fresh row with an explicit select, so the field is
-present or `null`). Decision: mirror current behavior — `undefined` → `false` — and document it.
+would violate "keep distinct input functions"). **`undefined` status → `false`**, mirroring today's
+`Set.has(undefined)` in both callers, written as an explicit guard so a future `?? null` refactor
+cannot silently flip it (the earlier draft of this paragraph contradicted itself; the Decision is
+`false`). The Sets are module-private after review (Codex round 1 / Opus advisory: exported mutable
+Sets invite mutation and a two-flavor trap); the status-only flavor is a named predicate.
 
 Callers:
 - `my-candidates-service.js`: replace the two local sets with the module's predicates; keep
@@ -99,6 +99,16 @@ No other file changes. No new map values. No server imports into the shared modu
   module-private; export `isClosedEngagementStatus(status)` (status-only, for the two historical
   status-only sites) alongside the two row predicates; the adapter's status-only sites call that
   predicate instead of `.has()`. Add a test that the module exports no `Set` instance.
+
+- **Opus review (`85aec404`): PASS WITH ADVISORIES, no required items.** All five sites (four
+  adapter, one service) behavior-identical across the full truth table [reviewer-verified]; the two
+  status-only sites were right to stay status-only (site 3 would newly throw on a legacy
+  completedat-stamped open row; site 4's select does not fetch completedat). Full suite 774 /
+  11,372; six gates green. Advisories accepted and folded into the correction commit: private Sets +
+  named status-only predicate; explicit `undefined` guard; docblock "four read sites". Recorded, not
+  fixed: no test detects widening `softDelete` to the completedat-aware predicate (coverage gap tied
+  to the declined Codex high); `lib/services/reviewer-rollup.js:25` keeps its own terminal set by
+  design (different question). Build not run by the reviewer; builder ran it.
 
 ## Review checkpoints
 
