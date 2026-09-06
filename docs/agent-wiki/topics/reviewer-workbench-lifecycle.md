@@ -1597,6 +1597,12 @@ returned zero eligible/enqueued/claimed/failed.** Plan doc:
   paths. Each move is byte-identical and pinned by a both-paths identity test plus a caller census
   (`tests/unit/reviewer-engagement-census.test.js`) that records every importer of the legacy path,
   so a new bypass must be recorded deliberately. Plan: `docs/REVIEWER_LIFECYCLE_STAGE3_BUILD_PLAN.md`.
+- **Narrow receipt operations (Stage 5, PR #157, 2026-09-05).** The DOCX pointer commit
+  (`individual-file-service.js` `commitPointers`) and the thank-you claim (`reviewer-thankyou-sweep.js`)
+  call named adapter ops `attachReviewDocumentPointer` / `claimThankYou` instead of the generic
+  `patchReviewReceipt`; both require a concrete ETag (`lib/utils/etag.js` `isConcreteEtag`) and fail
+  closed with `missing_version`. Caller wiring tests assert the generic patch is not called. Plan:
+  `docs/REVIEWER_LIFECYCLE_STAGE5_BUILD_PLAN.md`.
 - **Route→Service layout (Stage 7, 2026-07-05): every workbench and
   review-manager route is a thin shell; the lifecycle/business logic lives in
   `lib/services/workbench/` (incl. `grantee-deliverables/`) and

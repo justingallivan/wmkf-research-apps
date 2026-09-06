@@ -2,11 +2,11 @@
 title: Reviewer Lifecycle Stage 5 — narrow document-pointer and thank-you operations
 kind: plan
 domain: reviewer-workbench
-status: active
+status: historical
 canonical: false
 owner: product-engineering
 last_verified: 2026-09-05
-summary: Two narrow ETag-required adapter operations replace the generic receipt passthrough at the DOCX-pointer and thank-you-claim sites; optional helper skipped.
+summary: Shipped 2026-09-05 (PR #157). Two ETag-required adapter ops replace the generic receipt passthrough at the pointer and thank-you sites; 5B skipped.
 ---
 
 # Stage 5 — narrow document-pointer and thank-you operations
@@ -162,6 +162,7 @@ confirm no pre-read was introduced. Codex round 1 on the build; round 2 only for
 
 ## Docs (after merge)
 
-Readiness audit rows 5 (both) → complete / skipped-recorded; Atlas page
-`docs/atlas/dataverse-wmkf-appreviewersuggestion*` only if a write path description names the
-generic patch (grep); service catalog; receipt `docs/audits/REVIEWER_LIFECYCLE_STAGE5_RECEIPT_<date>.md`.
+Done 2026-09-05 after merge `21cc221b`: readiness audit rows 5 (both) → complete / skipped-recorded;
+no Atlas or wiki page named `patchReviewReceipt` (grep, zero hits) so none changed; service catalog
+gained the two ops and `lib/utils/etag.js`; the build record above is the receipt (no separate
+receipt file, matching Stages 2, 3A, 3B and 6C).
