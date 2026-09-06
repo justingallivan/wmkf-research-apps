@@ -2,13 +2,14 @@
 
 /**
  * Caller-boundary census for reviewer-engagement command extraction
- * (Stage 3 build plan). Each row records a legacy `lib/services/review-manager/`
- * module that has been (or is being) split into `lib/services/reviewer-engagement/`,
- * and the exact, recorded set of files outside the extracted module itself that
- * still import the legacy path. A new direct caller of the legacy path must be
+ * (Stage 3 build plan). Each row records either a legacy `lib/services/`
+ * module path (one that has been, or is being, split into
+ * `lib/services/reviewer-engagement/`) or one of the new `reviewer-engagement/`
+ * module paths itself, and the exact, recorded set of files outside the
+ * extracted module that import that path. A new direct importer must be
  * recorded here deliberately — this test fails if one appears unrecorded, and
- * fails if the regex that finds callers stops matching anything (never passes
- * vacuously).
+ * fails if the regex that finds importers stops matching anything (never
+ * passes vacuously).
  *
  * Extend CENSUS with one row per slice as more commands move.
  *
