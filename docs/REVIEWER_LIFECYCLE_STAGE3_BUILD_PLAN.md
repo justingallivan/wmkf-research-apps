@@ -240,6 +240,14 @@ builders on that file concurrently.
   pin only fires when the import disappears — hence the mandatory delegation pin above; A6
   pre-existing stale line refs at `reviewer-activity-history.js:15` and `grant-request.js:169` (sweep
   queue, not this slice).
+- **Correction `6c390a1d`** (rebased on `245f57e7`; PR #161): delegation pins
+  `tests/unit/reviewer-suggestion-sweep-delegation.test.js` (mocks `expire-invitation` with the real
+  `isPastCutoff` passed through; exact call shape; swept/skipped/412/not-found/other mapping) and
+  `tests/unit/send-emails-delegation.test.js` (five-argument call after `createAndSendEmail`, before
+  the terminal events; rejection → `updating_lifecycle` warning event). Mutation: inline
+  reimplementation keeping the import → each pin red (0 calls expected N). `etag.js` docblock, census
+  header and two header nits fixed. Rebase conflict in the census table resolved by keeping all rows.
+  34-suite superset 932 tests; full suite 792 / 11,576; gates green.
 
 ## Rules for every slice
 
