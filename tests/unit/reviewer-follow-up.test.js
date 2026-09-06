@@ -239,6 +239,29 @@ describe('reviewer follow-up request scope', () => {
     expect(screen.getByText('Select All requests to view the full cycle.')).toBeInTheDocument();
   });
 
+  test('shows search result context for the current reviewer view', async () => {
+    global.fetch = jest.fn(async (url) => {
+      if (url === '/api/workbench/dashboard') {
+        return { ok: true, json: async () => ({ cycles: [{ code: 'D26', label: 'December 2026' }], defaultCycleCode: 'D26' }) };
+      }
+      if (String(url).startsWith('/api/workbench/dashboard?')) {
+        return { ok: true, json: async () => ({ proposals: dashboardProposals }) };
+      }
+      return { ok: true, json: async () => ({ proposals: reviewerProposals }) };
+    });
+
+    render(<ReviewerFollowUpDashboard />);
+    expect(await screen.findByText('1 request in this view')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Search requests and reviewers'), {
+      target: { value: 'south university' },
+    });
+    expect(screen.getByText('0 matching requests')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'All reviewers' }));
+    expect(screen.getByText('1 matching request')).toBeInTheDocument();
+  });
+
   test('missing canManage projection fails closed in the rendered reviewer controls', async () => {
     global.fetch = jest.fn(async (url) => {
       if (url === '/api/workbench/dashboard') {
@@ -273,6 +296,21 @@ describe('reviewer follow-up refetch resilience', () => {
   afterEach(() => {
     global.fetch = originalFetch;
     window.history.replaceState({}, '', '/workbench/reviewer-follow-up');
+  });
+
+  test('announces the initial loading state', async () => {
+    let resolveCycles;
+    const cyclesPromise = new Promise((resolve) => { resolveCycles = resolve; });
+    global.fetch = jest.fn((url) => {
+      if (url === '/api/workbench/dashboard') return cyclesPromise;
+      return new Promise(() => {});
+    });
+
+    render(<ReviewerFollowUpDashboard />);
+    expect(screen.getByRole('status')).toHaveTextContent('Loading reviewer activity…');
+
+    resolveCycles({ ok: false, status: 503, json: async () => ({ error: 'cycles down' }) });
+    expect(await screen.findByText('Reviewer follow-up could not be loaded')).toBeInTheDocument();
   });
 
   test('initial load failure shows the banner only', async () => {

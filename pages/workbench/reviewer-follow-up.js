@@ -42,8 +42,8 @@ function ReviewerGroup({ proposal, previewReadOnly, onRefresh, degraded, loading
 
   return (
     <article className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-      <header className="px-4 py-4 sm:px-5">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+      <header className="px-4 py-3.5 sm:px-5 sm:py-4">
+        <div className="flex flex-col gap-3 sm:gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0">
             <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
               <Link
@@ -64,7 +64,7 @@ function ReviewerGroup({ proposal, previewReadOnly, onRefresh, degraded, loading
             {reviewers.length === 0 ? (
               <p className="mt-2 text-xs text-gray-500">No reviewers are in the tracking stage.</p>
             ) : (
-              <div className="mt-3 max-w-xl" aria-label={`Reviewer status: ${receivedCount} received, ${waitingCount} waiting, ${overdueCount} late`}>
+              <div className="mt-2.5 max-w-xl" aria-label={`Reviewer status: ${receivedCount} received, ${waitingCount} waiting, ${overdueCount} late`}>
                 <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-gray-200" role="img" aria-hidden="true">
                   {receivedCount > 0 && <span className="bg-green-500" style={{ width: `${(receivedCount / reviewers.length) * 100}%` }} />}
                   {waitingCount > 0 && <span className="bg-gray-400" style={{ width: `${(waitingCount / reviewers.length) * 100}%` }} />}
@@ -83,7 +83,7 @@ function ReviewerGroup({ proposal, previewReadOnly, onRefresh, degraded, loading
               type="button"
               onClick={() => setOpen((value) => !value)}
               aria-expanded={open}
-              className="min-h-9 rounded-lg bg-gray-900 px-3 py-2 text-sm font-semibold text-white hover:bg-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2"
+              className="min-h-11 rounded-lg bg-gray-900 px-3 py-2 text-sm font-semibold text-white hover:bg-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2"
             >
               {open ? 'Hide reviewer activity' : 'Show reviewer activity'}
             </button>
@@ -92,7 +92,7 @@ function ReviewerGroup({ proposal, previewReadOnly, onRefresh, degraded, loading
       </header>
 
       {open && (
-        <div className="border-t border-gray-200 bg-gray-50/60 p-4 sm:p-5">
+        <div className="border-t border-gray-200 bg-gray-50/60 px-4 py-3.5 sm:px-5 sm:py-4">
           {reviewers.length === 0 ? (
             <p className="py-4 text-sm text-gray-500">
               There are no accepted reviewers to track yet. Open the full reviewer panel to find or invite reviewers.
@@ -282,8 +282,8 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
         </div>
       )}
 
-      <div className="mb-6 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-        <div className="flex flex-col gap-4">
+      <div className="mb-5 rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
+        <div className="flex flex-col gap-3.5">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <label className="flex flex-col gap-1 text-sm font-medium text-gray-700">
             <span>Cycle</span>
@@ -358,7 +358,7 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
           </label>
           </div>
           <div className="flex flex-col gap-3 border-t border-gray-100 pt-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex min-w-0 flex-1">
+            <div className="flex min-w-0 flex-1 flex-col gap-1">
               <label htmlFor="reviewer-follow-up-search" className="sr-only">Search requests and reviewers</label>
               <input
                 id="reviewer-follow-up-search"
@@ -368,6 +368,9 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
                 placeholder="Search requests, institutions, PIs, or reviewers"
                 className="min-h-11 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-500 focus:border-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-400/30"
               />
+              <p className="text-xs text-gray-500" aria-live="polite">
+                {search.trim() ? `${visibleProposals.length} matching ${visibleProposals.length === 1 ? 'request' : 'requests'}` : `${visibleProposals.length} ${visibleProposals.length === 1 ? 'request' : 'requests'} in this view`}
+              </p>
             </div>
             {!previewReadOnly && (
           <button
@@ -382,14 +385,14 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
         </div>
       </div>
 
-      <dl className="mb-6 flex flex-wrap items-baseline gap-x-5 gap-y-2 border-b border-gray-200 pb-4 text-sm">
+      <dl className="mb-5 grid grid-cols-2 gap-x-4 gap-y-3 border-b border-gray-200 pb-4 text-sm sm:flex sm:flex-wrap sm:items-baseline sm:gap-x-6 sm:gap-y-2">
         {[
           [scope === 'all' ? 'Cycle requests' : 'Assigned requests', summary.assignedRequests],
           ['Active reviewers', summary.activeReviewers],
           ['Overdue', summary.overdueReviewers],
           ['Reviews received', summary.reviewsReceived],
         ].map(([label, value]) => (
-          <div key={label} className="flex items-baseline gap-2">
+          <div key={label} className="flex min-w-0 flex-col gap-0.5 sm:flex-row sm:items-baseline sm:gap-2">
             <dt className="text-gray-500">{label}</dt>
             <dd className="font-semibold tabular-nums text-gray-900">{value}</dd>
           </div>
@@ -397,17 +400,19 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
       </dl>
 
       {error && (
-        <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900" role="alert">
+        <div className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3.5 text-sm text-red-900" role="alert">
           {proposals.length > 0 ? (
             <>
               <p className="font-semibold">Reviewer follow-up could not be refreshed</p>
               <p className="mt-1">Showing the last loaded results. Retry before making changes.</p>
-              <p className="mt-1">{error}</p>
+              <p className="mt-1">I&apos;m having trouble accessing the server. This is usually a temporary blip. Please press retry and if the problem doesn&apos;t resolve, contact an administrator.</p>
+              <p className="mt-1 text-red-800">Details: <span>{error}</span></p>
             </>
           ) : (
             <>
               <p className="font-semibold">Reviewer follow-up could not be loaded</p>
-              <p className="mt-1">{error}</p>
+              <p className="mt-1">I&apos;m having trouble accessing the server. This is usually a temporary blip. Please press retry and if the problem doesn&apos;t resolve, contact an administrator.</p>
+              <p className="mt-1 text-red-800">Details: <span>{error}</span></p>
             </>
           )}
           {cycleCode ? (
@@ -433,7 +438,12 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
       )}
 
       {(loadingCycles || loadingProposals) && proposals.length === 0 ? (
-        <Card hover={false}><p className="text-sm text-gray-500">Loading reviewer activity…</p></Card>
+        <Card hover={false}>
+          <div className="flex items-center gap-3" role="status" aria-live="polite">
+            <span className="h-2 w-2 animate-pulse rounded-full bg-gray-500" aria-hidden="true" />
+            <p className="text-sm text-gray-600">Loading reviewer activity…</p>
+          </div>
+        </Card>
       ) : visibleProposals.length === 0 && (!error || proposals.length > 0) ? (
         <Card hover={false}>
           <p className="font-medium text-gray-900">
