@@ -127,6 +127,17 @@ const CENSUS = [
       'lib/services/reviewer-reminder-sweep.js',
     ],
   },
+  {
+    name: 'reviewer-engagement/change-review-deadline',
+    // Stage 3H extracted only the deadline-override write itself; eligibility,
+    // exact-date validation, the `_etag` presence check, `prepareNotification`
+    // and the notification envelope stay in `reviewer-due-extension.js`, which
+    // is the sole importer of the new command.
+    pattern: /reviewer-engagement\/change-review-deadline/,
+    expected: [
+      'lib/services/reviewer-due-extension.js',
+    ],
+  },
 ];
 
 // Hoisted: every production file under SCAN_DIRS is read exactly once, up
