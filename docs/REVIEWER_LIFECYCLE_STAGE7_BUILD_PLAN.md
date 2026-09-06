@@ -318,6 +318,23 @@ or backfill.
   `expireInvitationResponse(id, nowIso, { ifMatch })` with `requireIfMatch` (codification — the sweep
   already passes a concrete ETag) called by `expire-invitation.js`; the `patchFields` alias stays for
   `markInvitationGenerated` pending D2.
+- **Stage 7 build (Sonnet, 2026-09-06): `638ea8a1` (7A), `a8b9980e` (7B), `ac3dcaac` (7C)** on
+  `claude/reviewer-lifecycle-stage7`, rebased onto main after 3K merged. Gate on HEAD [architect
+  trace: law run exit 0; `--report` lists 14 bindings — 12 under `reviewer-engagement/`, 2 recorded
+  receipt sinks — zero un-exempted, zero stale]; builder judgment: the non-literal-source fail-closed
+  rule is narrower than the route-service-boundary exemplar (fails only on writer-keyed destructure,
+  writer-named member access, or identity re-export) because a blanket rule false-positived on
+  unrelated lazy-backend requires. 7B inlined the sequence verbatim (whitelist → empty → requestId →
+  findByRequest → sequential `updateLifecycle` → count; D4 unchanged), removed the trust-boundary
+  sink row, moved one `adapters-caller-id` test to `setRequestMetadata`, and made the importers test a
+  zero-reference pin with a carve-out for the two gate scripts (which keep the name in
+  `GENERIC_WRITERS`). 7C op with `requireIfMatch`; `expire-invitation.test.js` mock renamed and call
+  shape `(id, nowIso, opts)`, outcome assertions unchanged; the sweep delegation pin needed no edit;
+  new op suite. Full suite 806 / 11,651; new gate + self-test and four sibling gate pairs green; types,
+  lint, doc-currency, build, `git diff --check` green. Mutations: thank-you sweep importing
+  `updateLifecycle` → gate names it; bogus recorded entry → "stale recorded importer"; re-added
+  `bulkUpdateByRequest` export → pin red; dropped `requireIfMatch` → 7 op tests red. Opus and Codex
+  round 1 pending.
 
 ## Docs (after each merge)
 
