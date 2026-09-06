@@ -12,7 +12,7 @@
  */
 
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
-import { act } from 'react';
+import { act, useState } from 'react';
 import { TextDecoder as NodeTextDecoder } from 'util';
 import ReviewerManagePanel from '../../shared/components/reviewers/ReviewerManagePanel';
 
@@ -157,9 +157,9 @@ afterEach(() => {
   window.confirm.mockRestore();
 });
 
-function renderPanel({ proposal = PROPOSAL, reviewers = [REVIEWER_A, REVIEWER_B], onRefresh } = {}) {
+function renderPanel({ proposal = PROPOSAL, reviewers = [REVIEWER_A, REVIEWER_B], settings = { signature: 'PD' }, onRefresh } = {}) {
   return render(
-    <ReviewerManagePanel proposal={proposal} reviewers={reviewers} settings={{ signature: 'PD' }} onRefresh={onRefresh} />,
+    <ReviewerManagePanel proposal={proposal} reviewers={reviewers} settings={settings} onRefresh={onRefresh} />,
   );
 }
 
@@ -833,6 +833,176 @@ describe('send completion handshake (real parent onRefresh/selection)', () => {
     openReleaseModal(1);
     expect(screen.getByRole('button', { name: /preview 1 email/i })).toBeTruthy();
     expect(screen.queryByText('1 sent')).toBeNull();
+  });
+});
+
+// ── Settings identity (Stage 6B3a) ──────────────────────────────────────
+//
+// The session identity also folds in settings.signature and
+// settings.reviewDueDate — the only two `settings` fields consumed anywhere
+// (snapshotSettings in handlePreview). The label and input are sibling DOM
+// nodes (no htmlFor/id), so getByLabelText can't find the due-date field;
+// reviewDueDateInput() walks from the label text to its sibling <input>
+// instead.
+function reviewDueDateInput() {
+  return screen.getByText('Review Due Date').nextElementSibling;
+}
+
+describe('settings identity (signature / review deadline)', () => {
+  test('signature change during a pending preview invalidates it back to compose', async () => {
+    const first = deferred();
+    renderEmailsBehavior = () => first.promise;
+    const { rerender } = renderPanel({ proposal: PROPOSAL, reviewers: [REVIEWER_A], settings: { signature: 'PD' } });
+    openReleaseModal(1);
+    await preview(1);
+    await waitFor(() => expect(renderCalls().length).toBe(1));
+
+    rerender(
+      <ReviewerManagePanel proposal={PROPOSAL} reviewers={[REVIEWER_A]} settings={{ signature: 'PD2' }} />,
+    );
+
+    first.resolve(mockJson({ drafts: [draftFor(REVIEWER_A)] }));
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+
+    expect(screen.queryByRole('button', { name: /send 1 email/i })).toBeNull();
+    expect(screen.getByRole('button', { name: /preview 1 email/i })).toBeTruthy();
+    expect(renderCalls().length).toBe(1);
+  });
+
+  test('a deadline change after a completed preview invalidates back to compose and the next preview carries the new deadline', async () => {
+    renderEmailsBehavior = () => mockJson({ drafts: [draftFor(REVIEWER_A)] });
+    const { rerender } = renderPanel({ proposal: PROPOSAL, reviewers: [REVIEWER_A] });
+    openReleaseModal(1);
+    await preview(1);
+    await screen.findByRole('button', { name: /send 1 email/i });
+    expect(renderCalls().length).toBe(1);
+
+    const PROPOSAL_NEW_DEADLINE = { ...PROPOSAL, reviewDeadline: '2026-09-30' };
+    rerender(
+      <ReviewerManagePanel proposal={PROPOSAL_NEW_DEADLINE} reviewers={[REVIEWER_A]} settings={{ signature: 'PD' }} />,
+    );
+
+    expect(screen.queryByRole('button', { name: /send 1 email/i })).toBeNull();
+    expect(screen.getByRole('button', { name: /preview 1 email/i })).toBeTruthy();
+
+    await preview(1);
+    await waitFor(() => expect(renderCalls().length).toBe(2));
+    const [, init] = renderCalls()[1];
+    const payload = JSON.parse(init.body);
+    expect(payload.settings.reviewDueDate).toBe('2026-09-30');
+  });
+
+  test('a customized due date survives a deadline change and is preserved for the next preview', async () => {
+    renderEmailsBehavior = () => mockJson({ drafts: [draftFor(REVIEWER_A)] });
+    const { rerender } = renderPanel({ proposal: PROPOSAL, reviewers: [REVIEWER_A] });
+    openReleaseModal(1);
+
+    fireEvent.change(reviewDueDateInput(), { target: { value: '2026-10-15' } });
+
+    await preview(1);
+    await screen.findByRole('button', { name: /send 1 email/i });
+
+    const PROPOSAL_NEW_DEADLINE = { ...PROPOSAL, reviewDeadline: '2026-09-30' };
+    rerender(
+      <ReviewerManagePanel proposal={PROPOSAL_NEW_DEADLINE} reviewers={[REVIEWER_A]} settings={{ signature: 'PD' }} />,
+    );
+
+    // Back in compose (deadline changed), the customized value must survive
+    // — the follow rule only moves the field when it still held the PRIOR
+    // default (or was empty), and this field was explicitly customized.
+    expect(reviewDueDateInput().value).toBe('2026-10-15');
+
+    await preview(1);
+    await waitFor(() => expect(renderCalls().length).toBe(2));
+    const [, init] = renderCalls()[1];
+    const payload = JSON.parse(init.body);
+    expect(payload.settings.reviewDueDate).toBe('2026-10-15');
+  });
+
+  test('a fresh settings/proposal object with the SAME values does not invalidate a pending preview', async () => {
+    const first = deferred();
+    renderEmailsBehavior = () => first.promise;
+    const { rerender } = renderPanel({ proposal: PROPOSAL, reviewers: [REVIEWER_A], settings: { signature: 'PD' } });
+    openReleaseModal(1);
+    await preview(1);
+    await waitFor(() => expect(renderCalls().length).toBe(1));
+
+    rerender(
+      <ReviewerManagePanel proposal={{ ...PROPOSAL }} reviewers={[REVIEWER_A]} settings={{ signature: 'PD' }} />,
+    );
+
+    first.resolve(mockJson({ drafts: [draftFor(REVIEWER_A)] }));
+    await screen.findByRole('button', { name: /send 1 email/i });
+    expect(renderCalls().length).toBe(1);
+  });
+
+  test('signature change during an in-flight send invalidates it, no onRefresh, no sent summary', async () => {
+    const sse = controlledSse();
+    renderEmailsBehavior = () => mockJson({ drafts: [draftFor(REVIEWER_A)] });
+    sendEmailsBehavior = () => sse.response;
+    const onRefresh = jest.fn();
+    const { rerender } = renderPanel({ proposal: PROPOSAL, reviewers: [REVIEWER_A], onRefresh });
+    openReleaseModal(1);
+    await preview(1);
+    await send(1);
+    await waitFor(() => expect(sendCalls().length).toBe(1));
+
+    rerender(
+      <ReviewerManagePanel proposal={PROPOSAL} reviewers={[REVIEWER_A]} settings={{ signature: 'PD2' }} onRefresh={onRefresh} />,
+    );
+
+    sse.push(sseChunk('complete', { message: 'done' }));
+    sse.finish();
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+
+    expect(screen.queryByText(/sent$/i)).toBeNull();
+    expect(screen.getByRole('button', { name: /preview 1 email/i })).toBeTruthy();
+    expect(onRefresh).not.toHaveBeenCalled();
+  });
+
+  test('a signature change synchronized with the post-send selection clear defeats the completion exemption', async () => {
+    const sse = controlledSse();
+    renderEmailsBehavior = () => mockJson({ drafts: [draftFor(REVIEWER_A)] });
+    sendEmailsBehavior = () => sse.response;
+
+    // The parent's real onEmailsSent handler clears selection AND calls
+    // onRefresh in the SAME synchronous callback (see the panel call site).
+    // A host component whose `onRefresh` flips its OWN `settings` state is
+    // how the parent's setSelectedReviewers and this settings change land in
+    // the SAME React commit (React 18 batches synchronous state updates
+    // regardless of which callback issued them) — an imperative rerender()
+    // call nested inside onRefresh does not reliably reproduce this and was
+    // observed to corrupt the tree, so a real parent-state update is used
+    // instead.
+    function Host() {
+      const [signature, setSignature] = useState('PD');
+      return (
+        <ReviewerManagePanel
+          proposal={PROPOSAL}
+          reviewers={[REVIEWER_A]}
+          settings={{ signature }}
+          onRefresh={() => setSignature('PD2')}
+        />
+      );
+    }
+    render(<Host />);
+    openReleaseModal(1);
+    await preview(1);
+    await send(1);
+    await waitFor(() => expect(sendCalls().length).toBe(1));
+
+    sse.push(sseChunk('result', { sent: [{ suggestionId: REVIEWER_A.suggestionId, candidateName: REVIEWER_A.name, candidateEmail: REVIEWER_A.email }], failed: [], skipped: [] }));
+    await act(async () => { await Promise.resolve(); });
+    sse.push(sseChunk('complete', { message: 'done' }));
+    sse.finish();
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); });
+
+    // The settingsKey mismatch (signature changed in the same commit) must
+    // defeat the completion exemption: fresh compose, not the sent summary.
+    // Selection itself did clear to empty (that part of the transition is
+    // real), so the reset compose form targets 0 reviewers, not 1.
+    expect(screen.queryByText('1 sent')).toBeNull();
+    expect(screen.getByRole('button', { name: /preview 0 email/i })).toBeTruthy();
   });
 });
 

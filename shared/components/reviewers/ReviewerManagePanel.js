@@ -605,6 +605,11 @@ function ReleaseMaterialsModal({ isOpen, onClose, reviewers, proposalTitle, requ
   // identity — a same-membership rerender with fresh row objects must not
   // reset drafts/step. modalSessionRef (declared above) IS the epoch:
   // handlePreview/handleSend already capture and compare against it.
+  // Stage 6B3a: identity also folds in a settings-by-VALUE key (signature +
+  // reviewDueDate — the only two `settings` fields consumed anywhere, see
+  // snapshotSettings in handlePreview) — never the whole `settings` object,
+  // which the panel call site rebuilds fresh every render ({...settings,
+  // reviewDueDate}) and which can carry unrelated host keys.
   const mountedRef = useRef(true);
   const saveTimerRef = useRef(null);
   const uploadAttemptRef = useRef(null);
@@ -621,6 +626,10 @@ function ReleaseMaterialsModal({ isOpen, onClose, reviewers, proposalTitle, requ
     isOpen: false,
     requestId: undefined,
     key: '',
+    settingsKey: '',
+    // The committed settings.reviewDueDate default at last reconcile — the
+    // "prior default" the emailFields follow-rule below compares against.
+    reviewDueDateDefault: '',
     onEmailsSent,
   });
 
@@ -650,34 +659,50 @@ function ReleaseMaterialsModal({ isOpen, onClose, reviewers, proposalTitle, requ
 
   // Committed-session reconciliation: no dependency array, no cleanup, so it
   // runs on every commit (mirrors the Stage 6B1/6B2 committed-props effect
-  // pattern). Any change to isOpen, requestId or the sorted membership key
-  // bumps modalSessionRef, aborts the active render, and resets compose/
-  // preview/send scratch state back to a fresh 'compose' session — except
-  // when the transition is the one-use completion-cause exemption (a prior-
-  // membership→empty transition tagged by the just-finished send attempt),
-  // which updates the committed key WITHOUT bumping or resetting, preserving
-  // the just-completed 'sent' summary. Same-membership array/object churn
-  // (fresh reviewer objects, same ids) never bumps.
+  // pattern). Any change to isOpen, requestId, the sorted membership key, or
+  // the settings-by-value key (Stage 6B3a) bumps modalSessionRef, aborts the
+  // active render, and resets compose/preview/send scratch state back to a
+  // fresh 'compose' session — except when the transition is the one-use
+  // completion-cause exemption (a prior-membership→empty transition tagged
+  // by the just-finished send attempt, with settings ALSO unchanged), which
+  // updates the committed key WITHOUT bumping or resetting, preserving the
+  // just-completed 'sent' summary. Same-membership array/object churn (fresh
+  // reviewer objects, same ids; a fresh `settings` object with the same
+  // signature/reviewDueDate values) never bumps.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useLayoutEffect(() => {
     const context = sessionContextRef.current;
     const nextKey = reviewers.map(r => r.suggestionId).slice().sort().join(',');
-    const changed = context.isOpen !== isOpen || context.requestId !== requestId || context.key !== nextKey;
+    // Settings identity by VALUE, not object identity: the panel call site
+    // rebuilds `settings` fresh every render ({...settings, reviewDueDate:
+    // proposal.reviewDeadline}), so comparing the object (or JSON.stringify
+    // of the whole thing) would bump on every render and would also pick up
+    // unrelated host keys riding along in `...settings`. Only `signature` and
+    // `reviewDueDate` are ever consumed (see snapshotSettings in
+    // handlePreview) — those are the only two fields in this key. Joined
+    // with U+0000, which cannot appear in a date string and is not
+    // realistically typeable into the freeform signature field, so the two
+    // fields can't collide across the separator.
+    const nextSettingsKey = `${settings.signature || ''}\u0000${settings.reviewDueDate || ''}`;
+    const changed = context.isOpen !== isOpen || context.requestId !== requestId || context.key !== nextKey
+      || context.settingsKey !== nextSettingsKey;
 
     if (changed) {
       // The one-use completion-cause exemption: this specific transition is
-      // priorKey→empty, the session/request are UNCHANGED (only membership
-      // moved), and the cause the panel handed back as a prop is exactly the
-      // attempt this modal's own last `complete` produced (same token),
-      // still unconsumed, still referring to the current epoch/request/prior
-      // membership. Any mismatch (untagged empty, a different membership,
-      // request/mode/permission change, an expired/reused/foreign cause, or
-      // a change that happened before completion) invalidates normally.
+      // priorKey→empty, the session/request/settings are UNCHANGED (only
+      // membership moved), and the cause the panel handed back as a prop is
+      // exactly the attempt this modal's own last `complete` produced (same
+      // token), still unconsumed, still referring to the current
+      // epoch/request/prior membership. Any mismatch (untagged empty, a
+      // different membership, request/mode/permission/settings change, an
+      // expired/reused/foreign cause, or a change that happened before
+      // completion) invalidates normally.
       const attempt = lastSendAttemptRef.current;
       const cause = membershipCause;
       const isCompletionExemption = Boolean(
         context.isOpen === isOpen
           && context.requestId === requestId
+          && context.settingsKey === nextSettingsKey
           && nextKey === ''
           && attempt
           && !attempt.consumed
@@ -697,6 +722,29 @@ function ReleaseMaterialsModal({ isOpen, onClose, reviewers, proposalTitle, requ
         context.isOpen = isOpen;
         context.requestId = requestId;
         context.key = nextKey;
+        // Deadline follow rule: emailFields.reviewDueDate is seeded from the
+        // prop once (useState initializer) and otherwise wins over it at
+        // render, so widening the key alone would invalidate the session on
+        // a deadline change but never actually move the visible/sent date.
+        // Move it to the new committed default ONLY when the field still
+        // holds the PRIOR committed default or is empty — i.e. the PD never
+        // customized it away, and no localStorage restore put something else
+        // there. A functional update: a fresh `settings` object with the
+        // SAME reviewDueDate value must not schedule a no-op setState here
+        // (guarded by the nextDueDateDefault !== prevDueDateDefault check
+        // below), and if the field was customized, this must return the same
+        // `prev` object so the setState is a true no-op.
+        const prevDueDateDefault = context.reviewDueDateDefault;
+        const nextDueDateDefault = settings.reviewDueDate || '';
+        if (nextDueDateDefault !== prevDueDateDefault) {
+          setEmailFields(prev => (
+            (!prev.reviewDueDate || prev.reviewDueDate === prevDueDateDefault)
+              ? { ...prev, reviewDueDate: nextDueDateDefault }
+              : prev
+          ));
+        }
+        context.settingsKey = nextSettingsKey;
+        context.reviewDueDateDefault = nextDueDateDefault;
         if (activeRenderAbortRef.current) {
           activeRenderAbortRef.current.abort();
           activeRenderAbortRef.current = null;
