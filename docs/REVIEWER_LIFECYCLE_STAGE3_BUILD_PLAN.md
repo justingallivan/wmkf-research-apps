@@ -176,7 +176,20 @@ builders on that file concurrently.
   lifecycle — just to obtain its error class, inverting the boundary the earlier slices protected.
   Correction: give the class a neutral leaf owner (`lib/services/reviewer-engagement/errors.js`,
   imports nothing from services) imported by both files; the old file keeps its re-export; the paths
-  test pins identity across all three. Opus review pending at the time of this entry.
+  test pins identity across all three.
+- **Opus review (`08617c6a`): PASS WITH ADVISORIES, zero required.** Byte identity confirmed by md5
+  on the dedented ranges (`a3e2889c…`); order and partial-success semantics unchanged (the 400 guard,
+  `if (hasResearcher)` and the duplicate-email 409 block are outside the diff); every `instanceof
+  MyCandidatesError` site is in tests and the route maps only on `ServiceHttpError`; 7/7 imports
+  resolve to the same absolute modules and no `reviewer-engagement/ → reviewer-finder/` import
+  exists; census reproduced independently over 1,120 files with no over/under-match; the 23 direct
+  tests execute the implementation and the deferred-promise ordering test discriminates; 783 /
+  11,468 and both boundary gates re-run green. Advisories folded into the correction: A2 dead
+  fixture in the paths test (`findById` returned `undefined`, so the armed rejection never ran); A3
+  JSDoc misattributes GUID validation to the shell; A6 neutral error owner (same as Codex). Carried
+  forward: A1 "zero existing test edits" should read "census test extended additively"; A4 catalog
+  entry lands post-merge; A5 the `[my-candidates]` log prefix now emits from `reviewer-engagement/`
+  (deferred cosmetic, verbatim rule).
 
 ## Rules for every slice
 
