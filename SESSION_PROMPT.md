@@ -1,156 +1,194 @@
-# Session 486 Prompt: Build Reviewer Lifecycle Stage 6B
+# Session 488 Prompt: Promote Stage 6B, Then Choose the Optional Stages
 
-## Session 485 Summary
+## Session 487 Summary
 
-The owner selected Stage 6B for another agent to build in the next session.
-Codex coordinated parallel source investigations and prepared a bounded build
-plan and remaining-work assessment. **This handoff is planning only: no Stage 6B
-runtime implementation, extraction or new application test was added.**
-The source baseline for the assessment is main `d614de5c`.
+Stage 6B of the reviewer lifecycle work is complete on branch
+`codex/reviewer-lifecycle-stage6b`: 6B2 (reminder action and closeout modal), 6B3
+(materials-release modal) and five owner-decided amendments to 6B3 driven by a
+chain of Codex adversarial reviews. Claude (Fable) orchestrated; Sonnet subagents
+built each slice with sole file ownership; fresh-context Opus subagents reviewed
+with reproduced guard removals; Codex ran an adversarial review after each PASS.
+The last amendment (6B3e) was built by Codex through the rescue runtime and
+reviewed by Claude directly. **Nothing from this session is merged to `main` or
+deployed.** Promotion is a separate, deliberate action under the release strategy.
 
 ### What Was Completed
 
-- A concrete Stage 6B plan sequences **6B1 token/removal/terminal actions → fresh
-  review → 6B2 reminder/closeout → fresh review → 6B3 materials-release modal**.
-  It specifies action identity, permanent invalidation, cleanup ownership,
-  post-await effects, preserved behavior and discriminating tests.
-- A readiness audit distinguishes ready first slices, dependent work and optional
-  abstractions across remaining Stages 2–7. The narrow raw-policy comparison
-  agreed in 30 cases; the imported generic-call inventory reported 19 calls.
-  Neither is a complete writer inventory or a new application-test run.
-- Current execution routing now selects 6B1. Frozen implementation reviews,
-  the original investigation and the completed release receipt remain historical
-  evidence. The planning review receipt records the independent plan assessment.
+1. **Stage 6B2 (`b08c16f6`, `d3ec406a`, `039d5d8e`)** — `ReviewReminderAction` and
+   `ReviewerCloseoutModal` bind feedback to their committed session (request,
+   reviewer, permission), release locks by attempt identity, invoke the latest
+   committed callbacks without awaiting their promises, and the closeout modal
+   closes itself on committed permission loss (owner decision after a Codex
+   finding). Opus PASS after one BLOCK round; Codex re-review PASS.
+2. **Stage 6B3 (`a6a27ce8`, `b163172a`)** — `ReleaseMaterialsModal` session identity
+   (open state, request, sorted membership), a finished send-stream state with a
+   local results accumulator, a one-use completion cause exempting the parent's
+   post-send selection clear, and attempt-owned upload/save-template lifetimes.
+   Opus BLOCK on an over-broad proposal-load invalidation, corrected; PASS.
+3. **Amendments after Codex adversarial reviews**, each Opus PASS unless noted:
+   6B3a `3a4bcbbe`/`0a4eafd6` (signature and review due date in the key, with a
+   due-date follow rule); 6B3b `9a790c64`/`529ee426` (recipient name, email,
+   affiliation by value via `membershipKeyFor`); 6B3c `2622dfc7`/`4524eb95`
+   (proposal title, abstract, PI, institution via `proposalKeyFor`); 6B3d
+   `be76760f`/`0cd466bc` (`ReviewersTab` keeps the same-request proposal on a
+   refetch error, case-insensitive GUID guard); 6B3e `5b57991d` (degraded mode:
+   Retry control in the error banner, `degraded` prop disables release, row
+   actions, reminder send, closeout trigger and the open modal's Send; Codex-built,
+   Claude-reviewed with one wiring correction).
+4. **Exit evidence at `5b57991d`** — full suite 773 suites / 11,323 tests,
+   `check:types`, lint 0 errors / 75 pre-existing warnings, webpack build with no
+   generated changes, `git diff --check`, seven runtime gate pairs, doc gates and
+   docs catalog, all green. Every frozen commit has a HEAD-logged exit log.
+5. **Documentation** — `docs/audits/REVIEWER_LIFECYCLE_STAGE6B2_RECEIPT_2026-09-05.md`
+   and `..._STAGE6B3_RECEIPT_2026-09-05.md` (the latter with amendment sections
+   6B3a–6B3e, all Codex verdicts quoted, every accepted limit); plan, approved
+   decisions, readiness audit and the workbench-lifecycle wiki topic reconciled;
+   Stage 6D queued.
 
-### Existing Release and Commits
-
-[VERIFIED via the recorded release evidence] Stages 0, 1A–1E and 6A are shipped.
-Stage 1C confirmed receipt behavior already present. PR 149 merged as `c19a16d8`;
-its production deployment reached READY on 2026-09-05 at 17:40:20.139 UTC.
-The later documentation-only `d614de5c` deployment reached READY at
-17:52:37.434 UTC with all seven expected production aliases attached.
-All five push-main workflows for `d614de5c` were subsequently observed successful.
-
-- `c19a16d8` — Merge PR 149: protect reviewer lifecycle writes and report outcomes.
-- `d614de5c` — Document the production release and Session 485 handoff.
-- This session's documentation commit contains the next build plan, readiness
-  audit, plan-review receipt, decision routing update and this prompt; obtain its
-  exact hash from `git log` rather than treating the assessment baseline as HEAD.
-
-Final pre-release CI passed 770 suites / 10,850 tests, build, lint and 25 stock
-browser cases. The isolated local browser rehearsal passed 31 cases (25 stock
-plus six targeted status cases), with no external requests or sends. These are
-**previous release results**, not tests of planned Stage 6B. The release smoke
-was read-only, and its bounded log scan does not prove live lifecycle mutations,
-delivery, concurrency or every production workflow. See the release receipt.
+### Commits (branch `codex/reviewer-lifecycle-stage6b`, base `dcd58b32`)
+- `b08c16f6` `d3ec406a` `b0a94790` `1147ce5d` `039d5d8e` `489e07f2` — Stage 6B2 and its receipt
+- `a6a27ce8` `b163172a` `7e05d495` `8c29e67d` — Stage 6B3 and its receipt
+- `3a4bcbbe` `0a4eafd6` `11ac925c` — 6B3a
+- `9a790c64` `529ee426` `086cffee` — 6B3b
+- `2622dfc7` `4524eb95` `7ceca3a7` — 6B3c and the Stage 6D queue entry
+- `be76760f` `0cd466bc` `2db6bdfd` — 6B3d
+- `5b57991d` `90235820` — 6B3e
+- Session handoff commit: obtain from `git log`.
 
 ## Next Items
 
-### Verified Open — Selected and Build Ready
-
-**Start Stage 6B1 using `docs/REVIEWER_LIFECYCLE_STAGE6B_BUILD_PLAN.md`.**
-[VERIFIED via CodeGraph and direct source/caller/test inspection at `d614de5c`]
-The existing regenerate-token/clipboard, revoke-token, remove-reviewer and
-terminal handlers still lack the shipped status handler's full context guards.
-The build plan is the execution contract; the readiness audit is broader routing.
-
-1. Run `/start`; verify branch, HEAD, dirty state and agent ownership. Read the
-   plan, its fresh review receipt and approved decisions before editing. Recheck
-   the named functions against current source so concurrent work is not rebuilt.
-2. Create an isolated `codex/` runtime branch under the existing release strategy.
-   The current main checkout contains the completed release and this Tier 0
-   documentation handoff. Future runtime work still requires deliberate promotion.
-3. Act as orchestrator and use native subagents for bounded investigation,
-   implementation and fresh independent review. Give one builder ownership of
-   `ReviewerManagePanel.js` at a time; do not run 6B slices or 6C edits in parallel
-   against that shared surface. Tests must exercise real rendered behavior.
-4. Complete 6B1, run the plan's applicable checks, freeze a working commit and
-   obtain a fresh independent review. Fix required findings before proceeding.
-   Repeat that checkpoint before 6B2 and 6B3. Preserve earlier slices' tests.
-5. Continue autonomously within the reviewed plan. Escalate a genuine new product
-   or architecture decision; ordinary implementation choices and already settled
-   policies do not require another confirmation. Do not deploy merely because
-   local build/review passed.
+**Owner direction at close of Session 487:** "pick up with the optional work next
+session." The mandatory path of the reviewer lifecycle plan ends when Stage 6B is
+promoted. The remaining stages are elective by the readiness audit's own words:
+6D (queued), 6C extraction, and the alternatives 2, 3, 5 (Stage 4 optional, Stage 7
+blocked behind 3/5). Start by promoting the branch, then present the elective menu
+from `docs/audits/REVIEWER_LIFECYCLE_REMAINING_READINESS_2026-09-05.md` for a fresh
+choice; do not assume an order.
 
 ### Owner Decision Needed
 
-No unresolved product-policy decision blocks the selected 6B1 scope.
-A proposed server-contract change, broader lock, automatic retry/resend or
-reopening of the excluded policies below is outside this plan. Stop and explain
-that concrete scope change if it becomes necessary.
+1. **Promote the branch.** Tier 1 runtime work: open a PR from
+   `codex/reviewer-lifecycle-stage6b` to `main`, let CI run, merge deliberately,
+   then watch the deployment (`feedback-deployment-monitoring-use-inspect`).
+   Evidence: `docs/REVIEWER_LIFECYCLE_STAGE6B_BUILD_PLAN.md` status section;
+   `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md`. No browser or live probe
+   ran for any 6B slice; a signed-in Workbench smoke on Preview before merge is the
+   cheapest missing evidence.
+2. **Plan Stage 6D — server-side draft fingerprint.** Queued by the owner
+   2026-09-05: render-emails returns a per-draft fingerprint of every body input
+   (recipient, proposal including co-investigators, settings); send-emails
+   recomputes and refuses a stale draft with a new `skipped` code the modal
+   renders. Contract and SSE-vocabulary change; needs its own plan and planning
+   review, not a 6B amendment. Evidence: plan status section `[PLANNED]` block;
+   6B3 receipt amendment sections 6B3c/6B3d.
 
-### Queued / Optional / Parked
+### Verified Open
 
-- **Queued within 6B:** 6B2 reminder/closeout and 6B3 materials context safety,
-  each after the prior slice's fresh review. They are planned, not implemented.
-- **Alternatives, not the next authorized build:** Stage 2 narrow shared policy,
-  Stage 3 closeout-command pilot and Stage 5 narrow pointer/thank-you operations
-  have source-backed first slices. Stage 3 expansion and Stage 7 depend on the
-  relevant migrations and proofs. Stage 6C extraction follows completed 6B and
-  an explicit state-ownership contract. See the readiness matrix for details.
-- **Optional:** Stage 4 adapter decomposition and a shared receipt-persistence
-  helper need demonstrated benefit and, for the helper, a narrow input design.
-- Previously parked product items remain parked: progress-pill alignment and
-  chronology, Ops eligibility view, automatic reviewer reminders and one-click
-  PDF conversion. They were not re-probed as current deployment claims; the
-  automatic-reminder hold remains protected by its existing gate.
+1. **Reviewer-follow-up host refetch error.** `pages/workbench/reviewer-follow-up.js`
+   empties its proposal list on a refetch error, unmounting the panel and any open
+   modal (the worse form of the 6B3d finding). Pre-existing; the 6B3d/6B3e pattern
+   (keep last-known-good for the same scope, degrade controls, offer Retry)
+   applies. Evidence: 6B3 receipt 6B3d/6B3e limits; reviewer trace at
+   `reviewer-follow-up.js:~198–201`.
+2. **Stage 6C extraction** (move the modal and action components out of
+   `ReviewerManagePanel.js`). Explicitly outside the 6B handoff; after promotion.
 
-### Preserve These Contracts
+### Parked
 
-- Shipped status ownership is synchronous and per reviewer within one mounted
-  panel, held until settlement. Context loss permanently invalidates feedback;
-  returning to the same identity must not revive it. Ordinary same-context
-  object/callback churn does not cancel a valid operation. Preserve its mutex,
-  outcome parsing and matching-token cleanup while adding the separate 6B paths.
-- Stage 6A returns canonical unique batch partitions, executes sequentially and
-  stops at first failure. Single submitted IDs retain their formatting. A failed
-  adapter operation may have committed or may have rejected before writing;
-  complete response loss reveals no partition. Never automatically replay it.
-  Historical Stage 3 wording must preserve this shipped contract.
-- A confirmed mutation followed by refresh or clipboard failure remains a
-  confirmed mutation. A void/self-catching host callback does not prove a fresh
-  successful read; UI currentness cannot undo a clipboard write already invoked.
-- Receipt declarations enter Review Received and lock normal resubmission;
-  closeout and honorarium eligibility remain separate. Generic six-field
-  invitation/response corrections reject closed sources and require exact fresh
-  ETags. Do not change open-row null/empty status policy during this work.
-- Stage 1B post-send retry repairs bookkeeping only. A delivered email is not
-  resent; warning feedback does not authorize resend. Preserve reminder holds,
-  existing eligibility, server authorization, ETags and action payloads.
-- The previous release's explicit exception for separate human UAT and a live
-  rollback drill was specific to that release, on an assumed permitting campaign
-  window. It is not standing deployment approval or verified campaign timing.
+- Stage 2 shared policy, Stage 3 closeout-command pilot, Stage 4 decomposition,
+  Stage 5 pointer/thank-you operations, Stage 7 boundary gate. Not re-probed. See
+  `docs/audits/REVIEWER_LIFECYCLE_REMAINING_READINESS_2026-09-05.md`.
+- Progress-pill alignment/chronology, Ops eligibility view, automatic reviewer
+  reminders (gate-protected hold), one-click PDF conversion. Not re-probed.
 
-### Do Not Reopen Without a New Decision
+### Verify Before Acting
+
+1. **Codex worktree and branch drift.** A separate Codex session ran
+   `git checkout main` in this checkout mid-session (15:30:06), voiding a
+   background full-suite run. Codex now works in `../WMKF_Apps-codex` on
+   `codex/ui-features` and must never run checkout/switch/reset/stash/pull here.
+   Every background verification log records HEAD at start and end; treat a
+   mismatch as void. Memory: `feedback-verify-branch-before-git-action`.
+2. **Two stashes** (`stash@{0}` on main, `stash@{1}` on
+   `codex/reviewer-promotion-remediation`, both July 2026 reconciliation reports)
+   predate this work and were left alone.
+3. **Impeccable hook false positive** (gray-on-white contrast at the closeout
+   disposition label) was disclosed; the ignore write via `hook-admin.mjs` was
+   blocked by the permission classifier and is NOT persisted. Expect it again.
+4. **Accepted limits that later stages inherit** (all in the receipts): callback
+   promises observed, not awaited; no post-close refresh-failure surface; closeout
+   auto-closes on permission loss; a membership, settings, recipient or proposal
+   change during an in-flight materials send returns to compose while the
+   server-side one-time gate bounds a duplicate; client keys see only what the
+   panel has refetched and never co-investigators (6D); degraded mode is
+   advisory, controls re-enable optimistically while a retry loads.
+5. **Receipt figures are reviewer-measured.** Builders under-reported red
+   baselines twice (12 vs 13; 12 vs 14 split). Leave a placeholder until the
+   reviewer's number exists.
+
+### Do Not Reopen Without New Decision
 
 Automatic Complete from thank-you; writing the Operations/Finance final remit
 flag from this application; BILL API reviewer onboarding. No new schema, live
-lifecycle mutation, email send, cron invocation or backfill is authorized by this
-planning handoff. Local isolated tests are part of the build scope.
+lifecycle mutation, email send, cron invocation or backfill is authorized. The
+owner explicitly chose to FIX rather than accept the recipient-field, proposal-
+field and refetch-error findings; do not relitigate those as "the PD previewed
+it" limits.
 
-## Key Files
+## Preserve These Contracts
 
-- `docs/REVIEWER_LIFECYCLE_STAGE6B_BUILD_PLAN.md` — exact next-build contract,
-  scope, tests, review checkpoints and independent-review brief.
-- `docs/audits/REVIEWER_LIFECYCLE_STAGE6B_PLAN_REVIEW_2026-09-05.md` — fresh
-  independent planning review, assessed revision and verification limits.
-- `docs/audits/REVIEWER_LIFECYCLE_REMAINING_READINESS_2026-09-05.md` — remaining
-  stage matrix, bounded probes and historical-plan corrections.
-- `docs/audits/REVIEWER_LIFECYCLE_APPROVED_DECISIONS_2026-09-04.md` — settled
-  receipt/correction/batch policies, shipped contracts and current routing.
-- `docs/audits/REVIEWER_LIFECYCLE_RELEASE_2026-09-05.md` — completed release,
-  exact source/deployment association, CI/browser evidence and accepted limits.
-- `docs/audits/REVIEWER_LIFECYCLE_REFACTOR_REPORT_2026-09-04.md` — historical
-  investigation; use the current plan and readiness audit for execution status.
-- Stage 1D, 1E and 6A receipt/review files in `docs/audits/` — frozen runtime
-  and independent-review evidence. Preserve Claude's original separate report
-  and its adjacent follow-up receipt unchanged.
+- Shipped status ownership: synchronous per-reviewer mutex within one mounted
+  panel, permanent invalidation, matching-token cleanup, 6A outcome parsing.
+- Materials modal session identity = isOpen + requestId + `membershipKeyFor`
+  (suggestionId, name, email, affiliation) + signature/reviewDueDate +
+  `proposalKeyFor` (title, abstract, authors, institution), by VALUE; the
+  completion exemption requires all of them unchanged; proposal loading is
+  invalidated by open/close, request change and unmount only.
+- Send transmits the previewed body verbatim (PD edits are a feature); only the
+  destination address is re-resolved server-side. Do not add server re-render at
+  send outside Stage 6D.
+- Payload shapes, SSE vocabulary, preview single-flight and tail serialization,
+  send-emails one-time gate: unchanged through all of 6B.
+
+## Orchestration Lessons (one line each)
+
+- Await a host callback's promise only when you will report its failure.
+- Over-broad invalidation is the same defect class as missing invalidation; a
+  brief saying "bump on request change" must not ship as "bump on any change".
+- If an argument ("the PD previewed it") did not stop the last fix, it does not
+  justify accepting the next one; decide the boundary before building.
+- A Codex adversarial chain finds the next boundary each round; set the stopping
+  rule up front (this session ran five rounds before the owner called it).
+- Codex-built work: reproduce the mutations yourself; its red-first claim was the
+  missing test file, not red tests.
+
+## Key Files Reference
+
+| File | Purpose |
+|------|---------|
+| `docs/REVIEWER_LIFECYCLE_STAGE6B_BUILD_PLAN.md` | Execution contract; status marks 6B complete, 6D queued |
+| `docs/audits/REVIEWER_LIFECYCLE_STAGE6B3_RECEIPT_2026-09-05.md` | 6B3 plus amendments 6B3a–6B3e, all Codex verdicts, limits |
+| `docs/audits/REVIEWER_LIFECYCLE_STAGE6B2_RECEIPT_2026-09-05.md` | 6B2 invariants, reviews, permission-loss close |
+| `docs/audits/REVIEWER_LIFECYCLE_APPROVED_DECISIONS_2026-09-04.md` | Owner decisions incl. 6D queue |
+| `shared/components/reviewers/ReviewerManagePanel.js` | `membershipKeyFor`/`proposalKeyFor` ~551–600; modal ~600–1830; `degraded` gating |
+| `shared/components/reviewers/ReviewersTab.js` | `loadReviewers` catch ~154–169; Retry banner ~514; `degraded={Boolean(error)}` |
+| `shared/components/reviewers/ReviewerCloseoutModal.js` | 6B2 session binding and permission-loss close |
+| `tests/unit/reviewer-materials-modal-lifetimes.test.js` | 43 modal lifetime cases |
+| `tests/unit/reviewer-manage-degraded.test.js` | Degraded-mode gating through the panel |
+| `docs/agent-wiki/topics/reviewer-workbench-lifecycle.md` | Wiki topic with 6B2/6B3 paragraphs |
+
+## Testing
+
+```sh
+# Retained UI selection (all must stay green)
+npm test -- --runInBand --watch=false --runTestsByPath tests/unit/reviewer-action-lifetimes.test.js tests/unit/reviewer-status-mutation-characterization.test.js tests/unit/reviewer-manage-actions-menu.test.js tests/unit/reviewer-closeout-modal.test.js tests/unit/manage-panel-preview-error-retry.test.js tests/unit/reviewer-manage-proposal-attachment.test.js tests/unit/reviewers-tab-stale-request.test.js tests/unit/reviewers-tab-post-send-refresh.test.js tests/unit/reviewer-follow-up.test.js tests/unit/reviewer-materials-modal-lifetimes.test.js tests/unit/reviewer-manage-degraded.test.js
+# Slice exit
+npm test -- --runInBand --watch=false && npm run check:types && npm run lint && npm run build -- --webpack && git diff --check
+```
 
 ## Handoff and Milestone Determination
 
-The next agent begins 6B1; the completed lifecycle release requires no repeat
-implementation or release approval. `DEVELOPMENT_LOG.md` already records the
-Session 484 production milestone. This session prepared planning documents and
-requires **no additional milestone entry**. No CLAUDE.md, schema, API, environment
-or memory convention changed. The claim-evidence pilot command remained
-unavailable because local state could not be read; no observation row was invented.
+No production capability shipped; the branch is unmerged. **No DEVELOPMENT_LOG.md
+entry is required.** No CLAUDE.md, schema, API, environment or memory convention
+changed. The claim-evidence pilot report recorded no eligible plan/design edit
+for this session; no observation row was added.

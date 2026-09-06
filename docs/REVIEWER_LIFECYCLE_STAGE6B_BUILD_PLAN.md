@@ -3,11 +3,14 @@ title: Reviewer Lifecycle Stage 6B — Build Handoff
 domain: reviewer-workbench
 kind: plan
 status: active
-summary: Sequential in-place action lifetime fixes, beginning with token, removal, and terminal feedback while preserving shipped status and server contracts.
+summary: Sequential in-place action lifetime fixes; 6B1, 6B2 and 6B3 are all complete on a branch with independent PASS verdicts; promotion is the next decision.
 canonical: false
 owner: product-engineering
 last_verified: 2026-09-05
 related:
+  - docs/audits/REVIEWER_LIFECYCLE_STAGE6B1_RECEIPT_2026-09-05.md
+  - docs/audits/REVIEWER_LIFECYCLE_STAGE6B2_RECEIPT_2026-09-05.md
+  - docs/audits/REVIEWER_LIFECYCLE_STAGE6B3_RECEIPT_2026-09-05.md
   - docs/audits/REVIEWER_LIFECYCLE_REFACTOR_REPORT_2026-09-04.md
   - docs/audits/REVIEWER_LIFECYCLE_APPROVED_DECISIONS_2026-09-04.md
   - docs/audits/REVIEWER_LIFECYCLE_RELEASE_2026-09-05.md
@@ -18,10 +21,53 @@ related:
 
 ## Status and first action
 
-[PLANNED] **Build 6B1 first**, after the preflight below. Proceed to 6B2 and
-6B3 sequentially only after the preceding slice's checks and independent review.
+[VERIFIED via frozen commits, tests and independent review] **6B1 is complete**
+on branch `codex/reviewer-lifecycle-stage6b`: runtime `9258115a`, test-only review
+correction `06725d6c`, full suite 771 suites / 11,216 tests, webpack build, seven
+gate pairs and an independent PASS. See the
+[Stage 6B1 receipt](audits/REVIEWER_LIFECYCLE_STAGE6B1_RECEIPT_2026-09-05.md).
+[VERIFIED via frozen commits, tests and independent review] **6B2 is complete**
+on the same branch: runtime `b08c16f6`, review-driven correction `d3ec406a`,
+owner-decided permission-loss close `039d5d8e` after a Codex adversarial review, full
+suite 771 suites / 11,275 tests, webpack build, seven gate pairs and an independent
+PASS after one BLOCK round. See the
+[Stage 6B2 receipt](audits/REVIEWER_LIFECYCLE_STAGE6B2_RECEIPT_2026-09-05.md).
+[VERIFIED via frozen commits, tests and independent review] **6B3 is complete**
+on the same branch: runtime `a6a27ce8`, review-driven correction `b163172a`, full
+suite 772 suites / 11,301 tests, webpack build, seven gate pairs and an independent
+PASS after one BLOCK round; amendment 6B3a (`3a4bcbbe` runtime, `0a4eafd6` advisory test)
+folded the signature and review due date into the session identity after a Codex adversarial
+review, and amendment 6B3b (`9a790c64` runtime, `529ee426` advisory test) folded recipient
+name, email and affiliation after a second one, and 6B3c (`2622dfc7`) folded the panel-carried
+proposal title, abstract, PI and institution after a third, and 6B3d (`be76760f`, host-side in
+`ReviewersTab.js`) keeps the same-request proposal on a refetch error after a fourth, and 6B3e
+(`5b57991d`, Codex-built via rescue, Claude-reviewed) adds a degraded mode with Retry after a
+fifth; the reviewed amendments have independent PASS verdicts, the last full suite is recorded in
+the receipt. See the
+[Stage 6B3 receipt](audits/REVIEWER_LIFECYCLE_STAGE6B3_RECEIPT_2026-09-05.md).
+**Stage 6B is therefore complete on `codex/reviewer-lifecycle-stage6b`.** Nothing is
+merged or deployed; promotion (PR, CI, deliberate merge under the release strategy) is
+the next owner decision. The three receipts carry the accepted limits that a later
+stage inherits: callback promises are observed, not awaited; no post-close
+refresh-failure surface exists for the reminder, closeout or materials components; the
+closeout modal closes itself on committed permission loss; a membership change during an
+in-flight materials send returns the modal to compose while the server-side one-time
+release gate bounds a duplicate send; a signature or review-deadline change while the modal
+is open resets it the same way, even when the PD's customized due date would have rendered
+identically; a recipient name, email or affiliation change and a proposal title, abstract, PI
+or institution change (6B3c, `2622dfc7`) do too; co-investigators and unrefetched edits wait
+for Stage 6D.
 These are subdivisions of original Stage 6B, not additional product features.
 Stage 6C extraction is outside this handoff.
+
+[PLANNED, owner-queued 2026-09-05] **Stage 6D — server-side draft fingerprint.** The
+materials-modal session key (6B3a–6B3c) can only detect changes the panel has refetched and
+cannot see co-investigators at all, because no host carries them. A third Codex adversarial
+review asked for a defensible boundary; the owner chose the client key now and queued this
+slice: render-emails returns a per-draft fingerprint of every body input (recipient, proposal
+including co-PIs, settings); send-emails recomputes it and refuses a stale draft with a new
+`skipped` code the modal renders. This changes the render and send contracts and the SSE
+vocabulary, so it is a separately planned and reviewed slice, not a 6B amendment. Not started.
 
 [VERIFIED via source reads and git commands] Source baseline:
 `d614de5cf60baeaec8cf21ca8e4dd3c2489d2f7a`, `main`, initially clean.
@@ -109,6 +155,9 @@ Keep external callback arguments and invocation count unchanged. Only the local
 
 ## 6B1 — token, removal and terminal outcomes
 
+[VERIFIED] Implemented at `9258115a`/`06725d6c`; the requirements below are the
+contract that was built and reviewed. Line citations are to the `d614de5c` baseline.
+
 Runtime ownership: only relevant regions of
 `shared/components/reviewers/ReviewerManagePanel.js`.
 New focused test path (planned):
@@ -181,15 +230,21 @@ Start only after 6B2 review. Keep `ReleaseMaterialsModal` nested for this slice.
 669–682 do not invalidate preview/send epochs. Preview and send capture that
 epoch at lines 777–1026. Templates/attachments remain separate scratch concerns.
 
-Use a modal session identity of open/closed state, request ID and selected
-suggestion-ID membership, plus observed parent permission/read-only lifetime.
-Compare stable membership, not array identity or reviewer display-object identity.
+Use a modal session identity of open/closed state, request ID, selected
+suggestion-ID membership and, since the 6B3a amendment (`3a4bcbbe`, owner decision after a
+Codex adversarial review), the two consumed settings values (signature and review due
+date) compared by value and, since 6B3b (`9a790c64`, second Codex review), each selected
+reviewer's name, email and affiliation by value, plus observed parent permission/read-only
+lifetime. Compare stable membership and field VALUES, never array identity, reviewer
+display-object identity or `settings` object identity (the panel rebuilds both every render).
 External membership changes and request changes invalidate the previous session
 even while open; returning does not revive it. Reset drafts/results/error for a
 new session, except the explicitly owned completion reset below. Do not normalize
 or rewrite the existing request payload.
-Keep compose fields/settings and attachment persistence semantics; no new
-cross-request attachment-storage policy is implied by suppressing stale UI writes.
+Keep compose fields/settings and attachment persistence semantics, with one 6B3a
+exception: when the committed review-due-date default changes, a due-date field that still
+holds the prior default (or is empty) follows the new default; a customized field is kept.
+No new cross-request attachment-storage policy is implied by suppressing stale UI writes.
 
 | Owner / baseline region | Preservation and every asynchronous checkpoint |
 |---|---|

@@ -1,0 +1,1341 @@
+/**
+ * @jest-environment jsdom
+ *
+ * Stage 6B3 — ReleaseMaterialsModal session identity, stale-outcome
+ * suppression and the send-completion handshake
+ * (docs/REVIEWER_LIFECYCLE_STAGE6B_BUILD_PLAN.md "6B3"). Drives the REAL
+ * `ReviewerManagePanel` (the modal is not exported) with isolated,
+ * hand-controlled transport promises — no mocked handler implementations.
+ * Harness helpers (mockJson, deferred, TextDecoder polyfill, PROPOSAL/
+ * REVIEWER fixtures) are copied from manage-panel-preview-error-retry.test.js
+ * and reviewer-manage-proposal-attachment.test.js, not imported.
+ */
+
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { act, useState } from 'react';
+import { TextDecoder as NodeTextDecoder } from 'util';
+import ReviewerManagePanel from '../../shared/components/reviewers/ReviewerManagePanel';
+
+jest.mock('@vercel/blob/client', () => ({ upload: jest.fn() }));
+jest.mock('../../shared/components/reviewers/email-template-store', () => {
+  const actual = jest.requireActual('../../shared/components/reviewers/email-template-store');
+  return {
+    ...actual,
+    loadEmailTemplates: jest.fn(async () => actual.EMPTY_TEMPLATES),
+    saveEmailTemplates: jest.fn(async () => true),
+  };
+});
+
+const { upload } = require('@vercel/blob/client');
+const { saveEmailTemplates } = require('../../shared/components/reviewers/email-template-store');
+
+if (typeof global.TextDecoder === 'undefined') {
+  global.TextDecoder = NodeTextDecoder;
+}
+
+const PROPOSAL = {
+  proposalId: '00000000-0000-0000-0000-000000000001',
+  proposalTitle: 'Proposal Under Review',
+  reviewDeadline: '2026-07-22',
+  proposalAbstract: 'Original abstract text.',
+  proposalAuthors: 'Dr. Original PI',
+  proposalInstitution: 'Original University',
+};
+const PROPOSAL_2 = {
+  proposalId: '00000000-0000-0000-0000-000000000002',
+  proposalTitle: 'Second Proposal',
+  reviewDeadline: '2026-08-01',
+};
+
+const REVIEWER_A = { suggestionId: 'aaaaaaaa-0000-0000-0000-000000000001', name: 'Accepted A', email: 'a@example.org', reviewStatus: 'accepted' };
+const REVIEWER_B = { suggestionId: 'bbbbbbbb-0000-0000-0000-000000000002', name: 'Accepted B', email: 'b@example.org', reviewStatus: 'accepted' };
+
+function mockJson(data, ok = true, status = ok ? 200 : 500) {
+  return { ok, status, json: async () => data };
+}
+
+function deferred() {
+  let resolve;
+  let reject;
+  const promise = new Promise((res, rej) => { resolve = res; reject = rej; });
+  return { promise, resolve, reject };
+}
+
+function draftFor(reviewer, overrides = {}) {
+  return {
+    suggestionId: reviewer.suggestionId,
+    candidateName: reviewer.name,
+    candidateEmail: reviewer.email,
+    subject: 'S',
+    body: 'B',
+    ...overrides,
+  };
+}
+
+// Chunk-controlled SSE reader: `push` delivers a chunk immediately if a read
+// is already pending, otherwise queues it; `finish` ends the stream. Distinct
+// from the fire-and-forget mockSseFromChunks in the sibling suite — needed
+// here to control exactly which chunk carries which event, and to pause
+// mid-stream (external clear before complete, duplicate/trailing events).
+function controlledSse() {
+  const queued = [];
+  let waiting = null;
+  let ended = false;
+  const cancel = jest.fn(() => Promise.resolve());
+  return {
+    response: {
+      ok: true,
+      body: {
+        getReader: () => ({
+          read: () => new Promise((resolve) => {
+            if (queued.length > 0) {
+              resolve({ value: Buffer.from(queued.shift()), done: false });
+            } else if (ended) {
+              resolve({ done: true, value: undefined });
+            } else {
+              waiting = resolve;
+            }
+          }),
+          cancel,
+        }),
+      },
+    },
+    push(chunk) {
+      if (waiting) {
+        const r = waiting;
+        waiting = null;
+        r({ value: Buffer.from(chunk), done: false });
+      } else {
+        queued.push(chunk);
+      }
+    },
+    finish() {
+      ended = true;
+      if (waiting) {
+        const r = waiting;
+        waiting = null;
+        r({ done: true, value: undefined });
+      }
+    },
+    cancelSpy: cancel,
+  };
+}
+
+function sseChunk(event, data) {
+  return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+}
+
+// aria-label lookup (not a text-based row search): the modal's own 'sent'
+// summary also renders the reviewer's name, so a text-based `closest('tr')`
+// lookup is ambiguous once a send has completed while the modal stays open.
+function checkboxForRow(name) {
+  return screen.getByLabelText(`Select ${name} for proposal release`);
+}
+
+let renderEmailsBehavior;
+let sendEmailsBehavior;
+let loadProposalBehavior;
+
+function baseFetchImpl(url, init) {
+  const u = String(url);
+  if (u === '/api/review-manager/release-settings') return mockJson({ attachProposalEmail: false });
+  if (u.startsWith('/api/review-manager/materials-preflight')) return mockJson({ ok: true, fileCount: 3 });
+  if (u === '/api/review-manager/render-emails') return renderEmailsBehavior(init);
+  if (u === '/api/review-manager/send-emails') return sendEmailsBehavior(init);
+  if (u === '/api/reviewer-finder/load-proposal') return loadProposalBehavior(init);
+  throw new Error(`Unexpected fetch: ${url}`);
+}
+
+beforeEach(() => {
+  jest.clearAllMocks();
+  localStorage.clear();
+  renderEmailsBehavior = () => mockJson({ drafts: [] });
+  sendEmailsBehavior = () => mockJson({ error: 'unused' }, false, 500);
+  loadProposalBehavior = () => mockJson({ success: true, blobUrl: null, filename: null, allFiles: [] });
+  global.fetch = jest.fn(async (url, init) => baseFetchImpl(url, init));
+  jest.spyOn(window, 'confirm').mockReturnValue(true);
+});
+
+afterEach(() => {
+  window.confirm.mockRestore();
+});
+
+function renderPanel({ proposal = PROPOSAL, reviewers = [REVIEWER_A, REVIEWER_B], settings = { signature: 'PD' }, onRefresh } = {}) {
+  return render(
+    <ReviewerManagePanel proposal={proposal} reviewers={reviewers} settings={settings} onRefresh={onRefresh} />,
+  );
+}
+
+function openReleaseModal(count) {
+  fireEvent.click(screen.getByRole('button', { name: new RegExp(`release proposal to reviewers \\(${count}\\)`, 'i') }));
+}
+
+async function preview(count) {
+  fireEvent.click(await screen.findByRole('button', { name: new RegExp(`preview ${count} email`, 'i') }));
+}
+
+async function send(count) {
+  const btn = await screen.findByRole('button', { name: new RegExp(`send ${count} email`, 'i') });
+  fireEvent.click(btn);
+}
+
+function renderCalls() {
+  return global.fetch.mock.calls.filter(([url]) => String(url) === '/api/review-manager/render-emails');
+}
+
+function sendCalls() {
+  return global.fetch.mock.calls.filter(([url]) => String(url) === '/api/review-manager/send-emails');
+}
+
+// ── Same-membership churn keeps drafts/step ─────────────────────────────
+
+test('same-membership object churn (fresh reviewer objects, same ids) does not reset a preview in progress', async () => {
+  const first = deferred();
+  renderEmailsBehavior = () => first.promise;
+  const { rerender } = renderPanel({ reviewers: [REVIEWER_A, REVIEWER_B] });
+  fireEvent.click(checkboxForRow('Accepted A'));
+  openReleaseModal(1);
+  await preview(1);
+  await waitFor(() => expect(renderCalls().length).toBe(1));
+
+  // Fresh objects, same ids — parent rerenders with new array instances.
+  rerender(
+    <ReviewerManagePanel
+      proposal={PROPOSAL}
+      reviewers={[{ ...REVIEWER_A }, { ...REVIEWER_B }]}
+      settings={{ signature: 'PD' }}
+    />,
+  );
+
+  first.resolve(mockJson({ drafts: [draftFor(REVIEWER_A)] }));
+  await screen.findByRole('button', { name: /send 1 email/i });
+  expect(renderCalls().length).toBe(1);
+});
+
+test('same membership in reversed row order does not reset a preview in progress (key is sorted, not array-ordered)', async () => {
+  const first = deferred();
+  renderEmailsBehavior = () => first.promise;
+  const { rerender } = renderPanel({ reviewers: [REVIEWER_A, REVIEWER_B] });
+  openReleaseModal(2);
+  await preview(2);
+  await waitFor(() => expect(renderCalls().length).toBe(1));
+
+  // Same two selected reviewers, parent now lists them in the opposite order.
+  rerender(
+    <ReviewerManagePanel
+      proposal={PROPOSAL}
+      reviewers={[{ ...REVIEWER_B }, { ...REVIEWER_A }]}
+      settings={{ signature: 'PD' }}
+    />,
+  );
+
+  first.resolve(mockJson({ drafts: [draftFor(REVIEWER_A), draftFor(REVIEWER_B)] }));
+  await screen.findByRole('button', { name: /send 2 email/i });
+  expect(renderCalls().length).toBe(1);
+});
+
+// ── Session identity x deferred continuation x invalidation classes ─────
+
+describe('preview (deferred render-emails) invalidation', () => {
+  test('external membership change invalidates a pending preview', async () => {
+    const first = deferred();
+    renderEmailsBehavior = () => first.promise;
+    renderPanel({ reviewers: [REVIEWER_A, REVIEWER_B] });
+    fireEvent.click(checkboxForRow('Accepted A'));
+    openReleaseModal(1);
+    await preview(1);
+    await waitFor(() => expect(renderCalls().length).toBe(1));
+
+    // External membership change while the modal stays open: uncheck A via
+    // the underlying table checkbox (still rendered behind the modal in jsdom).
+    fireEvent.click(checkboxForRow('Accepted A'));
+
+    first.resolve(mockJson({ drafts: [draftFor(REVIEWER_A, { subject: 'Stale' })] }));
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+
+    // Compose is back, no stale draft/step leak.
+    expect(screen.queryByText('Stale')).toBeNull();
+    expect(screen.getByRole('button', { name: /preview 0 email/i })).toBeTruthy();
+  });
+
+  test('close/reopen invalidates a pending preview', async () => {
+    const first = deferred();
+    renderEmailsBehavior = () => first.promise;
+    renderPanel({ reviewers: [REVIEWER_A] });
+    openReleaseModal(1);
+    await preview(1);
+    await waitFor(() => expect(renderCalls().length).toBe(1));
+
+    fireEvent.click(screen.getByRole('button', { name: /^cancel$/i }));
+    openReleaseModal(1);
+
+    first.resolve(mockJson({ drafts: [draftFor(REVIEWER_A, { subject: 'Stale' })] }));
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    expect(screen.queryByText('Stale')).toBeNull();
+    expect(screen.getByRole('button', { name: /preview 1 email/i })).toBeTruthy();
+  });
+
+  test('unmount aborts a pending preview render and a fresh remount is a clean compose', async () => {
+    // A "modal gone" assertion alone doesn't discriminate the unmount guard —
+    // React already no-ops a captured setState call on an unmounted
+    // component regardless of any epoch check (verified: no warning, no
+    // crash, no effect). The unmount cleanup's OWN observable behavior is
+    // that it aborts the outstanding render's AbortController, which we can
+    // assert directly via the signal handed to fetch.
+    const first = deferred();
+    let capturedSignal;
+    renderEmailsBehavior = (init) => { capturedSignal = init.signal; return first.promise; };
+    const { rerender } = renderPanel({ reviewers: [REVIEWER_A] });
+    openReleaseModal(1);
+    await preview(1);
+    await waitFor(() => expect(renderCalls().length).toBe(1));
+    expect(capturedSignal.aborted).toBe(false);
+
+    rerender(
+      <ReviewerManagePanel proposal={PROPOSAL} reviewers={[REVIEWER_A]} settings={{ signature: 'PD' }} canManage={false} />,
+    );
+
+    // Discriminates the unmount cleanup: without it, the controller is never
+    // aborted here.
+    expect(capturedSignal.aborted).toBe(true);
+
+    // The stale promise settling after unmount must not throw.
+    first.resolve(mockJson({ drafts: [draftFor(REVIEWER_A)] }));
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    expect(screen.queryByRole('button', { name: /send 1 email/i })).toBeNull();
+
+    // A fresh remount (canManage regained) is a clean compose: no stale
+    // drafts, no stuck rendering lock.
+    rerender(
+      <ReviewerManagePanel proposal={PROPOSAL} reviewers={[REVIEWER_A]} settings={{ signature: 'PD' }} canManage />,
+    );
+    openReleaseModal(1);
+    expect(screen.getByRole('button', { name: /preview 1 email/i })).not.toBeDisabled();
+  });
+
+  test('membership A→B→A: returning to the original membership does not revive a stale attempt', async () => {
+    const first = deferred();
+    renderEmailsBehavior = () => first.promise;
+    renderPanel({ reviewers: [REVIEWER_A, REVIEWER_B] });
+    fireEvent.click(checkboxForRow('Accepted A'));
+    openReleaseModal(1);
+    await preview(1);
+    await waitFor(() => expect(renderCalls().length).toBe(1));
+
+    // A -> B
+    fireEvent.click(checkboxForRow('Accepted A'));
+    fireEvent.click(checkboxForRow('Accepted B'));
+    // B -> A (back to the original membership)
+    fireEvent.click(checkboxForRow('Accepted B'));
+    fireEvent.click(checkboxForRow('Accepted A'));
+
+    first.resolve(mockJson({ drafts: [draftFor(REVIEWER_A, { subject: 'Stale' })] }));
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    // Returning to A must not revive the stale first attempt's draft.
+    expect(screen.queryByText('Stale')).toBeNull();
+    expect(screen.getByRole('button', { name: /preview 1 email/i })).toBeTruthy();
+  });
+
+  test('request switch invalidates a pending preview', async () => {
+    const first = deferred();
+    renderEmailsBehavior = () => first.promise;
+    const { rerender } = renderPanel({ proposal: PROPOSAL, reviewers: [REVIEWER_A] });
+    openReleaseModal(1);
+    await preview(1);
+    await waitFor(() => expect(renderCalls().length).toBe(1));
+
+    rerender(
+      <ReviewerManagePanel proposal={PROPOSAL_2} reviewers={[REVIEWER_A]} settings={{ signature: 'PD' }} />,
+    );
+
+    first.resolve(mockJson({ drafts: [draftFor(REVIEWER_A, { subject: 'Stale' })] }));
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    expect(screen.queryByText('Stale')).toBeNull();
+  });
+});
+
+describe('send (deferred SSE stream) invalidation', () => {
+  test('external membership change during an in-flight send hides it and returns to a fresh compose', async () => {
+    const sse = controlledSse();
+    renderEmailsBehavior = () => mockJson({ drafts: [draftFor(REVIEWER_A), draftFor(REVIEWER_B)] });
+    sendEmailsBehavior = () => sse.response;
+    renderPanel({ reviewers: [REVIEWER_A, REVIEWER_B] });
+    openReleaseModal(2);
+    await preview(2);
+    await send(2);
+    await waitFor(() => expect(sendCalls().length).toBe(1));
+
+    // Membership changes while step === 'sending' — the D3 duplicate-send
+    // exposure: this hides the in-flight send and re-presents compose.
+    fireEvent.click(checkboxForRow('Accepted A'));
+
+    sse.push(sseChunk('complete', { message: 'done' }));
+    sse.finish();
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+
+    expect(screen.queryByText(/sent$/i)).toBeNull();
+    expect(screen.getByRole('button', { name: /preview 1 email/i })).toBeTruthy();
+  });
+
+  test('unmount during an in-flight send settles silently, no callback, no crash', async () => {
+    const sse = controlledSse();
+    renderEmailsBehavior = () => mockJson({ drafts: [draftFor(REVIEWER_A)] });
+    sendEmailsBehavior = () => sse.response;
+    // onRefresh is a plain JS callback, not React state — React's unmount
+    // no-op protection does NOT cover it. Whether handleSend still invokes
+    // the parent's onEmailsSent (and therefore onRefresh) after unmount
+    // depends entirely on our own epoch check, so this IS discriminating.
+    const onRefresh = jest.fn();
+    const { rerender } = renderPanel({ reviewers: [REVIEWER_A], onRefresh });
+    openReleaseModal(1);
+    await preview(1);
+    await send(1);
+    await waitFor(() => expect(sendCalls().length).toBe(1));
+
+    rerender(
+      <ReviewerManagePanel proposal={PROPOSAL} reviewers={[REVIEWER_A]} settings={{ signature: 'PD' }} canManage={false} onRefresh={onRefresh} />,
+    );
+
+    sse.push(sseChunk('complete', { message: 'done' }));
+    sse.finish();
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    // No throw, and the parent callback is never invoked for a send whose
+    // session ended before it completed.
+    expect(onRefresh).not.toHaveBeenCalled();
+  });
+
+  test('close/reopen during an in-flight send invalidates it', async () => {
+    const sse = controlledSse();
+    renderEmailsBehavior = () => mockJson({ drafts: [draftFor(REVIEWER_A)] });
+    sendEmailsBehavior = () => sse.response;
+    renderPanel({ reviewers: [REVIEWER_A] });
+    openReleaseModal(1);
+    await preview(1);
+    await send(1);
+    await waitFor(() => expect(sendCalls().length).toBe(1));
+
+    // The footer Cancel button is disabled while sending — use the header
+    // close ("×") control, which is not step-gated, to close mid-send.
+    fireEvent.click(screen.getByText('×'));
+    openReleaseModal(1);
+
+    sse.push(sseChunk('complete', { message: 'done' }));
+    sse.finish();
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    expect(screen.getByRole('button', { name: /preview 1 email/i })).toBeTruthy();
+  });
+
+  test('request switch during an in-flight send invalidates it', async () => {
+    const sse = controlledSse();
+    renderEmailsBehavior = () => mockJson({ drafts: [draftFor(REVIEWER_A)] });
+    sendEmailsBehavior = () => sse.response;
+    const { rerender } = renderPanel({ proposal: PROPOSAL, reviewers: [REVIEWER_A] });
+    openReleaseModal(1);
+    await preview(1);
+    await send(1);
+    await waitFor(() => expect(sendCalls().length).toBe(1));
+
+    rerender(
+      <ReviewerManagePanel proposal={PROPOSAL_2} reviewers={[REVIEWER_A]} settings={{ signature: 'PD' }} />,
+    );
+
+    sse.push(sseChunk('complete', { message: 'done' }));
+    sse.finish();
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    expect(screen.queryByText(/sent$/i)).toBeNull();
+  });
+});
+
+describe('upload (deferred @vercel/blob) invalidation', () => {
+  function enableAttachments() {
+    renderEmailsBehavior = () => mockJson({ drafts: [] });
+  }
+
+  test('second upload never started after membership loss; localStorage/UI stay clean', async () => {
+    global.fetch = jest.fn(async (url, init) => {
+      const u = String(url);
+      if (u === '/api/review-manager/release-settings') return mockJson({ attachProposalEmail: true });
+      if (u.startsWith('/api/review-manager/materials-preflight')) return mockJson({ ok: true, fileCount: 3 });
+      if (u === '/api/reviewer-finder/load-proposal') return mockJson({ success: true, blobUrl: null, filename: null, allFiles: [] });
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    enableAttachments();
+    renderPanel({ reviewers: [REVIEWER_A, REVIEWER_B] });
+    fireEvent.click(checkboxForRow('Accepted A'));
+    openReleaseModal(1);
+    await screen.findByText('Attachments (included in .eml files)');
+
+    const first = deferred();
+    upload.mockImplementationOnce(() => first.promise);
+    const input = document.querySelector('input[type="file"]');
+    const file1 = new File(['a'], 'one.pdf', { type: 'application/pdf' });
+    const file2 = new File(['b'], 'two.pdf', { type: 'application/pdf' });
+    fireEvent.change(input, { target: { files: [file1, file2] } });
+
+    await waitFor(() => expect(upload).toHaveBeenCalledTimes(1));
+
+    // Membership loss while upload #1 is still pending.
+    fireEvent.click(checkboxForRow('Accepted A'));
+
+    first.resolve({ url: 'https://blob.example/one.pdf' });
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); });
+
+    expect(upload).toHaveBeenCalledTimes(1); // second file never started
+    expect(localStorage.getItem('review_manager_attachments')).toBeNull();
+    expect(screen.queryByText(/Failed to upload/)).toBeNull();
+  });
+
+  test('unmount during a pending upload releases the uploading lock without a stale attachment write', async () => {
+    global.fetch = jest.fn(async (url) => {
+      const u = String(url);
+      if (u === '/api/review-manager/release-settings') return mockJson({ attachProposalEmail: true });
+      if (u.startsWith('/api/review-manager/materials-preflight')) return mockJson({ ok: true, fileCount: 3 });
+      if (u === '/api/reviewer-finder/load-proposal') return mockJson({ success: true, blobUrl: null, filename: null, allFiles: [] });
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    enableAttachments();
+    const { rerender } = renderPanel({ reviewers: [REVIEWER_A] });
+    openReleaseModal(1);
+    await screen.findByText('Attachments (included in .eml files)');
+
+    const first = deferred();
+    upload.mockImplementationOnce(() => first.promise);
+    const input = document.querySelector('input[type="file"]');
+    fireEvent.change(input, { target: { files: [new File(['a'], 'one.pdf', { type: 'application/pdf' })] } });
+    await waitFor(() => expect(upload).toHaveBeenCalledTimes(1));
+
+    rerender(
+      <ReviewerManagePanel proposal={PROPOSAL} reviewers={[REVIEWER_A]} settings={{ signature: 'PD' }} canManage={false} />,
+    );
+
+    first.resolve({ url: 'https://blob.example/one.pdf' });
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); });
+    expect(localStorage.getItem('review_manager_attachments')).toBeNull();
+  });
+});
+
+describe('load-proposal (deferred) invalidation', () => {
+  function withAttachProposal(reviewers) {
+    global.fetch = jest.fn(async (url) => {
+      const u = String(url);
+      if (u === '/api/review-manager/release-settings') return mockJson({ attachProposalEmail: true });
+      if (u.startsWith('/api/review-manager/materials-preflight')) return mockJson({ ok: true, fileCount: 3 });
+      if (u === '/api/reviewer-finder/load-proposal') return loadProposalBehavior();
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    return renderPanel({ reviewers });
+  }
+
+  // REQUIRED-1 (reviewer BLOCK on a6a27ce8): loadProposal posts only
+  // {requestId, fileKey} — membership is irrelevant to which document loads.
+  // A membership-only change during a pending load must NOT orphan it: the
+  // document is not stale, so it must still land (attachment shown, spinner
+  // gone). This inverts the original (wrong) assertion.
+  test('membership change during a pending proposal load does not orphan a non-stale load', async () => {
+    const first = deferred();
+    loadProposalBehavior = () => first.promise;
+    withAttachProposal([REVIEWER_A, REVIEWER_B]);
+    fireEvent.click(checkboxForRow('Accepted A'));
+    openReleaseModal(1);
+    await screen.findByText('Proposal document');
+
+    fireEvent.click(checkboxForRow('Accepted A'));
+
+    first.resolve(mockJson({ success: true, blobUrl: 'https://blob.example/current.pdf', filename: 'current.pdf', allFiles: [] }));
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    expect(await screen.findByText('current.pdf')).toBeTruthy();
+    expect(screen.queryByText(/Loading the request.s proposal from SharePoint/)).toBeNull();
+  });
+
+  // ADVISORY-3(ii): the prior "unmount ... never becomes the current
+  // attachment" test asserted nothing. It cannot be made discriminating —
+  // verified empirically (a standalone probe: mount, trigger a deferred
+  // setState via effect, unmount, then resolve) that React 18 silently
+  // no-ops a captured setState call on an already-unmounted function
+  // component: no warning, no crash, no state change, regardless of any
+  // application-level guard. loadProposal has no AbortController and calls
+  // no external callback, so there is no plain-JS side effect (unlike
+  // handleSend's onEmailsSent, covered by the send/unmount test above) left
+  // to observe post-unmount. Dropped rather than kept as a non-discriminating
+  // fixture.
+});
+
+describe('save-template (deferred) invalidation', () => {
+  test('membership change after clicking Save Template suppresses the late "Saved" feedback', async () => {
+    const first = deferred();
+    saveEmailTemplates.mockImplementationOnce(() => first.promise);
+    renderPanel({ reviewers: [REVIEWER_A, REVIEWER_B] });
+    fireEvent.click(checkboxForRow('Accepted A'));
+    openReleaseModal(1);
+    fireEvent.click(await screen.findByRole('button', { name: /save template/i }));
+
+    fireEvent.click(checkboxForRow('Accepted A'));
+
+    first.resolve(true);
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    expect(screen.queryByText('Saved ✓')).toBeNull();
+  });
+
+  test('unmount clears the pending save-template timer', async () => {
+    jest.useFakeTimers();
+    try {
+      saveEmailTemplates.mockImplementationOnce(async () => true);
+      const { rerender } = renderPanel({ reviewers: [REVIEWER_A] });
+      openReleaseModal(1);
+      const saveButton = await screen.findByRole('button', { name: /save template/i });
+      await act(async () => {
+        fireEvent.click(saveButton);
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      await screen.findByText('Saved ✓');
+
+      rerender(
+        <ReviewerManagePanel proposal={PROPOSAL} reviewers={[REVIEWER_A]} settings={{ signature: 'PD' }} canManage={false} />,
+      );
+      expect(jest.getTimerCount()).toBe(0);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+});
+
+// ── Send completion, real parent ────────────────────────────────────────
+
+describe('send completion handshake (real parent onRefresh/selection)', () => {
+  function setup(reviewers = [REVIEWER_A, REVIEWER_B]) {
+    renderEmailsBehavior = () => mockJson({ drafts: reviewers.map((r) => draftFor(r)) });
+  }
+
+  test('result then complete in separate chunks, mixed sent/failed: step sent, final arrays shown, selection cleared, onRefresh once with no args', async () => {
+    const sse = controlledSse();
+    setup();
+    sendEmailsBehavior = () => sse.response;
+    renderPanel({ reviewers: [REVIEWER_A, REVIEWER_B] });
+    openReleaseModal(2);
+    await preview(2);
+    await send(2);
+    await waitFor(() => expect(sendCalls().length).toBe(1));
+
+    sse.push(sseChunk('result', {
+      sent: [{ suggestionId: REVIEWER_A.suggestionId, candidateName: REVIEWER_A.name, candidateEmail: REVIEWER_A.email }],
+      failed: [{ suggestionId: REVIEWER_B.suggestionId, candidateName: REVIEWER_B.name, candidateEmail: REVIEWER_B.email, error: 'boom' }],
+      skipped: [],
+    }));
+    await act(async () => { await Promise.resolve(); });
+    sse.push(sseChunk('complete', { message: 'done' }));
+    sse.finish();
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); });
+
+    expect(await screen.findByText('1 sent, 1 failed')).toBeTruthy();
+    // Selection cleared: the release button reverts to targeting all accepted.
+    expect(screen.getByRole('button', { name: /release proposal to reviewers \(2\)/i })).toBeTruthy();
+    // Summary intact after the selection-clear commit.
+    expect(screen.getByText('1 sent, 1 failed')).toBeTruthy();
+  });
+
+  test('result and complete in ONE chunk shows the final arrays', async () => {
+    const sse = controlledSse();
+    setup([REVIEWER_A]);
+    sendEmailsBehavior = () => sse.response;
+    renderPanel({ reviewers: [REVIEWER_A] });
+    openReleaseModal(1);
+    await preview(1);
+    await send(1);
+    await waitFor(() => expect(sendCalls().length).toBe(1));
+
+    sse.push(
+      sseChunk('result', { sent: [{ suggestionId: REVIEWER_A.suggestionId, candidateName: REVIEWER_A.name, candidateEmail: REVIEWER_A.email }], failed: [], skipped: [] })
+      + sseChunk('complete', { message: 'done' }),
+    );
+    sse.finish();
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); });
+    expect(await screen.findByText('1 sent')).toBeTruthy();
+  });
+
+  // ADVISORY-2: the same-chunk `if (finished) break;` guard (immediately
+  // after a `complete` in the SAME chunk, not just a later one) had zero
+  // pins. result + complete + complete + error all in ONE chunk must still
+  // behave as exactly one completion: one onRefresh call, the summary intact,
+  // step 'sent', and no error banner from the trailing same-chunk `error`.
+  test('result + complete + complete + error in ONE chunk: one callback, summary intact, no error banner', async () => {
+    const sse = controlledSse();
+    setup([REVIEWER_A]);
+    sendEmailsBehavior = () => sse.response;
+    const onRefresh = jest.fn();
+    renderPanel({ reviewers: [REVIEWER_A], onRefresh });
+    openReleaseModal(1);
+    await preview(1);
+    await send(1);
+    await waitFor(() => expect(sendCalls().length).toBe(1));
+
+    sse.push(
+      sseChunk('result', { sent: [{ suggestionId: REVIEWER_A.suggestionId, candidateName: REVIEWER_A.name, candidateEmail: REVIEWER_A.email }], failed: [], skipped: [] })
+      + sseChunk('complete', { message: 'done' })
+      + sseChunk('complete', { message: 'done-again' })
+      + sseChunk('error', { message: 'late failure' }),
+    );
+    sse.finish();
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); });
+
+    expect(await screen.findByText('1 sent')).toBeTruthy();
+    expect(screen.queryByText('late failure')).toBeNull();
+    expect(onRefresh).toHaveBeenCalledTimes(1);
+  });
+
+  test('all-failed result then complete preserves the all-failed summary', async () => {
+    const sse = controlledSse();
+    setup([REVIEWER_A]);
+    sendEmailsBehavior = () => sse.response;
+    renderPanel({ reviewers: [REVIEWER_A] });
+    openReleaseModal(1);
+    await preview(1);
+    await send(1);
+    await waitFor(() => expect(sendCalls().length).toBe(1));
+
+    sse.push(sseChunk('result', { sent: [], failed: [{ suggestionId: REVIEWER_A.suggestionId, candidateName: REVIEWER_A.name, candidateEmail: REVIEWER_A.email, error: 'nope' }], skipped: [] }));
+    sse.push(sseChunk('complete', { message: 'done' }));
+    sse.finish();
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); });
+    expect(await screen.findByText('0 sent, 1 failed')).toBeTruthy();
+  });
+
+  test('duplicate complete in a later chunk: callback still fires once', async () => {
+    const sse = controlledSse();
+    setup([REVIEWER_A]);
+    sendEmailsBehavior = () => sse.response;
+    const onRefresh = jest.fn();
+    renderPanel({ reviewers: [REVIEWER_A], onRefresh });
+    openReleaseModal(1);
+    await preview(1);
+    await send(1);
+    await waitFor(() => expect(sendCalls().length).toBe(1));
+
+    sse.push(sseChunk('result', { sent: [{ suggestionId: REVIEWER_A.suggestionId, candidateName: REVIEWER_A.name, candidateEmail: REVIEWER_A.email }], failed: [], skipped: [] }));
+    sse.push(sseChunk('complete', { message: 'done' }));
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); });
+    await screen.findByText('1 sent');
+    expect(onRefresh).toHaveBeenCalledTimes(1);
+
+    sse.push(sseChunk('complete', { message: 'done-again' }));
+    sse.finish();
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+
+    // Still the same summary; the release button still reflects one clear (2 total accepted).
+    expect(screen.getByText('1 sent')).toBeTruthy();
+    // The finished-attempt guard: a duplicate complete must not call the
+    // parent's onEmailsSent (and therefore onRefresh) a second time.
+    expect(onRefresh).toHaveBeenCalledTimes(1);
+  });
+
+  test('trailing error after complete does not change the summary or step', async () => {
+    const sse = controlledSse();
+    setup([REVIEWER_A]);
+    sendEmailsBehavior = () => sse.response;
+    renderPanel({ reviewers: [REVIEWER_A] });
+    openReleaseModal(1);
+    await preview(1);
+    await send(1);
+    await waitFor(() => expect(sendCalls().length).toBe(1));
+
+    sse.push(sseChunk('result', { sent: [{ suggestionId: REVIEWER_A.suggestionId, candidateName: REVIEWER_A.name, candidateEmail: REVIEWER_A.email }], failed: [], skipped: [] }));
+    sse.push(sseChunk('complete', { message: 'done' }));
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); });
+    await screen.findByText('1 sent');
+
+    sse.push(sseChunk('error', { message: 'late failure' }));
+    sse.finish();
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+
+    expect(screen.queryByText('late failure')).toBeNull();
+    expect(screen.getByText('1 sent')).toBeTruthy();
+  });
+
+  test('external selection clear BEFORE complete suppresses the later complete callback', async () => {
+    const sse = controlledSse();
+    setup([REVIEWER_A]);
+    sendEmailsBehavior = () => sse.response;
+    renderPanel({ reviewers: [REVIEWER_A] });
+    openReleaseModal(1);
+    await preview(1);
+    await send(1);
+    await waitFor(() => expect(sendCalls().length).toBe(1));
+
+    // Toggle the last selected reviewer off via the checkbox BEFORE complete.
+    fireEvent.click(checkboxForRow('Accepted A'));
+
+    sse.push(sseChunk('complete', { message: 'done' }));
+    sse.finish();
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); });
+
+    // No 'sent' step reached — the membership change already invalidated
+    // the session, so the modal is back at compose with 0 reviewers.
+    expect(screen.queryByText(/^\d+ sent/)).toBeNull();
+  });
+
+  test('after complete, toggling a reviewer selection resets the summary normally (no blanket exemption)', async () => {
+    const sse = controlledSse();
+    setup([REVIEWER_A, REVIEWER_B]);
+    sendEmailsBehavior = () => sse.response;
+    renderPanel({ reviewers: [REVIEWER_A, REVIEWER_B] });
+    openReleaseModal(2);
+    await preview(2);
+    await send(2);
+    await waitFor(() => expect(sendCalls().length).toBe(1));
+
+    sse.push(sseChunk('result', {
+      sent: [
+        { suggestionId: REVIEWER_A.suggestionId, candidateName: REVIEWER_A.name, candidateEmail: REVIEWER_A.email },
+        { suggestionId: REVIEWER_B.suggestionId, candidateName: REVIEWER_B.name, candidateEmail: REVIEWER_B.email },
+      ],
+      failed: [],
+      skipped: [],
+    }));
+    sse.push(sseChunk('complete', { message: 'done' }));
+    sse.finish();
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); });
+    await screen.findByText('2 sent');
+
+    // Selection is now empty (post-completion clear). Select a reviewer again
+    // then open the release modal — this is a genuinely new, unrelated
+    // membership change and must reset normally (not exempted).
+    fireEvent.click(checkboxForRow('Accepted A'));
+    openReleaseModal(1);
+    expect(screen.getByRole('button', { name: /preview 1 email/i })).toBeTruthy();
+  });
+
+  test('reused cause: a second external clear after (i) does not exempt a later, unrelated transition', async () => {
+    const sse = controlledSse();
+    setup([REVIEWER_A, REVIEWER_B]);
+    sendEmailsBehavior = () => sse.response;
+    renderPanel({ reviewers: [REVIEWER_A, REVIEWER_B] });
+    openReleaseModal(2);
+    await preview(2);
+    await send(2);
+    await waitFor(() => expect(sendCalls().length).toBe(1));
+
+    sse.push(sseChunk('result', {
+      sent: [
+        { suggestionId: REVIEWER_A.suggestionId, candidateName: REVIEWER_A.name, candidateEmail: REVIEWER_A.email },
+        { suggestionId: REVIEWER_B.suggestionId, candidateName: REVIEWER_B.name, candidateEmail: REVIEWER_B.email },
+      ],
+      failed: [],
+      skipped: [],
+    }));
+    sse.push(sseChunk('complete', { message: 'done' }));
+    sse.finish();
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); });
+    await screen.findByText('2 sent');
+
+    // Reselect then deselect again — a second, unrelated prior→empty
+    // transition. The stale cause object (if the parent hasn't overwritten
+    // it) must not exempt this one: priorKey no longer matches.
+    fireEvent.click(checkboxForRow('Accepted A'));
+    fireEvent.click(checkboxForRow('Accepted A'));
+    openReleaseModal(2);
+    // A fresh compose for all 2 accepted reviewers, not the stale summary.
+    expect(screen.queryByText('2 sent')).toBeNull();
+    expect(screen.getByRole('button', { name: /preview 2 email/i })).toBeTruthy();
+  });
+
+  test('close/reopen after complete starts a fresh compose', async () => {
+    const sse = controlledSse();
+    setup([REVIEWER_A]);
+    sendEmailsBehavior = () => sse.response;
+    renderPanel({ reviewers: [REVIEWER_A] });
+    openReleaseModal(1);
+    await preview(1);
+    await send(1);
+    await waitFor(() => expect(sendCalls().length).toBe(1));
+
+    sse.push(sseChunk('result', { sent: [{ suggestionId: REVIEWER_A.suggestionId, candidateName: REVIEWER_A.name, candidateEmail: REVIEWER_A.email }], failed: [], skipped: [] }));
+    sse.push(sseChunk('complete', { message: 'done' }));
+    sse.finish();
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); });
+    await screen.findByText('1 sent');
+
+    fireEvent.click(screen.getByRole('button', { name: /^close$/i }));
+    openReleaseModal(1);
+    expect(screen.getByRole('button', { name: /preview 1 email/i })).toBeTruthy();
+    expect(screen.queryByText('1 sent')).toBeNull();
+  });
+});
+
+// ── Settings identity (Stage 6B3a) ──────────────────────────────────────
+//
+// The session identity also folds in settings.signature and
+// settings.reviewDueDate — the only two `settings` fields consumed anywhere
+// (snapshotSettings in handlePreview). The label and input are sibling DOM
+// nodes (no htmlFor/id), so getByLabelText can't find the due-date field;
+// reviewDueDateInput() walks from the label text to its sibling <input>
+// instead.
+function reviewDueDateInput() {
+  return screen.getByText('Review Due Date').nextElementSibling;
+}
+
+describe('settings identity (signature / review deadline)', () => {
+  test('signature change during a pending preview invalidates it back to compose', async () => {
+    const first = deferred();
+    renderEmailsBehavior = () => first.promise;
+    const { rerender } = renderPanel({ proposal: PROPOSAL, reviewers: [REVIEWER_A], settings: { signature: 'PD' } });
+    openReleaseModal(1);
+    await preview(1);
+    await waitFor(() => expect(renderCalls().length).toBe(1));
+
+    rerender(
+      <ReviewerManagePanel proposal={PROPOSAL} reviewers={[REVIEWER_A]} settings={{ signature: 'PD2' }} />,
+    );
+
+    first.resolve(mockJson({ drafts: [draftFor(REVIEWER_A)] }));
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+
+    expect(screen.queryByRole('button', { name: /send 1 email/i })).toBeNull();
+    expect(screen.getByRole('button', { name: /preview 1 email/i })).toBeTruthy();
+    expect(renderCalls().length).toBe(1);
+  });
+
+  test('a deadline change after a completed preview invalidates back to compose and the next preview carries the new deadline', async () => {
+    renderEmailsBehavior = () => mockJson({ drafts: [draftFor(REVIEWER_A)] });
+    const { rerender } = renderPanel({ proposal: PROPOSAL, reviewers: [REVIEWER_A] });
+    openReleaseModal(1);
+    await preview(1);
+    await screen.findByRole('button', { name: /send 1 email/i });
+    expect(renderCalls().length).toBe(1);
+
+    const PROPOSAL_NEW_DEADLINE = { ...PROPOSAL, reviewDeadline: '2026-09-30' };
+    rerender(
+      <ReviewerManagePanel proposal={PROPOSAL_NEW_DEADLINE} reviewers={[REVIEWER_A]} settings={{ signature: 'PD' }} />,
+    );
+
+    expect(screen.queryByRole('button', { name: /send 1 email/i })).toBeNull();
+    expect(screen.getByRole('button', { name: /preview 1 email/i })).toBeTruthy();
+
+    await preview(1);
+    await waitFor(() => expect(renderCalls().length).toBe(2));
+    const [, init] = renderCalls()[1];
+    const payload = JSON.parse(init.body);
+    expect(payload.settings.reviewDueDate).toBe('2026-09-30');
+  });
+
+  test('a customized due date survives a deadline change and is preserved for the next preview', async () => {
+    renderEmailsBehavior = () => mockJson({ drafts: [draftFor(REVIEWER_A)] });
+    const { rerender } = renderPanel({ proposal: PROPOSAL, reviewers: [REVIEWER_A] });
+    openReleaseModal(1);
+
+    fireEvent.change(reviewDueDateInput(), { target: { value: '2026-10-15' } });
+
+    await preview(1);
+    await screen.findByRole('button', { name: /send 1 email/i });
+
+    const PROPOSAL_NEW_DEADLINE = { ...PROPOSAL, reviewDeadline: '2026-09-30' };
+    rerender(
+      <ReviewerManagePanel proposal={PROPOSAL_NEW_DEADLINE} reviewers={[REVIEWER_A]} settings={{ signature: 'PD' }} />,
+    );
+
+    // Back in compose (deadline changed), the customized value must survive
+    // — the follow rule only moves the field when it still held the PRIOR
+    // default (or was empty), and this field was explicitly customized.
+    expect(reviewDueDateInput().value).toBe('2026-10-15');
+
+    await preview(1);
+    await waitFor(() => expect(renderCalls().length).toBe(2));
+    const [, init] = renderCalls()[1];
+    const payload = JSON.parse(init.body);
+    expect(payload.settings.reviewDueDate).toBe('2026-10-15');
+  });
+
+  test('a fresh settings/proposal object with the SAME values does not invalidate a pending preview', async () => {
+    const first = deferred();
+    renderEmailsBehavior = () => first.promise;
+    const { rerender } = renderPanel({ proposal: PROPOSAL, reviewers: [REVIEWER_A], settings: { signature: 'PD' } });
+    openReleaseModal(1);
+    await preview(1);
+    await waitFor(() => expect(renderCalls().length).toBe(1));
+
+    rerender(
+      <ReviewerManagePanel proposal={{ ...PROPOSAL }} reviewers={[REVIEWER_A]} settings={{ signature: 'PD' }} />,
+    );
+
+    first.resolve(mockJson({ drafts: [draftFor(REVIEWER_A)] }));
+    await screen.findByRole('button', { name: /send 1 email/i });
+    expect(renderCalls().length).toBe(1);
+  });
+
+  test('signature change during an in-flight send invalidates it, no onRefresh, no sent summary', async () => {
+    const sse = controlledSse();
+    renderEmailsBehavior = () => mockJson({ drafts: [draftFor(REVIEWER_A)] });
+    sendEmailsBehavior = () => sse.response;
+    const onRefresh = jest.fn();
+    const { rerender } = renderPanel({ proposal: PROPOSAL, reviewers: [REVIEWER_A], onRefresh });
+    openReleaseModal(1);
+    await preview(1);
+    await send(1);
+    await waitFor(() => expect(sendCalls().length).toBe(1));
+
+    rerender(
+      <ReviewerManagePanel proposal={PROPOSAL} reviewers={[REVIEWER_A]} settings={{ signature: 'PD2' }} onRefresh={onRefresh} />,
+    );
+
+    sse.push(sseChunk('complete', { message: 'done' }));
+    sse.finish();
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+
+    expect(screen.queryByText(/sent$/i)).toBeNull();
+    expect(screen.getByRole('button', { name: /preview 1 email/i })).toBeTruthy();
+    expect(onRefresh).not.toHaveBeenCalled();
+  });
+
+  test('a signature change synchronized with the post-send selection clear defeats the completion exemption', async () => {
+    const sse = controlledSse();
+    renderEmailsBehavior = () => mockJson({ drafts: [draftFor(REVIEWER_A)] });
+    sendEmailsBehavior = () => sse.response;
+
+    // The parent's real onEmailsSent handler clears selection AND calls
+    // onRefresh in the SAME synchronous callback (see the panel call site).
+    // A host component whose `onRefresh` flips its OWN `settings` state is
+    // how the parent's setSelectedReviewers and this settings change land in
+    // the SAME React commit (React 18 batches synchronous state updates
+    // regardless of which callback issued them) — an imperative rerender()
+    // call nested inside onRefresh does not reliably reproduce this and was
+    // observed to corrupt the tree, so a real parent-state update is used
+    // instead.
+    function Host() {
+      const [signature, setSignature] = useState('PD');
+      return (
+        <ReviewerManagePanel
+          proposal={PROPOSAL}
+          reviewers={[REVIEWER_A]}
+          settings={{ signature }}
+          onRefresh={() => setSignature('PD2')}
+        />
+      );
+    }
+    render(<Host />);
+    openReleaseModal(1);
+    await preview(1);
+    await send(1);
+    await waitFor(() => expect(sendCalls().length).toBe(1));
+
+    sse.push(sseChunk('result', { sent: [{ suggestionId: REVIEWER_A.suggestionId, candidateName: REVIEWER_A.name, candidateEmail: REVIEWER_A.email }], failed: [], skipped: [] }));
+    await act(async () => { await Promise.resolve(); });
+    sse.push(sseChunk('complete', { message: 'done' }));
+    sse.finish();
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); });
+
+    // The settingsKey mismatch (signature changed in the same commit) must
+    // defeat the completion exemption: fresh compose, not the sent summary.
+    // Selection itself did clear to empty (that part of the transition is
+    // real), so the reset compose form targets 0 reviewers, not 1.
+    expect(screen.queryByText('1 sent')).toBeNull();
+    expect(screen.getByRole('button', { name: /preview 0 email/i })).toBeTruthy();
+  });
+
+  test('a null proposal reviewDeadline (host reviewers-fetch failure) leaves the due date field controlled and empty, not "null"', async () => {
+    const { rerender } = renderPanel({ proposal: PROPOSAL, reviewers: [REVIEWER_A], settings: { signature: 'PD' } });
+    openReleaseModal(1);
+    expect(reviewDueDateInput().value).toBe(PROPOSAL.reviewDeadline);
+
+    // ReviewersTab nulls `proposal` on a reviewers-fetch failure and its panel
+    // proposal then carries reviewDeadline: null. The follow rule must
+    // normalize that to '' — a null would make the controlled input uncontrolled.
+    rerender(
+      <ReviewerManagePanel proposal={{ ...PROPOSAL, reviewDeadline: null }} reviewers={[REVIEWER_A]} settings={{ signature: 'PD' }} />,
+    );
+    expect(reviewDueDateInput().value).toBe('');
+    expect(reviewDueDateInput().value).not.toBe('null');
+  });
+});
+
+// ── Recipient identity (Stage 6B3b) ──────────────────────────────────────
+//
+// The rendered draft body (candidate.name / candidate.email /
+// candidate.affiliation — see email-generator.js buildTemplateContext) is
+// sent VERBATIM; the server only re-resolves the destination address at
+// send time. So a same-id change to a selected reviewer's name/email/
+// affiliation after a preview must invalidate the modal session exactly
+// like a membership change, or the sent body shows a stale greeting/
+// affiliation. The reviewers-service projection this panel's rows come from
+// (lib/services/review-manager/reviewers-service.js) does not carry an
+// expertiseAreas/expertise field at all, so there is nothing to fold into
+// the key for it (see membershipKeyFor in ReviewerManagePanel.js).
+describe('recipient identity (name / email / affiliation)', () => {
+  test('a reviewer name change (same id) during a pending preview invalidates it back to compose', async () => {
+    const first = deferred();
+    renderEmailsBehavior = () => first.promise;
+    const { rerender } = renderPanel({ reviewers: [REVIEWER_A, REVIEWER_B] });
+    fireEvent.click(checkboxForRow('Accepted A'));
+    openReleaseModal(1);
+    await preview(1);
+    await waitFor(() => expect(renderCalls().length).toBe(1));
+
+    rerender(
+      <ReviewerManagePanel
+        proposal={PROPOSAL}
+        reviewers={[{ ...REVIEWER_A, name: 'Renamed A' }, REVIEWER_B]}
+        settings={{ signature: 'PD' }}
+      />,
+    );
+
+    first.resolve(mockJson({ drafts: [draftFor(REVIEWER_A)] }));
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+
+    expect(screen.queryByRole('button', { name: /send 1 email/i })).toBeNull();
+    expect(renderCalls().length).toBe(1);
+  });
+
+  test('a reviewer affiliation change after a completed preview invalidates back to compose, and Preview again re-renders for the same membership', async () => {
+    renderEmailsBehavior = () => mockJson({ drafts: [draftFor(REVIEWER_A)] });
+    const { rerender } = renderPanel({ proposal: PROPOSAL, reviewers: [{ ...REVIEWER_A, affiliation: 'Old Univ' }] });
+    openReleaseModal(1);
+    await preview(1);
+    await screen.findByRole('button', { name: /send 1 email/i });
+    expect(renderCalls().length).toBe(1);
+
+    rerender(
+      <ReviewerManagePanel
+        proposal={PROPOSAL}
+        reviewers={[{ ...REVIEWER_A, affiliation: 'New Univ' }]}
+        settings={{ signature: 'PD' }}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: /send 1 email/i })).toBeNull();
+    expect(screen.getByRole('button', { name: /preview 1 email/i })).toBeTruthy();
+
+    await preview(1);
+    await waitFor(() => expect(renderCalls().length).toBe(2));
+    const [, init] = renderCalls()[1];
+    const payload = JSON.parse(init.body);
+    expect(payload.suggestionIds).toEqual([REVIEWER_A.suggestionId]);
+  });
+
+  test('a reviewer email change (same id) during a pending preview invalidates it back to compose', async () => {
+    const first = deferred();
+    renderEmailsBehavior = () => first.promise;
+    const { rerender } = renderPanel({ reviewers: [REVIEWER_A, REVIEWER_B] });
+    fireEvent.click(checkboxForRow('Accepted A'));
+    openReleaseModal(1);
+    await preview(1);
+    await waitFor(() => expect(renderCalls().length).toBe(1));
+
+    rerender(
+      <ReviewerManagePanel
+        proposal={PROPOSAL}
+        reviewers={[{ ...REVIEWER_A, email: 'renamed-a@example.org' }, REVIEWER_B]}
+        settings={{ signature: 'PD' }}
+      />,
+    );
+
+    first.resolve(mockJson({ drafts: [draftFor(REVIEWER_A)] }));
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+
+    expect(screen.queryByRole('button', { name: /send 1 email/i })).toBeNull();
+    expect(renderCalls().length).toBe(1);
+  });
+
+  // Same-membership, same-recipient-fields object churn (fresh row objects,
+  // identical name/email/affiliation) must still NOT bump — already covered
+  // by the top-level 'same-membership object churn' test above (REVIEWER_A/
+  // REVIEWER_B there carry no affiliation field either before or after the
+  // churn, so `undefined || '' === undefined || ''` in membershipKeyFor;
+  // that test stays green unmodified with the widened key).
+
+  // No completion-handshake test for recipient fields: after the post-send
+  // selection clear the modal's `reviewers` prop is empty, so `nextKey` is ''
+  // regardless of any reviewer's name/email/affiliation, and both
+  // `cause.priorKey` and `context.key` were computed before the clear. A
+  // recipient change landing with or after the clear is therefore
+  // unobservable by the exemption by construction (the send has completed;
+  // the summary describes what was sent). Unlike settingsKey, which is
+  // compared independent of selection. Asserting either outcome here would
+  // be vacuous; recorded as a by-design limit in the 6B3 receipt.
+});
+
+// ── Proposal identity (Stage 6B3c) ───────────────────────────────────────
+//
+// The rendered draft body also embeds PROPOSAL fields (title, abstract, PI,
+// institution — see render-emails-service.js) and is sent verbatim, so a
+// same-requestId proposal edit after a preview must invalidate the modal
+// session exactly like a membership or settings change, or the sent body
+// shows stale proposal text. Co-investigators are NOT carried by any host
+// (see ReviewersTab's synthetic fallback), so they are not part of this key.
+describe('proposal identity (title / abstract / PI / institution)', () => {
+  test('a proposalAbstract change (same proposalId) during a pending preview invalidates it back to compose', async () => {
+    const first = deferred();
+    renderEmailsBehavior = () => first.promise;
+    const { rerender } = renderPanel({ proposal: PROPOSAL, reviewers: [REVIEWER_A] });
+    openReleaseModal(1);
+    await preview(1);
+    await waitFor(() => expect(renderCalls().length).toBe(1));
+
+    rerender(
+      <ReviewerManagePanel
+        proposal={{ ...PROPOSAL, proposalAbstract: 'Changed abstract text.' }}
+        reviewers={[REVIEWER_A]}
+        settings={{ signature: 'PD' }}
+      />,
+    );
+
+    first.resolve(mockJson({ drafts: [draftFor(REVIEWER_A)] }));
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+
+    expect(screen.queryByRole('button', { name: /send 1 email/i })).toBeNull();
+    expect(renderCalls().length).toBe(1);
+  });
+
+  test('a proposalTitle change after a completed preview invalidates back to compose, and Preview again re-renders', async () => {
+    renderEmailsBehavior = () => mockJson({ drafts: [draftFor(REVIEWER_A)] });
+    const { rerender } = renderPanel({ proposal: PROPOSAL, reviewers: [REVIEWER_A] });
+    openReleaseModal(1);
+    await preview(1);
+    await screen.findByRole('button', { name: /send 1 email/i });
+    expect(renderCalls().length).toBe(1);
+
+    rerender(
+      <ReviewerManagePanel
+        proposal={{ ...PROPOSAL, proposalTitle: 'Retitled Proposal' }}
+        reviewers={[REVIEWER_A]}
+        settings={{ signature: 'PD' }}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: /send 1 email/i })).toBeNull();
+    expect(screen.getByRole('button', { name: /preview 1 email/i })).toBeTruthy();
+
+    await preview(1);
+    await waitFor(() => expect(renderCalls().length).toBe(2));
+  });
+
+  test('a proposalAuthors (PI) change during a pending preview invalidates it back to compose', async () => {
+    const first = deferred();
+    renderEmailsBehavior = () => first.promise;
+    const { rerender } = renderPanel({ proposal: PROPOSAL, reviewers: [REVIEWER_A] });
+    openReleaseModal(1);
+    await preview(1);
+    await waitFor(() => expect(renderCalls().length).toBe(1));
+
+    rerender(
+      <ReviewerManagePanel
+        proposal={{ ...PROPOSAL, proposalAuthors: 'Dr. New PI' }}
+        reviewers={[REVIEWER_A]}
+        settings={{ signature: 'PD' }}
+      />,
+    );
+
+    first.resolve(mockJson({ drafts: [draftFor(REVIEWER_A)] }));
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+
+    expect(screen.queryByRole('button', { name: /send 1 email/i })).toBeNull();
+    expect(renderCalls().length).toBe(1);
+  });
+
+  test('a proposalInstitution change during a pending preview invalidates it back to compose', async () => {
+    const first = deferred();
+    renderEmailsBehavior = () => first.promise;
+    const { rerender } = renderPanel({ proposal: PROPOSAL, reviewers: [REVIEWER_A] });
+    openReleaseModal(1);
+    await preview(1);
+    await waitFor(() => expect(renderCalls().length).toBe(1));
+
+    rerender(
+      <ReviewerManagePanel
+        proposal={{ ...PROPOSAL, proposalInstitution: 'New University' }}
+        reviewers={[REVIEWER_A]}
+        settings={{ signature: 'PD' }}
+      />,
+    );
+
+    first.resolve(mockJson({ drafts: [draftFor(REVIEWER_A)] }));
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+
+    expect(screen.queryByRole('button', { name: /send 1 email/i })).toBeNull();
+    expect(renderCalls().length).toBe(1);
+  });
+
+  test('a fresh proposal object with the SAME title/abstract/authors/institution values does not invalidate a pending preview', async () => {
+    const first = deferred();
+    renderEmailsBehavior = () => first.promise;
+    const { rerender } = renderPanel({ proposal: PROPOSAL, reviewers: [REVIEWER_A] });
+    openReleaseModal(1);
+    await preview(1);
+    await waitFor(() => expect(renderCalls().length).toBe(1));
+
+    rerender(
+      <ReviewerManagePanel proposal={{ ...PROPOSAL }} reviewers={[REVIEWER_A]} settings={{ signature: 'PD' }} />,
+    );
+
+    first.resolve(mockJson({ drafts: [draftFor(REVIEWER_A)] }));
+    await screen.findByRole('button', { name: /send 1 email/i });
+    expect(renderCalls().length).toBe(1);
+  });
+
+  test('a proposalAbstract change synchronized with the post-send selection clear defeats the completion exemption', async () => {
+    const sse = controlledSse();
+    renderEmailsBehavior = () => mockJson({ drafts: [draftFor(REVIEWER_A)] });
+    sendEmailsBehavior = () => sse.response;
+
+    // Same rationale as the settings-identity "signature change synchronized
+    // with the post-send selection clear" test above: the parent's real
+    // onEmailsSent clears selection AND calls onRefresh in the same commit, so
+    // a host component whose onRefresh flips a proposal field is used instead
+    // of an imperative rerender() nested inside onRefresh. Unlike recipient
+    // fields (which are unobservable here because `reviewers` is empty after
+    // the clear), proposalKey is compared independent of selection — so this
+    // IS a discriminating test for the exemption's proposalKey check.
+    function Host() {
+      const [abstract, setAbstract] = useState(PROPOSAL.proposalAbstract);
+      return (
+        <ReviewerManagePanel
+          proposal={{ ...PROPOSAL, proposalAbstract: abstract }}
+          reviewers={[REVIEWER_A]}
+          settings={{ signature: 'PD' }}
+          onRefresh={() => setAbstract('Changed abstract text.')}
+        />
+      );
+    }
+    render(<Host />);
+    openReleaseModal(1);
+    await preview(1);
+    await send(1);
+    await waitFor(() => expect(sendCalls().length).toBe(1));
+
+    sse.push(sseChunk('result', { sent: [{ suggestionId: REVIEWER_A.suggestionId, candidateName: REVIEWER_A.name, candidateEmail: REVIEWER_A.email }], failed: [], skipped: [] }));
+    await act(async () => { await Promise.resolve(); });
+    sse.push(sseChunk('complete', { message: 'done' }));
+    sse.finish();
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); });
+
+    // The proposalKey mismatch (proposalAbstract changed in the same commit)
+    // must defeat the completion exemption: fresh compose, not the sent
+    // summary. Selection itself did clear to empty (that part of the
+    // transition is real), so the reset compose form targets 0 reviewers.
+    expect(screen.queryByText('1 sent')).toBeNull();
+    expect(screen.getByRole('button', { name: /preview 0 email/i })).toBeTruthy();
+  });
+});
+
+// ── Payload equality ─────────────────────────────────────────────────────
+
+test('send-emails payload is unchanged shape: drafts fields, templateType, attachmentUrls, markAsSent', async () => {
+  renderEmailsBehavior = () => mockJson({ drafts: [draftFor(REVIEWER_A, { externalLinkExpected: true })] });
+  sendEmailsBehavior = () => controlledSse().response; // never completes; only payload matters
+  renderPanel({ reviewers: [REVIEWER_A] });
+  openReleaseModal(1);
+  await preview(1);
+  await send(1);
+  await waitFor(() => expect(sendCalls().length).toBe(1));
+
+  const [, init] = sendCalls()[0];
+  const payload = JSON.parse(init.body);
+  expect(payload).toEqual({
+    drafts: [{
+      suggestionId: REVIEWER_A.suggestionId,
+      subject: 'S',
+      body: 'B',
+      externalLinkExpected: true,
+    }],
+    templateType: 'materials',
+    attachmentUrls: [],
+    markAsSent: true,
+  });
+});

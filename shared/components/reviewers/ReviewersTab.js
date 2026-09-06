@@ -154,7 +154,15 @@ export default function ReviewersTab({
     } catch (e) {
       if (isCurrent()) {
         setError(e.message);
-        setProposal(null);
+        // A transient refetch error must not blank the panel or invalidate an
+        // open materials-modal session for the same request (Stage 6B3d) — keep
+        // the last committed proposal when it belongs to this request. A
+        // proposal from another request is still dropped.
+        // GUID compare is case-insensitive: the URL param may be mis-cased while
+        // Dataverse returns lowercase ids.
+        setProposal((prev) => (
+          prev && String(prev.proposalId).toLowerCase() === String(rid).toLowerCase() ? prev : null
+        ));
       }
     } finally {
       if (isCurrent()) setLoading(false);
@@ -505,7 +513,10 @@ export default function ReviewersTab({
 
       {error && (
         <div className="p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">
-          Couldn’t load reviewers: {error}
+          Couldn’t load reviewers: {error}{' '}
+          <button type="button" onClick={loadReviewers} disabled={loading} className="underline">
+            Retry
+          </button>
         </div>
       )}
 
@@ -548,6 +559,7 @@ export default function ReviewersTab({
           canManage={canEdit}
           showReviewReminderAction={current === 'track'}
           previewReadOnly={previewReadOnly}
+          degraded={Boolean(error)}
           declineReferrals={declineReferrals}
           referralActions={referralActions}
           onAddReferral={addReferralCandidate}

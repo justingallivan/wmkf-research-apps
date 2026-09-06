@@ -13,6 +13,7 @@ source_files:
   - lib/seed/email-defaults/reviewer-templates.js
   - shared/components/reviewers/ReviewersTab.js
   - shared/components/reviewers/ReviewerManagePanel.js
+  - shared/components/reviewers/ReviewerCloseoutModal.js
   - pages/api/review-manager/reviewers.js
   - lib/services/review-manager/reviewers-service.js
   - pages/api/workbench/decline-referrals.js
@@ -227,6 +228,69 @@ responses. Complete, withdrew, and released still require dedicated workflows.
 Existing null/empty-string status clearing on open rows remains supported,
 with closed-source protection intact; Stage 6A adds no status-validation policy.
 No rollback or automatic retry is introduced.
+
+Stage 6B1 (branch `codex/reviewer-lifecycle-stage6b`, `9258115a`/`06725d6c`, not
+merged): the regenerate-token, revoke-token, remove-reviewer and terminal-transition
+handlers in `ReviewerManagePanel.js` bind their alerts, prompt, clipboard write and
+`onRefresh` call to the UI context that started them through a per-action/row
+attempt registry invalidated by the existing layout effects. Stale outcomes after
+request/mode/permission change, row absence or unmount are suppressed and never
+revived; confirm dialogs revalidate before dispatch; a refresh failure after a
+confirmed mutation is reported separately. Payloads, success predicates and the
+status mutex are unchanged. Tests: `tests/unit/reviewer-action-lifetimes.test.js`.
+Receipt: `docs/audits/REVIEWER_LIFECYCLE_STAGE6B1_RECEIPT_2026-09-05.md`.
+
+Stage 6B2 (same branch, `b08c16f6`/`d3ec406a`/`039d5d8e`, not merged): `ReviewReminderAction` in
+`ReviewerManagePanel.js` and `ReviewerCloseoutModal.js` observe committed request/reviewer
+identity and parent read-only/management context through a no-deps layout effect and a
+monotonic epoch, separate from the per-attempt generation token. A stale attempt keeps its
+send/save lock until it settles, releases it by generation match alone, and never shows
+feedback or invokes a callback for a departed context; the reminder clears its feedback and
+the modal clears its error when the session changes. Callbacks run through the latest
+committed reference in their own try; a throw or rejected promise never relabels a confirmed
+mutation and is observed without awaiting, so the dialog closes and the lock releases without
+waiting for a host reload. The modal reinitializes disposition/notes only on open/close or
+reviewer/request identity change; a permission flip preserves typed notes but, since
+`039d5d8e` (owner decision after a Codex adversarial review), closes the modal through the
+parent's latest `onClose` once per loss transition while any pending save settles silently.
+The panel passes
+`requestId`, `canManage` and `previewReadOnly` to the modal. Payloads, predicates, eligibility
+rules and copy are unchanged. Tests: the lifetime describes in
+`tests/unit/reviewer-manage-actions-menu.test.js` and `tests/unit/reviewer-closeout-modal.test.js`.
+Receipt: `docs/audits/REVIEWER_LIFECYCLE_STAGE6B2_RECEIPT_2026-09-05.md`.
+
+Stage 6B3 (same branch, `a6a27ce8`/`b163172a`, amended by 6B3a `3a4bcbbe`/`0a4eafd6`, 6B3b
+`9a790c64`/`529ee426`, 6B3c `2622dfc7`, 6B3d `be76760f` (host) and 6B3e `5b57991d` (degraded
+mode), not merged): the nested materials-release modal's
+session is open state, request id, the sorted selected membership with each reviewer's name,
+email and affiliation by value (`membershipKeyFor`), the proposal title, abstract, PI and
+institution by value (`proposalKeyFor`, passed as the `proposalKey` string prop), and the
+signature and review due date by value (the only two `settings` fields render consumes). The destination address is re-resolved server-side at send,
+but the rendered body is sent verbatim, which is why recipient fields are in the key. All
+reconciled by one no-deps layout effect with an unmount cleanup; any change bumps the modal
+epoch, aborts the active preview render and returns the UI to a fresh compose, while
+same-membership object churn does not. Proposal loading is invalidated by open/close, request
+change and unmount only. The send handler keeps its own results accumulator, marks the attempt
+finished on `complete` so duplicate or trailing events have no effect, and hands the panel a
+one-use completion cause; the panel stores it with its selection clear and passes it back, so
+only that exact prior-membership-to-empty transition preserves the sent summary. Uploads and
+template-save feedback are checkpointed with attempt-owned lock release. Payloads, the SSE
+contract, preview single-flight and tail serialization are unchanged. When the committed due-date default
+changes, a due-date field still holding the prior default follows it; a customized field is
+kept. Accepted limits: a membership, signature or deadline change during an in-flight send
+returns to compose while the server-side one-time materials gate bounds a duplicate send; a
+deadline change with a customized field still resets drafts even though the render would be
+identical; the global localStorage due-date key makes a restored value read as customized
+(pre-existing); co-investigators are not carried by any host and edits the panel has not
+refetched are invisible to any client key — both deferred to the queued Stage 6D server-side
+draft fingerprint. Host side (6B3d): `ReviewersTab` keeps the same-request proposal when a
+reviewers refetch fails (case-insensitive GUID match) so a transient error after a confirmed send
+no longer flips the modal's keys and erases the sent summary; while that banner shows, the panel
+runs degraded (`degraded` prop): release, row actions, reminder send, closeout trigger and the
+open modal's Send are disabled with a title, a Retry control reloads, and nothing unmounts. The
+reviewer-follow-up workbench host still empties its list on error and unmounts the panel
+(pre-existing, not addressed). Tests: `tests/unit/reviewer-materials-modal-lifetimes.test.js`.
+Receipt: `docs/audits/REVIEWER_LIFECYCLE_STAGE6B3_RECEIPT_2026-09-05.md`.
 
 The existing `ReviewerManagePanel.updateStatus` UI submits one reviewer only.
 It trims/lowercases submitted and returned IDs for outcome comparison, refreshes

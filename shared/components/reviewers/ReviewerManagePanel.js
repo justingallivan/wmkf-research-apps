@@ -128,12 +128,58 @@ export function ReviewReminderAction({
   reviewer,
   onSent,
   previewReadOnly = false,
+  degraded = false,
 }) {
   const [sending, setSending] = useState(false);
   const [feedback, setFeedback] = useState(null);
   const mountedRef = useRef(true);
+  // The per-attempt supersession token: bumped only by a new send and by
+  // unmount. A committed-context epoch (below) is a SEPARATE dimension —
+  // request/reviewer identity/read-only changes bump epoch without bumping
+  // generation, so a stale attempt's finally can still find its own
+  // generation match and release the send lock even though its feedback/
+  // callback checkpoints (which also require epoch match) stay suppressed.
   const generationRef = useRef(0);
   const sendingRef = useRef(false);
+  const contextRef = useRef({ requestId, suggestionId: reviewer?.suggestionId, previewReadOnly, onSent, epoch: 0 });
+
+  useLayoutEffect(() => {
+    const context = contextRef.current;
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      generationRef.current += 1;
+      sendingRef.current = false;
+      context.epoch += 1;
+    };
+  }, []);
+
+  // Committed-props reconciliation, mirroring the Stage 6B1 registry effect
+  // pair (mount/unmount effect above, committed-props effect here): no
+  // dependency array, no cleanup, so it runs on every commit. Only
+  // request/suggestionId/read-only identity bumps the epoch; object/
+  // callback replacement is ordinary refresh and is tracked here (for the
+  // latest-callback rule) without invalidating anything. A departed
+  // session's feedback must not linger for the new one, so the epoch bump
+  // also clears it — this intentionally has no dependency array (identity
+  // is a multi-field comparison, not a single prop) and conditionally calls
+  // setState, so react-hooks/exhaustive-deps cannot infer a correct
+  // dependency list here.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useLayoutEffect(() => {
+    const context = contextRef.current;
+    if (context.requestId !== requestId
+      || context.suggestionId !== reviewer?.suggestionId
+      || context.previewReadOnly !== previewReadOnly) {
+      context.epoch += 1;
+      setFeedback(null);
+    }
+    context.requestId = requestId;
+    context.suggestionId = reviewer?.suggestionId;
+    context.previewReadOnly = previewReadOnly;
+    context.onSent = onSent;
+  });
+
   const lifecycleEligible = Boolean(
     requestId
     && reviewer?.suggestionId
@@ -144,21 +190,15 @@ export function ReviewReminderAction({
   const reminderEligibility = reviewer?.reviewDueReminderEligibility;
   const canSend = lifecycleEligible && reminderEligibility === 'eligible';
 
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-      generationRef.current += 1;
-      sendingRef.current = false;
-    };
-  }, []);
-
   if (!lifecycleEligible) return <span className="text-xs text-gray-300">—</span>;
 
+  const isCurrent = (epoch) => mountedRef.current && epoch === contextRef.current.epoch;
+
   const handleSend = async () => {
-    if (previewReadOnly || !canSend || sendingRef.current) return;
+    if (previewReadOnly || degraded || !canSend || sendingRef.current) return;
     const generation = generationRef.current + 1;
     generationRef.current = generation;
+    const epoch = contextRef.current.epoch;
     sendingRef.current = true;
     setSending(true);
     setFeedback(null);
@@ -172,7 +212,7 @@ export function ReviewReminderAction({
         }),
       });
       const data = await response.json().catch(() => ({}));
-      if (!mountedRef.current || generation !== generationRef.current) return;
+      if (generation !== generationRef.current || !isCurrent(epoch)) return;
       if (!response.ok || !data.ok) {
         setFeedback({
           ok: false,
@@ -181,9 +221,24 @@ export function ReviewReminderAction({
         return;
       }
       setFeedback({ ok: true, message: 'Reminder sent.' });
-      if (onSent) onSent();
+      // "Reminder sent." feedback is retained regardless of what the
+      // callback does: a throw/rejection here is a refresh failure, not a
+      // failed send, and must never relabel a confirmed mutation as failed
+      // or trigger a resend. The callback's returned promise is observed
+      // (so a rejection never becomes an unhandled rejection) but NOT
+      // awaited: a slow/never-resolving refresh must not hold the send
+      // lock or the UI feedback hostage.
+      const latestOnSent = contextRef.current.onSent;
+      if (latestOnSent) {
+        try {
+          const result = latestOnSent();
+          if (result && typeof result.then === 'function') result.catch(() => {});
+        } catch {
+          // Swallow: confirmed send, callback/refresh failure only.
+        }
+      }
     } catch (error) {
-      if (mountedRef.current && generation === generationRef.current) {
+      if (generation === generationRef.current && isCurrent(epoch)) {
         setFeedback({ ok: false, message: error.message || 'The reminder could not be sent.' });
       }
     } finally {
@@ -205,8 +260,8 @@ export function ReviewReminderAction({
       <button
         type="button"
         onClick={handleSend}
-        disabled={previewReadOnly || !canSend || sending}
-        title={previewReadOnly ? previewTitle : eligibilityTitle}
+        disabled={previewReadOnly || degraded || !canSend || sending}
+        title={degraded ? 'Reviewer data could not be refreshed - retry before making changes' : (previewReadOnly ? previewTitle : eligibilityTitle)}
         aria-label={`Send reminder to ${reviewer.name || 'reviewer'}${previewReadOnly ? ' (disabled in read-only Preview)' : ''}`}
         className="min-h-9 whitespace-nowrap rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-gray-700 hover:border-gray-400 hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400"
       >
@@ -235,6 +290,7 @@ export function TokenActionsMenu({
   statusPending = false,
   onTransition,
   onCloseReview,
+  degraded = false,
 }) {
   const [open, setOpen] = useState(false);
   const [coords, setCoords] = useState(null); // { left, top } in viewport px, or null
@@ -266,6 +322,7 @@ export function TokenActionsMenu({
       && reviewer.reviewStatus !== 'complete'
       && !TERMINAL_REVIEW_STATUSES.includes(reviewer.reviewStatus),
   );
+  const degradedTitle = 'Reviewer data could not be refreshed - retry before making changes';
   // The estimate drives the upward flip so the portalled menu never opens
   // off-screen. Status correction and terminal actions are taller sections;
   // the remaining items are standard 40px menu rows.
@@ -319,8 +376,9 @@ export function TokenActionsMenu({
       <button
         ref={btnRef}
         onClick={() => setOpen(o => !o)}
+        disabled={degraded}
         className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
-        title="Manage reviewer"
+        title={degraded ? degradedTitle : 'Manage reviewer'}
         aria-label={`Manage ${reviewer.name || 'reviewer'}`}
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -341,7 +399,8 @@ export function TokenActionsMenu({
                 </span>
                 <select
                   value={reviewer.reviewStatus === 'accepted' ? '' : reviewer.reviewStatus}
-                  disabled={statusPending}
+                  disabled={statusPending || degraded}
+                  title={degraded ? degradedTitle : undefined}
                   onChange={(event) => {
                     const newStatus = event.target.value;
                     if (!newStatus || statusPending) return;
@@ -371,6 +430,8 @@ export function TokenActionsMenu({
               </p>
               <button
                 type="button"
+                disabled={degraded}
+                title={degraded ? degradedTitle : undefined}
                 onClick={() => { setOpen(false); onTransition('withdrew'); }}
                 className="w-full text-left px-3 py-2 hover:bg-red-50 text-red-700"
               >
@@ -378,6 +439,8 @@ export function TokenActionsMenu({
               </button>
               <button
                 type="button"
+                disabled={degraded}
+                title={degraded ? degradedTitle : undefined}
                 onClick={() => { setOpen(false); onTransition('released'); }}
                 className="w-full text-left px-3 py-2 hover:bg-gray-50 text-gray-700"
               >
@@ -392,6 +455,8 @@ export function TokenActionsMenu({
               </p>
               <button
                 type="button"
+                disabled={degraded}
+                title={degraded ? degradedTitle : undefined}
                 onClick={() => { setOpen(false); onCloseReview(); }}
                 className="w-full text-left px-3 py-2 hover:bg-green-50 text-green-800"
               >
@@ -404,6 +469,8 @@ export function TokenActionsMenu({
           </p>
           {canRegenerate && (
             <button
+              disabled={degraded}
+              title={degraded ? degradedTitle : undefined}
               onClick={() => { setOpen(false); onRegenerate(); }}
               className="w-full text-left px-3 py-2 hover:bg-gray-50"
             >
@@ -417,6 +484,8 @@ export function TokenActionsMenu({
           )}
           {canRevoke && (
             <button
+              disabled={degraded}
+              title={degraded ? degradedTitle : undefined}
               onClick={() => { setOpen(false); onRevoke(); }}
               className="w-full text-left px-3 py-2 hover:bg-gray-50 text-red-700"
             >
@@ -425,6 +494,8 @@ export function TokenActionsMenu({
           )}
           {canRemove && (
             <button
+              disabled={degraded}
+              title={degraded ? degradedTitle : undefined}
               onClick={() => { setOpen(false); onRemove(); }}
               className="w-full text-left px-3 py-2 hover:bg-gray-50 text-red-700 border-t border-gray-100"
             >
@@ -464,7 +535,67 @@ const emptyProposalDoc = () => ({
   pickedKey: null,
 });
 
-function ReleaseMaterialsModal({ isOpen, onClose, reviewers, proposalTitle, requestId, settings, onEmailsSent }) {
+// Stage 6B3b: the modal session's membership key, by VALUE, over the fields
+// the rendered draft body actually consumes for a given reviewer (see
+// email-generator.js buildTemplateContext: candidate.name, candidate.email,
+// candidate.affiliation — candidate.expertiseAreas is also read there, but
+// the reviewers-service projection this panel's rows come from
+// (lib/services/review-manager/reviewers-service.js) never sets an
+// expertiseAreas/expertise field, so there is nothing to fold in for it).
+// A same-id change to any of these after a preview leaves the rendered body
+// (sent verbatim; the server only re-resolves the destination address)
+// showing a stale greeting/affiliation, so it must invalidate the session
+// exactly like a membership change. Per-reviewer strings are sorted (not
+// keyed by array order) and joined with U+0001 (a control character that
+// cannot appear in these fields), each field within a reviewer's string
+// joined with U+0000 (same non-collision rationale as the settings key
+// below) — so no combination of name/email/affiliation values across two
+// different reviewers can collide into the same overall key. An empty
+// `reviewers` array must still produce '' (the completion exemption's
+// `nextKey === ''` check depends on it). Used both by the committed-session
+// effect below AND by handleSend's `priorKey` capture (which reads
+// sessionContextRef.current.key, always assigned from this same function's
+// output — see the effect), so there is only one computation to keep in
+// sync.
+// Field/row separators built at runtime (String.fromCharCode) rather than
+// written as literal control characters in this source file: U+0000 cannot
+// appear in name/email/affiliation, and U+0001 cannot appear in any
+// suggestionId GUID, so no combination of per-reviewer field values or
+// per-reviewer joined strings can collide across the separators.
+const MEMBERSHIP_KEY_FIELD_SEP = String.fromCharCode(0);
+const MEMBERSHIP_KEY_ROW_SEP = String.fromCharCode(1);
+
+function membershipKeyFor(reviewers) {
+  return reviewers
+    .map(r => [r.suggestionId, r.name || '', r.email || '', r.affiliation || ''].join(MEMBERSHIP_KEY_FIELD_SEP))
+    .slice()
+    .sort()
+    .join(MEMBERSHIP_KEY_ROW_SEP);
+}
+
+// Stage 6B3c: a third Codex review found the rendered body also embeds
+// PROPOSAL fields (title, abstract, PI/authors, institution — see
+// render-emails-service.js buildTemplateContext) and send transmits the body
+// verbatim, so a same-requestId proposal edit after preview leaves stale
+// proposal text just like a stale membership/settings field would. Keyed by
+// VALUE over exactly the four proposal fields the panel carries (see the
+// `proposal` prop contract in reviewers-service.js / reviewer-follow-up.js /
+// ReviewersTab's synthetic fallback) — co-investigators are NOT carried by
+// any host, so there is nothing to fold in for them. Joined with the same
+// MEMBERSHIP_KEY_FIELD_SEP (no row separator needed: this is a fixed
+// four-field record, not a per-reviewer array). A null/undefined proposal
+// (e.g. a host reviewers-fetch failure) yields the four-empty join, same
+// shape as an empty membership key.
+function proposalKeyFor(proposal) {
+  return [
+    proposal?.proposalTitle,
+    proposal?.proposalAbstract,
+    proposal?.proposalAuthors,
+    proposal?.proposalInstitution,
+  ].map(v => v || '').join(MEMBERSHIP_KEY_FIELD_SEP);
+}
+
+function ReleaseMaterialsModal({ isOpen, onClose, reviewers, proposalTitle, proposalKey, requestId, settings, onEmailsSent, membershipCause, degraded = false }) {
   // This request-scoped entry point is intentionally materials-only. Review-due
   // nudges use ReviewReminderAction's fresh eligibility + atomic-claim path, and
   // thank-yous are handled by the dedicated sweep. Keeping those choices out of
@@ -517,6 +648,10 @@ function ReleaseMaterialsModal({ isOpen, onClose, reviewers, proposalTitle, requ
   // True whenever a preview render is queued or in flight — disables the
   // footer Preview button and the Retry button.
   const [rendering, setRendering] = useState(false);
+  // Declared here (not beside saveTemplate below) so the session-identity
+  // reconcile effect, which resets it on a new session, can reference the
+  // setter without a textual before-declaration lint warning.
+  const [templateSaved, setTemplateSaved] = useState(false);
 
   // Synchronous single-flight lock for handlePreview, keyed to the modal-session
   // epoch that was current when a render was started. A second call for the SAME
@@ -540,28 +675,208 @@ function ReleaseMaterialsModal({ isOpen, onClose, reviewers, proposalTitle, requ
   // means a hung render's tail blocks every later session until it times out.
   const activeRenderAbortRef = useRef(null);
 
-  // Reset email compose state when the modal opens or closes; bump the modal
-  // session on every transition so an in-flight response from a prior session
-  // can never mutate current state.
+  // Stage 6B3: modal session identity = isOpen + requestId + a per-reviewer
+  // membership+recipient key, plus the one-use completion-cause consumption
+  // (see handleSend/onEmailsSent below). Compare stable membership BY VALUE
+  // (see membershipKeyFor above), never array identity or reviewer
+  // display-object identity — a same-membership, same-field-values rerender
+  // with fresh row objects must not reset drafts/step. modalSessionRef
+  // (declared above) IS the epoch: handlePreview/handleSend already capture
+  // and compare against it.
+  // Stage 6B3a: identity also folds in a settings-by-VALUE key (signature +
+  // reviewDueDate — the only two `settings` fields consumed anywhere, see
+  // snapshotSettings in handlePreview) — never the whole `settings` object,
+  // which the panel call site rebuilds fresh every render ({...settings,
+  // reviewDueDate}) and which can carry unrelated host keys.
+  // Stage 6B3b: the membership key itself widened from suggestionId-only to
+  // suggestionId+name+email+affiliation (membershipKeyFor) — the rendered
+  // draft body is sent verbatim (the server only re-resolves the destination
+  // address at send time), so a same-id change to a recipient's rendered
+  // fields after preview must invalidate the session exactly like a
+  // membership change, not just leave a stale greeting/affiliation in the
+  // sent body.
+  // Stage 6B3c: identity also folds in a proposal-by-VALUE key (proposalKey
+  // prop, computed by the call site via proposalKeyFor over proposalTitle/
+  // proposalAbstract/proposalAuthors/proposalInstitution — see
+  // proposalKeyFor above) — the rendered draft body also embeds these
+  // PROPOSAL fields (render-emails-service.js) and is sent verbatim, so a
+  // same-requestId proposal edit after preview must invalidate the session
+  // exactly like a membership or settings change.
+  const mountedRef = useRef(true);
+  const saveTimerRef = useRef(null);
+  const uploadAttemptRef = useRef(null);
+  // The most recently FINISHED send attempt (see handleSend), set only when
+  // its `complete` event lands. `onEmailsSent` is called with this exact
+  // object, so the panel hands the SAME object back as the `membershipCause`
+  // prop after it clears selection — the effect below matches the incoming
+  // prop's identity/fields against this ref to decide whether a prior→empty
+  // membership transition is the one THIS attempt caused (and so must not
+  // reset the just-completed summary), vs. any other membership change
+  // (which discards this ref and invalidates normally).
+  const lastSendAttemptRef = useRef(null);
+  const sessionContextRef = useRef({
+    isOpen: false,
+    requestId: undefined,
+    key: '',
+    settingsKey: '',
+    // Stage 6B3c: proposal-by-VALUE key (proposalKeyFor) — see the
+    // committed-session effect below.
+    proposalKey: '',
+    // The committed settings.reviewDueDate default at last reconcile — the
+    // "prior default" the emailFields follow-rule below compares against.
+    reviewDueDateDefault: '',
+    onEmailsSent,
+  });
+
+  // Mount/unmount lifetime: unmounting (the modal renders under `canManage &&`
+  // at the panel call site, so permission loss is unmount here — see D2 in
+  // the 6B3 trace) permanently invalidates every in-flight attempt. This is a
+  // SEPARATE dimension from the committed-session reconcile effect below,
+  // mirroring the ReviewReminderAction/6B1 mount-effect pair.
   useEffect(() => {
-    modalSessionRef.current += 1;
-    // Abort any render still outstanding from the session that just ended —
-    // this modal stays mounted across close, so a wedged fetch would otherwise
-    // hold renderTailRef forever and block every future session's preview.
-    if (activeRenderAbortRef.current) {
-      activeRenderAbortRef.current.abort();
-      activeRenderAbortRef.current = null;
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      modalSessionRef.current += 1;
+      lastSendAttemptRef.current = null;
+      if (activeRenderAbortRef.current) {
+        activeRenderAbortRef.current.abort();
+        activeRenderAbortRef.current = null;
+      }
+      proposalLoadSeq.current += 1;
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = null;
+      }
+      uploadAttemptRef.current = null;
+    };
+  }, []);
+
+  // Committed-session reconciliation: no dependency array, no cleanup, so it
+  // runs on every commit (mirrors the Stage 6B1/6B2 committed-props effect
+  // pattern). Any change to isOpen, requestId, the membership+recipient key
+  // (Stage 6B3b — see membershipKeyFor above), the settings-by-value key
+  // (Stage 6B3a), or the proposal-by-value key (Stage 6B3c — see
+  // proposalKeyFor above) bumps modalSessionRef, aborts the active render,
+  // and resets compose/preview/send scratch state back to a fresh 'compose'
+  // session — except when the transition is the one-use completion-cause
+  // exemption (a prior-membership→empty transition tagged by the
+  // just-finished send attempt, with settings AND proposal ALSO unchanged),
+  // which updates the committed key WITHOUT bumping or resetting,
+  // preserving the just-completed 'sent' summary. Same-membership,
+  // same-recipient-fields array/object churn (fresh reviewer objects, same
+  // ids and same name/email/affiliation; a fresh `settings` object with the
+  // same signature/reviewDueDate values; a fresh `proposal` object with the
+  // same title/abstract/authors/institution values) never bumps.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useLayoutEffect(() => {
+    const context = sessionContextRef.current;
+    const nextKey = membershipKeyFor(reviewers);
+    // Settings identity by VALUE, not object identity: the panel call site
+    // rebuilds `settings` fresh every render ({...settings, reviewDueDate:
+    // proposal.reviewDeadline}), so comparing the object (or JSON.stringify
+    // of the whole thing) would bump on every render and would also pick up
+    // unrelated host keys riding along in `...settings`. Only `signature` and
+    // `reviewDueDate` are ever consumed (see snapshotSettings in
+    // handlePreview) — those are the only two fields in this key. Joined
+    // with U+0000, which cannot appear in a date string and is not
+    // realistically typeable into the freeform signature field, so the two
+    // fields can't collide across the separator.
+    const nextSettingsKey = `${settings.signature || ''}\u0000${settings.reviewDueDate || ''}`;
+    const changed = context.isOpen !== isOpen || context.requestId !== requestId || context.key !== nextKey
+      || context.settingsKey !== nextSettingsKey || context.proposalKey !== proposalKey;
+
+    if (changed) {
+      // The one-use completion-cause exemption: this specific transition is
+      // priorKey→empty, the session/request/settings/proposal are UNCHANGED
+      // (only membership moved), and the cause the panel handed back as a
+      // prop is exactly the attempt this modal's own last `complete`
+      // produced (same token), still unconsumed, still referring to the
+      // current epoch/request/prior membership. Any mismatch (untagged
+      // empty, a different membership, request/mode/permission/settings/
+      // proposal change, an expired/reused/foreign cause, or a change that
+      // happened before completion) invalidates normally.
+      const attempt = lastSendAttemptRef.current;
+      const cause = membershipCause;
+      const isCompletionExemption = Boolean(
+        context.isOpen === isOpen
+          && context.requestId === requestId
+          && context.settingsKey === nextSettingsKey
+          && context.proposalKey === proposalKey
+          && nextKey === ''
+          && attempt
+          && !attempt.consumed
+          && cause
+          && cause.token === attempt.token
+          && cause.session === modalSessionRef.current
+          && cause.requestId === requestId
+          && cause.priorKey === context.key
+      );
+
+      if (isCompletionExemption) {
+        attempt.consumed = true;
+        context.key = nextKey;
+      } else {
+        lastSendAttemptRef.current = null;
+        modalSessionRef.current += 1;
+        context.isOpen = isOpen;
+        context.requestId = requestId;
+        context.key = nextKey;
+        // Deadline follow rule: emailFields.reviewDueDate is seeded from the
+        // prop once (useState initializer) and otherwise wins over it at
+        // render, so widening the key alone would invalidate the session on
+        // a deadline change but never actually move the visible/sent date.
+        // Move it to the new committed default ONLY when the field still
+        // holds the PRIOR committed default or is empty — i.e. the PD never
+        // customized it away, and no localStorage restore put something else
+        // there. A functional update: a fresh `settings` object with the
+        // SAME reviewDueDate value must not schedule a no-op setState here
+        // (guarded by the nextDueDateDefault !== prevDueDateDefault check
+        // below), and if the field was customized, this must return the same
+        // `prev` object so the setState is a true no-op.
+        const prevDueDateDefault = context.reviewDueDateDefault;
+        const nextDueDateDefault = settings.reviewDueDate || '';
+        if (nextDueDateDefault !== prevDueDateDefault) {
+          setEmailFields(prev => (
+            (!prev.reviewDueDate || prev.reviewDueDate === prevDueDateDefault)
+              ? { ...prev, reviewDueDate: nextDueDateDefault }
+              : prev
+          ));
+        }
+        context.settingsKey = nextSettingsKey;
+        context.proposalKey = proposalKey;
+        context.reviewDueDateDefault = nextDueDateDefault;
+        if (activeRenderAbortRef.current) {
+          activeRenderAbortRef.current.abort();
+          activeRenderAbortRef.current = null;
+        }
+        // proposalLoadSeq is NOT bumped here: loadProposal posts only
+        // {requestId, fileKey} — membership is irrelevant to which document
+        // loads, so a membership-only change must not orphan a non-stale
+        // load. The two resetProposalDoc effects below already invalidate it
+        // on isOpen and requestId changes, and the unmount cleanup covers
+        // unmount; this branch also fires for pure membership changes, which
+        // must leave a pending proposal load alone.
+        if (isOpen) {
+          setStep('compose');
+          setProgress({ current: 0, total: 0, message: '' });
+          setDrafts([]);
+          setSentResults({ sent: [], failed: [], skipped: [] });
+          setError(null);
+          setPreviewFailed(false);
+          setRendering(false);
+          setIsUploading(false);
+          uploadAttemptRef.current = null;
+          setTemplateSaved(false);
+          if (saveTimerRef.current) {
+            clearTimeout(saveTimerRef.current);
+            saveTimerRef.current = null;
+          }
+        }
+      }
     }
-    if (isOpen) {
-      setStep('compose');
-      setProgress({ current: 0, total: 0, message: '' });
-      setDrafts([]);
-      setSentResults({ sent: [], failed: [], skipped: [] });
-      setError(null);
-      setPreviewFailed(false);
-      setRendering(false);
-    }
-  }, [isOpen]);
+    context.onEmailsSent = onEmailsSent;
+  });
 
   // Read the attach-proposal-email setting fresh every time the modal opens
   // (never cached/build-time) so an admin toggle takes effect immediately.
@@ -720,37 +1035,70 @@ function ReleaseMaterialsModal({ isOpen, onClose, reviewers, proposalTitle, requ
     } catch (e) { /* ignore */ }
   }, []);
 
-  const [templateSaved, setTemplateSaved] = useState(false);
-  const saveTemplate = useCallback(async () => {
+  // Plain function, not useCallback: it reads mountedRef/modalSessionRef
+  // (deliberately outside its "deps"), and it's used only as an onClick
+  // handler here — no downstream memoization depends on its identity.
+  const saveTemplate = async () => {
     // Templates → per-user Dataverse store (shared with the Workbench invite
     // flow + the EmailTemplatesModal). Email-fields + attachments stay local.
+    // Preference persistence itself (localStorage + saveEmailTemplates) is
+    // NEVER reverted by a departed session — only the "Saved ✓" feedback and
+    // its 1.5s timer are session/mounted-owned (Stage 6B3 D-save-template).
+    const epoch = modalSessionRef.current;
     try {
       localStorage.setItem(EMAIL_FIELDS_STORAGE_KEY, JSON.stringify(emailFields));
       localStorage.setItem(ATTACHMENTS_STORAGE_KEY, JSON.stringify(attachmentsByType));
     } catch (e) { /* ignore */ }
     const ok = await saveEmailTemplates(templates);
+    if (!mountedRef.current || modalSessionRef.current !== epoch) return;
     setTemplateSaved(ok);
-    if (ok) setTimeout(() => setTemplateSaved(false), 1500);
-  }, [templates, emailFields, attachmentsByType]);
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    if (ok) {
+      saveTimerRef.current = setTimeout(() => {
+        saveTimerRef.current = null;
+        if (mountedRef.current && modalSessionRef.current === epoch) setTemplateSaved(false);
+      }, 1500);
+    }
+  };
 
   const handleFileUpload = async (e) => {
     const files = Array.from(e.target.files);
     if (files.length === 0) return;
+    // Stage 6B3 D6: `isUploading` is released by attempt identity regardless
+    // of session epoch (the 6B2 lock pattern), but stale-session writes
+    // (attachments/localStorage/error) are suppressed. Already-started bytes
+    // may finish uploading — we never delete an uploaded blob or infer
+    // rollback — but a stale attempt does not start its NEXT file, and does
+    // not touch attachments/error for a departed session.
+    const epoch = modalSessionRef.current;
+    const attempt = {};
+    uploadAttemptRef.current = attempt;
+    const isCurrent = () => mountedRef.current && modalSessionRef.current === epoch;
     setIsUploading(true);
+    let stale = false;
     try {
       const { upload } = await import('@vercel/blob/client');
+      if (!isCurrent()) { stale = true; }
       for (const file of files) {
+        if (stale) break;
         const blob = await upload(file.name, file, {
           access: 'public',
           handleUploadUrl: '/api/upload-handler',
         });
+        if (!isCurrent()) { stale = true; break; }
         const newAttachment = { url: blob.url, filename: file.name, size: file.size };
         setAttachments((prev) => [...prev, newAttachment]);
       }
     } catch (err) {
-      setError(`Failed to upload: ${err.message}`);
+      if (isCurrent()) setError(`Failed to upload: ${err.message}`);
     } finally {
-      setIsUploading(false);
+      if (uploadAttemptRef.current === attempt) {
+        uploadAttemptRef.current = null;
+        if (mountedRef.current) setIsUploading(false);
+      }
       e.target.value = ''; // reset input
     }
   };
@@ -906,11 +1254,25 @@ function ReleaseMaterialsModal({ isOpen, onClose, reviewers, proposalTitle, requ
 
     // Captured before any async work: a response arriving after this modal
     // session closed/reopened must not mutate the current session's state.
+    // requestIdAtSend/priorKey are the COMMITTED identity at send start (not
+    // recomputed from props later) — this is what makes the completion-cause
+    // exemption's field comparisons in the session effect tautologically
+    // correct for this exact attempt.
     const epoch = modalSessionRef.current;
+    const requestIdAtSend = sessionContextRef.current.requestId;
+    const priorKey = sessionContextRef.current.key;
+    const sendToken = Symbol('send');
+    // Local mutable accumulator: the authoritative source for the completion
+    // summary, fed only by email_sent/email_failed/result — NOT a snapshot of
+    // (possibly stale/batched) React state. `finished` makes the attempt
+    // terminal: once true, no further event (a duplicate complete, or a
+    // trailing error/result in a later chunk) has any effect.
+    let results = { sent: [], failed: [], skipped: [] };
+    let finished = false;
     setStep('sending');
     setProgress({ current: 0, total: sendable.length, message: 'Starting...' });
     setError(null);
-    setSentResults({ sent: [], failed: [], skipped: [] });
+    setSentResults(results);
 
     try {
       // Attach-proposal-email OFF (default): never send attachmentUrls — the
@@ -950,11 +1312,21 @@ function ReleaseMaterialsModal({ isOpen, onClose, reviewers, proposalTitle, requ
       const decoder = new TextDecoder();
       let buffer = '';
       let currentEvent = null;
+      // reader.cancel() is a best-effort client stream close, not a server
+      // rollback: it may be absent on a test double, and its promise
+      // rejection is observed everywhere it's called so it never surfaces as
+      // an unhandled rejection.
+      const cancelReader = () => {
+        try {
+          const p = reader.cancel();
+          if (p && typeof p.then === 'function') p.catch(() => {});
+        } catch (e) { /* best-effort */ }
+      };
 
-      while (true) {
+      while (!finished) {
         const { value, done } = await reader.read();
         if (modalSessionRef.current !== epoch) {
-          try { reader.cancel(); } catch (e) { /* best-effort */ }
+          cancelReader();
           return;
         }
         if (done) break;
@@ -964,6 +1336,10 @@ function ReleaseMaterialsModal({ isOpen, onClose, reviewers, proposalTitle, requ
         buffer = lines.pop() || '';
 
         for (const line of lines) {
+          // A duplicate `complete`, or a trailing `error`/`result`, arriving
+          // in the SAME chunk right after this attempt already finished must
+          // also have no effect.
+          if (finished) break;
           if (line.startsWith('event: ')) {
             currentEvent = line.slice(7).trim();
           } else if (line.startsWith('data: ') && currentEvent) {
@@ -972,18 +1348,45 @@ function ReleaseMaterialsModal({ isOpen, onClose, reviewers, proposalTitle, requ
               if (currentEvent === 'progress') {
                 setProgress(prev => ({ ...prev, ...data }));
               } else if (currentEvent === 'email_sent') {
-                setSentResults(prev => ({ ...prev, sent: [...prev.sent, data] }));
+                results = { ...results, sent: [...results.sent, data] };
+                setSentResults(results);
               } else if (currentEvent === 'email_failed') {
-                setSentResults(prev => ({ ...prev, failed: [...prev.failed, data] }));
+                results = { ...results, failed: [...results.failed, data] };
+                setSentResults(results);
               } else if (currentEvent === 'result') {
-                setSentResults({
+                results = {
                   sent: data.sent || [],
                   failed: data.failed || [],
                   skipped: data.skipped || [],
-                });
+                };
+                setSentResults(results);
               } else if (currentEvent === 'complete') {
+                // Mark this attempt finished BEFORE calling the parent — the
+                // finished flag is what makes a duplicate complete or a
+                // trailing error/result a no-op, and the recorded attempt is
+                // what lets the session effect recognize the exact
+                // membership-clear this callback is about to cause.
+                finished = true;
+                setSentResults(results);
                 setStep('sent');
-                if (onEmailsSent) onEmailsSent();
+                lastSendAttemptRef.current = {
+                  token: sendToken,
+                  session: epoch,
+                  requestId: requestIdAtSend,
+                  priorKey,
+                  consumed: false,
+                };
+                const cause = lastSendAttemptRef.current;
+                const latestOnEmailsSent = sessionContextRef.current.onEmailsSent;
+                if (latestOnEmailsSent) {
+                  try {
+                    const result = latestOnEmailsSent(cause);
+                    if (result && typeof result.then === 'function') result.catch(() => {});
+                  } catch (e) {
+                    // Swallow: confirmed send, callback/refresh failure only —
+                    // never relabel a confirmed mutation as failed.
+                  }
+                }
               } else if (currentEvent === 'error') {
                 setError(data.message);
                 setStep('preview');
@@ -993,8 +1396,9 @@ function ReleaseMaterialsModal({ isOpen, onClose, reviewers, proposalTitle, requ
           }
         }
       }
+      if (finished) cancelReader();
     } catch (err) {
-      if (modalSessionRef.current !== epoch) return;
+      if (modalSessionRef.current !== epoch || finished) return;
       setError(err.message);
       setStep('preview');
     }
@@ -1415,7 +1819,7 @@ function ReleaseMaterialsModal({ isOpen, onClose, reviewers, proposalTitle, requ
                 >
                   Back
                 </button>
-                <Button onClick={handleSend}>
+                <Button onClick={handleSend} disabled={degraded} title={degraded ? 'Reviewer data could not be refreshed - retry before making changes' : undefined}>
                   Send {drafts.filter(d => !d.skipped).length} Email{drafts.filter(d => !d.skipped).length !== 1 ? 's' : ''}
                 </Button>
               </>
@@ -1629,6 +2033,7 @@ export default function ReviewerManagePanel({
   canManage = true,
   showReviewReminderAction = false,
   previewReadOnly = false,
+  degraded = false,
   declineReferrals = [],
   referralActions = {},
   onAddReferral,
@@ -1641,6 +2046,13 @@ export default function ReviewerManagePanel({
   const [releaseModalOpen, setReleaseModalOpen] = useState(false);
   const [activityDrawerId, setActivityDrawerId] = useState(null); // suggestionId
   const [closeoutReviewerId, setCloseoutReviewerId] = useState(null); // suggestionId
+  // Stage 6B3: the one-use completion-cause the ReleaseMaterialsModal hands
+  // back after a send finishes, so its own session effect can recognize the
+  // selection-clear THIS attempt caused (and not reset the summary it just
+  // showed) while still invalidating for any other selection change. Set
+  // synchronously BEFORE the selection clear below; cleared in every OTHER
+  // selection setter path so a cause never outlives its own transition.
+  const selectionCauseRef = useRef(null);
 
   const allReviewers = reviewersProp || proposal?.reviewers || [];
   const reviewers = filterByMode(allReviewers, mode);
@@ -1651,15 +2063,28 @@ export default function ReviewerManagePanel({
   const statusOperationsRef = useRef(new Map());
   const statusContextRef = useRef({ mounted: false, epoch: 0 });
   const [pendingStatusTokens, setPendingStatusTokens] = useState(() => new Map());
+  // Stage 6B1: feedback-ownership registry for the token/removal/terminal
+  // actions below. One entry per `${kind}:${suggestionId}` key holding the
+  // latest attempt for that action+row; a newer call for the same key simply
+  // replaces the map entry, which is how an older attempt gets superseded
+  // (checked via token identity in isAttemptCurrent) without cancelling or
+  // repeating its already-dispatched request. `valid` is flipped permanently
+  // false by the two layout effects below on unmount or observed row absence,
+  // the same way statusOperationsRef's operations are — this is required
+  // because a row that disappears and returns would otherwise look current
+  // again by the time an attempt settles.
+  const actionAttemptsRef = useRef(new Map());
 
   useLayoutEffect(() => {
     const context = statusContextRef.current;
     const operations = statusOperationsRef.current;
+    const attempts = actionAttemptsRef.current;
     context.mounted = true;
     return () => {
       context.mounted = false;
       context.epoch += 1;
       for (const operation of operations.values()) operation.valid = false;
+      for (const attempt of attempts.values()) attempt.valid = false;
     };
   }, []);
 
@@ -1683,11 +2108,60 @@ export default function ReviewerManagePanel({
         operation.valid = false;
       }
     }
+    for (const attempt of actionAttemptsRef.current.values()) {
+      if (attempt.epoch !== context.epoch || !context.reviewers.has(attempt.suggestionId)) {
+        attempt.valid = false;
+      }
+    }
   });
+
+  // Capture stable requestId/suggestionId/kind/epoch and a unique attempt
+  // token BEFORE the caller's first await. Returns null (caller must no-op)
+  // when the row is already gone or the committed context cannot currently
+  // accept a mutation — this is the "revalidate after confirm() before
+  // dispatch" checkpoint for revoke/remove/terminal, since beginAttempt is
+  // always called only after confirm() has returned.
+  const beginAttempt = (kind, suggestionId) => {
+    const context = statusContextRef.current;
+    const row = context.reviewers.get(suggestionId);
+    if (!context.mounted || !context.canManage || context.previewReadOnly || !row) return null;
+    const attempt = {
+      token: Symbol(kind),
+      kind,
+      suggestionId,
+      requestId: context.requestId,
+      epoch: context.epoch,
+      valid: true,
+    };
+    actionAttemptsRef.current.set(`${kind}:${suggestionId}`, attempt);
+    return attempt;
+  };
+
+  // Currentness checkpoint: same-context row/callback replacement stays
+  // valid; request/mode/permission change (epoch bump), observed row
+  // absence (attempt.valid flipped by the effects above) and a superseding
+  // later attempt for the same action+row (token mismatch in the registry)
+  // all invalidate.
+  const isAttemptCurrent = (attempt) => {
+    const context = statusContextRef.current;
+    return Boolean(attempt) && attempt.valid && context.mounted
+      && context.epoch === attempt.epoch && context.requestId === attempt.requestId
+      && context.canManage && !context.previewReadOnly
+      && context.reviewers.has(attempt.suggestionId)
+      && actionAttemptsRef.current.get(`${attempt.kind}:${attempt.suggestionId}`)?.token === attempt.token;
+  };
+
+  const finishAttempt = (attempt) => {
+    const key = `${attempt.kind}:${attempt.suggestionId}`;
+    if (actionAttemptsRef.current.get(key)?.token === attempt.token) {
+      actionAttemptsRef.current.delete(key);
+    }
+  };
 
   // Reset selection when the proposal OR the active mode changes — a
   // selection made under one sub-tab shouldn't leak into another's visible set.
   useEffect(() => {
+    selectionCauseRef.current = null;
     setSelectedReviewers(new Set());
   }, [proposal?.proposalId, mode]);
 
@@ -1720,6 +2194,7 @@ export default function ReviewerManagePanel({
   const tableMinWidth = showActionColumn ? 'min-w-[58rem]' : 'min-w-[48rem]';
 
   const toggleSelectAll = () => {
+    selectionCauseRef.current = null;
     if (allSelected) {
       setSelectedReviewers(new Set());
     } else {
@@ -1728,6 +2203,7 @@ export default function ReviewerManagePanel({
   };
 
   const toggleSelect = (id) => {
+    selectionCauseRef.current = null;
     setSelectedReviewers(prev => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
@@ -1741,46 +2217,102 @@ export default function ReviewerManagePanel({
   // suggestion has never had a token minted (regenerate is the entry point);
   // revoke + mark-received are 404-tolerant on the backend.
   const handleRegenerateToken = async (suggestionId) => {
+    const attempt = beginAttempt('regenerate', suggestionId);
+    if (!attempt) return;
+    const isCurrent = () => isAttemptCurrent(attempt);
     try {
-      const resp = await fetch('/api/review-manager/regenerate-token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ suggestionId }),
-      });
+      let resp;
+      try {
+        resp = await fetch('/api/review-manager/regenerate-token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ suggestionId }),
+        });
+      } catch (err) {
+        if (isCurrent()) alert(`Network error generating link: ${err.message}`);
+        return;
+      }
+      if (!isCurrent()) return;
       const data = await resp.json().catch(() => ({}));
+      if (!isCurrent()) return;
       if (!resp.ok || !data.ok) {
         alert(`Could not generate a new link: ${data.reason || resp.status}`);
         return;
       }
+      // A new token already exists server-side at this point (mintAndStore
+      // persists before the route responds). If we've gone stale, we must
+      // never copy or display it — but there is nothing to roll back either.
+      if (!isCurrent()) return;
+      let copied = false;
       try {
         await navigator.clipboard.writeText(data.url);
-        alert(`Link copied to clipboard. Expires ${new Date(data.expiresAt).toLocaleDateString()}.`);
+        copied = true;
       } catch {
         // Clipboard can fail on insecure contexts — show the URL anyway.
+        copied = false;
+      }
+      // A copy that already started cannot be cancelled by navigation, but we
+      // can still suppress the alert/prompt/refresh that would follow it.
+      if (!isCurrent()) return;
+      if (copied) {
+        alert(`Link copied to clipboard. Expires ${new Date(data.expiresAt).toLocaleDateString()}.`);
+      } else {
         prompt('Reviewer link (copy manually):', data.url);
       }
-      if (onRefresh) onRefresh();
-    } catch (err) {
-      alert(`Network error generating link: ${err.message}`);
+      const currentOnRefresh = statusContextRef.current.onRefresh;
+      if (currentOnRefresh) {
+        try {
+          await currentOnRefresh();
+        } catch {
+          if (isCurrent()) {
+            alert('The link was generated, but the reviewer list could not be refreshed. Reload to see the current list.');
+          }
+        }
+      }
+    } finally {
+      finishAttempt(attempt);
     }
   };
 
   const handleRevokeToken = async (suggestionId) => {
     if (!confirm('Revoke this reviewer\'s magic link? They will no longer be able to use it.')) return;
+    // Revalidate after confirm() and before dispatch: beginAttempt reads the
+    // current committed context, so a row/permission/request change while the
+    // confirm dialog was open makes it return null and we no-op.
+    const attempt = beginAttempt('revoke', suggestionId);
+    if (!attempt) return;
+    const isCurrent = () => isAttemptCurrent(attempt);
     try {
-      const resp = await fetch('/api/review-manager/revoke-token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ suggestionId }),
-      });
+      let resp;
+      try {
+        resp = await fetch('/api/review-manager/revoke-token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ suggestionId }),
+        });
+      } catch (err) {
+        if (isCurrent()) alert(`Network error: ${err.message}`);
+        return;
+      }
+      if (!isCurrent()) return;
       const data = await resp.json().catch(() => ({}));
+      if (!isCurrent()) return;
       if (!resp.ok || !data.ok) {
         alert(`Revoke failed: ${data.reason || resp.status}`);
         return;
       }
-      if (onRefresh) onRefresh();
-    } catch (err) {
-      alert(`Network error: ${err.message}`);
+      const currentOnRefresh = statusContextRef.current.onRefresh;
+      if (currentOnRefresh) {
+        try {
+          await currentOnRefresh();
+        } catch {
+          if (isCurrent()) {
+            alert('The link was revoked, but the reviewer list could not be refreshed. Reload to see the current list.');
+          }
+        }
+      }
+    } finally {
+      finishAttempt(attempt);
     }
   };
 
@@ -1810,21 +2342,42 @@ export default function ReviewerManagePanel({
       + 'Their reviewer record and any review history are preserved.';
     if (!confirm(msg)) return;
 
+    // Revalidate after confirm() and before dispatch (see handleRevokeToken).
+    const attempt = beginAttempt('remove', reviewer.suggestionId);
+    if (!attempt) return;
+    const isCurrent = () => isAttemptCurrent(attempt);
     try {
-      const resp = await fetch('/api/reviewer-finder/my-candidates', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ suggestionId: reviewer.suggestionId }),
-      });
+      let resp;
+      try {
+        resp = await fetch('/api/reviewer-finder/my-candidates', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ suggestionId: reviewer.suggestionId }),
+        });
+      } catch (err) {
+        if (isCurrent()) alert(`Network error removing reviewer: ${err.message}`);
+        return;
+      }
+      if (!isCurrent()) return;
       if (!resp.ok) {
         const data = await resp.json().catch(() => ({}));
+        if (!isCurrent()) return;
         const detail = data.error || data.message || data.details || resp.status;
         alert(`Could not remove the reviewer: ${detail}`);
         return;
       }
-      if (onRefresh) onRefresh();
-    } catch (err) {
-      alert(`Network error removing reviewer: ${err.message}`);
+      const currentOnRefresh = statusContextRef.current.onRefresh;
+      if (currentOnRefresh) {
+        try {
+          await currentOnRefresh();
+        } catch {
+          if (isCurrent()) {
+            alert('The reviewer was removed, but the reviewer list could not be refreshed. Reload to see the current list.');
+          }
+        }
+      }
+    } finally {
+      finishAttempt(attempt);
     }
   };
 
@@ -1965,25 +2518,53 @@ export default function ReviewerManagePanel({
       ? 'This changes their response to declined, updates reviewer counts, revokes their portal link, and removes any linked honorarium request.'
       : 'This ends the engagement and revokes their portal link.';
     if (!confirm(`Confirm that ${reviewer.name || 'this reviewer'} ${outcome}?\n\n${consequence}`)) return;
+    // Revalidate after confirm() and before dispatch (see handleRevokeToken).
+    // Both terminal choices for a given row share one generation, since only
+    // one of them can meaningfully be in flight for that row at a time.
+    const attempt = beginAttempt('terminal', reviewer.suggestionId);
+    if (!attempt) return;
+    const isCurrent = () => isAttemptCurrent(attempt);
+    // Captured at dispatch time, not read live from `proposal` later — a
+    // request switch after this point must not relabel this payload.
+    const requestId = attempt.requestId;
     try {
-      const response = await fetch('/api/review-manager/terminal-transition', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          requestId: proposal.proposalId,
-          suggestionIds: [reviewer.suggestionId],
-          terminalStatus,
-        }),
-      });
+      let response;
+      try {
+        response = await fetch('/api/review-manager/terminal-transition', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            requestId,
+            suggestionIds: [reviewer.suggestionId],
+            terminalStatus,
+          }),
+        });
+      } catch (transitionError) {
+        if (isCurrent()) alert(`Network error ending engagement: ${transitionError.message}`);
+        return;
+      }
+      if (!isCurrent()) return;
       const data = await response.json().catch(() => ({}));
+      if (!isCurrent()) return;
       if (!response.ok || data.transitioned !== 1) {
+        // A 409 with results[0].status === 'write_failed' may have partially
+        // committed server-side; there is no client-side replay or repair.
         const reason = data.results?.[0]?.status || data.error || response.status;
         alert(`Could not end the engagement: ${reason}. Reload and try again.`);
         return;
       }
-      if (onRefresh) onRefresh();
-    } catch (transitionError) {
-      alert(`Network error ending engagement: ${transitionError.message}`);
+      const currentOnRefresh = statusContextRef.current.onRefresh;
+      if (currentOnRefresh) {
+        try {
+          await currentOnRefresh();
+        } catch {
+          if (isCurrent()) {
+            alert('The engagement change was recorded, but the reviewer list could not be refreshed. Reload to see the current status.');
+          }
+        }
+      }
+    } finally {
+      finishAttempt(attempt);
     }
   };
 
@@ -2099,9 +2680,12 @@ export default function ReviewerManagePanel({
                 const releaseTargets = selectedList.length > 0
                   ? selectedList
                   : acceptedReviewers;
+                selectionCauseRef.current = null;
                 setSelectedReviewers(new Set(releaseTargets.map(r => r.suggestionId)));
                 setReleaseModalOpen(true);
               }}
+              disabled={degraded}
+              title={degraded ? 'Reviewer data could not be refreshed - retry before making changes' : undefined}
             >
               Release proposal to reviewers ({selectedList.length > 0 ? selectedList.length : acceptedReviewers.length})
             </Button>
@@ -2238,12 +2822,15 @@ export default function ReviewerManagePanel({
                                 reviewer={r}
                                 onSent={onRefresh}
                                 previewReadOnly={previewReadOnly || !canManage}
+                                degraded={degraded}
                               />
                             )}
                             {showActionsColumn && ['review_received', 'complete'].includes(r.reviewStatus) && (
                               <button
                                 type="button"
                                 onClick={() => setCloseoutReviewerId(r.suggestionId)}
+                                disabled={degraded}
+                                title={degraded ? 'Reviewer data could not be refreshed - retry before making changes' : undefined}
                                 className="min-h-9 whitespace-nowrap rounded-lg bg-gray-900 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2"
                               >
                                 {r.reviewStatus === 'complete' ? 'Edit closeout' : 'Close review'}
@@ -2274,6 +2861,7 @@ export default function ReviewerManagePanel({
                                 onStatusChange={(newStatus) => updateStatus(r.suggestionId, newStatus)}
                                 statusPending={pendingStatusTokens.has(r.suggestionId)}
                                 onTransition={(terminalStatus) => transitionTerminal(r, terminalStatus)}
+                                degraded={degraded}
                               />
                             </div>
                           )}
@@ -2301,10 +2889,11 @@ export default function ReviewerManagePanel({
           isOpen
           reviewer={closeoutReviewer}
           proposal={proposal}
+          requestId={proposal?.proposalId}
+          canManage={canManage}
+          previewReadOnly={previewReadOnly}
           onClose={() => setCloseoutReviewerId(null)}
-          onSaved={() => {
-            if (onRefresh) onRefresh();
-          }}
+          onSaved={() => (onRefresh ? onRefresh() : undefined)}
         />
       )}
 
@@ -2316,12 +2905,31 @@ export default function ReviewerManagePanel({
             onClose={() => setReleaseModalOpen(false)}
             reviewers={selectedList}
             proposalTitle={proposal.proposalTitle}
+            // Stage 6B3c: by-VALUE key over the proposal fields the rendered
+            // draft body embeds (see proposalKeyFor above) — never the
+            // proposal object itself, which this call site rebuilds fresh
+            // every render.
+            proposalKey={proposalKeyFor(proposal)}
             requestId={proposal?.proposalId}
             settings={{
               ...settings,
               reviewDueDate: proposal.reviewDeadline,
             }}
-            onEmailsSent={() => {
+            // Deliberate ref read during render (Stage 6B3 D4): the modal's
+            // session effect needs the LATEST committed cause at the moment
+            // this transition commits, not a value captured a render early
+            // via useState (which would itself need an extra commit and could
+            // race the very membership change it's meant to validate). The
+            // ref only carries plain data and never affects this component's
+            // own render output.
+            // eslint-disable-next-line react-hooks/refs
+            membershipCause={selectionCauseRef.current}
+            degraded={degraded}
+            onEmailsSent={(cause) => {
+              // Tag the clear synchronously BEFORE it commits — see
+              // selectionCauseRef's declaration above and the modal's own
+              // session-effect consumption of this exact prop.
+              selectionCauseRef.current = cause;
               setSelectedReviewers(new Set());
               if (onRefresh) onRefresh();
             }}
