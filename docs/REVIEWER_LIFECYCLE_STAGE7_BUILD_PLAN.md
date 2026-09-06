@@ -156,7 +156,12 @@ or backfill.
   result mapping, counter, courtesy email and checks stay. Direct tests (4), delegation pins (4),
   census row; no existing test edits (one route suite mocks the whole service as a black box, others
   mock adapters). Full suite 790 / 11,534; gates green. Mutations: inline keeping the import → 4/4
-  pins red; drop `ifMatch` → 1/4 red; write after send → 3/4 pins red. Opus and Codex round 1 pending.
+  pins red; drop `ifMatch` → 1/4 red; write after send → 3/4 pins red.
+- **3I Codex adversarial round 1 (`87edb12b`): needs-attention, one documentation medium** — no
+  catalog entry or wiki note yet for `withdraw-pending-invitation.js`. Accepted; per the Stage 3
+  plan's "Docs (after each merge)" these land in the architect's post-merge docs pass, as for
+  3A–3E (same disposition as the 3C round-1 catalog finding). No runtime defect confirmed. Opus
+  pending.
 
 ## Docs (after each merge)
 
