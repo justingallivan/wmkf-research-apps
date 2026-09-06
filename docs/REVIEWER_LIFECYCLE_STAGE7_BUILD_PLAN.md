@@ -219,7 +219,11 @@ or backfill.
   self-tests green. **Required R1:** `send-emails-service.js:11-12` still claimed the invitation stamp
   stays inline. Advisories folded into the correction: D1/D2 wording must read as open decisions;
   duplicated caller rationale → pointer; generate-emails pin should assert one batch timestamp and a
-  never-calls case; my-candidates pin should include a stale-link guard case. Correction sent.
+  never-calls case; my-candidates pin should include a stale-link guard case.
+- **3F correction `befc9fb3`** (rebased on `8ff86aad`): headers fixed in send-emails and
+  my-candidates; D1/D2 reworded as open decisions with one copy of the rationale; generate-emails pin
+  asserts one batch timestamp plus a `markAsSent:false` never-calls case; my-candidates pin gains the
+  token-hash-mismatch case. 26 scoped suites / 727; full suite 802 / 11,621; gates green. PR #165.
 
 ## Docs (after each merge)
 
