@@ -64,6 +64,14 @@ choice; do not assume an order.
 
 ### Verified Open
 
+0. **`softDelete` is not completion-aware (owner decision).** `reviewer-suggestion.js`
+   `softDelete` gates only on `wmkf_reviewstatus` (its select does not fetch `wmkf_completedat`),
+   so a completion-stamped row with a non-terminal status can be removed via candidate Remove.
+   Pre-existing; surfaced by Codex during Stage 2 and deliberately NOT changed there (Stage 2 is
+   behavior-preserving). Tightening it (select `completedat`, gate with `isClosedEngagementRow`) is
+   a staff-visible change — Remove would refuse such rows. Every current writer stamps `completedat`
+   together with status `complete`, so the case is legacy/hand-edited data only. Evidence:
+   `docs/REVIEWER_LIFECYCLE_STAGE2_BUILD_PLAN.md` build record.
 1. **Reviewer-follow-up host refetch error — FIXED in PR #152 (`e9909e91`, S489).** Remaining,
    pre-existing and out of that fix's scope (Opus finding): a cycles-load failure sets `error`
    while `cycleCode` is empty, so the banner renders with no Try again button and the proposals

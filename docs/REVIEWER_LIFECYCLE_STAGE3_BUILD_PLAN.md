@@ -104,6 +104,18 @@ builders on that file concurrently.
   is not detectable by the regex scanner; an AST scan is the later-slice upgrade if a real caller
   ever needs it. Census helper: `tests/helpers/import-census.js`.
 
+## 3B build and review record
+
+- **Build (Sonnet, 2026-09-05): `0169fb05`** on `claude/reviewer-lifecycle-stage3b` (cut from main
+  `b7a04cd6`). Moved module byte-identical to main's `terminal-transition-service.js`; wrapper
+  re-exports exactly `TerminalTransitionError`, `transitionReviewersTerminal`,
+  `_terminalTransitionInternals`; census row added (route is the sole legacy importer). Seven-suite
+  selection 278 tests; full suite 777 / 11,352; types, lint 0 errors, `check:route-service-boundary`,
+  `check:dataverse-access-layer`, build, `git diff --check` green. Mutations: wrapped export → paths
+  test red; scratch importer → census red.
+- **Codex adversarial round 1 (`0169fb05`): approve**, no material findings (cross-registry class
+  identity under Jest isolation noted as inherent, not a regression). Opus review recorded below.
+
 ## Rules for every slice
 
 Move verbatim; wrappers re-export the same objects (no re-wrapping that breaks `instanceof`); no

@@ -360,6 +360,18 @@ If you're touching a service or utility, read its header before this catalog. If
 
 ---
 
+## `shared/utils/` — lifecycle policy (browser-safe)
+
+- **`shared/utils/reviewer-engagement-policy.js`** — Stage 2 (PR #155, `716bc558`, 2026-09-05): the
+  one home for the duplicated invitation-correction policy. Exports three predicates over raw
+  suggestion rows — `isClosedEngagementStatus(status)` (status-only), `isClosedEngagementRow(row)`
+  (completion stamp or closed status), `isInvitationCorrectionSourceRow(row)` (explicit
+  `undefined → false`); the status Sets are module-private. Consumers: `my-candidates-service.js`
+  (response correction guard) and `reviewer-suggestion.js` `updateLifecycle`/`softDelete` (the two
+  historical status-only sites use the status predicate by design). Imports only `shared/config/`.
+  Not a universal "done" predicate: materials, receipt, terminal-transition and rollup keep their
+  own sets.
+
 ## Maintenance contract
 
 - New service / utility files: add a one-line entry here in the same commit.
