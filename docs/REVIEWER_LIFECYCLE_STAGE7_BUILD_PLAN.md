@@ -159,7 +159,8 @@ or backfill.
   import; mutations in a scratch copy: inline keeping the import → pin 2 red; drop `ifMatch` → 1 red;
   write after dispatch → 2 red; direct suite executes the module; census non-vacuous; 790 / 11,532
   and both boundary gates green. Advisories: branch behind main (rebased by the architect onto
-  `a7ed788d`, census conflict resolved keeping all rows; 4 suites / 36 green → `3ea5fe18`, PR #163);
+  `a7ed788d`, census conflict resolved keeping all rows; 4 suites / 36 green → `3ea5fe18`, then
+  `4d52e779` after 3G merged; PR #163 merged `81fdac43`, 2026-09-06);
   "no existing test edits" should read "census extended"; "conditional" wording nit. The plan's
   "persisted deadline with failed notification" case is covered by the retained
   `reviewer-due-extension.test.js:311`, which now runs the real module.
