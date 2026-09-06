@@ -119,6 +119,22 @@ export { PREVIEW_RENDER_TIMEOUT_MS } from './ReleaseMaterialsModal';
   identity, the `membershipCause` ref read, SSR/`window` guards that may have relied on module
   order. Round 2 only for a confirmed defect. Stop at two.
 
+## Build and review record
+
+- **Build (Sonnet, 2026-09-05):** `f7ab967f` on `claude/reviewer-lifecycle-stage6c`, cut from main
+  `dcecf972`. Six files: four new modules, the slimmed panel, one new exports test. Non-move lines
+  are import/export only (panel 7−/8+; modal 7; menu 4; reminder 2; keys 2). Retained 14 suites +
+  new pin: 15 suites / 1,037 tests; full suite 774 / 11,341; types, lint 0 errors, build,
+  `check:dataverse-access-layer`, `check:doc-symbol-refs`, `git diff --check` all green. No existing
+  test file changed.
+- **Codex adversarial round 1 (`f7ab967f`, two-dot diff against a main that had since advanced):**
+  "needs-attention" on one high — that the branch "deletes" the Stage 2/3/5 plans and the autonomy
+  directive. **Invalid finding, diff artifact:** those files were added to `main` after the branch
+  was cut; `git diff main...HEAD` (merge-base) shows exactly the six intended files and
+  `git merge-base` is `dcecf972` [VERIFIED via command]. Codex evidenced no moved-component seam
+  defect. Disposition: rebase the branch onto current main before the PR so the two-dot view matches.
+  Round 2 reserved for a confirmed defect from the Opus review.
+
 ## Docs (architect, after merge)
 
 - `docs/agent-wiki/topics/reviewer-workbench-lifecycle.md`: replace file/line pointers into
