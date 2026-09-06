@@ -315,6 +315,11 @@ function ExpenseReporter() {
               <h3 className="text-lg font-semibold">Upload Receipts</h3>
             </div>
 
+            <p className="text-sm text-gray-600">
+              Upload PDF, JPG, or PNG receipts and invoices. You can select multiple files;
+              extracted amounts and categories can be checked before export.
+            </p>
+
             <FileUploaderSimple
               onFilesUploaded={handleFilesUploaded}
               multiple={true}
@@ -345,8 +350,11 @@ function ExpenseReporter() {
                         </div>
                       </div>
                       <button
+                        type="button"
                         onClick={() => handleRemoveFile(index)}
-                        className="text-red-500 hover:text-red-700"
+                        aria-label={`Remove ${file.filename}`}
+                        title={`Remove ${file.filename}`}
+                        className="inline-flex min-h-9 min-w-9 items-center justify-center rounded-lg text-red-500 hover:bg-red-50 hover:text-red-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
                       >
                         <FiX />
                       </button>
@@ -370,7 +378,7 @@ function ExpenseReporter() {
             </div>
 
             {isProcessing && streamingMessage && (
-              <div className="mt-4 text-center">
+              <div className="mt-4 text-center" role="status" aria-live="polite">
                 <div className="inline-flex items-center space-x-2">
                   <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-500 border-t-transparent"></div>
                   <span className="text-sm text-gray-600">{streamingMessage}</span>
