@@ -380,6 +380,21 @@ Round 2 is spent on the build.
   are called; add one integration case that renders with non-default values, then sends with a
   request read that omits `wmkf_abstract` → `draft_stale`. Keep the wrapper for the migrated
   fixtures. Cap reached; Opus verifies the correction.
+- **Opus review (`2264b1bd`): PASS WITH ADVISORIES, one required.** Inputs match the contract field
+  for field (`draft-fingerprint.js:52-101`; call sites `render-emails-service.js:343-353`,
+  `send-emails-service.js:763-773`; send-side widening `:362/:368/:411-419/:427-439`); the gate sits
+  after `already_invited` and before link classification with no durable write ahead of it (races
+  test `:775-808`); every skip literal is now a `SEND_SKIP_REASON` member; parity entry #5 mirrors #3;
+  seven pre-existing test files changed by six removed lines, all re-wiring, zero assertions loosened;
+  no template-type branch (uniform enforcement confirmed); nothing outside the plan. **Required (same
+  gap as Codex round-2 #2):** the `projection-divergence` block in `draft-fingerprint.test.js:150-171`
+  only calls the pure builder twice; out-of-tree mutation M2 (narrow send's request `$select` at
+  `:368` to `akoya_title`) leaves 449/449 green because mocks ignore `select`. Advisories: the plan's
+  "drop `coInvestigators` → test (e) red" claim is wrong (M3: (e) stays green; the mutation is caught by
+  213 failures across 5 suites through the independent helper's structural mismatch plus the golden
+  suite) — recorded here as the real mechanism; lockstep coupling between the builder and
+  `tests/helpers/draft-fingerprint.js` is a named maintenance cost; `InviteEmailModal.skipReasonLabel`
+  is live for render-time skips and must not be removed. Correction sent to the builder 2026-09-06.
 
 ## Accepted limits (to record in the receipt)
 
