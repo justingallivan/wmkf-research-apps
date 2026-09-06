@@ -91,6 +91,13 @@ jest.mock('../../lib/utils/uploaded-blob', () => ({ readUploadedBlobBuffer: jest
 jest.mock('../../lib/utils/cycle-material-ref', () => ({
   isPrivateCycleMaterialPathname: (p) => typeof p === 'string' && p.startsWith('cycle-materials/'),
 }));
+// Stage 6D: send-emails-service now reads co-PIs (fingerprint input). Mocked
+// directly (default empty) rather than exercising the real app-request-person
+// adapter through the generic getRecord dispatch above.
+jest.mock('../../lib/services/proposal-participants', () => ({
+  fetchCoPIs: jest.fn(async () => []),
+}));
+const { stampFingerprint } = require('../helpers/draft-fingerprint');
 // S404 Plan v4 send-time token authority gate. This route-integration file
 // exercises many pre-existing send-path contracts unrelated to the gate, so
 // rather than hand-crafting a real JWT per test, the mock decodes the
@@ -219,8 +226,42 @@ const attachmentsSent = () => createAndSendEmail.mock.calls[0][0].attachments;
 const filenamesSent = () => attachmentsSent().map((a) => a.filename);
 const htmlBodySent = () => createAndSendEmail.mock.calls[0][0].body;
 
+// Stage 6D: stamp a real, matching draftFingerprint onto every draft this
+// suite posts to the route, computed from the CURRENT SUGGESTIONS/PERSON/
+// REQUEST fixture state at the moment `run()` is called — mirroring
+// tests/unit/send-emails-service.test.js's autoStampDraft. Deliberately does
+// NOT call the `getRecord` mock itself (several tests assert `getRecord`/
+// `findById` were called exactly zero times for a request that should error
+// before any adapter work — e.g. the unknown-templateType suite below — and
+// stamping must never itself perform adapter work). `getRecord` above
+// returns the SAME `PERSON`/`REQUEST` object regardless of the id requested
+// in every test EXCEPT the SSE-vocabulary test, which overrides person-by-id
+// and stamps its own drafts explicitly (bypassing this default). No fixture
+// in this file sets a cycle's programName/reviewDeadline/customFields, so
+// `cycle: {}` matches every other case here. A draft that already carries an
+// explicit `draftFingerprint` own property is left untouched.
+function autoStampDraft(d, templateType) {
+  if (!d || typeof d !== 'object' || Object.prototype.hasOwnProperty.call(d, 'draftFingerprint')) return d;
+  return stampFingerprint(d, {
+    templateType,
+    suggestionId: d.suggestionId,
+    suggestion: SUGGESTIONS[d.suggestionId],
+    person: PERSON,
+    request: REQUEST,
+    coPINames: [],
+    cycle: {},
+    honorariumAmount: 250,
+  });
+}
+
 async function run(body) {
-  const req = createMockReq({ method: 'POST', query: {}, body });
+  const stampedBody = {
+    ...body,
+    drafts: Array.isArray(body.drafts)
+      ? body.drafts.map((d) => autoStampDraft(d, body.templateType))
+      : body.drafts,
+  };
+  const req = createMockReq({ method: 'POST', query: {}, body: stampedBody });
   const res = createMockRes();
   await handler(req, res);
   return res;
@@ -748,8 +789,35 @@ describe('send-emails — full SSE event vocabulary and ordering (Stage 2b pre-e
       return { emailId: 'email-1' };
     });
 
+    // Stage 6D: SUG_SKIP/SUG_SENDFAIL resolve DIFFERENT people than the
+    // default `PERSON` fixture (via the getRecord override above), so
+    // autoStampDraft's default (which assumes PERSON for every draft) would
+    // fingerprint them against the wrong candidate and misfire draft_stale.
+    // Stamp these two explicitly against the person each will actually
+    // resolve to; SUG_1 keeps the default auto-stamp.
+    const skipDraft = stampFingerprint(draft(SUG_SKIP), {
+      templateType: 'invitation',
+      suggestionId: SUG_SKIP,
+      suggestion: SUGGESTIONS[SUG_SKIP],
+      person: { wmkf_potentialreviewersid: 'pr-skip', wmkf_name: 'No Email', wmkf_emailaddress: null, wmkf_emailsource: 'orcid', wmkf_identitystatus: 'confirmed' },
+      request: REQUEST,
+      coPINames: [],
+      cycle: {},
+      honorariumAmount: 250,
+    });
+    const sendFailDraft = stampFingerprint(draft(SUG_SENDFAIL), {
+      templateType: 'invitation',
+      suggestionId: SUG_SENDFAIL,
+      suggestion: SUGGESTIONS[SUG_SENDFAIL],
+      person: { wmkf_potentialreviewersid: 'pr-fail', wmkf_name: 'Send Fails', wmkf_emailaddress: 'fail@example.org', wmkf_emailsource: 'orcid', wmkf_identitystatus: 'confirmed' },
+      request: REQUEST,
+      coPINames: [],
+      cycle: {},
+      honorariumAmount: 250,
+    });
+
     const res = await run({
-      drafts: [draft(SUG_1), draft(SUG_SKIP), draft(SUG_SENDFAIL)],
+      drafts: [draft(SUG_1), skipDraft, sendFailDraft],
       templateType: 'invitation',
     });
 
@@ -914,5 +982,60 @@ describe('send-emails — send-time token authority gate SSE wire shape (S404 Pl
       suggestionId: SUG_1,
       code: 'external_link_expectation_missing',
     });
+  });
+});
+
+// Reviewer Lifecycle Stage 6D: server-side draft fingerprint, exercised at the
+// route level for a byte-identical happy path plus one draft_stale case.
+describe('send-emails — Stage 6D draft fingerprint', () => {
+  test('a CRM edit to the request title after render (before send) is skipped draft_stale; result/complete stay well-formed', async () => {
+    SUGGESTIONS = { [SUG_1]: baseSuggestion({ wmkf_appreviewersuggestionid: SUG_1, wmkf_accepted: true }) };
+    // "Render" happens first: stamp against the request as it exists now.
+    const staleDraft = stampFingerprint(draft(SUG_1), {
+      templateType: 'materials',
+      suggestionId: SUG_1,
+      suggestion: SUGGESTIONS[SUG_1],
+      person: PERSON,
+      request: REQUEST,
+      coPINames: [],
+      cycle: {},
+      honorariumAmount: 250,
+    });
+    // A CRM edit lands between render and send.
+    REQUEST = { ...REQUEST, akoya_title: 'A CRM edit made after the preview was rendered' };
+
+    const res = await run({ drafts: [staleDraft], templateType: 'materials' });
+
+    expect(mintAndStore).not.toHaveBeenCalled();
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+    expect(updateLifecycle).not.toHaveBeenCalled();
+    const seq = events(res).map((e) => e.event);
+    expect(seq).not.toContain('error');
+    expect(seq.slice(-2)).toEqual(['result', 'complete']);
+    expect(resultOf(res).skipped).toEqual([
+      expect.objectContaining({ suggestionId: SUG_1, reason: 'draft_stale' }),
+    ]);
+    expect(resultOf(res).stats).toMatchObject({ sent: 0, skipped: 1, total: 1 });
+  });
+
+  test('happy-path event contract is byte-identical to the pre-6D shape for a matching draft', async () => {
+    SUGGESTIONS = { [SUG_1]: baseSuggestion({ wmkf_appreviewersuggestionid: SUG_1, wmkf_accepted: true }) };
+    const res = await run({ drafts: [draft(SUG_1)], templateType: 'materials' });
+
+    const seq = events(res).map((e) => e.event);
+    expect(seq).not.toContain('error');
+    expect(seq.slice(-2)).toEqual(['result', 'complete']);
+    expect(resultOf(res).skipped).toEqual([]);
+    expect(resultOf(res).sent).toEqual([{
+      suggestionId: SUG_1,
+      candidateName: 'Dr. Reviewer',
+      candidateEmail: 'rev@example.org',
+      emailId: expect.any(String),
+      regardingLinked: true,
+      contactPromoted: false,
+      orcidBackprop: null,
+      deliveryMode: 'send',
+      emailConfidence: expect.any(Object),
+    }]);
   });
 });

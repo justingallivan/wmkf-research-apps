@@ -81,9 +81,17 @@ jest.mock('../../lib/utils/uploaded-blob', () => ({ readUploadedBlobBuffer: jest
 jest.mock('../../lib/utils/cycle-material-ref', () => ({
   isPrivateCycleMaterialPathname: (p) => typeof p === 'string' && p.startsWith('cycle-materials/'),
 }));
+// Stage 6D: send-emails-service now reads co-PIs (fingerprint input). Mocked
+// directly (default empty), same as render-emails-service.test.js, rather
+// than exercising the real app-request-person adapter.
+const fetchCoPIs = jest.fn(async () => []);
+jest.mock('../../lib/services/proposal-participants', () => ({
+  fetchCoPIs: (...a) => fetchCoPIs(...a),
+}));
 
 const { sendEmails } = require('../../lib/services/review-manager/send-emails-service');
 const { loadCycleConfigs } = require('../../lib/services/review-manager/cycle-config-loader');
+const { stampFingerprint } = require('../helpers/draft-fingerprint');
 
 const SUG_OK = '11111111-1111-4111-8111-111111111111';
 const SUG_NO_EMAIL = '22222222-2222-4222-8222-222222222222';
@@ -142,10 +150,45 @@ beforeEach(() => {
   mintAndStore.mockResolvedValue({ jwt: TOKEN });
 });
 
+// Stage 6D: stamp a real, matching draftFingerprint onto every draft this
+// suite hands to sendEmails, computed from the CURRENT SUGGESTIONS/PERSONS/
+// REQUEST fixture state at the moment `run()` is called (synchronously,
+// before sendEmails does any of its own — later — reads), via the same
+// independent test helper draft-fingerprint.test.js cross-checks against
+// production. This suite is about send-emails' OTHER behavior, not about
+// fingerprinting itself, so every pre-existing fixture should reach the send
+// path exactly as it did before Stage 6D. Every test in this file never sets
+// meetingdate/CYCLE, so cycleConfigByCode is always {} here (see beforeEach) —
+// cycle: {} matches. A draft that already carries an explicit
+// `draftFingerprint` (own property, any value including undefined — the
+// Stage 6D tests below use this to construct a deliberately missing or stale
+// value) is left untouched.
+function autoStampDraft(d, templateType) {
+  if (!d || typeof d !== 'object' || Object.prototype.hasOwnProperty.call(d, 'draftFingerprint')) return d;
+  const sug = SUGGESTIONS[d.suggestionId];
+  const per = (sug && PERSONS[sug._wmkf_potentialreviewer_value]) || PERSONS[`person-${d.suggestionId}`];
+  return stampFingerprint(d, {
+    templateType,
+    suggestionId: d.suggestionId,
+    suggestion: sug,
+    person: per,
+    request: REQUEST,
+    coPINames: [],
+    cycle: {},
+    honorariumAmount: 250,
+  });
+}
+
 async function run(requestBody) {
   const emitted = [];
+  const stampedBody = {
+    ...requestBody,
+    drafts: Array.isArray(requestBody.drafts)
+      ? requestBody.drafts.map((d) => autoStampDraft(d, requestBody.templateType))
+      : requestBody.drafts,
+  };
   await sendEmails(
-    { requestBody, fromEmail: 'staff@wmkeck.org', actingUserSystemId: 'u-1' },
+    { requestBody: stampedBody, fromEmail: 'staff@wmkeck.org', actingUserSystemId: 'u-1' },
     (e) => emitted.push(e),
   );
   return emitted;
@@ -1424,5 +1467,138 @@ describe('cycle-config-loader — per-caller projection shape', () => {
     expect(await loadCycleConfigs([], { fields: {} })).toEqual({});
     findByShortCode.mockResolvedValueOnce(null);
     expect(await loadCycleConfigs(['NOPE'], { fields: {} })).toEqual({});
+  });
+});
+
+// Reviewer Lifecycle Stage 6D: server-side draft fingerprint. Everywhere else
+// in this file `run()` auto-stamps a MATCHING fingerprint (see autoStampDraft
+// above) so pre-existing fixtures are unaffected; the tests below construct
+// an explicit (pre-stamped, or deliberately invalid) fingerprint via the
+// shared test helper to exercise the new gate itself.
+describe('send-emails-service — Stage 6D draft fingerprint', () => {
+  function fingerprintFor(over = {}) {
+    return {
+      templateType: 'materials',
+      suggestionId: SUG_OK,
+      suggestion: SUGGESTIONS[SUG_OK],
+      person: PERSONS[`person-${SUG_OK}`],
+      request: REQUEST,
+      coPINames: [],
+      cycle: {},
+      honorariumAmount: 250,
+      ...over,
+    };
+  }
+
+  test('(a) a fingerprint matching send-time reads sends normally (no behavior change)', async () => {
+    SUGGESTIONS[SUG_OK] = suggestion(SUG_OK, { wmkf_accepted: true });
+    const emitted = await run({ drafts: [draft(SUG_OK)], templateType: 'materials' });
+    expect(resultOf(emitted).sent).toHaveLength(1);
+    expect(resultOf(emitted).skipped).toEqual([]);
+  });
+
+  test('(b) a request field changed after render is skipped draft_stale before any token mint or transport; stream still ends result -> complete', async () => {
+    SUGGESTIONS[SUG_OK] = suggestion(SUG_OK, { wmkf_accepted: true });
+    const staleDraft = stampFingerprint(draft(SUG_OK), fingerprintFor());
+    // A CRM edit to the title made after the preview was rendered, before send.
+    REQUEST = { ...REQUEST, akoya_title: 'A CRM edit made after the preview was rendered' };
+
+    const emitted = await run({ drafts: [staleDraft], templateType: 'materials' });
+
+    expect(mintAndStore).not.toHaveBeenCalled();
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+    expect(updateLifecycle).not.toHaveBeenCalled();
+    expect(resultOf(emitted).skipped).toEqual([
+      expect.objectContaining({ suggestionId: SUG_OK, reason: 'draft_stale' }),
+    ]);
+    expect(resultOf(emitted).stats).toMatchObject({ sent: 0, skipped: 1, total: 1 });
+    expect(names(emitted).slice(-2)).toEqual(['result', 'complete']);
+  });
+
+  test('(c) a missing/malformed draftFingerprint is skipped draft_fingerprint_missing before any token mint or transport', async () => {
+    SUGGESTIONS[SUG_OK] = suggestion(SUG_OK, { wmkf_accepted: true });
+    const badDraft = { ...draft(SUG_OK), draftFingerprint: 'not-a-valid-hash' };
+
+    const emitted = await run({ drafts: [badDraft], templateType: 'materials' });
+
+    expect(mintAndStore).not.toHaveBeenCalled();
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+    expect(updateLifecycle).not.toHaveBeenCalled();
+    expect(resultOf(emitted).skipped).toEqual([
+      expect.objectContaining({ suggestionId: SUG_OK, reason: 'draft_fingerprint_missing' }),
+    ]);
+    expect(resultOf(emitted).stats).toMatchObject({ sent: 0, skipped: 1, total: 1 });
+    expect(names(emitted).slice(-2)).toEqual(['result', 'complete']);
+  });
+
+  test('(c2) a draft with no draftFingerprint property at all is skipped draft_fingerprint_missing', async () => {
+    SUGGESTIONS[SUG_OK] = suggestion(SUG_OK, { wmkf_accepted: true });
+    // undefined (an own property, so auto-stamp does not fill it in) exercises
+    // the exact `typeof !== 'string'` guard the service checks.
+    const badDraft = { ...draft(SUG_OK), draftFingerprint: undefined };
+
+    const emitted = await run({ drafts: [badDraft], templateType: 'materials' });
+
+    expect(resultOf(emitted).skipped).toEqual([
+      expect.objectContaining({ suggestionId: SUG_OK, reason: 'draft_fingerprint_missing' }),
+    ]);
+  });
+
+  test('(d) skip ordering: a draft that is both not_accepted and stale reports not_accepted (existing guards win)', async () => {
+    // wmkf_accepted stays false (default suggestion()) so the pre-existing
+    // not_accepted guard fires before the fingerprint check ever runs.
+    const staleDraft = stampFingerprint(draft(SUG_OK), fingerprintFor());
+    REQUEST = { ...REQUEST, akoya_title: 'Edited after render' };
+
+    const emitted = await run({ drafts: [staleDraft], templateType: 'materials' });
+
+    expect(resultOf(emitted).skipped).toEqual([
+      expect.objectContaining({ suggestionId: SUG_OK, reason: 'not_accepted' }),
+    ]);
+  });
+
+  test('(d2) skip ordering: a stale invitation draft with a missing secure link reports draft_stale, not missing_secure_link', async () => {
+    const noLinkDraft = {
+      suggestionId: SUG_OK,
+      subject: 'S',
+      body: 'No link here.',
+      externalLinkExpected: false,
+    };
+    const staleNoLinkDraft = stampFingerprint(noLinkDraft, fingerprintFor({ templateType: 'invitation' }));
+    REQUEST = { ...REQUEST, akoya_title: 'Edited after render' };
+
+    const emitted = await run({ drafts: [staleNoLinkDraft], templateType: 'invitation' });
+
+    expect(resultOf(emitted).skipped).toEqual([
+      expect.objectContaining({ suggestionId: SUG_OK, reason: 'draft_stale' }),
+    ]);
+  });
+
+  test('(e) a co-PI added to the request after render is skipped draft_stale (the headline gap)', async () => {
+    SUGGESTIONS[SUG_OK] = suggestion(SUG_OK, { wmkf_accepted: true });
+    // Rendered when the request had NO co-PI.
+    const renderedDraft = stampFingerprint(draft(SUG_OK), fingerprintFor({ coPINames: [] }));
+    // A co-PI is added in Dynamics before this batch is sent.
+    fetchCoPIs.mockResolvedValueOnce(['Dr. New CoPI']);
+
+    const emitted = await run({ drafts: [renderedDraft], templateType: 'materials' });
+
+    expect(resultOf(emitted).skipped).toEqual([
+      expect.objectContaining({ suggestionId: SUG_OK, reason: 'draft_stale' }),
+    ]);
+    expect(mintAndStore).not.toHaveBeenCalled();
+    expect(createAndSendEmail).not.toHaveBeenCalled();
+  });
+
+  test('send-time selects widened to match render: person/request reads include the fingerprinted fields', async () => {
+    SUGGESTIONS[SUG_OK] = suggestion(SUG_OK, { wmkf_accepted: true });
+    await run({ drafts: [draft(SUG_OK)], templateType: 'materials' });
+
+    expect(getPersonById).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({
+      select: expect.stringContaining('wmkf_primaryaffiliation'),
+    }));
+    expect(getPersonById).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({
+      select: expect.stringContaining('wmkf_organizationname'),
+    }));
   });
 });

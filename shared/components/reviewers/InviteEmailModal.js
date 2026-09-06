@@ -36,6 +36,7 @@ import {
   INVALID_SECURE_LINK_SKIP_REASON,
 } from '../../../lib/utils/invitation-link-validator';
 import { renderPreviewFailureMessage, RENDER_PREVIEW_NETWORK_MESSAGE } from './render-preview-failure';
+import { SEND_SKIP_REASON_LABEL } from '../../utils/reviewer-send-skip-reasons';
 
 // Parse a YYYY-MM-DD as LOCAL time (not UTC) and format as "January 15, 2026".
 function formatDate(ymd) {
@@ -730,6 +731,7 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
             subject: d.subject,
             body: d.body,
             externalLinkExpected: d.externalLinkExpected,
+            draftFingerprint: d.draftFingerprint,
           })),
           templateType: 'invitation',
           attachmentUrls: [],
@@ -1330,7 +1332,7 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
               )}
               {results.skipped.length > 0 && (
                 <p className="text-amber-700">
-                  Skipped {results.skipped.length}: {results.skipped.map((s) => `${s.candidateName || '?'} (${skipReasonLabel(s.reason)})`).join(', ')}
+                  Skipped {results.skipped.length}: {results.skipped.map((s) => `${s.candidateName || '?'} (${SEND_SKIP_REASON_LABEL[s.reason] || s.reason})`).join(', ')}
                 </p>
               )}
               {results.failed.length > 0 && (

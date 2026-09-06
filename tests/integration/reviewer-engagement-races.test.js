@@ -39,6 +39,15 @@ jest.mock('../../lib/utils/auth', () => ({
   requireAppAccess: jest.fn(),
   getUserRole: jest.fn(),
 }));
+// Stage 6D: send-emails-service now reads co-PIs (fingerprint input) via
+// proposal-participants -> app-request-person, an entity set this harness's
+// transport does not model (PRIMARY_KEYS is a fixed allowlist and an
+// unregistered set fails the afterEach unexpectedRequests assertion). Mocked
+// directly (default empty) — this suite's races are about expiry/email/
+// correction/status, not co-PI reads.
+jest.mock('../../lib/services/proposal-participants', () => ({
+  fetchCoPIs: jest.fn(async () => []),
+}));
 
 import { createReviewerEngagementTransport } from '../helpers/reviewer-engagement-transport';
 import { DynamicsService } from '../../lib/services/dynamics-service';
@@ -57,6 +66,7 @@ import { getReviewSynthesisJobState } from '../../lib/services/review-synthesis-
 import { ensureToken } from '../../lib/external/token-lifecycle';
 import reviewersHandler from '../../pages/api/review-manager/reviewers';
 import { requireAppAccess, getUserRole } from '../../lib/utils/auth';
+import { stampFingerprint } from '../helpers/draft-fingerprint';
 
 const SET = 'wmkf_appreviewersuggestions';
 const REQUESTS = 'akoya_requests';
@@ -153,9 +163,22 @@ function send(templateType = 'followup') {
   const body = needsLink
     ? 'Dear Reviewer,\n\nPlease review:\nhttps://reviews.example.org/external/review/aaa.bbb.ccc\n\nThank you.'
     : 'Dear Reviewer,\n\nA reminder about your review.\n\nThank you.';
+  const draft = { suggestionId: ID, subject: 'Reviewer message', body, externalLinkExpected: needsLink };
+  // Stage 6D: stamp a real, matching draftFingerprint computed from the
+  // transport's CURRENT fixture state (as of this call — before whatever this
+  // test does next), mirroring the other two send-emails test files' auto-stamp.
+  const stampedDraft = stampFingerprint(draft, {
+    templateType,
+    suggestionId: ID,
+    suggestion: transport.get(SET, ID),
+    person: transport.get(PEOPLE, PERSON),
+    request: transport.get(REQUESTS, REQUEST),
+    coPINames: [],
+    cycle: {},
+    honorariumAmount: 250,
+  });
   const promise = trusted(() => sendEmails({
-    requestBody: { templateType, drafts: [{ suggestionId: ID, subject: 'Reviewer message', body,
-      externalLinkExpected: needsLink }] },
+    requestBody: { templateType, drafts: [stampedDraft] },
     fromEmail: 'staff@example.org',
   }, (event) => events.push(event)));
   return { promise, events };
@@ -748,6 +771,39 @@ describe('F4 post-send bookkeeping races through the real adapter', () => {
     delete existingFields._etag;
     expect(transport.get(SET, ID)).toMatchObject(existingFields);
     expect(run.events.some((event) => event.data?.message?.includes('Warning: lifecycle update failed'))).toBe(false);
+  });
+});
+
+describe('Stage 6D draft fingerprint through the real adapter/transport chain', () => {
+  test('a request field edited via the real transport after the fingerprint was stamped is skipped draft_stale, not sent', async () => {
+    const draft = { suggestionId: ID, subject: 'Reviewer message', body: 'Dear Reviewer,\n\nA reminder about your review.\n\nThank you.', externalLinkExpected: false };
+    // Stamp against the CURRENT (pre-edit) request, as if a preview had just rendered.
+    const staleDraft = stampFingerprint(draft, {
+      templateType: 'followup',
+      suggestionId: ID,
+      suggestion: transport.get(SET, ID),
+      person: transport.get(PEOPLE, PERSON),
+      request: transport.get(REQUESTS, REQUEST),
+      coPINames: [],
+      cycle: {},
+      honorariumAmount: 250,
+    });
+    // A real write through the transport, exactly like a CRM edit between preview and send.
+    transport.patch(REQUESTS, REQUEST, { akoya_title: 'Edited after the preview was rendered' });
+
+    const events = [];
+    await trusted(() => sendEmails({
+      requestBody: { templateType: 'followup', drafts: [staleDraft] },
+      fromEmail: 'staff@example.org',
+    }, (event) => events.push(event)));
+
+    expect(email).not.toHaveBeenCalled();
+    expect(writes()).toEqual([]);
+    const result = events.find((event) => event.event === 'result').data;
+    expect(result.skipped).toEqual([
+      expect.objectContaining({ suggestionId: ID, reason: 'draft_stale' }),
+    ]);
+    expect(events.slice(-2).map((event) => event.event)).toEqual(['result', 'complete']);
   });
 });
 

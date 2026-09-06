@@ -44,10 +44,15 @@ const REQ = '11111111-1111-4111-8111-111111111111';
 
 let renderEmails;
 let RenderEmailsError;
+let buildDraftFingerprintInputs;
+let fingerprintDraft;
 beforeAll(async () => {
   const mod = await import('../../lib/services/review-manager/render-emails-service');
   renderEmails = mod.renderEmails;
   RenderEmailsError = mod.RenderEmailsError;
+  const fp = await import('../../lib/services/review-manager/draft-fingerprint');
+  buildDraftFingerprintInputs = fp.buildDraftFingerprintInputs;
+  fingerprintDraft = fp.fingerprintDraft;
 });
 
 function suggestion(over = {}) {
@@ -377,6 +382,84 @@ describe('externalLinkExpected render-time stamp (S404 Plan v4)', () => {
       actingUserSystemId: null,
     });
     expect(researchOnly.drafts[0]).toMatchObject({ skipped: 'email_research_only', externalLinkExpected: true });
+  });
+});
+
+// Stage 6D: every draft row carries a draftFingerprint (send-emails-service
+// recomputes and refuses a stale one; see draft-fingerprint.js).
+describe('draftFingerprint (Stage 6D)', () => {
+  test('a ready draft carries a 64-hex draftFingerprint equal to fingerprintDraft(buildDraftFingerprintInputs(...))', async () => {
+    findById.mockResolvedValueOnce(suggestion());
+    getReviewerByIdWithSelect.mockResolvedValueOnce(person());
+    const out = await renderEmails({ suggestionIds: [SUG1], template: TEMPLATE, settings: {}, actingUserSystemId: null });
+    const row = out.drafts[0];
+    expect(row.draftFingerprint).toMatch(/^[0-9a-f]{64}$/);
+    const expected = fingerprintDraft(buildDraftFingerprintInputs({
+      templateType: 'invitation',
+      suggestionId: SUG1,
+      suggestion: suggestion(),
+      person: person(),
+      request,
+      coPINames: [],
+      cycle: {},
+      honorariumAmount: 500,
+    }));
+    expect(row.draftFingerprint).toBe(expected);
+  });
+
+  test('skipped rows (no_email, address_conflict_pending, email_research_only) carry draftFingerprint: null', async () => {
+    findById.mockResolvedValueOnce(suggestion());
+    getReviewerByIdWithSelect.mockResolvedValueOnce(person({ wmkf_emailaddress: null }));
+    const noEmail = await renderEmails({ suggestionIds: [SUG1], template: TEMPLATE, settings: {}, actingUserSystemId: null });
+    expect(noEmail.drafts[0]).toMatchObject({ skipped: 'no_email', draftFingerprint: null });
+
+    findById.mockResolvedValueOnce(suggestion());
+    getReviewerByIdWithSelect.mockResolvedValueOnce(person({
+      wmkf_addresstruststatejson: JSON.stringify({
+        version: 1,
+        email: 'jane@uni.edu',
+        status: 'conflict_pending',
+        attestation: null,
+        conflict: {
+          reason: 'email_mismatch',
+          storedEmail: 'jane@uni.edu',
+          foundEmail: 'jane.roe@uni.edu',
+          source: 'institution_page',
+          requestId: REQ,
+          candidateKey: `suggestion:${SUG1}`,
+          detectedAt: '2026-07-31T12:00:00.000Z',
+        },
+        resolution: null,
+      }),
+    }));
+    const blocked = await renderEmails({ suggestionIds: [SUG1], template: TEMPLATE, settings: {}, actingUserSystemId: null });
+    expect(blocked.drafts[0]).toMatchObject({ skipped: 'address_conflict_pending', draftFingerprint: null });
+
+    findById.mockResolvedValueOnce(suggestion());
+    getReviewerByIdWithSelect.mockResolvedValueOnce(person({ wmkf_emailsource: 'serp_search' }));
+    const researchOnly = await renderEmails({
+      suggestionIds: [SUG1],
+      template: TEMPLATE,
+      settings: {},
+      templateType: 'invitation',
+      actingUserSystemId: null,
+    });
+    expect(researchOnly.drafts[0]).toMatchObject({ skipped: 'email_research_only', draftFingerprint: null });
+  });
+
+  test('a co-PI added between two renders changes the fingerprint', async () => {
+    findById.mockResolvedValueOnce(suggestion());
+    getReviewerByIdWithSelect.mockResolvedValueOnce(person());
+    const { fetchCoPIs } = require('../../lib/services/proposal-participants');
+    fetchCoPIs.mockResolvedValueOnce([]);
+    const before = await renderEmails({ suggestionIds: [SUG1], template: TEMPLATE, settings: {}, actingUserSystemId: null });
+
+    findById.mockResolvedValueOnce(suggestion());
+    getReviewerByIdWithSelect.mockResolvedValueOnce(person());
+    fetchCoPIs.mockResolvedValueOnce(['Dr. Alex Co-PI']);
+    const after = await renderEmails({ suggestionIds: [SUG1], template: TEMPLATE, settings: {}, actingUserSystemId: null });
+
+    expect(after.drafts[0].draftFingerprint).not.toBe(before.drafts[0].draftFingerprint);
   });
 });
 

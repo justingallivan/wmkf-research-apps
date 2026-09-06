@@ -221,6 +221,24 @@ function registry() {
     });
   }
 
+  // 5. send-emails skipped[].reason producer ⊆ shared reason-label consumer
+  //    (subset). Stage 6D: the send service pushes `SEND_SKIP_REASON.x`
+  //    everywhere instead of a bare string literal, so a new reason cannot
+  //    reach a modal's sent-summary list unlabeled. The label map may also
+  //    carry render-time `d.skipped` values the invite modal labels
+  //    separately — 6D does not merge the two vocabularies, hence `subset`.
+  {
+    const reasons = read('shared/utils/reviewer-send-skip-reasons.js');
+    checks.push({
+      name: 'SEND_SKIP_REASON ⊆ SEND_SKIP_REASON_LABEL',
+      producer: 'SEND_SKIP_REASON values (reviewer-send-skip-reasons.js)',
+      consumer: 'SEND_SKIP_REASON_LABEL keys (reviewer-send-skip-reasons.js)',
+      produced: extractObjectStringValues(reasons, 'SEND_SKIP_REASON'),
+      consumed: extractObjectKeys(reasons, 'SEND_SKIP_REASON_LABEL'),
+      rule: 'subset',
+    });
+  }
+
   return checks;
 }
 

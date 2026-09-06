@@ -377,3 +377,79 @@ describe('InviteEmailModal capture-mode result display', () => {
     });
   });
 });
+
+describe('Stage 6D draft fingerprint (InviteEmailModal)', () => {
+  const { SEND_SKIP_REASON_LABEL } = require('../../shared/utils/reviewer-send-skip-reasons');
+
+  test('forwards draftFingerprint from the render-emails draft into the send-emails payload', async () => {
+    global.fetch.mockImplementation(async (url) => {
+      if (String(url).startsWith('/api/user-preferences')) return mockJson({});
+      if (url === '/api/review-manager/campaign-timeline-defaults') {
+        return mockJson({ timeline: {}, isDefault: true, malformed: false });
+      }
+      if (url === '/api/review-manager/render-emails') {
+        return mockJson({ drafts: [{ ...draft, draftFingerprint: 'a'.repeat(64) }] });
+      }
+      if (url === '/api/review-manager/send-emails') return { ok: true, body: { getReader: () => ({ read: jest.fn() }) } };
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    readSseStream.mockImplementation(async () => {});
+
+    render(
+      <InviteEmailModal
+        candidates={[{ suggestionId: 'S1', name: 'Dr. Test Reviewer', email: 'reviewer@example.org' }]}
+        settings={{ signature: 'Program Director' }}
+        onClose={jest.fn()}
+        onSent={jest.fn()}
+      />,
+    );
+
+    await screen.findByDisplayValue('Invitation');
+    fireEvent.click(await screen.findByRole('button', { name: /send 1 invitation/i }));
+
+    await waitFor(() => {
+      const sendCall = global.fetch.mock.calls.find(([url]) => url === '/api/review-manager/send-emails');
+      expect(sendCall).toBeTruthy();
+      expect(JSON.parse(sendCall[1].body).drafts[0].draftFingerprint).toBe('a'.repeat(64));
+    });
+  });
+
+  test('a send-time skipped reason renders the shared SEND_SKIP_REASON_LABEL copy in the results summary', async () => {
+    global.fetch.mockImplementation(async (url) => {
+      if (String(url).startsWith('/api/user-preferences')) return mockJson({});
+      if (url === '/api/review-manager/campaign-timeline-defaults') {
+        return mockJson({ timeline: {}, isDefault: true, malformed: false });
+      }
+      if (url === '/api/review-manager/render-emails') {
+        return mockJson({ drafts: [{ ...draft, draftFingerprint: 'a'.repeat(64) }] });
+      }
+      if (url === '/api/review-manager/send-emails') return { ok: true, body: { getReader: () => ({ read: jest.fn() }) } };
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    readSseStream.mockImplementation(async (_response, onEvent) => {
+      onEvent({
+        event: 'result',
+        data: {
+          sent: [],
+          failed: [],
+          skipped: [{ suggestionId: 'S1', candidateName: 'Dr. Test Reviewer', candidateEmail: 'reviewer@example.org', reason: 'draft_stale' }],
+        },
+      });
+    });
+
+    render(
+      <InviteEmailModal
+        candidates={[{ suggestionId: 'S1', name: 'Dr. Test Reviewer', email: 'reviewer@example.org' }]}
+        settings={{ signature: 'Program Director' }}
+        onClose={jest.fn()}
+        onSent={jest.fn()}
+      />,
+    );
+
+    await screen.findByDisplayValue('Invitation');
+    fireEvent.click(await screen.findByRole('button', { name: /send 1 invitation/i }));
+
+    expect(await screen.findByText(new RegExp(SEND_SKIP_REASON_LABEL.draft_stale.slice(0, 40), 'i')))
+      .toBeTruthy();
+  });
+});

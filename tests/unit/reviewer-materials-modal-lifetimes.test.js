@@ -1339,3 +1339,48 @@ test('send-emails payload is unchanged shape: drafts fields, templateType, attac
     markAsSent: true,
   });
 });
+
+// ── Stage 6D: draft fingerprint forwarding + skipped-reason labels ────────
+
+describe('Stage 6D draft fingerprint (ReleaseMaterialsModal)', () => {
+  test('forwards draftFingerprint from the render-emails draft into the send-emails payload', async () => {
+    renderEmailsBehavior = () => mockJson({
+      drafts: [draftFor(REVIEWER_A, { externalLinkExpected: true, draftFingerprint: 'a'.repeat(64) })],
+    });
+    sendEmailsBehavior = () => controlledSse().response;
+    renderPanel({ reviewers: [REVIEWER_A] });
+    openReleaseModal(1);
+    await preview(1);
+    await send(1);
+    await waitFor(() => expect(sendCalls().length).toBe(1));
+
+    const [, init] = sendCalls()[0];
+    const payload = JSON.parse(init.body);
+    expect(payload.drafts[0].draftFingerprint).toBe('a'.repeat(64));
+  });
+
+  test('a draft_stale skipped reason renders the shared SEND_SKIP_REASON_LABEL copy in the sent summary', async () => {
+    const { SEND_SKIP_REASON_LABEL } = require('../../shared/utils/reviewer-send-skip-reasons');
+    const sse = controlledSse();
+    renderEmailsBehavior = () => mockJson({
+      drafts: [draftFor(REVIEWER_A, { externalLinkExpected: true, draftFingerprint: 'a'.repeat(64) })],
+    });
+    sendEmailsBehavior = () => sse.response;
+    renderPanel({ reviewers: [REVIEWER_A] });
+    openReleaseModal(1);
+    await preview(1);
+    await send(1);
+    await waitFor(() => expect(sendCalls().length).toBe(1));
+
+    sse.push(sseChunk('result', {
+      sent: [],
+      failed: [],
+      skipped: [{ suggestionId: REVIEWER_A.suggestionId, candidateName: REVIEWER_A.name, candidateEmail: REVIEWER_A.email, reason: 'draft_stale' }],
+    }));
+    sse.push(sseChunk('complete', { message: 'done' }));
+    sse.finish();
+
+    expect(await screen.findByText(new RegExp(SEND_SKIP_REASON_LABEL.draft_stale.slice(0, 40), 'i')))
+      .toBeTruthy();
+  });
+});
