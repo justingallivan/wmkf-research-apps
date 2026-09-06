@@ -259,9 +259,12 @@ rules and copy are unchanged. Tests: the lifetime describes in
 `tests/unit/reviewer-manage-actions-menu.test.js` and `tests/unit/reviewer-closeout-modal.test.js`.
 Receipt: `docs/audits/REVIEWER_LIFECYCLE_STAGE6B2_RECEIPT_2026-09-05.md`.
 
-Stage 6B3 (same branch, `a6a27ce8`/`b163172a`, not merged): the nested materials-release
-modal's session is open state, request id and the sorted membership of selected reviewers,
-reconciled by one no-deps layout effect with an unmount cleanup; any change bumps the modal
+Stage 6B3 (same branch, `a6a27ce8`/`b163172a`, amended by 6B3a `3a4bcbbe`/`0a4eafd6`, not
+merged): the nested materials-release modal's session is open state, request id, the sorted
+membership of selected reviewers and, since 6B3a, the signature and review due date compared
+by value (the only two `settings` fields render consumes; recipients are re-resolved server-side
+by suggestion id, so stale display props never reach an email), reconciled by one no-deps
+layout effect with an unmount cleanup; any change bumps the modal
 epoch, aborts the active preview render and returns the UI to a fresh compose, while
 same-membership object churn does not. Proposal loading is invalidated by open/close, request
 change and unmount only. The send handler keeps its own results accumulator, marks the attempt
@@ -269,9 +272,13 @@ finished on `complete` so duplicate or trailing events have no effect, and hands
 one-use completion cause; the panel stores it with its selection clear and passes it back, so
 only that exact prior-membership-to-empty transition preserves the sent summary. Uploads and
 template-save feedback are checkpointed with attempt-owned lock release. Payloads, the SSE
-contract, preview single-flight and tail serialization are unchanged. Accepted limit: a
-membership change during an in-flight send returns to compose while the server-side one-time
-materials gate bounds a duplicate send. Tests: `tests/unit/reviewer-materials-modal-lifetimes.test.js`.
+contract, preview single-flight and tail serialization are unchanged. When the committed due-date default
+changes, a due-date field still holding the prior default follows it; a customized field is
+kept. Accepted limits: a membership, signature or deadline change during an in-flight send
+returns to compose while the server-side one-time materials gate bounds a duplicate send; a
+deadline change with a customized field still resets drafts even though the render would be
+identical; the global localStorage due-date key makes a restored value read as customized
+(pre-existing). Tests: `tests/unit/reviewer-materials-modal-lifetimes.test.js`.
 Receipt: `docs/audits/REVIEWER_LIFECYCLE_STAGE6B3_RECEIPT_2026-09-05.md`.
 
 The existing `ReviewerManagePanel.updateStatus` UI submits one reviewer only.

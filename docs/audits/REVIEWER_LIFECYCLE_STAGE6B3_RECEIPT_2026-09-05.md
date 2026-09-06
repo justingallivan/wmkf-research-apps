@@ -211,3 +211,61 @@ browser-verified.
 - Structural zeros retained as defense in depth: the preview finally double-epoch check (pre-existing, unpinned anywhere), the prior-key/session/consumed checks in the completion exemption, the post-import upload checkpoint.
 - The `email_unconfirmed` stream event exists in the service vocabulary with no modal branch; pre-existing, not investigated.
 - No browser/live probe, deployment or human UAT ran for this slice. Nothing is merged to `main` or deployed; promotion is a separate, deliberate action under the release strategy.
+
+## Amendment 6B3a — settings folded into the session identity (2026-09-05)
+
+Origin: Codex adversarial review of `b163172a` (codex-companion `adversarial-review`, base
+`489e07f2`, verdict needs-attention, one medium finding): "Membership-only identity fails to
+invalidate changed recipient/context data ... a commit that keeps the same selected reviewers
+but changes their display/contact data or request settings does not create a new session ...
+the user can therefore review and send a draft rendered with stale deadline/signature/context
+after those props changed." The orchestrator verified the mechanism is pre-existing and was
+what the plan's identity definition specified; the owner chose to widen the identity rather
+than record it as a limit.
+
+Disposition of the two halves: the settings half is fixed below. The recipient-data half needs
+no code: render-emails takes `suggestionIds` and the send service re-resolves each recipient's
+address from Dataverse by suggestion id (`send-emails-service.js:340–354`, `:498` uses the
+hydrated person's email, never the draft's `candidateEmail`) [VERIFIED by the reviewer], so
+stale reviewer display props cannot reach an email.
+
+Implemented at `3a4bcbbe` (`ReviewerManagePanel.js` +64/−16 inside `ReleaseMaterialsModal`,
+test file +176; no other file):
+- The session key adds `signature` and `reviewDueDate` compared by value (joined with U+0000),
+  the only two `settings` fields render consumes (`snapshotSettings`); never the `settings`
+  object identity, which the panel rebuilds every render, and never other host keys.
+- The completion exemption additionally requires the settings key unchanged.
+- Follow rule: when the committed due-date default changes, the due-date field moves to the
+  new default only if it is empty or still equals the prior default; a customized (or
+  localStorage-restored) value is kept. Without this the widened key would reset drafts but the
+  re-render would still carry the stale date, because the field wins over the prop.
+- `0a4eafd6` adds the reviewer's advisory test: a null `reviewDeadline` (ReviewersTab nulls the
+  proposal on a reviewers-fetch failure) keeps the due-date input controlled and empty;
+  removing the `|| ''` normalization fails exactly that test.
+
+Red-before-code: the six new tests against the `8c29e67d` runtime: 5 failed / 1 passed
+(reviewer-measured; the passing case is the same-value fresh-object non-regression guard); no
+pre-existing test changed status.
+
+Verification at `3a4bcbbe`/`0a4eafd6` (orchestrator-run, HEAD logged at start and end): full
+suite 772 suites / 11,307 tests; `check:types` pass; lint 0 errors, 75 warnings (pre-existing
+set); webpack build pass with no generated changes; `git diff --check` clean; seven gate pairs (dataverse-access-layer, route-service-boundary, dynamics-context-boundary, api-routes, route-lifecycle-auth, trust-boundary-guid, status-enum-parity) all pass with self-tests, run serially.
+
+Independent review: fresh-context Opus subagent (native, subscription path), frozen `3a4bcbbe`,
+md5-verified before and after every mutation, waited for the full-suite `DONE`. Seven-suite UI
+selection 7 / 513 pass. Guard removals: settings key out of the comparison → 4 failures (a, b, c,
+e); follow rule deleted → 1 (b); settings check out of the exemption → 1 (f); the reviewer's own
+mutations: empty-field clause of the follow rule → 0 (display-only; the render already falls
+through to the prop when the field is empty), `|| ''` normalization → 0 before `0a4eafd6`, 1
+after. Test (f)'s host-component pattern was confirmed discriminating (the exemption is taken
+in the same commit under the mutant). Trace claims confirmed, with one correction: the
+`{signature}` object originates in `pages/workbench/[requestId].js:121–124`, passed through
+`ReviewersTab.js:546`. Lifecycle audit of the follow rule across first commit, localStorage
+merge ordering, open/close, request switch and same-value churn found no defect.
+**Verdict: PASS at `3a4bcbbe`, no required items.**
+
+Further accepted limits: a signature or deadline change during an in-flight send resets to
+compose like a membership change (same server-side bound); a deadline change while the PD has
+customized the field still clears drafts although the render would be identical
+(over-conservative); the global localStorage due-date key means a restored value reads as
+customized (pre-existing, unchanged).

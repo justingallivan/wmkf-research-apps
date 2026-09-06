@@ -35,7 +35,9 @@ PASS after one BLOCK round. See the
 [VERIFIED via frozen commits, tests and independent review] **6B3 is complete**
 on the same branch: runtime `a6a27ce8`, review-driven correction `b163172a`, full
 suite 772 suites / 11,301 tests, webpack build, seven gate pairs and an independent
-PASS after one BLOCK round. See the
+PASS after one BLOCK round; amendment 6B3a (`3a4bcbbe` runtime, `0a4eafd6` advisory test)
+folded the signature and review due date into the session identity after a Codex adversarial
+review, with an independent PASS and a full suite of 772 suites / 11,307 tests. See the
 [Stage 6B3 receipt](audits/REVIEWER_LIFECYCLE_STAGE6B3_RECEIPT_2026-09-05.md).
 **Stage 6B is therefore complete on `codex/reviewer-lifecycle-stage6b`.** Nothing is
 merged or deployed; promotion (PR, CI, deliberate merge under the release strategy) is
@@ -44,7 +46,9 @@ stage inherits: callback promises are observed, not awaited; no post-close
 refresh-failure surface exists for the reminder, closeout or materials components; the
 closeout modal closes itself on committed permission loss; a membership change during an
 in-flight materials send returns the modal to compose while the server-side one-time
-release gate bounds a duplicate send.
+release gate bounds a duplicate send; a signature or review-deadline change while the modal
+is open resets it the same way, even when the PD's customized due date would have rendered
+identically.
 These are subdivisions of original Stage 6B, not additional product features.
 Stage 6C extraction is outside this handoff.
 
@@ -209,15 +213,20 @@ Start only after 6B2 review. Keep `ReleaseMaterialsModal` nested for this slice.
 669–682 do not invalidate preview/send epochs. Preview and send capture that
 epoch at lines 777–1026. Templates/attachments remain separate scratch concerns.
 
-Use a modal session identity of open/closed state, request ID and selected
-suggestion-ID membership, plus observed parent permission/read-only lifetime.
-Compare stable membership, not array identity or reviewer display-object identity.
+Use a modal session identity of open/closed state, request ID, selected
+suggestion-ID membership and, since the 6B3a amendment (`3a4bcbbe`, owner decision after a
+Codex adversarial review), the two consumed settings values (signature and review due
+date) compared by value, plus observed parent permission/read-only lifetime.
+Compare stable membership, not array identity or reviewer display-object identity, and
+never the `settings` object identity (the panel rebuilds it every render).
 External membership changes and request changes invalidate the previous session
 even while open; returning does not revive it. Reset drafts/results/error for a
 new session, except the explicitly owned completion reset below. Do not normalize
 or rewrite the existing request payload.
-Keep compose fields/settings and attachment persistence semantics; no new
-cross-request attachment-storage policy is implied by suppressing stale UI writes.
+Keep compose fields/settings and attachment persistence semantics, with one 6B3a
+exception: when the committed review-due-date default changes, a due-date field that still
+holds the prior default (or is empty) follows the new default; a customized field is kept.
+No new cross-request attachment-storage policy is implied by suppressing stale UI writes.
 
 | Owner / baseline region | Preservation and every asynchronous checkpoint |
 |---|---|
