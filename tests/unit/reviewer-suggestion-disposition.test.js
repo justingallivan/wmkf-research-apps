@@ -1165,6 +1165,36 @@ describe('closed engagements survive the other write paths', () => {
     expect(opts.ifMatch).toBe('W/"9"');
   });
 
+  // D0 (owner decision 2026-09-06, Stage 7 plan): the guard is row-aware. A
+  // completion-stamped row whose status was never advanced to a closed value
+  // (legacy / hand-edited data) is a closed engagement too. This fixture is
+  // the one the Stage 2 review flagged as missing: the status alone passes
+  // the old status-only guard, so only the completedat check can refuse it.
+  test('D0: softDelete refuses a completion-stamped row even when its status is not closed', async () => {
+    DynamicsService.getRecord.mockResolvedValue({
+      wmkf_reviewstatus: REVIEW_STATUS_MAP.accepted,
+      wmkf_completedat: '2026-09-04T13:00:00Z',
+      _etag: 'W/"12"',
+    });
+    await expect(suggestionAdapter.softDelete(SUGGESTION_ID))
+      .rejects.toThrow(/closed review status/);
+    expect(DynamicsService.updateRecord).not.toHaveBeenCalled();
+  });
+
+  test('D0: the guard read selects wmkf_completedat alongside wmkf_reviewstatus', async () => {
+    DynamicsService.getRecord.mockResolvedValue({ wmkf_reviewstatus: null, wmkf_completedat: null, _etag: 'W/"13"' });
+    await suggestionAdapter.softDelete(SUGGESTION_ID);
+    const [, , opts] = DynamicsService.getRecord.mock.calls[0];
+    expect(opts.select.split(',')).toEqual(expect.arrayContaining(['wmkf_reviewstatus', 'wmkf_completedat']));
+  });
+
+  test('D0 inverse: a never-completed non-terminal row is still removed, bound to the fresh ETag', async () => {
+    DynamicsService.getRecord.mockResolvedValue({ wmkf_reviewstatus: REVIEW_STATUS_MAP.accepted, wmkf_completedat: null, _etag: 'W/"14"' });
+    await suggestionAdapter.softDelete(SUGGESTION_ID);
+    expect(DynamicsService.updateRecord).toHaveBeenCalledTimes(1);
+    expect(DynamicsService.updateRecord.mock.calls[0][3].ifMatch).toBe('W/"14"');
+  });
+
   // Without the ETag fallback the terminal guard was pure TOCTOU: the generic
   // batch PATCH supplies no ifMatch, so it could read a non-terminal row, lose
   // the race to a concurrent transition, then overwrite the new terminal status.

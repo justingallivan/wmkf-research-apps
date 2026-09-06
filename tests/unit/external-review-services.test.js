@@ -459,6 +459,29 @@ describe('applyReviewerResponse', () => {
     });
   });
 
+  it('D3: a missing_version refusal from the legacy repair op maps to concurrent_modification (not a 500)', async () => {
+    deselectLegacyDeclinedSuggestion.mockRejectedValueOnce(
+      Object.assign(new Error('deselectLegacyDeclinedSuggestion requires a current suggestion ETag.'), {
+        code: 'missing_version',
+        status: 400,
+      }),
+    );
+    await expect(applyReviewerResponse({
+      suggestion: baseSuggestion({
+        wmkf_declined: true,
+        wmkf_selected: true,
+        _etag: null,
+      }),
+      request,
+      reviewer,
+      body: { action: 'decline', decline: {} },
+    })).rejects.toMatchObject({
+      httpStatus: 412,
+      body: { ok: false, reason: 'concurrent_modification' },
+    });
+    expect(deselectLegacyDeclinedSuggestion).toHaveBeenCalledWith(expect.any(String), { ifMatch: undefined });
+  });
+
   it('already-deselected legacy row (wmkf_selected falsy) never calls the repair op', async () => {
     deselectLegacyDeclinedSuggestion.mockClear();
     updateLifecycle.mockClear();

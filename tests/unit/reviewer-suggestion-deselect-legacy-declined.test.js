@@ -7,7 +7,8 @@
  * `updateLifecycle` with a fixed `{ selected: false }` payload, so this suite
  * pins that the underlying transport call it produces is IDENTICAL to what
  * `updateLifecycle(id, { selected: false }, opts)` produces directly today —
- * not a reimplementation of the guards/fallback/picklist logic.
+ * not a reimplementation of the guards/fallback/picklist logic — plus the
+ * one intentional addition: D3 (2026-09-06) requires a concrete ETag.
  */
 import { DynamicsService } from '../../lib/services/dynamics-service.js';
 import {
@@ -64,27 +65,32 @@ describe('deselectLegacyDeclinedSuggestion', () => {
     expect(opCallArgs[3]).toEqual({ ifMatch: 'W/"1"' });
   });
 
-  test('with ifMatch: undefined, the same fallback behavior as updateLifecycle today (equality, not a specific policy)', async () => {
-    const getRecord = mockCleanGuardRead();
+  // D3 (owner decision 2026-09-06): a concrete ETag is required. Before this
+  // the op inherited updateLifecycle's fallback, which for this non-status,
+  // non-invitation-response payload meant an UNCONDITIONAL write. Every
+  // refusal below happens before the guard read, so Dataverse sees nothing.
+  test.each([
+    ['undefined', undefined],
+    ['null', null],
+    ['empty string', ''],
+    ['wildcard', '*'],
+    ['whitespace-padded', ' W/"7" '],
+  ])('D3: ifMatch %s is refused as missing_version with zero Dataverse calls', async (_label, ifMatch) => {
+    const getRecord = jest.spyOn(DynamicsService, 'getRecord').mockResolvedValue({});
     const patch = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue(undefined);
 
-    await deselectLegacyDeclinedSuggestion('sug-2', { ifMatch: undefined });
-    expect(getRecord).toHaveBeenCalledTimes(1);
-    expect(patch).toHaveBeenCalledTimes(1);
-    const opCallArgs = patch.mock.calls[0];
+    await expect(deselectLegacyDeclinedSuggestion('sug-2', { ifMatch }))
+      .rejects.toMatchObject({ code: 'missing_version', status: 400 });
+    expect(getRecord).not.toHaveBeenCalled();
+    expect(patch).not.toHaveBeenCalled();
+  });
 
-    getRecord.mockClear();
-    patch.mockClear();
+  test('D3 mutation pin: updateLifecycle itself still accepts ifMatch: undefined for this payload (the requirement lives in the op)', async () => {
+    mockCleanGuardRead();
+    const patch = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue(undefined);
     await updateLifecycle('sug-2', { selected: false }, { ifMatch: undefined });
-    expect(getRecord).toHaveBeenCalledTimes(1);
     expect(patch).toHaveBeenCalledTimes(1);
-    const directCallArgs = patch.mock.calls[0];
-
-    expect(opCallArgs).toEqual(directCallArgs);
-    // The specific fallback policy (no ifMatch supplied → no key on this
-    // non-status, non-invitation-response payload) is updateLifecycle's to
-    // define; this only pins that the op did not add one of its own.
-    expect(opCallArgs[3]).not.toHaveProperty('ifMatch');
+    expect(patch.mock.calls[0][3]).not.toHaveProperty('ifMatch');
   });
 
   test('actingUserSystemId is forwarded to the same transport call as updateLifecycle', async () => {
