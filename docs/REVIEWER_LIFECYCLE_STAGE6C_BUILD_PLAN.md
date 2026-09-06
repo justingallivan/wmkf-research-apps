@@ -134,11 +134,25 @@ export { PREVIEW_RENDER_TIMEOUT_MS } from './ReleaseMaterialsModal';
   `git merge-base` is `dcecf972` [VERIFIED via command]. Codex evidenced no moved-component seam
   defect. Disposition: rebase the branch onto current main before the PR so the two-dot view matches.
   Round 2 reserved for a confirmed defect from the Opus review.
+- **Opus review (`f7ab967f`): PASS WITH ADVISORIES, no required items.** Pure move confirmed with
+  and without whitespace relaxation; non-move lines are imports/exports and `export` declarations
+  only; base 14 suites / 1,027 tests vs head 15 / 1,037 (delta = the new pin); out-of-tree mutation
+  of the `TokenActionsMenu` re-export turns the pin red; lint warning sets map 1:1 base→head; no
+  circular import; `reviewer-draft-keys.js` has zero imports. Advisories: (A) two comment blocks
+  referred to code "below" that moved — fixed in follow-up commit `5d92d5bc` on the branch;
+  (B) docs to relocate after merge (see Docs below, extended with the reviewer's list).
+- Rebased onto main `f8d35368` as `70babc04` + `5d92d5bc`; pushed; PR opened.
 
 ## Docs (architect, after merge)
 
-- `docs/agent-wiki/topics/reviewer-workbench-lifecycle.md`: replace file/line pointers into
-  `ReviewerManagePanel.js` for the moved symbols with the new module names.
+- `docs/agent-wiki/topics/reviewer-workbench-lifecycle.md` (`:522`, `:1414`) and
+  `docs/agent-wiki/topics/external-reviewer-portal.md` (`:470`): "`ReviewerManagePanel`'s
+  `ReleaseMaterialsModal`" phrasing → the modal's own module.
+- `docs/REVIEWER_LIFECYCLE_STAGE6D_BUILD_PLAN.md` `:34`, `:105` (modal render/send/skipped lines);
+  `docs/REVIEWER_LIFECYCLE_STAGE6B_BUILD_PLAN.md` `:198`, `:229`;
+  `docs/audits/REVIEWER_LIFECYCLE_REMAINING_READINESS_2026-09-05.md` `:64`, `:77`, `:82`;
+  `SESSION_PROMPT.md` key-files row for the panel. Historical receipts/reviews stay as dated
+  evidence.
 - `docs/audits/REVIEWER_LIFECYCLE_REMAINING_READINESS_2026-09-05.md` 6C row → complete.
 - `docs/REVIEWER_LIFECYCLE_STAGE6B_BUILD_PLAN.md` status line: 6C done, 6D next.
 - Receipt: `docs/audits/REVIEWER_LIFECYCLE_STAGE6C_RECEIPT_<date>.md` with the verification
