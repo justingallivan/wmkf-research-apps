@@ -21,20 +21,29 @@ jest.mock('../../lib/dataverse/adapters/account', () => ({
   __esModule: true,
   queryAccounts: jest.fn(async () => ({ records: [] })),
 }));
-jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
-  __esModule: true,
-  findByRequest: jest.fn(async () => []),
-  findRemovedByRequest: jest.fn(async () => []),
-  findByPD: jest.fn(async () => ({ suggestions: [], requestById: {} })),
-  aggregateReviewHistory: jest.fn(async () => ({})),
-  findById: jest.fn(),
-  updateLifecycle: jest.fn(async () => {}),
-  restore: jest.fn(async () => {}),
-  softDelete: jest.fn(async () => {}),
-  bulkUpdateByRequest: jest.fn(async () => 0),
-  APPLICANT_DISPOSITION_MAP: { recommended: 100000000 },
-  RESPONSE_TYPE_BY_VALUE: { 100000000: 'accepted', 100000001: 'declined' },
-}));
+jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => {
+  // bulkUpdateByRequest stays mocked directly (nothing in this suite calls
+  // the real Stage 3K op's implementation); setRequestMetadata forwards to
+  // it so the existing bulkUpdateByRequest-shaped assertions below (bulk-by-
+  // request dispatch) stay byte-unchanged now that the service calls the
+  // whitelisted op instead.
+  const bulkUpdateByRequest = jest.fn(async () => 0);
+  return {
+    __esModule: true,
+    findByRequest: jest.fn(async () => []),
+    findRemovedByRequest: jest.fn(async () => []),
+    findByPD: jest.fn(async () => ({ suggestions: [], requestById: {} })),
+    aggregateReviewHistory: jest.fn(async () => ({})),
+    findById: jest.fn(),
+    updateLifecycle: jest.fn(async () => {}),
+    restore: jest.fn(async () => {}),
+    softDelete: jest.fn(async () => {}),
+    bulkUpdateByRequest,
+    setRequestMetadata: jest.fn((requestId, updates, opts) => bulkUpdateByRequest(requestId, updates, opts)),
+    APPLICANT_DISPOSITION_MAP: { recommended: 100000000 },
+    RESPONSE_TYPE_BY_VALUE: { 100000000: 'accepted', 100000001: 'declined' },
+  };
+});
 jest.mock('../../lib/dataverse/adapters/potential-reviewer', () => ({
   __esModule: true,
   queryReviewers: jest.fn(async () => ({ records: [] })),
