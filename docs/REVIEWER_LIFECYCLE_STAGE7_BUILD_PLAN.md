@@ -298,7 +298,15 @@ or backfill.
   comment-only mentions; gate script table/docblock) and an interim-census header; spaced call under
   `shared/` proved red; stale caller comments renamed; transport-identity test uses
   `'Medical Research Program'` → `'Medical Research'` and asserts the normalized payload. 806 / 11,641;
-  gates green. Codex round 2 running on the census fix.
+  gates green.
+- **3K Codex adversarial round 2 (final, `c07902cc`): needs-attention, one medium — accepted, resolved
+  by Stage 7 rather than a third round.** Round-1 widening confirmed present. Because
+  `my-candidates-service.js` is in the expected set for comment-only mentions, a new executable
+  `bulkUpdateByRequest` call in that file would not change the file set. True, and the reason the test
+  header calls itself interim: Stage 7B deletes `bulkUpdateByRequest` and rewrites this test as a
+  zero-reference pin (no expected set to hide behind), and Stage 7A's AST binding-resolved gate is the
+  deletion authority Codex asks for. 3K itself does not delete anything, so it merges on this basis;
+  cap reached.
 
 - **Stage 7 build launched (2026-09-06)** on `claude/reviewer-lifecycle-stage7`, branched from the
   3K branch (PR #167 awaiting CI) to avoid waiting; rebases onto main once 3K merges. Three commits:
