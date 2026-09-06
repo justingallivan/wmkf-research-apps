@@ -300,6 +300,17 @@ or backfill.
   `'Medical Research Program'` → `'Medical Research'` and asserts the normalized payload. 806 / 11,641;
   gates green. Codex round 2 running on the census fix.
 
+- **Stage 7 build launched (2026-09-06)** on `claude/reviewer-lifecycle-stage7`, branched from the
+  3K branch (PR #167 awaiting CI) to avoid waiting; rebases onto main once 3K merges. Three commits:
+  7A the gate (`check:reviewer-engagement-boundary` + self-test, workflow steps, CI reference rows,
+  `/start` list; LAW mode over `lib/pages/shared/modules`; recorded importers = the two receipt
+  sinks for `patchReviewReceipt`; stale recorded entries fail; non-literal sources fail closed); 7B
+  delete `bulkUpdateByRequest` (body inlined into `setRequestMetadata`, D4 unchanged; importers test
+  becomes a zero-reference pin; trust-boundary sink entry removed); 7C adapter op
+  `expireInvitationResponse(id, nowIso, { ifMatch })` with `requireIfMatch` (codification — the sweep
+  already passes a concrete ETag) called by `expire-invitation.js`; the `patchFields` alias stays for
+  `markInvitationGenerated` pending D2.
+
 ## Docs (after each merge)
 
 Readiness audit rows 3/7; service catalog; `reviewer-workbench-lifecycle.md` Stage 3 bullet;
