@@ -223,11 +223,19 @@ after those props changed." The orchestrator verified the mechanism is pre-exist
 what the plan's identity definition specified; the owner chose to widen the identity rather
 than record it as a limit.
 
-Disposition of the two halves: the settings half is fixed below. The recipient-data half needs
-no code: render-emails takes `suggestionIds` and the send service re-resolves each recipient's
-address from Dataverse by suggestion id (`send-emails-service.js:340–354`, `:498` uses the
-hydrated person's email, never the draft's `candidateEmail`) [VERIFIED by the reviewer], so
-stale reviewer display props cannot reach an email.
+Disposition of the two halves: the settings half is fixed below. For the recipient-data half,
+the destination address is re-resolved server-side at send (`send-emails-service.js:340–354`,
+`:498` uses the hydrated person's email, never the draft's `candidateEmail`) [VERIFIED by the
+reviewer], so a stale address cannot reach an email. The rendered subject and body are NOT
+re-resolved: render-emails expands the recipient name into the draft
+(`render-emails-service.js:195,323–335`), the PD may edit the draft in the preview textarea,
+and send transmits that body verbatim (`send-emails-service.js:773,871–875`). A reviewer-name
+change in Dataverse between preview and send therefore reaches the greeting with the old name.
+A second Codex adversarial review (thread `01a07442-4ee5-7922-9e01-85483df26d73`) caught this
+receipt's earlier overstatement that stale display data "cannot reach an email"; the earlier
+sentence was wrong and is replaced here. The panel's `reviewer.name` is the same Dataverse
+`wmkf_name` field the render uses (`reviewers-service.js:300`), so a by-value name key would be
+a faithful proxy if the owner chooses to widen the identity again. Owner disposition: widen the identity again (amendment 6B3b below).
 
 Implemented at `3a4bcbbe` (`ReviewerManagePanel.js` +64/−16 inside `ReleaseMaterialsModal`,
 test file +176; no other file):
@@ -269,3 +277,53 @@ compose like a membership change (same server-side bound); a deadline change whi
 customized the field still clears drafts although the render would be identical
 (over-conservative); the global localStorage due-date key means a restored value reads as
 customized (pre-existing, unchanged).
+
+## Amendment 6B3b — recipient fields folded into the session identity (2026-09-05)
+
+Origin: the second Codex adversarial review above (medium: "Recipient display data can remain
+stale in the email body"). The orchestrator first recommended recording it as a limit on the
+grounds that the PD previews the body; the owner asked why, and on re-weighing that argument
+applied equally to the signature and deadline already fixed in 6B3a, so the owner chose to fix.
+
+Implemented at `9a790c64` (`ReviewerManagePanel.js` +67/−17; test file +153 then trimmed;
+`529ee426` adds one advisory test): a module-level `membershipKeyFor(reviewers)` helper builds
+each selected reviewer's string from suggestionId, name, email and affiliation (U+0000 between
+fields, rows sorted, U+0001 between rows; separators built at runtime, no control bytes in the
+source), and the session effect uses it for the membership key. `handleSend` already captured
+`priorKey` from the committed context, so there is one computation site. Provenance
+[VERIFIED by the reviewer]: the panel row and the render read the same Dataverse person object
+(`reviewers-service.js:286–301`, `render-emails-service.js:278–282`), so email and affiliation
+are the same values; name is a strictly finer proxy (the render whitespace-normalizes it, so a
+raw-equal name is always render-equal). The render's candidate has no expertise field, so
+`recipientExpertise` is always empty on this path and there is nothing to key on.
+
+Completion exemption: a recipient change landing with or after the post-send selection clear is
+unobservable by construction (the modal's `reviewers` prop is empty, so the key is `''`; the
+send has completed and the summary describes what was sent). A vacuous test asserting this was
+removed and replaced by a comment; the reviewer confirmed no discriminating test can exist.
+
+Red-before-code: the three new tests against the `11ac925c` runtime: 3 failed / 0 passed
+(reviewer-measured); no pre-existing test changed status.
+
+Verification at `9a790c64` (orchestrator-run, HEAD logged start and end): full suite 772 suites /
+11,311 tests; `check:types` pass; lint 0 errors, 75 warnings; webpack build pass with no
+generated changes; `git diff --check` clean; the same seven gate pairs pass with self-tests.
+`529ee426`: single file 37 / 37; removing `.sort()` from the helper fails exactly the new test.
+
+Independent review: fresh-context Opus subagent (native, subscription path), frozen `9a790c64`,
+md5-verified before and after every mutation, waited for `DONE`. Seven-suite selection 7 / 517.
+Guard removals: name → 1 (name test), email → 1, affiliation → 1, `priorKey` recomputed as the
+old id-only join → 9 (all completion-handshake tests; the one survivor, the external clear before
+`complete`, is legitimately independent of `priorKey`; the builder had reported 10 before the
+vacuous test was removed). The reviewer's own mutation, `.sort()` removed → 0 at `9a790c64`,
+pinned by `529ee426`. Trace claims confirmed except the orchestrator's affiliation-proxy claim,
+which the reviewer refuted (same person object on both sides). ReviewersTab's fetch-failure path
+renders `[]` rows and resets the session; pre-existing with the id-only key.
+**Verdict: PASS at `9a790c64`, no required items.**
+
+Further accepted limits: the client observes only recipient changes the panel has refetched; a
+Dataverse edit between the last refetch and send is invisible to any client-side key. The
+rendered body's PROPOSAL-derived fields (title, abstract, PI, institution;
+`render-emails-service.js:288–297`) are keyed by requestId only, so an abstract edit after a
+preview leaves the same class of stale-body exposure for those fields (reviewer advisory 7,
+pre-existing, not addressed here; recorded for the owner).

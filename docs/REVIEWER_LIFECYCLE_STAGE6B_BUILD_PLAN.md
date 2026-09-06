@@ -37,7 +37,9 @@ on the same branch: runtime `a6a27ce8`, review-driven correction `b163172a`, ful
 suite 772 suites / 11,301 tests, webpack build, seven gate pairs and an independent
 PASS after one BLOCK round; amendment 6B3a (`3a4bcbbe` runtime, `0a4eafd6` advisory test)
 folded the signature and review due date into the session identity after a Codex adversarial
-review, with an independent PASS and a full suite of 772 suites / 11,307 tests. See the
+review, and amendment 6B3b (`9a790c64` runtime, `529ee426` advisory test) folded recipient
+name, email and affiliation after a second one; each has an independent PASS, the latter with a
+full suite of 772 suites / 11,311 tests. See the
 [Stage 6B3 receipt](audits/REVIEWER_LIFECYCLE_STAGE6B3_RECEIPT_2026-09-05.md).
 **Stage 6B is therefore complete on `codex/reviewer-lifecycle-stage6b`.** Nothing is
 merged or deployed; promotion (PR, CI, deliberate merge under the release strategy) is
@@ -48,7 +50,8 @@ closeout modal closes itself on committed permission loss; a membership change d
 in-flight materials send returns the modal to compose while the server-side one-time
 release gate bounds a duplicate send; a signature or review-deadline change while the modal
 is open resets it the same way, even when the PD's customized due date would have rendered
-identically.
+identically; a recipient name, email or affiliation change does too, while proposal-derived
+body fields (title, abstract, PI, institution) remain keyed by request only.
 These are subdivisions of original Stage 6B, not additional product features.
 Stage 6C extraction is outside this handoff.
 
@@ -216,9 +219,10 @@ epoch at lines 777–1026. Templates/attachments remain separate scratch concern
 Use a modal session identity of open/closed state, request ID, selected
 suggestion-ID membership and, since the 6B3a amendment (`3a4bcbbe`, owner decision after a
 Codex adversarial review), the two consumed settings values (signature and review due
-date) compared by value, plus observed parent permission/read-only lifetime.
-Compare stable membership, not array identity or reviewer display-object identity, and
-never the `settings` object identity (the panel rebuilds it every render).
+date) compared by value and, since 6B3b (`9a790c64`, second Codex review), each selected
+reviewer's name, email and affiliation by value, plus observed parent permission/read-only
+lifetime. Compare stable membership and field VALUES, never array identity, reviewer
+display-object identity or `settings` object identity (the panel rebuilds both every render).
 External membership changes and request changes invalidate the previous session
 even while open; returning does not revive it. Reset drafts/results/error for a
 new session, except the explicitly owned completion reset below. Do not normalize
