@@ -114,9 +114,10 @@ grantRequestAdapter.queryAllRequests({
   and shrinks only when a current Final pointer is cleared; at the **[ASSUMED]** rate in §1 the
   ceiling is decades away, so the owner accepts it rather than adding a grouped aggregate whose
   Dataverse datetime group-by behavior is unverified here. Two mitigations are part of 6A: (a) the
-  service emits one structured `console.warn` with code
+  service emits one structured `console.warn` whose first argument is the exact string
   `final_writeups_dashboard_cycle_list_near_cap` when `records.length` reaches half of
-  `MAX_EXPORT_RECORDS`, so the approach is visible in logs long before it bites, and (b) the plan
+  `MAX_EXPORT_RECORDS` (the one warning code used in the implementation, the invariant, and the
+  test; Codex second-pass finding 2), so the approach is visible in logs long before it bites, and (b) the plan
   records the aggregate path (`grantRequestAdapter.aggregateRequests` with a `groupBy` on the
   meeting date, `lib/dataverse/adapters/grant-request.js:265-267`) as the named replacement if
   the warning ever fires. Tests pin the capped 503 and the near-cap warning.
@@ -125,12 +126,16 @@ grantRequestAdapter.queryAllRequests({
   whose last current Final is cleared disappears from the picker. This is the intended reading of
   "current"; acknowledgement rows are unaffected because they key to the Final artifact, not the
   request pointer.
-- Dedupe to `{ code, label, count }` with `meetingDateToCycleCode` / `cycleCodeToLabel`, newest
-  first. `count` is the number of requests with a current Final in that cycle: a navigation count
-  for the picker, never a denominator (contract row "no denominator" preserved).
+- Dedupe to `{ code, label }` with `meetingDateToCycleCode` / `cycleCodeToLabel`, newest first.
+  **No per-cycle counts in the picker (Codex second-pass finding 1).** The scan is global, but
+  the dashboard is persona-filtered (`visibleToPersona`, `dashboard-service.js:254-266`, applied
+  at `:496-498`), so a count derived from the scan would tell a Leadership or PD viewer how many
+  Finals exist outside their lens. The picker therefore exposes only that a cycle has some current
+  Final, which every dashboard audience member may know; the visible row counts stay where they
+  are today, derived from `visibleProjected` (`:531-536`).
 - **Buckets must be total.** Requests whose meeting date is null yield `cycleCode === null`.
-  Count them as `uncycledCount`. If it is above zero, the picker shows an explicit **No cycle**
-  option. Its selector is the literal sentinel `none`, a first-class value in every layer (Codex
+  Record their existence as `hasUncycled: boolean` (not a count, for the same leak reason). If
+  true, the picker shows an explicit **No cycle** option. Its selector is the literal sentinel `none`, a first-class value in every layer (Codex
   finding 1): the handler grammar accepts `parseCycleCode(value) !== null || value === 'none'`
   (a local `isFinalWriteupCycleSelector` helper, since `parseCycleCode` alone rejects `none`
   **[VERIFIED via `lib/utils/cycle-code.js:39-48`]**); the service maps `none` to the filter
@@ -147,8 +152,15 @@ grantRequestAdapter.queryAllRequests({
 
 ### 3.3 Default cycle and selection
 
-- Index request without `cycleCode`: default to the newest cycle with any current Final.
-  Return `cycles.selected`.
+- Index request without `cycleCode`: default to the **newest cycle in which the viewer has at
+  least one visible row**, not the newest cycle globally (Codex second-pass finding 1). The service
+  scopes the newest cycle first; if `visibleProjected` is empty after persona filtering, it steps to
+  the next newest cycle, at most `FINAL_WRITEUPS_DEFAULT_CYCLE_WALKBACK` (3) scoped reads in total;
+  if none yields a visible row it returns the newest cycle with empty queues. Each step is one
+  bounded scoped read, so the worst case for a viewer with nothing visible is three reads, and the
+  common case is one. Return `cycles.selected` and `cycles.defaultResolvedBy: 'visible' | 'newest'`
+  so the client can say "Nothing awaits you in <cycle>; showing <older cycle>" when it walked back.
+  An explicit `cycleCode` never walks back.
 - Index request with `cycleCode`: after trim, must be either a real code (`^[JD]\d{2}$`
   case-insensitive via `parseCycleCode`) or the exact lowercase sentinel `none`; otherwise the
   handler rejects it as a bad request before any service call. A well-formed code that
@@ -181,9 +193,10 @@ grantRequestAdapter.queryAllRequests({
   success: true,
   viewer: { ...unchanged },
   cycles: {
-    selected: 'D26' | 'none' | null,   // 'none' only when uncycledCount > 0 and requested
-    available: [{ code: 'D26', label: 'December 2026', count: <n> }, ...],  // newest first
-    uncycledCount: <n>
+    selected: 'D26' | 'none' | null,   // 'none' only when hasUncycled and requested
+    available: [{ code: 'D26', label: 'December 2026' }, ...],  // newest first; no counts
+    hasUncycled: boolean,
+    defaultResolvedBy: 'visible' | 'newest' | 'explicit'
   },
   limits: { maximumRows: FINAL_WRITEUPS_DASHBOARD_MAX_ROWS, scope: 'cycle' },
   counts: { ...unchanged keys, scoped to the selected cycle },
@@ -206,9 +219,11 @@ intended semantic change and is called out in the security-matrix row and Atlas 
   `FinalWriteupsViews.js:425-453`]** already covers the reload; the cycle select is disabled
   while `loading`.
 - The header line becomes "N awaiting your review in December 2026".
-- The **No cycle** option (value `none`) renders only when `uncycledCount` is above zero; a
-  bookmarked `?cycleCode=none` when the count is zero returns success with empty queues, the same
-  as any absent cycle.
+- The **No cycle** option (value `none`) renders only when `hasUncycled` is true; a bookmarked
+  `?cycleCode=none` when it is false returns success with empty queues, the same as any absent
+  cycle.
+- When `defaultResolvedBy` is `visible` and the selected cycle is not the newest available, the
+  header adds one line: "Nothing awaits your review in <newest>; showing <selected>."
 - `FinalWriteupFocusedView` is unchanged except that it renders `cycles.selected` as context
   under the request number. It never sends `cycleCode`.
 - The header comment "THESIS: one legible review queue replaces a metrics-and-filters dashboard"
@@ -266,8 +281,10 @@ intended semantic change and is called out in the security-matrix row and Atlas 
 | Invariant | Files likely touched | Verification |
 |---|---|---|
 | A request row never appears in a cycle other than the one its own `cycleCode` derives | `dashboard-service.js` | test: fixtures across J26/D26; each scoped response contains only rows whose `cycleCode` equals `cycles.selected`; mutation (drop the filter) turns it red |
-| Rows with a null meeting date never vanish silently | `dashboard-service.js`, handler, views | test: one null-date fixture → `uncycledCount` of one, absent from J26/D26, present under `cycleCode=none`; handler test: `cycleCode=none` accepted; views test: option value `none` round-trips to the URL and back, shown only when the count is above zero |
-| Near-cap approach is visible before the cap bites | `dashboard-service.js` | test: scan returning half of `MAX_EXPORT_RECORDS` rows → one `console.warn` with code `cycle_list_near_cap`; below that → none |
+| Rows with a null meeting date never vanish silently | `dashboard-service.js`, handler, views | test: one null-date fixture → `hasUncycled: true`, absent from J26/D26, present under `cycleCode=none`; handler test: `cycleCode=none` accepted; views test: option value `none` round-trips to the URL and back, shown only when `hasUncycled` |
+| Near-cap approach is visible before the cap bites | `dashboard-service.js` | test: scan returning half of `MAX_EXPORT_RECORDS` rows → exactly one `console.warn` whose first argument is `final_writeups_dashboard_cycle_list_near_cap`; one row fewer → none |
+| The picker never reveals rows outside the viewer's lens | `dashboard-service.js` | test: Leadership viewer with a hidden group-review row in D26 and a visible leadership row in J26 → `available` lists both codes with no counts, `hasUncycled` only; response carries no per-cycle numbers |
+| The default cycle is the newest one with a visible row | `dashboard-service.js` | test (same fixture): default `selected` is J26 with `defaultResolvedBy: 'visible'`; a superuser with the same rows defaults to D26; explicit `cycleCode=D26` for the Leadership viewer returns D26 with empty queues and `defaultResolvedBy: 'explicit'`; walk-back stops after three scoped reads (mutation: remove the walk-back → the first assertion turns red) |
 | A current Final on a non-June/December meeting date fails loud, not silent | `dashboard-service.js` | test: March meeting date → typed 500 `cycle_invalid` whose body names that fixture's `akoya_requestnum` (and the GUID when the number is null); raised before any document/acknowledgement read; mutation (skip) turns it red |
 | Capped cycle list never returns partially | `dashboard-service.js` | test: `queryAllRequests` returns `capped: true` → 503 `cycle_list_capped`; no downstream reads |
 | Per-cycle bound keeps the fail-loud contract | `dashboard-service.js` | re-pin existing test at `:393` with a scoped filter assertion |
@@ -290,9 +307,12 @@ unrecognized key (rejected). For the cycle resolver, the response for: no reques
   selected cycle and returns the available cycle list"; "defaults to the newest cycle with a
   current Final"; "counts null-meeting-date rows as uncycled and serves them under `none`";
   "fails loud on a current Final whose meeting date is not a June/December cycle, naming the
-  request number"; "fails closed when the cycle list scan is capped"; "warns once when the cycle
-  list scan reaches half the export cap"; "serves `none` as an empty success when no uncycled rows
-  exist"; "a cleared current Final pointer drops the request and, if last, its cycle"; "focused reads derive the cycle from the request and
+  request number"; "fails closed when the cycle list scan is capped"; "warns once with
+  `final_writeups_dashboard_cycle_list_near_cap` when the scan reaches half the export cap";
+  "serves `none` as an empty success when no uncycled rows exist"; "a cleared current Final pointer
+  drops the request and, if last, its cycle"; "the cycle list carries no counts and the default
+  cycle is the newest with a visible row for the persona" (hidden newer-cycle row plus visible
+  older-cycle row, asserted for Leadership, PD, and superuser); "focused reads derive the cycle from the request and
   navigate within it"; re-pin "fails loudly instead of silently truncating" to assert the
   meeting-date window appears in the filter.
 - `tests/unit/workbench-final-writeups-route.test.js`: "accepts requestId, a well-formed
@@ -329,6 +349,9 @@ change to the Initial assessments locator.
 1. **Should the picker list cycles with zero current Finals?** Default: no. The list is derived
    from current Finals, so a cycle appears once its first Final exists. A bookmarked future cycle
    still resolves to an empty state.
+3. **Should the picker show per-cycle counts for superusers and configured PCs**, who already see
+   every row? Default: no. One picker shape for every audience is simpler and the counts add
+   nothing the queues do not already show.
 2. **Should the coordinator matrix stay per-cycle only?** Default: yes. A cross-cycle matrix
    reintroduces the unbounded scan this slice removes.
 
@@ -341,4 +364,11 @@ change to the Initial assessments locator.
 | 3 (medium) | The global scan is capped at `MAX_EXPORT_RECORDS`; a capped scan fails every cycle view | **Accepted as mechanism, declined as redesign (owner decision 2026-09-06).** The ceiling is stated, the growth rate and its [ASSUMED] basis are recorded, a near-cap warning and its test are added, and the aggregate path is named as the replacement if the warning fires (§3.2). |
 | — | Not raised by Codex | **Added:** cleared current Final pointers drop the request and, if last, the cycle (§3.2, §7). |
 
-Second Codex pass requested on this revision before build.
+**Second pass (2026-09-06, verdict NEEDS REWORK):**
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 (high) | Global discovery counts and default selection ran before persona filtering: hidden totals leak, and the default cycle could open empty for an authorized viewer | **Accepted.** Picker is existence-only (`{code,label}`, `hasUncycled` boolean, no counts); default cycle is the newest with a visible row via a bounded walk-back (max 3 scoped reads), `defaultResolvedBy` tells the client why; tests cover hidden-newer / visible-older for Leadership, PD, superuser (§3.2, §3.3, §3.5, §3.6, §6, §7). |
+| 2 (medium) | Warning code differed between contract and invariant | **Accepted.** One exact code, `final_writeups_dashboard_cycle_list_near_cap`, in the contract, invariant, and test (§3.2, §6, §7). |
+
+Third Codex pass requested on this revision before build.
