@@ -28,12 +28,32 @@
  *   (i) non-literal source hard-fail (a destructure of a generic writer name
  *       from a dynamic require path)
  *
+ * Stage 7 correction round (Codex round 1, HIGH 1) added a second scenario,
+ * runAliasAndBarrelAssertions, proving the fixpoint resolves:
+ *   (a) a two-hop same-file alias chain (`const a = adapter; const b = a;
+ *       b.updateLifecycle(...)`)
+ *   (a') an extracted method reference, itself then aliased (`const u =
+ *       adapter.patchReviewReceipt; const v = u; v(...)`)
+ *   (b) an ESM `export *` barrel consumed by a NAMED import, INCLUDING
+ *       transitively through a second barrel that `export *`s from the first
+ *       (not the adapter directly)
+ *   (b') a CJS whole-namespace re-publish barrel (`module.exports =
+ *       require('<adapter>')`) consumed by a destructured require()
+ *   (c) a computed member access with a non-literal key on a namespace
+ *       binding (`adapter[key]`) -- fails CLOSED as an unresolvable member
+ *   green counterpart to (c): a computed access whose key IS a string
+ *       literal resolving to a NON-writer name (`adapter['findById']`)
+ *
  * GREEN fixtures: a lib/services/reviewer-engagement/x.js importer; the two
  * recorded receipt sinks (valid); a file namespace-importing the adapter but
  * calling only narrow ops (setRequestMetadata, claimThankYou,
  * deselectLegacyDeclinedSuggestion); a scripts/ file importing
  * updateLifecycle directly (out of scope -- scripts/ is not scanned); a
- * green-only tree exits 0.
+ * green-only tree exits 0; a computed access resolving to a non-writer name
+ * (above); and, in runUnresolvedFailClosedAssertions, a lazy-backend module
+ * whose non-literal require() result is never member-accessed or
+ * re-published with a writer-shaped name -- the DOCUMENTED LIMIT of the
+ * narrowed non-literal-source rule (see the gate script's module docblock).
  *
  * LAW MODE: the default run must exit non-zero naming every red binding (no
  * baseline, no ratchet -- zero un-exempted bindings and zero stale entries is
@@ -244,6 +264,187 @@ function runDetectionAssertions() {
   console.log(`PASS detection assertions (${violations.length} violations, recorded/engagement/narrow-ops/scripts greens confirmed)`);
 }
 
+// Stage 7 correction round (Codex round 1, HIGH 1): alias chains, extracted
+// method references, whole-barrel wrappers (ESM `export *` and CJS
+// `module.exports = require(...)`), transitivity through a wrapper-of-a-
+// wrapper, and computed member access must all resolve through the same
+// fixpoint the direct/named forms use -- exercised in their own scenario so
+// they don't perturb the exact-count assertion in runDetectionAssertions.
+function setupAliasAndBarrelFixtures() {
+  cleanup();
+  writeAdapterAndRecordedSinks(true);
+
+  // (a) two-hop alias chain: import * as adapter -> const a = adapter ->
+  // const b = a -> b.updateLifecycle(...). Namespace binding must propagate
+  // across BOTH alias edges before the member access resolves.
+  write(tempRoot, 'lib/services/red-alias-chain.js', `
+    import * as adapter from '../dataverse/adapters/reviewer-suggestion.js';
+    const a = adapter;
+    const b = a;
+    export async function run(id) { return b.updateLifecycle(id, {}, {}); }
+  `);
+
+  // (a') extracted method reference, then aliased: const u =
+  // adapter.patchReviewReceipt -> const v = u -> v(...). The extraction
+  // itself binds `u` to the writer; the alias edge must carry that writer
+  // binding to `v`.
+  write(tempRoot, 'lib/services/red-extracted-method-alias.js', `
+    import * as adapter from '../dataverse/adapters/reviewer-suggestion.js';
+    const u = adapter.patchReviewReceipt;
+    const v = u;
+    export async function run(id) { return v(id, {}, {}); }
+  `);
+
+  // (b) ESM \`export *\` barrel -- a NAMED import from it must be classified
+  // exactly like a named import from the adapter, even though the barrel
+  // itself never names the writer anywhere in its own source text.
+  write(tempRoot, 'lib/wrappers/star-barrel.js', `
+    export * from '../dataverse/adapters/reviewer-suggestion.js';
+  `);
+  write(tempRoot, 'lib/services/red-star-barrel-consumer.js', `
+    import { updateLifecycle } from '../wrappers/star-barrel.js';
+    export async function run(id) { return updateLifecycle(id, {}, {}); }
+  `);
+  // Transitivity: a SECOND barrel that \`export *\`s from the FIRST barrel
+  // (not the adapter directly) must be recognized too.
+  write(tempRoot, 'lib/wrappers/star-barrel-2.js', `
+    export * from './star-barrel.js';
+  `);
+  write(tempRoot, 'lib/services/red-star-barrel-2-consumer.js', `
+    import { bulkUpdateByRequest } from '../wrappers/star-barrel-2.js';
+    export async function run(id) { return bulkUpdateByRequest(id, {}, {}); }
+  `);
+
+  // (b') CJS whole-namespace re-publish barrel (\`module.exports =
+  // require('<adapter>')\`), consumed by a destructured require().
+  write(tempRoot, 'lib/wrappers/cjs-whole-republish.js', `
+    module.exports = require('../dataverse/adapters/reviewer-suggestion.js');
+  `);
+  write(tempRoot, 'lib/services/red-cjs-whole-consumer.js', `
+    const { updateLifecycle } = require('../wrappers/cjs-whole-republish.js');
+    module.exports = { run: (id) => updateLifecycle(id, {}, {}) };
+  `);
+
+  // (a1) destructuring a writer directly off an object identifier (NOT off
+  // the require() call itself, which the main detection scenario's (c)
+  // fixture already covers): `const a = require(adapter); const {
+  // patchReviewReceipt } = a;` (Stage 7 correction round, Opus A1).
+  write(tempRoot, 'lib/services/red-destructure-from-adapter-local.js', `
+    const a = require('../dataverse/adapters/reviewer-suggestion.js');
+    const { patchReviewReceipt } = a;
+    module.exports = { run: (id) => patchReviewReceipt(id, {}, {}) };
+  `);
+
+  // (a2) CJS SPREAD re-publish barrel (\`module.exports = { ...adapter }\`) --
+  // a shallow spread of the adapter's namespace is whole-namespace-equivalent
+  // for detection purposes (Stage 7 correction round, Opus A2, third shape).
+  write(tempRoot, 'lib/wrappers/spread-barrel.js', `
+    const adapter = require('../dataverse/adapters/reviewer-suggestion.js');
+    module.exports = { ...adapter };
+  `);
+  write(tempRoot, 'lib/services/red-spread-barrel-consumer.js', `
+    const { updateLifecycle } = require('../wrappers/spread-barrel.js');
+    module.exports = { run: (id) => updateLifecycle(id, {}, {}) };
+  `);
+
+  // (c) computed member access on a namespace binding with a NON-literal key
+  // -- cannot be resolved statically, so it fails CLOSED as an unresolvable
+  // member rather than silently passing.
+  write(tempRoot, 'lib/services/red-computed-member.js', `
+    import * as adapter from '../dataverse/adapters/reviewer-suggestion.js';
+    const key = 'updateLifecycle';
+    export async function run(id) { return adapter[key](id, {}, {}); }
+  `);
+
+  // GREEN counterpart to (c): a computed access whose key IS a string
+  // literal, resolving to a name that is NOT one of the four writers --
+  // simply not a writer binding at all, must not be flagged.
+  write(tempRoot, 'lib/services/green-computed-non-writer.js', `
+    import * as adapter from '../dataverse/adapters/reviewer-suggestion.js';
+    export async function run(id) { return adapter['findById'](id); }
+  `);
+}
+
+function runAliasAndBarrelAssertions() {
+  setupAliasAndBarrelFixtures();
+
+  const run = runGate(['--json']);
+  expect(run.status === 0, `--json exited ${run.status}\n${run.output}`);
+  const entries = JSON.parse(run.output);
+  const violations = entries.filter((e) => !e.exempt);
+  const byFile = new Map();
+  for (const v of violations) {
+    if (!byFile.has(v.file)) byFile.set(v.file, []);
+    byFile.get(v.file).push(v);
+  }
+
+  // (a) alias chain: file named, writer resolved to updateLifecycle.
+  expect(byFile.has('lib/services/red-alias-chain.js'),
+    `(a) alias-chain file not flagged\nviolations: ${JSON.stringify(violations, null, 2)}`);
+  expect(byFile.get('lib/services/red-alias-chain.js').some((v) => v.writer === 'updateLifecycle'),
+    `(a) alias-chain violation did not resolve to updateLifecycle: ${JSON.stringify(byFile.get('lib/services/red-alias-chain.js'))}`);
+
+  // (a') extracted method + alias: file named, writer resolved to patchReviewReceipt.
+  expect(byFile.has('lib/services/red-extracted-method-alias.js'),
+    `(a') extracted-method-alias file not flagged\nviolations: ${JSON.stringify(violations, null, 2)}`);
+  expect(byFile.get('lib/services/red-extracted-method-alias.js').some((v) => v.writer === 'patchReviewReceipt'),
+    `(a') extracted-method-alias violation did not resolve to patchReviewReceipt: ${JSON.stringify(byFile.get('lib/services/red-extracted-method-alias.js'))}`);
+
+  // (b) export * barrel: it never names any writer in its OWN source (a
+  // whole-namespace re-export has no per-name text to bind), so it is not
+  // itself an entry -- what matters is that a NAMED import of a writer FROM
+  // it is classified exactly like a named import from the adapter.
+  expect(byFile.has('lib/services/red-star-barrel-consumer.js'),
+    `(b) star-barrel consumer not flagged\nviolations: ${JSON.stringify(violations, null, 2)}`);
+  const starConsumer = byFile.get('lib/services/red-star-barrel-consumer.js').find((v) => v.writer === 'updateLifecycle');
+  expect(starConsumer && starConsumer.wrapper === 'lib/wrappers/star-barrel.js',
+    `(b) star-barrel consumer violation did not name the wrapper: ${JSON.stringify(starConsumer)}`);
+
+  // (b, transitive) barrel-of-barrel: the SECOND barrel's consumer is
+  // flagged even though neither barrel imports the adapter directly and
+  // neither barrel names any writer in its own source.
+  expect(byFile.has('lib/services/red-star-barrel-2-consumer.js'),
+    `(b transitive) second-barrel consumer not flagged\nviolations: ${JSON.stringify(violations, null, 2)}`);
+  const starConsumer2 = byFile.get('lib/services/red-star-barrel-2-consumer.js').find((v) => v.writer === 'bulkUpdateByRequest');
+  expect(starConsumer2 && starConsumer2.wrapper === 'lib/wrappers/star-barrel-2.js',
+    `(b transitive) second-barrel consumer violation did not name the wrapper: ${JSON.stringify(starConsumer2)}`);
+
+  // (b') CJS whole-namespace re-publish barrel: same reasoning -- the
+  // barrel's own source names no writer; its consumer is flagged.
+  expect(byFile.has('lib/services/red-cjs-whole-consumer.js'),
+    `(b') CJS whole-republish consumer not flagged\nviolations: ${JSON.stringify(violations, null, 2)}`);
+  const cjsWholeConsumer = byFile.get('lib/services/red-cjs-whole-consumer.js').find((v) => v.writer === 'updateLifecycle');
+  expect(cjsWholeConsumer && cjsWholeConsumer.wrapper === 'lib/wrappers/cjs-whole-republish.js',
+    `(b') CJS whole-republish consumer violation did not name the wrapper: ${JSON.stringify(cjsWholeConsumer)}`);
+
+  // (a1) destructure off an object identifier bound (whole) to the adapter.
+  expect(byFile.has('lib/services/red-destructure-from-adapter-local.js'),
+    `(a1) destructure-from-adapter-local file not flagged\nviolations: ${JSON.stringify(violations, null, 2)}`);
+  expect(byFile.get('lib/services/red-destructure-from-adapter-local.js').some((v) => v.writer === 'patchReviewReceipt'),
+    `(a1) destructure-from-adapter-local violation did not resolve to patchReviewReceipt: ${JSON.stringify(byFile.get('lib/services/red-destructure-from-adapter-local.js'))}`);
+
+  // (a2) CJS spread re-publish barrel: consumer flagged, wrapper-attributed.
+  expect(byFile.has('lib/services/red-spread-barrel-consumer.js'),
+    `(a2) spread-barrel consumer not flagged\nviolations: ${JSON.stringify(violations, null, 2)}`);
+  const spreadConsumer = byFile.get('lib/services/red-spread-barrel-consumer.js').find((v) => v.writer === 'updateLifecycle');
+  expect(spreadConsumer && spreadConsumer.wrapper === 'lib/wrappers/spread-barrel.js',
+    `(a2) spread-barrel consumer violation did not name the wrapper: ${JSON.stringify(spreadConsumer)}`);
+
+  // (c) computed member on a namespace binding: file named, reported as an
+  // unresolvable member (writer null), not silently passed.
+  expect(byFile.has('lib/services/red-computed-member.js'),
+    `(c) computed-member file not flagged\nviolations: ${JSON.stringify(violations, null, 2)}`);
+  expect(byFile.get('lib/services/red-computed-member.js').some((v) => v.form === 'namespace-computed-member-unresolvable' && v.writer === null),
+    `(c) computed-member violation was not reported as unresolvable: ${JSON.stringify(byFile.get('lib/services/red-computed-member.js'))}`);
+
+  // GREEN: computed access resolving (statically) to a non-writer name.
+  const allFiles = new Set(entries.map((e) => e.file));
+  expect(!allFiles.has('lib/services/green-computed-non-writer.js'),
+    'computed access resolving to a non-writer name (findById) wrongly flagged');
+
+  console.log('PASS alias-chain / extracted-method / export-* barrel (incl. transitive) / CJS whole-republish / computed-member assertions');
+}
+
 function runStaleRecordedImporterAssertions() {
   cleanup();
   writeAdapterAndRecordedSinks(false);
@@ -299,6 +500,55 @@ function runUnresolvedFailClosedAssertions() {
     }
   `);
 
+  // Stage 7 correction round (Opus A4): the OTHER two documented fail-closed
+  // shapes, each in their own file so the failure message can be checked
+  // per-file.
+  //   - member access on an unresolved-bound local (no alias -- the direct
+  //     shape the docblock names).
+  write(tempRoot, 'lib/services/red-unresolved-member-access.js', `
+    export async function run(modPath) {
+      const a = require(modPath);
+      return a.updateLifecycle('x', {}, {});
+    }
+  `);
+  //   - identity re-export of an unresolved-bound local (its published
+  //     identity could be an unknowable generic-writer source).
+  write(tempRoot, 'lib/services/red-unresolved-identity-reexport.js', `
+    export async function run(modPath) {
+      const a = require(modPath);
+      module.exports = a;
+    }
+  `);
+
+  // Stage 7 correction round (Opus R1): the SAME two shapes, but reached
+  // through a same-file ALIAS EDGE -- proves unresolvedBindings survives the
+  // alias-closure fixpoint in collectFileInfo, not just the direct local.
+  write(tempRoot, 'lib/services/red-unresolved-alias-member-access.js', `
+    export async function run(modPath) {
+      const a = require(modPath);
+      const b = a;
+      return b.updateLifecycle('x', {}, {});
+    }
+  `);
+  write(tempRoot, 'lib/services/red-unresolved-alias-identity-reexport.js', `
+    export async function run(modPath) {
+      const a = require(modPath);
+      const b = a;
+      module.exports = b;
+    }
+  `);
+
+  // Stage 7 correction round (Opus A1): destructuring a writer directly off
+  // an UNRESOLVED-BOUND identifier (as opposed to destructuring straight off
+  // the require() call, which red-unresolved-destructure.js already covers).
+  write(tempRoot, 'lib/services/red-unresolved-destructure-from-identifier.js', `
+    export async function run(modPath) {
+      const a = require(modPath);
+      const { updateLifecycle } = a;
+      return updateLifecycle('x', {}, {});
+    }
+  `);
+
   // GREEN: lazy-backend shape -- non-literal require() held in a module-scope
   // local, only OWN functions exported. Must not trip fail-closed.
   write(tempRoot, 'lib/services/green-lazy-backend.js', `
@@ -314,9 +564,19 @@ function runUnresolvedFailClosedAssertions() {
     `expected unresolved-boundary-source error, got:\n${run.output}`);
   expect(/red-unresolved-destructure\.js:\d+/.test(run.output),
     `expected file:line for the non-literal destructure, got:\n${run.output}`);
+  expect(/red-unresolved-member-access\.js:\d+/.test(run.output),
+    `expected file:line for the unresolved member access, got:\n${run.output}`);
+  expect(/red-unresolved-identity-reexport\.js:\d+/.test(run.output),
+    `expected file:line for the unresolved identity re-export, got:\n${run.output}`);
+  expect(/red-unresolved-alias-member-access\.js:\d+/.test(run.output),
+    `expected file:line for the ALIASED unresolved member access, got:\n${run.output}`);
+  expect(/red-unresolved-alias-identity-reexport\.js:\d+/.test(run.output),
+    `expected file:line for the ALIASED unresolved identity re-export, got:\n${run.output}`);
+  expect(/red-unresolved-destructure-from-identifier\.js:\d+/.test(run.output),
+    `expected file:line for the destructure-from-identifier unresolved case, got:\n${run.output}`);
   expect(!run.output.includes('green-lazy-backend.js'),
     `lazy-backend GREEN fixture wrongly tripped fail-closed:\n${run.output}`);
-  console.log('PASS non-literal source fails closed only for a writer-shaped destructure; lazy-backend green');
+  console.log('PASS non-literal source fails closed for every documented writer-shaped use (destructure, member access, identity re-export, each direct and aliased); lazy-backend green');
 }
 
 // LAW MODE: the default run fails closed on every red binding and every
@@ -381,13 +641,14 @@ function parseMode(argv) {
   const modeIndex = argv.indexOf('--mode');
   if (modeIndex === -1) return 'all';
   const mode = argv[modeIndex + 1];
-  if (!mode) throw new Error('--mode requires one of: all, detection, stale, missing, unresolved, law, report, live');
+  if (!mode) throw new Error('--mode requires one of: all, detection, alias-barrel, stale, missing, unresolved, law, report, live');
   return mode;
 }
 
 function runMode(mode) {
   if (mode === 'all') {
     runDetectionAssertions();
+    runAliasAndBarrelAssertions();
     runStaleRecordedImporterAssertions();
     runMissingRecordedImporterFileAssertions();
     runUnresolvedFailClosedAssertions();
@@ -397,6 +658,7 @@ function runMode(mode) {
     return;
   }
   if (mode === 'detection') return runDetectionAssertions();
+  if (mode === 'alias-barrel') return runAliasAndBarrelAssertions();
   if (mode === 'stale') return runStaleRecordedImporterAssertions();
   if (mode === 'missing') return runMissingRecordedImporterFileAssertions();
   if (mode === 'unresolved') return runUnresolvedFailClosedAssertions();

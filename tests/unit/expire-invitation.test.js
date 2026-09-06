@@ -151,7 +151,7 @@ describe('expireInvitation', () => {
     // adapter op itself (expireInvitationResponse); this suite pins only the
     // call shape the service makes, not the payload fields, which are
     // covered by the op's own suite
-    // (tests/unit/reviewer-suggestion-expire-invitation-response.test.js).
+    // (tests/unit/reviewer-suggestion-receipt-ops.test.js).
     expect(expireInvitationResponse).toHaveBeenCalledWith(
       SUGGESTION_ID,
       NOW_ISO,
