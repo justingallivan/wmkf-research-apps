@@ -96,6 +96,36 @@ catch → test 2 fails; (b) drop `degraded={Boolean(error)}` at the call site �
 (c) revert the render guard to `!error ? … : null` → test 2 fails. Restore the fix after
 each check.
 
+## Corrections after the first build (architect + Codex round 1, 2026-09-05)
+
+5. **Last-known-good is bounded by cycle and scope.** A `lastLoadedParamsRef` records
+   `${cycle}|${scope}` on the success path of `loadProposals`. The cycle/scope effect compares
+   it to the current params; on a difference it **first supersedes any in-flight load
+   synchronously** (`requestIdRef.current += 1`, so a late response from the previous params
+   fails the existing request-id check and can neither repopulate the list nor rewrite the
+   ref), then clears `proposals` and `error`, then schedules the new load. Initial mount (ref
+   null) and same-params retries leave the list alone. Test 4 covers the scope change; test 5
+   resolves the old params' fetch *after* the change but *before* the scheduled new load and
+   asserts the old cards never render. [Codex round 1, high — accepted.]
+6. **Retry keeps the groups mounted.** The "Loading reviewer activity…" placeholder renders
+   only when `proposals.length === 0`. When a prior list exists, the list stays rendered during
+   the refetch, each `ReviewerGroup` keeps its `open` state, the panel receives
+   `loading={loadingProposals}` (the same prop `ReviewersTab.js:556` passes; the panel shows a
+   subtle spinner, `ReviewerManagePanel.js:15`), and the banner's "Try again" button is
+   `disabled` with the label "Retrying…" while a load is in flight. Test 6: expand a group,
+   click Try again with a slow failing fetch, assert the mock panel stays mounted and open
+   throughout and the button is disabled mid-flight. [Codex round 1, medium — accepted.]
+
+**Declined (recorded):** Codex round 1 asked for a real-panel test proving mutating controls are
+disabled while `degraded`. That contract is already pinned by
+`tests/unit/reviewer-manage-degraded.test.js` (6B3e) against the real panel; the host tests here
+prove the host passes the prop, the same composition `reviewers-tab-stale-request.test.js` uses
+for `ReviewersTab`. Adding a second real-panel test would duplicate 6B3e's teeth.
+
+Mutation checks now number six: (a)–(c) above; (d) remove the clearing block in the effect →
+test 4 red; (e) remove the synchronous `requestIdRef` bump → test 5 red; (f) restore the
+unconditional loading placeholder → test 6 red.
+
 ## Verification the builder runs
 
 ```sh
