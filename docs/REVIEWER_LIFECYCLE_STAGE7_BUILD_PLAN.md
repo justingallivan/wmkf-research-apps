@@ -390,6 +390,25 @@ or backfill.
   (9 PASS) re-run on the branch, and a scratch `--root` tree with the three Codex shapes (class
   field, renamed wrapper + consumer, direct dynamic import) reported all of them as violations. PR
   #168 merged `790ba3a1` (2026-09-06, eight checks green); the gate runs green on main.
+- **Post-merge Opus review of `4e471c94` (2026-09-06, S489 close).** Dispatched because the final
+  correction landed on architect verification after the Codex cap. Verdict: DEFECT + 4 advisories,
+  none affecting the real tree (14 / 0 / 0, 0 false positives across the 75 live `suggestionAdapter.`
+  usages, 0.6s). (D1, fail-open) `captureIdentifierRhs` created alias edges only for bare
+  Identifiers, so `const a = this.adapter; a.updateLifecycle()` and `helper(this.adapter).writer()`
+  escaped the class-field handling the docblock claimed; (A1, CI false-positive risk)
+  `(await import(<non-literal>)).anything` hard-failed the gate regardless of property, contradicting
+  the documented lazy-backend limit; (A2) inline `require('<adapter>').findById` was a violation while
+  its `import()` twin was green; (A3) the `this.<field>` key is file-scoped, not class-scoped
+  (over-approximation, closed); (docs) CI reference rows still described neither the second
+  correction round's classes nor the now-false "only" sentence. Self-test integrity, renamed-export
+  alias soundness, `specifiers.length` guard and perf were confirmed. **Fix (same night, architect):**
+  alias edge from `bindableKeyOf(rhs)`; `collectIdentifierReferences` emits `this.<field>` keys;
+  non-literal dynamic-import source fails closed only for writer-named/non-literal properties;
+  catch-all's literal-adapter-source arm requires a non-literal outer property; A3 documented as a
+  limit; CI reference rows rewritten. Fixtures: reds `red-class-field-alias-local`,
+  `red-class-field-helper-arg`; greens `green-inline-require-read`, `green-lazy-dynamic-import-default`.
+  The pre-fix gate fails the new self-test at (1'') and hard-fails a scratch tree holding only the
+  lazy dynamic import. PR recorded in `SESSION_PROMPT.md`.
 
 ## Docs (after each merge)
 

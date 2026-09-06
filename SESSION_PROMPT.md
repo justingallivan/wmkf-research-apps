@@ -54,8 +54,9 @@ dynamic-import shapes) landed after the two-round Codex cap on the architect's o
 verification (gate + self-test green, scratch `--root` fixture tree with all three shapes
 reported as violations, five real-file false positives from the builder's first catch-all
 removed by narrowing rather than exemptions). A post-merge read-only Opus review of that
-commit was dispatched at close; its verdict is recorded in the "Opus post-merge verdict"
-line at the end of this file. Stage 3K also hit the cap (round-2 masking finding resolved by
+commit ran at close and found one fail-open and one CI false-positive risk; both were fixed
+the same night with pinned fixtures (see the "Opus post-merge verdict" line at the end of this
+file and the Stage 7 plan). Stage 3K also hit the cap (round-2 masking finding resolved by
 the Stage 7B zero-reference pin instead of a third round).
 
 ### Commits (all on `main`)
@@ -204,5 +205,13 @@ CI, the `/start` list and `docs/CI_GATES_REFERENCE.md`; no CLAUDE.md, schema or 
 change. The claim-evidence pilot report recorded one eligible advisory (count shape on the
 Stage 7 plan) and one observation row was added to the pilot directive.
 
-**Opus post-merge verdict on `4e471c94`:** PENDING at handoff write time — see the line
-appended below once the review returns.
+**Opus post-merge verdict on `4e471c94`:** DEFECT + 4 advisories, none affecting the real
+tree (gate green, 0 false positives on the 75 live adapter usages, 0.6s). Fixed the same night
+in the follow-up PR recorded in the Stage 7 plan's "Post-merge Opus review" section: (D1
+fail-open) `const a = this.adapter; a.updateLifecycle()` and `helper(this.adapter).writer()`
+bypassed the class-field handling; (A1, CI false-positive risk) `(await import(p)).anything`
+hard-failed the gate on unrelated code; (A2) inline `require('<adapter>').findById` was a
+violation while its `import()` twin was green; (A3) `this.<field>` key is file-scoped, now
+documented as a closed over-approximation; CI reference rows had not been updated for the
+second correction round. Each fix has a self-test fixture; the old gate fails the new
+self-test.

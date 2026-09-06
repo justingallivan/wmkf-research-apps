@@ -473,6 +473,36 @@ function setupClassBarrelDynamicImportFixtures() {
     module.exports = { Runner };
   `);
 
+  // (1'') Post-merge Opus D1: the class-held adapter aliased into a plain local
+  // (`const a = this.adapter`) must flow through the alias fixpoint.
+  write(tempRoot, 'lib/services/red-class-field-alias-local.js', `
+    class Runner {
+      constructor() {
+        this.adapter = require('../dataverse/adapters/reviewer-suggestion.js');
+      }
+      run(id) { const a = this.adapter; return a.updateLifecycle(id, {}, {}); }
+    }
+    module.exports = { Runner };
+  `);
+  // (1''') ...and the class-held adapter passed through an unresolvable shape
+  // (`helper(this.adapter).updateLifecycle()`) is caught by the catch-all
+  // like its plain-local twin.
+  write(tempRoot, 'lib/services/red-class-field-helper-arg.js', `
+    function helper(x) { return x; }
+    class Runner {
+      adapter = require('../dataverse/adapters/reviewer-suggestion.js');
+      run(id) { return helper(this.adapter).patchFields(id, {}, {}); }
+    }
+    module.exports = { Runner };
+  `);
+  // GREEN (post-merge Opus A2): an inline literal adapter require() with a
+  // STATIC non-writer property is a read, not a writer binding.
+  write(tempRoot, 'lib/services/green-inline-require-read.js', `
+    export async function lookup(id) {
+      return require('../dataverse/adapters/reviewer-suggestion.js').findById(id);
+    }
+  `);
+
   // (2) Renamed CJS object-literal member re-export.
   write(tempRoot, 'lib/wrappers/cjs-renamed-object-wrapper.js', `
     const adapter = require('../dataverse/adapters/reviewer-suggestion.js');
@@ -549,6 +579,16 @@ function runClassBarrelDynamicImportAssertions() {
   expect(byFile.get('lib/services/red-class-field-constructor-assign.js').some((v) => v.writer === 'patchReviewReceipt'),
     `(1') constructor-assigned class-field violation did not resolve to patchReviewReceipt: ${JSON.stringify(byFile.get('lib/services/red-class-field-constructor-assign.js'))}`);
 
+  // (1'') class-held adapter aliased into a local, (1''') passed through a helper.
+  expect(byFile.has('lib/services/red-class-field-alias-local.js'),
+    `(1'') class-field alias-local file not flagged\nviolations: ${JSON.stringify(violations, null, 2)}`);
+  expect(byFile.get('lib/services/red-class-field-alias-local.js').some((v) => v.writer === 'updateLifecycle'),
+    `(1'') class-field alias-local violation did not resolve to updateLifecycle: ${JSON.stringify(byFile.get('lib/services/red-class-field-alias-local.js'))}`);
+  expect(byFile.has('lib/services/red-class-field-helper-arg.js'),
+    `(1''') class-field helper-arg file not flagged\nviolations: ${JSON.stringify(violations, null, 2)}`);
+  expect(byFile.get('lib/services/red-class-field-helper-arg.js').some((v) => v.form === 'unsupported-adapter-bearing-shape'),
+    `(1''') class-field helper-arg violation not recorded as unsupported-adapter-bearing-shape: ${JSON.stringify(byFile.get('lib/services/red-class-field-helper-arg.js'))}`);
+
   // (2) renamed CJS object-literal member re-export.
   expect(byFile.has('lib/services/red-cjs-renamed-object-consumer.js'),
     `(2) renamed-object consumer not flagged\nviolations: ${JSON.stringify(violations, null, 2)}`);
@@ -580,6 +620,8 @@ function runClassBarrelDynamicImportAssertions() {
   const allFiles = new Set(entries.map((e) => e.file));
   expect(!allFiles.has('lib/services/green-adapter-constant-lookup.js'),
     'dynamic-keyed constant lookup / chained non-writer call off the adapter wrongly flagged');
+  expect(!allFiles.has('lib/services/green-inline-require-read.js'),
+    'inline literal adapter require() with a static non-writer property wrongly flagged');
 
   console.log('PASS class-held adapter / renamed CJS+ESM member re-export / direct dynamic-import member assertions (with the narrowed-catch-all green)');
 }
@@ -713,6 +755,14 @@ function runUnresolvedFailClosedAssertions() {
     module.exports = { load, getThing };
   `);
 
+  // GREEN (post-merge Opus A1): a non-literal dynamic import() whose property
+  // is a static non-writer name is the lazy-backend twin of `require(p)`.
+  write(tempRoot, 'lib/services/green-lazy-dynamic-import-default.js', `
+    export async function load(modPath) {
+      return (await import(modPath)).default;
+    }
+  `);
+
   const run = runGate([]);
   expect(run.status !== 0, `unresolved writer-destructure source should fail closed, exited 0:\n${run.output}`);
   expect(run.output.includes('unresolved-boundary-source'),
@@ -735,6 +785,8 @@ function runUnresolvedFailClosedAssertions() {
     `expected file:line for the dynamic-import computed-property access, got:\n${run.output}`);
   expect(!run.output.includes('green-lazy-backend.js'),
     `lazy-backend GREEN fixture wrongly tripped fail-closed:\n${run.output}`);
+  expect(!run.output.includes('green-lazy-dynamic-import-default.js'),
+    `lazy dynamic-import .default GREEN fixture wrongly tripped fail-closed:\n${run.output}`);
   console.log('PASS non-literal source fails closed for every documented writer-shaped use (destructure, member access, identity re-export, each direct and aliased, plus dynamic-import member/computed-property); lazy-backend green');
 }
 
