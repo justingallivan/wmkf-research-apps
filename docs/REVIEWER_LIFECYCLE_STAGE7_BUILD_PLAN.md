@@ -173,7 +173,7 @@ or backfill.
   (the sweep is a caller, not a wrapper); the plan's "review-due token unchanged" case is covered by
   the retained sweep suite, not a new test; docs land post-merge. Rebased by the architect onto
   `c25f9e5a` (census-table conflict with 3E resolved by keeping all rows; 6 suites / 72 green) →
-  `88985583`, PR #162.
+  `88985583`, PR #162 — merged `ec74c0d4` (2026-09-06, seven checks green).
 - **3I build (Sonnet, 2026-09-06): `87edb12b`** on `claude/reviewer-lifecycle-stage3i` (new
   worktree `../WMKF_Apps-s4`). The withdrawal write (main `withdraw-sufficient-service.js:264–274`)
   moved verbatim to `reviewer-engagement/withdraw-pending-invitation.js` `withdrawPendingInvitation`;
