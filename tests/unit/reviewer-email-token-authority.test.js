@@ -233,8 +233,14 @@ describe('v4 rotate-after-verification race', () => {
       durableHashBySuggestion.set(SUG_Y, hashToken(interveningJwt));
       return { ok: true, payload: { suggestionId: SUG_Y, requestId: REQUEST_ID } };
     });
+    // Stage 6D: a "legacy/edited draft carrying a real JWT" (this test's own
+    // scenario, per the header comment) still needs a fingerprint that
+    // matches send-time reads — nothing about SUGGESTIONS/PERSONS/REQUEST
+    // changes between render and send in this test, so render once to get a
+    // real, matching draftFingerprint and substitute in the legacy body/link.
+    const [renderedDraft] = await render([SUG_Y]);
     const legacyDraft = {
-      suggestionId: SUG_Y,
+      ...renderedDraft,
       subject: 'Materials',
       body: `Hello,\nhttps://reviews.example.org/external/review/${staleJwt}?action=accept`,
       externalLinkExpected: true,
