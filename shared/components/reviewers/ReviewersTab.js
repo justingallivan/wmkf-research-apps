@@ -586,7 +586,8 @@ export default function ReviewersTab({
               letter-spacing: 0.05em;
               text-transform: uppercase;
             }
-            .request-reviewer-table table td span.rounded {
+            .request-reviewer-table table td span.rounded,
+            .request-reviewer-table table td span.rounded-full {
               display: inline-flex;
               min-height: 1.75rem;
               align-items: center;

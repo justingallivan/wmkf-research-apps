@@ -111,13 +111,14 @@ function ReviewerGroup({ proposal, previewReadOnly, onRefresh }) {
                 previewReadOnly={previewReadOnly}
               />
               <style jsx global>{`
-                .reviewer-activity-panel td span.rounded {
+                .reviewer-activity-panel td span.rounded,
+                .reviewer-activity-panel td span.rounded-full {
+                  display: inline-flex;
+                  min-height: 1.75rem;
+                  align-items: center;
                   border-radius: 9999px;
-                }
-                .reviewer-activity-panel td:nth-child(2) > div:first-child > span {
-                  min-height: 2rem;
-                  padding: 0.375rem 0.75rem;
-                  line-height: 1.25rem;
+                  line-height: 1.25;
+                  padding: 0.25rem 0.625rem;
                 }
                 .reviewer-activity-panel table thead th:last-child {
                   position: relative;
