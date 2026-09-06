@@ -141,6 +141,24 @@ describe('patchMyCandidates delegates the manual-invite write to recordManualInv
     expect(recordManualInvitation).not.toHaveBeenCalled();
   });
 
+  test('a stale link (token hash mismatch — the last pre-write guard) rejects before recordManualInvitation is ever called', async () => {
+    // wmkf_externaltokenhash does not match hash:manual.token, so this fails
+    // the LAST guard (token currency), after every earlier guard (selected,
+    // already_invited, already_responded) has already passed.
+    findById.mockResolvedValue(currentSuggestion({ wmkf_externaltokenhash: 'hash:newer.token' }));
+
+    await expect(patchMyCandidates({
+      body: {
+        suggestionId: SUGGESTION_ID,
+        markManualInviteSent: true,
+        manualLink: 'https://reviews.wmkeck.org/external/review/manual.token',
+      },
+      actingUserSystemId: SYS,
+    })).rejects.toMatchObject({ httpStatus: 409, body: { code: 'stale_manual_link' } });
+
+    expect(recordManualInvitation).not.toHaveBeenCalled();
+  });
+
   test('a 412 from recordManualInvitation maps to stale_manual_link', async () => {
     findById.mockResolvedValue(currentSuggestion());
     recordManualInvitation.mockRejectedValueOnce(Object.assign(new Error('precondition failed'), { status: 412 }));

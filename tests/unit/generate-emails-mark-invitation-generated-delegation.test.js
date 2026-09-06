@@ -94,9 +94,29 @@ test('mark-as-sent loop calls markInvitationGenerated once per id with { suggest
   expect(markInvitationGenerated).toHaveBeenCalledTimes(2);
   expect(markInvitationGenerated).toHaveBeenNthCalledWith(1, { suggestionId: SUGGESTION_ID, now: expect.any(String) });
   expect(markInvitationGenerated).toHaveBeenNthCalledWith(2, { suggestionId: OTHER_ID, now: expect.any(String) });
+  // One batch timestamp computed once before the loop, not recomputed per row.
+  expect(markInvitationGenerated.mock.calls[0][0].now).toBe(markInvitationGenerated.mock.calls[1][0].now);
 
   const result = events.find((e) => e.event === 'result');
   expect(result.data.stats.markedAsSent).toBe(2);
+});
+
+test('options.markAsSent: false never calls markInvitationGenerated', async () => {
+  const { events, onEvent } = recordingOnEvent();
+  await generateEmails(
+    baseArgs({
+      candidates: [
+        { name: 'A', email: 'a@example.org', suggestionId: SUGGESTION_ID },
+        { name: 'B', email: 'b@example.org', suggestionId: OTHER_ID },
+      ],
+      options: { markAsSent: false },
+    }),
+    onEvent,
+  );
+
+  expect(markInvitationGenerated).not.toHaveBeenCalled();
+  const result = events.find((e) => e.event === 'result');
+  expect(result.data.stats.markedAsSent).toBe(0);
 });
 
 test('a rejection for one id is best-effort: no count for it, but the loop continues to the next id', async () => {
