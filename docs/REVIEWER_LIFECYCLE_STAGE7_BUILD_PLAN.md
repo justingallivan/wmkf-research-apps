@@ -225,6 +225,21 @@ or backfill.
   asserts one batch timestamp plus a `markAsSent:false` never-calls case; my-candidates pin gains the
   token-hash-mismatch case. 26 scoped suites / 727; full suite 802 / 11,621; gates green. PR #165.
 
+- **3J build (Sonnet, 2026-09-06): `ef83bb9a`** on `claude/reviewer-lifecycle-stage3j`. Adapter op
+  `deselectLegacyDeclinedSuggestion(suggestionId, { ifMatch, ...opts })` next to the Stage 5 ops,
+  body `updateLifecycle(id, { selected:false }, { ifMatch, ...opts })` (inherits mapping, EXCLUDED
+  guard and ETag fallback; D3 documented as pending). `respond-service.js` legacy repair calls it with
+  the same `ifMatch` expression inside the same `withDalContext`; catch/envelope untouched;
+  `updateLifecycle` import dropped from the service. Hand-mocked adapter in
+  `external-review-services.test.js` gained a `jest.fn` forwarding shim (Stage 5 pattern) so the
+  pre-existing assertion is byte-unchanged, plus delegation, 412 and already-deselected pins; new op
+  suite compares `updateRecord` args between op and `updateLifecycle` (concrete ETag, undefined
+  ifMatch, actor) plus 412 propagation. No census row applies (no `reviewer-engagement/` import).
+  Full suite 799 / 11,608; types, lint, boundary/access-layer/dynamics-context gates + self-tests,
+  build, `git diff --check` green. Mutations: service calls `updateLifecycle` directly keeping the
+  import → 3 pins red; payload `selected:true` → 3/4 op tests red; add `requireIfMatch` → the
+  undefined-ifMatch equality case red. Opus and Codex round 1 pending.
+
 ## Docs (after each merge)
 
 Readiness audit rows 3/7; service catalog; `reviewer-workbench-lifecycle.md` Stage 3 bullet;
