@@ -116,6 +116,12 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   concrete ETag (`requireIfMatch`, same as the Stage 5 ops); a row arriving without `_etag` is refused
   as `missing_version` before any Dataverse call, and `respond-service.js` maps that to the same 412
   `concurrent_modification` envelope (decision record: D3 in `docs/REVIEWER_LIFECYCLE_STAGE7_BUILD_PLAN.md`).
+- **Accept/decline writes require a concrete ETag (2026-09-06, S490).** `respond-service.js` refuses a
+  fresh accept whose `If-Match` header is missing or a wildcard BEFORE staging the acceptance job, and a
+  decline with neither the header nor a verifier-row `_etag`, both with the 412 `concurrent_modification`
+  envelope the client already maps to "refresh and try again". Previously the adapter write ran
+  unconditionally in those cases. Consequence: when `/context` returns `etag: null` (its post-first-access
+  re-read failed) the reviewer's next submit gets a 412 and must reload, instead of an unlocked write.
 - **Accepted reviewer self-withdrawal (2026-07-24).** Before materials release,
   the accepted confirmation view and acceptance email link to the existing
   decline reason/referral form. The response service atomically flips the

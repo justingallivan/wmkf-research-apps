@@ -307,6 +307,33 @@ describe('applyReviewerResponse', () => {
     expect(cancelReviewerAcceptanceJob).toHaveBeenCalledWith(101, expect.any(String));
   });
 
+  // Acceptance-write ETag tightening (owner decision 2026-09-06, follow-on to
+  // D3): a fresh accept with no concrete If-Match is refused BEFORE any job
+  // is staged or any adapter write happens, with the same 412 envelope a
+  // stale version gets (the client's "refresh and try again" path).
+  it.each([
+    ['undefined', undefined],
+    ['empty string', ''],
+    ['wildcard', '*'],
+  ])('fresh accept with If-Match %s is refused as concurrent_modification with no job and no write', async (_l, ifMatch) => {
+    await expect(applyReviewerResponse({ suggestion: baseSuggestion(), request, reviewer, body: acceptBody(), ifMatch }))
+      .rejects.toMatchObject({ httpStatus: 412, body: { ok: false, reason: 'concurrent_modification' } });
+    expect(enqueueReviewerAcceptanceJob).not.toHaveBeenCalled();
+    expect(applyStage2aResponse).not.toHaveBeenCalled();
+    expect(cancelReviewerAcceptanceJob).not.toHaveBeenCalled();
+  });
+
+  it('fresh decline falls back to the verifier row _etag when the header is absent, and is refused when neither is concrete', async () => {
+    await applyReviewerResponse({ suggestion: baseSuggestion({ _etag: 'W/"row"' }), request, reviewer, body: { action: 'decline', decline: {} }, ifMatch: undefined });
+    expect(applyStage2aResponse).toHaveBeenCalledWith(
+      expect.any(String), expect.objectContaining({ action: 'decline' }), expect.objectContaining({ ifMatch: 'W/"row"' }),
+    );
+    applyStage2aResponse.mockClear();
+    await expect(applyReviewerResponse({ suggestion: baseSuggestion({ _etag: null }), request, reviewer, body: { action: 'decline', decline: {} }, ifMatch: undefined }))
+      .rejects.toMatchObject({ httpStatus: 412, body: { ok: false, reason: 'concurrent_modification' } });
+    expect(applyStage2aResponse).not.toHaveBeenCalled();
+  });
+
   it('repeat accept skips the PATCH but stages a queued job (tail retry)', async () => {
     const r = await applyReviewerResponse({
       suggestion: baseSuggestion({ wmkf_accepted: true }), request, reviewer, body: { action: 'accept' }, ifMatch: undefined,

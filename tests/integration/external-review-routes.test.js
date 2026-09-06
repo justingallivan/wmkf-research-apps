@@ -766,6 +766,22 @@ describe('/api/external/review/[token]/respond', () => {
     reviewer: { wmkf_name: 'Dr. Reviewer', wmkf_emailaddress: 'reviewer@example.org' },
   };
 
+  it('fresh accept with no If-Match header is refused 412 concurrent_modification before any job is staged (ETag tightening, 2026-09-06)', async () => {
+    verifySuggestionToken.mockResolvedValue(fresh);
+    const req = createMockReq({
+      method: 'POST',
+      query: { token: 'good-token' },
+      headers: {},
+      body: { action: 'accept', policyAcks: { 'reviewer-coi': true, 'reviewer-ai-use': true }, boardIdentity: { academicRank: 'Professor', primaryDepartment: 'Chemistry', mainInstitution: 'MIT' }, address: { line1: '1 St', city: 'Town', postalCode: '94000', state: 'NY', country: 'US', phone: '+1 555 0100' } },
+    });
+    const res = createMockRes();
+    await handler(req, res);
+    expect(res.status).toHaveBeenCalledWith(412);
+    expect(res.json).toHaveBeenCalledWith({ ok: false, reason: 'concurrent_modification' });
+    expect(enqueueReviewerAcceptanceJob).not.toHaveBeenCalled();
+    expect(applyStage2aResponse).not.toHaveBeenCalled();
+  });
+
   it('forwards the client If-Match header to the adapter as the optimistic lock (eval #2)', async () => {
     verifySuggestionToken.mockResolvedValue(fresh);
     const req = createMockReq({
@@ -810,7 +826,7 @@ describe('/api/external/review/[token]/respond', () => {
     const req = createMockReq({
       method: 'POST',
       query: { token: 'good-token' },
-      headers: {},
+      headers: { 'if-match': 'W/\"1001\"' },
       body: { action: 'accept', policyAcks: { 'reviewer-coi': true, 'reviewer-ai-use': true }, boardIdentity: { academicRank: 'Professor', primaryDepartment: 'Chemistry', mainInstitution: 'MIT' }, address: { line1: '1 St', city: 'Town', postalCode: '94000', state: 'NY', country: 'US', phone: '+1 555 0100' } },
     });
     const res = createMockRes();
@@ -862,7 +878,7 @@ describe('/api/external/review/[token]/respond', () => {
     const req = createMockReq({
       method: 'POST',
       query: { token: 'good-token' },
-      headers: {},
+      headers: { 'if-match': 'W/\"1001\"' },
       body: { action: 'accept', policyAcks: { 'reviewer-coi': true, 'reviewer-ai-use': true }, boardIdentity: { academicRank: 'Professor', primaryDepartment: '   ', mainInstitution: 'MIT' }, address: { line1: '1 St', city: 'Town', postalCode: '94000', state: 'NY', country: 'US', phone: '+1 555 0100' } },
     });
     const res = createMockRes();
@@ -885,7 +901,7 @@ describe('/api/external/review/[token]/respond', () => {
     const req = createMockReq({
       method: 'POST',
       query: { token: 'good-token' },
-      headers: {},
+      headers: { 'if-match': 'W/\"1001\"' },
       body: { action: 'accept', policyAcks: { 'reviewer-coi': true, 'reviewer-ai-use': true }, boardIdentity: { academicRank: 'Professor', primaryDepartment: 'Chemistry', mainInstitution: 'MIT' }, address: { line1: '1 St', city: 'Town', postalCode: '94000', state: 'NY', country: 'US', phone: '+1 555 0100' } },
     });
     const res = createMockRes();
@@ -904,7 +920,7 @@ describe('/api/external/review/[token]/respond', () => {
     ensureHonorariumOnboarding.mockClear();
     verifySuggestionToken.mockResolvedValue(fresh);
     const req = createMockReq({
-      method: 'POST', query: { token: 'good-token' }, headers: {},
+      method: 'POST', query: { token: 'good-token' }, headers: { 'if-match': 'W/\"1001\"' },
       body: { action: 'accept', honorariumOptOut: true, policyAcks: { 'reviewer-coi': true, 'reviewer-ai-use': true }, boardIdentity: { academicRank: 'Professor', primaryDepartment: 'Chemistry', mainInstitution: 'MIT' } },
     });
     const res = createMockRes();
@@ -926,7 +942,7 @@ describe('/api/external/review/[token]/respond', () => {
       suggestion: { ...fresh.suggestion, wmkf_accepted: true, wmkf_declined: false },
     });
     const req = createMockReq({
-      method: 'POST', query: { token: 'good-token' }, headers: {},
+      method: 'POST', query: { token: 'good-token' }, headers: { 'if-match': 'W/\"1001\"' },
       body: { action: 'accept' },
     });
     const res = createMockRes();
@@ -951,7 +967,7 @@ describe('/api/external/review/[token]/respond', () => {
       reviewer: { wmkf_name: 'Dr. Reviewer', wmkf_emailaddress: 'reviewer@example.org' },
     });
     const req = createMockReq({
-      method: 'POST', query: { token: 'good-token' }, headers: {},
+      method: 'POST', query: { token: 'good-token' }, headers: { 'if-match': 'W/\"1001\"' },
       body: { action: 'accept' },
     });
     const res = createMockRes();
@@ -969,7 +985,7 @@ describe('/api/external/review/[token]/respond', () => {
       ...fresh,
       suggestion: { ...fresh.suggestion, wmkf_accepted: true, wmkf_declined: false, wmkf_honorariumoptout: true },
     });
-    const req = createMockReq({ method: 'POST', query: { token: 'good-token' }, headers: {}, body: { action: 'accept' } });
+    const req = createMockReq({ method: 'POST', query: { token: 'good-token' }, headers: { 'if-match': 'W/\"1001\"' }, body: { action: 'accept' } });
     const res = createMockRes();
     await handler(req, res);
     expect(ensureHonorariumOnboarding).not.toHaveBeenCalled();
@@ -984,7 +1000,7 @@ describe('/api/external/review/[token]/respond', () => {
     markReviewerAcceptanceJobQueued.mockRejectedValueOnce(new Error('queue marker down'));
     verifySuggestionToken.mockResolvedValue(fresh);
     const req = createMockReq({
-      method: 'POST', query: { token: 'good-token' }, headers: {},
+      method: 'POST', query: { token: 'good-token' }, headers: { 'if-match': 'W/\"1001\"' },
       body: { action: 'accept', policyAcks: { 'reviewer-coi': true, 'reviewer-ai-use': true }, boardIdentity: { academicRank: 'Professor', primaryDepartment: 'Chemistry', mainInstitution: 'MIT' }, address: { line1: '1 St', city: 'T', postalCode: '9', state: 'NY', country: 'US', phone: '+1 555 0100' } },
     });
     const res = createMockRes();
@@ -998,7 +1014,7 @@ describe('/api/external/review/[token]/respond', () => {
     applyStage2aResponse.mockRejectedValueOnce(Object.assign(new Error('Update failed (412)'), { status: 412 }));
     verifySuggestionToken.mockResolvedValue(fresh);
     const req = createMockReq({
-      method: 'POST', query: { token: 'good-token' }, headers: {},
+      method: 'POST', query: { token: 'good-token' }, headers: { 'if-match': 'W/\"1001\"' },
       body: { action: 'accept', policyAcks: { 'reviewer-coi': true, 'reviewer-ai-use': true }, boardIdentity: { academicRank: 'Professor', primaryDepartment: 'Chemistry', mainInstitution: 'MIT' }, address: { line1: '1 St', city: 'T', postalCode: '9', state: 'NY', country: 'US', phone: '+1 555 0100' } },
     });
     const res = createMockRes();
@@ -1013,7 +1029,7 @@ describe('/api/external/review/[token]/respond', () => {
     applyStage2aResponse.mockRejectedValueOnce(new Error('Dataverse timeout after write'));
     verifySuggestionToken.mockResolvedValue(fresh);
     const req = createMockReq({
-      method: 'POST', query: { token: 'good-token' }, headers: {},
+      method: 'POST', query: { token: 'good-token' }, headers: { 'if-match': 'W/\"1001\"' },
       body: { action: 'accept', policyAcks: { 'reviewer-coi': true, 'reviewer-ai-use': true }, boardIdentity: { academicRank: 'Professor', primaryDepartment: 'Chemistry', mainInstitution: 'MIT' }, address: { line1: '1 St', city: 'T', postalCode: '9', state: 'NY', country: 'US', phone: '+1 555 0100' } },
     });
     const res = createMockRes();
@@ -1079,7 +1095,7 @@ describe('/api/external/review/[token]/respond', () => {
   it('rejects a malformed address with 400 before any write', async () => {
     verifySuggestionToken.mockResolvedValue(fresh);
     const req = createMockReq({
-      method: 'POST', query: { token: 'good-token' }, headers: {},
+      method: 'POST', query: { token: 'good-token' }, headers: { 'if-match': 'W/\"1001\"' },
       body: { action: 'accept', address: { country: 'U' } }, // ISO2 violation (len 1, passes the cap, fails ISO2 shape)
     });
     const res = createMockRes();
@@ -1149,7 +1165,7 @@ describe('/api/external/review/[token]/respond', () => {
     const { ensureHonorariumOnboarding } = require('../../lib/bill/honorarium-onboard-orchestrator');
     verifySuggestionToken.mockResolvedValue(fresh);
     const req = createMockReq({
-      method: 'POST', query: { token: 'good-token' }, headers: {},
+      method: 'POST', query: { token: 'good-token' }, headers: { 'if-match': 'W/\"1001\"' },
       body: { action: 'accept', policyAcks: { 'reviewer-coi': true, 'reviewer-ai-use': true }, boardIdentity: { academicRank: 'Professor', primaryDepartment: 'Chemistry', mainInstitution: 'MIT' }, address: { line1: '1 St', city: 'T', postalCode: '9', state: 'NY', country: 'US', phone: '+1 555 0100' } },
     });
     const res = createMockRes();
@@ -1163,7 +1179,7 @@ describe('/api/external/review/[token]/respond', () => {
   it('REPEAT accept (already accepted) still queues honorarium retry', async () => {
     const { ensureHonorariumOnboarding } = require('../../lib/bill/honorarium-onboard-orchestrator');
     verifySuggestionToken.mockResolvedValue({ ...fresh, suggestion: { ...fresh.suggestion, wmkf_accepted: true } });
-    const req = createMockReq({ method: 'POST', query: { token: 'good-token' }, headers: {}, body: { action: 'accept' } });
+    const req = createMockReq({ method: 'POST', query: { token: 'good-token' }, headers: { 'if-match': 'W/\"1001\"' }, body: { action: 'accept' } });
     const res = createMockRes();
     await handler(req, res);
     expect(enqueueReviewerAcceptanceJob).toHaveBeenCalledWith(expect.objectContaining({ isAcceptRepeat: true }));
@@ -1201,7 +1217,7 @@ describe('/api/external/review/[token]/respond', () => {
       suggestion: { ...fresh.suggestion, wmkf_responsetype: 100000004 }, // held, not accepted
     });
     const req = createMockReq({
-      method: 'POST', query: { token: 'good-token' }, headers: {},
+      method: 'POST', query: { token: 'good-token' }, headers: { 'if-match': 'W/\"1001\"' },
       body: { action: 'accept', policyAcks: { 'reviewer-coi': true, 'reviewer-ai-use': true }, boardIdentity: { academicRank: 'Professor', primaryDepartment: 'Chemistry', mainInstitution: 'MIT' }, address: { line1: '1 St', city: 'T', postalCode: '9', state: 'NY', country: 'US', phone: '+1 555 0100' } },
     });
     const res = createMockRes();
@@ -1266,7 +1282,7 @@ describe('/api/external/review/[token]/respond', () => {
   it('fresh accept 200 envelope pinned exactly (drain contract: acceptanceJobId surfaced)', async () => {
     verifySuggestionToken.mockResolvedValue(fresh);
     const req = createMockReq({
-      method: 'POST', query: { token: 'good-token' }, headers: {},
+      method: 'POST', query: { token: 'good-token' }, headers: { 'if-match': 'W/\"1001\"' },
       body: { action: 'accept', policyAcks: { 'reviewer-coi': true, 'reviewer-ai-use': true }, boardIdentity: { academicRank: 'Professor', primaryDepartment: 'Chemistry', mainInstitution: 'MIT' }, address: { line1: '1 St', city: 'Town', postalCode: '94000', state: 'NY', country: 'US', phone: '+1 555 0100' } },
     });
     const res = createMockRes();
@@ -1283,7 +1299,7 @@ describe('/api/external/review/[token]/respond', () => {
   it('accept write ORDERING pinned: durable job staged accept_pending BEFORE the Dataverse PATCH, queued-marker after (drain contract)', async () => {
     verifySuggestionToken.mockResolvedValue(fresh);
     const req = createMockReq({
-      method: 'POST', query: { token: 'good-token' }, headers: {},
+      method: 'POST', query: { token: 'good-token' }, headers: { 'if-match': 'W/\"1001\"' },
       body: { action: 'accept', policyAcks: { 'reviewer-coi': true, 'reviewer-ai-use': true }, boardIdentity: { academicRank: 'Professor', primaryDepartment: 'Chemistry', mainInstitution: 'MIT' }, address: { line1: '1 St', city: 'Town', postalCode: '94000', state: 'NY', country: 'US', phone: '+1 555 0100' } },
     });
     const res = createMockRes();
