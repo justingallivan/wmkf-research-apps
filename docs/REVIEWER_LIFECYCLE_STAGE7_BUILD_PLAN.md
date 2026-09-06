@@ -2,11 +2,11 @@
 title: Reviewer Lifecycle Stage 3 expansion (3F–3K) and Stage 7 — close the generic write bypasses
 kind: plan
 domain: reviewer-workbench
-status: draft
+status: historical
 canonical: false
 owner: product-engineering
 last_verified: 2026-09-06
-summary: Census of the 18 generic suggestion writers; six remaining moves (3F–3K, behavior-preserving); Stage 7 gate that only lets the recorded importer set shrink.
+summary: Shipped 2026-09-06 (PRs #162–#168). 18-site census, slices 3F–3K, LAW-mode boundary gate, bulkUpdateByRequest removed; D1–D5 open.
 ---
 
 # Stage 3 expansion and Stage 7 — close arbitrary bypasses
@@ -388,7 +388,8 @@ or backfill.
   groups (new `class-barrel-dynamic-import`; `unresolved` has eight fail-closed shapes). Live census
   14 / 0 / 0. Full suite 807 / 11,652; all gate pairs green. **Architect verification:** gate + self-test
   (9 PASS) re-run on the branch, and a scratch `--root` tree with the three Codex shapes (class
-  field, renamed wrapper + consumer, direct dynamic import) reported all of them as violations.
+  field, renamed wrapper + consumer, direct dynamic import) reported all of them as violations. PR
+  #168 merged `790ba3a1` (2026-09-06, eight checks green); the gate runs green on main.
 
 ## Docs (after each merge)
 

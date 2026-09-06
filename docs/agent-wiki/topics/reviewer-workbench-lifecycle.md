@@ -1614,7 +1614,15 @@ returned zero eligible/enqueued/claimed/failed.** Plan doc:
   stays raw pending owner decisions D1/D2 in `docs/REVIEWER_LIFECYCLE_STAGE7_BUILD_PLAN.md`), 3J a
   narrow adapter op for the external decline repair (`deselectLegacyDeclinedSuggestion`, PR #166; D3),
   3K the whitelisted `setRequestMetadata` adapter op behind the picker's proposal-wide cycle/program
-  edit (PR #167; the sequential no-`ifMatch` write is open decision D4);
+  edit (PR #167; the sequential no-`ifMatch` write is open decision D4). **Stage 7 (PR #168,
+  2026-09-06) closes the boundary:** `check:reviewer-engagement-boundary` (LAW mode, AST-resolved incl.
+  alias chains, barrels, class fields, dynamic imports) fails any binding of `updateLifecycle` /
+  `patchFields` / `patchReviewReceipt` from the suggestion adapter in `lib/pages/shared/modules`
+  outside `reviewer-engagement/`, the adapter, or the two receipt sinks recorded in the script and
+  pinned by `tests/unit/reviewer-engagement-boundary-recorded-set.test.js`; `bulkUpdateByRequest` is
+  deleted (zero-reference pin); the stale-invite sweep writes through the named
+  `expireInvitationResponse` op. Scripts are recorded, not gated (owner decision D5); D1–D4 are open
+  owner decisions in `docs/REVIEWER_LIFECYCLE_STAGE7_BUILD_PLAN.md`;
   the old `review-manager/close-review-service.js` is a pure re-export and routes keep their import
   paths. Each move is byte-identical and pinned by a both-paths identity test plus a caller census
   (`tests/unit/reviewer-engagement-census.test.js`) that records every importer of the legacy path,
