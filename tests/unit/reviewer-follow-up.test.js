@@ -325,7 +325,7 @@ describe('reviewer follow-up refetch resilience', () => {
     expect(await screen.findByText('Reviewer follow-up could not be refreshed')).toBeInTheDocument();
     expect(screen.getByText('Showing the last loaded results. Retry before making changes.')).toBeInTheDocument();
     expect(screen.getByText('Active proposal')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Show reviewer activity' }));
+    expect(screen.getByRole('button', { name: 'Hide reviewer activity' })).toBeInTheDocument();
     expect(screen.getByTestId('reviewer-manage-panel')).toHaveAttribute('data-degraded', 'true');
   });
 
@@ -356,17 +356,15 @@ describe('reviewer follow-up refetch resilience', () => {
     reviewersShouldFail = true;
     fireEvent.click(screen.getByRole('button', { name: 'Mock refresh' }));
     expect(await screen.findByText('Reviewer follow-up could not be refreshed')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Show reviewer activity' }));
     expect(screen.getByTestId('reviewer-manage-panel')).toHaveAttribute('data-degraded', 'true');
 
     reviewersShouldFail = false;
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
 
+    expect(await screen.findByText('Active proposal')).toBeInTheDocument();
     await waitFor(() => {
       expect(screen.queryByText('Reviewer follow-up could not be refreshed')).not.toBeInTheDocument();
     });
-    expect(await screen.findByText('Active proposal')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Show reviewer activity' }));
     expect(screen.getByTestId('reviewer-manage-panel')).toHaveAttribute('data-degraded', 'false');
   });
 
@@ -402,6 +400,140 @@ describe('reviewer follow-up refetch resilience', () => {
     expect(screen.queryByText('Reviewer follow-up could not be refreshed')).not.toBeInTheDocument();
     expect(screen.queryByText('Active proposal')).not.toBeInTheDocument();
     expect(screen.queryByTestId('reviewer-manage-panel')).not.toBeInTheDocument();
+  });
+
+  test('a superseded load cannot repopulate the list after a scope change', async () => {
+    let resolveStaleReviewers;
+    const staleReviewersPromise = new Promise((resolve) => { resolveStaleReviewers = resolve; });
+    let refreshTriggered = false;
+    let newScopeShouldFail = false;
+
+    global.fetch = jest.fn(async (url) => {
+      if (url === '/api/workbench/dashboard') {
+        return { ok: true, json: async () => cycleResponse };
+      }
+      const isAllScope = String(url).includes('scope=all');
+      if (String(url).startsWith('/api/workbench/dashboard?')) {
+        if (isAllScope && newScopeShouldFail) {
+          return { ok: false, json: async () => ({ error: 'boom' }) };
+        }
+        return { ok: true, json: async () => ({ proposals: dashboardProposals }) };
+      }
+      if (String(url).startsWith('/api/review-manager/reviewers')) {
+        if (isAllScope) {
+          if (newScopeShouldFail) {
+            return { ok: false, json: async () => ({ error: 'boom' }) };
+          }
+          return { ok: true, json: async () => ({ proposals: reviewerProposals }) };
+        }
+        if (refreshTriggered) {
+          await staleReviewersPromise;
+        }
+        return { ok: true, json: async () => ({ proposals: reviewerProposals }) };
+      }
+      return { ok: true, json: async () => ({ proposals: [] }) };
+    });
+
+    render(<ReviewerFollowUpDashboard />);
+    expect(await screen.findByText('Active proposal')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Show reviewer activity' }));
+
+    refreshTriggered = true;
+    newScopeShouldFail = true;
+    fireEvent.click(screen.getByRole('button', { name: 'Mock refresh' }));
+
+    fireEvent.click(screen.getByRole('button', { name: 'All requests' }));
+
+    // Resolve the superseded (stale) same-params fetch with the ORIGINAL fixtures
+    // after the scope change has already cleared the list and bumped requestIdRef.
+    resolveStaleReviewers();
+
+    expect(await screen.findByText('Reviewer follow-up could not be loaded')).toBeInTheDocument();
+    expect(screen.queryByText('Reviewer follow-up could not be refreshed')).not.toBeInTheDocument();
+    expect(screen.queryByText('Active proposal')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('reviewer-manage-panel')).not.toBeInTheDocument();
+  });
+
+  test('retry keeps the group mounted and disables Try again while pending', async () => {
+    let reviewersMode = 'ok';
+    let pendingReject = null;
+
+    global.fetch = jest.fn(async (url) => {
+      if (url === '/api/workbench/dashboard') {
+        return { ok: true, json: async () => cycleResponse };
+      }
+      if (String(url).startsWith('/api/workbench/dashboard?')) {
+        return { ok: true, json: async () => ({ proposals: dashboardProposals }) };
+      }
+      if (String(url).startsWith('/api/review-manager/reviewers')) {
+        if (reviewersMode === 'fail') {
+          return { ok: false, json: async () => ({ error: 'network blip' }) };
+        }
+        if (reviewersMode === 'pending') {
+          return new Promise((_resolve, reject) => { pendingReject = reject; });
+        }
+        return { ok: true, json: async () => ({ proposals: reviewerProposals }) };
+      }
+      return { ok: true, json: async () => ({ proposals: [] }) };
+    });
+
+    render(<ReviewerFollowUpDashboard />);
+    expect(await screen.findByText('Active proposal')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Show reviewer activity' }));
+
+    reviewersMode = 'fail';
+    fireEvent.click(screen.getByRole('button', { name: 'Mock refresh' }));
+    expect(await screen.findByText('Reviewer follow-up could not be refreshed')).toBeInTheDocument();
+
+    reviewersMode = 'pending';
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+
+    expect(await screen.findByRole('button', { name: 'Retrying…' })).toBeDisabled();
+    expect(screen.getByTestId('reviewer-manage-panel')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Hide reviewer activity' })).toBeInTheDocument();
+
+    pendingReject(new Error('still broken'));
+
+    expect(await screen.findByText('still broken')).toBeInTheDocument();
+    expect(screen.getByTestId('reviewer-manage-panel')).toHaveAttribute('data-degraded', 'true');
+    expect(screen.getByRole('button', { name: 'Hide reviewer activity' })).toBeInTheDocument();
+  });
+
+  test('a mismatched filter renders under a refresh-failure banner', async () => {
+    let reviewersShouldFail = false;
+    global.fetch = jest.fn(async (url) => {
+      if (url === '/api/workbench/dashboard') {
+        return { ok: true, json: async () => cycleResponse };
+      }
+      if (String(url).startsWith('/api/workbench/dashboard?')) {
+        return { ok: true, json: async () => ({ proposals: dashboardProposals }) };
+      }
+      if (String(url).startsWith('/api/review-manager/reviewers')) {
+        if (reviewersShouldFail) {
+          return { ok: false, json: async () => ({ error: 'network blip' }) };
+        }
+        return { ok: true, json: async () => ({ proposals: reviewerProposals }) };
+      }
+      return { ok: true, json: async () => ({ proposals: [] }) };
+    });
+
+    render(<ReviewerFollowUpDashboard />);
+    expect(await screen.findByText('Active proposal')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'All reviewers' }));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Show reviewer activity' })[0]);
+
+    reviewersShouldFail = true;
+    fireEvent.click(screen.getByRole('button', { name: 'Mock refresh' }));
+    expect(await screen.findByText('Reviewer follow-up could not be refreshed')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Search requests and reviewers'), {
+      target: { value: 'no such reviewer or institution' },
+    });
+
+    expect(screen.queryByText('Active proposal')).not.toBeInTheDocument();
+    expect(screen.getByText('No assigned requests match this view.')).toBeInTheDocument();
+    expect(screen.getByText('Reviewer follow-up could not be refreshed')).toBeInTheDocument();
   });
 });
 
