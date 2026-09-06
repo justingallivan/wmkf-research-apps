@@ -11,15 +11,12 @@
  * still shows the sweep counting them as skipped end-to-end.
  */
 
-const RESPONSE_TYPE_MAP = { no_response: 100000005, declined: 100000001, accepted: 100000000 };
-
 const getByIdWithSelect = jest.fn();
-const patchFields = jest.fn();
+const expireInvitationResponse = jest.fn();
 const isExcluded = jest.fn(() => false);
 jest.mock('../../lib/dataverse/adapters/reviewer-suggestion.js', () => ({
-  RESPONSE_TYPE_MAP,
   getByIdWithSelect: (...a) => getByIdWithSelect(...a),
-  patchFields: (...a) => patchFields(...a),
+  expireInvitationResponse: (...a) => expireInvitationResponse(...a),
   isExcluded: (...a) => isExcluded(...a),
 }));
 
@@ -73,7 +70,7 @@ beforeEach(() => {
   queryRequests.mockResolvedValue({
     records: [{ akoya_requestid: REQUEST_ID, wmkf_meetingdate: OLD_MEETING_DATE }],
   });
-  patchFields.mockResolvedValue({});
+  expireInvitationResponse.mockResolvedValue({});
 });
 
 describe('isPastCutoff', () => {
@@ -98,7 +95,7 @@ describe('expireInvitation', () => {
       actingUserSystemId: 'staff-1',
     });
     expect(result).toEqual({ outcome: 'skipped' });
-    expect(patchFields).not.toHaveBeenCalled();
+    expect(expireInvitationResponse).not.toHaveBeenCalled();
   });
 
   it('skips on a request-binding mismatch between discovery and the fresh read', async () => {
@@ -110,7 +107,7 @@ describe('expireInvitation', () => {
       actingUserSystemId: 'staff-1',
     });
     expect(result).toEqual({ outcome: 'skipped' });
-    expect(patchFields).not.toHaveBeenCalled();
+    expect(expireInvitationResponse).not.toHaveBeenCalled();
   });
 
   it.each([undefined, null, '', '  ', 'no-quotes', '*'])(
@@ -124,7 +121,7 @@ describe('expireInvitation', () => {
         actingUserSystemId: 'staff-1',
       });
       expect(result).toEqual({ outcome: 'skipped' });
-      expect(patchFields).not.toHaveBeenCalled();
+      expect(expireInvitationResponse).not.toHaveBeenCalled();
     },
   );
 
@@ -139,10 +136,10 @@ describe('expireInvitation', () => {
       actingUserSystemId: 'staff-1',
     });
     expect(result).toEqual({ outcome: 'skipped' });
-    expect(patchFields).not.toHaveBeenCalled();
+    expect(expireInvitationResponse).not.toHaveBeenCalled();
   });
 
-  it('sweeps: calls patchFields with the exact no_response/nowIso payload and options', async () => {
+  it('sweeps: calls expireInvitationResponse with the suggestion id, nowIso, and options', async () => {
     const result = await expireInvitation({
       suggestion: suggestion(),
       cutoffIso: CUTOFF_ISO,
@@ -150,15 +147,21 @@ describe('expireInvitation', () => {
       actingUserSystemId: 'staff-1',
     });
     expect(result).toEqual({ outcome: 'swept' });
-    expect(patchFields).toHaveBeenCalledWith(SUGGESTION_ID, {
-      wmkf_responsetype: RESPONSE_TYPE_MAP.no_response,
-      wmkf_responsereceivedat: NOW_ISO,
-    }, { actingUserSystemId: 'staff-1', ifMatch: ETAG });
+    // Stage 7 moved the no_response/nowIso payload construction into the
+    // adapter op itself (expireInvitationResponse); this suite pins only the
+    // call shape the service makes, not the payload fields, which are
+    // covered by the op's own suite
+    // (tests/unit/reviewer-suggestion-receipt-ops.test.js).
+    expect(expireInvitationResponse).toHaveBeenCalledWith(
+      SUGGESTION_ID,
+      NOW_ISO,
+      { actingUserSystemId: 'staff-1', ifMatch: ETAG },
+    );
   });
 
-  it('propagates a 412 from patchFields (does not classify it as skipped)', async () => {
+  it('propagates a 412 from expireInvitationResponse (does not classify it as skipped)', async () => {
     const conflict = Object.assign(new Error('conflict'), { status: 412 });
-    patchFields.mockRejectedValue(conflict);
+    expireInvitationResponse.mockRejectedValue(conflict);
     await expect(expireInvitation({
       suggestion: suggestion(),
       cutoffIso: CUTOFF_ISO,

@@ -1,47 +1,36 @@
 /**
  * @jest-environment node
  *
- * Interim TEXTUAL removal census for `bulkUpdateByRequest` (Reviewer
- * Lifecycle Stage 3K, docs/REVIEWER_LIFECYCLE_STAGE7_BUILD_PLAN.md census
- * row 14). This is a coarse, regex-based scan meant to catch a stray
- * reintroduction early, not a semantic guarantee — the AST binding-resolved
- * census that actually gates deletion is Stage 7's
- * `check-reviewer-engagement-boundary.js` (see the Stage 7 section of the
- * build plan), which resolves imports/aliases properly.
+ * Permanent removal pin for `bulkUpdateByRequest` (Reviewer Lifecycle
+ * Stage 7, docs/REVIEWER_LIFECYCLE_STAGE7_BUILD_PLAN.md, "7B — delete
+ * bulkUpdateByRequest"). Stage 3K's interim census recorded exactly two
+ * production files still naming the identifier (the adapter's own
+ * definition/delegation and the trust-boundary-guid gate's sink table);
+ * Stage 7 inlined the function's body verbatim into `setRequestMetadata`,
+ * removed the standalone export, dropped the sink-table entry, and
+ * reworded the remaining explanatory comments so the name no longer
+ * appears anywhere in application code.
  *
- * `bulkUpdateByRequest` is now a compatibility export: 3K moved its one
- * production caller (my-candidates-service.js) onto the whitelisted
- * `setRequestMetadata`, which itself delegates to `bulkUpdateByRequest`
- * internally. This test scans every production root —
- * `lib`, `pages`, `shared`, `modules`, `scripts` — for any word-bounded
- * TEXT reference to the identifier `bulkUpdateByRequest` (not only the call
- * form `bulkUpdateByRequest(`, so a spaced call, an aliased import, or a
- * bare reference is also caught) and asserts the matching file set is
- * EXACTLY the two recorded files below. When Stage 7 confirms this census
- * is still exactly those two files, `bulkUpdateByRequest` can be deleted
- * (and its sink-table entry removed); a new reference appearing anywhere
- * else must fail this test first.
+ * This test now asserts ZERO word-bounded references to the identifier
+ * `bulkUpdateByRequest` across all five production roots — `lib`, `pages`,
+ * `shared`, `modules`, `scripts` — and stays the permanent "it stays
+ * deleted" pin: a reintroduced import, a re-added export, or a stray
+ * comment mentioning the name anywhere in production code fails this test.
  *
- * Recorded matches:
- *   - lib/dataverse/adapters/reviewer-suggestion.js — the function's own
- *     definition (`export async function bulkUpdateByRequest(...)`) plus
- *     `setRequestMetadata`'s internal delegation call to it.
- *   - lib/services/reviewer-finder/my-candidates-service.js — no longer
- *     calls the function (3K moved that call to `setRequestMetadata`); its
- *     two comments now name `bulkUpdateByRequest` only to explain what
- *     `setRequestMetadata` delegates to, for a reader who does not have the
- *     adapter open.
- *   - scripts/check-trust-boundary-guid.js — names `bulkUpdateByRequest` in
- *     its GUID-sink table (`SINKS` map entry `['bulkUpdateByRequest', 0]`)
- *     and in its docblock listing the adapter's id-sink methods; it does
- *     not call the function.
+ * ONE carve-out: `scripts/check-reviewer-engagement-boundary.js` and its
+ * self-test deliberately keep `bulkUpdateByRequest` in the Stage 7 gate's
+ * GENERIC_WRITERS list (docs/REVIEWER_LIFECYCLE_STAGE7_BUILD_PLAN.md,
+ * "Remove the generic name from the gate's GENERIC WRITERS list only if
+ * nothing else needs it — keep it listed... a deleted symbol can still be
+ * re-added; listing it costs nothing"). Those two files are the detection
+ * MECHANISM that would catch a reintroduction, not a caller of the removed
+ * function, so they are excluded from this scan by name — not by directory
+ * or pattern — so a NEW file elsewhere naming the identifier still fails.
  *
  * Unlike the import-specifier census (reviewer-engagement-census.test.js),
- * this scans for an IDENTIFIER reference by name, not a module import —
- * `bulkUpdateByRequest` lives inside the same adapter module as its caller
- * (setRequestMetadata), so no import-path census would see that reference
- * at all, and the guard-script mention is a bare string/identifier, not an
- * import, either.
+ * this scans for a bare IDENTIFIER reference by name, not a module import —
+ * the deleted function lived inside the same adapter module as its caller
+ * (setRequestMetadata), so no import-path census would ever have seen it.
  */
 
 const path = require('path');
@@ -51,30 +40,49 @@ const ROOT = path.resolve(__dirname, '../..');
 const SCAN_DIRS = ['lib', 'pages', 'shared', 'modules', 'scripts'];
 const NAME_PATTERN = /\bbulkUpdateByRequest\b/;
 
+// The Stage 7 gate script and its self-test are the detection mechanism for
+// a reintroduction of this identifier, not a caller of it — see the module
+// docblock above.
+const CARVE_OUT_FILES = new Set([
+  'scripts/check-reviewer-engagement-boundary.js',
+  'scripts/check-reviewer-engagement-boundary-self-test.js',
+]);
+
 const PRODUCTION_FILES = readSourceFiles(
   SCAN_DIRS.map((dir) => path.join(ROOT, dir)),
   { relativeTo: ROOT },
-);
+).filter(({ file }) => !CARVE_OUT_FILES.has(file));
 
-describe('bulkUpdateByRequest removal census (interim textual scan)', () => {
+describe('bulkUpdateByRequest removal census (permanent pin)', () => {
   it('read at least one production file (scan roots resolved)', () => {
     expect(PRODUCTION_FILES.length).toBeGreaterThan(0);
   });
 
-  it('the only files referencing bulkUpdateByRequest are the adapter, its former caller\'s explanatory comments, and the trust-boundary-guid gate', () => {
+  it('the carve-out files exist, are excluded, and genuinely contain the name (non-vacuous exclusion)', () => {
+    const unfiltered = readSourceFiles(
+      SCAN_DIRS.map((dir) => path.join(ROOT, dir)),
+      { relativeTo: ROOT },
+    );
+    const byFile = new Map(unfiltered.map(({ file, content }) => [file, content]));
+    for (const carveOut of CARVE_OUT_FILES) {
+      expect(byFile.has(carveOut)).toBe(true);
+      // If this ever stops matching, the carve-out is dead weight (or the
+      // gate script no longer names the writer) and should be removed.
+      expect(NAME_PATTERN.test(byFile.get(carveOut))).toBe(true);
+    }
+    // And the filtered set actually dropped them.
+    const filteredFiles = new Set(PRODUCTION_FILES.map(({ file }) => file));
+    for (const carveOut of CARVE_OUT_FILES) {
+      expect(filteredFiles.has(carveOut)).toBe(false);
+    }
+  });
+
+  it('no production file (outside the Stage 7 gate carve-out) references bulkUpdateByRequest', () => {
     const matched = PRODUCTION_FILES
       .filter(({ content }) => NAME_PATTERN.test(content))
       .map(({ file }) => file)
       .sort();
 
-    // Non-vacuity: if the pattern stops matching anything (e.g. the
-    // function is renamed without updating this test), fail loudly rather
-    // than silently passing an empty comparison.
-    expect(matched.length).toBeGreaterThan(0);
-    expect(matched).toEqual([
-      'lib/dataverse/adapters/reviewer-suggestion.js',
-      'lib/services/reviewer-finder/my-candidates-service.js',
-      'scripts/check-trust-boundary-guid.js',
-    ]);
+    expect(matched).toEqual([]);
   });
 });
