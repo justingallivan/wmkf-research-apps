@@ -196,6 +196,19 @@ or backfill.
   not added; catalog entries land post-merge. Rebased onto `c833bf2a` (census conflict resolved
   keeping all rows; 4 suites / 34 green), PR #164.
 
+- **3F build (Sonnet, 2026-09-06): `2c5600e8`** on `claude/reviewer-lifecycle-stage3f` (rebased past
+  3G/3H/3I; census conflict kept all rows). `record-invitation.js` exports three unshared
+  passthroughs: `recordDeliveredInvitation` (send-emails ~`:932–944`, no `ifMatch`, D1 preserved),
+  `recordManualInvitation` (my-candidates ~`:629–635`; guards, 412 → `stale_manual_link` and response
+  stay in the caller), `markInvitationGenerated` (generate-emails ~`:501–505`, raw `patchFields`, no
+  options, D2 preserved). No caller import removed (all still use `findById`). Direct tests (7, incl.
+  no-`ifMatch` own-property assertion and a three-export surface test), three delegation-pin suites,
+  census row with three importers; 21 existing suites (674 tests) unchanged. Full suite 798 / 11,603;
+  types, lint, boundary/access-layer/trust-boundary gates + self-tests, build, `git diff --check`
+  green. Mutations: inline each write keeping the import → its pin red (2/4, 3/4, 2/2); add
+  `ifMatch:'*'` to the delivered stamp → direct red; route the generation mark through
+  `updateLifecycle` → direct red. Opus and Codex round 1 pending.
+
 ## Docs (after each merge)
 
 Readiness audit rows 3/7; service catalog; `reviewer-workbench-lifecycle.md` Stage 3 bullet;
