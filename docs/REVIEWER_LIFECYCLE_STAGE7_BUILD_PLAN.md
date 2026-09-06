@@ -377,6 +377,18 @@ or backfill.
   gate whose purpose is soundness, so a final builder correction closes them (detect, or fail closed
   on unsupported adapter-bearing shapes) with red fixtures; the architect verifies the gate pair and
   suites directly instead of a third Codex round. Recorded as the cap's stopping point.
+- **Stage 7 final correction `4e471c94`** (rebased on `47452cb8`): class-field and constructor
+  `this.<field>` adapter bindings flow through the fixpoint; renamed CJS/ESM member re-exports
+  (`module.exports = { mutate: adapter.updateLifecycle }`, `exports.mutate = …`, `export const mutate
+  = …`) resolve through the wrapper (fixing a latent bug where `export const` was swallowed by the
+  no-source `export {}` branch); direct `(await import(adapter)).writer` recognized, non-literal
+  source or computed key fails closed; `/start` wording fixed. The builder's first catch-all
+  false-positived on five real files (`adapter.CONSTANT_MAP[key]`, `adapter.findById(id).catch`) and
+  was narrowed to writer-named outer properties rather than exempting anything. Self-test now nine
+  groups (new `class-barrel-dynamic-import`; `unresolved` has eight fail-closed shapes). Live census
+  14 / 0 / 0. Full suite 807 / 11,652; all gate pairs green. **Architect verification:** gate + self-test
+  (9 PASS) re-run on the branch, and a scratch `--root` tree with the three Codex shapes (class
+  field, renamed wrapper + consumer, direct dynamic import) reported all of them as violations.
 
 ## Docs (after each merge)
 
