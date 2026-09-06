@@ -114,7 +114,13 @@ builders on that file concurrently.
   `check:dataverse-access-layer`, build, `git diff --check` green. Mutations: wrapped export → paths
   test red; scratch importer → census red.
 - **Codex adversarial round 1 (`0169fb05`): approve**, no material findings (cross-registry class
-  identity under Jest isolation noted as inherent, not a regression). Opus review recorded below.
+  identity under Jest isolation noted as inherent, not a regression).
+- **Opus review (`0169fb05`): PASS WITH ADVISORIES, zero required.** Byte-identical confirmed;
+  wrapper exports exactly the three prior symbols; imports resolve with no `review-manager/`
+  dependency; withdrawal atomic delete (`:97–104`) and cancellation warning (`:126–142`) located
+  verbatim; census grep matches; mutations bite. Advisory: catalog entry for
+  `review-manager/terminal-transition-service.js` still describes the implementation — fixed in the
+  post-merge docs pass. PR opened after rebase.
 
 ## Rules for every slice
 
