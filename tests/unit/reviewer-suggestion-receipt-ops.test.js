@@ -50,6 +50,10 @@ describe('attachReviewDocumentPointer', () => {
     ['missing', undefined],
     ['empty string', ''],
     ['non-string', 123],
+    ['wildcard', '*'],
+    ['empty weak quotes', 'W/""'],
+    ['whitespace-padded', ' "1" '],
+    ['unquoted', 'abc'],
   ])('throws missing_version (400) before any transport call when ifMatch is %s', async (_label, badIfMatch) => {
     const spy = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue({});
     await expect(
@@ -77,6 +81,10 @@ describe('claimThankYou', () => {
     ['missing', undefined],
     ['empty string', ''],
     ['non-string', 123],
+    ['wildcard', '*'],
+    ['empty weak quotes', 'W/""'],
+    ['whitespace-padded', ' "1" '],
+    ['unquoted', 'abc'],
   ])('throws missing_version (400) before any transport call when ifMatch is %s', async (_label, badIfMatch) => {
     const spy = jest.spyOn(DynamicsService, 'updateRecord').mockResolvedValue({});
     await expect(

@@ -77,6 +77,15 @@ const mockReviewerSuggestionAdapter = {
   notExcludedFilter: jest.fn(() => 'wmkf_applicantdisposition ne 100000001'),
   selectedAndNotRevokedFilter: jest.fn(() => 'wmkf_selected eq true and (wmkf_externaltokenrevoked eq false or wmkf_externaltokenrevoked eq null)'),
   ENTITY_SET_NAME: 'wmkf_appreviewersuggestions',
+  // Stage 5A: sweepReviewThankYous (required for real below) claims via
+  // claimThankYou instead of the generic passthrough. Forward through the
+  // same patchReviewReceipt mock so its mockResolvedValue/mockRejectedValue
+  // setup below still governs the claim outcome.
+  claimThankYou: jest.fn((id, sentAtIso, opts) => mockReviewerSuggestionAdapter.patchReviewReceipt(
+    id,
+    { wmkf_thankyousentat: sentAtIso },
+    opts,
+  )),
 };
 const mockPotentialReviewerAdapter = {
   getById: jest.fn(),
