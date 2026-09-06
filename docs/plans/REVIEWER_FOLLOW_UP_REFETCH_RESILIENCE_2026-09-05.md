@@ -134,6 +134,11 @@ Opus round 1 verdict at `8fb1f47f`: BLOCK, one required item (the superseded-loa
 Codex's high) and four advisories, all accepted above. Mutation checks (a)–(d) executed by the
 reviewer: all discriminating.
 
+Codex adversarial round 2 (final) at `7bf40cee`: **approve**, no material findings; round-1
+items confirmed resolved; tests 5 and 8 confirmed to exercise pending fetches rather than timer
+cancellation. Codex's sandbox could not run Jest (EPERM on the haste map); the slice-exit test
+evidence below is orchestrator-run.
+
 **Declined (recorded):** Codex round 1 asked for a real-panel test proving mutating controls are
 disabled while `degraded`. That contract is already pinned by
 `tests/unit/reviewer-manage-degraded.test.js` (6B3e) against the real panel; the host tests here
