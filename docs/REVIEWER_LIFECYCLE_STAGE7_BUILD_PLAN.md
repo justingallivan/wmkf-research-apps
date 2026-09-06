@@ -194,7 +194,7 @@ or backfill.
   the reviewer. Advisories: legacy header "Holds ALL business logic" (narrowed by the architect in
   `7c8b8575`); a legacy-path census row would match three files incl. a self-test template string —
   not added; catalog entries land post-merge. Rebased onto `c833bf2a` (census conflict resolved
-  keeping all rows; 4 suites / 34 green), PR #164.
+  keeping all rows; 4 suites / 34 green), PR #164 — rebased twice more as 3G/3H merged, merged `d47b07be` (2026-09-06).
 
 - **3F build (Sonnet, 2026-09-06): `2c5600e8`** on `claude/reviewer-lifecycle-stage3f` (rebased past
   3G/3H/3I; census conflict kept all rows). `record-invitation.js` exports three unshared

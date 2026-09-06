@@ -1608,7 +1608,8 @@ returned zero eligible/enqueued/claimed/failed.** Plan doc:
   bookkeeping (`record-email-outcome.js`) and the invitation expiry (`expire-invitation.js`, PR #161;
   callers keep their counters/warning events and are pinned by delegation tests), 3G the review-due
   reminder claim (`claim-reminder.js`, PR #162), 3H the due-date override write
-  (`change-review-deadline.js`, PR #163);
+  (`change-review-deadline.js`, PR #163), 3I the pending-invitation withdrawal write
+  (`withdraw-pending-invitation.js`, PR #164);
   the old `review-manager/close-review-service.js` is a pure re-export and routes keep their import
   paths. Each move is byte-identical and pinned by a both-paths identity test plus a caller census
   (`tests/unit/reviewer-engagement-census.test.js`) that records every importer of the legacy path,
