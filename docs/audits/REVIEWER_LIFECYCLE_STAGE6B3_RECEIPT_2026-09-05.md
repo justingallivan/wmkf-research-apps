@@ -463,6 +463,18 @@ Correction recorded for the orchestrator: a first conflict check between the two
 legacy `git merge-tree` output and grepped for conflict markers, reporting zero conflicts; `git merge-tree
 --write-tree` reported the real content conflict. Use the write-tree form for merge preflights.
 
+**Production smoke (2026-09-05, Session 489, partial):** signed-in Chrome session on
+`https://applications.wmkeck.org`, Workbench > Reviewers > Track Reviewers, main at `cdb49298`.
+- Closeout modal: opened "Close review" for a Review Received reviewer on request 1002874; the
+  "Close reviewer" dialog rendered (reviewer, status, request title, opted-out honorarium note,
+  optional closeout notes, Cancel / Complete closeout) and Cancel closed it with no mutation.
+- Reminder affordance: "Send reminder" rendered as the Next Action on every Materials Sent row across
+  requests 1002874, 1002852, 1002903, 1002912, 1002959, 1003010, 1003046 and 1003222; not clicked
+  (the action sends on click, no confirm step).
+- Release-materials modal: NOT exercised. Its trigger ("Release proposal to reviewers") renders only
+  when a reviewer is at `reviewStatus === 'accepted'`, and all ten active December 2026 requests had
+  every accepted reviewer already at Materials Sent or later. Re-run when a fresh acceptance arrives
+  or on a Preview with seeded data; no lifecycle mutation was authorized to create the state.
+
 Open after promotion: the reviewer-follow-up host refetch-error behavior (now on Codex's rewritten
-`pages/workbench/reviewer-follow-up.js`); a manual smoke of the release-materials, closeout and reminder
-affordances on production remains the cheapest missing evidence.
+`pages/workbench/reviewer-follow-up.js`); the release-materials modal smoke above.

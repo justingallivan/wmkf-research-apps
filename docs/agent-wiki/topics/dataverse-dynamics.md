@@ -125,6 +125,14 @@ fields, and sandbox/prod assumptions. The Atlas adjudicates live data state.
 
 ## Operating Notes
 
+- **Dynamics Explorer restriction management lives in Admin, not on the Explorer page
+  (Codex PR #151, `3fc0a936`, production 2026-09-05).** The Explorer page's inline "Admin
+  Panel" toggle was removed; `pages/admin.js` gained a **Dynamics safeguards** section
+  (`shared/components/admin/DynamicsExplorerRestrictionsSection.js`) that lists, adds and
+  removes table/field restrictions through the unchanged `/api/dynamics-explorer/restrictions`
+  route, and the Explorer page links to it ("Manage in Admin"). Example queries are grouped
+  and responses carry copy/helpful controls. Enforcement (`checkRestriction` at the injection
+  boundary) did not move.
 - **An `ifMatch` ETag on a PARENT record does not detect a new CHILD row (S423).**
   Creating a row that carries a lookup to a record does not bump that record's
   `versionnumber`, so optimistic concurrency on the parent is blind to child

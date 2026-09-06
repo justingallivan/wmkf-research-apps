@@ -113,6 +113,14 @@ a pre-J27-scale checkpoint rather than manufacturing Production evidence now.
 
 ## Sequencing / urgency (user, S258)
 
+**Initial Assessments are hidden in the UI for D26 (owner decision 2026-09-05, S489).**
+`/workbench/artifacts` (now titled "Initial assessments") and its `WorkbenchViewsNav` entry
+show a "not part of the D26 dual-phase workflow / available for J27" card for `cycleCode
+=== 'D26'` (Codex PR #151, `3fc0a936`). Justin: the D26 pilot proved the plumbing; its output
+was not needed by this cycle's business processes, so hiding it is safe. In J27 Initial
+Assessment becomes a real feature (every complete single-submission proposal gets one before
+advancement) — plan it as product work then, and do not treat the D26 hide as a regression.
+
 J27 design is a **large planning effort with many moving parts** that must **start soon after the bulk of the D26 Workbench work lands** — treat it as the next major planning push, not a someday item. J27 specifics (exactly what is collected up front, timing, final table shape) are **not yet decided** — re-confirm with Justin/Connor before building.
 
 Ground truth: [VERIFIED 2026-08-01 via

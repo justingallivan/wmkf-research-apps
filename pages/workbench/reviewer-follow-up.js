@@ -24,7 +24,7 @@ import {
 } from '../../shared/utils/reviewer-follow-up';
 import { classifyTarget } from '../../lib/dataverse/core/interlock';
 
-function ReviewerGroup({ proposal, previewReadOnly, onRefresh }) {
+function ReviewerGroup({ proposal, previewReadOnly, onRefresh, degraded, loading }) {
   const [open, setOpen] = useState(false);
   const reviewers = proposal.reviewers || [];
   const activeCount = reviewers.filter(isOpenReviewer).length;
@@ -108,6 +108,8 @@ function ReviewerGroup({ proposal, previewReadOnly, onRefresh }) {
                 canManage={canManage}
                 showReviewReminderAction={canManage || previewReadOnly}
                 previewReadOnly={previewReadOnly}
+                degraded={degraded}
+                loading={loading}
               />
               <style jsx global>{`
                 .reviewer-activity-panel td span.rounded,
@@ -169,6 +171,7 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
   const [loadingProposals, setLoadingProposals] = useState(false);
   const [error, setError] = useState(null);
   const requestIdRef = useRef(0);
+  const lastLoadedParamsRef = useRef(null);
 
   useEffect(() => {
     let active = true;
@@ -201,7 +204,6 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
     const requestId = ++requestIdRef.current;
     const requestScope = selectedScope === 'all' ? 'all' : 'my';
     setLoadingProposals(true);
-    setError(null);
     try {
       const [dashboardResponse, reviewerResponse] = await Promise.all([
         fetch(`/api/workbench/dashboard?cycleCode=${encodeURIComponent(selectedCycle)}&scope=${requestScope}&includeSetAside=1`),
@@ -222,10 +224,11 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
         dashboardBody.proposals || [],
         reviewerBody.proposals || [],
       ));
+      lastLoadedParamsRef.current = `${selectedCycle}|${requestScope}`;
+      setError(null);
     } catch (loadError) {
       if (requestIdRef.current !== requestId) return;
       setError(loadError.message);
-      setProposals([]);
     } finally {
       if (requestIdRef.current === requestId) setLoadingProposals(false);
     }
@@ -233,6 +236,14 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
 
   useEffect(() => {
     if (!cycleCode) return undefined;
+    const requestScope = scope === 'all' ? 'all' : 'my';
+    const currentParams = `${cycleCode}|${requestScope}`;
+    requestIdRef.current += 1;
+    if (lastLoadedParamsRef.current !== null && lastLoadedParamsRef.current !== currentParams) {
+      setProposals([]);
+      setError(null);
+      setLoadingProposals(true);
+    }
     const timer = window.setTimeout(() => { void loadProposals(cycleCode, scope); }, 0);
     return () => window.clearTimeout(timer);
   }, [cycleCode, loadProposals, scope]);
@@ -377,23 +388,34 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
 
       {error && (
         <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900" role="alert">
-          <p className="font-semibold">Reviewer follow-up could not be loaded</p>
-          <p className="mt-1">{error}</p>
+          {proposals.length > 0 ? (
+            <>
+              <p className="font-semibold">Reviewer follow-up could not be refreshed</p>
+              <p className="mt-1">Showing the last loaded results. Retry before making changes.</p>
+              <p className="mt-1">{error}</p>
+            </>
+          ) : (
+            <>
+              <p className="font-semibold">Reviewer follow-up could not be loaded</p>
+              <p className="mt-1">{error}</p>
+            </>
+          )}
           {cycleCode && (
             <button
               type="button"
               onClick={() => void loadProposals(cycleCode, scope)}
-              className="mt-3 min-h-10 rounded-lg bg-gray-900 px-3 py-2 font-semibold text-white hover:bg-gray-800"
+              disabled={loadingProposals}
+              className="mt-3 min-h-10 rounded-lg bg-gray-900 px-3 py-2 font-semibold text-white hover:bg-gray-800 disabled:opacity-50"
             >
-              Try again
+              {loadingProposals ? 'Retrying…' : 'Try again'}
             </button>
           )}
         </div>
       )}
 
-      {loadingCycles || loadingProposals ? (
+      {(loadingCycles || loadingProposals) && proposals.length === 0 ? (
         <Card hover={false}><p className="text-sm text-gray-500">Loading reviewer activity…</p></Card>
-      ) : !error && visibleProposals.length === 0 ? (
+      ) : visibleProposals.length === 0 && (!error || proposals.length > 0) ? (
         <Card hover={false}>
           <p className="font-medium text-gray-900">
             {scope === 'my' && proposals.length === 0
@@ -410,7 +432,7 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
               : 'Change the cycle, search, or set-aside filter.'}
           </p>
         </Card>
-      ) : !error ? (
+      ) : visibleProposals.length > 0 ? (
         <div className="space-y-4">
           {visibleProposals.map((proposal) => (
             <ReviewerGroup
@@ -418,6 +440,8 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
               proposal={proposal}
               previewReadOnly={previewReadOnly}
               onRefresh={() => loadProposals(cycleCode, scope)}
+              degraded={Boolean(error)}
+              loading={loadingProposals}
             />
           ))}
         </div>

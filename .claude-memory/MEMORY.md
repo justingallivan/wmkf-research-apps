@@ -41,6 +41,7 @@
 - Contact promotion / lifecycle: ../docs/REVIEWER_CONTACT_PROMOTION_AND_ADDRESS_LIFECYCLE.md; ../docs/REVIEWER_FINDER_ENFORCEMENT_CONTRACTS.md
 - Reviewer address trust: ../docs/REVIEWER_ADDRESS_TRUST_AND_CONFLICT_RESOLUTION_PLAN.md; ../docs/REVIEWER_EMAIL_CONFLICT_SELF_SERVICE_PLAN.md
 - Reviewer workbench / lifecycle / roster / referral: ../docs/agent-wiki/topics/reviewer-workbench-lifecycle.md; project-workbench-consolidation-rollout.md
+- Accepted-awaiting-materials is transient / release-modal smoke deferred to first real acceptance: project-accepted-awaiting-materials-is-transient.md
 - Candidate-card simplification / matching-layer sequencing / COI split: project-reviewer-card-simplification-direction.md; feedback-affordance-consistency-beats-deduplication.md
 - Reviewer workflow stabilization / Request 1002912: ../docs/REVIEWER_WORKFLOW_STABILIZATION_DIRECTIVE.md; ../outputs/reviewer-workflow-stabilization-fable-assessment.md
 - Reviewer Find latency / warm reconciliation / Request 1002903: feedback-latency-plan-scope-accretion-postmortem.md; ../docs/REVIEWER_FIND_WARM_RECONCILIATION_INCIDENT_2026-08-03.md

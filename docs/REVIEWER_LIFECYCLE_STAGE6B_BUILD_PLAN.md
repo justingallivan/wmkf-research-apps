@@ -45,7 +45,7 @@ proposal title, abstract, PI and institution after a third, and 6B3d (`be76760f`
 fifth; the reviewed amendments have independent PASS verdicts, the last full suite is recorded in
 the receipt. See the
 [Stage 6B3 receipt](audits/REVIEWER_LIFECYCLE_STAGE6B3_RECEIPT_2026-09-05.md).
-**Stage 6B is therefore complete and promoted.** **Promoted 2026-09-05:** PR #150 merged to `main` as `600cc972` after all eight CI checks passed; Vercel production deployment `dpl_4Jjwwou9LKd3z29KqgXaLmZMaWQw` reached Ready. No signed-in browser smoke of the 6B surfaces ran before or after the merge (Chrome automation could not reach a local server; the owner chose to promote on unit tests, reviews and CI). Codex's `codex/ui-features` (PR #151, `3fc0a936`, deployment `dpl_3hiiDPpWN1Zt1yAWcQnVXPURQfL8`) was rebased onto it the same day; the one `ReviewersTab.js` conflict was resolved by carrying `degraded={Boolean(error)}` into Codex's `request-reviewer-table` wrapper, verified by a 10-suite / 534-test run and a guard removal that turns `reviewers-tab-stale-request.test.js` red.
+**Stage 6B is therefore complete and promoted.** **Promoted 2026-09-05:** PR #150 merged to `main` as `600cc972` after all eight CI checks passed; Vercel production deployment `dpl_4Jjwwou9LKd3z29KqgXaLmZMaWQw` reached Ready. No signed-in browser smoke of the 6B surfaces ran before the merge (Chrome automation could not reach a local server; the owner chose to promote on unit tests, reviews and CI). A partial production smoke on 2026-09-05 (Session 489) verified the closeout modal open/cancel and the "Send reminder" affordance; the release-materials modal had no eligible `accepted` reviewer to target and remains unsmoked — see the 6B3 receipt Promotion section. Codex's `codex/ui-features` (PR #151, `3fc0a936`, deployment `dpl_3hiiDPpWN1Zt1yAWcQnVXPURQfL8`) was rebased onto it the same day; the one `ReviewersTab.js` conflict was resolved by carrying `degraded={Boolean(error)}` into Codex's `request-reviewer-table` wrapper, verified by a 10-suite / 534-test run and a guard removal that turns `reviewers-tab-stale-request.test.js` red.
 The next owner decision is which elective stage (6C extraction, 6D draft fingerprint,
 or the parked stages) to plan. The three receipts carry the accepted limits that a later
 stage inherits: callback promises are observed, not awaited; no post-close
@@ -220,7 +220,7 @@ Extend `tests/unit/reviewer-manage-actions-menu.test.js` and
 unmount tests. Existing reminder cases at lines 240–331 cover request payload,
 read-only display, rapid repeats and token eligibility; they are retained evidence.
 Read both callers: `ReviewersTab.js:541–558` and
-`pages/workbench/reviewer-follow-up.js:107–117`.
+`pages/workbench/reviewer-follow-up.js:102–111` (post-PR #151 layout).
 
 ## 6B3 — materials-modal lifetime and asynchronous scratch state
 
