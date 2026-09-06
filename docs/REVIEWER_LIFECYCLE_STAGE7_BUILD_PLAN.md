@@ -207,7 +207,10 @@ or backfill.
   types, lint, boundary/access-layer/trust-boundary gates + self-tests, build, `git diff --check`
   green. Mutations: inline each write keeping the import → its pin red (2/4, 3/4, 2/2); add
   `ifMatch:'*'` to the delivered stamp → direct red; route the generation mark through
-  `updateLifecycle` → direct red. Opus and Codex round 1 pending.
+  `updateLifecycle` → direct red.
+- **3F Codex adversarial round 1 (`2c5600e8`): approve** — payloads, options, ordering,
+  `inviteRecorded` handling, the fingerprint gate and the `recordDeliveredEmail` site unchanged; census
+  lists the three importers; D1/D2 neither tightened nor loosened. Opus pending.
 
 ## Docs (after each merge)
 
