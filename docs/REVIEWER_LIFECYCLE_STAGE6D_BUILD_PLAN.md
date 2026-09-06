@@ -15,7 +15,7 @@ summary: Shipped 2026-09-06 (PR #159). render-emails stamps a server-side draft 
 **Adversarial:** Codex, at most two rounds. **Tier:** 1–2 (route/service contract change on a
 live email path) — branch `claude/reviewer-lifecycle-stage6d`, PR, owner merge; **promotion
 timing chosen by the owner outside an active send window** (a browser tab holding a preview
-rendered before the deploy will be refused at send until it re-renders). **[DECIDED under the owner's 2026-09-05 autonomy grant — flagged for owner review]** uniform enforcement across all four template types (not exempting `invitation`). Architect and Opus recommend **uniform**: this route already fails a
+rendered before the deploy will be refused at send until it re-renders). **[DECIDED under the owner's 2026-09-05 autonomy grant; OWNER CONFIRMED 2026-09-06 (S490, decision 6D-1)]** uniform enforcement across all four template types (not exempting `invitation`). Architect and Opus recommend **uniform**: this route already fails a
 pre-deploy draft closed rather than guessing (`external_link_expectation_missing`,
 `send-emails-service.js:779–782`, pinned by tests), and the invitation is the one body that carries
 the full proposal-details block with co-PIs, so exempting it would fail open on the send this stage
@@ -407,6 +407,10 @@ Round 2 is spent on the build.
   (structural mismatch against the independent helper plus the golden suite), not by (e).
 
 ## Accepted limits (to record in the receipt)
+
+**Owner decision 6D-2 (2026-09-06, S490): PARKED.** Extending the fingerprint to cover batch-start
+hydration and Admin template drift is not scheduled; revisit only if a real stale send is observed.
+The limits below stand as written.
 
 Fingerprint inputs are hydrated once per send batch; a CRM edit between hydration and a later
 recipient's dispatch within the same batch is not detected (Codex round 2 high, declined — see the
