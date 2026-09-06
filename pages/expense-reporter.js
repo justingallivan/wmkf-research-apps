@@ -86,21 +86,23 @@ function ExpenseReporter() {
 
         for (const line of lines) {
           if (line.startsWith('data: ')) {
+            let data;
             try {
-              const data = JSON.parse(line.slice(6));
-
-              if (data.type === 'progress') {
-                setStreamingMessage(data.message);
-              } else if (data.type === 'result') {
-                setResults(data);
-                setStreamingMessage('');
-              } else if (data.type === 'error') {
-                throw new Error(data.error);
-              }
+              data = JSON.parse(line.slice(6));
             } catch (e) {
               if (line.slice(6) !== '[DONE]') {
                 console.error('Failed to parse streaming data:', e);
               }
+              continue;
+            }
+
+            if (data.type === 'progress') {
+              setStreamingMessage(data.message);
+            } else if (data.type === 'result') {
+              setResults(data);
+              setStreamingMessage('');
+            } else if (data.type === 'error') {
+              throw new Error(data.error || 'Expense processing failed');
             }
           }
         }
@@ -401,6 +403,9 @@ function ExpenseReporter() {
                     <FiDownload className="mr-1" /> Export Excel
                   </Button>
                 </div>
+              </div>
+              <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900" role="status">
+                Review the extracted fields below before exporting. You can edit any row if a receipt was read incorrectly.
               </div>
 
               {results.expenses && results.expenses.length > 0 ? (
