@@ -2,11 +2,11 @@
 title: Reviewer Lifecycle Stage 3 — named server commands (pilot and first expansion)
 kind: plan
 domain: reviewer-workbench
-status: active
+status: historical
 canonical: false
 owner: product-engineering
-last_verified: 2026-09-05
-summary: Move closeout, terminal transition, status/response correction, expire and post-send bookkeeping into lib/services/reviewer-engagement/ behind wrappers.
+last_verified: 2026-09-06
+summary: Shipped 2026-09-05/06 (3A–3E, PRs #154–#161). Named lifecycle commands live in lib/services/reviewer-engagement/; expansion 3F–3K is in the Stage 7 plan.
 ---
 
 # Stage 3 — named server commands
