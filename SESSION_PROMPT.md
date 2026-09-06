@@ -95,10 +95,25 @@ colleague reports it.
 1. ~~Four inline concrete-ETag regexes~~ **DONE S490** (branch `claude/open-items-cycles-retry-hygiene`, stacked on the D5 branch): all four sites call `isConcreteEtag`; `grep -rn 'W\\/)?"\[' lib/` hits only `lib/utils/etag.js`.
 2. ~~Small reviewer leftovers~~ **DONE S490**: `isPastCutoff` → `lib/utils/past-cutoff.js`; `[correct-response]` log prefix; `SUGGESTION_SET` removed; both stale line refs reworded to symbol/caller names.
 3. ~~Reviewer-follow-up cycles-load failure~~ **FIXED S490**: `loadCycles` is a retryable callback; when `cycleCode` is empty the banner's Try again reloads cycles, after which the proposals effect runs. Pinned by a mutation-checked test in `reviewer-follow-up.test.js`.
-4. **Wiki coverage of Codex's UI changes (PR #151)** — still unchecked. Evidence:
-   `git diff --stat 600cc972..3fc0a936`.
+4. ~~Wiki coverage of Codex's UI changes (PR #151)~~ **CHECKED S490: covered.** Every durable-behavior
+   change in the 22 commits already has a wiki home — the follow-up attention-queue simplification and
+   the D26 hide of Initial Assessments in `/workbench/artifacts` (`reviewer-workbench-lifecycle.md`
+   §"Codex UI features"), the Dynamics Explorer restrictions section moving into Admin
+   (`dataverse-dynamics.md`). The rest (status-pill geometry, expense-reporter and integrity-screener
+   copy/control hardening, Explorer example grouping) is presentation with no contract change; the
+   expense reporter has no wiki topic and does not need one for copy edits.
 5. **Production smoke** of 6B release-materials modal (needs an accepted reviewer) and of
-   any 6D send. Not run.
+   any 6D send. Not run; waits for the first real acceptance.
+6. **Summary blob is public with no remaining reader (owner decision needed).** `analyze.js` still
+   extracts summary pages and uploads them with `access: 'public'`, and `save-candidates` persists
+   the URL to `wmkf_summarybloburl`, but since the D2 retirement nothing reads it: no client component
+   consumes `summaryBlobUrl` [VERIFIED via `git grep` over `shared/` and `pages/` 2026-09-06], the
+   live send path attaches cycle materials and client-chosen attachments instead, and the only server
+   reader is the maintenance orphan-blob sweep, which keeps referenced blobs alive. Options: (a) stop
+   extracting/uploading the summary in `analyze.js` and stop persisting the column (removes the public
+   blob surface outright; `summaryExtracted` leaves the analyze response), or (b) keep the upload but
+   move it to a private store. (a) is simpler and removes dead work; either way the existing
+   `wmkf_summarybloburl` rows and blobs are history, not a cleanup target this session.
 
 ### Parked
 
