@@ -131,8 +131,25 @@ grantRequestAdapter.queryAllRequests({
   the dashboard is persona-filtered (`visibleToPersona`, `dashboard-service.js:254-266`, applied
   at `:496-498`), so a count derived from the scan would tell a Leadership or PD viewer how many
   Finals exist outside their lens. The picker therefore exposes only that a cycle has some current
-  Final, which every dashboard audience member may know; the visible row counts stay where they
-  are today, derived from `visibleProjected` (`:531-536`).
+  Final; the visible row counts stay where they are today, derived from `visibleProjected`
+  (`:531-536`).
+- **Authorization rule — OWNER DECISION REQUIRED before build (Codex third-pass finding 1).**
+  Existence-only cycle codes still disclose that a hidden cycle has current Finals: a Leadership
+  viewer (President, CSO) sees `D26` in the picker while every D26 row is still in group review,
+  and a PD sees a cycle whose only rows are leadership-stage writeups they do not own.
+  **Recommended default: accept and document this disclosure as non-sensitive.** The dashboard
+  audience is the Foundation's PDs, PCs, CSO, and President (`docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md`
+  "approved role-eligible audience"); that a board cycle has finalists with writeups in progress is
+  organizational calendar knowledge for all of them, and the persona lens exists to focus each
+  queue, not to conceal that a cycle is under way. The alternative — deriving `available` from the
+  viewer-visible set — requires projecting every cycle's rows before persona filtering, which is
+  the unbounded cross-cycle read this slice exists to remove. If the owner declines the default,
+  6A stops until a bounded visibility-aware discovery is designed (candidate:
+  `requestDocumentAdapter.findArtifactCycles(FINAL_WRITEUP)` gives lifecycle state per artifact
+  row, but depends on the copied `wmkf_cyclecode` field and misses a PD's own leadership-stage
+  rows; not chosen here). The rule, whichever way it goes, is recorded in
+  `docs/API_ROUTE_SECURITY_MATRIX.md:275` and pinned by the test "a cycle containing only rows
+  hidden from the viewer still appears in `available` with no count" (or its negation).
 - **Buckets must be total.** Requests whose meeting date is null yield `cycleCode === null`.
   Record their existence as `hasUncycled: boolean` (not a count, for the same leak reason). If
   true, the picker shows an explicit **No cycle** option. Its selector is the literal sentinel `none`, a first-class value in every layer (Codex
@@ -152,15 +169,28 @@ grantRequestAdapter.queryAllRequests({
 
 ### 3.3 Default cycle and selection
 
-- Index request without `cycleCode`: default to the **newest cycle in which the viewer has at
-  least one visible row**, not the newest cycle globally (Codex second-pass finding 1). The service
-  scopes the newest cycle first; if `visibleProjected` is empty after persona filtering, it steps to
-  the next newest cycle, at most `FINAL_WRITEUPS_DEFAULT_CYCLE_WALKBACK` (3) scoped reads in total;
-  if none yields a visible row it returns the newest cycle with empty queues. Each step is one
-  bounded scoped read, so the worst case for a viewer with nothing visible is three reads, and the
-  common case is one. Return `cycles.selected` and `cycles.defaultResolvedBy: 'visible' | 'newest'`
-  so the client can say "Nothing awaits you in <cycle>; showing <older cycle>" when it walked back.
-  An explicit `cycleCode` never walks back.
+- Index request without `cycleCode`: default to the **newest cycle, within the
+  `FINAL_WRITEUPS_DEFAULT_CYCLE_WALKBACK` (3) newest available cycles, in which the viewer has at
+  least one visible row** (Codex second-pass finding 1, bound made precise per third-pass finding
+  3). The service scopes the newest cycle first; if `visibleProjected` is empty after persona
+  filtering it steps to the next newest, stopping after three scoped reads or when the available
+  list is exhausted, whichever comes first. If no examined cycle yields a visible row it returns
+  the newest cycle with empty queues. Worst case for a viewer with nothing visible is three
+  bounded reads; the common case is one. `cycles.defaultResolvedBy` reports the outcome:
+  `'visible'` (a visible row was found, possibly after walking back), `'exhausted'` (the window or
+  the list ran out; newest cycle shown empty), or `'explicit'` (caller supplied `cycleCode`; never
+  walks back). The client uses `'visible'` plus `selected !== available[0].code` to say "Nothing
+  awaits you in <newest>; showing <selected>", and `'exhausted'` to say "Nothing awaits your review
+  in the <n> most recent cycles"; both are rendered from the response, never inferred.
+- **Oversized cycle during default resolution fails closed (Codex third-pass finding 2).** Each
+  candidate read is the same scoped loader, which throws `final_writeups_dashboard_scope_exceeded`
+  when a cycle exceeds `FINAL_WRITEUPS_DASHBOARD_MAX_ROWS` (`dashboard-service.js:118-134`). The
+  walk-back does **not** catch or skip that error: a cycle over the bound is an operational fault
+  that must be fixed regardless of who can see its rows, and skipping it would hide the fault from
+  exactly the users who would otherwise report it. The 503 body names the offending cycle
+  (`{ cycleCode }`) so the operator knows which one. The same behavior applies to an explicit
+  `cycleCode`. This is the availability posture the dashboard already has today; 6A narrows it
+  from "any cycle oversized" to "the examined cycle oversized".
 - Index request with `cycleCode`: after trim, must be either a real code (`^[JD]\d{2}$`
   case-insensitive via `parseCycleCode`) or the exact lowercase sentinel `none`; otherwise the
   handler rejects it as a bad request before any service call. A well-formed code that
@@ -196,7 +226,7 @@ grantRequestAdapter.queryAllRequests({
     selected: 'D26' | 'none' | null,   // 'none' only when hasUncycled and requested
     available: [{ code: 'D26', label: 'December 2026' }, ...],  // newest first; no counts
     hasUncycled: boolean,
-    defaultResolvedBy: 'visible' | 'newest' | 'explicit'
+    defaultResolvedBy: 'visible' | 'exhausted' | 'explicit'
   },
   limits: { maximumRows: FINAL_WRITEUPS_DASHBOARD_MAX_ROWS, scope: 'cycle' },
   counts: { ...unchanged keys, scoped to the selected cycle },
@@ -223,7 +253,9 @@ intended semantic change and is called out in the security-matrix row and Atlas 
   `?cycleCode=none` when it is false returns success with empty queues, the same as any absent
   cycle.
 - When `defaultResolvedBy` is `visible` and the selected cycle is not the newest available, the
-  header adds one line: "Nothing awaits your review in <newest>; showing <selected>."
+  header adds one line: "Nothing awaits your review in <newest>; showing <selected>." When it is
+  `exhausted`, the header says "Nothing awaits your review in the most recent cycles; choose a
+  cycle to look further back." Both come from response fields only.
 - `FinalWriteupFocusedView` is unchanged except that it renders `cycles.selected` as context
   under the request number. It never sends `cycleCode`.
 - The header comment "THESIS: one legible review queue replaces a metrics-and-filters dashboard"
@@ -284,7 +316,9 @@ intended semantic change and is called out in the security-matrix row and Atlas 
 | Rows with a null meeting date never vanish silently | `dashboard-service.js`, handler, views | test: one null-date fixture → `hasUncycled: true`, absent from J26/D26, present under `cycleCode=none`; handler test: `cycleCode=none` accepted; views test: option value `none` round-trips to the URL and back, shown only when `hasUncycled` |
 | Near-cap approach is visible before the cap bites | `dashboard-service.js` | test: scan returning half of `MAX_EXPORT_RECORDS` rows → exactly one `console.warn` whose first argument is `final_writeups_dashboard_cycle_list_near_cap`; one row fewer → none |
 | The picker never reveals rows outside the viewer's lens | `dashboard-service.js` | test: Leadership viewer with a hidden group-review row in D26 and a visible leadership row in J26 → `available` lists both codes with no counts, `hasUncycled` only; response carries no per-cycle numbers |
-| The default cycle is the newest one with a visible row | `dashboard-service.js` | test (same fixture): default `selected` is J26 with `defaultResolvedBy: 'visible'`; a superuser with the same rows defaults to D26; explicit `cycleCode=D26` for the Leadership viewer returns D26 with empty queues and `defaultResolvedBy: 'explicit'`; walk-back stops after three scoped reads (mutation: remove the walk-back → the first assertion turns red) |
+| The default cycle is the newest with a visible row **within the three newest available cycles**; otherwise the newest, empty, marked `exhausted` | `dashboard-service.js` | tests: (a) hidden-newer D26 + visible-older J26 for Leadership → `selected: 'J26'`, `defaultResolvedBy: 'visible'`, exactly two scoped reads; superuser on the same fixture → D26 in one read; (b) four cycles with the viewer's only visible row in the fourth → `selected` = newest, empty queues, `defaultResolvedBy: 'exhausted'`, exactly three scoped reads; (c) two available cycles, neither visible → `exhausted` after exactly two reads (list exhaustion stops before the bound); (d) explicit `cycleCode=D26` for the Leadership viewer → D26, empty, `'explicit'`, one read. Mutation: remove the walk-back → (a) turns red; raise the bound → (b) turns red |
+| An oversized cycle fails closed during default resolution, naming the cycle | `dashboard-service.js` | test: newest cycle returns `totalCount` over the bound with every row hidden from the viewer, older cycle visible → 503 `scope_exceeded` with `cycleCode` of the newest; no walk-back read is issued (mutation: catch-and-skip → turns red) |
+| Cycle existence outside the lens follows the recorded authorization rule | `dashboard-service.js`, security matrix | test: a cycle whose only current Final is hidden from the viewer appears in `available` with no count (default rule) — or is absent (if the owner declines); one of the two is pinned, never neither |
 | A current Final on a non-June/December meeting date fails loud, not silent | `dashboard-service.js` | test: March meeting date → typed 500 `cycle_invalid` whose body names that fixture's `akoya_requestnum` (and the GUID when the number is null); raised before any document/acknowledgement read; mutation (skip) turns it red |
 | Capped cycle list never returns partially | `dashboard-service.js` | test: `queryAllRequests` returns `capped: true` → 503 `cycle_list_capped`; no downstream reads |
 | Per-cycle bound keeps the fail-loud contract | `dashboard-service.js` | re-pin existing test at `:393` with a scoped filter assertion |
@@ -311,8 +345,11 @@ unrecognized key (rejected). For the cycle resolver, the response for: no reques
   `final_writeups_dashboard_cycle_list_near_cap` when the scan reaches half the export cap";
   "serves `none` as an empty success when no uncycled rows exist"; "a cleared current Final pointer
   drops the request and, if last, its cycle"; "the cycle list carries no counts and the default
-  cycle is the newest with a visible row for the persona" (hidden newer-cycle row plus visible
-  older-cycle row, asserted for Leadership, PD, and superuser); "focused reads derive the cycle from the request and
+  cycle is the newest visible within the walk-back window" (hidden-newer plus visible-older for
+  Leadership, PD, and superuser; four-cycle exhaustion; two-cycle list exhaustion; explicit code);
+  "an oversized newest cycle fails closed with its cycle code before any walk-back read"; "a cycle
+  with only hidden rows still appears in the picker without a count" (or its negation per the
+  owner's authorization decision); "focused reads derive the cycle from the request and
   navigate within it"; re-pin "fails loudly instead of silently truncating" to assert the
   meeting-date window appears in the filter.
 - `tests/unit/workbench-final-writeups-route.test.js`: "accepts requestId, a well-formed
@@ -344,7 +381,16 @@ hint (6D); other writeup stages (6E); any change to acknowledgement writes, pers
 matrix audiences, the leadership transition, or PC backup actions; any Dataverse write; any
 change to the Initial assessments locator.
 
-## 10. Open questions for the owner (non-blocking; defaults stated)
+## 10. Owner decisions
+
+**Blocking before build:**
+
+0. **Authorization rule for cycle existence (§3.2).** May a viewer see, in the cycle picker, a
+   cycle whose every current Final is hidden from their persona lens? Recommended: yes, documented
+   as non-sensitive for the PD/PC/CSO/President audience and pinned by test. Declining stops 6A
+   pending a bounded visibility-aware discovery design.
+
+**Non-blocking; defaults stated:**
 
 1. **Should the picker list cycles with zero current Finals?** Default: no. The list is derived
    from current Finals, so a cycle appears once its first Final exists. A bookmarked future cycle
@@ -371,4 +417,12 @@ change to the Initial assessments locator.
 | 1 (high) | Global discovery counts and default selection ran before persona filtering: hidden totals leak, and the default cycle could open empty for an authorized viewer | **Accepted.** Picker is existence-only (`{code,label}`, `hasUncycled` boolean, no counts); default cycle is the newest with a visible row via a bounded walk-back (max 3 scoped reads), `defaultResolvedBy` tells the client why; tests cover hidden-newer / visible-older for Leadership, PD, superuser (§3.2, §3.3, §3.5, §3.6, §6, §7). |
 | 2 (medium) | Warning code differed between contract and invariant | **Accepted.** One exact code, `final_writeups_dashboard_cycle_list_near_cap`, in the contract, invariant, and test (§3.2, §6, §7). |
 
-Third Codex pass requested on this revision before build.
+**Third pass (2026-09-06, verdict NEEDS REWORK):**
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 (high) | Existence-only cycle codes still disclose hidden-cycle activity | **Escalated to the owner (§10 item 0).** Plan carries the recommended default (accept, document in the security matrix, pin by test) and the alternative; build does not start until decided. |
+| 2 (high) | Oversized hidden newest cycle aborts before walk-back; behavior undefined | **Accepted.** Fail closed with the existing 503 naming the cycle; no catch-and-skip; test with oversized hidden newest + visible older (§3.3, §6, §7). |
+| 3 (medium) | Three-read bound contradicted the "newest visible" invariant | **Accepted.** Invariant relaxed to "newest visible within the three newest available cycles, else newest empty with `defaultResolvedBy: 'exhausted'`"; list-exhaustion stop condition stated; tests for four-cycle and two-cycle cases (§3.3, §6, §7). |
+
+Codex has run three adversarial passes; further review waits on the §10 item 0 decision.
