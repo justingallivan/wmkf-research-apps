@@ -114,7 +114,10 @@ No other file changes. No new map values. No server imports into the shared modu
   predicates; explicit `undefined` guard; four-site docblock; adapter status-only sites call
   `isClosedEngagementStatus`. Six-suite selection 602 tests; mutation (d) status-only delegating to
   the row predicate stays green (flavors agree on status), (e) ignore completedat → 12 red. PR #155
-  opened; Codex round 2 (final) requested.
+  opened. **Codex round 2 (final, `dc962ece`): approve** — round-1 item (1) confirmed resolved; the
+  `undefined` guard sits at the row-shaped predicate while the status-only callers' primitive lookups
+  safely return false; no material findings. Codex's sandbox could not run Jest; counts above are
+  builder/orchestrator-run.
 
 ## Review checkpoints
 
