@@ -152,7 +152,17 @@ or backfill.
   direct red.
 - **3H Codex adversarial round 1 (`4b0fbea2`): approve** — exact override (incl. `null`), ETag and
   actor forwarded; notification prepared first, write before dispatch, 412/error classification
-  preserved. Opus pending.
+  preserved.
+- **3H Opus review (`4b0fbea2`): PASS WITH ADVISORIES, zero required.** Call argument-for-argument
+  identical; `null` is a live input (clear-override path at `reviewer-due-extension.js:283–291`);
+  order prepare → write → dispatch and the saved/not-notified envelope untouched; single adapter
+  import; mutations in a scratch copy: inline keeping the import → pin 2 red; drop `ifMatch` → 1 red;
+  write after dispatch → 2 red; direct suite executes the module; census non-vacuous; 790 / 11,532
+  and both boundary gates green. Advisories: branch behind main (rebased by the architect onto
+  `a7ed788d`, census conflict resolved keeping all rows; 4 suites / 36 green → `3ea5fe18`, PR #163);
+  "no existing test edits" should read "census extended"; "conditional" wording nit. The plan's
+  "persisted deadline with failed notification" case is covered by the retained
+  `reviewer-due-extension.test.js:311`, which now runs the real module.
 - **3G Codex adversarial round 1 (`eed4f377`): approve** — field mapping, ETag forwarding,
   claim-before-send, 412 handling, respond-kind separation, pin and census all match.
 - **3G Opus review (`eed4f377`): PASS WITH ADVISORIES, none required.** Byte-identical hunk; respond
