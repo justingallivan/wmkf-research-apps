@@ -15,8 +15,12 @@ summary: render-emails stamps each draft with a fingerprint of server-observed i
 **Adversarial:** Codex, at most two rounds. **Tier:** 1–2 (route/service contract change on a
 live email path) — branch `claude/reviewer-lifecycle-stage6d`, PR, owner merge; **promotion
 timing chosen by the owner outside an active send window** (a browser tab holding a preview
-rendered before the deploy will be refused at send until it re-renders). **[OWNER DECISION PENDING]** uniform enforcement across all four template types (drafted below
-as the simplest rule) versus exempting `invitation` in the first cut. **Prerequisites:**
+rendered before the deploy will be refused at send until it re-renders). **[OWNER DECISION PENDING]** uniform enforcement across all four template types versus exempting
+`invitation` in the first cut. Architect and Opus recommend **uniform**: this route already fails a
+pre-deploy draft closed rather than guessing (`external_link_expectation_missing`,
+`send-emails-service.js:779–782`, pinned by tests), and the invitation is the one body that carries
+the full proposal-details block with co-PIs, so exempting it would fail open on the send this stage
+exists to protect. **Prerequisites:**
 Stage 6C merged; `/contract-reconcile` run on this plan and recorded below before build pickup
 (the 6B plan requires a recorded planning review).
 
@@ -29,6 +33,14 @@ is sent verbatim; `send-emails-service` re-resolves only the destination address
 token. So a CRM edit to the title, abstract, PI, institution, co-PI list, reviewer name or
 affiliation, per-engagement due-date override, honorarium opt-out or cycle config between
 preview and send goes out stale.
+
+Line citations into `ReviewerManagePanel.js` below are pre-6C; after Stage 6C the modal lives in
+`shared/components/reviewers/ReleaseMaterialsModal.js` — relocate at build. `ReleaseEmailModal` is
+NOT a third client (it uses `render-withdraw-emails` → `withdraw-sufficient`). Nothing in-app writes
+`akoya_title`, `wmkf_organizationname`, the PI or the co-PIs; those are CRM-only edits, exactly the
+class the fingerprint exists to catch. Co-PI order is deterministic
+(`app-request-person.js:31` `orderby wmkf_authorposition asc, createdon asc`), so "order counts" is
+not a spurious-stale risk.
 
 Two clients use the pair of routes:
 - `ReleaseMaterialsModal` (`ReviewerManagePanel.js:1173` render, `:1287` send) — types
@@ -63,7 +75,7 @@ fingerprintInputs = {
   suggestionId,                              // lower-cased
   candidate: { name, affiliation },          // as render resolves them — NOT email (see below)
   proposal:  { title, abstract, authors, institution, coInvestigators: [names…] },
-  engagement: { reviewDueDateOverride, honorariumOptOut },
+  engagement: { reviewDueDateOverride },       // NOT honorariumOptOut — see exclusions
   request:   { reviewDueDate, meetingDate },
   cycle:     { programName, reviewDeadline, customFields },  // loadCycleConfigs RAW cycle.custom_fields —
                                               // NOT the merged customFields (which includes client settings.customFields)
@@ -73,7 +85,13 @@ fingerprint = sha256(stableStringify(fingerprintInputs))   // hex, sorted keys, 
                                                            // strings trimmed, arrays kept in order
 ```
 
-Deliberately **excluded** (and why): **the recipient email** — `buildTemplateData` exposes it as
+Deliberately **excluded** (and why): **`wmkf_honorariumoptout`** — it is not a body input:
+`resolveHonorariumNote()` takes no parameters and always returns `''`
+(`lib/external/reviewer-reminder-email.js:168–170`) [VERIFIED], so render's
+`resolveHonorariumNote(sug?.wmkf_honorariumoptout)` passes an ignored argument; fingerprinting the
+flag would make a closeout opt-out toggle (set from `ReviewerCloseoutModal` in this same panel,
+immediately before a thank-you compose) refuse a draft whose body is identical. **The recipient
+email** — `buildTemplateData` exposes it as
 `{{recipientEmail}}` [VERIFIED via `lib/utils/email-generator.js:420`] but no tracked default
 template embeds it [VERIFIED via grep of `shared/`, `lib/services`, `scripts/` — only the
 generator itself]; the destination address is owned by the send-time re-resolution and the
@@ -88,14 +106,23 @@ previewed body is what the PD approved; the external-link placeholder — non-li
 fingerprint**, not an HMAC: the client is staff-only and a forged value can only send the body
 the PD already previewed. Record this as an accepted limit.
 
+`getHonorariumAmount()` failure is swallowed at render (`render-emails-service.js:180–184`); the
+fingerprint must be defined symmetrically: on read failure BOTH sides use the sentinel
+`honorariumAmount: null` (render already leaves `customFields.honorarium` at the cycle/client value
+in that case). A transient Dataverse blip on one side but not the other then reads as `draft_stale`
+once, which is the honest outcome; it never refuses every draft permanently.
+
 Two pure functions: `buildDraftFingerprintInputs({ templateType, suggestionId, suggestion,
 person, request, coPINames, cycle })` and `fingerprintDraft(inputs)`. Both render and send call
 the same pair, so the two sides cannot drift.
 
 ### render-emails (`render-emails-service.js`, route unchanged)
 
-Each draft row (including skipped rows, for the uniform DTO) gains `draftFingerprint: string`.
-No other change. Route shell untouched (`pages/api/review-manager/render-emails.js` passes the
+Each **sendable** draft row gains `draftFingerprint: string`. Render's skipped rows
+(`no_email`, `address_conflict_pending`, `email_research_only`) return before `candidate`/`proposal`
+are assembled (`:216–275`) and the clients filter them out of `sendable`, so they carry
+`draftFingerprint: null` rather than forcing the input assembly above the early returns. No other
+change. Route shell untouched (`pages/api/review-manager/render-emails.js` passes the
 result through).
 
 ### Clients (`ReleaseMaterialsModal`, `InviteEmailModal`)
@@ -112,13 +139,18 @@ reason (`no_email`, `program_director_sender_unavailable`, `not_accepted`, `mate
 new ones, and register producer↔consumer parity in `scripts/check-status-enum-parity.js`. Because the
 token-gate reasons are assigned through a variable (`reason = 'unresolved_placeholder'` at `:707`,
 `'missing_secure_link'` at `:710`, `INVALID_SECURE_LINK_SKIP_REASON`) rather than pushed as
-literals, a literal-regex producer would under-count; instead export an explicit
-`SEND_SKIP_REASONS` array from `send-emails-service.js` (every reason the service can push, old
-and new), make the REGISTRY entry `SEND_SKIP_REASONS ⇔ SEND_SKIP_REASON_LABEL keys` with rule
-`equal` (copy the shape of the `workRemaining stages ⇔ WORK_REMAINING_LABEL` entry,
-`check-status-enum-parity.js:123–131`), and add a unit test that greps the service source for
-`reason: '…'` and `reason = '…'` literals and asserts each is in `SEND_SKIP_REASONS` so the array
-cannot silently lag the code. Note the two vocabularies: render rows carry a string `skipped`
+literals, a literal-regex producer would under-count; the gate's extractors key off a NAMED const (`check-status-enum-parity.js:29–84`), so introduce
+`SEND_SKIP_REASON` — an object of the eleven existing values plus `draft_stale` and
+`draft_fingerprint_missing` — in `shared/utils/reviewer-send-skip-reasons.js` next to the label map,
+and have the service push `SEND_SKIP_REASON.x` everywhere (including the three link-validation
+assignments, replacing the imported `INVALID_SECURE_LINK_SKIP_REASON` identifier or aliasing it).
+REGISTRY entry: `produced: extractObjectStringValues(src, 'SEND_SKIP_REASON')`, `consumed:
+extractObjectKeys(labels, 'SEND_SKIP_REASON_LABEL')`, rule `subset` (the label map may also carry
+render-time `d.skipped` values the invite modal labels today, `InviteEmailModal.js:66–74`). Closest
+entry to copy: #3 "discovery verification statuses ⊆ save-candidate identity statuses"
+(`check-status-enum-parity.js:174–186`). Add a unit test that greps the service for any remaining
+bare `reason: '…'` / `reason = '…'` literal and fails if one exists, so a new bare literal cannot
+bypass the const. Note the two vocabularies: render rows carry a string `skipped`
 field (`render-emails-service.js:225,246,267`: `no_email`, `address_conflict_pending`,
 `email_research_only`) that the modals already label; send's `skipped[].reason` is the set this
 map covers. 6D does not merge them. The user-facing copy for the new reasons:
@@ -135,7 +167,15 @@ reasons `unresolved_placeholder` / `missing_secure_link` / `INVALID_SECURE_LINK_
 the token authority gate and `mintAndStore` (`:830`), attachment fetch and transport. No durable
 write precedes that point: the first `updateLifecycle` is the post-send stamp at `:913`; campaign
 config persists post-loop. A stale draft therefore `continue`s past one recipient and the batch
-proceeds; the stream still ends `result` → `complete`.
+proceeds; the stream still ends `result` → `complete`. Full pre-insertion order [VERIFIED
+`:483–729`]: `suggestion_not_found` (→ `failed`) · `no_email` · `program_director_sender_unavailable`
+· `not_accepted` · `materials_already_sent` · `materials_release_ineligible` ·
+`address_conflict_pending` · `email_research_only` · `email_unconfirmed` · `already_invited` ·
+**[6D check here]** · invitation link classification (`unresolved_placeholder` /
+`missing_secure_link` / `INVALID_SECURE_LINK_SKIP_REASON`) · request-number leak (→ `failed`) ·
+attachments · `mintAndStore` (`:829`). Placing the check before link classification means a stale
+body is never classified. Test (d) below pins `not_accepted` precedence; add (d2): a stale draft
+with a missing secure link reports `draft_stale`, not `missing_secure_link`.
 
 Inside the existing per-draft loop, **after** the existing hardcoded skips (`no_email`,
 `not_accepted`, `materials_already_sent`, `materials_release_ineligible`, address-trust,
@@ -154,15 +194,19 @@ attachment fetch or transport:
    (`lib/dataverse/core/entity-registry.js:140`, `:177`) [VERIFIED via source]. (The literal list
    at `reviewer-suggestion.js:305–340` is `MERGE_PREDICATE_SELECT`, not the read projection.) Add one
    `fetchCoPIs(requestId)` per distinct request (memoised map, `.catch(() => [])` exactly as
-   render does, inside the existing trusted DAL context). Cycle configs come from the existing
-   `loadCycleConfigs` result.
+   render does, inside the existing trusted DAL context). Widen send's `loadCycleConfigs` `fields` map (`send-emails-service.js:392–398`, today only
+   `review_template_blob_url`, `additional_attachments`, `review_deadline`) with `program_name` and
+   `custom_fields`, matching render's map (`render-emails-service.js:165–172`) [VERIFIED]; the
+   loader's "do not collapse callers" warning is about a shared superset, not about adding keys to
+   one caller's map, and downstream reads are by key.
 3. Mismatch → `skipped.push({…, reason: 'draft_stale' })`, `continue`. Match → proceed unchanged.
 
 Applies to **all four** template types uniformly (simplest rule; both clients forward the
 field). No new SSE event: `draft_stale` and `draft_fingerprint_missing` are new **values** of the
 existing `skipped[].reason`, carried in the existing `result` and `complete` events. The event
-vocabulary header comment in the service and the `email_failed` `code` list are unchanged; the
-`skipped` reason list in the header gains the two values.
+vocabulary header comment enumerates only `email_failed.code` today (`:44–50`), not `skipped`
+reasons; add a deliberate `skipped[].reason` enumeration to the header that mirrors
+`SEND_SKIP_REASON` (below), since the parity test will keep it honest.
 
 ### Client actions that mutate a fingerprinted input while drafts exist
 
@@ -186,6 +230,18 @@ mode, or the one-time materials release gate. No schema. No change to
 and send in one server pass and have no stale-draft window).
 
 ## Tests
+
+**Fixture migration (budget this):** every existing send fixture lacks `draftFingerprint`, so under
+uniform enforcement all flip to `draft_fingerprint_missing`: 71 `drafts:` fixtures in
+`tests/unit/send-emails-service.test.js`, 31 in `tests/integration/send-emails-route.test.js`, 1 in
+`tests/integration/reviewer-engagement-races.test.js` (103 sites, reviewer-counted). Build a shared
+test helper `tests/helpers/draft-fingerprint.js` that computes the fingerprint from the same
+Dataverse mocks the test installs, widen those mocks to carry `akoya_title`, `wmkf_abstract`, PI
+and institution annotations, `wmkf_primaryaffiliation`, co-PIs and cycle `program_name` /
+`custom_fields`, and stamp each fixture through the helper. Exact-shape assertions that constrain
+the change: `send-emails-service.test.js:697,917,1232,1315` use `toEqual` on whole `skipped[]` /
+`failed[]` rows — keep the row shape `{suggestionId, candidateName, candidateEmail, reason}`; render
+row assertions are `toMatchObject` and `out.stats` only, so the new field breaks nothing there.
 
 - `tests/unit/draft-fingerprint.test.js` (new): determinism; sorted-key/whitespace/null
   normalisation; a table-driven case per input field proving each flips the hash; co-PI
@@ -270,8 +326,16 @@ consumer ignores (grep `externalLinkExpected` shows only the two modals forward 
 
 **Verdict: READY WITH NAMED CHANGES** — the changes are the corrections folded above (registry
 citation, raw `custom_fields`, insertion point, `SEND_SKIP_REASONS` producer) plus the pending
-owner decision on uniform enforcement. Opus planning review and Codex round 1 recorded below when
-complete.
+owner decision on uniform enforcement. ### Opus planning review (2026-09-05, main `c3bbac74`)
+
+**READY WITH REQUIRED PLAN EDITS** — twelve edits, all plan text or scoping, all folded above:
+drop `honorariumOptOut` (not a body input); fix the `readById` citation; widen send's cycle
+`fields`; pin the insertion point and the full skip order; correct the header claim; named
+`SEND_SKIP_REASON` producer for the parity gate (copy entry #3); budget the 103-fixture migration
+and a shared fingerprint test helper; define honorarium read-failure symmetry; `null` fingerprint on
+render's skipped rows; pre-6C line note; recorded facts (constant `recipientExpertise`, implied
+co-PI count, deterministic co-PI order, `ReleaseEmailModal` not a client); recommend uniform
+enforcement. Codex round 1 recorded below when complete.
 
 ## Accepted limits (to record in the receipt)
 
