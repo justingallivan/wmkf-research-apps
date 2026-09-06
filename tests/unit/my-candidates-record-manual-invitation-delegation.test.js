@@ -38,7 +38,6 @@ jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
   restore: jest.fn(async () => {}),
   softDelete: jest.fn(async () => {}),
   bulkUpdateByRequest: jest.fn(async () => 0),
-  setRequestMetadata: jest.fn(async () => 0),
   APPLICANT_DISPOSITION_MAP: { recommended: 100000000 },
   RESPONSE_TYPE_BY_VALUE: { 100000000: 'accepted', 100000001: 'declined' },
 }));

@@ -217,10 +217,10 @@ If you're touching a service or utility, read its header before this catalog. If
 - **`reviewer-finder/my-candidates-service.js`** — Candidate reads and named
   edit/restore/manual-invite operations; since Stage 3D the response correction
   delegates to `reviewer-engagement/correct-response.js` (contract below unchanged); since Stage 3F the
-  manual-invite record delegates to `reviewer-engagement/record-invitation.js`; since Stage 3K (PR #167 →
-  `19955148`, 2026-09-06) the proposal-wide cycle/program-area update calls the adapter's whitelisted
-  `setRequestMetadata` (only `grantCycleCode`/`programArea`; sequential per-row write without `ifMatch`
-  preserved as open owner decision D4 in the Stage 7 plan) instead of the generic `bulkUpdateByRequest`. **[VERIFIED in source at `c51fa34d`,
+  manual-invite record delegates to `reviewer-engagement/record-invitation.js`; the proposal-wide
+  cycle/program-area fan-out (Stage 3K's `setRequestMetadata`, formerly the generic per-request bulk op)
+  was REMOVED 2026-09-06 under owner decision D4 — no client had sent that PATCH since the standalone
+  Reviewer Finder page was retired 2026-06-16, so a `proposalId`-only PATCH is now a plain 400. **[VERIFIED in source at `c51fa34d`,
   Stage 1D; shipped in Production at `c19a16d8` per the
   [release receipt](audits/REVIEWER_LIFECYCLE_RELEASE_2026-09-05.md)]** generic invitation/response
   corrections require a separately server-authorized Request binding, a fresh

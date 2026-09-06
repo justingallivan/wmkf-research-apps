@@ -230,29 +230,6 @@ describe('reviewer-suggestion adapter', () => {
       { actingUserSystemId: ACTING },
     );
   });
-
-  test('setRequestMetadata forwards to every per-row update', async () => {
-    // Stage 7 inlined the former bulkUpdateByRequest loop into
-    // setRequestMetadata (docs/REVIEWER_LIFECYCLE_STAGE7_BUILD_PLAN.md); this
-    // pin moves onto the surviving whitelisted op with the same per-row
-    // actingUserSystemId-forwarding assertion.
-    DynamicsService.queryRecords.mockResolvedValue({
-      records: [
-        { wmkf_appreviewersuggestionid: 'row-1' },
-        { wmkf_appreviewersuggestionid: 'row-2' },
-      ],
-    });
-    const updated = await suggestionAdapter.setRequestMetadata(
-      REQUEST_ID,
-      { programArea: 'Health' },
-      { actingUserSystemId: ACTING },
-    );
-    expect(updated).toBe(2);
-    expect(DynamicsService.updateRecord).toHaveBeenCalledTimes(2);
-    for (const call of DynamicsService.updateRecord.mock.calls) {
-      expect(call[3]).toEqual({ actingUserSystemId: ACTING });
-    }
-  });
 });
 
 describe('token-lifecycle', () => {

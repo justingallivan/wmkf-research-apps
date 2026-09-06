@@ -30,7 +30,8 @@
  * Unlike the import-specifier census (reviewer-engagement-census.test.js),
  * this scans for a bare IDENTIFIER reference by name, not a module import —
  * the deleted function lived inside the same adapter module as its caller
- * (setRequestMetadata), so no import-path census would ever have seen it.
+ * (setRequestMetadata — itself removed 2026-09-06 under owner decision D4),
+ * so no import-path census would ever have seen it.
  */
 
 const path = require('path');

@@ -22,7 +22,7 @@
  *
  *   Sinks (id-arg position):
  *     DynamicsService.getRecord/updateRecord/deleteRecord  → arg 1
- *     adapter findById/updateLifecycle/softDelete/findByRequest/setRequestMetadata → arg 0
+ *     adapter findById/updateLifecycle/softDelete/findByRequest → arg 0
  *   Object-argument sinks (id is a named property of the first-arg object):
  *     executePrompt({ requestId })  → forwards requestId raw to getById/updateById
  *       inside the Executor, reaching the same `akoya_requests(${id})` predicate.
@@ -111,7 +111,6 @@ const SINKS = new Map([
   ['updateLifecycle', 0],
   ['softDelete', 0],
   ['findByRequest', 0],
-  ['setRequestMetadata', 0],
 ]);
 
 // Object-argument sinks: the record-id is a NAMED property of the first-arg
