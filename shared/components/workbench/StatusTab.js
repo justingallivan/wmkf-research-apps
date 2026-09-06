@@ -30,7 +30,7 @@ export const CLASS_META = {
 export function StatusBadge({ statusClass }) {
   const meta = CLASS_META[statusClass];
   if (!meta) return null;
-  return <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold ${meta.cls}`}>{meta.label}</span>;
+  return <span className={`inline-flex min-h-6 items-center text-[11px] px-2 py-0.5 rounded-full font-semibold ${meta.cls}`}>{meta.label}</span>;
 }
 
 export default function StatusTab({ context }) {

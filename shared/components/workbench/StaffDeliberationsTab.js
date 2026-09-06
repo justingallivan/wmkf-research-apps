@@ -114,7 +114,7 @@ function StageRail({ stage, reopened }) {
         </span>
       ))}
       {reopened && (
-        <span className="rounded-full bg-amber-100 px-2 py-0.5 font-medium text-amber-800">
+        <span className="inline-flex min-h-6 items-center rounded-full bg-amber-100 px-2 py-0.5 font-medium text-amber-800">
           reopened
         </span>
       )}
@@ -722,7 +722,7 @@ export default function StaffDeliberationsTab({ requestId, requestNumber = '', i
                   Word document
                 </a>
                 {' '}
-                <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">
+                <span className="inline-flex min-h-6 items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">
                   Shared
                 </span>
               </p>
@@ -747,7 +747,7 @@ export default function StaffDeliberationsTab({ requestId, requestNumber = '', i
               )}
               {everSent && (
                 <p className="mt-3 text-sm text-gray-700">
-                  <span className="mr-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">
+                  <span className="mr-1 inline-flex min-h-6 items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">
                     Materials sent
                   </span>
                   Fill in the site-visit sections (recommendation, referee comments, presentation)

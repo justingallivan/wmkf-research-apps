@@ -27,7 +27,7 @@ const STAGE_META = {
 
 function StageChip({ stage }) {
   const m = STAGE_META[stage] || { label: stage, cls: 'bg-gray-100 text-gray-700' };
-  return <span className={`inline-block px-2.5 py-1 rounded-full text-xs font-semibold ${m.cls}`}>{m.label}</span>;
+  return <span className={`inline-flex min-h-7 items-center px-2.5 py-1 rounded-full text-xs font-semibold ${m.cls}`}>{m.label}</span>;
 }
 
 // Per-row triage flip (S261). The surrounding row navigates on click/keyboard,
@@ -266,12 +266,12 @@ export function WorkbenchDashboard() {
                         {p.cycleLabel && <span className="text-xs text-gray-500">{p.cycleLabel}</span>}
                         {p.grantProgram && <span className="text-xs text-gray-500">· {p.grantProgram}</span>}
                         {p.advancing && (
-                          <span className="inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-800">
+                          <span className="inline-flex min-h-7 items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-100 text-purple-800">
                             going-forward
                           </span>
                         )}
                         {p.setAside && (
-                          <span className="inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-200 text-gray-600">
+                          <span className="inline-flex min-h-7 items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-gray-200 text-gray-600">
                             set aside
                           </span>
                         )}
