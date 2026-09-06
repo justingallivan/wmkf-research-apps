@@ -367,7 +367,7 @@ export default function RequestLocator() {
                       </div>
                       <div className="flex shrink-0 items-center gap-3 sm:justify-end">
                         {result.requestStatus && (
-                          <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700">
+                          <span className="inline-flex min-h-7 items-center rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700">
                             {result.requestStatus}
                           </span>
                         )}

@@ -4,6 +4,7 @@ import Layout, { PageHeader, Card, Button } from '../shared/components/Layout';
 import HelpButton from '../shared/components/HelpButton';
 import ProfileContext from '../shared/context/ProfileContext';
 import RequireAppAccess from '../shared/components/RequireAppAccess';
+import Link from 'next/link';
 
 // ─── Markdown table parser ───
 
@@ -107,12 +108,19 @@ function renderMarkdownText(text) {
 
 // ─── Example query chips ───
 
-const EXAMPLE_QUERIES = [
-  'How many proposals are there?',
-  'Show me the 10 most recent proposals',
-  'What tables are available?',
-  'What fields does akoya_request have?',
-  'Find emails related to proposal 1002386',
+const EXAMPLE_QUERY_GROUPS = [
+  {
+    label: 'Explore records',
+    queries: ['How many proposals are there?', 'Show me the 10 most recent proposals'],
+  },
+  {
+    label: 'Understand the data',
+    queries: ['What tables are available?', 'What fields does akoya_request have?'],
+  },
+  {
+    label: 'Find related information',
+    queries: ['Find emails related to proposal 1002386'],
+  },
 ];
 
 // ─── Main Page ───
@@ -124,7 +132,6 @@ function DynamicsExplorer() {
   const [thinkingStatus, setThinkingStatus] = useState('');
   const [userRole, setUserRole] = useState('read_only');
   const [sessionId] = useState(() => `de-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
-  const [showAdmin, setShowAdmin] = useState(false);
   const [feedbackMap, setFeedbackMap] = useState({});       // { messageId: 'positive'|'negative' }
   const [suggestFeedbackId, setSuggestFeedbackId] = useState(null);
   const [feedbackModalFor, setFeedbackModalFor] = useState(null); // messageId or null
@@ -551,6 +558,9 @@ function DynamicsExplorer() {
               </button>
             )}
           </div>
+          <p className="mt-3 text-xs leading-5 text-gray-500">
+            Answers use approved Dynamics 365 and SharePoint sources. Verify important results in the linked records or documents before acting on them.
+          </p>
         </Card>
 
         {/* Chat area */}
@@ -595,7 +605,9 @@ function DynamicsExplorer() {
           {/* Input area */}
           <div className="border-t border-gray-200 p-4 bg-white rounded-b-xl">
             <div className="flex items-end gap-3">
+              <label htmlFor="dynamics-question" className="sr-only">Ask a question about your CRM data</label>
               <textarea
+                id="dynamics-question"
                 ref={textareaRef}
                 value={currentMessage}
                 onChange={(e) => { setCurrentMessage(e.target.value); adjustTextarea(); }}
@@ -603,7 +615,8 @@ function DynamicsExplorer() {
                 placeholder="Ask a question about your CRM data..."
                 disabled={isProcessing}
                 rows={1}
-                className="flex-1 resize-none border border-gray-300 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent disabled:bg-gray-50 disabled:text-gray-400"
+                wrap="soft"
+                className="flex-1 resize-none overflow-x-hidden overflow-y-auto border border-gray-300 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent disabled:bg-gray-50 disabled:text-gray-400"
                 style={{ maxHeight: '200px' }}
               />
               <Button
@@ -625,16 +638,15 @@ function DynamicsExplorer() {
         {/* Admin panel (superuser only) */}
         {userRole === 'superuser' && (
           <Card hover={false}>
-            <button
-              onClick={() => setShowAdmin(!showAdmin)}
-              className="flex items-center gap-2 w-full text-left text-sm font-medium text-gray-700"
-            >
-              <span className={`transition-transform ${showAdmin ? 'rotate-90' : ''}`}>&#9654;</span>
-              Admin Panel
-            </button>
-            {showAdmin && (
-              <AdminPanel userProfileId={currentProfile?.id} />
-            )}
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-semibold text-gray-900">Explorer safeguards</h2>
+                <p className="mt-1 text-xs text-gray-500">Superuser-managed query and export restrictions.</p>
+              </div>
+              <Link href="/admin?workspace=operations&view=dynamics-safeguards" className="shrink-0 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2">
+                Manage in Admin
+              </Link>
+            </div>
           </Card>
         )}
       </div>
@@ -660,15 +672,22 @@ function WelcomeMessage({ onExampleClick }) {
       <p className="text-gray-600 mb-6 max-w-md mx-auto">
         Ask questions about your CRM data in natural language. I'll query the Dynamics 365 system and present the results.
       </p>
-      <div className="flex flex-wrap justify-center gap-2 max-w-lg mx-auto">
-        {EXAMPLE_QUERIES.map((q, i) => (
-          <button
-            key={i}
-            onClick={() => onExampleClick(q)}
-            className="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-full transition-colors"
-          >
-            {q}
-          </button>
+      <div className="mx-auto max-w-2xl space-y-4 text-left">
+        {EXAMPLE_QUERY_GROUPS.map((group) => (
+          <div key={group.label}>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">{group.label}</p>
+            <div className="flex flex-wrap gap-2">
+              {group.queries.map((q) => (
+                <button
+                  key={q}
+                  onClick={() => onExampleClick(q)}
+                  className="rounded-full bg-gray-100 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                >
+                  {q}
+                </button>
+              ))}
+            </div>
+          </div>
         ))}
       </div>
     </div>
@@ -729,24 +748,33 @@ const MessageBubble = React.memo(function MessageBubble({ message, onCopy, onFee
         {!isUser && !message.isStreaming && (
           <div className="mt-1">
             <div className="flex items-center gap-3 text-xs text-gray-400">
-              <button onClick={() => onCopy(message.content)} className="hover:text-gray-600">
+              <button
+                type="button"
+                onClick={() => onCopy(message.content)}
+                className="inline-flex min-h-9 min-w-9 items-center justify-center rounded-lg hover:bg-gray-100 hover:text-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                aria-label="Copy"
+              >
                 Copy
               </button>
               {!message.isError && (
                 <>
                   <button
+                    type="button"
                     onClick={() => onFeedback(message.id, 'positive')}
-                    className={`hover:text-gray-600 ${feedbackGiven === 'positive' ? 'text-green-600' : ''}`}
+                    className={`inline-flex min-h-9 min-w-9 items-center justify-center rounded-lg hover:bg-gray-100 hover:text-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 ${feedbackGiven === 'positive' ? 'text-green-600' : ''}`}
                     title="Helpful"
+                    aria-label="Mark response helpful"
                   >
                     <svg className="w-4 h-4" viewBox="0 0 24 24" fill={feedbackGiven === 'positive' ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M7 10v12" /><path d="M15 5.88L14 10h5.83a2 2 0 011.92 2.56l-2.33 8A2 2 0 0117.5 22H4a2 2 0 01-2-2v-8a2 2 0 012-2h2.76a2 2 0 001.79-1.11L12 2a3.13 3.13 0 013 3.88z" />
                     </svg>
                   </button>
                   <button
+                    type="button"
                     onClick={() => onFeedback(message.id, 'negative')}
-                    className={`hover:text-gray-600 ${feedbackGiven === 'negative' ? 'text-red-600' : ''}`}
+                    className={`inline-flex min-h-9 min-w-9 items-center justify-center rounded-lg hover:bg-gray-100 hover:text-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 ${feedbackGiven === 'negative' ? 'text-red-600' : ''}`}
                     title="Not helpful"
+                    aria-label="Mark response not helpful"
                   >
                     <svg className="w-4 h-4" viewBox="0 0 24 24" fill={feedbackGiven === 'negative' ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M17 14V2" /><path d="M9 18.12L10 14H4.17a2 2 0 01-1.92-2.56l2.33-8A2 2 0 016.5 2H20a2 2 0 012 2v8a2 2 0 01-2 2h-2.76a2 2 0 00-1.79 1.11L12 22a3.13 3.13 0 01-3-3.88z" />
@@ -897,93 +925,6 @@ function DataTable({ headers, rows }) {
         >
           Export CSV
         </button>
-      </div>
-    </div>
-  );
-}
-
-// ─── Admin Panel ───
-
-function AdminPanel({ userProfileId }) {
-  const [restrictions, setRestrictions] = useState([]);
-  const [newRestriction, setNewRestriction] = useState({ table_name: '', field_name: '', reason: '' });
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetch(`/api/dynamics-explorer/restrictions?userProfileId=${userProfileId}`)
-      .then(r => r.json())
-      .then(data => {
-        setRestrictions(data.restrictions || []);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
-  }, [userProfileId]);
-
-  const addRestriction = async () => {
-    if (!newRestriction.table_name) return;
-    const resp = await fetch('/api/dynamics-explorer/restrictions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...newRestriction, userProfileId }),
-    });
-    const data = await resp.json();
-    if (data.restriction) {
-      setRestrictions(prev => [...prev, data.restriction]);
-      setNewRestriction({ table_name: '', field_name: '', reason: '' });
-    }
-  };
-
-  const removeRestriction = async (id) => {
-    await fetch('/api/dynamics-explorer/restrictions', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, userProfileId }),
-    });
-    setRestrictions(prev => prev.filter(r => r.id !== id));
-  };
-
-  if (loading) return <p className="text-sm text-gray-500 mt-4">Loading admin data...</p>;
-
-  return (
-    <div className="mt-4">
-      <h3 className="text-sm font-semibold text-gray-800 mb-2">Data Restrictions</h3>
-      {restrictions.length > 0 ? (
-        <div className="space-y-1 mb-3">
-          {restrictions.map(r => (
-            <div key={r.id} className="flex items-center justify-between text-sm bg-gray-50 px-3 py-2 rounded">
-              <span>
-                <span className="font-mono text-xs">{r.table_name}</span>
-                {r.field_name && <span className="font-mono text-xs">.{r.field_name}</span>}
-                <span className="text-gray-500 ml-2">({r.restriction_type})</span>
-                {r.reason && <span className="text-gray-500 ml-1">- {r.reason}</span>}
-              </span>
-              <button onClick={() => removeRestriction(r.id)} className="text-red-500 hover:text-red-700 text-xs">Remove</button>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <p className="text-xs text-gray-500 mb-3">No restrictions configured.</p>
-      )}
-      <div className="flex flex-wrap gap-2 items-end">
-        <input
-          placeholder="Table name"
-          value={newRestriction.table_name}
-          onChange={e => setNewRestriction(prev => ({ ...prev, table_name: e.target.value }))}
-          className="border border-gray-300 rounded px-2 py-1 text-sm w-40"
-        />
-        <input
-          placeholder="Field (optional)"
-          value={newRestriction.field_name}
-          onChange={e => setNewRestriction(prev => ({ ...prev, field_name: e.target.value }))}
-          className="border border-gray-300 rounded px-2 py-1 text-sm w-36"
-        />
-        <input
-          placeholder="Reason"
-          value={newRestriction.reason}
-          onChange={e => setNewRestriction(prev => ({ ...prev, reason: e.target.value }))}
-          className="border border-gray-300 rounded px-2 py-1 text-sm w-48"
-        />
-        <button onClick={addRestriction} className="px-3 py-1 bg-gray-900 text-white text-sm rounded hover:bg-gray-800">Add</button>
       </div>
     </div>
   );

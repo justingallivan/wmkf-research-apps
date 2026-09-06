@@ -9,6 +9,7 @@ import EmailDefaultsSection from '../shared/components/admin/EmailDefaultsSectio
 import SiteVisitRecipientsSection from '../shared/components/admin/SiteVisitRecipientsSection';
 import FinalWriteupMatrixAudiencesSection from '../shared/components/admin/FinalWriteupMatrixAudiencesSection';
 import ReviewerRepairAlertDetails from '../shared/components/admin/ReviewerRepairAlertDetails';
+import DynamicsExplorerRestrictionsSection from '../shared/components/admin/DynamicsExplorerRestrictionsSection';
 import DataverseFieldInfoButton, {
   appSystemSettingField,
   appSystemSettingPattern,
@@ -54,7 +55,7 @@ function StatusBadge({ status }) {
     skipped: 'bg-gray-100 text-gray-600',
   };
   return (
-    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${colors[status] || colors.skipped}`}>
+    <span className={`inline-flex min-h-6 items-center px-2 py-0.5 rounded-full text-xs font-medium ${colors[status] || colors.skipped}`}>
       {status}
     </span>
   );
@@ -687,7 +688,7 @@ function MaintenanceSection() {
                   {label.icon} {label.name}
                 </span>
                 {job.lastRun && (
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColors[job.lastRun.status] || 'text-gray-600 bg-gray-100'}`}>
+                  <span className={`inline-flex min-h-6 items-center text-xs px-2 py-0.5 rounded-full font-medium ${statusColors[job.lastRun.status] || 'text-gray-600 bg-gray-100'}`}>
                     {job.lastRun.status}
                   </span>
                 )}
@@ -798,7 +799,7 @@ function SecretExpirationSection() {
       not_tracked: 'bg-gray-100 text-gray-500',
     };
     return (
-      <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${colors[status] || colors.not_tracked}`}>
+      <span className={`inline-flex min-h-6 items-center px-2 py-0.5 rounded-full text-xs font-medium ${colors[status] || colors.not_tracked}`}>
         {status === 'not_tracked' ? 'not set' : status}
       </span>
     );
@@ -1559,7 +1560,7 @@ function RoleManagementSection() {
                 <tr key={role.id} className="border-b border-gray-100">
                   <td className="py-2 px-2 text-gray-900">{role.user_name}</td>
                   <td className="py-2 px-2">
-                    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${
+                    <span className={`inline-flex min-h-6 items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                       role.role === 'superuser' ? 'bg-purple-100 text-purple-800' :
                       role.role === 'read_write' ? 'bg-blue-100 text-blue-800' :
                       'bg-gray-100 text-gray-600'
@@ -2313,9 +2314,9 @@ function DynamicsIdentitySection() {
                 <td className="py-2 px-2 text-gray-900">{u.displayName || u.name}</td>
                 <td className="py-2 px-2">
                   {u.dynamicsSystemuserId ? (
-                    <span className="inline-block px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">✓ linked</span>
+                    <span className="inline-flex min-h-6 items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">✓ linked</span>
                   ) : (
-                    <span className="inline-block px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">not linked</span>
+                    <span className="inline-flex min-h-6 items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">not linked</span>
                   )}
                 </td>
                 <td className="py-2 px-2 text-gray-500 font-mono text-xs">{u.dynamicsSystemuserId || '-'}</td>
@@ -3046,6 +3047,17 @@ function OperationsWorkspace({ view }) {
       );
     case 'feedback':
       return <DynamicsFeedbackSection />;
+    case 'dynamics-safeguards':
+      return (
+        <AdminEditorPanel
+          id="dynamics-explorer-safeguards"
+          title="Dynamics Explorer data safeguards"
+          description="Control what Dynamics Explorer can query or export. These settings do not change a user&apos;s underlying Dynamics permissions."
+          scope="Global Explorer policy"
+        >
+          <DynamicsExplorerRestrictionsSection />
+        </AdminEditorPanel>
+      );
     case 'health':
     default:
       return (

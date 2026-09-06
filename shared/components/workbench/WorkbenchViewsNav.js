@@ -44,7 +44,7 @@ export default function WorkbenchViewsNav({ activeKey, cycleCode, counts = {} })
   return (
     <nav ref={scrollerRef} aria-label="Workbench views" className="mb-6 overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
       <div className="flex min-w-max items-stretch p-1.5">
-        {VIEWS.map((view) => {
+        {VIEWS.filter((view) => !(view.key === 'initial-assessments' && cycleCode === 'D26')).map((view) => {
           const active = resolvedActiveKey === view.key;
           const count = counts[view.key];
           return (

@@ -13,9 +13,7 @@ import Link from 'next/link';
 import Layout, { Card, PageHeader } from '../../shared/components/Layout';
 import RequireAppAccess from '../../shared/components/RequireAppAccess';
 import ReviewerManagePanel from '../../shared/components/reviewers/ReviewerManagePanel';
-import CampaignConfigModal from '../../shared/components/reviewers/CampaignConfigModal';
 import EmailTemplatesModal from '../../shared/components/reviewers/EmailTemplatesModal';
-import WorkbenchViewsNav from '../../shared/components/workbench/WorkbenchViewsNav';
 import {
   filterReviewerFollowUpProposals,
   isOpenReviewer,
@@ -27,8 +25,7 @@ import {
 import { classifyTarget } from '../../lib/dataverse/core/interlock';
 
 function ReviewerGroup({ proposal, previewReadOnly, onRefresh }) {
-  const [open, setOpen] = useState(() => proposalNeedsAttention(proposal));
-  const [campaignOpen, setCampaignOpen] = useState(false);
+  const [open, setOpen] = useState(false);
   const reviewers = proposal.reviewers || [];
   const activeCount = reviewers.filter(isOpenReviewer).length;
   const overdueCount = reviewers.filter((reviewer) => isReviewerOverdue(reviewer)).length;
@@ -37,6 +34,7 @@ function ReviewerGroup({ proposal, previewReadOnly, onRefresh }) {
     || reviewer.submitted
     || ['review_received', 'complete'].includes(reviewer.reviewStatus)
   )).length;
+  const waitingCount = Math.max(reviewers.length - receivedCount - overdueCount, 0);
   const canManage = !previewReadOnly && proposal.workbench?.canManage === true;
   const requestHref = `/workbench/${encodeURIComponent(proposal.proposalId)}?tab=reviewers&sub=track${
     proposal.requestNumber ? `&n=${encodeURIComponent(proposal.requestNumber)}` : ''
@@ -44,8 +42,8 @@ function ReviewerGroup({ proposal, previewReadOnly, onRefresh }) {
 
   return (
     <article className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-      <header className="border-b border-gray-200 px-4 py-4 sm:px-5">
-        <div className="flex flex-col gap-4 2xl:flex-row 2xl:items-start 2xl:justify-between">
+      <header className="px-4 py-4 sm:px-5">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0">
             <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
               <Link
@@ -63,68 +61,97 @@ function ReviewerGroup({ proposal, previewReadOnly, onRefresh }) {
                 .filter(Boolean)
                 .join(' · ')}
             </p>
-            <p className="mt-2 text-xs tabular-nums text-gray-500">
-              {reviewers.length === 0
-                ? 'No reviewers are in the tracking stage.'
-                : `${activeCount} active · ${receivedCount} received${overdueCount ? ` · ${overdueCount} overdue` : ''}`}
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2 2xl:justify-end">
-            <Link
-              href={requestHref}
-              className="inline-flex min-h-10 items-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 hover:border-gray-400 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500"
-            >
-              Open full reviewer panel
-            </Link>
-            {canManage && (
-              <button
-                type="button"
-                onClick={() => setCampaignOpen(true)}
-                className="min-h-10 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 hover:border-gray-400 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500"
-              >
-                Campaign settings
-              </button>
+            {reviewers.length === 0 ? (
+              <p className="mt-2 text-xs text-gray-500">No reviewers are in the tracking stage.</p>
+            ) : (
+              <div className="mt-3 max-w-xl" aria-label={`Reviewer status: ${receivedCount} received, ${waitingCount} waiting, ${overdueCount} late`}>
+                <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-gray-200" role="img" aria-hidden="true">
+                  {receivedCount > 0 && <span className="bg-green-500" style={{ width: `${(receivedCount / reviewers.length) * 100}%` }} />}
+                  {waitingCount > 0 && <span className="bg-gray-400" style={{ width: `${(waitingCount / reviewers.length) * 100}%` }} />}
+                  {overdueCount > 0 && <span className="bg-red-500" style={{ width: `${(overdueCount / reviewers.length) * 100}%` }} />}
+                </div>
+                <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs tabular-nums">
+                  <span className="text-green-700"><strong>{receivedCount}</strong> received</span>
+                  <span className="text-gray-600"><strong>{waitingCount}</strong> waiting</span>
+                  <span className="text-red-700"><strong>{overdueCount}</strong> late</span>
+                </div>
+              </div>
             )}
+          </div>
+          <div className="flex shrink-0 flex-wrap items-center gap-2 lg:justify-end">
             <button
               type="button"
               onClick={() => setOpen((value) => !value)}
               aria-expanded={open}
-              className="min-h-10 rounded-lg bg-gray-900 px-3 py-2 text-sm font-semibold text-white hover:bg-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2"
+              className="min-h-9 rounded-lg bg-gray-900 px-3 py-2 text-sm font-semibold text-white hover:bg-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2"
             >
-              {open ? 'Collapse' : 'Show reviewers'}
+              {open ? 'Hide reviewer activity' : 'Show reviewer activity'}
             </button>
           </div>
         </div>
       </header>
 
       {open && (
-        <div className="p-4 sm:p-5">
+        <div className="border-t border-gray-200 bg-gray-50/60 p-4 sm:p-5">
           {reviewers.length === 0 ? (
             <p className="py-4 text-sm text-gray-500">
               There are no accepted reviewers to track yet. Open the full reviewer panel to find or invite reviewers.
             </p>
           ) : (
-            <ReviewerManagePanel
-              proposal={proposal}
-              reviewers={reviewers}
-              onRefresh={onRefresh}
-              settings={{ reviewDueDate: proposal.reviewDeadline }}
-              mode="track"
-              canManage={canManage}
-              showReviewReminderAction={canManage || previewReadOnly}
-              previewReadOnly={previewReadOnly}
-            />
+            <div className="reviewer-activity-panel">
+              <ReviewerManagePanel
+                proposal={proposal}
+                reviewers={reviewers}
+                onRefresh={onRefresh}
+                settings={{ reviewDueDate: proposal.reviewDeadline }}
+                mode="track"
+                canManage={canManage}
+                showReviewReminderAction={canManage || previewReadOnly}
+                previewReadOnly={previewReadOnly}
+              />
+              <style jsx global>{`
+                .reviewer-activity-panel td span.rounded,
+                .reviewer-activity-panel td span.rounded-full {
+                  display: inline-flex;
+                  min-height: 1.75rem;
+                  align-items: center;
+                  border-radius: 9999px;
+                  line-height: 1.25;
+                  padding: 0.25rem 0.625rem;
+                }
+                .reviewer-activity-panel table thead th:last-child {
+                  position: relative;
+                  padding-right: 5rem;
+                }
+                .reviewer-activity-panel table thead th:last-child::after {
+                  content: 'More';
+                  position: absolute;
+                  top: 50%;
+                  right: 1rem;
+                  transform: translateY(-50%);
+                  color: #9ca3af;
+                  font-weight: 500;
+                  text-transform: none;
+                  letter-spacing: normal;
+                }
+                .reviewer-activity-panel button[aria-label^='Manage '] {
+                  min-width: 2.25rem;
+                  min-height: 2.25rem;
+                  border: 1px solid #d1d5db;
+                  border-radius: 0.5rem;
+                  color: #374151;
+                  background: #ffffff;
+                }
+                .reviewer-activity-panel button[aria-label^='Manage ']:hover {
+                  color: #111827;
+                  background: #f3f4f6;
+                }
+              `}</style>
+            </div>
           )}
         </div>
       )}
 
-      {campaignOpen && canManage && (
-        <CampaignConfigModal
-          requestId={proposal.proposalId}
-          onClose={() => setCampaignOpen(false)}
-          onSaved={onRefresh}
-        />
-      )}
     </article>
   );
 }
@@ -225,14 +252,8 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
     <Layout title="Reviewer follow-up">
       <PageHeader
         title="Reviewer follow-up"
-        subtitle="Monitor reviewer progress across a grant cycle and follow up without opening each proposal first."
+        subtitle="A focused queue for requests that need reviewer action."
       />
-      <WorkbenchViewsNav
-        activeKey="reviewer-follow-up"
-        cycleCode={cycleCode}
-        counts={{ 'reviewer-follow-up': summary.attentionRequests }}
-      />
-
       {previewReadOnly && (
         <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-950" role="status">
           <span className="font-semibold">Preview is read-only.</span>{' '}
@@ -240,8 +261,9 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
         </div>
       )}
 
-      <div className="mb-6 flex flex-col gap-4 border-y border-gray-200 py-4 lg:flex-row lg:items-end lg:justify-between">
-        <div className="flex flex-wrap items-start gap-3">
+      <div className="mb-6 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <label className="flex flex-col gap-1 text-sm font-medium text-gray-700">
             <span>Cycle</span>
             <select
@@ -304,7 +326,7 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
             </div>
           </fieldset>
 
-          <label className="flex min-h-11 self-end items-center gap-2 pb-0.5 text-sm font-medium text-gray-700">
+          <label className="flex min-h-11 items-center gap-2 text-sm font-medium text-gray-700">
             <input
               type="checkbox"
               checked={includeSetAside}
@@ -313,9 +335,20 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
             />
             Show set aside
           </label>
-        </div>
-
-        {!previewReadOnly && (
+          </div>
+          <div className="flex flex-col gap-3 border-t border-gray-100 pt-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 flex-1">
+              <label htmlFor="reviewer-follow-up-search" className="sr-only">Search requests and reviewers</label>
+              <input
+                id="reviewer-follow-up-search"
+                type="search"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search requests, institutions, PIs, or reviewers"
+                className="min-h-11 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-500 focus:border-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-400/30"
+              />
+            </div>
+            {!previewReadOnly && (
           <button
             type="button"
             onClick={() => setTemplatesOpen(true)}
@@ -323,10 +356,12 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
           >
             Email templates
           </button>
-        )}
+            )}
+          </div>
+        </div>
       </div>
 
-      <dl className="mb-6 flex flex-wrap gap-x-8 gap-y-3 text-sm">
+      <dl className="mb-6 flex flex-wrap items-baseline gap-x-5 gap-y-2 border-b border-gray-200 pb-4 text-sm">
         {[
           [scope === 'all' ? 'Cycle requests' : 'Assigned requests', summary.assignedRequests],
           ['Active reviewers', summary.activeReviewers],
@@ -339,18 +374,6 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
           </div>
         ))}
       </dl>
-
-      <div className="mb-5">
-        <label htmlFor="reviewer-follow-up-search" className="sr-only">Search requests and reviewers</label>
-        <input
-          id="reviewer-follow-up-search"
-          type="search"
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          placeholder="Search requests, institutions, PIs, or reviewers"
-          className="min-h-12 w-full max-w-2xl rounded-xl border border-gray-300 bg-white px-4 py-3 text-base text-gray-900 shadow-sm placeholder:text-gray-500 focus:border-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-400/30"
-        />
-      </div>
 
       {error && (
         <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900" role="alert">

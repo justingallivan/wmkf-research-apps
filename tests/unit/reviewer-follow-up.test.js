@@ -251,6 +251,7 @@ describe('reviewer follow-up request scope', () => {
 
     render(<ReviewerFollowUpDashboard />);
     expect(await screen.findByText('Foreign request')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Show reviewer activity' }));
     expect(screen.getByTestId('reviewer-manage-panel')).toHaveAttribute('data-can-manage', 'false');
     expect(screen.queryByRole('button', { name: 'Campaign settings' })).not.toBeInTheDocument();
   });

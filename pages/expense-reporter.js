@@ -86,21 +86,23 @@ function ExpenseReporter() {
 
         for (const line of lines) {
           if (line.startsWith('data: ')) {
+            let data;
             try {
-              const data = JSON.parse(line.slice(6));
-
-              if (data.type === 'progress') {
-                setStreamingMessage(data.message);
-              } else if (data.type === 'result') {
-                setResults(data);
-                setStreamingMessage('');
-              } else if (data.type === 'error') {
-                throw new Error(data.error);
-              }
+              data = JSON.parse(line.slice(6));
             } catch (e) {
               if (line.slice(6) !== '[DONE]') {
                 console.error('Failed to parse streaming data:', e);
               }
+              continue;
+            }
+
+            if (data.type === 'progress') {
+              setStreamingMessage(data.message);
+            } else if (data.type === 'result') {
+              setResults(data);
+              setStreamingMessage('');
+            } else if (data.type === 'error') {
+              throw new Error(data.error || 'Expense processing failed');
             }
           }
         }
@@ -315,6 +317,11 @@ function ExpenseReporter() {
               <h3 className="text-lg font-semibold">Upload Receipts</h3>
             </div>
 
+            <p className="text-sm text-gray-600">
+              Upload PDF, JPG, or PNG receipts and invoices. You can select multiple files;
+              extracted amounts and categories can be checked before export.
+            </p>
+
             <FileUploaderSimple
               onFilesUploaded={handleFilesUploaded}
               multiple={true}
@@ -345,8 +352,11 @@ function ExpenseReporter() {
                         </div>
                       </div>
                       <button
+                        type="button"
                         onClick={() => handleRemoveFile(index)}
-                        className="text-red-500 hover:text-red-700"
+                        aria-label={`Remove ${file.filename}`}
+                        title={`Remove ${file.filename}`}
+                        className="inline-flex min-h-9 min-w-9 items-center justify-center rounded-lg text-red-500 hover:bg-red-50 hover:text-red-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
                       >
                         <FiX />
                       </button>
@@ -370,7 +380,7 @@ function ExpenseReporter() {
             </div>
 
             {isProcessing && streamingMessage && (
-              <div className="mt-4 text-center">
+              <div className="mt-4 text-center" role="status" aria-live="polite">
                 <div className="inline-flex items-center space-x-2">
                   <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-500 border-t-transparent"></div>
                   <span className="text-sm text-gray-600">{streamingMessage}</span>
@@ -394,6 +404,9 @@ function ExpenseReporter() {
                   </Button>
                 </div>
               </div>
+              <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900" role="status">
+                Review the extracted fields below before exporting. You can edit any row if a receipt was read incorrectly.
+              </div>
 
               {results.expenses && results.expenses.length > 0 ? (
                 <>
@@ -412,12 +425,13 @@ function ExpenseReporter() {
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
                         {results.expenses.map((expense, index) => (
-                          <tr key={index} className="hover:bg-gray-50">
+                          <tr key={index} className={editingRow === index ? 'bg-blue-50/50' : 'hover:bg-gray-50'}>
                             {editingRow === index ? (
                               <>
                                 <td className="px-3 py-2">
                                   <input
                                     type="text"
+                                    aria-label={`Date for expense ${index + 1}`}
                                     value={editedData.date || ''}
                                     onChange={(e) => handleFieldChange('date', e.target.value)}
                                     className="w-full px-2 py-1 border rounded text-sm"
@@ -426,6 +440,7 @@ function ExpenseReporter() {
                                 <td className="px-3 py-2">
                                   <input
                                     type="text"
+                                    aria-label={`Vendor for expense ${index + 1}`}
                                     value={editedData.vendor || ''}
                                     onChange={(e) => handleFieldChange('vendor', e.target.value)}
                                     className="w-full px-2 py-1 border rounded text-sm"
@@ -434,6 +449,7 @@ function ExpenseReporter() {
                                 <td className="px-3 py-2">
                                   <input
                                     type="text"
+                                    aria-label={`Description for expense ${index + 1}`}
                                     value={editedData.description || ''}
                                     onChange={(e) => handleFieldChange('description', e.target.value)}
                                     className="w-full px-2 py-1 border rounded text-sm"
@@ -442,6 +458,7 @@ function ExpenseReporter() {
                                 <td className="px-3 py-2">
                                   <input
                                     type="text"
+                                    aria-label={`Amount for expense ${index + 1}`}
                                     value={editedData.amount || ''}
                                     onChange={(e) => handleFieldChange('amount', e.target.value)}
                                     className="w-24 px-2 py-1 border rounded text-sm"
@@ -450,6 +467,7 @@ function ExpenseReporter() {
                                 <td className="px-3 py-2">
                                   <input
                                     type="text"
+                                    aria-label={`Category for expense ${index + 1}`}
                                     value={editedData.category || ''}
                                     onChange={(e) => handleFieldChange('category', e.target.value)}
                                     className="w-full px-2 py-1 border rounded text-sm"
@@ -459,6 +477,7 @@ function ExpenseReporter() {
                                   <div className="space-y-1">
                                     <input
                                       type="text"
+                                      aria-label={`Payment method for expense ${index + 1}`}
                                       placeholder="Payment method"
                                       value={editedData.paymentMethod || ''}
                                       onChange={(e) => handleFieldChange('paymentMethod', e.target.value)}
@@ -469,6 +488,7 @@ function ExpenseReporter() {
                                         type="text"
                                         placeholder="Card"
                                         value={editedData.cardType || ''}
+                                        aria-label={`Card type for expense ${index + 1}`}
                                         onChange={(e) => handleFieldChange('cardType', e.target.value)}
                                         className="w-16 px-1 py-1 border rounded text-xs"
                                       />
@@ -476,6 +496,7 @@ function ExpenseReporter() {
                                         type="text"
                                         placeholder="****"
                                         value={editedData.cardLast4 || ''}
+                                        aria-label={`Last four card digits for expense ${index + 1}`}
                                         onChange={(e) => handleFieldChange('cardLast4', e.target.value)}
                                         className="w-12 px-1 py-1 border rounded text-xs"
                                         maxLength="4"
@@ -486,14 +507,18 @@ function ExpenseReporter() {
                                 <td className="px-3 py-2">
                                   <div className="flex space-x-1">
                                     <button
+                                      type="button"
                                       onClick={handleSaveEdit}
-                                      className="text-green-600 hover:text-green-800"
+                                      aria-label={`Save edits for expense ${index + 1}`}
+                                      className="inline-flex min-h-9 min-w-9 items-center justify-center rounded-lg text-green-600 hover:bg-green-50 hover:text-green-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-600"
                                     >
                                       <FiCheck />
                                     </button>
                                     <button
+                                      type="button"
                                       onClick={handleCancelEdit}
-                                      className="text-red-600 hover:text-red-800"
+                                      aria-label={`Cancel edits for expense ${index + 1}`}
+                                      className="inline-flex min-h-9 min-w-9 items-center justify-center rounded-lg text-red-600 hover:bg-red-50 hover:text-red-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-600"
                                     >
                                       <FiX />
                                     </button>
@@ -507,7 +532,7 @@ function ExpenseReporter() {
                                 <td className="px-3 py-2 text-sm">{expense.description || '-'}</td>
                                 <td className="px-3 py-2 text-sm font-semibold">{expense.amount || '-'}</td>
                                 <td className="px-3 py-2 text-sm">
-                                  <span className="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800">
+                                  <span className="inline-flex min-h-6 items-center px-2.5 py-1 text-xs rounded-full bg-blue-100 text-blue-800">
                                     {expense.category || 'Uncategorized'}
                                   </span>
                                 </td>
@@ -531,8 +556,10 @@ function ExpenseReporter() {
                                 </td>
                                 <td className="px-3 py-2">
                                   <button
+                                    type="button"
                                     onClick={() => handleEditRow(index)}
-                                    className="text-blue-600 hover:text-blue-800"
+                                    aria-label={`Edit expense ${index + 1}`}
+                                    className="inline-flex min-h-9 min-w-9 items-center justify-center rounded-lg text-blue-600 hover:bg-blue-50 hover:text-blue-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
                                   >
                                     <FiEdit />
                                   </button>

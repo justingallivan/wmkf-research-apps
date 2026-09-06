@@ -57,7 +57,7 @@ function RetractionMatchCard({ match, onDismiss }) {
 
       <div className="p-4 space-y-2">
         {match.retractionNature && (
-          <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded ${
+            <span className={`inline-flex min-h-6 items-center px-2 py-0.5 text-xs font-medium rounded-full ${
             match.retractionNature.toLowerCase().includes('retraction')
               ? 'bg-red-100 text-red-800'
               : 'bg-yellow-100 text-yellow-800'
@@ -73,7 +73,7 @@ function RetractionMatchCard({ match, onDismiss }) {
         {match.reasons && match.reasons.length > 0 && (
           <div className="flex flex-wrap gap-1">
             {match.reasons.map((reason, i) => (
-              <span key={i} className="inline-flex px-2 py-0.5 text-xs bg-red-50 text-red-700 rounded">
+              <span key={i} className="inline-flex min-h-6 items-center px-2 py-0.5 text-xs bg-red-50 text-red-700 rounded-full">
                 {reason}
               </span>
             ))}
@@ -186,6 +186,7 @@ function AIResultCard({ source, result, onDismiss, screenedName }) {
  */
 function ApplicantResultCard({ result, onDismiss }) {
   const [expanded, setExpanded] = useState(result.hasConcerns);
+  const detailsId = `integrity-result-${String(result.name || 'applicant').toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
 
   const retractionMatches = result.sources.retraction_watch?.matches || [];
   const pubpeerResult = result.sources.pubpeer || {};
@@ -200,7 +201,7 @@ function ApplicantResultCard({ result, onDismiss }) {
             <div className="flex items-center gap-2 flex-wrap">
               <h3 className="text-lg font-semibold text-gray-900">{result.name}</h3>
               {result.isCommonName && (
-                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-blue-100 text-blue-700">
+                <span className="inline-flex min-h-6 items-center px-2 py-0.5 rounded-full text-xs bg-blue-100 text-blue-700">
                   Common Name
                 </span>
               )}
@@ -212,17 +213,20 @@ function ApplicantResultCard({ result, onDismiss }) {
 
           <div className="flex items-center gap-3">
             {result.hasConcerns ? (
-              <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800 border border-yellow-300">
+              <span className="inline-flex min-h-7 items-center px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800 border border-yellow-300">
                 {result.matchCount} item{result.matchCount !== 1 ? 's' : ''} for review
               </span>
             ) : (
-              <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800 border border-green-300">
+              <span className="inline-flex min-h-7 items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800 border border-green-300">
                 No concerns
               </span>
             )}
             <button
+              type="button"
               onClick={() => setExpanded(!expanded)}
-              className="text-sm text-blue-600 hover:text-blue-800"
+              className="rounded-lg px-2 py-1 text-sm text-blue-600 hover:bg-blue-50 hover:text-blue-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
+              aria-expanded={expanded}
+              aria-controls={detailsId}
             >
               {expanded ? 'Collapse' : 'Expand'}
             </button>
@@ -232,7 +236,7 @@ function ApplicantResultCard({ result, onDismiss }) {
 
       {/* Expanded content */}
       {expanded && (
-        <div className="p-4 space-y-4">
+        <div id={detailsId} className="p-4 space-y-4">
           {/* Retraction Watch results */}
           {result.sources.retraction_watch?.searched && (
             <div>
@@ -309,7 +313,9 @@ function ApplicantInputRow({ applicant, index, onUpdate, onRemove, canRemove }) 
   return (
     <div className="flex gap-3 items-start">
       <div className="flex-1">
+        <label htmlFor={`applicant-name-${index}`} className="sr-only">Applicant {index + 1} full name</label>
         <input
+          id={`applicant-name-${index}`}
           type="text"
           value={applicant.name}
           onChange={(e) => onUpdate(index, 'name', e.target.value)}
@@ -318,7 +324,9 @@ function ApplicantInputRow({ applicant, index, onUpdate, onRemove, canRemove }) 
         />
       </div>
       <div className="flex-1">
+        <label htmlFor={`applicant-institution-${index}`} className="sr-only">Applicant {index + 1} institution</label>
         <input
+          id={`applicant-institution-${index}`}
           type="text"
           value={applicant.institution}
           onChange={(e) => onUpdate(index, 'institution', e.target.value)}
@@ -328,8 +336,9 @@ function ApplicantInputRow({ applicant, index, onUpdate, onRemove, canRemove }) 
       </div>
       {canRemove && (
         <button
+          type="button"
           onClick={() => onRemove(index)}
-          className="px-3 py-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg"
+          className="min-h-9 rounded-lg px-3 py-2 text-red-600 hover:bg-red-50 hover:text-red-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-600"
         >
           Remove
         </button>
@@ -779,11 +788,11 @@ function IntegrityScreenerPage() {
               (~63,000+ entries). Updated periodically.
             </p>
             <p>
-              <strong>PubPeer (requires SERP API):</strong> Post-publication peer review platform.
+              <strong>PubPeer:</strong> Post-publication peer review platform.
               AI analyzes comments for integrity concerns.
             </p>
             <p>
-              <strong>News Search (requires SERP API):</strong> Google News search for professionally
+              <strong>News Search:</strong> Google News search for professionally
               relevant concerns. AI filters for misconduct and integrity issues.
             </p>
             <p className="text-gray-500 mt-4">

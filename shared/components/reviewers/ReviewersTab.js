@@ -549,25 +549,70 @@ export default function ReviewersTab({
           repairSuggestionId={repairSuggestionId}
         />
       ) : (
-        <ReviewerManagePanel
-          proposal={panelProposal}
-          reviewers={reviewers}
-          loading={loading}
-          onRefresh={refreshAll}
-          settings={settings}
-          mode={current}
-          canManage={canEdit}
-          showReviewReminderAction={current === 'track'}
-          previewReadOnly={previewReadOnly}
-          degraded={Boolean(error)}
-          declineReferrals={declineReferrals}
-          referralActions={referralActions}
-          onAddReferral={addReferralCandidate}
-          onDismissDeclineReferral={dismissDeclineReferral}
-          onGoToInvite={() => selectSub('candidates')}
-          onNavigate={selectSub}
-          onDismissReferral={dismissReferralAction}
-        />
+        <div className="request-reviewer-table">
+          <ReviewerManagePanel
+            proposal={panelProposal}
+            reviewers={reviewers}
+            loading={loading}
+            onRefresh={refreshAll}
+            settings={settings}
+            mode={current}
+            canManage={canEdit}
+            showReviewReminderAction={current === 'track'}
+            previewReadOnly={previewReadOnly}
+            degraded={Boolean(error)}
+            declineReferrals={declineReferrals}
+            referralActions={referralActions}
+            onAddReferral={addReferralCandidate}
+            onDismissDeclineReferral={dismissDeclineReferral}
+            onGoToInvite={() => selectSub('candidates')}
+            onNavigate={selectSub}
+            onDismissReferral={dismissReferralAction}
+          />
+          <style jsx global>{`
+            .request-reviewer-table table thead th:last-child {
+              position: relative;
+              padding-right: 4.5rem;
+            }
+            .request-reviewer-table table thead th:last-child::after {
+              content: 'More';
+              position: absolute;
+              right: 1rem;
+              top: 50%;
+              transform: translateY(-50%);
+              color: #9ca3af;
+              font-size: 0.75rem;
+              font-weight: 600;
+              letter-spacing: 0.05em;
+              text-transform: uppercase;
+            }
+            .request-reviewer-table table td span.rounded,
+            .request-reviewer-table table td span.rounded-full {
+              display: inline-flex;
+              min-height: 1.75rem;
+              align-items: center;
+              border-radius: 9999px;
+              line-height: 1.25;
+              padding: 0.25rem 0.625rem;
+            }
+            .request-reviewer-table table td button[aria-label^='Manage '] {
+              display: inline-flex;
+              width: 2.25rem;
+              height: 2.25rem;
+              align-items: center;
+              justify-content: center;
+              border: 1px solid #d1d5db;
+              border-radius: 0.5rem;
+              color: #374151;
+              background: #fff;
+            }
+            .request-reviewer-table table td button[aria-label^='Manage ']:hover {
+              border-color: #9ca3af;
+              background: #f9fafb;
+              color: #111827;
+            }
+          `}</style>
+        </div>
       )}
     </div>
   );
