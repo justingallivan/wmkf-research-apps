@@ -129,6 +129,20 @@ prerequisite rather than a Stage 5 helper.
   asserts the named op is invoked with `ifMatch`, and that the generic patch is NOT called — this
   is the discriminating test mutation (c) lacked.
 
+- **Opus review (`749ac1c3`): PASS WITH ADVISORIES, one required.** Transport equivalence
+  confirmed at both sites (same keys, same order, `actingUserSystemId` still forwarded); weak ETags
+  accepted; no pre-read, no receipt gate. **Required:** a third suite,
+  `tests/unit/notification-trust-model-pushup.test.js:66–80`, hand-mocks the adapter and drives the
+  real sweep — latent `TypeError` swallowed into `claimFailed`; needs the same shim (applied in the
+  correction commit). Advisory corrections to this plan: on the POINTER path the ETag requirement is
+  a slight, safe tightening rather than pure codification — attempt 0 reads `row._etag` with no
+  guard (main would PATCH unconditionally if it were absent; HEAD throws `missing_version`, swallowed
+  by the loop's own catch, then retries with the reread ETag; outcomes diverge only if both reads
+  lack `_etag`, which the annotation layer prevents in practice). The hand-written shims are a
+  known blind spot: a production arg-order/payload change would not be caught by those two suites.
+  Recorded gap closed in the correction commit via `jest.fn` shims + `toHaveBeenCalled` pins (Opus
+  §7). Types/build not run by the reviewer; builder ran them.
+
 ## Review checkpoints
 
 Opus: confirm byte-identical transport call per site; confirm the pointer path's ETag provenance;
