@@ -788,11 +788,11 @@ function IntegrityScreenerPage() {
               (~63,000+ entries). Updated periodically.
             </p>
             <p>
-              <strong>PubPeer (requires SERP API):</strong> Post-publication peer review platform.
+              <strong>PubPeer:</strong> Post-publication peer review platform.
               AI analyzes comments for integrity concerns.
             </p>
             <p>
-              <strong>News Search (requires SERP API):</strong> Google News search for professionally
+              <strong>News Search:</strong> Google News search for professionally
               relevant concerns. AI filters for misconduct and integrity issues.
             </p>
             <p className="text-gray-500 mt-4">
