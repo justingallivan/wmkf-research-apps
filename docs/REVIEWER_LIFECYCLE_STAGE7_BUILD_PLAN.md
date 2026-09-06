@@ -154,7 +154,16 @@ or backfill.
   actor forwarded; notification prepared first, write before dispatch, 412/error classification
   preserved. Opus pending.
 - **3G Codex adversarial round 1 (`eed4f377`): approve** — field mapping, ETag forwarding,
-  claim-before-send, 412 handling, respond-kind separation, pin and census all match. Opus pending.
+  claim-before-send, 412 handling, respond-kind separation, pin and census all match.
+- **3G Opus review (`eed4f377`): PASS WITH ADVISORIES, none required.** Byte-identical hunk; respond
+  branch and catch untouched; claim precedes the send; single adapter import; mutations on a scratch
+  copy: inline keeping the import → 3 pins red with census green; dropped actor → pin red; swapped
+  field names → direct AND retained sweep suite red (both execute the real module); census
+  reproduced; 790 / 11,534 and both boundary gates green. Advisories: "both-paths identity" is N/A
+  (the sweep is a caller, not a wrapper); the plan's "review-due token unchanged" case is covered by
+  the retained sweep suite, not a new test; docs land post-merge. Rebased by the architect onto
+  `c25f9e5a` (census-table conflict with 3E resolved by keeping all rows; 6 suites / 72 green) →
+  `88985583`, PR #162.
 - **3I build (Sonnet, 2026-09-06): `87edb12b`** on `claude/reviewer-lifecycle-stage3i` (new
   worktree `../WMKF_Apps-s4`). The withdrawal write (main `withdraw-sufficient-service.js:264–274`)
   moved verbatim to `reviewer-engagement/withdraw-pending-invitation.js` `withdrawPendingInvitation`;
