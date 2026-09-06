@@ -288,8 +288,12 @@ reviewers refetch fails (case-insensitive GUID match) so a transient error after
 no longer flips the modal's keys and erases the sent summary; while that banner shows, the panel
 runs degraded (`degraded` prop): release, row actions, reminder send, closeout trigger and the
 open modal's Send are disabled with a title, a Retry control reloads, and nothing unmounts. The
-reviewer-follow-up workbench host still empties its list on error and unmounts the panel
-(pre-existing, not addressed). Tests: `tests/unit/reviewer-materials-modal-lifetimes.test.js`.
+reviewer-follow-up workbench host received the same treatment in PR #152 (`e9909e91`, 2026-09-05):
+it keeps the last loaded list under a "could not be refreshed" banner, passes `degraded` and
+`loading` to every mounted panel, keeps groups mounted during a retry, and unconditionally
+supersedes any in-flight load on a cycle/scope change so no response can commit rows from a
+different cycle or scope. Plan with the full review record:
+`docs/plans/REVIEWER_FOLLOW_UP_REFETCH_RESILIENCE_2026-09-05.md`. Tests: `tests/unit/reviewer-materials-modal-lifetimes.test.js`.
 Receipt: `docs/audits/REVIEWER_LIFECYCLE_STAGE6B3_RECEIPT_2026-09-05.md`.
 
 The existing `ReviewerManagePanel.updateStatus` UI submits one reviewer only.
@@ -1574,7 +1578,7 @@ returned zero eligible/enqueued/claimed/failed.** Plan doc:
   cards start collapsed ("Show reviewer activity"), the per-card **Campaign settings** button,
   the **Open full reviewer panel** link and the page-level `WorkbenchViewsNav` were removed,
   and search sits in the toolbar; the panel it mounts is still `ReviewerManagePanel` in
-  `track` mode, and the host still empties its list on a refetch error (see 6B3d note above).
+  `track` mode; its refetch-error handling was fixed in PR #152 (see the 6B3d note above).
   (b) `/workbench/artifacts` is retitled **Initial assessments** and renders a "not part of
   the D26 dual-phase workflow / available for J27" card for `cycleCode === 'D26'` without
   calling the initial-assessment API; `WorkbenchViewsNav` hides that view for D26. The

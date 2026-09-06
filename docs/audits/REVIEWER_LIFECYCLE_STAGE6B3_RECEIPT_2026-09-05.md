@@ -476,5 +476,6 @@ legacy `git merge-tree` output and grepped for conflict markers, reporting zero 
   every accepted reviewer already at Materials Sent or later. Re-run when a fresh acceptance arrives
   or on a Preview with seeded data; no lifecycle mutation was authorized to create the state.
 
-Open after promotion: the reviewer-follow-up host refetch-error behavior (now on Codex's rewritten
-`pages/workbench/reviewer-follow-up.js`); the release-materials modal smoke above.
+Open after promotion: the release-materials modal smoke above. The reviewer-follow-up host
+refetch-error behavior was fixed in PR #152 (`e9909e91`, 2026-09-05; plan and review record in
+`docs/plans/REVIEWER_FOLLOW_UP_REFETCH_RESILIENCE_2026-09-05.md`).

@@ -64,11 +64,12 @@ choice; do not assume an order.
 
 ### Verified Open
 
-1. **Reviewer-follow-up host refetch error.** `pages/workbench/reviewer-follow-up.js`
-   still empties its proposal list on a refetch error (pre-existing, the worse form of
-   6B3d). The file was rewritten by Codex in PR #151, so re-trace the catch path on
-   `main` before planning; the 6B3d/6B3e pattern (keep last-known-good, degrade,
-   Retry) applies. Evidence: 6B3 receipt 6B3e limits; `git log -1 -- pages/workbench/reviewer-follow-up.js`.
+1. **Reviewer-follow-up host refetch error — FIXED in PR #152 (`e9909e91`, S489).** Remaining,
+   pre-existing and out of that fix's scope (Opus finding): a cycles-load failure sets `error`
+   while `cycleCode` is empty, so the banner renders with no Try again button and the proposals
+   effect never runs (`pages/workbench/reviewer-follow-up.js` cycles effect). Historical text:
+   the host emptied its proposal list on a refetch error (the worse form of 6B3d). Evidence:
+   `docs/plans/REVIEWER_FOLLOW_UP_REFETCH_RESILIENCE_2026-09-05.md`; PR #152.
 2. **Wiki coverage of Codex's UI changes.** PR #151 changed 15 UI files (admin,
    dynamics-explorer, expense-reporter, integrity-screener, workbench nav/artifacts,
    reviewer-follow-up, `ReviewersTab` styling). Only
