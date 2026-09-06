@@ -220,7 +220,7 @@ Extend `tests/unit/reviewer-manage-actions-menu.test.js` and
 unmount tests. Existing reminder cases at lines 240–331 cover request payload,
 read-only display, rapid repeats and token eligibility; they are retained evidence.
 Read both callers: `ReviewersTab.js:541–558` and
-`pages/workbench/reviewer-follow-up.js:107–117`.
+`pages/workbench/reviewer-follow-up.js:102–111` (post-PR #151 layout).
 
 ## 6B3 — materials-modal lifetime and asynchronous scratch state
 

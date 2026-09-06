@@ -46,6 +46,9 @@ consume a `sources.pubpeer` shape (`hasConcerns`, `summary`, `resultCount`, `sea
 - The screen service saves completed runs when it receives a user profile ID, and
   authenticated history and dismissal API primitives exist.
 - The current page has no History tab and does not call the history API.
+- Since PR #151 (2026-09-05) the source descriptions on the page no longer say
+  "(requires SERP API)" for PubPeer and News; both are still gated behind
+  `effectiveSerpKey` server-side, so the label removal is copy, not a gating change.
 - The current Dismiss handler is explicitly a placeholder: it logs and alerts but
   does not call the dismissal API. `screenApplicants` also does not read prior
   dismissals, so future-screen suppression is not implemented.

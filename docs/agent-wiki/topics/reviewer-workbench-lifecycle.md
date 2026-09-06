@@ -1568,6 +1568,22 @@ returned zero eligible/enqueued/claimed/failed.** Plan doc:
 
 ## Operating Notes
 
+- **Workbench UI polish (Codex PR #151, `3fc0a936`, production 2026-09-05).** UI-only; no
+  `pages/api` or `lib` change, payload shapes and SSE vocabulary unchanged. Durable behavior
+  changes: (a) `/workbench/reviewer-follow-up` is now a focused attention queue — request
+  cards start collapsed ("Show reviewer activity"), the per-card **Campaign settings** button,
+  the **Open full reviewer panel** link and the page-level `WorkbenchViewsNav` were removed,
+  and search sits in the toolbar; the panel it mounts is still `ReviewerManagePanel` in
+  `track` mode, and the host still empties its list on a refetch error (see 6B3d note above).
+  (b) `/workbench/artifacts` is retitled **Initial assessments** and renders a "not part of
+  the D26 dual-phase workflow / available for J27" card for `cycleCode === 'D26'` without
+  calling the initial-assessment API; `WorkbenchViewsNav` hides that view for D26. The
+  D26-pilot records in `docs/INITIAL_ASSESSMENT_CONTROLLED_PILOT_2026-07-30.md` and the
+  requestdocument Atlas page are historical and no longer reproducible through that view for
+  D26. (c) `ReviewersTab` wraps the panel in a `request-reviewer-table` container carrying
+  `degraded={Boolean(error)}` (pinned by `reviewers-tab-stale-request.test.js`); status pills
+  across Status, Staff Deliberations, Final writeups and the request locator gained a uniform
+  min-height. Change record: `docs/plans/UI_FEATURES_CODEX_HANDOFF_2026-09-05.md`.
 - **Route→Service layout (Stage 7, 2026-07-05): every workbench and
   review-manager route is a thin shell; the lifecycle/business logic lives in
   `lib/services/workbench/` (incl. `grantee-deliverables/`) and
