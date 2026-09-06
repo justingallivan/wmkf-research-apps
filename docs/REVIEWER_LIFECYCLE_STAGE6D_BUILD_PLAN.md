@@ -65,7 +65,8 @@ fingerprintInputs = {
   proposal:  { title, abstract, authors, institution, coInvestigators: [names…] },
   engagement: { reviewDueDateOverride, honorariumOptOut },
   request:   { reviewDueDate, meetingDate },
-  cycle:     { programName, reviewDeadline, customFields },  // from loadCycleConfigs
+  cycle:     { programName, reviewDeadline, customFields },  // loadCycleConfigs RAW cycle.custom_fields —
+                                              // NOT the merged customFields (which includes client settings.customFields)
   honorariumAmount                            // getHonorariumAmount() (Dataverse honorarium.default_amount)
 }
 fingerprint = sha256(stableStringify(fingerprintInputs))   // hex, sorted keys, null-normalised,
@@ -108,15 +109,33 @@ own reason phrasing (`InviteEmailModal.js:71`). Add a shared `SEND_SKIP_REASON_L
 reason (`no_email`, `program_director_sender_unavailable`, `not_accepted`, `materials_already_sent`,
 `materials_release_ineligible`, `address_conflict_pending`, `email_research_only`,
 `email_unconfirmed`, `already_invited`, the token-gate `reason`s pushed at `:723`) plus the two
-new ones, and register producer↔consumer parity in `scripts/check-status-enum-parity.js`
-(REGISTRY entry: producer = the `reason:` literals in `send-emails-service.js`, consumer = the
-label map keys, rule `subset`). The user-facing copy for the new reasons:
+new ones, and register producer↔consumer parity in `scripts/check-status-enum-parity.js`. Because the
+token-gate reasons are assigned through a variable (`reason = 'unresolved_placeholder'` at `:707`,
+`'missing_secure_link'` at `:710`, `INVALID_SECURE_LINK_SKIP_REASON`) rather than pushed as
+literals, a literal-regex producer would under-count; instead export an explicit
+`SEND_SKIP_REASONS` array from `send-emails-service.js` (every reason the service can push, old
+and new), make the REGISTRY entry `SEND_SKIP_REASONS ⇔ SEND_SKIP_REASON_LABEL keys` with rule
+`equal` (copy the shape of the `workRemaining stages ⇔ WORK_REMAINING_LABEL` entry,
+`check-status-enum-parity.js:123–131`), and add a unit test that greps the service source for
+`reason: '…'` and `reason = '…'` literals and asserts each is in `SEND_SKIP_REASONS` so the array
+cannot silently lag the code. Note the two vocabularies: render rows carry a string `skipped`
+field (`render-emails-service.js:225,246,267`: `no_email`, `address_conflict_pending`,
+`email_research_only`) that the modals already label; send's `skipped[].reason` is the set this
+map covers. 6D does not merge them. The user-facing copy for the new reasons:
 - `draft_stale`: "The reviewer or proposal details changed after this preview was rendered.
   Nothing was sent to this reviewer — reopen the preview to render a fresh draft."
 - `draft_fingerprint_missing`: "This draft was rendered before the current version of the app.
   Nothing was sent — reopen the preview to render it again."
 
 ### send-emails (`send-emails-service.js`, SSE shell unchanged)
+
+Insertion point [VERIFIED via source at `dcecf972`]: immediately after the `already_invited`
+skip's `continue` (`:690`) and before the invitation secure-link gate (`:700–726`, skipped
+reasons `unresolved_placeholder` / `missing_secure_link` / `INVALID_SECURE_LINK_SKIP_REASON`),
+the token authority gate and `mintAndStore` (`:830`), attachment fetch and transport. No durable
+write precedes that point: the first `updateLifecycle` is the post-send stamp at `:913`; campaign
+config persists post-loop. A stale draft therefore `continue`s past one recipient and the batch
+proceeds; the stream still ends `result` → `complete`.
 
 Inside the existing per-draft loop, **after** the existing hardcoded skips (`no_email`,
 `not_accepted`, `materials_already_sent`, `materials_release_ineligible`, address-trust,
@@ -129,9 +148,11 @@ attachment fetch or transport:
    recipient-hydration block widens its selects: request adds `akoya_title, wmkf_abstract,
    _wmkf_projectleader_value, wmkf_organizationname, _akoya_applicantid_value`; person adds
    `wmkf_primaryaffiliation, wmkf_organizationname`; suggestion `findById` delegates to `readById`
-   (`reviewer-suggestion.js:1219–1225`) whose column list includes `wmkf_reviewduedateoverride`
-   and `wmkf_honorariumoptout` (`:322`, `:336`) [VERIFIED via source; confirm `readById` uses that
-   list at build — [ASSUMED]]. Add one
+   (`reviewer-suggestion.js:1215–1225`), which selects `FIELD_SELECT = selectFields(ENTITY_SET)`
+   (`:44`) from the entity registry, whose reviewer-suggestion SELECT includes
+   `wmkf_reviewduedateoverride` and `wmkf_honorariumoptout`
+   (`lib/dataverse/core/entity-registry.js:140`, `:177`) [VERIFIED via source]. (The literal list
+   at `reviewer-suggestion.js:305–340` is `MERGE_PREDICATE_SELECT`, not the read projection.) Add one
    `fetchCoPIs(requestId)` per distinct request (memoised map, `.catch(() => [])` exactly as
    render does, inside the existing trusted DAL context). Cycle configs come from the existing
    `loadCycleConfigs` result.
@@ -209,6 +230,48 @@ sentence, and a 6D paragraph); readiness audit 6D row; 6B plan status; Atlas pag
   deploy consequence, the parity registry shape). Record the verdicts here.
 - **Build review:** Opus on the diff with the mutation outputs; Codex round 2 only if round 1
   on the plan left an open item or the diff diverges from the plan. Stop at two.
+
+## Planning review record
+
+### Contract-reconcile Mode A (architect, 2026-09-05, main `dcecf972`)
+
+**Surface.** render-emails stamps `draftFingerprint`; send-emails recomputes and refuses. Entry
+points: `ReleaseMaterialsModal` and `InviteEmailModal` → `POST /api/review-manager/render-emails`
+(JSON `{drafts, stats}`) and `POST /api/review-manager/send-emails` (SSE). Persistence: none new;
+Dataverse reads only. Consumers: both modals' sent-summary lists, `check:status-enum-parity`,
+pinned tests. Prior findings verified: advisor's recipient-email exclusion (accepted, above) and
+honorarium amount (added, above).
+
+**Body-input census** [VERIFIED via `lib/utils/email-generator.js:382–475` key list]:
+`recipientName/FirstName/LastName/salutation/greeting` ← candidate.name (fingerprinted);
+`recipientEmail` ← excluded (above); `recipientAffiliation` ← fingerprinted; `recipientExpertise`
+← render never sets `candidate.expertise*` → constant `''` (excluded as constant);
+`proposalTitle/Abstract/piName/piInstitution/proposalDetails` ← fingerprinted;
+`coInvestigators/coInvestigatorCount/investigatorTeam/investigatorVerb` ← derived from the co-PI
+name list (fingerprinted via the list; count is implied); `programName/reviewDeadline` ← cycle
+(fingerprinted); `signature/reviewerFormLink/externalLink` ← client settings / placeholder
+(excluded, documented); `reviewDueDate` ← override → composer → request → cycle: the override,
+request and cycle legs are fingerprinted, the composer leg is client (excluded, covered by the
+6B3a key); `customFields` ← cycle.custom_fields (fingerprinted) + settings.customFields (client,
+excluded) + honorarium amount (fingerprinted); `honorariumNote` ← `wmkf_honorariumoptout`
+(fingerprinted via `engagement.honorariumOptOut`). Nothing is uncovered.
+
+**Audits.** Whole-flow: hops 1–9 traced above (client forward, route shells unchanged, service
+insertion point, no persistence, response = existing `result`/`complete`, consumer label map,
+tests/gates named). Partial-success: per-recipient `skipped` with identifiers; batch continues;
+`success` semantics unchanged. Async/stale: the fingerprint IS the stale guard; no new client
+await. Helper-extraction: `draft-fingerprint.js` is shared by render and send — it must not
+normalise differently per caller (single `stableStringify`; both sides pass raw Dataverse
+values). Durable-surface: no migration/Atlas; API matrix rows for both routes need the contract
+sentence (`check:api-routes`); no CANONICAL_COUNTS shift. Doc-reconcile: listed under Gates and
+docs. Symbol fan-out: new `reason` values → label map (both modals), `SEND_SKIP_REASONS`, parity
+entry, `send-emails-service.js` header comment; render row gains a field every existing row
+consumer ignores (grep `externalLinkExpected` shows only the two modals forward row fields).
+
+**Verdict: READY WITH NAMED CHANGES** — the changes are the corrections folded above (registry
+citation, raw `custom_fields`, insertion point, `SEND_SKIP_REASONS` producer) plus the pending
+owner decision on uniform enforcement. Opus planning review and Codex round 1 recorded below when
+complete.
 
 ## Accepted limits (to record in the receipt)
 
