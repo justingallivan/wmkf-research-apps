@@ -272,7 +272,15 @@ or backfill.
   `\bbulkUpdateByRequest\(` → adapter only; the gate script's table entry has no `(` so it does not
   match). Full suite 806 / 11,641; all gates green. Mutations: service calls `bulkUpdateByRequest`
   directly → independent pin red (the shimmed suites alone would not catch it); whitelist removed →
-  4/4 red; try/catch added → D4 test red. Opus and Codex round 1 pending.
+  4/4 red; try/catch added → D4 test red.
+- **3K Codex adversarial round 1 (`54de3d3b`): needs-attention, one medium, accepted narrowly.**
+  The removal-census test scans only `lib/pages/scripts` and matches only `bulkUpdateByRequest(`, so
+  a caller in `shared/`/`modules/`, a spaced or optional call, or an aliased import evades it.
+  Correction: scan every production root (`lib`, `pages`, `shared`, `modules`, `scripts`) and match
+  any `\bbulkUpdateByRequest\b` reference (not just the call form), with the expected set becoming
+  the adapter plus the trust-boundary gate script's sink-table entry; the AST binding-resolved census
+  is Stage 7's gate, not this interim test — stated in the test header. Runtime delegation and D4
+  judged behavior-preserving. Opus pending.
 
 ## Docs (after each merge)
 
