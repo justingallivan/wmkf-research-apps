@@ -223,7 +223,23 @@ builders on that file concurrently.
   import for the census) would pass all 45 direct tests. Correction: delegation tests that mock the
   extracted module and assert the sweep calls `expireInvitation` and maps `swept`/`skipped`/thrown
   412/not-found to the counters, and that the send loop calls `recordDeliveredEmail` with the existing
-  arguments at the same point relative to the SSE events (the 3D paths-test pattern). Opus pending.
+  arguments at the same point relative to the SSE events (the 3D paths-test pattern).
+- **Opus review (`41a7b2de`): PASS WITH ADVISORIES, one required (docblock).** Both moved bodies
+  byte-identical modulo `export` (`diff` empty); the only `expireInvitation` transforms are the two
+  return conversions and the `s` binding; the sweep's `if/else` sits inside the unchanged try so an
+  exception reaches the catch and the 412/not-found path counts `skipped` exactly once (pinned by the
+  existing sweep suite `:169/:180/:199/:207`); `recordDeliveredEmail` call site moved 1103 → 1023 with
+  a 29-line window diffing empty, the 6D gate untouched; dependency direction clean; census reproduced
+  over 1,122 files with no sibling-sweep over-match; 16 suites / 643 and full 788 / 11,544 green plus
+  both boundary gates. **Required R1:** `lib/utils/etag.js:12-15` still names the sweep and
+  send-emails as inline-regex sites; the four sites are now the adapter, `my-candidates-service.js`,
+  `expire-invitation.js:66`, `record-email-outcome.js:51` — fixed in the correction round (authorized
+  two-line out-of-slice edit). Advisories: A1 `isPastCutoff` living in a command module is a mild
+  inversion, accepted for verbatim-move discipline (candidate future home: a `lib/utils/` date
+  helper); A2 census header stale (fixed in correction); A3/A4 header nits (fixed); A5 the census-based
+  pin only fires when the import disappears — hence the mandatory delegation pin above; A6
+  pre-existing stale line refs at `reviewer-activity-history.js:15` and `grant-request.js:169` (sweep
+  queue, not this slice).
 
 ## Rules for every slice
 
