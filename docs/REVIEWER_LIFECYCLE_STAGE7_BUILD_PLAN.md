@@ -367,7 +367,16 @@ or backfill.
   `tests/unit/reviewer-engagement-boundary-recorded-set.test.js` pins the two-entry map and a real
   non-stale addition turns it red; docblock and CI-reference wording corrected. Live census unchanged:
   14 exempt bindings, 0 violations. Full suite 807 / 11,652; all gate pairs green. Architect re-ran
-  the gate, self-test and four suites (45 tests) on the branch. PR opened; Codex round 2 running.
+  the gate, self-test and four suites (45 tests) on the branch. PR #168 opened.
+- **Stage 7 Codex adversarial round 2 (final, `bd2e8e72`): needs-attention — three highs, one low.**
+  Round-1 items confirmed present and the live census confirmed (14 / 0 / 0). Remaining bypass shapes:
+  class-held adapters (`this.adapter.updateLifecycle`), renamed CJS member re-exports
+  (`module.exports = { mutate: adapter.updateLifecycle }`), direct dynamic-import member calls
+  (`(await import(adapter)).updateLifecycle(...)`); low: `/start` gate line still said "may only
+  shrink". **Architect decision under the two-round cap:** these are mechanical AST cases in a LAW
+  gate whose purpose is soundness, so a final builder correction closes them (detect, or fail closed
+  on unsupported adapter-bearing shapes) with red fixtures; the architect verifies the gate pair and
+  suites directly instead of a third Codex round. Recorded as the cap's stopping point.
 
 ## Docs (after each merge)
 
