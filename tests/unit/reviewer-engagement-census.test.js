@@ -117,6 +117,16 @@ const CENSUS = [
       'lib/services/reviewer-suggestion-sweep.js',
     ],
   },
+  {
+    name: 'reviewer-engagement/claim-reminder',
+    // Stage 3G: only the review-due (`kind !== 'respond'`) fire-once claim
+    // moved. The sweep is the sole importer — the respond-kind claim stays
+    // coupled to `mintAndStore` in the sweep, not this module.
+    pattern: /reviewer-engagement\/claim-reminder/,
+    expected: [
+      'lib/services/reviewer-reminder-sweep.js',
+    ],
+  },
 ];
 
 // Hoisted: every production file under SCAN_DIRS is read exactly once, up
