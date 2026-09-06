@@ -2,7 +2,7 @@
 title: Reviewer Lifecycle Stage 6C — extract the modal and action components out of ReviewerManagePanel
 kind: plan
 domain: reviewer-workbench
-status: active
+status: historical
 canonical: false
 owner: product-engineering
 last_verified: 2026-09-05
@@ -141,7 +141,7 @@ export { PREVIEW_RENDER_TIMEOUT_MS } from './ReleaseMaterialsModal';
   circular import; `reviewer-draft-keys.js` has zero imports. Advisories: (A) two comment blocks
   referred to code "below" that moved — fixed in follow-up commit `5d92d5bc` on the branch;
   (B) docs to relocate after merge (see Docs below, extended with the reviewer's list).
-- Rebased onto main `f8d35368` as `70babc04` + `5d92d5bc`; pushed; PR opened.
+- Rebased onto main `f8d35368` as `70babc04` + `5d92d5bc`; PR #153 merged as `3b2b34d5` (2026-09-05 PT, eight CI checks green); branch deleted. Docs relocated in the same session (this file, wiki lifecycle/portal topics, 6B plan, readiness audit, 6D plan, SESSION_PROMPT).
 
 ## Docs (architect, after merge)
 

@@ -519,7 +519,7 @@ legacy free-text values visible, so no existing referral is lost. Until S349
     duplicates to the latest request rather than starting a second
     overlapping render. `rendering` state
     disables Preview/Retry while a render is queued or in flight.
-  - **`ReviewerManagePanel` modal-session epoch:** `ReleaseMaterialsModal` keeps a
+  - **Materials-modal session epoch (`shared/components/reviewers/ReleaseMaterialsModal.js` since Stage 6C, PR #153):** `ReleaseMaterialsModal` keeps a
     monotonic `modalSessionRef`, bumped on every open/close transition (never
     reset). `handlePreview` and `handleSend` capture the epoch at entry and
     check it after every `await` before touching state — a response from an
@@ -1411,7 +1411,7 @@ returned zero eligible/enqueued/claimed/failed.** Plan doc:
   `thankyou`) resolve as **per-PD override → admin org default** for the shared
   render/send compatibility contract. The current interactive UI consumes
   `invitation` in `InviteEmailModal` and `materials` in
-  `ReviewerManagePanel`'s `ReleaseMaterialsModal`; the generic post-acceptance
+  `ReleaseMaterialsModal` (its own module since Stage 6C); the generic post-acceptance
   type selector and batch **Send Email** action are retired. Review-due follow-up
   uses the dedicated row-level reminder service, and thank-you uses the daily
   fire-once sweep, each with its own server-side renderer.

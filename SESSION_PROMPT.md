@@ -153,7 +153,7 @@ when it happens.
 | `docs/audits/REVIEWER_LIFECYCLE_REMAINING_READINESS_2026-09-05.md` | Elective menu |
 | `docs/plans/UI_FEATURES_CODEX_HANDOFF_2026-09-05.md` | Codex's UI critique and change record |
 | `shared/components/reviewers/ReviewersTab.js` | `degraded` wiring inside `request-reviewer-table` wrapper |
-| `shared/components/reviewers/ReviewerManagePanel.js` | `membershipKeyFor`/`proposalKeyFor`; modal; `degraded` gating |
+| `shared/components/reviewers/ReviewerManagePanel.js` | panel + re-exports; `degraded` gating (6C moved the modal to `ReleaseMaterialsModal.js` and the keys to `reviewer-draft-keys.js`) |
 | `pages/workbench/reviewer-follow-up.js` | Codex-rewritten host; refetch-error fix candidate |
 | `.claude-memory/project-vercel-cli-deploy-preview-auth.md` | Local/Preview smoke auth facts incl. this session's notes |
 

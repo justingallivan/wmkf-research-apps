@@ -195,7 +195,7 @@ stop that dependent change and report it rather than including it in 6B1.
 ## 6B2 — reminder and closeout component lifetimes
 
 Start only after 6B1's independent review passes.
-`ReviewReminderAction` at `ReviewerManagePanel.js:126–195` has a synchronous
+`ReviewReminderAction` at `ReviewerManagePanel.js:126–195` (now `shared/components/reviewers/ReviewReminderAction.js` after Stage 6C) has a synchronous
 send lock, send generation and mounted flag. Its baseline effect invalidates on
 unmount, not mounted request/reviewer changes. Preserve all current eligibility
 messages, exact request payload and HTTP/data.ok test.
@@ -226,7 +226,7 @@ Read both callers: `ReviewersTab.js:541–558` and
 
 Start only after 6B2 review. Keep `ReleaseMaterialsModal` nested for this slice.
 [VERIFIED via source] Its epoch increments on isOpen only
-(`ReviewerManagePanel.js:531–564`); proposal-load request guards at lines
+(`ReviewerManagePanel.js:531–564`, now in `ReleaseMaterialsModal.js` after Stage 6C); proposal-load request guards at lines
 669–682 do not invalidate preview/send epochs. Preview and send capture that
 epoch at lines 777–1026. Templates/attachments remain separate scratch concerns.
 

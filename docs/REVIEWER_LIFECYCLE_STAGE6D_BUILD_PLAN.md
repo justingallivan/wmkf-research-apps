@@ -33,8 +33,7 @@ token. So a CRM edit to the title, abstract, PI, institution, co-PI list, review
 affiliation, per-engagement due-date override, honorarium opt-out or cycle config between
 preview and send goes out stale.
 
-Line citations into `ReviewerManagePanel.js` below are pre-6C; after Stage 6C the modal lives in
-`shared/components/reviewers/ReleaseMaterialsModal.js` — relocate at build. `ReleaseEmailModal` is
+Stage 6C is merged (`3b2b34d5`): the modal lives in `shared/components/reviewers/ReleaseMaterialsModal.js`; `ReviewerManagePanel.js:NNNN` citations below are pre-6C line numbers into the moved body — relocate at build. `ReleaseEmailModal` is
 NOT a third client (it uses `render-withdraw-emails` → `withdraw-sufficient`). Nothing in-app writes
 `akoya_title`, `wmkf_organizationname`, the PI or the co-PIs; those are CRM-only edits, exactly the
 class the fingerprint exists to catch. Co-PI order is deterministic
