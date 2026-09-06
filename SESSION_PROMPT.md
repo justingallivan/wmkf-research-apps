@@ -102,8 +102,16 @@ colleague reports it.
    (`dataverse-dynamics.md`). The rest (status-pill geometry, expense-reporter and integrity-screener
    copy/control hardening, Explorer example grouping) is presentation with no contract change; the
    expense reporter has no wiki topic and does not need one for copy edits.
-5. **Production smoke** of 6B release-materials modal (needs an accepted reviewer) and of
-   any 6D send. Not run; waits for the first real acceptance.
+5. **Production smoke** — reframed S490. Owner clarified the December-cycle flow: materials are in
+   hand at request time and, on acceptance + onboarding, the system AUTOMATICALLY emails the reviewer
+   a link to the materials (not built yet; nothing in the acceptance job/drain sends materials today
+   [VERIFIED]). So: (a) the 6D fingerprint smoke can run at the cycle's FIRST INVITATION BATCH
+   (invitations are fingerprinted; no acceptance needed); (b) the manual release-materials modal
+   smoke is only needed if the automation does not ship before the first acceptance; (c) the new
+   automation is the next lifecycle build and needs a plan (`/contract-reconcile` triggers: new
+   background/durable work, email send, idempotency). Probe run S490 (owner-executed, read-only):
+   0 rows in the accepted-awaiting-materials state; 7 null-status accepted rows are May–July test
+   residue (unnamed, no email), not smoke candidates.
 6. ~~Summary blob is public with no remaining reader~~ **DONE S490, option (a) (same branch as the
    hygiene PR):** `analyze` no longer extracts summary pages or uploads a public Blob, and no longer
    returns `summaryBlobUrl`/`summaryFilename`/`summaryExtracted`; `save-candidates` no longer accepts
