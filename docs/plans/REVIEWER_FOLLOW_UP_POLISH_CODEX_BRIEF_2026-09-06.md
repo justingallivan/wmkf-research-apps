@@ -145,3 +145,11 @@ retry, degraded mode, and preview read-only behavior. Rules:
 - Verification run and results: 
 - Open questions / recommendations for the owner: 
 - Anything you wanted to change but could not within the owned surface: 
+
+## Codex handoff — 2026-09-06
+
+- Commits on `codex/reviewer-follow-up-polish`: `c1d56ee3` (`Polish reviewer follow-up triage UI`), pushed to `origin/codex/reviewer-follow-up-polish`.
+- Files changed: `pages/workbench/reviewer-follow-up.js`; `tests/unit/reviewer-follow-up.test.js`.
+- Verification run and results: focused reviewer-follow-up tests 23/23 passed; `npm run lint` passed; `npm run check:types` passed; `npm run build -- --webpack` passed (pre-existing dynamic-dependency warnings and reviewer-reminder hold notice); `npm run check:agent-invariants` and `npm run check:agent-invariants:ci` passed; `git diff --check` passed. Jest required the current `--testPathPatterns` spelling because the brief's older `--testPathPattern` flag is rejected.
+- Open questions / recommendations for the owner: retain the current equal-weight `Needs attention` / `All reviewers` toggle until product decides whether attention should become primary; revisit the four metrics and whether attention cards should collapse to a one-action summary in a later information-architecture pass; keep Workbench-wide navigation unchanged pending a shared-component decision.
+- Anything you wanted to change but could not within the owned surface: no browser screenshot pass was available in this worktree; shared navigation and reviewer-management primitives were intentionally left untouched.
