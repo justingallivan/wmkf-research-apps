@@ -138,6 +138,15 @@ const CENSUS = [
       'lib/services/reviewer-due-extension.js',
     ],
   },
+  {
+    name: 'reviewer-engagement/withdraw-pending-invitation',
+    // Stage 3I: the caller (`withdraw-sufficient-service.js`) is the sole
+    // importer of the new path.
+    pattern: /reviewer-engagement\/withdraw-pending-invitation/,
+    expected: [
+      'lib/services/review-manager/withdraw-sufficient-service.js',
+    ],
+  },
 ];
 
 // Hoisted: every production file under SCAN_DIRS is read exactly once, up
