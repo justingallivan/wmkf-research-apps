@@ -35,6 +35,16 @@ const suggestion = {
   getByIdWithSelect: jest.fn(),
   isExcluded: jest.fn((row) => row.wmkf_applicantdisposition === 100000001),
   patchReviewReceipt: jest.fn(),
+  // Stage 5A: commitPointers now calls the narrow named op instead of the
+  // generic passthrough. Forward through the same patchReviewReceipt mock
+  // (with the pointer payload it always sent) so every existing
+  // mockResolvedValue/mockRejectedValue/toHaveBeenCalledWith assertion below
+  // keeps observing calls unchanged.
+  attachReviewDocumentPointer: jest.fn((id, { folder, filename }, opts) => suggestion.patchReviewReceipt(
+    id,
+    { wmkf_reviewsharepointfolder: folder, wmkf_reviewfilename: filename },
+    opts,
+  )),
 };
 jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => suggestion);
 
@@ -621,6 +631,9 @@ test('creates with conflictBehavior=fail, conditionally commits exact pointers, 
     wmkf_reviewsharepointfolder: FOLDER,
     wmkf_reviewfilename: FILENAME,
   }, { ifMatch: 'W/"1"' });
+  // Stage 5A wiring pin: commitPointers calls the named op, which forwards
+  // into the patchReviewReceipt mock asserted above.
+  expect(suggestion.attachReviewDocumentPointer).toHaveBeenCalled();
   expect(assertDataverseOperationAllowed).toHaveBeenCalledWith(expect.objectContaining({
     method: 'PATCH',
     url: `https://wmkf.crm.dynamics.com/api/data/v9.2/wmkf_appreviewersuggestions(${SUGGESTION_ID})`,

@@ -42,9 +42,16 @@ jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
   // queryAllRecords/updateRecord assertions below still see these calls.
   queryAllSuggestions: (options) => queryAllRecords('wmkf_appreviewersuggestions', options),
   patchReviewReceipt: (id, payload, opts) => updateRecord('wmkf_appreviewersuggestions', id, payload, opts),
+  // Stage 5A: sendOneThankYou now claims via claimThankYou instead of the
+  // generic passthrough. Same forwarding pattern as patchReviewReceipt above
+  // so the existing updateRecord assertions keep observing the claim write.
+  // Wrapped in its own jest.fn() (wiring pin) so a regression that routes
+  // the claim back through patchReviewReceipt is directly observable here.
+  claimThankYou: jest.fn((id, sentAtIso, opts) => updateRecord('wmkf_appreviewersuggestions', id, { wmkf_thankyousentat: sentAtIso }, opts)),
 }));
 
 const { sweepReviewThankYous } = require('../../lib/services/reviewer-thankyou-sweep');
+const { claimThankYou } = require('../../lib/dataverse/adapters/reviewer-suggestion');
 
 const SUG = '11111111-1111-4111-8111-111111111111';
 const REQ = 'req-1';
@@ -123,6 +130,9 @@ describe('sweepReviewThankYous', () => {
       expect.objectContaining({ wmkf_thankyousentat: expect.any(String) }),
       expect.objectContaining({ ifMatch: 'W/"100"' }),
     );
+    // Stage 5A wiring pin: the claim goes through the named op, not the
+    // generic passthrough.
+    expect(claimThankYou).toHaveBeenCalled();
     // Claim-before-send ordering.
     expect(updateRecord.mock.invocationCallOrder[0]).toBeLessThan(createAndSendEmail.mock.invocationCallOrder[0]);
     expect(renderIndividualReviewDocx.mock.invocationCallOrder[0]).toBeLessThan(updateRecord.mock.invocationCallOrder[0]);
