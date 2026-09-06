@@ -238,7 +238,10 @@ or backfill.
   Full suite 799 / 11,608; types, lint, boundary/access-layer/dynamics-context gates + self-tests,
   build, `git diff --check` green. Mutations: service calls `updateLifecycle` directly keeping the
   import → 3 pins red; payload `selected:true` → 3/4 op tests red; add `requireIfMatch` → the
-  undefined-ifMatch equality case red. Opus and Codex round 1 pending.
+  undefined-ifMatch equality case red.
+- **3J Codex adversarial round 1 (`ef83bb9a`): approve** — transport-identical (payload, ETag
+  handling, exclusion/closed guards inherited); same ETag expression inside the external-respond
+  DAL context; delegation pin would catch a direct `updateLifecycle` call; D3 unchanged. Opus pending.
 
 ## Docs (after each merge)
 
