@@ -190,6 +190,14 @@ builders on that file concurrently.
   forward: A1 "zero existing test edits" should read "census test extended additively"; A4 catalog
   entry lands post-merge; A5 the `[my-candidates]` log prefix now emits from `reviewer-engagement/`
   (deferred cosmetic, verbatim rule).
+- **Correction `3aee6d0a`** (rebased on `6219c289`; PR #160): `reviewer-engagement/errors.js` is the
+  neutral leaf owner of `MyCandidatesError` (imports only `service-http-error`), imported by both
+  `correct-response.js` and the old service, which keeps its re-export; identity proved by `toBe`
+  on the errors export vs the re-export plus `instanceof` on an error `correctResponse` throws. The
+  paths-test fixture now returns a valid row and asserts `correction_conflict` on a 412. JSDoc fixed.
+  No census row for `reviewer-engagement/errors`: the bare `./errors` specifier and the generic
+  fragment collide with `dataverse/core/errors` consumers (builder judgment, sent to Codex round 2).
+  Full suite 788 / 11,525; gates green; no `reviewer-engagement/` file imports from `reviewer-finder/`.
 
 ## Rules for every slice
 
