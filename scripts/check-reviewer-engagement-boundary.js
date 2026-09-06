@@ -56,7 +56,11 @@
  *     } }`, or the same field set via `this.field = require(...)`/an awaited
  *     dynamic import in the constructor) -- bound under a synthetic
  *     `this.<field>` key that flows through the SAME fixpoint a normal local
- *     does;
+ *     does, including `const a = this.adapter; a.updateLifecycle()` and
+ *     `helper(this.adapter).updateLifecycle()`. The key is FILE-scoped, not
+ *     class-scoped: a second class in the same file with an unrelated
+ *     `this.adapter` field is over-approximated as adapter-bound (documented
+ *     limit; fails closed, never open);
  *   - a RENAMED member re-export -- `module.exports = { mutate:
  *     adapter.updateLifecycle }`, `exports.mutate = adapter.updateLifecycle`,
  *     or ESM `export const mutate = adapter.updateLifecycle;` -- publishes a
@@ -67,16 +71,21 @@
  *   - a DIRECT dynamic-import member access -- `(await
  *     import('<adapter>')).updateLifecycle(...)` (parenthesized/optional
  *     forms too) -- classified like a namespace member without needing an
- *     intermediate variable; a non-literal import source, or a non-literal
- *     computed property on the result, fails CLOSED instead;
+ *     intermediate variable; a non-literal computed property on the result
+ *     fails CLOSED, and a non-literal import SOURCE fails CLOSED only when the
+ *     property is a writer name or itself non-literal (`(await
+ *     import(p)).default` is the lazy-backend twin of a bare `require(p)` and
+ *     stays green);
  *   - a GENERIC CATCH-ALL for any OTHER member-access object shape this gate
  *     does not otherwise resolve (e.g. a function call's return value): fails
  *     CLOSED, naming the file:line as an "unsupported adapter-bearing shape",
  *     ONLY when (a) the outer property this access itself names IS one of the
- *     four writers AND the object's subtree references an identifier this
- *     file's fixpoint resolved to an adapter/writer binding, OR (b) the
- *     object's subtree contains a literal adapter require()/import() ANYWHERE,
- *     regardless of the outer property. A dynamic (non-literal) computed
+ *     four writers AND the object's subtree references an identifier (or a
+ *     `this.<field>` key) this file's fixpoint resolved to an adapter/writer
+ *     binding, OR (b) the outer property is NON-LITERAL and the object's
+ *     subtree contains a literal adapter require()/import() ANYWHERE (a static
+ *     non-writer property such as `require('<adapter>').findById(id)` is
+ *     never recorded). A dynamic (non-literal) computed
  *     property on such an unresolvable object is NOT, by itself, sufficient --
  *     narrowed against a real false-positive class found in this repo
  *     (`suggestionAdapter.HONORARIUM_ELIGIBILITY_BY_VALUE[row.x]`: a
@@ -412,8 +421,12 @@ function collectFileInfo(ast) {
   function captureIdentifierRhs(localName, rhsNode, line) {
     const rhs = unwrapExpression(rhsNode);
     if (!rhs) return;
-    if (rhs.type === 'Identifier') {
-      aliasEdges.push({ from: rhs.name, to: localName });
+    // Bare Identifier OR `this.<field>` (post-merge Opus D1: `const a =
+    // this.adapter; a.updateLifecycle()` must flow through the same alias
+    // fixpoint a plain local does -- previously only the Identifier form did).
+    const rhsKey = bindableKeyOf(rhs);
+    if (rhsKey) {
+      aliasEdges.push({ from: rhsKey, to: localName });
       return;
     }
     if (rhs.type === 'MemberExpression' || rhs.type === 'OptionalMemberExpression') {
@@ -661,7 +674,15 @@ function collectFileInfo(ast) {
         const spec = stringLiteralValue(dynSrc);
         const line = nodeLine(node);
         if (spec == null) {
-          dynamicImportMemberUnresolved.push({ line });
+          // Non-literal source: fail closed ONLY when the property could be a
+          // writer (named writer, or non-literal). `(await import(p)).default`
+          // is the lazy-backend twin of a bare `require(p)` and stays green
+          // (post-merge Opus A1: the unconditional form hard-failed the gate on
+          // code with no adapter relation).
+          const { kind, name } = resolvedPropertyName(node);
+          if (kind === 'dynamic' || (name && GENERIC_WRITERS_SET.has(name))) {
+            dynamicImportMemberUnresolved.push({ line });
+          }
         } else if (ADAPTER_SOURCE_RE.test(spec)) {
           const { kind, name } = resolvedPropertyName(node);
           if (kind === 'dynamic') {
@@ -695,9 +716,14 @@ function collectFileInfo(ast) {
       // all, regardless of the object. Resolved in analyzeRoot once the
       // fixpoint knows which identifiers in THIS file are adapter-bound.
       {
-        const { name } = resolvedPropertyName(node);
+        const { kind, name } = resolvedPropertyName(node);
         const isWriterName = name && GENERIC_WRITERS_SET.has(name);
-        const hasLiteralAdapterSource = subtreeHasLiteralAdapterSource(node.object);
+        // A literal adapter source in the subtree is decisive only when the
+        // OUTER property is non-literal; a static non-writer property
+        // (`require('<adapter>').findById(id)`) can never yield a writer and
+        // stays green, matching the `(await import('<adapter>')).findById`
+        // twin (post-merge Opus A2).
+        const hasLiteralAdapterSource = kind === 'dynamic' && subtreeHasLiteralAdapterSource(node.object);
         if (isWriterName || hasLiteralAdapterSource) {
           complexMemberAccesses.push({
             line: nodeLine(node),
@@ -770,6 +796,11 @@ function subtreeHasLiteralAdapterSource(node) {
 function collectIdentifierReferences(node) {
   const out = new Set();
   walkAst(node, (n, parent) => {
+    // `this.<field>` contributes its synthetic binding key so a class-held
+    // adapter passed through an unresolvable shape (`helper(this.adapter)
+    // .updateLifecycle()`) is caught like its plain-local twin (Opus D1).
+    const thisKey = bindableKeyOf(n);
+    if (thisKey && n.type !== 'Identifier') { out.add(thisKey); return; }
     if (n.type !== 'Identifier') return;
     if (parent) {
       if ((parent.type === 'MemberExpression' || parent.type === 'OptionalMemberExpression')
