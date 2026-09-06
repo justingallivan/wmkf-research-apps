@@ -122,6 +122,27 @@ builders on that file concurrently.
   `review-manager/terminal-transition-service.js` still describes the implementation — fixed in the
   post-merge docs pass. PR opened after rebase.
 
+## 3C build and review record
+
+- **Build (Sonnet, 2026-09-06 UTC): `07d46542` + `bcb9bbb1`** on `claude/reviewer-lifecycle-stage3c`.
+  `ReviewerStatusMutationError` and `patchReviewers` (main `reviewers-service.js:462–538` incl.
+  docblocks) moved byte-identically to `reviewer-engagement/correct-status.js`; the moved body uses
+  no local helper of the old file (all its symbols come from canonical modules); `reviewers-service.js`
+  keeps `getReviewers` and re-exports both. Census row added with a `(?<!-)reviewers-service`
+  lookbehind (bare pattern also matched `workbench/applicant-reviewers-service`); expected importers
+  = the route and `export-reviews-service.js` (imports `getReviewers` only). Builder judgment,
+  accepted: `tests/unit/export-reviews-service.test.js` hand-mocks the module with `getReviewers`
+  only; `correct-status.js` is never loaded in that graph. 13-suite selection 859 tests; full suite
+  779 / 11,409; gates green. Mutations: wrapper re-implemented → paths test red (3/3); scratch
+  importer → census red.
+- **Codex adversarial round 1 (`bcb9bbb1`): needs-attention, two documentation mediums, both
+  accepted.** (1) Catalog still said `reviewers-service.js` owns the correction — fixed on main in
+  this docs pass (entry for `correct-status.js`; old entry narrowed). (2) The legacy module's header
+  still claims "ALL business logic for GET/PATCH" and documents the correction contract as living
+  there — the builder's `bcb9bbb1` wording fix was insufficient; header rewritten to "owns
+  `getReviewers`; compatibility re-exports only; correction contract lives in `correct-status.js`"
+  in the correction commit. Opus review recorded below.
+
 ## Rules for every slice
 
 Move verbatim; wrappers re-export the same objects (no re-wrapping that breaks `instanceof`); no
