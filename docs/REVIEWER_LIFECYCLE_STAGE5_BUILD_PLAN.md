@@ -26,7 +26,7 @@ outside the adapter:
 
 | Caller | Purpose | Stage |
 |---|---|---|
-| `lib/services/review-documents/individual-file-service.js:652–663` `commitPointers` → `patchReviewReceipt(id, { wmkf_reviewsharepointfolder, wmkf_reviewfilename }, { ifMatch })` (2 sites) | completed-review DOCX pointer, conditional write + readback + retry | **5A** |
+| `lib/services/review-documents/individual-file-service.js:652–663` `commitPointers` → `patchReviewReceipt(id, { wmkf_reviewsharepointfolder, wmkf_reviewfilename }, { ifMatch })` (one site in a two-attempt loop) | completed-review DOCX pointer, conditional write + readback + retry | **5A** |
 | `lib/services/reviewer-thankyou-sweep.js:85–92` → `patchReviewReceipt(id, { wmkf_thankyousentat }, { ifMatch: row._etag })`; fails closed when `_etag` missing (`:63`) | thank-you courtesy claim before send | **5A** |
 | `lib/services/review-manager/mark-received-no-file-service.js:122`; `lib/services/review-upload.js:293` | receipt producers (no-file, upload) | 5B (optional helper) — **skipped**, see below |
 | `lib/services/reviewer-suggestion-sweep.js:150` `patchFields` | fixed conditional expire | Stage 3E |
@@ -94,6 +94,23 @@ prerequisite rather than a Stage 5 helper.
 - Slice exit: retained selection + full suite, types, lint, build, `check:dataverse-access-layer`
   (new adapter exports — check whether the ratchet counts named exports), `check:request-document-writers`
   (touches the review-document pointer path — run it), `git diff --check`.
+
+## Build record
+
+- **Build (Sonnet, 2026-09-05) — stopped once for an architect decision, correctly.** The adapter
+  ops, both caller edits and the new op test were built per §5A; the pointer path's ETag provenance
+  was verified (`@odata.etag → _etag` on every read via `lib/services/dynamics/annotations.js:23–26`;
+  all pointer fixtures carry `_etag`). Two pinned unit suites (`individual-review-file-service`,
+  `reviewer-thankyou-sweep`) replace the adapter module with hand-built mock objects exposing only
+  `patchReviewReceipt`, so the new op names resolved to `undefined` and 12 assertions failed
+  silently through the callers' own catch blocks; the real-transport pins
+  (`reviewer-engagement-contract` `:351`, `-races`) passed unchanged. **Architect decision:** those
+  mocks are test infrastructure, not behavior pins — add one forwarding shim per mock (no assertion
+  changed) and record the edit. Plan corrections from the build: `commitPointers` has ONE call site
+  executed up to twice (not "2 sites"); the census helper matches module specifiers, not named
+  exports, so mutation (c) cannot be caught by the census — its outcome is recorded honestly rather
+  than manufactured. `check:dataverse-access-layer` is a violation detector with no export-count
+  ratchet, so new named exports do not trip it.
 
 ## Review checkpoints
 
