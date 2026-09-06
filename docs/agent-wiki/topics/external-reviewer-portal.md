@@ -108,6 +108,12 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   release or review receipt. Other non-`stage2a` views ignore action hints.
   The query string itself performs no write; the existing response POST remains
   the only mutation boundary, which protects against email-link scanner fetches.
+- **Legacy declined-row repair (Stage 3J, PR #166, 2026-09-06).** When a repeat decline finds a
+  row still `wmkf_selected === true`, `respond-service.js` deselects it through the narrow adapter op
+  `deselectLegacyDeclinedSuggestion` (delegates to `updateLifecycle` with the fixed
+  `{ selected:false }` payload, inside the existing `external-respond` DAL context); the 412 →
+  `concurrent_modification` envelope is unchanged and the optional `ifMatch` (`_etag || undefined`)
+  is an open owner decision (D3 in `docs/REVIEWER_LIFECYCLE_STAGE7_BUILD_PLAN.md`).
 - **Accepted reviewer self-withdrawal (2026-07-24).** Before materials release,
   the accepted confirmation view and acceptance email link to the existing
   decline reason/referral form. The response service atomically flips the

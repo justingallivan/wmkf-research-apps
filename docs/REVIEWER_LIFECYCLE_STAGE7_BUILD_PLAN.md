@@ -41,7 +41,7 @@ re-gate that; scripts are outside that gate and are recorded, not gated, here to
 | 10 | `reviewer-engagement/claim-reminder.js` (3G, PR #162; was `reviewer-reminder-sweep.js:415`) | updateLifecycle | yes | review-due reminder claim | done; respond-kind claim stays coupled to `mintAndStore` in the sweep |
 | 11 | `reviewer-engagement/change-review-deadline.js` (3H, PR #163; was `reviewer-due-extension.js:312`) | updateLifecycle | yes | deadline override write | done |
 | 12 | `reviewer-engagement/withdraw-pending-invitation.js` (3I, PR #164; was `withdraw-sufficient-service.js:265`) | updateLifecycle | yes | pending-invitation withdrawal | done |
-| 13 | `external-review/respond-service.js:263` | updateLifecycle | `_etag \|\| undefined` | legacy declined-row deselection repair | 3J → adapter op `deselectLegacyDeclinedSuggestion(id, {ifMatch})`; optional version preserved (decision D3) |
+| 13 | adapter op `deselectLegacyDeclinedSuggestion` (3J, PR #166) called from `external-review/respond-service.js` | updateLifecycle (inside the op) | `_etag \|\| undefined` | legacy declined-row deselection repair | done; optional version preserved (decision D3) |
 | 14 | `reviewer-finder/my-candidates-service.js:549` → adapter `bulkUpdateByRequest:2320` | bulk updateLifecycle | **no** | proposal-wide cycle/program metadata | 3K → adapter op `setRequestMetadata(requestId, {grantCycleCode, programArea}, opts)` with a field whitelist; sequential no-`ifMatch` behavior preserved (decision D4) |
 | 15 | `review-manager/mark-received-no-file-service.js:122` | patchReviewReceipt | yes | receipt sink (in-scope use of the receipt op) | keep (5B skip decision) |
 | 16 | `review-upload.js:293` | patchReviewReceipt | yes | receipt sink | keep (5B) |
@@ -255,7 +255,8 @@ or backfill.
   excluded-row case, and a docblock nit ("closed-status checks" inert here).
 - **3J correction `d226564d`** (rebased on `799aedfc`; PR #166): call-count guards on every op-suite
   comparison, `not.toHaveProperty('ifMatch')` on the undefined case, a new excluded-row refusal test
-  (5 op tests), docblock reworded. Full suite 803 / 11,629; gates green.
+  (5 op tests), docblock reworded. Full suite 803 / 11,629; gates green. PR #166 merged `3b8dca2b`
+  (2026-09-06, seven checks green).
 
 ## Docs (after each merge)
 

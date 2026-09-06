@@ -300,7 +300,7 @@ If you're touching a service or utility, read its header before this catalog. If
 
 ### Versioning
 
-- **`etag.js`** — `isConcreteEtag(value)`: true only for a strong or weak entity tag with a nonempty opaque body and no surrounding whitespace (`"…"`, `W/"…"`); rejects `*`, `W/""`, unquoted and control-character values. Stage 5 (2026-09-05) made it the `ifMatch` requirement behind `reviewer-suggestion.js` `attachReviewDocumentPointer` / `claimThankYou`, which fail with 400 `missing_version` otherwise. Four older inline copies of the same regex (`reviewer-suggestion.js`, `reviewer-suggestion-sweep.js`, `send-emails-service.js`, `my-candidates-service.js`) are a pending consolidation.
+- **`etag.js`** — `isConcreteEtag(value)`: true only for a strong or weak entity tag with a nonempty opaque body and no surrounding whitespace (`"…"`, `W/"…"`); rejects `*`, `W/""`, unquoted and control-character values. Stage 5 (2026-09-05) made it the `ifMatch` requirement behind `reviewer-suggestion.js` `attachReviewDocumentPointer` / `claimThankYou`, which fail with 400 `missing_version` otherwise. Four older inline copies of the same regex (`reviewer-suggestion.js`, `reviewer-finder/my-candidates-service.js`, `reviewer-engagement/expire-invitation.js`, `reviewer-engagement/record-email-outcome.js` — the last two moved there in Stage 3E) are a pending consolidation.
 
 ### Health / files
 
