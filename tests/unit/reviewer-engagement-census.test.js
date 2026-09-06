@@ -49,6 +49,21 @@ const CENSUS = [
       'pages/api/review-manager/terminal-transition.js',
     ],
   },
+  {
+    name: 'review-manager/reviewers-service',
+    // Stage 3C is a PARTIAL-file extraction: only `patchReviewers` and
+    // `ReviewerStatusMutationError` moved to `reviewer-engagement/correct-status.js`;
+    // `getReviewers` and its projections stay here, so this legacy path keeps
+    // legitimate direct importers (unlike the full-file 3A/3B moves above).
+    // A negative lookbehind on the leading hyphen excludes the unrelated
+    // `workbench/applicant-reviewers-service` module, whose specifier also
+    // contains the bare substring "reviewers-service".
+    pattern: /(?<!-)reviewers-service/,
+    expected: [
+      'lib/services/review-manager/export-reviews-service.js',
+      'pages/api/review-manager/reviewers.js',
+    ],
+  },
 ];
 
 // Hoisted: every production file under SCAN_DIRS is read exactly once, up
