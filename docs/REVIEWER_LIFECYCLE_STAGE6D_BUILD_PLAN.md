@@ -395,6 +395,16 @@ Round 2 is spent on the build.
   suite) — recorded here as the real mechanism; lockstep coupling between the builder and
   `tests/helpers/draft-fingerprint.js` is a named maintenance cost; `InviteEmailModal.skipReasonLabel`
   is live for render-time skips and must not be removed. Correction sent to the builder 2026-09-06.
+- **Correction `f6a9c973`** (rebased on `876df4a9`; PR #159): the fake projection-divergence block is
+  replaced by `tests/unit/send-emails-fingerprint-selects.test.js` (inspects the send-side request /
+  person selects, cycle `fields`, `fetchCoPIs` and `getHonorariumAmount` call args) and
+  `tests/unit/draft-fingerprint-projection-divergence.test.js` (adapter mocks that project by
+  `select`; real `renderEmails` → real `sendEmails`; Case A sent, Case B one request read dropping
+  `wmkf_abstract` → `draft_stale`, no dispatch or write). Opus's M2 (narrow the request select at
+  `send-emails-service.js:368` by exactly the four fingerprinted fields) now fails those two tests
+  and nothing else. Full suite 786 / 11,496; all gates green. The "test (e) red" mutation claim above
+  is superseded by the Opus advisory: the `coInvestigators` drop is caught by 213 failures in 5 suites
+  (structural mismatch against the independent helper plus the golden suite), not by (e).
 
 ## Accepted limits (to record in the receipt)
 
