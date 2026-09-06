@@ -42,6 +42,10 @@ jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
   // queryAllRecords/updateRecord assertions below still see these calls.
   queryAllSuggestions: (options) => queryAllRecords('wmkf_appreviewersuggestions', options),
   patchReviewReceipt: (id, payload, opts) => updateRecord('wmkf_appreviewersuggestions', id, payload, opts),
+  // Stage 5A: sendOneThankYou now claims via claimThankYou instead of the
+  // generic passthrough. Same forwarding pattern as patchReviewReceipt above
+  // so the existing updateRecord assertions keep observing the claim write.
+  claimThankYou: (id, sentAtIso, opts) => updateRecord('wmkf_appreviewersuggestions', id, { wmkf_thankyousentat: sentAtIso }, opts),
 }));
 
 const { sweepReviewThankYous } = require('../../lib/services/reviewer-thankyou-sweep');

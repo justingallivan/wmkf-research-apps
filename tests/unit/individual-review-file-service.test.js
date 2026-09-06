@@ -35,6 +35,16 @@ const suggestion = {
   getByIdWithSelect: jest.fn(),
   isExcluded: jest.fn((row) => row.wmkf_applicantdisposition === 100000001),
   patchReviewReceipt: jest.fn(),
+  // Stage 5A: commitPointers now calls the narrow named op instead of the
+  // generic passthrough. Forward through the same patchReviewReceipt mock
+  // (with the pointer payload it always sent) so every existing
+  // mockResolvedValue/mockRejectedValue/toHaveBeenCalledWith assertion below
+  // keeps observing calls unchanged.
+  attachReviewDocumentPointer: (id, { folder, filename }, opts) => suggestion.patchReviewReceipt(
+    id,
+    { wmkf_reviewsharepointfolder: folder, wmkf_reviewfilename: filename },
+    opts,
+  ),
 };
 jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => suggestion);
 
