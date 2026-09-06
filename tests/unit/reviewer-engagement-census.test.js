@@ -64,6 +64,27 @@ const CENSUS = [
       'pages/api/review-manager/reviewers.js',
     ],
   },
+  {
+    name: 'reviewer-finder/my-candidates-service',
+    // Stage 3D is a PARTIAL-file extraction: only the approved response-only
+    // correction path (`correctResponse`) moved to
+    // `reviewer-engagement/correct-response.js`; bulk-by-request, restore,
+    // manual-invite-sent recording, and person/researcher edits stay here,
+    // so this legacy path keeps its one legitimate direct importer.
+    pattern: /my-candidates-service/,
+    expected: [
+      'pages/api/reviewer-finder/my-candidates.js',
+    ],
+  },
+  {
+    name: 'reviewer-engagement/correct-response',
+    // The wrapper (`my-candidates-service.js`) is the sole importer of the
+    // new path — the route's import of the old path is unchanged.
+    pattern: /reviewer-engagement\/correct-response/,
+    expected: [
+      'lib/services/reviewer-finder/my-candidates-service.js',
+    ],
+  },
 ];
 
 // Hoisted: every production file under SCAN_DIRS is read exactly once, up
