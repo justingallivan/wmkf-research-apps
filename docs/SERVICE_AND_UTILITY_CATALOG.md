@@ -205,8 +205,11 @@ If you're touching a service or utility, read its header before this catalog. If
   canonical digest of the accepted identity decision after ingestion and must
   still match the current row at use time. Mutable address/affiliation fields
   are deliberately excluded.
+- **`reviewer-engagement/correct-response.js`** — Stage 3D (PR #160 → `081d558b`, 2026-09-06): `correctResponse({ suggestionId, lifecycle, authorizedRequestId, actingUserSystemId })`, the response-only invitation/response correction moved byte-identically out of `my-candidates-service.js` `patchMyCandidates`: authorized-request GUID guard, fresh non-excluded known-open row (Stage 2 predicates), exact concrete ETag, `updateLifecycle` with `ifMatch`, 412 → `correction_conflict`, then the nonfatal `accepted:true` `ensureToken` follow-up. `correctionError` lives here. Person edits stay in the caller.
+- **`reviewer-engagement/errors.js`** — Neutral leaf owner of `MyCandidatesError` (imports only `service-http-error`); `my-candidates-service.js` re-exports it for compatibility.
 - **`reviewer-finder/my-candidates-service.js`** — Candidate reads and named
-  edit/restore/manual-invite operations. **[VERIFIED in source at `c51fa34d`,
+  edit/restore/manual-invite operations; since Stage 3D the response correction
+  delegates to `reviewer-engagement/correct-response.js` (contract below unchanged). **[VERIFIED in source at `c51fa34d`,
   Stage 1D; shipped in Production at `c19a16d8` per the
   [release receipt](audits/REVIEWER_LIFECYCLE_RELEASE_2026-09-05.md)]** generic invitation/response
   corrections require a separately server-authorized Request binding, a fresh

@@ -1602,7 +1602,9 @@ returned zero eligible/enqueued/claimed/failed.** Plan doc:
 - **Named lifecycle commands live in `lib/services/reviewer-engagement/` (reviewer lifecycle
   Stage 3, from 2026-09-05).** 3A moved the closeout command there (`close-review.js`, PR #154) and
   3B the terminal transition (`terminal-transition.js`, PR #156), 3C the preauthorized status
-  correction (`correct-status.js`, PR #158; `reviewers-service.js` keeps only `getReviewers`);
+  correction (`correct-status.js`, PR #158; `reviewers-service.js` keeps only `getReviewers`), 3D the
+  response correction (`correct-response.js`, PR #160; `my-candidates-service.js` delegates and
+  re-exports `MyCandidatesError` from the neutral `reviewer-engagement/errors.js`);
   the old `review-manager/close-review-service.js` is a pure re-export and routes keep their import
   paths. Each move is byte-identical and pinned by a both-paths identity test plus a caller census
   (`tests/unit/reviewer-engagement-census.test.js`) that records every importer of the legacy path,

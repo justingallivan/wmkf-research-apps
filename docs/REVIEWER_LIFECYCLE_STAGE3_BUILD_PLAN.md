@@ -201,7 +201,7 @@ builders on that file concurrently.
 - **Codex adversarial round 2 (final, `3aee6d0a`): approve.** Round-1 ownership item resolved (both
   services import the same neutral-leaf class; delegation enforced by the paths test and census);
   omitting a census row for `errors.js` is acceptable because it is a shared leaf, not an extracted
-  command boundary. Cap reached.
+  command boundary. Cap reached. PR #160 merged `081d558b` (2026-09-06, seven checks green).
 
 ## 3E build and review record
 
