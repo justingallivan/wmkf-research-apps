@@ -60,7 +60,11 @@ describe('setRequestMetadata: field whitelist', () => {
 
 describe('setRequestMetadata: transport identity with updateLifecycle', () => {
   it('same DynamicsService.updateRecord args as calling updateLifecycle directly, for two selected rows, incl. programArea normalization', async () => {
-    const updates = { grantCycleCode: 'J26', programArea: 'science' };
+    // 'Medical Research Program' is one of normalizeSuggestionProgramArea's
+    // two canonical-label rewrites (reviewer-suggestion.js:232) — it becomes
+    // 'Medical Research', not a pass-through — so this value actually
+    // discriminates "normalization ran" from "raw value forwarded verbatim".
+    const updates = { grantCycleCode: 'J26', programArea: 'Medical Research Program' };
     const rows = [existingRow(), existingRow()];
 
     // Path 1: setRequestMetadata over two rows.
@@ -94,6 +98,10 @@ describe('setRequestMetadata: transport identity with updateLifecycle', () => {
     // updateLifecycle's fallback ifMatch (status-change only) never engages.
     for (const call of opCalls) {
       expect(call[3]).toEqual({ actingUserSystemId: 'u-1' });
+    }
+    // Normalization actually ran (not a pass-through of the raw string).
+    for (const call of opCalls) {
+      expect(call[2].wmkf_programarea).toBe('Medical Research');
     }
   });
 });
