@@ -12,13 +12,13 @@
 // keyed by array order) and joined with U+0001 (a control character that
 // cannot appear in these fields), each field within a reviewer's string
 // joined with U+0000 (same non-collision rationale as the settings key
-// below) — so no combination of name/email/affiliation values across two
+// in ReleaseMaterialsModal.js) — so no combination of name/email/affiliation values across two
 // different reviewers can collide into the same overall key. An empty
 // `reviewers` array must still produce '' (the completion exemption's
 // `nextKey === ''` check depends on it). Used both by the committed-session
-// effect below AND by handleSend's `priorKey` capture (which reads
+// effect in ReleaseMaterialsModal.js AND by handleSend's `priorKey` capture (which reads
 // sessionContextRef.current.key, always assigned from this same function's
-// output — see the effect), so there is only one computation to keep in
+// output — see that effect), so there is only one computation to keep in
 // sync.
 // Field/row separators built at runtime (String.fromCharCode) rather than
 // written as literal control characters in this source file: U+0000 cannot

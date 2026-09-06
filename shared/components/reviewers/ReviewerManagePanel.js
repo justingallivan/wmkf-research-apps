@@ -55,11 +55,10 @@ export { ReviewReminderAction } from './ReviewReminderAction';
 export { PREVIEW_RENDER_TIMEOUT_MS } from './ReleaseMaterialsModal';
 
 // ─── Template Defaults ──────────────────────────────────────────────────────
-// Resolution + per-PD persistence live in email-template-store.js: the org
-// default (admin "Email Defaults" panel, Dataverse wmkf_appsystemsetting) with a
-// per-PD override layered on top (wmkf_appuserpreferences, EMAIL_TEMPLATES).
-// loadEmailTemplates() returns the resolved set; EMPTY_TEMPLATES is the blank
-// skeleton used until that load completes.
+// Resolution + per-PD persistence live in email-template-store.js (consumed by
+// ReleaseMaterialsModal.js since Stage 6C): the org default (admin "Email
+// Defaults" panel, Dataverse wmkf_appsystemsetting) with a per-PD override
+// layered on top (wmkf_appuserpreferences, EMAIL_TEMPLATES).
 
 // ─── Status Badge ───────────────────────────────────────────────────────────
 
