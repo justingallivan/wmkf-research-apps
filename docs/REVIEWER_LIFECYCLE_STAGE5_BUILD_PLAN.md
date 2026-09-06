@@ -143,6 +143,18 @@ prerequisite rather than a Stage 5 helper.
   Recorded gap closed in the correction commit via `jest.fn` shims + `toHaveBeenCalled` pins (Opus
   §7). Types/build not run by the reviewer; builder ran them.
 
+- **Corrections `c64bdd8c`** (rebased as `6a70890f` on `087d71d6`; PR #157): `lib/utils/etag.js`
+  `isConcreteEtag` (same regex as the four inline sites, which stay as a follow-up); `requireIfMatch`
+  uses it; negative cases for both ops + `tests/unit/etag.test.js`; third shim in
+  `notification-trust-model-pushup.test.js`; shims wrapped in `jest.fn` with `toHaveBeenCalled` pins;
+  mutation (c) now red at `reviewer-thankyou-sweep.test.js:135`. 11 suites / 399; full suite
+  779 / 11,431; all gates and build green.
+- **Codex adversarial round 2 (final, `6a70890f`): approve** — round-1 items resolved; the pointer
+  ETag tightening is fail-closed and unreachable on the normal flow (preflight rejects missing ETags
+  before `commitPointers`; malformed values are retried/read back, never written unconditionally);
+  `isConcreteEtag` matches the entity-tag grammar incl. weak tags. Codex's sandbox could not run
+  Jest; counts are builder-run.
+
 ## Review checkpoints
 
 Opus: confirm byte-identical transport call per site; confirm the pointer path's ETag provenance;
