@@ -752,7 +752,7 @@ const MessageBubble = React.memo(function MessageBubble({ message, onCopy, onFee
                 type="button"
                 onClick={() => onCopy(message.content)}
                 className="inline-flex min-h-9 min-w-9 items-center justify-center rounded-lg hover:bg-gray-100 hover:text-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
-                aria-label="Copy response"
+                aria-label="Copy"
               >
                 Copy
               </button>
