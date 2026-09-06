@@ -13,7 +13,7 @@ last_verified: 2026-09-05
 Assessment baseline: main `d614de5cf60baeaec8cf21ca8e4dd3c2489d2f7a`.
 The owner selected **Stage 6B as the next build**, starting with **6B1**.
 **Status update, 2026-09-05 (later sessions):** 6B1 (`9258115a`/`06725d6c`),
-6B2 (`b08c16f6`/`d3ec406a`/`039d5d8e`) and 6B3 (`a6a27ce8`/`b163172a`, amended by 6B3a `3a4bcbbe`/`0a4eafd6` and 6B3b `9a790c64`/`529ee426`) are complete on
+6B2 (`b08c16f6`/`d3ec406a`/`039d5d8e`) and 6B3 (`a6a27ce8`/`b163172a`, amended by 6B3a `3a4bcbbe`/`0a4eafd6` and 6B3b `9a790c64`/`529ee426` and 6B3c `2622dfc7`) are complete on
 branch `codex/reviewer-lifecycle-stage6b` with independent PASS verdicts, not merged; see
 the [Stage 6B1](REVIEWER_LIFECYCLE_STAGE6B1_RECEIPT_2026-09-05.md),
 [Stage 6B2](REVIEWER_LIFECYCLE_STAGE6B2_RECEIPT_2026-09-05.md) and
@@ -78,6 +78,7 @@ invalidates generation at unmount (`ReviewerCloseoutModal.js:41`). Cover changed
 reviewer/request/permissions while mounted, close/reopen and every post-await path.
 
 [PLANNED] **6B3** follows a fresh 6B2 review: materials-release modal context.
+[PLANNED, owner-queued 2026-09-05] **6D** server-side draft fingerprint (render returns, send verifies; refuses stale drafts) — closes the co-investigator and unrefetched-edit gaps the client key cannot; contract change, separately planned. See the build plan status section.
 Its session currently changes on `isOpen` (`ReviewerManagePanel.js:531`), while
 proposal loading separately reacts to request changes (`:669`). Preserve queue
 serialization, abort/timeout and SSE completion while binding preview/send and

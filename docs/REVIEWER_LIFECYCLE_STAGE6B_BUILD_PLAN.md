@@ -38,8 +38,9 @@ suite 772 suites / 11,301 tests, webpack build, seven gate pairs and an independ
 PASS after one BLOCK round; amendment 6B3a (`3a4bcbbe` runtime, `0a4eafd6` advisory test)
 folded the signature and review due date into the session identity after a Codex adversarial
 review, and amendment 6B3b (`9a790c64` runtime, `529ee426` advisory test) folded recipient
-name, email and affiliation after a second one; each has an independent PASS, the latter with a
-full suite of 772 suites / 11,311 tests. See the
+name, email and affiliation after a second one, and 6B3c (`2622dfc7`) folded the panel-carried
+proposal title, abstract, PI and institution after a third; each has an independent PASS, the
+last with a full suite of 772 suites / 11,318 tests. See the
 [Stage 6B3 receipt](audits/REVIEWER_LIFECYCLE_STAGE6B3_RECEIPT_2026-09-05.md).
 **Stage 6B is therefore complete on `codex/reviewer-lifecycle-stage6b`.** Nothing is
 merged or deployed; promotion (PR, CI, deliberate merge under the release strategy) is
@@ -50,10 +51,20 @@ closeout modal closes itself on committed permission loss; a membership change d
 in-flight materials send returns the modal to compose while the server-side one-time
 release gate bounds a duplicate send; a signature or review-deadline change while the modal
 is open resets it the same way, even when the PD's customized due date would have rendered
-identically; a recipient name, email or affiliation change does too, while proposal-derived
-body fields (title, abstract, PI, institution) remain keyed by request only.
+identically; a recipient name, email or affiliation change and a proposal title, abstract, PI
+or institution change (6B3c, `2622dfc7`) do too; co-investigators and unrefetched edits wait
+for Stage 6D.
 These are subdivisions of original Stage 6B, not additional product features.
 Stage 6C extraction is outside this handoff.
+
+[PLANNED, owner-queued 2026-09-05] **Stage 6D — server-side draft fingerprint.** The
+materials-modal session key (6B3a–6B3c) can only detect changes the panel has refetched and
+cannot see co-investigators at all, because no host carries them. A third Codex adversarial
+review asked for a defensible boundary; the owner chose the client key now and queued this
+slice: render-emails returns a per-draft fingerprint of every body input (recipient, proposal
+including co-PIs, settings); send-emails recomputes it and refuses a stale draft with a new
+`skipped` code the modal renders. This changes the render and send contracts and the SSE
+vocabulary, so it is a separately planned and reviewed slice, not a 6B amendment. Not started.
 
 [VERIFIED via source reads and git commands] Source baseline:
 `d614de5cf60baeaec8cf21ca8e4dd3c2489d2f7a`, `main`, initially clean.

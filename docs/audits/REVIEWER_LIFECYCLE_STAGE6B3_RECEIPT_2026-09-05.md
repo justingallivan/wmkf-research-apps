@@ -327,3 +327,52 @@ rendered body's PROPOSAL-derived fields (title, abstract, PI, institution;
 `render-emails-service.js:288–297`) are keyed by requestId only, so an abstract edit after a
 preview leaves the same class of stale-body exposure for those fields (reviewer advisory 7,
 pre-existing, not addressed here; recorded for the owner).
+
+## Amendment 6B3c — proposal fields folded into the session identity (2026-09-05)
+
+Origin: third Codex adversarial review (thread `01a0745b-1c18-78b3-802e-dbb550c6c92c`, medium:
+"Proposal edits can still send a stale preview body"; it asked for a defensible boundary or
+explicit product approval). Owner decision: key on the proposal fields the panel carries now
+(this amendment) and queue a server-side draft fingerprint as Stage 6D for co-investigators and
+edits the panel has not refetched, rather than accept the exposure as a product limit.
+
+Implemented at `2622dfc7` (`ReviewerManagePanel.js` +62/−21; test file +166): module-level
+`proposalKeyFor(proposal)` over `proposalTitle`, `proposalAbstract`, `proposalAuthors`,
+`proposalInstitution` (null-safe, `|| ''`, U+0000 separator built at runtime); the call site
+passes the string as `proposalKey`; the modal stores it in the session context, includes it in
+`changed`, requires it unchanged in the completion exemption and updates it on invalidation. A
+follow-up commit corrects one comment ("fourth" → "third" Codex review).
+
+Provenance [VERIFIED by the reviewer]: both panel construction sites
+(`reviewers-service.js:240–244,268–272`) and the render (`render-emails-service.js:288–301`)
+read the same Dataverse columns; title, abstract and institution match exactly (institution
+differs only by `.trim()`), authors is a safe-direction proxy (panel falls back to the applicant
+and keeps honorifics; render is PI-only and strips them), so every render-visible change flips
+the key and the only spurious resets are harmless. The follow-up host spreads the reviewers-API
+entry first, so the abstract is present there, and it mounts the panel only when that entry
+exists. Co-investigators appear nowhere under `shared/` or `pages/`, so the deferral to 6D is
+correct. The abstract is editable in-app (`update-abstract-service.js`), so the closed path is
+reachable, not theoretical.
+
+Red-before-code: 5 of the 6 new tests failed against the `086cffee` runtime; the same-value
+fresh-object case passed, as intended; no pre-existing test changed (reviewer-measured).
+
+Verification at `2622dfc7` (orchestrator-run, HEAD logged start and end): full suite 772 suites /
+11,318 tests; `check:types` pass; lint 0 errors, 75 warnings; webpack build pass with no generated
+changes; `git diff --check` clean; the seven gate pairs pass with self-tests.
+
+Independent review: fresh-context Opus subagent (native, subscription path), frozen `2622dfc7`,
+md5-verified, waited for `DONE`. Eight-suite selection 8 / 536. Guard removals: proposalKey out of
+`changed` → 4; out of the exemption → 1 (test f, so the exemption check is discriminating);
+abstract out of the helper → 2; authors → 1; title → 1; institution → 1; the context store line
+deleted → 43 of 43; separator join replaced by `''` → 0 (no boundary-collision test; same posture
+as `membershipKeyFor`). **Verdict: PASS at `2622dfc7`, no required items.**
+
+Known fail-safe edge (reviewer advisory 4): when ReviewersTab's refetch errors it nulls the
+proposal and the panel falls back to a synthetic proposal without abstract/authors/institution,
+so an erroring refresh right after a completed send now flips the key and shows a fresh compose
+instead of the sent summary. Pre-existing for the settings key whenever the deadline was
+non-null; 6B3c widens it to the null-deadline case. Nothing stale can be sent.
+
+Remaining limits for Stage 6D: co-investigators are not observable client-side; any body input
+edited between the panel's last refetch and send is invisible to a client key.

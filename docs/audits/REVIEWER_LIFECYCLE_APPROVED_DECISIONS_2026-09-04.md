@@ -51,11 +51,14 @@ permission-loss close after a Codex adversarial review) are complete on branch
 [Stage 6B1 receipt](REVIEWER_LIFECYCLE_STAGE6B1_RECEIPT_2026-09-05.md) and the
 [Stage 6B2 receipt](REVIEWER_LIFECYCLE_STAGE6B2_RECEIPT_2026-09-05.md). 6B3
 (`a6a27ce8` runtime, `b163172a` review correction, `3a4bcbbe` owner-decided 6B3a
-settings-identity widening after a Codex adversarial review, `0a4eafd6` advisory test, `9a790c64`/`529ee426` 6B3b recipient-field widening after a second) is also
+settings-identity widening after a Codex adversarial review, `0a4eafd6` advisory test, `9a790c64`/`529ee426` 6B3b recipient-field widening after a second, `2622dfc7` 6B3c proposal-field widening after a third) is also
 complete with independent PASS verdicts; see the
 [Stage 6B3 receipt](REVIEWER_LIFECYCLE_STAGE6B3_RECEIPT_2026-09-05.md).
 Stage 6B is complete on the branch. Nothing is merged or deployed; promotion is the
-next owner decision.**
+next owner decision.** On 2026-09-05 the owner also decided, after a third Codex adversarial
+review of the materials modal: key the modal session on the proposal fields the panel carries
+now (6B3c), and queue a server-side draft fingerprint (Stage 6D) for the co-investigator and
+unrefetched-edit gaps rather than accept them as a product limit.
 Use the [Stage 6B build plan](../REVIEWER_LIFECYCLE_STAGE6B_BUILD_PLAN.md) and
 [remaining readiness audit](REVIEWER_LIFECYCLE_REMAINING_READINESS_2026-09-05.md).
 Stages 2–5, 6C and 7 remain outside the selected next build; their dependencies

@@ -259,11 +259,12 @@ rules and copy are unchanged. Tests: the lifetime describes in
 `tests/unit/reviewer-manage-actions-menu.test.js` and `tests/unit/reviewer-closeout-modal.test.js`.
 Receipt: `docs/audits/REVIEWER_LIFECYCLE_STAGE6B2_RECEIPT_2026-09-05.md`.
 
-Stage 6B3 (same branch, `a6a27ce8`/`b163172a`, amended by 6B3a `3a4bcbbe`/`0a4eafd6` and 6B3b
-`9a790c64`/`529ee426`, not merged): the nested materials-release modal's session is open state,
-request id, the sorted selected membership with each reviewer's name, email and affiliation by
-value (`membershipKeyFor`), and the signature and review due date by value (the only two
-`settings` fields render consumes). The destination address is re-resolved server-side at send,
+Stage 6B3 (same branch, `a6a27ce8`/`b163172a`, amended by 6B3a `3a4bcbbe`/`0a4eafd6`, 6B3b
+`9a790c64`/`529ee426` and 6B3c `2622dfc7`, not merged): the nested materials-release modal's
+session is open state, request id, the sorted selected membership with each reviewer's name,
+email and affiliation by value (`membershipKeyFor`), the proposal title, abstract, PI and
+institution by value (`proposalKeyFor`, passed as the `proposalKey` string prop), and the
+signature and review due date by value (the only two `settings` fields render consumes). The destination address is re-resolved server-side at send,
 but the rendered body is sent verbatim, which is why recipient fields are in the key. All
 reconciled by one no-deps layout effect with an unmount cleanup; any change bumps the modal
 epoch, aborts the active preview render and returns the UI to a fresh compose, while
@@ -279,8 +280,9 @@ kept. Accepted limits: a membership, signature or deadline change during an in-f
 returns to compose while the server-side one-time materials gate bounds a duplicate send; a
 deadline change with a customized field still resets drafts even though the render would be
 identical; the global localStorage due-date key makes a restored value read as customized
-(pre-existing); proposal-derived body fields (title, abstract, PI, institution) are keyed by
-request only, so an abstract edit after preview is not detected. Tests: `tests/unit/reviewer-materials-modal-lifetimes.test.js`.
+(pre-existing); co-investigators are not carried by any host and edits the panel has not
+refetched are invisible to any client key — both deferred to the queued Stage 6D server-side
+draft fingerprint. Tests: `tests/unit/reviewer-materials-modal-lifetimes.test.js`.
 Receipt: `docs/audits/REVIEWER_LIFECYCLE_STAGE6B3_RECEIPT_2026-09-05.md`.
 
 The existing `ReviewerManagePanel.updateStatus` UI submits one reviewer only.
