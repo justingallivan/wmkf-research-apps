@@ -37,6 +37,9 @@ const PROPOSAL = {
   proposalId: '00000000-0000-0000-0000-000000000001',
   proposalTitle: 'Proposal Under Review',
   reviewDeadline: '2026-07-22',
+  proposalAbstract: 'Original abstract text.',
+  proposalAuthors: 'Dr. Original PI',
+  proposalInstitution: 'Original University',
 };
 const PROPOSAL_2 = {
   proposalId: '00000000-0000-0000-0000-000000000002',
@@ -1146,6 +1149,169 @@ describe('recipient identity (name / email / affiliation)', () => {
   // the summary describes what was sent). Unlike settingsKey, which is
   // compared independent of selection. Asserting either outcome here would
   // be vacuous; recorded as a by-design limit in the 6B3 receipt.
+});
+
+// ── Proposal identity (Stage 6B3c) ───────────────────────────────────────
+//
+// The rendered draft body also embeds PROPOSAL fields (title, abstract, PI,
+// institution — see render-emails-service.js) and is sent verbatim, so a
+// same-requestId proposal edit after a preview must invalidate the modal
+// session exactly like a membership or settings change, or the sent body
+// shows stale proposal text. Co-investigators are NOT carried by any host
+// (see ReviewersTab's synthetic fallback), so they are not part of this key.
+describe('proposal identity (title / abstract / PI / institution)', () => {
+  test('a proposalAbstract change (same proposalId) during a pending preview invalidates it back to compose', async () => {
+    const first = deferred();
+    renderEmailsBehavior = () => first.promise;
+    const { rerender } = renderPanel({ proposal: PROPOSAL, reviewers: [REVIEWER_A] });
+    openReleaseModal(1);
+    await preview(1);
+    await waitFor(() => expect(renderCalls().length).toBe(1));
+
+    rerender(
+      <ReviewerManagePanel
+        proposal={{ ...PROPOSAL, proposalAbstract: 'Changed abstract text.' }}
+        reviewers={[REVIEWER_A]}
+        settings={{ signature: 'PD' }}
+      />,
+    );
+
+    first.resolve(mockJson({ drafts: [draftFor(REVIEWER_A)] }));
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+
+    expect(screen.queryByRole('button', { name: /send 1 email/i })).toBeNull();
+    expect(renderCalls().length).toBe(1);
+  });
+
+  test('a proposalTitle change after a completed preview invalidates back to compose, and Preview again re-renders', async () => {
+    renderEmailsBehavior = () => mockJson({ drafts: [draftFor(REVIEWER_A)] });
+    const { rerender } = renderPanel({ proposal: PROPOSAL, reviewers: [REVIEWER_A] });
+    openReleaseModal(1);
+    await preview(1);
+    await screen.findByRole('button', { name: /send 1 email/i });
+    expect(renderCalls().length).toBe(1);
+
+    rerender(
+      <ReviewerManagePanel
+        proposal={{ ...PROPOSAL, proposalTitle: 'Retitled Proposal' }}
+        reviewers={[REVIEWER_A]}
+        settings={{ signature: 'PD' }}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: /send 1 email/i })).toBeNull();
+    expect(screen.getByRole('button', { name: /preview 1 email/i })).toBeTruthy();
+
+    await preview(1);
+    await waitFor(() => expect(renderCalls().length).toBe(2));
+  });
+
+  test('a proposalAuthors (PI) change during a pending preview invalidates it back to compose', async () => {
+    const first = deferred();
+    renderEmailsBehavior = () => first.promise;
+    const { rerender } = renderPanel({ proposal: PROPOSAL, reviewers: [REVIEWER_A] });
+    openReleaseModal(1);
+    await preview(1);
+    await waitFor(() => expect(renderCalls().length).toBe(1));
+
+    rerender(
+      <ReviewerManagePanel
+        proposal={{ ...PROPOSAL, proposalAuthors: 'Dr. New PI' }}
+        reviewers={[REVIEWER_A]}
+        settings={{ signature: 'PD' }}
+      />,
+    );
+
+    first.resolve(mockJson({ drafts: [draftFor(REVIEWER_A)] }));
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+
+    expect(screen.queryByRole('button', { name: /send 1 email/i })).toBeNull();
+    expect(renderCalls().length).toBe(1);
+  });
+
+  test('a proposalInstitution change during a pending preview invalidates it back to compose', async () => {
+    const first = deferred();
+    renderEmailsBehavior = () => first.promise;
+    const { rerender } = renderPanel({ proposal: PROPOSAL, reviewers: [REVIEWER_A] });
+    openReleaseModal(1);
+    await preview(1);
+    await waitFor(() => expect(renderCalls().length).toBe(1));
+
+    rerender(
+      <ReviewerManagePanel
+        proposal={{ ...PROPOSAL, proposalInstitution: 'New University' }}
+        reviewers={[REVIEWER_A]}
+        settings={{ signature: 'PD' }}
+      />,
+    );
+
+    first.resolve(mockJson({ drafts: [draftFor(REVIEWER_A)] }));
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+
+    expect(screen.queryByRole('button', { name: /send 1 email/i })).toBeNull();
+    expect(renderCalls().length).toBe(1);
+  });
+
+  test('a fresh proposal object with the SAME title/abstract/authors/institution values does not invalidate a pending preview', async () => {
+    const first = deferred();
+    renderEmailsBehavior = () => first.promise;
+    const { rerender } = renderPanel({ proposal: PROPOSAL, reviewers: [REVIEWER_A] });
+    openReleaseModal(1);
+    await preview(1);
+    await waitFor(() => expect(renderCalls().length).toBe(1));
+
+    rerender(
+      <ReviewerManagePanel proposal={{ ...PROPOSAL }} reviewers={[REVIEWER_A]} settings={{ signature: 'PD' }} />,
+    );
+
+    first.resolve(mockJson({ drafts: [draftFor(REVIEWER_A)] }));
+    await screen.findByRole('button', { name: /send 1 email/i });
+    expect(renderCalls().length).toBe(1);
+  });
+
+  test('a proposalAbstract change synchronized with the post-send selection clear defeats the completion exemption', async () => {
+    const sse = controlledSse();
+    renderEmailsBehavior = () => mockJson({ drafts: [draftFor(REVIEWER_A)] });
+    sendEmailsBehavior = () => sse.response;
+
+    // Same rationale as the settings-identity "signature change synchronized
+    // with the post-send selection clear" test above: the parent's real
+    // onEmailsSent clears selection AND calls onRefresh in the same commit, so
+    // a host component whose onRefresh flips a proposal field is used instead
+    // of an imperative rerender() nested inside onRefresh. Unlike recipient
+    // fields (which are unobservable here because `reviewers` is empty after
+    // the clear), proposalKey is compared independent of selection — so this
+    // IS a discriminating test for the exemption's proposalKey check.
+    function Host() {
+      const [abstract, setAbstract] = useState(PROPOSAL.proposalAbstract);
+      return (
+        <ReviewerManagePanel
+          proposal={{ ...PROPOSAL, proposalAbstract: abstract }}
+          reviewers={[REVIEWER_A]}
+          settings={{ signature: 'PD' }}
+          onRefresh={() => setAbstract('Changed abstract text.')}
+        />
+      );
+    }
+    render(<Host />);
+    openReleaseModal(1);
+    await preview(1);
+    await send(1);
+    await waitFor(() => expect(sendCalls().length).toBe(1));
+
+    sse.push(sseChunk('result', { sent: [{ suggestionId: REVIEWER_A.suggestionId, candidateName: REVIEWER_A.name, candidateEmail: REVIEWER_A.email }], failed: [], skipped: [] }));
+    await act(async () => { await Promise.resolve(); });
+    sse.push(sseChunk('complete', { message: 'done' }));
+    sse.finish();
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); });
+
+    // The proposalKey mismatch (proposalAbstract changed in the same commit)
+    // must defeat the completion exemption: fresh compose, not the sent
+    // summary. Selection itself did clear to empty (that part of the
+    // transition is real), so the reset compose form targets 0 reviewers.
+    expect(screen.queryByText('1 sent')).toBeNull();
+    expect(screen.getByRole('button', { name: /preview 0 email/i })).toBeTruthy();
+  });
 });
 
 // ── Payload equality ─────────────────────────────────────────────────────

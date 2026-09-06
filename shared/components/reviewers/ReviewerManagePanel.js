@@ -556,7 +556,29 @@ function membershipKeyFor(reviewers) {
     .join(MEMBERSHIP_KEY_ROW_SEP);
 }
 
-function ReleaseMaterialsModal({ isOpen, onClose, reviewers, proposalTitle, requestId, settings, onEmailsSent, membershipCause }) {
+// Stage 6B3c: a fourth Codex review found the rendered body also embeds
+// PROPOSAL fields (title, abstract, PI/authors, institution — see
+// render-emails-service.js buildTemplateContext) and send transmits the body
+// verbatim, so a same-requestId proposal edit after preview leaves stale
+// proposal text just like a stale membership/settings field would. Keyed by
+// VALUE over exactly the four proposal fields the panel carries (see the
+// `proposal` prop contract in reviewers-service.js / reviewer-follow-up.js /
+// ReviewersTab's synthetic fallback) — co-investigators are NOT carried by
+// any host, so there is nothing to fold in for them. Joined with the same
+// MEMBERSHIP_KEY_FIELD_SEP (no row separator needed: this is a fixed
+// four-field record, not a per-reviewer array). A null/undefined proposal
+// (e.g. a host reviewers-fetch failure) yields the four-empty join, same
+// shape as an empty membership key.
+function proposalKeyFor(proposal) {
+  return [
+    proposal?.proposalTitle,
+    proposal?.proposalAbstract,
+    proposal?.proposalAuthors,
+    proposal?.proposalInstitution,
+  ].map(v => v || '').join(MEMBERSHIP_KEY_FIELD_SEP);
+}
+
+function ReleaseMaterialsModal({ isOpen, onClose, reviewers, proposalTitle, proposalKey, requestId, settings, onEmailsSent, membershipCause }) {
   // This request-scoped entry point is intentionally materials-only. Review-due
   // nudges use ReviewReminderAction's fresh eligibility + atomic-claim path, and
   // thank-yous are handled by the dedicated sweep. Keeping those choices out of
@@ -656,6 +678,13 @@ function ReleaseMaterialsModal({ isOpen, onClose, reviewers, proposalTitle, requ
   // fields after preview must invalidate the session exactly like a
   // membership change, not just leave a stale greeting/affiliation in the
   // sent body.
+  // Stage 6B3c: identity also folds in a proposal-by-VALUE key (proposalKey
+  // prop, computed by the call site via proposalKeyFor over proposalTitle/
+  // proposalAbstract/proposalAuthors/proposalInstitution — see
+  // proposalKeyFor above) — the rendered draft body also embeds these
+  // PROPOSAL fields (render-emails-service.js) and is sent verbatim, so a
+  // same-requestId proposal edit after preview must invalidate the session
+  // exactly like a membership or settings change.
   const mountedRef = useRef(true);
   const saveTimerRef = useRef(null);
   const uploadAttemptRef = useRef(null);
@@ -673,6 +702,9 @@ function ReleaseMaterialsModal({ isOpen, onClose, reviewers, proposalTitle, requ
     requestId: undefined,
     key: '',
     settingsKey: '',
+    // Stage 6B3c: proposal-by-VALUE key (proposalKeyFor) — see the
+    // committed-session effect below.
+    proposalKey: '',
     // The committed settings.reviewDueDate default at last reconcile — the
     // "prior default" the emailFields follow-rule below compares against.
     reviewDueDateDefault: '',
@@ -706,17 +738,19 @@ function ReleaseMaterialsModal({ isOpen, onClose, reviewers, proposalTitle, requ
   // Committed-session reconciliation: no dependency array, no cleanup, so it
   // runs on every commit (mirrors the Stage 6B1/6B2 committed-props effect
   // pattern). Any change to isOpen, requestId, the membership+recipient key
-  // (Stage 6B3b — see membershipKeyFor above), or the settings-by-value key
-  // (Stage 6B3a) bumps modalSessionRef, aborts the active render, and resets
-  // compose/preview/send scratch state back to a fresh 'compose' session —
-  // except when the transition is the one-use completion-cause exemption (a
-  // prior-membership→empty transition tagged by the just-finished send
-  // attempt, with settings ALSO unchanged), which updates the committed key
-  // WITHOUT bumping or resetting, preserving the just-completed 'sent'
-  // summary. Same-membership, same-recipient-fields array/object churn
-  // (fresh reviewer objects, same ids and same name/email/affiliation; a
-  // fresh `settings` object with the same signature/reviewDueDate values)
-  // never bumps.
+  // (Stage 6B3b — see membershipKeyFor above), the settings-by-value key
+  // (Stage 6B3a), or the proposal-by-value key (Stage 6B3c — see
+  // proposalKeyFor above) bumps modalSessionRef, aborts the active render,
+  // and resets compose/preview/send scratch state back to a fresh 'compose'
+  // session — except when the transition is the one-use completion-cause
+  // exemption (a prior-membership→empty transition tagged by the
+  // just-finished send attempt, with settings AND proposal ALSO unchanged),
+  // which updates the committed key WITHOUT bumping or resetting,
+  // preserving the just-completed 'sent' summary. Same-membership,
+  // same-recipient-fields array/object churn (fresh reviewer objects, same
+  // ids and same name/email/affiliation; a fresh `settings` object with the
+  // same signature/reviewDueDate values; a fresh `proposal` object with the
+  // same title/abstract/authors/institution values) never bumps.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useLayoutEffect(() => {
     const context = sessionContextRef.current;
@@ -733,24 +767,25 @@ function ReleaseMaterialsModal({ isOpen, onClose, reviewers, proposalTitle, requ
     // fields can't collide across the separator.
     const nextSettingsKey = `${settings.signature || ''}\u0000${settings.reviewDueDate || ''}`;
     const changed = context.isOpen !== isOpen || context.requestId !== requestId || context.key !== nextKey
-      || context.settingsKey !== nextSettingsKey;
+      || context.settingsKey !== nextSettingsKey || context.proposalKey !== proposalKey;
 
     if (changed) {
       // The one-use completion-cause exemption: this specific transition is
-      // priorKey→empty, the session/request/settings are UNCHANGED (only
-      // membership moved), and the cause the panel handed back as a prop is
-      // exactly the attempt this modal's own last `complete` produced (same
-      // token), still unconsumed, still referring to the current
-      // epoch/request/prior membership. Any mismatch (untagged empty, a
-      // different membership, request/mode/permission/settings change, an
-      // expired/reused/foreign cause, or a change that happened before
-      // completion) invalidates normally.
+      // priorKey→empty, the session/request/settings/proposal are UNCHANGED
+      // (only membership moved), and the cause the panel handed back as a
+      // prop is exactly the attempt this modal's own last `complete`
+      // produced (same token), still unconsumed, still referring to the
+      // current epoch/request/prior membership. Any mismatch (untagged
+      // empty, a different membership, request/mode/permission/settings/
+      // proposal change, an expired/reused/foreign cause, or a change that
+      // happened before completion) invalidates normally.
       const attempt = lastSendAttemptRef.current;
       const cause = membershipCause;
       const isCompletionExemption = Boolean(
         context.isOpen === isOpen
           && context.requestId === requestId
           && context.settingsKey === nextSettingsKey
+          && context.proposalKey === proposalKey
           && nextKey === ''
           && attempt
           && !attempt.consumed
@@ -792,6 +827,7 @@ function ReleaseMaterialsModal({ isOpen, onClose, reviewers, proposalTitle, requ
           ));
         }
         context.settingsKey = nextSettingsKey;
+        context.proposalKey = proposalKey;
         context.reviewDueDateDefault = nextDueDateDefault;
         if (activeRenderAbortRef.current) {
           activeRenderAbortRef.current.abort();
@@ -2845,6 +2881,11 @@ export default function ReviewerManagePanel({
             onClose={() => setReleaseModalOpen(false)}
             reviewers={selectedList}
             proposalTitle={proposal.proposalTitle}
+            // Stage 6B3c: by-VALUE key over the proposal fields the rendered
+            // draft body embeds (see proposalKeyFor above) — never the
+            // proposal object itself, which this call site rebuilds fresh
+            // every render.
+            proposalKey={proposalKeyFor(proposal)}
             requestId={proposal?.proposalId}
             settings={{
               ...settings,
