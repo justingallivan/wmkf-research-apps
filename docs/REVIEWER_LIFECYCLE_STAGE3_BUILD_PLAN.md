@@ -40,7 +40,8 @@ proving both import paths resolve to the same function object (`toBe`) and that 
 the new path `instanceof` the class exported by the old path. Add a **caller-boundary census
 test** (`tests/unit/reviewer-engagement-census.test.js`) that greps `lib/`, `pages/`, `scripts/`
 for imports of `review-manager/close-review-service` and asserts the set equals the recorded list
-(route + wrapper), so a new direct caller must be recorded deliberately. Extend it per slice.
+(the route alone — the wrapper imports the NEW path), so a new direct caller must be recorded
+deliberately. Extend it per slice.
 
 Exit: retained suites + the four listed + full suite, types, lint, build, `check:route-service-boundary`
 (routes still import a `lib/services/<domain>/` module — both `review-manager/` and
@@ -81,6 +82,27 @@ Move the fixed conditional expire operation (`lib/services/reviewer-suggestion-s
 streaming and correlation stay where they are. **Sequencing note:** 3E touches
 `send-emails-service.js`, as does Stage 6D. Land 6D first or rebase 3E onto it; do not run both
 builders on that file concurrently.
+
+## 3A build and review record
+
+- **Build (Sonnet, 2026-09-05):** `16bacd6b` → corrections `aec5f54f`, `401f1161` on
+  `claude/reviewer-lifecycle-stage3a` (rebased as `29879919`/`44f2cffe`/`401f1161`); PR #154. The
+  moved module is byte-identical to main's `close-review-service.js`; the wrapper re-exports exactly
+  `closeReview` and `_closeReviewInternals`. Six-suite selection 6 / 288; full suite 775 / 11,336
+  (pre-correction head); types, lint 0 errors, `check:route-service-boundary` exit 0,
+  `check:dataverse-access-layer`, build, `git diff --check` green. Mutations: wrapper-not-identity →
+  paths test red; scratch importer → census red; broken regex → non-vacuity red.
+- **Opus review (`16bacd6b`): PASS WITH ADVISORIES**, two required — drop the `ServiceHttpError`
+  re-export (the plan's `<ErrorClass>` placeholder meant a dedicated class; there is none, errors are
+  plain `ServiceHttpError` via `closeoutError`), and match literal dynamic `import(`. Both applied.
+  Advisory accepted: this plan's wording "route + wrapper" was imprecise — the census records
+  importers of the OLD path, which is the route alone; the wrapper imports the new path.
+- **Codex adversarial round 1:** same two items plus scanning all production extensions and
+  export-from; applied. **Round 2 (final):** round-1 resolution confirmed; one further evasion (a
+  comment between the import keyword and the specifier) — fixed in `401f1161` with three more
+  fixtures. Cap reached; no round 3. Recorded limit: a non-literal specifier (`require(variable)`)
+  is not detectable by the regex scanner; an AST scan is the later-slice upgrade if a real caller
+  ever needs it. Census helper: `tests/helpers/import-census.js`.
 
 ## Rules for every slice
 
