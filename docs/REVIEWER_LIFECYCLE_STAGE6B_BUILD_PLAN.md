@@ -40,8 +40,10 @@ folded the signature and review due date into the session identity after a Codex
 review, and amendment 6B3b (`9a790c64` runtime, `529ee426` advisory test) folded recipient
 name, email and affiliation after a second one, and 6B3c (`2622dfc7`) folded the panel-carried
 proposal title, abstract, PI and institution after a third, and 6B3d (`be76760f`, host-side in
-`ReviewersTab.js`) keeps the same-request proposal on a refetch error after a fourth; each has an
-independent PASS, the last with a full suite of 772 suites / 11,320 tests. See the
+`ReviewersTab.js`) keeps the same-request proposal on a refetch error after a fourth, and 6B3e
+(`5b57991d`, Codex-built via rescue, Claude-reviewed) adds a degraded mode with Retry after a
+fifth; the reviewed amendments have independent PASS verdicts, the last full suite is recorded in
+the receipt. See the
 [Stage 6B3 receipt](audits/REVIEWER_LIFECYCLE_STAGE6B3_RECEIPT_2026-09-05.md).
 **Stage 6B is therefore complete on `codex/reviewer-lifecycle-stage6b`.** Nothing is
 merged or deployed; promotion (PR, CI, deliberate merge under the release strategy) is

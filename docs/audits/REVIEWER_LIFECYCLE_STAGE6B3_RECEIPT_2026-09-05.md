@@ -421,3 +421,36 @@ is a soft delete server-side, pre-existing); there is no automatic retry. Out of
 pre-existing: `pages/workbench/reviewer-follow-up.js` empties its proposal list on a refetch
 error, which unmounts the panel and the modal entirely on that host, so the same finding survives
 there in a worse form; recorded for the owner.
+
+## Amendment 6B3e — degraded mode while a reviewers refetch error is showing (2026-09-05)
+
+Origin: fifth Codex adversarial review (thread on 6B3d, medium: "Refetch-error fallback keeps
+mutation controls enabled on unverified reviewer state"). The orchestrator recommended recording
+it; the owner chose to build the degraded mode and asked Codex to implement it through the rescue
+runtime, with Claude reviewing.
+
+Implemented at `5b57991d` (`ReviewersTab.js` +5/−1; `ReviewerManagePanel.js` +34/−7; two host
+test files; new `tests/unit/reviewer-manage-degraded.test.js`): the error banner gains a Retry
+control calling the plain reload (`loadReviewers`, disabled while loading); the tab passes
+`degraded={Boolean(error)}` to the panel; when degraded the panel disables, with an explanatory
+title and without hiding or unmounting anything: the release button, the row actions menu trigger
+and every item and the status select inside it, the review-reminder send (through the action's own
+new `degraded` prop), the closeout trigger button, and the open materials modal's Send button.
+Preview, Cancel/Close, the sent summary, view-history and filters are untouched. `canManage` and
+`previewReadOnly` semantics are unchanged; `ReviewerCloseoutModal` receives no degraded signal, so
+its 6B2 permission-loss close cannot fire from a refetch error. Because `setError(null)` runs at the
+start of a load, controls re-enable while a retry is in flight and a failed retry re-degrades.
+
+Claude's review of Codex's work: the diff matched the traced affordance list; one correction was
+made before commit — Codex had folded `degraded` into the reminder's `previewReadOnly` (which
+changed its aria copy and would have bumped its committed-context epoch) while leaving the new
+`degraded` prop it added unused; the call site now passes `degraded` directly. Codex's red-first
+claim was weak (the only red was the missing new file), so Claude reproduced guard removals: release
+gate → 2 failures; tab wiring → 3; modal Send gate → 1; reminder wiring → 0 until the degraded test
+was rewritten to assert through the panel rather than the component in isolation, then 1. The
+shared `Button` passes `disabled` and `title` through [VERIFIED `shared/components/Layout.js:366+`].
+Nine-suite selection 9 / 522 at commit. Full battery at `5b57991d` (orchestrator-run, HEAD logged start and end): full suite 773 suites / 11,323 tests; types; lint 0 errors, 75 warnings; webpack build with no generated changes; `git diff --check`; seven gate pairs with self-tests.
+
+Accepted limits: the gate is client-side and advisory (server guards remain authoritative); the
+retry re-enables controls optimistically while loading; the reviewer-follow-up host has no
+equivalent and still unmounts its panel on error (pre-existing).
