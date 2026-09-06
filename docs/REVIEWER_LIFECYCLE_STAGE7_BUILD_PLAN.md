@@ -184,8 +184,16 @@ or backfill.
 - **3I Codex adversarial round 1 (`87edb12b`): needs-attention, one documentation medium** — no
   catalog entry or wiki note yet for `withdraw-pending-invitation.js`. Accepted; per the Stage 3
   plan's "Docs (after each merge)" these land in the architect's post-merge docs pass, as for
-  3A–3E (same disposition as the 3C round-1 catalog finding). No runtime defect confirmed. Opus
-  pending.
+  3A–3E (same disposition as the 3C round-1 catalog finding). No runtime defect confirmed.
+- **3I Opus review (`87edb12b`): PASS WITH ADVISORIES, zero required.** Payload byte-identical; the
+  try/catch stayed in the caller (the builder's wording, not the code, was wrong); write before send;
+  single adapter import; mutations in throwaway worktrees: inline keeping the import → 4/4 pins red;
+  drop `ifMatch` → 1 red; write after send → 3 red; payload mutation → 2/4 direct red; census
+  reproduced over 1,123 files; 790 / 11,534 and both boundary gates green; mock-seam table verified by
+  the reviewer. Advisories: legacy header "Holds ALL business logic" (narrowed by the architect in
+  `7c8b8575`); a legacy-path census row would match three files incl. a self-test template string —
+  not added; catalog entries land post-merge. Rebased onto `c833bf2a` (census conflict resolved
+  keeping all rows; 4 suites / 34 green), PR #164.
 
 ## Docs (after each merge)
 
