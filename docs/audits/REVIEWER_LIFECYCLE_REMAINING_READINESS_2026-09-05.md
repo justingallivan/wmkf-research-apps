@@ -12,12 +12,15 @@ last_verified: 2026-09-05
 
 Assessment baseline: main `d614de5cf60baeaec8cf21ca8e4dd3c2489d2f7a`.
 The owner selected **Stage 6B as the next build**, starting with **6B1**.
-**Status update, 2026-09-05 (later sessions):** 6B1 (`9258115a`/`06725d6c`) and
-6B2 (`b08c16f6`/`d3ec406a`/`039d5d8e`) are complete on branch `codex/reviewer-lifecycle-stage6b`
-with independent PASS verdicts, not merged; see the
-[Stage 6B1 receipt](REVIEWER_LIFECYCLE_STAGE6B1_RECEIPT_2026-09-05.md) and the
-[Stage 6B2 receipt](REVIEWER_LIFECYCLE_STAGE6B2_RECEIPT_2026-09-05.md).
-Routing below that says the next agent starts 6B1 or 6B2 is historical; 6B3 is next.
+**Status update, 2026-09-05 (later sessions):** 6B1 (`9258115a`/`06725d6c`),
+6B2 (`b08c16f6`/`d3ec406a`/`039d5d8e`) and 6B3 (`a6a27ce8`/`b163172a`) are complete on
+branch `codex/reviewer-lifecycle-stage6b` with independent PASS verdicts, not merged; see
+the [Stage 6B1](REVIEWER_LIFECYCLE_STAGE6B1_RECEIPT_2026-09-05.md),
+[Stage 6B2](REVIEWER_LIFECYCLE_STAGE6B2_RECEIPT_2026-09-05.md) and
+[Stage 6B3](REVIEWER_LIFECYCLE_STAGE6B3_RECEIPT_2026-09-05.md) receipts. Stage 6B is
+complete on the branch. Routing below that says the next agent starts a 6B slice is
+historical; the next decision is promotion of the branch, and Stage 6C remains queued
+behind that decision.
 Use [the Stage 6B build plan](../REVIEWER_LIFECYCLE_STAGE6B_BUILD_PLAN.md)
 for the exact implementation contract, verification and review checkpoints.
 Complete and freshly review each slice before starting the next dependent slice.

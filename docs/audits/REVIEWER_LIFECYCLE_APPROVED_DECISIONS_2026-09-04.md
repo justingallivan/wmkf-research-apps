@@ -49,8 +49,11 @@ between slices. **6B1 (`9258115a` runtime, `06725d6c` test correction) and 6B2
 permission-loss close after a Codex adversarial review) are complete on branch
 `codex/reviewer-lifecycle-stage6b` with independent PASS verdicts; see the
 [Stage 6B1 receipt](REVIEWER_LIFECYCLE_STAGE6B1_RECEIPT_2026-09-05.md) and the
-[Stage 6B2 receipt](REVIEWER_LIFECYCLE_STAGE6B2_RECEIPT_2026-09-05.md). Neither is
-merged or deployed. 6B3 remains planned, not implemented.**
+[Stage 6B2 receipt](REVIEWER_LIFECYCLE_STAGE6B2_RECEIPT_2026-09-05.md). 6B3
+(`a6a27ce8` runtime, `b163172a` review correction) is also complete with an independent
+PASS; see the [Stage 6B3 receipt](REVIEWER_LIFECYCLE_STAGE6B3_RECEIPT_2026-09-05.md).
+Stage 6B is complete on the branch. Nothing is merged or deployed; promotion is the
+next owner decision.**
 Use the [Stage 6B build plan](../REVIEWER_LIFECYCLE_STAGE6B_BUILD_PLAN.md) and
 [remaining readiness audit](REVIEWER_LIFECYCLE_REMAINING_READINESS_2026-09-05.md).
 Stages 2–5, 6C and 7 remain outside the selected next build; their dependencies

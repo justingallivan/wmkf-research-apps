@@ -3,13 +3,14 @@ title: Reviewer Lifecycle Stage 6B — Build Handoff
 domain: reviewer-workbench
 kind: plan
 status: active
-summary: Sequential in-place action lifetime fixes; 6B1 and 6B2 are complete on a branch, 6B3 materials-modal lifetime is next.
+summary: Sequential in-place action lifetime fixes; 6B1, 6B2 and 6B3 are all complete on a branch with independent PASS verdicts; promotion is the next decision.
 canonical: false
 owner: product-engineering
 last_verified: 2026-09-05
 related:
   - docs/audits/REVIEWER_LIFECYCLE_STAGE6B1_RECEIPT_2026-09-05.md
   - docs/audits/REVIEWER_LIFECYCLE_STAGE6B2_RECEIPT_2026-09-05.md
+  - docs/audits/REVIEWER_LIFECYCLE_STAGE6B3_RECEIPT_2026-09-05.md
   - docs/audits/REVIEWER_LIFECYCLE_REFACTOR_REPORT_2026-09-04.md
   - docs/audits/REVIEWER_LIFECYCLE_APPROVED_DECISIONS_2026-09-04.md
   - docs/audits/REVIEWER_LIFECYCLE_RELEASE_2026-09-05.md
@@ -31,11 +32,19 @@ owner-decided permission-loss close `039d5d8e` after a Codex adversarial review,
 suite 771 suites / 11,275 tests, webpack build, seven gate pairs and an independent
 PASS after one BLOCK round. See the
 [Stage 6B2 receipt](audits/REVIEWER_LIFECYCLE_STAGE6B2_RECEIPT_2026-09-05.md).
-Neither slice is merged or deployed; promotion is a separate action.
-[PLANNED] **Build 6B3 next**, after its preflight and a fresh read of the 6B2
-receipt's limits (callback promises are observed, not awaited; no post-close
-refresh-failure surface exists for the reminder or closeout components; the closeout
-modal closes itself on committed permission loss and a pending save then settles silently).
+[VERIFIED via frozen commits, tests and independent review] **6B3 is complete**
+on the same branch: runtime `a6a27ce8`, review-driven correction `b163172a`, full
+suite 772 suites / 11,301 tests, webpack build, seven gate pairs and an independent
+PASS after one BLOCK round. See the
+[Stage 6B3 receipt](audits/REVIEWER_LIFECYCLE_STAGE6B3_RECEIPT_2026-09-05.md).
+**Stage 6B is therefore complete on `codex/reviewer-lifecycle-stage6b`.** Nothing is
+merged or deployed; promotion (PR, CI, deliberate merge under the release strategy) is
+the next owner decision. The three receipts carry the accepted limits that a later
+stage inherits: callback promises are observed, not awaited; no post-close
+refresh-failure surface exists for the reminder, closeout or materials components; the
+closeout modal closes itself on committed permission loss; a membership change during an
+in-flight materials send returns the modal to compose while the server-side one-time
+release gate bounds a duplicate send.
 These are subdivisions of original Stage 6B, not additional product features.
 Stage 6C extraction is outside this handoff.
 
