@@ -241,7 +241,17 @@ or backfill.
   undefined-ifMatch equality case red.
 - **3J Codex adversarial round 1 (`ef83bb9a`): approve** — transport-identical (payload, ETag
   handling, exclusion/closed guards inherited); same ETag expression inside the external-respond
-  DAL context; delegation pin would catch a direct `updateLifecycle` call; D3 unchanged. Opus pending.
+  DAL context; delegation pin would catch a direct `updateLifecycle` call; D3 unchanged.
+- **3J Opus review (`ef83bb9a`): PASS WITH ADVISORIES, none required.** For `{ selected:false }` the
+  inherited path is mapping + guard read + excluded refusal; correction guards and the concrete-ETag
+  validation are inert (`wmkf_selected` is not an invitation-response field) and `statusChanging` is
+  false, so `effectiveIfMatch = ifMatch || undefined` byte-for-byte as before; no `requireIfMatch`.
+  Shim wrapped in `jest.fn` with pins per the Stage 5 precedent; the pre-existing assertion stays
+  load-bearing for id/ifMatch; delegation pin catches a direct call; op suite runs the real adapter
+  and an added `requireIfMatch` would fail its undefined-ifMatch case. 799 / 11,608 and three gates +
+  self-tests green. Advisories folded into a correction: op-suite comparisons need
+  `toHaveBeenCalledTimes(1)` guards (vacuous-capable), a `getRecord` guard-read assertion or
+  excluded-row case, and a docblock nit ("closed-status checks" inert here). Correction sent.
 
 ## Docs (after each merge)
 
