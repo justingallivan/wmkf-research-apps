@@ -9,6 +9,7 @@ import EmailDefaultsSection from '../shared/components/admin/EmailDefaultsSectio
 import SiteVisitRecipientsSection from '../shared/components/admin/SiteVisitRecipientsSection';
 import FinalWriteupMatrixAudiencesSection from '../shared/components/admin/FinalWriteupMatrixAudiencesSection';
 import ReviewerRepairAlertDetails from '../shared/components/admin/ReviewerRepairAlertDetails';
+import DynamicsExplorerRestrictionsSection from '../shared/components/admin/DynamicsExplorerRestrictionsSection';
 import DataverseFieldInfoButton, {
   appSystemSettingField,
   appSystemSettingPattern,
@@ -3046,6 +3047,17 @@ function OperationsWorkspace({ view }) {
       );
     case 'feedback':
       return <DynamicsFeedbackSection />;
+    case 'dynamics-safeguards':
+      return (
+        <AdminEditorPanel
+          id="dynamics-explorer-safeguards"
+          title="Dynamics Explorer data safeguards"
+          description="Control what Dynamics Explorer can query or export. These settings do not change a user&apos;s underlying Dynamics permissions."
+          scope="Global Explorer policy"
+        >
+          <DynamicsExplorerRestrictionsSection />
+        </AdminEditorPanel>
+      );
     case 'health':
     default:
       return (

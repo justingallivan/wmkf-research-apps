@@ -24,6 +24,7 @@ export const ADMIN_WORKSPACES = Object.freeze([
       { key: 'credentials', label: 'Credentials' },
       { key: 'notifications', label: 'Notifications' },
       { key: 'feedback', label: 'Feedback & quality' },
+      { key: 'dynamics-safeguards', label: 'Dynamics safeguards' },
     ],
   },
   {

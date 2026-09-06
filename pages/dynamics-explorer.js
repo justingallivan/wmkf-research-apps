@@ -4,6 +4,7 @@ import Layout, { PageHeader, Card, Button } from '../shared/components/Layout';
 import HelpButton from '../shared/components/HelpButton';
 import ProfileContext from '../shared/context/ProfileContext';
 import RequireAppAccess from '../shared/components/RequireAppAccess';
+import Link from 'next/link';
 
 // ─── Markdown table parser ───
 
@@ -124,7 +125,6 @@ function DynamicsExplorer() {
   const [thinkingStatus, setThinkingStatus] = useState('');
   const [userRole, setUserRole] = useState('read_only');
   const [sessionId] = useState(() => `de-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
-  const [showAdmin, setShowAdmin] = useState(false);
   const [feedbackMap, setFeedbackMap] = useState({});       // { messageId: 'positive'|'negative' }
   const [suggestFeedbackId, setSuggestFeedbackId] = useState(null);
   const [feedbackModalFor, setFeedbackModalFor] = useState(null); // messageId or null
@@ -626,21 +626,15 @@ function DynamicsExplorer() {
         {/* Admin panel (superuser only) */}
         {userRole === 'superuser' && (
           <Card hover={false}>
-            <button
-              type="button"
-              onClick={() => setShowAdmin(!showAdmin)}
-              className="flex items-center gap-2 w-full text-left text-sm font-medium text-gray-700"
-              aria-expanded={showAdmin}
-              aria-controls="dynamics-admin-panel"
-            >
-              <span className={`transition-transform ${showAdmin ? 'rotate-90' : ''}`}>&#9654;</span>
-              Admin Panel
-            </button>
-            {showAdmin && (
-              <div id="dynamics-admin-panel">
-                <AdminPanel userProfileId={currentProfile?.id} />
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-semibold text-gray-900">Explorer safeguards</h2>
+                <p className="mt-1 text-xs text-gray-500">Superuser-managed query and export restrictions.</p>
               </div>
-            )}
+              <Link href="/admin?workspace=operations&view=dynamics-safeguards" className="shrink-0 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2">
+                Manage in Admin
+              </Link>
+            </div>
           </Card>
         )}
       </div>
@@ -912,93 +906,6 @@ function DataTable({ headers, rows }) {
         >
           Export CSV
         </button>
-      </div>
-    </div>
-  );
-}
-
-// ─── Admin Panel ───
-
-function AdminPanel({ userProfileId }) {
-  const [restrictions, setRestrictions] = useState([]);
-  const [newRestriction, setNewRestriction] = useState({ table_name: '', field_name: '', reason: '' });
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetch(`/api/dynamics-explorer/restrictions?userProfileId=${userProfileId}`)
-      .then(r => r.json())
-      .then(data => {
-        setRestrictions(data.restrictions || []);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
-  }, [userProfileId]);
-
-  const addRestriction = async () => {
-    if (!newRestriction.table_name) return;
-    const resp = await fetch('/api/dynamics-explorer/restrictions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...newRestriction, userProfileId }),
-    });
-    const data = await resp.json();
-    if (data.restriction) {
-      setRestrictions(prev => [...prev, data.restriction]);
-      setNewRestriction({ table_name: '', field_name: '', reason: '' });
-    }
-  };
-
-  const removeRestriction = async (id) => {
-    await fetch('/api/dynamics-explorer/restrictions', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, userProfileId }),
-    });
-    setRestrictions(prev => prev.filter(r => r.id !== id));
-  };
-
-  if (loading) return <p className="text-sm text-gray-500 mt-4">Loading admin data...</p>;
-
-  return (
-    <div className="mt-4">
-      <h3 className="text-sm font-semibold text-gray-800 mb-2">Data Restrictions</h3>
-      {restrictions.length > 0 ? (
-        <div className="space-y-1 mb-3">
-          {restrictions.map(r => (
-            <div key={r.id} className="flex items-center justify-between text-sm bg-gray-50 px-3 py-2 rounded">
-              <span>
-                <span className="font-mono text-xs">{r.table_name}</span>
-                {r.field_name && <span className="font-mono text-xs">.{r.field_name}</span>}
-                <span className="text-gray-500 ml-2">({r.restriction_type})</span>
-                {r.reason && <span className="text-gray-500 ml-1">- {r.reason}</span>}
-              </span>
-              <button onClick={() => removeRestriction(r.id)} className="text-red-500 hover:text-red-700 text-xs">Remove</button>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <p className="text-xs text-gray-500 mb-3">No restrictions configured.</p>
-      )}
-      <div className="flex flex-wrap gap-2 items-end">
-        <input
-          placeholder="Table name"
-          value={newRestriction.table_name}
-          onChange={e => setNewRestriction(prev => ({ ...prev, table_name: e.target.value }))}
-          className="border border-gray-300 rounded px-2 py-1 text-sm w-40"
-        />
-        <input
-          placeholder="Field (optional)"
-          value={newRestriction.field_name}
-          onChange={e => setNewRestriction(prev => ({ ...prev, field_name: e.target.value }))}
-          className="border border-gray-300 rounded px-2 py-1 text-sm w-36"
-        />
-        <input
-          placeholder="Reason"
-          value={newRestriction.reason}
-          onChange={e => setNewRestriction(prev => ({ ...prev, reason: e.target.value }))}
-          className="border border-gray-300 rounded px-2 py-1 text-sm w-48"
-        />
-        <button onClick={addRestriction} className="px-3 py-1 bg-gray-900 text-white text-sm rounded hover:bg-gray-800">Add</button>
       </div>
     </div>
   );
