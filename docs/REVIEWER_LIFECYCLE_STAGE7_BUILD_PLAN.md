@@ -344,7 +344,21 @@ or backfill.
   a tracked pin test asserting the exact two-entry map (the census-test mechanism used throughout
   this campaign); header and CI-reference wording changed to "stale entries fail; growth requires a
   deliberate edit to the pin test". Codex confirmed D1–D5 untouched and 7C transport-equivalent.
-  Sandbox could not create fixtures, so the self-test was not run by Codex. Opus pending.
+  Sandbox could not create fixtures, so the self-test was not run by Codex.
+- **Stage 7 Opus review (`ac3dcaac`): PASS WITH ADVISORIES, one required.** Every trace reproduced:
+  14 bindings, zero violations, zero stale; self-test covers every plan-requested class (7 PASS
+  groups); recorded-entry stale rule correct in all three directions (a recorded file binding a
+  different writer is both a violation and stale); 7B carve-out is an exact-path Set and the
+  zero-reference pin goes red on a re-added export; `adapters-caller-id` lost no assertion; 7C is
+  codification (the sweep's guard regex is byte-identical to `isConcreteEtag`), transport identical,
+  outcome assertions unchanged line by line; docs rows/steps/scripts consistent; 42 suites / 993 tests
+  and four gate pairs green; six mutations all bite. **Required R1:** the docblock's fail-closed
+  claim is false for an alias chain (`const b = a; b.updateLifecycle`) in both the unresolved and the
+  literal path — port the exemplar's alias fixpoint. Advisories: destructure from an adapter local is
+  green (A1); `module.exports = require(adapter)`, spread re-publish and `export *` barrels are green
+  (A2 = Codex 1b); CI-reference row overclaims the hop (A3); only one of three fail-closed shapes is
+  fixtured (A4); dead `unresolved` array (A5); stale test pointer (A6); harmless error-text change
+  in 7B (A7). All folded into the correction round with the Codex highs.
 
 ## Docs (after each merge)
 
