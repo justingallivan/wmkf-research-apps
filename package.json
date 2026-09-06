@@ -103,12 +103,12 @@
     "report:claim-evidence-pilot": "node scripts/report-claim-evidence-pilot.js"
   },
   "dependencies": {
-    "@tiptap/extension-link": "^2.27.2",
-    "@tiptap/extension-subscript": "2.27.2",
-    "@tiptap/extension-superscript": "2.27.2",
+    "@tiptap/extension-link": "^3.31.0",
+    "@tiptap/extension-subscript": "3.31.0",
+    "@tiptap/extension-superscript": "3.31.0",
     "@tiptap/pm": "^2.27.2",
-    "@tiptap/react": "^2.27.2",
-    "@tiptap/starter-kit": "^2.27.2",
+    "@tiptap/react": "^3.31.0",
+    "@tiptap/starter-kit": "^3.31.0",
     "@vercel/analytics": "^1.6.1",
     "@vercel/blob": "^2.6.1",
     "@vercel/functions": "^3.7.6",
