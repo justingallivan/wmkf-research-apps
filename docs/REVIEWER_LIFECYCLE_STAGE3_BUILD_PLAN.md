@@ -248,6 +248,8 @@ builders on that file concurrently.
   reimplementation keeping the import → each pin red (0 calls expected N). `etag.js` docblock, census
   header and two header nits fixed. Rebase conflict in the census table resolved by keeping all rows.
   34-suite superset 932 tests; full suite 792 / 11,576; gates green.
+- **Codex adversarial round 2 (final, `6c390a1d`): approve.** Pins judged non-vacuous (exact
+  payloads, send → bookkeeping → terminal-event ordering, full outcome mapping). Cap reached.
 
 ## Rules for every slice
 
