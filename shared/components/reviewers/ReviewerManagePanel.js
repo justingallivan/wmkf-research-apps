@@ -556,7 +556,7 @@ function membershipKeyFor(reviewers) {
     .join(MEMBERSHIP_KEY_ROW_SEP);
 }
 
-// Stage 6B3c: a fourth Codex review found the rendered body also embeds
+// Stage 6B3c: a third Codex review found the rendered body also embeds
 // PROPOSAL fields (title, abstract, PI/authors, institution — see
 // render-emails-service.js buildTemplateContext) and send transmits the body
 // verbatim, so a same-requestId proposal edit after preview leaves stale
