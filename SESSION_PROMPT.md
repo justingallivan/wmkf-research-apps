@@ -1,4 +1,4 @@
-# Session 488 Prompt: Decide Promotion of Stage 6B; Plan Stage 6D
+# Session 488 Prompt: Promote Stage 6B, Then Choose the Optional Stages
 
 ## Session 487 Summary
 
@@ -56,6 +56,14 @@ deployed.** Promotion is a separate, deliberate action under the release strateg
 - Session handoff commit: obtain from `git log`.
 
 ## Next Items
+
+**Owner direction at close of Session 487:** "pick up with the optional work next
+session." The mandatory path of the reviewer lifecycle plan ends when Stage 6B is
+promoted. The remaining stages are elective by the readiness audit's own words:
+6D (queued), 6C extraction, and the alternatives 2, 3, 5 (Stage 4 optional, Stage 7
+blocked behind 3/5). Start by promoting the branch, then present the elective menu
+from `docs/audits/REVIEWER_LIFECYCLE_REMAINING_READINESS_2026-09-05.md` for a fresh
+choice; do not assume an order.
 
 ### Owner Decision Needed
 
