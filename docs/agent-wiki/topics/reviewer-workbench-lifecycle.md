@@ -1591,7 +1591,8 @@ returned zero eligible/enqueued/claimed/failed.** Plan doc:
   across Status, Staff Deliberations, Final writeups and the request locator gained a uniform
   min-height. Change record: `docs/plans/UI_FEATURES_CODEX_HANDOFF_2026-09-05.md`.
 - **Named lifecycle commands live in `lib/services/reviewer-engagement/` (reviewer lifecycle
-  Stage 3, from 2026-09-05).** 3A moved the closeout command there (`close-review.js`, PR #154);
+  Stage 3, from 2026-09-05).** 3A moved the closeout command there (`close-review.js`, PR #154) and
+  3B the terminal transition (`terminal-transition.js`, PR #156);
   the old `review-manager/close-review-service.js` is a pure re-export and routes keep their import
   paths. Each move is byte-identical and pinned by a both-paths identity test plus a caller census
   (`tests/unit/reviewer-engagement-census.test.js`) that records every importer of the legacy path,
