@@ -3,7 +3,7 @@ title: Final Writeups Dashboard — Slice 6A Cycle Scoping Plan
 domain: workbench
 kind: plan
 status: active
-summary: "Plan-first contract for scoping the Final writeups dashboard read model to one grant cycle before the global 100-row bound fails the page; not built."
+summary: "Contract for scoping the Final writeups dashboard read model to one grant cycle before the global row bound fails the page; reworked after Codex review."
 canonical: false
 cataloged: 2026-09-06
 last_verified: 2026-09-06
@@ -18,7 +18,8 @@ related:
 
 # Final Writeups Dashboard — Slice 6A: server-side cycle scoping
 
-**Status: [PLANNED 2026-09-06; NOT BUILT.]** Owner-directed on 2026-09-06 as work queue item 5,
+**Status: [PLANNED 2026-09-06; REWORKED AFTER CODEX ADVERSARIAL REVIEW (NEEDS REWORK → see §11);
+NOT BUILT.]** Owner-directed on 2026-09-06 as work queue item 5,
 build step 6A (`docs/CURRENT_WORK_QUEUE.md`; Slice 6 of
 `docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md`). Dated: must be live before D26 Final
 writeups exist alongside the J26 set. This document is the `/contract-reconcile` Mode A output
@@ -92,25 +93,54 @@ Add a cycle-list step that runs before the scoped request query:
 
 ```
 grantRequestAdapter.queryAllRequests({
-  select: 'akoya_requestid,wmkf_meetingdate',
+  select: 'akoya_requestid,akoya_requestnum,wmkf_meetingdate',
   filter: '_wmkf_currentfinalwriteup_value ne null',
   orderby: 'wmkf_meetingdate desc',
 })
 ```
 
+`akoya_requestnum` is selected so the off-month data fault below can name the request number
+(Codex finding 2); when it is null the fault names the GUID instead.
+
 - `queryAllRequests` is the paginated scan **[VERIFIED via
-  `lib/dataverse/adapters/grant-request.js:252-254`]**; on `result.capped` throw a typed 503
+  `lib/dataverse/adapters/grant-request.js:252-254`]**, which truncates at `MAX_EXPORT_RECORDS`
+  and marks the result `capped` **[VERIFIED via `lib/services/dynamics/read-ops.js:311-313` and
+  `lib/services/dynamics/constants.js:47`]**. On `result.capped` throw a typed 503
   (`final_writeups_dashboard_cycle_list_capped`) exactly as the reviewer follow-up picker does
   **[VERIFIED via `workbench/dashboard-service.js:109-113`]**. Never return a partial cycle list.
+- **Accepted ceiling, stated (Codex finding 3).** This scan is global across cycles, so once the
+  number of requests holding a current Final reaches `MAX_EXPORT_RECORDS` every cycle view fails
+  with that 503, not only the oversized one. The set grows by one cycle's finalists twice a year
+  and shrinks only when a current Final pointer is cleared; at the **[ASSUMED]** rate in §1 the
+  ceiling is decades away, so the owner accepts it rather than adding a grouped aggregate whose
+  Dataverse datetime group-by behavior is unverified here. Two mitigations are part of 6A: (a) the
+  service emits one structured `console.warn` with code
+  `final_writeups_dashboard_cycle_list_near_cap` when `records.length` reaches half of
+  `MAX_EXPORT_RECORDS`, so the approach is visible in logs long before it bites, and (b) the plan
+  records the aggregate path (`grantRequestAdapter.aggregateRequests` with a `groupBy` on the
+  meeting date, `lib/dataverse/adapters/grant-request.js:265-267`) as the named replacement if
+  the warning ever fires. Tests pin the capped 503 and the near-cap warning.
+- **Cleared pointers drop out, by design.** A request whose `_wmkf_currentfinalwriteup_value`
+  is later nulled leaves both the cycle list and the scoped queues on the next load, and a cycle
+  whose last current Final is cleared disappears from the picker. This is the intended reading of
+  "current"; acknowledgement rows are unaffected because they key to the Final artifact, not the
+  request pointer.
 - Dedupe to `{ code, label, count }` with `meetingDateToCycleCode` / `cycleCodeToLabel`, newest
   first. `count` is the number of requests with a current Final in that cycle: a navigation count
   for the picker, never a denominator (contract row "no denominator" preserved).
 - **Buckets must be total.** Requests whose meeting date is null yield `cycleCode === null`.
   Count them as `uncycledCount`. If it is above zero, the picker shows an explicit **No cycle**
-  option that scopes with `wmkf_meetingdate eq null`. A current Final on a request whose meeting
+  option. Its selector is the literal sentinel `none`, a first-class value in every layer (Codex
+  finding 1): the handler grammar accepts `parseCycleCode(value) !== null || value === 'none'`
+  (a local `isFinalWriteupCycleSelector` helper, since `parseCycleCode` alone rejects `none`
+  **[VERIFIED via `lib/utils/cycle-code.js:39-48`]**); the service maps `none` to the filter
+  `wmkf_meetingdate eq null` and every real code to `cycleCodeToOdataFilter`; the response returns
+  `cycles.selected: 'none'`; the URL serializes `?cycleCode=none`; the UI option value is `none`.
+  A current Final on a request whose meeting
   date is set but falls outside June/December cannot be expressed as a cycle window, so it is
   surfaced as a data fault by a typed 500 (`final_writeups_dashboard_cycle_invalid`) naming the
-  request number, matching the fail-loud posture of `lifecycleStage`
+  request number from the scan (GUID when the number is null), raised during cycle discovery
+  before any scoped read, matching the fail-loud posture of `lifecycleStage`
   (`dashboard-service.js:167-179`). Rows must never vanish silently from every view. **[PLANNED]**
 - Whether any null-date or off-month rows exist in Production is **[ASSUMED none]** and
   unverifiable from the repo; the build handles both branches and the tests pin both.
@@ -119,8 +149,9 @@ grantRequestAdapter.queryAllRequests({
 
 - Index request without `cycleCode`: default to the newest cycle with any current Final.
   Return `cycles.selected`.
-- Index request with `cycleCode`: must match `^[JD]\d{2}$` after trim/uppercase (reuse
-  `parseCycleCode`); otherwise the handler rejects it as a bad request. A well-formed code that
+- Index request with `cycleCode`: after trim, must be either a real code (`^[JD]\d{2}$`
+  case-insensitive via `parseCycleCode`) or the exact lowercase sentinel `none`; otherwise the
+  handler rejects it as a bad request before any service call. A well-formed code that
   is not in the discovered list succeeds with empty queues and `cycles.selected` set, so a
   bookmarked future cycle does not error. **[PLANNED]**
 - **Focused request (`requestId`) never takes `cycleCode`.** The service resolves the request
@@ -150,7 +181,7 @@ grantRequestAdapter.queryAllRequests({
   success: true,
   viewer: { ...unchanged },
   cycles: {
-    selected: 'D26' | 'none' | null,
+    selected: 'D26' | 'none' | null,   // 'none' only when uncycledCount > 0 and requested
     available: [{ code: 'D26', label: 'December 2026', count: <n> }, ...],  // newest first
     uncycledCount: <n>
   },
@@ -175,7 +206,9 @@ intended semantic change and is called out in the security-matrix row and Atlas 
   `FinalWriteupsViews.js:425-453`]** already covers the reload; the cycle select is disabled
   while `loading`.
 - The header line becomes "N awaiting your review in December 2026".
-- The **No cycle** option renders only when `uncycledCount` is above zero.
+- The **No cycle** option (value `none`) renders only when `uncycledCount` is above zero; a
+  bookmarked `?cycleCode=none` when the count is zero returns success with empty queues, the same
+  as any absent cycle.
 - `FinalWriteupFocusedView` is unchanged except that it renders `cycles.selected` as context
   under the request number. It never sends `cycleCode`.
 - The header comment "THESIS: one legible review queue replaces a metrics-and-filters dashboard"
@@ -191,7 +224,7 @@ intended semantic change and is called out in the security-matrix row and Atlas 
 | 1 user | opens `/workbench/final-writeups` | same, optionally with `?cycleCode=D26` |
 | 2 client state | `data`, `search`, stale guard | + `cycleCode` from URL; select disabled while loading |
 | 3 payload | `GET /api/workbench/final-writeups` or `?requestId=` | + `?cycleCode=` on index only; never with `requestId` |
-| 4 handler | allowlist `requestId` only; GUID check | allowlist `requestId` XOR `cycleCode`; `cycleCode` must parse (`parseCycleCode`); both together rejected as a bad request |
+| 4 handler | allowlist `requestId` only; GUID check | allowlist `requestId` XOR `cycleCode`; `cycleCode` must be a real code (`parseCycleCode`) or the sentinel `none`; both together rejected as a bad request |
 | 5 service | viewer ∥ all-requests ∥ personas | viewer ∥ cycle list ∥ personas → resolve selected cycle → scoped requests → unchanged projection |
 | 6 persistence | reads only | reads only; one extra paginated scan of two columns |
 | 7 response | queues/matrix over all cycles | + `cycles`; queues/matrix over one cycle |
@@ -233,8 +266,9 @@ intended semantic change and is called out in the security-matrix row and Atlas 
 | Invariant | Files likely touched | Verification |
 |---|---|---|
 | A request row never appears in a cycle other than the one its own `cycleCode` derives | `dashboard-service.js` | test: fixtures across J26/D26; each scoped response contains only rows whose `cycleCode` equals `cycles.selected`; mutation (drop the filter) turns it red |
-| Rows with a null meeting date never vanish silently | `dashboard-service.js`, views | test: one null-date fixture → `uncycledCount` of one, absent from J26/D26, present under `cycleCode=none`; UI shows the option only when the count is above zero |
-| A current Final on a non-June/December meeting date fails loud, not silent | `dashboard-service.js` | test: March meeting date → typed 500 `cycle_invalid` naming the request number; mutation (skip) turns it red |
+| Rows with a null meeting date never vanish silently | `dashboard-service.js`, handler, views | test: one null-date fixture → `uncycledCount` of one, absent from J26/D26, present under `cycleCode=none`; handler test: `cycleCode=none` accepted; views test: option value `none` round-trips to the URL and back, shown only when the count is above zero |
+| Near-cap approach is visible before the cap bites | `dashboard-service.js` | test: scan returning half of `MAX_EXPORT_RECORDS` rows → one `console.warn` with code `cycle_list_near_cap`; below that → none |
+| A current Final on a non-June/December meeting date fails loud, not silent | `dashboard-service.js` | test: March meeting date → typed 500 `cycle_invalid` whose body names that fixture's `akoya_requestnum` (and the GUID when the number is null); raised before any document/acknowledgement read; mutation (skip) turns it red |
 | Capped cycle list never returns partially | `dashboard-service.js` | test: `queryAllRequests` returns `capped: true` → 503 `cycle_list_capped`; no downstream reads |
 | Per-cycle bound keeps the fail-loud contract | `dashboard-service.js` | re-pin existing test at `:393` with a scoped filter assertion |
 | `requestId` and `cycleCode` are mutually exclusive; unrecognized keys fail closed | `final-writeups.js` | handler test: both together, an unrecognized key, and a malformed `cycleCode` are each rejected before any service call |
@@ -255,12 +289,15 @@ unrecognized key (rejected). For the cycle resolver, the response for: no reques
 - `tests/unit/final-writeups-dashboard-service.test.js`: "scopes the request query to the
   selected cycle and returns the available cycle list"; "defaults to the newest cycle with a
   current Final"; "counts null-meeting-date rows as uncycled and serves them under `none`";
-  "fails loud on a current Final whose meeting date is not a June/December cycle"; "fails closed
-  when the cycle list scan is capped"; "focused reads derive the cycle from the request and
+  "fails loud on a current Final whose meeting date is not a June/December cycle, naming the
+  request number"; "fails closed when the cycle list scan is capped"; "warns once when the cycle
+  list scan reaches half the export cap"; "serves `none` as an empty success when no uncycled rows
+  exist"; "a cleared current Final pointer drops the request and, if last, its cycle"; "focused reads derive the cycle from the request and
   navigate within it"; re-pin "fails loudly instead of silently truncating" to assert the
   meeting-date window appears in the filter.
-- `tests/unit/workbench-final-writeups-route.test.js`: "accepts requestId or a well-formed
-  cycleCode, never both, and rejects unrecognized keys before service work".
+- `tests/unit/workbench-final-writeups-route.test.js`: "accepts requestId, a well-formed
+  cycleCode, or the `none` sentinel, never requestId with cycleCode, and rejects unrecognized keys
+  and malformed codes before service work".
 - `tests/unit/final-writeups-views.test.js`: "cycle selector reflects the server list, defaults
   to the selected cycle, and reloads with the chosen code"; "ignores a late response after the
   cycle changes"; re-pin `:118` wording; "No cycle option renders only when uncycled rows exist".
@@ -294,3 +331,14 @@ change to the Initial assessments locator.
    still resolves to an empty state.
 2. **Should the coordinator matrix stay per-cycle only?** Default: yes. A cross-cycle matrix
    reintroduces the unbounded scan this slice removes.
+
+## 11. Review disposition (Codex adversarial review, 2026-09-06, verdict NEEDS REWORK)
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 (high) | `cycleCode=none` could not pass the strict `^[JD]\d{2}$` grammar, so the No cycle option was unreachable | **Accepted.** `none` is now a first-class sentinel through handler grammar, service filter, response, URL, UI, and tests (§3.2, §3.3, §3.6, §6, §7). |
+| 2 (high) | The off-month fault promised a request number the scan never selected | **Accepted.** `akoya_requestnum` added to the scan select; the fault names it, or the GUID when null, and is raised during discovery (§3.2, §6, §7). |
+| 3 (medium) | The global scan is capped at `MAX_EXPORT_RECORDS`; a capped scan fails every cycle view | **Accepted as mechanism, declined as redesign (owner decision 2026-09-06).** The ceiling is stated, the growth rate and its [ASSUMED] basis are recorded, a near-cap warning and its test are added, and the aggregate path is named as the replacement if the warning fires (§3.2). |
+| — | Not raised by Codex | **Added:** cleared current Final pointers drop the request and, if last, the cycle (§3.2, §7). |
+
+Second Codex pass requested on this revision before build.
