@@ -551,6 +551,9 @@ function DynamicsExplorer() {
               </button>
             )}
           </div>
+          <p className="mt-3 text-xs leading-5 text-gray-500">
+            Answers use approved Dynamics 365 and SharePoint sources. Verify important results in the linked records or documents before acting on them.
+          </p>
         </Card>
 
         {/* Chat area */}
@@ -595,7 +598,9 @@ function DynamicsExplorer() {
           {/* Input area */}
           <div className="border-t border-gray-200 p-4 bg-white rounded-b-xl">
             <div className="flex items-end gap-3">
+              <label htmlFor="dynamics-question" className="sr-only">Ask a question about your CRM data</label>
               <textarea
+                id="dynamics-question"
                 ref={textareaRef}
                 value={currentMessage}
                 onChange={(e) => { setCurrentMessage(e.target.value); adjustTextarea(); }}
