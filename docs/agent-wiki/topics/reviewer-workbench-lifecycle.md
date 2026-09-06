@@ -260,7 +260,7 @@ rules and copy are unchanged. Tests: the lifetime describes in
 Receipt: `docs/audits/REVIEWER_LIFECYCLE_STAGE6B2_RECEIPT_2026-09-05.md`.
 
 Stage 6B3 (same branch, `a6a27ce8`/`b163172a`, amended by 6B3a `3a4bcbbe`/`0a4eafd6`, 6B3b
-`9a790c64`/`529ee426` and 6B3c `2622dfc7`, not merged): the nested materials-release modal's
+`9a790c64`/`529ee426`, 6B3c `2622dfc7` and 6B3d `be76760f` (host), not merged): the nested materials-release modal's
 session is open state, request id, the sorted selected membership with each reviewer's name,
 email and affiliation by value (`membershipKeyFor`), the proposal title, abstract, PI and
 institution by value (`proposalKeyFor`, passed as the `proposalKey` string prop), and the
@@ -282,7 +282,10 @@ deadline change with a customized field still resets drafts even though the rend
 identical; the global localStorage due-date key makes a restored value read as customized
 (pre-existing); co-investigators are not carried by any host and edits the panel has not
 refetched are invisible to any client key — both deferred to the queued Stage 6D server-side
-draft fingerprint. Tests: `tests/unit/reviewer-materials-modal-lifetimes.test.js`.
+draft fingerprint. Host side (6B3d): `ReviewersTab` keeps the same-request proposal when a
+reviewers refetch fails (case-insensitive GUID match) so a transient error after a confirmed send
+no longer flips the modal's keys and erases the sent summary; the reviewer-follow-up workbench
+host still empties its list on error and unmounts the panel (pre-existing, not addressed). Tests: `tests/unit/reviewer-materials-modal-lifetimes.test.js`.
 Receipt: `docs/audits/REVIEWER_LIFECYCLE_STAGE6B3_RECEIPT_2026-09-05.md`.
 
 The existing `ReviewerManagePanel.updateStatus` UI submits one reviewer only.

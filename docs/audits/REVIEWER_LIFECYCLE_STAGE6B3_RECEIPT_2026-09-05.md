@@ -376,3 +376,48 @@ non-null; 6B3c widens it to the null-deadline case. Nothing stale can be sent.
 
 Remaining limits for Stage 6D: co-investigators are not observable client-side; any body input
 edited between the panel's last refetch and send is invisible to a client key.
+
+## Amendment 6B3d — ReviewersTab keeps the same-request proposal on a refetch error (2026-09-05)
+
+Origin: fourth Codex adversarial review (thread `01a0746b-f8c2-7be3-8130-f6105632dd60`, medium:
+"Transient ReviewersTab refetch errors discard the confirmed send summary"). The 6B3c reviewer had
+flagged the same edge as advisory 4; the third Codex pass showed it was a user-visible loss of a
+confirmed summary that 6B3c widened, so it was fixed rather than recorded.
+
+Implemented at `be76760f` (`ReviewersTab.js` catch block only; two host test files) with the
+case-fold correction at the follow-up commit: on a refetch error the tab keeps the last committed
+proposal when its id matches the failing request (GUIDs compared case-insensitively, because the
+URL param may be mis-cased while Dataverse returns lowercase), still shows the load-error banner,
+and still drops a proposal that belongs to another request. [VERIFIED by the reviewer] `proposal` is
+set only on success and in this catch; no request-change reset exists, so request-switch semantics
+are unchanged; `loading` clears in `finally` on both paths.
+
+Tests: a full integration test through the real ReviewersTab, panel and modal (SSE `result` +
+`complete`, then a failing refetch) asserts the "1 sent" summary stays and the banner shows; the
+stub of `ReviewerManagePanel` in that file was removed and the reviewer confirmed no pre-existing
+assertion weakened (the other tests never mount the panel). A stale-request test pins the
+same-request guard (A loads, B fails → A's rows gone) and a third pins the case-fold (upper-cased
+URL, lowercase API id, same-request failure → rows kept).
+
+Red-before-code: the integration test fails against the `7ceca3a7` host at the summary assertion
+after the banner appears (reviewer-measured 1 failed / 9 passed); the guard test passes on base by
+design as a mutation pin.
+
+Verification at `be76760f` (orchestrator-run): full suite 772 suites / 11,320 tests; types; lint 0
+errors, 75 warnings; webpack build with no generated changes; `git diff --check`; seven gate
+pairs with self-tests. The case-fold commit: both host files 11 / 11; reverting the case-fold
+fails exactly the new test.
+
+Independent review: fresh-context Opus subagent, frozen `be76760f`, md5-verified, waited for
+`DONE`. Six-suite selection 6 / 108. Mutations: `setProposal(null)` restored → integration test
+fails; guard dropped → stale-request test fails (request A's row leaks); guard inverted → both new
+tests fail, nothing else. The reviewer also found the fix removes a base-only sub-tab jump (a
+same-request error recomputed the default sub-tab from an empty list). **Verdict: PASS at
+`be76760f`, no required items.**
+
+Accepted limits: after a real removal followed by a failed refetch the removed row stays visible
+with the banner until the next successful refresh (base showed no rows with the banner; removal
+is a soft delete server-side, pre-existing); there is no automatic retry. Out of scope and
+pre-existing: `pages/workbench/reviewer-follow-up.js` empties its proposal list on a refetch
+error, which unmounts the panel and the modal entirely on that host, so the same finding survives
+there in a worse form; recorded for the owner.

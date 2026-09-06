@@ -51,7 +51,7 @@ permission-loss close after a Codex adversarial review) are complete on branch
 [Stage 6B1 receipt](REVIEWER_LIFECYCLE_STAGE6B1_RECEIPT_2026-09-05.md) and the
 [Stage 6B2 receipt](REVIEWER_LIFECYCLE_STAGE6B2_RECEIPT_2026-09-05.md). 6B3
 (`a6a27ce8` runtime, `b163172a` review correction, `3a4bcbbe` owner-decided 6B3a
-settings-identity widening after a Codex adversarial review, `0a4eafd6` advisory test, `9a790c64`/`529ee426` 6B3b recipient-field widening after a second, `2622dfc7` 6B3c proposal-field widening after a third) is also
+settings-identity widening after a Codex adversarial review, `0a4eafd6` advisory test, `9a790c64`/`529ee426` 6B3b recipient-field widening after a second, `2622dfc7` 6B3c proposal-field widening after a third, `be76760f` 6B3d host refetch-error fix after a fourth) is also
 complete with independent PASS verdicts; see the
 [Stage 6B3 receipt](REVIEWER_LIFECYCLE_STAGE6B3_RECEIPT_2026-09-05.md).
 Stage 6B is complete on the branch. Nothing is merged or deployed; promotion is the
