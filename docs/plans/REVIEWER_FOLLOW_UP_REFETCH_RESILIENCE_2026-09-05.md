@@ -100,10 +100,14 @@ each check.
 
 5. **Last-known-good is bounded by cycle and scope.** A `lastLoadedParamsRef` records
    `${cycle}|${scope}` on the success path of `loadProposals`. The cycle/scope effect compares
-   it to the current params; on a difference it **first supersedes any in-flight load
-   synchronously** (`requestIdRef.current += 1`, so a late response from the previous params
-   fails the existing request-id check and can neither repopulate the list nor rewrite the
-   ref), then clears `proposals` and `error`, then schedules the new load. Initial mount (ref
+   it to the current params. The effect **always** supersedes any in-flight load first
+   (`requestIdRef.current += 1`, unconditional — the effect runs only on mount or a param
+   change, so a late response from whatever was in flight fails the existing request-id
+   checks and can neither repopulate the list, flip `loadingProposals`, nor rewrite the ref);
+   only on a params difference does it then clear `proposals` and `error` and set
+   `loadingProposals`; then it schedules the new load. Opus round 2 showed the gated form
+   leaked when the first load was still in flight (ref null) and on an A→B→A toggle with B
+   pending; test 8 pins the first window. Initial mount (ref
    null) and same-params retries leave the list alone. Test 4 covers the scope change; test 5
    resolves the old params' fetch *after* the change but *before* the scheduled new load and
    asserts the old cards never render. [Codex round 1, high — accepted.]
@@ -111,7 +115,7 @@ each check.
    only when `proposals.length === 0`. When a prior list exists, the list stays rendered during
    the refetch, each `ReviewerGroup` keeps its `open` state, the panel receives
    `loading={loadingProposals}` (the same prop `ReviewersTab.js:556` passes; the panel shows a
-   subtle spinner, `ReviewerManagePanel.js:15`), and the banner's "Try again" button is
+   subtle spinner, `ReviewerManagePanel.js:2663`, documented at `:15`), and the banner's "Try again" button is
    `disabled` with the label "Retrying…" while a load is in flight. Test 6: expand a group,
    click Try again with a slow failing fetch, assert the mock panel stays mounted and open
    throughout and the button is disabled mid-flight. [Codex round 1, medium — accepted.]
@@ -136,9 +140,18 @@ disabled while `degraded`. That contract is already pinned by
 prove the host passes the prop, the same composition `reviewers-tab-stale-request.test.js` uses
 for `ReviewersTab`. Adding a second real-panel test would duplicate 6B3e's teeth.
 
-Mutation checks now number seven: (a)–(c) above; (d) remove the clearing block in the effect →
-test 4 red; (e) remove the synchronous `requestIdRef` bump → test 5 red; (f) restore the
-unconditional loading placeholder → test 6 red; (g) revert the empty-card guard → test 7 red.
+Mutation checks now number nine: (a)–(c) above; (d) remove the clearing block in the effect →
+test 4 red; (e) remove the `requestIdRef` bump → test 5 red; (f) restore the unconditional
+loading placeholder → test 6 red; (g) revert the empty-card guard → test 7 red; (h) move the
+bump back inside the params-changed `if` → test 8 red; (i) drop the `loading` pass-through →
+test 6 red (mock pins `data-loading`).
+
+Opus round 2 verdict at `07249a27`: BLOCK on the gated bump (two reproduced windows); everything
+else checked out — `finally` guard, error-clearing paths, loading precedence, the four
+empty-card combinations, tests 5–7 genuinely exercise their races. Advisories accepted: pin the
+`loading` pass-through (test 9 / mock `data-loading`); the `setLoadingProposals(true)` on clear
+remains untested by choice (a flash, not a correctness property). Pre-existing, out of scope: a
+cycles-load failure sets `error` with no `cycleCode`, so the banner has no Try again button.
 
 ## Verification the builder runs
 
