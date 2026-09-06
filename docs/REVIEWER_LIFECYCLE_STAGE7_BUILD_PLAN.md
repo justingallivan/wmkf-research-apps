@@ -252,7 +252,10 @@ or backfill.
   and an added `requireIfMatch` would fail its undefined-ifMatch case. 799 / 11,608 and three gates +
   self-tests green. Advisories folded into a correction: op-suite comparisons need
   `toHaveBeenCalledTimes(1)` guards (vacuous-capable), a `getRecord` guard-read assertion or
-  excluded-row case, and a docblock nit ("closed-status checks" inert here). Correction sent.
+  excluded-row case, and a docblock nit ("closed-status checks" inert here).
+- **3J correction `d226564d`** (rebased on `799aedfc`; PR #166): call-count guards on every op-suite
+  comparison, `not.toHaveProperty('ifMatch')` on the undefined case, a new excluded-row refusal test
+  (5 op tests), docblock reworded. Full suite 803 / 11,629; gates green.
 
 ## Docs (after each merge)
 
