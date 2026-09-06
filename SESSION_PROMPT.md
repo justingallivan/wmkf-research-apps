@@ -5,7 +5,7 @@
 Under the owner's evening autonomy grant ("keep working on the next items in the queue
 (2-5, then 7)… I'll check on your progress in the morning"), the architect ran the
 plan → Sonnet build → Opus review → Codex adversarial (≤2 rounds) cycle on every remaining
-reviewer-lifecycle stage. Seventeen PRs merged to `main` overnight (2026-09-06 PT); every
+reviewer-lifecycle stage. Eighteen PRs merged to `main` overnight (seventeen lifecycle stages plus one gate-fix follow-up) (2026-09-06 PT); every
 elective and boundary stage of the lifecycle plan is now shipped. Production deployment
 of the final docs push is Ready (built 37s). **No browser smoke ran on any of tonight's
 merges**; 6D is the only user-visible contract change. This checkout is on `main`.
@@ -63,7 +63,7 @@ the Stage 7B zero-reference pin instead of a third round).
 Merges: `e9909e91` #152, `3b2b34d5` #153, `b7a04cd6` #154, `716bc558` #155, `4e7c378c` #156,
 `21cc221b` #157, `1c24e56f` #158, `6606cc30` #159, `081d558b` #160, `01072571` #161,
 `ec74c0d4` #162, `81fdac43` #163, `d47b07be` #164, `68198b2f` #165, `3b8dca2b` #166,
-`19955148` #167, `790ba3a1` #168. Docs: `e287a174` (Stage 7 promotion record) and the
+`19955148` #167, `790ba3a1` #168, `4d777aad` #169 (gate fixes after the post-merge Opus review). Docs: `e287a174` (Stage 7 promotion record) and the
 per-stage "Record the … promotion" commits between merges. Session handoff commit: `git log`.
 
 ## Next Items
@@ -207,7 +207,7 @@ Stage 7 plan) and one observation row was added to the pilot directive.
 
 **Opus post-merge verdict on `4e471c94`:** DEFECT + 4 advisories, none affecting the real
 tree (gate green, 0 false positives on the 75 live adapter usages, 0.6s). Fixed the same night
-in the follow-up PR recorded in the Stage 7 plan's "Post-merge Opus review" section: (D1
+in PR #169 (`4d777aad`, all checks green), recorded in the Stage 7 plan's "Post-merge Opus review" section: (D1
 fail-open) `const a = this.adapter; a.updateLifecycle()` and `helper(this.adapter).writer()`
 bypassed the class-field handling; (A1, CI false-positive risk) `(await import(p)).anything`
 hard-failed the gate on unrelated code; (A2) inline `require('<adapter>').findById` was a

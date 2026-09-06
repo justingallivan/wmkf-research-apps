@@ -408,7 +408,7 @@ or backfill.
   limit; CI reference rows rewritten. Fixtures: reds `red-class-field-alias-local`,
   `red-class-field-helper-arg`; greens `green-inline-require-read`, `green-lazy-dynamic-import-default`.
   The pre-fix gate fails the new self-test at (1'') and hard-fails a scratch tree holding only the
-  lazy dynamic import. PR recorded in `SESSION_PROMPT.md`.
+  lazy dynamic import. PR #169 merged `4d777aad` (2026-09-06, all checks green).
 
 ## Docs (after each merge)
 

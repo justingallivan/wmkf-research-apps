@@ -18,7 +18,7 @@ fingerprint, Stage 2 policy module, all eleven Stage 3 command extractions into
 `lib/services/reviewer-engagement/`, Stage 5 narrow adapter ops, and Stage 7's new LAW-mode CI
 gate `check:reviewer-engagement-boundary` with the `bulkUpdateByRequest` export deleted.
 **Sessions:** 489 (plan → Sonnet build → Opus review → Codex adversarial ≤2 rounds per stage).
-**Ship state:** 17 PRs (#152–#168) merged 2026-09-06 PT, final `790ba3a1`; docs at `e287a174`;
+**Ship state:** 18 PRs (#152–#169; #169 fixes a post-merge Opus fail-open in the gate) merged 2026-09-06 PT, final `4d777aad`;
 Production Ready. All 33 gate/self-test pairs green. No browser smoke on any merge; 6D is the only
 user-visible contract change (pre-deploy previews must re-render). Owner decisions D0–D5 and two 6D
 items are recorded as open in the Stage 7 plan and `SESSION_PROMPT.md`, deliberately not taken.
