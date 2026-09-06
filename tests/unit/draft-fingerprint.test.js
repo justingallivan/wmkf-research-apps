@@ -129,31 +129,23 @@ describe('helper cross-check (tests/helpers/draft-fingerprint.js independence)',
   });
 });
 
-// Proves render and send read the same PROJECTION, not merely the same
-// helper: install two independent "resolved read" objects that agree on
-// every input except one, and assert the fingerprints diverge; then make
-// them agree and assert they match. This is the scenario the build plan
-// calls out by name (send's request read returning a different akoya_title
-// than render's).
-describe('projection-divergence (render vs send reads must agree to match)', () => {
-  test('a single differing read (akoya_title) between two independently-built inputs produces different fingerprints', () => {
-    const renderTimeArgs = baseArgs();
-    const sendTimeArgs = baseArgs();
-    sendTimeArgs.request = { ...sendTimeArgs.request, akoya_title: 'A CRM edit made after the preview was rendered' };
-
-    const renderFingerprint = fingerprintDraft(buildDraftFingerprintInputs(renderTimeArgs));
-    const sendFingerprint = fingerprintDraft(buildDraftFingerprintInputs(sendTimeArgs));
-    expect(sendFingerprint).not.toBe(renderFingerprint);
-  });
-
-  test('when render-time and send-time reads agree on every input, the fingerprints match', () => {
-    const renderTimeArgs = baseArgs();
-    const sendTimeArgs = baseArgs(); // independently constructed, same values
-    const renderFingerprint = fingerprintDraft(buildDraftFingerprintInputs(renderTimeArgs));
-    const sendFingerprint = fingerprintDraft(buildDraftFingerprintInputs(sendTimeArgs));
-    expect(sendFingerprint).toBe(renderFingerprint);
-  });
-});
+// Projection-divergence coverage moved off this file (2026-09-06 correction
+// round): calling the pure builder twice with literal objects here never ran
+// either service, so a real regression in which projection of a row
+// send-emails-service.js actually reads (a narrowed $select) could not fail
+// any test — every mock elsewhere returns the same fixed object regardless
+// of the `select` string it receives (Opus proved this: narrowing send's
+// request $select back to `akoya_title` only left 449/449 tests green). The
+// two files below run the REAL renderEmails/sendEmails against
+// select-honoring adapter mocks and assert on the mocks' call arguments, so a
+// narrowed select fails directly:
+//   - tests/unit/send-emails-fingerprint-selects.test.js (select/field
+//     inspection: request select, person select, cycle fields map,
+//     fetchCoPIs/getHonorariumAmount invocation)
+//   - tests/unit/draft-fingerprint-projection-divergence.test.js (Case A:
+//     both routes' real selects agree → sent; Case B: a request read whose
+//     select omits wmkf_abstract, simulated without touching production code
+//     → draft_stale, no dispatch/write)
 
 describe('exclusions (Stage 6D accepted contract)', () => {
   test('wmkf_honorariumoptout is not part of the fingerprint inputs', () => {
