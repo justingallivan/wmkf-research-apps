@@ -186,6 +186,7 @@ function AIResultCard({ source, result, onDismiss, screenedName }) {
  */
 function ApplicantResultCard({ result, onDismiss }) {
   const [expanded, setExpanded] = useState(result.hasConcerns);
+  const detailsId = `integrity-result-${String(result.name || 'applicant').toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
 
   const retractionMatches = result.sources.retraction_watch?.matches || [];
   const pubpeerResult = result.sources.pubpeer || {};
@@ -221,8 +222,11 @@ function ApplicantResultCard({ result, onDismiss }) {
               </span>
             )}
             <button
+              type="button"
               onClick={() => setExpanded(!expanded)}
-              className="text-sm text-blue-600 hover:text-blue-800"
+              className="rounded-lg px-2 py-1 text-sm text-blue-600 hover:bg-blue-50 hover:text-blue-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
+              aria-expanded={expanded}
+              aria-controls={detailsId}
             >
               {expanded ? 'Collapse' : 'Expand'}
             </button>
@@ -232,7 +236,7 @@ function ApplicantResultCard({ result, onDismiss }) {
 
       {/* Expanded content */}
       {expanded && (
-        <div className="p-4 space-y-4">
+        <div id={detailsId} className="p-4 space-y-4">
           {/* Retraction Watch results */}
           {result.sources.retraction_watch?.searched && (
             <div>
@@ -309,7 +313,9 @@ function ApplicantInputRow({ applicant, index, onUpdate, onRemove, canRemove }) 
   return (
     <div className="flex gap-3 items-start">
       <div className="flex-1">
+        <label htmlFor={`applicant-name-${index}`} className="sr-only">Applicant {index + 1} full name</label>
         <input
+          id={`applicant-name-${index}`}
           type="text"
           value={applicant.name}
           onChange={(e) => onUpdate(index, 'name', e.target.value)}
@@ -318,7 +324,9 @@ function ApplicantInputRow({ applicant, index, onUpdate, onRemove, canRemove }) 
         />
       </div>
       <div className="flex-1">
+        <label htmlFor={`applicant-institution-${index}`} className="sr-only">Applicant {index + 1} institution</label>
         <input
+          id={`applicant-institution-${index}`}
           type="text"
           value={applicant.institution}
           onChange={(e) => onUpdate(index, 'institution', e.target.value)}
@@ -328,8 +336,9 @@ function ApplicantInputRow({ applicant, index, onUpdate, onRemove, canRemove }) 
       </div>
       {canRemove && (
         <button
+          type="button"
           onClick={() => onRemove(index)}
-          className="px-3 py-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg"
+          className="min-h-9 rounded-lg px-3 py-2 text-red-600 hover:bg-red-50 hover:text-red-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-600"
         >
           Remove
         </button>
