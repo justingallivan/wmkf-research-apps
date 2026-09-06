@@ -48,6 +48,8 @@ jobs:
       - run: npm run check:route-service-boundary:self-test
       - run: npm run check:reviewer-engagement-boundary
       - run: npm run check:reviewer-engagement-boundary:self-test
+      - run: npm run check:script-suggestion-writers
+      - run: npm run check:script-suggestion-writers:self-test
       - run: npm run check:route-lifecycle-auth
       - run: npm run check:route-lifecycle-auth:self-test
       - run: npm run check:secret-scan

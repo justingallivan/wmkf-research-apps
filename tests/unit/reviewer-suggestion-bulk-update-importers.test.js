@@ -17,12 +17,13 @@
  * deleted" pin: a reintroduced import, a re-added export, or a stray
  * comment mentioning the name anywhere in production code fails this test.
  *
- * ONE carve-out: `scripts/check-reviewer-engagement-boundary.js` and its
+ * Carve-out: `scripts/check-reviewer-engagement-boundary.js` and its
  * self-test deliberately keep `bulkUpdateByRequest` in the Stage 7 gate's
- * GENERIC_WRITERS list (docs/REVIEWER_LIFECYCLE_STAGE7_BUILD_PLAN.md,
+ * GENERIC_WRITERS list, and `scripts/check-script-suggestion-writers.js`
+ * (owner decision D5, 2026-09-06) keeps the same list for `scripts/` (docs/REVIEWER_LIFECYCLE_STAGE7_BUILD_PLAN.md,
  * "Remove the generic name from the gate's GENERIC WRITERS list only if
  * nothing else needs it — keep it listed... a deleted symbol can still be
- * re-added; listing it costs nothing"). Those two files are the detection
+ * re-added; listing it costs nothing"). Those three files are the detection
  * MECHANISM that would catch a reintroduction, not a caller of the removed
  * function, so they are excluded from this scan by name — not by directory
  * or pattern — so a NEW file elsewhere naming the identifier still fails.
@@ -47,6 +48,7 @@ const NAME_PATTERN = /\bbulkUpdateByRequest\b/;
 const CARVE_OUT_FILES = new Set([
   'scripts/check-reviewer-engagement-boundary.js',
   'scripts/check-reviewer-engagement-boundary-self-test.js',
+  'scripts/check-script-suggestion-writers.js',
 ]);
 
 const PRODUCTION_FILES = readSourceFiles(
