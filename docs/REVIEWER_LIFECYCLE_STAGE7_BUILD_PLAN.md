@@ -123,10 +123,11 @@ census helper recognizes — static/named/namespace/require/dynamic/export-from)
 `reviewer-suggestion.js` that binds `updateLifecycle`, `patchFields`, `patchReviewReceipt` or
 `bulkUpdateByRequest` is allowed only from (a) `lib/services/reviewer-engagement/*` and (b) the
 tracked **recorded importer set** in the script (rows 15–16 for `patchReviewReceipt`; nothing else
-once 3F–3K land). The recorded set may only shrink: the self-test proves that adding one entry, or
-a synthetic file importing `updateLifecycle` from `lib/services/foo.js`, turns the gate red, and
-that removing a recorded entry whose importer still exists turns it red (so the list cannot rot
-silently). Aliases: reuse `scripts/lib/ast-scan-core` binding resolution rather than regex.
+once 3F–3K land). Stale recorded entries (file gone, or no longer binding the writer) fail the gate, and the exact
+map is pinned by a tracked test so growth is a deliberate, reviewed edit; the self-test proves a
+synthetic outside importer and a stale entry both turn the gate red. (Earlier wording claimed the
+map "may only shrink" and that adding an entry turns the gate red — Codex showed that was not
+mechanized; corrected 2026-09-06.) Aliases: reuse `scripts/lib/ast-scan-core` binding resolution rather than regex.
 **Then** remove the `patchFields` alias (after row 6's named op and 3F's `markInvitationGenerated`
 — which keeps calling `patchReviewReceipt` under its own name until D2 is decided, so that entry is
 recorded), and delete `bulkUpdateByRequest` if the census is empty.
@@ -333,8 +334,17 @@ or backfill.
   new op suite. Full suite 806 / 11,651; new gate + self-test and four sibling gate pairs green; types,
   lint, doc-currency, build, `git diff --check` green. Mutations: thank-you sweep importing
   `updateLifecycle` → gate names it; bogus recorded entry → "stale recorded importer"; re-added
-  `bulkUpdateByRequest` export → pin red; dropped `requireIfMatch` → 7 op tests red. Opus and Codex
-  round 1 pending.
+  `bulkUpdateByRequest` export → pin red; dropped `requireIfMatch` → 7 op tests red.
+- **Stage 7 Codex adversarial round 1 (`ac3dcaac`): needs-attention, two highs, both accepted.**
+  (1) Binding resolution misses local alias chains, computed member access and `export *` barrels
+  (`check-reviewer-engagement-boundary.js:291-500`) — correction: alias fixpoint via `ast-scan-core`,
+  transitive barrel sources, computed members on an adapter binding fail closed, fixtures for each.
+  (2) `RECORDED_IMPORTERS` can grow in the same PR that adds a violation, so "may only shrink" was
+  not mechanized (this plan's own claim "adding one entry turns the gate red" was wrong) — correction:
+  a tracked pin test asserting the exact two-entry map (the census-test mechanism used throughout
+  this campaign); header and CI-reference wording changed to "stale entries fail; growth requires a
+  deliberate edit to the pin test". Codex confirmed D1–D5 untouched and 7C transport-equivalent.
+  Sandbox could not create fixtures, so the self-test was not run by Codex. Opus pending.
 
 ## Docs (after each merge)
 
