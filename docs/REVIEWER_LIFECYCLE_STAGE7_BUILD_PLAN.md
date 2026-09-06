@@ -210,7 +210,16 @@ or backfill.
   `updateLifecycle` → direct red.
 - **3F Codex adversarial round 1 (`2c5600e8`): approve** — payloads, options, ordering,
   `inviteRecorded` handling, the fingerprint gate and the `recordDeliveredEmail` site unchanged; census
-  lists the three importers; D1/D2 neither tightened nor loosened. Opus pending.
+  lists the three importers; D1/D2 neither tightened nor loosened.
+- **3F Opus review (`2c5600e8`): PASS WITH ADVISORIES, one required.** All three bodies verbatim
+  (main never passed `ifMatch` on the delivered stamp; main passed exactly two args to `patchFields`);
+  no shared helper; callers' `inviteRecorded`, guards, 412 mapping, loop/count/progress, the 6D gate
+  and the 3E site untouched; pins mutation-verified (inline keeping the import → 2 red each; call
+  hoisted above the stale-link guard → 2 red); census reproduced; 798 / 11,603 and three gates +
+  self-tests green. **Required R1:** `send-emails-service.js:11-12` still claimed the invitation stamp
+  stays inline. Advisories folded into the correction: D1/D2 wording must read as open decisions;
+  duplicated caller rationale → pointer; generate-emails pin should assert one batch timestamp and a
+  never-calls case; my-candidates pin should include a stale-link guard case. Correction sent.
 
 ## Docs (after each merge)
 
