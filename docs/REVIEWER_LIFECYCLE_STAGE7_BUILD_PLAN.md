@@ -33,8 +33,8 @@ re-gate that; scripts are outside that gate and are recorded, not gated, here to
 | 2 | `reviewer-engagement/terminal-transition.js:106` | updateLifecycle | yes | named command (3B) | keep |
 | 3 | `reviewer-engagement/correct-status.js:77` | updateLifecycle | yes | named command (3C) | keep |
 | 4 | `reviewer-engagement/correct-response.js:78` | updateLifecycle | yes | named command (3D) | keep |
-| 5 | `send-emails-service.js:200` on main today; moves to `reviewer-engagement/record-email-outcome.js` when 3E merges | updateLifecycle | yes | post-send bookkeeping (3E) | keep |
-| 6 | `reviewer-suggestion-sweep.js:150` on main today; the same call moves to `reviewer-engagement/expire-invitation.js` when 3E (PR pending) merges | patchFields | yes | invitation expiry (one site, two locations in time) | Stage 7: replace the alias call with adapter op `expireInvitationResponse(id, nowIso, {ifMatch})` (raw fields `wmkf_responsetype=no_response`, `wmkf_responsereceivedat`) |
+| 5 | `reviewer-engagement/record-email-outcome.js` (3E, PR #161 → `01072571`; was `send-emails-service.js:200`) | updateLifecycle | yes | post-send bookkeeping (3E) | keep |
+| 6 | `reviewer-engagement/expire-invitation.js` (3E, PR #161; was `reviewer-suggestion-sweep.js:150`) | patchFields | yes | invitation expiry (one site, two locations in time) | Stage 7: replace the alias call with adapter op `expireInvitationResponse(id, nowIso, {ifMatch})` (raw fields `wmkf_responsetype=no_response`, `wmkf_responsereceivedat`) |
 | 7 | `review-manager/send-emails-service.js:1012` | updateLifecycle | **no** | inline post-send invitation stamp | 3F → `record-invitation.js` `recordDeliveredInvitation`; unconditional write preserved (decision D1) |
 | 8 | `reviewer-finder/my-candidates-service.js:631` | updateLifecycle | yes | manual verified-link invite record | 3F → `record-invitation.js` `recordManualInvitation` |
 | 9 | `reviewer-finder/generate-emails-service.js:501` | patchFields | **no** | legacy generation mark-as-sent (raw fields) | 3F → `record-invitation.js` `markInvitationGenerated`; preserved verbatim (decision D2) |
@@ -153,6 +153,8 @@ or backfill.
 - **3H Codex adversarial round 1 (`4b0fbea2`): approve** — exact override (incl. `null`), ETag and
   actor forwarded; notification prepared first, write before dispatch, 412/error classification
   preserved. Opus pending.
+- **3G Codex adversarial round 1 (`eed4f377`): approve** — field mapping, ETag forwarding,
+  claim-before-send, 412 handling, respond-kind separation, pin and census all match. Opus pending.
 - **3I build (Sonnet, 2026-09-06): `87edb12b`** on `claude/reviewer-lifecycle-stage3i` (new
   worktree `../WMKF_Apps-s4`). The withdrawal write (main `withdraw-sufficient-service.js:264–274`)
   moved verbatim to `reviewer-engagement/withdraw-pending-invitation.js` `withdrawPendingInvitation`;

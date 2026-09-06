@@ -1604,7 +1604,9 @@ returned zero eligible/enqueued/claimed/failed.** Plan doc:
   3B the terminal transition (`terminal-transition.js`, PR #156), 3C the preauthorized status
   correction (`correct-status.js`, PR #158; `reviewers-service.js` keeps only `getReviewers`), 3D the
   response correction (`correct-response.js`, PR #160; `my-candidates-service.js` delegates and
-  re-exports `MyCandidatesError` from the neutral `reviewer-engagement/errors.js`);
+  re-exports `MyCandidatesError` from the neutral `reviewer-engagement/errors.js`), 3E the post-send
+  bookkeeping (`record-email-outcome.js`) and the invitation expiry (`expire-invitation.js`, PR #161;
+  callers keep their counters/warning events and are pinned by delegation tests);
   the old `review-manager/close-review-service.js` is a pure re-export and routes keep their import
   paths. Each move is byte-identical and pinned by a both-paths identity test plus a caller census
   (`tests/unit/reviewer-engagement-census.test.js`) that records every importer of the legacy path,
