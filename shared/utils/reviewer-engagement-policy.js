@@ -10,18 +10,17 @@
  *     `updateLifecycle`'s invitation-response guard - both row-level
  *     (completedat OR status), now `isClosedEngagementRow` /
  *     `isInvitationCorrectionSourceRow`.
- *   - `updateLifecycle`'s later "refuse to leave a closed status" guard and
- *     `softDelete`'s terminal guard - both status-only, now
- *     `isClosedEngagementStatus`.
- * The two status-only sites deliberately do NOT use the completedat-aware
- * row predicate: pre-Stage-2 they only ever inspected `wmkf_reviewstatus`,
- * never `wmkf_completedat`, even in `updateLifecycle` where `completedat` is
- * part of the same select - and `softDelete`'s select does not even fetch
- * `completedat`, so a completedat-aware check there would silently always
- * see `undefined`. Switching either site to the row predicate would add a
- * completedat check that was never there, a behavior change outside this
- * refactor's scope. This module preserves that split instead of collapsing
- * it.
+ *   - `updateLifecycle`'s later "refuse to leave a closed status" guard -
+ *     status-only, now `isClosedEngagementStatus`.
+ *   - `softDelete`'s terminal guard - status-only at Stage 2; widened to the
+ *     row predicate (and its select widened to fetch `wmkf_completedat`) on
+ *     2026-09-06 under owner decision D0 (Stage 7 plan).
+ * The remaining status-only site deliberately does NOT use the
+ * completedat-aware row predicate: pre-Stage-2 it only ever inspected
+ * `wmkf_reviewstatus`, never `wmkf_completedat`, even though `completedat`
+ * is part of the same select. Switching it to the row predicate would add a
+ * completedat check that was never there - a behavior change that needs its
+ * own owner decision, as D0 was for `softDelete`.
  *
  * The two Sets below are intentionally module-private: only the exported
  * predicates are part of the contract, so a future edit to set membership
@@ -59,7 +58,7 @@ const CLOSED_ENGAGEMENT_STATUSES = new Set([
 /**
  * True when `status` (a raw `wmkf_reviewstatus` option integer) is one of the
  * closed/terminal statuses. Status-only - does not consider
- * `wmkf_completedat` - for the two call sites that never checked completedat
+ * `wmkf_completedat` - for the one remaining call site that never checked completedat
  * pre-Stage-2 (see module docblock).
  */
 export function isClosedEngagementStatus(status) {

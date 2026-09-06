@@ -388,8 +388,9 @@ If you're touching a service or utility, read its header before this catalog. If
   suggestion rows — `isClosedEngagementStatus(status)` (status-only), `isClosedEngagementRow(row)`
   (completion stamp or closed status), `isInvitationCorrectionSourceRow(row)` (explicit
   `undefined → false`); the status Sets are module-private. Consumers: `my-candidates-service.js`
-  (response correction guard) and `reviewer-suggestion.js` `updateLifecycle`/`softDelete` (the two
-  historical status-only sites use the status predicate by design). Imports only `shared/config/`.
+  (response correction guard) and `reviewer-suggestion.js` `updateLifecycle`/`softDelete`
+  (`updateLifecycle`'s leave-closed guard is the one remaining historical status-only site; `softDelete`
+  moved to the row predicate 2026-09-06 under owner decision D0). Imports only `shared/config/`.
   Not a universal "done" predicate: materials, receipt, terminal-transition and rollup keep their
   own sets.
 
