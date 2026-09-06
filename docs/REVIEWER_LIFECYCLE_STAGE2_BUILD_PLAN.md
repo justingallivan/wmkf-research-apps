@@ -110,6 +110,12 @@ No other file changes. No new map values. No server imports into the shared modu
   to the declined Codex high); `lib/services/reviewer-rollup.js:25` keeps its own terminal set by
   design (different question). Build not run by the reviewer; builder ran it.
 
+- **Corrections `bbc5ab52`** (rebased as `dc962ece` on `1fdd359b`): private Sets; three exported
+  predicates; explicit `undefined` guard; four-site docblock; adapter status-only sites call
+  `isClosedEngagementStatus`. Six-suite selection 602 tests; mutation (d) status-only delegating to
+  the row predicate stays green (flavors agree on status), (e) ignore completedat → 12 red. PR #155
+  opened; Codex round 2 (final) requested.
+
 ## Review checkpoints
 
 Opus: confirm the predicates are the only behavior source now (grep for the old set names →
