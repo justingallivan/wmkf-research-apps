@@ -238,8 +238,8 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
     if (!cycleCode) return undefined;
     const requestScope = scope === 'all' ? 'all' : 'my';
     const currentParams = `${cycleCode}|${requestScope}`;
+    requestIdRef.current += 1;
     if (lastLoadedParamsRef.current !== null && lastLoadedParamsRef.current !== currentParams) {
-      requestIdRef.current += 1;
       setProposals([]);
       setError(null);
       setLoadingProposals(true);

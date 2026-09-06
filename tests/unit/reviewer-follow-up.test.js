@@ -25,13 +25,14 @@ jest.mock('../../shared/components/Layout', () => {
 
 jest.mock('../../shared/components/reviewers/ReviewerManagePanel', () => {
   const React = require('react');
-  return function MockReviewerManagePanel({ canManage, degraded, onRefresh }) {
+  return function MockReviewerManagePanel({ canManage, degraded, loading, onRefresh }) {
     return React.createElement(
       'div',
       {
         'data-testid': 'reviewer-manage-panel',
         'data-can-manage': String(canManage),
         'data-degraded': degraded ? 'true' : 'false',
+        'data-loading': loading ? 'true' : 'false',
       },
       React.createElement('button', { type: 'button', onClick: onRefresh }, 'Mock refresh'),
     );
@@ -491,11 +492,13 @@ describe('reviewer follow-up refetch resilience', () => {
     expect(await screen.findByRole('button', { name: 'Retrying…' })).toBeDisabled();
     expect(screen.getByTestId('reviewer-manage-panel')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Hide reviewer activity' })).toBeInTheDocument();
+    expect(screen.getByTestId('reviewer-manage-panel')).toHaveAttribute('data-loading', 'true');
 
     pendingReject(new Error('still broken'));
 
     expect(await screen.findByText('still broken')).toBeInTheDocument();
     expect(screen.getByTestId('reviewer-manage-panel')).toHaveAttribute('data-degraded', 'true');
+    expect(screen.getByTestId('reviewer-manage-panel')).toHaveAttribute('data-loading', 'false');
     expect(screen.getByRole('button', { name: 'Hide reviewer activity' })).toBeInTheDocument();
   });
 
@@ -534,6 +537,55 @@ describe('reviewer follow-up refetch resilience', () => {
     expect(screen.queryByText('Active proposal')).not.toBeInTheDocument();
     expect(screen.getByText('No assigned requests match this view.')).toBeInTheDocument();
     expect(screen.getByText('Reviewer follow-up could not be refreshed')).toBeInTheDocument();
+  });
+
+  test('an initial load in flight cannot commit under a different scope', async () => {
+    let resolveInitialReviewers;
+    const initialReviewersPromise = new Promise((resolve) => { resolveInitialReviewers = resolve; });
+    let allScopeShouldFail = false;
+
+    global.fetch = jest.fn(async (url) => {
+      if (url === '/api/workbench/dashboard') {
+        return { ok: true, json: async () => cycleResponse };
+      }
+      const isAllScope = String(url).includes('scope=all');
+      if (String(url).startsWith('/api/workbench/dashboard?')) {
+        if (isAllScope && allScopeShouldFail) {
+          return { ok: false, json: async () => ({ error: 'boom' }) };
+        }
+        return { ok: true, json: async () => ({ proposals: dashboardProposals }) };
+      }
+      if (String(url).startsWith('/api/review-manager/reviewers')) {
+        if (isAllScope) {
+          if (allScopeShouldFail) {
+            return { ok: false, json: async () => ({ error: 'boom' }) };
+          }
+          return { ok: true, json: async () => ({ proposals: reviewerProposals }) };
+        }
+        await initialReviewersPromise;
+        return { ok: true, json: async () => ({ proposals: reviewerProposals }) };
+      }
+      return { ok: true, json: async () => ({ proposals: [] }) };
+    });
+
+    render(<ReviewerFollowUpDashboard />);
+
+    // Mandatory gate: the initial my-scope reviewers fetch must actually be in
+    // flight before we toggle scope, or the effect's cleanup would simply
+    // clear the still-pending setTimeout and this would pass trivially.
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('scope=my'));
+    });
+
+    allScopeShouldFail = true;
+    fireEvent.click(screen.getByRole('button', { name: 'All requests' }));
+
+    // Resolve the superseded initial load's fetch with the ORIGINAL fixtures
+    // after the scope change already bumped requestIdRef.
+    resolveInitialReviewers();
+
+    expect(await screen.findByText('Reviewer follow-up could not be loaded')).toBeInTheDocument();
+    expect(screen.queryByText('Active proposal')).not.toBeInTheDocument();
   });
 });
 
