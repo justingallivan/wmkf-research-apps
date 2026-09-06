@@ -20,7 +20,9 @@ polish (reviewer follow-up navigation, admin, explorer, screener, status pills) 
 **Ship state:** PR #150 merged as `600cc972` (deployment `dpl_4Jjwwou9LKd3z29KqgXaLmZMaWQw`
 Ready); PR #151 merged as `3fc0a936` (deployment `dpl_3hiiDPpWN1Zt1yAWcQnVXPURQfL8` Ready),
 both 2026-09-05 PT. Full suite 773 / 11,323 and all CI green on both. No signed-in
-browser smoke of the 6B surfaces ran; owner decision.
+browser smoke of the 6B surfaces ran before promotion; owner decision. Session 489 smoked
+closeout modal and "Send reminder" on production; release-materials modal still unsmoked
+(no `accepted` reviewer to target).
 **Why it matters:** Stale request or reviewer switches can no longer land a reminder,
 closeout or materials result on the wrong row, closing the mandatory path of the lifecycle plan.
 **Pointers:** [6B3 receipt with Promotion](docs/audits/REVIEWER_LIFECYCLE_STAGE6B3_RECEIPT_2026-09-05.md);
