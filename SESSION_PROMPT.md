@@ -1,182 +1,208 @@
-# Session 489 Prompt: Choose the Elective Reviewer Lifecycle Stage
+# Session 490 Prompt: Owner Review of the Overnight Lifecycle Campaign
 
-## Session 488 Summary
+## Session 489 Summary
 
-Stage 6B of the reviewer lifecycle work and Codex's Workbench UI polish were both
-promoted to `main` and production. The owner merged after all CI checks passed; no
-signed-in browser smoke of the 6B surfaces ran on any environment. The Codex
-worktree at `../WMKF_Apps-codex` was torn down and both feature branches were
-deleted locally and on origin. This checkout is on `main`.
+Under the owner's evening autonomy grant ("keep working on the next items in the queue
+(2-5, then 7)… I'll check on your progress in the morning"), the architect ran the
+plan → Sonnet build → Opus review → Codex adversarial (≤2 rounds) cycle on every remaining
+reviewer-lifecycle stage. Seventeen PRs merged to `main` overnight (2026-09-06 PT); every
+elective and boundary stage of the lifecycle plan is now shipped. Production deployment
+of the final docs push is Ready (built 37s). **No browser smoke ran on any of tonight's
+merges**; 6D is the only user-visible contract change. This checkout is on `main`.
 
 ### What Was Completed
 
-1. **Stage 6B promoted (PR #150 → `600cc972`)** — 32 commits from
-   `codex/reviewer-lifecycle-stage6b`; eight CI checks green; production deployment
-   `dpl_4Jjwwou9LKd3z29KqgXaLmZMaWQw` Ready. Preflight: `main` had not moved since
-   the branch was cut, runtime diff limited to `ReviewerManagePanel.js`,
-   `ReviewerCloseoutModal.js`, `ReviewersTab.js`; eleven retained reviewer suites
-   1,001 tests green at `3ff9fc35`.
-2. **Codex UI features promoted (PR #151 → `3fc0a936`)** — Codex rebased
-   `codex/ui-features` (22 commits, 15 UI files, no `pages/api`/`lib`) onto the 6B
-   merge from a prompt Claude wrote; the one conflict (`ReviewersTab.js`) was
-   resolved by carrying `degraded={Boolean(error)}` into Codex's
-   `request-reviewer-table` wrapper. Claude verified independently: ten reviewer
-   suites / 534 tests green on `d80c8fe7`; deleting the prop turns
-   `reviewers-tab-stale-request.test.js` red (the degraded suite alone does not
-   catch it). Production deployment `dpl_3hiiDPpWN1Zt1yAWcQnVXPURQfL8` Ready. The
-   permission classifier blocked Claude's `gh pr merge`; the owner ran it.
-3. **Docs reconciled (`65e0daf6`)** — plan, 6B1/6B2/6B3 receipts, approved
-   decisions, readiness audit, workbench-lifecycle wiki no longer say "not merged";
-   6B3 receipt gained a Promotion section (both deployments, missing smoke,
-   merge-tree correction). Docs catalog regenerated; all doc gates green.
-4. **Local smoke attempt (not completed)** — a dev server on port 3001 with
-   `NEXTAUTH_URL=http://localhost:3001` started fine, but Claude-in-Chrome could
-   not load any localhost origin (error page, zero server hits) while public sites
-   loaded. Port 3000 was held by the Codex worktree's dev server. Recorded in
-   `project-vercel-cli-deploy-preview-auth.md`.
-5. **Teardown** — Codex dev server stopped, worktree removed, `codex/ui-features`
-   and `codex/reviewer-lifecycle-stage6b` deleted locally and on origin.
+1. **Reviewer follow-up refetch fix (PR #152 → `e9909e91`)** — host keeps last-known-good
+   proposals on a refetch failure and shows Retry.
+2. **Stage 6C (PR #153 → `3b2b34d5`)** — pure extraction of `ReleaseMaterialsModal.js`,
+   `TokenActionsMenu.js`, `ReviewReminderAction.js`, `reviewer-draft-keys.js` out of
+   `ReviewerManagePanel.js`; re-exports preserved and pinned.
+3. **Stage 6D (PR #159 → `6606cc30`)** — server-side draft fingerprint: render-emails
+   returns `draftFingerprint`; send-emails recomputes and skips `draft_stale` /
+   `draft_fingerprint_missing` per reviewer (new skip-reason VALUES, no new SSE event).
+   Uniform across all four template types (architect decision under the grant; both
+   reviewers recommended it). Select-honoring mocks + projection-divergence test added.
+4. **Stage 2 (PR #155 → `716bc558`)** — narrow shared engagement policy module.
+5. **Stage 3, all eleven slices** — commands extracted to `lib/services/reviewer-engagement/`
+   with delegation pins on every legacy caller: 3A closeout (#154 `b7a04cd6`), 3B terminal
+   transition (#156 `4e7c378c`), 3C status correction (#158 `1c24e56f`), 3D response
+   correction + neutral `errors.js` (#160 `081d558b`), 3E invitation expiry + post-send
+   bookkeeping + `lib/utils/etag.js` (#161 `01072571`), 3G reminder claim (#162 `ec74c0d4`),
+   3H deadline override (#163 `81fdac43`), 3I pending-invitation withdrawal (#164 `d47b07be`),
+   3F three invitation-record passthroughs (#165 `68198b2f`), 3J narrow
+   `deselectLegacyDeclinedSuggestion` op (#166 `3b8dca2b`), 3K whitelisted
+   `setRequestMetadata` replaces the picker's `bulkUpdateByRequest` (#167 `19955148`).
+6. **Stage 5 (PR #157 → `21cc221b`)** — narrow document-pointer and thank-you adapter ops.
+7. **Stage 7 (PR #168 → `790ba3a1`)** — new LAW-mode CI gate
+   `check:reviewer-engagement-boundary` (+ self-test, workflow step, CI reference rows,
+   `/start` list): generic writers `updateLifecycle`/`patchFields`/`patchReviewReceipt` from
+   the reviewer-suggestion adapter allowed only under `lib/services/reviewer-engagement/`,
+   the adapter itself, or a tracked `RECORDED_IMPORTERS` set (two receipt sinks) whose growth
+   is pinned by `tests/unit/reviewer-engagement-boundary-recorded-set.test.js`; AST fixpoint
+   resolves aliases, barrels, class-held adapters and dynamic imports; computed members fail
+   closed. `bulkUpdateByRequest` deleted (zero-reference pin). Named op
+   `expireInvitationResponse` added. Live census: 14 exempt bindings / 0 violations / 0 stale.
+8. **Docs reconciled after each merge** — Stage 3/5/6D/7 plans marked historical; readiness
+   audit rows 2, 3, 5, 6C, 6D, 7 COMPLETE; catalog entries for every new module; wiki topic
+   pages; security matrix rows for render/send-emails. All 33 gate/self-test pairs green on
+   final `main` (`e287a174`).
+
+### Review-protocol deviation (read this)
+
+Stage 7's final correction (`4e471c94`: class-held, renamed CJS re-export and direct
+dynamic-import shapes) landed after the two-round Codex cap on the architect's own
+verification (gate + self-test green, scratch `--root` fixture tree with all three shapes
+reported as violations, five real-file false positives from the builder's first catch-all
+removed by narrowing rather than exemptions). A post-merge read-only Opus review of that
+commit was dispatched at close; its verdict is recorded in the "Opus post-merge verdict"
+line at the end of this file. Stage 3K also hit the cap (round-2 masking finding resolved by
+the Stage 7B zero-reference pin instead of a third round).
 
 ### Commits (all on `main`)
-- `600cc972` — Merge PR #150 (Stage 6B)
-- `3fc0a936` — Merge PR #151 (Codex UI features, rebased onto 6B)
-- `65e0daf6` — Record the promotions in the lifecycle docs
-- Session handoff commit: obtain from `git log`.
+Merges: `e9909e91` #152, `3b2b34d5` #153, `b7a04cd6` #154, `716bc558` #155, `4e7c378c` #156,
+`21cc221b` #157, `1c24e56f` #158, `6606cc30` #159, `081d558b` #160, `01072571` #161,
+`ec74c0d4` #162, `81fdac43` #163, `d47b07be` #164, `68198b2f` #165, `3b8dca2b` #166,
+`19955148` #167, `790ba3a1` #168. Docs: `e287a174` (Stage 7 promotion record) and the
+per-stage "Record the … promotion" commits between merges. Session handoff commit: `git log`.
 
 ## Next Items
 
-**Owner direction at close of Session 487, still standing:** the mandatory path of
-the reviewer lifecycle plan is done. Present the elective menu from
-`docs/audits/REVIEWER_LIFECYCLE_REMAINING_READINESS_2026-09-05.md` for a fresh
-choice; do not assume an order.
+### Owner Decision Needed (the morning ask)
 
-### Owner Decision Needed
+Every tightening below was found during the campaign and deliberately NOT taken: each
+changes what staff see or what a failure does. Current behavior is preserved
+behavior-for-behavior. Evidence for D1–D5: `docs/REVIEWER_LIFECYCLE_STAGE7_BUILD_PLAN.md`
+decisions table; D0: Stage 2 plan build record; 6D items: Stage 6D plan.
 
-1. **Which elective stage next.** Options: Stage 6D server-side draft fingerprint
-   (queued 2026-09-05; contract and SSE-vocabulary change, needs its own plan and
-   planning review); Stage 6C extraction of the modal/action components out of
-   `ReviewerManagePanel.js`; alternatives 2, 3, 5 (Stage 4 optional, Stage 7
-   blocked behind 3/5). Evidence: readiness audit; plan status section.
-2. **Production smoke of the 6B surfaces.** Never run on any environment. Cheapest
-   evidence now is production itself: open a request's Reviewers tab, open the
-   release-materials and closeout modals, confirm "Send reminder" is present, cancel
-   without sending. Evidence: 6B3 receipt Promotion section.
+| # | Where | Current behavior | Tightening available | Staff-visible effect if tightened |
+|---|---|---|---|---|
+| D0 | `reviewer-suggestion.js` `softDelete` | gates on `wmkf_reviewstatus` only; a completion-stamped row with a non-terminal status can be removed via candidate Remove | select `wmkf_completedat`, gate with `isClosedEngagementRow` | Remove refuses such rows (legacy/hand-edited data only) |
+| D1 | send-emails post-send invitation stamp | unconditional write, no `ifMatch`; failure → `inviteRecorded:false` | condition on the batch-start ETag | a concurrent edit leaves a sent invitation unrecorded more often |
+| D2 | generate-emails draft generation mark | raw `patchFields` stamps `wmkf_invited`/`wmkf_emailsentat` unconditionally (`markInvitationGenerated` alias kept) | none until the legacy mark-as-sent semantics are separately approved | n/a (decision is whether to keep the alias) |
+| D3 | respond-service acceptance write | `ifMatch: _etag \|\| undefined` falls to the adapter fallback when the ETag is missing | require a concrete ETag (`isConcreteEtag`) | a reviewer response with a missing ETag would be refused instead of written |
+| D4 | picker `setRequestMetadata` (former `bulkUpdateByRequest`) | sequential unconditional per-row writes, no try/catch: a middle-row failure returns an error but earlier rows stay written and the caller cannot tell which | (a) per-row results in the response, (b) atomic changeset, (c) per-row `ifMatch` | (a) picker can show partial success; (b)/(c) some saves that succeed today would fail whole |
+| D5 | ten operational scripts writing `wmkf_appreviewersuggestions` raw (three via own `fetch`, outside the target interlock) | not gated; Stage 7 closes APPLICATION bypasses only | (a) route through adapter named ops, (b) scripts gate with recorded set, (c) archive executed one-off repair scripts | none at runtime; operator workflow changes |
+| 6D-1 | send-emails fingerprint enforcement | uniform across all four template types (taken under the grant) | exempt `invitation` | none today; confirms or reverses the architect's call |
+| 6D-2 | 6D accepted limits | batch-start hydration and Admin template drift are not covered by the fingerprint | extend the fingerprint to cover them | tighter stale-draft refusal |
+
+**Expected first-morning behavior:** any PD whose preview was rendered before the 6D deploy
+sees `draft_fingerprint_missing` on send and must re-render. By design; say so before a
+colleague reports it.
 
 ### Verified Open
 
-0. **`softDelete` is not completion-aware (owner decision).** `reviewer-suggestion.js`
-   `softDelete` gates only on `wmkf_reviewstatus` (its select does not fetch `wmkf_completedat`),
-   so a completion-stamped row with a non-terminal status can be removed via candidate Remove.
-   Pre-existing; surfaced by Codex during Stage 2 and deliberately NOT changed there (Stage 2 is
-   behavior-preserving). Tightening it (select `completedat`, gate with `isClosedEngagementRow`) is
-   a staff-visible change — Remove would refuse such rows. Every current writer stamps `completedat`
-   together with status `complete`, so the case is legacy/hand-edited data only. Evidence:
-   `docs/REVIEWER_LIFECYCLE_STAGE2_BUILD_PLAN.md` build record.
-1. **Reviewer-follow-up host refetch error — FIXED in PR #152 (`e9909e91`, S489).** Remaining,
-   pre-existing and out of that fix's scope (Opus finding): a cycles-load failure sets `error`
-   while `cycleCode` is empty, so the banner renders with no Try again button and the proposals
-   effect never runs (`pages/workbench/reviewer-follow-up.js` cycles effect). Historical text:
-   the host emptied its proposal list on a refetch error (the worse form of 6B3d). Evidence:
-   `docs/plans/REVIEWER_FOLLOW_UP_REFETCH_RESILIENCE_2026-09-05.md`; PR #152.
-2. **Wiki coverage of Codex's UI changes.** PR #151 changed 15 UI files (admin,
-   dynamics-explorer, expense-reporter, integrity-screener, workbench nav/artifacts,
-   reviewer-follow-up, `ReviewersTab` styling). Only
-   `docs/plans/UI_FEATURES_CODEX_HANDOFF_2026-09-05.md` describes them; check
-   whether any wiki topic states behavior that changed. Evidence: `git diff --stat 600cc972..3fc0a936`.
+1. **Four inline concrete-ETag regexes remain** alongside `lib/utils/etag.js`
+   `isConcreteEtag`: the adapter (imports the util but keeps one literal), `correct-response.js`,
+   `expire-invitation.js`, `record-email-outcome.js`. Consolidation is mechanical; not done to
+   keep slices behavior-preserving. Evidence: `grep -rln 'W\\/)?"\[' lib/ pages/ shared/`.
+2. **Small leftovers flagged by reviewers:** `isPastCutoff` lives in a command module
+   (`expire-invitation.js`) rather than a util; `[my-candidates]` log prefix is emitted from
+   `reviewer-engagement/`; `SUGGESTION_SET` exported but unused in the reminder sweep; stale
+   line refs at `reviewer-activity-history.js:15` and `grant-request.js:169` (A6). Evidence:
+   Stage 3/7 plan review records.
+3. **Reviewer-follow-up cycles-load failure** (pre-existing, out of #152's scope): sets
+   `error` while `cycleCode` is empty, so the banner has no Try again and the proposals
+   effect never runs. Evidence: `docs/plans/REVIEWER_FOLLOW_UP_REFETCH_RESILIENCE_2026-09-05.md`.
+4. **Wiki coverage of Codex's UI changes (PR #151)** — still unchecked. Evidence:
+   `git diff --stat 600cc972..3fc0a936`.
+5. **Production smoke** of 6B release-materials modal (needs an accepted reviewer) and of
+   any 6D send. Not run.
 
 ### Parked
 
-- Stages 2, 3, 4, 5, 7 of the lifecycle plan. Not re-probed.
-- Progress-pill alignment/chronology, Ops eligibility view, automatic reviewer
-  reminders (gate-protected hold), one-click PDF conversion. Not re-probed.
-- Five stale one-off Preview callbacks remain in the Entra app registration
-  (`g0buiqhuh`, `7doz4qxsn`, `15rny26o5`, `git-codex-pau-5b4bef`,
-  `git-codex-wor-464bcd`). Owner cleanup; read with `az ad app show`. Not this
-  session's scope.
+- Stage 4 of the lifecycle plan (readiness audit: optional, benefit not established).
+- Progress-pill alignment/chronology, Ops eligibility view, automatic reviewer reminders
+  (gate-protected hold), one-click PDF conversion. Not re-probed.
+- Five stale one-off Preview callbacks in the Entra app registration. Owner cleanup.
 
 ### Verify Before Acting
 
-1. **No Codex worktree exists.** Any Codex task now needs a fresh worktree
-   (`parallel-agent-worktree` skill). Codex must never run
-   checkout/switch/reset/stash/pull in this checkout. Codex's sandbox has no
-   network: a sandboxed `git fetch` silently leaves `origin/main` stale and a
-   sandboxed `gh` call fails; run those outside the sandbox.
+1. **Four idle worktrees exist**, all detached and clean: `../WMKF_Apps-6c` (`790ba3a1`),
+   `-s2` (`19955148`), `-s3` (`68198b2f`), `-s4` (`d47b07be`; created tonight with its own
+   `npm ci`, `.env.local` and `.agents/skills` symlinks). Left for the owner; remove with
+   `git worktree remove <path>` when convenient. All feature branches are deleted locally and
+   on origin.
 2. **Two stashes** (`stash@{0}` on main, `stash@{1}` on
-   `codex/reviewer-promotion-remediation`, July 2026 reconciliation reports)
-   predate this work and were left alone.
-3. **Merge preflights:** use `git merge-tree --write-tree A B`. The legacy
-   `git merge-tree <base> A B` output has no conflict markers to grep and reported
-   zero conflicts for a real one this session.
-4. **Local browser smoke:** Claude-in-Chrome could not reach localhost from this
-   machine; the Entra localhost port exception (any port on `http://localhost`) is
-   documented by Microsoft but unverified here. `.env.local` carries full Azure AD,
-   NextAuth, interlock and prod-read config; `AUTH_REQUIRED=true`.
-5. **Permission classifier** blocked `gh pr merge` and a chained
-   `git rev-parse && npm run report:...` this session; expect to hand merges to the
-   owner (`! gh pr merge <n> --merge`).
+   `codex/reviewer-promotion-remediation`, July 2026 reports) predate this work; untouched.
+3. **`gh pr merge` worked from this session** for all 17 PRs (the classifier that blocked
+   it in S488 did not fire). Merges still require all checks green.
+4. **Codex adversarial review from a worktree:** always instruct the three-dot diff
+   `main...HEAD` and rebase first, or Codex reviews a two-dot artifact. Codex's sandbox never
+   ran Jest or created fixtures; all test evidence tonight is builder/Opus/architect.
+5. **Local browser smoke:** Claude-in-Chrome could not reach localhost from this machine
+   (S488); unchanged.
 
 ### Do Not Reopen Without New Decision
 
-Automatic Complete from thank-you; writing the Operations/Finance final remit
-flag from this application; BILL API reviewer onboarding. No new schema, live
-lifecycle mutation, email send, cron invocation or backfill is authorized. The
-owner chose to FIX the recipient-field, proposal-field and refetch-error findings;
-do not relitigate them as "the PD previewed it" limits. The owner chose to promote
-6B without a browser smoke; do not reopen that decision, just record the smoke
-when it happens.
+Automatic Complete from thank-you; writing the Operations/Finance final remit flag from
+this application; BILL API reviewer onboarding. No new schema, live lifecycle mutation,
+email send, cron invocation or backfill is authorized. Accepted-awaiting-materials is
+transient (no dashboard change; release-modal smoke deferred to first real acceptance).
+D26 hide of Initial Assessments is intended. Stage 4 skipped per audit. The owner chose to
+promote 6B without a browser smoke.
 
 ## Preserve These Contracts
 
-- Shipped status ownership: synchronous per-reviewer mutex within one mounted
-  panel, permanent invalidation, matching-token cleanup, 6A outcome parsing.
-- Materials modal session identity = isOpen + requestId + `membershipKeyFor`
-  (suggestionId, name, email, affiliation) + signature/reviewDueDate +
-  `proposalKeyFor` (title, abstract, authors, institution), by VALUE; the
-  completion exemption requires all of them unchanged; proposal loading is
-  invalidated by open/close, request change and unmount only.
-- `ReviewersTab` passes `degraded={Boolean(error)}` to the panel inside Codex's
-  `request-reviewer-table` wrapper; `reviewers-tab-stale-request.test.js` pins it.
-- Send transmits the previewed body verbatim; only the destination address is
-  re-resolved server-side. No server re-render at send outside Stage 6D.
-- Payload shapes, SSE vocabulary, preview single-flight and tail serialization,
-  send-emails one-time gate: unchanged through 6B and PR #151.
+- Shipped status ownership: synchronous per-reviewer mutex within one mounted panel,
+  permanent invalidation, matching-token cleanup, 6A outcome parsing.
+- Materials modal session identity = isOpen + requestId + `membershipKeyFor` +
+  signature/reviewDueDate + `proposalKeyFor`, by VALUE (now in `reviewer-draft-keys.js`).
+- `ReviewersTab` passes `degraded={Boolean(error)}`; `reviewers-tab-stale-request.test.js` pins it.
+- Send transmits the previewed body verbatim; the server recomputes only the draft
+  fingerprint and the destination address (6D). `draft_stale` / `draft_fingerprint_missing`
+  are skip-reason values, not new SSE events.
+- Every extracted command is invoked by its legacy caller with the same args and every
+  outcome mapped; the delegation-pin suites make an inline reimplementation red.
+- `check:reviewer-engagement-boundary` is LAW: a new importer of a generic writer outside
+  `lib/services/reviewer-engagement/` fails CI; growing `RECORDED_IMPORTERS` requires editing
+  the tracked recorded-set pin test in the same PR.
 
 ## Orchestration Lessons (one line each)
 
-- Verify another agent's rebase yourself: run the full listed selection (Codex ran
-  8 of 10 suites) and remove the carried-over line to prove a test goes red.
-- A "not merged" report from a sandboxed agent may be a stale ref, not a fact;
-  check the shared ref from outside before changing the plan.
-- Two unmerged branches showing different UI look like regressions; diff the
-  branches before diagnosing.
-- When a classifier blocks a one-line merge twice, hand it to the owner; do not
-  reshape the command.
+- Census-table rows in a shared plan conflict on every rebase; append at the end and keep
+  all rows when resolving.
+- Add the delegation-pin rule to the plan before slice one, not after a reviewer asks (3E).
+- A "gate turns red when X grows" claim needs a tracked pin test, not a script constant.
+- Builder catch-alls false-positive on real code (`adapter.CONST[key]`, `.findById().catch`);
+  narrow the rule, never add exemptions.
+- Sequence worktrees so parallel builders never share a file; rebase stacked branches after
+  each merge and relaunch CI watchers after every force-push.
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `docs/REVIEWER_LIFECYCLE_STAGE6B_BUILD_PLAN.md` | Status marks 6B promoted; elective stages next |
-| `docs/audits/REVIEWER_LIFECYCLE_STAGE6B3_RECEIPT_2026-09-05.md` | 6B3 + amendments; Promotion section with both deployments |
-| `docs/audits/REVIEWER_LIFECYCLE_REMAINING_READINESS_2026-09-05.md` | Elective menu |
-| `docs/plans/UI_FEATURES_CODEX_HANDOFF_2026-09-05.md` | Codex's UI critique and change record |
-| `shared/components/reviewers/ReviewersTab.js` | `degraded` wiring inside `request-reviewer-table` wrapper |
-| `shared/components/reviewers/ReviewerManagePanel.js` | panel + re-exports; `degraded` gating (6C moved the modal to `ReleaseMaterialsModal.js` and the keys to `reviewer-draft-keys.js`) |
-| `pages/workbench/reviewer-follow-up.js` | Codex-rewritten host; refetch-error fix candidate |
-| `.claude-memory/project-vercel-cli-deploy-preview-auth.md` | Local/Preview smoke auth facts incl. this session's notes |
+| `docs/REVIEWER_LIFECYCLE_STAGE7_BUILD_PLAN.md` | 18-site census, D0–D5 decisions, gate shape, all review records |
+| `docs/REVIEWER_LIFECYCLE_STAGE3_BUILD_PLAN.md` | 3A–3K records; delegation-pin rule |
+| `docs/REVIEWER_LIFECYCLE_STAGE6D_BUILD_PLAN.md` | fingerprint contract, uniform-enforcement decision, accepted limits |
+| `docs/audits/REVIEWER_LIFECYCLE_REMAINING_READINESS_2026-09-05.md` | every row COMPLETE except optional Stage 4 |
+| `lib/services/reviewer-engagement/` | extracted commands (close-review, terminal-transition, correct-status, correct-response, expire-invitation, record-email-outcome, claim-reminder, change-review-deadline, withdraw-pending-invitation, record-invitation, errors) |
+| `scripts/check-reviewer-engagement-boundary.js` | Stage 7 LAW gate; `RECORDED_IMPORTERS` |
+| `tests/unit/reviewer-engagement-boundary-recorded-set.test.js` | tracked pin on the recorded set |
+| `lib/dataverse/adapters/reviewer-suggestion.js` | named ops incl. `setRequestMetadata`, `deselectLegacyDeclinedSuggestion`, `expireInvitationResponse` |
+| `shared/components/reviewers/ReleaseMaterialsModal.js` | 6C-extracted modal carrying the 6D `draftFingerprint` |
+| `.claude-memory/project-reviewer-lifecycle-autonomy-directive-2026-09-05.md` | the grant and its completion |
 
 ## Testing
 
 ```sh
-# Retained reviewer UI selection (all must stay green)
-npm test -- --runInBand --watch=false --runTestsByPath tests/unit/reviewer-action-lifetimes.test.js tests/unit/reviewer-status-mutation-characterization.test.js tests/unit/reviewer-manage-actions-menu.test.js tests/unit/reviewer-closeout-modal.test.js tests/unit/manage-panel-preview-error-retry.test.js tests/unit/reviewer-manage-proposal-attachment.test.js tests/unit/reviewers-tab-stale-request.test.js tests/unit/reviewers-tab-post-send-refresh.test.js tests/unit/reviewers-tab-proposal-binding.test.js tests/unit/reviewers-tab-referral-add.test.js tests/unit/reviewer-follow-up.test.js tests/unit/reviewer-materials-modal-lifetimes.test.js tests/unit/reviewer-manage-degraded.test.js
+# Stage 7 gate pair (sequential)
+npm run check:reviewer-engagement-boundary && npm run check:reviewer-engagement-boundary:self-test
+node scripts/check-reviewer-engagement-boundary.js --report
+# Delegation pins + boundary pins
+npm test -- --runInBand --watch=false --testPathPattern 'reviewer-engagement|reviewer-suggestion-(bulk-update|receipt)|draft-fingerprint|send-emails-fingerprint'
 # Slice exit
 npm test -- --runInBand --watch=false && npm run check:types && npm run lint && npm run build -- --webpack && git diff --check
 ```
 
 ## Handoff and Milestone Determination
 
-Production cutover shipped: Stage 6B and the Workbench UI polish are live.
-**A DEVELOPMENT_LOG.md entry was added (Session 488).** No CLAUDE.md, schema, API,
-environment or memory convention changed. The claim-evidence pilot report recorded
-no eligible plan/design edit for this session; no observation row was added.
+Production cutover shipped: the full reviewer-lifecycle elective and boundary program
+(Stages 2, 3, 5, 6C, 6D, 7) is live with a new CI gate and a deleted adapter export.
+**A DEVELOPMENT_LOG.md entry was added (Session 489).** A new `check:*` gate was added to
+CI, the `/start` list and `docs/CI_GATES_REFERENCE.md`; no CLAUDE.md, schema or environment
+change. The claim-evidence pilot report recorded one eligible advisory (count shape on the
+Stage 7 plan) and one observation row was added to the pilot directive.
+
+**Opus post-merge verdict on `4e471c94`:** PENDING at handoff write time — see the line
+appended below once the review returns.

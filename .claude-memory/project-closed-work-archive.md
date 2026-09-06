@@ -39,6 +39,8 @@ These items are **done, closed, or point-in-time** and no longer earn a slot in 
 - **Prompt legacy audit** (RESOLVED S344) — sunset apps and dead generators were removed and peer-review execution was migrated; current prompt behavior lives in the Prompt/Executor wiki. [[project-prompt-legacy-audit-followup]], `docs/PROMPT_LEGACY_AUDIT.md`.
 - **Spec-audit docs recovery** (RESOLVED S350-S352) — design docs were recovered, accept-fast-response verified, and quota/PD-email behavior built. [[project-spec-audit-docs-recovery-parked]].
 
+- **Reviewer lifecycle elective + boundary program** (SHIPPED S489, 2026-09-06) — Stages 2, 3A–3K, 5, 6C, 6D, 7 merged as PRs #152–#168; LAW gate `check:reviewer-engagement-boundary` live; `bulkUpdateByRequest` deleted. Owner decisions D0–D5 remain open in the Stage 7 plan. [[project-reviewer-lifecycle-autonomy-directive-2026-09-05]], `docs/REVIEWER_LIFECYCLE_STAGE7_BUILD_PLAN.md`.
+
 ## Point-in-time status snapshots (superseded by live SESSION_PROMPT handoffs)
 - **Intake pilot decisions 2026-05-06** — six-decision walkthrough; items 1C+1D superseded by the 2026-05-13 Track-1 decisions (still in index). [[project-intake-portal-pilot-decisions-2026-05-06]].
 - **Slice-0 role probe — VERIFIED S179** — `probe-apprequestperson-role-data.js` + `extend-apprequestperson-role-picklist.mjs` (idempotent); data clear, picklist already expanded in prod. [[project-slice0-role-probe]].

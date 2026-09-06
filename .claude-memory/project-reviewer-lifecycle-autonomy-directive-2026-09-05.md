@@ -1,9 +1,10 @@
 ---
 name: project-reviewer-lifecycle-autonomy-directive-2026-09-05
-description: Owner directive (2026-09-05 evening): after the follow-up fix, 6C and 6D land, keep building lifecycle Stages 2, 3, 5, then 7 (skip 4) autonomously with the plan→Sonnet build→Opus review→Codex (≤2 rounds) cycle; grace period is now, not next cycle; stop only when stuck.
+description: Owner directive (2026-09-05 evening) to build lifecycle Stages 2, 3, 5, 7 autonomously with the plan→Sonnet→Opus→Codex(≤2) cycle; COMPLETED 2026-09-06 (17 PRs). Open owner decisions D0–D5 + two 6D items live in the Stage 7 plan and SESSION_PROMPT.
 metadata:
   type: project
-  status: active
+  status: closed
+  last_verified: 2026-09-06 via S489 close
 ---
 
 On 2026-09-05 (Session 489, evening) Justin granted autonomy for the remaining reviewer
@@ -29,3 +30,13 @@ decision is genuinely the owner's. Architect took the 6D uniform-enforcement dec
 under this grant (both reviewers recommended it); flagged for morning review. See
 [[project-accepted-awaiting-materials-is-transient]] and the readiness audit
 `docs/audits/REVIEWER_LIFECYCLE_REMAINING_READINESS_2026-09-05.md`.
+
+**Outcome (2026-09-06, S489 close):** the queue is exhausted. PRs #152–#168 merged (follow-up fix,
+6C, 6D, Stage 2, Stage 3A–3K, Stage 5, Stage 7); readiness audit rows all COMPLETE except optional
+Stage 4. `gh pr merge` was not blocked this session. Two stages (3K, 7) hit the Codex two-round cap;
+both were closed by architect verification rather than a third round, recorded in the Stage 7 plan.
+Every tightening surfaced during the campaign (D0–D5, 6D uniform enforcement, 6D accepted limits)
+was preserved behavior-for-behavior and tabled for the owner in `SESSION_PROMPT.md`; nothing was
+tightened under the grant except the 6D uniform-enforcement call already flagged above. The cycle
+itself (delegation-pin rule from slice one, three-dot Codex diffs, worktree sequencing) is the
+reusable part; see [[project-closed-work-archive]].

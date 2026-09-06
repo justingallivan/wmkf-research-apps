@@ -10,6 +10,26 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## September 2026 — Reviewer lifecycle elective and boundary program reached Production (Session 489)
+
+**Milestone:** Every remaining stage of the reviewer lifecycle plan shipped overnight under an
+owner autonomy grant: the follow-up refetch fix, 6C panel extraction, 6D server-side draft
+fingerprint, Stage 2 policy module, all eleven Stage 3 command extractions into
+`lib/services/reviewer-engagement/`, Stage 5 narrow adapter ops, and Stage 7's new LAW-mode CI
+gate `check:reviewer-engagement-boundary` with the `bulkUpdateByRequest` export deleted.
+**Sessions:** 489 (plan → Sonnet build → Opus review → Codex adversarial ≤2 rounds per stage).
+**Ship state:** 17 PRs (#152–#168) merged 2026-09-06 PT, final `790ba3a1`; docs at `e287a174`;
+Production Ready. All 33 gate/self-test pairs green. No browser smoke on any merge; 6D is the only
+user-visible contract change (pre-deploy previews must re-render). Owner decisions D0–D5 and two 6D
+items are recorded as open in the Stage 7 plan and `SESSION_PROMPT.md`, deliberately not taken.
+**Why it matters:** Generic Dataverse writers on reviewer suggestions can no longer be reached from
+routes or UI code without a tracked, pinned exemption, and each lifecycle mutation has one named
+command with delegation-pinned callers, so the next cycle's defects have one place to look.
+**Pointers:** [Stage 7 plan](docs/REVIEWER_LIFECYCLE_STAGE7_BUILD_PLAN.md);
+[Stage 3 plan](docs/REVIEWER_LIFECYCLE_STAGE3_BUILD_PLAN.md);
+[Stage 6D plan](docs/REVIEWER_LIFECYCLE_STAGE6D_BUILD_PLAN.md);
+[readiness audit](docs/audits/REVIEWER_LIFECYCLE_REMAINING_READINESS_2026-09-05.md).
+
 ## September 2026 — Reviewer lifecycle Stage 6B and Workbench UI polish reached Production (Session 488)
 
 **Milestone:** Reviewer workbench actions and modals now bind their feedback to the
