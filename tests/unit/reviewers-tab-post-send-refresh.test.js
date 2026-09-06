@@ -19,12 +19,30 @@
  * Child panels are mocked to stubs so ReviewersTab renders in isolation;
  * ReviewerInvitePanel echoes its candidates prop and exposes buttons that
  * exercise onRefresh the way the real panel's afterSent does.
+ *
+ * ReviewerManagePanel is NOT stubbed (unlike the other child panels) — the
+ * post-send/failing-refresh test below drives the real panel and its nested
+ * ReleaseMaterialsModal so the modal-session assertions are meaningful. This
+ * is safe for every other test in this file: they all run with `mockSub` at
+ * 'candidates' or 'find', so `current` never routes to ManagePanel.
  */
 import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
+import { TextDecoder as NodeTextDecoder } from 'util';
 
-jest.mock('../../shared/components/reviewers/ReviewerManagePanel', () => function ManagePanelStub() {
-  return <div data-testid="manage-panel" />;
+jest.mock('@vercel/blob/client', () => ({ upload: jest.fn() }));
+jest.mock('../../shared/components/reviewers/email-template-store', () => {
+  const actual = jest.requireActual('../../shared/components/reviewers/email-template-store');
+  return {
+    ...actual,
+    loadEmailTemplates: jest.fn(async () => actual.EMPTY_TEMPLATES),
+    saveEmailTemplates: jest.fn(async () => true),
+  };
 });
+
+if (typeof global.TextDecoder === 'undefined') {
+  global.TextDecoder = NodeTextDecoder;
+}
+
 jest.mock('../../shared/components/reviewers/ReviewerFindPanel', () => function FindPanelStub(props) {
   return <div data-testid="find-panel" data-saved-pool={JSON.stringify(props.savedPool || [])} />;
 });
@@ -243,4 +261,160 @@ test('an older in-flight my-candidates response does not repaint over a newer on
   const rows = candidatesOf();
   expect(rows).toHaveLength(1);
   expect(rows[0]).toMatchObject({ suggestionId: 's-1', invited: true });
+});
+
+// ── Stage 6B3d: a transient refetch error after a confirmed send must not
+// blank the panel or invalidate the open materials-modal session ──────────
+
+describe('a confirmed materials send followed by a failing reviewers refetch', () => {
+  const PROPOSAL_TRACK = {
+    proposalId: REQ,
+    proposalTitle: 'Proposal Under Review',
+    reviewDeadline: '2026-07-22',
+    proposalAbstract: 'Original abstract text.',
+    proposalAuthors: 'Dr. Original PI',
+    proposalInstitution: 'Original University',
+  };
+  const REVIEWER_A = {
+    suggestionId: 'aaaaaaaa-0000-0000-0000-000000000001',
+    name: 'Accepted A',
+    email: 'a@example.org',
+    reviewStatus: 'accepted',
+  };
+
+  function mockJson(data, ok = true, status = ok ? 200 : 500) {
+    return { ok, status, json: async () => data };
+  }
+
+  // Chunk-controlled SSE reader, copied (not imported) from
+  // reviewer-materials-modal-lifetimes.test.js's controlledSse/sseChunk.
+  function controlledSse() {
+    const queued = [];
+    let waiting = null;
+    let ended = false;
+    const cancel = jest.fn(() => Promise.resolve());
+    return {
+      response: {
+        ok: true,
+        body: {
+          getReader: () => ({
+            read: () => new Promise((resolve) => {
+              if (queued.length > 0) {
+                resolve({ value: Buffer.from(queued.shift()), done: false });
+              } else if (ended) {
+                resolve({ done: true, value: undefined });
+              } else {
+                waiting = resolve;
+              }
+            }),
+            cancel,
+          }),
+        },
+      },
+      push(chunk) {
+        if (waiting) {
+          const r = waiting;
+          waiting = null;
+          r({ value: Buffer.from(chunk), done: false });
+        } else {
+          queued.push(chunk);
+        }
+      },
+      finish() {
+        ended = true;
+        if (waiting) {
+          const r = waiting;
+          waiting = null;
+          r({ done: true, value: undefined });
+        }
+      },
+    };
+  }
+
+  function sseChunk(event, data) {
+    return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    localStorage.clear();
+    mockSub = 'track';
+    jest.spyOn(window, 'confirm').mockReturnValue(true);
+  });
+
+  afterEach(() => {
+    window.confirm.mockRestore();
+  });
+
+  test('keeps the sent summary visible and shows the load error', async () => {
+    const sse = controlledSse();
+    let reviewersCall = 0;
+    global.fetch = jest.fn((url, init) => {
+      const u = String(url);
+      if (u.includes('/api/review-manager/reviewers')) {
+        reviewersCall += 1;
+        if (reviewersCall === 1) {
+          return Promise.resolve(mockJson({
+            success: true,
+            proposals: [{ ...PROPOSAL_TRACK, reviewers: [REVIEWER_A] }],
+          }));
+        }
+        return Promise.resolve(mockJson({ success: false, error: 'boom' }, false, 500));
+      }
+      if (u.includes('/api/reviewer-finder/my-candidates')) {
+        return Promise.resolve(mockJson({ proposals: [] }));
+      }
+      if (u.includes('/api/workbench/decline-referrals')) {
+        return Promise.resolve(mockJson({ referrals: [] }));
+      }
+      if (u === '/api/review-manager/release-settings') {
+        return Promise.resolve(mockJson({ attachProposalEmail: false }));
+      }
+      if (u.startsWith('/api/review-manager/materials-preflight')) {
+        return Promise.resolve(mockJson({ ok: true, fileCount: 3 }));
+      }
+      if (u === '/api/review-manager/render-emails') {
+        return Promise.resolve(mockJson({
+          drafts: [{
+            suggestionId: REVIEWER_A.suggestionId,
+            candidateName: REVIEWER_A.name,
+            candidateEmail: REVIEWER_A.email,
+            subject: 'S',
+            body: 'B',
+          }],
+        }));
+      }
+      if (u === '/api/review-manager/send-emails') {
+        return Promise.resolve(sse.response);
+      }
+      throw new Error(`unexpected fetch ${u} ${init ? JSON.stringify(init) : ''}`);
+    });
+
+    render(<ReviewersTab requestId={REQ} />);
+
+    const releaseBtn = await screen.findByRole('button', { name: /release proposal to reviewers \(1\)/i });
+    fireEvent.click(releaseBtn);
+    fireEvent.click(await screen.findByRole('button', { name: /preview 1 email/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /send 1 email/i }));
+    await waitFor(() => expect(
+      global.fetch.mock.calls.filter(([u]) => String(u) === '/api/review-manager/send-emails').length,
+    ).toBe(1));
+
+    sse.push(sseChunk('result', {
+      sent: [{ suggestionId: REVIEWER_A.suggestionId, candidateName: REVIEWER_A.name, candidateEmail: REVIEWER_A.email }],
+      failed: [],
+      skipped: [],
+    }));
+    sse.push(sseChunk('complete', { message: 'done' }));
+    sse.finish();
+
+    // The completion handshake calls onRefresh, which re-triggers the reviewers
+    // refetch — that refetch is the SECOND call, and fails. Wait for the error
+    // banner (it lands after the completion handshake settles) before asserting
+    // the sent summary is still intact.
+    await waitFor(() => expect(screen.getByText(/Couldn.t load reviewers: boom/)).toBeInTheDocument());
+
+    expect(screen.getByText('1 sent')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /preview 0 email/i })).toBeNull();
+  });
 });

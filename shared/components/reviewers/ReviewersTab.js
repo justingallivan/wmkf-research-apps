@@ -154,7 +154,11 @@ export default function ReviewersTab({
     } catch (e) {
       if (isCurrent()) {
         setError(e.message);
-        setProposal(null);
+        // A transient refetch error must not blank the panel or invalidate an
+        // open materials-modal session for the same request (Stage 6B3d) — keep
+        // the last committed proposal when it belongs to this request. A
+        // proposal from another request is still dropped.
+        setProposal((prev) => (prev && prev.proposalId === rid ? prev : null));
       }
     } finally {
       if (isCurrent()) setLoading(false);
