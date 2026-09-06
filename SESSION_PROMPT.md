@@ -92,18 +92,9 @@ colleague reports it.
 
 ### Verified Open
 
-1. **Four inline concrete-ETag regexes remain** alongside `lib/utils/etag.js`
-   `isConcreteEtag`: the adapter (imports the util but keeps one literal), `correct-response.js`,
-   `expire-invitation.js`, `record-email-outcome.js`. Consolidation is mechanical; not done to
-   keep slices behavior-preserving. Evidence: `grep -rln 'W\\/)?"\[' lib/ pages/ shared/`.
-2. **Small leftovers flagged by reviewers:** `isPastCutoff` lives in a command module
-   (`expire-invitation.js`) rather than a util; `[my-candidates]` log prefix is emitted from
-   `reviewer-engagement/`; `SUGGESTION_SET` exported but unused in the reminder sweep; stale
-   line refs at `reviewer-activity-history.js:15` and `grant-request.js:169` (A6). Evidence:
-   Stage 3/7 plan review records.
-3. **Reviewer-follow-up cycles-load failure** (pre-existing, out of #152's scope): sets
-   `error` while `cycleCode` is empty, so the banner has no Try again and the proposals
-   effect never runs. Evidence: `docs/plans/REVIEWER_FOLLOW_UP_REFETCH_RESILIENCE_2026-09-05.md`.
+1. ~~Four inline concrete-ETag regexes~~ **DONE S490** (branch `claude/open-items-cycles-retry-hygiene`, stacked on the D5 branch): all four sites call `isConcreteEtag`; `grep -rn 'W\\/)?"\[' lib/` hits only `lib/utils/etag.js`.
+2. ~~Small reviewer leftovers~~ **DONE S490**: `isPastCutoff` → `lib/utils/past-cutoff.js`; `[correct-response]` log prefix; `SUGGESTION_SET` removed; both stale line refs reworded to symbol/caller names.
+3. ~~Reviewer-follow-up cycles-load failure~~ **FIXED S490**: `loadCycles` is a retryable callback; when `cycleCode` is empty the banner's Try again reloads cycles, after which the proposals effect runs. Pinned by a mutation-checked test in `reviewer-follow-up.test.js`.
 4. **Wiki coverage of Codex's UI changes (PR #151)** — still unchecked. Evidence:
    `git diff --stat 600cc972..3fc0a936`.
 5. **Production smoke** of 6B release-materials modal (needs an accepted reviewer) and of

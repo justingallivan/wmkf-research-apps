@@ -25,7 +25,8 @@ jest.mock('../../lib/dataverse/adapters/grant-request.js', () => ({
   queryRequests: (...a) => queryRequests(...a),
 }));
 
-const { expireInvitation, isPastCutoff } = require('../../lib/services/reviewer-engagement/expire-invitation.js');
+const { expireInvitation } = require('../../lib/services/reviewer-engagement/expire-invitation.js');
+const { isPastCutoff } = require('../../lib/utils/past-cutoff.js');
 
 const SUGGESTION_ID = 'sug-1';
 const REQUEST_ID = 'req-1';

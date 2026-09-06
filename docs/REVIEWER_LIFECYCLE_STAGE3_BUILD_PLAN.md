@@ -236,10 +236,10 @@ builders on that file concurrently.
   `expire-invitation.js:66`, `record-email-outcome.js:51` — fixed in the correction round (authorized
   two-line out-of-slice edit). Advisories: A1 `isPastCutoff` living in a command module is a mild
   inversion, accepted for verbatim-move discipline (candidate future home: a `lib/utils/` date
-  helper); A2 census header stale (fixed in correction); A3/A4 header nits (fixed); A5 the census-based
+  helper — **done 2026-09-06, S490: `lib/utils/past-cutoff.js`**); A2 census header stale (fixed in correction); A3/A4 header nits (fixed); A5 the census-based
   pin only fires when the import disappears — hence the mandatory delegation pin above; A6
   pre-existing stale line refs at `reviewer-activity-history.js:15` and `grant-request.js:169` (sweep
-  queue, not this slice).
+  queue, not this slice — **both reworded to symbol/caller names 2026-09-06, S490**).
 - **Correction `6c390a1d`** (rebased on `245f57e7`; PR #161): delegation pins
   `tests/unit/reviewer-suggestion-sweep-delegation.test.js` (mocks `expire-invitation` with the real
   `isPastCutoff` passed through; exact call shape; swept/skipped/412/not-found/other mapping) and
