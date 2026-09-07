@@ -4,7 +4,7 @@
  * @jest-environment node
  */
 jest.mock('../../lib/utils/auth', () => ({ requireAppAccess: jest.fn() }));
-jest.mock('../../lib/services/dynamics-service', () => ({ DynamicsService: { queryRecords: jest.fn() } }));
+jest.mock('../../lib/services/dynamics-service', () => ({ DynamicsService: { queryAllRecords: jest.fn() } }));
 jest.mock('../../lib/services/grantee-deliverable-record', () => ({ getDeliverableForRequest: jest.fn() }));
 jest.mock('../../lib/services/program-director-resolver', () => ({ resolveByEmail: jest.fn() }));
 jest.mock('../../lib/services/dynamics-context', () => ({
@@ -29,7 +29,7 @@ function mockRes() {
 
 beforeEach(() => {
   requireAppAccess.mockReset().mockResolvedValue({ profileId: 'p', session: { user: { azureEmail: 'jgallivan@wmkeck.org' } } });
-  DynamicsService.queryRecords.mockReset().mockResolvedValue({ records: [] });
+  DynamicsService.queryAllRecords.mockReset().mockResolvedValue({ records: [], totalCount: 0, capped: false });
   getDeliverableForRequest.mockReset().mockResolvedValue(null);
   resolveByEmail.mockReset().mockResolvedValue({ systemuserid: 'pd-me', fullName: 'Justin Gallivan' });
 });
@@ -45,15 +45,31 @@ test('unauthenticated caller: short-circuit, no PD resolve or query', async () =
   const res = mockRes();
   await handler({ method: 'GET', query: { cycleCode: 'J26' }, headers: {} }, res);
   expect(resolveByEmail).not.toHaveBeenCalled();
-  expect(DynamicsService.queryRecords).not.toHaveBeenCalled();
+  expect(DynamicsService.queryAllRecords).not.toHaveBeenCalled();
 });
 
 test('query failure → 500 with the sanitized error envelope', async () => {
-  DynamicsService.queryRecords.mockRejectedValue(new Error('dataverse down'));
+  DynamicsService.queryAllRecords.mockRejectedValue(new Error('dataverse down'));
   const res = mockRes();
   await handler({ method: 'GET', query: { cycleCode: 'J26' }, headers: {} }, res);
   expect(res.statusCode).toBe(500);
   expect(res.body).toEqual({ error: 'Failed to list awardees.' });
+});
+
+test('capped awardee query → explicit 503 without enriching partial rows', async () => {
+  DynamicsService.queryAllRecords.mockResolvedValue({
+    records: [{ akoya_requestid: 'r1' }],
+    totalCount: 5001,
+    capped: true,
+  });
+  const res = mockRes();
+  await handler({ method: 'GET', query: { cycleCode: 'J26' }, headers: {} }, res);
+  expect(res.statusCode).toBe(503);
+  expect(res.body).toEqual({
+    error: 'Awardee list is temporarily incomplete. Please try again later.',
+    cycleCode: 'J26',
+  });
+  expect(getDeliverableForRequest).not.toHaveBeenCalled();
 });
 
 test('mine-scope 200 envelope pins the full key set (cycleLabel/scope/pdResolved/programDirector)', async () => {
@@ -74,14 +90,14 @@ test('invalid cycleCode → 400, no query', async () => {
   const res = mockRes();
   await handler({ method: 'GET', query: { cycleCode: 'NOPE' }, headers: {} }, res);
   expect(res.statusCode).toBe(400);
-  expect(DynamicsService.queryRecords).not.toHaveBeenCalled();
+  expect(DynamicsService.queryAllRecords).not.toHaveBeenCalled();
 });
 
 test('builds the eligibility filter: Active + research program GUIDs + PI present, scoped to the cycle', async () => {
   const res = mockRes();
   await handler({ method: 'GET', query: { cycleCode: 'J26' }, headers: {} }, res);
   expect(res.statusCode).toBe(200);
-  const { filter, orderby } = DynamicsService.queryRecords.mock.calls[0][1];
+  const { filter, orderby } = DynamicsService.queryAllRecords.mock.calls[0][1];
   expect(filter).toContain("akoya_requeststatus eq 'Active'");
   expect(filter).toContain('_wmkf_projectleader_value ne null');
   expect(filter).toContain('wmkf_meetingdate ge 2026-06-01');
@@ -98,7 +114,7 @@ test('scope=all omits the PD clause and lists everyone', async () => {
   const res = mockRes();
   await handler({ method: 'GET', query: { cycleCode: 'J26', scope: 'all' }, headers: {} }, res);
   expect(res.statusCode).toBe(200);
-  const { filter } = DynamicsService.queryRecords.mock.calls[0][1];
+  const { filter } = DynamicsService.queryAllRecords.mock.calls[0][1];
   expect(filter).not.toContain('_wmkf_programdirector_value');
   expect(res.body.scope).toBe('all');
 });
@@ -110,11 +126,11 @@ test('mine-scope with no resolvable PD → empty list, pdResolved:false, no quer
   expect(res.statusCode).toBe(200);
   expect(res.body.count).toBe(0);
   expect(res.body.pdResolved).toBe(false);
-  expect(DynamicsService.queryRecords).not.toHaveBeenCalled();
+  expect(DynamicsService.queryAllRecords).not.toHaveBeenCalled();
 });
 
 test('maps records to awardees with formatted PI/liaison names + deliverable status', async () => {
-  DynamicsService.queryRecords.mockResolvedValue({ records: [
+  DynamicsService.queryAllRecords.mockResolvedValue({ records: [
     {
       akoya_requestid: 'r1', akoya_requestnum: '1002238', akoya_title: 'Fungal Networks',
       _wmkf_projectleader_value: 'pi1', _wmkf_projectleader_value_formatted: 'Erika Espinosa-Ortiz',

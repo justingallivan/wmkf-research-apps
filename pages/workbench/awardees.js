@@ -5,7 +5,7 @@
  * Phase-II-Pending/Advancing; awardees are status=Active research grants).
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import Layout, { Card, PageHeader } from '../../shared/components/Layout';
@@ -22,6 +22,8 @@ function currentCycleCode() {
   return `D${String(d.getFullYear() - 1).slice(-2)}`;          // Jan–May → prior Dec cycle
 }
 
+const contextKey = (code, all) => `${code}:${all ? 'all' : 'mine'}`;
+
 function AwardeesList() {
   const router = useRouter();
   const [cycleCode, setCycleCode] = useState(currentCycleCode());
@@ -30,6 +32,12 @@ function AwardeesList() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [showAll, setShowAll] = useState(false);
+  const activeRequestRef = useRef(null);
+  const [dataContextKey, setDataContextKey] = useState(null);
+  const [dataContextVersion, setDataContextVersion] = useState(null);
+  const [errorContextKey, setErrorContextKey] = useState(null);
+  const [errorContextVersion, setErrorContextVersion] = useState(null);
+  const [selectionVersion, setSelectionVersion] = useState(0);
 
   // Honor a ?cycleCode= deep link (e.g. the workbench "View awardees" link) once
   // the router is ready; falls back to the current-cycle default otherwise.
@@ -37,26 +45,78 @@ function AwardeesList() {
     if (!router.isReady) return;
     const q = typeof router.query.cycleCode === 'string' ? router.query.cycleCode.trim().toUpperCase() : '';
     if (!q || !/^[JD]\d{2}$/.test(q)) return;
-    const timer = window.setTimeout(() => { setCycleCode(q); setInput(q); }, 0);
+    const timer = window.setTimeout(() => {
+      setSelectionVersion((version) => version + 1);
+      setCycleCode(q);
+      setInput(q);
+    }, 0);
     return () => window.clearTimeout(timer);
   }, [router.isReady, router.query.cycleCode]);
 
-  const load = useCallback(async (code, all) => {
-    setLoading(true); setError(null);
+  const load = useCallback(async (code, all, request) => {
+    const ownsRequest = () => activeRequestRef.current === request;
+    if (!ownsRequest()) return;
+    setLoading(true);
+    setError(null);
+    setErrorContextKey(null);
+    setErrorContextVersion(null);
     try {
       const scopeParam = all ? '&scope=all' : '';
-      const res = await fetch(`/api/workbench/grantee-deliverables/awardees?cycleCode=${encodeURIComponent(code)}${scopeParam}`);
+      const res = await fetch(
+        `/api/workbench/grantee-deliverables/awardees?cycleCode=${encodeURIComponent(code)}${scopeParam}`,
+        { signal: request.controller.signal },
+      );
       const d = await res.json();
-      if (!res.ok) { setError(d.error || 'Failed to load awardees.'); setData(null); }
-      else setData(d);
-    } catch { setError('Failed to load awardees.'); setData(null); }
-    setLoading(false);
+      if (!ownsRequest()) return;
+      if (!res.ok) {
+        setError(d?.error || 'Failed to load awardees.');
+        setErrorContextKey(contextKey(code, all));
+        setErrorContextVersion(request.version);
+        setData(null);
+        setDataContextKey(null);
+        setDataContextVersion(null);
+      } else {
+        setErrorContextKey(null);
+        setErrorContextVersion(null);
+        setData(d);
+        setDataContextKey(contextKey(code, all));
+        setDataContextVersion(request.version);
+      }
+    } catch {
+      if (!ownsRequest()) return;
+      setError('Failed to load awardees.');
+      setErrorContextKey(contextKey(code, all));
+      setErrorContextVersion(request.version);
+      setData(null);
+      setDataContextKey(null);
+      setDataContextVersion(null);
+    } finally {
+      if (ownsRequest()) {
+        setLoading(false);
+        activeRequestRef.current = null;
+      }
+    }
   }, []);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => { void load(cycleCode, showAll); }, 0);
-    return () => window.clearTimeout(timer);
-  }, [cycleCode, showAll, load]);
+    const controller = new AbortController();
+    const request = { controller, version: selectionVersion };
+    activeRequestRef.current = request;
+    const timer = window.setTimeout(() => { void load(cycleCode, showAll, request); }, 0);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+      if (activeRequestRef.current === request) activeRequestRef.current = null;
+    };
+  }, [cycleCode, showAll, load, selectionVersion]);
+
+  const currentContextKey = contextKey(cycleCode, showAll);
+  const visibleData = dataContextKey === currentContextKey && dataContextVersion === selectionVersion
+    ? data
+    : null;
+  const visibleError = errorContextKey === currentContextKey && errorContextVersion === selectionVersion
+    ? error
+    : null;
 
   return (
     <Layout title="Awardees">
@@ -71,7 +131,11 @@ function AwardeesList() {
         </div>
         <form
           className="flex items-center gap-2 mb-4"
-          onSubmit={(e) => { e.preventDefault(); setCycleCode(input.trim().toUpperCase()); }}
+          onSubmit={(e) => {
+            e.preventDefault();
+            setSelectionVersion((version) => version + 1);
+            setCycleCode(input.trim().toUpperCase());
+          }}
         >
           <label className="text-sm">Cycle
             <input
@@ -83,30 +147,37 @@ function AwardeesList() {
           </label>
           <button type="submit" className="px-3 py-1 text-sm rounded bg-blue-700 text-white">Load</button>
           <label className="flex items-center gap-1 text-sm text-gray-700 ml-2">
-            <input type="checkbox" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} />
+            <input
+              type="checkbox"
+              checked={showAll}
+              onChange={(e) => {
+                setSelectionVersion((version) => version + 1);
+                setShowAll(e.target.checked);
+              }}
+            />
             Show all programs
           </label>
-          {data?.cycleLabel && (
+          {visibleData?.cycleLabel && (
             <span className="text-sm text-gray-500">
-              {data.cycleLabel} · {data.count} awardee(s){showAll ? ' (all PDs)' : ' (yours)'}
+              {visibleData.cycleLabel} · {visibleData.count} awardee(s){showAll ? ' (all PDs)' : ' (yours)'}
             </span>
           )}
         </form>
 
         {loading && <p className="text-sm text-gray-500">Loading…</p>}
-        {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
+        {visibleError && <p role="alert" className="text-sm text-red-700">{visibleError}</p>}
 
-        {data && !loading && data.awardees.length === 0 && (
+        {visibleData && !loading && visibleData.awardees.length === 0 && (
           <p className="text-sm text-gray-500">
-            {data.pdResolved === false
+            {visibleData.pdResolved === false
               ? 'Could not match your account to a Program Director — tick “Show all programs” to see the full list.'
               : showAll
-                ? `No research awardees found for ${data.cycleLabel || cycleCode}.`
-                : `No awardees assigned to you for ${data.cycleLabel || cycleCode}. Tick “Show all programs” to see everyone’s.`}
+                ? `No research awardees found for ${visibleData.cycleLabel || cycleCode}.`
+                : `No awardees assigned to you for ${visibleData.cycleLabel || cycleCode}. Tick “Show all programs” to see everyone’s.`}
           </p>
         )}
 
-        {data && data.awardees.length > 0 && (
+        {visibleData && visibleData.awardees.length > 0 && (
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-gray-500 border-b">
@@ -119,7 +190,7 @@ function AwardeesList() {
               </tr>
             </thead>
             <tbody>
-              {data.awardees.map((a) => (
+              {visibleData.awardees.map((a) => (
                 <tr key={a.requestId} className="border-b align-top">
                   <td className="py-1 pr-2 whitespace-nowrap">{a.requestNumber}</td>
                   <td className="py-1 pr-2">{a.title}</td>
