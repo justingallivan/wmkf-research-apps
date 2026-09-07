@@ -26,5 +26,7 @@ summary: "Reviewer history now surfaces extensions; Request Workbench cycles use
 ## Issue 3 — grant-cycle proposal counts lose requests when fiscal-year joins miss
 
 - Diagnosis: `pages/api/reviewer-finder/grant-cycles.js` joined proposal counts on `akoya_fiscalyear`, while production has 100 distinct request fiscal-year values but only 10 active cycle rows [VERIFIED via production probe 2026-09-07]. Historical cycles without a catalogue row therefore returned zero.
-- Fix: pending implementation on this branch; proposal counts will be scoped to `wmkf_request_type = 100000001`, grouped by persisted `wmkf_meetingdate`, mapped through strict cycle-name parsing, and conserved in `unassigned.proposalCount` for null/off-cycle/unmatched rows. Honorarium rows are excluded.
+- Fix: proposal counts are scoped to `wmkf_request_type = 100000001`, grouped by persisted `wmkf_meetingdate`, joined through strict display-name/fiscal-year parsing, and conserved against an independent proposal total in `unassigned.proposalCount`; duplicate cycle rows receive the count once. Honorarium rows are excluded.
 - Claude review: blocking findings B1–B8 were incorporated into `docs/plans/REVIEWER_UI_SURFACING_LOAD_BEARING_PLAN_2026-09-07.md` before implementation.
+- Follow-up review fixes: valid `wmkf_fiscalyearcode` now falls back when the display name is malformed; duplicate cycle IDs are assigned once; null/off-cycle groups are covered by the independent total-count reconciliation.
+- Owner smoke: signed-in Reviewer Finder → grant cycles, compare active-only and `includeArchived=true` results; confirm duplicate month rows do not inflate the proposal total and the unassigned bucket absorbs unmatched/null-date proposals.

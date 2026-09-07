@@ -84,7 +84,9 @@ async function handleGet(req, res) {
       // meeting-month/year key. fiscalYearCode remains the response map key;
       // it is not used to classify proposal rows.
       const fyKey = c.fiscalYearCode || c.name;
-      const proposalCount = counts.proposalCountsByFiscalYear.get(fyKey) || 0;
+      const proposalCount = counts.proposalCountsByCycleId
+        ? counts.proposalCountsByCycleId.get(c.id) || 0
+        : counts.proposalCountsByFiscalYear.get(fyKey) || 0;
       // Per-cycle candidate count: keyed on shortcode (uppercased).
       const candidateCount = c.shortCode
         ? counts.candidateCountsByShortCode.get(c.shortCode.toUpperCase()) || 0

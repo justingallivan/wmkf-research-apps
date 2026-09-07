@@ -56,3 +56,24 @@ test('GET exposes conserved unmatched proposal count and passes listed cycles to
   expect(res.body.cycles[0]).toEqual(expect.objectContaining({ proposalCount: 2, candidateCount: 4 }));
   expect(res.body.unassigned).toEqual({ proposalCount: 3, candidateCount: 1 });
 });
+
+test('GET does not duplicate a proposal count across duplicate cycle rows', async () => {
+  listCycles.mockResolvedValue([
+    { id: 'active-j26', name: 'June 2026', fiscalYearCode: null, shortCode: 'J26', additionalAttachments: [] },
+    { id: 'archived-j26', name: 'June 2026', fiscalYearCode: null, shortCode: 'J26A', additionalAttachments: [] },
+  ]);
+  fetchCounts.mockResolvedValue({
+    proposalCountsByCycleId: new Map([['active-j26', 40]]),
+    proposalCountsByFiscalYear: new Map([['June 2026', 40]]),
+    candidateCountsByShortCode: new Map(),
+    unassignedProposalCount: 0,
+    unassignedCandidateCount: 0,
+  });
+
+  const res = mockRes();
+  await handler({ method: 'GET', query: { includeArchived: 'true' } }, res);
+
+  expect(res.body.cycles.map(c => c.proposalCount)).toEqual([40, 0]);
+  expect(res.body.cycles.reduce((sum, c) => sum + c.proposalCount, 0)
+    + res.body.unassigned.proposalCount).toBe(40);
+});
