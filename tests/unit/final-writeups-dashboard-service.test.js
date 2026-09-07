@@ -62,6 +62,21 @@ function finalRow({ requestId, finalId, version = '1.0', lifecycle = REQUEST_DOC
     wmkf_sharepointitemid: `item-${finalId.slice(-1)}`,
     wmkf_sharepointweburl: `https://example.sharepoint.com/${finalId}`,
     wmkf_sharepointversionid: version,
+    ...(lifecycle === REQUEST_DOCUMENT_LIFECYCLE_STATE.FINAL ? leadershipCheckpoint() : {}),
+  };
+}
+
+// The complete leadership checkpoint a FINAL Final row must carry to count as
+// leadership review (shared predicate in lib/services/final-writeup/leadership-checkpoint.js).
+function leadershipCheckpoint(overrides = {}) {
+  return {
+    wmkf_leadershipreviewstartedat: '2026-09-07T20:00:00Z',
+    _wmkf_leadershipreviewstartedby_value: '44444444-4444-4444-8444-444444444444',
+    wmkf_sharepointetag: 'etag-leadership',
+    wmkf_sharepointlastmodified: '2026-09-07T19:30:00Z',
+    wmkf_filesize: 2100,
+    wmkf_contenthash: 'gdc1:leadership-hash',
+    ...overrides,
   };
 }
 
@@ -866,5 +881,29 @@ describe('acknowledged version and matrix PD identity (Slices 6B/6C)', () => {
       result.queues.history[0].responsibleProgramDirector,
     );
     expect(unconfigured.responsibleProgramDirector.id).toEqual(expect.any(String));
+  });
+});
+
+describe('leadership checkpoint (shared with the transition and acknowledgement readers)', () => {
+  test.each([
+    ['a missing leadership actor', { _wmkf_leadershipreviewstartedby_value: null }],
+    ['a blank leadership time', { wmkf_leadershipreviewstartedat: ' ' }],
+    ['a malformed lastModified', { wmkf_sharepointlastmodified: 'yesterday' }],
+    ['a blank content hash', { wmkf_contenthash: '' }],
+    ['a negative filesize', { wmkf_filesize: -5 }],
+  ])('a FINAL Final row with %s is a reconciliation failure, not a leadership-review row', async (_label, overrides) => {
+    const { documents, dependencies } = harness();
+    const malformed = documents.find((row) => row.wmkf_requestdocumentid === FINAL_B_ID);
+    Object.assign(malformed, overrides);
+    // The dashboard projects each row through the acknowledgement reader first,
+    // so the shared validator surfaces there; lifecycleStage is the second gate.
+    // Either way the row is a 500 reconciliation failure, never a rendered stage.
+    const error = await loadFinalWriteupsDashboard({ actingUserSystemId: ACTOR_ID }, dependencies)
+      .catch((caught) => caught);
+    expect(error.httpStatus).toBe(500);
+    expect([
+      'final_writeup_acknowledgement_final_state_invalid',
+      'final_writeups_dashboard_lifecycle_invalid',
+    ]).toContain(error.code);
   });
 });

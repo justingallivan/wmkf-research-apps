@@ -51,11 +51,11 @@ toolbar/header · `314e9426` `e68bffe9` ToolbarSelect · `f4bcb5b6` smoke record
 
 ### Verified Open
 
-1. **Plan the Leadership stage transition as a PD Workbench action (D26).** Evidence: queue item 4
-   completion column (owner 2026-09-06); nothing built [VERIFIED S492: no Review→Final write path
-   from the Workbench exists; `mayAcknowledge` has no stage condition]. A new `wmkf_requestdocument`
-   lifecycle-state write Review→Final: DAL context, interlock, who may trigger, reversibility, what
-   the Leadership lens shows before/after. Plan-first (`/contract-reconcile`), Tier 1 branch, Codex.
+1. **Leadership stage transition (Slice 4): PRODUCTION-LIVE 2026-09-07.** Plan
+   `docs/FINAL_WRITEUP_LEADERSHIP_TRANSITION_PLAN.md` (six Codex plan passes, seven diff passes, D2
+   owner-confirmed 2026-09-07). PR #176 merged as `25dc8645`; deployment `dpl_22eyAD8S4yPmx16iv3Nng2u9sw5T`;
+   owner-run signed-in smoke passed on Request `1002788`, whose Final row now sits at leadership stage
+   (reversal is the owner-run repair in plan §4.7). Nothing remains on this item.
 2. **Build the `J27:` marker convention and `scripts/check-j27-register.js`** (advisory gate).
    Evidence: `docs/J27_SINGLE_PHASE_TRANSITION_INVENTORY_PLAN.md` §7, register §9, Codex high
    finding (S491). Register in `docs/CI_GATES_REFERENCE.md` and the `/start` list; gate then

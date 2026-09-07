@@ -3,7 +3,7 @@ title: Final Writeup Review — Implementation Plan
 domain: workbench
 kind: plan
 status: active
-summary: "Final runtime, staffing, lenses, 6A scoping, 6B views/PD filter, and 6C version context are Production-live; stage transitions remain."
+summary: "Final runtime, staffing, lenses, and dashboard Slices 6A–6C are Production-live; the leadership-review transition (Slice 4) is Production-live since 2026-09-07."
 canonical: false
 cataloged: 2026-08-28
 last_verified: 2026-09-07
@@ -35,7 +35,8 @@ related:
 ## Plan status
 
 **Verdict: CORE FINAL REVIEW AND PERSONA DASHBOARD LENSES ARE PRODUCTION-LIVE;
-LEADERSHIP-STAGE AND PC-BACKUP TRANSITIONS REMAIN STAGED WORK.**
+THE LEADERSHIP-STAGE TRANSITION (SLICE 4) IS BUILT ON A BRANCH AWAITING PRODUCTION
+PROMOTION (S493); PC BACKUP IS CLOSED BY OWNER DECISION (PCs already see every Final).**
 
 This plan translates the approved Final Writeup and group-review experience into the current Request Workbench architecture. Slice 0 is complete. **[PRODUCTION-PROVED 2026-08-30 PT / 2026-08-31 UTC]** Slice 1 shipped on `main` at `ebb147bb` in Ready Production deployment `dpl_7kzQ1v7XGtyNx4Fady2JxMrTxQEJ`; Wave 22 is 4 exact / 0 absent / 0 divergent and the non-sensitive `FINAL_WRITEUP_SCHEMA_READY` value is literal `on` in Production. The authorized Request `1002788` transition created one Ready/Review Final row, moved the retained current Pre-Site source to lifecycle Final, set the current-Final pointer, recorded Justin Gallivan and `2026-08-31T03:57:20Z`, and reused the exact same SharePoint drive/item, version `1.0`, 38,273-byte file, and governed hash. The distinct SharePoint-file count remained four, proving that no copy or upload occurred. A bounded 30-minute scan found no Production error logs or 5xx responses.
 
@@ -133,8 +134,12 @@ The named prerequisites are deliberately attached to the slices that need them:
 Prerequisite 5 does **not** block the responsible-PD handoff, ordinary-PD
 review slices, or the superuser matrix. Those relationships and the exact
 reviewer-role roster are already server-verifiable. Persona-specific dashboard
-queues are now enabled; PC backup actions and the transition into Leadership
-review remain separate unbuilt authority/workflow slices.
+queues are now enabled. The transition into Leadership review is Slice 4,
+built S493 on `claude/final-writeup-leadership-review` per
+`docs/FINAL_WRITEUP_LEADERSHIP_TRANSITION_PLAN.md` and awaiting Production
+promotion; PC backup is closed (owner 2026-09-06: PCs already see every Final,
+and a retiring PD's requests transfer by changing the program director in
+Dataverse).
 
 The board-package handoff remains excluded until the PCs describe their downstream process.
 
@@ -287,7 +292,7 @@ The existing schema carries the file and lineage contract:
 - the Request current-Final lookup selects the canonical row;
 - the generation key makes exact retry converge.
 
-Wave 22 defines `wmkf_GroupReviewStartedBy`, `wmkf_GroupReviewStartedAt`, `wmkf_LeadershipReviewStartedBy`, and `wmkf_LeadershipReviewStartedAt`. Runtime selects them only when `FINAL_WRITEUP_SCHEMA_READY=on`. The group-review actor lookup is resolved from the authenticated session and written with its timestamp in the same activation changeset; Dataverse `modifiedby` is informational only. Leadership fields remain schema-only until Slice 4 (planned in `docs/FINAL_WRITEUP_LEADERSHIP_TRANSITION_PLAN.md`; not yet built).
+Wave 22 defines `wmkf_GroupReviewStartedBy`, `wmkf_GroupReviewStartedAt`, `wmkf_LeadershipReviewStartedBy`, and `wmkf_LeadershipReviewStartedAt`. Runtime selects them only when `FINAL_WRITEUP_SCHEMA_READY=on`. The group-review actor lookup is resolved from the authenticated session and written with its timestamp in the same activation changeset; Dataverse `modifiedby` is informational only. The leadership pair is written by Slice 4's `advanceToLeadershipReview` **[PRODUCTION-LIVE 2026-09-07: PR #176 merged as `25dc8645`, Ready deployment `dpl_22eyAD8S4yPmx16iv3Nng2u9sw5T`, owner-run signed-in smoke passed on Request `1002788`.]**
 
 For **Ready for leadership review**, move the Final row lifecycle from `REVIEW` to `FINAL`, write `wmkf_LeadershipReviewStartedBy` / `wmkf_LeadershipReviewStartedAt`, and refresh the row's own SharePoint observation fields (`wmkf_sharepointversionid`, `wmkf_sharepointetag`, `wmkf_sharepointlastmodified`, `wmkf_filesize`, `wmkf_contenthash`) to the verified current version, the same refresh the Site Visit handoff performs. The milestone triple and `wmkf_MilestoneCreatedBy` are **not** written: the Wave 24 actor contract defines that actor as the Pre-Site → Site Visit handoff person (`docs/REQUEST_DOCUMENT_EXPLICIT_ACTOR_PLAN.md`), so reusing the milestone fields here would misattribute provenance (owner decision D2, 2026-09-07; plan `docs/FINAL_WRITEUP_LEADERSHIP_TRANSITION_PLAN.md` §4.1). The lifecycle is the stage discriminator; milestone presence alone never changes stage. Review acknowledgements live elsewhere and therefore do not rewrite the Final row after this transition.
 
@@ -620,11 +625,17 @@ This slice can ship before the PC/leadership persona model because responsible-P
   configuration and current reviewer-role roster are the only persona
   authority. Representative Word access and all six read-only production-data
   projections passed; no team exists or is required.
-- Add **Ready for leadership review**, moving the Final lifecycle from `REVIEW` to `FINAL` and storing the exact milestone version/hash/time plus explicit actor/time.
-- **Complete for dashboard visibility:** enable the PC all-active view; the
-  exceptional backup transition remains unbuilt.
-- **Complete for dashboard visibility:** enable CSO/President leadership-stage
-  queues; the transition that creates Leadership-stage work remains unbuilt.
+- **[PRODUCTION-LIVE 2026-09-07: PR #176 merged as `25dc8645`, Ready deployment `dpl_22eyAD8S4yPmx16iv3Nng2u9sw5T`, owner-run signed-in smoke passed on Request `1002788`.]** **Ready for leadership review** (`advanceToLeadershipReview`, POST
+  `/api/workbench/final-writeup/leadership-review`) moves the Final lifecycle from `REVIEW` to `FINAL`,
+  writes the explicit `wmkf_LeadershipReviewStartedBy`/`At` pair, and refreshes the row's SharePoint
+  observation fields (`wmkf_sharepointversionid`, `wmkf_sharepointetag`, `wmkf_sharepointlastmodified`,
+  `wmkf_filesize`, `wmkf_contenthash`) to the verified current version. It does **not** write the
+  milestone triple or `wmkf_MilestoneCreatedBy` (owner D2, 2026-09-07; that actor means Site Visit
+  handoff). Plan and review record: `docs/FINAL_WRITEUP_LEADERSHIP_TRANSITION_PLAN.md`.
+- **Complete for dashboard visibility:** the PC all-active view is enabled; the
+  exceptional PC backup transition is closed by owner decision (2026-09-06), not built.
+- **Complete for dashboard visibility:** CSO/President leadership-stage queues are
+  enabled; the transition that creates Leadership-stage work is the built Slice 4 item above.
 - Verify the President’s reviewed-history behavior and the no-sequence rule.
 - **Complete:** extend the already-built complete coordinator matrix to
   configured PC users and preserve its non-compliance semantics for all
@@ -706,8 +717,8 @@ read model's scope, cap, and fail-closed behavior change):
   Assessment locator stays separate unless that decision says otherwise.
 
 Explicitly unchanged: no approval gates, denominators, due dates, or leadership ordering; Word
-opens outside the Workbench; the responsible PD does not self-acknowledge; PC backup and the
-Leadership-stage transition remain the separate slices named above.
+opens outside the Workbench; the responsible PD does not self-acknowledge. PC backup is closed by
+owner decision (2026-09-06) and the Leadership-stage transition is Slice 4 (Production-live 2026-09-07, merge `25dc8645`, owner-smoked on Request `1002788`).
 
 ## Likely file surface
 
@@ -804,6 +815,6 @@ exact 11-person roster and correct Request `1002788` states/actions with zero
 browser-console errors. Non-superuser persona visibility is now Production-live
 at `213f6c34` / `dpl_HGrbWUNPJMJunVevYLVEmtn7He6a`; its v2 configuration,
 representative Word access, and six-case read-only production-data smoke passed.
-PC backup and the Leadership-stage transition remain separate work. This sequence advances the
+PC backup is closed by owner decision and the Leadership-stage transition is Production-live 2026-09-07 (merge `25dc8645`, owner-smoked on Request `1002788`). This sequence advances the
 approved experience without guessing role identity or inventing the still-unknown
 board-package workflow.

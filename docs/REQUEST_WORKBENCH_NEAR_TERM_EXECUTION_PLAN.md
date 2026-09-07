@@ -921,7 +921,8 @@ Decision order:
    `dpl_HGrbWUNPJMJunVevYLVEmtn7He6a`. A six-case read-only production-data
    smoke passed. **[OWNER-REPORTED 2026-09-04]** Program Coordinator Duncan
    Spore then found Request `1002788` in History, saw the matrix, and opened the
-   Word document. PC backup and Leadership-stage transitions remain separate.
+   Word document. PC backup is closed by owner decision (2026-09-06); the
+   Leadership-stage transition is Production-live 2026-09-07 (merge `25dc8645`, owner-smoked on Request `1002788`).
    The unshipped team mechanism is removed from current source.
 4. **Initial Assessment** — the pilot and administrator controls are
    Production-deployed and the signed-in read surface has passed. Decide
