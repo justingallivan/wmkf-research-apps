@@ -58,6 +58,23 @@ function spyOnBuilder() {
   return calls;
 }
 
+// The canonical document headings, written out independently of BOTH
+// renderers. Each is asserted against this literal below, so the two cannot
+// drift together behind a self-referential comparison. `Caveats` is last in the
+// document and is the one heading the PDF renders as a highlight box.
+const CANONICAL_HEADINGS = [
+  'Overview',
+  'Sub-areas',
+  'Key methods',
+  'Frontiers & why now',
+  'Active communities',
+  'Notable venues',
+  'Field experts (orienting, not vetted)',
+  'Where this proposal sits',
+  'Caveats',
+];
+const CANONICAL_PDF_SECTIONS = CANONICAL_HEADINGS.filter((h) => h !== 'Caveats');
+
 const sections = (calls) => calls.filter(([k]) => k === 'section').map(([, t]) => t);
 const flat = (calls) => JSON.stringify(calls);
 
@@ -68,16 +85,7 @@ describe('generateFieldPrimerPdf', () => {
 
     expect(bytes).toBeInstanceOf(Uint8Array);
     expect(new NodeTextDecoder().decode(bytes.slice(0, 4))).toBe('%PDF');
-    expect(sections(calls)).toEqual([
-      'Overview',
-      'Sub-areas',
-      'Key methods',
-      'Frontiers & why now',
-      'Active communities',
-      'Notable venues',
-      'Field experts (orienting, not vetted)',
-      'Where this proposal sits',
-    ]);
+    expect(sections(calls)).toEqual(CANONICAL_PDF_SECTIONS);
     expect(calls).toContainEqual(['title', 'Field Primer',
       'Request 1002852  •  Structural principles of poly(ADP-ribose)  •  Johns Hopkins University']);
     expect(calls).toContainEqual(['meta', 'Principal Investigator', 'Anthony Leung']);
@@ -177,23 +185,25 @@ describe('generateFieldPrimerPdf', () => {
   });
 });
 
-// The module header claims this export follows the MARKDOWN renderer's
+// The module header claims this export follows the MARKDOWN document renderer's
 // headings, not the compact on-screen panel's (those two already disagree with
-// each other). Pin it, so the claim is enforced rather than asserted.
-test('PDF headings match renderPrimerMarkdown heading-for-heading, with Caveats as the one documented difference', async () => {
-  const calls = spyOnBuilder();
-  await generateFieldPrimerPdf(envelope(FULL_PRIMER), META);
-  const pdfHeadings = sections(calls);
-
-  jest.restoreAllMocks();
+// each other). Both renderers are pinned to the independent CANONICAL_HEADINGS
+// literal above, so a change to either alone fails here, and a change to both
+// together still fails — which a renderer-against-renderer comparison would
+// not catch.
+test('both document renderers match the canonical heading contract, with Caveats as the one documented difference', async () => {
   const markdownHeadings = renderPrimerMarkdown(FULL_PRIMER, { title: META.title })
     .split('\n')
     .filter((line) => line.startsWith('## '))
     .map((line) => line.slice(3));
+  expect(markdownHeadings).toEqual(CANONICAL_HEADINGS);
 
+  const calls = spyOnBuilder();
+  await generateFieldPrimerPdf(envelope(FULL_PRIMER), META);
   // Caveats is a highlight box in the PDF (matching the screen's amber
-  // callout), so it is the only markdown heading absent from the section list.
-  expect([...pdfHeadings, 'Caveats']).toEqual(markdownHeadings);
+  // callout), so it is the only canonical heading absent from the section list.
+  expect(sections(calls)).toEqual(CANONICAL_PDF_SECTIONS);
+  expect([...sections(calls), 'Caveats']).toEqual(markdownHeadings);
 });
 
 describe('fieldPrimerPdfFilename', () => {
