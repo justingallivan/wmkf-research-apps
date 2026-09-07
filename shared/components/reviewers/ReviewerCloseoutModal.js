@@ -225,7 +225,7 @@ export default function ReviewerCloseoutModal({
         className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl"
       >
         <h2 id="reviewer-closeout-title" className="text-lg font-semibold text-gray-900">
-          {editing ? 'Edit reviewer closeout' : 'Close reviewer'}
+          {editing ? 'Edit reviewer closeout' : 'Mark reviewer complete'}
         </h2>
         <p className="mt-1 text-sm text-gray-600">
           {reviewer.name || 'Reviewer'} · {reviewer.reviewStatus === 'complete' ? 'Completed review' : 'Review received'}
