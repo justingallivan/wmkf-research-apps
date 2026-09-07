@@ -6,7 +6,7 @@ status: active
 summary: "Opens the Final writeups dashboard on Needs my review with two alternative views and a PD filter, URL-persisted; renders the acknowledged publication version."
 canonical: false
 cataloged: 2026-09-06
-last_verified: 2026-09-06
+last_verified: 2026-09-07
 owner: product-engineering
 related:
   - docs/FINAL_WRITEUPS_DASHBOARD_CYCLE_SCOPING_PLAN.md

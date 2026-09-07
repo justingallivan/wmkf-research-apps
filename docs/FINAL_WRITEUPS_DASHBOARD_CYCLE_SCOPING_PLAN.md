@@ -6,7 +6,7 @@ status: active
 summary: "Scopes the Final writeups dashboard read model to one grant cycle before the global row bound fails the page; PD lens retention decided."
 canonical: false
 cataloged: 2026-09-06
-last_verified: 2026-09-06
+last_verified: 2026-09-07
 owner: product-engineering
 related:
   - docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md

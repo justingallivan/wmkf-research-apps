@@ -647,13 +647,21 @@ describe('views, Program director filter, and version context (Slices 6B/6C)', (
   test('invalid view and pd are sanitized on mount and the address bar is rewritten immediately', async () => {
     setLocation('?cycleCode=D26&view=bogus&pd=not-a-guid');
     global.fetch.mockResolvedValueOnce(response(twoPdDashboard()));
-    render(<FinalWriteupsDashboardView />);
+    const first = render(<FinalWriteupsDashboardView />);
     await screen.findByRole('heading', { name: 'Needs my review' });
     expect(window.location.search).toBe('?cycleCode=D26');
     expect(pressed(/Needs my review/)).toBe('true');
     expect(screen.getByRole('combobox', { name: 'Program director' })).toHaveValue('');
     expect(screen.getByText('Open for A')).toBeInTheDocument();
     expect(global.fetch).toHaveBeenCalledWith('/api/workbench/final-writeups?cycleCode=D26');
+    first.unmount();
+
+    // The default view written explicitly is normalized away: a clean URL stays clean.
+    setLocation('?view=needs-review');
+    global.fetch.mockResolvedValueOnce(response(twoPdDashboard()));
+    render(<FinalWriteupsDashboardView />);
+    await screen.findByRole('heading', { name: 'Needs my review' });
+    expect(window.location.search).toBe('');
   });
 
   test('Program director options derive from loaded rows and filter list, Your writeups, configured and unconfigured matrix rows', async () => {
