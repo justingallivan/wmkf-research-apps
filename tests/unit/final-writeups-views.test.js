@@ -235,7 +235,8 @@ test('the controlled cycle value always has an option: bookmarked none without u
   render(<FinalWriteupsDashboardView />);
   const absent = await screen.findByRole('combobox', { name: 'Cycle' });
   expect(absent).toHaveValue('J25');
-  expect(screen.getByRole('option', { name: 'J25' })).toBeInTheDocument();
+  expect(screen.getByRole('option', { name: 'June 2025' })).toBeInTheDocument();
+  expect(screen.getByText(/awaiting your review in June 2025/)).toBeInTheDocument();
   expect(screen.queryByRole('option', { name: 'No cycle' })).not.toBeInTheDocument();
 });
 

@@ -11,6 +11,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import Layout from '../Layout';
 import WorkbenchViewsNav from '../workbench/WorkbenchViewsNav';
+import { cycleCodeToLabel } from '../../../lib/utils/cycle-code.js';
 
 const DATE_FORMATTER = new Intl.DateTimeFormat('en-US', {
   month: 'short',
@@ -411,7 +412,7 @@ function cycleLabelFor(cycles, code) {
   if (!code) return null;
   if (code === NO_CYCLE) return 'No cycle';
   const match = (cycles?.available || []).find((cycle) => cycle.code === code);
-  return match?.label || code;
+  return match?.label || cycleCodeToLabel(code) || code;
 }
 
 function initialCycleFromLocation() {
