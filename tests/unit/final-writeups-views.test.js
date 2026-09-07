@@ -685,6 +685,18 @@ describe('views, Program director filter, and version context (Slices 6B/6C)', (
     expect(screen.getByRole('link', { name: 'Open in Word' })).toBeInTheDocument();
   });
 
+  test('a valid pd GUID with whitespace or uppercase is canonicalized, filters correctly, and the address bar is rewritten', async () => {
+    setLocation(`?pd=%20${PD_B.toUpperCase()}%20`);
+    global.fetch.mockResolvedValueOnce(response(twoPdDashboard()));
+    render(<FinalWriteupsDashboardView />);
+    const select = await screen.findByRole('combobox', { name: 'Program director' });
+    expect(select).toHaveValue(PD_B);
+    expect(window.location.search).toBe(`?pd=${PD_B}`);
+    expect(screen.queryByRole('option', { name: 'Program director not in this cycle' })).not.toBeInTheDocument();
+    expect(screen.getByText('Stewardship for B')).toBeInTheDocument();
+    expect(screen.queryByText('Open for A')).not.toBeInTheDocument();
+  });
+
   test('non-GUID pd is dropped; a GUID absent from the cycle keeps an option and shows the empty copy', async () => {
     setLocation(`?pd=${PD_ABSENT}`);
     global.fetch.mockResolvedValueOnce(response(twoPdDashboard()));

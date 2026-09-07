@@ -489,9 +489,13 @@ function readLocationState() {
   const viewRaw = params.get('view');
   const pdRaw = params.get('pd');
   const view = isViewKey(viewRaw) ? viewRaw : DEFAULT_VIEW;
-  const pd = isGuid(pdRaw || '') ? pdRaw.toLowerCase() : null;
+  // Canonical form is the trimmed, lowercased GUID; anything else (including a
+  // valid GUID with stray whitespace or uppercase) is rewritten so the stored
+  // value always equals what the rows are compared against.
+  const pdCanonical = String(pdRaw || '').trim().toLowerCase();
+  const pd = isGuid(pdCanonical) ? pdCanonical : null;
   const invalid = (viewRaw !== null && (!isViewKey(viewRaw) || viewRaw === DEFAULT_VIEW))
-    || (pdRaw !== null && pd === null);
+    || (pdRaw !== null && pdRaw !== pd);
   return { cycleCode: cycleRaw ? cycleRaw.trim() : null, view, pd, invalid };
 }
 
