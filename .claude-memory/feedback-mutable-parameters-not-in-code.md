@@ -5,7 +5,7 @@ metadata:
   type: feedback
   status: active
   scope: executor-config
-  last_verified: 2026-08-30 (S469) — Production-deployed Admin read surface; first publication still explicit
+  last_verified: 2026-09-07 (S493) — first durable revision executor.budgets.v000001 published in Production
 ---
 
 Owner directive, S467 (2026-08-28), on seeing the pre-site writeup's
@@ -27,6 +27,11 @@ in code. **[PRODUCTION-DEPLOYED AND OWNER-VIEWED 2026-08-30]** Executor standing
 append-only `executor.budgets.vNNNNNN` Dataverse settings through
 `lib/services/executor-budget-service.js` and the superuser Admin editor; the
 tracked registry owns only bounds and fallback. The Production Admin read
-surface showed the expected no-revision/code-fallback state. The first durable
-Admin publication remains an explicit owner action, not a source gap.
+surface showed the expected no-revision/code-fallback state. **[PUBLISHED 2026-09-07, S493]**
+The owner directed the first durable publication: `executor.budgets.v000001` pins the reviewed
+code defaults for all three registered prompts, so a later edit to those defaults cannot move
+Production on its own. Two mechanics worth carrying: the Admin editor disables Publish when the
+draft equals the current values, so an identical document must go through
+`PUT /api/admin/executor-budgets`; and registering a new prompt name is additive, because reads
+fill names missing from an older revision from code defaults.
 See [[feedback-no-fabricated-placeholder-values]].

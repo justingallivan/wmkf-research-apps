@@ -85,7 +85,14 @@ The contract covers **Pattern A + dual-caller prompts and Pattern B/C Vercel-onl
 
 ### Durable Executor-budget publication
 
-**[PRODUCTION-DEPLOYED / OWNER-VIEWED 2026-08-30; first publication remains open.]**
+**[PRODUCTION-DEPLOYED 2026-08-30; FIRST REVISION PUBLISHED 2026-09-07.]** Revision
+`executor.budgets.v000001` is live (published 2026-09-07T20:33:23Z by Justin Gallivan,
+owner-directed): Pre-Site standing 32 768 tokens / 240 000 ms, review-synthesis retry
+16 000–32 000, field-primer timeout-only 240 000 ms — the reviewed code defaults, pinned so a
+later change to those defaults cannot move Production on its own. Publication reported model
+ceilings for the two token-carrying prompts only, confirming the timeout-only kind skips that read.
+The Admin editor refuses a revision identical to the current values, so v1 was published through
+`PUT /api/admin/executor-budgets` from the signed-in superuser session.
 `GET/PUT /api/admin/executor-budgets` is superuser-only and publishes one
 complete budget document as a new `wmkf_appsystemsettings` row named
 `executor.budgets.vNNNNNN`. Existing revision rows are never updated. PUT

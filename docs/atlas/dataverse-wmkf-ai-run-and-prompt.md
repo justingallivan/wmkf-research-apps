@@ -222,9 +222,15 @@ Migration plans touching either entity must preserve these foreign keys.
   audit records. The post-cleanup census returned to zero eligible requests,
   and a post-PR-#99 production drain again scanned 25 requests with zero
   eligible, claimed, completed, cancelled, or failed jobs.
-- **Executor budget settings (Production-deployed / owner-viewed 2026-08-30;
-  first publication open):** the Production Admin panel reported no published
-  revision and the reviewed code fallback, without performing a write.
+- **Executor budget settings (Production-deployed 2026-08-30; revision v1 published
+  2026-09-07):** the 2026-08-30 Admin panel reported no published revision and the reviewed
+  code fallback, without performing a write. On 2026-09-07 the owner directed the first
+  publication: `executor.budgets.v000001`, published `2026-09-07T20:33:23.393Z` by Justin
+  Gallivan, pinning the reviewed code defaults for all three registered prompts (Pre-Site
+  standing 32 768 / 240 000 ms, review-synthesis retry 16 000–32 000, field-primer timeout-only
+  240 000 ms). The response reported model ceilings for the two token-carrying prompts only.
+  Admin and runtime reads return `source: dataverse`, version 1, `latestRevision` 1, zero
+  storage warnings.
   `lib/services/executor-budget-service.js` resolves the Pre-Site
   standing output/transport budget, the review-synthesis retry range, and the
   field-primer timeout-only budget (S493) from the
