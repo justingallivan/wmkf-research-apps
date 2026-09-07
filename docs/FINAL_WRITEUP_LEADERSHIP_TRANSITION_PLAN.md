@@ -58,8 +58,10 @@ empty and the leadership actor/time fields provisioned by Wave 22 stay unused
   and the row's SharePoint observation fields refreshed to the verified current version
   (`wmkf_sharepointversionid`, `wmkf_sharepointetag`, `wmkf_sharepointlastmodified`, `wmkf_filesize`,
   `wmkf_contenthash`). The milestone triple and `wmkf_MilestoneCreatedBy` are not written (§4.1).
-  The group-review activation path is not changed. No SharePoint write. No new entity, no migration,
-  no Postgres.
+  The request row receives a conditional re-bind of `wmkf_CurrentFinalWriteup` to the same Final
+  row, carrying the request `_etag`, in the same changeset, so the pointer is fenced atomically
+  (§4.1). The group-review activation path is not changed. No SharePoint write. No new entity, no
+  migration, no Postgres.
 - **Consumers:** `getFinalWriteupStatus` and `startFinalWriteup` (transition-service), the Final
   Writeup tab, the acknowledgement service, the Final writeups dashboard and its persona filter,
   the Staff Deliberations receipt (reads the *source* row, unaffected), the security matrix,
@@ -185,13 +187,26 @@ This slice neither widens nor repairs that: it adds no milestone writes. The can
 Tier 0 census change that classifies Final Writeup rows' milestone stamp as group-review-backed (or
 excludes them from the site-visit kind), owner-decided separately (§10 D6).
 
-One row changes, so this is `requestDocumentAdapter.update(id, patch, { ifMatch, actingUserSystemId })`
-under `withDalContext`, not a changeset. The adapter's origin-field guard covers only the
-`initiatedat` / `initiatedby` pair `[VERIFIED via request-document.js:120-133]`;
+**Two operations in one changeset, not a single PATCH.** The Final-row PATCH alone cannot fence the
+request's current-Final pointer: a concurrent request update could re-point `wmkf_CurrentFinalWriteup`
+between the re-read and the PATCH while the old row's `_etag` stays valid. The group-review
+activation already solves this by PATCHing the request inside the same changeset with the request's
+`ifMatch` `[VERIFIED via transition-service.js:626-635]`. The leadership transition uses the same
+shape via `commitChangeset` (`runChangeset`, which asserts the DAL context
+`[VERIFIED via lib/dataverse/core/changeset.js:116-119]`):
+
+1. PATCH `wmkf_requestdocuments(<finalId>)`, `ifMatch: final._etag`, body per the table above.
+2. PATCH `akoya_requests(<requestId>)`, `ifMatch: request._etag`, body
+   `{ 'wmkf_CurrentFinalWriteup@odata.bind': '/wmkf_requestdocuments(<finalId>)' }`, a re-bind to
+   the value already held, so a request whose pointer or version moved fails the changeset with 412
+   and nothing is written.
+
+The adapter's origin-field guard covers only the `initiatedat` / `initiatedby` pair
+`[VERIFIED via request-document.js:120-133]` and is not on the changeset path anyway;
 `check:request-document-writers` counts create seams only
 `[VERIFIED via scripts/check-request-document-writers.js:16-23]`, so no allowlist change. The
-interlock already classifies PATCH on `wmkf_requestdocuments` because the group-review path issues
-one `[VERIFIED via transition-service.js:604-609]`.
+interlock already classifies PATCH on both entity sets because the group-review changeset issues
+both `[VERIFIED via transition-service.js:604-635]`.
 
 ### 4.2 Who may trigger
 
@@ -249,15 +264,20 @@ expectedFinalArtifactId, isSuperuser, actingUserSystemId })`:
    metadata after; unstable → `final_writeup_leadership_source_changed` ("The Word document changed
    while leadership review was starting. Retry to use the latest version."). Identity must match the
    row's persisted drive/item.
-9. **Commit-time concurrency check.** Re-read the Dataverse row and the SharePoint metadata
-   immediately before the write, in the `activate` pattern `[VERIFIED via
-   transition-service.js:590-600]`: the row must still be the current Final in `REVIEW` with the
-   same `_etag`, and the metadata must satisfy `stableMetadataMatches(verified.metadata, now)` and
-   `persistedIdentityMatches(row, now)`; otherwise `final_writeup_leadership_source_changed` with no
-   write. The interval between this read and the PATCH is the same residual the group-review
-   activation accepts today; the recorded checkpoint is the version observed at that read.
-10. Conditional PATCH (§4.1) with `ifMatch: _etag`. 412 → `final_writeup_leadership_conflict`
-   ("The writeup lifecycle changed while leadership review was starting. Reload and retry.").
+9. **Commit-time concurrency check.** Re-read request and rows (`readState`) and the SharePoint
+   metadata immediately before the write, in the `activate` pattern `[VERIFIED via
+   transition-service.js:564-600]`: the request's `_wmkf_currentfinalwriteup_value` must still name
+   this row, the row must still be `READY` / `REVIEW` with the same `_etag`, and the metadata must
+   satisfy `stableMetadataMatches(verified.metadata, now)` and `persistedIdentityMatches(row, now)`;
+   otherwise `final_writeup_leadership_source_changed` (metadata) or
+   `final_writeup_leadership_conflict` (row or pointer) with no write. The fresh request `_etag` and
+   row `_etag` from this read are the ones carried into step 10, so the interval between this read
+   and the commit is closed by the conditional changeset, not by timing.
+10. **Atomic changeset** (§4.1): Final-row PATCH with `ifMatch: final._etag` plus the request
+   pointer re-bind with `ifMatch: request._etag`. Any 412 → `final_writeup_leadership_conflict`
+   ("The writeup lifecycle changed while leadership review was starting. Reload and retry."), after
+   the `activate`-style post-failure re-read that returns the committed state if this call's own
+   write actually landed `[VERIFIED pattern via transition-service.js:636-652]`.
 11. Post-commit `readState` and confirm via generalized `committedFinal`, including that the
    persisted `wmkf_sharepointversionid` / `wmkf_contenthash` equal the verified values
    (`persistedIdentityMatches` plus the hash); unconfirmed → 500 `final_writeup_leadership_unconfirmed`. Return `{ phase: 'leadership-review',
@@ -354,8 +374,9 @@ notification work stays parked.
 4. **Route:** `requireAppAccess('reviewers')`; superuser via fresh `getUserRole`; exact-body
    allowlist; GUID checks; `withDalContext`.
 5. **Service:** §4.3 steps 1-11; authorization is server-resolved from the request's lead PD lookup.
-6. **Persistence:** one conditional PATCH on the Final row; no SharePoint write; no request write
-   (the current Final pointer is unchanged).
+6. **Persistence:** one changeset: conditional Final-row PATCH plus a conditional re-bind of the
+   request's current-Final pointer to the same row (value unchanged, `_etag` fenced); no
+   SharePoint write.
 7. **Response:** `{ success, phase: 'leadership-review', artifact, reused }`; errors carry
    `ServiceHttpError` bodies.
 8. **Consumers:** tab re-renders the leadership panel and reloads acknowledgement state; dashboard
@@ -366,9 +387,9 @@ notification work stays parked.
 
 1. **Whole-flow:** covered by §5. Staff Deliberations reads the source row, which does not change
    `[VERIFIED via FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md:180]`.
-2. **Partial success:** one row, one PATCH, so success is atomic. Confirmation is by re-read, never
-   by the PATCH response alone (§4.3 step 11). A lost response with a committed write converges on
-   retry via step 4.
+2. **Partial success:** two operations in one Dataverse changeset, so both land or neither does.
+   Confirmation is by re-read, never by the changeset response alone (§4.3 step 11). A lost
+   response with a committed write converges on retry via step 6, after authorization.
 3. **Async / stale state:** the tab already uses `activeController` generation guards for start and
    poll `[VERIFIED via FinalWriteupTab.js:255-297]`; the new action reuses the same controller and
    the `acknowledgementReload` counter to refresh the block after success. Every post-await
@@ -410,7 +431,8 @@ notification work stays parked.
 | Exact retry of the transition writes nothing and returns `reused: true` | transition-service.js | Unit: `updateDocument` not called when the row is already committed `FINAL` |
 | A non-lead PD with a valid session gets 403 and no write | route + service | Route test with a mismatched system user; `updateDocument` not called |
 | Missing lead PD is superuser-only | service | Unit mirrors the group-review case |
-| The PATCH carries `ifMatch`; 412 maps to the reload-and-retry conflict | service | Unit with a 412 rejection |
+| Both changeset operations carry `ifMatch`; 412 maps to the reload-and-retry conflict | service | Unit with a 412 rejection from `commitChangeset`; assert both `ifMatch` values |
+| A current-Final pointer change between the initial read and commit writes nothing | service | Unit: second `readState` returns a request whose `_wmkf_currentfinalwriteup_value` names another row → conflict, `commitChangeset` not called; and a request `_etag` change alone → the changeset's 412 path |
 | A SharePoint version change between before/after aborts with no write | service | Unit with differing metadata |
 | A SharePoint version change between verification and commit aborts with no write | service | Unit: commit-time metadata differs from verified → `source_changed`, `updateDocument` not called |
 | No milestone field is written by the transition | service | Unit: the PATCH body has no `wmkf_milestone*` key and no `wmkf_MilestoneCreatedBy@odata.bind` |
@@ -425,14 +447,17 @@ notification work stays parked.
 | Button hidden when `canAdvance` is false; server still rejects | tab + route | Tab test + route test |
 | Dashboard `leadership-review` rows are unchanged by this slice | dashboard-service.js (no edit) | Existing tests stay green; no new assertions needed |
 | Publication version is untouched by the transition | service | Unit: `downloadFile` and `getFileMetadataById` only; no Graph write dependency exists in `DEFAULT_DEPENDENCIES` `[VERIFIED via :62-72]` |
+| The request pointer value is unchanged by the transition | service | Unit: the request operation's bind names the same `finalId` the fence resolved |
 
 ## 8. Tests (names to add or re-pin)
 
 - `tests/unit/final-writeup-transition-service.test.js` (13 tests today): add the `committedFinal`
   generalization cases, the `leadership-review` status projection, `canAdvance` for lead PD /
   superuser / other, and the nine-step service happy path, retry, 403, ineligible, stale fence,
-  source-changed at verification, source-changed at commit time, 412, unconfirmed (including a
-  re-read whose `wmkf_sharepointversionid` differs from the verified one), actor resolution
+  source-changed at verification, source-changed at commit time, pointer moved at commit time,
+  changeset 412 (with the post-failure re-read returning committed state when this call's write
+  landed), unconfirmed (including a re-read whose `wmkf_sharepointversionid` differs from the
+  verified one), actor resolution
   (resolved id used, resolver 403 propagates with no write, flag-off fallback), and a PATCH-body
   assertion that no milestone key is present.
 - New `tests/unit/workbench-final-writeup-leadership-review-route.test.js`: method allowlist,
@@ -523,6 +548,12 @@ Three findings, all verified against source and all accepted.
 | I1 | high | Pointer-missing and fence-mismatch errors were still reachable before authorization, giving an unauthorized caller a state oracle. | **Accepted.** §4.3 step 3 is the single `readState`; step 4 authorizes from the request's lead PD; `findCurrentFinal`, the fence, and every later inspection follow. Recorded that this is stricter than the existing group-review start `[VERIFIED via transition-service.js:700-733]`, which is not retrofitted here. |
 | I2 | high | The `FINAL` branch of `committedFinal` required version and hash only, not the eTag, lastModified, and filesize the write refreshes and `persistedIdentityMatches` compares. | **Accepted.** §4.4 requires all five observation fields; §7 lists each as a missing-field test. |
 | I3 | medium | F2, G2, and G3 still described superseded milestone-write requirements as the active contract. | **Accepted.** Those rows are rewritten in place to name the H1 supersession and the active contract. Pass 4 also confirmed the observation-field refresh collides with no Final-row claim-identity reader. |
+
+### Pass 5 (2026-09-07, verdict NEEDS REWORK)
+
+| # | Severity | Finding | Disposition |
+|---|---|---|---|
+| J1 | high | A single Final-row PATCH cannot fence `_wmkf_currentfinalwriteup_value`; a concurrent re-point between re-read and PATCH would advance a row that is no longer current. | **Accepted.** §4.1 and §4.3 step 10 switch to the group-review activation's own shape: one changeset with the Final-row PATCH and a conditional re-bind of the request pointer carrying the request `_etag` `[VERIFIED via transition-service.js:626-635]`. Step 9 checks the pointer explicitly, step 10 fences it atomically; §7 and §8 add the pointer-moved and request-ETag tests. §2, §5, and §6.2 updated to match. |
 
 Re-review pending after this revision.
 
