@@ -10,7 +10,7 @@ last_verified: 2026-07-28 via my-proposals-service.js, dashboard-service.js, the
 
 ## Recall Rule
 
-Read this when: writing document-loading or phase-gating logic, or planning for the J27 single-submission cycle.
+Read this when: writing document-loading or phase-gating logic, or planning for the J27 single-submission cycle. The collection plan for every J27-sensitive site (retire / persist / change / build / scale register) is `docs/J27_SINGLE_PHASE_TRANSITION_INVENTORY_PLAN.md` (2026-09-06; sweep not yet run).
 
 Do:
 - Gate reviewer-finding on the internal Phase II label (`akoya_requeststatus = 'Phase II Pending'`) — stays correct across both dual-phase (D26) and single-submission (J27) cycles.
