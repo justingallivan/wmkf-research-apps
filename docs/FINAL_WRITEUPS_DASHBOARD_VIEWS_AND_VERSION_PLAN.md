@@ -17,7 +17,7 @@ related:
 
 # Final Writeups Dashboard — Slices 6B and 6C Plan
 
-**Status: BUILT 2026-09-07 on branch `claude/final-writeups-views-and-version`; see §14.** Mode A `/contract-reconcile` plan for the two remaining
+**Status: Production-live 2026-09-07 via PR #175 merge `44bdd240`, deployment `dpl_2UrsDnydRqudu95wJyLCK7A6FUFR`; see §14.** Mode A `/contract-reconcile` plan for the two remaining
 Slice 6 items the owner shaped on 2026-09-06 (queue item 5; 6A plan §12 tail). Slices 6D and 6E are
 closed by owner decision and are not part of this plan. Every state claim below is labeled;
 `[PLANNED]` marks intended behavior, never built state. Line numbers are as of `3e3645b0`.
@@ -393,7 +393,7 @@ Leadership stage transition (separate plan), matrix redesign, inline preview.
 
 ## 14. Build record (2026-09-07, branch `claude/final-writeups-views-and-version`)
 
-Built per §4–§8 with no deviation from the plan. Files: `lib/services/final-writeup/acknowledgement-service.js`
+Built per §4–§8 with no deviation from the plan; merged to `main` via PR #175 as `44bdd240` (Production deployment `dpl_2UrsDnydRqudu95wJyLCK7A6FUFR`, Ready 2026-09-07 PT; all PR checks green including the full Jest run). Owner-run signed-in smoke pending. Files: `lib/services/final-writeup/acknowledgement-service.js`
 (`acknowledgedPublicationVersionId` in the shared projection, null for the responsible PD, and in
 the `markFinalWriteupReviewed` response from the confirmed row), `lib/services/final-writeup/dashboard-service.js`
 (row passthrough; `responsibleProgramDirector` on unconfigured matrix rows),

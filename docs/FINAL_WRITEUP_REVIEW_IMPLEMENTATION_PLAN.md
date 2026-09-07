@@ -3,7 +3,7 @@ title: Final Writeup Review — Implementation Plan
 domain: workbench
 kind: plan
 status: active
-summary: "Final runtime, staffing, lenses, and 6A scoping are Production-live; 6B views/PD filter and 6C version context built on a branch; stage transitions remain."
+summary: "Final runtime, staffing, lenses, 6A scoping, 6B views/PD filter, and 6C version context are Production-live; stage transitions remain."
 canonical: false
 cataloged: 2026-08-28
 last_verified: 2026-09-07
@@ -681,8 +681,9 @@ read model's scope, cap, and fail-closed behavior change):
   keep the per-cycle cap and fail-closed behavior. The cycle selector is the first filter and lives
   in the API contract; add `cycleCode` validation to the GET route and the route-security matrix
   row. The persona queues, matrix, and focused page keep their semantics inside the selected cycle.
-- **6B — views and Program Director filter over the loaded cycle (owner-shaped 2026-09-06; BUILT
-  2026-09-07 on branch `claude/final-writeups-views-and-version` per
+- **6B — views and Program Director filter over the loaded cycle (owner-shaped 2026-09-06;
+  PRODUCTION-LIVE 2026-09-07 via PR #175 merge `44bdd240`, deployment
+  `dpl_2UrsDnydRqudu95wJyLCK7A6FUFR`, owner smoke pending; per
   `docs/FINAL_WRITEUPS_DASHBOARD_VIEWS_AND_VERSION_PLAN.md`, three Codex plan passes).** The page
   opens on "Needs my review" for every role (`bucket open`), with "Reviewed by me" (`bucket history`,
   including Updated-since-review rows) and "All writeups" (every visible row, merged and sorted by
@@ -694,7 +695,7 @@ read model's scope, cap, and fail-closed behavior change):
   selector does not filter the matrix. Counts are navigation counts, never denominators; no
   program-taxonomy grouping or authorization branch. The header thesis comment in
   `FinalWriteupsViews.js` carries the amended direction.
-- **6C — current-version context (BUILT 2026-09-07, same branch).** Preview is retired; each row
+- **6C — current-version context (PRODUCTION-LIVE 2026-09-07, same merge).** Preview is retired; each row
   shows "Version {publicationVersionId}" (verbatim Graph string) and, when Updated since review,
   "You reviewed version {acknowledgedPublicationVersionId}". The shared projection and the POST
   acknowledgement response both carry `acknowledgedPublicationVersionId` (null for the responsible

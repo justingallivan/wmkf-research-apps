@@ -111,7 +111,7 @@ read is scoped to the selected cycle's meeting-date window, and the 100-row
 bound applies per cycle), derive ordinary staff open/history/stewardship
 queues plus an optional focused row, and keep a reviewed row in history after
 a later Word edit while labeling its freshness Updated. Since Slice 6C
-(2026-09-07, branch `claude/final-writeups-views-and-version`) the shared
+(Production-live 2026-09-07, PR #175 merge `44bdd240`) the shared
 projection and the POST mark response also expose the stored
 `wmkf_publicationversionid` as `acknowledgedPublicationVersionId` (null for the
 responsible PD), so the dashboard row and focused page can name the version a
