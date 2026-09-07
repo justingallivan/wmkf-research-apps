@@ -1,8 +1,9 @@
 /**
- * Final Writeup — group-review entry and Word launcher.
+ * Final Writeup — group-review entry, leadership handoff, and Word launcher.
  *
  * This surface never edits the document in-browser. It starts the governed
- * transition and opens the same stable SharePoint Word item in a separate tab.
+ * transitions (group review, then leadership review) and opens the same stable
+ * SharePoint Word item in a separate tab.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -11,6 +12,24 @@ import { Card } from '../Layout';
 const POLL_INTERVAL_MS = 2000;
 const POLL_ATTEMPTS = 10;
 const ACKNOWLEDGEMENT_SCHEMA_NOT_READY = 'final_writeup_acknowledgement_schema_not_ready';
+// Phases with a current Final row: review tracking loads and the review panel renders.
+const IN_REVIEW_PHASES = new Set(['group-review', 'leadership-review']);
+const STAGE_PRESENTATION = Object.freeze({
+  'group-review': {
+    chip: 'Group review',
+    heading: 'Final Writeup is ready',
+    chipClass: 'bg-green-100 text-green-900',
+    panelClass: 'border-green-200 bg-green-50',
+    dividerClass: 'border-green-200',
+  },
+  'leadership-review': {
+    chip: 'Leadership review',
+    heading: 'Final Writeup is with leadership',
+    chipClass: 'bg-indigo-100 text-indigo-900',
+    panelClass: 'border-indigo-200 bg-indigo-50',
+    dividerClass: 'border-indigo-200',
+  },
+});
 
 async function fetchStatus(requestId, signal) {
   const response = await fetch(
@@ -128,8 +147,10 @@ export default function FinalWriteupTab({ requestId }) {
   const [status, setStatus] = useState(null);
   const [loading, setLoading] = useState(false);
   const [starting, setStarting] = useState(false);
+  const [advancing, setAdvancing] = useState(false);
   const [error, setError] = useState(null);
-  const [confirming, setConfirming] = useState(false);
+  // null | 'group' | 'leadership': which governed transition the dialog confirms.
+  const [confirming, setConfirming] = useState(null);
   const [acknowledgement, setAcknowledgement] = useState(null);
   const [acknowledgementLoading, setAcknowledgementLoading] = useState(false);
   const [acknowledging, setAcknowledging] = useState(false);
@@ -178,7 +199,7 @@ export default function FinalWriteupTab({ requestId }) {
     };
   }, [requestId, load]);
 
-  const acknowledgementArtifactId = status?.phase === 'group-review'
+  const acknowledgementArtifactId = IN_REVIEW_PHASES.has(status?.phase)
     ? status?.artifact?.artifactId || null
     : null;
 
@@ -216,12 +237,14 @@ export default function FinalWriteupTab({ requestId }) {
     return () => controller.abort();
   }, [requestId, acknowledgementArtifactId, acknowledgementReload]);
 
+  const transitioning = starting || advancing;
+
   useEffect(() => {
     if (!confirming) return undefined;
     const previous = document.activeElement;
     confirmButtonRef.current?.focus();
     const onKeyDown = (event) => {
-      if (event.key === 'Escape' && !starting) setConfirming(false);
+      if (event.key === 'Escape' && !transitioning) setConfirming(null);
       if (event.key === 'Tab') {
         const first = cancelButtonRef.current;
         const last = confirmButtonRef.current;
@@ -239,14 +262,14 @@ export default function FinalWriteupTab({ requestId }) {
       document.removeEventListener('keydown', onKeyDown);
       previous?.focus?.();
     };
-  }, [confirming, starting]);
+  }, [confirming, transitioning]);
 
   const pollUntilReady = async (controller) => {
     for (let attempt = 0; attempt < POLL_ATTEMPTS; attempt += 1) {
       const next = await load(controller.signal);
       if (activeController.current !== controller) return null;
       setStatus(next);
-      if (next?.phase === 'group-review') return next;
+      if (IN_REVIEW_PHASES.has(next?.phase)) return next;
       if (attempt < POLL_ATTEMPTS - 1) await waitForPoll(controller.signal);
     }
     throw new Error('The transition is still running. Reload this tab in a moment.');
@@ -272,7 +295,7 @@ export default function FinalWriteupTab({ requestId }) {
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.error || `Final Writeup transition failed (${response.status})`);
       if (activeController.current !== controller) return;
-      setConfirming(false);
+      setConfirming(null);
       if (response.status === 202 || body.inProgress) {
         setStatus((current) => ({ ...current, phase: 'starting' }));
         await pollUntilReady(controller);
@@ -281,6 +304,7 @@ export default function FinalWriteupTab({ requestId }) {
           available: true,
           phase: 'group-review',
           canStart: false,
+          canAdvance: Boolean(body.canAdvance),
           sourceArtifactId: status.sourceArtifactId,
           artifact: body.artifact,
         });
@@ -293,6 +317,50 @@ export default function FinalWriteupTab({ requestId }) {
       if (activeController.current === controller) {
         activeController.current = null;
         setStarting(false);
+      }
+    }
+  };
+
+  const advance = async () => {
+    const finalArtifactId = status?.artifact?.artifactId || null;
+    if (!requestId || status?.phase !== 'group-review' || !finalArtifactId || advancing) return;
+    activeController.current?.abort();
+    const controller = new AbortController();
+    activeController.current = controller;
+    setAdvancing(true);
+    setError(null);
+    try {
+      const response = await fetch('/api/workbench/final-writeup/leadership-review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId, expectedFinalArtifactId: finalArtifactId }),
+        signal: controller.signal,
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(body.error || `Leadership review transition failed (${response.status})`);
+      }
+      if (activeController.current !== controller) return;
+      if (body.artifact?.artifactId !== finalArtifactId) {
+        throw new Error('The current Final Writeup changed. Reload this tab before continuing.');
+      }
+      setConfirming(null);
+      setStatus((current) => ({
+        ...current,
+        phase: 'leadership-review',
+        canStart: false,
+        canAdvance: false,
+        artifact: body.artifact,
+      }));
+      setAcknowledgementReload((value) => value + 1);
+    } catch (advanceError) {
+      if (activeController.current === controller && advanceError?.name !== 'AbortError') {
+        setError(advanceError.message);
+      }
+    } finally {
+      if (activeController.current === controller) {
+        activeController.current = null;
+        setAdvancing(false);
       }
     }
   };
@@ -345,7 +413,10 @@ export default function FinalWriteupTab({ requestId }) {
   };
 
   const artifact = status?.artifact || null;
+  const stage = STAGE_PRESENTATION[status?.phase] || null;
   const startedAt = formatStartedAt(artifact?.groupReview?.startedAt);
+  const leadershipStartedAt = formatStartedAt(artifact?.leadershipReview?.startedAt);
+  const leadershipStartedBy = artifact?.leadershipReview?.startedByName || null;
   const lastUpdated = formatReviewDate(acknowledgement?.publicationLastModified);
   const personalReviewedAt = formatReviewDate(acknowledgement?.acknowledgedAt);
   const personalReview = personalReviewPresentation(acknowledgement?.personalState);
@@ -409,16 +480,18 @@ export default function FinalWriteupTab({ requestId }) {
               This stage is not available yet. Setup must be completed before staff can start group review.
             </p>
           </div>
-        ) : status?.phase === 'group-review' && artifact ? (
-          <div className="mt-6 rounded-xl border border-green-200 bg-green-50 p-5">
+        ) : stage && artifact ? (
+          <div className={`mt-6 rounded-xl border p-5 ${stage.panelClass}`}>
             <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0 max-w-2xl">
-                <span className="inline-flex rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-900">
-                  Group review
+                <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${stage.chipClass}`}>
+                  {stage.chip}
                 </span>
-                <h3 className="mt-3 text-lg font-semibold text-gray-900">Final Writeup is ready</h3>
+                <h3 className="mt-3 text-lg font-semibold text-gray-900">{stage.heading}</h3>
                 <p className="mt-1 text-sm leading-6 text-gray-700">
-                  {startedAt ? `Started ${startedAt}. ` : ''}
+                  {status.phase === 'leadership-review'
+                    ? `${leadershipStartedAt ? `Moved to leadership review ${leadershipStartedAt}` : 'Moved to leadership review'}${leadershipStartedBy ? ` by ${leadershipStartedBy}` : ''}. `
+                    : (startedAt ? `Started ${startedAt}. ` : '')}
                   Word opens separately so staff can co-author in its normal window.
                 </p>
                 {lastUpdated && (
@@ -428,20 +501,32 @@ export default function FinalWriteupTab({ requestId }) {
                   <p className="mt-1 break-words text-xs text-gray-600">{artifact.file.name}</p>
                 )}
               </div>
-              <a
-                href={artifact.file?.webUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl bg-gray-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2"
-              >
-                Edit writeup
-              </a>
+              <div className="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-center">
+                {status.phase === 'group-review' && status.canAdvance && (
+                  <button
+                    type="button"
+                    disabled={transitioning}
+                    onClick={() => setConfirming('leadership')}
+                    className="inline-flex min-h-11 items-center justify-center rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-900 hover:border-gray-400 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Ready for leadership review
+                  </button>
+                )}
+                <a
+                  href={artifact.file?.webUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex min-h-11 items-center justify-center rounded-xl bg-gray-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2"
+                >
+                  Edit writeup
+                </a>
+              </div>
             </div>
 
             {(acknowledgementLoading
               || acknowledgementError
               || acknowledgement?.available === true) && (
-              <div className="mt-5 border-t border-green-200 pt-5">
+              <div className={`mt-5 border-t pt-5 ${stage.dividerClass}`}>
                 {acknowledgementLoading ? (
                   <p className="text-sm text-gray-600" role="status">Checking review activity…</p>
                 ) : acknowledgementError ? (
@@ -537,7 +622,7 @@ export default function FinalWriteupTab({ requestId }) {
               <button
                 type="button"
                 disabled={starting}
-                onClick={() => setConfirming(true)}
+                onClick={() => setConfirming('group')}
                 className="min-h-11 shrink-0 rounded-xl bg-gray-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-45"
               >
                 Ready for group review
@@ -557,18 +642,27 @@ export default function FinalWriteupTab({ requestId }) {
             className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl"
           >
             <h3 id="final-writeup-confirm-title" className="text-xl font-semibold tracking-tight text-gray-900">
-              Start group review?
+              {confirming === 'leadership' ? 'Move to leadership review?' : 'Start group review?'}
             </h3>
             <div id="final-writeup-confirm-description" className="mt-3 space-y-2 text-sm leading-6 text-gray-700">
-              <p>The current Word version becomes the starting point for group review.</p>
-              <p>The SharePoint file stays the same. Pre-Site regeneration will no longer be available.</p>
+              {confirming === 'leadership' ? (
+                <>
+                  <p>The current Word version is recorded as the version leadership starts from, and the writeup appears for the President and CSO in Final writeups.</p>
+                  <p>Editing continues in the same document. Nobody is notified by this step, and group review does not reopen from here.</p>
+                </>
+              ) : (
+                <>
+                  <p>The current Word version becomes the starting point for group review.</p>
+                  <p>The SharePoint file stays the same. Pre-Site regeneration will no longer be available.</p>
+                </>
+              )}
             </div>
             <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
               <button
                 ref={cancelButtonRef}
                 type="button"
-                disabled={starting}
-                onClick={() => setConfirming(false)}
+                disabled={transitioning}
+                onClick={() => setConfirming(null)}
                 className="min-h-11 rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-700 focus:ring-offset-2 disabled:opacity-50"
               >
                 Cancel
@@ -576,11 +670,13 @@ export default function FinalWriteupTab({ requestId }) {
               <button
                 ref={confirmButtonRef}
                 type="button"
-                disabled={starting}
-                onClick={start}
+                disabled={transitioning}
+                onClick={confirming === 'leadership' ? advance : start}
                 className="min-h-11 rounded-xl bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:ring-offset-2 disabled:opacity-50"
               >
-                {starting ? 'Starting…' : 'Ready for group review'}
+                {confirming === 'leadership'
+                  ? (advancing ? 'Moving…' : 'Ready for leadership review')
+                  : (starting ? 'Starting…' : 'Ready for group review')}
               </button>
             </div>
           </div>

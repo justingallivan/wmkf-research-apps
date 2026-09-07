@@ -269,7 +269,9 @@ expectedFinalArtifactId, isSuperuser, actingUserSystemId })`:
    metadata immediately before the write, in the `activate` pattern `[VERIFIED via
    transition-service.js:564-600]`: the request's `_wmkf_currentfinalwriteup_value` must still name
    this row, the row must still be `READY` / `REVIEW` with the same `_etag`, and the metadata must
-   satisfy `stableMetadataMatches(verified.metadata, now)` and `persistedIdentityMatches(row, now)`;
+   match the row's drive/item identity and satisfy `stableMetadataMatches(verified.metadata, now)`
+   (not `persistedIdentityMatches(row, now)`: the row's claim-time observation legitimately differs
+   after group-review edits; that helper is used only in the post-commit confirm, §4.3 step 11);
    otherwise `final_writeup_leadership_source_changed` (metadata) or
    `final_writeup_leadership_conflict` (row or pointer) with no write. The fresh request `_etag` and
    row `_etag` from this read are the ones carried into step 10, so the interval between this read
@@ -564,6 +566,20 @@ Three findings, all verified against source and all accepted.
 
 Codex passes 1–6 produced twelve findings (F1–F3, G1–G3, H1–H3, I1–I3, J1, K1); all accepted, none
 rejected. Plan status: **design closed, awaiting owner decisions D1–D6 before the Tier 1 build.**
+
+## 14. Build record (S493, branch `claude/final-writeup-leadership-review`)
+
+**[BUILT S493 on branch `claude/final-writeup-leadership-review`; PRODUCTION PROMOTION PENDING.]** Built to §4 as revised through pass 6. Files: `lib/services/final-writeup/transition-service.js`
+(`committedFinal` generalization, `leadershipCheckpointComplete`, `verifyDocument`, `advanceToLeadershipReview`,
+`canAdvance`/`leadership-review` phase, `leadershipReview` on the artifact projection),
+`pages/api/workbench/final-writeup/leadership-review.js`, `shared/components/workbench/FinalWriteupTab.js`
+(`IN_REVIEW_PHASES`, stage presentation map, advance action, parametrized confirm dialog), tests
+`final-writeup-leadership-transition-service.test.js` (32), `workbench-final-writeup-leadership-review-route.test.js`
+(6), four new `final-writeup-tab.test.js` cases; existing `final-writeup-transition-service.test.js` shape
+assertion gained `canAdvance: false`. One correction to §4.3 step 9 recorded in place (identity + verified
+metadata pre-commit; `persistedIdentityMatches` post-commit only). Docs reconciled: security matrix row, atlas,
+implementation plan status lines, queue item 4, wiki topic section. Codex diff review, PR, deployment, and
+owner-run smoke are recorded below as they happen.
 
 ## 13. Explicitly out of scope
 

@@ -278,6 +278,7 @@ test('schema-off status and transition perform no Dataverse work', async () => {
     available: false,
     phase: 'unavailable',
     canStart: false,
+    canAdvance: false,
     artifact: null,
   });
   await expect(startFinalWriteup({

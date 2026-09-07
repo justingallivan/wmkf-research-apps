@@ -35,7 +35,8 @@ related:
 ## Plan status
 
 **Verdict: CORE FINAL REVIEW AND PERSONA DASHBOARD LENSES ARE PRODUCTION-LIVE;
-LEADERSHIP-STAGE AND PC-BACKUP TRANSITIONS REMAIN STAGED WORK.**
+THE LEADERSHIP-STAGE TRANSITION (SLICE 4) IS BUILT ON A BRANCH AWAITING PRODUCTION
+PROMOTION (S493); PC BACKUP IS CLOSED BY OWNER DECISION (PCs already see every Final).**
 
 This plan translates the approved Final Writeup and group-review experience into the current Request Workbench architecture. Slice 0 is complete. **[PRODUCTION-PROVED 2026-08-30 PT / 2026-08-31 UTC]** Slice 1 shipped on `main` at `ebb147bb` in Ready Production deployment `dpl_7kzQ1v7XGtyNx4Fady2JxMrTxQEJ`; Wave 22 is 4 exact / 0 absent / 0 divergent and the non-sensitive `FINAL_WRITEUP_SCHEMA_READY` value is literal `on` in Production. The authorized Request `1002788` transition created one Ready/Review Final row, moved the retained current Pre-Site source to lifecycle Final, set the current-Final pointer, recorded Justin Gallivan and `2026-08-31T03:57:20Z`, and reused the exact same SharePoint drive/item, version `1.0`, 38,273-byte file, and governed hash. The distinct SharePoint-file count remained four, proving that no copy or upload occurred. A bounded 30-minute scan found no Production error logs or 5xx responses.
 
@@ -133,8 +134,12 @@ The named prerequisites are deliberately attached to the slices that need them:
 Prerequisite 5 does **not** block the responsible-PD handoff, ordinary-PD
 review slices, or the superuser matrix. Those relationships and the exact
 reviewer-role roster are already server-verifiable. Persona-specific dashboard
-queues are now enabled; PC backup actions and the transition into Leadership
-review remain separate unbuilt authority/workflow slices.
+queues are now enabled. The transition into Leadership review is Slice 4,
+built S493 on `claude/final-writeup-leadership-review` per
+`docs/FINAL_WRITEUP_LEADERSHIP_TRANSITION_PLAN.md` and awaiting Production
+promotion; PC backup is closed (owner 2026-09-06: PCs already see every Final,
+and a retiring PD's requests transfer by changing the program director in
+Dataverse).
 
 The board-package handoff remains excluded until the PCs describe their downstream process.
 
@@ -287,7 +292,7 @@ The existing schema carries the file and lineage contract:
 - the Request current-Final lookup selects the canonical row;
 - the generation key makes exact retry converge.
 
-Wave 22 defines `wmkf_GroupReviewStartedBy`, `wmkf_GroupReviewStartedAt`, `wmkf_LeadershipReviewStartedBy`, and `wmkf_LeadershipReviewStartedAt`. Runtime selects them only when `FINAL_WRITEUP_SCHEMA_READY=on`. The group-review actor lookup is resolved from the authenticated session and written with its timestamp in the same activation changeset; Dataverse `modifiedby` is informational only. Leadership fields remain schema-only until Slice 4 (planned in `docs/FINAL_WRITEUP_LEADERSHIP_TRANSITION_PLAN.md`; not yet built).
+Wave 22 defines `wmkf_GroupReviewStartedBy`, `wmkf_GroupReviewStartedAt`, `wmkf_LeadershipReviewStartedBy`, and `wmkf_LeadershipReviewStartedAt`. Runtime selects them only when `FINAL_WRITEUP_SCHEMA_READY=on`. The group-review actor lookup is resolved from the authenticated session and written with its timestamp in the same activation changeset; Dataverse `modifiedby` is informational only. The leadership pair is written by Slice 4's `advanceToLeadershipReview` **[BUILT S493 on branch `claude/final-writeup-leadership-review`; PRODUCTION PROMOTION PENDING.]**
 
 For **Ready for leadership review**, move the Final row lifecycle from `REVIEW` to `FINAL`, write `wmkf_LeadershipReviewStartedBy` / `wmkf_LeadershipReviewStartedAt`, and refresh the row's own SharePoint observation fields (`wmkf_sharepointversionid`, `wmkf_sharepointetag`, `wmkf_sharepointlastmodified`, `wmkf_filesize`, `wmkf_contenthash`) to the verified current version, the same refresh the Site Visit handoff performs. The milestone triple and `wmkf_MilestoneCreatedBy` are **not** written: the Wave 24 actor contract defines that actor as the Pre-Site → Site Visit handoff person (`docs/REQUEST_DOCUMENT_EXPLICIT_ACTOR_PLAN.md`), so reusing the milestone fields here would misattribute provenance (owner decision D2, 2026-09-07; plan `docs/FINAL_WRITEUP_LEADERSHIP_TRANSITION_PLAN.md` §4.1). The lifecycle is the stage discriminator; milestone presence alone never changes stage. Review acknowledgements live elsewhere and therefore do not rewrite the Final row after this transition.
 

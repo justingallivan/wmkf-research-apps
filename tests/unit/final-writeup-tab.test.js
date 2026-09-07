@@ -42,14 +42,38 @@ function finalArtifact() {
   };
 }
 
-function groupReviewStatus() {
+function groupReviewStatus(canAdvance = false) {
   return {
     success: true,
     available: true,
     phase: 'group-review',
     canStart: false,
+    canAdvance,
     sourceArtifactId: SOURCE_ID,
     artifact: finalArtifact(),
+  };
+}
+
+function leadershipArtifact() {
+  return {
+    ...finalArtifact(),
+    leadershipReview: {
+      startedAt: '2026-09-07T20:00:00Z',
+      startedById: '44444444-4444-4444-8444-444444444444',
+      startedByName: 'Justin Gallivan',
+    },
+  };
+}
+
+function leadershipReviewStatus() {
+  return {
+    success: true,
+    available: true,
+    phase: 'leadership-review',
+    canStart: false,
+    canAdvance: false,
+    sourceArtifactId: SOURCE_ID,
+    artifact: leadershipArtifact(),
   };
 }
 
@@ -284,4 +308,104 @@ test('shows schema-off state without offering an action', async () => {
   expect(await screen.findByRole('heading', { name: 'Final Writeup setup is not active' }))
     .toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Ready for group review' })).not.toBeInTheDocument();
+});
+
+describe('leadership review stage', () => {
+  test('a leadership-stage writeup still loads review tracking and keeps the Word action', async () => {
+    global.fetch = jest.fn()
+      .mockResolvedValueOnce(response(leadershipReviewStatus()))
+      .mockResolvedValueOnce(response(acknowledgementState({
+        mayAcknowledge: true,
+        reviewers: [{
+          reviewerId: '99999999-9999-4999-8999-999999999999',
+          name: 'Allison Keller',
+          initials: 'AK',
+          state: 'reviewed',
+          acknowledgedAt: '2026-09-07T21:00:00Z',
+        }],
+      })));
+    render(<FinalWriteupTab requestId={REQUEST_ID} />);
+
+    expect(await screen.findByText('Leadership review')).toBeInTheDocument();
+    expect(screen.getByText('Final Writeup is with leadership')).toBeInTheDocument();
+    expect(screen.getByText(/Moved to leadership review .* by Justin Gallivan\./)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Edit writeup' })).toHaveAttribute(
+      'href',
+      'https://sharepoint.test/site-visit.docx',
+    );
+    // The acknowledgement GET fires for the leadership phase, not only group review.
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2));
+    expect(global.fetch.mock.calls[1][0]).toContain('/api/workbench/final-writeup/acknowledgement?requestId=');
+    expect(await screen.findByText('Reviewed by')).toBeInTheDocument();
+    expect(screen.getByLabelText(/Allison Keller/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Mark reviewed' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Ready for leadership review' })).not.toBeInTheDocument();
+  });
+
+  test('offers the leadership handoff to the authorized PD only', async () => {
+    global.fetch = jest.fn()
+      .mockResolvedValueOnce(response(groupReviewStatus(false)))
+      .mockResolvedValueOnce(response(acknowledgementState({ mayAcknowledge: false, personalState: 'not-applicable' })));
+    const { unmount } = render(<FinalWriteupTab requestId={REQUEST_ID} />);
+    expect(await screen.findByText('Final Writeup is ready')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Ready for leadership review' })).not.toBeInTheDocument();
+    unmount();
+
+    global.fetch = jest.fn()
+      .mockResolvedValueOnce(response(groupReviewStatus(true)))
+      .mockResolvedValueOnce(response(acknowledgementState({ mayAcknowledge: false, personalState: 'not-applicable' })));
+    render(<FinalWriteupTab requestId={REQUEST_ID} />);
+    expect(await screen.findByRole('button', { name: 'Ready for leadership review' })).toBeInTheDocument();
+  });
+
+  test('confirms the leadership handoff with only request and current-Final fences, then shows the new stage', async () => {
+    global.fetch = jest.fn()
+      .mockResolvedValueOnce(response(groupReviewStatus(true)))
+      .mockResolvedValueOnce(response(acknowledgementState({ mayAcknowledge: false, personalState: 'not-applicable' })))
+      .mockResolvedValueOnce(response({
+        success: true,
+        phase: 'leadership-review',
+        reused: false,
+        artifact: leadershipArtifact(),
+      }))
+      .mockResolvedValueOnce(response(acknowledgementState({ mayAcknowledge: false, personalState: 'not-applicable' })));
+    render(<FinalWriteupTab requestId={REQUEST_ID} />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Ready for leadership review' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Move to leadership review?' });
+    expect(within(dialog).getByText(/appears for the President and CSO/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/Nobody is notified by this step/)).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Ready for leadership review' }));
+
+    expect(await screen.findByText('Leadership review')).toBeInTheDocument();
+    const [url, init] = global.fetch.mock.calls[2];
+    expect(url).toBe('/api/workbench/final-writeup/leadership-review');
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body)).toEqual({ requestId: REQUEST_ID, expectedFinalArtifactId: FINAL_ID });
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Ready for leadership review' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Edit writeup' })).toBeInTheDocument();
+    // Review tracking reloads for the new stage.
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(4));
+    expect(global.fetch.mock.calls[3][0]).toContain('/api/workbench/final-writeup/acknowledgement?requestId=');
+  });
+
+  test('surfaces a rejected handoff and leaves the group-review stage in place', async () => {
+    global.fetch = jest.fn()
+      .mockResolvedValueOnce(response(groupReviewStatus(true)))
+      .mockResolvedValueOnce(response(acknowledgementState({ mayAcknowledge: false, personalState: 'not-applicable' })))
+      .mockResolvedValueOnce(response({
+        error: 'The writeup lifecycle changed while leadership review was starting. Reload and retry.',
+        code: 'final_writeup_leadership_conflict',
+      }, 409));
+    render(<FinalWriteupTab requestId={REQUEST_ID} />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Ready for leadership review' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Move to leadership review?' });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Ready for leadership review' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/Reload and retry/);
+    expect(screen.getByText('Group review')).toBeInTheDocument();
+    expect(global.fetch).toHaveBeenCalledTimes(3);
+  });
 });
