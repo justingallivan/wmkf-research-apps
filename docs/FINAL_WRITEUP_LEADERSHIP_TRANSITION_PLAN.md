@@ -612,7 +612,13 @@ four more regression cases. (b) §1–§4 of this plan still read as pre-build; 
 **Codex diff review pass 4 (2026-09-07): runtime clean; one medium doc finding, accepted.** The
 implementation plan's Slice 4 checklist still said "add" and "milestone version/hash/time", this plan's
 origin paragraph still quoted "plan-first, not built" as present state, and the Atlas `last_verified` was
-stale. All three rewritten in place. PR, deployment, and owner-run smoke are recorded below as they happen.
+stale. All three rewritten in place.
+
+**Codex diff review pass 5 (2026-09-07): runtime consistent; one medium doc finding, accepted.** Four more
+"remain separate work" restatements (implementation plan :721 and :818, `DATAVERSE_SHAREPOINT_FILE_MODEL.md:802`,
+`REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md:924`) plus the explicit-actor plan's "runtime not yet built" row
+(`REQUEST_DOCUMENT_EXPLICIT_ACTOR_PLAN.md:124`) rewritten in place. PR, deployment, and owner-run smoke are
+recorded below as they happen.
 
 ## 13. Explicitly out of scope
 

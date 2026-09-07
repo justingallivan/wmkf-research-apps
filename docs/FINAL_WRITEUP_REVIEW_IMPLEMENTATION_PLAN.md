@@ -717,8 +717,8 @@ read model's scope, cap, and fail-closed behavior change):
   Assessment locator stays separate unless that decision says otherwise.
 
 Explicitly unchanged: no approval gates, denominators, due dates, or leadership ordering; Word
-opens outside the Workbench; the responsible PD does not self-acknowledge; PC backup and the
-Leadership-stage transition remain the separate slices named above.
+opens outside the Workbench; the responsible PD does not self-acknowledge. PC backup is closed by
+owner decision (2026-09-06) and the Leadership-stage transition is Slice 4 (built S493 on branch `claude/final-writeup-leadership-review`, promotion pending).
 
 ## Likely file surface
 
@@ -815,6 +815,6 @@ exact 11-person roster and correct Request `1002788` states/actions with zero
 browser-console errors. Non-superuser persona visibility is now Production-live
 at `213f6c34` / `dpl_HGrbWUNPJMJunVevYLVEmtn7He6a`; its v2 configuration,
 representative Word access, and six-case read-only production-data smoke passed.
-PC backup and the Leadership-stage transition remain separate work. This sequence advances the
+PC backup is closed by owner decision and the Leadership-stage transition is built S493 on branch `claude/final-writeup-leadership-review`, promotion pending. This sequence advances the
 approved experience without guessing role identity or inventing the still-unknown
 board-package workflow.
