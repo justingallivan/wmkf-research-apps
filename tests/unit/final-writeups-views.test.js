@@ -401,6 +401,21 @@ test('reviewer initials expose current and earlier-version meaning without color
   expect(screen.getByLabelText('Review activity: 1 current · 1 earlier version')).toBeInTheDocument();
 });
 
+test('review activity pluralizes earlier versions', async () => {
+  const several = writeup({
+    reviewers: [
+      { reviewerId: 'reviewer-2', name: 'Sam Reviewer', initials: 'SR', state: 'updated' },
+      { reviewerId: 'reviewer-3', name: 'Kim Reviewer', initials: 'KR', state: 'updated' },
+      { reviewerId: 'reviewer-4', name: 'Lee Reviewer', initials: 'LR', state: 'updated' },
+    ],
+  });
+  global.fetch.mockResolvedValueOnce(response(dashboard({
+    queues: { open: [several], history: [], stewardship: [] },
+  })));
+  render(<FinalWriteupsDashboardView />);
+  expect(await screen.findByText('3 earlier versions')).toBeInTheDocument();
+});
+
 test('focused review keeps Word external, exposes collapsed context, and records exact-current review', async () => {
   const initial = dashboard({
     counts: { total: 1, open: 1, history: 0, stewardship: 0 },

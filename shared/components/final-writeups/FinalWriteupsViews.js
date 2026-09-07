@@ -82,10 +82,9 @@ function ReviewerInitials({ reviewers = [] }) {
   if (!reviewers.length) return <span className="text-xs text-gray-500">No reviews recorded</span>;
   const currentCount = reviewers.filter((reviewer) => reviewer.state !== 'updated').length;
   const earlierCount = reviewers.length - currentCount;
-  const countLabel = (count, label) => `${count} ${label}`;
   const reviewSummary = [
-    currentCount ? countLabel(currentCount, 'current') : null,
-    earlierCount ? countLabel(earlierCount, 'earlier version') : null,
+    currentCount ? `${currentCount} current` : null,
+    earlierCount ? `${earlierCount} earlier version${earlierCount === 1 ? '' : 's'}` : null,
   ].filter(Boolean).join(' · ');
   return (
     <div className="flex flex-wrap items-center gap-2" aria-label={`Review activity: ${reviewSummary}`}>
