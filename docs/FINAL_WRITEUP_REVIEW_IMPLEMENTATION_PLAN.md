@@ -683,7 +683,7 @@ read model's scope, cap, and fail-closed behavior change):
   row. The persona queues, matrix, and focused page keep their semantics inside the selected cycle.
 - **6B — views and Program Director filter over the loaded cycle (owner-shaped 2026-09-06;
   PRODUCTION-LIVE 2026-09-07 via PR #175 merge `44bdd240`, deployment
-  `dpl_2UrsDnydRqudu95wJyLCK7A6FUFR`, owner smoke pending; per
+  `dpl_2UrsDnydRqudu95wJyLCK7A6FUFR`, owner-run signed-in smoke passed 2026-09-07; per
   `docs/FINAL_WRITEUPS_DASHBOARD_VIEWS_AND_VERSION_PLAN.md`, three Codex plan passes).** The page
   opens on "Needs my review" for every role (`bucket open`), with "Reviewed by me" (`bucket history`,
   including Updated-since-review rows) and "All writeups" (every visible row, merged and sorted by
