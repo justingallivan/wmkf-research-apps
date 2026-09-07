@@ -578,8 +578,13 @@ rejected. Plan status: **design closed, awaiting owner decisions D1–D6 before 
 (6), four new `final-writeup-tab.test.js` cases; existing `final-writeup-transition-service.test.js` shape
 assertion gained `canAdvance: false`. One correction to §4.3 step 9 recorded in place (identity + verified
 metadata pre-commit; `persistedIdentityMatches` post-commit only). Docs reconciled: security matrix row, atlas,
-implementation plan status lines, queue item 4, wiki topic section. Codex diff review, PR, deployment, and
-owner-run smoke are recorded below as they happen.
+implementation plan status lines, queue item 4, wiki topic section.
+
+**Codex diff review pass 1 (2026-09-07): one medium finding, accepted.** `leadershipCheckpointComplete` was
+truthiness-based, so blank or malformed persisted values could pass the `FINAL` committed-state guard. It is
+now a strict validator (parseable timestamps, GUID actor, non-blank strings, finite non-negative size) with
+nine malformed-value regression cases beside the seven missing-field cases. Diff review pass 2, PR,
+deployment, and owner-run smoke are recorded below as they happen.
 
 ## 13. Explicitly out of scope
 

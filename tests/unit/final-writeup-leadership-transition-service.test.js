@@ -202,6 +202,31 @@ describe('status projection at both stages', () => {
   });
 
   test.each([
+    ['blank leadership time', { wmkf_leadershipreviewstartedat: '   ' }],
+    ['malformed leadership time', { wmkf_leadershipreviewstartedat: 'not-a-date' }],
+    ['non-GUID leadership actor', { _wmkf_leadershipreviewstartedby_value: 'someone' }],
+    ['blank version id', { wmkf_sharepointversionid: '' }],
+    ['blank eTag', { wmkf_sharepointetag: ' ' }],
+    ['malformed lastModified', { wmkf_sharepointlastmodified: 'yesterday' }],
+    ['negative filesize', { wmkf_filesize: -1 }],
+    ['non-numeric filesize', { wmkf_filesize: 'big' }],
+    ['blank content hash', { wmkf_contenthash: '' }],
+  ])('a FINAL row with %s is not committed', async (_label, overrides) => {
+    const harness = createHarness({
+      finalLifecycle: REQUEST_DOCUMENT_LIFECYCLE_STATE.FINAL,
+      finalOverrides: { ...LEADERSHIP_FIELDS, ...overrides },
+    });
+    await expect(getFinalWriteupStatus(
+      { requestId: REQUEST_ID, isSuperuser: false, actingUserSystemId: LEAD_PD_ID },
+      harness.dependencies,
+    )).rejects.toMatchObject({ code: 'final_writeup_committed_state_invalid' });
+    await expect(advance(harness)).rejects.toMatchObject({
+      code: 'final_writeup_committed_state_invalid',
+    });
+    expectNoWrite(harness);
+  });
+
+  test.each([
     REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT,
     REQUEST_DOCUMENT_LIFECYCLE_STATE.BOARD_READY,
     REQUEST_DOCUMENT_LIFECYCLE_STATE.SUPERSEDED,
