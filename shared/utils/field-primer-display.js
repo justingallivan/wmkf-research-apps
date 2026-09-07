@@ -1,9 +1,10 @@
 /**
  * Field Primer — expert display helpers (profile links + bibliometrics).
  *
- * Shared by ALL THREE render surfaces so they can never drift:
+ * Shared by ALL FOUR render surfaces so they can never drift:
  *   - renderPrimerMarkdown (lib/services/field-primer-service.js, server/CLI)
  *   - ProposalTab PrimerView (shared/components/workbench/ProposalTab.js, client)
+ *   - generateFieldPrimerDocx (shared/utils/field-primer-docx.js, client export)
  *   - generateFieldPrimerPdf (shared/utils/field-primer-pdf.js, client export)
  *
  * SCOPE: orientation only. The primer is staff-facing field orientation and is

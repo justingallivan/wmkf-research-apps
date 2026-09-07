@@ -140,6 +140,20 @@ function ExpertProfile({ grounding }) {
   );
 }
 
+// Trigger a download for a generated Blob. `downloadPdf` in
+// shared/utils/pdf-export.js does this for PDF bytes; DOCX renderers return a
+// Blob directly, and the repo's convention is that the caller downloads it.
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
 function PrimerList({ title, items, render }) {
   // The LLM output is parseable JSON but not schema-validated per-item, so guard
   // against null/non-object array entries before rendering.
@@ -214,7 +228,8 @@ function FieldPrimer({ requestId, initialRaw, exportMeta }) {
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState(null);
   const [pending, setPending] = useState(false); // another session is generating
-  const [exporting, setExporting] = useState(false);
+  // null | 'pdf' | 'docx' — which export is in flight, if any.
+  const [exporting, setExporting] = useState(null);
   const [exportError, setExportError] = useState(null);
   const reqRef = useRef(0);
 
@@ -229,7 +244,7 @@ function FieldPrimer({ requestId, initialRaw, exportMeta }) {
     // A superseded export's `finally` is token-guarded, so it will not clear
     // these for the request now on screen — reset them here or the new
     // request's button stays stuck on "Preparing PDF…".
-    setExporting(false);
+    setExporting(null);
     setExportError(null);
   }, [requestId, initialRaw]);
 
@@ -257,28 +272,53 @@ function FieldPrimer({ requestId, initialRaw, exportMeta }) {
     }
   };
 
-  const exportPdf = async () => {
+  // Word carries real inline runs and full Unicode, so it keeps bold names and
+  // Greek letters that the PDF's base-14 Helvetica cannot; the PDF stays as the
+  // convenient flattened copy. Both go through one handler so the
+  // stale-generation guard below can never be applied to only one of them.
+  const EXPORTS = {
+    pdf: {
+      label: 'PDF',
+      run: async (env, meta) => {
+        const [{ generateFieldPrimerPdf, fieldPrimerPdfFilename }, { downloadPdf }] = await Promise.all([
+          import('../../utils/field-primer-pdf'),
+          import('../../utils/pdf-export'),
+        ]);
+        const bytes = await generateFieldPrimerPdf(env, meta);
+        return () => downloadPdf(bytes, fieldPrimerPdfFilename(meta));
+      },
+    },
+    docx: {
+      label: 'Word document',
+      run: async (env, meta) => {
+        const { generateFieldPrimerDocx, fieldPrimerDocxFilename } = await import('../../utils/field-primer-docx');
+        const blob = await generateFieldPrimerDocx(env, meta);
+        return () => downloadBlob(blob, fieldPrimerDocxFilename(meta));
+      },
+    },
+  };
+
+  const runExport = async (kind) => {
     if (!envelope) return;
-    // Same stale-generation guard as `generate`: the two dynamic imports and the
+    // Same stale-generation guard as `generate`: the dynamic import and the
     // render are awaits, and the request (or its stored primer) can change
     // underneath them. A superseded export must neither download the previous
-    // request's PDF nor write its error into the new request's view.
+    // request's file nor write its error into the new request's view. The
+    // render is done BEFORE the download so a superseded run never touches the
+    // filesystem.
     const token = reqRef.current;
     const meta = exportMeta || {};
-    setExporting(true);
+    const { label, run } = EXPORTS[kind];
+    setExporting(kind);
     setExportError(null);
     try {
-      const [{ generateFieldPrimerPdf, fieldPrimerPdfFilename }, { downloadPdf }] = await Promise.all([
-        import('../../utils/field-primer-pdf'),
-        import('../../utils/pdf-export'),
-      ]);
-      const bytes = await generateFieldPrimerPdf(envelope, meta);
+      const download = await run(envelope, meta);
       if (token !== reqRef.current) return;
-      downloadPdf(bytes, fieldPrimerPdfFilename(meta));
+      download();
     } catch (e) {
-      if (token === reqRef.current) setExportError(`Could not build the PDF: ${e.message}`);
+      if (token === reqRef.current) setExportError(`Could not build the ${label}: ${e.message}`);
     } finally {
-      if (token === reqRef.current) setExporting(false);
+      if (token === reqRef.current) setExporting(null);
     }
   };
 
@@ -288,14 +328,24 @@ function FieldPrimer({ requestId, initialRaw, exportMeta }) {
         <dt className="text-xs uppercase tracking-wide text-gray-400">Field Primer</dt>
         <div className="flex items-center gap-3">
           {envelope && (
-            <button
-              type="button"
-              onClick={exportPdf}
-              disabled={exporting || generating}
-              className="text-sm font-medium text-indigo-600 hover:underline disabled:text-gray-400"
-            >
-              {exporting ? 'Preparing PDF…' : 'Export PDF'}
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={() => runExport('docx')}
+                disabled={!!exporting || generating}
+                className="text-sm font-medium text-indigo-600 hover:underline disabled:text-gray-400"
+              >
+                {exporting === 'docx' ? 'Preparing Word…' : 'Export Word'}
+              </button>
+              <button
+                type="button"
+                onClick={() => runExport('pdf')}
+                disabled={!!exporting || generating}
+                className="text-sm font-medium text-indigo-600 hover:underline disabled:text-gray-400"
+              >
+                {exporting === 'pdf' ? 'Preparing PDF…' : 'Export PDF'}
+              </button>
+            </>
           )}
           <button
             type="button"

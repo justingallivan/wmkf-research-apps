@@ -13,11 +13,16 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import ProposalTab from '../../shared/components/workbench/ProposalTab';
 import { generateFieldPrimerPdf, fieldPrimerPdfFilename } from '../../shared/utils/field-primer-pdf';
+import { generateFieldPrimerDocx, fieldPrimerDocxFilename } from '../../shared/utils/field-primer-docx';
 import { downloadPdf } from '../../shared/utils/pdf-export';
 
 jest.mock('../../shared/utils/field-primer-pdf', () => ({
   generateFieldPrimerPdf: jest.fn(async () => new Uint8Array([1, 2, 3])),
   fieldPrimerPdfFilename: jest.fn(() => 'field-primer-1002852-2026-09-07.pdf'),
+}));
+jest.mock('../../shared/utils/field-primer-docx', () => ({
+  generateFieldPrimerDocx: jest.fn(async () => new Blob(['docx'])),
+  fieldPrimerDocxFilename: jest.fn(() => 'field-primer-1002852-2026-09-07.docx'),
 }));
 jest.mock('../../shared/utils/pdf-export', () => ({
   downloadPdf: jest.fn(),
@@ -48,8 +53,17 @@ function context(fieldPrimer) {
   };
 }
 
+// The DOCX path downloads a Blob through an anchor, so capture the click
+// instead of letting jsdom navigate.
+let anchorClicks;
 beforeEach(() => {
   jest.clearAllMocks();
+  anchorClicks = [];
+  global.URL.createObjectURL = jest.fn(() => 'blob:primer');
+  global.URL.revokeObjectURL = jest.fn();
+  jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function record() {
+    anchorClicks.push({ href: this.href, download: this.download });
+  });
   global.fetch = jest.fn(async () => ({
     ok: true,
     status: 200,
@@ -57,10 +71,60 @@ beforeEach(() => {
   }));
 });
 
-test('no Export PDF button until a primer is stored', async () => {
+test('neither export button appears until a primer is stored', async () => {
   render(<ProposalTab context={context()} />);
   expect(await screen.findByRole('button', { name: 'Generate field primer' })).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: /Export PDF/ })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /Export Word/ })).not.toBeInTheDocument();
+});
+
+test('exports Word with the same envelope and identity, and downloads it as a .docx', async () => {
+  render(<ProposalTab context={context(JSON.stringify(ENVELOPE))} />);
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Export Word' }));
+
+  await waitFor(() => expect(anchorClicks).toHaveLength(1));
+  expect(generateFieldPrimerDocx).toHaveBeenCalledWith(ENVELOPE, {
+    requestNumber: '1002852',
+    title: 'Structural principles of poly(ADP-ribose)',
+    institution: 'Johns Hopkins University',
+    pi: 'Anthony Leung',
+  });
+  expect(fieldPrimerDocxFilename).toHaveBeenCalledWith(expect.objectContaining({ requestNumber: '1002852' }));
+  expect(anchorClicks[0].download).toBe('field-primer-1002852-2026-09-07.docx');
+  expect(global.URL.revokeObjectURL).toHaveBeenCalledWith('blob:primer');
+  // The PDF path is untouched by a Word export.
+  expect(generateFieldPrimerPdf).not.toHaveBeenCalled();
+  expect(downloadPdf).not.toHaveBeenCalled();
+});
+
+test('an in-flight export disables both buttons, so two renders cannot overlap', async () => {
+  let release;
+  generateFieldPrimerDocx.mockImplementationOnce(() => new Promise((resolve) => { release = resolve; }));
+
+  render(<ProposalTab context={context(JSON.stringify(ENVELOPE))} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Export Word' }));
+
+  const preparing = await screen.findByRole('button', { name: 'Preparing Word…' });
+  expect(preparing).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Export PDF' })).toBeDisabled();
+
+  await act(async () => {
+    release(new Blob(['docx']));
+    await Promise.resolve();
+  });
+  expect(screen.getByRole('button', { name: 'Export Word' })).toBeEnabled();
+  expect(screen.getByRole('button', { name: 'Export PDF' })).toBeEnabled();
+});
+
+test('a Word renderer failure names the Word document, not the PDF', async () => {
+  generateFieldPrimerDocx.mockRejectedValueOnce(new Error('packer blew up'));
+  render(<ProposalTab context={context(JSON.stringify(ENVELOPE))} />);
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Export Word' }));
+
+  expect(await screen.findByText(/Could not build the Word document: packer blew up/)).toBeInTheDocument();
+  expect(anchorClicks).toHaveLength(0);
 });
 
 test('exports the stored envelope with the request identity and downloads under a named file', async () => {

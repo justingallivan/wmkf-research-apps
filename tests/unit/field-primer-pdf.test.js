@@ -12,6 +12,8 @@ import { TextDecoder as NodeTextDecoder } from 'util';
 import { PDFReportBuilder } from '../../shared/utils/pdf-export';
 import { generateFieldPrimerPdf, fieldPrimerPdfFilename } from '../../shared/utils/field-primer-pdf';
 import { renderPrimerMarkdown } from '../../lib/services/field-primer-service';
+import { generateFieldPrimerDocx } from '../../shared/utils/field-primer-docx';
+import JSZip from 'jszip';
 
 afterEach(() => jest.restoreAllMocks());
 
@@ -191,7 +193,7 @@ describe('generateFieldPrimerPdf', () => {
 // literal above, so a change to either alone fails here, and a change to both
 // together still fails — which a renderer-against-renderer comparison would
 // not catch.
-test('both document renderers match the canonical heading contract, with Caveats as the one documented difference', async () => {
+test('all three document renderers match the canonical heading contract, with Caveats as the PDF-only difference', async () => {
   const markdownHeadings = renderPrimerMarkdown(FULL_PRIMER, { title: META.title })
     .split('\n')
     .filter((line) => line.startsWith('## '))
@@ -201,9 +203,21 @@ test('both document renderers match the canonical heading contract, with Caveats
   const calls = spyOnBuilder();
   await generateFieldPrimerPdf(envelope(FULL_PRIMER), META);
   // Caveats is a highlight box in the PDF (matching the screen's amber
-  // callout), so it is the only canonical heading absent from the section list.
+  // callout), so it is the only canonical heading absent from its section list.
   expect(sections(calls)).toEqual(CANONICAL_PDF_SECTIONS);
   expect([...sections(calls), 'Caveats']).toEqual(markdownHeadings);
+  jest.restoreAllMocks();
+
+  // The Word renderer has no such exception: every canonical heading appears,
+  // in order. Compared against the same independent literal, not against the
+  // other renderers' output.
+  const blob = await generateFieldPrimerDocx(envelope(FULL_PRIMER), META);
+  const xml = await (await JSZip.loadAsync(await blob.arrayBuffer())).file('word/document.xml').async('string');
+  const docxNodes = [...xml.matchAll(/<w:t(?: [^>]*)?>([^<]*)<\/w:t>/g)]
+    .map((m) => m[1].replace(/&amp;/g, '&'));
+  const docxHeadingPositions = CANONICAL_HEADINGS.map((h) => docxNodes.indexOf(h));
+  expect(docxHeadingPositions.every((i) => i >= 0)).toBe(true);
+  expect([...docxHeadingPositions].sort((a, b) => a - b)).toEqual(docxHeadingPositions);
 });
 
 describe('fieldPrimerPdfFilename', () => {

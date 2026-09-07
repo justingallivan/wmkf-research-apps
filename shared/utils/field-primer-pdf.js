@@ -41,9 +41,13 @@
  * replaces what it cannot map with '?'. Two consequences worth knowing: this
  * renderer joins with a plain hyphen rather than the em dash the markdown and
  * React surfaces use, because an em dash sanitizes to '--'; and a Greek letter
- * in the model's prose (α-synuclein, β-sheet) renders as '?'. Prose fidelity
- * for symbol-heavy fields therefore belongs to the on-screen primer, not to
- * this export.
+ * in the model's prose (α-synuclein, β-sheet) renders as '?'.
+ *
+ * SO THIS IS THE CONVENIENT EXPORT, NOT THE COMPLETE ONE. Both limitations are
+ * inherent to pdf-lib's base-14 Helvetica, and neither is worth a font-embedding
+ * dependency here: `shared/utils/field-primer-docx.js` keeps emphasis, keeps
+ * Unicode, and makes profile links clickable. Send staff there when fidelity
+ * matters; this stays for a quick, universally readable copy.
  *
  * @param {Object} envelope - a parsed field-primer envelope (schema
  *   `field-primer/v1`): { generatedAt, model, runId, promptVersion, primer }.
