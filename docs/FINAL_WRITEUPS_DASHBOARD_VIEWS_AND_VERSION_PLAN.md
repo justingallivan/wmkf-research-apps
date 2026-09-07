@@ -41,7 +41,8 @@ first D26 Final exists means the first real reviewers meet the intended shape.
   (`FinalWriteupsDashboardView`, `WriteupRow`, `AcknowledgementPanel`, `FocusedDocument`);
   `lib/services/final-writeup/acknowledgement-service.js` (`projectAcknowledgementState`, one
   additive field); `lib/services/final-writeup/dashboard-service.js` (`projectRequestRow`, one
-  additive field). `GET /api/workbench/final-writeups` and
+  additive field; `unconfiguredMatrixRow`, one additive field so the PD filter covers every matrix
+  row). `GET /api/workbench/final-writeups` and
   `GET /api/workbench/final-writeup/acknowledgement` are **not edited**; their response bodies gain
   one additive field through the shared projection.
 - **Persistence:** **none.** No Dataverse, Postgres, Blob, or settings write. Page-URL query
@@ -84,7 +85,14 @@ first D26 Final exists means the first real reviewers meet the intended shape.
   The header copy for that outcome reads "Nothing awaits your review in {newest}; showing {cycle}"
   `[VERIFIED via FinalWriteupsViews.js:471-474]`, which names a criterion the server does not use.
 - The coordinator matrix (superuser or configured PC) is filtered by the search field only
-  `[VERIFIED via FinalWriteupsViews.js:238,316]`.
+  `[VERIFIED via FinalWriteupsViews.js:238,316]`. Configured matrix rows carry
+  `responsibleProgramDirector` `[VERIFIED via dashboard-service.js:395]`; the
+  `unconfiguredRows` DTO does not (request, title, institution, grant program only)
+  `[VERIFIED via dashboard-service.js:412-422]`, so a client PD filter has no key for those rows
+  today.
+- The service sorts `visibleProjected` once by request number and then splits it into the three
+  queues `[VERIFIED via dashboard-service.js:569-571,697-701]`; concatenating the queues does not
+  restore that order.
 - The publication version string comes verbatim from Graph file metadata `versionId`
   `[VERIFIED via acknowledgement-service.js:210-233]`. Its format is not established in any doc
   read for this plan; the string is treated as opaque.
@@ -101,7 +109,11 @@ first D26 Final exists means the first real reviewers meet the intended shape.
 |---|---|---|---|
 | `needs-review` (default) | Needs my review | `queues.open` | open rows after PD filter and search |
 | `reviewed` | Reviewed by me | `queues.history` | history rows after PD filter and search |
-| `all` | All writeups | open + history + stewardship, one list, sorted by request number | all rows after PD filter and search |
+| `all` | All writeups | open + history + stewardship merged into one list | all rows after PD filter and search |
+
+Every view's main list is re-sorted on the client by request number (string compare, the server's
+rule) after merging and filtering, so the ordering rule is stated once and All writeups is not a
+concatenation of three pre-sorted queues.
 
 - The page opens on `needs-review` for every persona when the URL carries no `view`. This is the
   owner's 2026-09-06 shape: one opening view for every role, no per-persona default.
@@ -115,8 +127,9 @@ first D26 Final exists means the first real reviewers meet the intended shape.
   review or Reviewed by me main lists. Under those two views the existing collapsed "Your writeups"
   section remains below the main list; under All writeups the section is omitted because its rows
   are already in the list. Owner default; see §10.
-- An unknown or missing `view` value resolves to `needs-review` and the parameter is removed from
-  the URL on the next write (never echoed back). No error surface.
+- An unknown or missing `view` value resolves to `needs-review`. Normalization is **immediate**:
+  on mount the component sanitizes `view` and `pd`, and if either was invalid it rewrites the address
+  bar at once (`replaceState`) so a bookmarked bad value never survives a reload. No error surface.
 - The header line stays: "{open} awaiting your review in {cycle}". Under Reviewed by me and All
   writeups it remains the same sentence, because it states the viewer's work, not the view.
 
@@ -129,13 +142,16 @@ first D26 Final exists means the first real reviewers meet the intended shape.
   "All program directors" (value empty). Existence-only; every listed PD already has a visible row,
   so this discloses nothing new.
 - URL key `pd`, value the PD's `systemuserid` GUID (lowercased). A non-GUID value is dropped on
-  mount and never applied. A GUID absent from the loaded rows still becomes the controlled value
+  mount, never applied, and removed from the address bar immediately (§4.1 timing rule). A GUID absent from the loaded rows still becomes the controlled value
   with an option labeled "Program director not in this cycle" (same rule the cycle select follows
   `[VERIFIED via FinalWriteupsViews.js:439-443]`); the main list shows the empty copy "No writeups
   for the selected Program Director in {cycle}. Choose All program directors to clear the filter."
   No silent fallback.
-- The PD filter applies to the main list, the "Your writeups" section, **and** the coordinator
-  matrix rows (implementation plan Slice 6 text: filters apply to the matrix). The view selector
+- The PD filter applies to the main list, the "Your writeups" section, **and** every coordinator
+  matrix row, including `unconfiguredRows` (implementation plan Slice 6 text: filters apply to the
+  matrix). To make that total, `unconfiguredMatrixRow` gains `responsibleProgramDirector: { id,
+  name }` copied from the projected writeup (the same value configured rows already carry). A row
+  whose PD id is null is shown only under "All program directors". The view selector
   does **not** apply to the matrix: the matrix is a per-reviewer grid and "Needs my review" has no
   meaning there. Owner default; see §10.
 - Changing the cycle keeps both `view` and `pd` in the URL. If the PD has no rows in the new cycle
@@ -181,7 +197,9 @@ bound). Instead:
   on {acknowledgedAt}. The current version is {current}." In the `reviewed` state it reads "You
   reviewed version {current} on {acknowledgedAt}."
 - `FinalWriteupTab` is unchanged; it reads named fields from the response
-  `[VERIFIED via FinalWriteupTab.js:98,350]`. A tab test with the extra field present pins it.
+  `[VERIFIED via FinalWriteupTab.js:98,350]`, so the additive field is inert there. No tab test is
+  added for it: a fixture carrying an ignored key would be decorative. Exact-value assertions live
+  on the projection, the dashboard row, and the focused render (§8).
 - No embedded editor, no iframe, no "has edits" hint (6D closed).
 
 ### 4.6 Header thesis comment
@@ -200,9 +218,11 @@ only filters, one search field, no denominators. The implementation plan 6B text
    leave the page.
 4. **Route:** unchanged; allowlist still `requestId` | `cycleCode`.
 5. **Service:** `projectAcknowledgementState` adds `acknowledgedPublicationVersionId`;
-   `projectRequestRow` passes it through. No query, filter, or bound changes.
+   `projectRequestRow` passes it through; `unconfiguredMatrixRow` adds `responsibleProgramDirector`.
+   No query, filter, or bound changes.
 6. **Persistence:** none (read-only paths unchanged).
-7. **Response shape:** each row and the acknowledgement GET body gain one nullable string.
+7. **Response shape:** each row and the acknowledgement GET body gain one nullable string; each
+   unconfigured matrix row gains the PD object configured rows already carry.
 8. **Consumer render:** view selector partitions `queues`; PD filter narrows rows and matrix; row
    and focused panel render version strings.
 9. **Docs/tests/gates:** §7, §8; docs in §9.
@@ -235,16 +255,16 @@ only filters, one search field, no denominators. The implementation plan 6B text
 | Invariant | Files likely touched | Verification |
 |---|---|---|
 | Fetch query carries only `cycleCode`; `view`/`pd` never reach the API | `FinalWriteupsViews.js` | views test with both set asserts the fetch URL has one query key |
-| Default view is `needs-review` for every persona; unknown `view` resolves to it and is dropped from the URL | `FinalWriteupsViews.js` | views tests: no param, `view=bogus`, PD/PC/Leadership fixtures |
+| Default view is `needs-review` for every persona; unknown `view` and non-GUID `pd` resolve to defaults and the address bar is rewritten on mount | `FinalWriteupsViews.js` | views tests assert `window.location.search` after mount for `?view=bogus&pd=not-a-guid` (both gone, `cycleCode` kept) and after each valid change |
 | Needs my review = `bucket open`; Reviewed by me = `bucket history` incl. `updated`; All = every row | `FinalWriteupsViews.js` | fixture with rows in all three buckets plus one `updated`; switching proves exclusion |
+| Every view's list is sorted by request number after merge and filter | `FinalWriteupsViews.js` | All-view fixture with interleaved numbers across buckets (open #200, history #100, stewardship #150) renders 100, 150, 200 |
 | Stewardship rows never in the first two main lists; "Your writeups" section hidden under All | `FinalWriteupsViews.js` | views test per view |
 | PD options are derived from loaded rows, existence-only; non-GUID `pd` dropped; absent GUID keeps an option and shows empty copy | `FinalWriteupsViews.js` | views tests: two PDs, `pd=not-a-guid`, `pd=<absent guid>` |
-| PD filter applies to main list, Your writeups, and matrix rows; view does not filter the matrix | `FinalWriteupsViews.js` | superuser fixture with matrix, two PDs; switch view leaves matrix row count unchanged |
+| PD filter applies to main list, Your writeups, configured matrix rows, and unconfigured matrix rows; view does not filter the matrix | `FinalWriteupsViews.js`, `dashboard-service.js` | superuser fixture with a configured group and an unconfigured row for PD-A: selecting PD-B removes both; switching view leaves matrix counts unchanged; service test pins `responsibleProgramDirector` on unconfigured rows |
 | Counts beside views reflect PD filter and search; header count is the server `counts.open` | `FinalWriteupsViews.js` | views test with search narrowing |
 | Cycle change preserves `view` and `pd` in the URL | `FinalWriteupsViews.js` | views test reading `window.location.search` after change |
 | `acknowledgedPublicationVersionId` equals the personal row's `wmkf_publicationversionid`; null without a row and for the responsible PD | `acknowledgement-service.js`, `dashboard-service.js` | service tests on both projections |
 | Version strings rendered verbatim | `FinalWriteupsViews.js` | views test with `"3.0"` and a non-numeric string |
-| `FinalWriteupTab` unaffected by the additive field | `final-writeup-tab.test.js` | fixture response includes the field; render passes |
 | Walk-back copy names the server criterion | `FinalWriteupsViews.js` | re-pin the existing walk-back views test |
 
 ## 8. Tests (names to add or re-pin)
@@ -253,25 +273,24 @@ only filters, one search field, no denominators. The implementation plan 6B text
 - re-pin `dashboard search filters all queues without adding filter controls other than the cycle selector` → "…other than the cycle select, view selector, and Program director filter"
 - `dashboard opens on Needs my review for every persona and never sends view or pd to the API`
 - `view selector partitions by bucket: updated rows stay in Reviewed by me, stewardship only in All`
-- `unknown view value resolves to Needs my review and is dropped from the URL`
-- `Program director options derive from loaded rows and filter list, Your writeups, and matrix`
+- `All writeups merges the buckets and sorts by request number`
+- `invalid view and pd are sanitized on mount and the address bar is rewritten immediately`
+- `Program director options derive from loaded rows and filter list, Your writeups, configured and unconfigured matrix rows`
 - `non-GUID pd is dropped; a GUID absent from the cycle keeps an option and shows the empty copy`
 - `view does not filter the coordinator matrix`
 - `view counts reflect the PD filter and search; header count is the server count`
 - `cycle change preserves view and pd in the URL`
 - `Needs my review empty state offers the other views with counts`
 - re-pin `walk-back outcomes are rendered from response fields only` with the corrected copy
-- `rows render the publication version verbatim and the acknowledged version when updated`
-- `focused panel states name the reviewed and current versions`
+- `rows render the exact publicationVersionId verbatim and the exact acknowledgedPublicationVersionId when updated`
+- `focused panel states name the exact reviewed and current versions`
 
 `tests/unit/final-writeup-acknowledgement-service.test.js`
 - `projection returns acknowledgedPublicationVersionId from the personal row and null without one`
 
 `tests/unit/final-writeups-dashboard-service.test.js`
-- `rows carry acknowledgedPublicationVersionId`
-
-`tests/unit/final-writeup-tab.test.js`
-- `tab renders when the acknowledgement response carries acknowledgedPublicationVersionId`
+- `rows carry the exact acknowledgedPublicationVersionId from the personal acknowledgement row`
+- `unconfigured matrix rows carry responsibleProgramDirector`
 
 Every negative assertion uses a fixture that would trip it (all three buckets populated, two PDs,
 a matrix present) so a deleted guard turns the test red.
@@ -318,7 +337,16 @@ branch `claude/final-writeups-views-and-version`; Codex diff pass; PR to `main`;
 smoke on the three views, the PD filter, a bookmarked URL, and one row's version label. Exit: queue
 item 5 "Met when" clause satisfied except the two-cycle load, which 6A already covers.
 
-## 12. Explicitly out of scope
+## 12. Review disposition (Codex adversarial review, 2026-09-06, verdict NEEDS REWORK)
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 (high) | Unconfigured matrix rows carry no PD key, so the PD filter cannot cover them | **Accepted.** `unconfiguredMatrixRow` gains `responsibleProgramDirector`; filter is total; service and views tests added (§3, §4.2, §5, §7, §8). |
+| 2 (medium) | All writeups "sorted by request number" is not achieved by concatenating pre-sorted buckets | **Accepted.** Every view re-sorts after merge and filter; interleaved-number test (§4.1, §7, §8). |
+| 3 (medium) | URL sanitization timing contradicted itself ("next write" vs "dropped") | **Accepted.** Normalization is immediate on mount with an address-bar rewrite; tests assert `window.location.search` after mount and after each change (§4.1, §4.2, §7, §8). |
+| 4 (medium) | The proposed `FinalWriteupTab` fixture test would be decorative | **Accepted.** Test removed; exact-value assertions placed on projection, dashboard row, and focused render (§4.5, §7, §8). |
+
+## 13. Explicitly out of scope
 
 Stage filter (owner dropped it), 6D "has edits", 6E other-stage lists, approval gates,
 denominators, program-taxonomy grouping, authorization changes, any route or query change, the
