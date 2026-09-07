@@ -297,6 +297,31 @@ test('dashboard ignores a late response after the cycle changes', async () => {
   expect(screen.getByText('Back on December')).toBeInTheDocument();
 });
 
+test('a PD acknowledging a leadership-stage writeup is warned, not locked; Leadership viewers are not warned', async () => {
+  const movedOn = writeup({ stage: { key: 'leadership-review', label: 'Leadership review' } });
+  const pdViewer = { id: 'reviewer-1', name: 'Ada Reviewer', personas: ['program-director'], personaLensesEnabled: true, isSuperuser: false };
+  const warningCopy = 'This writeup has moved on to leadership review. You can still record your review, but group review has closed.';
+
+  global.fetch.mockResolvedValueOnce(response(dashboard({ viewer: pdViewer, selected: movedOn, navigation: null })));
+  const { unmount } = render(<FinalWriteupFocusedView requestId={REQUEST_ID} />);
+  expect(await screen.findByText(warningCopy)).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Mark reviewed' })).toBeEnabled();
+  unmount();
+
+  global.fetch.mockResolvedValueOnce(response(dashboard({
+    viewer: { ...pdViewer, personas: ['leadership'] }, selected: movedOn, navigation: null,
+  })));
+  const leadership = render(<FinalWriteupFocusedView requestId={REQUEST_ID} />);
+  expect(await screen.findByRole('button', { name: 'Mark reviewed' })).toBeEnabled();
+  expect(screen.queryByText(warningCopy)).not.toBeInTheDocument();
+  leadership.unmount();
+
+  global.fetch.mockResolvedValueOnce(response(dashboard({ viewer: pdViewer, selected: writeup(), navigation: null })));
+  render(<FinalWriteupFocusedView requestId={REQUEST_ID} />);
+  expect(await screen.findByRole('button', { name: 'Mark reviewed' })).toBeInTheDocument();
+  expect(screen.queryByText(warningCopy)).not.toBeInTheDocument();
+});
+
 test('focused view shows the cycle as context and never sends cycleCode', async () => {
   global.fetch.mockResolvedValueOnce(response(dashboard({ selected: writeup(), navigation: null })));
   render(<FinalWriteupFocusedView requestId={REQUEST_ID} />);

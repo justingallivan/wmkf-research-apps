@@ -677,10 +677,23 @@ function FocusedDocument({ writeup }) {
   );
 }
 
-function AcknowledgementPanel({ writeup, saving, error, onAcknowledge }) {
+/**
+ * A Program Director may still record a review after a writeup moves to
+ * leadership review (owner decision 2026-09-06: warn, do not lock). Leadership
+ * viewers are not warned; leadership-stage rows are their ordinary work.
+ */
+function stageMovedOnWarning(writeup, viewer) {
+  if (writeup.stage?.key !== 'leadership-review' || !viewer?.personaLensesEnabled) return null;
+  const personas = viewer.personas || [];
+  if (!personas.includes('program-director') || personas.includes('leadership')) return null;
+  return 'This writeup has moved on to leadership review. You can still record your review, but group review has closed.';
+}
+
+function AcknowledgementPanel({ writeup, viewer, saving, error, onAcknowledge }) {
   if (!writeup.mayAcknowledge) return null;
   const reviewed = writeup.personalState === 'reviewed';
   const updated = writeup.personalState === 'updated';
+  const warning = stageMovedOnWarning(writeup, viewer);
   return (
     <section aria-labelledby="review-state-heading" className="rounded-xl border border-gray-200 bg-white p-5 sm:p-6">
       <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
@@ -697,6 +710,11 @@ function AcknowledgementPanel({ writeup, saving, error, onAcknowledge }) {
           </p>
           {writeup.acknowledgedAt && (
             <p className="mt-2 text-xs text-gray-500">Last marked {formatDate(writeup.acknowledgedAt)}</p>
+          )}
+          {warning && !reviewed && (
+            <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900" role="status">
+              {warning}
+            </p>
           )}
           {error && <p className="mt-3 text-sm text-red-700" role="alert">{error}</p>}
         </div>
@@ -847,6 +865,7 @@ export function FinalWriteupFocusedView({ requestId }) {
               <FocusedDocument writeup={writeup} />
               <AcknowledgementPanel
                 writeup={writeup}
+                viewer={data.viewer}
                 saving={saving}
                 error={saveError}
                 onAcknowledge={acknowledge}

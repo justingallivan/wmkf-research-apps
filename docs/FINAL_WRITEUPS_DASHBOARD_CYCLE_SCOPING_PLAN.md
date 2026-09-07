@@ -289,6 +289,12 @@ focused row's own 200 or 404. This mirrors the existing convention that focused 
   other PDs' leadership-stage writeups": the fixture already carries Request B in leadership review
   owned by another PD **[VERIFIED via `tests/unit/final-writeups-dashboard-service.test.js:167-168, 260-268`]**,
   so the assertion `total: 3` with Request B in History discriminates (the old lens returns 2).
+- **Warn, do not lock (owner, 2026-09-06).** A PD opening a retained leadership-stage writeup sees
+  an amber notice in the acknowledgement panel ("This writeup has moved on to leadership review. You
+  can still record your review, but group review has closed."); the Mark reviewed button stays
+  enabled. Rendered only for viewers whose lens includes Program Director and not Leadership, and
+  only from `stage.key` and `viewer.personas` in the response. Views test pins PD-warned,
+  Leadership-not-warned, and group-review-not-warned.
 - Reconcile in the same commit: `docs/FINAL_WRITEUP_PERSONA_CONFIGURATION_PLAN.md:246`,
   `docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md:381`, the security-matrix row, and the
   `visibleToPersona` docblock.
@@ -441,7 +447,7 @@ Built per §3–§7 on the branch; not promoted. Files: `lib/services/final-writ
 service does not import transport constants — the access-layer gate rejected the direct import),
 `pages/api/workbench/final-writeups.js` (allowlist `requestId` | `cycleCode`, mutually exclusive),
 `shared/components/final-writeups/FinalWriteupsViews.js` (cycle `<select>`, URL persistence, header
-copy, focused cycle context), and the three test files (35 service, 5 route, 15 views tests).
+copy, focused cycle context), and the three test files (35 service, 5 route, 16 views tests).
 Complement check: zero query keys → default cycle; `requestId` alone → focused, cycle derived;
 `cycleCode` alone → explicit, never walks back; both → 400; any other key → 400; malformed or
 uppercase-`NONE` selector → 400 at the handler and again at the service; empty cycle list →
