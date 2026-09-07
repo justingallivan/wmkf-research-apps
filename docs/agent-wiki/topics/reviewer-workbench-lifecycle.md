@@ -1584,6 +1584,27 @@ returned zero eligible/enqueued/claimed/failed.** Plan doc:
 
 ## Operating Notes
 
+- **Reviewer follow-up polish (Codex worktree branch, merged `f0494607` + `d0a5fc07`, production
+  2026-09-06).** Owner requested and approved the changes, including edits to the shared reviewer
+  components used by both `/workbench/reviewer-follow-up` and the request page Reviewers tab.
+  UI-only; no `pages/api` or `lib` change; API request shapes, the cycles/proposals stale-response
+  guards, degraded mode, and preview read-only behavior unchanged. Durable behavior changes: (a) the
+  **Review Received** and **Complete** status badges link to the request's Reviews tab
+  (`/workbench/<requestId>?tab=reviews`); (b) Materials Sent / Under Review badges, the Active token
+  pill when first-access data exists, and the amber reminder-count pill open the existing in-page
+  Activity history drawer; (c) the token pill and reminder count are hidden once a review is
+  received or complete; (d) the primary action and overflow item **Close review** are renamed
+  **Mark complete** and the closeout modal heading **Close reviewer** became **Mark reviewer
+  complete** (the "closeout" vocabulary in code, docs, and `honorariumEligibility` is unchanged);
+  (e) page-level spacing, toolbar alignment, a two-column metrics grid at narrow widths, a
+  result-count line under search, a pulsing loading indicator, and the owner-set server-trouble
+  error copy with the raw error as a details line. Brief and handoff:
+  `docs/plans/REVIEWER_FOLLOW_UP_POLISH_CODEX_BRIEF_2026-09-06.md`,
+  `docs/plans/REVIEWER_FOLLOW_UP_POLISH_HANDOFF_2026-09-06.md`. **Open product to-do:** the
+  reviewer record stores only cumulative `reminderCount` plus the latest `reminderSentAt`, so the
+  drawer shows the latest reminder and "N reminders recorded in total"; a per-reminder audit trail
+  plus an activity DTO projection needs its own `/contract-reconcile` plan before build. Do not read
+  `reminderCount` as evidence of individual reminder timestamps.
 - **Workbench UI polish (Codex PR #151, `3fc0a936`, production 2026-09-05).** UI-only; no
   `pages/api` or `lib` change, payload shapes and SSE vocabulary unchanged. Durable behavior
   changes: (a) `/workbench/reviewer-follow-up` is now a focused attention queue — request
