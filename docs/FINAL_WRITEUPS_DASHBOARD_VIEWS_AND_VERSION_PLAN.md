@@ -97,7 +97,11 @@ first D26 Final exists means the first real reviewers meet the intended shape.
   `[VERIFIED via acknowledgement-service.js:210-233]`. Its format is not established in any doc
   read for this plan; the string is treated as opaque.
 - The acknowledgement GET route and the dashboard consume the same projection function
-  `[VERIFIED via acknowledgement-service.js:405,538]`.
+  `[VERIFIED via acknowledgement-service.js:405,538]`. The POST path (`markFinalWriteupReviewed`)
+  does **not**: it returns a hand-built body with `acknowledgedAt`, `publicationVersionId`,
+  `publicationLastModified`, `reused`, and `reviewers` `[VERIFIED via
+  acknowledgement-service.js:520-531]`, and `FinalWriteupTab` stores that body as its acknowledgement
+  state after a mark `[VERIFIED via FinalWriteupTab.js:334]`.
 
 ## 4. Decisions
 
@@ -130,8 +134,11 @@ concatenation of three pre-sorted queues.
 - An unknown or missing `view` value resolves to `needs-review`. Normalization is **immediate**:
   on mount the component sanitizes `view` and `pd`, and if either was invalid it rewrites the address
   bar at once (`replaceState`) so a bookmarked bad value never survives a reload. No error surface.
-- The header line stays: "{open} awaiting your review in {cycle}". Under Reviewed by me and All
-  writeups it remains the same sentence, because it states the viewer's work, not the view.
+- The header line stays "{n} awaiting your review in {cycle}", but `n` is the **filtered** open
+  count (after the PD filter and search), not the server's `counts.open`, so the header never says
+  42 while the list shows one. When a PD is selected the sentence appends "for {PD name}". Under
+  Reviewed by me and All writeups it remains the same sentence, because it states the viewer's work,
+  not the view. The server `counts` object is left unchanged and unused by the header.
 
 ### 4.2 Program Director filter (6B)
 
@@ -175,9 +182,10 @@ bound). Instead:
 - The Needs my review empty state names the alternatives with their counts: "Nothing needs your
   review in {cycle}. {n} reviewed by you · {m} writeups in all." Each is a button that switches the
   view.
-- The walk-back copy is corrected to the criterion the server uses: "No current writeups for you
-  in {newest}; showing {cycle}." and, for `exhausted`, "No current writeups for you in the most
-  recent cycles; choose a cycle to look further back." Copy only; no behavior change.
+- The walk-back copy is corrected to the criterion the server uses (any visible row, whether
+  open, history, or stewardship): "No current writeups visible to you in {newest}; showing {cycle}."
+  and, for `exhausted`, "No current writeups visible to you in the most recent cycles; choose a cycle
+  to look further back." Copy only; no behavior change.
 
 ### 4.5 Acknowledged publication version (6C)
 
@@ -185,8 +193,10 @@ bound). Instead:
 
 - `projectAcknowledgementState` returns `acknowledgedPublicationVersionId:
   personal?.wmkf_publicationversionid || null` beside `acknowledgedAt`. The dashboard row and the
-  acknowledgement GET response carry it unchanged. Both routes' response shapes grow by one
-  nullable string; no request shape changes.
+  acknowledgement GET response carry it unchanged. The POST response in `markFinalWriteupReviewed`
+  adds the same key from the confirmed stored row (`existing.wmkf_publicationversionid`), so every
+  response variant of the acknowledgement route carries it and the tab's post-mark state matches the
+  GET shape. Both routes' response shapes grow by one nullable string; no request shape changes.
 - **Dashboard row:** beside "Updated {lastModified}" render "Version {publicationVersionId}". When
   `personalState === 'updated'` add "You reviewed version {acknowledgedPublicationVersionId}". The
   string is rendered verbatim (no parsing, trimming, or numeric formatting); a null observed version
@@ -261,7 +271,8 @@ only filters, one search field, no denominators. The implementation plan 6B text
 | Stewardship rows never in the first two main lists; "Your writeups" section hidden under All | `FinalWriteupsViews.js` | views test per view |
 | PD options are derived from loaded rows, existence-only; non-GUID `pd` dropped; absent GUID keeps an option and shows empty copy | `FinalWriteupsViews.js` | views tests: two PDs, `pd=not-a-guid`, `pd=<absent guid>` |
 | PD filter applies to main list, Your writeups, configured matrix rows, and unconfigured matrix rows; view does not filter the matrix | `FinalWriteupsViews.js`, `dashboard-service.js` | superuser fixture with a configured group and an unconfigured row for PD-A: selecting PD-B removes both; switching view leaves matrix counts unchanged; service test pins `responsibleProgramDirector` on unconfigured rows |
-| Counts beside views reflect PD filter and search; header count is the server `counts.open` | `FinalWriteupsViews.js` | views test with search narrowing |
+| Counts beside views and the header count reflect PD filter and search; server `counts` unused by the header | `FinalWriteupsViews.js` | views test: PD filter and search each narrow the header number and the view counts together |
+| `acknowledgedPublicationVersionId` present in the POST response and equal to the stored row's version | `acknowledgement-service.js` | service test asserts the exact value after mark, both fresh and `reused` |
 | Cycle change preserves `view` and `pd` in the URL | `FinalWriteupsViews.js` | views test reading `window.location.search` after change |
 | `acknowledgedPublicationVersionId` equals the personal row's `wmkf_publicationversionid`; null without a row and for the responsible PD | `acknowledgement-service.js`, `dashboard-service.js` | service tests on both projections |
 | Version strings rendered verbatim | `FinalWriteupsViews.js` | views test with `"3.0"` and a non-numeric string |
@@ -278,7 +289,7 @@ only filters, one search field, no denominators. The implementation plan 6B text
 - `Program director options derive from loaded rows and filter list, Your writeups, configured and unconfigured matrix rows`
 - `non-GUID pd is dropped; a GUID absent from the cycle keeps an option and shows the empty copy`
 - `view does not filter the coordinator matrix`
-- `view counts reflect the PD filter and search; header count is the server count`
+- `header count and view counts reflect the PD filter and search together`
 - `cycle change preserves view and pd in the URL`
 - `Needs my review empty state offers the other views with counts`
 - re-pin `walk-back outcomes are rendered from response fields only` with the corrected copy
@@ -287,6 +298,7 @@ only filters, one search field, no denominators. The implementation plan 6B text
 
 `tests/unit/final-writeup-acknowledgement-service.test.js`
 - `projection returns acknowledgedPublicationVersionId from the personal row and null without one`
+- `markFinalWriteupReviewed returns the exact acknowledgedPublicationVersionId of the confirmed row (fresh and reused)`
 
 `tests/unit/final-writeups-dashboard-service.test.js`
 - `rows carry the exact acknowledgedPublicationVersionId from the personal acknowledgement row`
@@ -345,6 +357,14 @@ item 5 "Met when" clause satisfied except the two-cycle load, which 6A already c
 | 2 (medium) | All writeups "sorted by request number" is not achieved by concatenating pre-sorted buckets | **Accepted.** Every view re-sorts after merge and filter; interleaved-number test (§4.1, §7, §8). |
 | 3 (medium) | URL sanitization timing contradicted itself ("next write" vs "dropped") | **Accepted.** Normalization is immediate on mount with an address-bar rewrite; tests assert `window.location.search` after mount and after each change (§4.1, §4.2, §7, §8). |
 | 4 (medium) | The proposed `FinalWriteupTab` fixture test would be decorative | **Accepted.** Test removed; exact-value assertions placed on projection, dashboard row, and focused render (§4.5, §7, §8). |
+
+**Second pass (2026-09-07, verdict NEEDS REWORK):**
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 (high) | The POST acknowledgement response is hand-built and would lack the new field, diverging from GET | **Accepted.** POST adds `acknowledgedPublicationVersionId` from the confirmed row; exact-value test fresh and reused (§3, §4.5, §7, §8). |
+| 2 (medium) | Header count pinned to the unfiltered server count while view counts follow the filters | **Accepted.** Header derives from filtered open rows and names the selected PD; test narrows both together (§4.1, §7, §8). |
+| 3 (medium) | Walk-back copy still conflated visibility with personal work | **Accepted.** Copy now says "visible to you", matching `visibleProjected` (§4.4). |
 
 ## 13. Explicitly out of scope
 
