@@ -59,7 +59,10 @@ let anchorClicks;
 beforeEach(() => {
   jest.clearAllMocks();
   anchorClicks = [];
-  global.URL.createObjectURL = jest.fn(() => 'blob:primer');
+  // A UNIQUE url per call, so an assertion about THIS test's revoke cannot be
+  // confused by a deferred revoke leaking in from an earlier test.
+  let urlSeq = 0;
+  global.URL.createObjectURL = jest.fn(() => `blob:primer-${(urlSeq += 1)}`);
   global.URL.revokeObjectURL = jest.fn();
   jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function record() {
     anchorClicks.push({ href: this.href, download: this.download });
@@ -69,6 +72,14 @@ beforeEach(() => {
     status: 200,
     json: async () => ({ success: true, reviewerMaterials: [], aiMaterials: [] }),
   }));
+});
+
+// `downloadBlob` revokes its object URL on a later task, so a test that
+// downloads leaves a pending timer. Drain it here or it fires inside the NEXT
+// test and lands on that test's fresh revoke mock.
+afterEach(async () => {
+  jest.useRealTimers();
+  await new Promise((resolve) => setTimeout(resolve, 0));
 });
 
 test('neither export button appears until a primer is stored', async () => {
@@ -92,7 +103,6 @@ test('exports Word with the same envelope and identity, and downloads it as a .d
   });
   expect(fieldPrimerDocxFilename).toHaveBeenCalledWith(expect.objectContaining({ requestNumber: '1002852' }));
   expect(anchorClicks[0].download).toBe('field-primer-1002852-2026-09-07.docx');
-  expect(global.URL.revokeObjectURL).toHaveBeenCalledWith('blob:primer');
   // The PDF path is untouched by a Word export.
   expect(generateFieldPrimerPdf).not.toHaveBeenCalled();
   expect(downloadPdf).not.toHaveBeenCalled();
@@ -157,6 +167,89 @@ test('a renderer failure is shown to the user and leaves the button usable', asy
   expect(await screen.findByText(/Could not build the PDF: font embed failed/)).toBeInTheDocument();
   expect(downloadPdf).not.toHaveBeenCalled();
   expect(screen.getByRole('button', { name: 'Export PDF' })).toBeEnabled();
+});
+
+// The stale guard lives in one shared handler, but a mistake applied to only
+// one branch would otherwise slip through, so both exports run the same cases.
+const EXPORTS = [
+  { kind: 'PDF', button: 'Export PDF', renderer: generateFieldPrimerPdf, result: () => new Uint8Array([9, 9, 9]), didDownload: () => downloadPdf.mock.calls.length },
+  { kind: 'Word', button: 'Export Word', renderer: generateFieldPrimerDocx, result: () => new Blob(['docx']), didDownload: () => anchorClicks.length },
+];
+
+describe.each(EXPORTS)('$kind export superseded by a request change', ({ button, renderer, result, didDownload }) => {
+  test('neither downloads nor writes its error into the new request', async () => {
+    let release;
+    renderer.mockImplementationOnce(() => new Promise((resolve, reject) => { release = { resolve, reject }; }));
+
+    const { rerender } = render(<ProposalTab context={context(JSON.stringify(ENVELOPE))} />);
+    fireEvent.click(await screen.findByRole('button', { name: button }));
+    await waitFor(() => expect(release).toBeDefined());
+
+    const other = { ...context(JSON.stringify({ ...ENVELOPE, runId: 'run-other' })), requestId: 'ffffffff-3c43-f111-88b5-000d3a3065b8', requestNumber: '1002999' };
+    rerender(<ProposalTab context={other} />);
+    await screen.findByRole('button', { name: button });
+
+    await act(async () => {
+      release.resolve(result());
+      await Promise.resolve();
+    });
+    expect(didDownload()).toBe(0);
+
+    // A late failure on a superseded export must not surface either.
+    renderer.mockImplementationOnce(() => new Promise((_r, reject) => { release = { reject }; }));
+    fireEvent.click(screen.getByRole('button', { name: button }));
+    await waitFor(() => expect(renderer).toHaveBeenCalledTimes(2));
+    rerender(<ProposalTab context={context(JSON.stringify(ENVELOPE))} />);
+    await act(async () => {
+      release.reject(new Error('late failure'));
+      await Promise.resolve();
+    });
+    expect(screen.queryByText(/Could not build the/)).not.toBeInTheDocument();
+  });
+});
+
+test('generation is blocked while an export is in flight, so a regenerate cannot replace the primer underneath it', async () => {
+  let release;
+  generateFieldPrimerDocx.mockImplementationOnce(() => new Promise((resolve) => { release = resolve; }));
+
+  render(<ProposalTab context={context(JSON.stringify(ENVELOPE))} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Export Word' }));
+  await waitFor(() => expect(release).toBeDefined());
+
+  // The structural half of the same-request race guard.
+  expect(screen.getByRole('button', { name: 'Regenerate' })).toBeDisabled();
+
+  await act(async () => {
+    release(new Blob(['docx']));
+    await Promise.resolve();
+  });
+  expect(screen.getByRole('button', { name: 'Regenerate' })).toBeEnabled();
+});
+
+test('the object URL is revoked on a later task, not synchronously, so a queued download still has it', async () => {
+  render(<ProposalTab context={context(JSON.stringify(ENVELOPE))} />);
+  const button = await screen.findByRole('button', { name: 'Export Word' });
+
+  // Fake timers hold the deferred revoke until it is explicitly run. Awaiting
+  // real time (or `waitFor`) would let it fire on its own, which is exactly the
+  // difference under test.
+  jest.useFakeTimers();
+  try {
+    await act(async () => {
+      fireEvent.click(button);
+      for (let i = 0; i < 8; i += 1) await Promise.resolve();
+    });
+    expect(anchorClicks).toHaveLength(1);
+    const objectUrl = anchorClicks[0].href;
+    expect(objectUrl).toMatch(/^blob:primer-/);
+    expect(global.URL.revokeObjectURL).not.toHaveBeenCalledWith(objectUrl);
+
+    // Once the queued task runs, the URL is cleaned up, so nothing is leaked.
+    jest.runOnlyPendingTimers();
+    expect(global.URL.revokeObjectURL).toHaveBeenCalledWith(objectUrl);
+  } finally {
+    jest.useRealTimers();
+  }
 });
 
 test('an export superseded by a request change neither downloads nor writes its error into the new request', async () => {

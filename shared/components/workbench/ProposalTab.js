@@ -151,7 +151,12 @@ function downloadBlob(blob, filename) {
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+  // Revoke on the next task, not synchronously: some browsers start the
+  // download navigation after the click handler returns, and revoking first can
+  // yield an empty file. (`downloadPdf` in shared/utils/pdf-export.js still
+  // revokes synchronously; it is shared by four other pages and proven in
+  // production, so it is left alone rather than changed from here.)
+  setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
 function PrimerList({ title, items, render }) {
@@ -276,6 +281,13 @@ function FieldPrimer({ requestId, initialRaw, exportMeta }) {
   // Greek letters that the PDF's base-14 Helvetica cannot; the PDF stays as the
   // convenient flattened copy. Both go through one handler so the
   // stale-generation guard below can never be applied to only one of them.
+  //
+  // Export and generation are mutually exclusive: the export buttons are
+  // disabled while `generating`, and Generate/Regenerate is disabled while
+  // `exporting`. That makes the same-request race structural — a regenerate
+  // cannot replace the envelope underneath an export render, so an export can
+  // never write out a superseded primer. The reqRef token below still covers
+  // the remaining case, a change of request.
   const EXPORTS = {
     pdf: {
       label: 'PDF',
@@ -350,7 +362,7 @@ function FieldPrimer({ requestId, initialRaw, exportMeta }) {
           <button
             type="button"
             onClick={() => generate(!!envelope)}
-            disabled={generating}
+            disabled={generating || !!exporting}
             className="text-sm font-medium text-indigo-600 hover:underline disabled:text-gray-400"
           >
             {generating
