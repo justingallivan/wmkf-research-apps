@@ -230,9 +230,9 @@ The replacement is the staff-wide **Final Writeups Dashboard**
 proposal. **[STATUS 2026-09-06, VERIFIED via source]:** the dashboard is
 Production-live and delivers the list, Open in Word, per-editor Reviewed
 marker, personal state/history, persona queues, and the coordinator matrix for
-Final artifacts. Still open, planned as Slice 6 of
-`docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md`: cycle scoping (the list
-currently spans all cycles under one 100-row cap), the filters, current-version
+Final artifacts. Slice 6 of `docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md`:
+cycle scoping (6A) is built 2026-09-06 on branch `claude/final-writeups-cycle-scoping`, not yet promoted, so the list is bounded per cycle rather than spanning
+all cycles under one 100-row cap; still open are the filters, current-version
 context, the "has edits" hint, and whether earlier writeup stages get a
 cycle-wide list. Inline preview was retired from this contract by owner
 decision on 2026-09-06 (Word opens outside the Workbench). The approved

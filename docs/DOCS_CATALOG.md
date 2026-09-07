@@ -460,6 +460,7 @@ related:
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
 | [FINAL_WRITEUP_PERSONA_CONFIGURATION_PLAN.md](FINAL_WRITEUP_PERSONA_CONFIGURATION_PLAN.md) | plan | active |  | Version-2 staffing and explicit Final Writeup persona lenses are Production-live; live-data smoke and natural signed-in staff observation passed. | 2026-08-31 |
-| [FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md](FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md) | plan | active |  | Final runtime, v2 staffing, and explicit persona dashboard lenses are Production-live; stage transitions and the Slice 6 dashboard filters/cycle scoping remain. | 2026-08-28 |
+| [FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md](FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md) | plan | active |  | Final runtime, v2 staffing, and persona lenses are Production-live; Slice 6A cycle scoping is built on a branch; stage transitions and 6B filters remain. | 2026-08-28 |
+| [FINAL_WRITEUPS_DASHBOARD_CYCLE_SCOPING_PLAN.md](FINAL_WRITEUPS_DASHBOARD_CYCLE_SCOPING_PLAN.md) | plan | active |  | Scopes the Final writeups dashboard read model to one grant cycle before the global row bound fails the page; PD lens retention decided. | 2026-09-06 |
 | [WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md](WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md) | plan | active |  | Pre-Site/Site Visit lifecycle, Final acknowledgement/dashboard, and explicit persona lenses are live; later Final stage transitions remain. | 2026-08-17 |
 

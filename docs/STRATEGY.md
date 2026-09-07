@@ -307,8 +307,8 @@ sequence and boundary in `docs/CURRENT_WORK_QUEUE.md` item 6.
 writeups dashboard against the Editor Dashboard contract. The dashboard is
 Production-live for Final artifacts; the owner kept the filters requirement
 (cycle, program/PD, stage, review state), retired inline preview, and kept the
-residuals. Cycle scoping is dated before D26 Final writeups exist because the
-list spans all cycles under one hard 100-row cap. Plan: Slice 6 of
+residuals. Cycle scoping was dated before D26 Final writeups exist because the
+list spanned all cycles under one hard 100-row cap; it is built 2026-09-06 on branch `claude/final-writeups-cycle-scoping`, not yet promoted. Plan: Slice 6 of
 `docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md`; queue item 5.
 
 ---

@@ -3,7 +3,7 @@
  * THESIS: one legible review queue replaces a metrics-and-filters dashboard.
  * OWN-WORLD: white paper surfaces, ink actions, fine gray rules, semantic amber/green.
  * STORY: find open work, review the document, record review, then move to the next item.
- * FIRST VIEWPORT: compact title, one search field, then the open queue at full width.
+ * FIRST VIEWPORT: compact title, cycle selector and one search field, then the open queue at full width.
  * FORM: an editorial task list; restrained row expansion is the signature interaction.
  */
 
@@ -406,6 +406,76 @@ function matchesSearch(row, search) {
   ].some((value) => String(value || '').toLowerCase().includes(needle));
 }
 
+const NO_CYCLE = 'none';
+
+function cycleLabelFor(cycles, code) {
+  if (!code) return null;
+  if (code === NO_CYCLE) return 'No cycle';
+  const match = (cycles?.available || []).find((cycle) => cycle.code === code);
+  return match?.label || code;
+}
+
+function initialCycleFromLocation() {
+  if (typeof window === 'undefined') return null;
+  const value = new URLSearchParams(window.location.search).get('cycleCode');
+  return value ? value.trim() : null;
+}
+
+function writeCycleToLocation(code) {
+  if (typeof window === 'undefined') return;
+  const url = new URL(window.location.href);
+  if (code) url.searchParams.set('cycleCode', code);
+  else url.searchParams.delete('cycleCode');
+  window.history.replaceState(window.history.state, '', url);
+}
+
+/**
+ * Server-resolved cycle picker. Options come only from the response; the
+ * selected value is what the server scoped to, never a client inference. The
+ * controlled value is always one of the rendered options: a bookmarked cycle
+ * absent from the list, or `none` with no uncycled rows, still gets an option
+ * so the picker never shows a cycle other than the one the data is scoped to.
+ */
+function CycleSelector({ cycles, disabled, onChange }) {
+  const options = [...(cycles?.available || [])];
+  if (cycles?.selected && cycles.selected !== NO_CYCLE
+    && !options.some((cycle) => cycle.code === cycles.selected)) {
+    options.push({ code: cycles.selected, label: cycleLabelFor(cycles, cycles.selected) });
+  }
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label htmlFor="final-writeup-cycle" className="text-sm font-medium text-gray-700">Cycle</label>
+      <select
+        id="final-writeup-cycle"
+        value={cycles?.selected || ''}
+        disabled={disabled}
+        onChange={(event) => onChange(event.target.value)}
+        className="min-h-12 rounded-xl border border-gray-300 bg-white px-4 py-3 text-base text-gray-900 shadow-sm focus:border-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-400/30 disabled:opacity-60"
+      >
+        {options.length === 0 && <option value="">No cycles with current writeups</option>}
+        {options.map((cycle) => (
+          <option key={cycle.code} value={cycle.code}>{cycle.label}</option>
+        ))}
+        {(cycles?.hasUncycled || cycles?.selected === NO_CYCLE) && (
+          <option value={NO_CYCLE}>No cycle</option>
+        )}
+      </select>
+    </div>
+  );
+}
+
+function cycleResolutionCopy(cycles) {
+  if (!cycles) return null;
+  const newest = cycles.available?.[0];
+  if (cycles.defaultResolvedBy === 'visible' && newest && cycles.selected !== newest.code) {
+    return `Nothing awaits your review in ${newest.label}; showing ${cycleLabelFor(cycles, cycles.selected)}.`;
+  }
+  if (cycles.defaultResolvedBy === 'exhausted' && newest) {
+    return 'Nothing awaits your review in the most recent cycles; choose a cycle to look further back.';
+  }
+  return null;
+}
+
 function personaViewLabel(viewer) {
   if (!viewer?.personaLensesEnabled) return null;
   const labels = {
@@ -422,6 +492,7 @@ export function FinalWriteupsDashboardView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
+  const [cycleCode, setCycleCode] = useState(initialCycleFromLocation);
   const requestIdRef = useRef(0);
 
   const load = useCallback(async () => {
@@ -429,7 +500,8 @@ export function FinalWriteupsDashboardView() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch('/api/workbench/final-writeups');
+      const query = cycleCode ? `?cycleCode=${encodeURIComponent(cycleCode)}` : '';
+      const response = await fetch(`/api/workbench/final-writeups${query}`);
       const body = await response.json().catch(() => ({}));
       if (requestIdRef.current !== requestId) return;
       if (!response.ok) throw new Error(body.error || `Failed to load Final Writeups (${response.status})`);
@@ -442,6 +514,11 @@ export function FinalWriteupsDashboardView() {
     } finally {
       if (requestIdRef.current === requestId) setLoading(false);
     }
+  }, [cycleCode]);
+
+  const changeCycle = useCallback((code) => {
+    writeCycleToLocation(code);
+    setCycleCode(code || null);
   }, []);
 
   useEffect(() => {
@@ -477,9 +554,15 @@ export function FinalWriteupsDashboardView() {
               </p>
             </div>
             {data && (
-              <p className="text-sm text-gray-500">
-                <span className="font-semibold tabular-nums text-gray-900">{data.counts.open}</span> awaiting your review
-              </p>
+              <div className="text-sm text-gray-500 sm:text-right">
+                <p>
+                  <span className="font-semibold tabular-nums text-gray-900">{data.counts.open}</span> awaiting your review
+                  {cycleLabelFor(data.cycles, data.cycles?.selected) && ` in ${cycleLabelFor(data.cycles, data.cycles.selected)}`}
+                </p>
+                {cycleResolutionCopy(data.cycles) && (
+                  <p className="mt-1 text-gray-600">{cycleResolutionCopy(data.cycles)}</p>
+                )}
+              </div>
             )}
           </div>
         </header>
@@ -487,7 +570,10 @@ export function FinalWriteupsDashboardView() {
           <WorkbenchViewsNav activeKey="final-writeups" />
         </div>
 
-        <div className="my-6">
+        <div className="my-6 space-y-4">
+          {data && (
+            <CycleSelector cycles={data.cycles} disabled={loading} onChange={changeCycle} />
+          )}
           <label htmlFor="final-writeup-search" className="sr-only">Search Final Writeups</label>
           <div className="relative max-w-2xl">
             <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-gray-400"><SearchIcon /></span>
@@ -539,11 +625,13 @@ export function FinalWriteupsDashboardView() {
   );
 }
 
-function FocusedHeader({ writeup }) {
+function FocusedHeader({ writeup, cycles }) {
+  const cycleLabel = cycleLabelFor(cycles, cycles?.selected) || writeup.cycleLabel;
   return (
     <header className="border-b border-gray-200 pb-6">
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <span className="text-sm font-semibold tabular-nums text-gray-700">Request #{writeup.requestNumber || '—'}</span>
+        {cycleLabel && <span className="text-xs font-medium text-gray-500">{cycleLabel}</span>}
         <StateChip state={writeup.personalState} />
         <span className="text-xs font-medium text-gray-500">{writeup.stage.label}</span>
       </div>
@@ -589,10 +677,23 @@ function FocusedDocument({ writeup }) {
   );
 }
 
-function AcknowledgementPanel({ writeup, saving, error, onAcknowledge }) {
+/**
+ * A Program Director may still record a review after a writeup moves to
+ * leadership review (owner decision 2026-09-06: warn, do not lock). Leadership
+ * viewers are not warned; leadership-stage rows are their ordinary work.
+ */
+function stageMovedOnWarning(writeup, viewer) {
+  if (writeup.stage?.key !== 'leadership-review' || !viewer?.personaLensesEnabled) return null;
+  const personas = viewer.personas || [];
+  if (!personas.includes('program-director') || personas.includes('leadership')) return null;
+  return 'This writeup has moved on to leadership review. You can still record your review, but group review has closed.';
+}
+
+function AcknowledgementPanel({ writeup, viewer, saving, error, onAcknowledge }) {
   if (!writeup.mayAcknowledge) return null;
   const reviewed = writeup.personalState === 'reviewed';
   const updated = writeup.personalState === 'updated';
+  const warning = stageMovedOnWarning(writeup, viewer);
   return (
     <section aria-labelledby="review-state-heading" className="rounded-xl border border-gray-200 bg-white p-5 sm:p-6">
       <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
@@ -609,6 +710,11 @@ function AcknowledgementPanel({ writeup, saving, error, onAcknowledge }) {
           </p>
           {writeup.acknowledgedAt && (
             <p className="mt-2 text-xs text-gray-500">Last marked {formatDate(writeup.acknowledgedAt)}</p>
+          )}
+          {warning && !reviewed && (
+            <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900" role="status">
+              {warning}
+            </p>
           )}
           {error && <p className="mt-3 text-sm text-red-700" role="alert">{error}</p>}
         </div>
@@ -755,10 +861,11 @@ export function FinalWriteupFocusedView({ requestId }) {
             <ErrorSurface message={error} onRetry={load} />
           ) : writeup ? (
             <div className="space-y-6">
-              <FocusedHeader writeup={writeup} />
+              <FocusedHeader writeup={writeup} cycles={data.cycles} />
               <FocusedDocument writeup={writeup} />
               <AcknowledgementPanel
                 writeup={writeup}
+                viewer={data.viewer}
                 saving={saving}
                 error={saveError}
                 onAcknowledge={acknowledge}

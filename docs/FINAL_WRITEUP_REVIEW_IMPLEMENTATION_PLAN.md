@@ -3,7 +3,7 @@ title: Final Writeup Review — Implementation Plan
 domain: workbench
 kind: plan
 status: active
-summary: "Final runtime, v2 staffing, and explicit persona dashboard lenses are Production-live; stage transitions and the Slice 6 dashboard filters/cycle scoping remain."
+summary: "Final runtime, v2 staffing, and persona lenses are Production-live; Slice 6A cycle scoping is built on a branch; stage transitions and 6B filters remain."
 canonical: false
 cataloged: 2026-08-28
 last_verified: 2026-09-06
@@ -379,7 +379,9 @@ Every returned row includes:
 
 The service, not the client, derives queue membership. Leadership and PC cycle selection uses the artifact-cycle query rather than the lead-PD-derived cycle picker:
 
-- PD reviewer lens: other PDs’ active writeups not yet acknowledged, with reviewed history secondary;
+- PD reviewer lens: other PDs’ active writeups not yet acknowledged, with reviewed history secondary; a
+  writeup stays in the PD’s lens after it moves to leadership review (owner decision 2026-09-06, built in
+  Slice 6A: nothing disappears from a PD view unless they filter it out by choice);
 - PC lens: all active writeups, with review as the primary row action and stewardship controls secondary;
 - leadership lens: leadership-stage writeups only, with open and reviewed lists;
 - President behavior: an acknowledged row stays in reviewed history after later edits and displays **Updated since your review** there.
@@ -650,10 +652,11 @@ This supersedes the earlier "one search field; no filter forest" line above.
 
 Current-state boundary [VERIFIED 2026-09-06 via source]:
 
-- `lib/services/final-writeup/dashboard-service.js` loads **every** request with a current Final
-  across all cycles (`_wmkf_currentfinalwriteup_value ne null`, no cycle constraint) and throws
-  `final_writeups_dashboard_scope_exceeded` (503) once more than
-  `FINAL_WRITEUPS_DASHBOARD_MAX_ROWS` (100) current rows exist. Each row already carries
+- `lib/services/final-writeup/dashboard-service.js` in Production loads **every** request with a
+  current Final across all cycles (`_wmkf_currentfinalwriteup_value ne null`, no cycle constraint)
+  and throws `final_writeups_dashboard_scope_exceeded` (503) once more than
+  `FINAL_WRITEUPS_DASHBOARD_MAX_ROWS` (100) current rows exist; Slice 6A (built 2026-09-06 on branch `claude/final-writeups-cycle-scoping`, not yet promoted) bounds
+  that read per cycle. Each row already carries
   `cycleCode`/`cycleLabel`, `stage`, `responsibleProgramDirector`, `bucket`, `personalState`, and
   `document.publicationVersionId`/`lastModified`.
 - `shared/components/final-writeups/FinalWriteupsViews.js` renders one free-text search over
@@ -667,7 +670,10 @@ Current-state boundary [VERIFIED 2026-09-06 via source]:
 Build order (each step reviewable on its own; `/contract-reconcile` applies to 6A because the
 read model's scope, cap, and fail-closed behavior change):
 
-- **6A — server-side cycle scoping (dated: before D26 Final writeups exist).** The 100-row cap is
+- **6A — server-side cycle scoping (dated: before D26 Final writeups exist). BUILT 2026-09-06 on
+  branch `claude/final-writeups-cycle-scoping` per `docs/FINAL_WRITEUPS_DASHBOARD_CYCLE_SCOPING_PLAN.md`
+  (contract-reconcile trace, invariant table, tests); Codex diff review and deliberate promotion
+  pending; not in Production.** The 100-row cap was
   global, so a second cycle of Finals eventually takes the whole dashboard down rather than
   degrading. Scope the request query by the selected cycle (artifact-cycle query from the current
   Final rows' requests, per the persona section above — not the lead-PD-derived picker), return the

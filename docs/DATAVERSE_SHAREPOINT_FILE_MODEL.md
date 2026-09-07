@@ -120,8 +120,8 @@ hood.
   every request separately. This narrow cycle list does not implement the
   Editor Dashboard filters, version context, or Reviewed progress contract
   below; for Final artifacts those live on the Final writeups dashboard
-  (Reviewed progress live; filters, cycle scoping, and version context planned
-  as Slice 6 of `docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md`).
+  (Reviewed progress live; cycle scoping built 2026-09-06 on branch `claude/final-writeups-cycle-scoping`, not yet promoted; filters and version context
+  planned as Slice 6 of `docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md`).
 - **Current metadata readback (deployed and live-verified 2026-07-30 local /
   2026-07-31 UTC):** native
   Word editing preserves stable item identity, while Dataverse intentionally

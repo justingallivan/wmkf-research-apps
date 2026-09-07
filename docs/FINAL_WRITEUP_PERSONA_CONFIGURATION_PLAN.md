@@ -243,7 +243,9 @@ out-of-band recovery path when Admin cannot parse the stored value.
 The existing dashboard semantics remain:
 
 - Program Coordinator: all active rows and the complete neutral matrix;
-- Program Director: group-review rows plus the viewer's responsible-PD rows;
+- Program Director: every row, including other PDs' writeups after they move to leadership
+  review (owner decision 2026-09-06: lenses focus, they do not conceal; before Slice 6A the PD
+  lens dropped leadership-stage rows it did not own);
 - Leadership: leadership-stage rows;
 - overlapping assignments: union of all applicable rows;
 - unassigned/ineligible viewer: no persona visibility;
