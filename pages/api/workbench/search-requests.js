@@ -6,7 +6,7 @@
  *   GET ?mode=options
  *     → live historical cycle and request-status options
  *
- *   GET ?q=<text>&cycle=<fiscal-year>&status=<request-status>&offset=<0..75>
+ *   GET ?q=<text>&cycle=<meeting-month-year>&status=<request-status>&offset=<0..75>
  *     → bounded active/historical request results
  */
 
