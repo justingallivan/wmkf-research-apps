@@ -601,7 +601,7 @@ document inventory, and individual implementation plans do not establish priorit
 - Strategy/system model: `project-system-model`, `project-strategy-direction`.
 - Virtual Review Panel: `project-virtual-review-panel`.
 - Roadmap snapshots: `project-app-roadmap-2026-04-25`, `project-phase-i-summary-app-winddown`.
-- Phasing/cycle scoping: `project-grant-phasing-evolution`, `feedback-cycle-vs-executor-scope`, `feedback-concepts-vs-phase-i`.
+- Phasing/cycle scoping: `project-grant-phasing-evolution`, `feedback-cycle-vs-executor-scope`, `feedback-concepts-vs-phase-i`. Every J27-sensitive site (retire / persist / change / build / scale) lives in `docs/J27_TRANSITION_REGISTER.md`; add there, not here.
 - J27 document-capture & Proposal-tab evolution (document identity/metadata →
   typed Dataverse registry; file bytes and editable narrative remain in
   SharePoint; D26 filename-match is interim; near-term planning):

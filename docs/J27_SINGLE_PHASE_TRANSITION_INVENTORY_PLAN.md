@@ -19,7 +19,7 @@ related:
 
 # J27 Single-Phase Transition Inventory Plan
 
-**Status:** plan approved for authoring 2026-09-06 by the owner ("collect all of these in one place, as well as have a plan for what needs to be built/changed for June 27"). The sweep itself has **not** run. Nothing in this document is a finding; it defines how findings get collected, labelled, and kept current.
+**Status:** plan approved for authoring 2026-09-06 by the owner ("collect all of these in one place, as well as have a plan for what needs to be built/changed for June 27"). The sweep ran the same day; its output is `docs/J27_TRANSITION_REGISTER.md`. Nothing in this document is a finding; it defines how findings get collected, labelled, and kept current.
 
 ## 1. Why this exists
 
@@ -129,4 +129,5 @@ The reviewer hold step is **not** an open question: it was retired in Session 27
 
 ## 10. Record
 
-- 2026-09-06: plan written at the owner's request in Session 491. Sweep not started. Work queue row added. Pointer added to `.claude-memory/project-grant-phasing-evolution.md`.
+- 2026-09-06: plan written at the owner's request in Session 491. Work queue row added. Pointer added to `.claude-memory/project-grant-phasing-evolution.md`.
+- 2026-09-06 (later): owner authorized the sweep. Six read-only agents ran slices A to F; the register was synthesized as `docs/J27_TRANSITION_REGISTER.md` (74 rows plus contradictions, 25 owner questions, slice G checklist). The §7 marker convention and check script were deferred to a follow-up to keep the change docs-only; the register §9 records the gap. Codex adversarial review of both documents requested.

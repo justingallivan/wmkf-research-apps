@@ -28,7 +28,7 @@ Ground truth: `/phase-i-dynamics` page + `/api/phase-i-dynamics/summarize{,-v2}`
 
 The user-facing `/phase-i-dynamics` summary app was originally a quick way to produce template-conforming summaries when the workflow was human-driven. Post-May-2026 cycle:
 
-- **Cycle structure changes:** Phase I and Phase II are merging into a streamlined single-phase process for the cycle after May 2026
+- **Cycle structure changes:** Phase I and Phase II merge into a streamlined single-phase process starting with J27 (June 2027 cycle; D26 is the last dual-phase cycle — corrected 2026-09-06, the original note said "the cycle after May 2026")
 - **Templates change:** the Phase I summary template will change (length, format) and most applications will use AI-generated summaries instead of human writeups
 - **Demand shifts:** user-facing summary apps see steeply reduced usage; backend automation owns the volume
 - **High-touch user apps stay valuable:** review finder + Phase II apps (low-volume, late-cycle, expert-driven). These get robust ongoing investment.
