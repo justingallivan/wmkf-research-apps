@@ -3,7 +3,7 @@ title: Workbench Writeup Lifecycle Plan
 domain: workbench
 kind: plan
 status: active
-summary: "Pre-Site/Site Visit lifecycle, Final acknowledgement/dashboard, and explicit persona lenses are live; the Final leadership-review transition is built and awaiting promotion."
+summary: "Pre-Site/Site Visit lifecycle, Final acknowledgement, dashboard, and persona lenses are live; leadership-review transition built, awaiting promotion."
 canonical: false
 cataloged: 2026-08-17
 last_verified: 2026-09-04
