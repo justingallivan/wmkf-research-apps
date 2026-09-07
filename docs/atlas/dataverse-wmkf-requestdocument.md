@@ -3,10 +3,10 @@ title: Dataverse wmkf_requestdocument
 domain: application-state
 kind: atlas
 status: active
-summary: Governed request-artifact registry with Production-proved same-item Final lineage and explicit group-review attribution.
+summary: Governed request-artifact registry with Production-proved same-item Final lineage, explicit group-review attribution, and the built (promotion-pending) leadership-review transition.
 canonical: false
 owner: product-engineering
-last_verified: 2026-09-04
+last_verified: 2026-09-07
 related:
   - lib/dataverse/schema/wave16-request-document-registry/wmkf_requestdocument.json
   - lib/dataverse/schema/wave19-pre-site-draft/01_wmkf_requestdocument_pre_site_draft.json

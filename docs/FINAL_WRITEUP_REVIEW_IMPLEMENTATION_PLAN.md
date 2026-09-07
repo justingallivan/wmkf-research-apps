@@ -625,11 +625,17 @@ This slice can ship before the PC/leadership persona model because responsible-P
   configuration and current reviewer-role roster are the only persona
   authority. Representative Word access and all six read-only production-data
   projections passed; no team exists or is required.
-- Add **Ready for leadership review**, moving the Final lifecycle from `REVIEW` to `FINAL` and storing the exact milestone version/hash/time plus explicit actor/time.
-- **Complete for dashboard visibility:** enable the PC all-active view; the
-  exceptional backup transition remains unbuilt.
-- **Complete for dashboard visibility:** enable CSO/President leadership-stage
-  queues; the transition that creates Leadership-stage work remains unbuilt.
+- **[BUILT S493 on branch `claude/final-writeup-leadership-review`; PRODUCTION PROMOTION PENDING.]** **Ready for leadership review** (`advanceToLeadershipReview`, POST
+  `/api/workbench/final-writeup/leadership-review`) moves the Final lifecycle from `REVIEW` to `FINAL`,
+  writes the explicit `wmkf_LeadershipReviewStartedBy`/`At` pair, and refreshes the row's SharePoint
+  observation fields (`wmkf_sharepointversionid`, `wmkf_sharepointetag`, `wmkf_sharepointlastmodified`,
+  `wmkf_filesize`, `wmkf_contenthash`) to the verified current version. It does **not** write the
+  milestone triple or `wmkf_MilestoneCreatedBy` (owner D2, 2026-09-07; that actor means Site Visit
+  handoff). Plan and review record: `docs/FINAL_WRITEUP_LEADERSHIP_TRANSITION_PLAN.md`.
+- **Complete for dashboard visibility:** the PC all-active view is enabled; the
+  exceptional PC backup transition is closed by owner decision (2026-09-06), not built.
+- **Complete for dashboard visibility:** CSO/President leadership-stage queues are
+  enabled; the transition that creates Leadership-stage work is the built Slice 4 item above.
 - Verify the President’s reviewed-history behavior and the no-sequence rule.
 - **Complete:** extend the already-built complete coordinator matrix to
   configured PC users and preserve its non-compliance semantics for all

@@ -18,15 +18,17 @@ related:
 
 # Final Writeup — Leadership Review Transition Plan (Slice 4)
 
-**Status: **[BUILT S493 on branch `claude/final-writeup-leadership-review`; PRODUCTION PROMOTION PENDING.]** Design closed after six Codex plan passes (§12); D2 owner-confirmed 2026-09-07;
+**Status: **[BUILT S493 on branch `claude/final-writeup-leadership-review`; PRODUCTION PROMOTION PENDING.]**** Design closed after six Codex plan passes (§12); D2 owner-confirmed 2026-09-07;
 D1, D3–D6 stand at their recommendations. §3 is the pre-build baseline; §4 is implemented as written
-with the corrections recorded in §14; Codex diff passes are in §14.** Mode A `/contract-reconcile` plan for the owner decision of
-2026-09-06 recorded in queue item 4: *the Leadership stage transition is a PD action in the
-Workbench, a new lifecycle-state write from Review to Final; plan-first, not built.* The
-implementation plan already specifies the durable shape
-(`docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md:263,292,329-332`); this document turns it into a
-buildable slice with the read-side consequences traced. Every state claim is labeled; `[PLANNED]`
-marks intended behavior, never built state. Line numbers are as of `c4e256c8`.
+with the corrections recorded in §14; Codex diff passes are in §14.
+
+Origin: Mode A `/contract-reconcile` plan for the owner decision of 2026-09-06 recorded in queue item
+4, *the Leadership stage transition is a PD action in the Workbench, a new lifecycle-state write from
+Review to Final*, which the owner asked to plan first. The implementation plan specified the durable
+shape (`docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md:263,292,329-332`); this document turned it
+into a buildable slice with the read-side consequences traced, and the plan was then built (§14).
+State labels: `[VERIFIED]` claims in §3 describe the pre-build baseline; `[PLANNED]` in §4 marks the
+reviewed design, now implemented. Line numbers are as of `c4e256c8` unless stated.
 
 **Cycle context.** D26 is the cycle this must serve: D26 reviews are arriving now and the D26 board
 meets December 2026 (`docs/J27_TRANSITION_REGISTER.md:30`). The atlas snapshot records one Final
@@ -605,8 +607,12 @@ dashboard fixture's leadership rows now carry the checkpoint.
 **Codex diff review pass 3 (2026-09-07): two medium findings, accepted.** (a) `Date.parse` alone accepted
 values such as `"0"` and `"2026"`; the shared predicate now also requires the canonical ISO-8601 shape, with
 four more regression cases. (b) §1–§4 of this plan still read as pre-build; the status line, §3 heading,
-§3.1, §3.2, §4 preamble, and §4.5 now state the built state in place. Diff review pass 4, PR, deployment, and
-owner-run smoke are recorded below as they happen.
+§3.1, §3.2, §4 preamble, and §4.5 now state the built state in place.
+
+**Codex diff review pass 4 (2026-09-07): runtime clean; one medium doc finding, accepted.** The
+implementation plan's Slice 4 checklist still said "add" and "milestone version/hash/time", this plan's
+origin paragraph still quoted "plan-first, not built" as present state, and the Atlas `last_verified` was
+stale. All three rewritten in place. PR, deployment, and owner-run smoke are recorded below as they happen.
 
 ## 13. Explicitly out of scope
 
