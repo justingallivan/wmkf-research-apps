@@ -485,16 +485,19 @@ describe('executePrompt — LLMClient transport (Phase 2)', () => {
       })).rejects.toMatchObject({ code: 'executor_deadline_exhausted' });
       expect(fetchCalls).toHaveLength(0);
 
-      // ~1.2s left on the deadline but a 240s caller budget: the transport
-      // timeout must be the remaining time, not the budget.
+      // ~1.2s left on the deadline but a 240s caller budget: the hanging
+      // provider call must end at the deadline with the typed error, not run
+      // out the 240s budget.
+      const started = Date.now();
       await expect(executePrompt({
         promptName: 'phase-i.summary',
         overrideVariables: {},
         runSource: 'Vercel Test',
         timeoutMsOverride: 240_000,
         deadlineMs: Date.now() + 1_200,
-      })).rejects.toThrow(/timeout after 1[0-2]\d\dms/);
+      })).rejects.toMatchObject({ code: 'executor_deadline_exhausted' });
       expect(fetchCalls).toHaveLength(1);
+      expect(Date.now() - started).toBeLessThan(4_000);
 
       await expect(executePrompt({
         promptName: 'phase-i.summary',
@@ -502,6 +505,37 @@ describe('executePrompt — LLMClient transport (Phase 2)', () => {
         runSource: 'Vercel Test',
         deadlineMs: -5,
       })).rejects.toThrow(/deadlineMs must be a positive epoch-millisecond number/);
+    } finally {
+      global.fetch = standardFetch;
+    }
+  });
+
+  test('deadlineMs bounds the WHOLE provider operation: a 429 retry backoff that would cross the deadline aborts with the typed error and no second attempt starts', async () => {
+    const standardFetch = global.fetch;
+    let calls = 0;
+    global.fetch = jest.fn(async () => {
+      calls += 1;
+      return {
+        ok: false,
+        status: 429,
+        headers: { get: (h) => (h.toLowerCase() === 'retry-after' ? '5' : null) },
+        text: async () => 'rate limited',
+        json: async () => ({}),
+      };
+    });
+    try {
+      PROMPT_ROW = buildPromptRow({ variables: [], systemPrompt: 'SYS', promptBody: 'BODY' });
+      const started = Date.now();
+      await expect(executePrompt({
+        promptName: 'phase-i.summary',
+        overrideVariables: {},
+        runSource: 'Vercel Test',
+        timeoutMsOverride: 240_000,
+        deadlineMs: Date.now() + 1_100,
+      })).rejects.toMatchObject({ code: 'executor_deadline_exhausted' });
+      // One attempt, then the 5s retry-after backoff was cut at the ~1.1s deadline.
+      expect(calls).toBe(1);
+      expect(Date.now() - started).toBeLessThan(4_000);
     } finally {
       global.fetch = standardFetch;
     }
