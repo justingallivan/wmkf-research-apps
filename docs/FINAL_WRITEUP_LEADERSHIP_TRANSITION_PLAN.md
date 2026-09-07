@@ -18,7 +18,7 @@ related:
 
 # Final Writeup — Leadership Review Transition Plan (Slice 4)
 
-**Status: **[BUILT S493 on branch `claude/final-writeup-leadership-review`; PRODUCTION PROMOTION PENDING.]**** Design closed after six Codex plan passes (§12); D2 owner-confirmed 2026-09-07;
+**Status: **[PRODUCTION-LIVE 2026-09-07: PR #176 merged as `25dc8645`, Ready deployment `dpl_22eyAD8S4yPmx16iv3Nng2u9sw5T`, owner-run signed-in smoke passed on Request `1002788`.]**** Design closed after six Codex plan passes (§12); D2 owner-confirmed 2026-09-07;
 D1, D3–D6 stand at their recommendations. §3 is the pre-build baseline; §4 is implemented as written
 with the corrections recorded in §14; Codex diff passes are in §14.
 
@@ -580,7 +580,7 @@ rejected. Plan status: **design closed, awaiting owner decisions D1–D6 before 
 
 ## 14. Build record (S493, branch `claude/final-writeup-leadership-review`)
 
-**[BUILT S493 on branch `claude/final-writeup-leadership-review`; PRODUCTION PROMOTION PENDING.]** Built to §4 as revised through pass 6. Files: `lib/services/final-writeup/transition-service.js`
+**[PRODUCTION-LIVE 2026-09-07: PR #176 merged as `25dc8645`, Ready deployment `dpl_22eyAD8S4yPmx16iv3Nng2u9sw5T`, owner-run signed-in smoke passed on Request `1002788`.]** Built to §4 as revised through pass 6. Files: `lib/services/final-writeup/transition-service.js`
 (`committedFinal` generalization, `leadershipCheckpointComplete`, `verifyDocument`, `advanceToLeadershipReview`,
 `canAdvance`/`leadership-review` phase, `leadershipReview` on the artifact projection),
 `pages/api/workbench/final-writeup/leadership-review.js`, `shared/components/workbench/FinalWriteupTab.js`
@@ -625,7 +625,7 @@ implementation plan and lifecycle plan frontmatter summaries and `WORKBENCH_WRIT
 ("reserved for the later leadership slice"), with the docs catalog regenerated. A repo-wide grep for
 leadership + unbuilt / not built / remains / reserved / later slice now hits only historical audits and
 `DEVELOPMENT_LOG.md`. Review loop closed here; runtime has been clean since pass 4. PR, deployment, and
-owner-run smoke are recorded below as they happen.
+owner-run smoke are recorded below.
 
 ## 13. Explicitly out of scope
 
@@ -644,3 +644,15 @@ the rest). Full jest: 805 suites / 11,750 tests. Owner-side runs; the Codex sand
 `FinalWriteupTab.js` synthesizes the status from the start response, which carries no `canAdvance`, so the
 "Ready for leadership review" button appears only after the next status load (reload or the 202 poll path).
 The Production-proved start path is deliberately untouched in this slice.
+
+**Promotion and smoke (2026-09-07):** PR #176 merged into `main` as `25dc8645` (merge commit, after the
+`claude-review`, Jest, Semgrep, Gitleaks, Trivy, and Vercel checks were green). Production deployment
+`dpl_22eyAD8S4yPmx16iv3Nng2u9sw5T` reached Ready. Owner-run signed-in smoke on Request `1002788` in the
+owner's browser session: the Final Writeup tab showed the Group review chip and the "Ready for leadership
+review" button for the lead PD; the confirm dialog rendered with focus on the primary action; POST
+`/api/workbench/final-writeup/leadership-review` returned 200 and the panel switched to the Leadership review
+chip with "Moved to leadership review 9/7/2026, 11:47:56 AM by Justin Gallivan"; after a full reload the
+status and acknowledgement GETs returned 200 and the stage persisted; the Final writeups dashboard
+(`/api/workbench/final-writeups` 200) listed the row as "Leadership review" under All writeups with the
+coordinator matrix intact. Request `1002788`'s Final row now sits at lifecycle `FINAL`; reversal, if the
+owner wants it, is the owner-run repair in §4.7 and the requestdocument atlas page.

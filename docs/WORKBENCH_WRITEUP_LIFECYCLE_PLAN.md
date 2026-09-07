@@ -3,7 +3,7 @@ title: Workbench Writeup Lifecycle Plan
 domain: workbench
 kind: plan
 status: active
-summary: "Pre-Site/Site Visit lifecycle, Final acknowledgement, dashboard, and persona lenses are live; leadership-review transition built, awaiting promotion."
+summary: "Pre-Site/Site Visit lifecycle, Final acknowledgement, dashboard, and persona lenses are live; leadership-review transition Production-live since 2026-09-07."
 canonical: false
 cataloged: 2026-08-17
 last_verified: 2026-09-04
@@ -577,8 +577,8 @@ non-superseded lifecycle.
    Wave 22 adds explicit group-review and leadership-review transition actor/time
    fields on the Final row; `modifiedby` is not authoritative. Group-review
    attribution is Production-proved; the leadership pair is written by Slice 4's
-   `advanceToLeadershipReview` (built S493 on branch `claude/final-writeup-leadership-review`,
-   promotion pending; `docs/FINAL_WRITEUP_LEADERSHIP_TRANSITION_PLAN.md`).
+   `advanceToLeadershipReview` (Production-live 2026-09-07, merge `25dc8645`, owner-smoked on
+   Request `1002788`; `docs/FINAL_WRITEUP_LEADERSHIP_TRANSITION_PLAN.md`).
 4. **Completed and Production-proved 2026-08-31 (Wave 23
    `wmkf_finalwriteupreviewacknowledgement`):** Editor Dashboard Reviewed
    acknowledgements are a separate child entity.

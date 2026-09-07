@@ -51,12 +51,11 @@ toolbar/header · `314e9426` `e68bffe9` ToolbarSelect · `f4bcb5b6` smoke record
 
 ### Verified Open
 
-1. **Leadership stage transition (Slice 4): planned and BUILT in S493; promotion pending.** Plan
-   `docs/FINAL_WRITEUP_LEADERSHIP_TRANSITION_PLAN.md` (six Codex plan passes, D2 owner-confirmed
-   2026-09-07); build on branch `claude/final-writeup-leadership-review` (Codex diff passes in plan §14).
-   Remaining: PR merge (deliberate Tier 1 promotion), Production deployment, owner-run signed-in smoke on
-   Request `1002788` (the only Final row; it will sit at leadership stage afterwards). The S492 baseline
-   note "nothing built" described `main` at `c4e256c8`.
+1. **Leadership stage transition (Slice 4): PRODUCTION-LIVE 2026-09-07.** Plan
+   `docs/FINAL_WRITEUP_LEADERSHIP_TRANSITION_PLAN.md` (six Codex plan passes, seven diff passes, D2
+   owner-confirmed 2026-09-07). PR #176 merged as `25dc8645`; deployment `dpl_22eyAD8S4yPmx16iv3Nng2u9sw5T`;
+   owner-run signed-in smoke passed on Request `1002788`, whose Final row now sits at leadership stage
+   (reversal is the owner-run repair in plan §4.7). Nothing remains on this item.
 2. **Build the `J27:` marker convention and `scripts/check-j27-register.js`** (advisory gate).
    Evidence: `docs/J27_SINGLE_PHASE_TRANSITION_INVENTORY_PLAN.md` §7, register §9, Codex high
    finding (S491). Register in `docs/CI_GATES_REFERENCE.md` and the `/start` list; gate then
