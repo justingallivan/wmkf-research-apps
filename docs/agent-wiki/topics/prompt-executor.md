@@ -83,8 +83,14 @@ reviewer-finder prompt migration.
   lease, after the shared 120s transport timeout expired in Production on
   Request 1002852, and passes the Executor an absolute `deadlineMs` (lease
   deadline minus its grounding reserve) that `callClaude` re-checks immediately
-  before the provider call. Older two-key revisions still parse; missing
-  registered names fill from code defaults. `/api/admin/executor-budgets` is superuser-only and
+  before the provider call and carries as an abort across every retry and
+  backoff. Older two-key revisions still parse; missing registered names fill
+  from code defaults. **[PRODUCTION-VERIFIED 2026-09-07]** merge `ebcad0ab`,
+  Ready deployment `dpl_748H9dcgzp3Yc6R7YgqNBvswAMBy`; the owner-run signed-in
+  regeneration of Request 1002852 (the request whose 120s failure prompted this)
+  returned 200 in roughly 100 seconds, rendered and persisted the primer, and
+  logged no new `/api/field-primer/generate` error event. No durable budget
+  revision is published, so Production runs on the 240s code default. `/api/admin/executor-budgets` is superuser-only and
   publishes one complete immutable revision with expected-version,
   payload-bound UUID idempotency, resolved-model ceiling checks, and post-create
   verification of the exact created row. Settings reads page to completion;
