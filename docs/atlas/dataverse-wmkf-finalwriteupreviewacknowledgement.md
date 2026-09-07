@@ -110,7 +110,12 @@ one lightweight scan discovers the cycles that hold current Finals, the queue
 read is scoped to the selected cycle's meeting-date window, and the 100-row
 bound applies per cycle), derive ordinary staff open/history/stewardship
 queues plus an optional focused row, and keep a reviewed row in history after
-a later Word edit while labeling its freshness Updated. The route accepts an
+a later Word edit while labeling its freshness Updated. Since Slice 6C
+(2026-09-07, branch `claude/final-writeups-views-and-version`) the shared
+projection and the POST mark response also expose the stored
+`wmkf_publicationversionid` as `acknowledgedPublicationVersionId` (null for the
+responsible PD), so the dashboard row and focused page can name the version a
+reviewer acknowledged beside the current one. The route accepts an
 optional Request GUID or an optional `cycleCode` (never both) and derives the
 reviewer from the session. **[PRODUCTION-LIVE + SIGNED-IN READ SMOKE PASSED
 2026-08-31]** commit `52575761` and Ready deployment

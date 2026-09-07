@@ -3,10 +3,10 @@ title: Final Writeup Review — Implementation Plan
 domain: workbench
 kind: plan
 status: active
-summary: "Final runtime, v2 staffing, persona lenses, and Slice 6A cycle scoping are Production-live; stage transitions and 6B filters remain."
+summary: "Final runtime, staffing, lenses, and 6A scoping are Production-live; 6B views/PD filter and 6C version context built on a branch; stage transitions remain."
 canonical: false
 cataloged: 2026-08-28
-last_verified: 2026-09-06
+last_verified: 2026-09-07
 owner: product-engineering
 related:
   - docs/audits/final-writeup-review-fable-review-2026-08-28.md
@@ -681,22 +681,26 @@ read model's scope, cap, and fail-closed behavior change):
   keep the per-cycle cap and fail-closed behavior. The cycle selector is the first filter and lives
   in the API contract; add `cycleCode` validation to the GET route and the route-security matrix
   row. The persona queues, matrix, and focused page keep their semantics inside the selected cycle.
-- **6B — client-side filters over the loaded cycle.** Program/PD (responsible PD), artifact stage
-  (Group review / Leadership review), and editing/review state (Not reviewed / Reviewed / Updated
-  since review / My writeups) as navigation-only controls beside the search field, applied to the
-  open, history, and stewardship queues and to the coordinator matrix. Counts shown on a filter
-  are navigation counts, never denominators; no program-taxonomy grouping or authorization branch
-  (contract rows "coordinator matrix is complete without becoming a compliance scorecard" and
-  "program taxonomy does not control access or primary grouping" still hold). Filters persist in
-  the URL query so a filtered view is bookmarkable. Replace the header thesis comment in
-  `FinalWriteupsViews.js` with the amended direction.
-- **6C — current-version context.** Preview is retired; in its place render the observed
-  SharePoint publication version that acknowledgements key to, next to last-modified, so
-  "Updated since review" is explainable without opening Word. No embedded editor, no iframe.
-- **6D — "has edits" secondary hint (product call, unscheduled).** SharePoint revision or
-  tracked-changes evidence as a secondary hint only; it never replaces the explicit Reviewed
-  marker. Requires a Graph read contract and a freshness posture before build.
-- **6E — other writeup stages (product call, unscheduled).** Decide whether Pre-Site / Site Visit
+- **6B — views and Program Director filter over the loaded cycle (owner-shaped 2026-09-06; BUILT
+  2026-09-07 on branch `claude/final-writeups-views-and-version` per
+  `docs/FINAL_WRITEUPS_DASHBOARD_VIEWS_AND_VERSION_PLAN.md`, three Codex plan passes).** The page
+  opens on "Needs my review" for every role (`bucket open`), with "Reviewed by me" (`bucket history`,
+  including Updated-since-review rows) and "All writeups" (every visible row, merged and sorted by
+  request number) as the only alternatives, plus a Program director dropdown derived from the loaded
+  rows. The stage filter was dropped (two stages only; the label is already on each row) and the
+  four-state control was not built. Both controls persist in the page URL (`view`, `pd`), are
+  sanitized on mount, and are never sent to the API. The PD filter applies to the list, Your
+  writeups, and every coordinator-matrix row (unconfigured rows now carry the PD); the view
+  selector does not filter the matrix. Counts are navigation counts, never denominators; no
+  program-taxonomy grouping or authorization branch. The header thesis comment in
+  `FinalWriteupsViews.js` carries the amended direction.
+- **6C — current-version context (BUILT 2026-09-07, same branch).** Preview is retired; each row
+  shows "Version {publicationVersionId}" (verbatim Graph string) and, when Updated since review,
+  "You reviewed version {acknowledgedPublicationVersionId}". The shared projection and the POST
+  acknowledgement response both carry `acknowledgedPublicationVersionId` (null for the responsible
+  PD). The focused page names the reviewed and current versions. No embedded editor, no iframe.
+- **6D — "has edits" secondary hint. CLOSED by owner decision 2026-09-06; do not build.**
+- **6E — other writeup stages. CLOSED by owner decision 2026-09-06; do not build.** Decide whether Pre-Site / Site Visit
   documents need a cycle-wide list or the per-request Staff Deliberations tab suffices; the Initial
   Assessment locator stays separate unless that decision says otherwise.
 
