@@ -301,6 +301,36 @@ describe('generateForRequest (Mode A)', () => {
     });
     const last = grantRequestAdapter.updateById.mock.calls.at(-1);
     expect(last[1]).toEqual({ wmkf_ai_fieldprimer: prior });
+    expect(last[2]).toEqual({ ifMatch: OWN_LEASE_ETAG });
+  });
+
+  it('a transport timeout after a peer reclaimed the lease never writes the prior value', async () => {
+    const prior = JSON.stringify({ schema: FIELD_PRIMER_ENVELOPE_SCHEMA, generatedAt: 'old', primer: {} });
+    const peerEnvelope = JSON.stringify({ schema: FIELD_PRIMER_ENVELOPE_SCHEMA, generatedAt: 'peer', primer: { experts: [] } });
+    grantRequestAdapter.getById
+      .mockResolvedValueOnce(row({ wmkf_ai_fieldprimer: prior }))
+      .mockResolvedValueOnce({ wmkf_ai_fieldprimer: peerEnvelope, _etag: 'W/"9"' });
+    getAiProposalNarrativeText.mockResolvedValue({ text: 'A'.repeat(60) });
+    generateFieldPrimer.mockRejectedValueOnce(new Error('Claude API timeout after 240000ms'));
+    await expect(generateForRequest({ requestId: GUID, regenerate: true })).rejects.toMatchObject({ httpStatus: 504 });
+    const priorWrites = grantRequestAdapter.updateById.mock.calls.filter(([, patch]) => patch.wmkf_ai_fieldprimer === prior);
+    expect(priorWrites).toHaveLength(0);
+  });
+
+  it('passes an absolute model deadline derived from the lease claim (lease TTL minus grounding reserve and margin)', async () => {
+    let leaseStartedAt = null;
+    grantRequestAdapter.updateById.mockImplementation(async (_id, patch) => {
+      const v = patch?.wmkf_ai_fieldprimer;
+      if (typeof v === 'string' && v.includes('field-primer/lease')) { lastLease = v; leaseStartedAt = Date.parse(JSON.parse(v).startedAt); }
+      return {};
+    });
+    grantRequestAdapter.getById.mockResolvedValueOnce(row());
+    getAiProposalNarrativeText.mockResolvedValue({ text: 'A'.repeat(60) });
+    generateFieldPrimer.mockResolvedValueOnce({ primer: { experts: [] }, runId: 'r', model: 'm' });
+    await generateForRequest({ requestId: GUID });
+    const args = generateFieldPrimer.mock.calls[0][0];
+    expect(args.deadlineMs).toBe(leaseStartedAt + FIELD_PRIMER_LEASE_TTL_MS - LEASE_GROUNDING_RESERVE_MS - LEASE_SAFETY_MARGIN_MS);
+    expect(args.timeoutMs).toBe(240000);
   });
 
   it('a provider HTTP error surfaces a short 502 without the raw message', async () => {
@@ -336,6 +366,8 @@ describe('classifyGenerationFailure', () => {
       .toMatchObject({ httpStatus: 504, message: expect.stringContaining('did not finish in time') });
     expect(classifyGenerationFailure(Object.assign(new Error('x'), { status: 429 })))
       .toMatchObject({ httpStatus: 502, code: 'field_primer_provider_error' });
+    expect(classifyGenerationFailure(Object.assign(new Error('caller deadline exhausted'), { code: 'executor_deadline_exhausted' })))
+      .toMatchObject({ httpStatus: 504, code: 'field_primer_lease_exhausted' });
     expect(classifyGenerationFailure(new Error('llm down')))
       .toMatchObject({ httpStatus: 500, code: 'field_primer_generation_failed', message: 'Field primer generation failed.' });
     expect(classifyGenerationFailure(null)).toMatchObject({ httpStatus: 500 });

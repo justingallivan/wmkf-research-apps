@@ -81,8 +81,10 @@ reviewer-finder prompt migration.
   typed truncation; the Workbench field primer (`field-primer.generate`, S493)
   reads a timeout-only budget (default 240s) before claiming its generation
   lease, after the shared 120s transport timeout expired in Production on
-  Request 1002852. Older two-key revisions still parse; missing registered
-  names fill from code defaults. `/api/admin/executor-budgets` is superuser-only and
+  Request 1002852, and passes the Executor an absolute `deadlineMs` (lease
+  deadline minus its grounding reserve) that `callClaude` re-checks immediately
+  before the provider call. Older two-key revisions still parse; missing
+  registered names fill from code defaults. `/api/admin/executor-budgets` is superuser-only and
   publishes one complete immutable revision with expected-version,
   payload-bound UUID idempotency, resolved-model ceiling checks, and post-create
   verification of the exact created row. Settings reads page to completion;
