@@ -18,7 +18,8 @@ related:
 
 # Final Writeup — Leadership Review Transition Plan (Slice 4)
 
-**Status: plan, nothing built.** Mode A `/contract-reconcile` plan for the owner decision of
+**Status: design closed after six Codex passes (§12), nothing built; the build waits on owner
+decisions D1–D6 (§10).** Mode A `/contract-reconcile` plan for the owner decision of
 2026-09-06 recorded in queue item 4: *the Leadership stage transition is a PD action in the
 Workbench, a new lifecycle-state write from Review to Final; plan-first, not built.* The
 implementation plan already specifies the durable shape
@@ -555,7 +556,14 @@ Three findings, all verified against source and all accepted.
 |---|---|---|---|
 | J1 | high | A single Final-row PATCH cannot fence `_wmkf_currentfinalwriteup_value`; a concurrent re-point between re-read and PATCH would advance a row that is no longer current. | **Accepted.** §4.1 and §4.3 step 10 switch to the group-review activation's own shape: one changeset with the Final-row PATCH and a conditional re-bind of the request pointer carrying the request `_etag` `[VERIFIED via transition-service.js:626-635]`. Step 9 checks the pointer explicitly, step 10 fences it atomically; §7 and §8 add the pointer-moved and request-ETag tests. §2, §5, and §6.2 updated to match. |
 
-Re-review pending after this revision.
+### Pass 6 (2026-09-07, verdict: design closed, build blocked on owner D2)
+
+| # | Severity | Finding | Disposition |
+|---|---|---|---|
+| K1 | high | J1 is closed and §2, §4.1, §4.3, §5, §6, §7, §8 are mutually consistent; the only blocker is that the checkpoint contract (D2) awaits owner confirmation while `FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md:292` still instructs builders to reuse the milestone fields. | **Accepted as the exit condition.** No design change. The build branch does not open until the owner answers D1–D6 (§10); on a D2 confirmation the first commit rewrites implementation plan :292 in place (§9) before any code. |
+
+Codex passes 1–6 produced twelve findings (F1–F3, G1–G3, H1–H3, I1–I3, J1, K1); all accepted, none
+rejected. Plan status: **design closed, awaiting owner decisions D1–D6 before the Tier 1 build.**
 
 ## 13. Explicitly out of scope
 
