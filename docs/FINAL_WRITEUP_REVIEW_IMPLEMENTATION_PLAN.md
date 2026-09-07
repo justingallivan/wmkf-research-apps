@@ -3,7 +3,7 @@ title: Final Writeup Review — Implementation Plan
 domain: workbench
 kind: plan
 status: active
-summary: "Final runtime, v2 staffing, and explicit persona dashboard lenses are Production-live; stage transitions and the Slice 6 dashboard filters/cycle scoping remain."
+summary: "Final runtime, v2 staffing, and persona lenses are Production-live; Slice 6A cycle scoping is built on a branch; stage transitions and 6B filters remain."
 canonical: false
 cataloged: 2026-08-28
 last_verified: 2026-09-06
@@ -652,10 +652,11 @@ This supersedes the earlier "one search field; no filter forest" line above.
 
 Current-state boundary [VERIFIED 2026-09-06 via source]:
 
-- `lib/services/final-writeup/dashboard-service.js` loads **every** request with a current Final
-  across all cycles (`_wmkf_currentfinalwriteup_value ne null`, no cycle constraint) and throws
-  `final_writeups_dashboard_scope_exceeded` (503) once more than
-  `FINAL_WRITEUPS_DASHBOARD_MAX_ROWS` (100) current rows exist. Each row already carries
+- `lib/services/final-writeup/dashboard-service.js` in Production loads **every** request with a
+  current Final across all cycles (`_wmkf_currentfinalwriteup_value ne null`, no cycle constraint)
+  and throws `final_writeups_dashboard_scope_exceeded` (503) once more than
+  `FINAL_WRITEUPS_DASHBOARD_MAX_ROWS` (100) current rows exist; Slice 6A (built 2026-09-06 on branch `claude/final-writeups-cycle-scoping`, not yet promoted) bounds
+  that read per cycle. Each row already carries
   `cycleCode`/`cycleLabel`, `stage`, `responsibleProgramDirector`, `bucket`, `personalState`, and
   `document.publicationVersionId`/`lastModified`.
 - `shared/components/final-writeups/FinalWriteupsViews.js` renders one free-text search over
