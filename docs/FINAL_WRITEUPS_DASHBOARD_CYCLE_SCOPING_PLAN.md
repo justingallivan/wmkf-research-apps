@@ -3,7 +3,7 @@ title: Final Writeups Dashboard — Slice 6A Cycle Scoping Plan
 domain: workbench
 kind: plan
 status: active
-summary: "Contract for scoping the Final writeups dashboard read model to one grant cycle before the global row bound fails the page; reworked after Codex review."
+summary: "Scopes the Final writeups dashboard read model to one grant cycle before the global row bound fails the page; PD lens retention decided."
 canonical: false
 cataloged: 2026-09-06
 last_verified: 2026-09-06
@@ -133,23 +133,23 @@ grantRequestAdapter.queryAllRequests({
   Finals exist outside their lens. The picker therefore exposes only that a cycle has some current
   Final; the visible row counts stay where they are today, derived from `visibleProjected`
   (`:531-536`).
-- **Authorization rule — OWNER DECISION REQUIRED before build (Codex third-pass finding 1).**
-  Existence-only cycle codes still disclose that a hidden cycle has current Finals: a Leadership
-  viewer (President, CSO) sees `D26` in the picker while every D26 row is still in group review,
-  and a PD sees a cycle whose only rows are leadership-stage writeups they do not own.
-  **Recommended default: accept and document this disclosure as non-sensitive.** The dashboard
-  audience is the Foundation's PDs, PCs, CSO, and President (`docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md`
-  "approved role-eligible audience"); that a board cycle has finalists with writeups in progress is
-  organizational calendar knowledge for all of them, and the persona lens exists to focus each
-  queue, not to conceal that a cycle is under way. The alternative — deriving `available` from the
-  viewer-visible set — requires projecting every cycle's rows before persona filtering, which is
-  the unbounded cross-cycle read this slice exists to remove. If the owner declines the default,
-  6A stops until a bounded visibility-aware discovery is designed (candidate:
-  `requestDocumentAdapter.findArtifactCycles(FINAL_WRITEUP)` gives lifecycle state per artifact
-  row, but depends on the copied `wmkf_cyclecode` field and misses a PD's own leadership-stage
-  rows; not chosen here). The rule, whichever way it goes, is recorded in
-  `docs/API_ROUTE_SECURITY_MATRIX.md:275` and pinned by the test "a cycle containing only rows
-  hidden from the viewer still appears in `available` with no count" (or its negation).
+- **Authorization rule — DECIDED by the owner 2026-09-06 (Codex third-pass finding 1).** The owner's
+  direction: "nothing should disappear from a PD view at the end, unless they filter against it by
+  choice." Persona lenses focus a queue; they are not a confidentiality boundary, and the voluntary
+  filters are Slice 6B. Two consequences for this slice:
+  1. **The Program Director lens retains leadership-stage rows (§3.7).** Today the PD branch of
+     `visibleToPersona` admits only `group-review` rows and the viewer's own `responsible-pd` rows
+     **[VERIFIED via `dashboard-service.js:260-263`]**, so a writeup the PD already acknowledged
+     leaves their History the moment it moves to leadership review. That is the disappearance the
+     owner rejected. After 6A the PD lens admits every row regardless of stage; the Leadership lens
+     is unchanged (leadership-stage rows only, since group-review rows have not yet reached them,
+     which is arrival, not disappearance).
+  2. **Existence-only cycle codes are disclosed to every enabled persona.** With the PD lens no
+     longer hiding rows, the residual disclosure is only to Leadership viewers (a cycle whose rows
+     are all still in group review), and a board cycle being under way is calendar knowledge for
+     the President and CSO. Recorded in `docs/API_ROUTE_SECURITY_MATRIX.md:275` and pinned by the
+     test "a cycle containing only rows hidden from the viewer still appears in `available` with no
+     count". The visibility-aware discovery alternative is not built.
 - **Buckets must be total.** Requests whose meeting date is null yield `cycleCode === null`.
   Record their existence as `hasUncycled: boolean` (not a count, for the same leak reason). If
   true, the picker shows an explicit **No cycle** option. Its selector is the literal sentinel `none`, a first-class value in every layer (Codex
@@ -267,6 +267,28 @@ intended semantic change and is called out in the security-matrix row and Atlas 
   (`final-writeups-views.test.js:118`) is re-pinned in 6A to "…without adding filter controls
   other than the cycle selector".
 
+### 3.7 Program Director lens retains leadership-stage rows (owner decision 2026-09-06)
+
+- `visibleToPersona` PD branch becomes `personas.has(PROGRAM_DIRECTOR) → true` for every row. The
+  `relationship === 'responsible-pd'` clause is subsumed (a PD's own rows were already visible) and
+  the `stage.key === 'group-review'` restriction is removed. Program Coordinator and superuser
+  already admit every row; Leadership keeps `stage.key === 'leadership-review'`.
+- Bucket placement is unchanged: a leadership-stage row the PD acknowledged stays in History with
+  its existing freshness label; one they never acknowledged stays in Open, where `mayAcknowledge`
+  and the primary action are still derived from the acknowledgement service, not from the lens.
+  **[ASSUMED until the build reads it]** the acknowledgement service already treats a
+  leadership-stage Final as acknowledgeable for non-responsible PDs; if it does not, the row renders
+  read-only (`mayAcknowledge: false`) and that is acceptable — the owner asked for retention, not
+  for a new write path.
+- Re-pin the test "enabled Program Director lens keeps group review plus own stewardship and
+  excludes other leadership rows" as "enabled Program Director lens retains every row, including
+  other PDs' leadership-stage writeups": the fixture already carries Request B in leadership review
+  owned by another PD **[VERIFIED via `tests/unit/final-writeups-dashboard-service.test.js:167-168, 260-268`]**,
+  so the assertion `total: 3` with Request B in History discriminates (the old lens returns 2).
+- Reconcile in the same commit: `docs/FINAL_WRITEUP_PERSONA_CONFIGURATION_PLAN.md:246`,
+  `docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md:381`, the security-matrix row, and the
+  `visibleToPersona` docblock.
+
 ## 4. Contract trace (Step 3)
 
 | Hop | Before | After 6A |
@@ -321,7 +343,8 @@ intended semantic change and is called out in the security-matrix row and Atlas 
 | The picker never reveals rows outside the viewer's lens | `dashboard-service.js` | test: Leadership viewer with a hidden group-review row in D26 and a visible leadership row in J26 → `available` lists both codes with no counts, `hasUncycled` only; response carries no per-cycle numbers |
 | The default cycle is the newest with a visible row **within the three newest available cycles**; otherwise the newest, empty, marked `exhausted` | `dashboard-service.js` | tests: (a) hidden-newer D26 + visible-older J26 for Leadership → `selected: 'J26'`, `defaultResolvedBy: 'visible'`, exactly two scoped reads; superuser on the same fixture → D26 in one read; (b) four cycles with the viewer's only visible row in the fourth → `selected` = newest, empty queues, `defaultResolvedBy: 'exhausted'`, exactly three scoped reads; (c) two available cycles, neither visible → `exhausted` after exactly two reads (list exhaustion stops before the bound); (d) explicit `cycleCode=D26` for the Leadership viewer → D26, empty, `'explicit'`, one read. Mutation: remove the walk-back → (a) turns red; raise the bound → (b) turns red |
 | An oversized cycle fails closed during default resolution, naming the cycle | `dashboard-service.js` | test: newest cycle returns `totalCount` over the bound with every row hidden from the viewer, older cycle visible → 503 `scope_exceeded` with `cycleCode` of the newest; no walk-back read is issued (mutation: catch-and-skip → turns red) |
-| Cycle existence outside the lens follows the recorded authorization rule | `dashboard-service.js`, security matrix | test: a cycle whose only current Final is hidden from the viewer appears in `available` with no count (default rule) — or is absent (if the owner declines); one of the two is pinned, never neither |
+| Cycle existence outside the lens is disclosed existence-only (owner decision 2026-09-06) | `dashboard-service.js`, security matrix | test: a cycle whose only current Final is hidden from a Leadership viewer appears in `available` with no count |
+| The PD lens hides no row (owner decision 2026-09-06) | `dashboard-service.js` | re-pinned test: PD viewer with another PD's leadership-stage row in the fixture → `total: 3`, that row in History; mutation (restore the stage clause) turns it red |
 | A current Final on a non-June/December meeting date fails loud, not silent | `dashboard-service.js` | test: March meeting date → typed 500 `cycle_invalid` whose body names that fixture's `akoya_requestnum` (and the GUID when the number is null); raised before any document/acknowledgement read; mutation (skip) turns it red |
 | Capped cycle list never returns partially | `dashboard-service.js` | test: `queryAllRequests` returns `capped: true` → 503 `cycle_list_capped`; no downstream reads |
 | Per-cycle bound keeps the fail-loud contract | `dashboard-service.js` | re-pin existing test at `:393` with a scoped filter assertion |
@@ -329,7 +352,7 @@ intended semantic change and is called out in the security-matrix row and Atlas 
 | Focused navigation stays inside the request's cycle | `dashboard-service.js` | test: focused read on a D26 request with J26 rows present → previous/next are D26 only |
 | No client-chosen cycle reaches the focused read | `FinalWriteupsViews.js`, handler | handler test: `requestId` + `cycleCode` rejected; views test: focused fetch URL has no `cycleCode` |
 | Cycle change cannot write a stale response | `FinalWriteupsViews.js` | views test modeled on `:247` "ignores a late response after its request changes" for cycle change |
-| Persona lenses, matrix semantics, self-acknowledgement rule unchanged | `dashboard-service.js` | existing tests at `:152-374` pass unmodified except the scoped filter assertion |
+| Leadership lens, PC lens, matrix semantics, self-acknowledgement rule unchanged | `dashboard-service.js` | existing tests at `:152-374` pass unmodified except the scoped filter assertion and the PD-lens re-pin above |
 | No write path added | all | `git diff` shows no `create`/`update`/`patch` call; `check:request-document-writers` green |
 
 **Complement check the build must write down:** for the handler allowlist, the response when the
@@ -351,8 +374,9 @@ unrecognized key (rejected). For the cycle resolver, the response for: no reques
   cycle is the newest visible within the walk-back window" (hidden-newer plus visible-older for
   Leadership, PD, and superuser; four-cycle exhaustion; two-cycle list exhaustion; explicit code);
   "an oversized newest cycle fails closed with its cycle code before any walk-back read"; "a cycle
-  with only hidden rows still appears in the picker without a count" (or its negation per the
-  owner's authorization decision); "focused reads derive the cycle from the request and
+  with only hidden rows still appears in the picker without a count"; re-pin "enabled Program
+  Director lens keeps group review plus own stewardship and excludes other leadership rows" as
+  "enabled Program Director lens retains every row, including other PDs' leadership-stage writeups"; "focused reads derive the cycle from the request and
   navigate within it"; re-pin "fails loudly instead of silently truncating" to assert the
   meeting-date window appears in the filter.
 - `tests/unit/workbench-final-writeups-route.test.js`: "accepts requestId, a well-formed
@@ -386,12 +410,12 @@ change to the Initial assessments locator.
 
 ## 10. Owner decisions
 
-**Blocking before build:**
+**Decided 2026-09-06:**
 
-0. **Authorization rule for cycle existence (§3.2).** May a viewer see, in the cycle picker, a
-   cycle whose every current Final is hidden from their persona lens? Recommended: yes, documented
-   as non-sensitive for the PD/PC/CSO/President audience and pinned by test. Declining stops 6A
-   pending a bounded visibility-aware discovery design.
+0. **Authorization rule for cycle existence (§3.2).** Owner: "nothing should disappear from a PD
+   view at the end, unless they filter against it by choice." Taken as: lenses are focus, not
+   concealment; the PD lens retains leadership-stage rows (§3.7); existence-only cycle codes are
+   disclosed to every enabled persona; voluntary filters are 6B. Build unblocked.
 
 **Non-blocking; defaults stated:**
 
@@ -424,8 +448,8 @@ change to the Initial assessments locator.
 
 | # | Finding | Disposition |
 |---|---|---|
-| 1 (high) | Existence-only cycle codes still disclose hidden-cycle activity | **Escalated to the owner (§10 item 0).** Plan carries the recommended default (accept, document in the security matrix, pin by test) and the alternative; build does not start until decided. |
+| 1 (high) | Existence-only cycle codes still disclose hidden-cycle activity | **Escalated; owner decided 2026-09-06 (§10 item 0).** Disclosure accepted as non-sensitive and, going further, the PD lens now retains leadership-stage rows so no PD row disappears (§3.7); documented in the security matrix and pinned by test. |
 | 2 (high) | Oversized hidden newest cycle aborts before walk-back; behavior undefined | **Accepted.** Fail closed with the existing 503 naming the cycle; no catch-and-skip; test with oversized hidden newest + visible older (§3.3, §6, §7). |
 | 3 (medium) | Three-read bound contradicted the "newest visible" invariant | **Accepted.** Invariant relaxed to "newest visible within the three newest available cycles, else newest empty with `defaultResolvedBy: 'exhausted'`"; list-exhaustion stop condition stated; tests for four-cycle and two-cycle cases (§3.3, §6, §7). |
 
-Codex has run three adversarial passes; further review waits on the §10 item 0 decision.
+Codex has run three adversarial passes; the §10 item 0 decision is recorded and the build proceeds. The built diff gets its own Codex adversarial review.
