@@ -58,7 +58,7 @@ export const EVENT_DESCRIPTORS = [
   {
     key: 'review_due_extended',
     field: 'reviewDueDateExtensionGrantedAt',
-    rawField: 'wmkf_reviewdueextensiongrantedat',
+    rawField: 'wmkf_reviewduedateextensiongrantedat',
     label: 'Review due date extended',
     deliveryProven: true,
     order: 60,

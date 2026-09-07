@@ -648,7 +648,7 @@ back without resolving the reason: `wmkf_coiackedat` and `wmkf_aiuseackedat` hav
 writers but are **not** reset members, so a value may belong to a prior engagement;
 `wmkf_heldat` has **no writer anywhere** in the repository (only ever nulled at
 `reviewer-suggestion.js:1957`). Deadline extensions now use the paired
-`wmkf_reviewdueextensiongrantedat` current-engagement timestamp alongside the
+`wmkf_reviewduedateextensiongrantedat` current-engagement timestamp alongside the
 DateOnly `wmkf_reviewduedateoverride`, so the history can place the extension on the
 timeline without inferring a date from the deadline value. The invariant is
 machine-enforced by `tests/unit/reviewer-activity-history.test.js`, which re-derives

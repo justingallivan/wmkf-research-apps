@@ -45,7 +45,7 @@ const ENGAGEMENT_STAMP_RESET_PAYLOAD = {
   wmkf_withdrawnsufficientat: null,
   wmkf_proposalfirstaccessed: null,
       wmkf_reviewduedateoverride: null,
-      wmkf_reviewdueextensiongrantedat: null,
+      wmkf_reviewduedateextensiongrantedat: null,
 };
 const ENGAGEMENT_STAMP_RESET_FIELDS = Object.keys(ENGAGEMENT_STAMP_RESET_PAYLOAD);
 

@@ -79,7 +79,7 @@ Outreach timestamps:
   accepted-reviewer writer permits only a current/future date strictly after
   the request default, evaluated in the Foundation's Pacific time zone, with
   no maximum; null remains the supported restore value.
-- [VERIFIED via source/tests on `codex/reviewer-ui-surfacing`] `wmkf_reviewdueextensiongrantedat`
+- [VERIFIED via source/tests on `codex/reviewer-ui-surfacing`] `wmkf_reviewduedateextensiongrantedat`
   is a nullable current-engagement DateTime event timestamp. The dedicated
   writer sets it atomically with a non-null override and clears it when the
   override is restored; reviewer history consumes it for a dated extension
