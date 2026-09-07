@@ -393,7 +393,7 @@ Leadership stage transition (separate plan), matrix redesign, inline preview.
 
 ## 14. Build record (2026-09-07, branch `claude/final-writeups-views-and-version`)
 
-Built per §4–§8 with no deviation from the plan; merged to `main` via PR #175 as `44bdd240` (Production deployment `dpl_2UrsDnydRqudu95wJyLCK7A6FUFR`, Ready 2026-09-07 PT; all PR checks green including the full Jest run). Owner-run signed-in smoke pending. Files: `lib/services/final-writeup/acknowledgement-service.js`
+Built per §4–§8 with no deviation from the plan; merged to `main` via PR #175 as `44bdd240` (Production deployment `dpl_2UrsDnydRqudu95wJyLCK7A6FUFR`, Ready 2026-09-07 PT; all PR checks green including the full Jest run). Owner-run signed-in smoke (2026-09-07 PT): PD dropdown correctly listed only the owner (the sole PD with a current D26 Final); two follow-ups landed directly on `main` as Tier 0: `dccb39b9` gave the view control the selects' 48px box, and a second commit opted both toolbar selects out of the native menu-button appearance (Safari ignores height and padding on a native `<select>`, so they rendered ~30px) with a drawn chevron, and moved the persona lens label out of the eyebrow slot above the title into the first line of the header's right-hand summary (owner chose this over a chip beside the title after a two-option mockup; the eyebrow pattern had no other instance across the suite). Files: `lib/services/final-writeup/acknowledgement-service.js`
 (`acknowledgedPublicationVersionId` in the shared projection, null for the responsible PD, and in
 the `markFinalWriteupReviewed` response from the confirmed row), `lib/services/final-writeup/dashboard-service.js`
 (row passthrough; `responsibleProgramDirector` on unconfigured matrix rows),

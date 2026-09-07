@@ -438,6 +438,27 @@ const NO_CYCLE = 'none';
 const DEFAULT_VIEW = 'needs-review';
 
 /**
+ * Toolbar selects opt out of the native menu-button appearance: Safari
+ * ignores height and padding on a native `<select>`, so the controls rendered
+ * ~30px beside a 48px view control. With `appearance-none` the 48px box holds
+ * in every browser and `SelectShell` draws the chevron.
+ */
+const TOOLBAR_SELECT_CLASS = 'h-12 w-full appearance-none rounded-xl border border-gray-300 bg-white pl-4 pr-10 text-base text-gray-900 shadow-sm focus:border-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-400/30 disabled:opacity-60';
+
+function SelectShell({ children }) {
+  return (
+    <div className="relative">
+      {children}
+      <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-gray-500">
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4">
+          <path d="m7 9 5-5 5 5M7 15l5 5 5-5" />
+        </svg>
+      </span>
+    </div>
+  );
+}
+
+/**
  * The three dashboard views. Keys are the `view` URL values; `select` picks
  * the rows from the server queues. Allowlist and labels live in one map so an
  * unknown value cannot be labeled and a labeled value cannot be unselectable.
@@ -527,12 +548,13 @@ function CycleSelector({ cycles, disabled, onChange }) {
   return (
     <div className="flex flex-col gap-1.5">
       <label htmlFor="final-writeup-cycle" className="text-sm font-medium text-gray-700">Cycle</label>
+      <SelectShell>
       <select
         id="final-writeup-cycle"
         value={cycles?.selected || ''}
         disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
-        className="min-h-12 rounded-xl border border-gray-300 bg-white px-4 py-3 text-base text-gray-900 shadow-sm focus:border-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-400/30 disabled:opacity-60"
+        className={TOOLBAR_SELECT_CLASS}
       >
         {options.length === 0 && <option value="">No cycles with current writeups</option>}
         {options.map((cycle) => (
@@ -542,6 +564,7 @@ function CycleSelector({ cycles, disabled, onChange }) {
           <option value={NO_CYCLE}>No cycle</option>
         )}
       </select>
+      </SelectShell>
     </div>
   );
 }
@@ -562,18 +585,20 @@ function ProgramDirectorSelector({ options, value, disabled, onChange }) {
   return (
     <div className="flex flex-col gap-1.5">
       <label htmlFor="final-writeup-pd" className="text-sm font-medium text-gray-700">Program director</label>
+      <SelectShell>
       <select
         id="final-writeup-pd"
         value={value || ''}
         disabled={disabled}
         onChange={(event) => onChange(event.target.value || null)}
-        className="min-h-12 rounded-xl border border-gray-300 bg-white px-4 py-3 text-base text-gray-900 shadow-sm focus:border-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-400/30 disabled:opacity-60"
+        className={TOOLBAR_SELECT_CLASS}
       >
         <option value="">All program directors</option>
         {rendered.map((option) => (
           <option key={option.id} value={option.id}>{option.name}</option>
         ))}
       </select>
+      </SelectShell>
     </div>
   );
 }
@@ -770,11 +795,6 @@ export function FinalWriteupsDashboardView() {
         <header className="border-b border-gray-200 pb-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              {personaViewLabel(data?.viewer) && (
-                <p className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-gray-500">
-                  {personaViewLabel(data.viewer)}
-                </p>
-              )}
               <h1 className="text-3xl font-bold tracking-[-0.03em] text-gray-900 sm:text-4xl">Final Writeups</h1>
               <p className="mt-2 max-w-2xl text-base leading-7 text-gray-600">
                 Review colleagues’ current writeups, or return to your own for editing.
@@ -782,6 +802,9 @@ export function FinalWriteupsDashboardView() {
             </div>
             {data && (
               <div className="text-sm text-gray-500 sm:text-right">
+                {personaViewLabel(data.viewer) && (
+                  <p className="mb-1 font-medium text-gray-700">{personaViewLabel(data.viewer)}</p>
+                )}
                 <p>
                   <span className="font-semibold tabular-nums text-gray-900">{viewCounts['needs-review']}</span> awaiting your review
                   {cycleLabel && ` in ${cycleLabel}`}
