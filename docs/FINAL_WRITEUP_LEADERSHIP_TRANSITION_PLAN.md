@@ -48,16 +48,18 @@ empty and the leadership actor/time fields provisioned by Wave 22 stay unused
 ## 2. Surface (contract-reconcile Step 0)
 
 - **Change surface:** one new governed write, Final row lifecycle `REVIEW` → `FINAL` with explicit
-  leadership actor/time and a refreshed milestone checkpoint, triggered by the responsible PD (or a
-  superuser) from the Final Writeup tab; the status reader and tab gain a `leadership-review` phase.
+  leadership actor/time and the row's SharePoint observation refreshed to the verified current
+  version, triggered by the responsible PD (or a superuser) from the Final Writeup tab; the status
+  reader and tab gain a `leadership-review` phase.
 - **Entry points:** `shared/components/workbench/FinalWriteupTab.js` (button, confirm dialog, new
   panel); new route `pages/api/workbench/final-writeup/leadership-review.js` (POST only).
 - **Persistence:** Dataverse `wmkf_requestdocument`, the current Final row only. Fields written:
   `wmkf_lifecyclestate`, `wmkf_LeadershipReviewStartedBy@odata.bind`, `wmkf_leadershipreviewstartedat`,
-  `wmkf_milestoneversionid`, `wmkf_milestonecontenthash`, `wmkf_milestonecreatedat`,
-  `wmkf_MilestoneCreatedBy@odata.bind`. The group-review activation changeset additionally gains
-  `wmkf_MilestoneCreatedBy@odata.bind` on its Final-row PATCH (§4.1). No SharePoint write. No new
-  entity, no migration, no Postgres.
+  and the row's SharePoint observation fields refreshed to the verified current version
+  (`wmkf_sharepointversionid`, `wmkf_sharepointetag`, `wmkf_sharepointlastmodified`, `wmkf_filesize`,
+  `wmkf_contenthash`). The milestone triple and `wmkf_MilestoneCreatedBy` are not written (§4.1).
+  The group-review activation path is not changed. No SharePoint write. No new entity, no migration,
+  no Postgres.
 - **Consumers:** `getFinalWriteupStatus` and `startFinalWriteup` (transition-service), the Final
   Writeup tab, the acknowledgement service, the Final writeups dashboard and its persona filter,
   the Staff Deliberations receipt (reads the *source* row, unaffected), the security matrix,
@@ -133,7 +135,23 @@ empty and the leadership actor/time fields provisioned by Wave 22 stay unused
   already stamps `wmkf_milestonecreatedat` on the Final row without a milestone actor
   `[VERIFIED via transition-service.js:621; no MilestoneCreatedBy write in that file]`, so a census
   run over that window already reports the existing Final row as a milestone violation. That is a
-  pre-existing gap, recorded here so the D2 decision is made with it in view (§10 D2, §12 F2).
+  pre-existing gap, recorded here so the D2 decision is made with it in view (§10 D6, §12 F2, H1).
+- **The milestone actor has a fixed meaning.** The explicit-actor contract defines
+  `wmkf_MilestoneCreatedBy` as the "authenticated staff member who completed the Pre-Site → Site
+  Visit handoff represented by the existing `wmkf_milestone*` fields"
+  `[VERIFIED via docs/REQUEST_DOCUMENT_EXPLICIT_ACTOR_PLAN.md:136]`, and its write is gated on
+  `REQUEST_DOCUMENT_EXPLICIT_ACTOR_SCHEMA_READY`, a different flag from `FINAL_WRITEUP_SCHEMA_READY`
+  `[VERIFIED via :149-151; lib/services/request-document-actor-service.js:66-84]`. The implementation
+  plan's instruction to "reuse its existing milestone version/hash/time fields" for the leadership
+  checkpoint (`FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md:292`) predates that contract and is
+  `[STALE/CONFLICT]` with it: writing a leadership checkpoint into fields whose actor sibling means
+  "Site Visit handoff" would misattribute provenance. §9 reconciles that line at build.
+- **Actor resolution precedent.** `startFinalWriteup` resolves the acting user through
+  `resolveRequestDocumentActor` with policy `REQUIRED` after authorization and uses the returned
+  enabled id for every write; when the Wave 24 schema flag is off it falls back to the raw session
+  id `[VERIFIED via transition-service.js:740-747]`. A stale or disabled user under `REQUIRED` is a
+  403 `request_document_actor_unavailable` thrown by the resolver
+  `[VERIFIED via request-document-actor-service.js:49-63,80-82]`.
 
 ## 4. Decisions
 
@@ -146,31 +164,26 @@ empty and the leadership actor/time fields provisioned by Wave 22 stay unused
 | `wmkf_lifecyclestate` | `REQUEST_DOCUMENT_LIFECYCLE_STATE.FINAL` (`100000004`) | The lifecycle is the stage discriminator (impl plan :292, :332). |
 | `wmkf_LeadershipReviewStartedBy@odata.bind` | `/systemusers(<actingUserSystemId>)` | Explicit actor; `modifiedby` is not authoritative (impl plan :290). |
 | `wmkf_leadershipreviewstartedat` | server `now()` ISO | Explicit time, same write as the actor. |
-| `wmkf_milestoneversionid` / `wmkf_milestonecontenthash` / `wmkf_milestonecreatedat` | the verified current SharePoint version, governed DOCX hash, and `now()` | "Reuse its existing milestone version/hash/time fields for the exact leadership-ready checkpoint" (impl plan :292). |
-| `wmkf_MilestoneCreatedBy@odata.bind` | `/systemusers(<actingUserSystemId>)` | Keeps the milestone time/actor pair complete for the explicit-actor census (§3.4); same actor as the leadership fields. |
+| `wmkf_sharepointversionid`, `wmkf_sharepointetag`, `wmkf_sharepointlastmodified`, `wmkf_filesize`, `wmkf_contenthash` | the verified current SharePoint metadata and governed DOCX hash | The exact leadership-ready checkpoint, recorded in the row's own observation fields; the Site Visit transition refreshes the same fields at its handoff `[VERIFIED via lib/services/pre-site-visit/site-visit-transition-service.js:280-288]`, and the claim already seeds them from the verified source `[VERIFIED via transition-service.js:411-427]`. |
 
-**Milestone overwrite is a named decision, not a side effect.** Writing the milestone triple
-discards the group-review-start values on that row. The handoff checkpoint survives in
-`wmkf_sourceversionid` / `wmkf_sourcecontenthash` and the group-review actor/time survive in their
-own fields, so nothing about the earlier stage is lost. Because the census pairs milestone time with
-a milestone actor (§3.4), the overwrite also writes `wmkf_MilestoneCreatedBy`; the census kind label
-`site-visit-milestone` and its comment then need a rename to a stage-neutral "milestone" at build
-(`scripts/probe-request-document-explicit-actor-census.js:64-78`), since Final rows now carry
-milestones from two stages. Alternatives: (ii) leave the triple alone and record nothing about the
-leadership-ready version beyond the actor/time, relying on SharePoint version history; rejected
-because the implementation plan's success table promises "stable version/hash/time and explicit
-actor are recorded" for this checkpoint (:263) **and because it leaves the census gap below open**.
-(iii) New leadership version/hash columns; rejected for this slice as a schema change with no
-consumer. Owner decides (§10 D2); the build does not start until D2 is answered.
+**The milestone triple and its actor are left alone: a named decision.** Pass 1 and 2 of the
+review moved toward overwriting `wmkf_milestone*` and writing `wmkf_MilestoneCreatedBy`; pass 3
+showed the actor field's contract is Site Visit handoff only (§3.4), so any write from a Final
+Writeup stage would misattribute provenance, and a census rename would not repair persisted data.
+The leadership-ready checkpoint therefore lives in the leadership actor/time pair plus the row's
+refreshed SharePoint observation fields. This still meets the implementation plan's promise that
+"stable version/hash/time and explicit actor are recorded" (:263): version and hash in
+`wmkf_sharepointversionid` / `wmkf_contenthash`, time and actor in the leadership pair.
+Alternatives: (a) overwrite the milestone triple with or without the actor, rejected as above;
+(b) new leadership version/hash columns, rejected for this slice as a schema wave with no consumer
+beyond the confirm step. Owner confirms (§10 D2).
 
-**Pre-existing census gap and its treatment.** Group-review activation stamps
-`wmkf_milestonecreatedat` on the Final row with no milestone actor (§3.4), so the census already
-classifies that stamp as a violation. This slice closes it going forward by adding
-`wmkf_MilestoneCreatedBy@odata.bind` for the acting user to the activation changeset's Final-row
-PATCH (`transition-service.js:612-624`), the same person the group-review actor field records; the
-transition-service tests pin the pair. The one existing Final row (Request `1002788`, the smoke
-row) keeps its unattributed stamp; it predates the contract and is listed as known in the census
-run notes rather than repaired, unless the owner asks for a repair (§10 D6).
+**Pre-existing census gap, out of this slice.** Group-review activation stamps
+`wmkf_milestonecreatedat` on the Final row without a milestone actor (§3.4), and the census kind
+`site-visit-milestone` does not filter by artifact type, so it reports that stamp as a violation.
+This slice neither widens nor repairs that: it adds no milestone writes. The candidate fix is a
+Tier 0 census change that classifies Final Writeup rows' milestone stamp as group-review-backed (or
+excludes them from the site-visit kind), owner-decided separately (§10 D6).
 
 One row changes, so this is `requestDocumentAdapter.update(id, patch, { ifMatch, actingUserSystemId })`
 under `withDalContext`, not a changeset. The adapter's origin-field guard covers only the
@@ -207,31 +220,40 @@ expectedFinalArtifactId, isSuperuser, actingUserSystemId })`:
    existing GET status route already returns committed Final state, including the group-review
    actor id, to every reviewers-app user `[VERIFIED via pages/api/workbench/final-writeup.js:50-58;
    transition-service.js:232-235]`; the POST is simply not a second disclosure path.)
-5. **Exact-retry convergence.** If the row is already `FINAL` and the generalized `committedFinal`
+5. **Actor resolution.** `resolveRequestDocumentActor({ actingUserSystemId, policy: REQUIRED })`,
+   exactly as `startFinalWriteup` does after its authorization check
+   `[VERIFIED via transition-service.js:740-747]`. When the Wave 24 flag is on, the returned enabled
+   id is the only id used for the `wmkf_LeadershipReviewStartedBy` bind and the `actingUserSystemId`
+   write option; a stale or disabled user is the resolver's own 403
+   `request_document_actor_unavailable`. When the flag is off, the raw session id is used, the same
+   fallback the group-review path takes today. No Wave 24 field is written by this slice, so the
+   Wave 24 readiness boundary is not crossed either way; the leadership fields are Wave 22 and are
+   protected by step 1's `FINAL_WRITEUP_SCHEMA_READY` gate.
+6. **Exact-retry convergence.** If the row is already `FINAL` and the generalized `committedFinal`
    (§4.4) accepts it, return the committed state with `reused: true` and 200. This is the
-   idempotency guard: the write in step 9 is never reached for an already-advanced row
+   idempotency guard: the write in step 10 is never reached for an already-advanced row
    `[PLANNED guard, to be pinned by test]`. A `FINAL` row that `committedFinal` rejects is not
    converged; it surfaces as 500 `final_writeup_committed_state_invalid` for reconciliation, never
    as success.
-6. Eligibility: artifact type Final Writeup, operation status `READY`, lifecycle `REVIEW`, stable
+7. Eligibility: artifact type Final Writeup, operation status `READY`, lifecycle `REVIEW`, stable
    drive/item identity present, `_etag` present; else `final_writeup_leadership_ineligible`.
-7. Verify the current SharePoint version in the `verifySource` pattern
+8. Verify the current SharePoint version in the `verifySource` pattern
    `[VERIFIED via transition-service.js:358-388]`: metadata before, download, governed hash,
    metadata after; unstable → `final_writeup_leadership_source_changed` ("The Word document changed
    while leadership review was starting. Retry to use the latest version."). Identity must match the
    row's persisted drive/item.
-8. **Commit-time concurrency check.** Re-read the Dataverse row and the SharePoint metadata
+9. **Commit-time concurrency check.** Re-read the Dataverse row and the SharePoint metadata
    immediately before the write, in the `activate` pattern `[VERIFIED via
    transition-service.js:590-600]`: the row must still be the current Final in `REVIEW` with the
    same `_etag`, and the metadata must satisfy `stableMetadataMatches(verified.metadata, now)` and
    `persistedIdentityMatches(row, now)`; otherwise `final_writeup_leadership_source_changed` with no
    write. The interval between this read and the PATCH is the same residual the group-review
    activation accepts today; the recorded checkpoint is the version observed at that read.
-9. Conditional PATCH (§4.1) with `ifMatch: _etag`. 412 → `final_writeup_leadership_conflict`
+10. Conditional PATCH (§4.1) with `ifMatch: _etag`. 412 → `final_writeup_leadership_conflict`
    ("The writeup lifecycle changed while leadership review was starting. Reload and retry.").
-10. Post-commit `readState` and confirm via generalized `committedFinal`, including that the
-   persisted `wmkf_milestoneversionid` / `wmkf_milestonecontenthash` equal the verified values;
-   unconfirmed → 500 `final_writeup_leadership_unconfirmed`. Return `{ phase: 'leadership-review',
+11. Post-commit `readState` and confirm via generalized `committedFinal`, including that the
+   persisted `wmkf_sharepointversionid` / `wmkf_contenthash` equal the verified values
+   (`persistedIdentityMatches` plus the hash); unconfirmed → 500 `final_writeup_leadership_unconfirmed`. Return `{ phase: 'leadership-review',
    artifact, reused: false }`.
 
 Error codes are `[PLANNED]` names; the owner-voice copy rule applies to every message.
@@ -240,10 +262,11 @@ Error codes are `[PLANNED]` names; the owner-voice copy rule applies to every me
 
 `[PLANNED]` `committedFinal` accepts a Final row whose lifecycle is `REVIEW` **or** `FINAL`. When
 `FINAL`, it additionally requires the complete leadership checkpoint: `wmkf_leadershipreviewstartedat`,
-`_wmkf_leadershipreviewstartedby_value`, `wmkf_milestoneversionid`, `wmkf_milestonecontenthash`,
-`wmkf_milestonecreatedat`, and (under D2 overwrite) `_wmkf_milestonecreatedby_value`, mirroring how
-it requires the group-review pair today (`:278-279`). A `FINAL` row missing any of these is
-rejected, so exact retry and `activate`'s concurrent-success branch never certify a half-written
+`_wmkf_leadershipreviewstartedby_value`, `wmkf_sharepointversionid`, and `wmkf_contenthash`,
+mirroring how it requires the group-review pair today (`:278-279`). (The Wave 22 leadership fields
+are in the select only under `FINAL_WRITEUP_SCHEMA_READY` `[VERIFIED via request-document.js:87-92,
+100-113]`, the same flag that gates the whole service, so the check is never evaluated against an
+unselected field.) A `FINAL` row missing any of these is rejected, so exact retry and `activate`'s concurrent-success branch never certify a half-written
 transition; the caller's existing 500 reports it for reconciliation. Every other check (source
 pointer, identity, source version/hash, group-review pair) is unchanged. The complement stays
 fail-closed: any other lifecycle still returns null and the callers still throw. There are no legacy
@@ -320,7 +343,7 @@ notification work stays parked.
 3. **Payload:** `{ requestId, expectedFinalArtifactId }`, nothing else accepted.
 4. **Route:** `requireAppAccess('reviewers')`; superuser via fresh `getUserRole`; exact-body
    allowlist; GUID checks; `withDalContext`.
-5. **Service:** §4.3 steps 1-10; authorization is server-resolved from the request's lead PD lookup.
+5. **Service:** §4.3 steps 1-11; authorization is server-resolved from the request's lead PD lookup.
 6. **Persistence:** one conditional PATCH on the Final row; no SharePoint write; no request write
    (the current Final pointer is unchanged).
 7. **Response:** `{ success, phase: 'leadership-review', artifact, reused }`; errors carry
@@ -334,7 +357,7 @@ notification work stays parked.
 1. **Whole-flow:** covered by §5. Staff Deliberations reads the source row, which does not change
    `[VERIFIED via FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md:180]`.
 2. **Partial success:** one row, one PATCH, so success is atomic. Confirmation is by re-read, never
-   by the PATCH response alone (§4.3 step 10). A lost response with a committed write converges on
+   by the PATCH response alone (§4.3 step 11). A lost response with a committed write converges on
    retry via step 4.
 3. **Async / stale state:** the tab already uses `activeController` generation guards for start and
    poll `[VERIFIED via FinalWriteupTab.js:255-297]`; the new action reuses the same controller and
@@ -380,9 +403,12 @@ notification work stays parked.
 | The PATCH carries `ifMatch`; 412 maps to the reload-and-retry conflict | service | Unit with a 412 rejection |
 | A SharePoint version change between before/after aborts with no write | service | Unit with differing metadata |
 | A SharePoint version change between verification and commit aborts with no write | service | Unit: commit-time metadata differs from verified → `source_changed`, `updateDocument` not called |
-| The milestone time and milestone actor are written together, at leadership transition and at group-review activation | service | Unit: both patches contain `wmkf_milestonecreatedat` and `wmkf_MilestoneCreatedBy@odata.bind` with the acting user |
+| No milestone field is written by the transition | service | Unit: the PATCH body has no `wmkf_milestone*` key and no `wmkf_MilestoneCreatedBy@odata.bind` |
+| The leadership bind and the write option use the resolved enabled actor id; a stale or disabled user is 403 with no write | service | Unit: resolver returns `actorId` ≠ session id → bind uses `actorId`; resolver throws → `updateDocument` not called |
+| Wave 24 flag off falls back to the raw session id, as group review does | service | Unit with `schemaReady: false` |
+| The observation fields are refreshed to the verified metadata and hash | service | Unit: PATCH body carries `wmkf_sharepointversionid`, `wmkf_sharepointetag`, `wmkf_sharepointlastmodified`, `wmkf_filesize`, `wmkf_contenthash` equal to the verified values |
 | Authorization precedes the exact-retry read; an unauthorized caller gets 403 with no stage state | service | Unit: mismatched actor against an already-`FINAL` row → 403, response body carries no artifact |
-| A `FINAL` row missing any leadership-checkpoint field is not committed | transition-service.js `committedFinal` | Unit per missing field: leadership at/by, milestone version/hash/at/actor → null → caller 500 |
+| A `FINAL` row missing any leadership-checkpoint field is not committed | transition-service.js `committedFinal` | Unit per missing field: leadership at/by, `wmkf_sharepointversionid`, `wmkf_contenthash` → null → caller 500 |
 | PD-without-leadership warning on leadership-stage rows stays | FinalWriteupsViews.js (no edit) | `final-writeups-views.test.js:309` stays green |
 | Success is confirmed by re-read, not by PATCH resolution | service | Unit: PATCH resolves but re-read shows `REVIEW` → 500 unconfirmed |
 | Acknowledgement block loads and renders at leadership stage | FinalWriteupTab.js | Tab test: `phase: 'leadership-review'` fetches acknowledgement state and renders Reviewed by |
@@ -396,7 +422,9 @@ notification work stays parked.
   generalization cases, the `leadership-review` status projection, `canAdvance` for lead PD /
   superuser / other, and the nine-step service happy path, retry, 403, ineligible, stale fence,
   source-changed at verification, source-changed at commit time, 412, unconfirmed (including a
-  re-read whose milestone version differs from the verified one).
+  re-read whose `wmkf_sharepointversionid` differs from the verified one), actor resolution
+  (resolved id used, resolver 403 propagates with no write, flag-off fallback), and a PATCH-body
+  assertion that no milestone key is present.
 - New `tests/unit/workbench-final-writeup-leadership-review-route.test.js`: method allowlist,
   exact body, GUID validation, superuser resolution, `ServiceHttpError` passthrough, following
   `workbench-final-writeup-acknowledgement-route.test.js`.
@@ -408,8 +436,6 @@ notification work stays parked.
   leadership-stage fixture still passes.
 - `tests/unit/final-writeups-views.test.js:309`: unchanged; the leadership-stage warning assertion
   must stay green.
-- `scripts/probe-request-document-explicit-actor-census.js` self-test: extend for a Final row whose
-  milestone actor is the leadership actor (attributed) once the census kind is renamed.
 
 ## 9. Docs to reconcile at build (in place, never appended)
 
@@ -418,8 +444,9 @@ notification work stays parked.
 - `docs/atlas/dataverse-wmkf-requestdocument.md`: leadership fields runtime-written; Final-row
   lifecycle `FINAL` semantics; owner-run reversal procedure (§4.7).
 - `docs/API_ROUTE_SECURITY_MATRIX.md`: new row beside `:273-275`.
-- `scripts/probe-request-document-explicit-actor-census.js:64-78`: rename the `site-visit-milestone`
-  kind and comment to stage-neutral milestone wording if D2 stays at overwrite.
+- `docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md:292`: the "reuse its existing milestone
+  version/hash/time fields" instruction is `[STALE/CONFLICT]` with the Wave 24 actor contract
+  (§3.4); rewrite it to the observation-field checkpoint in place.
 - `docs/CURRENT_WORK_QUEUE.md` item 4 completion column.
 - Agent wiki: Final Writeup has no section in `reviewer-workbench-lifecycle.md`
   `[VERIFIED via rg "Final Writeup|final-writeup" docs/agent-wiki: strategy-roadmap.md only]`. Add a
@@ -432,8 +459,8 @@ notification work stays parked.
 | # | Decision | Recommendation | Default if silent |
 |---|---|---|---|
 | D1 | Reverse path in this slice? | None; owner-run Dataverse repair documented in the atlas page | No reverse action |
-| D2 | Overwrite the milestone triple with the leadership-ready checkpoint? | Yes, per the implementation plan, **and** write the milestone actor so the census pair is complete; rename the census kind at build. Fallback (ii) leaves the census gap open and is not recommended | **No default; build waits on this answer** |
-| D6 | Repair the one existing Final row's unattributed group-review milestone stamp (Request `1002788`)? | No repair; record it as known in census run notes. The forward fix lands in the activation changeset | No repair |
+| D2 | Where does the leadership-ready checkpoint live? | Leadership actor/time pair plus the row's refreshed SharePoint observation fields (`wmkf_sharepointversionid`, `wmkf_contenthash`, and siblings). No milestone triple or milestone actor write, because that actor field means Site Visit handoff (§3.4) | Observation fields; **owner confirms before build** |
+| D6 | The census reports Final rows' group-review milestone stamp (no milestone actor) as a violation, pre-existing and untouched by this slice. Fix the census separately? | Yes, as a separate Tier 0 script change: classify Final Writeup rows' stamp as group-review-backed or exclude them from the `site-visit-milestone` kind. Request `1002788`'s row is the one instance today | Separate Tier 0 item, not in this slice |
 | D3 | Superuser may advance, as with group review? | Yes, same `resolveAuthorization` | Yes |
 | D4 | Acknowledgements continue after the transition? | Yes; today's `knownLifecycle` already allows it and Leadership acknowledges at this stage | Yes |
 | D5 | Button placement: inside the group-review panel as a secondary action beside Edit writeup | Yes; keeps one stage card per phase like the Ready for group review card | Secondary action in the panel |
@@ -470,6 +497,14 @@ Three findings, all verified against source and all accepted.
 | G1 | high | Exact-retry convergence ran before authorization, so an unauthorized reviewers-app user could read committed stage state from POST. | **Accepted.** §4.3 now authorizes at step 4 and converges at step 5; §7 pins 403-with-no-artifact. Scope note recorded: GET already discloses committed state to every reviewers-app user `[VERIFIED via final-writeup.js:50-58]`, so this closes an ordering flaw, not a new disclosure. |
 | G2 | high | `committedFinal`'s `FINAL` branch required only the leadership pair, so a half-written transition or malformed row would be certified as committed and returned as `reused: true`. | **Accepted.** §4.4 requires the complete checkpoint (leadership at/by, milestone version/hash/at, milestone actor under D2); §7 and §8 add per-missing-field tests. No legacy leadership rows exist `[VERIFIED via atlas :36-41]`. |
 | G3 | medium | D2's fallback left the census gap open while the plan implied closure, and the pre-existing unattributed group-review stamp had no policy. | **Accepted.** §4.1 states fallback (ii) leaves the gap open and is not recommended; D2 has no default and blocks the build. The forward fix adds the milestone actor to the group-review activation PATCH; the one existing row is D6 (no repair, recorded as known). |
+
+### Pass 3 (2026-09-07, verdict NEEDS REWORK)
+
+| # | Severity | Finding | Disposition |
+|---|---|---|---|
+| H1 | high | Writing the group-review or leadership actor into `wmkf_MilestoneCreatedBy` repurposes a field whose contract is "Site Visit handoff actor"; a census rename does not repair persisted provenance. | **Accepted; D2 reversed.** The transition writes no milestone field and the group-review activation path is untouched. The checkpoint moves to the leadership pair plus the row's SharePoint observation fields, following the Site Visit transition's own refresh precedent `[VERIFIED via site-visit-transition-service.js:280-288]`. Implementation plan :292 marked `[STALE/CONFLICT]` for reconcile at build (§9). |
+| H2 | high | An unconditional `wmkf_MilestoneCreatedBy` write in the activation changeset would cross the Wave 24 readiness boundary in any environment with that flag off. | **Accepted, moot after H1.** No Wave 24 field is written by this slice; §4.3 step 5 states which flag protects which field. |
+| H3 | high | The service validated the acting id as a GUID only; no `systemuser` re-read, no disabled check, before writing lookup binds. | **Accepted.** §4.3 step 5 adds `resolveRequestDocumentActor` with `REQUIRED` after authorization, exactly the `startFinalWriteup` pattern `[VERIFIED via transition-service.js:740-747]`; the resolved id is the only id used for the bind and the write option; §7 and §8 pin resolved-id, resolver-403, and flag-off cases. |
 
 Re-review pending after this revision.
 
