@@ -12,7 +12,7 @@ const TOKEN_STATE_INFO = {
   invalid:    { label: 'Needs review', color: 'bg-amber-100 text-amber-800' },
 };
 
-export function TokenStateBadge({ state, expiresAt, firstAccessedAt }) {
+export function TokenStateBadge({ state, expiresAt, firstAccessedAt, onClick, ariaLabel }) {
   const known = Boolean(TOKEN_STATE_INFO[state]);
   const info = TOKEN_STATE_INFO[state] || {
     label: 'Unknown',
@@ -24,15 +24,31 @@ export function TokenStateBadge({ state, expiresAt, firstAccessedAt }) {
     expiresAt && `Expires ${new Date(expiresAt).toLocaleDateString()}`,
     firstAccessedAt && `Opened ${new Date(firstAccessedAt).toLocaleDateString()}`,
   ].filter(Boolean).join(' · ');
+  const content = <>
+    {info.label}
+    {state === 'active' && firstAccessedAt && (
+      <span className="ml-1 text-xs opacity-75">opened</span>
+    )}
+  </>;
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className={`inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ${info.color} hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-1`}
+        title={tooltip || 'View activity history'}
+        aria-label={ariaLabel}
+      >
+        {content}
+      </button>
+    );
+  }
   return (
     <span
       className={`inline-flex items-center whitespace-nowrap px-2 py-0.5 rounded text-xs font-medium ${info.color}`}
       title={tooltip || undefined}
     >
-      {info.label}
-      {state === 'active' && firstAccessedAt && (
-        <span className="ml-1 text-xs opacity-75">opened</span>
-      )}
+      {content}
     </span>
   );
 }
@@ -218,7 +234,7 @@ export function TokenActionsMenu({
                 onClick={() => { setOpen(false); onCloseReview(); }}
                 className="w-full text-left px-3 py-2 hover:bg-green-50 text-green-800"
               >
-                {reviewer.reviewStatus === 'complete' ? 'Edit closeout' : 'Close review'}
+                {reviewer.reviewStatus === 'complete' ? 'Edit closeout' : 'Mark complete'}
               </button>
             </div>
           )}

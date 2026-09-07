@@ -1,0 +1,59 @@
+import { render, screen } from '@testing-library/react';
+import {
+  StatusBadge,
+  reviewerHasReceivedReview,
+} from '../../shared/components/reviewers/ReviewerManagePanel';
+import { TokenStateBadge } from '../../shared/components/reviewers/TokenActionsMenu';
+
+describe('reviewer status badge links', () => {
+  test('links received and complete statuses to the request reviews tab', () => {
+    const { rerender } = render(
+      <StatusBadge status="review_received" href="/workbench/request-a?tab=reviews" />,
+    );
+
+    expect(screen.getByRole('link', { name: 'Review Received' })).toHaveAttribute(
+      'href',
+      '/workbench/request-a?tab=reviews',
+    );
+
+    rerender(<StatusBadge status="complete" href="/workbench/request-a?tab=reviews" />);
+    expect(screen.getByRole('link', { name: 'Complete' })).toHaveAttribute(
+      'href',
+      '/workbench/request-a?tab=reviews',
+    );
+  });
+
+  test('keeps non-submitted statuses as non-links', () => {
+    render(<StatusBadge status="materials_sent" />);
+    expect(screen.getByText('Materials Sent').tagName).toBe('SPAN');
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+  });
+
+  test('supports opening activity history for non-terminal statuses', () => {
+    const onClick = jest.fn();
+    render(<StatusBadge status="materials_sent" onClick={onClick} ariaLabel="View activity history for Ada Reviewer" />);
+    const button = screen.getByRole('button', { name: 'View activity history for Ada Reviewer' });
+    expect(button.tagName).toBe('BUTTON');
+    button.click();
+    expect(onClick).toHaveBeenCalledTimes(1);
+  });
+
+  test('renders the clickable token state as a pill', () => {
+    render(
+      <TokenStateBadge
+        state="active"
+        firstAccessedAt="2026-09-06T12:00:00Z"
+        onClick={() => {}}
+        ariaLabel="View activity history for Ada Reviewer"
+      />,
+    );
+    expect(screen.getByRole('button')).toHaveClass('rounded-full');
+  });
+
+  test('treats received timestamps, submitted reviews, and terminal statuses as received', () => {
+    expect(reviewerHasReceivedReview({ reviewReceivedAt: '2026-09-06T12:00:00Z' })).toBe(true);
+    expect(reviewerHasReceivedReview({ submitted: true, reviewStatus: 'under_review' })).toBe(true);
+    expect(reviewerHasReceivedReview({ reviewStatus: 'complete' })).toBe(true);
+    expect(reviewerHasReceivedReview({ reviewStatus: 'materials_sent', reminderCount: 2 })).toBe(false);
+  });
+});

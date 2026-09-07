@@ -62,12 +62,41 @@ export { PREVIEW_RENDER_TIMEOUT_MS } from './ReleaseMaterialsModal';
 
 // ─── Status Badge ───────────────────────────────────────────────────────────
 
-export function StatusBadge({ status }) {
+export function StatusBadge({ status, href, onClick, ariaLabel }) {
   const info = getStatusInfo(status);
-  return (
-    <span className={`inline-flex items-center whitespace-nowrap px-2.5 py-0.5 rounded-full text-xs font-medium ${info.color}`}>
-      {info.label}
-    </span>
+  const className = `inline-flex items-center whitespace-nowrap px-2.5 py-0.5 rounded-full text-xs font-medium ${info.color}`;
+  if (href) {
+    return (
+      <a
+        href={href}
+        className={`${className} underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-green-600 focus-visible:ring-offset-1`}
+        title="View submitted review"
+      >
+        {info.label}
+      </a>
+    );
+  }
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className={`${className} focus:outline-none focus-visible:ring-2 focus-visible:ring-green-600 focus-visible:ring-offset-1`}
+        aria-label={ariaLabel}
+        title="View activity history"
+      >
+        {info.label}
+      </button>
+    );
+  }
+  return <span className={className}>{info.label}</span>;
+}
+
+export function reviewerHasReceivedReview(reviewer) {
+  return Boolean(
+    reviewer?.reviewReceivedAt
+    || reviewer?.submitted === true
+    || ['review_received', 'complete'].includes(reviewer?.reviewStatus),
   );
 }
 
@@ -982,6 +1011,7 @@ export default function ReviewerManagePanel({
                 // Terminal status has no guaranteed timestamp, so it takes precedence
                 // without being fabricated as a dated timeline event.
                 const lastEvent = latestActivitySummary(r);
+                const receivedReview = reviewerHasReceivedReview(r);
 
                 return (
                   <tr key={r.suggestionId} className="hover:bg-gray-50 transition-colors">
@@ -1005,16 +1035,43 @@ export default function ReviewerManagePanel({
                     </td>
                     <td className="px-4 py-3 align-top">
                       <div className="flex flex-wrap items-center gap-1.5">
-                        <StatusBadge status={r.reviewStatus} />
-                        <TokenStateBadge state={r.tokenState} expiresAt={r.tokenExpiresAt} firstAccessedAt={r.proposalFirstAccessedAt} />
+                        <StatusBadge
+                          status={r.reviewStatus}
+                          href={['review_received', 'complete'].includes(r.reviewStatus)
+                            ? `/workbench/${encodeURIComponent(proposal.proposalId)}?tab=reviews`
+                            : undefined}
+                          onClick={['materials_sent', 'under_review'].includes(r.reviewStatus)
+                            ? () => setActivityDrawerId(r.suggestionId)
+                            : undefined}
+                          ariaLabel={`View activity history for ${r.name || 'reviewer'}`}
+                        />
+                        {!receivedReview && (
+                          <TokenStateBadge
+                            state={r.tokenState}
+                            expiresAt={r.tokenExpiresAt}
+                            firstAccessedAt={r.proposalFirstAccessedAt}
+                            onClick={r.proposalFirstAccessedAt
+                              ? () => setActivityDrawerId(r.suggestionId)
+                              : undefined}
+                            ariaLabel={`View activity history for ${r.name || 'reviewer'}`}
+                          />
+                        )}
                       </div>
                       {r.reviewStatus === 'complete' && (
                         <span className="mt-1 block text-xs leading-4 text-gray-600">
                           {closeoutDispositionLabel(r.honorariumEligibility)}
                         </span>
                       )}
-                      {r.reminderCount > 0 && (
-                        <span className="text-xs text-gray-400 ml-1">({r.reminderCount} reminder{r.reminderCount !== 1 ? 's' : ''})</span>
+                      {!receivedReview && r.reminderCount > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setActivityDrawerId(r.suggestionId)}
+                          className="mt-1.5 inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800 hover:border-amber-300 hover:bg-amber-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-600 focus-visible:ring-offset-1"
+                          aria-label={`View activity history for ${r.name || 'reviewer'}`}
+                          title="View activity history"
+                        >
+                          {r.reminderCount} reminder{r.reminderCount !== 1 ? 's' : ''}
+                        </button>
                       )}
                     </td>
                     <td className="px-4 py-3 align-top">
@@ -1051,7 +1108,7 @@ export default function ReviewerManagePanel({
                     </td>
                     {showActionColumn && (
                       <td className="px-4 py-3 align-top">
-                        <div className="flex min-h-9 items-start justify-between gap-2">
+                        <div className="flex min-h-9 items-center justify-between gap-2">
                           <div className="flex flex-wrap items-center gap-2">
                             {showFollowUpColumn
                               && ['materials_sent', 'under_review'].includes(r.reviewStatus)
@@ -1073,21 +1130,21 @@ export default function ReviewerManagePanel({
                                 title={degraded ? 'Reviewer data could not be refreshed - retry before making changes' : undefined}
                                 className="min-h-9 whitespace-nowrap rounded-lg bg-gray-900 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2"
                               >
-                                {r.reviewStatus === 'complete' ? 'Edit closeout' : 'Close review'}
+                                {r.reviewStatus === 'complete' ? 'Edit closeout' : 'Mark complete'}
                               </button>
                             )}
                           </div>
                           {showActionsColumn && (
-                            <div className="flex shrink-0 items-center gap-1">
+                            <div className="flex shrink-0 items-center gap-2">
                               {/* Download received review from SharePoint via Graph. */}
                               {r.reviewSharePointFolder && (
                                 <a
                                   href={`/api/review-manager/download-review?suggestionId=${encodeURIComponent(r.suggestionId)}`}
-                                  className="rounded-lg p-1.5 text-green-600 hover:bg-green-50 hover:text-green-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-600"
+                                  className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg p-2 text-green-600 hover:bg-green-50 hover:text-green-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-600"
                                   title={`Download: ${r.reviewFilename || 'review'}`}
                                   aria-label={`Download review from ${r.name || 'reviewer'}`}
                                 >
-                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                                   </svg>
                                 </a>

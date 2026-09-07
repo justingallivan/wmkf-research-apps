@@ -582,7 +582,7 @@ describe('closeout lifetime wiring through the panel (D4)', () => {
         onRefresh={onRefresh}
       />,
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Close review' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Mark complete' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Complete closeout' }));
 
     rerender(
@@ -623,7 +623,7 @@ describe('closeout lifetime wiring through the panel (D4)', () => {
         onRefresh={onRefresh}
       />,
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Close review' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Mark complete' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Complete closeout' }));
 
     rerender(
@@ -665,7 +665,7 @@ describe('closeout lifetime wiring through the panel (D4)', () => {
         onRefresh={onRefresh}
       />,
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Close review' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Mark complete' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Complete closeout' }));
 
     rerender(
