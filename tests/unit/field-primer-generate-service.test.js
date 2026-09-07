@@ -30,7 +30,7 @@ import { FIELD_PRIMER_ENVELOPE_SCHEMA, makeFieldPrimerLease } from '../../shared
 import { ServiceHttpError } from '../../lib/services/service-http-error';
 import {
   classifyGenerationFailure, clampTimeoutToLease, generateForRequest, generateStandalone,
-  LEASE_GROUNDING_RESERVE_MS, LEASE_SAFETY_MARGIN_MS,
+  LEASE_GROUNDING_RESERVE_MS, LEASE_SAFETY_MARGIN_MS, MIN_MODEL_TIMEOUT_MS,
 } from '../../lib/services/field-primer/generate-service';
 import { FIELD_PRIMER_LEASE_TTL_MS } from '../../shared/utils/field-primer-envelope';
 
@@ -40,9 +40,18 @@ const row = (over = {}) => ({
   wmkf_ai_fieldprimer: null, _etag: 'W/"1"', ...over,
 });
 
+// Default adapter behaviour once the per-test `Once` queues drain: remember the
+// lease this run wrote and read it back as still-current, so conditional
+// restores find our own nonce. Tests that model a peer override the readback.
+let lastLease = null;
+const OWN_LEASE_ETAG = 'W/"lease"';
 beforeEach(() => {
-  grantRequestAdapter.getById.mockReset();
-  grantRequestAdapter.updateById.mockReset().mockResolvedValue({});
+  lastLease = null;
+  grantRequestAdapter.getById.mockReset().mockImplementation(async () => ({ wmkf_ai_fieldprimer: lastLease, _etag: OWN_LEASE_ETAG }));
+  grantRequestAdapter.updateById.mockReset().mockImplementation(async (_id, patch) => {
+    if (typeof patch?.wmkf_ai_fieldprimer === 'string' && patch.wmkf_ai_fieldprimer.includes('field-primer/lease')) lastLease = patch.wmkf_ai_fieldprimer;
+    return {};
+  });
   generateFieldPrimer.mockReset();
   getAiProposalNarrativeText.mockReset();
   getExecutorBudget.mockReset().mockResolvedValue({ kind: 'timeout', timeoutMsOverride: 240000 });
@@ -96,10 +105,45 @@ describe('generateForRequest (Mode A)', () => {
     getAiProposalNarrativeText.mockResolvedValue({ text: 'A'.repeat(60) });
     generateFieldPrimer.mockRejectedValueOnce(new Error('llm down'));
     await expect(generateForRequest({ requestId: GUID, regenerate: true })).rejects.toMatchObject({ httpStatus: 500 });
-    // Last write restores the PRIOR value (unconditional).
+    // Last write restores the PRIOR value, conditionally on the lease we still own.
     const last = grantRequestAdapter.updateById.mock.calls.at(-1);
     expect(last[1]).toEqual({ wmkf_ai_fieldprimer: prior });
-    expect(last[2]).toBeUndefined();
+    expect(last[2]).toEqual({ ifMatch: OWN_LEASE_ETAG });
+  });
+
+  it('a generation failure after a peer reclaimed the lease leaves the peer value untouched', async () => {
+    const prior = JSON.stringify({ schema: FIELD_PRIMER_ENVELOPE_SCHEMA, generatedAt: 'old', primer: {} });
+    const peerLease = makeFieldPrimerLease(new Date().toISOString(), 'peer');
+    grantRequestAdapter.getById
+      .mockResolvedValueOnce(row({ wmkf_ai_fieldprimer: prior }))
+      .mockResolvedValueOnce({ wmkf_ai_fieldprimer: peerLease, _etag: 'W/"9"' });
+    getAiProposalNarrativeText.mockResolvedValue({ text: 'A'.repeat(60) });
+    generateFieldPrimer.mockRejectedValueOnce(new Error('llm down'));
+    await expect(generateForRequest({ requestId: GUID, regenerate: true })).rejects.toMatchObject({ httpStatus: 500 });
+    const priorWrites = grantRequestAdapter.updateById.mock.calls.filter(([, patch]) => patch.wmkf_ai_fieldprimer === prior);
+    expect(priorWrites).toHaveLength(0);
+  });
+
+  it('a proposal pull that exhausts the lease stops before the paid model call and restores conditionally', async () => {
+    const prior = JSON.stringify({ schema: FIELD_PRIMER_ENVELOPE_SCHEMA, generatedAt: 'old', primer: {} });
+    const base = Date.now();
+    let clock = base;
+    const nowSpy = jest.spyOn(Date, 'now').mockImplementation(() => clock);
+    try {
+      grantRequestAdapter.getById.mockResolvedValueOnce(row({ wmkf_ai_fieldprimer: prior }));
+      getAiProposalNarrativeText.mockImplementation(async () => { clock += FIELD_PRIMER_LEASE_TTL_MS; return { text: 'A'.repeat(60) }; });
+      await expect(generateForRequest({ requestId: GUID, regenerate: true })).rejects.toMatchObject({
+        httpStatus: 504,
+        code: 'field_primer_lease_exhausted',
+      });
+      expect(generateFieldPrimer).not.toHaveBeenCalled();
+      const last = grantRequestAdapter.updateById.mock.calls.at(-1);
+      expect(last[1]).toEqual({ wmkf_ai_fieldprimer: prior });
+      expect(last[2]).toEqual({ ifMatch: OWN_LEASE_ETAG });
+    } finally {
+      nowSpy.mockRestore();
+      getAiProposalNarrativeText.mockReset();
+    }
   });
 
   it('missing AI proposal narrative restores the prior value and stops before generation', async () => {
@@ -116,6 +160,7 @@ describe('generateForRequest (Mode A)', () => {
     expect(grantRequestAdapter.updateById).toHaveBeenLastCalledWith(
       GUID,
       { wmkf_ai_fieldprimer: null },
+      { ifMatch: OWN_LEASE_ETAG },
     );
   });
 
@@ -271,13 +316,15 @@ describe('generateForRequest (Mode A)', () => {
 });
 
 describe('clampTimeoutToLease', () => {
-  it('leaves the published timeout alone when the lease has room, clamps it when the pull ate the lease, and floors it', () => {
+  it('leaves the published timeout alone when the lease has room, clamps it when the pull ate part of the lease, and returns null below the model minimum', () => {
     const start = 1_000_000;
     const deadline = start + FIELD_PRIMER_LEASE_TTL_MS;
     expect(clampTimeoutToLease(240000, deadline, start)).toBe(240000);
     const late = deadline - LEASE_GROUNDING_RESERVE_MS - LEASE_SAFETY_MARGIN_MS - 100000;
     expect(clampTimeoutToLease(240000, deadline, late)).toBe(100000);
-    expect(clampTimeoutToLease(240000, deadline, deadline)).toBe(30000);
+    expect(clampTimeoutToLease(240000, deadline, deadline - LEASE_GROUNDING_RESERVE_MS - LEASE_SAFETY_MARGIN_MS - MIN_MODEL_TIMEOUT_MS)).toBe(MIN_MODEL_TIMEOUT_MS);
+    expect(clampTimeoutToLease(240000, deadline, deadline - LEASE_GROUNDING_RESERVE_MS - LEASE_SAFETY_MARGIN_MS - MIN_MODEL_TIMEOUT_MS + 1)).toBeNull();
+    expect(clampTimeoutToLease(240000, deadline, deadline)).toBeNull();
   });
 });
 
