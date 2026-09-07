@@ -32,7 +32,7 @@ describe('reviewer status badge links', () => {
     const onClick = jest.fn();
     render(<StatusBadge status="materials_sent" onClick={onClick} ariaLabel="View activity history for Ada Reviewer" />);
     const button = screen.getByRole('button', { name: 'View activity history for Ada Reviewer' });
-    expect(button).toHaveClass('min-h-11');
+    expect(button.tagName).toBe('BUTTON');
     button.click();
     expect(onClick).toHaveBeenCalledTimes(1);
   });

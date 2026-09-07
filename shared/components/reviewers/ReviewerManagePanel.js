@@ -81,7 +81,7 @@ export function StatusBadge({ status, href, onClick, ariaLabel }) {
       <button
         type="button"
         onClick={onClick}
-        className={`${className} min-h-11 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-600 focus-visible:ring-offset-1`}
+        className={`${className} focus:outline-none focus-visible:ring-2 focus-visible:ring-green-600 focus-visible:ring-offset-1`}
         aria-label={ariaLabel}
         title="View activity history"
       >
@@ -1066,7 +1066,7 @@ export default function ReviewerManagePanel({
                         <button
                           type="button"
                           onClick={() => setActivityDrawerId(r.suggestionId)}
-                          className="mt-1.5 inline-flex min-h-11 items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800 hover:border-amber-300 hover:bg-amber-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-600 focus-visible:ring-offset-1"
+                          className="mt-1.5 inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800 hover:border-amber-300 hover:bg-amber-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-600 focus-visible:ring-offset-1"
                           aria-label={`View activity history for ${r.name || 'reviewer'}`}
                           title="View activity history"
                         >

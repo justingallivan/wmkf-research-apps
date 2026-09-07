@@ -35,7 +35,7 @@ export function TokenStateBadge({ state, expiresAt, firstAccessedAt, onClick, ar
       <button
         type="button"
         onClick={onClick}
-        className={`inline-flex min-h-11 items-center whitespace-nowrap rounded px-2 py-0.5 text-xs font-medium ${info.color} hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-1`}
+        className={`inline-flex items-center whitespace-nowrap rounded px-2 py-0.5 text-xs font-medium ${info.color} hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-1`}
         title={tooltip || 'View activity history'}
         aria-label={ariaLabel}
       >
