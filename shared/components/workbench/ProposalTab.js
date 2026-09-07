@@ -209,11 +209,13 @@ function PrimerView({ envelope }) {
   );
 }
 
-function FieldPrimer({ requestId, initialRaw }) {
+function FieldPrimer({ requestId, initialRaw, exportMeta }) {
   const [envelope, setEnvelope] = useState(() => parseFieldPrimerEnvelope(initialRaw));
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState(null);
   const [pending, setPending] = useState(false); // another session is generating
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState(null);
   const reqRef = useRef(0);
 
   // Reset state (and invalidate any in-flight generate) when the request — or its
@@ -224,6 +226,7 @@ function FieldPrimer({ requestId, initialRaw }) {
     setGenerating(false);
     setError(null);
     setPending(false);
+    setExportError(null);
   }, [requestId, initialRaw]);
 
   const generate = async (regenerate) => {
@@ -250,22 +253,53 @@ function FieldPrimer({ requestId, initialRaw }) {
     }
   };
 
+  const exportPdf = async () => {
+    if (!envelope) return;
+    setExporting(true);
+    setExportError(null);
+    try {
+      const [{ generateFieldPrimerPdf, fieldPrimerPdfFilename }, { downloadPdf }] = await Promise.all([
+        import('../../utils/field-primer-pdf'),
+        import('../../utils/pdf-export'),
+      ]);
+      const bytes = await generateFieldPrimerPdf(envelope, exportMeta || {});
+      downloadPdf(bytes, fieldPrimerPdfFilename(exportMeta || {}));
+    } catch (e) {
+      setExportError(`Could not build the PDF: ${e.message}`);
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <div>
       <div className="flex items-center justify-between gap-3 mb-1">
         <dt className="text-xs uppercase tracking-wide text-gray-400">Field Primer</dt>
-        <button
-          type="button"
-          onClick={() => generate(!!envelope)}
-          disabled={generating}
-          className="text-sm font-medium text-indigo-600 hover:underline disabled:text-gray-400"
-        >
-          {generating
-            ? (envelope ? 'Regenerating…' : 'Generating…')
-            : (envelope ? 'Regenerate' : 'Generate field primer')}
-        </button>
+        <div className="flex items-center gap-3">
+          {envelope && (
+            <button
+              type="button"
+              onClick={exportPdf}
+              disabled={exporting || generating}
+              className="text-sm font-medium text-indigo-600 hover:underline disabled:text-gray-400"
+            >
+              {exporting ? 'Preparing PDF…' : 'Export PDF'}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => generate(!!envelope)}
+            disabled={generating}
+            className="text-sm font-medium text-indigo-600 hover:underline disabled:text-gray-400"
+          >
+            {generating
+              ? (envelope ? 'Regenerating…' : 'Generating…')
+              : (envelope ? 'Regenerate' : 'Generate field primer')}
+          </button>
+        </div>
       </div>
       {error && <p className="text-sm text-amber-600 mb-2">{error}</p>}
+      {exportError && <p className="text-sm text-amber-600 mb-2">{exportError}</p>}
       {pending && !envelope && (
         <p className="text-sm text-gray-500">Another session is generating this primer — refresh in a moment.</p>
       )}
@@ -466,7 +500,16 @@ export default function ProposalTab({ context }) {
             <dt className="text-xs uppercase tracking-wide text-gray-400 mb-1">AI Extracted Data</dt>
             <dd><ExtractedData raw={ai.dataExtract} /></dd>
           </div>
-          <FieldPrimer requestId={requestId} initialRaw={ai.fieldPrimer} />
+          <FieldPrimer
+            requestId={requestId}
+            initialRaw={ai.fieldPrimer}
+            exportMeta={{
+              requestNumber: context?.requestNumber || '',
+              title: context?.title || '',
+              institution: info.institution || '',
+              pi: info.pi || '',
+            }}
+          />
         </div>
       </Section>
     </div>
