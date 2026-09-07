@@ -18,6 +18,7 @@ import Layout from '../Layout';
 import WorkbenchViewsNav from '../workbench/WorkbenchViewsNav';
 import { cycleCodeToLabel } from '../../../lib/utils/cycle-code.js';
 import { isGuid } from '../../../lib/utils/guid.js';
+import ToolbarSelect, { TOOLBAR_CONTROL_HEIGHT_CLASS } from '../ToolbarSelect';
 
 const DATE_FORMATTER = new Intl.DateTimeFormat('en-US', {
   month: 'short',
@@ -438,27 +439,6 @@ const NO_CYCLE = 'none';
 const DEFAULT_VIEW = 'needs-review';
 
 /**
- * Toolbar selects opt out of the native menu-button appearance: Safari
- * ignores height and padding on a native `<select>`, so the controls rendered
- * ~30px beside a 48px view control. With `appearance-none` the 48px box holds
- * in every browser and `SelectShell` draws the chevron.
- */
-const TOOLBAR_SELECT_CLASS = 'h-12 w-full appearance-none rounded-xl border border-gray-300 bg-white pl-4 pr-10 text-base text-gray-900 shadow-sm focus:border-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-400/30 disabled:opacity-60';
-
-function SelectShell({ children }) {
-  return (
-    <div className="relative">
-      {children}
-      <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-gray-500">
-        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4">
-          <path d="m7 9 5-5 5 5M7 15l5 5 5-5" />
-        </svg>
-      </span>
-    </div>
-  );
-}
-
-/**
  * The three dashboard views. Keys are the `view` URL values; `select` picks
  * the rows from the server queues. Allowlist and labels live in one map so an
  * unknown value cannot be labeled and a labeled value cannot be unselectable.
@@ -546,26 +526,21 @@ function CycleSelector({ cycles, disabled, onChange }) {
     options.push({ code: cycles.selected, label: cycleLabelFor(cycles, cycles.selected) });
   }
   return (
-    <div className="flex flex-col gap-1.5">
-      <label htmlFor="final-writeup-cycle" className="text-sm font-medium text-gray-700">Cycle</label>
-      <SelectShell>
-      <select
-        id="final-writeup-cycle"
-        value={cycles?.selected || ''}
-        disabled={disabled}
-        onChange={(event) => onChange(event.target.value)}
-        className={TOOLBAR_SELECT_CLASS}
-      >
-        {options.length === 0 && <option value="">No cycles with current writeups</option>}
-        {options.map((cycle) => (
-          <option key={cycle.code} value={cycle.code}>{cycle.label}</option>
-        ))}
-        {(cycles?.hasUncycled || cycles?.selected === NO_CYCLE) && (
-          <option value={NO_CYCLE}>No cycle</option>
-        )}
-      </select>
-      </SelectShell>
-    </div>
+    <ToolbarSelect
+      id="final-writeup-cycle"
+      label="Cycle"
+      value={cycles?.selected || ''}
+      disabled={disabled}
+      onChange={(event) => onChange(event.target.value)}
+    >
+      {options.length === 0 && <option value="">No cycles with current writeups</option>}
+      {options.map((cycle) => (
+        <option key={cycle.code} value={cycle.code}>{cycle.label}</option>
+      ))}
+      {(cycles?.hasUncycled || cycles?.selected === NO_CYCLE) && (
+        <option value={NO_CYCLE}>No cycle</option>
+      )}
+    </ToolbarSelect>
   );
 }
 
@@ -583,23 +558,18 @@ function ProgramDirectorSelector({ options, value, disabled, onChange }) {
     rendered.push({ id: value, name: PD_ABSENT_LABEL });
   }
   return (
-    <div className="flex flex-col gap-1.5">
-      <label htmlFor="final-writeup-pd" className="text-sm font-medium text-gray-700">Program director</label>
-      <SelectShell>
-      <select
-        id="final-writeup-pd"
-        value={value || ''}
-        disabled={disabled}
-        onChange={(event) => onChange(event.target.value || null)}
-        className={TOOLBAR_SELECT_CLASS}
-      >
-        <option value="">All program directors</option>
-        {rendered.map((option) => (
-          <option key={option.id} value={option.id}>{option.name}</option>
-        ))}
-      </select>
-      </SelectShell>
-    </div>
+    <ToolbarSelect
+      id="final-writeup-pd"
+      label="Program director"
+      value={value || ''}
+      disabled={disabled}
+      onChange={(event) => onChange(event.target.value || null)}
+    >
+      <option value="">All program directors</option>
+      {rendered.map((option) => (
+        <option key={option.id} value={option.id}>{option.name}</option>
+      ))}
+    </ToolbarSelect>
   );
 }
 
@@ -610,7 +580,7 @@ function ProgramDirectorSelector({ options, value, disabled, onChange }) {
  */
 function ViewSelector({ view, counts, disabled, onChange }) {
   return (
-    <div role="group" aria-labelledby="final-writeup-view-label" className="inline-flex h-12 items-stretch gap-1 rounded-xl border border-gray-200 bg-gray-50 p-1">
+    <div role="group" aria-labelledby="final-writeup-view-label" className={`inline-flex ${TOOLBAR_CONTROL_HEIGHT_CLASS} items-stretch gap-1 rounded-xl border border-gray-200 bg-gray-50 p-1`}>
       {VIEW_KEYS.map((key) => {
         const active = key === view;
         return (

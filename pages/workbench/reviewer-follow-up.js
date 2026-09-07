@@ -11,6 +11,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import Layout, { Card, PageHeader } from '../../shared/components/Layout';
+import ToolbarSelect, { TOOLBAR_CONTROL_HEIGHT_CLASS } from '../../shared/components/ToolbarSelect';
 import RequireAppAccess from '../../shared/components/RequireAppAccess';
 import ReviewerManagePanel from '../../shared/components/reviewers/ReviewerManagePanel';
 import EmailTemplatesModal from '../../shared/components/reviewers/EmailTemplatesModal';
@@ -284,28 +285,26 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
 
       <div className="mb-5 rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
         <div className="flex flex-col gap-3.5">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-          <label className="flex flex-col gap-1 text-sm font-medium text-gray-700">
-            <span>Cycle</span>
-            <select
-              value={cycleCode}
-              onChange={(event) => setCycleCode(event.target.value)}
-              disabled={loadingCycles || cycles.length === 0}
-              className="block min-h-11 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 disabled:opacity-50"
-            >
-              {cycles.map((cycle) => (
-                <option key={cycle.code} value={cycle.code}>
-                  {cycle.label || cycle.code} ({cycle.count || 0} active{cycle.setAsideCount
-                    ? ` + ${cycle.setAsideCount} set aside`
-                    : ''})
-                </option>
-              ))}
-            </select>
-          </label>
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <ToolbarSelect
+            id="reviewer-follow-up-cycle"
+            label="Cycle"
+            value={cycleCode}
+            disabled={loadingCycles || cycles.length === 0}
+            onChange={(event) => setCycleCode(event.target.value)}
+          >
+            {cycles.map((cycle) => (
+              <option key={cycle.code} value={cycle.code}>
+                {cycle.label || cycle.code} ({cycle.count || 0} active{cycle.setAsideCount
+                  ? ` + ${cycle.setAsideCount} set aside`
+                  : ''})
+              </option>
+            ))}
+          </ToolbarSelect>
 
-          <fieldset className="flex flex-col gap-1">
+          <fieldset className="flex flex-col gap-1.5">
             <legend className="text-sm font-medium text-gray-700">Requests</legend>
-            <div className="inline-flex min-h-11 overflow-hidden rounded-lg border border-gray-300 bg-white">
+            <div className={`inline-flex ${TOOLBAR_CONTROL_HEIGHT_CLASS} overflow-hidden rounded-xl border border-gray-300 bg-white`}>
               <button
                 type="button"
                 onClick={() => setScope('my')}
@@ -325,9 +324,9 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
             </div>
           </fieldset>
 
-          <fieldset className="flex flex-col gap-1">
+          <fieldset className="flex flex-col gap-1.5">
             <legend className="text-sm font-medium text-gray-700">Reviewers</legend>
-            <div className="inline-flex min-h-11 overflow-hidden rounded-lg border border-gray-300 bg-white">
+            <div className={`inline-flex ${TOOLBAR_CONTROL_HEIGHT_CLASS} overflow-hidden rounded-xl border border-gray-300 bg-white`}>
               <button
                 type="button"
                 onClick={() => setView('attention')}
