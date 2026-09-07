@@ -1038,7 +1038,9 @@ export default function ReviewerManagePanel({
                         </span>
                       )}
                       {!receivedReview && r.reminderCount > 0 && (
-                        <span className="text-xs text-gray-400 ml-1">({r.reminderCount} reminder{r.reminderCount !== 1 ? 's' : ''})</span>
+                        <span className="ml-1 inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800">
+                          {r.reminderCount} reminder{r.reminderCount !== 1 ? 's' : ''}
+                        </span>
                       )}
                     </td>
                     <td className="px-4 py-3 align-top">
