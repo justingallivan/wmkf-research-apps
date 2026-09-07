@@ -14,6 +14,7 @@ import Layout, { PageHeader, Card } from '../shared/components/Layout';
 import RequireAppAccess from '../shared/components/RequireAppAccess';
 import ReviewerStatusIndicator from '../shared/components/workbench/ReviewerStatusIndicator';
 import WorkbenchViewsNav from '../shared/components/workbench/WorkbenchViewsNav';
+import ToolbarSelect, { TOOLBAR_CONTROL_HEIGHT_CLASS } from '../shared/components/ToolbarSelect';
 import RequestLocator from '../shared/components/workbench/RequestLocator';
 import { TRIAGE_STATUS } from '../shared/config/triageStatus';
 
@@ -178,24 +179,22 @@ export function WorkbenchDashboard() {
       <RequestLocator />
 
       {/* Controls */}
-      <div className="flex flex-wrap items-center gap-4 mb-6">
-        <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
-          Cycle
-          <select
-            className="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white"
-            value={cycleCode || ''}
-            onChange={(e) => setCycleCode(e.target.value || null)}
-            disabled={loadingCycles || cycles.length === 0}
-          >
-            {cycles.map((c) => (
-              <option key={c.code} value={c.code}>
-                {c.label || c.code}{c.count ? ` (${c.count})` : ''}
-              </option>
-            ))}
-          </select>
-        </label>
+      <div className="flex flex-wrap items-end gap-4 mb-6">
+        <ToolbarSelect
+          id="workbench-cycle"
+          label="Cycle"
+          value={cycleCode || ''}
+          disabled={loadingCycles || cycles.length === 0}
+          onChange={(e) => setCycleCode(e.target.value || null)}
+        >
+          {cycles.map((c) => (
+            <option key={c.code} value={c.code}>
+              {c.label || c.code}{c.count ? ` (${c.count})` : ''}
+            </option>
+          ))}
+        </ToolbarSelect>
 
-        <div className="inline-flex rounded-lg border border-gray-300 overflow-hidden">
+        <div className={`inline-flex ${TOOLBAR_CONTROL_HEIGHT_CLASS} rounded-xl border border-gray-300 overflow-hidden`}>
           {['my', 'all'].map((s) => (
             <button
               key={s}
@@ -210,7 +209,7 @@ export function WorkbenchDashboard() {
           ))}
         </div>
 
-        <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+        <label className={`flex ${TOOLBAR_CONTROL_HEIGHT_CLASS} items-center gap-2 text-sm font-medium text-gray-700`}>
           <input
             type="checkbox"
             className="rounded border-gray-300"
@@ -221,7 +220,7 @@ export function WorkbenchDashboard() {
         </label>
 
         {rollup && (
-          <div className="ml-auto text-sm text-gray-600">
+          <div className={`ml-auto flex ${TOOLBAR_CONTROL_HEIGHT_CLASS} items-center text-sm text-gray-600`}>
             <span className="font-semibold text-gray-900">{rollup.total}</span> request{rollup.total === 1 ? '' : 's'}
             {rollup.stages?.find ? <span className="ml-3">· {rollup.stages.find} need reviewers</span> : null}
             {rollup.stages?.done ? <span className="ml-3">· {rollup.stages.done} complete</span> : null}

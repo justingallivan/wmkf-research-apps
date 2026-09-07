@@ -11,6 +11,7 @@ import Layout, { Card, PageHeader } from '../../shared/components/Layout';
 import RequireAppAccess from '../../shared/components/RequireAppAccess';
 import ArtifactFileMetadata from '../../shared/components/workbench/ArtifactFileMetadata';
 import WorkbenchViewsNav from '../../shared/components/workbench/WorkbenchViewsNav';
+import ToolbarSelect from '../../shared/components/ToolbarSelect';
 
 function ArtifactDashboard() {
   const [cycles, setCycles] = useState([]);
@@ -82,23 +83,21 @@ function ArtifactDashboard() {
         icon="📝"
       />
       <WorkbenchViewsNav activeKey="initial-assessments" cycleCode={cycleCode} />
-      <div className="mb-6">
-        <label className="text-sm font-medium text-gray-700">
-          Cycle{' '}
-          <select
-            value={cycleCode}
-            onChange={(event) => {
-              setLoading(true);
-              setError(null);
-              setCycleCode(event.target.value);
-            }}
-            className="ml-2 border border-gray-300 rounded-lg px-3 py-2 bg-white"
-          >
-            {cycles.map((cycle) => (
-              <option key={cycle.code} value={cycle.code}>{cycle.label || cycle.code}</option>
-            ))}
-          </select>
-        </label>
+      <div className="mb-6 flex flex-wrap items-end gap-4">
+        <ToolbarSelect
+          id="initial-assessments-cycle"
+          label="Cycle"
+          value={cycleCode}
+          onChange={(event) => {
+            setLoading(true);
+            setError(null);
+            setCycleCode(event.target.value);
+          }}
+        >
+          {cycles.map((cycle) => (
+            <option key={cycle.code} value={cycle.code}>{cycle.label || cycle.code}</option>
+          ))}
+        </ToolbarSelect>
       </div>
       {error && (
         <div className="mb-4 p-4 rounded-lg bg-red-50 border border-red-200 text-red-800 text-sm">
