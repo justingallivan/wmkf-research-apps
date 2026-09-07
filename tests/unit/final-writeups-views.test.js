@@ -117,26 +117,31 @@ test('dashboard leads with one search field and server-derived task queues', asy
   global.fetch.mockResolvedValueOnce(response(dashboard()));
   render(<FinalWriteupsDashboardView />);
 
-  expect(await screen.findByRole('heading', { name: 'Awaiting your review' })).toBeInTheDocument();
+  expect(await screen.findByRole('heading', { name: 'Needs my review' })).toBeInTheDocument();
   expect(screen.getAllByRole('searchbox')).toHaveLength(1);
   expect(screen.getAllByRole('link', { name: 'Open review' })[0])
     .toHaveAttribute('href', `/workbench/final-writeups/${REQUEST_ID}`);
-  expect(screen.getByText('Reviewed history')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /Reviewed by me/ })).toBeInTheDocument();
   expect(screen.getByText('Your writeups')).toBeInTheDocument();
   expect(screen.getByRole('link', { name: 'Edit in Word' })).toHaveAttribute('target', '_blank');
   expect(screen.queryByText(/Science and Engineering|Medical Research/i)).not.toBeInTheDocument();
 });
 
-test('dashboard search filters all queues without adding filter controls other than the cycle selector', async () => {
+test('dashboard search filters the active view without adding controls other than the cycle select, view selector, and Program director filter', async () => {
   global.fetch.mockResolvedValueOnce(response(dashboard()));
   render(<FinalWriteupsDashboardView />);
   const search = await screen.findByRole('searchbox');
 
   fireEvent.change(search, { target: { value: 'second' } });
   expect(screen.queryByText('Cellular repair after tissue injury')).not.toBeInTheDocument();
+  expect(screen.queryByText('A second proposal')).not.toBeInTheDocument();
+  expect(screen.getByText('0 matching writeups')).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: /All writeups/ }));
   expect(screen.getByText('A second proposal')).toBeInTheDocument();
   expect(screen.getByText('1 matching writeup')).toBeInTheDocument();
-  expect(screen.getAllByRole('combobox')).toHaveLength(1);
+  expect(screen.getAllByRole('combobox')).toHaveLength(2);
+  expect(screen.getByRole('group', { name: 'View' }).querySelectorAll('button')).toHaveLength(3);
 });
 
 test('cycle selector reflects the server list, defaults to the selected cycle, and reloads with the chosen code', async () => {
@@ -165,7 +170,7 @@ test('cycle selector reflects the server list, defaults to the selected cycle, a
   expect(global.fetch).toHaveBeenLastCalledWith('/api/workbench/final-writeups?cycleCode=J26');
   expect(window.location.search).toBe('?cycleCode=J26');
   await waitFor(() => expect(screen.getByRole('combobox', { name: 'Cycle' })).toHaveValue('J26'));
-  expect(screen.getByText('You have no writeups waiting for review.')).toBeInTheDocument();
+  expect(screen.getByText(/Nothing needs your review in June 2026\./)).toBeInTheDocument();
 });
 
 test('dashboard reads cycleCode from the URL on mount and passes it as the only query parameter', async () => {
@@ -250,7 +255,7 @@ test('walk-back outcomes are rendered from response fields only', async () => {
     },
   })));
   const { unmount } = render(<FinalWriteupsDashboardView />);
-  expect(await screen.findByText('Nothing awaits your review in December 2026; showing June 2026.')).toBeInTheDocument();
+  expect(await screen.findByText('No current writeups visible to you in December 2026; showing June 2026.')).toBeInTheDocument();
   unmount();
 
   global.fetch.mockResolvedValueOnce(response(dashboard({
@@ -264,7 +269,7 @@ test('walk-back outcomes are rendered from response fields only', async () => {
     queues: { open: [], history: [], stewardship: [] },
   })));
   render(<FinalWriteupsDashboardView />);
-  expect(await screen.findByText('Nothing awaits your review in the most recent cycles; choose a cycle to look further back.')).toBeInTheDocument();
+  expect(await screen.findByText('No current writeups visible to you in the most recent cycles; choose a cycle to look further back.')).toBeInTheDocument();
 });
 
 test('dashboard ignores a late response after the cycle changes', async () => {
@@ -349,7 +354,8 @@ test('enabled overlapping persona lenses are named without adding another contro
   render(<FinalWriteupsDashboardView />);
 
   expect(await screen.findByText('Program Director + Leadership view')).toBeInTheDocument();
-  expect(screen.queryByRole('button', { name: /view/i })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /persona|lens/i })).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /Needs my review/ })).toHaveAttribute('aria-pressed', 'true');
 });
 
 test('superuser dashboard renders a complete neutral coordinator matrix with direct Word links', async () => {
@@ -499,4 +505,332 @@ test('responsible PD focused view offers editing but never self-acknowledgement'
   render(<FinalWriteupFocusedView requestId={REQUEST_ID} />);
   expect(await screen.findByRole('link', { name: 'Edit in Word' })).toHaveAttribute('target', '_blank');
   expect(screen.queryByRole('button', { name: /Mark .*reviewed/i })).not.toBeInTheDocument();
+});
+
+describe('views, Program director filter, and version context (Slices 6B/6C)', () => {
+  const PD_A = '33333333-3333-4333-8333-333333333331';
+  const PD_B = '33333333-3333-4333-8333-333333333332';
+  const PD_ABSENT = '33333333-3333-4333-8333-333333333339';
+  const pdA = { id: PD_A, name: 'Program Director A' };
+  const pdB = { id: PD_B, name: 'Program Director B' };
+
+  function pressed(name) {
+    return screen.getByRole('button', { name }).getAttribute('aria-pressed');
+  }
+
+  function twoPdDashboard(overrides = {}) {
+    const openA = writeup({ responsibleProgramDirector: pdA, title: 'Open for A' });
+    const historyB = writeup({
+      requestId: '11111111-1111-4111-8111-111111111112',
+      requestNumber: '1002789',
+      title: 'History for B',
+      responsibleProgramDirector: pdB,
+      bucket: 'history',
+      personalState: 'updated',
+      acknowledgedAt: '2026-08-30T12:00:00.000Z',
+      acknowledgedPublicationVersionId: '1.0',
+    });
+    const stewardshipB = writeup({
+      requestId: '11111111-1111-4111-8111-111111111113',
+      requestNumber: '1002790',
+      title: 'Stewardship for B',
+      responsibleProgramDirector: pdB,
+      relationship: 'responsible-pd',
+      bucket: 'stewardship',
+      personalState: 'not-applicable',
+      mayAcknowledge: false,
+      primaryAction: { key: 'edit', label: 'Edit in Word' },
+    });
+    return dashboard({
+      counts: { total: 3, open: 1, history: 1, stewardship: 1 },
+      queues: { open: [openA], history: [historyB], stewardship: [stewardshipB] },
+      ...overrides,
+    });
+  }
+
+  function matrixFor(rowA, rowB) {
+    return {
+      mode: 'configured',
+      groups: [{
+        grantProgramId: 'program-1',
+        grantProgramName: 'Research',
+        reviewers: [{ reviewerId: 'reviewer-1', name: 'Ada Reviewer', initials: 'AR' }],
+        rows: [{
+          requestId: rowA.requestId,
+          requestNumber: rowA.requestNumber,
+          title: rowA.title,
+          institution: rowA.institution,
+          responsibleProgramDirector: rowA.responsibleProgramDirector,
+          stage: rowA.stage,
+          documentUrl: rowA.document.url,
+          cells: [{ reviewerId: 'reviewer-1', state: 'unreviewed', acknowledgedAt: null }],
+        }],
+      }],
+      unconfiguredRows: [{
+        requestId: rowB.requestId,
+        requestNumber: rowB.requestNumber,
+        title: rowB.title,
+        institution: rowB.institution,
+        responsibleProgramDirector: rowB.responsibleProgramDirector,
+        grantProgramId: 'program-2',
+        grantProgramName: 'Southern California',
+      }],
+    };
+  }
+
+  test('dashboard opens on Needs my review for every persona and never sends view or pd to the API', async () => {
+    setLocation(`?cycleCode=D26&view=reviewed&pd=${PD_A}`);
+    global.fetch.mockResolvedValueOnce(response(twoPdDashboard()));
+    const first = render(<FinalWriteupsDashboardView />);
+    await screen.findByRole('heading', { name: 'Reviewed by me' });
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(global.fetch).toHaveBeenCalledWith('/api/workbench/final-writeups?cycleCode=D26');
+    expect(window.location.search).toBe(`?cycleCode=D26&view=reviewed&pd=${PD_A}`);
+    first.unmount();
+
+    for (const personas of [['program-director'], ['program-coordinator'], ['leadership']]) {
+      setLocation('');
+      global.fetch.mockResolvedValueOnce(response(twoPdDashboard({
+        viewer: { id: 'reviewer-1', name: 'Ada', personas, personaLensesEnabled: true, isSuperuser: false },
+      })));
+      const view = render(<FinalWriteupsDashboardView />);
+      await screen.findByRole('heading', { name: 'Needs my review' });
+      expect(pressed(/Needs my review/)).toBe('true');
+      expect(window.location.search).toBe('');
+      view.unmount();
+    }
+  });
+
+  test('view selector partitions by bucket: updated rows stay in Reviewed by me, stewardship only in All', async () => {
+    global.fetch.mockResolvedValueOnce(response(dashboard()));
+    render(<FinalWriteupsDashboardView />);
+    await screen.findByRole('heading', { name: 'Needs my review' });
+    expect(screen.getByText('Cellular repair after tissue injury')).toBeInTheDocument();
+    expect(screen.queryByText('A second proposal')).not.toBeInTheDocument();
+    expect(screen.getByText('Your writeups')).toBeInTheDocument();
+    expect(screen.getByText('My proposal')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Reviewed by me/ }));
+    expect(screen.getByRole('heading', { name: 'Reviewed by me' })).toBeInTheDocument();
+    expect(screen.getByText('A second proposal')).toBeInTheDocument();
+    expect(screen.getByText('Updated since review')).toBeInTheDocument();
+    expect(screen.queryByText('Cellular repair after tissue injury')).not.toBeInTheDocument();
+    expect(window.location.search).toBe('?view=reviewed');
+
+    fireEvent.click(screen.getByRole('button', { name: /All writeups/ }));
+    expect(screen.getByRole('heading', { name: 'All writeups' })).toBeInTheDocument();
+    expect(screen.getByText('Cellular repair after tissue injury')).toBeInTheDocument();
+    expect(screen.getByText('A second proposal')).toBeInTheDocument();
+    expect(screen.getByText('My proposal')).toBeInTheDocument();
+    expect(screen.queryByText('Your writeups')).not.toBeInTheDocument();
+    expect(window.location.search).toBe('?view=all');
+
+    fireEvent.click(screen.getByRole('button', { name: /Needs my review/ }));
+    expect(window.location.search).toBe('');
+  });
+
+  test('All writeups merges the buckets and sorts by request number', async () => {
+    global.fetch.mockResolvedValueOnce(response(dashboard({
+      queues: {
+        open: [writeup({ requestNumber: '200', title: 'Two hundred' })],
+        history: [writeup({ requestId: 'h', requestNumber: '100', title: 'One hundred', bucket: 'history', personalState: 'reviewed' })],
+        stewardship: [writeup({ requestId: 's', requestNumber: '150', title: 'One fifty', bucket: 'stewardship', relationship: 'responsible-pd', personalState: 'not-applicable', mayAcknowledge: false, primaryAction: { key: 'edit', label: 'Edit in Word' } })],
+      },
+    })));
+    render(<FinalWriteupsDashboardView />);
+    await screen.findByRole('heading', { name: 'Needs my review' });
+    fireEvent.click(screen.getByRole('button', { name: /All writeups/ }));
+    const titles = screen.getAllByRole('heading', { level: 3 }).map((heading) => heading.textContent);
+    expect(titles).toEqual(['One hundred', 'One fifty', 'Two hundred']);
+  });
+
+  test('invalid view and pd are sanitized on mount and the address bar is rewritten immediately', async () => {
+    setLocation('?cycleCode=D26&view=bogus&pd=not-a-guid');
+    global.fetch.mockResolvedValueOnce(response(twoPdDashboard()));
+    const first = render(<FinalWriteupsDashboardView />);
+    await screen.findByRole('heading', { name: 'Needs my review' });
+    expect(window.location.search).toBe('?cycleCode=D26');
+    expect(pressed(/Needs my review/)).toBe('true');
+    expect(screen.getByRole('combobox', { name: 'Program director' })).toHaveValue('');
+    expect(screen.getByText('Open for A')).toBeInTheDocument();
+    expect(global.fetch).toHaveBeenCalledWith('/api/workbench/final-writeups?cycleCode=D26');
+    first.unmount();
+
+    // The default view written explicitly is normalized away: a clean URL stays clean.
+    setLocation('?view=needs-review');
+    global.fetch.mockResolvedValueOnce(response(twoPdDashboard()));
+    render(<FinalWriteupsDashboardView />);
+    await screen.findByRole('heading', { name: 'Needs my review' });
+    expect(window.location.search).toBe('');
+  });
+
+  test('Program director options derive from loaded rows and filter list, Your writeups, configured and unconfigured matrix rows', async () => {
+    const data = twoPdDashboard();
+    data.coordinatorMatrix = matrixFor(data.queues.open[0], data.queues.history[0]);
+    global.fetch.mockResolvedValueOnce(response(data));
+    render(<FinalWriteupsDashboardView />);
+    const select = await screen.findByRole('combobox', { name: 'Program director' });
+    expect([...select.options].map((option) => option.textContent))
+      .toEqual(['All program directors', 'Program Director A', 'Program Director B']);
+    expect(screen.getByText('Audience configuration needed')).toBeInTheDocument();
+
+    fireEvent.change(select, { target: { value: PD_B } });
+    expect(window.location.search).toBe(`?pd=${PD_B}`);
+    expect(screen.queryByText('Open for A')).not.toBeInTheDocument();
+    expect(screen.getByText(/Nothing needs your review in December 2026 for Program Director B\./)).toBeInTheDocument();
+    expect(screen.getByText('Stewardship for B')).toBeInTheDocument();
+    expect(screen.getByText('No matrix rows match your filters.')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /History for B/ })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /All writeups/ }));
+    expect(screen.getByText('History for B')).toBeInTheDocument();
+    expect(screen.queryByText('Open for A')).not.toBeInTheDocument();
+
+    fireEvent.change(select, { target: { value: PD_A } });
+    expect(screen.getByRole('heading', { level: 3, name: 'Open for A' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { level: 3, name: 'History for B' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Audience configuration needed')).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Open in Word' })).toBeInTheDocument();
+  });
+
+  test('a valid pd GUID with whitespace or uppercase is canonicalized, filters correctly, and the address bar is rewritten', async () => {
+    setLocation(`?pd=%20${PD_B.toUpperCase()}%20`);
+    global.fetch.mockResolvedValueOnce(response(twoPdDashboard()));
+    render(<FinalWriteupsDashboardView />);
+    const select = await screen.findByRole('combobox', { name: 'Program director' });
+    expect(select).toHaveValue(PD_B);
+    expect(window.location.search).toBe(`?pd=${PD_B}`);
+    expect(screen.queryByRole('option', { name: 'Program director not in this cycle' })).not.toBeInTheDocument();
+    expect(screen.getByText('Stewardship for B')).toBeInTheDocument();
+    expect(screen.queryByText('Open for A')).not.toBeInTheDocument();
+  });
+
+  test('non-GUID pd is dropped; a GUID absent from the cycle keeps an option and shows the empty copy', async () => {
+    setLocation(`?pd=${PD_ABSENT}`);
+    global.fetch.mockResolvedValueOnce(response(twoPdDashboard()));
+    render(<FinalWriteupsDashboardView />);
+    const select = await screen.findByRole('combobox', { name: 'Program director' });
+    expect(select).toHaveValue(PD_ABSENT);
+    expect(screen.getByRole('option', { name: 'Program director not in this cycle' })).toBeInTheDocument();
+    expect(screen.getByText(/No writeups for the selected Program Director in December 2026\. Choose All program directors to clear the filter\./)).toBeInTheDocument();
+    expect(screen.queryByText('Open for A')).not.toBeInTheDocument();
+    expect(window.location.search).toBe(`?pd=${PD_ABSENT}`);
+  });
+
+  test('view does not filter the coordinator matrix', async () => {
+    const data = twoPdDashboard();
+    data.coordinatorMatrix = matrixFor(data.queues.open[0], data.queues.history[0]);
+    global.fetch.mockResolvedValueOnce(response(data));
+    render(<FinalWriteupsDashboardView />);
+    await screen.findByRole('heading', { name: 'Coordinator matrix' });
+    const matrixLinks = () => screen.getAllByRole('link', { name: 'Open in Word' }).length
+      + (screen.queryByText('Audience configuration needed') ? 1 : 0);
+    expect(matrixLinks()).toBe(2);
+    fireEvent.click(screen.getByRole('button', { name: /Reviewed by me/ }));
+    expect(matrixLinks()).toBe(2);
+    fireEvent.click(screen.getByRole('button', { name: /All writeups/ }));
+    expect(matrixLinks()).toBe(2);
+  });
+
+  test('header count and view counts reflect the PD filter and search together', async () => {
+    const openB = writeup({
+      requestId: '11111111-1111-4111-8111-111111111114',
+      requestNumber: '1002791',
+      title: 'Open for B',
+      responsibleProgramDirector: pdB,
+    });
+    const data = twoPdDashboard();
+    data.queues.open.push(openB);
+    data.counts = { total: 4, open: 42, history: 1, stewardship: 1 };
+    global.fetch.mockResolvedValueOnce(response(data));
+    render(<FinalWriteupsDashboardView />);
+    await screen.findByRole('heading', { name: 'Needs my review' });
+    expect(screen.getByText(/awaiting your review in December 2026/).textContent).toMatch(/^2 awaiting/);
+    expect(screen.getByRole('button', { name: /Needs my review/ }).textContent).toContain('2');
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Program director' }), { target: { value: PD_B } });
+    expect(screen.getByText(/awaiting your review in December 2026 for Program Director B/).textContent).toMatch(/^1 awaiting/);
+    expect(screen.getByRole('button', { name: /Needs my review/ }).textContent).toContain('1');
+    expect(screen.getByRole('button', { name: /All writeups/ }).textContent).toContain('3');
+
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'zzz' } });
+    expect(screen.getByText(/awaiting your review/).textContent).toMatch(/^0 awaiting/);
+    expect(screen.getByRole('button', { name: /All writeups/ }).textContent).toContain('0');
+  });
+
+  test('cycle change preserves view and pd in the URL', async () => {
+    setLocation(`?view=reviewed&pd=${PD_B}`);
+    global.fetch
+      .mockResolvedValueOnce(response(twoPdDashboard()))
+      .mockResolvedValueOnce(response(twoPdDashboard({
+        cycles: { selected: 'J26', available: [{ code: 'D26', label: 'December 2026' }, { code: 'J26', label: 'June 2026' }], hasUncycled: false, defaultResolvedBy: 'explicit' },
+      })));
+    render(<FinalWriteupsDashboardView />);
+    const cycle = await screen.findByRole('combobox', { name: 'Cycle' });
+    fireEvent.change(cycle, { target: { value: 'J26' } });
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2));
+    expect(global.fetch).toHaveBeenLastCalledWith('/api/workbench/final-writeups?cycleCode=J26');
+    const params = new URLSearchParams(window.location.search);
+    expect(params.get('cycleCode')).toBe('J26');
+    expect(params.get('view')).toBe('reviewed');
+    expect(params.get('pd')).toBe(PD_B);
+    expect([...params.keys()]).toHaveLength(3);
+  });
+
+  test('Needs my review empty state offers the other views with counts', async () => {
+    const data = twoPdDashboard();
+    data.queues.open = [];
+    global.fetch.mockResolvedValueOnce(response(data));
+    render(<FinalWriteupsDashboardView />);
+    await screen.findByText(/Nothing needs your review in December 2026\./);
+    fireEvent.click(screen.getByRole('button', { name: '1 reviewed by you' }));
+    expect(pressed(/Reviewed by me/)).toBe('true');
+    expect(screen.getByText('History for B')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Needs my review/ }));
+    fireEvent.click(screen.getByRole('button', { name: '2 writeups in all' }));
+    expect(pressed(/All writeups/)).toBe('true');
+  });
+
+  test('rows render the exact publicationVersionId verbatim and the exact acknowledgedPublicationVersionId when updated', async () => {
+    const data = twoPdDashboard();
+    data.queues.open[0].document.publicationVersionId = 'abc';
+    data.queues.history[0].document.publicationVersionId = '2.0';
+    data.queues.stewardship[0].document.publicationVersionId = '5.0';
+    global.fetch.mockResolvedValueOnce(response(data));
+    render(<FinalWriteupsDashboardView />);
+    await screen.findByText('Open for A');
+    expect(screen.getByText(/Version abc/)).toBeInTheDocument();
+    expect(screen.queryByText(/You reviewed version/)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Reviewed by me/ }));
+    expect(screen.getByText(/Version 2\.0/)).toBeInTheDocument();
+    expect(screen.getByText('· You reviewed version 1.0')).toBeInTheDocument();
+  });
+
+  test('focused panel states name the exact reviewed and current versions', async () => {
+    const updated = writeup({
+      bucket: 'history',
+      personalState: 'updated',
+      acknowledgedAt: '2026-08-30T12:00:00.000Z',
+      acknowledgedPublicationVersionId: '1.0',
+      document: { url: 'https://example.sharepoint.com/final.docx', publicationVersionId: '2.0', lastModified: '2026-08-31T12:00:00.000Z' },
+    });
+    global.fetch.mockResolvedValueOnce(response(dashboard({ selected: updated, navigation: null })));
+    const first = render(<FinalWriteupFocusedView requestId={REQUEST_ID} />);
+    expect(await screen.findByText(/^You reviewed version 1\.0 on .+\. The current version is 2\.0\.$/)).toBeInTheDocument();
+    expect(screen.getByText('Version 2.0')).toBeInTheDocument();
+    first.unmount();
+
+    global.fetch.mockResolvedValueOnce(response(dashboard({
+      selected: writeup({
+        bucket: 'history',
+        personalState: 'reviewed',
+        acknowledgedAt: '2026-08-31T12:05:00.000Z',
+        acknowledgedPublicationVersionId: '2.0',
+      }),
+      navigation: null,
+    })));
+    render(<FinalWriteupFocusedView requestId={REQUEST_ID} />);
+    expect(await screen.findByText(/^You reviewed version 2\.0 on .+\.$/)).toBeInTheDocument();
+  });
 });

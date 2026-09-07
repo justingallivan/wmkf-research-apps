@@ -1,10 +1,15 @@
 /**
  * Impeccable direction contract — code-first extension of The Clear Workbench.
- * THESIS: one legible review queue replaces a metrics-and-filters dashboard.
+ * THESIS: one opening view, "Needs my review", with "Reviewed by me" and "All writeups" as the
+ *   only alternatives; cycle and Program Director are the only filters, plus one search field.
+ *   Counts are navigation, never denominators (Slice 6B, owner-shaped 2026-09-06).
  * OWN-WORLD: white paper surfaces, ink actions, fine gray rules, semantic amber/green.
  * STORY: find open work, review the document, record review, then move to the next item.
- * FIRST VIEWPORT: compact title, cycle selector and one search field, then the open queue at full width.
- * FORM: an editorial task list; restrained row expansion is the signature interaction.
+ * FIRST VIEWPORT: compact title, cycle / Program Director / view controls and one search field,
+ *   then the selected view's list at full width. View and filter state live in the page URL and
+ *   are never sent to the API.
+ * FORM: an editorial task list; each row names the publication version acknowledgements key to
+ *   (Slice 6C) so "Updated since review" is explainable without opening Word.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -12,6 +17,7 @@ import Link from 'next/link';
 import Layout from '../Layout';
 import WorkbenchViewsNav from '../workbench/WorkbenchViewsNav';
 import { cycleCodeToLabel } from '../../../lib/utils/cycle-code.js';
+import { isGuid } from '../../../lib/utils/guid.js';
 
 const DATE_FORMATTER = new Intl.DateTimeFormat('en-US', {
   month: 'short',
@@ -110,6 +116,22 @@ function ReviewerInitials({ reviewers = [] }) {
   );
 }
 
+/**
+ * The SharePoint publication version acknowledgements key to (Slice 6C). The
+ * version string is rendered verbatim: its format is Graph's, not ours.
+ */
+function VersionContext({ currentVersion, acknowledgedVersion, personalState }) {
+  if (!currentVersion) return null;
+  return (
+    <span className="text-xs text-gray-500">
+      Version {currentVersion}
+      {personalState === 'updated' && acknowledgedVersion && (
+        <span className="text-amber-900"> · You reviewed version {acknowledgedVersion}</span>
+      )}
+    </span>
+  );
+}
+
 function RowAction({ row }) {
   const classes = 'inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2';
   if (row.relationship === 'responsible-pd') {
@@ -161,6 +183,11 @@ function WriteupRow({ row }) {
                 Updated {formatDate(row.document.lastModified)}
               </span>
             )}
+            <VersionContext
+              currentVersion={row.document.publicationVersionId}
+              acknowledgedVersion={row.acknowledgedPublicationVersionId}
+              personalState={row.personalState}
+            />
           </div>
         </div>
         <div className="shrink-0 self-start lg:self-center">
@@ -234,8 +261,9 @@ function MatrixState({ state, reviewerName, requestNumber }) {
   );
 }
 
-function MatrixTable({ group, search }) {
-  const rows = (group.rows || []).filter((row) => matchesSearch(row, search));
+function MatrixTable({ group, search, pd }) {
+  const rows = (group.rows || [])
+    .filter((row) => matchesProgramDirector(row, pd) && matchesSearch(row, search));
   return (
     <section aria-labelledby={`coordinator-matrix-${group.grantProgramId || 'default'}`}>
       <div className="mb-3 flex flex-wrap items-baseline justify-between gap-3">
@@ -299,7 +327,7 @@ function MatrixTable({ group, search }) {
             {rows.length === 0 && (
               <tr>
                 <td colSpan={(group.reviewers?.length || 0) + 1} className="px-6 py-10 text-center text-sm text-gray-500">
-                  No matrix rows match your search.
+                  No matrix rows match your filters.
                 </td>
               </tr>
             )}
@@ -310,10 +338,10 @@ function MatrixTable({ group, search }) {
   );
 }
 
-function CoordinatorMatrix({ matrix, search }) {
+function CoordinatorMatrix({ matrix, search, pd }) {
   if (!matrix) return null;
   const unconfiguredRows = (matrix.unconfiguredRows || [])
-    .filter((row) => matchesSearch(row, search));
+    .filter((row) => matchesProgramDirector(row, pd) && matchesSearch(row, search));
   return (
     <section aria-labelledby="coordinator-matrix-heading" className="space-y-5">
       <div>
@@ -341,7 +369,7 @@ function CoordinatorMatrix({ matrix, search }) {
       </div>
 
       {(matrix.groups || []).map((group) => (
-        <MatrixTable key={group.grantProgramId || 'role-default'} group={group} search={search} />
+        <MatrixTable key={group.grantProgramId || 'role-default'} group={group} search={search} pd={pd} />
       ))}
 
       {unconfiguredRows.length > 0 && (
@@ -407,6 +435,38 @@ function matchesSearch(row, search) {
 }
 
 const NO_CYCLE = 'none';
+const DEFAULT_VIEW = 'needs-review';
+
+/**
+ * The three dashboard views. Keys are the `view` URL values; `select` picks
+ * the rows from the server queues. Allowlist and labels live in one map so an
+ * unknown value cannot be labeled and a labeled value cannot be unselectable.
+ */
+const VIEWS = Object.freeze({
+  'needs-review': {
+    label: 'Needs my review',
+    select: (queues) => queues.open,
+    description: 'Open a writeup, read it in Word, then record that you reviewed the current version.',
+    emptyCopy: 'Nothing needs your review',
+  },
+  reviewed: {
+    label: 'Reviewed by me',
+    select: (queues) => queues.history,
+    description: 'Writeups you have acknowledged. A later edit is shown as an update, not a new requirement.',
+    emptyCopy: 'You have not reviewed any writeups',
+  },
+  all: {
+    label: 'All writeups',
+    select: (queues) => [...queues.open, ...queues.history, ...queues.stewardship],
+    description: 'Every current writeup you can see in this cycle, including your own.',
+    emptyCopy: 'No current writeups',
+  },
+});
+const VIEW_KEYS = Object.keys(VIEWS);
+
+function isViewKey(value) {
+  return typeof value === 'string' && Object.prototype.hasOwnProperty.call(VIEWS, value);
+}
 
 function cycleLabelFor(cycles, code) {
   if (!code) return null;
@@ -415,17 +475,39 @@ function cycleLabelFor(cycles, code) {
   return match?.label || cycleCodeToLabel(code) || code;
 }
 
-function initialCycleFromLocation() {
-  if (typeof window === 'undefined') return null;
-  const value = new URLSearchParams(window.location.search).get('cycleCode');
-  return value ? value.trim() : null;
+/**
+ * Read the page's own query state. `view` must be a known key and `pd` a GUID;
+ * anything else is dropped (and `invalid` tells the caller to rewrite the
+ * address bar immediately so a bookmarked bad value never survives a reload).
+ * None of these values is ever sent to the API: the fetch is built from
+ * `cycleCode` alone, and the route rejects any other key.
+ */
+function readLocationState() {
+  if (typeof window === 'undefined') return { cycleCode: null, view: DEFAULT_VIEW, pd: null, invalid: false };
+  const params = new URLSearchParams(window.location.search);
+  const cycleRaw = params.get('cycleCode');
+  const viewRaw = params.get('view');
+  const pdRaw = params.get('pd');
+  const view = isViewKey(viewRaw) ? viewRaw : DEFAULT_VIEW;
+  // Canonical form is the trimmed, lowercased GUID; anything else (including a
+  // valid GUID with stray whitespace or uppercase) is rewritten so the stored
+  // value always equals what the rows are compared against.
+  const pdCanonical = String(pdRaw || '').trim().toLowerCase();
+  const pd = isGuid(pdCanonical) ? pdCanonical : null;
+  const invalid = (viewRaw !== null && (!isViewKey(viewRaw) || viewRaw === DEFAULT_VIEW))
+    || (pdRaw !== null && pdRaw !== pd);
+  return { cycleCode: cycleRaw ? cycleRaw.trim() : null, view, pd, invalid };
 }
 
-function writeCycleToLocation(code) {
+function writeLocationState({ cycleCode, view, pd }) {
   if (typeof window === 'undefined') return;
   const url = new URL(window.location.href);
-  if (code) url.searchParams.set('cycleCode', code);
+  if (cycleCode) url.searchParams.set('cycleCode', cycleCode);
   else url.searchParams.delete('cycleCode');
+  if (view && view !== DEFAULT_VIEW) url.searchParams.set('view', view);
+  else url.searchParams.delete('view');
+  if (pd) url.searchParams.set('pd', pd);
+  else url.searchParams.delete('pd');
   window.history.replaceState(window.history.state, '', url);
 }
 
@@ -464,14 +546,91 @@ function CycleSelector({ cycles, disabled, onChange }) {
   );
 }
 
+const PD_ABSENT_LABEL = 'Program director not in this cycle';
+
+/**
+ * Program Director filter. Options are the distinct responsible PDs of the
+ * rows already loaded (existence-only; every listed PD has a visible row). A
+ * bookmarked PD absent from the cycle keeps an option so the control never
+ * shows a value other than the one the list is filtered by.
+ */
+function ProgramDirectorSelector({ options, value, disabled, onChange }) {
+  const rendered = [...options];
+  if (value && !rendered.some((option) => option.id === value)) {
+    rendered.push({ id: value, name: PD_ABSENT_LABEL });
+  }
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label htmlFor="final-writeup-pd" className="text-sm font-medium text-gray-700">Program director</label>
+      <select
+        id="final-writeup-pd"
+        value={value || ''}
+        disabled={disabled}
+        onChange={(event) => onChange(event.target.value || null)}
+        className="min-h-12 rounded-xl border border-gray-300 bg-white px-4 py-3 text-base text-gray-900 shadow-sm focus:border-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-400/30 disabled:opacity-60"
+      >
+        <option value="">All program directors</option>
+        {rendered.map((option) => (
+          <option key={option.id} value={option.id}>{option.name}</option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+/** Segmented view control; counts are navigation counts over the filtered rows. */
+function ViewSelector({ view, counts, disabled, onChange }) {
+  return (
+    <div role="group" aria-label="View" className="inline-flex flex-wrap gap-1 rounded-xl border border-gray-200 bg-gray-50 p-1">
+      {VIEW_KEYS.map((key) => {
+        const active = key === view;
+        return (
+          <button
+            key={key}
+            type="button"
+            aria-pressed={active}
+            disabled={disabled}
+            onClick={() => onChange(key)}
+            className={`inline-flex min-h-11 items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:opacity-60 ${
+              active ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            {VIEWS[key].label}
+            <span className="tabular-nums text-xs font-medium text-gray-500">{counts[key]}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function matchesProgramDirector(row, pd) {
+  if (!pd) return true;
+  return String(row?.responsibleProgramDirector?.id || '').toLowerCase() === pd;
+}
+
+function byRequestNumber(left, right) {
+  return String(left.requestNumber || '').localeCompare(String(right.requestNumber || ''));
+}
+
+function programDirectorOptions(queues) {
+  const seen = new Map();
+  for (const row of Object.values(queues).flat()) {
+    const id = String(row?.responsibleProgramDirector?.id || '').toLowerCase();
+    if (!id || seen.has(id)) continue;
+    seen.set(id, { id, name: row.responsibleProgramDirector.name || 'Program Director' });
+  }
+  return [...seen.values()].sort((left, right) => left.name.localeCompare(right.name));
+}
+
 function cycleResolutionCopy(cycles) {
   if (!cycles) return null;
   const newest = cycles.available?.[0];
   if (cycles.defaultResolvedBy === 'visible' && newest && cycles.selected !== newest.code) {
-    return `Nothing awaits your review in ${newest.label}; showing ${cycleLabelFor(cycles, cycles.selected)}.`;
+    return `No current writeups visible to you in ${newest.label}; showing ${cycleLabelFor(cycles, cycles.selected)}.`;
   }
   if (cycles.defaultResolvedBy === 'exhausted' && newest) {
-    return 'Nothing awaits your review in the most recent cycles; choose a cycle to look further back.';
+    return 'No current writeups visible to you in the most recent cycles; choose a cycle to look further back.';
   }
   return null;
 }
@@ -487,13 +646,45 @@ function personaViewLabel(viewer) {
   return resolved.length ? `${resolved.join(' + ')} view` : 'No Final Writeup view assigned';
 }
 
+function NeedsReviewEmptyState({ cycleLabel, pdName, counts, search, onChangeView }) {
+  if (search) return <>No open writeups match your search.</>;
+  if (pdName === PD_ABSENT_LABEL) {
+    return <>No writeups for the selected Program Director{cycleLabel ? ` in ${cycleLabel}` : ''}. Choose All program directors to clear the filter.</>;
+  }
+  const switcher = (key) => (
+    <button
+      type="button"
+      onClick={() => onChangeView(key)}
+      className="font-semibold text-gray-900 underline underline-offset-4 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500"
+    >
+      {counts[key]} {key === 'reviewed' ? 'reviewed by you' : 'writeups in all'}
+    </button>
+  );
+  return (
+    <>
+      Nothing needs your review{cycleLabel ? ` in ${cycleLabel}` : ''}{pdName ? ` for ${pdName}` : ''}.{' '}
+      {switcher('reviewed')} · {switcher('all')}
+    </>
+  );
+}
+
 export function FinalWriteupsDashboardView() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
-  const [cycleCode, setCycleCode] = useState(initialCycleFromLocation);
+  const [location] = useState(readLocationState);
+  const [cycleCode, setCycleCode] = useState(location.cycleCode);
+  const [view, setView] = useState(location.view);
+  const [pd, setPd] = useState(location.pd);
   const requestIdRef = useRef(0);
+
+  // Normalize a bookmarked bad `view` or `pd` immediately, not on the next write.
+  useEffect(() => {
+    if (location.invalid) {
+      writeLocationState({ cycleCode: location.cycleCode, view: location.view, pd: location.pd });
+    }
+  }, [location]);
 
   const load = useCallback(async () => {
     const requestId = ++requestIdRef.current;
@@ -517,9 +708,21 @@ export function FinalWriteupsDashboardView() {
   }, [cycleCode]);
 
   const changeCycle = useCallback((code) => {
-    writeCycleToLocation(code);
+    writeLocationState({ cycleCode: code || null, view, pd });
     setCycleCode(code || null);
-  }, []);
+  }, [view, pd]);
+
+  const changeView = useCallback((key) => {
+    const next = isViewKey(key) ? key : DEFAULT_VIEW;
+    writeLocationState({ cycleCode, view: next, pd });
+    setView(next);
+  }, [cycleCode, pd]);
+
+  const changePd = useCallback((id) => {
+    const next = id ? String(id).toLowerCase() : null;
+    writeLocationState({ cycleCode, view, pd: next });
+    setPd(next);
+  }, [cycleCode, view]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => { void load(); }, 0);
@@ -529,13 +732,33 @@ export function FinalWriteupsDashboardView() {
     };
   }, [load]);
 
-  const queues = useMemo(() => {
-    const source = data?.queues || { open: [], history: [], stewardship: [] };
-    return Object.fromEntries(Object.entries(source).map(([key, value]) => (
-      [key, (value || []).filter((row) => matchesSearch(row, search))]
-    )));
-  }, [data, search]);
-  const resultCount = Object.values(queues).reduce((count, list) => count + list.length, 0);
+  const serverQueues = useMemo(
+    () => data?.queues || { open: [], history: [], stewardship: [] },
+    [data],
+  );
+  const pdOptions = useMemo(() => programDirectorOptions(serverQueues), [serverQueues]);
+  const filteredQueues = useMemo(() => Object.fromEntries(
+    Object.entries(serverQueues).map(([key, value]) => [
+      key,
+      (value || []).filter((row) => matchesProgramDirector(row, pd) && matchesSearch(row, search)),
+    ]),
+  ), [serverQueues, pd, search]);
+  const viewCounts = useMemo(() => Object.fromEntries(
+    VIEW_KEYS.map((key) => [key, VIEWS[key].select(filteredQueues).length]),
+  ), [filteredQueues]);
+  const mainRows = useMemo(
+    () => [...VIEWS[view].select(filteredQueues)].sort(byRequestNumber),
+    [filteredQueues, view],
+  );
+  const stewardshipRows = useMemo(
+    () => [...(filteredQueues.stewardship || [])].sort(byRequestNumber),
+    [filteredQueues],
+  );
+  const pdName = pd
+    ? (pdOptions.find((option) => option.id === pd)?.name || PD_ABSENT_LABEL)
+    : null;
+  const cycleLabel = data ? cycleLabelFor(data.cycles, data.cycles?.selected) : null;
+  const current = VIEWS[view];
 
   return (
     <Layout title="Final Writeups" description="Review current grant writeups and return to completed work.">
@@ -556,8 +779,9 @@ export function FinalWriteupsDashboardView() {
             {data && (
               <div className="text-sm text-gray-500 sm:text-right">
                 <p>
-                  <span className="font-semibold tabular-nums text-gray-900">{data.counts.open}</span> awaiting your review
-                  {cycleLabelFor(data.cycles, data.cycles?.selected) && ` in ${cycleLabelFor(data.cycles, data.cycles.selected)}`}
+                  <span className="font-semibold tabular-nums text-gray-900">{viewCounts['needs-review']}</span> awaiting your review
+                  {cycleLabel && ` in ${cycleLabel}`}
+                  {pdName && pdName !== PD_ABSENT_LABEL && ` for ${pdName}`}
                 </p>
                 {cycleResolutionCopy(data.cycles) && (
                   <p className="mt-1 text-gray-600">{cycleResolutionCopy(data.cycles)}</p>
@@ -572,7 +796,14 @@ export function FinalWriteupsDashboardView() {
 
         <div className="my-6 space-y-4">
           {data && (
-            <CycleSelector cycles={data.cycles} disabled={loading} onChange={changeCycle} />
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-end">
+              <CycleSelector cycles={data.cycles} disabled={loading} onChange={changeCycle} />
+              <ProgramDirectorSelector options={pdOptions} value={pd} disabled={loading} onChange={changePd} />
+              <div className="flex flex-col gap-1.5">
+                <span className="text-sm font-medium text-gray-700">View</span>
+                <ViewSelector view={view} counts={viewCounts} disabled={loading} onChange={changeView} />
+              </div>
+            </div>
           )}
           <label htmlFor="final-writeup-search" className="sr-only">Search Final Writeups</label>
           <div className="relative max-w-2xl">
@@ -588,7 +819,7 @@ export function FinalWriteupsDashboardView() {
           </div>
           {search && data && (
             <p className="mt-2 text-sm text-gray-500" aria-live="polite">
-              {resultCount} matching writeup{resultCount === 1 ? '' : 's'}
+              {mainRows.length} matching writeup{mainRows.length === 1 ? '' : 's'}
             </p>
           )}
         </div>
@@ -597,27 +828,36 @@ export function FinalWriteupsDashboardView() {
           <ErrorSurface message={error} onRetry={load} />
         ) : (
           <div className="space-y-6">
-            <CoordinatorMatrix matrix={data.coordinatorMatrix} search={search} />
+            <CoordinatorMatrix matrix={data.coordinatorMatrix} search={search} pd={pd} />
             <QueueSection
-              title="Awaiting your review"
-              description="Open a writeup, read it in Word, then record that you reviewed the current version."
-              rows={queues.open}
-              emptyCopy={search ? 'No open writeups match your search.' : 'You have no writeups waiting for review.'}
+              title={current.label}
+              description={current.description}
+              rows={mainRows}
+              emptyCopy={view === DEFAULT_VIEW ? (
+                <NeedsReviewEmptyState
+                  cycleLabel={cycleLabel}
+                  pdName={pdName}
+                  counts={viewCounts}
+                  search={search}
+                  onChangeView={changeView}
+                />
+              ) : (
+                search
+                  ? 'No writeups match your search.'
+                  : pdName === PD_ABSENT_LABEL
+                    ? `No writeups for the selected Program Director${cycleLabel ? ` in ${cycleLabel}` : ''}. Choose All program directors to clear the filter.`
+                    : `${current.emptyCopy}${cycleLabel ? ` in ${cycleLabel}` : ''}${pdName ? ` for ${pdName}` : ''}.`
+              )}
             />
-            <QueueSection
-              secondary
-              title="Reviewed history"
-              description="Acknowledged writeups stay here. A later edit is shown as an update, not a new requirement."
-              rows={queues.history}
-              emptyCopy="No reviewed writeups yet."
-            />
-            <QueueSection
-              secondary
-              title="Your writeups"
-              description="These are the writeups for which you are the responsible Program Director."
-              rows={queues.stewardship}
-              emptyCopy="No current writeups are assigned to you."
-            />
+            {view !== 'all' && (
+              <QueueSection
+                secondary
+                title="Your writeups"
+                description="These are the writeups for which you are the responsible Program Director."
+                rows={stewardshipRows}
+                emptyCopy="No current writeups are assigned to you."
+              />
+            )}
           </div>
         )}
       </div>
@@ -663,6 +903,9 @@ function FocusedDocument({ writeup }) {
             {formatDate(writeup.document.lastModified) && (
               <p className="mt-2 text-xs text-gray-500">Last updated {formatDate(writeup.document.lastModified)}</p>
             )}
+            {writeup.document.publicationVersionId && (
+              <p className="mt-1 text-xs text-gray-500">Version {writeup.document.publicationVersionId}</p>
+            )}
           </div>
         </div>
         <a
@@ -691,6 +934,19 @@ function stageMovedOnWarning(writeup, viewer) {
   return 'This writeup has moved on to leadership review. You can still record your review, but group review has closed.';
 }
 
+function acknowledgementVersionCopy(writeup) {
+  const marked = formatDate(writeup.acknowledgedAt);
+  const acknowledged = writeup.acknowledgedPublicationVersionId;
+  const current = writeup.document?.publicationVersionId;
+  if (writeup.personalState === 'updated' && acknowledged && current) {
+    return `You reviewed version ${acknowledged} on ${marked}. The current version is ${current}.`;
+  }
+  if (writeup.personalState === 'reviewed' && current) {
+    return `You reviewed version ${current} on ${marked}.`;
+  }
+  return `Last marked ${marked}`;
+}
+
 function AcknowledgementPanel({ writeup, viewer, saving, error, onAcknowledge }) {
   if (!writeup.mayAcknowledge) return null;
   const reviewed = writeup.personalState === 'reviewed';
@@ -711,7 +967,9 @@ function AcknowledgementPanel({ writeup, viewer, saving, error, onAcknowledge })
                 : 'After reading the current version, mark it reviewed. This is personal tracking, not an approval.'}
           </p>
           {writeup.acknowledgedAt && (
-            <p className="mt-2 text-xs text-gray-500">Last marked {formatDate(writeup.acknowledgedAt)}</p>
+            <p className="mt-2 text-xs text-gray-500">
+              {acknowledgementVersionCopy(writeup)}
+            </p>
           )}
           {warning && !reviewed && (
             <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900" role="status">

@@ -831,3 +831,40 @@ describe('cycle scoping (Slice 6A)', () => {
     });
   });
 });
+
+describe('acknowledged version and matrix PD identity (Slices 6B/6C)', () => {
+  test('rows carry the exact acknowledgedPublicationVersionId from the personal acknowledgement row', async () => {
+    const { dependencies } = harness();
+    const result = await loadFinalWriteupsDashboard({ actingUserSystemId: ACTOR_ID }, dependencies);
+    expect(result.queues.history[0]).toMatchObject({
+      requestId: REQUEST_B_ID,
+      acknowledgedPublicationVersionId: '1.0',
+    });
+    expect(result.queues.open[0].acknowledgedPublicationVersionId).toBeNull();
+    expect(result.queues.stewardship[0].acknowledgedPublicationVersionId).toBeNull();
+  });
+
+  test('unconfigured matrix rows carry responsibleProgramDirector', async () => {
+    const { dependencies, requests } = harness();
+    requests[1]._wmkf_grantprogram_value = SOCAL_PROGRAM_ID;
+    requests[1]._wmkf_grantprogram_value_formatted = 'Southern California';
+    dependencies.resolveMatrixAudiences.mockResolvedValue({
+      mode: 'configured',
+      fallbackReviewers: null,
+      programs: [{
+        grantProgramId: RESEARCH_PROGRAM_ID,
+        reviewers: [{ reviewerId: ACTOR_ID, name: 'Ada Reviewer', initials: 'AR' }],
+      }],
+    });
+    const result = await loadFinalWriteupsDashboard({
+      actingUserSystemId: ACTOR_ID,
+      isSuperuser: true,
+    }, dependencies);
+    const [unconfigured] = result.coordinatorMatrix.unconfiguredRows;
+    expect(unconfigured.requestNumber).toBe('1002');
+    expect(unconfigured.responsibleProgramDirector).toEqual(
+      result.queues.history[0].responsibleProgramDirector,
+    );
+    expect(unconfigured.responsibleProgramDirector.id).toEqual(expect.any(String));
+  });
+});

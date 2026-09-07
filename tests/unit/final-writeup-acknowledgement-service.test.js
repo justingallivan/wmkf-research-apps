@@ -350,3 +350,56 @@ test('state classifier complement is total for absent, exact, and different publ
     driveId: 'DRIVE-1', itemId: 'item-1', publicationVersionId: '1.0',
   })).toBe('updated');
 });
+
+describe('acknowledged publication version (Slice 6C)', () => {
+  test('projection returns acknowledgedPublicationVersionId from the personal row, null without one, and null for the responsible PD even with a historical row', async () => {
+    const withRow = harness({ initialAcknowledgement: acknowledgement() });
+    withRow.dependencies.getFileMetadataById.mockResolvedValue({ ...BASE_OBSERVATION, versionId: '2.0' });
+    await expect(getFinalWriteupAcknowledgementState({
+      requestId: REQUEST_ID,
+      actingUserSystemId: REVIEWER_ID,
+    }, withRow.dependencies)).resolves.toMatchObject({
+      personalState: 'updated',
+      acknowledgedPublicationVersionId: '1.0',
+      publicationVersionId: '2.0',
+    });
+
+    const withoutRow = harness();
+    const fresh = await getFinalWriteupAcknowledgementState({
+      requestId: REQUEST_ID,
+      actingUserSystemId: REVIEWER_ID,
+    }, withoutRow.dependencies);
+    expect(fresh.acknowledgedPublicationVersionId).toBeNull();
+
+    // A responsible PD who once held a row (before becoming PD) must not see a
+    // stale version on a stewardship row.
+    const responsiblePd = harness({
+      requestRow: request({ _wmkf_programdirector_value: REVIEWER_ID }),
+      initialAcknowledgement: acknowledgement({ wmkf_publicationversionid: '0.9' }),
+    });
+    const pdState = await getFinalWriteupAcknowledgementState({
+      requestId: REQUEST_ID,
+      actingUserSystemId: REVIEWER_ID,
+    }, responsiblePd.dependencies);
+    expect(pdState.personalState).toBe('not-applicable');
+    expect(pdState.acknowledgedPublicationVersionId).toBeNull();
+  });
+
+  test('markFinalWriteupReviewed returns the exact acknowledgedPublicationVersionId of the confirmed row (fresh and reused)', async () => {
+    const fresh = harness({ observation: { ...BASE_OBSERVATION, versionId: '3.0' } });
+    const created = await markFinalWriteupReviewed(markArgs(), fresh.dependencies);
+    expect(created).toMatchObject({
+      reused: false,
+      acknowledgedPublicationVersionId: '3.0',
+      publicationVersionId: '3.0',
+    });
+
+    const reused = harness({ initialAcknowledgement: acknowledgement() });
+    const result = await markFinalWriteupReviewed(markArgs(), reused.dependencies);
+    expect(result).toMatchObject({
+      reused: true,
+      acknowledgedPublicationVersionId: '1.0',
+      publicationVersionId: '1.0',
+    });
+  });
+});

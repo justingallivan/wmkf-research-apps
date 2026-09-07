@@ -6,7 +6,7 @@ status: active
 summary: "Opens the Final writeups dashboard on Needs my review with two alternative views and a PD filter, URL-persisted; renders the acknowledged publication version."
 canonical: false
 cataloged: 2026-09-06
-last_verified: 2026-09-06
+last_verified: 2026-09-07
 owner: product-engineering
 related:
   - docs/FINAL_WRITEUPS_DASHBOARD_CYCLE_SCOPING_PLAN.md
@@ -17,7 +17,7 @@ related:
 
 # Final Writeups Dashboard — Slices 6B and 6C Plan
 
-**Status: PLANNED, NOT BUILT** (2026-09-06). Mode A `/contract-reconcile` plan for the two remaining
+**Status: BUILT 2026-09-07 on branch `claude/final-writeups-views-and-version`; see §14.** Mode A `/contract-reconcile` plan for the two remaining
 Slice 6 items the owner shaped on 2026-09-06 (queue item 5; 6A plan §12 tail). Slices 6D and 6E are
 closed by owner decision and are not part of this plan. Every state claim below is labeled;
 `[PLANNED]` marks intended behavior, never built state. Line numbers are as of `3e3645b0`.
@@ -377,8 +377,36 @@ item 5 "Met when" clause satisfied except the two-cycle load, which 6A already c
 
 Three passes reached the stopping rule; the build proceeds on this plan.
 
+**Build diff, first pass (2026-09-07, verdict needs-attention):**
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 (medium) | A valid `pd` GUID with surrounding whitespace passed `isGuid` but was stored untrimmed, so it matched no row and showed the absent-PD state | **Accepted.** `pd` is canonicalized (trim + lowercase) before validation; any raw value that differs from the canonical form triggers the on-mount rewrite; regression test added. |
+
+**Build diff, second pass (2026-09-07, verdict approve):** no material findings; the pd canonicalization fix verified closed. Two build passes reached the stopping rule.
+
 ## 13. Explicitly out of scope
 
 Stage filter (owner dropped it), 6D "has edits", 6E other-stage lists, approval gates,
 denominators, program-taxonomy grouping, authorization changes, any route or query change, the
 Leadership stage transition (separate plan), matrix redesign, inline preview.
+
+## 14. Build record (2026-09-07, branch `claude/final-writeups-views-and-version`)
+
+Built per §4–§8 with no deviation from the plan. Files: `lib/services/final-writeup/acknowledgement-service.js`
+(`acknowledgedPublicationVersionId` in the shared projection, null for the responsible PD, and in
+the `markFinalWriteupReviewed` response from the confirmed row), `lib/services/final-writeup/dashboard-service.js`
+(row passthrough; `responsibleProgramDirector` on unconfigured matrix rows),
+`shared/components/final-writeups/FinalWriteupsViews.js` (one frozen `VIEWS` map holding allowlist,
+labels, and selectors; `readLocationState` / `writeLocationState` with immediate on-mount rewrite of
+an invalid `view` or `pd`; `ProgramDirectorSelector`, `ViewSelector`, per-view merge and sort by
+request number; filtered header count naming the selected PD; Needs my review empty state with
+view-switching counts; walk-back copy "visible to you"; `VersionContext` on rows and version copy
+on the focused document and acknowledgement panel; header thesis comment rewritten), and the three
+test files (13 new or re-pinned views tests, 2 acknowledgement-service tests, 2 dashboard-service
+tests; 167 `final-writeup*` tests green). Complement check: unknown `view` → default and dropped
+from the URL on mount; non-GUID `pd` → dropped on mount; GUID `pd` absent from the cycle → kept as
+the controlled value with the absent-PD option and empty copy; `view=needs-review` written
+explicitly → normalized away (clean URL stays clean); matrix rows with a null PD id → shown only
+under All program directors. Docs reconciled in place: implementation plan Slice 6, 6A plan §12
+tail, queue item 5, both route-matrix rows, the acknowledgement Atlas read path.
