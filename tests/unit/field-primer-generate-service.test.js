@@ -23,12 +23,16 @@ jest.mock('../../lib/services/executor-budget-service.js', () => ({
 }));
 
 import * as grantRequestAdapter from '../../lib/dataverse/adapters/grant-request.js';
-import { generateFieldPrimer } from '../../lib/services/field-primer-service';
+import { generateFieldPrimer, groundPrimerExperts } from '../../lib/services/field-primer-service';
 import { getAiProposalNarrativeText } from '../../lib/services/workbench-proposal-documents';
 import { getExecutorBudget } from '../../lib/services/executor-budget-service.js';
 import { FIELD_PRIMER_ENVELOPE_SCHEMA, makeFieldPrimerLease } from '../../shared/utils/field-primer-envelope';
 import { ServiceHttpError } from '../../lib/services/service-http-error';
-import { classifyGenerationFailure, generateForRequest, generateStandalone } from '../../lib/services/field-primer/generate-service';
+import {
+  classifyGenerationFailure, clampTimeoutToLease, generateForRequest, generateStandalone,
+  LEASE_GROUNDING_RESERVE_MS, LEASE_SAFETY_MARGIN_MS,
+} from '../../lib/services/field-primer/generate-service';
+import { FIELD_PRIMER_LEASE_TTL_MS } from '../../shared/utils/field-primer-envelope';
 
 const GUID = '33333333-3333-3333-3333-333333333333';
 const row = (over = {}) => ({
@@ -168,7 +172,7 @@ describe('generateForRequest (Mode A)', () => {
     expect(generateFieldPrimer).toHaveBeenCalledWith(expect.objectContaining({ timeoutMs: 180000 }));
   });
 
-  it('a budget read failure keeps the client default timeout and still generates', async () => {
+  it('a budget read failure falls back to the registry default timeout and still generates', async () => {
     getExecutorBudget.mockRejectedValueOnce(new Error('settings down'));
     grantRequestAdapter.getById
       .mockResolvedValueOnce(row())
@@ -176,7 +180,68 @@ describe('generateForRequest (Mode A)', () => {
     getAiProposalNarrativeText.mockResolvedValue({ text: 'A'.repeat(60) });
     generateFieldPrimer.mockResolvedValueOnce({ primer: { experts: [] }, runId: 'r', model: 'm' });
     await generateForRequest({ requestId: GUID });
-    expect(generateFieldPrimer).toHaveBeenCalledWith(expect.objectContaining({ timeoutMs: null }));
+    expect(generateFieldPrimer).toHaveBeenCalledWith(expect.objectContaining({ timeoutMs: 240000 }));
+  });
+
+  it('grounding receives an abort signal bounded by the lease deadline', async () => {
+    grantRequestAdapter.getById
+      .mockResolvedValueOnce(row())
+      .mockResolvedValueOnce({ wmkf_ai_fieldprimer: null, _etag: 'W/"2"' });
+    getAiProposalNarrativeText.mockResolvedValue({ text: 'A'.repeat(60) });
+    generateFieldPrimer.mockResolvedValueOnce({ primer: { experts: [{ name: 'Ada Lovelace' }] }, runId: 'r', model: 'm' });
+    await generateForRequest({ requestId: GUID });
+    expect(groundPrimerExperts).toHaveBeenCalledWith(
+      [{ name: 'Ada Lovelace' }],
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
+  });
+
+  it('a failed final persist restores the prior value only while our lease nonce is still stored', async () => {
+    const prior = JSON.stringify({ schema: FIELD_PRIMER_ENVELOPE_SCHEMA, generatedAt: 'old', primer: {} });
+    let leaseWritten = null;
+    grantRequestAdapter.updateById.mockImplementation(async (_id, patch, opts) => {
+      if (typeof patch.wmkf_ai_fieldprimer === 'string' && patch.wmkf_ai_fieldprimer.includes('field-primer/lease')) {
+        leaseWritten = patch.wmkf_ai_fieldprimer; return {};
+      }
+      if (opts?.ifMatch === 'W/"2"') throw Object.assign(new Error('dataverse write refused'), { status: 500 });
+      return {};
+    });
+    grantRequestAdapter.getById
+      .mockResolvedValueOnce(row({ wmkf_ai_fieldprimer: prior }))
+      .mockImplementationOnce(async () => ({ wmkf_ai_fieldprimer: leaseWritten, _etag: 'W/"2"' }))   // pre-persist readback: still ours
+      .mockImplementationOnce(async () => ({ wmkf_ai_fieldprimer: leaseWritten, _etag: 'W/"3"' }));  // restore readback: still ours
+    getAiProposalNarrativeText.mockResolvedValue({ text: 'A'.repeat(60) });
+    generateFieldPrimer.mockResolvedValueOnce({ primer: { experts: [] }, runId: 'r', model: 'm' });
+    const r = await generateForRequest({ requestId: GUID, regenerate: true });
+    expect(r).toMatchObject({ persisted: false, persistError: true });
+    const last = grantRequestAdapter.updateById.mock.calls.at(-1);
+    expect(last[1]).toEqual({ wmkf_ai_fieldprimer: prior });
+    expect(last[2]).toEqual({ ifMatch: 'W/"3"' });
+  });
+
+  it('a failed final persist does not touch the field when a peer has reclaimed the lease', async () => {
+    const prior = JSON.stringify({ schema: FIELD_PRIMER_ENVELOPE_SCHEMA, generatedAt: 'old', primer: {} });
+    grantRequestAdapter.updateById.mockImplementation(async (_id, patch, opts) => {
+      if (opts?.ifMatch === 'W/"2"') throw new Error('dataverse write refused');
+      return {};
+    });
+    const peerLease = makeFieldPrimerLease(new Date().toISOString(), 'peer');
+    let leaseWritten = null;
+    grantRequestAdapter.updateById.mockImplementation(async (_id, patch, opts) => {
+      if (opts?.ifMatch === 'W/"1"') { leaseWritten = patch.wmkf_ai_fieldprimer; return {}; }
+      if (opts?.ifMatch === 'W/"2"') throw new Error('dataverse write refused');
+      return {};
+    });
+    grantRequestAdapter.getById
+      .mockResolvedValueOnce(row({ wmkf_ai_fieldprimer: prior }))
+      .mockImplementationOnce(async () => ({ wmkf_ai_fieldprimer: leaseWritten, _etag: 'W/"2"' }))
+      .mockResolvedValueOnce({ wmkf_ai_fieldprimer: peerLease, _etag: 'W/"9"' });
+    getAiProposalNarrativeText.mockResolvedValue({ text: 'A'.repeat(60) });
+    generateFieldPrimer.mockResolvedValueOnce({ primer: { experts: [] }, runId: 'r', model: 'm' });
+    const r = await generateForRequest({ requestId: GUID, regenerate: true });
+    expect(r).toMatchObject({ persisted: false, persistError: true });
+    const writes = grantRequestAdapter.updateById.mock.calls.filter(([, patch]) => patch.wmkf_ai_fieldprimer === prior);
+    expect(writes).toHaveLength(0);
   });
 
   it('a transport timeout restores the prior value and surfaces a 504 naming the seconds and the Admin path', async () => {
@@ -202,6 +267,17 @@ describe('generateForRequest (Mode A)', () => {
       code: 'field_primer_provider_error',
       message: 'Field primer generation failed: the model provider returned HTTP 529. Try again in a few minutes.',
     });
+  });
+});
+
+describe('clampTimeoutToLease', () => {
+  it('leaves the published timeout alone when the lease has room, clamps it when the pull ate the lease, and floors it', () => {
+    const start = 1_000_000;
+    const deadline = start + FIELD_PRIMER_LEASE_TTL_MS;
+    expect(clampTimeoutToLease(240000, deadline, start)).toBe(240000);
+    const late = deadline - LEASE_GROUNDING_RESERVE_MS - LEASE_SAFETY_MARGIN_MS - 100000;
+    expect(clampTimeoutToLease(240000, deadline, late)).toBe(100000);
+    expect(clampTimeoutToLease(240000, deadline, deadline)).toBe(30000);
   });
 });
 
