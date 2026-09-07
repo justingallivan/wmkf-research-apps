@@ -1,4 +1,34 @@
-# Session 493 Prompt: Leadership stage transition plan, J27 marker gate, or the J27 build plan when Connor's file decision lands
+# Session 494 Prompt: Continue from the reconciled reviewer UI and field-primer integration branch
+
+## Session 493 Summary
+
+This owner-present session reconciled Codex reviewer-surfacing work with Claude's already-merged
+field-primer/Executor work. The integration branch is clean and pushed; no production promotion was
+performed from this branch.
+
+### What Was Completed
+
+1. **Reviewer UI surfacing fixes.** Due-date extension history, meeting-date cycle options, and
+   conserved grant-cycle proposal counts are implemented and tested. Duplicate cycle rows assign a
+   proposal count once; null/off-cycle rows are conserved through an independent proposal total.
+2. **Claude work reconciled.** `origin/main` was merged cleanly, bringing the timeout, Executor budget,
+   and Word/PDF field-primer export commits into this branch without source-file conflicts.
+3. **Verification.** Focused reviewer tests, full type/lint checks, API/DAL/security gates, and docs
+   gates passed. Lint reported 0 errors and 76 existing warnings.
+
+### Commits
+
+- `82c42904` through `780649f9` — reviewer UI surfacing work and review corrections
+- `05fd2672` — merge `origin/main` into `codex/reviewer-ui-surfacing`
+
+## Next Items
+
+1. **Owner smoke required:** signed-in Reviewer Finder cycle counts and Request Workbench cycle
+   filtering; Claude's remaining field-primer export download smoke on Request `1002852`.
+2. **Release decision:** promote the reconciled branch only through the normal reviewed release path;
+   Codex does not push `main`.
+3. **Deferred review follow-ups:** zero-argument count-script ergonomics, shared cycle-parser reuse,
+   aggregate-limit documentation, and stale acceptance comments.
 
 ## Session 492 Summary
 
