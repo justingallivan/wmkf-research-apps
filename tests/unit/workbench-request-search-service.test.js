@@ -6,12 +6,14 @@ const searchRequests = jest.fn();
 const findByIds = jest.fn();
 const queryRequests = jest.fn();
 const aggregateRequests = jest.fn();
+const aggregateMeetingDateCycles = jest.fn();
 const searchDirectoryByName = jest.fn();
 jest.mock('../../lib/dataverse/adapters/grant-request.js', () => ({
   searchRequests: (...args) => searchRequests(...args),
   findByIds: (...args) => findByIds(...args),
   queryRequests: (...args) => queryRequests(...args),
   aggregateRequests: (...args) => aggregateRequests(...args),
+  aggregateMeetingDateCycles: (...args) => aggregateMeetingDateCycles(...args),
 }));
 jest.mock('../../lib/dataverse/adapters/contact.js', () => ({
   searchDirectoryByName: (...args) => searchDirectoryByName(...args),
@@ -44,6 +46,7 @@ const requestRow = (id, over = {}) => ({
 beforeEach(() => {
   jest.clearAllMocks();
   aggregateRequests.mockResolvedValue({ results: [] });
+  aggregateMeetingDateCycles.mockResolvedValue([]);
   searchDirectoryByName.mockResolvedValue([]);
   searchRequests.mockResolvedValue({ results: [], totalCount: 0 });
   findByIds.mockResolvedValue({ records: [] });
@@ -51,17 +54,14 @@ beforeEach(() => {
 });
 
 test('loads grouped live cycles/statuses and sorts them for the filters', async () => {
-  aggregateRequests
-    .mockResolvedValueOnce({
-      results: [
-        { akoya_fiscalyear: 'June 2026' },
-        { akoya_fiscalyear: 'December 2025' },
-        { akoya_fiscalyear: 'December 2026' },
-        { akoya_fiscalyear: 'June 2026' },
-        { akoya_fiscalyear: null },
-      ],
-    })
-    .mockResolvedValueOnce({
+  aggregateMeetingDateCycles.mockResolvedValueOnce([
+    { year: 2026, month: 6 },
+    { year: 2025, month: 12 },
+    { year: 2026, month: 12 },
+    { year: 2026, month: 6 },
+    { year: 2025, month: 3 },
+  ]);
+  aggregateRequests.mockResolvedValueOnce({
       results: [
         { akoya_requeststatus: 'Phase II Pending' },
         { akoya_requeststatus: 'Active' },
@@ -75,11 +75,13 @@ test('loads grouped live cycles/statuses and sorts them for the filters', async 
       { value: 'December 2026', label: 'December 2026' },
       { value: 'June 2026', label: 'June 2026' },
       { value: 'December 2025', label: 'December 2025' },
+      { value: 'March 2025 (off-cycle)', label: 'March 2025 (off-cycle)' },
+      { value: 'Unclassified (no meeting date)', label: 'Unclassified (no meeting date)' },
     ],
     statuses: ['Active', 'Phase II Pending'],
   });
-  expect(aggregateRequests).toHaveBeenNthCalledWith(1, REQUEST_SEARCH_OPTIONS_AGGREGATES.cycles);
-  expect(aggregateRequests).toHaveBeenNthCalledWith(2, REQUEST_SEARCH_OPTIONS_AGGREGATES.statuses);
+  expect(aggregateMeetingDateCycles).toHaveBeenCalledTimes(1);
+  expect(aggregateRequests).toHaveBeenCalledWith(REQUEST_SEARCH_OPTIONS_AGGREGATES.statuses);
 });
 
 test('propagates a rejected guarded aggregate without returning partial options', async () => {
@@ -116,7 +118,7 @@ test('text search applies escaped server filters, hydrates rows, and preserves r
   expect(searchRequests).toHaveBeenCalledWith('regeneration', {
     top: 100,
     orderby: REQUEST_SEARCH_ORDER,
-    filter: "akoya_request:(akoya_fiscalyear eq 'December 2026' and akoya_requeststatus eq 'Director''s Review')",
+    filter: "akoya_request:(wmkf_meetingdate ge 2026-12-01T00:00:00Z and wmkf_meetingdate lt 2027-01-01T00:00:00Z and akoya_requeststatus eq 'Director''s Review')",
   });
   expect(findByIds).toHaveBeenCalledWith([second, first], {
     select: REQUEST_SEARCH_SELECT,
@@ -227,7 +229,7 @@ test('unions true project-leader name matches ahead of indexed request-text matc
   expect(searchDirectoryByName).toHaveBeenCalledWith('Cynthia Reinhart-King', { top: 26 });
   expect(queryRequests).toHaveBeenCalledWith({
     select: REQUEST_SEARCH_SELECT,
-    filter: "(_wmkf_projectleader_value eq 33333333-3333-3333-3333-333333333333) and akoya_fiscalyear eq 'June 2020' and akoya_requeststatus eq 'Closed'",
+    filter: "(_wmkf_projectleader_value eq 33333333-3333-3333-3333-333333333333) and wmkf_meetingdate ge 2020-06-01T00:00:00Z and wmkf_meetingdate lt 2020-07-01T00:00:00Z and akoya_requeststatus eq 'Closed'",
     orderby: REQUEST_SEARCH_PROJECT_LEADER_ORDER,
     top: 100,
   });
@@ -394,7 +396,7 @@ test('filter-only search stays bounded and reports the 100-result ceiling honest
 
   expect(queryRequests).toHaveBeenCalledWith({
     select: REQUEST_SEARCH_SELECT,
-    filter: "akoya_fiscalyear eq 'June 2026'",
+    filter: "wmkf_meetingdate ge 2026-06-01T00:00:00Z and wmkf_meetingdate lt 2026-07-01T00:00:00Z",
     orderby: 'akoya_requestnum desc',
     top: 100,
   });

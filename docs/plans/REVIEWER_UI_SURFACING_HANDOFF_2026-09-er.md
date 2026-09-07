@@ -1,7 +1,7 @@
 ---
 title: Reviewer UI surfacing handoff 2026-09-er
 status: active
-summary: "Due-date extensions now persist a granted-at event and surface in reviewer history."
+summary: "Reviewer history now surfaces extensions; Request Workbench cycles use meeting dates and retain explicit off-cycle/no-date buckets."
 ---
 
 # Reviewer UI surfacing handoff
@@ -14,3 +14,11 @@ summary: "Due-date extensions now persist a granted-at event and surface in revi
 - Sibling surfaces checked: main FIELD_SELECT, token-status, token-regeneration, acceptance-drain, merge predicate, engagement reset, reviewer DTO, Last Action, and History drawer.
 - Owner smoke: on signed-in Request `1003046`, confirm Liang’s Last Action is “Review due date extended” dated Sep 7, 2026 and History includes the new due date.
 - Historical backfill: owner-authorized, owner-run exact-row backfill is required for Liang because the pre-field write has no durable grant timestamp.
+
+## Issue 2 — Request Workbench cycle dropdown has irregular gaps/order
+
+- Screenshot: Request Workbench → Request list → Cycle dropdown showed scattered fiscal-year labels (December 2026, June 2020, December 2017, etc.) instead of a recent-first timeline.
+- Root cause: `/api/workbench/search-requests` delegated options to `request-search-service`, which grouped and filtered on sparse legacy `akoya_fiscalyear`; production meeting-date data is continuous for June/December 2020–2026 [VERIFIED via production aggregate probe 2026-09-07].
+- Fix: aggregate cycle options from `wmkf_meetingdate`, sort by year/month descending, filter by month ranges, and retain explicit `(off-cycle)` and `Unclassified (no meeting date)` buckets.
+- Sibling surfaces checked: `RequestLocator` option rendering, search route, request projection, project-leader filter path, and sub-agent audit of other `akoya_fiscalyear` consumers. Other consumers are intentional historical/funding displays or separate grant-cycle APIs; none were changed.
+- Owner smoke: signed-in Request Workbench → Request list, confirm cycles are recent-first with no missing June/December 2020–2026 entries; selecting a cycle returns only requests whose `wmkf_meetingdate` is in that month, and off-cycle/no-date buckets remain usable.
