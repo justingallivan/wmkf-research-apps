@@ -437,7 +437,7 @@ Built per §3–§7 on the branch; not promoted. Files: `lib/services/final-writ
 service does not import transport constants — the access-layer gate rejected the direct import),
 `pages/api/workbench/final-writeups.js` (allowlist `requestId` | `cycleCode`, mutually exclusive),
 `shared/components/final-writeups/FinalWriteupsViews.js` (cycle `<select>`, URL persistence, header
-copy, focused cycle context), and the three test files (33 service, 5 route, 14 views tests).
+copy, focused cycle context), and the three test files (34 service, 5 route, 15 views tests).
 Complement check: zero query keys → default cycle; `requestId` alone → focused, cycle derived;
 `cycleCode` alone → explicit, never walks back; both → 400; any other key → 400; malformed or
 uppercase-`NONE` selector → 400 at the handler and again at the service; empty cycle list →
@@ -472,4 +472,11 @@ verified during the build (`mayAcknowledge` has no stage condition); no deviatio
 | 2 (high) | Oversized hidden newest cycle aborts before walk-back; behavior undefined | **Accepted.** Fail closed with the existing 503 naming the cycle; no catch-and-skip; test with oversized hidden newest + visible older (§3.3, §6, §7). |
 | 3 (medium) | Three-read bound contradicted the "newest visible" invariant | **Accepted.** Invariant relaxed to "newest visible within the three newest available cycles, else newest empty with `defaultResolvedBy: 'exhausted'`"; list-exhaustion stop condition stated; tests for four-cycle and two-cycle cases (§3.3, §6, §7). |
 
-Codex has run three adversarial passes; the §10 item 0 decision is recorded and the build is in §11. The built diff gets its own Codex adversarial review before promotion.
+Codex has run three adversarial plan passes; the §10 item 0 decision is recorded and the build is in §11.
+
+**Build diff, first pass (2026-09-06, verdict NEEDS REWORK):**
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 (medium) | A bookmarked `cycleCode=none` with no uncycled rows returned `selected: 'none'` but the picker rendered no `none` option, so the controlled select showed a different cycle than the data | **Accepted.** The `none` option renders whenever `hasUncycled` or `selected === 'none'`; the controlled value always has an option (a bookmarked absent cycle already did); views test added for both cases. |
+| 2 (medium) | The oversized-cycle test set both `totalCount` over the bound and `hasMore`, so deleting the `hasMore` branch stayed green | **Accepted.** Separate service test: in-bound count with `hasMore: true` → 503; over-bound count with `hasMore: false` → 503. |

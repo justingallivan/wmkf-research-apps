@@ -431,7 +431,10 @@ function writeCycleToLocation(code) {
 
 /**
  * Server-resolved cycle picker. Options come only from the response; the
- * selected value is what the server scoped to, never a client inference.
+ * selected value is what the server scoped to, never a client inference. The
+ * controlled value is always one of the rendered options: a bookmarked cycle
+ * absent from the list, or `none` with no uncycled rows, still gets an option
+ * so the picker never shows a cycle other than the one the data is scoped to.
  */
 function CycleSelector({ cycles, disabled, onChange }) {
   const options = [...(cycles?.available || [])];
@@ -453,7 +456,9 @@ function CycleSelector({ cycles, disabled, onChange }) {
         {options.map((cycle) => (
           <option key={cycle.code} value={cycle.code}>{cycle.label}</option>
         ))}
-        {cycles?.hasUncycled && <option value={NO_CYCLE}>No cycle</option>}
+        {(cycles?.hasUncycled || cycles?.selected === NO_CYCLE) && (
+          <option value={NO_CYCLE}>No cycle</option>
+        )}
       </select>
     </div>
   );

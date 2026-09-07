@@ -205,6 +205,40 @@ test('No cycle option renders only when uncycled rows exist and round-trips to t
   expect(screen.getByText(/awaiting your review in No cycle/)).toBeInTheDocument();
 });
 
+test('the controlled cycle value always has an option: bookmarked none without uncycled rows, and a cycle absent from the list', async () => {
+  global.fetch.mockResolvedValueOnce(response(dashboard({
+    cycles: {
+      selected: 'none',
+      available: [{ code: 'D26', label: 'December 2026' }],
+      hasUncycled: false,
+      defaultResolvedBy: 'explicit',
+    },
+    counts: { total: 0, open: 0, history: 0, stewardship: 0 },
+    queues: { open: [], history: [], stewardship: [] },
+  })));
+  const { unmount } = render(<FinalWriteupsDashboardView />);
+  const select = await screen.findByRole('combobox', { name: 'Cycle' });
+  expect(select).toHaveValue('none');
+  expect(screen.getByRole('option', { name: 'No cycle' })).toBeInTheDocument();
+  unmount();
+
+  global.fetch.mockResolvedValueOnce(response(dashboard({
+    cycles: {
+      selected: 'J25',
+      available: [{ code: 'D26', label: 'December 2026' }],
+      hasUncycled: false,
+      defaultResolvedBy: 'explicit',
+    },
+    counts: { total: 0, open: 0, history: 0, stewardship: 0 },
+    queues: { open: [], history: [], stewardship: [] },
+  })));
+  render(<FinalWriteupsDashboardView />);
+  const absent = await screen.findByRole('combobox', { name: 'Cycle' });
+  expect(absent).toHaveValue('J25');
+  expect(screen.getByRole('option', { name: 'J25' })).toBeInTheDocument();
+  expect(screen.queryByRole('option', { name: 'No cycle' })).not.toBeInTheDocument();
+});
+
 test('walk-back outcomes are rendered from response fields only', async () => {
   global.fetch.mockResolvedValueOnce(response(dashboard({
     cycles: {

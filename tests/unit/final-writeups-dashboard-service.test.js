@@ -466,6 +466,29 @@ test('fails loudly instead of silently truncating the dashboard, naming the over
   expect(dependencies.getFileMetadataById).not.toHaveBeenCalled();
 });
 
+test('a continuation page alone (hasMore with an in-bound count) also fails closed per cycle', async () => {
+  const { dependencies, requests } = harness();
+  dependencies.queryRequests.mockResolvedValue({
+    records: requests,
+    totalCount: requests.length,
+    hasMore: true,
+  });
+  await expect(loadFinalWriteupsDashboard({ actingUserSystemId: ACTOR_ID, cycleCode: 'D26' }, dependencies))
+    .rejects.toMatchObject({
+      httpStatus: 503,
+      body: { code: 'final_writeups_dashboard_scope_exceeded', cycleCode: 'D26' },
+    });
+  expect(dependencies.findDocumentsByIds).not.toHaveBeenCalled();
+
+  dependencies.queryRequests.mockResolvedValue({
+    records: [],
+    totalCount: FINAL_WRITEUPS_DASHBOARD_MAX_ROWS + 1,
+    hasMore: false,
+  });
+  await expect(loadFinalWriteupsDashboard({ actingUserSystemId: ACTOR_ID, cycleCode: 'D26' }, dependencies))
+    .rejects.toMatchObject({ body: { code: 'final_writeups_dashboard_scope_exceeded' } });
+});
+
 test('selected request must identify a projected current Final row', async () => {
   const { dependencies } = harness();
   const missingId = '30000000-0000-4000-8000-000000000099';
