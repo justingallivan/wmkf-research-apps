@@ -383,6 +383,8 @@ Three passes reached the stopping rule; the build proceeds on this plan.
 |---|---|---|
 | 1 (medium) | A valid `pd` GUID with surrounding whitespace passed `isGuid` but was stored untrimmed, so it matched no row and showed the absent-PD state | **Accepted.** `pd` is canonicalized (trim + lowercase) before validation; any raw value that differs from the canonical form triggers the on-mount rewrite; regression test added. |
 
+**Build diff, second pass (2026-09-07, verdict approve):** no material findings; the pd canonicalization fix verified closed. Two build passes reached the stopping rule.
+
 ## 13. Explicitly out of scope
 
 Stage filter (owner dropped it), 6D "has edits", 6E other-stage lists, approval gates,
