@@ -240,7 +240,11 @@ grantRequestAdapter.queryAllRequests({
 ```
 
 No existing key changes meaning. `counts.*` and the matrix now describe one cycle, which is the
-intended semantic change and is called out in the security-matrix row and Atlas note.
+intended semantic change and is called out in the security-matrix row and Atlas note. **Focused
+responses carry `cycles.available: []` and `hasUncycled: false`** (Codex build-pass 2): the focused
+path never runs the global scan, so an unrelated off-month row or a capped scan cannot replace the
+focused row's own 200 or 404. This mirrors the existing convention that focused responses return
+`coordinatorMatrix: null`; the focused view uses only `cycles.selected`.
 
 ### 3.6 Client (minimal; 6B adds the other filters)
 
@@ -437,7 +441,7 @@ Built per §3–§7 on the branch; not promoted. Files: `lib/services/final-writ
 service does not import transport constants — the access-layer gate rejected the direct import),
 `pages/api/workbench/final-writeups.js` (allowlist `requestId` | `cycleCode`, mutually exclusive),
 `shared/components/final-writeups/FinalWriteupsViews.js` (cycle `<select>`, URL persistence, header
-copy, focused cycle context), and the three test files (34 service, 5 route, 15 views tests).
+copy, focused cycle context), and the three test files (35 service, 5 route, 15 views tests).
 Complement check: zero query keys → default cycle; `requestId` alone → focused, cycle derived;
 `cycleCode` alone → explicit, never walks back; both → 400; any other key → 400; malformed or
 uppercase-`NONE` selector → 400 at the handler and again at the service; empty cycle list →
@@ -480,3 +484,11 @@ Codex has run three adversarial plan passes; the §10 item 0 decision is recorde
 |---|---|---|
 | 1 (medium) | A bookmarked `cycleCode=none` with no uncycled rows returned `selected: 'none'` but the picker rendered no `none` option, so the controlled select showed a different cycle than the data | **Accepted.** The `none` option renders whenever `hasUncycled` or `selected === 'none'`; the controlled value always has an option (a bookmarked absent cycle already did); views test added for both cases. |
 | 2 (medium) | The oversized-cycle test set both `totalCount` over the bound and `hasMore`, so deleting the `hasMore` branch stayed green | **Accepted.** Separate service test: in-bound count with `hasMore: true` → 503; over-bound count with `hasMore: false` → 503. |
+
+**Build diff, second pass (2026-09-06, verdict NEEDS REWORK):**
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 (high) | The focused path ran the global cycle scan in parallel, so an unrelated off-month Final (typed 500) or a capped scan (503) could replace the focused row's 404 or 200 | **Accepted.** Focused reads skip `discoverCycles` and return an empty picker (§3.5); test: unrelated off-month row plus capped scan → visible focused row 200, hidden focused row 404, scan never called. |
+
+Two build passes reached the stopping rule; the remaining verdict is closed by this fix and its test.

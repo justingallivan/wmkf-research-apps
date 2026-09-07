@@ -797,6 +797,29 @@ describe('cycle scoping (Slice 6A)', () => {
       expect(fixture.dependencies.queryRequests).not.toHaveBeenCalled();
     });
 
+    test('never run the global cycle scan, so an unrelated data fault cannot mask the focused 200 or 404', async () => {
+      const fixture = harness();
+      // Unrelated off-month current Final elsewhere, and a scan that would be capped.
+      addRequest(fixture, { requestId: REQUEST_D_ID, finalId: FINAL_D_ID, requestNumber: '0999', meetingDate: '2026-03-15T00:00:00Z' });
+      fixture.dependencies.queryAllRequests.mockResolvedValue({ records: [], totalCount: 0, capped: true });
+
+      const visible = await loadFinalWriteupsDashboard({
+        actingUserSystemId: ACTOR_ID, selectedRequestId: REQUEST_A_ID,
+      }, fixture.dependencies);
+      expect(visible.selected.requestId).toBe(REQUEST_A_ID);
+      expect(visible.cycles).toEqual({
+        selected: 'D26', available: [], hasUncycled: false, defaultResolvedBy: 'explicit',
+      });
+
+      fixture.dependencies.resolvePersonas.mockResolvedValue({ enabled: true, personas: ['leadership'] });
+      await expect(loadFinalWriteupsDashboard({
+        actingUserSystemId: ACTOR_ID, selectedRequestId: REQUEST_A_ID,
+      }, fixture.dependencies)).rejects.toMatchObject({
+        httpStatus: 404, body: { code: 'final_writeups_dashboard_request_not_found' },
+      });
+      expect(fixture.dependencies.queryAllRequests).not.toHaveBeenCalled();
+    });
+
     test('a focused request without a meeting date is served under none', async () => {
       const fixture = harness();
       addRequest(fixture, { requestId: REQUEST_D_ID, finalId: FINAL_D_ID, requestNumber: '0999', meetingDate: null });
