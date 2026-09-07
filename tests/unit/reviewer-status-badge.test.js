@@ -3,6 +3,7 @@ import {
   StatusBadge,
   reviewerHasReceivedReview,
 } from '../../shared/components/reviewers/ReviewerManagePanel';
+import { TokenStateBadge } from '../../shared/components/reviewers/TokenActionsMenu';
 
 describe('reviewer status badge links', () => {
   test('links received and complete statuses to the request reviews tab', () => {
@@ -35,6 +36,18 @@ describe('reviewer status badge links', () => {
     expect(button.tagName).toBe('BUTTON');
     button.click();
     expect(onClick).toHaveBeenCalledTimes(1);
+  });
+
+  test('renders the clickable token state as a pill', () => {
+    render(
+      <TokenStateBadge
+        state="active"
+        firstAccessedAt="2026-09-06T12:00:00Z"
+        onClick={() => {}}
+        ariaLabel="View activity history for Ada Reviewer"
+      />,
+    );
+    expect(screen.getByRole('button')).toHaveClass('rounded-full');
   });
 
   test('treats received timestamps, submitted reviews, and terminal statuses as received', () => {
