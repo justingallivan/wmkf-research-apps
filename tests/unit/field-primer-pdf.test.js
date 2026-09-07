@@ -11,6 +11,7 @@
 import { TextDecoder as NodeTextDecoder } from 'util';
 import { PDFReportBuilder } from '../../shared/utils/pdf-export';
 import { generateFieldPrimerPdf, fieldPrimerPdfFilename } from '../../shared/utils/field-primer-pdf';
+import { renderPrimerMarkdown } from '../../lib/services/field-primer-service';
 
 afterEach(() => jest.restoreAllMocks());
 
@@ -174,6 +175,25 @@ describe('generateFieldPrimerPdf', () => {
     expect(calls).toContainEqual(['meta', 'Generated', 'not-a-date']);
     expect(flat(calls)).not.toMatch(/Invalid Date/);
   });
+});
+
+// The module header claims this export follows the MARKDOWN renderer's
+// headings, not the compact on-screen panel's (those two already disagree with
+// each other). Pin it, so the claim is enforced rather than asserted.
+test('PDF headings match renderPrimerMarkdown heading-for-heading, with Caveats as the one documented difference', async () => {
+  const calls = spyOnBuilder();
+  await generateFieldPrimerPdf(envelope(FULL_PRIMER), META);
+  const pdfHeadings = sections(calls);
+
+  jest.restoreAllMocks();
+  const markdownHeadings = renderPrimerMarkdown(FULL_PRIMER, { title: META.title })
+    .split('\n')
+    .filter((line) => line.startsWith('## '))
+    .map((line) => line.slice(3));
+
+  // Caveats is a highlight box in the PDF (matching the screen's amber
+  // callout), so it is the only markdown heading absent from the section list.
+  expect([...pdfHeadings, 'Caveats']).toEqual(markdownHeadings);
 });
 
 describe('fieldPrimerPdfFilename', () => {

@@ -226,6 +226,10 @@ function FieldPrimer({ requestId, initialRaw, exportMeta }) {
     setGenerating(false);
     setError(null);
     setPending(false);
+    // A superseded export's `finally` is token-guarded, so it will not clear
+    // these for the request now on screen — reset them here or the new
+    // request's button stays stuck on "Preparing PDF…".
+    setExporting(false);
     setExportError(null);
   }, [requestId, initialRaw]);
 
@@ -255,6 +259,12 @@ function FieldPrimer({ requestId, initialRaw, exportMeta }) {
 
   const exportPdf = async () => {
     if (!envelope) return;
+    // Same stale-generation guard as `generate`: the two dynamic imports and the
+    // render are awaits, and the request (or its stored primer) can change
+    // underneath them. A superseded export must neither download the previous
+    // request's PDF nor write its error into the new request's view.
+    const token = reqRef.current;
+    const meta = exportMeta || {};
     setExporting(true);
     setExportError(null);
     try {
@@ -262,12 +272,13 @@ function FieldPrimer({ requestId, initialRaw, exportMeta }) {
         import('../../utils/field-primer-pdf'),
         import('../../utils/pdf-export'),
       ]);
-      const bytes = await generateFieldPrimerPdf(envelope, exportMeta || {});
-      downloadPdf(bytes, fieldPrimerPdfFilename(exportMeta || {}));
+      const bytes = await generateFieldPrimerPdf(envelope, meta);
+      if (token !== reqRef.current) return;
+      downloadPdf(bytes, fieldPrimerPdfFilename(meta));
     } catch (e) {
-      setExportError(`Could not build the PDF: ${e.message}`);
+      if (token === reqRef.current) setExportError(`Could not build the PDF: ${e.message}`);
     } finally {
-      setExporting(false);
+      if (token === reqRef.current) setExporting(false);
     }
   };
 

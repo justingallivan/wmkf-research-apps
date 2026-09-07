@@ -10,7 +10,7 @@
  * @jest-environment jsdom
  */
 
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import ProposalTab from '../../shared/components/workbench/ProposalTab';
 import { generateFieldPrimerPdf, fieldPrimerPdfFilename } from '../../shared/utils/field-primer-pdf';
 import { downloadPdf } from '../../shared/utils/pdf-export';
@@ -86,6 +86,44 @@ test('a renderer failure is shown to the user and leaves the button usable', asy
   expect(await screen.findByText(/Could not build the PDF: font embed failed/)).toBeInTheDocument();
   expect(downloadPdf).not.toHaveBeenCalled();
   expect(screen.getByRole('button', { name: 'Export PDF' })).toBeEnabled();
+});
+
+test('an export superseded by a request change neither downloads nor writes its error into the new request', async () => {
+  let releaseRender;
+  generateFieldPrimerPdf.mockImplementationOnce(() => new Promise((resolve, reject) => {
+    releaseRender = { resolve, reject };
+  }));
+
+  const { rerender } = render(<ProposalTab context={context(JSON.stringify(ENVELOPE))} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Export PDF' }));
+  await waitFor(() => expect(releaseRender).toBeDefined());
+
+  // The user moves to another request while the render is still pending. The
+  // reset effect bumps the generation token.
+  const other = { ...context(JSON.stringify({ ...ENVELOPE, runId: 'run-other' })), requestId: 'ffffffff-3c43-f111-88b5-000d3a3065b8', requestNumber: '1002999' };
+  rerender(<ProposalTab context={other} />);
+  // The new request gets a usable button immediately; the superseded render is
+  // still pending but can no longer own this panel's state.
+  await screen.findByRole('button', { name: 'Export PDF' });
+  expect(screen.queryByRole('button', { name: 'Preparing PDF…' })).not.toBeInTheDocument();
+
+  releaseRender.resolve(new Uint8Array([9, 9, 9]));
+  await waitFor(() => expect(generateFieldPrimerPdf).toHaveBeenCalledTimes(1));
+  expect(downloadPdf).not.toHaveBeenCalled();
+
+  // A late FAILURE on a superseded export must not surface either. The
+  // rejection is flushed inside act() so the state write it would perform has
+  // actually run by the time we assert — asserting before the rejection
+  // propagates would pass even with the guard removed.
+  generateFieldPrimerPdf.mockImplementationOnce(() => new Promise((_r, reject) => { releaseRender = { reject }; }));
+  fireEvent.click(screen.getByRole('button', { name: 'Export PDF' }));
+  await waitFor(() => expect(generateFieldPrimerPdf).toHaveBeenCalledTimes(2));
+  rerender(<ProposalTab context={context(JSON.stringify(ENVELOPE))} />);
+  await act(async () => {
+    releaseRender.reject(new Error('late failure'));
+    await Promise.resolve();
+  });
+  expect(screen.queryByText(/Could not build the PDF/)).not.toBeInTheDocument();
 });
 
 test('a malformed stored primer offers generation, not export', async () => {

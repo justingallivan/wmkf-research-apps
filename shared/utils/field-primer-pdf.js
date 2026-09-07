@@ -6,9 +6,21 @@
  * alongside:
  *   - renderPrimerMarkdown (lib/services/field-primer-service.js, server/CLI)
  *   - ProposalTab PrimerView (shared/components/workbench/ProposalTab.js, client)
- * Section order and labels deliberately track those two. Expert links and
- * bibliometrics come from the shared `field-primer-display` helpers so the
- * three surfaces cannot drift on WHICH experts get an identity treatment.
+ *
+ * HEADINGS FOLLOW THE MARKDOWN RENDERER, NOT THE SCREEN. Those two existing
+ * surfaces already disagree: the compact on-screen panel says "Subareas",
+ * "Frontiers", "Communities", "Venues", "Experts (orienting only - verify
+ * before use)", while the document renderer says "Sub-areas", "Frontiers & why
+ * now", "Active communities", "Notable venues", "Field experts (orienting, not
+ * vetted)". This export is a document, so it tracks the document renderer
+ * heading-for-heading; `tests/unit/field-primer-pdf.test.js` pins that against
+ * `renderPrimerMarkdown` so the claim is enforced rather than asserted. The one
+ * intentional difference is Caveats, which renders as a highlight box to match
+ * the amber callout the screen uses, not as a plain section.
+ *
+ * Expert links and bibliometrics come from the shared `field-primer-display`
+ * helpers so all three surfaces agree on WHICH experts get an identity
+ * treatment — an `unverified` name never carries metrics or a profile link.
  *
  * SCOPE CARRIES INTO THE FILE. A PDF leaves the app, so the exported document
  * repeats the orientation disclaimer and the grounding legend verbatim rather
