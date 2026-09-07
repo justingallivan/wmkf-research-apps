@@ -55,6 +55,20 @@ function finalDocument(overrides = {}) {
   };
 }
 
+function leadershipCheckpoint(overrides = {}) {
+  return {
+    wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.FINAL,
+    wmkf_leadershipreviewstartedat: '2026-09-07T20:00:00Z',
+    _wmkf_leadershipreviewstartedby_value: '44444444-4444-4444-8444-444444444444',
+    wmkf_sharepointversionid: '9.0',
+    wmkf_sharepointetag: 'etag-leadership',
+    wmkf_sharepointlastmodified: '2026-09-07T19:30:00Z',
+    wmkf_filesize: 2100,
+    wmkf_contenthash: 'gdc1:leadership-hash',
+    ...overrides,
+  };
+}
+
 function acknowledgement(overrides = {}) {
   return {
     wmkf_finalwriteupreviewacknowledgementid: ACK_ID,
@@ -401,5 +415,43 @@ describe('acknowledged publication version (Slice 6C)', () => {
       acknowledgedPublicationVersionId: '1.0',
       publicationVersionId: '1.0',
     });
+  });
+});
+
+describe('leadership checkpoint (shared with the transition and dashboard readers)', () => {
+  test('a leadership-stage Final with the complete checkpoint stays reviewable', async () => {
+    const { dependencies } = harness({ finalRow: finalDocument(leadershipCheckpoint()) });
+    const state = await getFinalWriteupAcknowledgementState({
+      requestId: REQUEST_ID,
+      actingUserSystemId: REVIEWER_ID,
+    }, dependencies);
+    expect(state).toMatchObject({ available: true, finalArtifactId: FINAL_ID, mayAcknowledge: true });
+  });
+
+  test.each([
+    ['a missing leadership actor', { _wmkf_leadershipreviewstartedby_value: null }],
+    ['a non-GUID leadership actor', { _wmkf_leadershipreviewstartedby_value: 'someone' }],
+    ['a malformed leadership time', { wmkf_leadershipreviewstartedat: 'not-a-date' }],
+    ['a blank eTag', { wmkf_sharepointetag: '' }],
+    ['a non-numeric filesize', { wmkf_filesize: 'big' }],
+  ])('a FINAL Final row with %s fails closed for read and mark before Graph or persistence', async (_label, overrides) => {
+    const { dependencies } = harness({ finalRow: finalDocument(leadershipCheckpoint(overrides)) });
+    await expect(getFinalWriteupAcknowledgementState({
+      requestId: REQUEST_ID,
+      actingUserSystemId: REVIEWER_ID,
+    }, dependencies)).rejects.toMatchObject({
+      code: 'final_writeup_acknowledgement_final_state_invalid',
+      httpStatus: 500,
+    });
+    await expect(markFinalWriteupReviewed({
+      requestId: REQUEST_ID,
+      expectedFinalArtifactId: FINAL_ID,
+      actingUserSystemId: REVIEWER_ID,
+    }, dependencies)).rejects.toMatchObject({
+      code: 'final_writeup_acknowledgement_final_state_invalid',
+    });
+    expect(dependencies.getFileMetadataById).not.toHaveBeenCalled();
+    expect(dependencies.createAcknowledgement).not.toHaveBeenCalled();
+    expect(dependencies.updateAcknowledgement).not.toHaveBeenCalled();
   });
 });

@@ -583,8 +583,16 @@ implementation plan status lines, queue item 4, wiki topic section.
 **Codex diff review pass 1 (2026-09-07): one medium finding, accepted.** `leadershipCheckpointComplete` was
 truthiness-based, so blank or malformed persisted values could pass the `FINAL` committed-state guard. It is
 now a strict validator (parseable timestamps, GUID actor, non-blank strings, finite non-negative size) with
-nine malformed-value regression cases beside the seven missing-field cases. Diff review pass 2, PR,
-deployment, and owner-run smoke are recorded below as they happen.
+nine malformed-value regression cases beside the seven missing-field cases.
+
+**Codex diff review pass 2 (2026-09-07): one medium finding, accepted.** The strict validator lived only in
+the transition service; the acknowledgement and dashboard readers still accepted any `FINAL` row. The
+predicate now lives in `lib/services/final-writeup/leadership-checkpoint.js` and all three readers use it:
+the acknowledgement reader throws 500 `final_writeup_acknowledgement_final_state_invalid` for a malformed
+`FINAL` row (read and mark, before Graph or persistence), and the dashboard stage map falls through to its
+existing lifecycle-invalid 500. Cross-consumer malformed-row tests added to both sibling suites; the
+dashboard fixture's leadership rows now carry the checkpoint. Diff review pass 3, PR, deployment, and
+owner-run smoke are recorded below as they happen.
 
 ## 13. Explicitly out of scope
 
