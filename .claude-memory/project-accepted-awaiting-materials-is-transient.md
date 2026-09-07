@@ -34,6 +34,8 @@ S490); plan it before the **J27** (June 2027 cycle) reviewer invitations go out 
 owner correction 2026-09-06: D26 acceptances have already happened, so this is a
 J27 build, not a D26 one ("the proposals will arrive in December of 2026, which
 may be the confusion"). If it ships, smoke the automated send at the first J27
-acceptance; the manual modal remains the D26 path and is smoked by any remaining
-D26 acceptance — record either in the 6B3 receipt. See
+acceptance. The manual-modal smoke is **effectively closed** (owner 2026-09-06): D26
+invitations have gone out and many reviews are in; the only residual D26 use is a
+replacement reviewer if someone backs out, which would exercise the modal
+naturally. Do not list it as an open D26 item. See
 [[project-workbench-consolidation-rollout]] for the Workbench lifecycle context.

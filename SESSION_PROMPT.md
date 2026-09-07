@@ -93,7 +93,7 @@ materials-on-acceptance clarification · `9b60cea5` queue item 5 · handoff: `gi
 3. **6D fingerprint smoke at the first J27 invitation batch** (D26 batches already went out; corrected 2026-09-06). Evidence: invitations are fingerprinted
    (6D-1 confirmed); no acceptance needed. Render → change a proposal detail in CRM → send → observe
    `draft_stale` skip → re-render → send. Write the PD checklist beforehand.
-4. **Release-materials modal smoke** at any remaining D26 acceptance (the manual modal is the D26 path).
+4. **Release-materials modal smoke**: effectively closed (owner 2026-09-06). D26 materials are out and reviews are in; a replacement reviewer would exercise the modal naturally. Not an open item.
    Evidence: `project-accepted-awaiting-materials-is-transient`.
 
 ### Owner Decision Needed
