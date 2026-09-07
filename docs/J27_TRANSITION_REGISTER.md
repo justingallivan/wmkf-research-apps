@@ -140,7 +140,7 @@ D26 observed volumes to size against (all dated, from the sweep): dashboard defa
 |---|---|---|
 | C-1 | Phasing memory L58 said single-submission "may un-scaffold the reviewer hold step"; the hold step was removed S279 independent of J27. | Memory line corrected 2026-09-06 (J27-014). |
 | C-2 | Winddown memory L31 placed the single-phase pivot in "the cycle after May 2026" (D26). | Memory line corrected 2026-09-06 to J27 (J27-052). |
-| C-3 | Redesign memory L421,479 and `REQUEST_WORKBENCH_BUILD_PLAN.md:33` date the D26 Phase I→II flip "~mid-June 2026", which cannot precede the 2026-08-18 Phase II due date. | Not edited. Q18. |
+| C-3 | Redesign memory L421,479 and `REQUEST_WORKBENCH_BUILD_PLAN.md:33` date the D26 Phase I→II flip "~mid-June 2026", which cannot precede the 2026-08-18 Phase II due date. | **Resolved 2026-09-06 (owner): the D26 flip was June 22, 2026**, so "mid-June" was close and the 2026-08-18 date is the Phase II proposal due date eight weeks later. Memory annotated; the historical build plan left as written. |
 | C-4 | `SYSTEM_MODEL.md:132-139` states the single-submission model as present fact while D26 still has a second submission. | **Resolved 2026-09-06:** a dated cycle-boundary note now precedes the section, in the owner's words; `GRANT_CYCLE_LIFECYCLE.md:23` hedge replaced the same way. |
 | C-5 | Superseded 2026-05-06 intake decisions (Connor) say J27 intake sets `Phase II Pending` at submission; the phasing memory says the internal downselect flips it after. | **Resolved 2026-09-06 (owner):** the downselect reading is correct; the status changes only after staff decide to move a proposal forward. The 2026-05-06 memory stays historical. |
 | C-6 | `STAGED_REVIEW_PIPELINE.md` frontmatter is `kind: history` but `status: active`. | Not edited. Owner to classify (Q4). |
@@ -169,7 +169,7 @@ Numbering continues from the plan's §8. Q0 (calendar) is answered: proposals ar
 - **Q15.** Who flips `REVIEW_DOCX_SHAREPOINT_CYCLE` to `J27`, when, and do late-D26 and early-J27 reviews need concurrent filing?
 - **Q16.** Rename or rescope `REVIEWER_FINDER_D26_PIPELINE_FLOWCHART.md` for J27, or freeze it and write a successor?
 - **Q17.** ANSWERED 2026-09-06: both docs now carry a dated cycle-boundary note. Owner's framing: D26 is active and the last cycle with different submitted materials; Phase I / Phase II terminology persists internally for back-end workflows; the J27 advance is a status change with no separate materials. Rows J27-049 and J27-050 close as `done (this commit)`.
-- **Q18.** Annotate the passages that couple the J27 Initial Assessment pilot to 2026-08-18, and confirm the real D26 Phase I→II flip date.
+- **Q18.** Flip date ANSWERED 2026-09-06: **June 22, 2026** (Phase II proposals then due 2026-08-18). Annotating the pilot passages that couple "J27 Initial Assessment" to 2026-08-18 remains a copy item.
 - **Q19.** ANSWERED 2026-09-06: no, GOApply carries J27 intake. The virus-scan E2E and the P1-Update Power Automate gate are **not** J27 prerequisites; they stay with the parked portal for the future pilot.
 - **Q20.** Does the "do not cut over to the grounded origination arm" verdict need re-testing on J27 full proposals?
 - **Q21.** In J27, does Connor's flow still emit a separate `Reviewer Materials/Proposal_{n}.pdf`, and does the never-expose rule for the Phase I application survive? (slice G)

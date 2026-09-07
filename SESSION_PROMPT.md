@@ -99,8 +99,9 @@ materials-on-acceptance clarification · `9b60cea5` queue item 5 · handoff: `gi
 ### Owner Decision Needed
 
 1. **Dataverse attribute drops**: `wmkf_appreviewersuggestion.wmkf_summarybloburl` and
-   `wmkf_appgrantcycle.wmkf_summarypages` are deployed but unused (both Atlas pages say so). Dropping
-   is a schema change with its own pre-flight; historical values exist. Not urgent.
+   `wmkf_appgrantcycle.wmkf_summarypages` are deployed but unused (both Atlas pages say so). **Owner
+   2026-09-06: drop them.** Schema change with its own pre-flight (Connor-applied); historical values
+   exist and are not needed. Not urgent; queue as a Tier 0 schema task.
 2. **Runtime zero-hit for generate-emails** (before merging #171, optional): a glance at the Vercel
    dashboard request logs for `/api/reviewer-finder/generate-emails`. Code evidence is decisive for
    in-app use; this is the one signal not obtainable from the CLI.
