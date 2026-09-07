@@ -41,8 +41,8 @@ sits in lifecycle `REVIEW`, and reviewers acknowledge versions
 know about a second stage: a Final row in lifecycle `FINAL` renders as **Leadership review**
 `[VERIFIED via lib/services/final-writeup/dashboard-service.js:259-270]`, and the persona filter
 admits a Leadership-only viewer to `leadership-review` rows and nothing else
-`[VERIFIED via dashboard-service.js:353-360; the function has exactly three branches: PC, PD,
-Leadership]`. Nothing writes that state. Until it does, the President and CSO lens is permanently
+`[VERIFIED via dashboard-service.js:353-360; after the rollout-off/superuser pass-through the
+function has three persona branches: PC, PD, Leadership]`. Nothing writes that state. Until it does, the President and CSO lens is permanently
 empty and the leadership actor/time fields provisioned by Wave 22 stay unused
 `[VERIFIED via lib/dataverse/schema/wave22-final-writeup-transition/wmkf_requestdocument_final_writeup_transition.json:17-40]`.
 
