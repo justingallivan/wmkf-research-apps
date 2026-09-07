@@ -1077,7 +1077,7 @@ export default function ReviewerManagePanel({
                     </td>
                     {showActionColumn && (
                       <td className="px-4 py-3 align-top">
-                        <div className="flex min-h-9 items-start justify-between gap-2">
+                        <div className="flex min-h-9 items-center justify-between gap-2">
                           <div className="flex flex-wrap items-center gap-2">
                             {showFollowUpColumn
                               && ['materials_sent', 'under_review'].includes(r.reviewStatus)
@@ -1104,16 +1104,16 @@ export default function ReviewerManagePanel({
                             )}
                           </div>
                           {showActionsColumn && (
-                            <div className="flex shrink-0 items-center gap-1">
+                            <div className="flex shrink-0 items-center gap-2">
                               {/* Download received review from SharePoint via Graph. */}
                               {r.reviewSharePointFolder && (
                                 <a
                                   href={`/api/review-manager/download-review?suggestionId=${encodeURIComponent(r.suggestionId)}`}
-                                  className="rounded-lg p-1.5 text-green-600 hover:bg-green-50 hover:text-green-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-600"
+                                  className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg p-2 text-green-600 hover:bg-green-50 hover:text-green-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-600"
                                   title={`Download: ${r.reviewFilename || 'review'}`}
                                   aria-label={`Download review from ${r.name || 'reviewer'}`}
                                 >
-                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                                   </svg>
                                 </a>
