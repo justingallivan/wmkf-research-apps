@@ -211,15 +211,22 @@ expectedFinalArtifactId, isSuperuser, actingUserSystemId })`:
 1. Schema gate: `schemaReady()` or 503 `final_writeup_schema_not_ready` (same as start).
 2. GUID validation of `requestId`, `expectedFinalArtifactId`, `actingUserSystemId` (403 when the
    actor is missing, mirroring `:702-709`).
-3. `readState` → `findCurrentFinal`. No current Final → 409-class error
-   `final_writeup_leadership_final_missing`. Pointer mismatch with `expectedFinalArtifactId` →
-   `final_writeup_leadership_stale_final` ("A different Final Writeup is now current. Reload before
-   continuing.").
-4. Authorization (§4.2) → 403 `final_writeup_leadership_forbidden`. This runs before any stage
-   state is returned, so an unauthorized caller learns nothing from POST beyond the 403. (The
-   existing GET status route already returns committed Final state, including the group-review
-   actor id, to every reviewers-app user `[VERIFIED via pages/api/workbench/final-writeup.js:50-58;
-   transition-service.js:232-235]`; the POST is simply not a second disclosure path.)
+3. `readState` (one request read plus the request's document rows, the same single read the
+   group-review start performs `[VERIFIED via transition-service.js:153-163]`). The only state
+   inspected before authorization is the request's existence, which is a 404 for an authorized and
+   an unauthorized caller alike.
+4. Authorization (§4.2) from `state.request._wmkf_programdirector_value` → 403
+   `final_writeup_leadership_forbidden`. Every pointer, fence, lifecycle, and retry inspection comes
+   **after** this step, so an unauthorized caller learns nothing from POST beyond "request exists"
+   and 403; the error codes below are unreachable without authorization. This is stricter than
+   today's group-review start, which inspects the current Final pointer before authorizing
+   `[VERIFIED via transition-service.js:700-733]`; the stricter order is the contract for the new
+   path and is not retrofitted onto the existing one in this slice. (GET already returns committed
+   Final state to every reviewers-app user `[VERIFIED via pages/api/workbench/final-writeup.js:50-58]`;
+   that is a separate, existing contract.)
+   Then `findCurrentFinal`: no current Final → 409-class `final_writeup_leadership_final_missing`;
+   pointer mismatch with `expectedFinalArtifactId` → `final_writeup_leadership_stale_final` ("A
+   different Final Writeup is now current. Reload before continuing.").
 5. **Actor resolution.** `resolveRequestDocumentActor({ actingUserSystemId, policy: REQUIRED })`,
    exactly as `startFinalWriteup` does after its authorization check
    `[VERIFIED via transition-service.js:740-747]`. When the Wave 24 flag is on, the returned enabled
@@ -262,8 +269,11 @@ Error codes are `[PLANNED]` names; the owner-voice copy rule applies to every me
 
 `[PLANNED]` `committedFinal` accepts a Final row whose lifecycle is `REVIEW` **or** `FINAL`. When
 `FINAL`, it additionally requires the complete leadership checkpoint: `wmkf_leadershipreviewstartedat`,
-`_wmkf_leadershipreviewstartedby_value`, `wmkf_sharepointversionid`, and `wmkf_contenthash`,
-mirroring how it requires the group-review pair today (`:278-279`). (The Wave 22 leadership fields
+`_wmkf_leadershipreviewstartedby_value`, and every observation field the transition refreshes,
+`wmkf_sharepointversionid`, `wmkf_sharepointetag`, `wmkf_sharepointlastmodified`, `wmkf_filesize`
+(finite number), and `wmkf_contenthash`, mirroring how it requires the group-review pair today
+(`:278-279`) and matching the field set `persistedIdentityMatches` compares
+`[VERIFIED via transition-service.js:141-148]`. (The Wave 22 leadership fields
 are in the select only under `FINAL_WRITEUP_SCHEMA_READY` `[VERIFIED via request-document.js:87-92,
 100-113]`, the same flag that gates the whole service, so the check is never evaluated against an
 unselected field.) A `FINAL` row missing any of these is rejected, so exact retry and `activate`'s concurrent-success branch never certify a half-written
@@ -407,8 +417,8 @@ notification work stays parked.
 | The leadership bind and the write option use the resolved enabled actor id; a stale or disabled user is 403 with no write | service | Unit: resolver returns `actorId` ≠ session id → bind uses `actorId`; resolver throws → `updateDocument` not called |
 | Wave 24 flag off falls back to the raw session id, as group review does | service | Unit with `schemaReady: false` |
 | The observation fields are refreshed to the verified metadata and hash | service | Unit: PATCH body carries `wmkf_sharepointversionid`, `wmkf_sharepointetag`, `wmkf_sharepointlastmodified`, `wmkf_filesize`, `wmkf_contenthash` equal to the verified values |
-| Authorization precedes the exact-retry read; an unauthorized caller gets 403 with no stage state | service | Unit: mismatched actor against an already-`FINAL` row → 403, response body carries no artifact |
-| A `FINAL` row missing any leadership-checkpoint field is not committed | transition-service.js `committedFinal` | Unit per missing field: leadership at/by, `wmkf_sharepointversionid`, `wmkf_contenthash` → null → caller 500 |
+| A `FINAL` row missing any leadership-checkpoint field is not committed | transition-service.js `committedFinal` | Unit per missing field: leadership at/by, `wmkf_sharepointversionid`, `wmkf_sharepointetag`, `wmkf_sharepointlastmodified`, `wmkf_filesize`, `wmkf_contenthash` → null → caller 500 |
+| Authorization precedes every pointer/fence/lifecycle inspection; an unauthorized caller sees only 403 | service | Unit: mismatched actor against (a) no current Final, (b) stale fence, (c) already-`FINAL` row → all 403, no state-specific code, `updateDocument` not called |
 | PD-without-leadership warning on leadership-stage rows stays | FinalWriteupsViews.js (no edit) | `final-writeups-views.test.js:309` stays green |
 | Success is confirmed by re-read, not by PATCH resolution | service | Unit: PATCH resolves but re-read shows `REVIEW` → 500 unconfirmed |
 | Acknowledgement block loads and renders at leadership stage | FinalWriteupTab.js | Tab test: `phase: 'leadership-review'` fetches acknowledgement state and renders Reviewed by |
@@ -486,17 +496,17 @@ Three findings, all verified against source and all accepted.
 
 | # | Severity | Finding | Disposition |
 |---|---|---|---|
-| F1 | high | The verify-then-PATCH flow had no commit-time SharePoint check, so an edit between the second metadata read and the PATCH would be stamped as the older version while returning success. | **Accepted.** §4.3 gains step 8, the `activate`-pattern commit-time re-read of row and metadata `[VERIFIED via transition-service.js:590-600]`, and step 10 confirms the persisted milestone version equals the verified one. Residual: the read-to-PATCH interval, identical to today's group-review activation; named in §4.3. |
-| F2 | medium | The milestone overwrite was reconciled against runtime readers only; the explicit-actor census and the inventory probe read the raw fields, and the census expects a milestone actor beside the milestone time. | **Accepted and widened.** §3.4 records the `wmkf_MilestoneCreatedBy` sibling, the census pairing rule, and the pre-existing gap that group-review activation already stamps the time without an actor. §4.1 writes the milestone actor with the triple and schedules the census kind rename; §10 D2 now carries the fallback of leaving the triple alone. |
+| F1 | high | The verify-then-PATCH flow had no commit-time SharePoint check, so an edit between the second metadata read and the PATCH would be stamped as the older version while returning success. | **Accepted.** §4.3 gains the `activate`-pattern commit-time re-read of row and metadata (now step 9) `[VERIFIED via transition-service.js:590-600]`, and step 11 confirms the persisted observation fields equal the verified ones. Residual: the read-to-PATCH interval, identical to today's group-review activation; named in §4.3. |
+| F2 | medium | The milestone overwrite was reconciled against runtime readers only; the explicit-actor census and the inventory probe read the raw fields, and the census expects a milestone actor beside the milestone time. | **Accepted; the pass-2 response (write the milestone actor, rename the census kind) was superseded by H1.** Active contract: no milestone field is written (§4.1); §3.4 records the census pairing rule and the pre-existing group-review stamp gap, which is D6, a separate Tier 0 item. |
 | F3 | medium | `FinalWriteupsViews.js:927-932` `stageMovedOnWarning` is an existing `stage.key` consumer missing from the fan-out and the test contract. | **Accepted.** Added to §6.7 with the disconfirming grep; §7 and §8 pin the existing assertion at `final-writeups-views.test.js:309`. No code change needed. |
 
 ### Pass 2 (2026-09-07, verdict NEEDS REWORK)
 
 | # | Severity | Finding | Disposition |
 |---|---|---|---|
-| G1 | high | Exact-retry convergence ran before authorization, so an unauthorized reviewers-app user could read committed stage state from POST. | **Accepted.** §4.3 now authorizes at step 4 and converges at step 5; §7 pins 403-with-no-artifact. Scope note recorded: GET already discloses committed state to every reviewers-app user `[VERIFIED via final-writeup.js:50-58]`, so this closes an ordering flaw, not a new disclosure. |
-| G2 | high | `committedFinal`'s `FINAL` branch required only the leadership pair, so a half-written transition or malformed row would be certified as committed and returned as `reused: true`. | **Accepted.** §4.4 requires the complete checkpoint (leadership at/by, milestone version/hash/at, milestone actor under D2); §7 and §8 add per-missing-field tests. No legacy leadership rows exist `[VERIFIED via atlas :36-41]`. |
-| G3 | medium | D2's fallback left the census gap open while the plan implied closure, and the pre-existing unattributed group-review stamp had no policy. | **Accepted.** §4.1 states fallback (ii) leaves the gap open and is not recommended; D2 has no default and blocks the build. The forward fix adds the milestone actor to the group-review activation PATCH; the one existing row is D6 (no repair, recorded as known). |
+| G1 | high | Exact-retry convergence ran before authorization, so an unauthorized reviewers-app user could read committed stage state from POST. | **Accepted; tightened further by I1.** §4.3 authorizes at step 4 immediately after the single `readState`, and every pointer, fence, and retry inspection follows it; §7 pins 403-only for three unauthorized shapes. |
+| G2 | high | `committedFinal`'s `FINAL` branch required only the leadership pair, so a half-written transition or malformed row would be certified as committed and returned as `reused: true`. | **Accepted; the field list was re-based by H1 and completed by I2.** Active contract (§4.4): leadership at/by plus all five observation fields; §7 and §8 add per-missing-field tests. No legacy leadership rows exist `[VERIFIED via atlas :36-41]`. |
+| G3 | medium | D2's fallback left the census gap open while the plan implied closure, and the pre-existing unattributed group-review stamp had no policy. | **Accepted; the pass-2 response (write the milestone actor in the activation changeset) was withdrawn under H1.** Active contract: this slice makes no milestone write and does not touch activation; the census gap is pre-existing and is D6, a separate Tier 0 item. D2 is explicit (§10) and the build waits on it. |
 
 ### Pass 3 (2026-09-07, verdict NEEDS REWORK)
 
@@ -505,6 +515,14 @@ Three findings, all verified against source and all accepted.
 | H1 | high | Writing the group-review or leadership actor into `wmkf_MilestoneCreatedBy` repurposes a field whose contract is "Site Visit handoff actor"; a census rename does not repair persisted provenance. | **Accepted; D2 reversed.** The transition writes no milestone field and the group-review activation path is untouched. The checkpoint moves to the leadership pair plus the row's SharePoint observation fields, following the Site Visit transition's own refresh precedent `[VERIFIED via site-visit-transition-service.js:280-288]`. Implementation plan :292 marked `[STALE/CONFLICT]` for reconcile at build (§9). |
 | H2 | high | An unconditional `wmkf_MilestoneCreatedBy` write in the activation changeset would cross the Wave 24 readiness boundary in any environment with that flag off. | **Accepted, moot after H1.** No Wave 24 field is written by this slice; §4.3 step 5 states which flag protects which field. |
 | H3 | high | The service validated the acting id as a GUID only; no `systemuser` re-read, no disabled check, before writing lookup binds. | **Accepted.** §4.3 step 5 adds `resolveRequestDocumentActor` with `REQUIRED` after authorization, exactly the `startFinalWriteup` pattern `[VERIFIED via transition-service.js:740-747]`; the resolved id is the only id used for the bind and the write option; §7 and §8 pin resolved-id, resolver-403, and flag-off cases. |
+
+### Pass 4 (2026-09-07, verdict NEEDS REWORK)
+
+| # | Severity | Finding | Disposition |
+|---|---|---|---|
+| I1 | high | Pointer-missing and fence-mismatch errors were still reachable before authorization, giving an unauthorized caller a state oracle. | **Accepted.** §4.3 step 3 is the single `readState`; step 4 authorizes from the request's lead PD; `findCurrentFinal`, the fence, and every later inspection follow. Recorded that this is stricter than the existing group-review start `[VERIFIED via transition-service.js:700-733]`, which is not retrofitted here. |
+| I2 | high | The `FINAL` branch of `committedFinal` required version and hash only, not the eTag, lastModified, and filesize the write refreshes and `persistedIdentityMatches` compares. | **Accepted.** §4.4 requires all five observation fields; §7 lists each as a missing-field test. |
+| I3 | medium | F2, G2, and G3 still described superseded milestone-write requirements as the active contract. | **Accepted.** Those rows are rewritten in place to name the H1 supersession and the active contract. Pass 4 also confirmed the observation-field refresh collides with no Final-row claim-identity reader. |
 
 Re-review pending after this revision.
 
