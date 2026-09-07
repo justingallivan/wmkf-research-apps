@@ -21,6 +21,10 @@ export const EXECUTOR_BUDGET_DEFAULTS = Object.freeze({
     floor: 16_000,
     ceiling: 32_000,
   }),
+  'field-primer.generate': Object.freeze({
+    kind: 'timeout',
+    timeoutMsOverride: 240_000,
+  }),
 });
 
 // Safety bounds remain code-owned. Admin publications may tune values only
@@ -35,6 +39,9 @@ export const EXECUTOR_BUDGET_LIMITS = Object.freeze({
     floor: Object.freeze({ min: 4_096, max: 128_000 }),
     ceiling: Object.freeze({ min: 4_096, max: 128_000 }),
   }),
+  'field-primer.generate': Object.freeze({
+    timeoutMsOverride: Object.freeze({ min: 60_000, max: 240_000 }),
+  }),
 });
 
 export const EXECUTOR_BUDGET_DESCRIPTIONS = Object.freeze({
@@ -46,8 +53,17 @@ export const EXECUTOR_BUDGET_DESCRIPTIONS = Object.freeze({
     since: '2026-07-27 (commit 0afea876)',
     reason: 'One bounded recovery attempt after a provider-confirmed max_tokens truncation of the first synthesis pass.',
   }),
+  'field-primer.generate': Object.freeze({
+    since: 'S493 (2026-09-07)',
+    reason: 'One structured primer over a full proposal narrative; the shared 120s transport timeout expired in production on Request 1002852. Output tokens stay on the prompt row.',
+  }),
 });
 
 export const EXECUTOR_BUDGET_PROMPT_NAMES = Object.freeze(
   Object.keys(EXECUTOR_BUDGET_DEFAULTS),
 );
+
+// Registry growth is additive: a durable revision published before a prompt
+// name was registered is still authoritative for the names it carries, and the
+// reader fills the missing names from these code defaults. Publication always
+// writes the complete set. Removing or renaming a key is a schemaVersion bump.

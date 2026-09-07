@@ -293,8 +293,8 @@ document inventory, and individual implementation plans do not establish priorit
   no-privilege-team prototype is removed from current source and created no
   Production teams.
 - **Prior owner-directed release (S469, 2026-08-30):** durable Executor
-  budgets are Production-deployed and owner-viewed in the safe no-revision/code-
-  fallback state; first publication remains an explicit administrator action.
+  budgets are Production-deployed; the owner published the first revision
+  `executor.budgets.v000001` on 2026-09-07 (S493), pinning the reviewed code defaults.
   Initial Assessment superuser restore and exact byte-copy Board snapshots are
   Production-deployed through PR #138 (`c519daf6`); the relevant gates, full
   9,205-test suite, webpack build, and post-merge checks passed. Signed-in

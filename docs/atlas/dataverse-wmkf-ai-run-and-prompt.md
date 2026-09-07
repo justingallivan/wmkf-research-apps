@@ -222,16 +222,24 @@ Migration plans touching either entity must preserve these foreign keys.
   audit records. The post-cleanup census returned to zero eligible requests,
   and a post-PR-#99 production drain again scanned 25 requests with zero
   eligible, claimed, completed, cancelled, or failed jobs.
-- **Executor budget settings (Production-deployed / owner-viewed 2026-08-30;
-  first publication open):** the Production Admin panel reported no published
-  revision and the reviewed code fallback, without performing a write.
+- **Executor budget settings (Production-deployed 2026-08-30; revision v1 published
+  2026-09-07):** the 2026-08-30 Admin panel reported no published revision and the reviewed
+  code fallback, without performing a write. On 2026-09-07 the owner directed the first
+  publication: `executor.budgets.v000001`, published `2026-09-07T20:33:23.393Z` by Justin
+  Gallivan, pinning the reviewed code defaults for all three registered prompts (Pre-Site
+  standing 32 768 / 240 000 ms, review-synthesis retry 16 000–32 000, field-primer timeout-only
+  240 000 ms). The response reported model ceilings for the two token-carrying prompts only.
+  Admin and runtime reads return `source: dataverse`, version 1, `latestRevision` 1, zero
+  storage warnings.
   `lib/services/executor-budget-service.js` resolves the Pre-Site
-  standing output/transport budget and review-synthesis retry range from the
+  standing output/transport budget, the review-synthesis retry range, and the
+  field-primer timeout-only budget (S493) from the
   highest valid append-only `wmkf_appsystemsettings` row keyed
-  `executor.budgets.vNNNNNN`. The superuser-only
+  `executor.budgets.vNNNNNN`; a revision that predates a registered name fills
+  that name from the code default. The superuser-only
   `/api/admin/executor-budgets` publisher accepts one complete closed schema,
   requires the highest reserved numeric revision as `expectedVersion` plus a UUID request id, checks code-owned numeric
-  bounds and both current prompts' resolved model output ceilings, creates the
+  bounds and the token-carrying prompts' resolved model output ceilings, creates the
   next alternate-key row, and verifies that exact row before success. Prefix
   reads page to completion; alternate-key create races reread current state;
   canonical request-id replay is idempotent only for the same payload and returns
