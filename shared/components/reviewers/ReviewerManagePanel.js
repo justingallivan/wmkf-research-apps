@@ -62,13 +62,21 @@ export { PREVIEW_RENDER_TIMEOUT_MS } from './ReleaseMaterialsModal';
 
 // ─── Status Badge ───────────────────────────────────────────────────────────
 
-export function StatusBadge({ status }) {
+export function StatusBadge({ status, href }) {
   const info = getStatusInfo(status);
-  return (
-    <span className={`inline-flex items-center whitespace-nowrap px-2.5 py-0.5 rounded-full text-xs font-medium ${info.color}`}>
-      {info.label}
-    </span>
-  );
+  const className = `inline-flex items-center whitespace-nowrap px-2.5 py-0.5 rounded-full text-xs font-medium ${info.color}`;
+  if (href) {
+    return (
+      <a
+        href={href}
+        className={`${className} underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-green-600 focus-visible:ring-offset-1`}
+        title="View submitted review"
+      >
+        {info.label}
+      </a>
+    );
+  }
+  return <span className={className}>{info.label}</span>;
 }
 
 // ─── Decline-referral inline add helpers ────────────────────────────────────
@@ -1005,7 +1013,12 @@ export default function ReviewerManagePanel({
                     </td>
                     <td className="px-4 py-3 align-top">
                       <div className="flex flex-wrap items-center gap-1.5">
-                        <StatusBadge status={r.reviewStatus} />
+                        <StatusBadge
+                          status={r.reviewStatus}
+                          href={['review_received', 'complete'].includes(r.reviewStatus)
+                            ? `/workbench/${encodeURIComponent(proposal.proposalId)}?tab=reviews`
+                            : undefined}
+                        />
                         <TokenStateBadge state={r.tokenState} expiresAt={r.tokenExpiresAt} firstAccessedAt={r.proposalFirstAccessedAt} />
                       </div>
                       {r.reviewStatus === 'complete' && (
