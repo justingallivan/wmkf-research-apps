@@ -133,6 +133,55 @@ test('an export superseded by a request change neither downloads nor writes its 
   expect(screen.queryByText(/Could not build the PDF/)).not.toBeInTheDocument();
 });
 
+// Same request and same stored primer, but the parent re-renders with changed
+// header metadata while the render is pending.
+//
+// The envelope/metadata pair CANNOT mix: `exportPdf` closes over the props of
+// the render it was created in, so a later render's metadata is unreachable
+// from an in-flight call. (The explicit `const meta` snapshot in exportPdf is
+// defensive clarity, not the mechanism — reading `exportMeta` after the await
+// behaves identically.) This test therefore documents that pairing rather than
+// enforcing it.
+//
+// What it DOES enforce: a metadata change must not be treated as superseding
+// the export. Invalidating the generation token on a metadata change cancels a
+// legitimate download, and this test fails if anyone does that.
+test('metadata changing mid-export cannot mix into the file, and does not cancel the export', async () => {
+  let releaseRender;
+  generateFieldPrimerPdf.mockImplementationOnce(() => new Promise((resolve) => { releaseRender = resolve; }));
+
+  const { rerender } = render(<ProposalTab context={context(JSON.stringify(ENVELOPE))} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Export PDF' }));
+  await waitFor(() => expect(releaseRender).toBeDefined());
+
+  rerender(<ProposalTab context={{
+    ...context(JSON.stringify(ENVELOPE)),
+    title: 'A retitled proposal',
+    institution: 'Some Other University',
+    proposalInfo: { coPIs: [], pi: 'Someone Else' },
+  }} />);
+
+  await act(async () => {
+    releaseRender(new Uint8Array([4, 5, 6]));
+    await Promise.resolve();
+  });
+
+  // Rendered with the metadata as of the click, not the replacement.
+  expect(generateFieldPrimerPdf).toHaveBeenCalledWith(ENVELOPE, {
+    requestNumber: '1002852',
+    title: 'Structural principles of poly(ADP-ribose)',
+    institution: 'Johns Hopkins University',
+    pi: 'Anthony Leung',
+  });
+  expect(generateFieldPrimerPdf).not.toHaveBeenCalledWith(ENVELOPE, expect.objectContaining({ title: 'A retitled proposal' }));
+  // Not superseded: the request is the same, so the user still gets the file,
+  // named from the same snapshot.
+  expect(downloadPdf).toHaveBeenCalledWith(new Uint8Array([4, 5, 6]), 'field-primer-1002852-2026-09-07.pdf');
+  expect(fieldPrimerPdfFilename).toHaveBeenCalledWith(expect.objectContaining({
+    title: 'Structural principles of poly(ADP-ribose)',
+  }));
+});
+
 test('a malformed stored primer offers generation, not export', async () => {
   render(<ProposalTab context={context('{"schema":"something-else"}')} />);
   expect(await screen.findByRole('button', { name: 'Generate field primer' })).toBeInTheDocument();
