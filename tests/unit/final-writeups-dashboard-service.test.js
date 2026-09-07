@@ -2,8 +2,11 @@
 
 import {
   FINAL_WRITEUPS_DASHBOARD_MAX_ROWS,
+  FINAL_WRITEUPS_DEFAULT_CYCLE_WALKBACK,
+  isFinalWriteupCycleSelector,
   loadFinalWriteupsDashboard,
 } from '../../lib/services/final-writeup/dashboard-service.js';
+import { QUERY_ALL_REQUESTS_CAP } from '../../lib/dataverse/adapters/grant-request.js';
 import {
   REQUEST_DOCUMENT_ARTIFACT_TYPE,
   REQUEST_DOCUMENT_LIFECYCLE_STATE,
@@ -23,12 +26,20 @@ const ACK_B_ID = '50000000-0000-4000-8000-000000000002';
 const RESEARCH_PROGRAM_ID = '60000000-0000-4000-8000-000000000001';
 const SOCAL_PROGRAM_ID = '60000000-0000-4000-8000-000000000002';
 
-function requestRow({ requestId, requestNumber, finalId, pdId, pdName, programId = RESEARCH_PROGRAM_ID, programName = 'Research' }) {
+const D26 = '2026-12-11T00:00:00Z';
+const J26 = '2026-06-04T00:00:00Z';
+const D25 = '2025-12-10T00:00:00Z';
+const J25 = '2025-06-05T00:00:00Z';
+
+function requestRow({
+  requestId, requestNumber, finalId, pdId, pdName, meetingDate = D26,
+  programId = RESEARCH_PROGRAM_ID, programName = 'Research',
+}) {
   return {
     akoya_requestid: requestId,
     akoya_requestnum: requestNumber,
     akoya_title: `Proposal ${requestNumber}`,
-    wmkf_meetingdate: '2026-12-11T00:00:00Z',
+    wmkf_meetingdate: meetingDate,
     wmkf_organizationname: `Institution ${requestNumber}`,
     _wmkf_projectleader_value_formatted: `PI ${requestNumber}`,
     _wmkf_programdirector_value: pdId,
@@ -68,6 +79,34 @@ function acknowledgementRow() {
     wmkf_acknowledgedat: '2026-08-30T12:05:00.000Z',
     _etag: 'W/"1"',
   };
+}
+
+/**
+ * Evaluate the exact OData filter shapes the service emits against a fixture
+ * row, so a scoped read returns only rows inside the requested window.
+ */
+function matchesFilter(row, filter) {
+  if (!filter.startsWith('_wmkf_currentfinalwriteup_value ne null')) {
+    throw new Error(`unexpected filter: ${filter}`);
+  }
+  if (!row._wmkf_currentfinalwriteup_value) return false;
+  const byId = filter.match(/akoya_requestid eq ([0-9a-f-]{36})/);
+  if (byId) return row.akoya_requestid === byId[1];
+  if (filter.includes('wmkf_meetingdate eq null')) return !row.wmkf_meetingdate;
+  const window = filter.match(/wmkf_meetingdate ge (\S+) and wmkf_meetingdate lt (\S+)/);
+  if (window) {
+    if (!row.wmkf_meetingdate) return false;
+    const at = Date.parse(row.wmkf_meetingdate);
+    return at >= Date.parse(window[1]) && at < Date.parse(window[2]);
+  }
+  if (filter === '_wmkf_currentfinalwriteup_value ne null') {
+    throw new Error('the dashboard must never issue an unscoped request read');
+  }
+  throw new Error(`unexpected filter: ${filter}`);
+}
+
+function scopedFilters(dependencies) {
+  return dependencies.queryRequests.mock.calls.map(([options]) => options.filter);
 }
 
 function harness() {
@@ -120,11 +159,19 @@ function harness() {
       ],
       programs: [],
     })),
-    queryRequests: jest.fn(async () => ({
-      records: requests,
-      totalCount: requests.length,
-      hasMore: false,
+    queryAllRequests: jest.fn(async () => ({
+      records: requests.filter((row) => row._wmkf_currentfinalwriteup_value).map((row) => ({
+        akoya_requestid: row.akoya_requestid,
+        akoya_requestnum: row.akoya_requestnum,
+        wmkf_meetingdate: row.wmkf_meetingdate,
+      })),
+      totalCount: requests.filter((row) => row._wmkf_currentfinalwriteup_value).length,
+      capped: false,
     })),
+    queryRequests: jest.fn(async ({ filter }) => {
+      const matching = requests.filter((row) => matchesFilter(row, filter));
+      return { records: matching, totalCount: matching.length, hasMore: false };
+    }),
     findDocumentsByIds: jest.fn(async (ids) => ({
       records: documents.filter((row) => ids.includes(row.wmkf_requestdocumentid)),
       totalCount: ids.length,
@@ -257,15 +304,21 @@ test('enabled Leadership lens includes only leadership-stage rows', async () => 
   expect(result.coordinatorMatrix).toBeNull();
 });
 
-test('enabled Program Director lens keeps group review plus own stewardship and excludes other leadership rows', async () => {
+test("enabled Program Director lens retains every row, including other PDs' leadership-stage writeups", async () => {
   const { dependencies } = harness();
   dependencies.resolvePersonas.mockResolvedValue({ enabled: true, personas: ['program-director'] });
 
   const result = await loadFinalWriteupsDashboard({ actingUserSystemId: ACTOR_ID }, dependencies);
 
-  expect(result.counts).toEqual({ total: 2, open: 1, history: 0, stewardship: 1 });
+  // Request B is another PD's writeup already in leadership review; it must not disappear.
+  expect(result.counts).toEqual({ total: 3, open: 1, history: 1, stewardship: 1 });
   expect(result.queues.open.map((row) => row.requestId)).toEqual([REQUEST_A_ID]);
+  expect(result.queues.history[0]).toMatchObject({
+    requestId: REQUEST_B_ID,
+    stage: { key: 'leadership-review', label: 'Leadership review' },
+  });
   expect(result.queues.stewardship.map((row) => row.requestId)).toEqual([REQUEST_C_ID]);
+  expect(result.coordinatorMatrix).toBeNull();
 });
 
 test('enabled multi-persona visibility is a union and an unassigned viewer fails closed', async () => {
@@ -390,7 +443,7 @@ test('schema-off and missing actor fail before any request or Graph read', async
   expect(dependencies.getFileMetadataById).not.toHaveBeenCalled();
 });
 
-test('fails loudly instead of silently truncating the dashboard', async () => {
+test('fails loudly instead of silently truncating the dashboard, naming the oversized cycle', async () => {
   const { dependencies } = harness();
   dependencies.queryRequests.mockResolvedValue({
     records: [],
@@ -403,8 +456,12 @@ test('fails loudly instead of silently truncating the dashboard', async () => {
       body: {
         code: 'final_writeups_dashboard_scope_exceeded',
         maximumRows: FINAL_WRITEUPS_DASHBOARD_MAX_ROWS,
+        cycleCode: 'D26',
       },
     });
+  expect(scopedFilters(dependencies)).toEqual([
+    '_wmkf_currentfinalwriteup_value ne null and wmkf_meetingdate ge 2026-12-01T00:00:00Z and wmkf_meetingdate lt 2027-01-01T00:00:00Z',
+  ]);
   expect(dependencies.findDocumentsByIds).not.toHaveBeenCalled();
   expect(dependencies.getFileMetadataById).not.toHaveBeenCalled();
 });
@@ -418,5 +475,313 @@ test('selected request must identify a projected current Final row', async () =>
   }, dependencies)).rejects.toMatchObject({
     httpStatus: 404,
     body: { code: 'final_writeups_dashboard_request_not_found' },
+  });
+});
+
+describe('cycle scoping (Slice 6A)', () => {
+  const REQUEST_D_ID = '30000000-0000-4000-8000-000000000004';
+  const FINAL_D_ID = '40000000-0000-4000-8000-000000000004';
+  const REQUEST_E_ID = '30000000-0000-4000-8000-000000000005';
+  const FINAL_E_ID = '40000000-0000-4000-8000-000000000005';
+  const REQUEST_F_ID = '30000000-0000-4000-8000-000000000006';
+  const FINAL_F_ID = '40000000-0000-4000-8000-000000000006';
+
+  function addRequest(fixture, { requestId, finalId, requestNumber, meetingDate, pdId = PD_A_ID, lifecycle }) {
+    fixture.requests.push(requestRow({
+      requestId, finalId, requestNumber, pdId, pdName: 'Another PD', meetingDate,
+    }));
+    fixture.documents.push(finalRow({ requestId, finalId, lifecycle }));
+  }
+
+  test('accepts real cycle codes and the none sentinel only', () => {
+    expect(isFinalWriteupCycleSelector('D26')).toBe(true);
+    expect(isFinalWriteupCycleSelector('j25')).toBe(true);
+    expect(isFinalWriteupCycleSelector('none')).toBe(true);
+    for (const value of ['NONE', 'X26', '', null, undefined, 'D2026', 'D 26']) {
+      expect(isFinalWriteupCycleSelector(value)).toBe(false);
+    }
+  });
+
+  test('scopes the request query to the selected cycle and returns the available cycle list without counts', async () => {
+    const fixture = harness();
+    addRequest(fixture, { requestId: REQUEST_D_ID, finalId: FINAL_D_ID, requestNumber: '0999', meetingDate: J26 });
+    const result = await loadFinalWriteupsDashboard({
+      actingUserSystemId: ACTOR_ID, cycleCode: 'j26',
+    }, fixture.dependencies);
+
+    expect(result.cycles).toEqual({
+      selected: 'J26',
+      available: [{ code: 'D26', label: 'December 2026' }, { code: 'J26', label: 'June 2026' }],
+      hasUncycled: false,
+      defaultResolvedBy: 'explicit',
+    });
+    expect(result.limits).toEqual({ maximumRows: FINAL_WRITEUPS_DASHBOARD_MAX_ROWS, scope: 'cycle' });
+    expect(result.counts.total).toBe(1);
+    expect(result.queues.open.map((row) => row.requestId)).toEqual([REQUEST_D_ID]);
+    expect(result.queues.open.every((row) => row.cycleCode === 'J26')).toBe(true);
+    expect(scopedFilters(fixture.dependencies)).toHaveLength(1);
+    expect(fixture.dependencies.queryAllRequests).toHaveBeenCalledWith({
+      select: 'akoya_requestid,akoya_requestnum,wmkf_meetingdate',
+      filter: '_wmkf_currentfinalwriteup_value ne null',
+      orderby: 'wmkf_meetingdate desc',
+    });
+    expect(JSON.stringify(result.cycles)).not.toMatch(/count/i);
+  });
+
+  test('defaults to the newest cycle with a current Final in one read', async () => {
+    const fixture = harness();
+    addRequest(fixture, { requestId: REQUEST_D_ID, finalId: FINAL_D_ID, requestNumber: '0999', meetingDate: J26 });
+    const result = await loadFinalWriteupsDashboard({ actingUserSystemId: ACTOR_ID }, fixture.dependencies);
+    expect(result.cycles.selected).toBe('D26');
+    expect(result.cycles.defaultResolvedBy).toBe('visible');
+    expect(result.counts.total).toBe(3);
+    expect(scopedFilters(fixture.dependencies)).toHaveLength(1);
+  });
+
+  test('a well-formed cycle absent from the list succeeds empty; no cycles at all yields a null selection', async () => {
+    const fixture = harness();
+    const result = await loadFinalWriteupsDashboard({
+      actingUserSystemId: ACTOR_ID, cycleCode: 'J25',
+    }, fixture.dependencies);
+    expect(result.cycles.selected).toBe('J25');
+    expect(result.counts).toEqual({ total: 0, open: 0, history: 0, stewardship: 0 });
+
+    const empty = harness();
+    empty.requests.splice(0, empty.requests.length);
+    const emptyResult = await loadFinalWriteupsDashboard({ actingUserSystemId: ACTOR_ID }, empty.dependencies);
+    expect(emptyResult.cycles).toEqual({
+      selected: null, available: [], hasUncycled: false, defaultResolvedBy: 'exhausted',
+    });
+    expect(scopedFilters(empty.dependencies)).toHaveLength(0);
+  });
+
+  test('counts null-meeting-date rows as uncycled and serves them under none, never in a real cycle', async () => {
+    const fixture = harness();
+    addRequest(fixture, { requestId: REQUEST_D_ID, finalId: FINAL_D_ID, requestNumber: '0999', meetingDate: null });
+
+    const d26 = await loadFinalWriteupsDashboard({ actingUserSystemId: ACTOR_ID, cycleCode: 'D26' }, fixture.dependencies);
+    expect(d26.cycles.hasUncycled).toBe(true);
+    expect(d26.cycles.available).toEqual([{ code: 'D26', label: 'December 2026' }]);
+    expect(d26.queues.open.map((row) => row.requestId)).not.toContain(REQUEST_D_ID);
+
+    const none = await loadFinalWriteupsDashboard({ actingUserSystemId: ACTOR_ID, cycleCode: 'none' }, fixture.dependencies);
+    expect(none.cycles.selected).toBe('none');
+    expect(none.queues.open.map((row) => row.requestId)).toEqual([REQUEST_D_ID]);
+    expect(none.queues.open[0].cycleCode).toBeNull();
+    expect(scopedFilters(fixture.dependencies).at(-1)).toBe(
+      '_wmkf_currentfinalwriteup_value ne null and wmkf_meetingdate eq null',
+    );
+  });
+
+  test('serves none as an empty success when no uncycled rows exist', async () => {
+    const fixture = harness();
+    const result = await loadFinalWriteupsDashboard({ actingUserSystemId: ACTOR_ID, cycleCode: 'none' }, fixture.dependencies);
+    expect(result.cycles.hasUncycled).toBe(false);
+    expect(result.cycles.selected).toBe('none');
+    expect(result.counts.total).toBe(0);
+  });
+
+  test('fails loud on a current Final whose meeting date is not a June/December cycle, naming the request number', async () => {
+    const fixture = harness();
+    addRequest(fixture, { requestId: REQUEST_D_ID, finalId: FINAL_D_ID, requestNumber: '0999', meetingDate: '2026-03-15T00:00:00Z' });
+    await expect(loadFinalWriteupsDashboard({ actingUserSystemId: ACTOR_ID }, fixture.dependencies))
+      .rejects.toMatchObject({
+        httpStatus: 500,
+        body: { code: 'final_writeups_dashboard_cycle_invalid', requestNumber: '0999', requestId: REQUEST_D_ID },
+      });
+    expect(fixture.dependencies.queryRequests).not.toHaveBeenCalled();
+    expect(fixture.dependencies.findDocumentsByIds).not.toHaveBeenCalled();
+
+    const unnumbered = harness();
+    addRequest(unnumbered, { requestId: REQUEST_D_ID, finalId: FINAL_D_ID, requestNumber: null, meetingDate: '2026-03-15T00:00:00Z' });
+    await expect(loadFinalWriteupsDashboard({ actingUserSystemId: ACTOR_ID }, unnumbered.dependencies))
+      .rejects.toMatchObject({ body: { error: expect.stringContaining(REQUEST_D_ID) } });
+  });
+
+  test('fails closed when the cycle list scan is capped', async () => {
+    const fixture = harness();
+    fixture.dependencies.queryAllRequests.mockResolvedValue({ records: [], totalCount: 0, capped: true });
+    await expect(loadFinalWriteupsDashboard({ actingUserSystemId: ACTOR_ID }, fixture.dependencies))
+      .rejects.toMatchObject({ httpStatus: 503, body: { code: 'final_writeups_dashboard_cycle_list_capped' } });
+    expect(fixture.dependencies.queryRequests).not.toHaveBeenCalled();
+  });
+
+  test('warns once with final_writeups_dashboard_cycle_list_near_cap when the scan reaches half the export cap', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const half = QUERY_ALL_REQUESTS_CAP / 2;
+      const scan = (count) => Array.from({ length: count }, (_, index) => ({
+        akoya_requestid: REQUEST_A_ID, akoya_requestnum: String(index), wmkf_meetingdate: D26,
+      }));
+      const fixture = harness();
+      fixture.dependencies.queryAllRequests.mockResolvedValue({ records: scan(half), totalCount: half, capped: false });
+      await loadFinalWriteupsDashboard({ actingUserSystemId: ACTOR_ID }, fixture.dependencies);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn.mock.calls[0][0]).toBe('final_writeups_dashboard_cycle_list_near_cap');
+
+      warn.mockClear();
+      fixture.dependencies.queryAllRequests.mockResolvedValue({ records: scan(half - 1), totalCount: half - 1, capped: false });
+      await loadFinalWriteupsDashboard({ actingUserSystemId: ACTOR_ID }, fixture.dependencies);
+      expect(warn).not.toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  test('a cleared current Final pointer drops the request and, if last, its cycle', async () => {
+    const fixture = harness();
+    addRequest(fixture, { requestId: REQUEST_D_ID, finalId: FINAL_D_ID, requestNumber: '0999', meetingDate: J26 });
+    fixture.requests[3]._wmkf_currentfinalwriteup_value = null;
+    const result = await loadFinalWriteupsDashboard({ actingUserSystemId: ACTOR_ID }, fixture.dependencies);
+    expect(result.cycles.available.map((cycle) => cycle.code)).toEqual(['D26']);
+  });
+
+  describe('default walk-back', () => {
+    // Fixture: D26 holds only group-review rows (hidden from Leadership), J26 holds one
+    // leadership-stage row owned by another PD (visible to Leadership).
+    function walkbackFixture() {
+      const fixture = harness();
+      fixture.documents[1].wmkf_lifecyclestate = REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW;
+      addRequest(fixture, {
+        requestId: REQUEST_D_ID, finalId: FINAL_D_ID, requestNumber: '0999', meetingDate: J26,
+        lifecycle: REQUEST_DOCUMENT_LIFECYCLE_STATE.FINAL,
+      });
+      return fixture;
+    }
+
+    test('the cycle list carries no counts and the default cycle is the newest visible within the walk-back window', async () => {
+      const leadership = walkbackFixture();
+      leadership.dependencies.resolvePersonas.mockResolvedValue({ enabled: true, personas: ['leadership'] });
+      const result = await loadFinalWriteupsDashboard({ actingUserSystemId: ACTOR_ID }, leadership.dependencies);
+      expect(result.cycles.available).toEqual([
+        { code: 'D26', label: 'December 2026' },
+        { code: 'J26', label: 'June 2026' },
+      ]);
+      expect(result.cycles.selected).toBe('J26');
+      expect(result.cycles.defaultResolvedBy).toBe('visible');
+      expect(result.counts.total).toBe(1);
+      expect(result.queues.open.map((row) => row.requestId)).toEqual([REQUEST_D_ID]);
+      expect(scopedFilters(leadership.dependencies)).toHaveLength(2);
+
+      const superuser = walkbackFixture();
+      const superResult = await loadFinalWriteupsDashboard({ actingUserSystemId: ACTOR_ID, isSuperuser: true }, superuser.dependencies);
+      expect(superResult.cycles.selected).toBe('D26');
+      expect(superResult.cycles.defaultResolvedBy).toBe('visible');
+      expect(scopedFilters(superuser.dependencies)).toHaveLength(1);
+
+      const pd = walkbackFixture();
+      pd.dependencies.resolvePersonas.mockResolvedValue({ enabled: true, personas: ['program-director'] });
+      const pdResult = await loadFinalWriteupsDashboard({ actingUserSystemId: ACTOR_ID }, pd.dependencies);
+      expect(pdResult.cycles.selected).toBe('D26');
+      expect(scopedFilters(pd.dependencies)).toHaveLength(1);
+    });
+
+    test('explicit cycleCode never walks back', async () => {
+      const fixture = walkbackFixture();
+      fixture.dependencies.resolvePersonas.mockResolvedValue({ enabled: true, personas: ['leadership'] });
+      const result = await loadFinalWriteupsDashboard({ actingUserSystemId: ACTOR_ID, cycleCode: 'D26' }, fixture.dependencies);
+      expect(result.cycles).toMatchObject({ selected: 'D26', defaultResolvedBy: 'explicit' });
+      expect(result.counts.total).toBe(0);
+      expect(scopedFilters(fixture.dependencies)).toHaveLength(1);
+    });
+
+    test('stops after the walk-back bound and shows the newest cycle empty as exhausted', async () => {
+      const fixture = harness();
+      fixture.documents[1].wmkf_lifecyclestate = REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW;
+      addRequest(fixture, { requestId: REQUEST_D_ID, finalId: FINAL_D_ID, requestNumber: '0999', meetingDate: J26 });
+      addRequest(fixture, { requestId: REQUEST_E_ID, finalId: FINAL_E_ID, requestNumber: '0998', meetingDate: D25 });
+      addRequest(fixture, {
+        requestId: REQUEST_F_ID, finalId: FINAL_F_ID, requestNumber: '0997', meetingDate: J25,
+        lifecycle: REQUEST_DOCUMENT_LIFECYCLE_STATE.FINAL,
+      });
+      fixture.dependencies.resolvePersonas.mockResolvedValue({ enabled: true, personas: ['leadership'] });
+      const result = await loadFinalWriteupsDashboard({ actingUserSystemId: ACTOR_ID }, fixture.dependencies);
+      expect(result.cycles.available.map((cycle) => cycle.code)).toEqual(['D26', 'J26', 'D25', 'J25']);
+      expect(result.cycles.selected).toBe('D26');
+      expect(result.cycles.defaultResolvedBy).toBe('exhausted');
+      expect(result.counts.total).toBe(0);
+      expect(scopedFilters(fixture.dependencies)).toHaveLength(FINAL_WRITEUPS_DEFAULT_CYCLE_WALKBACK);
+    });
+
+    test('stops when the list is exhausted before the bound', async () => {
+      const fixture = harness();
+      fixture.documents[1].wmkf_lifecyclestate = REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW;
+      addRequest(fixture, { requestId: REQUEST_D_ID, finalId: FINAL_D_ID, requestNumber: '0999', meetingDate: J26 });
+      fixture.dependencies.resolvePersonas.mockResolvedValue({ enabled: true, personas: ['leadership'] });
+      const result = await loadFinalWriteupsDashboard({ actingUserSystemId: ACTOR_ID }, fixture.dependencies);
+      expect(result.cycles).toMatchObject({ selected: 'D26', defaultResolvedBy: 'exhausted' });
+      expect(scopedFilters(fixture.dependencies)).toHaveLength(2);
+    });
+
+    test('an oversized newest cycle fails closed with its cycle code before any walk-back read', async () => {
+      const fixture = walkbackFixture();
+      fixture.dependencies.resolvePersonas.mockResolvedValue({ enabled: true, personas: ['leadership'] });
+      const realQuery = fixture.dependencies.queryRequests.getMockImplementation();
+      fixture.dependencies.queryRequests.mockImplementation(async (options) => {
+        if (options.filter.includes('2026-12-01')) {
+          return { records: [], totalCount: FINAL_WRITEUPS_DASHBOARD_MAX_ROWS + 1, hasMore: true };
+        }
+        return realQuery(options);
+      });
+      await expect(loadFinalWriteupsDashboard({ actingUserSystemId: ACTOR_ID }, fixture.dependencies))
+        .rejects.toMatchObject({
+          httpStatus: 503,
+          body: { code: 'final_writeups_dashboard_scope_exceeded', cycleCode: 'D26' },
+        });
+      expect(scopedFilters(fixture.dependencies)).toHaveLength(1);
+    });
+
+    test('a cycle containing only rows hidden from the viewer still appears in available with no count', async () => {
+      const fixture = walkbackFixture();
+      fixture.dependencies.resolvePersonas.mockResolvedValue({ enabled: true, personas: ['leadership'] });
+      const result = await loadFinalWriteupsDashboard({ actingUserSystemId: ACTOR_ID, cycleCode: 'J26' }, fixture.dependencies);
+      expect(result.cycles.available).toEqual([
+        { code: 'D26', label: 'December 2026' },
+        { code: 'J26', label: 'June 2026' },
+      ]);
+    });
+  });
+
+  describe('focused reads', () => {
+    test('derive the cycle from the request and navigate within it', async () => {
+      const fixture = harness();
+      addRequest(fixture, { requestId: REQUEST_D_ID, finalId: FINAL_D_ID, requestNumber: '0999', meetingDate: J26 });
+      addRequest(fixture, { requestId: REQUEST_E_ID, finalId: FINAL_E_ID, requestNumber: '0998', meetingDate: J26 });
+      const result = await loadFinalWriteupsDashboard({
+        actingUserSystemId: ACTOR_ID, selectedRequestId: REQUEST_D_ID,
+      }, fixture.dependencies);
+      expect(result.cycles).toMatchObject({ selected: 'J26', defaultResolvedBy: 'explicit' });
+      expect(result.selected.requestId).toBe(REQUEST_D_ID);
+      expect(result.navigation).toEqual({
+        previous: { requestId: REQUEST_E_ID, requestNumber: '0998', title: 'Proposal 0998' },
+        next: null,
+      });
+      expect(result.counts.total).toBe(2);
+      const filters = scopedFilters(fixture.dependencies);
+      expect(filters[0]).toBe(`_wmkf_currentfinalwriteup_value ne null and akoya_requestid eq ${REQUEST_D_ID}`);
+      expect(filters[1]).toContain('2026-06-01');
+    });
+
+    test('reject cycleCode alongside requestId and a malformed selector before any read', async () => {
+      const fixture = harness();
+      await expect(loadFinalWriteupsDashboard({
+        actingUserSystemId: ACTOR_ID, selectedRequestId: REQUEST_A_ID, cycleCode: 'D26',
+      }, fixture.dependencies)).rejects.toMatchObject({ httpStatus: 400, body: { code: 'final_writeups_dashboard_cycle_with_request' } });
+      await expect(loadFinalWriteupsDashboard({
+        actingUserSystemId: ACTOR_ID, cycleCode: 'NONE',
+      }, fixture.dependencies)).rejects.toMatchObject({ httpStatus: 400, body: { code: 'final_writeups_dashboard_cycle_selector_invalid' } });
+      expect(fixture.dependencies.queryAllRequests).not.toHaveBeenCalled();
+      expect(fixture.dependencies.queryRequests).not.toHaveBeenCalled();
+    });
+
+    test('a focused request without a meeting date is served under none', async () => {
+      const fixture = harness();
+      addRequest(fixture, { requestId: REQUEST_D_ID, finalId: FINAL_D_ID, requestNumber: '0999', meetingDate: null });
+      const result = await loadFinalWriteupsDashboard({
+        actingUserSystemId: ACTOR_ID, selectedRequestId: REQUEST_D_ID,
+      }, fixture.dependencies);
+      expect(result.cycles.selected).toBe('none');
+      expect(result.selected.requestId).toBe(REQUEST_D_ID);
+    });
   });
 });

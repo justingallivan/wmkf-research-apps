@@ -276,10 +276,10 @@ intended semantic change and is called out in the security-matrix row and Atlas 
 - Bucket placement is unchanged: a leadership-stage row the PD acknowledged stays in History with
   its existing freshness label; one they never acknowledged stays in Open, where `mayAcknowledge`
   and the primary action are still derived from the acknowledgement service, not from the lens.
-  **[ASSUMED until the build reads it]** the acknowledgement service already treats a
-  leadership-stage Final as acknowledgeable for non-responsible PDs; if it does not, the row renders
-  read-only (`mayAcknowledge: false`) and that is acceptable — the owner asked for retention, not
-  for a new write path.
+  **[VERIFIED via `lib/services/final-writeup/acknowledgement-service.js:359-361`]** `mayAcknowledge`
+  is `!isResponsiblePd` with no lifecycle-stage condition, so a retained leadership-stage row stays
+  acknowledgeable for a non-responsible PD exactly as it already is for Leadership viewers; no write
+  path changes.
 - Re-pin the test "enabled Program Director lens keeps group review plus own stewardship and
   excludes other leadership rows" as "enabled Program Director lens retains every row, including
   other PDs' leadership-stage writeups": the fixture already carries Request B in leadership review
@@ -428,7 +428,27 @@ change to the Initial assessments locator.
 2. **Should the coordinator matrix stay per-cycle only?** Default: yes. A cross-cycle matrix
    reintroduces the unbounded scan this slice removes.
 
-## 11. Review disposition (Codex adversarial review, 2026-09-06, verdict NEEDS REWORK)
+## 11. Build record (2026-09-06, branch `claude/final-writeups-cycle-scoping`)
+
+Built per §3–§7 on the branch; not promoted. Files: `lib/services/final-writeup/dashboard-service.js`
+(`discoverCycles`, scoped `loadCurrentRequests`, `projectRequests`, `resolveIndexScope`, PD lens per
+§3.7, exported `isFinalWriteupCycleSelector` / `FINAL_WRITEUPS_DEFAULT_CYCLE_WALKBACK` /
+`FINAL_WRITEUPS_NO_CYCLE`), `lib/dataverse/adapters/grant-request.js` (`QUERY_ALL_REQUESTS_CAP`, so the
+service does not import transport constants — the access-layer gate rejected the direct import),
+`pages/api/workbench/final-writeups.js` (allowlist `requestId` | `cycleCode`, mutually exclusive),
+`shared/components/final-writeups/FinalWriteupsViews.js` (cycle `<select>`, URL persistence, header
+copy, focused cycle context), and the three test files (33 service, 5 route, 14 views tests).
+Complement check: zero query keys → default cycle; `requestId` alone → focused, cycle derived;
+`cycleCode` alone → explicit, never walks back; both → 400; any other key → 400; malformed or
+uppercase-`NONE` selector → 400 at the handler and again at the service; empty cycle list →
+`selected: null`, `exhausted`, no scoped read; requested cycle absent from the list → empty success;
+null meeting date → `none`; off-month date → typed 500 naming the request. Gates run green:
+`api-routes`, `trust-boundary-guid`, `route-service-boundary`, `route-lifecycle-auth`, `atlas`,
+`status-enum-parity`, `request-document-writers`, `dataverse-access-layer`, `odata-escape` (each with
+self-test), lint, `check:types`, all `final-writeup*` suites. The §3.7 acknowledgeability question was
+verified during the build (`mayAcknowledge` has no stage condition); no deviation from §3.
+
+## 12. Review disposition (Codex adversarial review, 2026-09-06, verdict NEEDS REWORK)
 
 | # | Finding | Disposition |
 |---|---|---|
@@ -452,4 +472,4 @@ change to the Initial assessments locator.
 | 2 (high) | Oversized hidden newest cycle aborts before walk-back; behavior undefined | **Accepted.** Fail closed with the existing 503 naming the cycle; no catch-and-skip; test with oversized hidden newest + visible older (§3.3, §6, §7). |
 | 3 (medium) | Three-read bound contradicted the "newest visible" invariant | **Accepted.** Invariant relaxed to "newest visible within the three newest available cycles, else newest empty with `defaultResolvedBy: 'exhausted'`"; list-exhaustion stop condition stated; tests for four-cycle and two-cycle cases (§3.3, §6, §7). |
 
-Codex has run three adversarial passes; the §10 item 0 decision is recorded and the build proceeds. The built diff gets its own Codex adversarial review.
+Codex has run three adversarial passes; the §10 item 0 decision is recorded and the build is in §11. The built diff gets its own Codex adversarial review before promotion.

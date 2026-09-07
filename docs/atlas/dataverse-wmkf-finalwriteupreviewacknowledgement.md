@@ -105,10 +105,14 @@ the Word action remains independent.
 `lib/services/final-writeup/dashboard-service.js` and
 `pages/api/workbench/final-writeups.js` are also Production-deployed for the
 ordinary/focused foundation. They batch-read acknowledgements for at most 100
-requests with current-Final pointers, derive ordinary staff
-open/history/stewardship queues plus an optional focused row, and keep a
-reviewed row in history after a later Word edit while labeling its freshness
-Updated. The route accepts only an optional Request GUID and derives the
+requests with current-Final pointers in one grant cycle (Slice 6A, built
+2026-09-06 on branch `claude/final-writeups-cycle-scoping`, not yet promoted:
+one lightweight scan discovers the cycles that hold current Finals, the queue
+read is scoped to the selected cycle's meeting-date window, and the 100-row
+bound applies per cycle), derive ordinary staff open/history/stewardship
+queues plus an optional focused row, and keep a reviewed row in history after
+a later Word edit while labeling its freshness Updated. The route accepts an
+optional Request GUID or an optional `cycleCode` (never both) and derives the
 reviewer from the session. **[PRODUCTION-LIVE + SIGNED-IN READ SMOKE PASSED
 2026-08-31]** commit `52575761` and Ready deployment
 `dpl_Frc6fAonyFFYwiWyFJCzzE3UNune` ship the superuser-only complete matrix.

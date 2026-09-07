@@ -85,6 +85,13 @@ function dashboard(overrides = {}) {
       personaLensesEnabled: false,
       isSuperuser: false,
     },
+    cycles: {
+      selected: 'D26',
+      available: [{ code: 'D26', label: 'December 2026' }, { code: 'J26', label: 'June 2026' }],
+      hasUncycled: false,
+      defaultResolvedBy: 'visible',
+    },
+    limits: { maximumRows: 100, scope: 'cycle' },
     counts: { total: 3, open: 1, history: 1, stewardship: 1 },
     queues: { open: [open], history: [history], stewardship: [stewardship] },
     coordinatorMatrix: null,
@@ -94,9 +101,14 @@ function dashboard(overrides = {}) {
   };
 }
 
+function setLocation(search) {
+  window.history.replaceState(null, '', `/workbench/final-writeups${search}`);
+}
+
 beforeEach(() => {
   jest.clearAllMocks();
   global.fetch = jest.fn();
+  setLocation('');
 });
 
 afterEach(() => jest.restoreAllMocks());
@@ -115,7 +127,7 @@ test('dashboard leads with one search field and server-derived task queues', asy
   expect(screen.queryByText(/Science and Engineering|Medical Research/i)).not.toBeInTheDocument();
 });
 
-test('dashboard search filters all queues without adding filter controls', async () => {
+test('dashboard search filters all queues without adding filter controls other than the cycle selector', async () => {
   global.fetch.mockResolvedValueOnce(response(dashboard()));
   render(<FinalWriteupsDashboardView />);
   const search = await screen.findByRole('searchbox');
@@ -124,6 +136,139 @@ test('dashboard search filters all queues without adding filter controls', async
   expect(screen.queryByText('Cellular repair after tissue injury')).not.toBeInTheDocument();
   expect(screen.getByText('A second proposal')).toBeInTheDocument();
   expect(screen.getByText('1 matching writeup')).toBeInTheDocument();
+  expect(screen.getAllByRole('combobox')).toHaveLength(1);
+});
+
+test('cycle selector reflects the server list, defaults to the selected cycle, and reloads with the chosen code', async () => {
+  global.fetch
+    .mockResolvedValueOnce(response(dashboard()))
+    .mockResolvedValueOnce(response(dashboard({
+      cycles: {
+        selected: 'J26',
+        available: [{ code: 'D26', label: 'December 2026' }, { code: 'J26', label: 'June 2026' }],
+        hasUncycled: false,
+        defaultResolvedBy: 'explicit',
+      },
+      counts: { total: 0, open: 0, history: 0, stewardship: 0 },
+      queues: { open: [], history: [], stewardship: [] },
+    })));
+  render(<FinalWriteupsDashboardView />);
+
+  const select = await screen.findByRole('combobox', { name: 'Cycle' });
+  expect(global.fetch).toHaveBeenCalledWith('/api/workbench/final-writeups');
+  expect(select).toHaveValue('D26');
+  expect(screen.getByText(/awaiting your review in December 2026/)).toBeInTheDocument();
+  expect(screen.queryByRole('option', { name: 'No cycle' })).not.toBeInTheDocument();
+
+  fireEvent.change(select, { target: { value: 'J26' } });
+  await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2));
+  expect(global.fetch).toHaveBeenLastCalledWith('/api/workbench/final-writeups?cycleCode=J26');
+  expect(window.location.search).toBe('?cycleCode=J26');
+  await waitFor(() => expect(screen.getByRole('combobox', { name: 'Cycle' })).toHaveValue('J26'));
+  expect(screen.getByText('You have no writeups waiting for review.')).toBeInTheDocument();
+});
+
+test('dashboard reads cycleCode from the URL on mount and passes it as the only query parameter', async () => {
+  setLocation('?cycleCode=J26');
+  global.fetch.mockResolvedValueOnce(response(dashboard()));
+  render(<FinalWriteupsDashboardView />);
+  await screen.findByRole('combobox', { name: 'Cycle' });
+  expect(global.fetch).toHaveBeenCalledWith('/api/workbench/final-writeups?cycleCode=J26');
+});
+
+test('No cycle option renders only when uncycled rows exist and round-trips to the URL', async () => {
+  global.fetch
+    .mockResolvedValueOnce(response(dashboard({
+      cycles: {
+        selected: 'D26',
+        available: [{ code: 'D26', label: 'December 2026' }],
+        hasUncycled: true,
+        defaultResolvedBy: 'visible',
+      },
+    })))
+    .mockResolvedValueOnce(response(dashboard({
+      cycles: {
+        selected: 'none',
+        available: [{ code: 'D26', label: 'December 2026' }],
+        hasUncycled: true,
+        defaultResolvedBy: 'explicit',
+      },
+    })));
+  render(<FinalWriteupsDashboardView />);
+  const select = await screen.findByRole('combobox', { name: 'Cycle' });
+  expect(screen.getByRole('option', { name: 'No cycle' })).toBeInTheDocument();
+
+  fireEvent.change(select, { target: { value: 'none' } });
+  await waitFor(() => expect(global.fetch).toHaveBeenLastCalledWith('/api/workbench/final-writeups?cycleCode=none'));
+  expect(window.location.search).toBe('?cycleCode=none');
+  await waitFor(() => expect(screen.getByRole('combobox', { name: 'Cycle' })).toHaveValue('none'));
+  expect(screen.getByText(/awaiting your review in No cycle/)).toBeInTheDocument();
+});
+
+test('walk-back outcomes are rendered from response fields only', async () => {
+  global.fetch.mockResolvedValueOnce(response(dashboard({
+    cycles: {
+      selected: 'J26',
+      available: [{ code: 'D26', label: 'December 2026' }, { code: 'J26', label: 'June 2026' }],
+      hasUncycled: false,
+      defaultResolvedBy: 'visible',
+    },
+  })));
+  const { unmount } = render(<FinalWriteupsDashboardView />);
+  expect(await screen.findByText('Nothing awaits your review in December 2026; showing June 2026.')).toBeInTheDocument();
+  unmount();
+
+  global.fetch.mockResolvedValueOnce(response(dashboard({
+    cycles: {
+      selected: 'D26',
+      available: [{ code: 'D26', label: 'December 2026' }],
+      hasUncycled: false,
+      defaultResolvedBy: 'exhausted',
+    },
+    counts: { total: 0, open: 0, history: 0, stewardship: 0 },
+    queues: { open: [], history: [], stewardship: [] },
+  })));
+  render(<FinalWriteupsDashboardView />);
+  expect(await screen.findByText('Nothing awaits your review in the most recent cycles; choose a cycle to look further back.')).toBeInTheDocument();
+});
+
+test('dashboard ignores a late response after the cycle changes', async () => {
+  let resolveSecond;
+  global.fetch
+    .mockResolvedValueOnce(response(dashboard()))
+    .mockImplementationOnce(() => new Promise((resolve) => { resolveSecond = resolve; }))
+    .mockResolvedValueOnce(response(dashboard({
+      cycles: {
+        selected: 'D26',
+        available: [{ code: 'D26', label: 'December 2026' }, { code: 'J26', label: 'June 2026' }],
+        hasUncycled: false,
+        defaultResolvedBy: 'explicit',
+      },
+      queues: { open: [writeup({ title: 'Back on December' })], history: [], stewardship: [] },
+    })));
+  render(<FinalWriteupsDashboardView />);
+  const select = await screen.findByRole('combobox', { name: 'Cycle' });
+
+  fireEvent.change(select, { target: { value: 'J26' } });
+  await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2));
+  fireEvent.change(select, { target: { value: 'D26' } });
+  expect(await screen.findByText('Back on December')).toBeInTheDocument();
+
+  resolveSecond(response(dashboard({
+    cycles: { selected: 'J26', available: [{ code: 'J26', label: 'June 2026' }], hasUncycled: false, defaultResolvedBy: 'explicit' },
+    queues: { open: [writeup({ title: 'Stale June response' })], history: [], stewardship: [] },
+  })));
+  await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(3));
+  expect(screen.queryByText('Stale June response')).not.toBeInTheDocument();
+  expect(screen.getByText('Back on December')).toBeInTheDocument();
+});
+
+test('focused view shows the cycle as context and never sends cycleCode', async () => {
+  global.fetch.mockResolvedValueOnce(response(dashboard({ selected: writeup(), navigation: null })));
+  render(<FinalWriteupFocusedView requestId={REQUEST_ID} />);
+  expect(await screen.findByText('December 2026')).toBeInTheDocument();
+  expect(global.fetch).toHaveBeenCalledWith(`/api/workbench/final-writeups?requestId=${REQUEST_ID}`);
+  expect(global.fetch.mock.calls[0][0]).not.toContain('cycleCode');
 });
 
 test('enabled overlapping persona lenses are named without adding another control panel', async () => {

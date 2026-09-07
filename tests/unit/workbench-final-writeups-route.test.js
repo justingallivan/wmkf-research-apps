@@ -8,6 +8,7 @@ jest.mock('../../lib/dataverse/core/context', () => ({
   withDalContext: jest.fn((_label, fn) => fn()),
 }));
 jest.mock('../../lib/services/final-writeup/dashboard-service', () => ({
+  isFinalWriteupCycleSelector: jest.requireActual('../../lib/services/final-writeup/dashboard-service').isFinalWriteupCycleSelector,
   loadFinalWriteupsDashboard: jest.fn(),
 }));
 
@@ -57,6 +58,7 @@ test('GET derives viewer identity from the session and accepts only optional req
   expect(loadFinalWriteupsDashboard).toHaveBeenCalledWith({
     actingUserSystemId: USER_ID,
     selectedRequestId: REQUEST_ID,
+    cycleCode: null,
     isSuperuser: true,
   });
   expect(res.statusCode).toBe(200);
@@ -67,6 +69,38 @@ test('GET derives viewer identity from the session and accepts only optional req
   expect(loadFinalWriteupsDashboard).toHaveBeenCalledTimes(1);
 });
 
+test('accepts requestId, a well-formed cycleCode, or the none sentinel, never requestId with cycleCode, and rejects unrecognized keys and malformed codes before service work', async () => {
+  const cycle = mockRes();
+  await handler({ method: 'GET', query: { cycleCode: ' d26 ' } }, cycle);
+  expect(cycle.statusCode).toBe(200);
+  expect(loadFinalWriteupsDashboard).toHaveBeenLastCalledWith({
+    actingUserSystemId: USER_ID,
+    selectedRequestId: null,
+    cycleCode: 'd26',
+    isSuperuser: true,
+  });
+
+  const none = mockRes();
+  await handler({ method: 'GET', query: { cycleCode: 'none' } }, none);
+  expect(none.statusCode).toBe(200);
+  expect(loadFinalWriteupsDashboard).toHaveBeenLastCalledWith(expect.objectContaining({ cycleCode: 'none' }));
+  expect(loadFinalWriteupsDashboard).toHaveBeenCalledTimes(2);
+
+  for (const query of [
+    { cycleCode: 'X26' },
+    { cycleCode: 'NONE' },
+    { cycleCode: '2026-12' },
+    { cycleCode: ['D26', 'J26'] },
+    { requestId: REQUEST_ID, cycleCode: 'D26' },
+    { cycleCode: 'D26', scope: 'all' },
+  ]) {
+    const res = mockRes();
+    await handler({ method: 'GET', query }, res);
+    expect(res.statusCode).toBe(400);
+  }
+  expect(loadFinalWriteupsDashboard).toHaveBeenCalledTimes(2);
+});
+
 test('ordinary users cannot request the superuser matrix branch', async () => {
   getUserRole.mockResolvedValueOnce('user');
   const res = mockRes();
@@ -74,6 +108,7 @@ test('ordinary users cannot request the superuser matrix branch', async () => {
   expect(loadFinalWriteupsDashboard).toHaveBeenCalledWith({
     actingUserSystemId: USER_ID,
     selectedRequestId: null,
+    cycleCode: null,
     isSuperuser: false,
   });
 });
