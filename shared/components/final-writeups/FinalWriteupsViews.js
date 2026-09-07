@@ -579,9 +579,13 @@ function ProgramDirectorSelector({ options, value, disabled, onChange }) {
 }
 
 /** Segmented view control; counts are navigation counts over the filtered rows. */
+/**
+ * Segmented view control. Its outer box is the same 48px as the selects beside
+ * it (border-box), so the three toolbar labels and controls share one baseline.
+ */
 function ViewSelector({ view, counts, disabled, onChange }) {
   return (
-    <div role="group" aria-label="View" className="inline-flex flex-wrap gap-1 rounded-xl border border-gray-200 bg-gray-50 p-1">
+    <div role="group" aria-labelledby="final-writeup-view-label" className="inline-flex h-12 items-stretch gap-1 rounded-xl border border-gray-200 bg-gray-50 p-1">
       {VIEW_KEYS.map((key) => {
         const active = key === view;
         return (
@@ -591,7 +595,7 @@ function ViewSelector({ view, counts, disabled, onChange }) {
             aria-pressed={active}
             disabled={disabled}
             onClick={() => onChange(key)}
-            className={`inline-flex min-h-11 items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:opacity-60 ${
+            className={`inline-flex items-center gap-2 whitespace-nowrap rounded-lg px-4 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:opacity-60 ${
               active ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
             }`}
           >
@@ -796,11 +800,11 @@ export function FinalWriteupsDashboardView() {
 
         <div className="my-6 space-y-4">
           {data && (
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-end">
+            <div className="flex flex-col gap-4 lg:flex-row lg:flex-wrap lg:items-end">
               <CycleSelector cycles={data.cycles} disabled={loading} onChange={changeCycle} />
               <ProgramDirectorSelector options={pdOptions} value={pd} disabled={loading} onChange={changePd} />
               <div className="flex flex-col gap-1.5">
-                <span className="text-sm font-medium text-gray-700">View</span>
+                <span id="final-writeup-view-label" className="text-sm font-medium text-gray-700">View</span>
                 <ViewSelector view={view} counts={viewCounts} disabled={loading} onChange={changeView} />
               </div>
             </div>
