@@ -322,10 +322,15 @@ test('a PD acknowledging a leadership-stage writeup is warned, not locked; Leade
   expect(screen.queryByText(warningCopy)).not.toBeInTheDocument();
 });
 
-test('focused view shows the cycle as context and never sends cycleCode', async () => {
-  global.fetch.mockResolvedValueOnce(response(dashboard({ selected: writeup(), navigation: null })));
+test('focused view shows the cycle label as context (with the empty focused cycle list) and never sends cycleCode', async () => {
+  global.fetch.mockResolvedValueOnce(response(dashboard({
+    cycles: { selected: 'D26', available: [], hasUncycled: false, defaultResolvedBy: 'explicit' },
+    selected: writeup(),
+    navigation: null,
+  })));
   render(<FinalWriteupFocusedView requestId={REQUEST_ID} />);
   expect(await screen.findByText('December 2026')).toBeInTheDocument();
+  expect(screen.queryByText('D26')).not.toBeInTheDocument();
   expect(global.fetch).toHaveBeenCalledWith(`/api/workbench/final-writeups?requestId=${REQUEST_ID}`);
   expect(global.fetch.mock.calls[0][0]).not.toContain('cycleCode');
 });

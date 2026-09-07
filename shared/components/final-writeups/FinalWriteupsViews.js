@@ -625,7 +625,9 @@ export function FinalWriteupsDashboardView() {
 }
 
 function FocusedHeader({ writeup, cycles }) {
-  const cycleLabel = cycleLabelFor(cycles, cycles?.selected) || writeup.cycleLabel;
+  // Focused responses carry no cycle list, so prefer the row's own label and
+  // fall back to the selector label (which covers the `none` sentinel).
+  const cycleLabel = writeup.cycleLabel || cycleLabelFor(cycles, cycles?.selected);
   return (
     <header className="border-b border-gray-200 pb-6">
       <div className="mb-3 flex flex-wrap items-center gap-2">
