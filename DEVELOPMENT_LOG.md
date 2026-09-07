@@ -10,6 +10,14 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## September 2026 — Final writeups cycle scoping live; J27 transition register built and owner decisions taken (Session 491)
+
+**Milestone:** The Final writeups dashboard is scoped to one grant cycle server-side (Slice 6A) with a cycle select, URL persistence, and the owner's decision that lenses focus rather than conceal (the PD lens retains Leadership-stage rows with a warn-not-lock notice). The Codex reviewer follow-up polish merged. The repo's first single-place inventory of the D26→J27 single-phase transition exists: a six-slice read-only agent sweep produced `docs/J27_TRANSITION_REGISTER.md` (76 rows, Retire/Persist/Change/Build/Scale), Codex-reviewed, and the owner then settled the shaping questions in one sitting: J27 proposals arrive early December 2026 as `Phase I Pending`; every one gets an AI Initial Assessment; the advance is a status change to `Phase II Pending` that PDs make from the Workbench (Connor may change it behind the scenes); triage gains a "save for now" state settable by PDs and PCs; intake stays on GOApply; the concept-evaluator archive and D26 allowlist cluster are deleted after D26 closes; the 2026-08-18 date was the D26 Phase II due date, and the D26 flip was June 22, 2026.
+**Sessions:** 491.
+**Ship state:** Slice 6A merged `842c9f13` and owner-smoked in Production 2026-09-06 with three Tier 0 copy fixes (`12cfbafc`, `e53beb97`, `3a2c4352`); polish merged `f0494607`; register and decisions in twenty docs-only commits `6a2d2756`…`05b15113`. D26 posture: reviewer season under way, reminders manual, remaining D26 items are planning-only (6B "Needs my review" default, 6C acknowledged version, Leadership transition as a PD action). The `J27:` marker check script is not built.
+**Why it matters:** Things that go away in J27 were scattered across dozens of docs and memories; they now have one register with evidence labels, and the decisions that gate the J27 build are recorded rather than remembered.
+**Pointers:** `docs/J27_TRANSITION_REGISTER.md`, `docs/J27_SINGLE_PHASE_TRANSITION_INVENTORY_PLAN.md`, `docs/FINAL_WRITEUPS_DASHBOARD_CYCLE_SCOPING_PLAN.md` §11–12, `docs/CURRENT_WORK_QUEUE.md` items 5–8.
+
 ## September 2026 — Owner lifecycle decisions D0–D5 reached Production; generate-emails retired (Sessions 490–491)
 
 **Milestone:** The owner resolved every decision the Session 489 campaign tabled. Taken: `softDelete`

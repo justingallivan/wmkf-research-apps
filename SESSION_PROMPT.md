@@ -1,188 +1,166 @@
-# Session 491 Prompt: Merge the Session 490 Decision Stack, Then Plan Materials-on-Acceptance
+# Session 492 Prompt: D26 Final-writeup planning items, then the J27 build plan when Connor's file decision lands
 
-## Session 490 Summary
+## Session 491 Summary
 
-The owner reviewed the overnight lifecycle campaign and resolved every open decision. Work
-landed as a **four-PR stack, unmerged at handoff**, each PR based on the one before it so the
-shared Stage 7 plan rows and this file never conflict. Merge in order; GitHub retargets each
-child to `main` as its parent merges. This checkout is on `claude/open-items-cycles-retry-hygiene`
-(the top of the stack); the handoff commit lands there by owner choice.
-
-| PR | Branch | Head | What |
-|---|---|---|---|
-| #170 | `claude/reviewer-lifecycle-d0-d3-tightenings` | `456d5029` | D0 taken (softDelete row-aware guard), D3 taken (repair op requires concrete ETag). All checks green incl. claude-review. |
-| #171 | `claude/retire-generate-emails-and-proposal-wide-patch` | `d1810a24` | D2: generate-emails route/service/prompt/`markInvitationGenerated`/`patchFields` alias retired. D4: proposal-wide my-candidates PATCH + `setRequestMetadata` removed. All checks green. |
-| #172 | `claude/acceptance-etag-d5-scripts-6d-decisions` | `06fe1253` | Accept/decline writes require a concrete ETag; D5: three raw-fetch one-offs archived + new LAW gate `check:script-suggestion-writers`; 6D-1 confirmed, 6D-2 parked. All checks green. |
-| #173 | `claude/open-items-cycles-retry-hygiene` | `9b60cea5` + handoff | Follow-up cycles-load retry fix; four inline ETag regexes → `isConcreteEtag`; `isPastCutoff` → `lib/utils/past-cutoff.js`; reviewer leftovers; summary-blob extraction + `wmkf_summarypages` mapping removed; queue item 5 documented. CI was still running at handoff. |
+A long owner-present session on `main`. Three things shipped or landed, then the owner worked
+through the J27 decisions one at a time.
 
 ### What Was Completed
 
-1. **Owner decisions D0–D5 + 6D-1/6D-2 all resolved** (table below). D1 preserved by decision;
-   everything else taken, removed, confirmed or parked. Each taken item has a mutation-checked test.
-2. **Four idle worktrees removed** (`../WMKF_Apps-6c`, `-s2`, `-s3`, `-s4`), each verified clean and
-   ancestor-of-main first.
-3. **D2 investigation** [VERIFIED via `git grep` + `git log -S`]: the only client of
-   `/api/reviewer-finder/generate-emails` (`EmailGeneratorModal`) was deleted 2026-06-21 (`9114adeb`);
-   no page/component/script referenced the route since; the route never wrote `api_usage_log` and the
-   Vercel CLI exposes no historical request log, so runtime zero-hit is unverified (dashboard glance
-   optional before merging #171). The `email-reviewer.js` prompt had that route as its sole caller.
-4. **D4 investigation**: the proposal-wide PATCH served the standalone Reviewer Finder page's
-   per-proposal Program Area / Grant Cycle dropdowns, deleted 2026-06-16 (`94bbbce4`); the Workbench
-   never rebuilt them. Owner first chose (a) per-row results, then reversed to removal. **Explicit
-   capability drop:** no post-save correction path for `wmkf_grantcyclecode`/`wmkf_programarea` on
-   suggestion rows.
-5. **D5 gate census**: 13 `scripts/` writers recorded (five more than the Stage 7 plan's grep census —
-   alias resolution + fail-closed unresolved targets caught them); growth pinned by
-   `tests/unit/script-suggestion-writers-recorded-set.test.js`. Documented limit: raw POST creates
-   via fetch are not detected (every script's token call is a POST).
-6. **Acceptance-write tightening** (follow-on to D3, owner-approved): accept requires a concrete
-   `If-Match` checked BEFORE the acceptance job is enqueued; decline requires header or verifier-row
-   `_etag`; missing → 412 `concurrent_modification` (client already maps to "refresh and try again").
-   Consequence: a `/context` that returned `etag: null` now yields a reload prompt, not an unlocked write.
-7. **Summary blob chain removed (option a)**: `analyze` no longer extracts/uploads; `save-candidates`
-   no longer accepts `summaryBlobUrl`; `pdf-extractor.js` deleted; `wmkf_summarypages` no longer
-   selected/mapped/written/defaulted. The Workbench client never requested extraction, so no live
-   behavior changed. Dataverse attributes `wmkf_summarybloburl`/`wmkf_summarypages` and the drain-only
-   PG columns stay (schema drops are separate decisions).
-8. **Owner clarified the December 2026 flow** and it is documented as **work queue item 5**
-   (`docs/CURRENT_WORK_QUEUE.md`), in `docs/STRATEGY.md` current execution, the strategy wiki router,
-   and `project-accepted-awaiting-materials-is-transient`: materials in hand at request time; on
-   acceptance + onboarding the system AUTOMATICALLY emails the reviewer a materials link. Not built;
-   nothing in the acceptance job/drain sends materials today [VERIFIED]. Build when campaigns settle;
-   plan before J27 reviewer invitations (2027); live before the first J27 acceptance. (Corrected 2026-09-06: not a D26 item.)
-9. **Owner-run read-only probe** (scratchpad, not tracked): 0 rows in the accepted-awaiting-materials
-   state; 7 null-status accepted rows are May–July test residue. The probe's request lookups 400'd
-   because it selected `wmkf_grantcyclecode` on `akoya_requests` (column lives on the suggestion);
-   fix the select before any rerun.
+1. **Session 490 stack merged and promoted.** PRs #170–#173 merged in order, final `7389e489`,
+   Production Ready. DEVELOPMENT_LOG entry written (Sessions 490–491).
+2. **Slice 6A: Final writeups dashboard cycle scoping — Production-live and owner-smoked.**
+   Three Codex plan passes, build on `claude/final-writeups-cycle-scoping`, two Codex diff passes,
+   merged `842c9f13`. Owner decision recorded: lenses focus rather than conceal, so the PD lens keeps
+   Leadership-stage rows with an amber warn-not-lock notice; existence-only cycle codes disclosed to
+   all personas. Smoke defects fixed on `main` as Tier 0: `12cfbafc` plural, `e53beb97` focused
+   header label, `3a2c4352` bookmarked-cycle label. Docs reconciled in `09d360a9`. Branch deleted.
+3. **Codex reviewer follow-up polish merged** `f0494607` (owner-approved shared-component edits;
+   "Mark complete" rename finished `d0a5fc07`); wiki note and queue item 7 in `a8cb8591`. Codex
+   worktree parked on `codex/parked` at main.
+4. **J27 single-phase transition inventory.** Plan `docs/J27_SINGLE_PHASE_TRANSITION_INVENTORY_PLAN.md`
+   (`6a2d2756`, `4f5b6df9`); six read-only agents swept slices A–F; register
+   `docs/J27_TRANSITION_REGISTER.md` synthesized (`6b784362`); Codex adversarial review NEEDS REWORK,
+   four of five findings fixed (`08839a6a`), the fifth is the unbuilt `J27:` marker check script.
+   Register: 76 rows, 7 contradictions (5 resolved), 25 owner questions, slice G owner-run checklist.
+5. **Owner decisions recorded (all 2026-09-06, commits `d05af5e8`…`05b15113`):**
+   - Calendar: J27 proposals arrive **early December 2026**, date TBD. **2026-08-18 was the D26 Phase II
+     proposal due date**, not J27 intake (six misattributions corrected by hand; no bulk replace). D26
+     Phase I→II flip was **June 22, 2026**.
+   - Sequence: proposals arrive probably as `Phase I Pending`; staff review every one with a mostly
+     AI-generated Initial Assessment on existing infrastructure ("might have to change a bit"); only
+     after staff decide does `akoya_requeststatus` become `Phase II Pending`. The advance is the status
+     change; PDs will mostly flip it from the Workbench, Connor may change it behind the scenes via
+     AkoyaGO or Power Automate. Colleague discussion still to confirm the PD front-end flip.
+   - Review surface: every PD sees other PDs' requests but focuses on their own; **nothing gets lost**.
+   - Triage gains an intermediate **"save for now"** state (name editable) settable by PDs **and PCs**
+     (today's manage gate is lead-PD/superuser only). Default list = Advancing + Save for now +
+     Untriaged; Set aside hidden but counted and one click away.
+   - **Intake stays on GOApply** until further notice; custom portal parked for a future pilot; its
+     gates are not J27 prerequisites.
+   - **Delete after D26 closes:** concept-evaluator archive + registry residue, and the D26 allowlist
+     patch cluster (destructive-carryover checks still apply at execution; re-point
+     `scripts/smoke-test-candidate.mjs` first).
+   - `SYSTEM_MODEL.md` and `GRANT_CYCLE_LIFECYCLE.md` now carry a dated cycle-boundary note in the
+     owner's words.
+   - **Connor's early decision:** SharePoint location and filename of the J27 submitted proposal (Q5);
+     heads the slice G checklist and gates five register rows.
+   - D26 posture: reviewer season under way (invitations out, many reviews in, 22 review DOCX
+     backfilled). Reminders **stay manual for D26**. Toolbar rebuild, three-state triage, per-reminder
+     audit trail, materials-on-acceptance email and invitation fingerprint smoke are **J27** items.
+     Release-materials modal smoke effectively closed.
+   - Final writeups dashboard: **6B** = open on "Needs my review" for every role, alternatives
+     "Reviewed by me" / "All writeups", Program director dropdown, stage filter dropped. **6C** yes
+     (acknowledged version per row). **6D/6E closed**. **Leadership stage transition = PD action in the
+     Workbench** (new lifecycle-state write). PCs already see everything (no backup feature); a retiring
+     PD's requests transfer by changing the program director in Dataverse.
+   - Drop the two unused Dataverse attributes (`wmkf_summarybloburl`, `wmkf_summarypages`).
+   - Seven J27 questions filed important-not-urgent (register §7 status line).
+6. **Toolbar redesign assessment** (dropdown style; impeccable consulted) delivered; build deferred to J27.
 
-### Decisions table (final state)
-
-| # | Outcome | Where |
-|---|---|---|
-| D0 | TAKEN — `softDelete` selects `wmkf_completedat`, gates with `isClosedEngagementRow` | #170 |
-| D1 | PRESERVE — post-send invitation stamp stays unconditional (the fact recorded is "email left") | — |
-| D2 | RETIRED — route, service, prompt, generation mark, `patchFields` alias | #171 |
-| D3 | TAKEN — repair op requires concrete ETag; follow-on: accept/decline writes too | #170, #172 |
-| D4 | REMOVED — proposal-wide PATCH branch + `setRequestMetadata` (owner reversed from (a) on the orphan finding) | #171 |
-| D5 | TAKEN — archive executed one-offs, gate the rest (`check:script-suggestion-writers`) | #172 |
-| 6D-1 | CONFIRMED — uniform fingerprint enforcement | #172 (record) |
-| 6D-2 | PARKED — revisit only on an observed stale send | #172 (record) |
-
-### Commits (this session, all on the stack; `git log --oneline main..claude/open-items-cycles-retry-hygiene`)
-`2a7c9397` D0+D3 · `456d5029` D0/D3 restatements · `7fe51c53` D2 · `d1810a24` D4 · `582f0f6a`
-accept/decline ETag + 6D records · `06fe1253` D5 archive + gate · `06bab592` cycles retry ·
-`adad6107` ETag consolidation + leftovers · `c8f95dcb` #151 check + blob decision · `c4e83b84`
-summary-blob extraction removed · `2531d2bc` `wmkf_summarypages` dropped from service · `268c19ef`
-materials-on-acceptance clarification · `9b60cea5` queue item 5 · handoff: `git log -1`.
+### Commits (session, all on `main`)
+`7389e489` stack merge · `842c9f13` 6A merge · `12cfbafc` `e53beb97` `3a2c4352` 6A smoke fixes ·
+`09d360a9` 6A docs · `f0494607` `d0a5fc07` `a8cb8591` polish · `6a2d2756` `4f5b6df9` `d05af5e8` plan and
+calendar · `6b784362` `08839a6a` register and Codex fixes · `3d1d29af` `5fd25644` `02e04662` `ac708391`
+`9260743e` `ba35f2c7` `bbeab2a7` `2f382fae` `9f13de25` `30ed5444` `4a7609b9` `5870d79f` `ec481bda`
+`aa5d7136` `43aa2318` `05b15113` owner decisions.
 
 ## Next Items
 
 ### Verified Open
 
-1. **Merge the stack in order: #170 → #171 → #172 → #173.** Evidence: `gh pr checks <n>`; #170–#172
-   were fully green at handoff, #173 CI was running after the last push. Each child retargets to
-   `main` automatically. After #173 merges: confirm the Production deployment is Ready (`vercel inspect`,
-   not a `vercel ls` grep), delete the four branches, and **add the DEVELOPMENT_LOG.md entry** — this
-   session deliberately did not write one because nothing has reached `main`/Production yet (see
-   Milestone Determination). Then re-run `/start` gates on `main`.
-2. **Plan the automated materials-on-acceptance email (queue item 5).** Evidence:
-   `docs/CURRENT_WORK_QUEUE.md` item 5 lists the design questions (precondition the drain can verify,
-   accept-before-materials, idempotency across drain retries, PD visibility/override, manual modal as
-   fallback). Plan-first; `/contract-reconcile` triggers apply. Timing: when campaigns settle, before
-   J27 reviewer invitations go out in 2027 (owner correction 2026-09-06: D26 invitations already happened).
-3. **6D fingerprint smoke at the first J27 invitation batch** (D26 batches already went out; corrected 2026-09-06). Evidence: invitations are fingerprinted
-   (6D-1 confirmed); no acceptance needed. Render → change a proposal detail in CRM → send → observe
-   `draft_stale` skip → re-render → send. Write the PD checklist beforehand.
-4. **Release-materials modal smoke**: effectively closed (owner 2026-09-06). D26 materials are out and reviews are in; a replacement reviewer would exercise the modal naturally. Not an open item.
-   Evidence: `project-accepted-awaiting-materials-is-transient`.
+1. **Plan Slice 6B + 6C together (D26, before Finals exist).** Evidence: queue item 5; owner shape
+   2026-09-06 in `docs/FINAL_WRITEUPS_DASHBOARD_CYCLE_SCOPING_PLAN.md` §12 tail. "Needs my review" as the
+   opening view for every persona is a per-user computation (eligible ∧ not yet acknowledged) on top of
+   the persona lens; PD dropdown; URL persistence beside `cycleCode`; 6C = publication version label per
+   row keyed to the acknowledgement. Plan-first (`/contract-reconcile`), Tier 1 branch, Codex pass.
+2. **Plan the Leadership stage transition as a PD Workbench action (D26).** Evidence: queue item 4
+   completion column (owner 2026-09-06). A new `wmkf_requestdocument` lifecycle-state write Review→Final
+   from the Workbench: DAL context, interlock, who may trigger, reversibility, what the Leadership lens
+   shows before/after. Plan-first.
+3. **Build the `J27:` marker convention and `scripts/check-j27-register.js`** (advisory gate). Evidence:
+   plan §7, register §9, Codex high finding. Register it in `docs/CI_GATES_REFERENCE.md` and the `/start`
+   list; run gate then self-test sequentially.
+4. **Write `docs/J27_BUILD_AND_CHANGE_PLAN.md`** once Connor's file-location decision (Q5) lands.
+   Evidence: register §2 deliverables table. Sequence: triage state + gate widening; staff review surface
+   (J27-062) with nothing-lost default; Initial Assessment scale-out to ~300 (J27-060, J27-076); Workbench
+   status write path for `Phase II Pending` (J27-064) plus the persist-gate tests; materials-on-acceptance
+   email (queue 6); D26 close-out deletions (Q1).
+5. **Annotate the pilot passages** that couple "J27 Initial Assessment" to 2026-08-18
+   (`REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md:60-61,71`, `DATAVERSE_SHAREPOINT_FILE_MODEL.md:804`,
+   `strategy-roadmap.md:578`). Evidence: register J27-051, Q18. Copy only; owner said no bulk replace.
 
 ### Owner Decision Needed
 
-1. **Dataverse attribute drops**: `wmkf_appreviewersuggestion.wmkf_summarybloburl` and
-   `wmkf_appgrantcycle.wmkf_summarypages` are deployed but unused (both Atlas pages say so). **Owner
-   2026-09-06: drop them.** Schema change with its own pre-flight (Connor-applied); historical values
-   exist and are not needed. Not urgent; queue as a Tier 0 schema task.
-2. **Runtime zero-hit for generate-emails** (before merging #171, optional): a glance at the Vercel
-   dashboard request logs for `/api/reviewer-finder/generate-emails`. Code evidence is decisive for
-   in-app use; this is the one signal not obtainable from the CLI.
+1. **Colleague discussion:** confirm the PD front-end flip to `Phase II Pending` as the primary path
+   (owner inclination) and whether any back-end path writes other fields. Register Q8.
+2. **Connor:** J27 proposal SharePoint location and filename (Q5); how back-end status changes will be
+   made; the other slice G checklist items (register §8).
+3. **Filed, not urgent** (register §7 status line): Q1b, Q12, Q13, Q15, Q16, Q20, Q24.
+4. **Dataverse attribute drops** approved 2026-09-06; Connor-applied schema change with its own
+   pre-flight. Queue as Tier 0 when convenient.
 
 ### Parked
 
-- 6D-2 fingerprint coverage extension (batch-start hydration, Admin template drift) — reopen only on
-  an observed stale send.
-- Stage 4 of the lifecycle plan; progress-pill alignment/chronology; Ops eligibility view; automatic
-  reviewer reminders (gate-protected hold); one-click PDF conversion. Not re-probed.
-- Five stale one-off Preview callbacks in the Entra app registration. Owner cleanup.
+- Follow-up toolbar rebuild (dropdown style, set-aside as Requests option, shared cycle select) and the
+  three-state triage dropdown — J27. Evidence: owner 2026-09-06, register J27-037.
+- Per-reminder audit trail (queue 7) and automatic reminder un-pause — J27. Reminders manual for D26.
+- Materials-on-acceptance email (queue 6) and 6D fingerprint smoke — J27 invitations (2027).
+- Custom intake portal — parked for a future pilot; GOApply carries J27.
+- 6D-2 fingerprint coverage; Stage 4 lifecycle plan; Ops eligibility view; one-click PDF conversion; five
+  stale Preview callbacks in Entra. Not re-probed.
 
 ### Verify Before Acting
 
-1. **Two stashes** (`stash@{0}` on main, `stash@{1}` on `codex/reviewer-promotion-remediation`, July
-   2026 reports) predate this work; untouched.
-2. **Both recorded-set pins are LAW**: growing `RECORDED_IMPORTERS` (boundary gate) or
-   `RECORDED_SCRIPT_WRITERS` (scripts gate) requires editing the matching
-   `tests/unit/*-recorded-set.test.js` in the same PR; stale entries fail the gate itself.
-3. **`bulkUpdateByRequest` removal pin** (`tests/unit/reviewer-suggestion-bulk-update-importers.test.js`)
-   now carves out three gate scripts by name; a new file naming the identifier anywhere in
-   lib/pages/shared/modules/scripts still fails.
-4. **Merge-conflict hazard**: every stacked PR edits `SESSION_PROMPT.md` and the Stage 7 plan. Merge in
-   order; do not cherry-pick a child ahead of its parent.
-5. **Probe select bug** (item 9 above) before rerunning the scratchpad probe; and production Dataverse
-   reads remain owner-run only (`feedback-never-self-authorize-prod-dataverse-reads`).
+1. **D26 residue deletions** (register J27-003…007) are approved in principle for *after D26 closes*.
+   Grep live callers per file at execution; `scripts/probe-triage-filter.mjs:16` imports the allowlist for a
+   cycle code; `scripts/smoke-test-candidate.mjs:50` defaults to request 1002788.
+2. **Register SV labels were sampled, not exhaustively verified** (Codex found two overclaims in a
+   sample). Re-read the cited `file:line` before scheduling any row. Line numbers are as of `d05af5e8`.
+3. **Two stashes** (`stash@{0}` on main, `stash@{1}` on `codex/reviewer-promotion-remediation`) predate
+   this work; untouched.
+4. Production Dataverse reads remain owner-run only.
 
 ### Do Not Reopen Without New Decision
 
-Automatic Complete from thank-you; Operations/Finance final remit flag from this application; BILL
-API reviewer onboarding. No new schema, live lifecycle mutation, email send, cron invocation or
-backfill is authorized. D1 stays unconditional by owner decision. D4's capability drop (no post-save
-cycle/program-area correction) is accepted. D26 hide of Initial Assessments is intended.
+D26 hide of Initial Assessments (Q3 leans keep; J27 brings the feature back). PD lens retains
+leadership-stage rows with a warning, not a lock. Set aside hidden-but-counted by default. Concepts are
+a pre-Phase-I stage, not Phase I. `Phase II Pending` gate persists in J27. Filename-match bridge is
+Change, not Retire. Hold step retired S279 (not a J27 item). 6D/6E closed. Automatic Complete from
+thank-you; Operations/Finance remit flag; BILL API onboarding — all still closed.
 
 ## Preserve These Contracts
 
-- Every taken decision has a mutation-checked test; reverting the guard turns a named test red
-  (D0: `reviewer-suggestion-disposition`; D3: `reviewer-suggestion-deselect-legacy-declined`;
-  accept/decline ETag: `external-review-services` + `external-review-routes`; cycles retry:
-  `reviewer-follow-up`).
-- `isConcreteEtag` (`lib/utils/etag.js`) is the single concrete-ETag rule; no inline copies remain.
-- `check:reviewer-engagement-boundary` and `check:script-suggestion-writers` are both LAW with pinned
-  recorded sets.
-- Send transmits the previewed body verbatim; the server recomputes only the fingerprint and
-  destination (6D, uniform across all four template types).
-- Materials modal session identity by VALUE (`reviewer-draft-keys.js`); `ReviewersTab` passes
-  `degraded={Boolean(error)}`.
+- Final writeups dashboard: explicit `cycleCode` never walks back; focused reads skip the global scan;
+  `FINAL_WRITEUPS_DASHBOARD_MAX_ROWS` is per cycle and fails closed; `QUERY_ALL_REQUESTS_CAP` is the
+  adapter's re-export (services never import transport constants).
+- `visibleToPersona`: PC and PD see all; Leadership sees `leadership-review` only.
+- Register rule: nothing schedules unless `[OWNER-CONFIRMED]` or `[SOURCE-VERIFIED]`; Retire rows are
+  candidates, not authorizations.
+- Owner voice for error copy; OAuth-only agent sessions; no metered review products without explicit
+  authorization; Codex never pushes `main`.
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `docs/REVIEWER_LIFECYCLE_STAGE7_BUILD_PLAN.md` | D0–D5 decisions table with final outcomes and evidence |
-| `docs/CURRENT_WORK_QUEUE.md` | item 5: automated materials-on-acceptance email (plan-first) |
-| `scripts/check-script-suggestion-writers.js` | D5 LAW gate; `RECORDED_SCRIPT_WRITERS` (13) |
-| `tests/unit/script-suggestion-writers-recorded-set.test.js` | growth pin for the recorded set |
-| `lib/services/external-review/respond-service.js` | accept/decline ETag requirement |
-| `lib/dataverse/adapters/reviewer-suggestion.js` | D0 guard, D3 op; `setRequestMetadata` + `patchFields` gone |
-| `pages/workbench/reviewer-follow-up.js` | retryable `loadCycles` |
-| `lib/utils/past-cutoff.js` | `isPastCutoff` (moved from expire-invitation) |
-| `_archived/scripts/` + `_archived/README.md` | the three archived raw-fetch scripts with execution evidence |
-| `.claude-memory/project-accepted-awaiting-materials-is-transient.md` | December-cycle flow clarification |
+| `docs/J27_TRANSITION_REGISTER.md` | The J27 register: rows, contradictions, owner questions (§7 status line), slice G checklist |
+| `docs/J27_SINGLE_PHASE_TRANSITION_INVENTORY_PLAN.md` | Sweep method, schema, marker convention (§7 unbuilt) |
+| `docs/FINAL_WRITEUPS_DASHBOARD_CYCLE_SCOPING_PLAN.md` | 6A build record, review dispositions, 6B shape |
+| `lib/services/final-writeup/dashboard-service.js` | Cycle discovery, scoping, persona lens |
+| `shared/components/final-writeups/FinalWriteupsViews.js` | CycleSelector, URL persistence, stage warning |
+| `docs/CURRENT_WORK_QUEUE.md` | Items 5–8 carry today's decisions |
+| `.claude-memory/project-grant-phasing-evolution.md` | Phasing facts incl. all 2026-09-06 decisions |
 
 ## Testing
 
-```sh
-# New gate pair (sequential) + census
-npm run check:script-suggestion-writers && npm run check:script-suggestion-writers:self-test
-node scripts/check-script-suggestion-writers.js --report
-# Decision pins
-npm test -- --runInBand --watch=false --testPathPattern 'reviewer-suggestion-disposition|deselect-legacy-declined|external-review-(services|routes)|reviewer-follow-up|script-suggestion-writers|my-candidates'
-# Branch exit (all green at handoff on 9b60cea5)
-npm test -- --runInBand --watch=false && npm run check:types && npm run lint && npm run build -- --webpack && git diff --check
+```bash
+npm test -- --runInBand --watch=false --testPathPatterns "final-writeups|reviewer-follow-up"
+npm run check:docs-catalog && npm run check:doc-currency && npm run check:memory-router
 ```
 
 ## Handoff and Milestone Determination
 
-**No DEVELOPMENT_LOG.md entry this session.** Everything shipped is on four unmerged PRs; nothing
-reached `main` or Production. The retirement of the generate-emails route, the D4 capability drop,
-and the new `check:script-suggestion-writers` gate ARE milestone-worthy — write the entry in Session
-491 once the stack merges and the deployment is Ready. No CLAUDE.md, schema or environment change.
-A new `check:*` gate was added to CI, the `/start` list and `docs/CI_GATES_REFERENCE.md`. The
-claim-evidence pilot report recorded no eligible plan/design edit for this session; no observation
-row added.
+Milestone entry added to DEVELOPMENT_LOG.md: "Final writeups cycle scoping live; J27 transition
+register built and owner decisions taken (Session 491)". Claim-evidence pilot row added for S491
+(1 event, universal shape, resolved by narrowing).
