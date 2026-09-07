@@ -77,7 +77,7 @@ The contract covers **Pattern A + dual-caller prompts and Pattern B/C Vercel-onl
 | `assertSystemIncludes` | string \| string[] | no | Fail-closed assertion that each required substring survived composition in the actual system prompt. Used when a mutable prompt row must retain a security-critical block. |
 | `requireNoPersistence` | bool | no | Default `false`. When `true`, the Executor rejects any current prompt row whose output schema declares a target other than `kind: none`, before the model call or target write. Use for producers that need request-linked audit lineage but must remain pass-through-only even if the mutable prompt row drifts. |
 | `maxTokensOverride` | positive integer | no | Server-owned, per-invocation output-budget override, capped at the final resolved model's reviewed `maxOutputTokens`. The Pre-Site standing value and review-synthesis retry floor/ceiling resolve through `lib/services/executor-budget-service.js` from the latest append-only `executor.budgets.vNNNNNN` Dataverse setting; `shared/config/executorBudgets.js` owns only the closed schema, safety bounds, and outage fallback. The superuser Admin panel reads the same resolved revision. Never accept this value from client input. |
-| `timeoutMsOverride` | positive integer | no | Server-owned, per-invocation LLM transport timeout override (milliseconds), passed to `LLMClient` in place of its 120s default. The Pre-Site value resolves through the same durable budget revision and remains bounded to the reviewed 60 000–240 000 ms range; never accept it from client input. Non-integer/non-positive values are ignored. |
+| `timeoutMsOverride` | positive integer | no | Server-owned, per-invocation LLM transport timeout override (milliseconds), passed to `LLMClient` in place of its 120s default. The Pre-Site standing value and the field-primer timeout-only value resolve through the same durable budget revision and remain bounded to the reviewed 60 000–240 000 ms range; never accept it from client input. Non-integer/non-positive values are ignored. |
 | `minimumEffectiveMaxTokensExclusive` | non-negative integer | no | Server-owned retry guard. After applying the resolved model ceiling, the final token budget must exceed this value or the Executor aborts before the provider call. Review synthesis uses the first attempt's budget here so a concurrent model change cannot trigger a retry with no larger effective budget. |
 | `semanticAttempt` | positive integer | no | Default `1`. Server-owned audit metadata for caller-level semantic retries. |
 | `retryOfRunId` | GUID | no | Prior failed `wmkf_ai_run` id when the caller re-invokes. Included in notes for deterministic audit pairing; null is allowed when the prior audit write failed. |
@@ -99,10 +99,17 @@ even if a later valid revision has already overtaken it. The closed schema conta
 
 - `pre-site-visit.proposal-core.generate`: standing `maxTokensOverride` and
   `timeoutMsOverride`;
-- `review-synthesis.generate`: retry `floor` and `ceiling`.
+- `review-synthesis.generate`: retry `floor` and `ceiling`;
+- `field-primer.generate` (S493, 2026-09-07): timeout-only `timeoutMsOverride`
+  (default 240 000 ms). Output tokens stay on the prompt row, so no model
+  ceiling applies and publication does not read that prompt.
 
-Publication validates code-owned numeric ranges and both prompts' currently
-resolved reviewed-model output ceilings before the create. Admin and seed
+Registry growth is additive: a stored revision published before a prompt name
+was registered stays authoritative for the names it carries, and the reader
+fills the missing names from the code default with no storage warning.
+Publication always requires the complete set. Publication validates code-owned
+numeric ranges and the token-carrying prompts' currently resolved
+reviewed-model output ceilings before the create. Admin and seed
 publication of a governed prompt model perform the inverse strict check against
 the current durable budget. Because these are separate Dataverse publications,
 the final Executor call seam also caps a server-owned override to the resolved

@@ -1,7 +1,10 @@
 import {
   EXECUTOR_BUDGET_DEFAULTS,
   EXECUTOR_BUDGET_DESCRIPTIONS,
+  EXECUTOR_BUDGET_LIMITS,
 } from '../../shared/config/executorBudgets.js';
+import { FIELD_PRIMER_PROMPT_NAME } from '../../lib/services/field-primer-service.js';
+import { FIELD_PRIMER_LEASE_TTL_MS } from '../../shared/utils/field-primer-envelope.js';
 import { PRE_SITE_VISIT_CONTRACT } from '../../shared/config/requestDocument.js';
 import { lookupModelCapabilities } from '../../lib/services/model-capabilities.js';
 import { resolveModel } from '../../lib/services/model-resolver.js';
@@ -23,6 +26,18 @@ test('registry keys are the prompt names the callers use', () => {
     floor: 16_000,
     ceiling: 32_000,
   });
+  expect(EXECUTOR_BUDGET_DEFAULTS[FIELD_PRIMER_PROMPT_NAME]).toEqual({
+    kind: 'timeout',
+    timeoutMsOverride: 240_000,
+  });
+});
+
+test('the field-primer generation lease outlives the longest publishable timeout', () => {
+  // A lease that expires before the transport timeout lets a second click start
+  // a duplicate paid generation while the first is still running.
+  expect(FIELD_PRIMER_LEASE_TTL_MS).toBeGreaterThan(
+    EXECUTOR_BUDGET_LIMITS[FIELD_PRIMER_PROMPT_NAME].timeoutMsOverride.max,
+  );
 });
 
 test('every budget fits inside the default model\'s reviewed output ceiling', () => {
@@ -30,9 +45,14 @@ test('every budget fits inside the default model\'s reviewed output ceiling', ()
   const ceiling = lookupModelCapabilities(defaultId)?.maxOutputTokens;
   expect(Number.isInteger(ceiling)).toBe(true);
   for (const [name, entry] of Object.entries(EXECUTOR_BUDGET_DEFAULTS)) {
-    const budget = entry.kind === 'standing' ? entry.maxTokensOverride : entry.ceiling;
-    expect(Number.isInteger(budget) && budget > 0).toBe(true);
-    expect(budget).toBeLessThanOrEqual(ceiling);
+    if (entry.kind !== 'timeout') {
+      const budget = entry.kind === 'standing' ? entry.maxTokensOverride : entry.ceiling;
+      expect(Number.isInteger(budget) && budget > 0).toBe(true);
+      expect(budget).toBeLessThanOrEqual(ceiling);
+    } else {
+      expect(entry).toEqual({ kind: 'timeout', timeoutMsOverride: entry.timeoutMsOverride });
+      expect(Number.isInteger(entry.timeoutMsOverride) && entry.timeoutMsOverride > 0).toBe(true);
+    }
     expect(typeof EXECUTOR_BUDGET_DESCRIPTIONS[name].since).toBe('string');
     expect(typeof EXECUTOR_BUDGET_DESCRIPTIONS[name].reason).toBe('string');
     expect(name).toBe(name.trim());

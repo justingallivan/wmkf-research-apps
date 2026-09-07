@@ -14,9 +14,13 @@
 
 export const FIELD_PRIMER_ENVELOPE_SCHEMA = 'field-primer/v1';
 export const FIELD_PRIMER_LEASE_SCHEMA = 'field-primer/lease';
-// Generation (pull + LLM + grounding) is well under a minute; give the lease a
-// generous ceiling so a crashed generation's stale lease becomes re-claimable.
-export const FIELD_PRIMER_LEASE_TTL_MS = 180_000;
+// The lease must outlive the longest transport timeout an admin can publish for
+// `field-primer.generate` (240s ceiling in shared/config/executorBudgets.js) plus
+// proposal pull and expert grounding, or a second click could start a duplicate
+// paid generation while the first is still running. A crashed generation's
+// stale lease becomes re-claimable after this window. Pinned against the limit
+// in tests/unit/executor-budgets.test.js.
+export const FIELD_PRIMER_LEASE_TTL_MS = 300_000;
 
 export function isFieldPrimerEnvelope(env) {
   return !!env

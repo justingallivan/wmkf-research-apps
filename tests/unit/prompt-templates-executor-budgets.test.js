@@ -35,6 +35,7 @@ function budgetConfig(version = 0, maxTokensOverride = 32768) {
         kind: 'standing', maxTokensOverride, timeoutMsOverride: 240000,
       },
       'review-synthesis.generate': { kind: 'retry', floor: 16000, ceiling: 32000 },
+      'field-primer.generate': { kind: 'timeout', timeoutMsOverride: 240000 },
     },
     limits: {
       'pre-site-visit.proposal-core.generate': {
@@ -44,6 +45,9 @@ function budgetConfig(version = 0, maxTokensOverride = 32768) {
       'review-synthesis.generate': {
         floor: { min: 4096, max: 128000 },
         ceiling: { min: 4096, max: 128000 },
+      },
+      'field-primer.generate': {
+        timeoutMsOverride: { min: 60000, max: 240000 },
       },
     },
     descriptions: {
@@ -101,6 +105,7 @@ test('Admin edits and atomically publishes the complete Executor budget revision
     budgets: {
       'pre-site-visit.proposal-core.generate': { maxTokensOverride: 40000 },
       'review-synthesis.generate': { floor: 16000, ceiling: 32000 },
+      'field-primer.generate': { kind: 'timeout', timeoutMsOverride: 240000 },
     },
   });
   expect(JSON.parse(put[1].body).requestId).toMatch(/^[0-9a-f-]{36}$/);
@@ -314,5 +319,40 @@ test('retry display does not claim the retry override is capped when only the pr
   const line = screen.getByTestId('output-budget');
   expect(line).toHaveTextContent('PROMPT ROW OVER CEILING');
   expect(line).not.toHaveTextContent('effective retry ceiling');
+  expect(line).not.toHaveTextContent('configured override is capped');
+});
+
+test('the field-primer timeout is editable, range-checked, and published with the complete revision', async () => {
+  render(<PromptTemplatesSection />);
+  const timeout = await screen.findByLabelText(/Field primer timeout/);
+  expect(timeout).toHaveValue(240000);
+  fireEvent.change(timeout, { target: { value: '30000' } });
+  expect(screen.getByText(/Use whole numbers inside each displayed safety range/)).toBeInTheDocument();
+  fireEvent.change(timeout, { target: { value: '180000' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Publish v1' }));
+  await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
+    '/api/admin/executor-budgets',
+    expect.objectContaining({ method: 'PUT' }),
+  ));
+  const put = global.fetch.mock.calls.find(([, options]) => options?.method === 'PUT');
+  expect(JSON.parse(put[1].body).budgets['field-primer.generate']).toEqual({ kind: 'timeout', timeoutMsOverride: 180000 });
+});
+
+test('timeout-only budget display names the timeout and leaves output tokens on the prompt row', () => {
+  render(<OutputBudgetLine
+    prompt={{ ...prompt, name: 'field-primer.generate', maxTokens: null }}
+    executorBudgetConfig={budgetConfig(1)}
+    modelCatalog={{
+      tiers: [],
+      defaultModel: 'claude-sonnet-5',
+      defaultModelResolved: 'claude-sonnet-5',
+      modelStatuses: {
+        'claude-sonnet-5': { capability: { status: 'reviewed', maxOutputTokens: 64000 } },
+      },
+    }}
+  />);
+  const line = screen.getByTestId('output-budget');
+  expect(line).toHaveTextContent('16,384 tokens');
+  expect(line).toHaveTextContent('timeout 240s configured by published revision 1');
   expect(line).not.toHaveTextContent('configured override is capped');
 });

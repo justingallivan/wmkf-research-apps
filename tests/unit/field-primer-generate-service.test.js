@@ -11,19 +11,24 @@ jest.mock('../../lib/dataverse/adapters/grant-request.js', () => ({
   updateById: jest.fn(),
 }));
 jest.mock('../../lib/services/field-primer-service', () => ({
+  FIELD_PRIMER_PROMPT_NAME: 'field-primer.generate',
   generateFieldPrimer: jest.fn(),
   groundPrimerExperts: jest.fn(async (experts) => experts),
 }));
 jest.mock('../../lib/services/workbench-proposal-documents', () => ({
   getAiProposalNarrativeText: jest.fn(),
 }));
+jest.mock('../../lib/services/executor-budget-service.js', () => ({
+  getExecutorBudget: jest.fn(async () => ({ kind: 'timeout', timeoutMsOverride: 240000 })),
+}));
 
 import * as grantRequestAdapter from '../../lib/dataverse/adapters/grant-request.js';
 import { generateFieldPrimer } from '../../lib/services/field-primer-service';
 import { getAiProposalNarrativeText } from '../../lib/services/workbench-proposal-documents';
+import { getExecutorBudget } from '../../lib/services/executor-budget-service.js';
 import { FIELD_PRIMER_ENVELOPE_SCHEMA, makeFieldPrimerLease } from '../../shared/utils/field-primer-envelope';
 import { ServiceHttpError } from '../../lib/services/service-http-error';
-import { generateForRequest, generateStandalone } from '../../lib/services/field-primer/generate-service';
+import { classifyGenerationFailure, generateForRequest, generateStandalone } from '../../lib/services/field-primer/generate-service';
 
 const GUID = '33333333-3333-3333-3333-333333333333';
 const row = (over = {}) => ({
@@ -36,6 +41,7 @@ beforeEach(() => {
   grantRequestAdapter.updateById.mockReset().mockResolvedValue({});
   generateFieldPrimer.mockReset();
   getAiProposalNarrativeText.mockReset();
+  getExecutorBudget.mockReset().mockResolvedValue({ kind: 'timeout', timeoutMsOverride: 240000 });
 });
 
 describe('generateForRequest (Mode A)', () => {
@@ -147,6 +153,70 @@ describe('generateForRequest (Mode A)', () => {
     // Only the lease claim was written — never a clobbering persist.
     expect(grantRequestAdapter.updateById).toHaveBeenCalledTimes(1);
   });
+
+  it('passes the published field-primer timeout to the generator, read before the lease is claimed', async () => {
+    const calls = [];
+    getExecutorBudget.mockImplementation(async (name) => { calls.push(`budget:${name}`); return { kind: 'timeout', timeoutMsOverride: 180000 }; });
+    grantRequestAdapter.updateById.mockImplementation(async () => { calls.push('lease'); return {}; });
+    grantRequestAdapter.getById
+      .mockResolvedValueOnce(row())
+      .mockResolvedValueOnce({ wmkf_ai_fieldprimer: null, _etag: 'W/"2"' });
+    getAiProposalNarrativeText.mockResolvedValue({ text: 'A'.repeat(60) });
+    generateFieldPrimer.mockResolvedValueOnce({ primer: { experts: [] }, runId: 'r', model: 'm' });
+    await generateForRequest({ requestId: GUID });
+    expect(calls.slice(0, 2)).toEqual(['budget:field-primer.generate', 'lease']);
+    expect(generateFieldPrimer).toHaveBeenCalledWith(expect.objectContaining({ timeoutMs: 180000 }));
+  });
+
+  it('a budget read failure keeps the client default timeout and still generates', async () => {
+    getExecutorBudget.mockRejectedValueOnce(new Error('settings down'));
+    grantRequestAdapter.getById
+      .mockResolvedValueOnce(row())
+      .mockResolvedValueOnce({ wmkf_ai_fieldprimer: null, _etag: 'W/"2"' });
+    getAiProposalNarrativeText.mockResolvedValue({ text: 'A'.repeat(60) });
+    generateFieldPrimer.mockResolvedValueOnce({ primer: { experts: [] }, runId: 'r', model: 'm' });
+    await generateForRequest({ requestId: GUID });
+    expect(generateFieldPrimer).toHaveBeenCalledWith(expect.objectContaining({ timeoutMs: null }));
+  });
+
+  it('a transport timeout restores the prior value and surfaces a 504 naming the seconds and the Admin path', async () => {
+    const prior = JSON.stringify({ schema: FIELD_PRIMER_ENVELOPE_SCHEMA, generatedAt: 'old', primer: {} });
+    grantRequestAdapter.getById.mockResolvedValueOnce(row({ wmkf_ai_fieldprimer: prior }));
+    getAiProposalNarrativeText.mockResolvedValue({ text: 'A'.repeat(60) });
+    generateFieldPrimer.mockRejectedValueOnce(new Error('Claude API timeout after 240000ms'));
+    await expect(generateForRequest({ requestId: GUID, regenerate: true })).rejects.toMatchObject({
+      httpStatus: 504,
+      code: 'field_primer_generation_timeout',
+      message: expect.stringMatching(/timed out: the model did not finish within 240 seconds.*Admin → Prompt templates → Executor output budgets/),
+    });
+    const last = grantRequestAdapter.updateById.mock.calls.at(-1);
+    expect(last[1]).toEqual({ wmkf_ai_fieldprimer: prior });
+  });
+
+  it('a provider HTTP error surfaces a short 502 without the raw message', async () => {
+    grantRequestAdapter.getById.mockResolvedValueOnce(row());
+    getAiProposalNarrativeText.mockResolvedValue({ text: 'A'.repeat(60) });
+    generateFieldPrimer.mockRejectedValueOnce(Object.assign(new Error('overloaded: secret-ish detail'), { status: 529 }));
+    await expect(generateForRequest({ requestId: GUID })).rejects.toMatchObject({
+      httpStatus: 502,
+      code: 'field_primer_provider_error',
+      message: 'Field primer generation failed: the model provider returned HTTP 529. Try again in a few minutes.',
+    });
+  });
+});
+
+describe('classifyGenerationFailure', () => {
+  it('maps timeout, provider status, and everything else to distinct typed errors', () => {
+    expect(classifyGenerationFailure(new Error('Claude API timeout after 120000ms'), { timeoutMs: 120000 }))
+      .toMatchObject({ httpStatus: 504, code: 'field_primer_generation_timeout', message: expect.stringContaining('within 120 seconds') });
+    expect(classifyGenerationFailure(Object.assign(new Error('aborted'), { name: 'AbortError' })))
+      .toMatchObject({ httpStatus: 504, message: expect.stringContaining('did not finish in time') });
+    expect(classifyGenerationFailure(Object.assign(new Error('x'), { status: 429 })))
+      .toMatchObject({ httpStatus: 502, code: 'field_primer_provider_error' });
+    expect(classifyGenerationFailure(new Error('llm down')))
+      .toMatchObject({ httpStatus: 500, code: 'field_primer_generation_failed', message: 'Field primer generation failed.' });
+    expect(classifyGenerationFailure(null)).toMatchObject({ httpStatus: 500 });
+  });
 });
 
 describe('generateStandalone (Mode B)', () => {
@@ -164,5 +234,12 @@ describe('generateStandalone (Mode B)', () => {
   it('wraps generation failure in a 500 ServiceHttpError', async () => {
     generateFieldPrimer.mockRejectedValueOnce(new Error('llm down'));
     await expect(generateStandalone({ proposalText: 'B'.repeat(60) })).rejects.toBeInstanceOf(ServiceHttpError);
+  });
+
+  it('does not read the Executor budget or set a timeout (standalone keeps the client default)', async () => {
+    generateFieldPrimer.mockResolvedValueOnce({ primer: { experts: [] }, runId: 'r', model: 'm' });
+    await generateStandalone({ proposalText: 'B'.repeat(60) });
+    expect(getExecutorBudget).not.toHaveBeenCalled();
+    expect(generateFieldPrimer.mock.calls[0][0]).not.toHaveProperty('timeoutMs');
   });
 });
