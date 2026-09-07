@@ -49,7 +49,7 @@ child to `main` as its parent merges. This checkout is on `claude/open-items-cyc
    and `project-accepted-awaiting-materials-is-transient`: materials in hand at request time; on
    acceptance + onboarding the system AUTOMATICALLY emails the reviewer a materials link. Not built;
    nothing in the acceptance job/drain sends materials today [VERIFIED]. Build when campaigns settle;
-   plan before D26 invitations; live before the first D26 acceptance.
+   plan before J27 reviewer invitations (2027); live before the first J27 acceptance. (Corrected 2026-09-06: not a D26 item.)
 9. **Owner-run read-only probe** (scratchpad, not tracked): 0 rows in the accepted-awaiting-materials
    state; 7 null-status accepted rows are May–July test residue. The probe's request lookups 400'd
    because it selected `wmkf_grantcyclecode` on `akoya_requests` (column lives on the suggestion);
@@ -89,11 +89,11 @@ materials-on-acceptance clarification · `9b60cea5` queue item 5 · handoff: `gi
    `docs/CURRENT_WORK_QUEUE.md` item 5 lists the design questions (precondition the drain can verify,
    accept-before-materials, idempotency across drain retries, PD visibility/override, manual modal as
    fallback). Plan-first; `/contract-reconcile` triggers apply. Timing: when campaigns settle, before
-   D26 invitations go out.
-3. **6D fingerprint smoke at the first D26 invitation batch.** Evidence: invitations are fingerprinted
+   J27 reviewer invitations go out in 2027 (owner correction 2026-09-06: D26 invitations already happened).
+3. **6D fingerprint smoke at the first J27 invitation batch** (D26 batches already went out; corrected 2026-09-06). Evidence: invitations are fingerprinted
    (6D-1 confirmed); no acceptance needed. Render → change a proposal detail in CRM → send → observe
    `draft_stale` skip → re-render → send. Write the PD checklist beforehand.
-4. **Release-materials modal smoke** only if item 2 does not ship before the first D26 acceptance.
+4. **Release-materials modal smoke** at any remaining D26 acceptance (the manual modal is the D26 path).
    Evidence: `project-accepted-awaiting-materials-is-transient`.
 
 ### Owner Decision Needed

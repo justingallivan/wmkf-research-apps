@@ -299,8 +299,9 @@ owner gates. None is an implied next step.
 materials-on-acceptance email. For the December 2026 cycle, review materials
 will be in hand at request time, and on acceptance plus onboarding the system
 will email the reviewer a link to the materials with no PD action. Today
-materials go out only through the PD-driven release modal. Plan first, build
-when the current campaigns settle, live before the first D26 acceptance;
+materials go out only through the PD-driven release modal. This is a J27 (June
+2027 cycle) item: D26 acceptances have already happened (owner, 2026-09-06). Plan
+first, build when the current campaigns settle, live before the first J27 acceptance;
 sequence and boundary in `docs/CURRENT_WORK_QUEUE.md` item 6.
 
 **Prioritized ahead of it (owner-directed 2026-09-06):** completing the Final

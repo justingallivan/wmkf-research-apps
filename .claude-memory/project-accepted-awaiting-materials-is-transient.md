@@ -1,6 +1,6 @@
 ---
 name: project-accepted-awaiting-materials-is-transient
-description: Owner stance (2026-09-05): reviewers will receive materials immediately on acceptance going forward, so the "accepted, awaiting materials" reviewStatus is transient; no dashboard sub-count for it, and the unsmoked release-materials modal gets real exercise at the next acceptance.
+description: Owner stance (2026-09-05, dated to J27 on 2026-09-06): from the J27 cycle reviewers will receive materials immediately on acceptance, so the "accepted, awaiting materials" reviewStatus is transient; no dashboard sub-count for it; the manual release-materials modal remains the D26 path.
 metadata:
   type: project
   status: active
@@ -30,7 +30,10 @@ gap worth building for.
 **How to apply:** Do not propose a dashboard "awaiting materials" sub-count or a
 Preview seeding exercise for the release-materials smoke. The automated
 materials-on-acceptance send is the next lifecycle build (not yet planned as of
-S490); plan it before the December 2026 cycle's first acceptance. If it ships,
-smoke the automated send; if it does not, the first real acceptance is the
-natural smoke of the manual modal — record either in the 6B3 receipt. See
+S490); plan it before the **J27** (June 2027 cycle) reviewer invitations go out in 2027;
+owner correction 2026-09-06: D26 acceptances have already happened, so this is a
+J27 build, not a D26 one ("the proposals will arrive in December of 2026, which
+may be the confusion"). If it ships, smoke the automated send at the first J27
+acceptance; the manual modal remains the D26 path and is smoked by any remaining
+D26 acceptance — record either in the 6B3 receipt. See
 [[project-workbench-consolidation-rollout]] for the Workbench lifecycle context.
