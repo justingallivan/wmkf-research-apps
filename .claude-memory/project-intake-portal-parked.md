@@ -1,6 +1,6 @@
 ---
 name: project-intake-portal-parked
-description: The applicant intake portal build (/apply/*) is PARKED / back-burner as of 2026-07-08 — Connor is re-engineering GOApply for the next cycle; our portal work paused pending whether WMKF adopts it. Not dead; design memories retained for revival.
+description: The applicant intake portal build (/apply/*) is PARKED / back-burner as of 2026-07-08 and reaffirmed 2026-09-06 — J27 (June 2027) intake occurs through GOApply until further notice; the custom plan and built work are retained for a future pilot. Not dead; design memories retained for revival.
 metadata:
   type: project
   status: active
@@ -16,7 +16,11 @@ Read this when: about to plan, scope, or build any applicant intake-portal work
 
 Do:
 - Treat the intake-portal build as **PARKED / back-burner** (owner decision
-  2026-07-08). Do NOT spin up intake-portal build/planning as if it's active work.
+  2026-07-08; reaffirmed 2026-09-06: "Until further notice, intake will occur using
+  GOApply. Retain the memory of our custom plan and the supporting work. I'd like
+  to do a pilot some day but it will have to wait."). Do NOT spin up intake-portal
+  build/planning as if it's active work, and do NOT list its open gates (virus-scan
+  E2E, P1-Update PA gate) as J27 prerequisites — see `docs/J27_TRANSITION_REGISTER.md` Q19.
 - Treat security and reliability work whose only trigger is an intake launch — including
   the joint `proxy.js` applicant-surface + `/api/intake/*` Origin/CSRF fix — as part of
   the parked product, not as an independent security backlog item. It becomes actionable
