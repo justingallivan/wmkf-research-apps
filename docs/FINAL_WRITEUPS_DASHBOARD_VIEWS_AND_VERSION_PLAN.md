@@ -191,8 +191,11 @@ bound). Instead:
 
 `[PLANNED]` One additive field through the shared projection:
 
-- `projectAcknowledgementState` returns `acknowledgedPublicationVersionId:
-  personal?.wmkf_publicationversionid || null` beside `acknowledgedAt`. The dashboard row and the
+- `projectAcknowledgementState` returns `acknowledgedPublicationVersionId: isResponsiblePd ? null :
+  (personal?.wmkf_publicationversionid || null)` beside `acknowledgedAt`. The responsible-PD branch is
+  explicit because the projection today still exposes the personal row's fields for a PD who once
+  held a historical acknowledgement `[VERIFIED via acknowledgement-service.js:359-364]`; a stale
+  version must not surface on a stewardship row. The dashboard row and the
   acknowledgement GET response carry it unchanged. The POST response in `markFinalWriteupReviewed`
   adds the same key from the confirmed stored row (`existing.wmkf_publicationversionid`), so every
   response variant of the acknowledgement route carries it and the tab's post-mark state matches the
@@ -297,7 +300,7 @@ only filters, one search field, no denominators. The implementation plan 6B text
 - `focused panel states name the exact reviewed and current versions`
 
 `tests/unit/final-writeup-acknowledgement-service.test.js`
-- `projection returns acknowledgedPublicationVersionId from the personal row and null without one`
+- `projection returns acknowledgedPublicationVersionId from the personal row, null without one, and null for the responsible PD even with a historical row`
 - `markFinalWriteupReviewed returns the exact acknowledgedPublicationVersionId of the confirmed row (fresh and reused)`
 
 `tests/unit/final-writeups-dashboard-service.test.js`
@@ -365,6 +368,14 @@ item 5 "Met when" clause satisfied except the two-cycle load, which 6A already c
 | 1 (high) | The POST acknowledgement response is hand-built and would lack the new field, diverging from GET | **Accepted.** POST adds `acknowledgedPublicationVersionId` from the confirmed row; exact-value test fresh and reused (§3, §4.5, §7, §8). |
 | 2 (medium) | Header count pinned to the unfiltered server count while view counts follow the filters | **Accepted.** Header derives from filtered open rows and names the selected PD; test narrows both together (§4.1, §7, §8). |
 | 3 (medium) | Walk-back copy still conflated visibility with personal work | **Accepted.** Copy now says "visible to you", matching `visibleProjected` (§4.4). |
+
+**Third pass (2026-09-07, verdict READY WITH NAMED CHANGES):**
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 (medium) | `acknowledgedPublicationVersionId` was unconditional, so a responsible PD with a historical row would expose a stale version on a stewardship row | **Accepted.** Field is `isResponsiblePd ? null : …`; responsible-PD-with-row fixture added (§4.5, §8). |
+
+Three passes reached the stopping rule; the build proceeds on this plan.
 
 ## 13. Explicitly out of scope
 
