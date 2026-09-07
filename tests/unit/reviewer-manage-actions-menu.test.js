@@ -74,7 +74,7 @@ describe('reviewer management actions menu', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Manage Dr. Test Reviewer' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Close review' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Mark complete' }));
     expect(onCloseReview).toHaveBeenCalledTimes(1);
 
     rerender(
@@ -218,9 +218,9 @@ describe('reviewer table geometry', () => {
       await Promise.resolve();
     });
 
-    expect(screen.getByRole('button', { name: 'Close review' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Mark complete' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Manage Joshua Rosenthal' }));
-    expect(screen.queryAllByRole('button', { name: 'Close review' })).toHaveLength(1);
+    expect(screen.queryAllByRole('button', { name: 'Mark complete' })).toHaveLength(1);
   });
 });
 

@@ -218,7 +218,7 @@ export function TokenActionsMenu({
                 onClick={() => { setOpen(false); onCloseReview(); }}
                 className="w-full text-left px-3 py-2 hover:bg-green-50 text-green-800"
               >
-                {reviewer.reviewStatus === 'complete' ? 'Edit closeout' : 'Close review'}
+                {reviewer.reviewStatus === 'complete' ? 'Edit closeout' : 'Mark complete'}
               </button>
             </div>
           )}

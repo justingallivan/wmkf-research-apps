@@ -38,7 +38,7 @@ test('degraded disables traced mutation controls and re-enables them', async () 
   rerender(<ReviewerManagePanel proposal={proposal} reviewers={rows} canManage mode="track" showReviewReminderAction degraded />);
   expect(screen.getByRole('button', { name: /release proposal/i })).toBeDisabled();
   expect(screen.getAllByRole('button', { name: /manage /i })[0]).toBeDisabled();
-  expect(screen.getByRole('button', { name: 'Close review' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Mark complete' })).toBeDisabled();
   // Panel wiring, not the component prop in isolation: the reminder send is
   // gated through the panel's `degraded` prop.
   expect(screen.getByRole('button', { name: /send reminder to Reminder/i })).toBeDisabled();
@@ -46,7 +46,7 @@ test('degraded disables traced mutation controls and re-enables them', async () 
   expect(screen.getByRole('button', { name: /send reminder to Accepted/i })).toBeDisabled();
   const calls = global.fetch.mock.calls.length;
   fireEvent.click(screen.getByRole('button', { name: /release proposal/i }));
-  fireEvent.click(screen.getByRole('button', { name: 'Close review' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Mark complete' }));
   fireEvent.click(screen.getByRole('button', { name: /send reminder to Reminder/i }));
   expect(global.fetch.mock.calls.length).toBe(calls);
   rerender(<ReviewerManagePanel proposal={proposal} reviewers={rows} canManage mode="track" showReviewReminderAction degraded={false} />);

@@ -1099,7 +1099,7 @@ export default function ReviewerManagePanel({
                                 title={degraded ? 'Reviewer data could not be refreshed - retry before making changes' : undefined}
                                 className="min-h-9 whitespace-nowrap rounded-lg bg-gray-900 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2"
                               >
-                                {r.reviewStatus === 'complete' ? 'Edit closeout' : 'Close review'}
+                                {r.reviewStatus === 'complete' ? 'Edit closeout' : 'Mark complete'}
                               </button>
                             )}
                           </div>
