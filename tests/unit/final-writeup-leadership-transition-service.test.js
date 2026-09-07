@@ -204,6 +204,10 @@ describe('status projection at both stages', () => {
   test.each([
     ['blank leadership time', { wmkf_leadershipreviewstartedat: '   ' }],
     ['malformed leadership time', { wmkf_leadershipreviewstartedat: 'not-a-date' }],
+    ['numeric-string leadership time', { wmkf_leadershipreviewstartedat: '0' }],
+    ['year-only leadership time', { wmkf_leadershipreviewstartedat: '2026' }],
+    ['overflowed leadership time', { wmkf_leadershipreviewstartedat: '2026-13-45T00:00:00Z' }],
+    ['date-only lastModified', { wmkf_sharepointlastmodified: '2026-09-07' }],
     ['non-GUID leadership actor', { _wmkf_leadershipreviewstartedby_value: 'someone' }],
     ['blank version id', { wmkf_sharepointversionid: '' }],
     ['blank eTag', { wmkf_sharepointetag: ' ' }],
