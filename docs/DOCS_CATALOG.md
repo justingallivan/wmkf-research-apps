@@ -461,6 +461,7 @@ related:
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
+| [FINAL_WRITEUP_LEADERSHIP_TRANSITION_PLAN.md](FINAL_WRITEUP_LEADERSHIP_TRANSITION_PLAN.md) | plan | active |  | PD-triggered Ready for leadership review: the current Final row moves from lifecycle Review to Final with explicit actor/time; every reader accepts the stage. | 2026-09-07 |
 | [FINAL_WRITEUP_PERSONA_CONFIGURATION_PLAN.md](FINAL_WRITEUP_PERSONA_CONFIGURATION_PLAN.md) | plan | active |  | Version-2 staffing and explicit Final Writeup persona lenses are Production-live; live-data smoke and natural signed-in staff observation passed. | 2026-08-31 |
 | [FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md](FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md) | plan | active |  | Final runtime, staffing, lenses, 6A scoping, 6B views/PD filter, and 6C version context are Production-live; stage transitions remain. | 2026-08-28 |
 | [FINAL_WRITEUPS_DASHBOARD_CYCLE_SCOPING_PLAN.md](FINAL_WRITEUPS_DASHBOARD_CYCLE_SCOPING_PLAN.md) | plan | active |  | Scopes the Final writeups dashboard read model to one grant cycle before the global row bound fails the page; PD lens retention decided. | 2026-09-06 |
