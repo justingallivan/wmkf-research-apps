@@ -14,7 +14,7 @@ Read this when: writing document-loading or phase-gating logic, or planning for 
 
 Do:
 - Gate reviewer-finding on the internal Phase II label (`akoya_requeststatus = 'Phase II Pending'`) — stays correct across both dual-phase (D26) and single-submission (J27) cycles.
-- Treat the Phase I→II flip as a first-class lifecycle event (a status flip, not a second submission). Owner decision 2026-09-06: in J27 a **Power Automate flow** sets `akoya_requeststatus = 'Phase II Pending'`; the repo documents and plans around that trigger rather than building it (register row J27-064).
+- Treat the Phase I→II flip as a first-class lifecycle event (a status flip, not a second submission). Owner decision 2026-09-06: J27 proposals arrive probably as `Phase I Pending` (confirm); staff review them with Initial Assessment elements; **only after staff decide to move a proposal forward** does a **Power Automate flow** set `akoya_requeststatus = 'Phase II Pending'`. The repo documents and plans around that trigger rather than building it. OPEN (owner to discuss with colleagues): whether Connor's backend or a PD front-end action initiates the flip (register rows J27-064, Q8).
 - Plan an upstream per-PD triage/cycle dashboard for J27 (proposals arrive
   in early December 2026, exact date TBD (owner, 2026-09-06); up to ~300 full
   proposals, most never sent for outside review).
