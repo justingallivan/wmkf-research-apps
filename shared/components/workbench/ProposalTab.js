@@ -515,9 +515,12 @@ export default function ProposalTab({ context }) {
             requestId={requestId}
             initialRaw={ai.fieldPrimer}
             exportMeta={{
+              // Shapes differ: resolveWorkbenchRequest puts institution at the
+              // context top level and only `pi` inside proposalInfo
+              // (lib/services/workbench/resolve-request-service.js).
               requestNumber: context?.requestNumber || '',
               title: context?.title || '',
-              institution: info.institution || '',
+              institution: context?.institution || '',
               pi: info.pi || '',
             }}
           />

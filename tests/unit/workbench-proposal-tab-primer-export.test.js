@@ -33,12 +33,17 @@ const ENVELOPE = {
   primer: { field_overview: 'ADP-ribosylation biology.' },
 };
 
+// Mirrors the real resolveWorkbenchRequest response shape: `institution` is a
+// TOP-LEVEL context field and `proposalInfo` carries only pi/coPIs/abstract/
+// amounts (lib/services/workbench/resolve-request-service.js). An earlier
+// fixture put institution inside proposalInfo, which hid a wiring bug.
 function context(fieldPrimer) {
   return {
     requestId: REQUEST_ID,
     requestNumber: '1002852',
     title: 'Structural principles of poly(ADP-ribose)',
-    proposalInfo: { coPIs: [], pi: 'Anthony Leung', institution: 'Johns Hopkins University' },
+    institution: 'Johns Hopkins University',
+    proposalInfo: { coPIs: [], pi: 'Anthony Leung', abstract: null, requestedAmount: null, totalProjectBudget: null },
     aiContent: fieldPrimer === undefined ? {} : { fieldPrimer },
   };
 }
@@ -65,6 +70,8 @@ test('exports the stored envelope with the request identity and downloads under 
   fireEvent.click(button);
 
   await waitFor(() => expect(downloadPdf).toHaveBeenCalled());
+  // Every identity field the PDF header prints must arrive, each read from the
+  // level the resolver actually puts it at.
   expect(generateFieldPrimerPdf).toHaveBeenCalledWith(ENVELOPE, {
     requestNumber: '1002852',
     title: 'Structural principles of poly(ADP-ribose)',
