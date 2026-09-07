@@ -585,7 +585,7 @@ rejected. Plan status: **design closed, awaiting owner decisions D1–D6 before 
 `canAdvance`/`leadership-review` phase, `leadershipReview` on the artifact projection),
 `pages/api/workbench/final-writeup/leadership-review.js`, `shared/components/workbench/FinalWriteupTab.js`
 (`IN_REVIEW_PHASES`, stage presentation map, advance action, parametrized confirm dialog), tests
-`final-writeup-leadership-transition-service.test.js` (32), `workbench-final-writeup-leadership-review-route.test.js`
+`final-writeup-leadership-transition-service.test.js` (45 after diff passes 1–4), `workbench-final-writeup-leadership-review-route.test.js`
 (6), four new `final-writeup-tab.test.js` cases; existing `final-writeup-transition-service.test.js` shape
 assertion gained `canAdvance: false`. One correction to §4.3 step 9 recorded in place (identity + verified
 metadata pre-commit; `persistedIdentityMatches` post-commit only). Docs reconciled: security matrix row, atlas,
@@ -633,3 +633,14 @@ PC backup transitions (owner closed 2026-09-06: PCs already see everything; tran
 PD change); notifications or email on transition; a reverse-stage UI; any change to
 `visibleToPersona`, buckets, or the matrix; supporting-material projection; anything that adds an
 approval gate or reviewer denominator between stages.
+
+**Pre-PR gate run (2026-09-07, branch HEAD after pass 7):** all 37 `check:*` gates green, each followed
+sequentially by its `:self-test` where one exists (`secret-scan`, `scaffolding-tokens`, `dynamics-context-boundary`,
+`odata-escape`, `model-override-warming`, `prompt-injection-tagging`, `request-document-writers`,
+`route-service-boundary`, `route-lifecycle-auth`, `api-routes`, `fact-consistency`, `docs-catalog`, `types`, and
+the rest). Full jest: 805 suites / 11,750 tests. Owner-side runs; the Codex sandbox cannot execute jest.
+
+**Known follow-up (not a defect in the transition):** after a synchronous 200 from the group-review start,
+`FinalWriteupTab.js` synthesizes the status from the start response, which carries no `canAdvance`, so the
+"Ready for leadership review" button appears only after the next status load (reload or the 202 poll path).
+The Production-proved start path is deliberately untouched in this slice.
