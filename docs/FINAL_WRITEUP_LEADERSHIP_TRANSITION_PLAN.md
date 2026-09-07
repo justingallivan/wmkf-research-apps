@@ -18,8 +18,8 @@ related:
 
 # Final Writeup — Leadership Review Transition Plan (Slice 4)
 
-**Status: design closed after six Codex passes (§12), nothing built; the build waits on owner
-decisions D1–D6 (§10).** Mode A `/contract-reconcile` plan for the owner decision of
+**Status: design closed after six Codex passes (§12), nothing built. D2 owner-confirmed
+2026-09-07; D1, D3–D6 stand at their recommendations unless the owner objects (§10).** Mode A `/contract-reconcile` plan for the owner decision of
 2026-09-06 recorded in queue item 4: *the Leadership stage transition is a PD action in the
 Workbench, a new lifecycle-state write from Review to Final; plan-first, not built.* The
 implementation plan already specifies the durable shape
@@ -480,9 +480,9 @@ notification work stays parked.
 - `docs/atlas/dataverse-wmkf-requestdocument.md`: leadership fields runtime-written; Final-row
   lifecycle `FINAL` semantics; owner-run reversal procedure (§4.7).
 - `docs/API_ROUTE_SECURITY_MATRIX.md`: new row beside `:273-275`.
-- `docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md:292`: the "reuse its existing milestone
-  version/hash/time fields" instruction is `[STALE/CONFLICT]` with the Wave 24 actor contract
-  (§3.4); rewrite it to the observation-field checkpoint in place.
+- `docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md:292`: **done 2026-09-07** on D2 confirmation;
+  the "reuse its existing milestone version/hash/time fields" instruction now states the
+  observation-field checkpoint and why the milestone fields are excluded.
 - `docs/CURRENT_WORK_QUEUE.md` item 4 completion column.
 - Agent wiki: Final Writeup has no section in `reviewer-workbench-lifecycle.md`
   `[VERIFIED via rg "Final Writeup|final-writeup" docs/agent-wiki: strategy-roadmap.md only]`. Add a
@@ -495,7 +495,7 @@ notification work stays parked.
 | # | Decision | Recommendation | Default if silent |
 |---|---|---|---|
 | D1 | Reverse path in this slice? | None; owner-run Dataverse repair documented in the atlas page | No reverse action |
-| D2 | Where does the leadership-ready checkpoint live? | Leadership actor/time pair plus the row's refreshed SharePoint observation fields (`wmkf_sharepointversionid`, `wmkf_contenthash`, and siblings). No milestone triple or milestone actor write, because that actor field means Site Visit handoff (§3.4) | Observation fields; **owner confirms before build** |
+| D2 | Where does the leadership-ready checkpoint live? | Leadership actor/time pair plus the row's refreshed SharePoint observation fields (`wmkf_sharepointversionid`, `wmkf_contenthash`, and siblings). No milestone triple or milestone actor write, because that actor field means Site Visit handoff (§3.4) | **[OWNER-CONFIRMED 2026-09-07]** as recommended; implementation plan :292 rewritten in place the same day |
 | D6 | The census reports Final rows' group-review milestone stamp (no milestone actor) as a violation, pre-existing and untouched by this slice. Fix the census separately? | Yes, as a separate Tier 0 script change: classify Final Writeup rows' stamp as group-review-backed or exclude them from the `site-visit-milestone` kind. Request `1002788`'s row is the one instance today | Separate Tier 0 item, not in this slice |
 | D3 | Superuser may advance, as with group review? | Yes, same `resolveAuthorization` | Yes |
 | D4 | Acknowledgements continue after the transition? | Yes; today's `knownLifecycle` already allows it and Leadership acknowledges at this stage | Yes |
