@@ -74,17 +74,15 @@ async function handleGet(req, res) {
   try {
     const includeArchived = req.query.includeArchived === 'true';
 
-    // Parallel: list + count aggregation (3 OData queries total).
-    const [rawCycles, counts] = await Promise.all([
-      listCycles({ includeArchived }),
-      fetchCounts(),
-    ]);
+    // Cycle names provide the temporary validated month/year join key until
+    // the cycle table's meeting-date field is populated.
+    const rawCycles = await listCycles({ includeArchived });
+    const counts = await fetchCounts(rawCycles);
 
     const cycles = rawCycles.map(c => {
-      // Per-cycle proposal count: join on akoya_fiscalyear. The Dataverse
-      // wmkf_fiscalyearcode column is the canonical key; fall back to the
-      // displayname (which equals fiscalyearcode in the Postgres-backfilled
-      // domain) when fiscalyearcode is missing on a sandbox/legacy row.
+      // Per-cycle proposal count: join on the validated cycle name's
+      // meeting-month/year key. fiscalYearCode remains the response map key;
+      // it is not used to classify proposal rows.
       const fyKey = c.fiscalYearCode || c.name;
       const proposalCount = counts.proposalCountsByFiscalYear.get(fyKey) || 0;
       // Per-cycle candidate count: keyed on shortcode (uppercased).
@@ -98,7 +96,7 @@ async function handleGet(req, res) {
       success: true,
       cycles,
       unassigned: {
-        proposalCount: 0, // No analogue under Dataverse — see note below.
+        proposalCount: counts.unassignedProposalCount,
         candidateCount: counts.unassignedCandidateCount,
       },
     });
@@ -111,13 +109,10 @@ async function handleGet(req, res) {
     });
   }
 }
-// Unassigned proposalCount NOTE: the pre-cutover Postgres handler counted
-// `proposal_searches` rows with grant_cycle_id IS NULL. Under Dataverse,
-// the equivalent would be akoya_request rows with an unrecognized
-// akoya_fiscalyear value — but every request has a fiscalyear set, so the
-// concept doesn't translate. Surfacing as 0 preserves the response shape
-// without inventing a false signal; the client UI only displays the
-// candidateCount portion of "unassigned" anyway.
+// Unassigned proposalCount includes proposal requests whose meeting date is
+// null, off-cycle, unmatched to a cycle row, or whose cycle name is invalid.
+// This keeps the response conservative: no proposal disappears merely because
+// the legacy fiscal-year text or cycle catalogue is incomplete.
 
 async function handlePost(req, res) {
   try {

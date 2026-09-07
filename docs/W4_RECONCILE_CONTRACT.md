@@ -54,7 +54,7 @@ GET /wmkf_appreviewersuggestions?$filter=wmkf_grantcyclecode eq '<CODE>' and wmk
 
 **Navigation property note (Codex W4-Day-1 Q3):** the single-valued nav property `wmkf_Request` (PascalCase) is the same one used by `lib/services/review-upload.js:114` for the request join. Verified in working code; no metadata-discovery dance needed.
 
-**Pagination:** Dataverse pages OData queries at the `Prefer: odata.maxpagesize` header value. Follow `@odata.nextLink` until exhausted before aggregating, or per-page client-side aggregation will undercount. The W3 helper's `fetchCounts` did NOT need to paginate because it used `$apply/groupby` (server-side aggregation); reconcile uses per-row reads and MUST paginate.
+**Pagination:** Dataverse pages OData queries at the `Prefer: odata.maxpagesize` header value. Follow `@odata.nextLink` until exhausted before aggregating, or per-page client-side aggregation will undercount. The grant-cycle proposal count uses a server-side FetchXML aggregate (with a documented aggregate ceiling); reconcile uses per-row reads and MUST paginate.
 
 Aggregate client-side by the expanded `akoya_requestnum`.
 

@@ -4,7 +4,7 @@
   "schemaName": "wmkf_AppGrantCycle",
   "displayName": "App Grant Cycle",
   "displayCollectionName": "App Grant Cycles",
-  "description": "Grant review cycles backing the Reviewer Finder. One row per fiscal-year board meeting cycle. Alt-keyed on fiscal year code so it joins to akoya_request.akoya_fiscalyear.",
+  "description": "Grant review cycles backing the Reviewer Finder. One row per fiscal-year board meeting cycle. Fiscal-year code remains a compatibility alt-key; proposal counts join requests by persisted meeting-date month/year.",
   "ownershipType": "OrganizationOwned",
   "primaryNameAttribute": {
     "schemaName": "wmkf_DisplayName",
@@ -18,7 +18,7 @@
       "type": "String",
       "schemaName": "wmkf_FiscalYearCode",
       "displayName": "Fiscal Year Code",
-      "description": "Matches akoya_request.akoya_fiscalyear (e.g. 'June 2026'). Alternate key.",
+      "description": "Legacy compatibility value matching akoya_request.akoya_fiscalyear when clean (e.g. 'June 2026'). Alternate key; proposal counts use meeting-date month/year.",
       "maxLength": 50,
       "requiredLevel": "ApplicationRequired"
     },
