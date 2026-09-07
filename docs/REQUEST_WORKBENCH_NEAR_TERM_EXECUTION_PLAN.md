@@ -231,7 +231,7 @@ proposal. **[STATUS 2026-09-06, VERIFIED via source]:** the dashboard is
 Production-live and delivers the list, Open in Word, per-editor Reviewed
 marker, personal state/history, persona queues, and the coordinator matrix for
 Final artifacts. Slice 6 of `docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md`:
-cycle scoping (6A) is built 2026-09-06 on branch `claude/final-writeups-cycle-scoping`, not yet promoted, so the list is bounded per cycle rather than spanning
+cycle scoping (6A) is in Production since 2026-09-06 (merge `842c9f13`, deployment `dpl_2xuEv64c5NQVXEhA3rSXZRQQaWPa`, owner-run signed-in smoke passed), so the list is bounded per cycle rather than spanning
 all cycles under one 100-row cap; still open are the filters, current-version
 context, the "has edits" hint, and whether earlier writeup stages get a
 cycle-wide list. Inline preview was retired from this contract by owner

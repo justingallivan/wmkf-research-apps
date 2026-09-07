@@ -105,8 +105,7 @@ the Word action remains independent.
 `lib/services/final-writeup/dashboard-service.js` and
 `pages/api/workbench/final-writeups.js` are also Production-deployed for the
 ordinary/focused foundation. They batch-read acknowledgements for at most 100
-requests with current-Final pointers in one grant cycle (Slice 6A, built
-2026-09-06 on branch `claude/final-writeups-cycle-scoping`, not yet promoted:
+requests with current-Final pointers in one grant cycle (Slice 6A, in Production since 2026-09-06 (merge `842c9f13`, deployment `dpl_2xuEv64c5NQVXEhA3rSXZRQQaWPa`, owner-run signed-in smoke passed):
 one lightweight scan discovers the cycles that hold current Finals, the queue
 read is scoped to the selected cycle's meeting-date window, and the 100-row
 bound applies per cycle), derive ordinary staff open/history/stewardship

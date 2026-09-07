@@ -440,7 +440,7 @@ change to the Initial assessments locator.
 
 ## 11. Build record (2026-09-06, branch `claude/final-writeups-cycle-scoping`)
 
-Built per §3–§7 on the branch; not promoted. Files: `lib/services/final-writeup/dashboard-service.js`
+Built per §3–§7 on the branch and merged to `main` as `842c9f13` (Production deployment `dpl_2xuEv64c5NQVXEhA3rSXZRQQaWPa`, Ready 2026-09-06 PT). Files: `lib/services/final-writeup/dashboard-service.js`
 (`discoverCycles`, scoped `loadCurrentRequests`, `projectRequests`, `resolveIndexScope`, PD lens per
 §3.7, exported `isFinalWriteupCycleSelector` / `FINAL_WRITEUPS_DEFAULT_CYCLE_WALKBACK` /
 `FINAL_WRITEUPS_NO_CYCLE`), `lib/dataverse/adapters/grant-request.js` (`QUERY_ALL_REQUESTS_CAP`, so the
@@ -457,6 +457,18 @@ null meeting date → `none`; off-month date → typed 500 naming the request. G
 `status-enum-parity`, `request-document-writers`, `dataverse-access-layer`, `odata-escape` (each with
 self-test), lint, `check:types`, all `final-writeup*` suites. The §3.7 acknowledgeability question was
 verified during the build (`mayAcknowledge` has no stage condition); no deviation from §3.
+
+**Owner-run signed-in Production smoke (2026-09-06 PT, PD/superuser identity, read-only):** dashboard
+loaded with the Cycle select on December 2026, the matrix and queues scoped to that cycle, Request
+`1002788` in Group review under Your writeups; the bookmarked `?cycleCode=J26` load returned zero rows
+with no error and the select on the typed cycle; the focused page for `1002788` showed the cycle beside
+the request number with no `cycleCode` in the address and Edit in Word as the only action. Three copy
+follow-ups landed directly on `main` as Tier 0 (`12cfbafc` plural "earlier versions", `e53beb97` focused
+header shows the cycle label rather than the code, `3a2c4352` a bookmarked cycle absent from the list is
+labeled from its code, e.g. June 2026). The PD warn-not-lock notice cannot be exercised until a Final
+reaches leadership review. The extension-driven smoke was abandoned: the Claude-in-Chrome tab view went
+stale against the real tab, and the first attempt targeted `reviews.wmkeck.org`, which is the external
+reviewer portal host, not the staff Workbench (`applications.wmkeck.org`).
 
 ## 12. Review disposition (Codex adversarial review, 2026-09-06, verdict NEEDS REWORK)
 

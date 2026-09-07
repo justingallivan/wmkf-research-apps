@@ -3,7 +3,7 @@ title: Final Writeup Review — Implementation Plan
 domain: workbench
 kind: plan
 status: active
-summary: "Final runtime, v2 staffing, and persona lenses are Production-live; Slice 6A cycle scoping is built on a branch; stage transitions and 6B filters remain."
+summary: "Final runtime, v2 staffing, persona lenses, and Slice 6A cycle scoping are Production-live; stage transitions and 6B filters remain."
 canonical: false
 cataloged: 2026-08-28
 last_verified: 2026-09-06
@@ -655,7 +655,7 @@ Current-state boundary [VERIFIED 2026-09-06 via source]:
 - `lib/services/final-writeup/dashboard-service.js` in Production loads **every** request with a
   current Final across all cycles (`_wmkf_currentfinalwriteup_value ne null`, no cycle constraint)
   and throws `final_writeups_dashboard_scope_exceeded` (503) once more than
-  `FINAL_WRITEUPS_DASHBOARD_MAX_ROWS` (100) current rows exist; Slice 6A (built 2026-09-06 on branch `claude/final-writeups-cycle-scoping`, not yet promoted) bounds
+  `FINAL_WRITEUPS_DASHBOARD_MAX_ROWS` (100) current rows exist; Slice 6A (in Production since 2026-09-06 (merge `842c9f13`, deployment `dpl_2xuEv64c5NQVXEhA3rSXZRQQaWPa`, owner-run signed-in smoke passed)) bounds
   that read per cycle. Each row already carries
   `cycleCode`/`cycleLabel`, `stage`, `responsibleProgramDirector`, `bucket`, `personalState`, and
   `document.publicationVersionId`/`lastModified`.
@@ -670,10 +670,10 @@ Current-state boundary [VERIFIED 2026-09-06 via source]:
 Build order (each step reviewable on its own; `/contract-reconcile` applies to 6A because the
 read model's scope, cap, and fail-closed behavior change):
 
-- **6A — server-side cycle scoping (dated: before D26 Final writeups exist). BUILT 2026-09-06 on
-  branch `claude/final-writeups-cycle-scoping` per `docs/FINAL_WRITEUPS_DASHBOARD_CYCLE_SCOPING_PLAN.md`
-  (contract-reconcile trace, invariant table, tests); Codex diff review and deliberate promotion
-  pending; not in Production.** The 100-row cap was
+- **6A — server-side cycle scoping (dated: before D26 Final writeups exist). PRODUCTION-LIVE 2026-09-06
+  (merge `842c9f13`) per `docs/FINAL_WRITEUPS_DASHBOARD_CYCLE_SCOPING_PLAN.md` (contract-reconcile
+  trace, invariant table, tests, two Codex diff passes); owner-run signed-in smoke passed on the
+  picker, a bookmarked empty cycle, and the focused page.** The 100-row cap was
   global, so a second cycle of Finals eventually takes the whole dashboard down rather than
   degrading. Scope the request query by the selected cycle (artifact-cycle query from the current
   Final rows' requests, per the persona section above — not the lead-PD-derived picker), return the
