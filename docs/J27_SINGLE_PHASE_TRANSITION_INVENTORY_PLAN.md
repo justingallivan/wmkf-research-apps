@@ -110,7 +110,7 @@ Retire rows are candidates, not authorizations. At execution time each Retire ro
 
 ## 8. Owner questions the sweep cannot answer
 
-0. **The J27 calendar.** The phasing memory records J27 proposal intake beginning around 2026-08-18, a decision dated 2026-07-28. As of 2026-09-06, either intake is already open, in which case some Build rows are current work rather than next-year work, or the calendar moved. Every date in the register depends on the answer: intake open, triage window, reviewer-finding window, board meeting.
+0. **The J27 calendar.** ANSWERED 2026-09-06: J27 proposals arrive in **early December 2026**, exact date TBD. The 2026-08-18 date carried by the phasing memory was the D26 Phase II proposal due date, not J27 intake, and has been corrected in the memories that misattributed it. Still open: the triage window, reviewer-finding window, and board meeting date, which the register needs before Build rows can be dated.
 1. Do `shared/config/d26Allowlist.js` and the archived concept-evaluator app get deleted after D26 closes, or stay as historical record?
 2. Does the triage set-aside control survive into J27 as a first-class filter, or does it become a request-list option only, as the 2026-09-06 follow-up toolbar assessment proposed?
 3. Should the Initial assessments view remain hidden for D26 in Production until D26 closes, or be shown read-only so PDs can preview the J27 workflow?
@@ -122,7 +122,7 @@ The reviewer hold step is **not** an open question: it was retired in Session 27
 
 - `docs/J27_TRANSITION_REGISTER.md` exists with frontmatter, every row carrying all §3 columns, and no row scheduled unless its label is `[OWNER-CONFIRMED]` or `[SOURCE-VERIFIED]`.
 - The Codex verification pass ran and its dispositions are recorded in the register.
-- Section 8 answers are recorded with dates, or the unanswered ones are listed in the work queue as owner decisions.
+- Section 8 answers are recorded with dates (question 0 answered 2026-09-06), or the unanswered ones are listed in the work queue as owner decisions.
 - The `J27:` marker convention and check script exist and are referenced from `docs/CI_GATES_REFERENCE.md`.
 - The two J27 memories and `docs/agent-wiki/topics/strategy-roadmap.md` point at the register instead of carrying their own lists.
 - `docs/J27_BUILD_AND_CHANGE_PLAN.md` is a separate, later deliverable and is not required to close this plan.

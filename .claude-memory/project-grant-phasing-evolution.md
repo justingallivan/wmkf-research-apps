@@ -5,7 +5,7 @@ type: project
 originSessionId: 8d412c2f-d6c6-4080-a43c-79e0e04e9653
 status: active
 scope: strategy
-last_verified: 2026-07-28 via my-proposals-service.js, dashboard-service.js, the akoya-request Atlas, and current owner calendar decisions; J27 shape remains owner-confirmed planning context
+last_verified: 2026-09-06 via owner calendar correction (J27 proposals arrive early December 2026, date TBD; 2026-08-18 was the D26 Phase II due date); code claims last re-probed 2026-07-28
 ---
 
 ## Recall Rule
@@ -15,9 +15,9 @@ Read this when: writing document-loading or phase-gating logic, or planning for 
 Do:
 - Gate reviewer-finding on the internal Phase II label (`akoya_requeststatus = 'Phase II Pending'`) — stays correct across both dual-phase (D26) and single-submission (J27) cycles.
 - Treat the Phase I→II flip as a first-class lifecycle event (a status flip, not a second submission).
-- Plan an upstream per-PD triage/cycle dashboard for J27 (proposal intake
-  begins around 2026-08-18; up to ~300 full proposals, most never sent for
-  outside review).
+- Plan an upstream per-PD triage/cycle dashboard for J27 (proposals arrive
+  in early December 2026, exact date TBD (owner, 2026-09-06); up to ~300 full
+  proposals, most never sent for outside review).
 
 Do not:
 - Hard-code "Phase II is a different file than Phase I" — next cycle they're the same relabeled document.
@@ -38,9 +38,10 @@ the future J27 submission shape is an owner-confirmed plan, not code state.
 
 **Next cycle (J27 — single-submission begins; D26 is the current/last
 dual-phase cycle):** Single-package submission, but internal phasing remains.
-Proposal intake begins around **2026-08-18** (current owner decision,
-2026-07-28), with up to ~300 full proposals and most never sent for outside
-review. The older ~December 2026 intake assumption is superseded. J27 therefore
+J27 proposals arrive in **early December 2026**, exact date TBD (owner,
+2026-09-06), with up to ~300 full proposals and most never sent for outside
+review. An earlier note here dated J27 intake at 2026-08-18; that date was the
+D26 Phase II proposal due date, not J27 intake, and was recorded in error. J27 therefore
 needs an upstream per-PD triage/cycle dashboard to winnow to the pursue-set
 BEFORE the reviewer dashboard applies (see
 [[project-reviewer-apps-redesign-direction]] — the tier-2 lens family:
