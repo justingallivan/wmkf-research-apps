@@ -28,9 +28,8 @@
  *
  * DELIBERATE EXCLUSIONS — do not add these back without addressing the reason:
  *
- * - Deadline extensions. `wmkf_reviewduedateoverride` is a DateOnly holding the new
- *   deadline, not a stamp of when it was granted, so an extension has no position on
- *   a timeline at all. Surfacing it needs Phase 2, not a sort change.
+ * - Deadline extensions use the paired current-engagement granted-at stamp. The
+ *   DateOnly override remains the deadline value; the timestamp supplies event order.
  * - COI and AI-use acknowledgements (`wmkf_coiackedat`, `wmkf_aiuseackedat`). They
  *   have real writers (`reviewer-suggestion.js:1755-1756`) but are NOT members of
  *   `ENGAGEMENT_STAMP_RESET_ENTRIES`, unlike every stamp below. They therefore
@@ -56,6 +55,14 @@
  * rather than depending on object key order.
  */
 export const EVENT_DESCRIPTORS = [
+  {
+    key: 'review_due_extended',
+    field: 'reviewDueDateExtensionGrantedAt',
+    rawField: 'wmkf_reviewdueextensiongrantedat',
+    label: 'Review due date extended',
+    deliveryProven: true,
+    order: 60,
+  },
   {
     key: 'invited',
     field: 'emailSentAt',
@@ -288,6 +295,7 @@ export function buildActivityHistory(reviewer) {
 
   const events = [];
   for (const descriptor of EVENT_DESCRIPTORS) {
+    if (descriptor.key === 'review_due_extended' && !reviewer.reviewDueDateOverride) continue;
     const raw = reviewer[descriptor.field];
     const timestamp = parseTime(raw);
     if (timestamp === null) continue;
@@ -323,6 +331,9 @@ export function buildActivityHistory(reviewer) {
  * `label` so the label stays a stable, testable constant.
  */
 function buildDetail(key, reviewer) {
+  if (key === 'review_due_extended' && reviewer.effectiveReviewDeadline) {
+    return `New due date: ${reviewer.effectiveReviewDeadline}`;
+  }
   if (key === 'review_reminder' && reviewer.reminderCount > 0) {
     const count = reviewer.reminderCount;
     return `${count} reminder${count === 1 ? '' : 's'} recorded in total`;

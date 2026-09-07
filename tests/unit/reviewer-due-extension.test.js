@@ -122,7 +122,7 @@ test('saves first, then automatically sends the confirmed reviewer a fixed-subje
   });
   expect(suggestionAdapter.updateLifecycle).toHaveBeenCalledWith(
     SUGGESTION_ID,
-    { reviewDueDateOverride: '2099-09-15' },
+    expect.objectContaining({ reviewDueDateOverride: '2099-09-15', reviewDueDateExtensionGrantedAt: expect.any(String) }),
     { actingUserSystemId: PD_ID, ifMatch: 'W/"7"' },
   );
   expect(DynamicsService.createAndSendEmail).toHaveBeenCalledWith(expect.objectContaining({
@@ -230,7 +230,7 @@ test('restoring clears the override and notifies with the original deadline', as
   expect(result.effectiveReviewDeadline).toBe('2099-09-01');
   expect(suggestionAdapter.updateLifecycle).toHaveBeenCalledWith(
     SUGGESTION_ID,
-    { reviewDueDateOverride: null },
+    { reviewDueDateOverride: null, reviewDueDateExtensionGrantedAt: null },
     { actingUserSystemId: null, ifMatch: 'W/"7"' },
   );
   const email = DynamicsService.createAndSendEmail.mock.calls[0][0];

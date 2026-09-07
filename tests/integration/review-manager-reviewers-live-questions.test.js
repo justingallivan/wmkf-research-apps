@@ -255,6 +255,7 @@ test('GET success returns the full proposal + reviewer envelope', async () => {
         reminderSentAt: '2026-06-22T00:00:00Z',
         reminderCount: 1,
         reviewDueDateOverride: null,
+        reviewDueDateExtensionGrantedAt: null,
         effectiveReviewDeadline: '2026-09-09',
         reviewDueReminderEligibility: 'eligible',
         reviewReceivedAt: '2026-06-28T12:00:00Z',

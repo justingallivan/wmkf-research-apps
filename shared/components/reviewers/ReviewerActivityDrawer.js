@@ -104,8 +104,8 @@ export default function ReviewerActivityDrawer({ reviewer, onClose }) {
         <p id={noteId} className="mt-3 rounded-lg bg-gray-50 p-3 text-xs text-gray-600">
           Derived from this reviewer&rsquo;s current record. This is an operational summary,
           not a complete audit trail; overwritten and prior-engagement transitions cannot
-          be reconstructed. Deadline extensions are not listed because the record stores
-          the new deadline, not when it was granted.
+          be reconstructed. The due-date extension event is shown when its current-engagement
+          granted-at timestamp is present.
         </p>
 
         {terminalStatus && (

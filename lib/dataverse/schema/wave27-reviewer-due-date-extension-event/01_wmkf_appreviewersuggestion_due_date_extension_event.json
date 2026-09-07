@@ -1,0 +1,16 @@
+{
+  "name": "wmkf_appreviewersuggestion-due-date-extension-event",
+  "kind": "extensions-on-existing",
+  "entityLogicalName": "wmkf_appreviewersuggestion",
+  "_comment": "Additive current-engagement event timestamp for the per-reviewer due-date override. Null means no active extension is recorded; the timestamp is cleared when the override is restored and on engagement reset.",
+  "attributes": [
+    {
+      "type": "DateTime",
+      "schemaName": "wmkf_ReviewDueDateExtensionGrantedAt",
+      "displayName": "Review Due Date Extension Granted At",
+      "format": "DateAndTime",
+      "behavior": "UserLocal",
+      "description": "Timestamp when the current reviewer engagement's due-date extension was granted. Nullable and current-state only; not an append-only audit of prior extensions."
+    }
+  ]
+}

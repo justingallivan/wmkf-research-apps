@@ -16,7 +16,7 @@ beforeEach(() => {
   updateLifecycle.mockReset();
 });
 
-test('passes exactly the reviewDueDateOverride field and the ifMatch/actingUserSystemId options', async () => {
+test('writes the override and a current granted-at timestamp atomically', async () => {
   updateLifecycle.mockResolvedValue({ ok: true });
 
   await changeReviewDeadline({
@@ -27,11 +27,11 @@ test('passes exactly the reviewDueDateOverride field and the ifMatch/actingUserS
   });
 
   expect(updateLifecycle).toHaveBeenCalledTimes(1);
-  expect(updateLifecycle).toHaveBeenCalledWith(
-    SUGGESTION_ID,
-    { reviewDueDateOverride: '2099-09-15' },
-    { actingUserSystemId: 'user-1', ifMatch: ETAG },
-  );
+  const [id, updates, options] = updateLifecycle.mock.calls[0];
+  expect(id).toBe(SUGGESTION_ID);
+  expect(updates.reviewDueDateOverride).toBe('2099-09-15');
+  expect(new Date(updates.reviewDueDateExtensionGrantedAt).getTime()).not.toBeNaN();
+  expect(options).toEqual({ actingUserSystemId: 'user-1', ifMatch: ETAG });
 });
 
 test('passes a null reviewDueDateOverride through unchanged (clearing an extension is valid input)', async () => {
@@ -46,7 +46,7 @@ test('passes a null reviewDueDateOverride through unchanged (clearing an extensi
 
   expect(updateLifecycle).toHaveBeenCalledWith(
     SUGGESTION_ID,
-    { reviewDueDateOverride: null },
+    { reviewDueDateOverride: null, reviewDueDateExtensionGrantedAt: null },
     { actingUserSystemId: 'user-1', ifMatch: ETAG },
   );
 });

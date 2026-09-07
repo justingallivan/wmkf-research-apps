@@ -114,15 +114,17 @@ describe('buildActivityHistory', () => {
     expect(events.map(e => e.key)).toEqual(['review_received', 'materials_sent']);
   });
 
-  it('does not represent a deadline extension — the record has no granted-at stamp', () => {
+  it('represents a deadline extension from its durable granted-at stamp', () => {
     const events = buildActivityHistory({
       suggestionId: 's5',
       materialsSentAt: '2026-07-05T00:00:00Z',
       reviewDueDateOverride: '2026-09-01',
       effectiveReviewDeadline: '2026-09-01',
+      reviewDueDateExtensionGrantedAt: '2026-09-07T15:00:00Z',
     });
 
-    expect(events.map(e => e.key)).toEqual(['materials_sent']);
+    expect(events.map(e => e.key)).toEqual(['review_due_extended', 'materials_sent']);
+    expect(events[0].detail).toBe('New due date: 2026-09-01');
   });
 
   it('drops absent and unparseable stamps rather than inventing events', () => {

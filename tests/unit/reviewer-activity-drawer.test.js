@@ -131,7 +131,7 @@ describe('ReviewerActivityDrawer', () => {
     const note = screen.getByText(/operational summary/i);
     expect(note).toHaveTextContent(/not a complete audit trail/i);
     expect(note).toHaveTextContent(/overwritten and prior-engagement transitions cannot be reconstructed/i);
-    expect(note).toHaveTextContent(/Deadline extensions are not listed/i);
+    expect(note).toHaveTextContent(/due-date extension event is shown/i);
   });
 
   it('shows an explicit empty state rather than a bare panel', () => {

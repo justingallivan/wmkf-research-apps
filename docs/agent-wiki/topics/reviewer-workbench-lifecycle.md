@@ -647,9 +647,10 @@ remove/re-add. Three tempting fields are deliberately EXCLUDED and must not be a
 back without resolving the reason: `wmkf_coiackedat` and `wmkf_aiuseackedat` have real
 writers but are **not** reset members, so a value may belong to a prior engagement;
 `wmkf_heldat` has **no writer anywhere** in the repository (only ever nulled at
-`reviewer-suggestion.js:1957`). Deadline extensions are also absent —
-`wmkf_reviewduedateoverride` is a DateOnly holding the new deadline, not a granted-at
-stamp, so an extension has no position on a timeline at all. The invariant is
+`reviewer-suggestion.js:1957`). Deadline extensions now use the paired
+`wmkf_reviewdueextensiongrantedat` current-engagement timestamp alongside the
+DateOnly `wmkf_reviewduedateoverride`, so the history can place the extension on the
+timeline without inferring a date from the deadline value. The invariant is
 machine-enforced by `tests/unit/reviewer-activity-history.test.js`, which re-derives
 the reset set from the adapter source rather than trusting a copied list.
 
