@@ -62,7 +62,7 @@ export { PREVIEW_RENDER_TIMEOUT_MS } from './ReleaseMaterialsModal';
 
 // ─── Status Badge ───────────────────────────────────────────────────────────
 
-export function StatusBadge({ status, href }) {
+export function StatusBadge({ status, href, onClick, ariaLabel }) {
   const info = getStatusInfo(status);
   const className = `inline-flex items-center whitespace-nowrap px-2.5 py-0.5 rounded-full text-xs font-medium ${info.color}`;
   if (href) {
@@ -74,6 +74,19 @@ export function StatusBadge({ status, href }) {
       >
         {info.label}
       </a>
+    );
+  }
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className={`${className} min-h-11 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-600 focus-visible:ring-offset-1`}
+        aria-label={ariaLabel}
+        title="View activity history"
+      >
+        {info.label}
+      </button>
     );
   }
   return <span className={className}>{info.label}</span>;
@@ -1027,9 +1040,21 @@ export default function ReviewerManagePanel({
                           href={['review_received', 'complete'].includes(r.reviewStatus)
                             ? `/workbench/${encodeURIComponent(proposal.proposalId)}?tab=reviews`
                             : undefined}
+                          onClick={['materials_sent', 'under_review'].includes(r.reviewStatus)
+                            ? () => setActivityDrawerId(r.suggestionId)
+                            : undefined}
+                          ariaLabel={`View activity history for ${r.name || 'reviewer'}`}
                         />
                         {!receivedReview && (
-                          <TokenStateBadge state={r.tokenState} expiresAt={r.tokenExpiresAt} firstAccessedAt={r.proposalFirstAccessedAt} />
+                          <TokenStateBadge
+                            state={r.tokenState}
+                            expiresAt={r.tokenExpiresAt}
+                            firstAccessedAt={r.proposalFirstAccessedAt}
+                            onClick={r.proposalFirstAccessedAt
+                              ? () => setActivityDrawerId(r.suggestionId)
+                              : undefined}
+                            ariaLabel={`View activity history for ${r.name || 'reviewer'}`}
+                          />
                         )}
                       </div>
                       {r.reviewStatus === 'complete' && (
@@ -1038,9 +1063,15 @@ export default function ReviewerManagePanel({
                         </span>
                       )}
                       {!receivedReview && r.reminderCount > 0 && (
-                        <span className="mt-1.5 inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800">
+                        <button
+                          type="button"
+                          onClick={() => setActivityDrawerId(r.suggestionId)}
+                          className="mt-1.5 inline-flex min-h-11 items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800 hover:border-amber-300 hover:bg-amber-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-600 focus-visible:ring-offset-1"
+                          aria-label={`View activity history for ${r.name || 'reviewer'}`}
+                          title="View activity history"
+                        >
                           {r.reminderCount} reminder{r.reminderCount !== 1 ? 's' : ''}
-                        </span>
+                        </button>
                       )}
                     </td>
                     <td className="px-4 py-3 align-top">

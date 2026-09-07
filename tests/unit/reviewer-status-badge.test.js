@@ -28,6 +28,15 @@ describe('reviewer status badge links', () => {
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
   });
 
+  test('supports opening activity history for non-terminal statuses', () => {
+    const onClick = jest.fn();
+    render(<StatusBadge status="materials_sent" onClick={onClick} ariaLabel="View activity history for Ada Reviewer" />);
+    const button = screen.getByRole('button', { name: 'View activity history for Ada Reviewer' });
+    expect(button).toHaveClass('min-h-11');
+    button.click();
+    expect(onClick).toHaveBeenCalledTimes(1);
+  });
+
   test('treats received timestamps, submitted reviews, and terminal statuses as received', () => {
     expect(reviewerHasReceivedReview({ reviewReceivedAt: '2026-09-06T12:00:00Z' })).toBe(true);
     expect(reviewerHasReceivedReview({ submitted: true, reviewStatus: 'under_review' })).toBe(true);
