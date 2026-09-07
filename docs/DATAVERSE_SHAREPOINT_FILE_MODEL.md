@@ -798,8 +798,9 @@ positively identified PCs and superusers. It shows neutral blank, Reviewed, and
 Updated since review states and is not an approval, required count, due-date,
 or compliance surface. The v2 access/persona contract and representative Word
 access are now proved, and commit `213f6c34` enables the dashboard lenses in
-Ready Production deployment `dpl_HGrbWUNPJMJunVevYLVEmtn7He6a`; PC backup and
-Leadership-stage transitions remain separate work.
+Ready Production deployment `dpl_HGrbWUNPJMJunVevYLVEmtn7He6a`. PC backup is closed by owner
+decision (2026-09-06); the Leadership-stage transition is built S493 on branch `claude/final-writeup-leadership-review`, promotion pending
+(`docs/FINAL_WRITEUP_LEADERSHIP_TRANSITION_PLAN.md`).
 The first draft-functional delivery gate was targeted at 2026-08-10, before
 proposal intake begins around 2026-08-18. That date was a deliberately early
 **internal buffer, not an external commitment** (owner, 2026-08-10 / S412) and

@@ -1582,6 +1582,15 @@ returned zero eligible/enqueued/claimed/failed.** Plan doc:
   fallback: promotion must deliberately rebaseline the admin default, and existing
   per-PD subject/body overrides remain intact until reset or edited.
 
+## Final Writeup lifecycle (Slices 1–4)
+
+One Final Writeup row per request over the same stable SharePoint Word item; the row's `wmkf_lifecyclestate` is the stage discriminator. Source: `lib/services/final-writeup/transition-service.js`; plans `docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md` and `docs/FINAL_WRITEUP_LEADERSHIP_TRANSITION_PLAN.md`; Atlas `docs/atlas/dataverse-wmkf-requestdocument.md`.
+
+- **Group review** (`REVIEW`, Production-live): `startFinalWriteup` claims a deterministic Final row from the current Pre-Site source, moves the *source* row to `FINAL`, sets `wmkf_CurrentFinalWriteup`, records `wmkf_GroupReviewStartedBy`/`At`.
+- **Leadership review** (`FINAL` on the Final row, **[BUILT S493 on branch `claude/final-writeup-leadership-review`; PRODUCTION PROMOTION PENDING.]**): `advanceToLeadershipReview` via POST `/api/workbench/final-writeup/leadership-review`, lead PD or superuser, authorization before any state inspection; one changeset (Final-row PATCH + request-pointer re-bind, both ETag-fenced); writes the leadership pair and refreshes the row's SharePoint observation fields; **never writes `wmkf_milestone*` or `wmkf_MilestoneCreatedBy`** (that actor means Site Visit handoff). `committedFinal`, the acknowledgement reader, and the dashboard stage map all accept `FINAL` only with the complete, well-formed checkpoint via the shared `lib/services/final-writeup/leadership-checkpoint.js`.
+- **Readers**: `getFinalWriteupStatus` returns `phase` `group-review` | `leadership-review` and `canAdvance`; the dashboard maps lifecycle to stage and the Leadership persona sees `leadership-review` rows only; acknowledgements continue at both stages.
+- **Hazards**: any new reader of a Final row's lifecycle must handle `FINAL`; do not reuse milestone fields for Final-row checkpoints; the group-review activation's milestone stamp has no actor (pre-existing census gap, plan §10 D6).
+
 ## Operating Notes
 
 - **Reviewer follow-up polish (Codex worktree branch, merged `f0494607` + `d0a5fc07`, production

@@ -18,14 +18,17 @@ related:
 
 # Final Writeup — Leadership Review Transition Plan (Slice 4)
 
-**Status: design closed after six Codex passes (§12), nothing built. D2 owner-confirmed
-2026-09-07; D1, D3–D6 stand at their recommendations unless the owner objects (§10).** Mode A `/contract-reconcile` plan for the owner decision of
-2026-09-06 recorded in queue item 4: *the Leadership stage transition is a PD action in the
-Workbench, a new lifecycle-state write from Review to Final; plan-first, not built.* The
-implementation plan already specifies the durable shape
-(`docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md:263,292,329-332`); this document turns it into a
-buildable slice with the read-side consequences traced. Every state claim is labeled; `[PLANNED]`
-marks intended behavior, never built state. Line numbers are as of `c4e256c8`.
+**Status: **[BUILT S493 on branch `claude/final-writeup-leadership-review`; PRODUCTION PROMOTION PENDING.]**** Design closed after six Codex plan passes (§12); D2 owner-confirmed 2026-09-07;
+D1, D3–D6 stand at their recommendations. §3 is the pre-build baseline; §4 is implemented as written
+with the corrections recorded in §14; Codex diff passes are in §14.
+
+Origin: Mode A `/contract-reconcile` plan for the owner decision of 2026-09-06 recorded in queue item
+4, *the Leadership stage transition is a PD action in the Workbench, a new lifecycle-state write from
+Review to Final*, which the owner asked to plan first. The implementation plan specified the durable
+shape (`docs/FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md:263,292,329-332`); this document turned it
+into a buildable slice with the read-side consequences traced, and the plan was then built (§14).
+State labels: `[VERIFIED]` claims in §3 describe the pre-build baseline; `[PLANNED]` in §4 marks the
+reviewed design, now implemented. Line numbers are as of `c4e256c8` unless stated.
 
 **Cycle context.** D26 is the cycle this must serve: D26 reviews are arriving now and the D26 board
 meets December 2026 (`docs/J27_TRANSITION_REGISTER.md:30`). The atlas snapshot records one Final
@@ -69,11 +72,15 @@ empty and the leadership actor/time fields provisioned by Wave 22 stay unused
   `check:api-routes`, `check:route-lifecycle-auth`, `check:atlas`, unit tests.
 - **Prior findings being verified:** none. This is the first plan for the slice.
 
-## 3. Current state (verified 2026-09-07)
+## 3. Current state (pre-build baseline, verified 2026-09-07 before the S493 build)
+
+Everything in this section describes `main` at `c4e256c8`, before the branch. §14 records what the
+build changed; the security matrix and Atlas carry the built state.
 
 ### 3.1 The write does not exist
 
-- No runtime path writes `wmkf_lifecyclestate: FINAL` onto a Final Writeup row. The only `FINAL`
+- (Baseline.) No runtime path wrote `wmkf_lifecyclestate: FINAL` onto a Final Writeup row; the build adds
+  `advanceToLeadershipReview`. At the baseline the only `FINAL`
   write targets the *source* Pre-Site row at group-review activation
   `[VERIFIED via transition-service.js:604-609]`. The leadership fields are selected
   `[VERIFIED via lib/dataverse/adapters/request-document.js:87-92]` and never written: the only
@@ -86,8 +93,8 @@ empty and the leadership actor/time fields provisioned by Wave 22 stay unused
 - **Dashboard: ready.** `lifecycleStage` maps `REVIEW` → `group-review` and `FINAL` →
   `leadership-review`, and throws on anything else `[VERIFIED via dashboard-service.js:259-270]`.
   Bucket assignment does not branch on stage `[VERIFIED via dashboard-service.js:295-303]`, so a
-  leadership-stage row lands in the same stewardship / open / history bucket it would otherwise. No
-  dashboard change is needed.
+  leadership-stage row lands in the same stewardship / open / history bucket it would otherwise. The
+  build's only dashboard edit is the shared checkpoint predicate in `lifecycleStage` (§14, diff pass 2).
 - **Acknowledgement: ready.** `knownLifecycle` accepts `REVIEW` and `FINAL`
   `[VERIFIED via lib/services/final-writeup/acknowledgement-service.js:156-163]`, so reviewers keep
   acknowledging after the transition and the "Updated since review" comparison keeps working. The
@@ -157,6 +164,10 @@ empty and the leadership actor/time fields provisioned by Wave 22 stay unused
   `[VERIFIED via request-document-actor-service.js:49-63,80-82]`.
 
 ## 4. Decisions
+
+`[PLANNED]` below marks the design as reviewed; the S493 build implements §4 as written, with two
+recorded corrections: §4.3 step 9 (pre-commit identity check) and the shared checkpoint predicate used by
+all three readers (§14).
 
 ### 4.1 Durable write (follows the implementation plan)
 
@@ -269,7 +280,9 @@ expectedFinalArtifactId, isSuperuser, actingUserSystemId })`:
    metadata immediately before the write, in the `activate` pattern `[VERIFIED via
    transition-service.js:564-600]`: the request's `_wmkf_currentfinalwriteup_value` must still name
    this row, the row must still be `READY` / `REVIEW` with the same `_etag`, and the metadata must
-   satisfy `stableMetadataMatches(verified.metadata, now)` and `persistedIdentityMatches(row, now)`;
+   match the row's drive/item identity and satisfy `stableMetadataMatches(verified.metadata, now)`
+   (not `persistedIdentityMatches(row, now)`: the row's claim-time observation legitimately differs
+   after group-review edits; that helper is used only in the post-commit confirm, §4.3 step 11);
    otherwise `final_writeup_leadership_source_changed` (metadata) or
    `final_writeup_leadership_conflict` (row or pointer) with no write. The fresh request `_etag` and
    row `_etag` from this read are the ones carried into step 10, so the interval between this read
@@ -314,7 +327,7 @@ concurrent-success branch inherit the generalization with no further change.
 
 ### 4.5 Route
 
-`[PLANNED]` New sibling route `pages/api/workbench/final-writeup/leadership-review.js`, POST only,
+`[PLANNED]` (built, see §14) New sibling route `pages/api/workbench/final-writeup/leadership-review.js`, POST only,
 exact body `{ requestId, expectedFinalArtifactId }`, mirroring
 `pages/api/workbench/final-writeup/acknowledgement.js` `[VERIFIED via that file:61-80]`:
 `requireAppAccess('reviewers')`, fresh `getUserRole` for the superuser flag (as in
@@ -565,9 +578,69 @@ Three findings, all verified against source and all accepted.
 Codex passes 1–6 produced twelve findings (F1–F3, G1–G3, H1–H3, I1–I3, J1, K1); all accepted, none
 rejected. Plan status: **design closed, awaiting owner decisions D1–D6 before the Tier 1 build.**
 
+## 14. Build record (S493, branch `claude/final-writeup-leadership-review`)
+
+**[BUILT S493 on branch `claude/final-writeup-leadership-review`; PRODUCTION PROMOTION PENDING.]** Built to §4 as revised through pass 6. Files: `lib/services/final-writeup/transition-service.js`
+(`committedFinal` generalization, `leadershipCheckpointComplete`, `verifyDocument`, `advanceToLeadershipReview`,
+`canAdvance`/`leadership-review` phase, `leadershipReview` on the artifact projection),
+`pages/api/workbench/final-writeup/leadership-review.js`, `shared/components/workbench/FinalWriteupTab.js`
+(`IN_REVIEW_PHASES`, stage presentation map, advance action, parametrized confirm dialog), tests
+`final-writeup-leadership-transition-service.test.js` (45 after diff passes 1–4), `workbench-final-writeup-leadership-review-route.test.js`
+(6), four new `final-writeup-tab.test.js` cases; existing `final-writeup-transition-service.test.js` shape
+assertion gained `canAdvance: false`. One correction to §4.3 step 9 recorded in place (identity + verified
+metadata pre-commit; `persistedIdentityMatches` post-commit only). Docs reconciled: security matrix row, atlas,
+implementation plan status lines, queue item 4, wiki topic section.
+
+**Codex diff review pass 1 (2026-09-07): one medium finding, accepted.** `leadershipCheckpointComplete` was
+truthiness-based, so blank or malformed persisted values could pass the `FINAL` committed-state guard. It is
+now a strict validator (parseable timestamps, GUID actor, non-blank strings, finite non-negative size) with
+nine malformed-value regression cases beside the seven missing-field cases.
+
+**Codex diff review pass 2 (2026-09-07): one medium finding, accepted.** The strict validator lived only in
+the transition service; the acknowledgement and dashboard readers still accepted any `FINAL` row. The
+predicate now lives in `lib/services/final-writeup/leadership-checkpoint.js` and all three readers use it:
+the acknowledgement reader throws 500 `final_writeup_acknowledgement_final_state_invalid` for a malformed
+`FINAL` row (read and mark, before Graph or persistence), and the dashboard stage map falls through to its
+existing lifecycle-invalid 500. Cross-consumer malformed-row tests added to both sibling suites; the
+dashboard fixture's leadership rows now carry the checkpoint.
+
+**Codex diff review pass 3 (2026-09-07): two medium findings, accepted.** (a) `Date.parse` alone accepted
+values such as `"0"` and `"2026"`; the shared predicate now also requires the canonical ISO-8601 shape, with
+four more regression cases. (b) §1–§4 of this plan still read as pre-build; the status line, §3 heading,
+§3.1, §3.2, §4 preamble, and §4.5 now state the built state in place.
+
+**Codex diff review pass 4 (2026-09-07): runtime clean; one medium doc finding, accepted.** The
+implementation plan's Slice 4 checklist still said "add" and "milestone version/hash/time", this plan's
+origin paragraph still quoted "plan-first, not built" as present state, and the Atlas `last_verified` was
+stale. All three rewritten in place.
+
+**Codex diff review pass 5 (2026-09-07): runtime consistent; one medium doc finding, accepted.** Four more
+"remain separate work" restatements (implementation plan :721 and :818, `DATAVERSE_SHAREPOINT_FILE_MODEL.md:802`,
+`REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md:924`) plus the explicit-actor plan's "runtime not yet built" row
+(`REQUEST_DOCUMENT_EXPLICIT_ACTOR_PLAN.md:124`) rewritten in place.
+
+**Codex diff review passes 6–7 (2026-09-07): runtime consistent; doc restatements only, accepted.** Pass 6:
+the group-review matrix row's "remain absent" sentence and `SESSION_PROMPT.md` item 1. Pass 7: the
+implementation plan and lifecycle plan frontmatter summaries and `WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md:579`
+("reserved for the later leadership slice"), with the docs catalog regenerated. A repo-wide grep for
+leadership + unbuilt / not built / remains / reserved / later slice now hits only historical audits and
+`DEVELOPMENT_LOG.md`. Review loop closed here; runtime has been clean since pass 4. PR, deployment, and
+owner-run smoke are recorded below as they happen.
+
 ## 13. Explicitly out of scope
 
 PC backup transitions (owner closed 2026-09-06: PCs already see everything; transfer is a Dataverse
 PD change); notifications or email on transition; a reverse-stage UI; any change to
 `visibleToPersona`, buckets, or the matrix; supporting-material projection; anything that adds an
 approval gate or reviewer denominator between stages.
+
+**Pre-PR gate run (2026-09-07, branch HEAD after pass 7):** all 37 `check:*` gates green, each followed
+sequentially by its `:self-test` where one exists (`secret-scan`, `scaffolding-tokens`, `dynamics-context-boundary`,
+`odata-escape`, `model-override-warming`, `prompt-injection-tagging`, `request-document-writers`,
+`route-service-boundary`, `route-lifecycle-auth`, `api-routes`, `fact-consistency`, `docs-catalog`, `types`, and
+the rest). Full jest: 805 suites / 11,750 tests. Owner-side runs; the Codex sandbox cannot execute jest.
+
+**Known follow-up (not a defect in the transition):** after a synchronous 200 from the group-review start,
+`FinalWriteupTab.js` synthesizes the status from the start response, which carries no `canAdvance`, so the
+"Ready for leadership review" button appears only after the next status load (reload or the 202 poll path).
+The Production-proved start path is deliberately untouched in this slice.

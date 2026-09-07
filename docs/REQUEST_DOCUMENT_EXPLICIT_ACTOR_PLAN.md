@@ -121,7 +121,7 @@ the larger workflow.
 | Frozen distribution prepared | `pre_site_distribution_attempts.acting_user_system_id` plus Dynamics email sender/activity | Keep the existing ledger authoritative; also stamp row-origin actor/time on retained snapshot rows for direct registry interpretation |
 | Site Visit handoff completed | Existing milestone version/hash/time; built-in `modifiedby` currently service principal | Add explicit milestone actor lookup paired with existing milestone time |
 | Final group review started | Explicit `GroupReviewStartedBy/At` | Keep unchanged; it is already authoritative |
-| Final leadership review started | Explicit schema fields exist; runtime not yet built | Use existing `LeadershipReviewStartedBy/At` when that transition is implemented |
+| Final leadership review started | Explicit `LeadershipReviewStartedBy/At` written by `advanceToLeadershipReview` (built S493 on branch `claude/final-writeup-leadership-review`, promotion pending); the milestone triple and `MilestoneCreatedBy` are deliberately not written by that transition (owner D2, 2026-09-07) | Actor resolved via `resolveRequestDocumentActor` (`REQUIRED`) before the write |
 | Personal Final review acknowledgement | Separate acknowledgement row with session-derived reviewer | Keep unchanged; do not merge its audience or role into Request Document writing |
 | Initial Assessment native version restore | SharePoint owns version history; app-side repeatable human actor history is not modeled | Do not pretend a mutable “last restored by” field is an audit trail. Resolve separately before the first Production restore write if full app-side actor history is required |
 
