@@ -79,6 +79,14 @@ export function StatusBadge({ status, href }) {
   return <span className={className}>{info.label}</span>;
 }
 
+export function reviewerHasReceivedReview(reviewer) {
+  return Boolean(
+    reviewer?.reviewReceivedAt
+    || reviewer?.submitted === true
+    || ['review_received', 'complete'].includes(reviewer?.reviewStatus),
+  );
+}
+
 // ─── Decline-referral inline add helpers ────────────────────────────────────
 
 // Map an identity-lookup match/candidate to the resolution the manual-reviewer
@@ -990,6 +998,7 @@ export default function ReviewerManagePanel({
                 // Terminal status has no guaranteed timestamp, so it takes precedence
                 // without being fabricated as a dated timeline event.
                 const lastEvent = latestActivitySummary(r);
+                const receivedReview = reviewerHasReceivedReview(r);
 
                 return (
                   <tr key={r.suggestionId} className="hover:bg-gray-50 transition-colors">
@@ -1019,14 +1028,16 @@ export default function ReviewerManagePanel({
                             ? `/workbench/${encodeURIComponent(proposal.proposalId)}?tab=reviews`
                             : undefined}
                         />
-                        <TokenStateBadge state={r.tokenState} expiresAt={r.tokenExpiresAt} firstAccessedAt={r.proposalFirstAccessedAt} />
+                        {!receivedReview && (
+                          <TokenStateBadge state={r.tokenState} expiresAt={r.tokenExpiresAt} firstAccessedAt={r.proposalFirstAccessedAt} />
+                        )}
                       </div>
                       {r.reviewStatus === 'complete' && (
                         <span className="mt-1 block text-xs leading-4 text-gray-600">
                           {closeoutDispositionLabel(r.honorariumEligibility)}
                         </span>
                       )}
-                      {r.reminderCount > 0 && (
+                      {!receivedReview && r.reminderCount > 0 && (
                         <span className="text-xs text-gray-400 ml-1">({r.reminderCount} reminder{r.reminderCount !== 1 ? 's' : ''})</span>
                       )}
                     </td>

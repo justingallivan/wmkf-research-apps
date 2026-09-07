@@ -1,5 +1,8 @@
 import { render, screen } from '@testing-library/react';
-import { StatusBadge } from '../../shared/components/reviewers/ReviewerManagePanel';
+import {
+  StatusBadge,
+  reviewerHasReceivedReview,
+} from '../../shared/components/reviewers/ReviewerManagePanel';
 
 describe('reviewer status badge links', () => {
   test('links received and complete statuses to the request reviews tab', () => {
@@ -23,5 +26,12 @@ describe('reviewer status badge links', () => {
     render(<StatusBadge status="materials_sent" />);
     expect(screen.getByText('Materials Sent').tagName).toBe('SPAN');
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
+  });
+
+  test('treats received timestamps, submitted reviews, and terminal statuses as received', () => {
+    expect(reviewerHasReceivedReview({ reviewReceivedAt: '2026-09-06T12:00:00Z' })).toBe(true);
+    expect(reviewerHasReceivedReview({ submitted: true, reviewStatus: 'under_review' })).toBe(true);
+    expect(reviewerHasReceivedReview({ reviewStatus: 'complete' })).toBe(true);
+    expect(reviewerHasReceivedReview({ reviewStatus: 'materials_sent', reminderCount: 2 })).toBe(false);
   });
 });
