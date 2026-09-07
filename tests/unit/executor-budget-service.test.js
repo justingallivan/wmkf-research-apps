@@ -12,7 +12,20 @@ const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
 const SECOND_REQUEST_ID = '22222222-2222-4222-8222-222222222222';
 const THIRD_REQUEST_ID = '33333333-3333-4333-8333-333333333333';
 
+// The complete registry as a publisher must send it today.
 function budgets(overrides = {}) {
+  return {
+    ...legacyBudgets(overrides),
+    'field-primer.generate': {
+      kind: 'timeout',
+      timeoutMsOverride: 240000,
+      ...(overrides.timeout || {}),
+    },
+  };
+}
+
+// The two-key shape every revision published before S493 carries in Dataverse.
+function legacyBudgets(overrides = {}) {
   return {
     'pre-site-visit.proposal-core.generate': {
       kind: 'standing',
@@ -334,4 +347,52 @@ test('governed prompt-model validation rejects a model below the durable retry c
     'claude-limited',
     deps,
   )).rejects.toMatchObject({ httpStatus: 409, code: 'executor_budget_model_conflict' });
+});
+
+test('a revision published before a prompt name was registered still governs and fills the new name from code', async () => {
+  const deps = dependencies(storedRevision(1, REQUEST_ID, legacyBudgets({ standing: { timeoutMsOverride: 180000 } })));
+  const config = await getExecutorBudgetConfig({ strict: true }, deps);
+  expect(config).toMatchObject({
+    source: 'dataverse',
+    version: 1,
+    storageWarnings: [],
+    budgets: {
+      'pre-site-visit.proposal-core.generate': { timeoutMsOverride: 180000 },
+      'field-primer.generate': EXECUTOR_BUDGET_DEFAULTS['field-primer.generate'],
+    },
+  });
+  await expect(getExecutorBudget('field-primer.generate', {}, deps)).resolves.toEqual({
+    kind: 'timeout',
+    timeoutMsOverride: 240000,
+  });
+});
+
+test('publication still requires the complete registry and rejects unregistered names', () => {
+  expect(() => validateExecutorBudgets(legacyBudgets())).toThrow(/must contain exactly/);
+  expect(() => validateExecutorBudgets({ ...budgets(), 'nope.generate': { kind: 'timeout', timeoutMsOverride: 60000 } }))
+    .toThrow(/unregistered prompt names: nope.generate/);
+  expect(() => validateExecutorBudgets({ ...legacyBudgets(), 'nope.generate': {} }, { fillRegisteredDefaults: true }))
+    .toThrow(/unregistered prompt names/);
+});
+
+test('a timeout-only budget is bounded, carries no token override, and skips the model-ceiling read', async () => {
+  expect(() => validateExecutorBudgets(budgets({ timeout: { timeoutMsOverride: 30000 } })))
+    .toThrow(/field-primer\.generate\.timeoutMsOverride must be an integer from 60000 through 240000/);
+  expect(() => validateExecutorBudgets(budgets({ timeout: { maxTokensOverride: 1000 } })))
+    .toThrow(/must contain exactly/);
+  expect(() => validateExecutorBudgets(budgets({ timeout: { kind: 'standing' } })))
+    .toThrow(/must contain exactly|kind must be "timeout"/);
+
+  const deps = dependencies();
+  const result = await publishExecutorBudgetConfig({
+    budgets: budgets({ timeout: { timeoutMsOverride: 120000 } }),
+    expectedVersion: 0,
+    requestId: REQUEST_ID,
+  }, deps);
+  expect(result.status).toBe('completed');
+  expect(result.config.budgets['field-primer.generate']).toEqual({ kind: 'timeout', timeoutMsOverride: 120000 });
+  const fetched = deps.fetchCurrentPrompt.mock.calls.map(([name]) => name);
+  expect(fetched).not.toContain('field-primer.generate');
+  expect(fetched).toContain('pre-site-visit.proposal-core.generate');
+  await expect(assertExecutorBudgetForPromptModel('field-primer.generate', 'claude-unknown-model', deps)).resolves.toBeNull();
 });

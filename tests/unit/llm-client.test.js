@@ -554,6 +554,43 @@ describe('LLMClient.complete', () => {
 });
 
 describe('LLMClient external-abort (deadline) handling', () => {
+  test('an external abort during the unary body read surfaces the caller\'s typed reason, not a JSON parse error', async () => {
+    safeFetch.mockImplementationOnce((url, opts) => {
+      const acSignal = opts.signal;
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        headers: { get: () => null },
+        json: () => new Promise((_resolve, reject) => {
+          if (acSignal.aborted) return reject(new Error('body aborted'));
+          acSignal.addEventListener('abort', () => reject(new Error('body aborted')), { once: true });
+        }),
+      });
+    });
+    const controller = new AbortController();
+    const client = new LLMClient({ apiKey: 'sk-ant-test', model: 'm', timeoutMs: 100000 });
+    const p = client.complete({ messages: [], signal: controller.signal });
+    await new Promise(r => setTimeout(r, 5));
+    const reason = Object.assign(new Error('caller deadline reached'), { code: 'executor_deadline_exhausted' });
+    controller.abort(reason);
+    await expect(p).rejects.toMatchObject({ code: 'executor_deadline_exhausted', message: 'caller deadline reached' });
+  });
+
+  test('a hanging deprecated-parameter alert cannot hold the operation past the deadline; no corrected attempt starts once aborted', async () => {
+    NotificationService.notify.mockImplementationOnce(() => new Promise(() => {})); // never settles
+    const controller = new AbortController();
+    safeFetch.mockImplementationOnce(async () => {
+      // Deadline fires while the first (400) response is being handled.
+      controller.abort(Object.assign(new Error('caller deadline reached'), { code: 'executor_deadline_exhausted' }));
+      return jsonResponse({ error: { message: 'temperature is deprecated for this model' } }, { status: 400 });
+    });
+    const client = new LLMClient({ apiKey: 'sk-ant-test', model: 'claude-sonnet-4-6', timeoutMs: 100000, initialRetryDelayMs: 1 });
+    await expect(client.complete({ messages: [{ role: 'user', content: 'hi' }], temperature: 0.2, signal: controller.signal }))
+      .rejects.toMatchObject({ code: 'executor_deadline_exhausted' });
+    expect(safeFetch).toHaveBeenCalledTimes(1);
+    expect(NotificationService.notify).toHaveBeenCalledTimes(1);
+  });
+
   test('external abort cancels body consumption, not just the fetch', async () => {
     // The mock binds .json() to opts.signal (== the internal ac.signal), exactly
     // as a real fetch body is. If the external→ac bridge is torn down before
@@ -576,7 +613,8 @@ describe('LLMClient external-abort (deadline) handling', () => {
     const p = client.complete({ messages: [], signal: controller.signal });
     await new Promise(r => setTimeout(r, 5)); // let execution reach json()
     controller.abort(new Error('reviewer_time_budget_exceeded'));
-    await expect(p).rejects.toThrow(/aborted/);
+    // The caller's own abort reason surfaces (not the body's generic rejection).
+    await expect(p).rejects.toThrow(/reviewer_time_budget_exceeded/);
   });
 
   test('aborts during retry backoff instead of waiting the full delay', async () => {

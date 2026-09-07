@@ -92,7 +92,8 @@ afterAll(() => {
   global.fetch = originalFetch;
 });
 
-import { executePrompt } from '../../lib/services/execute-prompt';
+import { executePrompt, resolveTimeoutForCall, DEADLINE_MIN_REMAINING_MS } from '../../lib/services/execute-prompt';
+import { DEFAULT_TIMEOUT_MS } from '../../lib/services/llm-client.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -464,6 +465,92 @@ describe('executePrompt — LLMClient transport (Phase 2)', () => {
     } finally {
       global.fetch = standardFetch;
     }
+  });
+
+  test('deadlineMs is enforced immediately before the provider call: exhausted → typed error and no fetch; nearly exhausted → clamps the timeout below the caller budget (S493)', async () => {
+    const standardFetch = global.fetch;
+    const fetchCalls = [];
+    global.fetch = jest.fn((url, init) => new Promise((resolve, reject) => {
+      fetchCalls.push(url);
+      init?.signal?.addEventListener('abort', () => reject(init.signal.reason || new Error('aborted')));
+    }));
+    try {
+      PROMPT_ROW = buildPromptRow({ variables: [], systemPrompt: 'SYS', promptBody: 'BODY' });
+      await expect(executePrompt({
+        promptName: 'phase-i.summary',
+        overrideVariables: {},
+        runSource: 'Vercel Test',
+        timeoutMsOverride: 240_000,
+        deadlineMs: Date.now() - 1,
+      })).rejects.toMatchObject({ code: 'executor_deadline_exhausted' });
+      expect(fetchCalls).toHaveLength(0);
+
+      // ~1.2s left on the deadline but a 240s caller budget: the hanging
+      // provider call must end at the deadline with the typed error, not run
+      // out the 240s budget.
+      const started = Date.now();
+      await expect(executePrompt({
+        promptName: 'phase-i.summary',
+        overrideVariables: {},
+        runSource: 'Vercel Test',
+        timeoutMsOverride: 240_000,
+        deadlineMs: Date.now() + 1_200,
+      })).rejects.toMatchObject({ code: 'executor_deadline_exhausted' });
+      expect(fetchCalls).toHaveLength(1);
+      expect(Date.now() - started).toBeLessThan(4_000);
+
+      await expect(executePrompt({
+        promptName: 'phase-i.summary',
+        overrideVariables: {},
+        runSource: 'Vercel Test',
+        deadlineMs: -5,
+      })).rejects.toThrow(/deadlineMs must be a positive epoch-millisecond number/);
+    } finally {
+      global.fetch = standardFetch;
+    }
+  });
+
+  test('deadlineMs bounds the WHOLE provider operation: a 429 retry backoff that would cross the deadline aborts with the typed error and no second attempt starts', async () => {
+    const standardFetch = global.fetch;
+    let calls = 0;
+    global.fetch = jest.fn(async () => {
+      calls += 1;
+      return {
+        ok: false,
+        status: 429,
+        headers: { get: (h) => (h.toLowerCase() === 'retry-after' ? '5' : null) },
+        text: async () => 'rate limited',
+        json: async () => ({}),
+      };
+    });
+    try {
+      PROMPT_ROW = buildPromptRow({ variables: [], systemPrompt: 'SYS', promptBody: 'BODY' });
+      const started = Date.now();
+      await expect(executePrompt({
+        promptName: 'phase-i.summary',
+        overrideVariables: {},
+        runSource: 'Vercel Test',
+        timeoutMsOverride: 240_000,
+        deadlineMs: Date.now() + 1_100,
+      })).rejects.toMatchObject({ code: 'executor_deadline_exhausted' });
+      // One attempt, then the 5s retry-after backoff was cut at the ~1.1s deadline.
+      expect(calls).toBe(1);
+      expect(Date.now() - started).toBeLessThan(4_000);
+    } finally {
+      global.fetch = standardFetch;
+    }
+  });
+
+  test('resolveTimeoutForCall arithmetic: default passthrough, budget passthrough, deadline clamp, and the one-second floor', () => {
+    const now = 10_000_000;
+    expect(resolveTimeoutForCall({ nowMs: now })).toBeNull();
+    expect(resolveTimeoutForCall({ timeoutMsOverride: 240_000, nowMs: now })).toBe(240_000);
+    expect(resolveTimeoutForCall({ timeoutMsOverride: 240_000, deadlineMs: now + 60_000, nowMs: now })).toBe(60_000);
+    expect(resolveTimeoutForCall({ deadlineMs: now + 300_000, nowMs: now })).toBe(DEFAULT_TIMEOUT_MS);
+    expect(resolveTimeoutForCall({ deadlineMs: now + 90_000, nowMs: now })).toBe(90_000);
+    expect(() => resolveTimeoutForCall({ deadlineMs: now + DEADLINE_MIN_REMAINING_MS - 1, nowMs: now }))
+      .toThrow(expect.objectContaining({ code: 'executor_deadline_exhausted' }));
+    expect(resolveTimeoutForCall({ deadlineMs: now + DEADLINE_MIN_REMAINING_MS, nowMs: now })).toBe(DEADLINE_MIN_REMAINING_MS);
   });
 
   test('cache-hit detection fires when the API reports cache_read tokens (re-shape preserved)', async () => {

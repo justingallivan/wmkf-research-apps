@@ -226,12 +226,14 @@ Migration plans touching either entity must preserve these foreign keys.
   first publication open):** the Production Admin panel reported no published
   revision and the reviewed code fallback, without performing a write.
   `lib/services/executor-budget-service.js` resolves the Pre-Site
-  standing output/transport budget and review-synthesis retry range from the
+  standing output/transport budget, the review-synthesis retry range, and the
+  field-primer timeout-only budget (S493) from the
   highest valid append-only `wmkf_appsystemsettings` row keyed
-  `executor.budgets.vNNNNNN`. The superuser-only
+  `executor.budgets.vNNNNNN`; a revision that predates a registered name fills
+  that name from the code default. The superuser-only
   `/api/admin/executor-budgets` publisher accepts one complete closed schema,
   requires the highest reserved numeric revision as `expectedVersion` plus a UUID request id, checks code-owned numeric
-  bounds and both current prompts' resolved model output ceilings, creates the
+  bounds and the token-carrying prompts' resolved model output ceilings, creates the
   next alternate-key row, and verifies that exact row before success. Prefix
   reads page to completion; alternate-key create races reread current state;
   canonical request-id replay is idempotent only for the same payload and returns

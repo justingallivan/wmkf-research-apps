@@ -26,8 +26,12 @@ jest.mock('../../lib/services/model-override-loader', () => ({
   loadModelOverrides: jest.fn(async () => {}),
 }));
 jest.mock('../../lib/services/field-primer-service', () => ({
+  FIELD_PRIMER_PROMPT_NAME: 'field-primer.generate',
   generateFieldPrimer: jest.fn(),
   groundPrimerExperts: jest.fn(async (experts) => experts),
+}));
+jest.mock('../../lib/services/executor-budget-service.js', () => ({
+  getExecutorBudget: jest.fn(async () => ({ kind: 'timeout', timeoutMsOverride: 240000 })),
 }));
 jest.mock('../../lib/services/workbench-proposal-documents', () => ({
   getAiProposalNarrativeText: jest.fn(),
