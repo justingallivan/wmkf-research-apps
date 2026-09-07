@@ -617,8 +617,15 @@ stale. All three rewritten in place.
 **Codex diff review pass 5 (2026-09-07): runtime consistent; one medium doc finding, accepted.** Four more
 "remain separate work" restatements (implementation plan :721 and :818, `DATAVERSE_SHAREPOINT_FILE_MODEL.md:802`,
 `REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md:924`) plus the explicit-actor plan's "runtime not yet built" row
-(`REQUEST_DOCUMENT_EXPLICIT_ACTOR_PLAN.md:124`) rewritten in place. PR, deployment, and owner-run smoke are
-recorded below as they happen.
+(`REQUEST_DOCUMENT_EXPLICIT_ACTOR_PLAN.md:124`) rewritten in place.
+
+**Codex diff review passes 6–7 (2026-09-07): runtime consistent; doc restatements only, accepted.** Pass 6:
+the group-review matrix row's "remain absent" sentence and `SESSION_PROMPT.md` item 1. Pass 7: the
+implementation plan and lifecycle plan frontmatter summaries and `WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md:579`
+("reserved for the later leadership slice"), with the docs catalog regenerated. A repo-wide grep for
+leadership + unbuilt / not built / remains / reserved / later slice now hits only historical audits and
+`DEVELOPMENT_LOG.md`. Review loop closed here; runtime has been clean since pass 4. PR, deployment, and
+owner-run smoke are recorded below as they happen.
 
 ## 13. Explicitly out of scope
 

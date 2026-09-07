@@ -3,7 +3,7 @@ title: Final Writeup Review — Implementation Plan
 domain: workbench
 kind: plan
 status: active
-summary: "Final runtime, staffing, lenses, 6A scoping, 6B views/PD filter, and 6C version context are Production-live; stage transitions remain."
+summary: "Final runtime, staffing, lenses, 6A scoping, 6B views/PD filter, and 6C version context are Production-live; the leadership-review transition (Slice 4) is built and awaiting promotion."
 canonical: false
 cataloged: 2026-08-28
 last_verified: 2026-09-07
