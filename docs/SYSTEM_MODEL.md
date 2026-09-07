@@ -129,6 +129,8 @@ architectural axis.
 
 ## The upstream fact: grant phasing
 
+> **Cycle boundary (owner, 2026-09-06).** D26 (December 2026 board) is **active** and is the **last cycle with different submitted materials for Phase I and Phase II**. The model below describes J27 (June 2027) onward. Staff and back-end workflows keep the Phase I / Phase II terminology; what changes is that there are no separate materials in Dataverse or SharePoint, only a status change. Every J27-sensitive site is tracked in `docs/J27_TRANSITION_REGISTER.md`.
+
 **One applicant submission, entered as Phase I.** All application materials arrive once, at Phase I.
 An internal downselect flips a request's status to **"Phase II"** = *advanced into the working
 process* (find reviewers, evaluate). **It is not a second submission. There are no Phase II uploads;

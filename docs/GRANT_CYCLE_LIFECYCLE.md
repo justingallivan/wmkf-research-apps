@@ -20,7 +20,7 @@ related:
 **Created:** Session 94, 2026-04-08
 **Stakeholders:** Justin (prompt development, Vercel app), Connor (PowerAutomate flows, Dynamics admin)
 
-> **Cycle redesign in flight.** The next grant cycle is being restructured: the standalone "Concept" stage is being eliminated and Phase I + Phase II are likely to merge into a single applicant-facing package (internal Phase I/II labels persist as a label change, not a separate document submission). The lifecycle below describes the **current cycle**; the redesigned cycle will need its own pass once Sarah/Connor lock the new shape. See memory entries `project_grant_phasing_evolution.md` and `project_app_roadmap_2026-04-25.md`.
+> **Cycle redesign decided (owner, 2026-09-06).** D26 is the last cycle with different submitted materials for Phase I and Phase II; the tables below describe it. From J27 (June 2027) the standalone "Concept" stage is gone and applicants submit once. Staff and back-end workflows keep the Phase I / Phase II terminology, but the advance is a status change with no separate materials. Proposals arrive in early December 2026 (date TBD). The J27 sites and open decisions are in `docs/J27_TRANSITION_REGISTER.md`. The lifecycle below describes the **current cycle**; the redesigned cycle will need its own pass once Sarah/Connor lock the new shape. See memory entries `project_grant_phasing_evolution.md` and `project_app_roadmap_2026-04-25.md`.
 
 ## What's live now (2026-05-08)
 
