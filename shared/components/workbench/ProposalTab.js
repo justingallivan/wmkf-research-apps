@@ -140,6 +140,25 @@ function ExpertProfile({ grounding }) {
   );
 }
 
+// Trigger a download for a generated Blob. `downloadPdf` in
+// shared/utils/pdf-export.js does this for PDF bytes; DOCX renderers return a
+// Blob directly, and the repo's convention is that the caller downloads it.
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  // Revoke on the next task, not synchronously: some browsers start the
+  // download navigation after the click handler returns, and revoking first can
+  // yield an empty file. (`downloadPdf` in shared/utils/pdf-export.js still
+  // revokes synchronously; it is shared by four other pages and proven in
+  // production, so it is left alone rather than changed from here.)
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
 function PrimerList({ title, items, render }) {
   // The LLM output is parseable JSON but not schema-validated per-item, so guard
   // against null/non-object array entries before rendering.
@@ -209,11 +228,14 @@ function PrimerView({ envelope }) {
   );
 }
 
-function FieldPrimer({ requestId, initialRaw }) {
+function FieldPrimer({ requestId, initialRaw, exportMeta }) {
   const [envelope, setEnvelope] = useState(() => parseFieldPrimerEnvelope(initialRaw));
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState(null);
   const [pending, setPending] = useState(false); // another session is generating
+  // null | 'pdf' | 'docx' — which export is in flight, if any.
+  const [exporting, setExporting] = useState(null);
+  const [exportError, setExportError] = useState(null);
   const reqRef = useRef(0);
 
   // Reset state (and invalidate any in-flight generate) when the request — or its
@@ -224,6 +246,11 @@ function FieldPrimer({ requestId, initialRaw }) {
     setGenerating(false);
     setError(null);
     setPending(false);
+    // A superseded export's `finally` is token-guarded, so it will not clear
+    // these for the request now on screen — reset them here or the new
+    // request's button stays stuck on "Preparing PDF…".
+    setExporting(null);
+    setExportError(null);
   }, [requestId, initialRaw]);
 
   const generate = async (regenerate) => {
@@ -250,22 +277,102 @@ function FieldPrimer({ requestId, initialRaw }) {
     }
   };
 
+  // Word carries real inline runs and full Unicode, so it keeps bold names and
+  // Greek letters that the PDF's base-14 Helvetica cannot; the PDF stays as the
+  // convenient flattened copy. Both go through one handler so the
+  // stale-generation guard below can never be applied to only one of them.
+  //
+  // Export and generation are mutually exclusive: the export buttons are
+  // disabled while `generating`, and Generate/Regenerate is disabled while
+  // `exporting`. That makes the same-request race structural — a regenerate
+  // cannot replace the envelope underneath an export render, so an export can
+  // never write out a superseded primer. The reqRef token below still covers
+  // the remaining case, a change of request.
+  const EXPORTS = {
+    pdf: {
+      label: 'PDF',
+      run: async (env, meta) => {
+        const [{ generateFieldPrimerPdf, fieldPrimerPdfFilename }, { downloadPdf }] = await Promise.all([
+          import('../../utils/field-primer-pdf'),
+          import('../../utils/pdf-export'),
+        ]);
+        const bytes = await generateFieldPrimerPdf(env, meta);
+        return () => downloadPdf(bytes, fieldPrimerPdfFilename(meta));
+      },
+    },
+    docx: {
+      label: 'Word document',
+      run: async (env, meta) => {
+        const { generateFieldPrimerDocx, fieldPrimerDocxFilename } = await import('../../utils/field-primer-docx');
+        const blob = await generateFieldPrimerDocx(env, meta);
+        return () => downloadBlob(blob, fieldPrimerDocxFilename(meta));
+      },
+    },
+  };
+
+  const runExport = async (kind) => {
+    if (!envelope) return;
+    // Same stale-generation guard as `generate`: the dynamic import and the
+    // render are awaits, and the request (or its stored primer) can change
+    // underneath them. A superseded export must neither download the previous
+    // request's file nor write its error into the new request's view. The
+    // render is done BEFORE the download so a superseded run never touches the
+    // filesystem.
+    const token = reqRef.current;
+    const meta = exportMeta || {};
+    const { label, run } = EXPORTS[kind];
+    setExporting(kind);
+    setExportError(null);
+    try {
+      const download = await run(envelope, meta);
+      if (token !== reqRef.current) return;
+      download();
+    } catch (e) {
+      if (token === reqRef.current) setExportError(`Could not build the ${label}: ${e.message}`);
+    } finally {
+      if (token === reqRef.current) setExporting(null);
+    }
+  };
+
   return (
     <div>
       <div className="flex items-center justify-between gap-3 mb-1">
         <dt className="text-xs uppercase tracking-wide text-gray-400">Field Primer</dt>
-        <button
-          type="button"
-          onClick={() => generate(!!envelope)}
-          disabled={generating}
-          className="text-sm font-medium text-indigo-600 hover:underline disabled:text-gray-400"
-        >
-          {generating
-            ? (envelope ? 'Regenerating…' : 'Generating…')
-            : (envelope ? 'Regenerate' : 'Generate field primer')}
-        </button>
+        <div className="flex items-center gap-3">
+          {envelope && (
+            <>
+              <button
+                type="button"
+                onClick={() => runExport('docx')}
+                disabled={!!exporting || generating}
+                className="text-sm font-medium text-indigo-600 hover:underline disabled:text-gray-400"
+              >
+                {exporting === 'docx' ? 'Preparing Word…' : 'Export Word'}
+              </button>
+              <button
+                type="button"
+                onClick={() => runExport('pdf')}
+                disabled={!!exporting || generating}
+                className="text-sm font-medium text-indigo-600 hover:underline disabled:text-gray-400"
+              >
+                {exporting === 'pdf' ? 'Preparing PDF…' : 'Export PDF'}
+              </button>
+            </>
+          )}
+          <button
+            type="button"
+            onClick={() => generate(!!envelope)}
+            disabled={generating || !!exporting}
+            className="text-sm font-medium text-indigo-600 hover:underline disabled:text-gray-400"
+          >
+            {generating
+              ? (envelope ? 'Regenerating…' : 'Generating…')
+              : (envelope ? 'Regenerate' : 'Generate field primer')}
+          </button>
+        </div>
       </div>
       {error && <p className="text-sm text-amber-600 mb-2">{error}</p>}
+      {exportError && <p className="text-sm text-amber-600 mb-2">{exportError}</p>}
       {pending && !envelope && (
         <p className="text-sm text-gray-500">Another session is generating this primer — refresh in a moment.</p>
       )}
@@ -466,7 +573,19 @@ export default function ProposalTab({ context }) {
             <dt className="text-xs uppercase tracking-wide text-gray-400 mb-1">AI Extracted Data</dt>
             <dd><ExtractedData raw={ai.dataExtract} /></dd>
           </div>
-          <FieldPrimer requestId={requestId} initialRaw={ai.fieldPrimer} />
+          <FieldPrimer
+            requestId={requestId}
+            initialRaw={ai.fieldPrimer}
+            exportMeta={{
+              // Shapes differ: resolveWorkbenchRequest puts institution at the
+              // context top level and only `pi` inside proposalInfo
+              // (lib/services/workbench/resolve-request-service.js).
+              requestNumber: context?.requestNumber || '',
+              title: context?.title || '',
+              institution: context?.institution || '',
+              pi: info.pi || '',
+            }}
+          />
         </div>
       </Section>
     </div>
