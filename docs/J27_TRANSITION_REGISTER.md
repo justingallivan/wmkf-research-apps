@@ -156,7 +156,7 @@ Numbering continues from the plan's §8. Q0 (calendar) is answered: proposals ar
 - **Q3** (plan §8.3). Keep the Initial assessments view hidden for D26 until the cycle closes, or show read-only as a J27 preview?
 - **Q4** (plan §8.4). PARTLY ANSWERED 2026-09-06: the staff review surface must give every PD some visibility into other PDs' requests while focusing them on their own, and nothing may get lost. Still open: whether the current request list with better filters carries this or a purpose-built view is needed, and whether `STAGED_REVIEW_PIPELINE.md` is still the intended shape (its frontmatter is history/active).
 - **Q4b.** ANSWERED 2026-09-06: every J27 request/proposal gets a mostly AI-generated Initial Assessment on the existing infrastructure, which may need some changes.
-- **Q5.** What is the canonical J27 document path: `AI Materials/ProposalNarrative_{n}.pdf` via filename match, a `wmkf_requestdocument` row, or both? Are J27 filenames and subfolder the same as D26's? Does the Proposal tab keep two sections?
+- **Q5.** **TBD, flagged 2026-09-06 as an early, high-leverage design decision in Connor's territory.** The SharePoint location and filename of the J27 submitted proposal must be settled with Connor well before the December 2026 intake, because many subsequent flows (Proposal tab, Reviewer Finder loader, Initial Assessment producer, reviewer materials, downloads) key on it. Sub-questions held open until then: (a) same `Phase I` subfolder and names as D26, or new; (b) register applicant documents in `wmkf_requestdocument` at intake; (c) collapse the Proposal tab to one section for J27 requests.
 - **Q6.** What is the J27 intake form key, given the submitted document is still called "Phase I", and is a form directory needed at all if GOApply carries intake?
 - **Q7.** Is the Planned "Phase II file organization" Power Automate flow dropped now that J27 has no Phase II upload?
 - **Q8.** PARTLY ANSWERED 2026-09-06: the status is set only after staff decide a proposal moves forward, not at submission; proposals probably arrive as `Phase I Pending` (confirm the intake label, slice G). **Still open (owner will discuss with colleagues):** does Connor's backend flip the status, or does a PD flip it from the Workbench front end? Owner inclination 2026-09-06: the PD decides. Whether the flow writes other fields is also open.
@@ -193,6 +193,7 @@ Production Dataverse reads are owner-run only. Report results back and rows will
 - [ ] Bibliography assembly flow: exists or planned? (Q23)
 - [ ] The J27 phase trigger: confirm with Connor the Power Automate flow that sets `Phase II Pending`, what triggers it (backend vs PD front-end action, Q8), and any other fields it writes.
 - [ ] Intake label: confirm J27 proposals arrive as `akoya_requeststatus = 'Phase I Pending'` (owner: probably, not certain).
+- [ ] **Early decision, Connor:** SharePoint location and filename of the J27 submitted proposal (Q5). Blocks the document-path rows J27-038, J27-039, J27-056, J27-059, J27-063.
 
 ## 9. Coverage and known gaps
 
