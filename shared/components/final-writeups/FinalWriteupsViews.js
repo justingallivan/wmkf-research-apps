@@ -242,8 +242,8 @@ function QueueSection({ title, description, rows, emptyCopy, secondary = false }
 function MatrixState({ state, reviewerName, requestNumber }) {
   const copy = {
     reviewed: 'Reviewed',
-    updated: 'Updated',
-    unreviewed: 'Not reviewed',
+    updated: 'Needs re-review',
+    unreviewed: 'No review yet',
     'not-applicable': 'Responsible PD',
   }[state] || 'Unavailable';
   const classes = {
@@ -275,6 +275,7 @@ function MatrixTable({ group, search, pd }) {
           {group.reviewers?.length || 0} reviewer{group.reviewers?.length === 1 ? '' : 's'} · {group.rows?.length || 0} writeup{group.rows?.length === 1 ? '' : 's'}
         </span>
       </div>
+      <p className="mb-2 text-xs text-gray-500 sm:hidden">Swipe horizontally to compare reviewers. The request column stays visible.</p>
       <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
         <table className="min-w-max border-collapse text-left">
           <thead>

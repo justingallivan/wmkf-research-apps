@@ -1,6 +1,7 @@
 import Head from 'next/head';
 import Link from 'next/link';
 import { useState, useEffect, useMemo } from 'react';
+import { useRouter } from 'next/router';
 import { useSession, signOut } from 'next-auth/react';
 import { useProfile } from '../context/ProfileContext';
 import { useAppAccess } from '../context/AppAccessContext';
@@ -22,6 +23,7 @@ export default function Layout({
   const { data: session, status } = useSession();
   const { currentProfile } = useProfile();
   const { hasAccess, isSuperuser } = useAppAccess();
+  const router = useRouter();
 
   // Check if auth is enabled — shared, deduped lookup (one /api/auth/status
   // per page load across RequireAuth + Layout, S398).
@@ -62,6 +64,15 @@ export default function Layout({
     return items;
   }, [hasAccess, isSuperuser, alertCount]);
 
+  const desktopNavigation = useMemo(() => {
+    if (navigationItems.length <= 6) return { primary: navigationItems, secondary: [] };
+    const current = navigationItems.find((item) => item.href === router.pathname);
+    const preferred = navigationItems.slice(0, 4);
+    if (current && !preferred.some((item) => item.href === current.href)) preferred[preferred.length - 1] = current;
+    const primary = preferred.filter((item, index, items) => items.findIndex((candidate) => candidate.href === item.href) === index);
+    return { primary, secondary: navigationItems.filter((item) => !primary.some((candidate) => candidate.href === item.href)) };
+  }, [navigationItems, router.pathname]);
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <Head>
@@ -76,8 +87,8 @@ export default function Layout({
           <div className="flex justify-between items-center py-4">
             {/* Desktop Navigation */}
             {showNavigation && (
-              <nav className="hidden md:flex items-center gap-1 flex-wrap flex-1">
-                {navigationItems.map((item) => (
+              <nav className="hidden md:flex items-center gap-1 flex-1" aria-label="Primary navigation">
+                {desktopNavigation.primary.map((item) => (
                   <Link
                     key={item.href}
                     href={item.href}
@@ -92,6 +103,21 @@ export default function Layout({
                     )}
                   </Link>
                 ))}
+                {desktopNavigation.secondary.length > 0 && (
+                  <details className="relative">
+                    <summary className="flex cursor-pointer list-none items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900">
+                      <span aria-hidden="true">＋</span>
+                      <span>More apps</span>
+                    </summary>
+                    <div className="absolute left-0 top-full z-50 mt-2 grid w-80 grid-cols-1 gap-1 rounded-xl border border-gray-200 bg-white p-2 shadow-lg">
+                      {desktopNavigation.secondary.map((item) => (
+                        <Link key={item.href} href={item.href} className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900">
+                          <span className="text-base" aria-hidden="true">{item.icon}</span><span>{item.name}</span>
+                        </Link>
+                      ))}
+                    </div>
+                  </details>
+                )}
               </nav>
             )}
 
@@ -104,6 +130,9 @@ export default function Layout({
               {authEnabled && status === 'authenticated' && session?.user ? (
                 <div className="relative">
                   <button
+                    type="button"
+                    aria-label={showUserMenu ? 'Close account menu' : 'Open account menu'}
+                    aria-expanded={showUserMenu}
                     onClick={() => setShowUserMenu(!showUserMenu)}
                     className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors"
                   >
@@ -188,6 +217,9 @@ export default function Layout({
               {/* Show user avatar on mobile when auth is enabled and authenticated */}
               {authEnabled && status === 'authenticated' && session?.user && (
                 <button
+                  type="button"
+                  aria-label={showUserMenu ? 'Close account menu' : 'Open account menu'}
+                  aria-expanded={showUserMenu}
                   onClick={() => setShowUserMenu(!showUserMenu)}
                   className="flex items-center gap-2 px-2 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-900 rounded-lg"
                 >
@@ -201,6 +233,10 @@ export default function Layout({
               )}
               {showNavigation && (
                 <button
+                  type="button"
+                  aria-label={isMobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
+                  aria-expanded={isMobileMenuOpen}
+                  aria-controls="mobile-navigation"
                   onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
                   className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-all duration-200"
                 >
@@ -214,7 +250,7 @@ export default function Layout({
 
           {/* Mobile User Menu (only when auth enabled) */}
           {authEnabled && showUserMenu && status === 'authenticated' && (
-            <div className="md:hidden border-t border-gray-200 py-4">
+            <div id="mobile-user-menu" className="md:hidden border-t border-gray-200 py-4">
               <div className="px-4 pb-3 border-b border-gray-100 mb-3">
                 <div className="text-sm font-medium text-gray-900">{session.user.name}</div>
                 <div className="text-xs text-gray-500">{session.user.email}</div>
@@ -247,7 +283,7 @@ export default function Layout({
 
           {/* Mobile Navigation */}
           {showNavigation && isMobileMenuOpen && (
-            <div className="md:hidden border-t border-gray-200 py-4">
+            <div id="mobile-navigation" className="md:hidden border-t border-gray-200 py-4">
               <nav className="space-y-2">
                 {navigationItems.map((item) => (
                   <Link

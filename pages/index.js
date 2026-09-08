@@ -205,6 +205,22 @@ export default function LandingPage() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 py-12">
+        <section className="mb-10" aria-labelledby="common-tasks-heading">
+          <h2 id="common-tasks-heading" className="mb-4 text-xl font-semibold text-gray-900">Common tasks</h2>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {[
+              ['/workbench', 'Review a request', 'Open the cycle-aware request workbench.'],
+              ['/workbench/reviewer-follow-up', 'Follow up with reviewers', 'See reviewer work that needs attention.'],
+              ['/workbench/final-writeups', 'Review final writeups', 'Open writeups waiting for staff review.'],
+              ['/dynamics-explorer', 'Explore CRM data', 'Search and export Dataverse records.'],
+            ].map(([href, label, description]) => (
+              <Link key={href} href={href} className="rounded-xl border border-gray-200 bg-white p-4 transition-colors hover:border-gray-300 hover:bg-gray-50">
+                <span className="block font-semibold text-gray-900">{label}</span>
+                <span className="mt-1 block text-sm text-gray-600">{description}</span>
+              </Link>
+            ))}
+          </div>
+        </section>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {filteredApps.map((app) => (
             <AppCard key={app.id} app={app} />
