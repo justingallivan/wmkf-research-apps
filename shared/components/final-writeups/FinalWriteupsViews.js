@@ -242,7 +242,7 @@ function QueueSection({ title, description, rows, emptyCopy, secondary = false }
 function MatrixState({ state, reviewerName, requestNumber }) {
   const copy = {
     reviewed: 'Reviewed',
-    updated: 'Needs re-review',
+    updated: 'Updated',
     unreviewed: 'No review yet',
     'not-applicable': 'Responsible PD',
   }[state] || 'Unavailable';
