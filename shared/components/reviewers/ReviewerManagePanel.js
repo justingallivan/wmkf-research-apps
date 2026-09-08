@@ -979,13 +979,13 @@ export default function ReviewerManagePanel({
                 the visible card edge. */}
             <colgroup>
               {showSelectionColumn && <col className="w-[4%]" />}
-              <col className={reviewerColumnWidth} />
-              <col className={showActionColumn ? 'w-[17%]' : 'w-[20%]'} />
-              <col className={showActionColumn ? 'w-[14%]' : 'w-[17%]'} />
-              <col className={showActionColumn ? 'w-[15%]' : 'w-[25%]'} />
+              <col className={showActionColumn ? 'w-[27%]' : reviewerColumnWidth} />
+              <col className={showActionColumn ? 'w-[16%]' : 'w-[20%]'} />
+              <col className={showActionColumn ? 'w-[13%]' : 'w-[17%]'} />
+              <col className={showActionColumn ? 'w-[14%]' : 'w-[25%]'} />
               {showActionColumn && <col className="w-[14%]" />}
-              {showActionsColumn && <col className="w-[5%]" />}
-              {showActionsColumn && <col className="w-[5%]" />}
+              {showActionsColumn && <col className="w-[8%]" />}
+              {showActionsColumn && <col className="w-[8%]" />}
             </colgroup>
             <thead className="bg-gray-50">
               <tr>
@@ -1011,10 +1011,10 @@ export default function ReviewerManagePanel({
                 )}
                 {showActionsColumn && (
                   <>
-                    <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider" aria-label="Download review">
+                    <th className="whitespace-nowrap px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider" aria-label="Download review">
                       Download
                     </th>
-                    <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 tracking-wider">
+                    <th className="whitespace-nowrap px-2 py-3 text-center text-xs font-medium text-gray-500 tracking-wider">
                       Actions
                     </th>
                   </>
