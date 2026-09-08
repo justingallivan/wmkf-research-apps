@@ -10,6 +10,10 @@
  *      followed by an optional register ID (`J27-###`). A tag without an ID
  *      is allowed by the convention ("followed by the register ID once one
  *      exists") and is listed as an unregistered marker (warning, exit 0).
+ *      "Tracked tree" here is the index plus untracked files that are not
+ *      ignored, so a tag is seen before it is staged; `outputs/`, `.next/`,
+ *      and `node_modules/` are skipped (EXCLUDED_DIRS) because they hold
+ *      local-only reports and build products, not sites.
  *   2. FAIL when a tag names a register ID that does not exist in the
  *      register (exit 1).
  *   3. FAIL when a register row's `site` no longer resolves to a file that
