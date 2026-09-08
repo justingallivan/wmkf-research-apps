@@ -127,6 +127,8 @@ function greenFixture(root) {
   write(root, 'lib/arrow-ascii-bound-vs-bag.js', "const TEMPLATE = 1; // generic 8-char bag word only\n");
   write(root, 'lib/short-binding.js', "export const IRRELEVANT = true;\n");
   write(root, 'lib/self-referential.js', "// see lib/self-referential.js for details\n");
+  write(root, 'dir/a.js', "export const DIR_A_MARK = true;\n");
+  write(root, 'otherdir/c.js', "export const OTHERDIR_C_MARK = true;\n");
   write(root, 'tests/unit/perfile-a.test.js', "const PERFILE_A_MARK = true;\n");
   write(root, 'tests/unit/perfile-b.test.js', "const PERFILE_B_MARK = true;\n");
   return HEADER
@@ -305,6 +307,36 @@ function main() {
     const r = runGate(['--root', dir]);
     check('C1 re-review, glob per-file bindings (one match unbound): exits 1', r.status === 1, r.output);
     check('C1 re-review, glob per-file bindings (one match unbound): names it via STRICT UNBOUND', /J27-108 .*unbound: tests\/unit\/perfile-b\.test\.js/.test(r.output), r.output);
+    cleanup();
+  }
+
+  // ---- regression fix (2026-09-08, integration re-review): a bare-basename
+  // binding must resolve via the FULL set of sibling directories `site`
+  // walked through, not just the last one. `site` here crosses TWO
+  // directories (`dir` then `otherdir`), mirroring the real J27-040 shape:
+  // the bare `b.js` token sits between them and its sibling context (`dir`)
+  // is not the LAST directory `site` ends on (`otherdir`). Before this fix,
+  // a `b.js` binding resolved against only that final directory and
+  // wrongly went `binding path unresolved`.
+  {
+    const { dir, cleanup } = registerTmpFixture('j27-register-binding-sibling-lastdir-');
+    write(dir, 'dir/b.js', "export const DIR_B_MARK = true;\n");
+    write(dir, 'docs/J27_TRANSITION_REGISTER.md', greenFixture(dir)
+      + row('J27-110', '`dir/a.js`; `b.js`; `otherdir/c.js`', '`dir/a.js` → `DIR_A_MARK` · `b.js` → `DIR_B_MARK` · `otherdir/c.js` → `OTHERDIR_C_MARK`'));
+    const r = runGate(['--root', dir]);
+    check('binding sibling lastDir (cross-directory site): bare-basename binding resolves via the earlier sibling directory, not stale', !/J27-110 stale/.test(r.output), r.output);
+    check('binding sibling lastDir (cross-directory site): not reported as an unresolved binding', !/J27-110 .*binding path unresolved/.test(r.output), r.output);
+    cleanup();
+  }
+
+  // ---- regression fix (2026-09-08): red twin -- `b.js` genuinely does not exist anywhere
+  {
+    const { dir, cleanup } = registerTmpFixture('j27-register-binding-sibling-lastdir-missing-');
+    write(dir, 'docs/J27_TRANSITION_REGISTER.md', greenFixture(dir)
+      + row('J27-111', '`dir/a.js`; `b.js`; `otherdir/c.js`', '`dir/a.js` → `DIR_A_MARK` · `b.js` → `DIR_B_MARK` · `otherdir/c.js` → `OTHERDIR_C_MARK`'));
+    const r = runGate(['--root', dir]);
+    check('binding sibling lastDir, missing file: exits 1', r.status === 1, r.output);
+    check('binding sibling lastDir, missing file: reason names b.js as a missing site', /J27-111 .*site path missing: b\.js/.test(r.output), r.output);
     cleanup();
   }
 

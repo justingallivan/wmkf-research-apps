@@ -304,7 +304,13 @@ function globToRegExp(glob) {
 //   { kind: 'missing', files: [] }  -- did not resolve at all
 // Ignored tokens (blank, non-path-like, route-shaped `/...`) return null and
 // are the caller's job to skip.
-function resolveToken(root, rels, rawToken, lastDir) {
+// `lastDirs` is an ARRAY of sibling-shorthand fallback directories to try (in
+// order), not a single directory: a row's `site` cell can walk through
+// several unrelated directories, and a bare-basename token (in `site` OR in
+// an excerpt binding) must be able to match ANY of them, not just whichever
+// one happened to be resolved last (2026-09-08, regression fix -- see
+// resolveSitePaths and resolveBoundPathToken below).
+function resolveToken(root, rels, rawToken, lastDirs) {
   const token = stripSiteDecoration(rawToken);
   if (!token || !isPathLike(token) || token.startsWith('/')) return null;
   if (token.includes('*')) {
@@ -315,7 +321,7 @@ function resolveToken(root, rels, rawToken, lastDir) {
   const candidates = [token];
   if (!token.includes('/')) {
     for (const prefix of BARE_NAME_PREFIXES) candidates.push(path.posix.join(prefix, token));
-    if (lastDir) candidates.push(path.posix.join(lastDir, token));
+    for (const dir of lastDirs) candidates.push(path.posix.join(dir, token));
   }
   const hit = candidates.find((c) => existsUnder(root, c));
   return { token, kind: hit ? 'file' : 'missing', files: hit ? [hit] : [] };
@@ -325,16 +331,22 @@ function resolveSitePaths(root, rels, siteCell) {
   const resolved = [];
   const missing = [];
   const tokenMap = new Map(); // stripped token (as it appeared in `site`) -> resolved files
+  const lastDirs = []; // every sibling directory context seen while walking `site`, in order
   let lastDir = null;
   for (const span of backtickSpans(siteCell)) {
-    const result = resolveToken(root, rels, span, lastDir);
+    // `site`'s own sibling-shorthand resolution is unchanged: only the MOST
+    // RECENT directory is tried, same as before this fix.
+    const result = resolveToken(root, rels, span, lastDir ? [lastDir] : []);
     if (!result) continue;
     if (result.kind === 'missing') { missing.push(result.token); continue; }
     resolved.push(...result.files);
     tokenMap.set(result.token, result.files);
-    if (result.kind === 'file') lastDir = path.posix.dirname(result.files[0]);
+    if (result.kind === 'file') {
+      lastDir = path.posix.dirname(result.files[0]);
+      if (!lastDirs.includes(lastDir)) lastDirs.push(lastDir);
+    }
   }
-  return { resolved, missing, tokenMap, lastDir };
+  return { resolved, missing, tokenMap, lastDir, lastDirs };
 }
 
 function normalizeWs(s) {
@@ -415,24 +427,31 @@ function parseExcerptBindings(excerptCell) {
 }
 
 // Resolve a bound path/glob token the same way a `site` token resolves
-// (BARE_NAME_PREFIXES, sibling dir via siteLastDir, or a glob match against
-// the tracked tree), then classify each resolved file against this row's
-// own `resolved` set (2026-09-08, Opus re-review of 987ba3c9: membership
-// must be checked against the row's actually-resolved FILES, not against a
-// string-equality match on the raw site token -- that missed both
-// equivalent-spelling bindings (`.claude-memory/x.md` binding a `site` cited
-// as memory shorthand `x.md`) and per-file bindings under a glob site
-// (`tests/unit/intake-a.test.js` binding when `site` cites the glob
-// `tests/unit/intake-*.test.js`), which plan Sec2 explicitly promises: "an
-// exact rel path, or the glob that matched it"). Returns:
+// (BARE_NAME_PREFIXES, sibling dir, or a glob match against the tracked
+// tree), then classify each resolved file against this row's own `resolved`
+// set (2026-09-08, Opus re-review of 987ba3c9: membership must be checked
+// against the row's actually-resolved FILES, not against a string-equality
+// match on the raw site token -- that missed both equivalent-spelling
+// bindings (`.claude-memory/x.md` binding a `site` cited as memory shorthand
+// `x.md`) and per-file bindings under a glob site (`tests/unit/intake-a.
+// test.js` binding when `site` cites the glob `tests/unit/intake-*.test.js`),
+// which plan Sec2 explicitly promises: "an exact rel path, or the glob that
+// matched it"). `siteLastDirs` is the FULL array of every sibling directory
+// `site` walked through (not just the last one) -- 2026-09-08, second
+// regression fix: a row whose `site` cites files across several unrelated
+// directories was resolving every bare-basename binding against only the
+// LAST directory site happened to end on, so a binding using the same
+// sibling shorthand as an earlier `site` token (in a different directory)
+// fell through as unresolved even though `site` itself resolved it fine.
+// Returns:
 //   { unresolvedToken: <token> | null, inSiteFiles: [...], outsideFiles: [...] }
 // A file the token resolves to that IS in `resolvedSet` is inSiteFiles (the
 // binding applies to it); one that resolves but is NOT a member is
 // outsideFiles (STALE `binding path not in site`) -- a coincidental match
 // elsewhere in the tree still does not count, even if some other file the
 // same glob matched does.
-function resolveBoundPathToken(root, rels, rawToken, resolvedSet, siteLastDir) {
-  const result = resolveToken(root, rels, rawToken, siteLastDir);
+function resolveBoundPathToken(root, rels, rawToken, resolvedSet, siteLastDirs) {
+  const result = resolveToken(root, rels, rawToken, siteLastDirs);
   if (!result || result.kind === 'missing') {
     return { unresolvedToken: stripSiteDecoration(rawToken), inSiteFiles: [], outsideFiles: [] };
   }
@@ -462,7 +481,7 @@ function checkRow(root, rels, row) {
     ? dispositionWord
     : null;
   if (CLOSED_DISPOSITION_RE.test(row.disposition)) return { status: 'closed', dispositionWarning };
-  const { resolved, missing, lastDir } = resolveSitePaths(root, rels, row.site);
+  const { resolved, missing, lastDirs } = resolveSitePaths(root, rels, row.site);
   if (missing.length > 0) return { status: 'stale', reason: `site path missing: ${missing.join(', ')}`, dispositionWarning };
   const resolvedSet = new Set(resolved);
 
@@ -471,7 +490,7 @@ function checkRow(root, rels, row) {
   const unresolvedBindings = [];
   const notInSiteBindings = [];
   for (const b of bound) {
-    const res = resolveBoundPathToken(root, rels, b.pathToken, resolvedSet, lastDir);
+    const res = resolveBoundPathToken(root, rels, b.pathToken, resolvedSet, lastDirs);
     if (res.unresolvedToken) { unresolvedBindings.push(res.unresolvedToken); continue; }
     notInSiteBindings.push(...res.outsideFiles);
     for (const rel of res.inSiteFiles) {
