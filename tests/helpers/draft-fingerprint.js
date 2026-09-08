@@ -86,7 +86,8 @@ function buildFingerprintInputsFromFixture({
   const candidateName = normalizeDisplayName(person?.wmkf_name);
   const candidateAffiliation = person?.wmkf_primaryaffiliation || person?.wmkf_organizationname || null;
   const authors = stripHonorific(request?._wmkf_projectleader_value_formatted) || null;
-  const institution = (request?.wmkf_organizationname || request?._akoya_applicantid_value_formatted || '').trim() || null;
+  // Applicant lookup only: request.wmkf_organizationname is a Bill.com field (see shared/utils/institution.js).
+  const institution = String(request?._akoya_applicantid_value_formatted || '').trim() || null;
   const coInvestigators = (Array.isArray(coPINames) ? coPINames : []).map(stripHonorific);
 
   return {

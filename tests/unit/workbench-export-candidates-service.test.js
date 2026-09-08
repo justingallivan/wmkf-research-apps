@@ -28,7 +28,8 @@ beforeEach(() => {
     akoya_requestid: REQ,
     akoya_requestnum: '1002794',
     akoya_title: 'A Study',
-    wmkf_organizationname: 'Example University',
+    wmkf_organizationname: 'N/A',
+    _akoya_applicantid_value_formatted: 'Example University',
     _wmkf_projectleader_value_formatted: 'Dr. Ada Lovelace',
     wmkf_meetingdate: '2026-06-01',
   });
@@ -51,7 +52,7 @@ test('golden path: authoritative meta + dated filename', async () => {
       requestNumber: '1002794',
       institution: 'Example University',
       pi: 'Dr. Ada Lovelace',
-      applicant: null,
+      applicant: 'Example University',
       title: 'A Study',
       program: null,
       cycleLabel: 'June 2026',

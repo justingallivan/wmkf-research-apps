@@ -22,7 +22,8 @@ function baseArgs() {
       akoya_title: 'Proposal T',
       wmkf_abstract: 'Abstract text',
       _wmkf_projectleader_value_formatted: 'Dr. Sam PI',
-      wmkf_organizationname: 'Org A',
+      _akoya_applicantid_value_formatted: 'Org A',
+      wmkf_organizationname: 'N/A',
       wmkf_reviewduedate: '2099-01-01',
       wmkf_meetingdate: '2099-06-01',
     },
@@ -39,6 +40,12 @@ const BASE_HASH = 'e11cba6940f5fc3345d936ad4662029ab3b39c57beac9b5230837e714a26f
 describe('fingerprintDraft golden hashes', () => {
   test('base fixture hashes to the pinned golden value', () => {
     expect(fingerprintDraft(buildDraftFingerprintInputs(baseArgs()))).toBe(BASE_HASH);
+  });
+
+  test('request.wmkf_organizationname is not a body input: changing it leaves the hash at the golden value', () => {
+    const args = baseArgs();
+    args.request.wmkf_organizationname = 'Some Other Org';
+    expect(fingerprintDraft(buildDraftFingerprintInputs(args))).toBe(BASE_HASH);
   });
 
   test('determinism: same inputs (fresh objects) hash identically', () => {
@@ -81,7 +88,7 @@ describe('fingerprintDraft golden hashes', () => {
     ['proposal.title', (a) => { a.request.akoya_title = 'Different title'; }, '49e0ea176bccee0a61cc43376a54e3d14154bb978b03ca5c061929828b87369c'],
     ['proposal.abstract', (a) => { a.request.wmkf_abstract = 'Different abstract'; }, '9226edfae124b34c8a81f72919b16cb1b224c6158d571f0057cdcd19b0ffce0c'],
     ['proposal.authors', (a) => { a.request._wmkf_projectleader_value_formatted = 'Dr. Other PI'; }, 'a37d5134462211770cf88ce3f149c5aee2521cc93fbc31d63343c9d1ec9efde5'],
-    ['proposal.institution', (a) => { a.request.wmkf_organizationname = 'Org B'; }, '0dd4b7115f405a69e01e0fe3d69da9fe5cc720eb891f25634655fbd687be1337'],
+    ['proposal.institution', (a) => { a.request._akoya_applicantid_value_formatted = 'Org B'; }, '0dd4b7115f405a69e01e0fe3d69da9fe5cc720eb891f25634655fbd687be1337'],
     ['proposal.coInvestigators (membership)', (a) => { a.coPINames = ['Dr. Alex Co']; }, '40ef06db702fc0a85f165a8eac1ccb85f916efac527d5b5f10d7f7c2762e6236'],
     ['proposal.coInvestigators (order only, same membership)', (a) => { a.coPINames = ['Dr. Bea Co', 'Dr. Alex Co']; }, 'aa5fee701a734466660ddb005b61d872927d1d9ca26d4a80f468cb7acebbaad1'],
     ['engagement.reviewDueDateOverride', (a) => { a.suggestion = { wmkf_reviewduedateoverride: '2099-03-01' }; }, '00b7072b317770b4bf441aa175a18ec2894d3e641d38e580bfa4d07d3daf5eeb'],
