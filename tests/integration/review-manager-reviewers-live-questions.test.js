@@ -201,7 +201,7 @@ test('GET success returns the full proposal + reviewer envelope', async () => {
       proposalTitle: 'Full Envelope Test Request',
       proposalAbstract: 'An abstract.',
       proposalAuthors: 'PI Name',
-      proposalInstitution: 'Test University',
+      proposalInstitution: 'Applicant Name',
       requestNumber: '1002788',
       programArea: 'Area A',
       grantCycleCode: null,
