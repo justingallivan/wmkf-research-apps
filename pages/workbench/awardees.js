@@ -14,9 +14,13 @@ import WorkbenchViewsNav from '../../shared/components/workbench/WorkbenchViewsN
 import { resolveLastDecidedCycle, conventionalCycles } from '../../lib/utils/cycle-code';
 
 // Board meets June (J) and December (D); default to the most recent meeting.
-// Awardees are the last DECIDED cycle (owner decision 2026-09-08); the
-// Workbench's working cycle is the upcoming one. Both come from the shared
-// resolver so no page carries its own calendar arithmetic.
+// Awardees open on the last DECIDED cycle (owner decision 2026-09-08); the
+// Workbench's working cycle is the upcoming one. EXPLICIT FALLBACK POLICY:
+// this page has no cycle list before its first fetch, so it resolves against
+// the June/December convention (`conventionalCycles`), not against the cycles
+// that exist. /api/workbench/dashboard already returns `lastDecidedCycleCode`
+// from the organization-wide list; the single-page Workbench shell will pass
+// that down and this calendar fallback goes away with it.
 const currentCycleCode = () => resolveLastDecidedCycle(conventionalCycles(new Date()), new Date());
 
 const contextKey = (code, all) => `${code}:${all ? 'all' : 'mine'}`;

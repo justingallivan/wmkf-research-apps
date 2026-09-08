@@ -36,6 +36,10 @@ export default async function handler(req, res) {
   if (!verifyCronSecret(req, res)) return;
 
   const cycleCode = (typeof req.query?.cycleCode === 'string' && req.query.cycleCode.trim())
+    // No user and no cycle list here: EXPLICIT FALLBACK POLICY — the working
+    // cycle of the June/December convention (`conventionalCycles`), not of the
+    // cycles that exist. The window filter below returns zero rows for a cycle
+    // with no requests, which is the correct no-op; `?cycleCode=` overrides.
     || resolveWorkingCycle(conventionalCycles(new Date()), new Date());
   const cycleFilter = cycleCodeToOdataFilter(cycleCode, 'wmkf_meetingdate');
   if (!cycleFilter) {

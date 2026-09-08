@@ -47,10 +47,15 @@ function of the calendar and the cycles that exist — never of the caller's ass
 is visible to them. `lib/utils/cycle-code.js` `resolveWorkingCycle` (earliest meeting on/after today;
 September → D26) and `resolveLastDecidedCycle` (newest meeting before today; September → J26) are
 the only default-cycle rules; `conventionalCycles(today)` supplies the June/December codes to
-callers with no list. Awardees = last decided; every other Workbench view = working. UTC throughout.
-This superseded three divergent rules (Workbench "caller's assigned cycle", Final writeups
-"walk back to a visible row" — 2026-09-06 decision superseded 2026-09-08 in favor of an in-place
-message with a link — and Initial assessments "newest artifact row") and two disagreeing
-calendar helpers (Awardees local-time "last past", grantee-titles cron UTC "upcoming").
+callers with no list (an explicit fallback, not existence-aware — used by the Awardees page before
+its first fetch and by the grantee-titles cron). Awardees = last decided; every other Workbench
+view = working. UTC throughout. **Wired (PR #203):** `/api/workbench/dashboard` cycle-list mode
+returns `defaultCycleCode` (working) and `lastDecidedCycleCode` from the organization-wide list
+with each cycle's latest `meetingDate`, replacing the "caller's assigned cycle" rule; Reviewer
+follow-up inherits it. The two disagreeing calendar helpers (Awardees local-time "last past",
+grantee-titles cron UTC "upcoming") are retired. **Not yet wired:** Final writeups still walks
+back to a visible row (2026-09-06 decision, superseded 2026-09-08 in favor of an in-place message
+with a link — to be applied with the single-page shell) and Initial assessments still defaults to
+the newest artifact row.
 
 Related: [[dataverse-export-floor-scoping]]
