@@ -141,7 +141,7 @@ human decision.
 | A restored/reused engagement does not inherit a prior closeout decision. | reviewer-suggestion reset set | Reset contract clears `wmkf_honorariumeligibility`; parity test derives the reset set. |
 | Unknown disposition values fail closed. | route; service; adapter maps and reverse maps | Invalid and unmapped values return 400/no write; all three valid values round-trip. |
 | The PD answers only the applicable payment question; No requires a reason. | closeout modal; route; close-review service | UI exposes Yes/No only for linked, non-opted-out engagements; blank No is blocked before authorization/read/write; service repeats the fail-closed guard. |
-| Existing Complete rows are not inferred or bulk-backfilled. | UI/read projection; deployment procedure | Null renders the amber “$ Undecided” pill in the Track table and “Closeout disposition not recorded” in the closeout modal (owner decision 2026-09-08); no migration updates rows. |
+| Existing Complete rows are not inferred or bulk-backfilled. | UI/read projection; deployment procedure | Null renders the amber “$ Undecided” pill in the Track table (owner decision 2026-09-08); no migration updates rows. |
 | Complete remains visible and uses the approved deeper success green. | reviewer modes and Track table | Status partition and class tests remain total. |
 
 ## Closeout rules
@@ -253,8 +253,7 @@ contract avoids the current sequential partial-success problem.
   badge (**$ Eligible** / **$ None** / **$ N/A**; amber **$ Undecided** for a
   null legacy row; amber **$ Needs review** when the API emits `unknown` for an
   unrecognized stored picklist value, which needs technical repair rather than
-  a new closeout decision; owner decision 2026-09-08). The modal still says
-  **Closeout disposition not recorded** for null. Never infer it from receipt, thank-you, opt-out, or linked-request state.
+  a new closeout decision; owner decision 2026-09-08). Never infer it from receipt, thank-you, opt-out, or linked-request state.
 - Check `response.ok`, display the server reason, disable duplicate submission
   while pending, and refresh only after a confirmed result.
 - Change Complete's badge classes only to `bg-green-200 text-green-900`; preserve

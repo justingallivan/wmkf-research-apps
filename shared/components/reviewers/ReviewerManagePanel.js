@@ -93,9 +93,7 @@ export function StatusBadge({ status, href, onClick, ariaLabel }) {
 }
 
 // Small honorarium-eligibility pill shown next to the status badge for
-// completed reviews. Distinct from `closeoutDispositionLabel` in
-// ReviewerCloseoutModal.js -- this is the compact Track Reviewers table
-// rendering.
+// completed reviews (the compact Track Reviewers table rendering).
 const HONORARIUM_PILL_INFO = Object.freeze({
   eligible: { text: 'Eligible', label: 'Honorarium eligibility: eligible', tone: 'neutral' },
   not_eligible: { text: 'None', label: 'Honorarium eligibility: not eligible', tone: 'neutral' },

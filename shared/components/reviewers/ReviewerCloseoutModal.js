@@ -1,21 +1,9 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 
-export const CLOSEOUT_DISPOSITION_LABELS = Object.freeze({
-  eligible: 'Eligible',
-  not_eligible: 'Not eligible',
-  not_applicable: 'Not applicable',
-  unknown: 'Needs technical review',
-});
-
 const PAYMENT_OPTIONS = [
   { value: 'eligible', label: 'Yes' },
   { value: 'not_eligible', label: 'No' },
 ];
-
-export function closeoutDispositionLabel(value) {
-  if (value == null) return 'Closeout disposition not recorded';
-  return CLOSEOUT_DISPOSITION_LABELS[value] || CLOSEOUT_DISPOSITION_LABELS.unknown;
-}
 
 function optionAllowed(option, reviewer) {
   const optedOut = reviewer?.honorariumOptOut === true;
