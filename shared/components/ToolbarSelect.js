@@ -5,12 +5,17 @@
  * select opts out of the native menu-button appearance because Safari ignores
  * height and padding on a native `<select>`, which left toolbar dropdowns
  * ~30px tall beside 48px sibling controls. Use this wherever a page-level
- * toolbar offers a dropdown, so the suite's toolbars share one control.
+ * toolbar offers a dropdown, so the suite's toolbars share one control. The
+ * compact size uses a 44px rounded-lg box for filters inside working panels;
+ * callers retain ownership of options, loading, and saved selection state.
  */
 
 export const TOOLBAR_CONTROL_HEIGHT_CLASS = 'h-12';
+export const COMPACT_CONTROL_HEIGHT_CLASS = 'h-11';
+export const COMPACT_CONTROL_FOCUS_CLASS = 'focus:border-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2';
 
 export const TOOLBAR_SELECT_CLASS = `${TOOLBAR_CONTROL_HEIGHT_CLASS} w-full appearance-none rounded-xl border border-gray-300 bg-white pl-4 pr-10 text-base text-gray-900 shadow-sm focus:border-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-400/30 disabled:opacity-60`;
+const COMPACT_SELECT_CLASS = `${COMPACT_CONTROL_HEIGHT_CLASS} w-full min-w-0 appearance-none rounded-lg border border-gray-300 bg-white pl-3 pr-10 text-base text-gray-900 sm:text-sm ${COMPACT_CONTROL_FOCUS_CLASS} disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-500`;
 
 function ChevronsIcon() {
   return (
@@ -28,9 +33,12 @@ export default function ToolbarSelect({
   onChange,
   children,
   className = '',
+  size = 'toolbar',
+  'aria-describedby': describedBy,
 }) {
+  const compact = size === 'compact';
   return (
-    <div className={`flex flex-col gap-1.5 ${className}`}>
+    <div className={`flex flex-col gap-1.5 ${compact ? 'min-w-0' : ''} ${className}`}>
       <label htmlFor={id} className="text-sm font-medium text-gray-700">{label}</label>
       <div className="relative">
         <select
@@ -38,7 +46,8 @@ export default function ToolbarSelect({
           value={value}
           disabled={disabled}
           onChange={onChange}
-          className={TOOLBAR_SELECT_CLASS}
+          aria-describedby={describedBy}
+          className={compact ? COMPACT_SELECT_CLASS : TOOLBAR_SELECT_CLASS}
         >
           {children}
         </select>

@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Card } from '../Layout';
+import ToolbarSelect, { COMPACT_CONTROL_HEIGHT_CLASS, COMPACT_CONTROL_FOCUS_CLASS } from '../ToolbarSelect';
 
 const STORAGE_KEY = 'wmkf-workbench-request-locator-v1';
 const MAX_QUERY_LENGTH = 100;
@@ -58,6 +59,7 @@ export default function RequestLocator() {
   const [statuses, setStatuses] = useState([]);
   const [optionsBusy, setOptionsBusy] = useState(true);
   const [optionsError, setOptionsError] = useState(null);
+  const [optionsAttempt, setOptionsAttempt] = useState(0);
   const [results, setResults] = useState(null);
   const [submittedCriteria, setSubmittedCriteria] = useState(null);
   const [totalCount, setTotalCount] = useState(0);
@@ -99,13 +101,13 @@ export default function RequestLocator() {
         setCycles(Array.isArray(body.cycles) ? body.cycles : []);
         setStatuses(Array.isArray(body.statuses) ? body.statuses : []);
       } catch (loadError) {
-        if (!cancelled) setOptionsError(loadError.message);
+        if (!cancelled) setOptionsError(loadError.message || 'Failed to load filters');
       } finally {
         if (!cancelled) setOptionsBusy(false);
       }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [optionsAttempt]);
 
   useEffect(() => () => {
     requestIdRef.current += 1;
@@ -215,6 +217,15 @@ export default function RequestLocator() {
   }, [invalidatePending]);
 
   const showingCount = results?.length || 0;
+  const filtersUnavailable = optionsBusy || Boolean(optionsError);
+  const hasFilters = Boolean(cycle || status);
+  const filtersFeedback = optionsBusy
+    ? 'Loading cycle and status filters…'
+    : optionsError
+      ? hasFilters
+        ? 'Cycle and status filters could not load. Selected filters still apply. Clear filters to search without them, or retry.'
+        : 'Cycle and status filters could not load. You can still search by request number, institution, PI, or title.'
+      : '';
   const searchAnnouncement = busy
     ? 'Searching requests.'
     : results
@@ -238,7 +249,7 @@ export default function RequestLocator() {
 
         <form onSubmit={submitSearch} className="mt-5 space-y-3">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-            <label className="min-w-0 flex-1 text-sm font-medium text-gray-700">
+            <label className="flex min-w-0 flex-1 flex-col gap-1.5 text-sm font-medium text-gray-700">
               Request number, institution, PI, or proposal title
               <input
                 type="search"
@@ -247,56 +258,58 @@ export default function RequestLocator() {
                 value={query}
                 onChange={(event) => { invalidatePending(); setQuery(event.target.value); }}
                 placeholder="For example, 1002959 or University of Washington"
-                className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className={`${COMPACT_CONTROL_HEIGHT_CLASS} block w-full rounded-lg border border-gray-300 bg-white px-3 text-base font-normal text-gray-900 placeholder:text-gray-500 sm:text-sm ${COMPACT_CONTROL_FOCUS_CLASS}`}
               />
             </label>
             <button
               type="submit"
               disabled={busy}
-              className="inline-flex min-h-10 items-center justify-center rounded-lg bg-gray-900 px-5 py-2 text-sm font-semibold text-white hover:bg-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-50"
+              className={`${COMPACT_CONTROL_HEIGHT_CLASS} inline-flex shrink-0 items-center justify-center rounded-lg bg-gray-900 px-5 text-base font-semibold text-white hover:bg-gray-800 sm:text-sm ${COMPACT_CONTROL_FOCUS_CLASS} disabled:cursor-wait disabled:opacity-50`}
             >
               {busy ? 'Searching…' : 'Search'}
             </button>
           </div>
 
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-            <label className="text-sm font-medium text-gray-700 sm:min-w-56">
-              Cycle
-              <select
-                value={cycle}
-                onChange={(event) => { invalidatePending(); setCycle(event.target.value); }}
-                disabled={optionsBusy}
-                className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm disabled:bg-gray-50 disabled:text-gray-400"
-              >
-                <option value="">All cycles</option>
-                {cycle && !cycles.some((option) => option.value === cycle) && (
-                  <option value={cycle}>{cycle} (saved)</option>
-                )}
-                {cycles.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
-            </label>
-            <label className="text-sm font-medium text-gray-700 sm:min-w-64">
-              Request status
-              <select
-                value={status}
-                onChange={(event) => { invalidatePending(); setStatus(event.target.value); }}
-                disabled={optionsBusy}
-                className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm disabled:bg-gray-50 disabled:text-gray-400"
-              >
-                <option value="">All statuses</option>
-                {status && !statuses.includes(status) && (
-                  <option value={status}>{status} (saved)</option>
-                )}
-                {statuses.map((option) => <option key={option} value={option}>{option}</option>)}
-              </select>
-            </label>
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end" aria-busy={optionsBusy}>
+            <ToolbarSelect
+              id="request-locator-cycle"
+              label="Cycle"
+              size="compact"
+              className="sm:w-56"
+              value={cycle}
+              onChange={(event) => { invalidatePending(); setCycle(event.target.value); }}
+              disabled={filtersUnavailable}
+              aria-describedby={filtersUnavailable ? 'request-locator-filters-status' : undefined}
+            >
+              <option value="">All cycles</option>
+              {cycle && !cycles.some((option) => option.value === cycle) && (
+                <option value={cycle}>{cycle} (saved)</option>
+              )}
+              {cycles.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </ToolbarSelect>
+            <ToolbarSelect
+              id="request-locator-status"
+              label="Request status"
+              size="compact"
+              className="sm:w-64"
+              value={status}
+              onChange={(event) => { invalidatePending(); setStatus(event.target.value); }}
+              disabled={filtersUnavailable}
+              aria-describedby={filtersUnavailable ? 'request-locator-filters-status' : undefined}
+            >
+              <option value="">All statuses</option>
+              {status && !statuses.includes(status) && (
+                <option value={status}>{status} (saved)</option>
+              )}
+              {statuses.map((option) => <option key={option} value={option}>{option}</option>)}
+            </ToolbarSelect>
             {(query || cycle || status || results) && (
               <button
                 type="button"
                 onClick={clearSearch}
-                className="min-h-10 px-2 text-sm font-medium text-gray-600 hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500"
+                className={`${COMPACT_CONTROL_HEIGHT_CLASS} shrink-0 rounded-lg px-2 text-base font-medium text-gray-600 hover:text-gray-900 sm:text-sm ${COMPACT_CONTROL_FOCUS_CLASS}`}
               >
                 Clear
               </button>
@@ -304,10 +317,40 @@ export default function RequestLocator() {
           </div>
         </form>
 
-        {optionsError && (
-          <p className="mt-3 text-xs text-amber-700">
-            Cycle and status filters are temporarily unavailable. Text search still works.
-          </p>
+        <p
+          id="request-locator-filters-status"
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+          className={filtersFeedback ? `mt-3 text-sm ${optionsError ? 'text-amber-800' : 'text-gray-600'}` : 'sr-only'}
+        >
+          {filtersFeedback}
+        </p>
+        {(optionsError || (optionsBusy && optionsAttempt > 0)) && (
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={optionsBusy}
+              onClick={() => {
+                if (optionsBusy) return;
+                setOptionsBusy(true);
+                setOptionsError(null);
+                setOptionsAttempt((attempt) => attempt + 1);
+              }}
+              className={`${COMPACT_CONTROL_HEIGHT_CLASS} rounded-lg border border-gray-300 bg-white px-3 text-base font-medium text-gray-700 hover:bg-gray-50 sm:text-sm ${COMPACT_CONTROL_FOCUS_CLASS} disabled:cursor-wait disabled:opacity-60`}
+            >
+              {optionsBusy ? 'Retrying filters…' : 'Retry filters'}
+            </button>
+            {hasFilters && (
+              <button
+                type="button"
+                onClick={() => { invalidatePending(); setCycle(''); setStatus(''); }}
+                className={`${COMPACT_CONTROL_HEIGHT_CLASS} rounded-lg px-3 text-base font-medium text-gray-700 hover:bg-gray-50 sm:text-sm ${COMPACT_CONTROL_FOCUS_CLASS}`}
+              >
+                Clear filters
+              </button>
+            )}
+          </div>
         )}
         {error && <p className="mt-3 text-sm text-red-700" role="alert">{error}</p>}
         <p
