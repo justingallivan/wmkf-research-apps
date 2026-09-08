@@ -239,9 +239,8 @@ def build_pd():
     content_slide(prs, "STEP 11", "Reviewers · Track Reviewers", [
         "Accepted reviewers live here — use Release to reviewers to send the proposal to those awaiting materials.",
         "Track everyone in flight, from materials sent through review received (this one tab absorbed the old Invite and Completed sub-tabs).",
-        "Scheduled automatic reviewer reminders remain paused; here you can nudge an accepted",
-        (1, "reviewer who hasn't submitted with Send reminder — this action is link-free, it doesn't"),
-        (1, "mint or change their existing review link (the invite-stage nudge lives in Invite Reviewers)."),
+        "Scheduled automatic reviewer reminders remain paused; here you can nudge an accepted reviewer who hasn't submitted with Send reminder.",
+        (1, "This action is link-free — it doesn't mint or change their existing review link (the invite-stage nudge lives in Invite Reviewers)."),
     ])
 
     section_slide(prs, "12", SPINE[11])
@@ -275,7 +274,7 @@ def build_pd():
     content_slide(prs, "WRAP-UP", "FAQ & where to get help", [
         "\"Where did the Re-invite button go?\" — it was retired (S277) when the automated respond-by reminder shipped; nudge an unanswered invitee instead with Send reminder in Invite Reviewers. Scheduled automatic reminders remain paused separately.",
         "\"A change isn't showing\" — hard-refresh; the app updates as we ship.",
-        "\"A tab says coming soon\" — that lifecycle stage isn't built yet; it's on the roadmap.",
+        "\"Awardee tab looks empty\" — it's research-grants only; other grant types won't populate it.",
         "Who to ask: your team lead for workflow; Connor for anything technical.",
         ("", "This deck is a draft — tell us what's confusing and we'll tighten it."),
     ])
@@ -305,8 +304,7 @@ def build_tech():
         "Per-request shell: pages/workbench/[requestId].js (tier-3 page).",
         "Tab + sub-tab selection is query-string driven: ?tab=reviewers&sub=track (deep-linkable; legacy sub=invite/completed normalize to track).",
         "Implemented tab components (all nine keys are live, none fall through):",
-        (1, "OverviewTab · ProposalTab · InitialAssessmentTab · ReviewersTab · ReviewsTab ·"),
-        (1, "StaffDeliberationsTab · FinalWriteupTab · StatusTab · AwardeeTab (shared/components/...)."),
+        (1, "OverviewTab · ProposalTab · InitialAssessmentTab · ReviewersTab · ReviewsTab · StaffDeliberationsTab · FinalWriteupTab · StatusTab · AwardeeTab (shared/components/...)."),
         (1, "Legacy pre-site-visit/site-visit deep links alias to staff-deliberations (S466 merge)."),
         "Consolidation: the Workbench merges the old reviewer-finder + review-manager apps; one app-access grant ('reviewers') now covers them.",
     ])

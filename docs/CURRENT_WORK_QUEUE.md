@@ -72,7 +72,7 @@ sequence.
   (`shared/components/reviewers/ReviewersTab.js:10`,
   `ReviewerManagePanel.js:145`), so an unanswered invitee never appears
   there — the first pass's "Send reminder … in Track Reviewers" copy for the
-  respond-by nudge was wrong. Fixed at six locations in the generator
+  respond-by nudge was wrong. Fixed at five locations in the generator
   (PD-deck Step 7/8/11/FAQ, technical-deck Step 7) and in this file/the
   README to name each nudge's real surface, and reworded the causal claim
   about why the Re-invite button was removed: `docs/REVIEWER_ENGAGEMENT_SPEC.md:110`
