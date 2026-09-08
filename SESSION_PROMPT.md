@@ -1,3 +1,41 @@
+# Session 498 Prompt: Reviewer UI release handoff and J27 brief awareness
+
+## Session 497 Summary (Codex, 2026-09-08)
+
+Owner-present UI polish continued on `codex/UI-audit`. Reviewer Follow-up action
+columns were widened to prevent heading overlap, action headings were normalized to
+all caps, and the vertical kebab trigger was explicitly centered. The changes were
+visually verified in the local dev browser. Production promotion was intentionally
+deferred because this branch is 19 commits ahead of `origin/main` but 56 commits
+behind it across 134 divergent files; Claude is currently promoting the newer main
+line through the reviewed path.
+
+### Commits
+
+- `b5f353de` — Prevent reviewer action header overlap
+- `ab426be6` — Normalize reviewer action header casing
+- `7f1ee13d` — Center reviewer action menu trigger
+
+### Next Items
+
+1. **Reconcile the three reviewer UI commits onto the current `main` after Claude's
+   promotion completes.** Inspect the resulting diff first, then use the reviewed
+   release path; do not deploy `codex/UI-audit` wholesale.
+2. **Run focused Reviewer Follow-up verification** after the cherry-pick, including
+   desktop and narrow-width screenshots and the affected lint/test gates.
+
+### Verify Before Acting
+
+1. **J27 register/site binding contract.** Read `docs/plans/J27_GATE_AND_SESSION_496_CODEX_BRIEF_2026-09-08.md` first: `check:j27-register` is now strict, `shared/config/workbenchVisibility.js` is a register site (J27-020, J27-037), and any dossier change to its predicate text must rebind those rows in the same PR.
+2. **Concurrent release state.** Re-check `origin/main`, active branches, and Vercel deployments before cherry-picking or promoting the reviewer UI commits.
+
+### Handoff Notes
+
+- Current UI branch retains unrelated dirty `.claude-memory/` files; do not fold them
+  into the reviewer UI release.
+- No `DEVELOPMENT_LOG.md` milestone entry is required: this session shipped UI polish
+  on a feature branch but no production capability or cutover.
+
 # Session 497 Prompt: Cycle Dossier reconciliation (Codex lane) and J27 follow-ups (Claude lane)
 
 ## Session 496 Summary (Claude, 2026-09-07/08)
