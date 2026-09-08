@@ -7,9 +7,17 @@
  * behaviors, nothing more:
  *
  *   1. LIST every `J27:` tagged site in the tracked tree. A tag is `J27:`
- *      followed by an optional register ID (`J27-###`). A tag without an ID
- *      is allowed by the convention ("followed by the register ID once one
- *      exists") and is listed as an unregistered marker (warning, exit 0).
+ *      followed by an optional register ID (`J27-###`). A tag WITH an id is
+ *      a tag anywhere in a line. A tag WITHOUT an id is allowed by the
+ *      convention ("followed by the register ID once one exists") and is
+ *      listed as an unregistered marker (warning, exit 0) only when it sits
+ *      in a comment: the line, after leading whitespace, begins with a
+ *      code-comment leader (`//`, `/*`, `*`, `#`, `--`, `<!--`) and `J27:`
+ *      follows that leader immediately (optionally after whitespace). A bare
+ *      `J27:` in prose, inside bold (`**J27:**`), or mid-line is not a
+ *      marker — it is prose using the term, not a site tag. This keeps
+ *      cycle-label lead-ins ("- **J27:** …") and sentences ("for J27:
+ *      whether …") from being counted.
  *      "Tracked tree" here is the index plus untracked files that are not
  *      ignored, so a tag is seen before it is staged; `outputs/`, `.next/`,
  *      and `node_modules/` are skipped (EXCLUDED_DIRS) because they hold
@@ -34,9 +42,14 @@
  *     Files are compared with inner backticks and line-comment sigils
  *     (`//`, ` * `, `#`) removed and whitespace collapsed, so a register
  *     excerpt can quote a wrapped comment or a backticked identifier.
- *   - A row is STALE when at least one path resolved and at least one
- *     fragment exists and no fragment appears in any resolved file, or when
- *     a path-like token resolves to nothing at all (the site is gone).
+ *   - Resolution is PER SITE, not per row: every resolved file (and every
+ *     glob match) must contain at least one excerpt fragment. The first
+ *     resolved file containing none makes the row STALE, reported as
+ *     `no excerpt fragment found in <that file>` (all such misses are
+ *     listed, not just the first). A directory site passes on existence
+ *     alone, same as before.
+ *   - A row is also STALE when a path-like token resolves to nothing at all
+ *     (the site is gone).
  *   - A row with no resolvable path or no backticked fragment is
  *     UNVERIFIABLE: counted and printed, never failed. Dataverse surfaces,
  *     "work queue item N", and plain-prose excerpts land here on purpose.
@@ -69,6 +82,11 @@ const DEFAULT_REGISTER = 'docs/J27_TRANSITION_REGISTER.md';
 // negative lookbehind drops the convention's own self-references, which are
 // always written backtick-wrapped (`J27:` marker).
 const TAG_RE = /(?<!`)J27:(?:\s*(J27-\d{3})\b)?/g;
+// An id-less `J27:` counts as a marker only when the line, after leading
+// whitespace, begins with one of these comment leaders and `J27:` follows
+// immediately (optionally after whitespace). Prose and bold-label uses of
+// the bare term are not markers.
+const COMMENT_LEAD_RE = /^\s*(?:\/\/|\/\*|\*|#|--|<!--)\s*/;
 const ROW_ID_RE = /^\| (J27-\d{3})\b/;
 const REGISTER_COLUMNS = 7; // id · site · excerpt · Dep · Ev · Q · disposition
 
@@ -138,9 +156,12 @@ function scanTags(root, rels) {
     const text = readText(path.join(root, rel));
     if (text === null || !text.includes('J27:')) continue;
     text.split('\n').forEach((line, i) => {
+      const leadMatch = line.match(COMMENT_LEAD_RE);
+      const commentJ27At = leadMatch ? leadMatch[0].length : -1;
       TAG_RE.lastIndex = 0;
       let m;
       while ((m = TAG_RE.exec(line)) !== null) {
+        if (!m[1] && m.index !== commentJ27At) continue; // id-less marker not comment-led: prose, ignore
         tags.push({ rel, lineNo: i + 1, id: m[1] || null, text: line.trim().slice(0, 160) });
       }
     });
@@ -288,9 +309,12 @@ function checkRow(root, rels, row) {
   const fragments = excerptFragments(row.excerpt);
   if (missing.length > 0) return { status: 'stale', reason: `site path missing: ${missing.join(', ')}` };
   if (resolved.length === 0 || fragments.length === 0) return { status: 'unverifiable' };
-  const hit = resolved.some((rel) => fileContainsAnyFragment(root, rel, fragments));
-  if (hit) return { status: 'ok' };
-  return { status: 'stale', reason: `no excerpt fragment found in ${resolved.join(', ')}` };
+  // Per-site resolution: every resolved file (each glob match included) must
+  // contain at least one fragment on its own. A row is not "ok" just because
+  // some other cited file in the same row still has a match.
+  const misses = resolved.filter((rel) => !fileContainsAnyFragment(root, rel, fragments));
+  if (misses.length === 0) return { status: 'ok' };
+  return { status: 'stale', reason: `no excerpt fragment found in ${misses.join(', ')}` };
 }
 
 // ---------------------------------------------------------------- main

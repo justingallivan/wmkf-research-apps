@@ -12,11 +12,16 @@
  *   RED    row excerpt absent from an existing site file
  *   RED    row site path missing
  *   RED    glob site with no match
+ *   RED    two-site row: fragment present in only one file → stale naming the other
+ *   RED    glob site: fragment present in only one match → stale naming the other
  *   RED    malformed register row → configuration error (exit 2)
  *   GREEN  tag names an existing id
- *   WARN   bare `J27:` marker without an id → listed, exit 0
+ *   WARN   comment-led bare `J27:` marker (`//`) without an id → listed, exit 0
+ *   WARN   comment-led bare `J27:` marker (`<!--`) without an id → listed, exit 0
  *   SKIP   backtick-wrapped `J27:` self-reference is not a tag
- *   GREEN  excerpt present only in the second of two site files
+ *   SKIP   bold-label `**J27:**` lead-in is not a marker (not comment-led)
+ *   SKIP   mid-line prose `for J27: whether` is not a marker (not comment-led)
+ *   GREEN  two-site row: fragment present in each of two files
  *   GREEN  `…`-split excerpt with one fragment present
  *   GREEN  wrapped `//` comment and inner backticks in the source
  *   GREEN  bare memory basename resolves through `.claude-memory/`
@@ -64,22 +69,25 @@ function row(id, site, excerpt, disposition = 'open.') {
 // A tree + register where every rule is green.
 function greenFixture(root) {
   write(root, 'lib/a.js', "// J27: J27-001 D26-only hide\nconst x = 1;\n");
-  write(root, 'lib/b.js', "// nothing here\n");
+  write(root, 'lib/b.js', "export const NEEDLE_IN_SECOND_FILE = true;\n");
   write(root, 'lib/c.js', "export const NEEDLE_IN_SECOND_FILE = true;\n");
   write(root, 'lib/wrapped.js', "  // Always exclude concept rows — they never need outside\n  // reviewers. Uses `akoya_requeststatus` here.\n");
   write(root, '.claude-memory/project-thing.md', "- Single-submission may change the picker default.\n");
   write(root, 'scripts/find-first.js', "* Find 2025 candidates.\n");
   write(root, 'scripts/find-second.js', "* Second sibling script.\n");
   write(root, 'tests/unit/intake-one.test.js', "form_key 'phase-ii-research-2026-06'\n");
-  write(root, 'docs/notes.md', "The `J27:` marker convention is described here, not used.\n");
+  write(root, 'tests/unit/glob-a.test.js', "const GLOB_A_NEEDLE_TEXT = true;\n");
+  write(root, 'tests/unit/glob-b.test.js', "// no needle here\n");
+  write(root, 'docs/notes.md', "The `J27:` marker convention is described here, not used.\nStill open for J27: whether this changes.\n");
   write(root, 'docs/plan.md', "- **J27:** every complete proposal receives an assessment.\n");
+  write(root, 'lib/marker-comment.js', "// J27: pending refactor, no id yet\nconst y = 2;\n");
+  write(root, 'docs/html-comment.md', "<!-- J27: pending row, no id yet -->\n");
   return HEADER
     + row('J27-001', '`lib/a.js:1`', '`D26-only hide`')
     + row('J27-002', '`lib/b.js`; `lib/c.js:1`', '`NEEDLE_IN_SECOND_FILE`')
     + row('J27-003', '`lib/a.js`', '`absent fragment text` … `const x = 1;`')
     + row('J27-004', '`lib/wrapped.js:1`', '`// Always exclude concept rows — they never need outside reviewers. Uses akoya_requeststatus here.`')
     + row('J27-005', 'memory `project-thing.md` L1', '`Single-submission may change the picker default.`')
-    + row('J27-006', '`scripts/find-first.js`, `find-second.js`', '`Second sibling script.`')
     + row('J27-007', '`tests/unit/intake-*.test.js`; `/api/workbench/dashboard`', "`'phase-ii-research-2026-06'`")
     + row('J27-008', '`lib/b.js`', '`this excerpt is gone`', '**rejected (already retired)**.')
     + row('J27-009', 'work queue item 6; Dataverse: akoya_request', 'plain prose, no backticks');
@@ -99,17 +107,44 @@ function main() {
     const r = runGate(['--root', dir]);
     check('green tree exits 0', r.status === 0, r.output);
     check('green tree: tag with existing id listed as ok', /lib\/a\.js:1 → J27-001/.test(r.output), r.output);
-    check('green tree: bare J27: marker listed without id (warning, not error)', /docs\/plan\.md:1 → \(no id\)/.test(r.output) && /1 marker\(s\) without a register id/.test(r.output), r.output);
-    check('green tree: backtick-wrapped `J27:` self-reference is not a tag', !/docs\/notes\.md/.test(r.output), r.output);
-    check('green tree: second-file excerpt (J27-002) not stale', !/J27-002 stale/.test(r.output), r.output);
+    check('green tree: comment-led bare J27: marker (//) listed without id', /lib\/marker-comment\.js:1 → \(no id\)/.test(r.output), r.output);
+    check('green tree: comment-led bare J27: marker (<!--) listed without id', /docs\/html-comment\.md:1 → \(no id\)/.test(r.output), r.output);
+    check('green tree: 2 marker(s) without a register id', /2 marker\(s\) without a register id/.test(r.output), r.output);
+    check('green tree: backtick-wrapped `J27:` self-reference is not a tag', !/docs\/notes\.md:1/.test(r.output), r.output);
+    check('green tree: mid-line prose "for J27: whether" is not a marker', !/docs\/notes\.md:2/.test(r.output), r.output);
+    check('green tree: bold-label "**J27:**" lead-in is not a marker', !/docs\/plan\.md/.test(r.output), r.output);
+    check('green tree: two-file row with fragment in each (J27-002) not stale', !/J27-002 stale/.test(r.output), r.output);
     check('green tree: ellipsis-split excerpt (J27-003) not stale', !/J27-003 stale/.test(r.output), r.output);
     check('green tree: wrapped comment + inner backticks (J27-004) not stale', !/J27-004 stale/.test(r.output), r.output);
     check('green tree: memory basename shorthand (J27-005) not stale', !/J27-005 stale/.test(r.output), r.output);
-    check('green tree: sibling basename shorthand (J27-006) not stale', !/J27-006 stale/.test(r.output), r.output);
     check('green tree: glob site + route token (J27-007) not stale', !/J27-007 stale/.test(r.output), r.output);
     check('green tree: rejected row (J27-008) closed, not stale', !/J27-008/.test(r.output) && /1 closed/.test(r.output), r.output);
     check('green tree: prose-only row (J27-009) unverifiable, not stale', /J27-009 unverifiable/.test(r.output), r.output);
-    check('green tree: row counts 7 ok / 0 stale / 1 unverifiable / 1 closed', /rows: 7 ok, 0 stale, 1 unverifiable, 1 closed/.test(r.output), r.output);
+    check('green tree: row counts 6 ok / 0 stale / 1 unverifiable / 1 closed', /rows: 6 ok, 0 stale, 1 unverifiable, 1 closed/.test(r.output), r.output);
+    cleanup();
+  }
+
+  // ---- red: two-site row, fragment present in only one of two files
+  {
+    const { dir, cleanup } = registerTmpFixture('j27-register-two-site-one-frag-');
+    write(dir, 'docs/J27_TRANSITION_REGISTER.md', greenFixture(dir)
+      + row('J27-090', '`scripts/find-first.js`, `find-second.js`', '`Second sibling script.`'));
+    const r = runGate(['--root', dir]);
+    check('two-site one-frag: exits 1', r.status === 1, r.output);
+    check('two-site one-frag: J27-090 names the file lacking the fragment', /J27-090 .*no excerpt fragment found in scripts\/find-first\.js/.test(r.output), r.output);
+    check('two-site one-frag: file WITH the fragment is not named', !/no excerpt fragment found in [^\n]*find-second\.js/.test(r.output), r.output);
+    cleanup();
+  }
+
+  // ---- red: glob site, fragment present in only one match
+  {
+    const { dir, cleanup } = registerTmpFixture('j27-register-glob-one-frag-');
+    write(dir, 'docs/J27_TRANSITION_REGISTER.md', greenFixture(dir)
+      + row('J27-091', '`tests/unit/glob-*.test.js`', '`GLOB_A_NEEDLE_TEXT`'));
+    const r = runGate(['--root', dir]);
+    check('glob one-frag: exits 1', r.status === 1, r.output);
+    check('glob one-frag: J27-091 names the match lacking the fragment', /J27-091 .*no excerpt fragment found in tests\/unit\/glob-b\.test\.js/.test(r.output), r.output);
+    check('glob one-frag: matching file is not named', !/no excerpt fragment found in [^\n]*glob-a\.test\.js/.test(r.output), r.output);
     cleanup();
   }
 

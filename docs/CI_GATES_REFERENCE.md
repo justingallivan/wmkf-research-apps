@@ -301,15 +301,21 @@ Added 2026-09-07 from `docs/J27_SINGLE_PHASE_TRANSITION_INVENTORY_PLAN.md` §7. 
 `scripts/check-j27-register.js` against the tracked tree and
 `docs/J27_TRANSITION_REGISTER.md`. Three behaviors: lists every `J27:` tagged site; fails
 (exit 1) when a tag names a register id that does not exist; fails when a register row's
-`site` no longer resolves to a file containing its `excerpt`. A `J27:` marker without an
-id is listed as a warning, not a failure. Rows whose disposition begins `rejected` or
-`done` are closed and skipped; rows with no backticked path in `site` or no backticked
-fragment in `excerpt` (Dataverse surfaces, work-queue pointers, plain-prose excerpts) are
-reported as unverifiable and never fail. A register row that does not parse into the
-seven schema columns, or a duplicate id, is a configuration error (exit 2). **Advisory:**
-registered here and in the `/start` battery only, not in `test.yml` or any hook;
-promotion to blocking is an owner decision (plan §7). The self-test is `--root`/`--register`
-isolated to a temp fixture tree.
+`site` no longer resolves to a file containing its `excerpt`. An id-less `J27:` is listed
+as a warning (not a failure) only when it sits in a comment — the line, after leading
+whitespace, begins with a code-comment leader (`//`, `/*`, `*`, `#`, `--`, `<!--`) with
+`J27:` following immediately (optionally after whitespace); a bare `J27:` in prose, inside
+a bold label (`**J27:**`), or mid-sentence is not a marker at all (tightened 2026-09-08).
+Excerpt resolution is per site, not per row (tightened 2026-09-08): a multi-site row (several
+backticked files, or a glob with several matches) is stale unless every resolved file/match
+contains a fragment; the first miss is named (all misses are listed, not just the first).
+Rows whose disposition begins `rejected` or `done` are closed and skipped; rows with no
+backticked path in `site` or no backticked fragment in `excerpt` (Dataverse surfaces,
+work-queue pointers, plain-prose excerpts) are reported as unverifiable and never fail. A
+register row that does not parse into the seven schema columns, or a duplicate id, is a
+configuration error (exit 2). **Advisory:** registered here and in the `/start` battery
+only, not in `test.yml` or any hook; promotion to blocking is an owner decision (plan §7).
+The self-test is `--root`/`--register` isolated to a temp fixture tree.
 
 ### `check:model-override-warming` — LLM 404-on-tier-alias prevention (S230)
 
@@ -440,7 +446,7 @@ When modifying any `scripts/check-*.js` gate (or building a new one), the matchi
 | `check:scaffolding-tokens` | `check:scaffolding-tokens:self-test` |
 | `check:prompt-injection-tagging` | `check:prompt-injection-tagging:self-test` |
 | `check:reviewer-reminder-hold` | `check:reviewer-reminder-hold:self-test` — safe registry and lookalike-path positives; exact held-route (including query-string registration), invalid JSON, missing/non-array registry, malformed entry, missing-path, and alternate-config negatives. |
-| `check:j27-register` | `check:j27-register:self-test` — unknown-id, stale-excerpt, missing-site, unmatched-glob, malformed-row and duplicate-id reds; existing-id, bare-marker warning, backtick self-reference, second-file, ellipsis-split, wrapped-comment, memory/sibling/glob shorthand, closed-row and prose-only greens; real-baseline green before and after. |
+| `check:j27-register` | `check:j27-register:self-test` — unknown-id, stale-excerpt, missing-site, unmatched-glob, two-site-one-fragment, glob-one-fragment, malformed-row and duplicate-id reds; existing-id, comment-led bare-marker (`//` and `<!--`) warning, backtick self-reference, bold-label and mid-line prose non-marker skips, two-site-both-fragment, ellipsis-split, wrapped-comment, memory/glob shorthand, closed-row and prose-only greens; real-baseline green before and after. |
 
 **When external review catches a structural pattern an existing gate missed, the order is mandatory:**
 
