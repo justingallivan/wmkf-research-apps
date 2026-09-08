@@ -6,6 +6,15 @@ jest.mock('../../lib/dataverse/adapters/grant-request.js', () => ({
   queryAllRequests: jest.fn(),
   getById: jest.fn(),
 }));
+jest.mock('../../lib/services/workbench/program-scope-service.js', () => ({
+  resolveWorkbenchProgramScope: jest.fn(async () => ({
+    programs: [{ programId: '94cab30b-958f-ee11-8179-000d3a341e8f', name: 'Research' }],
+    defaultProgramId: '94cab30b-958f-ee11-8179-000d3a341e8f',
+    programId: '94cab30b-958f-ee11-8179-000d3a341e8f',
+    programName: 'Research',
+  })),
+  buildProgramScopeFilter: jest.fn((programId) => `_wmkf_grantprogram_value eq ${programId}`),
+}));
 jest.mock('../../lib/services/cycle-dossier-generation.js', () => ({
   prepareRequestInput: jest.fn(),
   snapshotConfiguration: jest.fn(),
@@ -47,6 +56,7 @@ import * as generation from '../../lib/services/cycle-dossier-generation.js';
 import { resolveDossierDestination } from '../../lib/services/cycle-dossier-sharepoint.js';
 import * as storage from '../../lib/services/cycle-dossier-storage.js';
 import * as store from '../../lib/services/cycle-dossier-store.js';
+import { resolveWorkbenchProgramScope } from '../../lib/services/workbench/program-scope-service.js';
 import {
   controlCycleDossier,
   cycleDossierAction,
@@ -91,6 +101,16 @@ beforeEach(() => {
 });
 
 afterEach(() => { delete process.env.CYCLE_DOSSIER_ENABLED; delete process.env.CYCLE_DOSSIER_REQUEST_ALLOWLIST; delete process.env.CYCLE_DOSSIER_ROLLOUT_MODE; delete process.env.CYCLE_DOSSIER_OPERATOR_PROFILE_ID; });
+
+test('roster is scoped server-side to the Workbench default program with no caller identity', async () => {
+  store.createDossierPreview.mockResolvedValue({ id: PREVIEW, expires_at: '2026-09-07T01:00:00Z', dossier_id: 'dossier-1' });
+  const result = await previewCycleDossier(7, { selectedRequestIds: [ID], generateRequestIds: [] });
+  expect(result.preview.id).toBe(PREVIEW);
+  expect(resolveWorkbenchProgramScope).toHaveBeenCalledWith({});
+  expect(requests.queryAllRequests).toHaveBeenCalledWith(expect.objectContaining({
+    filter: expect.stringMatching(/^wmkf_meetingdate ge .* and _wmkf_grantprogram_value eq 94cab30b-958f-ee11-8179-000d3a341e8f and \(akoya_requeststatus eq 'Phase II Pending'/),
+  }));
+});
 
 test('preview returns the selected and generated DTOs and saves the selection', async () => {
   store.listDossierEntries.mockResolvedValue([{ request_id: ID, id: 'entry-existing', revision: 1, created_at: '2026-09-07T00:00:00Z', created_by: 9 }]);

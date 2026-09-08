@@ -7,7 +7,7 @@ summary: "D26 private Cycle Dossier pilot design and branch-local implementation
 canonical: true
 cataloged: 2026-09-07
 owner: product-engineering
-last_verified: 2026-09-07
+last_verified: 2026-09-08
 related:
   - docs/atlas/postgres-cycle-dossiers.md
   - docs/EXECUTOR_CONTRACT.md
@@ -22,7 +22,9 @@ related:
 
 The D26 Cycle Dossier is a private superuser workflow for preparing scientific briefings from the Workbench D26 candidate set. A successful eligible request entry is reusable by any superuser; the dossier selection, run, and edition remain private to their owner. The pilot excludes Set Aside requests and retains the Workbench's server-owned cycle, eligibility, and program-director visibility rules.
 
-Owner decisions: every candidate initially selected, with persistent manual exclusions for test requests; expected roster of 44 is not hard-coded. Target 2–3 pages plus references for a PD with a PhD in an unrelated scientific field. Reuse the newest successful request entry from any superuser and selectively rewrite others. Individual Word/PDF files belong in each request's AI Artifacts folder; combined, PD-grouped editions are private to the dossier owner. Preserve editions, publish partial results, and retry failures. Peer reviews and staff notes are excluded from source collection.
+The roster is scoped server-side to the Workbench default program (Research) through the shared program-scope resolver; the page renders no program selector and the route accepts no program input. The prompts are research-specific, so a request tagged into the D26 cycle under another program is omitted by design rather than shown. `buildDossierRosterFilter` in `lib/services/cycle-dossier-rollout.js` is the single roster predicate used by both `loadDossierRoster` and the rollout preflight, so the preflight proves the list the pilot loads. Adding a selectable program later means a program-specific prompt family plus passing a program id into the same resolver (owner decision 2026-09-08).
+
+Owner decisions: every candidate initially selected, with persistent manual exclusions for test requests; the roster size is not hard-coded (44 on 2026-09-07; 23 on 2026-09-08, all Research, after the owner set the remaining requests, including the test copies, to Set Aside, which the pilot excludes by design). Target 2–3 pages plus references for a PD with a PhD in an unrelated scientific field. Reuse the newest successful request entry from any superuser and selectively rewrite others. Individual Word/PDF files belong in each request's AI Artifacts folder; combined, PD-grouped editions are private to the dossier owner. Preserve editions, publish partial results, and retry failures. Peer reviews and staff notes are excluded from source collection.
 
 Each entry has five sections: Project at a glance, Why it matters, The field around it, Background for an outside-field scientist, and References. Proposal claims, retrieved external evidence, interpretation, and uncertainty remain distinct in the generated content. References are limited to source IDs returned by the bounded research stage.
 

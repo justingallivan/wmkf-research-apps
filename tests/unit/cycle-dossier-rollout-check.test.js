@@ -24,6 +24,7 @@ import {
   assertDossierProfileAllowed,
   assertDossierRequestAllowed,
   assertDossierWorkerOpen,
+  buildDossierRosterFilter,
   parseDossierRequestAllowlist,
   validateDossierEnvironment,
 } from '../../lib/services/cycle-dossier-rollout.js';
@@ -63,18 +64,22 @@ test('prompt verification pins every seeded field and current identity', () => {
   expect(verifyPromptRow({ ...row, wmkf_ai_iscurrent: false }, expected).mismatches).toContain('wmkf_ai_iscurrent');
 });
 
-test('default roster uses the dependency-free Workbench visibility predicate', async () => {
+test('default roster uses the server-owned program scope plus the Workbench visibility predicate', async () => {
+  const programId = '94cab30b-958f-ee11-8179-000d3a341e8f';
+  const resolveScope = jest.fn(async () => ({ programId, programName: 'Research' }));
   const queryAllRequests = jest.fn(async () => ({ capped: false, records: [{
     akoya_requestid: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
     akoya_requestnum: 'D26-001',
     akoya_title: 'A',
   }] }));
-  await expect(defaultReadRoster({ requestAdapter: { queryAllRequests } })).resolves.toMatchObject([
+  await expect(defaultReadRoster({ requestAdapter: { queryAllRequests }, resolveScope })).resolves.toMatchObject([
     { requestId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', requestNumber: 'D26-001' },
   ]);
-  expect(queryAllRequests).toHaveBeenCalledWith(expect.objectContaining({
-    filter: "wmkf_meetingdate ge 2026-12-01T00:00:00Z and wmkf_meetingdate lt 2027-01-01T00:00:00Z and (akoya_requeststatus eq 'Phase II Pending' or wmkf_triagestatus eq 100000000) and (wmkf_triagestatus eq null or wmkf_triagestatus ne 100000001)",
-  }));
+  expect(resolveScope).toHaveBeenCalledWith({});
+  const expectedFilter = `wmkf_meetingdate ge 2026-12-01T00:00:00Z and wmkf_meetingdate lt 2027-01-01T00:00:00Z and _wmkf_grantprogram_value eq ${programId} and (akoya_requeststatus eq 'Phase II Pending' or wmkf_triagestatus eq 100000000) and (wmkf_triagestatus eq null or wmkf_triagestatus ne 100000001)`;
+  expect(queryAllRequests).toHaveBeenCalledWith(expect.objectContaining({ filter: expectedFilter }));
+  // The service and the preflight must load the same list.
+  expect(buildDossierRosterFilter(programId)).toBe(expectedFilter);
 });
 
 test('preflight prompt readback uses the admin current-row projection', async () => {

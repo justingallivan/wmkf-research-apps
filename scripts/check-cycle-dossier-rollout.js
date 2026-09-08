@@ -16,8 +16,7 @@ import { fileURLToPath } from 'node:url';
 import { validateReviewedClaudeModelValue } from '../lib/services/model-review-validation.js';
 import * as research from '../shared/config/prompts/cycle-dossier-research-plan.js';
 import * as entry from '../shared/config/prompts/cycle-dossier-entry.js';
-import { buildVisibilityFilter } from '../shared/config/workbenchVisibility.js';
-import { parseDossierRequestAllowlist, validateDossierEnvironment, dossierRolloutConfig } from '../lib/services/cycle-dossier-rollout.js';
+import { parseDossierRequestAllowlist, validateDossierEnvironment, dossierRolloutConfig, buildDossierRosterFilter } from '../lib/services/cycle-dossier-rollout.js';
 
 export const MIGRATION_FILE = '038_cycle_dossiers.sql';
 export const PROMPTS = [
@@ -128,12 +127,15 @@ async function defaultReadSchemaState() {
   return { tables, migrationApplied: migrations.length === 1, control };
 }
 
-export async function defaultReadRoster({ requestAdapter = null } = {}) {
+export async function defaultReadRoster({ requestAdapter = null, resolveScope = null } = {}) {
   const requests = requestAdapter || await import('../lib/dataverse/adapters/grant-request.js');
-  const { cycleCodeToOdataFilter } = await import('../lib/utils/cycle-code.js');
+  const resolveProgramScope = resolveScope || (await import('../lib/services/workbench/program-scope-service.js')).resolveWorkbenchProgramScope;
+  // Same server-owned program scope as loadDossierRoster: the preflight must
+  // prove the list the pilot will actually load.
+  const programScope = await resolveProgramScope({});
   const result = await requests.queryAllRequests({
     select: 'akoya_requestid,akoya_requestnum,akoya_title,wmkf_organizationname,_wmkf_projectleader_value,_wmkf_programdirector_value',
-    filter: `${cycleCodeToOdataFilter('D26')} and ${buildVisibilityFilter(false)}`,
+    filter: buildDossierRosterFilter(programScope.programId),
     orderby: 'akoya_requestnum asc',
   });
   if (result.capped || !Array.isArray(result.records)) throw new Error('The ungated D26 roster is incomplete or capped.');
