@@ -89,15 +89,18 @@ toolbar/header · `314e9426` `e68bffe9` ToolbarSelect · `f4bcb5b6` smoke record
 2. **`J27:` marker convention and `scripts/check-j27-register.js`: MERGED TO `main` 2026-09-08 UTC**
    (Session 496, PR #180, merge commit `6059118a`; advisory gate + `--root`-isolated self-test,
    registered in `docs/CI_GATES_REFERENCE.md` and `/start`). Baseline 61 ok / 0 stale /
-   6 unverifiable / 9 closed. Two `J27:` markers without ids print as `/start` warnings
-   (`docs/REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md:152`, register Q10) until tagged or accepted.
-   Remaining plan exit criteria: memory/wiki pointers to the register, §8 answers.
+   6 unverifiable / 9 closed. All three `J27:` markers found without ids (the third,
+   in `.claude/skills/start/SKILL.md`, surfaced only on plan-closeout re-run) were
+   resolved 2026-09-07 on branch `claude/j27-plan-closeout`; the memory/wiki pointer
+   exit criterion is also met. §8 owner answers beyond Q0 remain open.
 3. **Write `docs/J27_BUILD_AND_CHANGE_PLAN.md`** once Connor's file-location decision (Q5) lands.
    Evidence: register §2 deliverables table. Sequence unchanged from the S492 prompt.
-4. **Annotate the pilot passages** coupling "J27 Initial Assessment" to 2026-08-18
-   (`REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md:60-61,71`, `DATAVERSE_SHAREPOINT_FILE_MODEL.md:804`,
-   `strategy-roadmap.md:578`). Evidence: register J27-051, Q18. Copy only; no bulk replace. Line
-   numbers as of `d05af5e8`, re-check before editing.
+4. **Annotate the pilot passages** coupling "J27 Initial Assessment" to 2026-08-18:
+   DONE 2026-09-07 (branch `claude/j27-plan-closeout`) for 3 of 4 cited sites —
+   `REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md`, `DATAVERSE_SHAREPOINT_FILE_MODEL.md`,
+   `strategy-roadmap.md` — each now carries a dated note. The fourth cited site, memory
+   `project-reviewer-apps-redesign-direction.md` L82, was left unannotated (out of that
+   session's assigned scope); flag if it needs the same note. Evidence: register J27-051, Q18.
 5. **Smaller shared select variant** for the 54 inline/table/modal selects (optional consistency
    follow-up). Evidence: S492 survey above; owner asked for consistency but did not direct this.
    Not urgent; propose before building.

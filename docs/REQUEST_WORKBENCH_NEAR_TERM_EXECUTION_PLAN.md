@@ -154,7 +154,7 @@ These decisions now constrain every remaining writeup slice:
 - **D26:** the Initial Writeup placeholder corresponds to the approximately
   one-page staff Phase I writeup completed before the Workbench was built. Do
   not backfill or reinterpret it as a live D26 workflow.
-- **J27: J27-060.** every complete single-submission proposal receives an AI-generated
+- **J27** (J27: J27-060): every complete single-submission proposal receives an AI-generated
   **Initial Assessment** before the staff merits discussion and Board
   advancement decision.
 - Staff deliberate from the Initial Assessments and recommend a subset to the
