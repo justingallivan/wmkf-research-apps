@@ -31,7 +31,7 @@
 import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import ReviewerDueDateEditor from './ReviewerDueDateEditor';
 import ReviewerActivityDrawer from './ReviewerActivityDrawer';
-import ReviewerCloseoutModal, { closeoutDispositionLabel } from './ReviewerCloseoutModal';
+import ReviewerCloseoutModal from './ReviewerCloseoutModal';
 import { latestActivitySummary } from './reviewer-activity-history';
 import { acceptedReviewerRemoveWarning } from './remove-reviewer-confirm';
 import { Card, Button } from '../Layout';
@@ -92,6 +92,32 @@ export function StatusBadge({ status, href, onClick, ariaLabel }) {
   return <span className={className}>{info.label}</span>;
 }
 
+// Small honorarium-eligibility pill shown next to the status badge for
+// completed reviews. Distinct from `closeoutDispositionLabel` in
+// ReviewerCloseoutModal.js -- this is the compact Track Reviewers table
+// rendering.
+const HONORARIUM_PILL_INFO = Object.freeze({
+  eligible: { text: 'Eligible', label: 'Honorarium eligibility: eligible', tone: 'neutral' },
+  not_eligible: { text: 'None', label: 'Honorarium eligibility: not eligible', tone: 'neutral' },
+  not_applicable: { text: 'N/A', label: 'Honorarium eligibility: not applicable', tone: 'neutral' },
+  // The API emits this literal when the stored picklist integer doesn't map
+  // to a known value (lib/services/review-manager/reviewers-service.js) --
+  // distinct from "not recorded"; it needs a technical fix, not a decision.
+  unknown: {
+    text: 'Needs review',
+    label: 'Honorarium eligibility: saved disposition not recognized; technical repair required',
+    tone: 'amber',
+  },
+});
+
+function honorariumEligibilityPillInfo(value) {
+  return HONORARIUM_PILL_INFO[value] || {
+    text: 'Undecided',
+    label: 'Honorarium eligibility not recorded',
+    tone: 'amber',
+  };
+}
+
 export function reviewerHasReceivedReview(reviewer) {
   return Boolean(
     reviewer?.reviewReceivedAt
@@ -112,7 +138,7 @@ function closeoutNextAction(reviewer) {
   return null;
 }
 
-export const _managePanelInternals = { closeoutNextAction };
+export const _managePanelInternals = { closeoutNextAction, honorariumEligibilityPillInfo };
 
 // ─── Decline-referral inline add helpers ────────────────────────────────────
 
@@ -1038,6 +1064,9 @@ export default function ReviewerManagePanel({
                 const lastEvent = latestActivitySummary(r);
                 const receivedReview = reviewerHasReceivedReview(r);
                 const nextAction = closeoutNextAction(r);
+                const honorariumPill = r.reviewStatus === 'complete'
+                  ? honorariumEligibilityPillInfo(r.honorariumEligibility)
+                  : null;
 
                 return (
                   <tr key={r.suggestionId} className="hover:bg-gray-50 transition-colors">
@@ -1071,6 +1100,22 @@ export default function ReviewerManagePanel({
                             : undefined}
                           ariaLabel={`View activity history for ${r.name || 'reviewer'}`}
                         />
+                        {honorariumPill && (
+                          <span
+                            className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-medium ${
+                              honorariumPill.tone === 'amber'
+                                ? 'border-amber-200 bg-amber-50 text-amber-800'
+                                : 'border-gray-200 bg-gray-50 text-gray-700'
+                            }`}
+                            title={honorariumPill.label}
+                          >
+                            {/* Compact visual text is hidden from AT; the sr-only span carries the full wording. */}
+                            <span aria-hidden="true">$</span>
+                            <span aria-hidden="true">{honorariumPill.text}</span>
+                            <span className="sr-only">{honorariumPill.label}</span>
+                            
+                          </span>
+                        )}
                         {!receivedReview && (
                           <TokenStateBadge
                             state={r.tokenState}
@@ -1083,11 +1128,6 @@ export default function ReviewerManagePanel({
                           />
                         )}
                       </div>
-                      {r.reviewStatus === 'complete' && (
-                        <span className="mt-1 block text-xs leading-4 text-gray-600">
-                          {closeoutDispositionLabel(r.honorariumEligibility)}
-                        </span>
-                      )}
                       {!receivedReview && r.reminderCount > 0 && (
                         <button
                           type="button"

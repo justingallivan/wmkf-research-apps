@@ -6,7 +6,7 @@ status: active
 summary: "Approved contract separating review receipt, thank-you, PD closeout and honorarium eligibility, and final authorization to remit."
 canonical: false
 cataloged: 2026-09-03
-last_verified: 2026-09-04
+last_verified: 2026-09-08
 owner: product-engineering
 related:
   - docs/REVIEWER_DATA_MODEL.md
@@ -141,7 +141,7 @@ human decision.
 | A restored/reused engagement does not inherit a prior closeout decision. | reviewer-suggestion reset set | Reset contract clears `wmkf_honorariumeligibility`; parity test derives the reset set. |
 | Unknown disposition values fail closed. | route; service; adapter maps and reverse maps | Invalid and unmapped values return 400/no write; all three valid values round-trip. |
 | The PD answers only the applicable payment question; No requires a reason. | closeout modal; route; close-review service | UI exposes Yes/No only for linked, non-opted-out engagements; blank No is blocked before authorization/read/write; service repeats the fail-closed guard. |
-| Existing Complete rows are not inferred or bulk-backfilled. | UI/read projection; deployment procedure | Null renders “Closeout disposition not recorded”; no migration updates rows. |
+| Existing Complete rows are not inferred or bulk-backfilled. | UI/read projection; deployment procedure | Null renders the amber “$ Undecided” pill in the Track table and “Closeout disposition not recorded” in the closeout modal (owner decision 2026-09-08); no migration updates rows. |
 | Complete remains visible and uses the approved deeper success green. | reviewer modes and Track table | Status partition and class tests remain total. |
 
 ## Closeout rules
@@ -249,8 +249,12 @@ contract avoids the current sequential partial-success problem.
 - For a Complete row, show the disposition; show **Record closeout** as the
   Next-action button only while no disposition is recorded, otherwise edit via
   the More menu's **Edit closeout** (owner decision 2026-09-08).
-- Show null on legacy Complete rows as **Closeout disposition not recorded**;
-  never infer it from receipt, thank-you, opt-out, or linked-request state.
+- Show the disposition on Complete rows as a compact pill beside the status
+  badge (**$ Eligible** / **$ None** / **$ N/A**; amber **$ Undecided** for a
+  null legacy row; amber **$ Needs review** when the API emits `unknown` for an
+  unrecognized stored picklist value, which needs technical repair rather than
+  a new closeout decision; owner decision 2026-09-08). The modal still says
+  **Closeout disposition not recorded** for null. Never infer it from receipt, thank-you, opt-out, or linked-request state.
 - Check `response.ok`, display the server reason, disable duplicate submission
   while pending, and refresh only after a confirmed result.
 - Change Complete's badge classes only to `bg-green-200 text-green-900`; preserve

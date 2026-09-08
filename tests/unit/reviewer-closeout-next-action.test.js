@@ -14,7 +14,7 @@ import ReviewerManagePanel, {
   _managePanelInternals,
 } from '../../shared/components/reviewers/ReviewerManagePanel';
 
-const { closeoutNextAction } = _managePanelInternals;
+const { closeoutNextAction, honorariumEligibilityPillInfo } = _managePanelInternals;
 
 jest.mock('../../shared/components/Layout', () => ({
   Card: ({ children }) => <div>{children}</div>,
@@ -75,6 +75,7 @@ describe('Next-action column wiring through the panel', () => {
     expect(screen.queryByRole('button', { name: 'Record closeout' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Edit closeout' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Mark complete' })).not.toBeInTheDocument();
+    expect(screen.getByText('Honorarium eligibility: eligible')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Manage Dr. Closeout Reviewer' }));
     const editButton = screen.getByRole('button', { name: 'Edit closeout' });
@@ -98,6 +99,8 @@ describe('Next-action column wiring through the panel', () => {
       await Promise.resolve();
     });
 
+    expect(screen.getByText('Honorarium eligibility not recorded')).toBeInTheDocument();
+
     const button = screen.getByRole('button', { name: 'Record closeout' });
     fireEvent.click(button);
     expect(screen.getByRole('dialog')).toBeInTheDocument();
@@ -118,7 +121,22 @@ describe('Next-action column wiring through the panel', () => {
     });
 
     expect(screen.getByRole('button', { name: 'Mark complete' })).toBeInTheDocument();
+    expect(screen.queryByText(/Honorarium eligibility/)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Manage Dr. Closeout Reviewer' }));
     expect(screen.queryAllByRole('button', { name: 'Mark complete' })).toHaveLength(1);
+  });
+});
+
+describe('honorariumEligibilityPillInfo', () => {
+  test.each([
+    ['eligible', 'Eligible', 'Honorarium eligibility: eligible', 'neutral'],
+    ['not_eligible', 'None', 'Honorarium eligibility: not eligible', 'neutral'],
+    ['not_applicable', 'N/A', 'Honorarium eligibility: not applicable', 'neutral'],
+    [null, 'Undecided', 'Honorarium eligibility not recorded', 'amber'],
+    [undefined, 'Undecided', 'Honorarium eligibility not recorded', 'amber'],
+    ['bogus', 'Undecided', 'Honorarium eligibility not recorded', 'amber'],
+    ['unknown', 'Needs review', 'Honorarium eligibility: saved disposition not recognized; technical repair required', 'amber'],
+  ])('%s -> text=%s, label=%s, tone=%s', (value, text, label, tone) => {
+    expect(honorariumEligibilityPillInfo(value)).toEqual({ text, label, tone });
   });
 });
