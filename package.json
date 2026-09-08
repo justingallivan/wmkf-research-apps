@@ -102,6 +102,8 @@
     "check:scaffolding-tokens:self-test": "node scripts/check-scaffolding-tokens-self-test.js",
     "check:harness-framing": "node scripts/check-harness-framing.js",
     "check:harness-framing:self-test": "node scripts/check-harness-framing-self-test.js",
+    "check:j27-register": "node scripts/check-j27-register.js",
+    "check:j27-register:self-test": "node scripts/check-j27-register-self-test.js",
     "report:claim-evidence-pilot": "node scripts/report-claim-evidence-pilot.js"
   },
   "dependencies": {

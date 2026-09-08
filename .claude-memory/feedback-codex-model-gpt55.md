@@ -8,6 +8,8 @@ metadata:
   originSessionId: 29a6b837-b641-4706-996e-0d56eb5d5029
 ---
 
+> **Superseded again 2026-09-08:** see [[feedback-codex-model-gpt56-sol]] (owner directive: `--model gpt-5.6-sol`, never `gpt-6-astra`).
+>
 > **Superseded 2026-07-22:** The installed Codex companion runtime now explicitly
 > says to leave the model unset unless the user requests one, and the Codex app
 > exposes its own current model list. Use the active runtime contract and

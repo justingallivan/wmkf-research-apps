@@ -9,7 +9,7 @@ last_verified: 2026-08-30 via Production-deployed Initial Assessment controls, s
 
 ## Recall Rule
 
-Read this when: building/maintaining the **Request Workbench → Proposal tab** document section, writing any SharePoint document-resolution for a request, planning **J27** document collection, or considering changes to the reviewer **hold step**. Pairs with [[project-grant-phasing-evolution]] (the phasing mechanics — single-submission, "Phase II" = status flip).
+Read this when: building/maintaining the **Request Workbench → Proposal tab** document section, writing any SharePoint document-resolution for a request, planning **J27** document collection, or considering changes to the reviewer **hold step**. Pairs with [[project-grant-phasing-evolution]] (the phasing mechanics — single-submission, "Phase II" = status flip). Every J27-sensitive site (retire / persist / change / build / scale) is registered in `docs/J27_TRANSITION_REGISTER.md`; add new sites there rather than here.
 
 **2026-07-28 clarification (supersedes the older shorthand
 “doc-resident knowledge onto Dataverse tables”):** the converging direction is

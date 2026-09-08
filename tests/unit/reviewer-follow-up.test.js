@@ -188,9 +188,10 @@ describe('reviewer follow-up request scope', () => {
       expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('/api/workbench/dashboard?cycleCode=D26&scope=my'));
       expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('/api/review-manager/reviewers?cycleCode=D26&scope=my'));
     });
+    expect(global.fetch.mock.calls.some(([url]) => String(url).includes('includeSetAside'))).toBe(false);
 
     expect(screen.getByRole('button', { name: 'My requests' })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByRole('button', { name: 'All reviewers' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { name: 'Show all (0)' })).toHaveAttribute('aria-pressed', 'false');
 
     fireEvent.click(screen.getByRole('button', { name: 'All requests' }));
 
@@ -198,8 +199,9 @@ describe('reviewer follow-up request scope', () => {
       expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('/api/workbench/dashboard?cycleCode=D26&scope=all'));
       expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('/api/review-manager/reviewers?cycleCode=D26&scope=all'));
     });
+    expect(global.fetch.mock.calls.some(([url]) => String(url).includes('includeSetAside'))).toBe(false);
     expect(screen.getByRole('button', { name: 'All requests' })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByRole('button', { name: 'All reviewers' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { name: 'Show all (0)' })).toHaveAttribute('aria-pressed', 'false');
   });
 
   test('uses the server default even when it is not the first cycle, while honoring a valid URL override', async () => {
@@ -217,8 +219,9 @@ describe('reviewer follow-up request scope', () => {
 
     const { unmount } = render(<ReviewerFollowUpDashboard />);
     await waitFor(() => expect(screen.getByRole('combobox', { name: 'Cycle' })).toHaveValue('J26'));
-    expect(screen.getByRole('option', { name: 'December 2026 (44 active + 6 set aside)' })).toBeInTheDocument();
-    expect(screen.getByRole('option', { name: 'June 2026 (0 active + 3 set aside)' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'December 2026 (44)' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'June 2026 (0)' })).toBeInTheDocument();
+    expect(screen.queryByLabelText('Show set aside')).not.toBeInTheDocument();
     unmount();
 
     window.history.replaceState({}, '', '/workbench/reviewer-follow-up?cycleCode=D26');
@@ -252,14 +255,16 @@ describe('reviewer follow-up request scope', () => {
 
     render(<ReviewerFollowUpDashboard />);
     expect(await screen.findByText('1 request in this view')).toBeInTheDocument();
+    expect(screen.queryByText('Set aside proposal')).not.toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText('Search requests and reviewers'), {
       target: { value: 'south university' },
     });
     expect(screen.getByText('0 matching requests')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'All reviewers' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show all (2)' }));
     expect(screen.getByText('1 matching request')).toBeInTheDocument();
+    expect(screen.queryByText('Set aside proposal')).not.toBeInTheDocument();
   });
 
   test('missing canManage projection fails closed in the rendered reviewer controls', async () => {
@@ -592,7 +597,7 @@ describe('reviewer follow-up refetch resilience', () => {
     render(<ReviewerFollowUpDashboard />);
     expect(await screen.findByText('Active proposal')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'All reviewers' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show all (2)' }));
     fireEvent.click(screen.getAllByRole('button', { name: 'Show reviewer activity' })[0]);
 
     reviewersShouldFail = true;

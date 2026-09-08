@@ -616,7 +616,7 @@ stale. All three rewritten in place.
 
 **Codex diff review pass 5 (2026-09-07): runtime consistent; one medium doc finding, accepted.** Four more
 "remain separate work" restatements (implementation plan :721 and :818, `DATAVERSE_SHAREPOINT_FILE_MODEL.md:802`,
-`REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md:924`) plus the explicit-actor plan's "runtime not yet built" row
+`REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md:929`) plus the explicit-actor plan's "runtime not yet built" row
 (`REQUEST_DOCUMENT_EXPLICIT_ACTOR_PLAN.md:124`) rewritten in place.
 
 **Codex diff review passes 6–7 (2026-09-07): runtime consistent; doc restatements only, accepted.** Pass 6:

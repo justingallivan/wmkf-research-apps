@@ -155,7 +155,7 @@ describe('reviewer table geometry', () => {
     expect(screen.getByText(reviewer.email)).toHaveClass('truncate');
   });
 
-  test('uses the corresponding five-column grid when management controls are present', async () => {
+  test('uses dedicated action columns when management controls are present', async () => {
     let container;
     await act(async () => {
       ({ container } = render(
@@ -171,11 +171,13 @@ describe('reviewer table geometry', () => {
 
     const table = container.querySelector('table');
     expect(table).toHaveClass('table-fixed', 'min-w-[58rem]');
-    expect(table.querySelectorAll('colgroup col')).toHaveLength(5);
+    expect(table.querySelectorAll('colgroup col')).toHaveLength(7);
     expect(screen.getByRole('columnheader', { name: 'Next action' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: /Download/ })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'More' })).toBeInTheDocument();
   });
 
-  test('combines follow-up and secondary controls into one aligned action lane', async () => {
+  test('keeps follow-up controls separate from download and secondary actions', async () => {
     let container;
     await act(async () => {
       ({ container } = render(
@@ -192,9 +194,10 @@ describe('reviewer table geometry', () => {
 
     const table = container.querySelector('table');
     expect(table).toHaveClass('table-fixed', 'min-w-[58rem]');
-    expect(table.querySelectorAll('colgroup col')).toHaveLength(5);
+    expect(table.querySelectorAll('colgroup col')).toHaveLength(7);
     expect(screen.queryByRole('columnheader', { name: 'Follow up' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('columnheader', { name: 'Actions' })).not.toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: /Download/ })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'More' })).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: 'Next action' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Send reminder to Joshua Rosenthal' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Manage Joshua Rosenthal' })).toBeInTheDocument();

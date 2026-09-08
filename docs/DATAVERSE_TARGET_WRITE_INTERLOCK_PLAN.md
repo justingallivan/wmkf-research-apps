@@ -177,10 +177,17 @@ assertDataverseOperationAllowed({ url, method, callerLabel })
   anything else — including a `*.crm.dynamics.com` host not in the registry —
   is `unknown`. No env-var extension of the registry, deliberately: an unknown
   org must force a reviewed commit, not a quiet env edit.
-- Operation class from HTTP method: `GET`/`HEAD` → **read**; anything else
-  (`POST`, `PATCH`, `DELETE`, `PUT`) → **write**. A `$batch` POST is a write —
-  correct, because `executeChangeset` only carries mutations
-  (`changeset.js:60` types operations as `POST|PATCH|DELETE`).
+- Operation class from the actual URL and HTTP method: `GET`/`HEAD` →
+  **read**. The exact normalized pathname `POST /api/search/v1.0/query` is
+  also a read because Dataverse exposes that indexed query operation through
+  POST. Query strings do not change the pathname. Every other method/path
+  combination remains a **write**, including `$batch`, generic Web API POSTs,
+  Search suggest/autocomplete, suffix or trailing-slash variants, encoded
+  variants, malformed URLs, and Search endpoints that have not received a
+  separate policy review. The exemption is derived inside the interlock from
+  `url` and `method`; callers cannot supply an operation label. Preview/local
+  access to this production read still requires
+  `DATAVERSE_ALLOW_PROD_READS=yes`.
 
 ### 3.2 Policy matrix **[PLANNED — implements strategy §6]**
 

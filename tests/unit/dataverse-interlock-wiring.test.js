@@ -22,6 +22,7 @@ import { createClient } from '../../lib/dataverse/client.js';
 import { _resetInterlockStateForTests } from '../../lib/dataverse/core/interlock.js';
 
 const UNKNOWN_URL = 'https://someorg.crm.dynamics.com/api/data/v9.2/contacts';
+const PROD_SEARCH_URL = 'https://wmkf.crm.dynamics.com/api/search/v1.0/query';
 const TOKEN_URL = 'https://login.microsoftonline.com/x/token';
 
 const ENV_KEYS = [
@@ -59,6 +60,31 @@ afterEach(() => {
 });
 
 describe('dynamics/http.js fetchWithTimeout', () => {
+  test('exact Search POST is classified as a read before fetch', async () => {
+    process.env.DATAVERSE_TARGET_INTERLOCK = 'on';
+    process.env.DYNAMICS_URL = PROD_SEARCH_URL.replace('/api/search/v1.0/query', '');
+    delete process.env.VERCEL_ENV;
+    process.env.NODE_ENV = 'development';
+
+    await expect(
+      fetchWithTimeout(PROD_SEARCH_URL, { method: 'POST' }, 5000),
+    ).rejects.toThrow(/prod read denied/);
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  test('exact Search POST reaches fetch when production reads are explicitly allowed', async () => {
+    process.env.DATAVERSE_TARGET_INTERLOCK = 'on';
+    process.env.DATAVERSE_ALLOW_PROD_READS = 'yes';
+    process.env.DYNAMICS_URL = PROD_SEARCH_URL.replace('/api/search/v1.0/query', '');
+    delete process.env.VERCEL_ENV;
+    process.env.NODE_ENV = 'development';
+
+    await expect(
+      fetchWithTimeout(PROD_SEARCH_URL, { method: 'POST' }, 5000),
+    ).resolves.toBeDefined();
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
   test('on mode + registry-unknown URL: throws before any fetch, message contains denial marker', async () => {
     process.env.DATAVERSE_TARGET_INTERLOCK = 'on';
     await expect(

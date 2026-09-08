@@ -295,6 +295,73 @@ The report's top-level `summary` describes current live drift only. The dated 20
 
 Added S348 (audit Slice 5 from `docs/audits/memory-hygiene-control-audit-2026-07-02.md`). Runs `scripts/check-memory-health.js`. **Read-only, never fails** — complements `check:memory-router` (structure) with semantic-freshness signals. Reports per active leaf memory: `shadow-atlas` (structural claim, no Atlas/source/probe pointer), `weak-basis` (structural claim + explicitly weak `last_verified`, or no acceptable basis), `no-recall-rule`, `oversize-routed`, `stale-routed`. An acceptable basis is either a non-weak `last_verified` value or both a parseable harness `modified:` timestamp and a dated in-body `[VERIFIED ...]` label. Explicit unknown/not-re-probed text still flags even when the alternative evidence shape is present. Parses top-level and `metadata:`-nested frontmatter keys. `--json` emits a machine-readable triage worklist; `--quiet` prints summary only. It is the intended starting point for future memory-triage passes (see `docs/audits/memory-triage-2026-07-08.md`). Wired into the `/start` advisory gate list. Focused coverage: `npm test -- --runInBand tests/unit/check-memory-health.test.js`.
 
+### `check:j27-register` (advisory) — `J27:` marker convention ↔ transition register (S496)
+
+Added 2026-09-07 from `docs/J27_SINGLE_PHASE_TRANSITION_INVENTORY_PLAN.md` §7. Runs
+`scripts/check-j27-register.js` against the tracked tree and
+`docs/J27_TRANSITION_REGISTER.md`. Three behaviors: lists every `J27:` tagged site; fails
+(exit 1) when a tag names a register id that does not exist; fails when a register row's
+`site` no longer resolves to a file containing its `excerpt`. An id-less `J27:` is listed
+as a warning (not a failure) only when it sits in a comment — the line, after leading
+whitespace, begins with a code-comment leader (`//`, `/*`, `*`, `#`, `--`, `<!--`) with
+`J27:` following immediately (optionally after whitespace); a bare `J27:` in prose, inside
+a bold label (`**J27:**`), or mid-sentence is not a marker at all (tightened 2026-09-08).
+Excerpt resolution is per site, not per row (tightened 2026-09-08): a multi-site row (several
+backticked files, or a glob with several matches) is stale unless every resolved file/match
+contains a fragment; any miss makes the row stale, and every miss is listed, not just one.
+Rows whose disposition begins `rejected` or `done` are closed and skipped; rows with no
+backticked path in `site` or no backticked fragment in `excerpt` (Dataverse surfaces,
+work-queue pointers, plain-prose excerpts) are reported as unverifiable and never fail. Row detection is whitespace-tolerant (2026-09-08, Codex adversarial review of
+`65eb4bfe`): a line that looks like a row — after any leading whitespace, a pipe, optional
+whitespace, and something id-shaped — is always parsed, not silently skipped for using
+non-canonical spacing (no space after the opening pipe, leading whitespace before it). A
+register row that does not parse into the seven schema columns, a malformed id
+(`J27-23`, `J27-0230` — anything not exactly `J27-` plus three digits), or a duplicate id,
+is a configuration error (exit 2). **Advisory:** registered here and in the `/start` battery
+only, not in `test.yml` or any hook; promotion to blocking is an owner decision (plan §7).
+The self-test is `--root`/`--register` isolated to a temp fixture tree.
+
+**Site-to-fragment binding (Phase 0, 2026-09-08 —
+`docs/plans/J27_REGISTER_PER_SITE_RECONCILIATION_PLAN_2026-09-08.md` §2):** an `excerpt`
+fragment may be bound to one of `site`'s cited paths/globs: `` `path/or/glob` → `fragment` ``
+(arrow is `→` or `->`); unprefixed backticked fragments remain a shared bag, except a bare
+path/glob span (no whitespace) left unpaired by an arrow, which is dropped rather than
+becoming a bag fragment. A file with one or more fragments bound to it must contain one of
+THOSE — the bag is never consulted for a bound file, even on a coincidental bag match. The
+disposition vocabulary is `open` · `scheduled` · `done` · `rejected` (plan §3); any other
+leading word (a bare `closed.`, for example) is reported (`? J27-NNN disposition not in
+vocabulary: <word>`, info only) and the row is still checked, not silently treated as
+closed. A directory site no longer passes on existence alone — it must cite a specific
+file, or the row is stale with `directory site needs a file: <dir>`.
+
+**Binding resolution and STRICT UNBOUND (Opus review of Phase 0, `987ba3c9`, 2026-09-08):**
+a bound path/glob token resolves the same way a `site` token does — first an exact match
+against one of the row's own cited `site` tokens, then independent resolution
+(`BARE_NAME_PREFIXES`, sibling dir, or a glob match). A token that resolves to nothing is
+stale (`binding path unresolved: <token>`); one that resolves to a real file NOT among the
+row's `site` citations is also stale (`binding path not in site: <file>`) — a coincidental
+match elsewhere in the tree does not count. A bound pair whose fragment span drops to
+nothing (< `MIN_FRAGMENT_LENGTH`) is stale (`binding fragment too short: <path>`), never
+silently discarded. **STRICT UNBOUND (owner decision 2026-09-08, "we don't need drift"):** a
+file with no binding in a multi-site row (more than one resolved file) is itself a failure —
+the bag is not consulted for it at all — and the row is stale (`unbound: <files>`) even when
+the bag would have matched. Only a single-file row still falls back to the bag. The
+`N multi-site rows with unbound files` summary line is kept for that count.
+
+**Register reconciliation complete (2026-09-08):** four parallel slice agents bound
+every stale row to the new syntax, followed by two exhaustive Opus matrix reviews
+whose CONDITIONS were applied on top (`docs/J27_TRANSITION_REGISTER.md` §10). Current
+baseline (after the owner's 2026-09-08 J27-023 ruling, `docs/J27_TRANSITION_REGISTER.md`
+§10): `check:j27-register` reports 59 ok, 0 stale, 6 unverifiable, 11 closed; 0 multi-site
+rows unbound; 0 rows with a disposition outside the vocabulary. The self-test is fully
+green (80/80 assertions; its `KNOWN_OWNER_PENDING` allowlist is empty and exists only for
+a future owner-pending row), including the real-repository
+baseline). A 2026-09-08 Codex adversarial review also found the row-detection regex
+silently skipped valid rows using non-canonical Markdown spacing (no space after the
+opening pipe, leading whitespace) instead of checking them; row detection is now
+whitespace-tolerant and fails closed (exit 2, configuration error) on a malformed
+`J27-##`/`J27-####`-shaped id rather than either skipping or wrongly accepting it.
+
 ### `check:model-override-warming` — LLM 404-on-tier-alias prevention (S230)
 
 AST gate (`@babel/parser`). Every `pages/api/**` route that reaches a `getModelForApp` / `getFallbackModelForApp` call — directly or transitively through an imported module — must call an **awaited** `loadModelOverrides()` first (and within a single function, the warm must lexically precede a direct resolver call). Without warming, the synchronous resolver returns the raw tier alias (e.g. `sonnet`) and Anthropic 404s in prod; unit tests never catch it (they mock the LLM). This class recurred 3× (web-suggestions S229; applicant-reviewers + integrity-screener/screen S230) before the gate.
@@ -424,6 +491,7 @@ When modifying any `scripts/check-*.js` gate (or building a new one), the matchi
 | `check:scaffolding-tokens` | `check:scaffolding-tokens:self-test` |
 | `check:prompt-injection-tagging` | `check:prompt-injection-tagging:self-test` |
 | `check:reviewer-reminder-hold` | `check:reviewer-reminder-hold:self-test` — safe registry and lookalike-path positives; exact held-route (including query-string registration), invalid JSON, missing/non-array registry, malformed entry, missing-path, and alternate-config negatives. |
+| `check:j27-register` | `check:j27-register:self-test` — unknown-id, stale-excerpt, missing-site, unmatched-glob, swapped-binding, bound-vs-bag (Unicode and ASCII arrow), directory-site, glob-bound-one-fragment, binding-path-unresolved, binding-path-not-in-site, binding-fragment-too-short, path-like-bag-exclusion, strict-unbound (pure-bag and partially-bound multi-file rows, including the two superseded pre-binding fixtures), malformed-row and duplicate-id reds; existing-id, comment-led bare-marker (`//`, `<!--`, and `####`) warning, backtick self-reference, bold-label and mid-line prose non-marker skips, two-site-both-bound, ellipsis-split, wrapped-comment, memory/glob shorthand, ASCII/Unicode arrow parsing, fully-bound multi-file row, closed-row and prose-only greens; `closed.`-disposition-not-closed-plus-vocabulary-warning info case; no-space-after-opening-pipe and leading-whitespace rows recognised and checked (not skipped), malformed-id (two- and four-digit) exit-2 reds; real-baseline stale-only-on-`KNOWN_OWNER_PENDING` before and after (register reconciliation complete 2026-09-08 after the owner's J27-023 ruling — 59 ok, 0 stale, 6 unverifiable, 11 closed, 0 unbound; the allowlist is empty). |
 
 **When external review catches a structural pattern an existing gate missed, the order is mandatory:**
 
@@ -458,3 +526,4 @@ before its self-test:**
 - `check:reviewer-engagement-boundary` then `check:reviewer-engagement-boundary:self-test` (self-test is `--root`-isolated to a temp dir like the route-service-boundary pair; run sequentially per the universal gate convention)
 - `check:script-suggestion-writers` then `check:script-suggestion-writers:self-test` (self-test is `--root`-isolated to a temp dir; run sequentially per the universal gate convention)
 - `check:secret-scan` then `check:secret-scan:self-test`
+- `check:j27-register` then `check:j27-register:self-test` (self-test is `--root`-isolated to a temp dir; run sequentially per the universal gate convention)
