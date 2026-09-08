@@ -17,6 +17,17 @@ services, and those services use the grant-request adapter for normal request re
 and writes. `DynamicsService` remains the underlying transport; Dynamics Explorer
 uses its generic query surface rather than the domain adapter.
 
+**Related Dataverse system entity:** `savedqueries` stores the system views that
+configure request discovery. [VERIFIED via source inspection 2026-09-08]
+`scripts/probe-request-search-index-config.mjs` reads the single
+`akoya_request` Quick Find view to report its FetchXML projection, search
+conditions, and layout. The dry-run-by-default
+`scripts/add-akoya-request-programid-quick-find-column.mjs` targets that same
+row through the guarded Dataverse client; its production apply path is blocked
+after two HTTP 400 / `0x80040216` attempts, which left the view unchanged and
+did not call `PublishXml`. This is platform configuration metadata, not
+application-owned request state.
+
 ## Key fields (live, sample-probed 2026-05-07)
 
 Identity / status:

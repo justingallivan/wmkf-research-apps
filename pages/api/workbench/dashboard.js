@@ -44,6 +44,10 @@ export default async function handler(req, res) {
 
   const scope = req.query.scope === 'all' ? 'all' : 'my';
   const { cycleCode } = req.query;
+  if (Array.isArray(req.query.programId)) {
+    return res.status(400).json({ error: 'programId must be a single GUID' });
+  }
+  const programId = req.query.programId;
   const includeSetAside = req.query.includeSetAside === '1';
 
   return withDalContext('workbench-dashboard', async () => {
@@ -55,6 +59,7 @@ export default async function handler(req, res) {
         cycleCode,
         scope,
         includeSetAside,
+        programId,
       });
       return res.status(200).json(body);
     } catch (err) {

@@ -20,6 +20,7 @@ import {
 import { PRODUCTION_HOSTS, SANDBOX_HOSTS } from '../../lib/dataverse/core/target-registry.js';
 
 const PROD_URL = `https://${PRODUCTION_HOSTS[0]}/api/data/v9.2/contacts`;
+const PROD_SEARCH_URL = `https://${PRODUCTION_HOSTS[0]}/api/search/v1.0/query`;
 const PROD_RECORD_URL = `https://${PRODUCTION_HOSTS[0]}/api/data/v9.2/contacts(11111111-1111-1111-1111-111111111111)`;
 const PROD_BATCH_URL = `https://${PRODUCTION_HOSTS[0]}/api/data/v9.2/$batch`;
 const PROD_BOUND_ACTION_URL = `https://${PRODUCTION_HOSTS[0]}/api/data/v9.2/emails(11111111-1111-1111-1111-111111111111)/Microsoft.Dynamics.CRM.SendEmail`;
@@ -351,6 +352,61 @@ describe.each(MATRIX)(
 );
 
 describe('DATAVERSE_ALLOW_PROD_READS exception', () => {
+  test('local + prod target + exact Search POST is denied without the read opt-in', () => {
+    process.env.DATAVERSE_TARGET_INTERLOCK = 'on';
+    setDeployment('local');
+    expect(() =>
+      assertDataverseOperationAllowed({ url: PROD_SEARCH_URL, method: 'POST', callerLabel: 'test' }),
+    ).toThrow();
+  });
+
+  test('local + prod target + exact Search POST is allowed with the read opt-in', () => {
+    process.env.DATAVERSE_TARGET_INTERLOCK = 'on';
+    process.env.DATAVERSE_ALLOW_PROD_READS = 'yes';
+    setDeployment('local');
+    expect(() =>
+      assertDataverseOperationAllowed({ url: `${PROD_SEARCH_URL}?search=grant`, method: 'POST', callerLabel: 'test' }),
+    ).not.toThrow();
+  });
+
+  test.each([
+    ['/api/search/v1.0/query/extra', 'trailing path'],
+    ['/api/search/v1.0/suggest', 'suggest endpoint'],
+    ['/api/search/v1.0/autocomplete', 'autocomplete endpoint'],
+    ['/api/data/v9.2/contacts', 'generic Web API POST'],
+    ['/api/data/v9.2/$batch', '$batch'],
+    ['/api/search/v1.0/%71uery', 'encoded path segment'],
+    ['/api/search/v1.0/query/', 'trailing slash'],
+  ])('POST %s remains a write (%s)', (pathname) => {
+    process.env.DATAVERSE_TARGET_INTERLOCK = 'on';
+    process.env.DATAVERSE_ALLOW_PROD_READS = 'yes';
+    setDeployment('local');
+    expect(() =>
+      assertDataverseOperationAllowed({
+        url: `https://${PRODUCTION_HOSTS[0]}${pathname}`,
+        method: 'POST',
+        callerLabel: 'test',
+      }),
+    ).toThrow();
+  });
+
+  test('malformed POST URL remains a write', () => {
+    process.env.DATAVERSE_TARGET_INTERLOCK = 'on';
+    process.env.DATAVERSE_ALLOW_PROD_READS = 'yes';
+    setDeployment('local');
+    expect(() =>
+      assertDataverseOperationAllowed({ url: 'not-a-url', method: 'POST', callerLabel: 'test' }),
+    ).toThrow();
+  });
+
+  test.each(['GET', 'HEAD'])('%s remains a read for the Search path', (method) => {
+    process.env.DATAVERSE_TARGET_INTERLOCK = 'on';
+    setDeployment('local');
+    expect(() =>
+      assertDataverseOperationAllowed({ url: PROD_SEARCH_URL, method, callerLabel: 'test' }),
+    ).toThrow(/prod read denied/);
+  });
+
   test('preview + prod target + read is allowed when DATAVERSE_ALLOW_PROD_READS=yes', () => {
     process.env.DATAVERSE_TARGET_INTERLOCK = 'on';
     process.env.DATAVERSE_ALLOW_PROD_READS = 'yes';
