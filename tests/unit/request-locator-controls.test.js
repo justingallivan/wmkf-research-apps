@@ -223,3 +223,35 @@ test('switching Grant Program clears dependent state and requests fresh scoped o
   expect(screen.getByRole('option', { name: 'December 2026' })).toBeInTheDocument();
   expect(statusSelect()).toHaveValue('');
 });
+
+test('cached Research results cannot revive after switching to Southern California', async () => {
+  const socalId = '22222222-2222-4222-8222-222222222222';
+  window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify({
+    criteria: { query: 'cached', cycle: '', status: '', programId: PROGRAM_ID },
+    results: [{ requestId: 'research-row', title: 'Research-only cached row' }],
+    totalCount: 1,
+  }));
+  const pending = deferred();
+  fetch.mockResolvedValueOnce(response({
+    ...options,
+    programs: [
+      { programId: PROGRAM_ID, name: 'Research' },
+      { programId: socalId, name: 'Southern California' },
+    ],
+  })).mockReturnValueOnce(pending.promise);
+  render(<RequestLocator />);
+  await waitFor(() => expect(programSelect()).toBeEnabled());
+  expect(screen.getByText('Research-only cached row')).toBeInTheDocument();
+  fireEvent.change(programSelect(), { target: { value: socalId } });
+  expect(screen.queryByText('Research-only cached row')).not.toBeInTheDocument();
+  await act(async () => pending.resolve(response({
+    ...options,
+    programs: [
+      { programId: PROGRAM_ID, name: 'Research' },
+      { programId: socalId, name: 'Southern California' },
+    ],
+    programId: socalId,
+    programName: 'Southern California',
+  })));
+  await waitFor(() => expect(programSelect()).toHaveValue(socalId));
+});

@@ -48,8 +48,8 @@ test('uses only the newest visible Workbench cycle for the PD default', async ()
   ]);
   dependencies.queryAssignedRequests.mockResolvedValue({
     records: [
-      { _wmkf_grantprogram_value: SOCAL, wmkf_meetingdate: '2025-12-11' },
-      { _wmkf_grantprogram_value: RESEARCH, wmkf_meetingdate: '2026-06-04' },
+      { _wmkf_grantprogram_value: SOCAL, wmkf_meetingdate: '2026-06-04' },
+      { _wmkf_grantprogram_value: RESEARCH, wmkf_meetingdate: '2026-12-11' },
     ],
   });
   await expect(resolveWorkbenchProgramScope({ callerSystemId: PD, dependencies })).resolves.toMatchObject({

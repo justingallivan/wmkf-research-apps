@@ -108,8 +108,8 @@ export default function RequestLocator() {
       setHasMore(saved.hasMore === true);
       setNextOffset(saved.nextOffset);
     }
-    if (criteria.programId && criteria.programId !== programId) setProgramId(criteria.programId);
-  }, [programId]);
+    if (criteria.programId) setProgramId(criteria.programId);
+  }, []);
 
   useEffect(() => {
     if (skipProgramEffectRef.current) {

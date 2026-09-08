@@ -234,6 +234,32 @@ describe('getReviewers', () => {
     expect(resolvePD).not.toHaveBeenCalled();
   });
 
+  test('specific proposal lookup enforces the selected broad Grant Program before loading suggestions', async () => {
+    getRequestById.mockResolvedValueOnce({
+      akoya_requestid: REQ,
+      akoya_requestnum: 'R-1001',
+      _wmkf_grantprogram_value: '22222222-2222-4222-8222-222222222222',
+    });
+    const out = await getReviewers({
+      proposalId: REQ,
+      programId: '11111111-1111-4111-8111-111111111111',
+      azureEmail: 'pd@wmkeck.org',
+    });
+    expect(out).toEqual({ success: true, proposals: [], totalReviewers: 0 });
+    expect(findByRequest).not.toHaveBeenCalled();
+  });
+
+  test('specific proposal lookup applies the live default when programId is omitted', async () => {
+    getRequestById.mockResolvedValueOnce({
+      akoya_requestid: REQ,
+      _wmkf_grantprogram_value: '22222222-2222-4222-8222-222222222222',
+    });
+    findByRequest.mockResolvedValueOnce([]);
+    const out = await getReviewers({ proposalId: REQ, azureEmail: 'pd@wmkeck.org' });
+    expect(out.success).toBe(true);
+    expect(findByRequest).toHaveBeenCalledWith(REQ, { selectedOnly: true, requireComplete: true });
+  });
+
   test('default scope: unresolved PD → empty DTO WITH programDirector:null', async () => {
     resolvePD.mockResolvedValueOnce(null);
     const out = await getReviewers({ azureEmail: 'someone@wmkeck.org' });
@@ -259,6 +285,7 @@ describe('getReviewers', () => {
   test('proposalId scope groups accepted suggestions into the proposal DTO with liveQuestions', async () => {
     getRequestById.mockResolvedValueOnce({
       akoya_requestid: REQ,
+      _wmkf_grantprogram_value: '11111111-1111-4111-8111-111111111111',
       akoya_requestnum: 'R-1001',
       akoya_title: 'T',
       wmkf_meetingdate: null,
@@ -303,7 +330,7 @@ describe('getReviewers', () => {
 
   test('unavailable synthesis dependency preserves reviewer DTO and returns the logged fallback without SQL or network', async () => {
     getRequestById.mockResolvedValueOnce({
-      akoya_requestid: REQ, akoya_requestnum: 'R-1001', akoya_title: 'T',
+      akoya_requestid: REQ, _wmkf_grantprogram_value: '11111111-1111-4111-8111-111111111111', akoya_requestnum: 'R-1001', akoya_title: 'T',
       wmkf_reviewsynthesisjson: JSON.stringify({ overall: 'Previously stored synthesis' }),
     });
     findByRequest.mockResolvedValueOnce([{
@@ -366,7 +393,7 @@ describe('getReviewers', () => {
 
   test('chunk boundary: 26 distinct person ids yield EXACTLY 2 total queryReviewers calls (merged read), first call gets ids 0-24 in order, second gets id 25, and every call select includes both former person-only and researcher-only fields', async () => {
     getRequestById.mockResolvedValueOnce({
-      akoya_requestid: REQ, akoya_requestnum: 'R-1001', akoya_title: 'T', wmkf_meetingdate: null,
+      akoya_requestid: REQ, _wmkf_grantprogram_value: '11111111-1111-4111-8111-111111111111', akoya_requestnum: 'R-1001', akoya_title: 'T', wmkf_meetingdate: null,
     });
     const personIds = Array.from({ length: 26 }, (_, i) => `person-${i}`);
     findByRequest.mockResolvedValueOnce(
@@ -399,7 +426,7 @@ describe('getReviewers', () => {
 
   test('single-chunk exact count: 2 person ids → exactly 1 queryReviewers call', async () => {
     getRequestById.mockResolvedValueOnce({
-      akoya_requestid: REQ, akoya_requestnum: 'R-1001', akoya_title: 'T', wmkf_meetingdate: null,
+      akoya_requestid: REQ, _wmkf_grantprogram_value: '11111111-1111-4111-8111-111111111111', akoya_requestnum: 'R-1001', akoya_title: 'T', wmkf_meetingdate: null,
     });
     findByRequest.mockResolvedValueOnce([
       { wmkf_appreviewersuggestionid: IDS[0], _wmkf_request_value: REQ, _wmkf_potentialreviewer_value: 'person-a', wmkf_accepted: true, wmkf_reviewstatus: 100000001 },
@@ -413,7 +440,7 @@ describe('getReviewers', () => {
 
   test('empty person-id set (no suggestion has a _wmkf_potentialreviewer_value) → queryReviewers never called', async () => {
     getRequestById.mockResolvedValueOnce({
-      akoya_requestid: REQ, akoya_requestnum: 'R-1001', akoya_title: 'T', wmkf_meetingdate: null,
+      akoya_requestid: REQ, _wmkf_grantprogram_value: '11111111-1111-4111-8111-111111111111', akoya_requestnum: 'R-1001', akoya_title: 'T', wmkf_meetingdate: null,
     });
     findByRequest.mockResolvedValueOnce([
       { wmkf_appreviewersuggestionid: IDS[0], _wmkf_request_value: REQ, _wmkf_potentialreviewer_value: null, wmkf_accepted: true, wmkf_reviewstatus: 100000001 },
@@ -429,7 +456,7 @@ describe('getReviewers', () => {
     const FORMER_RESEARCHER_SELECT = ['wmkf_potentialreviewersid', 'wmkf_primaryaffiliation', 'wmkf_website', 'wmkf_hindex', 'wmkf_totalcitations'];
 
     getRequestById.mockResolvedValueOnce({
-      akoya_requestid: REQ, akoya_requestnum: 'R-1001', akoya_title: 'T', wmkf_meetingdate: null,
+      akoya_requestid: REQ, _wmkf_grantprogram_value: '11111111-1111-4111-8111-111111111111', akoya_requestnum: 'R-1001', akoya_title: 'T', wmkf_meetingdate: null,
     });
     findByRequest.mockResolvedValueOnce([
       { wmkf_appreviewersuggestionid: IDS[0], _wmkf_request_value: REQ, _wmkf_potentialreviewer_value: 'person-a', wmkf_accepted: true, wmkf_reviewstatus: 100000001 },
@@ -445,7 +472,7 @@ describe('getReviewers', () => {
 
   test('hydration equivalence: a merged record hydrates the reviewer DTO exactly as the two split records used to', async () => {
     getRequestById.mockResolvedValueOnce({
-      akoya_requestid: REQ, akoya_requestnum: 'R-1001', akoya_title: 'T', wmkf_meetingdate: null,
+      akoya_requestid: REQ, _wmkf_grantprogram_value: '11111111-1111-4111-8111-111111111111', akoya_requestnum: 'R-1001', akoya_title: 'T', wmkf_meetingdate: null,
     });
     findByRequest.mockResolvedValueOnce([
       { wmkf_appreviewersuggestionid: IDS[0], _wmkf_request_value: REQ, _wmkf_potentialreviewer_value: 'person-a', wmkf_accepted: true, wmkf_reviewstatus: 100000001 },
@@ -489,7 +516,7 @@ describe('getReviewers', () => {
 
   test('affiliation fallback: missing wmkf_primaryaffiliation falls back to wmkf_organizationname', async () => {
     getRequestById.mockResolvedValueOnce({
-      akoya_requestid: REQ, akoya_requestnum: 'R-1001', akoya_title: 'T', wmkf_meetingdate: null,
+      akoya_requestid: REQ, _wmkf_grantprogram_value: '11111111-1111-4111-8111-111111111111', akoya_requestnum: 'R-1001', akoya_title: 'T', wmkf_meetingdate: null,
     });
     findByRequest.mockResolvedValueOnce([
       { wmkf_appreviewersuggestionid: IDS[0], _wmkf_request_value: REQ, _wmkf_potentialreviewer_value: 'person-a', wmkf_accepted: true, wmkf_reviewstatus: 100000001 },
@@ -510,7 +537,7 @@ describe('getReviewers', () => {
 
   test('merged-read rejection propagates untyped (fail-hard preserved)', async () => {
     getRequestById.mockResolvedValueOnce({
-      akoya_requestid: REQ, akoya_requestnum: 'R-1001', akoya_title: 'T', wmkf_meetingdate: null,
+      akoya_requestid: REQ, _wmkf_grantprogram_value: '11111111-1111-4111-8111-111111111111', akoya_requestnum: 'R-1001', akoya_title: 'T', wmkf_meetingdate: null,
     });
     findByRequest.mockResolvedValueOnce([
       { wmkf_appreviewersuggestionid: IDS[0], _wmkf_request_value: REQ, _wmkf_potentialreviewer_value: 'person-a', wmkf_accepted: true, wmkf_reviewstatus: 100000001 },

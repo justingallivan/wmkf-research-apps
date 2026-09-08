@@ -8,6 +8,7 @@ const queryRequests = jest.fn();
 const findByRequestNumber = jest.fn();
 const aggregateRequests = jest.fn();
 const aggregateMeetingDateCycles = jest.fn();
+const aggregateStatusesByGrantProgram = jest.fn();
 const searchDirectoryByName = jest.fn();
 jest.mock('../../lib/services/workbench/program-scope-service.js', () => ({
   resolveWorkbenchProgramScope: jest.fn(async () => ({
@@ -25,6 +26,7 @@ jest.mock('../../lib/dataverse/adapters/grant-request.js', () => ({
   findByRequestNumber: (...args) => findByRequestNumber(...args),
   aggregateRequests: (...args) => aggregateRequests(...args),
   aggregateMeetingDateCycles: (...args) => aggregateMeetingDateCycles(...args),
+  aggregateStatusesByGrantProgram: (...args) => aggregateStatusesByGrantProgram(...args),
 }));
 jest.mock('../../lib/dataverse/adapters/contact.js', () => ({
   searchDirectoryByName: (...args) => searchDirectoryByName(...args),
@@ -65,6 +67,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   aggregateRequests.mockResolvedValue({ results: [] });
   aggregateMeetingDateCycles.mockResolvedValue([]);
+  aggregateStatusesByGrantProgram.mockResolvedValue({ results: [] });
   searchDirectoryByName.mockResolvedValue([]);
   searchRequests.mockResolvedValue({ results: [], totalCount: 0 });
   findByIds.mockResolvedValue({ records: [] });
@@ -80,7 +83,7 @@ test('loads grouped live cycles/statuses and sorts them for the filters', async 
     { year: 2026, month: 6 },
     { year: 2025, month: 3 },
   ]);
-  aggregateRequests.mockResolvedValueOnce({
+  aggregateStatusesByGrantProgram.mockResolvedValueOnce({
       results: [
         { akoya_requeststatus: 'Phase II Pending' },
         { akoya_requeststatus: 'Active' },
@@ -102,11 +105,11 @@ test('loads grouped live cycles/statuses and sorts them for the filters', async 
     statuses: ['Active', 'Phase II Pending'],
   });
   expect(aggregateMeetingDateCycles).toHaveBeenCalledWith({ grantProgramIds: [PROGRAM_IDS[1]] });
-  expect(aggregateRequests).toHaveBeenCalledWith({ ...REQUEST_SEARCH_OPTIONS_AGGREGATES.statuses, filter: RESEARCH_FILTER });
+  expect(aggregateStatusesByGrantProgram).toHaveBeenCalledWith(PROGRAM_IDS[1]);
 });
 
 test('propagates a rejected guarded aggregate without returning partial options', async () => {
-  aggregateRequests.mockRejectedValueOnce(new Error('Access denied'));
+  aggregateStatusesByGrantProgram.mockRejectedValueOnce(new Error('Access denied'));
   await expect(loadRequestSearchOptions()).rejects.toThrow('Access denied');
 });
 

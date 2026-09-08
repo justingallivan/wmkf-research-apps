@@ -88,6 +88,7 @@ async function handleGet(req, res, access) {
       scope,
       azureEmail: access.session?.user?.azureEmail,
       programId,
+      callerSystemId: actorRefFromSession(access.session),
     });
     return res.status(200).json(result);
   } catch (error) {

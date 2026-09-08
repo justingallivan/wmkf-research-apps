@@ -4,7 +4,7 @@ import { DynamicsService } from '../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions, withDynamicsContext } from '../../lib/services/dynamics-context';
 import * as interlock from '../../lib/dataverse/core/interlock';
 import { RESEARCH_PROGRAM_IDS } from '../../shared/config/researchPrograms';
-import { aggregateMeetingDateCycles } from '../../lib/dataverse/adapters/grant-request';
+import { aggregateMeetingDateCycles, aggregateStatusesByGrantProgram } from '../../lib/dataverse/adapters/grant-request';
 
 jest.mock('../../lib/dataverse/core/interlock', () => ({
   assertDataverseOperationAllowed: jest.fn(),
@@ -100,6 +100,26 @@ test('supports the broad Grant Program lookup and checks its DAL field', async (
   await expect(withDynamicsContext({ restrictions: [{
     table_name: 'akoya_request', field_name: 'wmkf_grantprogram',
   }] }, () => aggregateMeetingDateCycles({ grantProgramIds: [grantProgramId] }))).rejects.toThrow('Access denied');
+});
+
+test('status aggregation fails closed when the broad lookup field is not allowed', async () => {
+  const grantProgramId = '11111111-1111-4111-8111-111111111111';
+  await expect(withDynamicsContext({ restrictions: [{
+    table_name: 'akoya_request', field_name: 'akoya_requeststatus',
+  }] }, () => aggregateStatusesByGrantProgram(grantProgramId))).rejects.toThrow('Access denied');
+  expect(tokenMock).not.toHaveBeenCalled();
+  expect(fetchMock).not.toHaveBeenCalled();
+});
+
+test('status aggregation emits the Dataverse lookup filter for the broad program id', async () => {
+  const grantProgramId = '11111111-1111-4111-8111-111111111111';
+  await expect(bypassDynamicsRestrictions('meeting-date-test', () => (
+    aggregateStatusesByGrantProgram(grantProgramId)
+  ))).resolves.toEqual(expect.objectContaining({ results: [] }));
+  const requestUrl = String(fetchMock.mock.calls[0]?.[0] || '');
+  expect(decodeURIComponent(requestUrl).replace(/\+/g, ' ')).toContain(
+    `_wmkf_grantprogram_value eq ${grantProgramId}`,
+  );
 });
 
 test.each([null, 'akoya_requestid', 'wmkf_meetingdate', 'akoya_programid', 'wmkf_grantprogram'])(
