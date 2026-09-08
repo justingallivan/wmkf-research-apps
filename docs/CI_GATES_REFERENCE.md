@@ -351,11 +351,11 @@ the bag would have matched. Only a single-file row still falls back to the bag. 
 **Register reconciliation complete (2026-09-08):** four parallel slice agents bound
 every stale row to the new syntax, followed by two exhaustive Opus matrix reviews
 whose CONDITIONS were applied on top (`docs/J27_TRANSITION_REGISTER.md` §10). Current
-baseline: `check:j27-register` reports 58 ok, 1 stale (J27-023, owner ruling pending —
-see `docs/J27_TRANSITION_REGISTER.md` §10), 6 unverifiable, 11 closed; 0 multi-site
-rows unbound apart from that one file; 0 rows with a disposition outside the
-vocabulary. The self-test is fully green (80/80 assertions, tolerant only of J27-023
-via the self-test's `KNOWN_OWNER_PENDING` constant, including the real-repository
+baseline (after the owner's 2026-09-08 J27-023 ruling, `docs/J27_TRANSITION_REGISTER.md`
+§10): `check:j27-register` reports 59 ok, 0 stale, 6 unverifiable, 11 closed; 0 multi-site
+rows unbound; 0 rows with a disposition outside the vocabulary. The self-test is fully
+green (80/80 assertions; its `KNOWN_OWNER_PENDING` allowlist is empty and exists only for
+a future owner-pending row), including the real-repository
 baseline). A 2026-09-08 Codex adversarial review also found the row-detection regex
 silently skipped valid rows using non-canonical Markdown spacing (no space after the
 opening pipe, leading whitespace) instead of checking them; row detection is now
@@ -491,7 +491,7 @@ When modifying any `scripts/check-*.js` gate (or building a new one), the matchi
 | `check:scaffolding-tokens` | `check:scaffolding-tokens:self-test` |
 | `check:prompt-injection-tagging` | `check:prompt-injection-tagging:self-test` |
 | `check:reviewer-reminder-hold` | `check:reviewer-reminder-hold:self-test` — safe registry and lookalike-path positives; exact held-route (including query-string registration), invalid JSON, missing/non-array registry, malformed entry, missing-path, and alternate-config negatives. |
-| `check:j27-register` | `check:j27-register:self-test` — unknown-id, stale-excerpt, missing-site, unmatched-glob, swapped-binding, bound-vs-bag (Unicode and ASCII arrow), directory-site, glob-bound-one-fragment, binding-path-unresolved, binding-path-not-in-site, binding-fragment-too-short, path-like-bag-exclusion, strict-unbound (pure-bag and partially-bound multi-file rows, including the two superseded pre-binding fixtures), malformed-row and duplicate-id reds; existing-id, comment-led bare-marker (`//`, `<!--`, and `####`) warning, backtick self-reference, bold-label and mid-line prose non-marker skips, two-site-both-bound, ellipsis-split, wrapped-comment, memory/glob shorthand, ASCII/Unicode arrow parsing, fully-bound multi-file row, closed-row and prose-only greens; `closed.`-disposition-not-closed-plus-vocabulary-warning info case; no-space-after-opening-pipe and leading-whitespace rows recognised and checked (not skipped), malformed-id (two- and four-digit) exit-2 reds; real-baseline stale-only-on-`KNOWN_OWNER_PENDING` before and after (register reconciliation complete 2026-09-08 apart from J27-023, owner ruling pending — 58 ok, 1 stale, 6 unverifiable, 11 closed, 0 unbound apart from that one file). |
+| `check:j27-register` | `check:j27-register:self-test` — unknown-id, stale-excerpt, missing-site, unmatched-glob, swapped-binding, bound-vs-bag (Unicode and ASCII arrow), directory-site, glob-bound-one-fragment, binding-path-unresolved, binding-path-not-in-site, binding-fragment-too-short, path-like-bag-exclusion, strict-unbound (pure-bag and partially-bound multi-file rows, including the two superseded pre-binding fixtures), malformed-row and duplicate-id reds; existing-id, comment-led bare-marker (`//`, `<!--`, and `####`) warning, backtick self-reference, bold-label and mid-line prose non-marker skips, two-site-both-bound, ellipsis-split, wrapped-comment, memory/glob shorthand, ASCII/Unicode arrow parsing, fully-bound multi-file row, closed-row and prose-only greens; `closed.`-disposition-not-closed-plus-vocabulary-warning info case; no-space-after-opening-pipe and leading-whitespace rows recognised and checked (not skipped), malformed-id (two- and four-digit) exit-2 reds; real-baseline stale-only-on-`KNOWN_OWNER_PENDING` before and after (register reconciliation complete 2026-09-08 after the owner's J27-023 ruling — 59 ok, 0 stale, 6 unverifiable, 11 closed, 0 unbound; the allowlist is empty). |
 
 **When external review catches a structural pattern an existing gate missed, the order is mandatory:**
 

@@ -81,7 +81,7 @@ const GATE = path.join(repoRoot, 'scripts', 'check-j27-register.js');
 // citation stays in `site` with a drift note and AS evidence, and the file
 // is left unbound so the row is honestly STALE rather than green on a
 // non-fact match. Remove the entry here the same commit the owner rules.
-const KNOWN_OWNER_PENDING = ['J27-023'];
+const KNOWN_OWNER_PENDING = []; // emptied 2026-09-08: owner dropped the J27-023 non-site citation (register §10)
 
 let failures = 0;
 function check(label, cond, detail) {

@@ -6,8 +6,9 @@ all four slices, applied in a follow-up commit (`docs/J27_REGISTER_RECONCILIATIO
 Gate reached 59 ok / 0 stale / 6 unverifiable / 11 closed, 0 unbound, 0 vocabulary
 warnings, self-test 72/72; a subsequent Codex adversarial review (`65eb4bfe`) found a
 row-detection parsing gap (fixed) and that J27-023 was bound to a fragment that is not
-its fact (fixed by unbinding it). Current: 58 ok / 1 stale (J27-023, owner ruling
-pending), 6 unverifiable, 11 closed, self-test 80/80. See
+its fact (fixed by unbinding it; the owner then ruled 2026-09-08 to drop the citation, since
+the file is not a J27 site). Final: 59 ok / 0 stale / 6 unverifiable / 11 closed, 0 unbound,
+self-test 80/80. See
 `docs/J27_TRANSITION_REGISTER.md` §10 for the full record.
 
 [RECHECKED after scripts/check-j27-register.js change: §2 and §9 track the gate as of 440143d8 — binding syntax, strict unbound, sibling-fallback binding resolution, whitespace-tolerant row detection] **Owner decision (2026-09-08):** keep the strict per-site rule in `scripts/check-j27-register.js`
