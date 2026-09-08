@@ -85,15 +85,15 @@ test('cycle-list mode: lists organization-wide eligible cycles with honest activ
     records: [
       { wmkf_meetingdate: '2026-06-04', _wmkf_programdirector_value: 'pd-1' },
       { wmkf_meetingdate: '2026-12-11', _wmkf_programdirector_value: 'pd-2' },
-      { wmkf_meetingdate: '2026-12-12', _wmkf_programdirector_value: 'pd-2', wmkf_triagestatus: 100000001 },
+      { wmkf_meetingdate: '2026-12-12', _wmkf_programdirector_value: 'pd-1', wmkf_triagestatus: 100000001 },
       { wmkf_meetingdate: null }, // no code → skipped
     ],
     capped: false,
   });
   const body = await loadDashboard(args());
   expect(body.success).toBe(true);
-  expect(body.cycles.map((c) => [c.code, c.count, c.setAsideCount]))
-    .toEqual([['D26', 1, 1], ['J26', 1, 0]]);
+  expect(body.cycles.map((c) => [c.code, c.count, c.setAsideCount, c.myCount, c.mySetAsideCount]))
+    .toEqual([['D26', 1, 1, 0, 1], ['J26', 1, 0, 1, 0]]);
   expect(body.defaultCycleCode).toBe('J26');
   expect(body.programDirector).toEqual({ systemuserid: 'pd-1', fullName: 'Dr. PD One' });
   expect(queryAllRequests).toHaveBeenCalledWith({

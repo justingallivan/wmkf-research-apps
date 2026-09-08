@@ -141,6 +141,10 @@ export function WorkbenchDashboard() {
     return () => window.clearTimeout(timer);
   }, [cycleCode, scope, includeSetAside, loadProposals, programId]);
 
+  const selectedCycle = cycles.find((cycle) => cycle.code === cycleCode);
+  const myRequestCount = (selectedCycle?.myCount || 0)
+    + (includeSetAside ? selectedCycle?.mySetAsideCount || 0 : 0);
+
   const changeProgram = useCallback(async (nextProgramId) => {
     if (!nextProgramId || nextProgramId === programId) return;
     const requestId = ++reqIdRef.current;
@@ -247,7 +251,7 @@ export function WorkbenchDashboard() {
                 scope === s ? 'bg-gray-900 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'
               }`}
             >
-              {s === 'my' ? 'My requests' : 'All'}
+              {s === 'my' ? `My requests (${myRequestCount})` : 'All'}
             </button>
           ))}
         </div>

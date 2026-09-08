@@ -72,6 +72,38 @@ async function renderReady() {
   await waitFor(() => expect(screen.getAllByLabelText('Cycle')[0]).not.toBeDisabled());
 }
 
+test('shows the signed-in PD request count for the selected cycle and set-aside state', async () => {
+  global.fetch.mockImplementation(async (url) => {
+    if (url === '/api/workbench/dashboard') {
+      return response({ body: {
+        success: true,
+        cycles: [{
+          code: 'D26',
+          label: 'December 2026',
+          count: 5,
+          setAsideCount: 3,
+          myCount: 2,
+          mySetAsideCount: 1,
+        }],
+        defaultCycleCode: 'D26',
+      } });
+    }
+    if (String(url).startsWith('/api/workbench/dashboard?cycleCode=')) {
+      return response({ body: { proposals: [] } });
+    }
+    return baseResponse(url);
+  });
+
+  render(<WorkbenchDashboard />);
+  await waitFor(() => expect(screen.getByRole('button', { name: 'My requests (2)' })).toBeInTheDocument());
+  expect(screen.getByRole('button', { name: 'My requests (2)' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'All' })).toBeInTheDocument();
+
+  fireEvent.click(screen.getByLabelText('Show set aside'));
+  expect(screen.getByRole('button', { name: 'My requests (3)' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'All' })).toBeInTheDocument();
+});
+
 test('opens an exact historical Research request through the scoped search', async () => {
   global.fetch.mockImplementation(async (url) => {
     if (url === '/api/workbench/search-requests?q=1002379') {
