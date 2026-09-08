@@ -99,6 +99,15 @@ test('operator stop after claim prevents the next paid stage and leaves the item
   expect(run.data.items[0].status).toBe('queued');
   expect(run.data.items[0].stage).toBeUndefined();
 });
+test('operator stop before assembly prevents rendering and private artifact writes', async()=>{
+  run.data.items=[{...queued('a'),status:'ready',reuseId:'existing'}];
+  run.data.cutPending=true;
+  store.readDossierControl.mockResolvedValue({ stop_requested: true });
+  await drainCycleDossiers();
+  expect(renderDossierDocuments).not.toHaveBeenCalled();
+  expect(storage.storeDossierFile).not.toHaveBeenCalled();
+  expect(store.publishDossierEdition).not.toHaveBeenCalled();
+});
 test('partial edition pins a successful foreign-superuser entry and an older failed-rewrite fallback',async()=>{
   run.data.items=[{...queued('a'),status:'ready',reuseId:'other-superuser-entry'}, {...queued('b'),status:'failed',fallbackId:'old-b',error:'Generation failed'}, {...queued('c'),status:'failed',error:'Missing narrative'}];
   await drainCycleDossiers();

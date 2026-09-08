@@ -39,6 +39,7 @@ jest.mock('../../lib/services/cycle-dossier-store.js', () => ({
   readDossierEdition: jest.fn(),
   getDossierEntry: jest.fn(),
   setDossierOperatorStop: jest.fn(),
+  readDossierControl: jest.fn(),
 }));
 
 import * as requests from '../../lib/dataverse/adapters/grant-request.js';
@@ -86,6 +87,7 @@ beforeEach(() => {
   storage.readDossierJSON.mockResolvedValue({});
   resolveDossierDestination.mockResolvedValue({ library: 'akoya_request', folder: '1001_GUID', siteId: 'site', driveId: 'drive' });
   store.setDossierOperatorStop.mockResolvedValue({ stop_requested: true, reason: 'controlled stop', updated_at: '2026-09-07T00:00:00Z' });
+  store.readDossierControl.mockResolvedValue({ stop_requested: false, reason: null, updated_by: 7, updated_at: '2026-09-07T00:00:00Z' });
 });
 
 afterEach(() => { delete process.env.CYCLE_DOSSIER_ENABLED; delete process.env.CYCLE_DOSSIER_REQUEST_ALLOWLIST; });

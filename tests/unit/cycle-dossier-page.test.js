@@ -37,6 +37,7 @@ const dossierResponse = (selection = ['a', 'b'], extra = {}) => ({
   runs: [],
   editions: [],
   configuration: { ready: true, estimatedPerEntryUsd: 1, prompts: [{ name: 'cycle-dossier.entry', version: 3, model: 'model-b' }] },
+  control: { stopRequested: false, reason: null },
   ...extra,
 });
 
@@ -143,6 +144,25 @@ describe('cycle dossier page', () => {
     render(<CycleDossierPage />);
     await waitFor(() => expect(screen.getByText('Cycle Dossier')).toBeInTheDocument());
     expect(screen.getByText('Superuser workspace')).toBeInTheDocument();
+  });
+
+  it('shows the durable processing control and confirms stop/resume actions', async () => {
+    const confirmMock = jest.spyOn(window, 'confirm').mockReturnValue(true);
+    const fetchMock = jest.spyOn(global, 'fetch')
+      .mockResolvedValueOnce(response(dossierResponse(['a', 'b'], { control: { stopRequested: false, reason: null } })))
+      .mockResolvedValueOnce(response({ control: { stopRequested: true, reason: 'Stopped by operator.' } }))
+      .mockResolvedValueOnce(response(dossierResponse(['a', 'b'], { control: { stopRequested: true, reason: 'Stopped by operator.' } })))
+      .mockResolvedValue(response(dossierResponse(['a', 'b'], { control: { stopRequested: true, reason: 'Stopped by operator.' } })));
+    render(<CycleDossierWorkspace />);
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Processing control' })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: 'Stop all processing' }));
+    await waitFor(() => expect(screen.getByText(/All dossier processing is stopped/)).toBeInTheDocument());
+    expect(confirmMock).toHaveBeenCalledWith(expect.stringMatching(/Stop all/));
+    const stopCall = fetchMock.mock.calls.find(([, init]) => init?.method === 'POST');
+    expect(JSON.parse(stopCall[1].body)).toMatchObject({ action: 'operator-stop', stop: true });
+    fireEvent.click(screen.getByRole('button', { name: 'Resume processing' }));
+    await waitFor(() => expect(fetchMock.mock.calls.some(([, init]) => init?.method === 'POST' && JSON.parse(init.body).stop === false)).toBe(true));
+    expect(confirmMock).toHaveBeenCalledWith(expect.stringMatching(/Resume/));
   });
 
   it('sends separate generate choices in the preview and uses the reviewed preview on launch', async () => {

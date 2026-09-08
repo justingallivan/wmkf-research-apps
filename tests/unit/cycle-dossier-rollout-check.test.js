@@ -11,6 +11,7 @@ import * as research from '../../shared/config/prompts/cycle-dossier-research-pl
 import * as entry from '../../shared/config/prompts/cycle-dossier-entry.js';
 import {
   assertDossierPilotEnabled,
+  assertDossierProfileAllowed,
   assertDossierRequestAllowed,
   assertDossierWorkerOpen,
   parseDossierRequestAllowlist,
@@ -21,7 +22,8 @@ const migrationText = `
 CREATE TABLE IF NOT EXISTS cycle_dossiers (id uuid);
 CREATE TABLE IF NOT EXISTS cycle_dossier_previews (id uuid);
 CREATE TABLE IF NOT EXISTS cycle_dossier_entries (id uuid);
-CREATE TABLE IF NOT EXISTS cycle_dossier_runs (id uuid);
+  CREATE TABLE IF NOT EXISTS cycle_dossier_runs (id uuid);
+CREATE TABLE IF NOT EXISTS cycle_dossier_control (id boolean);
 CREATE TABLE IF NOT EXISTS cycle_dossier_editions (id uuid);
 `;
 
@@ -31,10 +33,11 @@ afterEach(() => {
   delete process.env.CYCLE_DOSSIER_REQUEST_ALLOWLIST;
 });
 
-test('migration contract requires manifest inclusion, sorted files, and all five tables', () => {
+test('migration contract requires manifest inclusion, sorted files, and the control table', () => {
   expect(verifyMigrationContract({ migrationText, manifest: { files: ['001.sql', '038_cycle_dossiers.sql'] } }).ok).toBe(true);
   expect(verifyMigrationContract({ migrationText, manifest: { files: ['038_cycle_dossiers.sql', '001.sql'] } }).ok).toBe(false);
   expect(verifyMigrationContract({ migrationText: migrationText.replace('cycle_dossier_editions', 'wrong'), manifest: { files: ['038_cycle_dossiers.sql'] } }).missingTables).toContain('cycle_dossier_editions');
+  expect(verifyMigrationContract({ migrationText: migrationText.replace('cycle_dossier_control', 'wrong'), manifest: { files: ['038_cycle_dossiers.sql'] } }).missingTables).toContain('cycle_dossier_control');
 });
 
 test('prompt verification pins every seeded field and current identity', () => {
@@ -56,6 +59,12 @@ test('environment and cohort guards fail closed', () => {
   expect(() => assertDossierRequestAllowed({ requestNumber: 'D26-002' })).toThrow(/outside/i);
 });
 
+test('pilot mode admits any superuser while smoke mode pins one operator profile', () => {
+  expect(() => assertDossierProfileAllowed(99, { CYCLE_DOSSIER_ROLLOUT_MODE: 'pilot' })).not.toThrow();
+  expect(() => assertDossierProfileAllowed(7, { CYCLE_DOSSIER_ROLLOUT_MODE: 'smoke', CYCLE_DOSSIER_OPERATOR_PROFILE_ID: '7' })).not.toThrow();
+  expect(() => assertDossierProfileAllowed(8, { CYCLE_DOSSIER_ROLLOUT_MODE: 'smoke', CYCLE_DOSSIER_OPERATOR_PROFILE_ID: '7' })).toThrow(/outside/i);
+});
+
 test('worker stop is checked after a run is claimed', async () => {
   process.env.CYCLE_DOSSIER_ENABLED = 'true';
   process.env.CYCLE_DOSSIER_OPERATOR_STOP = 'true';
@@ -72,9 +81,12 @@ test('live preflight verifies both exact prompt rows and one request source/dest
   const result = await runPreflight({
     root: process.cwd(), expectedEnvironment: 'local', vercelEnv: undefined, nodeEnv: 'development', dynamicsUrl: null,
     liveRead: true, smokeRequest: 'D26-001',
+    env: { CYCLE_DOSSIER_ENABLED: 'true', CYCLE_DOSSIER_REQUEST_ALLOWLIST: 'D26-001', CYCLE_DOSSIER_ROLLOUT_MODE: 'smoke', CYCLE_DOSSIER_OPERATOR_PROFILE_ID: '7', DOSSIER_BLOB_READ_WRITE_TOKEN: 'blob', CRON_SECRET: 'cron' },
     dependencies: {
       fetchCurrentPrompt: jest.fn(async name => rows.find(row => row.wmkf_ai_promptname === name)),
-      loadDossierRoster: jest.fn(async () => [{ requestId: 'id-1', requestNumber: 'D26-001' }]),
+      readSchemaState: jest.fn(async () => ({ tables: ['cycle_dossiers', 'cycle_dossier_previews', 'cycle_dossier_entries', 'cycle_dossier_runs', 'cycle_dossier_control', 'cycle_dossier_editions'], migrationApplied: true, control: { stop_requested: false } })),
+      readRoster: jest.fn(async () => [{ requestId: 'id-1', requestNumber: 'D26-001' }]),
+      withReadContext: jest.fn(async fn => fn()),
       prepareRequestInput: jest.fn(async () => ({ narrative: { text: 'frozen', contentHash: 'a'.repeat(64) } })),
       resolveDossierDestination: jest.fn(async () => ({ library: 'akoya_request', folder: 'request', siteId: 'site', driveId: 'drive' })),
     },
@@ -82,6 +94,16 @@ test('live preflight verifies both exact prompt rows and one request source/dest
   expect(result.ok).toBe(true);
   expect(result.live.request.narrativeHash).toHaveLength(64);
   expect(result.smoke).toMatchObject({ writes: false, paidCalls: false, mode: 'readiness-only' });
+});
+
+test('static preflight reports unavailable live checks and cannot pass', async () => {
+  const result = await runPreflight({
+    root: process.cwd(), expectedEnvironment: 'local', nodeEnv: 'development',
+    env: { CYCLE_DOSSIER_REQUEST_ALLOWLIST: 'D26-001', DOSSIER_BLOB_READ_WRITE_TOKEN: 'blob', CRON_SECRET: 'cron' },
+  });
+  expect(result.ok).toBe(false);
+  expect(result.checks.schema.status).toBe('unavailable');
+  expect(result.checks.roster.status).toBe('unavailable');
 });
 
 test('smoke plan remains read-only and explicitly requires operator authorization', () => {

@@ -439,6 +439,29 @@ export function CycleDossierWorkspace() {
     }
   };
 
+  const setOperatorStop = async (stop) => {
+    const message = stop
+      ? 'Stop all Cycle Dossier processing? Queued and running work will be paused.'
+      : 'Resume Cycle Dossier processing?';
+    if (typeof window !== 'undefined' && typeof window.confirm === 'function' && !window.confirm(message)) return;
+    const action = stop ? 'operator-stop' : 'operator-resume';
+    setActionLoading(action);
+    setError('');
+    try {
+      const body = await readResponse(await fetch('/api/cycle-dossier', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'operator-stop', stop, reason: stop ? 'Stopped by the Cycle Dossier operator.' : null }),
+      }));
+      if (mounted.current && body.control) setData((current) => ({ ...(current || {}), control: body.control }));
+      if (mounted.current) void load({ silent: true });
+    } catch (controlError) {
+      if (mounted.current) setError(controlError.message);
+    } finally {
+      if (mounted.current) setActionLoading('');
+    }
+  };
+
   if (!isSuperuser) {
     return <div className="mx-auto max-w-xl rounded-2xl border border-gray-200 bg-white p-10 text-center shadow-sm"><h1 className="text-2xl font-bold text-gray-900">Cycle Dossier is restricted</h1><p className="mt-3 text-sm leading-6 text-gray-600">This D26 pilot is available to authorized superusers only.</p></div>;
   }
@@ -454,6 +477,8 @@ export function CycleDossierWorkspace() {
 
       {error && <div role="alert" className="mb-6 flex items-start justify-between gap-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"><span>{error}</span><button type="button" className="font-semibold underline underline-offset-2" onClick={() => { setError(''); void load(); }}>Retry</button></div>}
       {data?.configuration && !data.configuration.ready && <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900"><p className="font-semibold">Dossier preparation is unavailable.</p><p className="mt-1">{data.configuration.error || 'An administrator must publish the Cycle Dossier prompt and model configuration before launch.'}</p></div>}
+
+      {data?.control && <section aria-labelledby="cycle-dossier-control-heading" className="mb-6"><Card hover={false} padding="p-5"><div className="flex flex-wrap items-center justify-between gap-4"><div><h2 id="cycle-dossier-control-heading" className="text-base font-bold text-gray-900">Processing control</h2><p className="mt-1 text-sm text-gray-600">{data.control.stopRequested ? 'All dossier processing is stopped.' : 'Dossier processing is available to the pilot.'}{data.control.reason ? ` ${data.control.reason}` : ''}</p></div><div className="flex items-center gap-3"><StatusPill tone={data.control.stopRequested ? 'warning' : 'good'}>{data.control.stopRequested ? 'Stopped' : 'Running'}</StatusPill>{data.control.stopRequested ? <Button type="button" loading={actionLoading === 'operator-resume'} onClick={() => setOperatorStop(false)}>Resume processing</Button> : <Button type="button" variant="outline" loading={actionLoading === 'operator-stop'} onClick={() => setOperatorStop(true)}>Stop all processing</Button>}</div></div></Card></section>}
 
       <nav aria-label="Cycle Dossier workflow" className="mb-6 grid grid-cols-3 gap-1 rounded-xl border border-gray-200 bg-gray-100 p-1">
         {[['requests', 'Choose requests'], ['review', 'Review & launch'], ['progress', 'Progress & editions']].map(([key, label], index) => <button key={key} type="button" onClick={() => setView(key)} className={`rounded-lg px-3 py-2.5 text-sm font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 ${view === key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}><span className="mr-2 text-xs text-gray-400">{index + 1}</span>{label}</button>)}

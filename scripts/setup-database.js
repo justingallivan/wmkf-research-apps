@@ -1895,7 +1895,7 @@ async function runMigration() {
     console.log('  • scheduled_email_messages (PD review windows + exact draft/send recovery ledger)');
     console.log('\nV43 new tables (Cycle Dossier pilot):');
     console.log('  • cycle_dossiers, cycle_dossier_previews, cycle_dossier_entries,');
-    console.log('    cycle_dossier_runs, cycle_dossier_editions (private state/checkpoints; bytes in private Blob)');
+    console.log('    cycle_dossier_runs, cycle_dossier_control, cycle_dossier_editions (private state/checkpoints; bytes in private Blob)');
     console.log('\nIndexes created: 64 (plus 7 added in V30, 6 added in V35, 4 added in V37, 3 added in V39, 3 added in V40)');
 
   } catch (error) {

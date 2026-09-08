@@ -16,7 +16,7 @@ import { fileURLToPath } from 'node:url';
 import { validateReviewedClaudeModelValue } from '../lib/services/model-review-validation.js';
 import * as research from '../shared/config/prompts/cycle-dossier-research-plan.js';
 import * as entry from '../shared/config/prompts/cycle-dossier-entry.js';
-import { parseDossierRequestAllowlist, validateDossierEnvironment } from '../lib/services/cycle-dossier-rollout.js';
+import { parseDossierRequestAllowlist, validateDossierEnvironment, dossierRolloutConfig } from '../lib/services/cycle-dossier-rollout.js';
 
 export const MIGRATION_FILE = '038_cycle_dossiers.sql';
 export const PROMPTS = [
@@ -25,7 +25,7 @@ export const PROMPTS = [
 ];
 export const REQUIRED_TABLES = [
   'cycle_dossiers', 'cycle_dossier_previews', 'cycle_dossier_entries',
-  'cycle_dossier_runs', 'cycle_dossier_editions',
+  'cycle_dossier_runs', 'cycle_dossier_control', 'cycle_dossier_editions',
 ];
 
 export function expectedPrompt(definition, maxTokens, model) {
@@ -86,6 +86,34 @@ export function buildSmokePlan({ requestId, requestNumber, environment, promptVe
   };
 }
 
+export function readinessCheck(ok, reason = null) {
+  return ok ? { status: 'ready' } : { status: reason ? 'unavailable' : 'not-ready', reason: reason || 'Check did not pass.' };
+}
+
+async function defaultReadSchemaState() {
+  const { sql } = await import('@vercel/postgres');
+  const tables = (await sql.query(`SELECT table_name FROM information_schema.tables
+    WHERE table_schema='public' AND table_name = ANY($1::text[])`, [REQUIRED_TABLES])).rows.map(row => row.table_name);
+  const migrations = (await sql.query(`SELECT name FROM schema_migrations WHERE name=$1`, [MIGRATION_FILE])).rows;
+  const control = (await sql.query('SELECT stop_requested FROM cycle_dossier_control WHERE id=TRUE')).rows[0] || null;
+  return { tables, migrationApplied: migrations.length === 1, control };
+}
+
+async function defaultReadRoster() {
+  const requests = await import('../lib/dataverse/adapters/grant-request.js');
+  const { cycleCodeToOdataFilter } = await import('../lib/utils/cycle-code.js');
+  const { buildVisibilityFilter } = await import('../lib/services/workbench/dashboard-service.js');
+  const result = await requests.queryAllRequests({
+    select: 'akoya_requestid,akoya_requestnum,akoya_title,wmkf_organizationname,_wmkf_projectleader_value,_wmkf_programdirector_value',
+    filter: `${cycleCodeToOdataFilter('D26')} and ${buildVisibilityFilter(false)}`,
+    orderby: 'akoya_requestnum asc',
+  });
+  if (result.capped || !Array.isArray(result.records)) throw new Error('The ungated D26 roster is incomplete or capped.');
+  return result.records.map(row => ({ requestId: String(row.akoya_requestid).toLowerCase(), requestNumber: row.akoya_requestnum,
+    title: row.akoya_title || '', institution: row.wmkf_organizationname || '', pi: row._wmkf_projectleader_value_formatted || '',
+    programDirector: row._wmkf_programdirector_value_formatted || 'Unassigned', programDirectorId: row._wmkf_programdirector_value || null }));
+}
+
 export async function runPreflight({
   root = resolve(fileURLToPath(new URL('..', import.meta.url))),
   expectedEnvironment,
@@ -95,6 +123,7 @@ export async function runPreflight({
   model = process.env.CYCLE_DOSSIER_PROMPT_MODEL || 'claude-sonnet-4-6',
   liveRead = false,
   smokeRequest = null,
+  env = process.env,
   dependencies = {},
 } = {}) {
   const migrationText = await readFile(resolve(root, 'lib/db/migrations', MIGRATION_FILE), 'utf8').catch(() => null);
@@ -103,38 +132,74 @@ export async function runPreflight({
   const environment = validateDossierEnvironment({ expected: expectedEnvironment, vercelEnv, nodeEnv, dynamicsUrl });
   const modelCheck = validateReviewedClaudeModelValue(model);
   const promptContract = { ok: modelCheck.valid && modelCheck.kind === 'claude' && modelCheck.capabilities?.supportsStructuredOutput === true, model };
-  const allowlist = parseDossierRequestAllowlist(process.env.CYCLE_DOSSIER_REQUEST_ALLOWLIST || '');
-  const result = { ok: migration.ok && environment.ok && promptContract.ok, migration, environment, promptContract,
-    cohort: { configured: allowlist.length > 0, values: allowlist }, prompts: [], live: null, smoke: null };
+  const config = dossierRolloutConfig(env);
+  const allowlist = parseDossierRequestAllowlist(env.CYCLE_DOSSIER_REQUEST_ALLOWLIST || '');
+  const checks = {
+    migration: readinessCheck(migration.ok, 'Migration 038 is missing, unlisted, unsorted, or incomplete.'),
+    environment: readinessCheck(environment.ok, environment.reason),
+    cohort: readinessCheck(allowlist.length > 0, 'CYCLE_DOSSIER_REQUEST_ALLOWLIST is empty or malformed.'),
+    blob: readinessCheck(Boolean(String(env.DOSSIER_BLOB_READ_WRITE_TOKEN || '').trim()), 'DOSSIER_BLOB_READ_WRITE_TOKEN is unavailable.'),
+    cron: readinessCheck(Boolean(String(env.CRON_SECRET || '').trim()), 'CRON_SECRET is unavailable.'),
+    operator: readinessCheck(config.mode === 'pilot' || (config.mode === 'smoke' && Number.isInteger(config.operatorProfileId) && config.operatorProfileId > 0), 'Smoke mode requires CYCLE_DOSSIER_OPERATOR_PROFILE_ID; mode must be pilot or smoke.'),
+    schema: readinessCheck(false, 'Live schema/control state was not checked.'),
+    prompts: readinessCheck(false, 'Live published prompt rows were not checked.'),
+    roster: readinessCheck(false, 'Live ungated D26 roster was not checked.'),
+    source: readinessCheck(false, 'An exact request source was not checked.'),
+    destination: readinessCheck(false, 'An exact request destination was not checked.'),
+  };
+  const result = { ok: Object.values(checks).every(check => check.status === 'ready'), checks, migration, environment, promptContract,
+    cohort: { configured: allowlist.length > 0, values: allowlist, mode: config.mode, operatorProfileId: config.operatorProfileId }, prompts: [], live: null, smoke: null };
   if (liveRead) {
     if (!environment.ok) throw new Error(environment.reason);
-    const fetchCurrentPrompt = dependencies.fetchCurrentPrompt || (await import('../lib/services/prompt-store.js')).fetchCurrentPrompt;
-    for (const item of PROMPTS) {
-      const row = await fetchCurrentPrompt(item.definition.PROMPT_NAME);
-      const check = verifyPromptRow(row, expectedPrompt(item.definition, item.maxTokens, model));
-      result.prompts.push({ name: item.definition.PROMPT_NAME, version: row.wmkf_promptversion, ...check });
-      if (!check.ok) result.ok = false;
-    }
-    const loadRoster = dependencies.loadDossierRoster || (await import('../lib/services/cycle-dossier-service.js')).loadDossierRoster;
-    const roster = await loadRoster();
-    if (!roster.length) throw new Error('The controlled D26 roster is empty.');
-    result.live = { rosterCount: roster.length };
-    if (smokeRequest) {
-      const wanted = String(smokeRequest).toLowerCase();
-      const item = roster.find(row => row.requestId === wanted || String(row.requestNumber).toLowerCase() === wanted);
-      if (!item) throw new Error(`Smoke request ${smokeRequest} is outside the live controlled cohort.`);
-      const prepare = dependencies.prepareRequestInput || (await import('../lib/services/cycle-dossier-generation.js')).prepareRequestInput;
-      const destination = dependencies.resolveDossierDestination || (await import('../lib/services/cycle-dossier-sharepoint.js')).resolveDossierDestination;
-      const input = await prepare(item.requestId);
-      const target = await destination(item.requestId, item.requestNumber);
-      if (!input?.narrative?.contentHash || !input?.narrative?.text) throw new Error('The exact Proposal Narrative source is missing or unhashable.');
-      result.live.request = { requestId: item.requestId, requestNumber: item.requestNumber, narrativeHash: input.narrative.contentHash, narrativeChars: input.narrative.text.length };
-      result.smoke = buildSmokePlan({ requestId: item.requestId, requestNumber: item.requestNumber, environment: expectedEnvironment, promptVersions: result.prompts.map(p => ({ name: p.name, version: p.version })), destination: target });
-    }
+    const runRead = dependencies.withReadContext || (async fn => {
+      const { enterDynamicsBypassForScript } = await import('../lib/services/dynamics-context.js');
+      enterDynamicsBypassForScript('cycle-dossier-rollout-preflight');
+      return fn();
+    });
+    await runRead(async () => {
+      try {
+        const state = await (dependencies.readSchemaState || defaultReadSchemaState)();
+        const schemaReady = REQUIRED_TABLES.every(table => state.tables?.includes(table)) && state.migrationApplied && state.control && state.control.stop_requested === false;
+        checks.schema = readinessCheck(schemaReady, schemaReady ? null : 'Migration 038, all dossier tables, and an un-stopped control row are required.');
+      } catch (error) { checks.schema = readinessCheck(false, `Schema/control check unavailable: ${error.message}`); }
+      try {
+        const fetchCurrentPrompt = dependencies.fetchCurrentPrompt || (await import('../lib/services/prompt-store.js')).fetchCurrentPrompt;
+        for (const item of PROMPTS) {
+          const row = await fetchCurrentPrompt(item.definition.PROMPT_NAME);
+          const check = verifyPromptRow(row, expectedPrompt(item.definition, item.maxTokens, model));
+          result.prompts.push({ name: item.definition.PROMPT_NAME, version: row.wmkf_promptversion, ...check });
+          if (!check.ok) result.ok = false;
+        }
+        checks.prompts = readinessCheck(result.prompts.length === PROMPTS.length && result.prompts.every(prompt => prompt.ok), 'Published prompt readback did not match the seeded contract.');
+      } catch (error) { checks.prompts = readinessCheck(false, `Prompt check unavailable: ${error.message}`); }
+      try {
+        const readRoster = dependencies.readRoster || defaultReadRoster;
+        const roster = await readRoster();
+        checks.roster = readinessCheck(roster.length > 0, 'The ungated D26 roster is empty.');
+        result.live = { rosterCount: roster.length };
+        if (smokeRequest) {
+          const wanted = String(smokeRequest).toLowerCase();
+          const item = roster.find(row => row.requestId === wanted || String(row.requestNumber).toLowerCase() === wanted);
+          if (!item) throw new Error(`Smoke request ${smokeRequest} is outside the live controlled cohort.`);
+          if (!allowlist.includes(String(item.requestId).toLowerCase()) && !allowlist.includes(String(item.requestNumber).toLowerCase())) throw new Error(`Smoke request ${smokeRequest} is not named in CYCLE_DOSSIER_REQUEST_ALLOWLIST.`);
+          const prepare = dependencies.prepareRequestInput || (await import('../lib/services/cycle-dossier-generation.js')).prepareRequestInput;
+          const destination = dependencies.resolveDossierDestination || (await import('../lib/services/cycle-dossier-sharepoint.js')).resolveDossierDestination;
+          const input = await prepare(item.requestId);
+          const target = await destination(item.requestId, item.requestNumber);
+          checks.source = readinessCheck(Boolean(input?.narrative?.contentHash && input?.narrative?.text), 'The exact Proposal Narrative source is missing or unhashable.');
+          checks.destination = readinessCheck(Boolean(target?.siteId && target?.driveId && target?.folder && target?.library), 'The authoritative SharePoint destination is incomplete.');
+          result.live.request = { requestId: item.requestId, requestNumber: item.requestNumber, narrativeHash: input?.narrative?.contentHash || null, narrativeChars: input?.narrative?.text?.length || 0 };
+          result.smoke = buildSmokePlan({ requestId: item.requestId, requestNumber: item.requestNumber, environment: expectedEnvironment, promptVersions: result.prompts.map(p => ({ name: p.name, version: p.version })), destination: target });
+        }
+      } catch (error) {
+        checks.roster = readinessCheck(false, `Roster/source/destination check unavailable: ${error.message}`);
+      }
+    });
   } else if (smokeRequest) {
     result.smoke = buildSmokePlan({ requestId: null, requestNumber: smokeRequest, environment: expectedEnvironment, promptVersions: [], destination: null });
     result.smoke.blocked = 'Use --live-read with --smoke-request to prove the exact roster/source/folder before operator authorization.';
   }
+  result.ok = Object.values(checks).every(check => check.status === 'ready');
   return result;
 }
 

@@ -1,12 +1,14 @@
 /** @jest-environment node */
 jest.mock('@vercel/postgres', () => ({ db: { connect: jest.fn() }, sql: { query: jest.fn() } }));
 import { db, sql } from '@vercel/postgres';
-import { assertDossierActor, mutateDossierRun, publishDossierEdition, claimDossierRun, releaseDossierRun } from '../../lib/services/cycle-dossier-store';
+import { assertDossierActor, mutateDossierRun, publishDossierEdition, claimDossierRun, releaseDossierRun, setDossierOperatorStop } from '../../lib/services/cycle-dossier-store';
 
 let client;
 beforeEach(() => {
   jest.clearAllMocks();
-  client = { query: jest.fn().mockResolvedValue({ rows: [] }), release: jest.fn() };
+  client = { query: jest.fn().mockImplementation(query => query.includes('cycle_dossier_control')
+    ? Promise.resolve({ rows: [{ stop_requested: false }] })
+    : Promise.resolve({ rows: [] })), release: jest.fn() };
   db.connect.mockResolvedValue(client);
 });
 test('active profile AND live superuser role are required even with a real profile ID', async () => {
@@ -52,12 +54,32 @@ test('a concurrent worker with a live global lease prevents any new run claim', 
   expect(await claimDossierRun()).toBeNull();
   expect(client.query.mock.calls.some(([q])=>q.includes('FOR UPDATE SKIP LOCKED'))).toBe(false);
 });
+test('a durable operator stop prevents a subsequent tick from claiming cut-pending work', async () => {
+  const stopped = { id: 'run', status: 'paused', data: { cutPending: true } };
+  client.query.mockImplementation(async query => {
+    if (query.includes('cycle_dossier_control')) return { rows: [{ stop_requested: true }] };
+    if (query.includes('ORDER BY created_at LIMIT 1')) return { rows: [stopped] };
+    return { rows: [] };
+  });
+  expect(await claimDossierRun()).toBeNull();
+  expect(client.query.mock.calls.some(([query]) => query.includes('FOR UPDATE SKIP LOCKED'))).toBe(false);
+});
+test('operator stop pauses queued work without leaving a cut-pending assembly', async () => {
+  client.query.mockImplementation(async query => {
+    if (query.includes('FROM user_profiles')) return { rows: [{ id: 7, dynamics_systemuser_id: null }] };
+    if (query.includes('INSERT INTO cycle_dossier_control')) return { rows: [{ stop_requested: true, reason: 'maintenance', updated_at: new Date().toISOString() }] };
+    return { rows: [] };
+  });
+  await setDossierOperatorStop(7, true, 'maintenance');
+  expect(client.query.mock.calls.some(([query]) => query.includes("'{cutPending}','false'::jsonb"))).toBe(true);
+});
 test('expired paid attempts stay failed and retain their possible charge on reclaim', async () => {
   const expired = { id:'run',status:'running',lease_token:'expired',data:{ reservedUsd:7,items:[
     {requestId:'paid',status:'running',paidInFlight:true,reserved:true,reservationUsd:5},
     {requestId:'unpaid',status:'running',paidInFlight:false,reserved:true,reservationUsd:2},
   ]}};
-  client.query.mockImplementation(async q => ({ rows:q.includes('ORDER BY created_at LIMIT 1') ? [expired] : [] }));
+  client.query.mockImplementation(async q => ({ rows:q.includes('cycle_dossier_control') ? [{ stop_requested: false }]
+    : q.includes('ORDER BY created_at LIMIT 1') ? [expired] : [] }));
   const row = await claimDossierRun();
   expect(row.lease_token).not.toBe('expired');
   expect(row.data.reservedUsd).toBe(5);
