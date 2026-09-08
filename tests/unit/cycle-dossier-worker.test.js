@@ -4,6 +4,7 @@ jest.mock('../../lib/services/cycle-dossier-store', () => ({
   claimDossierRun:jest.fn(), mutateDossierRun:jest.fn(), readDossierRun:jest.fn(), assertDossierActor:jest.fn(),
   getDossierEntry:jest.fn(), finishDossierEntry:jest.fn(), reserveDossierEdition:jest.fn(), publishDossierEdition:jest.fn(),
   releaseDossierRun:jest.fn(), stopRevokedDossierRun:jest.fn(),
+  readDossierControl:jest.fn(),
 }));
 jest.mock('../../lib/services/cycle-dossier-service', () => ({
   dossierPool: async(items,fn)=>Promise.all(items.map(fn)), loadDossierRoster:jest.fn(),
@@ -27,12 +28,15 @@ let run; const clone=x=>JSON.parse(JSON.stringify(x));
 const queued=(id='a')=>({requestId:id,requestNumber:id,revisionId:`rev-${id}`,status:'queued',inputRef:{pathname:'input'},estimate:{highUsd:2},programDirector:'Justin'});
 beforeEach(()=>{
   jest.clearAllMocks();
+  process.env.CYCLE_DOSSIER_ENABLED = 'true';
+  delete process.env.CYCLE_DOSSIER_OPERATOR_STOP;
   run={id:'run',dossier_id:'dossier',owner_profile_id:7,status:'running',lease_token:'token',locked_until:new Date(Date.now()+270000).toISOString(),
     data:{items:[queued()],budgetUsd:null,spentUsd:0,reservedUsd:0,cutCounter:0,cutPending:false,config:{}}};
   store.claimDossierRun.mockImplementation(async()=>clone(run));
   store.mutateDossierRun.mockImplementation(async(id,fn)=>{const next=clone(run);await fn(next,{});run=next;return clone(run);});
   store.readDossierRun.mockImplementation(async()=>clone(run));
   store.assertDossierActor.mockResolvedValue({profileId:7,actingUserSystemId:null});
+  store.readDossierControl.mockResolvedValue({ stop_requested: false });
   loadDossierRoster.mockImplementation(async()=>run.data.items.map(i=>({requestId:i.requestId})));
   storage.readDossierJSON.mockResolvedValue({narrative:{text:'proposal'},entry:{references:[]}});
   storage.storeDossierJSON.mockImplementation(async(path)=>({pathname:path}));
@@ -42,6 +46,10 @@ beforeEach(()=>{
   store.reserveDossierEdition.mockImplementation(async(current,key,data)=>({id:`edition-${key}`,dossier_id:'dossier',owner_profile_id:7,ready:false,data}));
   renderDossierDocuments.mockResolvedValue({combined:{docx:Buffer.from('word'),pdf:Buffer.from('%PDF-')}});
   storage.storeDossierFile.mockImplementation(async path=>({pathname:path}));
+});
+afterEach(() => {
+  delete process.env.CYCLE_DOSSIER_ENABLED;
+  delete process.env.CYCLE_DOSSIER_OPERATOR_STOP;
 });
 test('one research stage checkpoints and leaves entry generation for a later invocation',async()=>{
   await drainCycleDossiers();
@@ -76,6 +84,20 @@ test('ambiguous provider failure is terminal for that attempt and preserves its 
   expect(run.data.items[0]).toMatchObject({status:'failed',paidInFlight:true,reservationUsd:2});
   expect(run.data.reservedUsd).toBe(2);expect(run.status).toBe('failed');
   expect(store.publishDossierEdition).not.toHaveBeenCalled();
+});
+test('operator stop after claim prevents the next paid stage and leaves the item queued', async()=>{
+  store.readDossierControl.mockReset()
+    .mockResolvedValueOnce({ stop_requested: false })
+    .mockResolvedValueOnce({ stop_requested: true });
+  generateResearch.mockImplementation(async(input,config,options)=>{
+    await options.beforePaidCall({stage:'research-plan'});
+    return {research:{evidence:['should-not-save']},costUsd:0.2};
+  });
+  await drainCycleDossiers();
+  expect(generateResearch).toHaveBeenCalledTimes(1);
+  expect(storage.storeDossierJSON).not.toHaveBeenCalled();
+  expect(run.data.items[0].status).toBe('queued');
+  expect(run.data.items[0].stage).toBeUndefined();
 });
 test('partial edition pins a successful foreign-superuser entry and an older failed-rewrite fallback',async()=>{
   run.data.items=[{...queued('a'),status:'ready',reuseId:'other-superuser-entry'}, {...queued('b'),status:'failed',fallbackId:'old-b',error:'Generation failed'}, {...queued('c'),status:'failed',error:'Missing narrative'}];

@@ -93,8 +93,11 @@ Each provider key is independent; `VRP_ALLOWED_PROVIDERS` further gates which ar
 | `DVX_BLOB_RW_TOKEN` | Dataverse Bulk Export private store (`dvx-export-private`) RW token | Manual — see "Private Blob store provisioning" below |
 | `INTAKE_BLOB_RW_TOKEN` | Applicant intake drain private store (`intake-applicant-private`, `store_Eaui32n6i2wYMS6E`, `iad1`) RW token | Manual — same provisioning shape as DVX |
 | `UPLOADS_BLOB_RW_TOKEN` | Shared private store (`wmkf-uploads-private`, `store_WvoDkxrlWniAuJAj`, `iad1`) RW token — document uploader plus actor-bound portal image staging | Manual — set in **dev + preview + production** (2026-06-11). Private uploads fail closed where unset. Portal staging mints 15-minute single-path client tokens and server-reads only ledger pathnames; `scripts/probe-private-blob-client-access.mjs` must prove public override fails before release. See "Private Blob store provisioning" below |
-| `DOSSIER_BLOB_RW_TOKEN` | Dedicated private Blob RW token for Cycle Dossier immutable inputs and Word/PDF artifacts | **Source-built 2026-09-07; not provisioned.** Set independently in each environment after dedicated private-store provisioning; service fails closed when unset. |
+| `DOSSIER_BLOB_READ_WRITE_TOKEN` | Dedicated private Blob RW token for Cycle Dossier immutable inputs and Word/PDF artifacts | **Source-built 2026-09-07; not provisioned.** Set independently in each environment after dedicated private-store provisioning; service fails closed when unset. |
 | `CYCLE_DOSSIER_ENABLED` | Cycle Dossier pilot activation flag | **Source-built 2026-09-07; disabled until rollout.** Set literal `true` only after migration 038, private Blob token, and governed prompts are verified; cron remains inert otherwise. |
+| `CYCLE_DOSSIER_CRON_SECRET` | Dedicated strict secret for the Cycle Dossier drain | **Source-built 2026-09-07; not provisioned.** Required even in development; the drain never uses the shared development bypass. |
+| `CYCLE_DOSSIER_REQUEST_ALLOWLIST` | Server-owned comma-separated request IDs or request numbers admitted to the controlled cohort | **Source-built 2026-09-07; not configured.** Required before activation; keep to the explicitly rehearsed request(s). |
+| `CYCLE_DOSSIER_OPERATOR_STOP` | Immediate process-level outer stop checked before paid calls and SharePoint writes | **Source-built 2026-09-07; unset by default.** The durable Postgres operator stop is the authoritative pause and settles queued/running runs. |
 | `NODE_ENV` | Environment flag | Auto-set (`production` on Vercel, `development` locally) |
 
 ### Optional — Dynamics Explorer
@@ -282,7 +285,7 @@ This is the most common maintenance task. Both `AZURE_AD_CLIENT_SECRET` and `DYN
 
 ---
 
-## Private Blob store provisioning (`DVX_BLOB_RW_TOKEN`, `INTAKE_BLOB_RW_TOKEN`, `UPLOADS_BLOB_RW_TOKEN`, `DOSSIER_BLOB_RW_TOKEN`)
+## Private Blob store provisioning (`DVX_BLOB_RW_TOKEN`, `INTAKE_BLOB_RW_TOKEN`, `UPLOADS_BLOB_RW_TOKEN`, `DOSSIER_BLOB_READ_WRITE_TOKEN`)
 
 These env vars hold RW tokens for **dedicated PRIVATE** Vercel Blob stores. They are deliberately separate from the shared `BLOB_READ_WRITE_TOKEN` (which is bound to the public `phase-ii-summaries-blob` store used by uploads / reviewer-finder / review-manager / maintenance) and must NOT be conflated. Apps that PUT or GET against a private store with the public token will fail at the Blob API layer.
 
@@ -291,7 +294,7 @@ These env vars hold RW tokens for **dedicated PRIVATE** Vercel Blob stores. They
 | `DVX_BLOB_RW_TOKEN` | `dvx-export-private` | (read from dashboard) | `iad1` |
 | `INTAKE_BLOB_RW_TOKEN` | `intake-applicant-private` | `store_Eaui32n6i2wYMS6E` | `iad1` |
 | `UPLOADS_BLOB_RW_TOKEN` | `wmkf-uploads-private` | `store_WvoDkxrlWniAuJAj` | `iad1` |
-| `DOSSIER_BLOB_RW_TOKEN` | Dedicated Cycle Dossier private store | **not provisioned** | record at rollout |
+| `DOSSIER_BLOB_READ_WRITE_TOKEN` | Dedicated Cycle Dossier private store | **not provisioned** | record at rollout |
 
 `UPLOADS_BLOB_RW_TOKEN` backs the **private-blob migration of the shared document uploader** (Phase 1; `FileUploaderSimple access="private"` → `pages/api/upload-handler.js` mints the client token against this store, and `lib/utils/uploaded-blob.js` reads private blobs with it). **Provisioned 2026-06-11** in **dev + preview + production**, and the **live smoke PASSED** (`node scripts/smoke-private-upload.mjs` + a real expense-reporter upload→extract run locally against the store — receipts landed in the private store; the receipt URL returns HTTP 403 unauthenticated). **Cohort promoted to production 2026-06-11:** the prod token + `NEXT_PUBLIC_PHASE_I_DYNAMICS_PRIVATE_BLOB` + `NEXT_PUBLIC_GRANT_REPORTING_PRIVATE_BLOB` are set in Production and deployed (`dpl_Cd6MGvsGvYgcqW8LHPNV4j7Wg5oA`); grant-reporting prod-verified (live upload → private store, URL 403, extraction ran). **`expense-reporter` also promoted** — `NEXT_PUBLIC_EXPENSE_REPORTER_PRIVATE_BLOB=true` set in Production + deployed (`wmkfresearchapps-njdq4gr5y`); all three Phase-1 consumers now upload private in prod (expense shares the prod-verified store/token/read path). Where the token is unset, `process-expenses` (and any future private consumer) fails closed and the flag must stay `public`.
 
@@ -326,11 +329,11 @@ The Vercel CLI (53.x + 54.x) cannot connect a *second* Blob store under a custom
 
 ### Sender constraints
 
-These stores are private — direct browser fetches against their Blob URLs return 404/403. Retrieval MUST go through an authenticated server-side proxy (`/api/dataverse-export/download?t=<token>` for DVX; the drain's three-call attach dance for intake). The "shipping a short-lived public Blob URL to the browser" pattern is explicitly NOT used for these stores; see the Track B build plan §5 for the rationale. Cycle Dossier artifacts use the dedicated `DOSSIER_BLOB_RW_TOKEN` and worker-side exact-path retrieval.
+These stores are private — direct browser fetches against their Blob URLs return 404/403. Retrieval MUST go through an authenticated server-side proxy (`/api/dataverse-export/download?t=<token>` for DVX; the drain's three-call attach dance for intake). The "shipping a short-lived public Blob URL to the browser" pattern is explicitly NOT used for these stores; see the Track B build plan §5 for the rationale. Cycle Dossier artifacts use the dedicated `DOSSIER_BLOB_READ_WRITE_TOKEN` and worker-side exact-path retrieval.
 
 The Cycle Dossier store follows the same dedicated-token rule. Provision a
 separate private store, record its store identity in the rollout receipt, and
-set only `DOSSIER_BLOB_RW_TOKEN` in development, preview, and production. Do
+set only `DOSSIER_BLOB_READ_WRITE_TOKEN` in development, preview, and production. Do
 not put it in `BLOB_READ_WRITE_TOKEN` or reuse the intake/uploads token. The
 source-built service fails closed when this token is absent and reads only
 server-persisted exact pathnames with SHA-256/size checks. Keep

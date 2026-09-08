@@ -97,6 +97,33 @@ it('reuses a supplied site id when resolving a drive', async () => {
   expect(global.fetch.mock.calls[0][0]).toContain('/sites/known-site/drives');
 });
 
+it('uses pinned site and drive identities before creating any folder', async () => {
+  const siteSpy = jest.spyOn(GraphService, 'getSiteId');
+  const driveSpy = jest.spyOn(GraphService, 'getDriveId');
+  jest.spyOn(GraphService, 'getAccessToken').mockResolvedValue('token');
+  global.fetch = jest.fn()
+    .mockResolvedValueOnce(response(404))
+    .mockResolvedValueOnce(response(201, { id: 'request', folder: {} }))
+    .mockResolvedValueOnce(response(404))
+    .mockResolvedValueOnce(response(201, { id: 'artifacts', folder: {} }));
+
+  await expect(GraphService.ensureFolderPath(
+    'akoya_request',
+    'request/AI Artifacts',
+    { siteId: 'pinned-site', driveId: 'pinned-drive' },
+  )).resolves.toMatchObject({ siteId: 'pinned-site', driveId: 'pinned-drive' });
+  expect(siteSpy).not.toHaveBeenCalled();
+  expect(driveSpy).not.toHaveBeenCalled();
+  expect(global.fetch.mock.calls[0][0]).toContain('/drives/pinned-drive/');
+});
+
+it('rejects incomplete pinned identity before any Graph request', async () => {
+  global.fetch = jest.fn();
+  await expect(GraphService.ensureFolderPath('akoya_request', 'request/AI Artifacts', { siteId: 'site' }))
+    .rejects.toThrow(/supplied together/);
+  expect(global.fetch).not.toHaveBeenCalled();
+});
+
 it('reads current file metadata by encoded stable drive and item identity', async () => {
   jest.spyOn(GraphService, 'getAccessToken').mockResolvedValue('token');
   global.fetch = jest.fn().mockResolvedValueOnce(response(200, {

@@ -46,18 +46,18 @@ function refFor(bytes, overrides = {}) {
 }
 
 beforeEach(() => {
-  process.env.DOSSIER_BLOB_RW_TOKEN = TOKEN;
+  process.env.DOSSIER_BLOB_READ_WRITE_TOKEN = TOKEN;
   get.mockReset();
   put.mockReset();
 });
 
 afterEach(() => {
-  delete process.env.DOSSIER_BLOB_RW_TOKEN;
+  delete process.env.DOSSIER_BLOB_READ_WRITE_TOKEN;
 });
 
 describe('Cycle Dossier private storage configuration', () => {
   it('fails closed before accessing Blob when the dedicated token is absent', async () => {
-    delete process.env.DOSSIER_BLOB_RW_TOKEN;
+    delete process.env.DOSSIER_BLOB_READ_WRITE_TOKEN;
 
     expect(() => assertDossierStorageConfigured()).toThrow(/private dossier store has not been configured/i);
     await expect(readDossierFile(refFor(Buffer.from('bytes')))).rejects.toThrow(/private dossier store has not been configured/i);

@@ -38,6 +38,7 @@ jest.mock('../../lib/services/cycle-dossier-store.js', () => ({
   mutateDossierRun: jest.fn(),
   readDossierEdition: jest.fn(),
   getDossierEntry: jest.fn(),
+  setDossierOperatorStop: jest.fn(),
 }));
 
 import * as requests from '../../lib/dataverse/adapters/grant-request.js';
@@ -47,6 +48,7 @@ import * as storage from '../../lib/services/cycle-dossier-storage.js';
 import * as store from '../../lib/services/cycle-dossier-store.js';
 import {
   controlCycleDossier,
+  cycleDossierAction,
   downloadCycleDossier,
   getCycleDossierPage,
   launchCycleDossier,
@@ -69,6 +71,7 @@ function runRow(overrides = {}) {
 beforeEach(() => {
   jest.clearAllMocks();
   process.env.CYCLE_DOSSIER_ENABLED = 'true';
+  process.env.CYCLE_DOSSIER_REQUEST_ALLOWLIST = `${ID},${ID2}`;
   store.assertDossierActor.mockResolvedValue({ profileId: 7 });
   store.getDossier.mockResolvedValue({ id: 'dossier-1', cycle: 'D26', selection: [ID, ID2], latest_edition_id: null });
   store.listDossierEntries.mockResolvedValue([]);
@@ -82,9 +85,10 @@ beforeEach(() => {
   storage.storeDossierJSON.mockResolvedValue('input-ref');
   storage.readDossierJSON.mockResolvedValue({});
   resolveDossierDestination.mockResolvedValue({ library: 'akoya_request', folder: '1001_GUID', siteId: 'site', driveId: 'drive' });
+  store.setDossierOperatorStop.mockResolvedValue({ stop_requested: true, reason: 'controlled stop', updated_at: '2026-09-07T00:00:00Z' });
 });
 
-afterEach(() => { delete process.env.CYCLE_DOSSIER_ENABLED; });
+afterEach(() => { delete process.env.CYCLE_DOSSIER_ENABLED; delete process.env.CYCLE_DOSSIER_REQUEST_ALLOWLIST; });
 
 test('preview returns the selected and generated DTOs and saves the selection', async () => {
   store.listDossierEntries.mockResolvedValue([{ request_id: ID, id: 'entry-existing', revision: 1, created_at: '2026-09-07T00:00:00Z', created_by: 9 }]);
@@ -103,6 +107,22 @@ test('empty selection is rejected before a no-cap launch and unknown estimate re
   await expect(previewCycleDossier(7, { selectedRequestIds: [], generateRequestIds: [] })).rejects.toMatchObject({ httpStatus: 400 });
   expect(generation.prepareRequestInput).not.toHaveBeenCalled();
   expect(generation.estimateGenerationCost).not.toHaveBeenCalled();
+});
+
+test('disabled pilot rejects preview before any private Blob or Postgres write', async () => {
+  process.env.CYCLE_DOSSIER_ENABLED = 'false';
+  await expect(previewCycleDossier(7, { selectedRequestIds: [ID], generateRequestIds: [ID] }))
+    .rejects.toMatchObject({ httpStatus: 503 });
+  expect(requests.queryAllRequests).not.toHaveBeenCalled();
+  expect(storage.storeDossierJSON).not.toHaveBeenCalled();
+  expect(store.createDossierPreview).not.toHaveBeenCalled();
+});
+
+test('disabled pilot rejects selection persistence before Postgres write', async () => {
+  process.env.CYCLE_DOSSIER_ENABLED = 'false';
+  await expect(cycleDossierAction(7, { action: 'selection', selectedRequestIds: [ID] }))
+    .rejects.toMatchObject({ httpStatus: 503 });
+  expect(store.saveDossierSelection).not.toHaveBeenCalled();
 });
 
 test('launch without a cap accepts a complete preview and returns a queued run', async () => {
@@ -170,4 +190,10 @@ test('missing superuser role fails closed on page reads', async () => {
   store.assertDossierActor.mockRejectedValue(Object.assign(new Error('An active superuser profile is required.'), { httpStatus: 403 }));
   await expect(getCycleDossierPage(7)).rejects.toMatchObject({ httpStatus: 403 });
   expect(store.listDossierEntries).not.toHaveBeenCalled();
+});
+
+test('operator stop persists a global stop without requiring a run id', async () => {
+  await expect(controlCycleDossier(7, { action: 'operator-stop', stop: true, reason: 'controlled rehearsal complete' }))
+    .resolves.toEqual({ control: { stopRequested: true, reason: 'controlled stop', updatedAt: '2026-09-07T00:00:00Z' } });
+  expect(store.setDossierOperatorStop).toHaveBeenCalledWith(7, true, 'controlled rehearsal complete');
 });

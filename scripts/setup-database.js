@@ -1018,6 +1018,14 @@ const v43Statements = [
     UNIQUE(owner_profile_id, idempotency_key)
   )`,
   `CREATE INDEX IF NOT EXISTS cycle_dossier_runs_queue ON cycle_dossier_runs(status, created_at)`,
+  `CREATE TABLE IF NOT EXISTS cycle_dossier_control (
+    id BOOLEAN PRIMARY KEY DEFAULT TRUE CHECK (id=TRUE),
+    stop_requested BOOLEAN NOT NULL DEFAULT FALSE,
+    reason TEXT,
+    updated_by INTEGER REFERENCES user_profiles(id),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`,
+  `INSERT INTO cycle_dossier_control(id) VALUES(TRUE) ON CONFLICT(id) DO NOTHING`,
   `CREATE TABLE IF NOT EXISTS cycle_dossier_editions (
     id UUID PRIMARY KEY, owner_profile_id INTEGER NOT NULL REFERENCES user_profiles(id),
     dossier_id UUID NOT NULL REFERENCES cycle_dossiers(id), run_id UUID NOT NULL REFERENCES cycle_dossier_runs(id),
