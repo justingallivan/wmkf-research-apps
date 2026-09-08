@@ -139,6 +139,7 @@ test('proposal mode: superuser gets canManage on rows they do not lead; rollup s
   });
   const body = await loadDashboard(args({ cycleCode: 'D26', scope: 'all' }));
   expect(body.proposals[0].canManage).toBe(true); // superuser override
+  expect(body.proposals[0].isMine).toBe(false);
   expect(body.proposals[0].advancing).toBe(true);
   expect(body.proposals[0].reviewers.needed).toBe(3);
   expect(body.rollup).toEqual({ total: 1, stages: { find: 1, invite: 0, awaiting: 0, review: 0, done: 0 } });
@@ -169,7 +170,7 @@ test('proposal mode: canonical session actor is case-insensitive and missing act
     }],
   });
   await expect(loadDashboard(args({ cycleCode: 'D26', scope: 'all', callerSystemId: 'pd-1' })))
-    .resolves.toMatchObject({ proposals: [{ canManage: true }] });
+    .resolves.toMatchObject({ proposals: [{ canManage: true, isMine: true }] });
   await expect(loadDashboard(args({ cycleCode: 'D26', scope: 'all', callerSystemId: null })))
-    .resolves.toMatchObject({ proposals: [{ canManage: false }] });
+    .resolves.toMatchObject({ proposals: [{ canManage: false, isMine: true }] });
 });
