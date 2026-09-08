@@ -15,9 +15,11 @@ paths = [
   '''^tests/unit/prompt-templates-executor-budgets\.test\.js$''',
 ]
 
-[[allowlists]]
+[[rules]]
+id = "generic-api-key"
+
+[[rules.allowlists]]
 description = "Public Cycle Dossier activation flag in its rollout documentation; this literal is not a credential."
-targetRules = ["generic-api-key"]
 condition = "AND"
 regexes = ['''^CYCLE_DOSSIER_ENABLED=true$''']
 paths = ['''^docs/CYCLE_DOSSIER_PILOT_DESIGN\.md$''']
