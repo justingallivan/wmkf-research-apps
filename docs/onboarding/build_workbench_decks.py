@@ -176,7 +176,8 @@ def build_pd():
     section_slide(prs, "4", SPINE[3])
     content_slide(prs, "STEP 4", "Overview tab — the command center", [
         "A fast answer to \"where is this request and what do I do next?\"",
-        "Reviewer funnel at a glance: how many candidates, invited, accepted, materials sent, reviews in.",
+        "Reviewer funnel at a glance: Candidates, Invited, Accepted, Complete.",
+        ("", "Complete here means closed out, not just \"review returned\" — see Step 13."),
         "A \"what next\" hint based on that funnel.",
         "Key request facts: meeting date, amounts, status.",
         ("", "Use it as your daily starting point for each request."),
@@ -253,8 +254,10 @@ def build_pd():
 
     section_slide(prs, "13", SPINE[12])
     content_slide(prs, "STEP 13", "Reviewers · Track Reviewers (completion)", [
-        "Completed reviewers (review returned) show within Track Reviewers — there is no separate Completed tab anymore.",
-        "Marking a review complete is record-keeping only; nothing auto-pays or drops the row off.",
+        "Review Received and Complete are two different states — a returned review isn't closed out yet.",
+        "Closing it out asks whether an honorarium should be paid (Yes/No/not applicable), with a reason required when the answer is No.",
+        (1, "That decision doesn't itself create or pay anything — payment stays an Operations/Finance process outside the Workbench."),
+        "There is no separate Completed tab anymore; both states show within Track Reviewers.",
     ])
 
     section_slide(prs, "14", SPINE[13])
@@ -309,10 +312,10 @@ def build_tech():
         "Consolidation: the Workbench merges the old reviewer-finder + review-manager apps; one app-access grant ('reviewers') now covers them.",
     ])
     content_slide(prs, "ARCHITECTURE", "Access & auth", [
-        "Page is wrapped in RequireAppAccess appKey=\"reviewers\".",
-        "Per-user app grants live in Dataverse (admin-managed); the same filter gates tab visibility.",
+        "Page is wrapped in RequireAppAccess appKey=\"reviewers\" — one gate for the whole page, not per tab.",
+        "Per-user app grants live in Dataverse (admin-managed); the tab strip itself is NOT filtered — all nine tabs render for anyone with the grant.",
         "Identity comes from the authenticated session — never from request input.",
-        "canManage is computed (reviewer-modes) to gate write actions vs. read-only viewers.",
+        "canManage is computed (reviewer-modes) and passed only into the Reviewers tab, to gate write actions vs. read-only viewers there.",
     ])
 
     section_slide(prs, "1-3", "Shell, entry & tab strip")
@@ -403,7 +406,8 @@ def build_tech():
 
     section_slide(prs, "13-14", "Completion (in Track Reviewers) & Status")
     content_slide(prs, "STEPS 13-14", "Completed reviews & Status reflection", [
-        "Completed reviews show within Track Reviewers (no separate Completed tab): reviews returned via the review-manager reviewers feed; wmkf_accepted lifecycle.",
+        "Track Reviewers (no separate Completed tab) holds both states: wmkf_reviewstatus review_received (returned, not yet closed out) and complete.",
+        (1, "ReviewerCloseoutModal -> POST close-review: one ETag-bound write sets reviewStatus:'complete' + completedAt + honorariumEligibility (+ notes); never writes the honorarium request itself."),
         "StatusTab.js: read-only reflection of akoya_requeststatus.",
         (1, "statusClass derived via the value->class map in lib/services/dataverse-export/constants.js."),
         (1, "Unknown status -> UNCLASSIFIED, shown raw (never coerced). Workbench never writes status."),

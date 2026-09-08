@@ -46,7 +46,8 @@ sequence.
 ## Audit follow-ups — verified open, not silently prioritized
 - **Public/onboarding reviewer-token documentation reconciliation.**
   **[OWNER-DEFERRED 2026-09-01; RECONCILED 2026-09-07; REWORKED 2026-09-07
-  AFTER OPUS REVIEW.]** Internal operating sources now reflect the production
+  AFTER TWO OPUS REVIEW ROUNDS AND A CODEX ADVERSARIAL REVIEW.]** Internal
+  operating sources now reflect the production
   incident remediation: review-due reminders are link-free and preserve token
   authority, manual reminders have resumed, and the automatic schedule
   remains held. Public/onboarding artifacts were intentionally left untouched
@@ -107,6 +108,57 @@ sequence.
   name present, `CRON_SECRET` (technical deck's ops appendix, name only, no
   value), is acceptable — the same name already appears in 7+ other tracked
   public docs — so it was left as-is.
+
+  A Codex adversarial review then found three factual deck errors outside the
+  reminder/tab scope, all now fixed and re-verified from source. (1) The PD
+  deck's Step 13 (Track Reviewers completion) and the technical deck's Steps
+  13-14 slide conflated a returned review with a closed-out one and called
+  closeout "record-keeping only." Live behavior is two distinct
+  `wmkf_reviewstatus` values, `review_received` (100000003) and `complete`
+  (100000004) `[VERIFIED via shared/config/reviewerLifecycle.js:19-26]`;
+  `ReviewerCloseoutModal` requires an explicit honorarium disposition
+  (Yes/No/not-applicable, with a reason required for No) before a review can
+  be closed `[VERIFIED via ReviewerCloseoutModal.js:159-180,245-320]`, and
+  `close-review` → `closeReview` persists `reviewStatus:'complete'` +
+  `completedAt` + `honorariumEligibility` + notes in one ETag-bound write,
+  explicitly never writing the linked honorarium request itself
+  `[VERIFIED via lib/services/reviewer-engagement/close-review.js:1-8,195-210]`.
+  Payment authorization stays outside the app
+  `[VERIFIED via docs/agent-wiki/topics/finance-honoraria.md:39-51: "That is
+  not final authorization to pay... Operations/Finance retains that
+  control."]`. Fixed both decks to describe closeout as a distinct step that
+  records a payment disposition without paying anything. (2) The PD deck's
+  Overview slide (Step 4) listed a five-metric funnel including "materials
+  sent" and "reviews in," but `OverviewTab.js` renders exactly four fields —
+  Candidates, Invited, Accepted, Complete
+  `[VERIFIED via shared/components/workbench/OverviewTab.js:103-111]` — and
+  "Complete" there is the same closeout-derived count as above
+  `[VERIFIED via lib/services/reviewer-rollup.js:119]`, not "review
+  returned." Fixed to the real four metrics with an explicit pointer to the
+  Step 13 distinction. (3) The technical deck's "Access & auth" slide
+  claimed the per-user app-grant filter also gates tab visibility. In fact
+  `RequireAppAccess appKey="reviewers"` wraps the whole page once
+  `[VERIFIED via pages/workbench/[requestId].js:242-247]`, the tab strip
+  renders all nine `TABS` entries unconditionally with no per-tab filter
+  `[VERIFIED via pages/workbench/[requestId].js:152-171]`, and `canManage` is
+  computed once and passed only into the Reviewers tab
+  `[VERIFIED via pages/workbench/[requestId].js: single JSX pass at the
+  Reviewers branch, no other passes in the file]`. Fixed to describe one
+  page-level grant plus route-level authorization, and to state plainly
+  that the tab strip is not filtered per tab.
+
+  Process note: regenerating from source is not currently checked for
+  generator→binary parity by CI — four generator-only commits drifted from
+  the shipped `.pptx` files before this reconciliation pass (see above), and
+  nothing would have caught it. Pinned the build recipe in
+  `docs/onboarding/README.md` to the exact `python-pptx` version used here
+  (`1.0.2`, confirmed via `pip show`) so a regeneration is reproducible.
+  Building an automated parity check (e.g., CI diffs regenerated output
+  against the checked-in `.pptx`) was explicitly out of scope for this pass
+  and is an open follow-up pending an owner decision on whether it's worth
+  the CI cost for two onboarding decks. Status is: reminder/token/scheduler/
+  tab-strip/closeout/funnel/access claims reconciled and re-verified; deck↔
+  generator parity enforcement remains open.
 
   Known open item, not fixed here per instruction: `docs/REVIEWER_ENGAGEMENT_SPEC.md:110`
   itself still reads "staff should not substitute a link-bearing resend

@@ -37,11 +37,12 @@ Technical = what's under the hood).
 ## Regenerating the decks
 
 The script uses [`python-pptx`](https://python-pptx.readthedocs.io/), which is **not** a
-project dependency. Use a throwaway venv:
+project dependency. Use a throwaway venv, pinned to the version last used to build the
+checked-in `.pptx` files (`1.0.2`) for a reproducible regeneration:
 
 ```bash
 python3 -m venv /tmp/pptxvenv
-/tmp/pptxvenv/bin/pip install python-pptx
+/tmp/pptxvenv/bin/pip install python-pptx==1.0.2
 /tmp/pptxvenv/bin/python docs/onboarding/build_workbench_decks.py
 ```
 
