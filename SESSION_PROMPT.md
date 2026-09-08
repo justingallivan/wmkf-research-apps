@@ -114,7 +114,7 @@ toolbar/header · `314e9426` `e68bffe9` ToolbarSelect · `f4bcb5b6` smoke record
 
 1. **Colleague discussion:** PD front-end flip to `Phase II Pending` as primary path (register Q8).
 2. **Connor:** J27 proposal SharePoint location and filename (Q5); back-end status changes; slice G
-   checklist (register §8).
+   checklist (register §8). Connor is out as of 2026-09-08; Q5 and this item are parked until he returns.
 3. **Filed, not urgent** (register §7 status line): Q1b, Q12, Q13, Q15, Q16, Q20, Q24.
 4. **Dataverse attribute drops** (`wmkf_summarybloburl`, `wmkf_summarypages`) approved 2026-09-06;
    Connor-applied with its own pre-flight. Tier 0 when convenient.
