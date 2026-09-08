@@ -100,6 +100,14 @@ const HONORARIUM_PILL_INFO = Object.freeze({
   eligible: { text: 'Eligible', label: 'Honorarium eligibility: eligible', tone: 'neutral' },
   not_eligible: { text: 'None', label: 'Honorarium eligibility: not eligible', tone: 'neutral' },
   not_applicable: { text: 'N/A', label: 'Honorarium eligibility: not applicable', tone: 'neutral' },
+  // The API emits this literal when the stored picklist integer doesn't map
+  // to a known value (lib/services/review-manager/reviewers-service.js) --
+  // distinct from "not recorded"; it needs a technical fix, not a decision.
+  unknown: {
+    text: 'Needs review',
+    label: 'Honorarium eligibility: saved disposition not recognized; technical repair required',
+    tone: 'amber',
+  },
 });
 
 function honorariumEligibilityPillInfo(value) {
@@ -1094,7 +1102,8 @@ export default function ReviewerManagePanel({
                         />
                         {honorariumPill && (
                           <span
-                            className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${
+                            role="img"
+                            className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-medium ${
                               honorariumPill.tone === 'amber'
                                 ? 'border-amber-200 bg-amber-50 text-amber-800'
                                 : 'border-gray-200 bg-gray-50 text-gray-700'
