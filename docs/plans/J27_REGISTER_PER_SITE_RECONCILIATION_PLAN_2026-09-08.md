@@ -1,5 +1,11 @@
 # J27 Register Per-Site Reconciliation Plan (2026-09-08, rev 2 after Codex review)
 
+**Status: executed 2026-09-08, rev 2.** Four parallel Sonnet slice agents reconciled every
+stale row to the binding syntax; two exhaustive Opus matrix reviews returned CONDITIONS on
+all four slices, applied in a follow-up commit (`docs/J27_REGISTER_RECONCILIATION_DECISIONS_2026-09-08.md`).
+Final gate: 59 ok / 0 stale / 6 unverifiable / 11 closed, 0 unbound, 0 vocabulary warnings;
+self-test 72/72. See `docs/J27_TRANSITION_REGISTER.md` §10 for the full record.
+
 **Owner decision (2026-09-08):** keep the strict per-site rule in `scripts/check-j27-register.js`
 and bring `docs/J27_TRANSITION_REGISTER.md` up to it with subagents, rather than weakening the
 gate to warnings. "These things tend to drift and we don't need that now."

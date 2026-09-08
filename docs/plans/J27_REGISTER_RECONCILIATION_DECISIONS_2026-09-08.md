@@ -3,6 +3,13 @@
 Per-file decision matrix for the per-site reconciliation (plan §3). One line
 per cited file, in the order the agent reached it.
 
+**Reviewed exhaustively by two Opus passes, findings applied** (2026-09-08, commit
+`3ff76885`). Both reviews returned CONDITIONS on all four slices — no REWORK. Conditions
+applied: J27-011 excluded-list move, J27-061 disposition normalization, J27-071 stray
+fragment removal, a missing J27-032 subsection, line-cite drift across ten rows, and five
+matrix-only corrections (marked inline below where they touch this file). Gate stayed
+59 ok / 0 stale / 0 unbound throughout; self-test stayed fully green.
+
 ## Slice A
 
 | register id | file | case | fragment or note | reason |

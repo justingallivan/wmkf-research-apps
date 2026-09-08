@@ -99,6 +99,12 @@ toolbar/header · `314e9426` `e68bffe9` ToolbarSelect · `f4bcb5b6` smoke record
    Overview funnel, and page-level access; `python-pptx==1.0.2` pinned. Open follow-ups from its
    Codex/Opus reviews: generator↔deck parity check (owner decision), `REVIEWER_ENGAGEMENT_SPEC.md:110`
    stale hold wording, `finance-honoraria.md:41-42` stale "deployment pending".
+   **Unmerged, branch `claude/j27-gate-tighten` (2026-09-08):** the two register-§9 gate follow-ups
+   above (prose-colon false positives, any-fragment/any-file multi-site check) are fixed, plus a
+   site-to-fragment binding schema, STRICT UNBOUND, and full register reconciliation across four
+   parallel slice agents and two Opus matrix reviews. Gate is green again on this branch: 59 ok /
+   0 stale / 6 unverifiable / 11 closed, 0 unbound, 0 vocabulary warnings, self-test 72/72. Not yet
+   merged to `main`. Next action is the J27 build plan once Q5 lands (item 3 below).
 3. **Write `docs/J27_BUILD_AND_CHANGE_PLAN.md`** once Connor's file-location decision (Q5) lands.
    Evidence: register §2 deliverables table. Sequence unchanged from the S492 prompt.
 4. **Annotate the pilot passages** coupling "J27 Initial Assessment" to 2026-08-18:

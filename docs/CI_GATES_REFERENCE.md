@@ -344,6 +344,13 @@ the bag is not consulted for it at all — and the row is stale (`unbound: <file
 the bag would have matched. Only a single-file row still falls back to the bag. The
 `N multi-site rows with unbound files` summary line is kept for that count.
 
+**Register reconciliation complete (2026-09-08):** four parallel slice agents bound
+every stale row to the new syntax, followed by two exhaustive Opus matrix reviews
+whose CONDITIONS were applied on top (`docs/J27_TRANSITION_REGISTER.md` §10). Current
+baseline: `check:j27-register` reports 59 ok, 0 stale, 6 unverifiable, 11 closed; 0
+multi-site rows with unbound files; 0 rows with a disposition outside the vocabulary.
+The self-test is fully green (72/72 assertions, including the real-repository baseline).
+
 ### `check:model-override-warming` — LLM 404-on-tier-alias prevention (S230)
 
 AST gate (`@babel/parser`). Every `pages/api/**` route that reaches a `getModelForApp` / `getFallbackModelForApp` call — directly or transitively through an imported module — must call an **awaited** `loadModelOverrides()` first (and within a single function, the warm must lexically precede a direct resolver call). Without warming, the synchronous resolver returns the raw tier alias (e.g. `sonnet`) and Anthropic 404s in prod; unit tests never catch it (they mock the LLM). This class recurred 3× (web-suggestions S229; applicant-reviewers + integrity-screener/screen S230) before the gate.
@@ -473,7 +480,7 @@ When modifying any `scripts/check-*.js` gate (or building a new one), the matchi
 | `check:scaffolding-tokens` | `check:scaffolding-tokens:self-test` |
 | `check:prompt-injection-tagging` | `check:prompt-injection-tagging:self-test` |
 | `check:reviewer-reminder-hold` | `check:reviewer-reminder-hold:self-test` — safe registry and lookalike-path positives; exact held-route (including query-string registration), invalid JSON, missing/non-array registry, malformed entry, missing-path, and alternate-config negatives. |
-| `check:j27-register` | `check:j27-register:self-test` — unknown-id, stale-excerpt, missing-site, unmatched-glob, swapped-binding, bound-vs-bag (Unicode and ASCII arrow), directory-site, glob-bound-one-fragment, binding-path-unresolved, binding-path-not-in-site, binding-fragment-too-short, path-like-bag-exclusion, strict-unbound (pure-bag and partially-bound multi-file rows, including the two superseded pre-binding fixtures), malformed-row and duplicate-id reds; existing-id, comment-led bare-marker (`//`, `<!--`, and `####`) warning, backtick self-reference, bold-label and mid-line prose non-marker skips, two-site-both-bound, ellipsis-split, wrapped-comment, memory/glob shorthand, ASCII/Unicode arrow parsing, fully-bound multi-file row, closed-row and prose-only greens; `closed.`-disposition-not-closed-plus-vocabulary-warning info case; real-baseline green before and after (currently red — 47 stale rows pending register reconciliation under STRICT UNBOUND, see `docs/plans/J27_REGISTER_PER_SITE_RECONCILIATION_PLAN_2026-09-08.md`). |
+| `check:j27-register` | `check:j27-register:self-test` — unknown-id, stale-excerpt, missing-site, unmatched-glob, swapped-binding, bound-vs-bag (Unicode and ASCII arrow), directory-site, glob-bound-one-fragment, binding-path-unresolved, binding-path-not-in-site, binding-fragment-too-short, path-like-bag-exclusion, strict-unbound (pure-bag and partially-bound multi-file rows, including the two superseded pre-binding fixtures), malformed-row and duplicate-id reds; existing-id, comment-led bare-marker (`//`, `<!--`, and `####`) warning, backtick self-reference, bold-label and mid-line prose non-marker skips, two-site-both-bound, ellipsis-split, wrapped-comment, memory/glob shorthand, ASCII/Unicode arrow parsing, fully-bound multi-file row, closed-row and prose-only greens; `closed.`-disposition-not-closed-plus-vocabulary-warning info case; real-baseline green before and after (register reconciliation complete 2026-09-08 — 59 ok, 0 stale, 6 unverifiable, 11 closed, 0 unbound). |
 
 **When external review catches a structural pattern an existing gate missed, the order is mandatory:**
 
