@@ -1,141 +1,178 @@
-# J27 Register Per-Site Reconciliation Plan (2026-09-08)
+# J27 Register Per-Site Reconciliation Plan (2026-09-08, rev 2 after Codex review)
 
 **Owner decision (2026-09-08):** keep the strict per-site rule in `scripts/check-j27-register.js`
 and bring `docs/J27_TRANSITION_REGISTER.md` up to it with subagents, rather than weakening the
 gate to warnings. "These things tend to drift and we don't need that now."
 
+**Codex adversarial review of rev 1 (2026-09-08, `gpt-5.6-sol`): needs-attention.** Two design
+findings accepted and folded in below: (1) demoting tests, Atlas pages, and memories to
+"context" would silently drop real J27 sites from checking; (2) the gate had no site-to-fragment
+binding, so a reconciled register could pass on coincidental matches. Three record findings
+also accepted: contradictory exit counts, an unrecognised `closed.` disposition on J27-072, and
+the canonical work queue left stale. Rev 2 sequences a schema fix **before** the row work.
+
 **State this plan starts from** `[VERIFIED via node scripts/check-j27-register.js on branch
-claude/j27-gate-tighten at 49cf4d28]`: 17 ok · **43 stale** · 6 unverifiable · 10 closed;
-0 id-less markers. The 43 stale rows are listed in §4. None of them went stale because a site
-changed since 2026-09-07; they fail because the row cites several files and quotes a snippet
-that exists in only one of them.
+claude/j27-gate-tighten at c96a6a27]`: 76 rows = 17 ok · **43 stale** · 6 unverifiable ·
+10 closed; 0 id-less markers. Codex counted 130 cited files across the 43 rows that currently
+match no fragment. None went stale because a site changed since 2026-09-07; they fail because
+the row cites several files and quotes a snippet that exists in only one of them.
 
 ## 1. Goal and non-goals
 
-**Goal.** Every open register row satisfies the strict rule: each file named in its `site`
-cell contains at least one of the row's backticked `excerpt` fragments, verbatim. The gate
-returns 0 stale and its self-test passes 32/32 (both "real repository baseline is green"
-assertions included).
+**Goal.** Every open register row verifies each of its cited files against a fragment that
+belongs to that file. The gate returns 0 stale, 0 id-less markers, and its self-test passes.
 
 **Non-goals.** No cited source file, doc, memory, or wiki page is edited. No row is scheduled,
-no evidence label is upgraded, no register id is reused, no new rows are added, and the gate
-script is not changed again. This is register-content work only.
+no evidence label is upgraded, no register id is reused. Rows may be **split** (one fact per
+row, new ids) when a file carries a distinct J27 fact; rows are never merged or deleted.
 
-## 2. The per-row decision rule (agents apply this, nothing else)
+## 2. Phase 0 — schema binding in the gate (before any row work)
 
-For each stale row, for each cited file the gate names as lacking a fragment, read the file at
-the cited line(s) and pick exactly one of:
+**Change to the register `excerpt` cell (plan §3 amendment).** A fragment may be **bound** to a
+cited path by prefixing it: `` `path/or/glob` → `fragment` ``. Unprefixed fragments remain a
+shared bag. Joins stay ` · `. Example:
+
+```
+`lib/a.js` → `const PHASE_II_FOLDER = 'Phase II';` · `pages/x.js` → `'wmkf_phaseiistatus'` · `shared fallback`
+```
+
+**Gate rule (Phase 0 build).** For each resolved file (every glob match included):
+- if one or more fragments are bound to a path that resolves to this file (exact rel path, or
+  the glob that matched it), the file must contain at least one of **those** fragments;
+- otherwise the file falls back to the shared bag, and the gate counts it as **unbound**.
+- A multi-file row with any unbound file is reported as a warning line (`unbound: <files>`);
+  the summary prints `N multi-site rows with unbound files`. After this plan completes that
+  number must be 0 for the 43 rows and is a drift signal thereafter.
+- Directory sites no longer pass on existence: a directory in `site` must be replaced by a
+  specific file inside it (or the row is stale with `directory site needs a file`).
+- Dispositions: `closed` is **not** a vocabulary word (plan §3 is `open` · `scheduled` · `done` ·
+  `rejected`). J27-072's `closed.` is normalised to `done (6b810c96, promoted 2026-09-07)`.
+  The gate stays strict on vocabulary; it does not learn `closed`.
+
+**Negative self-tests required (Codex finding 2):** swapped bindings fail (fragment bound to
+`a.js` present only in `b.js`); a bound fragment absent from its file fails even when a bag
+fragment matches; a common eight-character token in the bag does not rescue a bound file;
+directory-only existence fails; a glob-bound fragment must appear in every glob match;
+`closed.` is not treated as closed. Positive: bound + bag mix passes; single-file row with bag
+only passes with no unbound warning.
+
+**Also in Phase 0:** `docs/CURRENT_WORK_QUEUE.md` item 8 is corrected (gate baseline is red on
+this branch, reconciliation is prerequisite work, next action is this plan) and
+`docs/J27_SINGLE_PHASE_TRANSITION_INVENTORY_PLAN.md` §3/§7 and `docs/CI_GATES_REFERENCE.md`
+describe the binding syntax. Phase 0 is one commit on `claude/j27-gate-tighten`, Opus-reviewed
+before Phase 1 starts.
+
+## 3. Phase 1 — the per-row decision rule (agents apply this, nothing else)
+
+For each stale row, for each cited file the gate names, read the file at the cited line(s)
+and pick exactly one of:
 
 | Case | What you see in the file | Action |
 |---|---|---|
-| **A. Real site, unquoted** | The file states the J27-sensitive fact the row is about (the code literal, comment, doc sentence, or memory line). | Add a verbatim backticked fragment from that file to the `excerpt` cell. Join fragments with ` · `. Keep each fragment ≥ 8 characters, short (one clause or one code token run), and copied exactly, including punctuation and case. Inner backticks and comment sigils are ignored by the matcher, so quote the text, not the `//` or the backticks. |
-| **B. Context, not a site** | The file only pins, restates, tests, or cross-references the fact (a unit test asserting the value, an Atlas restatement, a memory that summarises the plan, a doc that mentions it in passing). | Move that citation out of the `site` cell into the `disposition / notes` cell, prefixed `context:` and keeping its original `file:line` form. The row's checked sites shrink to the files that actually carry the fact. |
-| **C. Genuine drift** | The file no longer contains the fact at all, or says something different. | Do not invent a fragment. Update the `site` line cite to where the fact now lives if it moved within the file; otherwise treat the citation as case B **and** add a dated note `drift 2026-09-08: <what changed>`. If the row's claim itself no longer holds, set the evidence label to `AS` and say why; only the owner may move a row to `rejected`. |
+| **A. Site carries the fact** | The file states, implements, pins, or restates the J27-sensitive fact the row is about. **Tests, Atlas pages, wiki topics, and active memories count** — they must change with the transition, so they stay checked. | Add a **bound** verbatim fragment from that file: `` `path` → `fragment` ``. Copy exactly, ≥ 8 characters, one clause or one code-token run. The matcher ignores inner backticks, comment sigils, and whitespace runs; nothing else. |
+| **A′. Same file, different fact** | The file carries a J27-sensitive fact that is *not* the one this row states (the row was bundling two facts). | **Split**: leave this row for the original fact; add a new row with the next unused id in the same section for the other fact, with its own bound fragment, `Dep`/`Ev` copied, `Q` as applicable, disposition `open (split from J27-NNN 2026-09-08)`. |
+| **B. Non-actionable provenance** | The file is a dated snapshot that will never change: `DEVELOPMENT_LOG.md`, `docs/audits/*`, `docs/archive/*`, `_archived/**`, a memory whose frontmatter is `status: stale` or `superseded`, or a commit-record line. | Move the citation into the `disposition / notes` cell prefixed `provenance:` with its original `file:line`. **Nothing else qualifies for B.** Every B is listed in the agent's decision matrix and reviewed. |
+| **C. Genuine drift** | The file no longer contains the fact, or says something different. | Never invent a fragment. If the fact moved within the file, fix the line cite and bind a fragment at the new location. If it is gone, keep the citation in `site`, add a dated note `drift 2026-09-08: <what changed>`, and set `Ev` to `AS` with a one-line reason; the row is then reported to the orchestrator, who decides with the owner whether it is `rejected`. A row with unresolved drift stays stale on purpose. |
 
 Rules that apply to every edit:
 
-- Excerpt fragments are **verbatim**. Copy from the file, never paraphrase, never "clean up" a
-  quote. If the matcher fails after your edit, the quote is wrong, not the matcher.
-- Keep the seven-column row shape (`id | site | excerpt | Dep | Ev | Q | disposition`). Never
-  put a bare `|` inside a cell; the gate exits 2 on a malformed row and that blocks the batch.
-- Do not remove a citation from a row. Case B *moves* it; the row must still be findable from
-  the same places it was before.
-- Do not touch rows outside your slice, the section headers, the legend, §6–§10, or any other
-  file. If you believe a row is wrong in a way this rule does not cover, leave it and report it.
-- Do not write `J27:` in prose; the gate treats comment-led `J27:` as a marker.
-- Line cites (`file:47`) are decorations the matcher strips; correct them when you notice they
-  are off, but a wrong line cite alone never makes a row stale.
+- Fragments are verbatim. If the matcher fails after your edit, the quote is wrong, not the
+  matcher.
+- Seven-column row shape; no bare `|` inside a cell (gate exits 2 on malformed rows).
+- Never remove a citation. Case B moves it into notes; nothing deletes it.
+- Every multi-file row you touch ends with **zero unbound files**.
+- Do not touch rows outside your slice, section headers, legend, §6–§10, or any other file.
+- Do not write `J27:` in prose.
+- **Decision matrix.** Each agent appends its per-file decisions to
+  `docs/plans/J27_REGISTER_RECONCILIATION_DECISIONS_2026-09-08.md` (one table row per cited
+  file: `register id · file · case · fragment or note · one-line reason`). This is the artifact
+  the reviewers audit, and it is committed with the register change.
 
-## 3. Execution shape
+## 4. Execution shape
 
-Four Sonnet subagents run **in parallel, each in its own worktree** branched from
-`claude/j27-gate-tighten`. Each owns a contiguous block of register lines so no two agents edit
-adjacent rows. Each agent:
+Four Sonnet subagents run **in parallel, each in its own worktree** branched from the
+Phase 0 commit. Each owns a contiguous block of register lines so no two agents edit adjacent
+rows; new split rows are appended at the end of the agent's own block, not the section end.
+Each agent:
 
-1. Verifies its base: clean tree, HEAD at `49cf4d28` or later on the branch; symlinks
-   `node_modules` and `.agents/skills` from the main checkout.
-2. Runs `node scripts/check-j27-register.js` and confirms its rows are the stale ones assigned.
-3. Applies §2 row by row, reading every cited file at the cited lines before deciding.
-4. Re-runs the gate after each row. Its rows must reach `ok`; the gate must never exit 2.
-5. Commits once (register only), does not push, and reports per row: `id · case per file
-   (A/B/C) · fragments added · citations moved · drift noted`, plus any row it could not resolve
-   under §2 and why.
+1. Verifies its base (clean tree, HEAD at the Phase 0 commit or later); symlinks `node_modules`
+   and `.agents/skills` from the main checkout.
+2. Runs the gate and confirms its rows are the stale ones assigned.
+3. Applies §3 row by row, reading every cited file at the cited lines before deciding, and
+   writing the decision-matrix line before editing the row.
+4. Re-runs the gate after each row: the row must reach `ok` with no `unbound` warning; the
+   gate must never exit 2.
+5. Commits once (register + decision matrix only), does not push, and reports: rows done,
+   per-slice A/A′/B/C counts, any row left stale (case C) with its note.
 
-Time-box: 60 minutes per agent. An agent that cannot finish stops, commits what is done,
-and reports the remainder; the orchestrator reassigns.
+Time-box 60 minutes per agent; an agent that cannot finish commits what is done and reports
+the remainder for reassignment.
 
-**Integration (orchestrator, Fable).** Because all four agents edit one file, the orchestrator
-splices the four commits onto `claude/j27-gate-tighten` with zero-context patches so
-near-adjacent hunks do not conflict:
+**Integration (orchestrator, Fable).** The four commits are spliced onto the branch with
+zero-context patches (`git diff -U0 <phase0>..HEAD -- <register> <matrix> | git apply
+--unidiff-zero`) in slice order; after each splice the orchestrator diffs the register row ids
+touched against the slice's assignment and rejects any patch that touches an id outside it.
+Fallback: re-run that slice sequentially against the integrated register.
 
-```
-git -C <agent worktree> diff -U0 49cf4d28..HEAD -- docs/J27_TRANSITION_REGISTER.md \
-  | git -C <integration worktree> apply --unidiff-zero
-```
+## 5. Verification and review (exhaustive, not sampled — Codex finding 3)
 
-applied in slice order A→D, then one integration commit. Fallback if a splice fails: apply the
-slices sequentially by re-running that agent against the partially integrated register.
+- **Gate:** 0 stale, 0 id-less markers, 0 multi-site rows with unbound files, no exit 2.
+  Expected counts: 76 original rows + split rows; ok = 76 − 6 unverifiable − closed (10 + any
+  case-C rows the owner rejects) + splits. The orchestrator computes the exact expected line
+  from the decision matrix before running the gate and records both in the PR.
+- **Self-test:** exits 0 (the assertion count is whatever the file maintains; today 36 `check()`
+  calls plus the Phase 0 additions — cite the number from the run, not from this plan).
+- **Docs battery** sequentially: memory-router, fact-consistency, doc-currency, doc-symbol-refs,
+  build-claim-freshness, canonical-pointers, docs-catalog, harness-framing, agent-wiki (each
+  with self-test), agent-invariants:ci.
+- **Opus review, exhaustive.** Two Opus reviewers split the decision matrix by slice (A+B, C+D)
+  and check **every** line: open the file, confirm the bound fragment is verbatim and is the J27
+  fact the row states (not a coincidental token); confirm every case B file matches the §3
+  provenance definition; confirm every A′ split is a distinct fact; confirm every case C note is
+  true. Reject any slice with an unjustified B or a paraphrased fragment; findings route back to
+  the slice agent.
+- **Codex adversarial review** of the whole branch (`--model gpt-5.6-sol`, `--base origin/main`)
+  after Opus is clean.
+- **PR** to `main` (Tier 0: gate script, self-test, register, plan docs, queue). Owner merge.
 
-**Verification (orchestrator).** On the integrated branch, sequentially: `check:j27-register`
-(0 stale, 0 id-less markers), `check:j27-register:self-test` (32/32), then the docs battery
-used on the earlier register PRs (memory-router, fact-consistency, doc-currency,
-doc-symbol-refs, build-claim-freshness, canonical-pointers, docs-catalog, harness-framing,
-agent-wiki, each with self-test; agent-invariants:ci).
+## 6. Record surfaces
 
-**Review chain.** Opus read-only review of the register diff: spot-check at least ten rows across
-all four slices by opening the cited file and confirming each added fragment is verbatim and
-each `context:` move is defensible; check no row lost a citation and no row outside the 43
-changed. Then Codex adversarial review of the whole branch (`--model gpt-5.6-sol`, from the
-integration worktree, `--base origin/main`). Findings route back to the responsible slice agent.
-Then one PR to `main` (Tier 0, docs + gate script), owner merge decision.
+`docs/J27_TRANSITION_REGISTER.md` §9 (drop the resolved weakness bullets, add the binding
+convention) and §10 (dated line with before/after counts); `docs/J27_SINGLE_PHASE_TRANSITION_INVENTORY_PLAN.md`
+§3 (schema amendment) and §10; `docs/CI_GATES_REFERENCE.md`; **`docs/CURRENT_WORK_QUEUE.md`
+item 8** (Codex finding 5); `SESSION_PROMPT.md` item 2.
 
-**Record.** Register §9 loses its "multi-site rows only need one live match" bullet (already
-rewritten on the branch) and §10 gains a dated line with the before/after counts. Plan §10 of
-`docs/J27_SINGLE_PHASE_TRANSITION_INVENTORY_PLAN.md` gets the same line. `SESSION_PROMPT.md`
-item 2 records the outcome.
-
-## 4. Slices (43 rows; register line numbers as of `49cf4d28`, re-check before editing)
+## 7. Slices (43 rows; register line numbers as of `c96a6a27`, re-check after Phase 0)
 
 | Slice | Register lines | Rows | Count |
 |---|---|---|---|
 | **A** Retire + Persist | 44–72 | J27-007, 008, 010, 011, 022, 023, 024, 025, 026, 027, 028, 032, 033 | 13 |
 | **B** Change (code-heavy) | 79–92 | J27-035, 036, 037, 038, 039, 040, 041, 042, 043, 044, 045, 047, 048 | 13 |
 | **C** Change (docs/memory) | 94–103 | J27-050, 053, 055, 056, 057, 058, 059 | 7 |
-| **D** Build + Scale | 109–133 | J27-060, 062, 063, 065, 066, 070, 072, 073, 074, 079 | 10 |
+| **D** Build + Scale | 109–133 | J27-060, 062, 063, 065, 066, 070, 073, 074, 079 (J27-072 leaves via Phase 0 normalisation) | 9 |
 
-Known heavy rows, so the agent budgets for them: J27-011 (six intake test fixtures via glob:
-expect case B for the tests, case A for the migration and smoke script), J27-032 (a glob over
-`shared/components/reviewers/*`: expect case B for most components and a fragment from
-`REVIEWER_ENGAGEMENT_SPEC.md`; if no component carries a "Phase 3" comment verbatim, narrow the
-glob to the files that do), J27-040 and J27-041 (nine and seven Phase I/II sites: most are real
-sites, each needs its own short fragment), J27-045 (five files sharing the `cycleCode` error
-string: one fragment may satisfy several files; verify each), J27-047 (runbook, security matrix,
-Atlas: expect case B for all three docs).
+Known heavy rows: J27-011 (glob over six intake tests: case A each, one bound fragment per
+test, or narrow the glob to the tests that carry the form key); J27-032 (glob over
+`shared/components/reviewers/*`: bind per file or narrow to the components with a "Phase 3"
+comment; case A′ likely); J27-040 / J27-041 (nine and seven Phase I/II sites: one bound
+fragment each); J27-045 (five files sharing the `cycleCode` error string: one bound fragment
+per file even if identical); J27-047 (runbook, security matrix, Atlas: all case A — they
+change when the cycle constant flips).
 
-## 5. Exit criteria
+## 8. Exit criteria
 
-- `node scripts/check-j27-register.js` on the integrated branch: 0 stale, 0 id-less markers;
-  the ok count is 60 minus closed minus unverifiable (unverifiable rows are untouched by this
-  plan).
-- `scripts/check-j27-register-self-test.js`: 32/32.
-- Every one of the 43 rows shows in the integrated diff; no other row changed; no file outside
-  `docs/J27_TRANSITION_REGISTER.md` and the three record surfaces changed.
-- Opus spot-check found no paraphrased fragment; Codex adversarial findings dispositioned.
+- Gate: 0 stale, 0 id-less markers, 0 unbound multi-site rows; self-test exit 0; docs battery
+  green; expected-count line in the PR matches the gate's summary.
+- Every one of the 43 rows (and every split row) appears in the diff with a decision-matrix
+  line per cited file; no other row changed; no file outside the register, matrix, and §6
+  record surfaces changed.
+- Both Opus reviewers clean on their halves; Codex findings dispositioned; owner has ruled on
+  any case-C row.
 - PR merged on owner decision; `/start` runs the gate green afterwards.
 
-## 6. Risks the reviewer should challenge
+## 9. What the gate still cannot detect (stated so nobody over-trusts it)
 
-- **Verbatim discipline.** The failure mode is an agent "quoting" a fragment from memory or
-  tidying whitespace; the matcher collapses whitespace and strips backticks and comment sigils
-  but nothing else. Mitigation: the gate is run after every row, and Opus opens the files.
-- **Over-demotion.** Case B is the easy way out; an agent could demote every hard citation to
-  `context:` and the row "passes" while checking nothing. Mitigation: the rule requires reading
-  the file first, the report lists case per file, and Opus reviews the B/A ratio per slice; a
-  slice that is almost all B is sent back.
-- **Glob rows.** Globs expand to every match; a fragment must appear in each match. Narrowing a
-  glob is allowed only when the excluded files do not carry the fact.
-- **Adjacent-row splice conflicts.** Mitigated by contiguous blocks and zero-context apply;
-  fallback is sequential re-run.
-- **Semantic drift hidden as case A.** A file might still contain the quoted words while the
-  surrounding meaning changed. Out of scope here; the register's evidence labels and the owner
-  questions carry that, not the string check.
+A bound fragment proves the quoted words are still in the file, not that their meaning is
+unchanged. Semantic drift is caught by the evidence labels, the owner questions, and the
+next sweep, not by this string check. The register is an inventory with a freshness alarm,
+not a contract.

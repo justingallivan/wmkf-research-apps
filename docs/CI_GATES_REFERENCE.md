@@ -317,6 +317,21 @@ configuration error (exit 2). **Advisory:** registered here and in the `/start` 
 only, not in `test.yml` or any hook; promotion to blocking is an owner decision (plan §7).
 The self-test is `--root`/`--register` isolated to a temp fixture tree.
 
+**Site-to-fragment binding (Phase 0, 2026-09-08 —
+`docs/plans/J27_REGISTER_PER_SITE_RECONCILIATION_PLAN_2026-09-08.md` §2):** an `excerpt`
+fragment may be bound to one of `site`'s cited paths/globs: `` `path/or/glob` → `fragment` ``
+(arrow is `→` or `->`); unprefixed backticked fragments remain a shared bag. A file with one
+or more fragments bound to it (by exact path, or via a glob binding that matched it) must
+contain one of THOSE — the bag is never consulted for a bound file, even on a coincidental
+bag match. A file with no binding falls back to the bag and is reported `unbound` in a
+multi-site row (`? J27-NNN unbound: <files>`, summarized as `N multi-site rows with unbound
+files`) — informational, never a failure; a single-file row is never reported unbound. A
+directory site no longer passes on existence alone — it must cite a specific file, or the
+row is stale with `directory site needs a file: <dir>`. The disposition vocabulary is
+`open` · `scheduled` · `done` · `rejected` (plan §3); any other leading word (a bare
+`closed.`, for example) is reported (`? J27-NNN disposition not in vocabulary: <word>`,
+info only) and the row is still checked, not silently treated as closed.
+
 ### `check:model-override-warming` — LLM 404-on-tier-alias prevention (S230)
 
 AST gate (`@babel/parser`). Every `pages/api/**` route that reaches a `getModelForApp` / `getFallbackModelForApp` call — directly or transitively through an imported module — must call an **awaited** `loadModelOverrides()` first (and within a single function, the warm must lexically precede a direct resolver call). Without warming, the synchronous resolver returns the raw tier alias (e.g. `sonnet`) and Anthropic 404s in prod; unit tests never catch it (they mock the LLM). This class recurred 3× (web-suggestions S229; applicant-reviewers + integrity-screener/screen S230) before the gate.
@@ -446,7 +461,7 @@ When modifying any `scripts/check-*.js` gate (or building a new one), the matchi
 | `check:scaffolding-tokens` | `check:scaffolding-tokens:self-test` |
 | `check:prompt-injection-tagging` | `check:prompt-injection-tagging:self-test` |
 | `check:reviewer-reminder-hold` | `check:reviewer-reminder-hold:self-test` — safe registry and lookalike-path positives; exact held-route (including query-string registration), invalid JSON, missing/non-array registry, malformed entry, missing-path, and alternate-config negatives. |
-| `check:j27-register` | `check:j27-register:self-test` — unknown-id, stale-excerpt, missing-site, unmatched-glob, two-site-one-fragment, glob-one-fragment, malformed-row and duplicate-id reds; existing-id, comment-led bare-marker (`//` and `<!--`) warning, backtick self-reference, bold-label and mid-line prose non-marker skips, two-site-both-fragment, ellipsis-split, wrapped-comment, memory/glob shorthand, closed-row and prose-only greens; real-baseline green before and after. |
+| `check:j27-register` | `check:j27-register:self-test` — unknown-id, stale-excerpt, missing-site, unmatched-glob, two-site-one-fragment, glob-one-fragment, swapped-binding, bound-vs-bag, directory-site, glob-bound-one-fragment, malformed-row and duplicate-id reds; existing-id, comment-led bare-marker (`//` and `<!--`) warning, backtick self-reference, bold-label and mid-line prose non-marker skips, two-site-both-fragment, ellipsis-split, wrapped-comment, memory/glob shorthand, ASCII/Unicode arrow parsing, bound+bag mix, single-file-no-unbound-warning, multi-file-unbound-warning, closed-row and prose-only greens; `closed.`-disposition-not-closed-plus-vocabulary-warning info case; real-baseline green before and after (currently red — 42 stale rows pending register reconciliation, see `docs/plans/J27_REGISTER_PER_SITE_RECONCILIATION_PLAN_2026-09-08.md`). |
 
 **When external review catches a structural pattern an existing gate missed, the order is mandatory:**
 
