@@ -50,6 +50,7 @@ const dashboardProposals = [
     cycleCode: 'D26',
     canManage: true,
     setAside: false,
+    programDirector: 'Pat Director',
   },
   {
     requestId: 'request-b',
@@ -115,6 +116,7 @@ describe('reviewer follow-up projection', () => {
       reviewers: [],
       proposalInstitution: 'South University',
     });
+    expect(merged[0].workbench.programDirector).toBe('Pat Director');
   });
 
   test('defines attention from open reviewer engagements, not completed or empty requests', () => {
@@ -127,9 +129,8 @@ describe('reviewer follow-up projection', () => {
     expect(filterReviewerFollowUpProposals(merged, { view: 'all' })).toHaveLength(2);
     expect(filterReviewerFollowUpProposals(merged, {
       view: 'all',
-      includeSetAside: true,
       search: 'casey',
-    }).map((proposal) => proposal.proposalId)).toEqual(['request-c']);
+    })).toEqual([]);
     expect(filterReviewerFollowUpProposals(merged, {
       view: 'all',
       search: 'south university',
@@ -188,6 +189,8 @@ describe('reviewer follow-up request scope', () => {
       expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('/api/workbench/dashboard?cycleCode=D26&scope=my'));
       expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('/api/review-manager/reviewers?cycleCode=D26&scope=my'));
     });
+    expect(global.fetch.mock.calls.some(([url]) => String(url).includes('includeSetAside'))).toBe(false);
+    expect(screen.queryByLabelText('Show set aside')).not.toBeInTheDocument();
 
     expect(screen.getByRole('button', { name: 'My requests' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('button', { name: 'All reviewers' })).toHaveAttribute('aria-pressed', 'false');
@@ -216,9 +219,9 @@ describe('reviewer follow-up request scope', () => {
     }));
 
     const { unmount } = render(<ReviewerFollowUpDashboard />);
-    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Cycle' })).toHaveValue('J26'));
-    expect(screen.getByRole('option', { name: 'December 2026 (44 active + 6 set aside)' })).toBeInTheDocument();
-    expect(screen.getByRole('option', { name: 'June 2026 (0 active + 3 set aside)' })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Cycle' })).toHaveValue('D26'));
+    expect(screen.getByRole('option', { name: 'December 2026 (44 active)' })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'June 2026 (0 active)' })).not.toBeInTheDocument();
     unmount();
 
     window.history.replaceState({}, '', '/workbench/reviewer-follow-up?cycleCode=D26');

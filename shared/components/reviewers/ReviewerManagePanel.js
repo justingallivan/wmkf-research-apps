@@ -458,7 +458,7 @@ export default function ReviewerManagePanel({
   const showActionsColumn = canManage;
   const showActionColumn = showFollowUpColumn || showActionsColumn;
   const reviewerColumnWidth = showActionColumn
-    ? showSelectionColumn ? 'w-[30%]' : 'w-[34%]'
+    ? showSelectionColumn ? 'w-[26%]' : 'w-[30%]'
     : 'w-[38%]';
   const tableMinWidth = showActionColumn ? 'min-w-[58rem]' : 'min-w-[48rem]';
 
@@ -979,8 +979,10 @@ export default function ReviewerManagePanel({
               <col className={reviewerColumnWidth} />
               <col className={showActionColumn ? 'w-[17%]' : 'w-[20%]'} />
               <col className={showActionColumn ? 'w-[14%]' : 'w-[17%]'} />
-              <col className={showActionColumn ? 'w-[17%]' : 'w-[25%]'} />
-              {showActionColumn && <col className="w-[18%]" />}
+              <col className={showActionColumn ? 'w-[15%]' : 'w-[25%]'} />
+              {showActionColumn && <col className="w-[14%]" />}
+              {showActionsColumn && <col className="w-[5%]" />}
+              {showActionsColumn && <col className="w-[5%]" />}
             </colgroup>
             <thead className="bg-gray-50">
               <tr>
@@ -1003,6 +1005,16 @@ export default function ReviewerManagePanel({
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Next action
                   </th>
+                )}
+                {showActionsColumn && (
+                  <>
+                    <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider" aria-label="Download review">
+                      <span className="sr-only">Download</span>
+                    </th>
+                    <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 tracking-wider">
+                      More
+                    </th>
+                  </>
                 )}
               </tr>
             </thead>
@@ -1134,36 +1146,40 @@ export default function ReviewerManagePanel({
                               </button>
                             )}
                           </div>
-                          {showActionsColumn && (
-                            <div className="flex shrink-0 items-center gap-2">
-                              {/* Download received review from SharePoint via Graph. */}
-                              {r.reviewSharePointFolder && (
-                                <a
-                                  href={`/api/review-manager/download-review?suggestionId=${encodeURIComponent(r.suggestionId)}`}
-                                  className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg p-2 text-green-600 hover:bg-green-50 hover:text-green-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-600"
-                                  title={`Download: ${r.reviewFilename || 'review'}`}
-                                  aria-label={`Download review from ${r.name || 'reviewer'}`}
-                                >
-                                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                                  </svg>
-                                </a>
-                              )}
-                              {/* Secondary magic-link and lifecycle actions. */}
-                              <TokenActionsMenu
-                                reviewer={r}
-                                onRegenerate={() => handleRegenerateToken(r.suggestionId)}
-                                onRevoke={() => handleRevokeToken(r.suggestionId)}
-                                onRemove={() => handleRemoveReviewer(r)}
-                                onStatusChange={(newStatus) => updateStatus(r.suggestionId, newStatus)}
-                                statusPending={pendingStatusTokens.has(r.suggestionId)}
-                                onTransition={(terminalStatus) => transitionTerminal(r, terminalStatus)}
-                                degraded={degraded}
-                              />
-                            </div>
-                          )}
                         </div>
                       </td>
+                    )}
+                    {showActionsColumn && (
+                      <>
+                        <td className="px-2 py-3 align-top text-center">
+                          {/* Download received review from SharePoint via Graph. */}
+                          {r.reviewSharePointFolder && (
+                            <a
+                              href={`/api/review-manager/download-review?suggestionId=${encodeURIComponent(r.suggestionId)}`}
+                              className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg p-2 text-green-600 hover:bg-green-50 hover:text-green-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-600"
+                              title={`Download: ${r.reviewFilename || 'review'}`}
+                              aria-label={`Download review from ${r.name || 'reviewer'}`}
+                            >
+                              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                              </svg>
+                            </a>
+                          )}
+                        </td>
+                        <td className="px-2 py-3 align-top text-center">
+                          {/* Secondary magic-link and lifecycle actions. */}
+                          <TokenActionsMenu
+                            reviewer={r}
+                            onRegenerate={() => handleRegenerateToken(r.suggestionId)}
+                            onRevoke={() => handleRevokeToken(r.suggestionId)}
+                            onRemove={() => handleRemoveReviewer(r)}
+                            onStatusChange={(newStatus) => updateStatus(r.suggestionId, newStatus)}
+                            statusPending={pendingStatusTokens.has(r.suggestionId)}
+                            onTransition={(terminalStatus) => transitionTerminal(r, terminalStatus)}
+                            degraded={degraded}
+                          />
+                        </td>
+                      </>
                     )}
                   </tr>
                 );

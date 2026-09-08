@@ -66,10 +66,10 @@ function matchesSearch(proposal, search) {
 
 export function filterReviewerFollowUpProposals(
   proposals = [],
-  { view = 'attention', search = '', includeSetAside = false } = {},
+  { view = 'attention', search = '' } = {},
 ) {
   return proposals.filter((proposal) => {
-    if (!includeSetAside && proposal.workbench?.setAside) return false;
+    if (proposal.workbench?.setAside) return false;
     if (view === 'attention' && !proposalNeedsAttention(proposal)) return false;
     return matchesSearch(proposal, search);
   });
@@ -89,4 +89,3 @@ export function summarizeReviewerFollowUp(proposals = [], today) {
     attentionRequests: proposals.filter(proposalNeedsAttention).length,
   };
 }
-

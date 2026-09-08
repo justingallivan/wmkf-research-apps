@@ -43,7 +43,9 @@ policy decision, implementation, and Production release are verified.
   without that app remain denied by `requireAppAccess(req, res, 'reviewers')`.
 - **Everything:** every request in the selected cycle that already satisfies the
   Workbench eligibility rule: `Phase II Pending` or `Advancing`. `Set aside`
-  requests remain excluded until **Show set aside** is selected.
+  requests remain excluded. Reviewer Follow-up does not expose a **Show set aside** control
+  because set-aside requests do not have reviewers; the main Workbench dashboard owns that
+  visibility control.
 - **Read, not manage:** organization-wide rows remain visible in **All requests**,
   but `canManage` is true only for the lead Program Director or a superuser.
   The implementation branch enforces the same decision server-side before
@@ -64,7 +66,7 @@ policy decision, implementation, and Production release are verified.
 | The adapter docblock says the PD-scoped helper also serves Reviewer Finder, but a live symbol census finds only the Workbench dashboard caller; Reviewer Finder now builds its own PD-scoped `queryAllRequests` call. | `lib/dataverse/adapters/grant-request.js:172-190`; `lib/services/reviewer-finder/my-proposals-service.js:65-81` | `[STALE/CONFLICT verified via CodeGraph + rg + source]` |
 | In the authenticated Preview, the owner account saw 10 requests in **My requests** and 44 in **All requests** for D26. | Preview UAT on 2026-09-02 | `[VERIFIED via authenticated browser probe]` |
 | The authenticated owner account had no J26 assignment, could select **June 2026 (5 active)** directly, and saw all 5 cycle requests after selecting **All requests**. | Preview UAT on 2026-09-02 | `[VERIFIED via authenticated browser complement]` |
-| Reviewer Follow-up always loads selected-cycle dashboard rows with `includeSetAside=1`, then its checkbox filters set-aside rows in the client. | `pages/workbench/reviewer-follow-up.js:199-232` (post-PR #151 layout) | `[VERIFIED via source]` |
+| Reviewer Follow-up loads selected-cycle dashboard rows without `includeSetAside=1`; set-aside requests remain excluded and no checkbox is shown because they have no reviewers. | `pages/workbench/reviewer-follow-up.js` | `[VERIFIED via source]` |
 
 ## Owner decision: foreign-row mutation policy — resolved 2026-09-02
 

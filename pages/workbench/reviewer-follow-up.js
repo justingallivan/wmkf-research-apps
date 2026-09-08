@@ -62,6 +62,11 @@ function ReviewerGroup({ proposal, previewReadOnly, onRefresh, degraded, loading
                 .filter(Boolean)
                 .join(' · ')}
             </p>
+            {proposal.workbench?.programDirector && (
+              <p className="mt-1 text-sm text-gray-500">
+                PD: {proposal.workbench.programDirector}
+              </p>
+            )}
             {reviewers.length === 0 ? (
               <p className="mt-2 text-xs text-gray-500">No reviewers are in the tracking stage.</p>
             ) : (
@@ -122,21 +127,6 @@ function ReviewerGroup({ proposal, previewReadOnly, onRefresh, degraded, loading
                   line-height: 1.25;
                   padding: 0.25rem 0.625rem;
                 }
-                .reviewer-activity-panel table thead th:last-child {
-                  position: relative;
-                  padding-right: 5rem;
-                }
-                .reviewer-activity-panel table thead th:last-child::after {
-                  content: 'More';
-                  position: absolute;
-                  top: 50%;
-                  right: 1rem;
-                  transform: translateY(-50%);
-                  color: #9ca3af;
-                  font-weight: 500;
-                  text-transform: none;
-                  letter-spacing: normal;
-                }
                 .reviewer-activity-panel button[aria-label^='Manage '] {
                   min-width: 2.25rem;
                   min-height: 2.25rem;
@@ -166,7 +156,6 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
   const [scope, setScope] = useState('my');
   const [view, setView] = useState('attention');
   const [search, setSearch] = useState('');
-  const [includeSetAside, setIncludeSetAside] = useState(false);
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const [loadingCycles, setLoadingCycles] = useState(true);
   const [loadingProposals, setLoadingProposals] = useState(false);
@@ -188,7 +177,9 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.error || `Failed to load cycles (${response.status})`);
       if (activeCyclesLoadRef.current !== token) return;
-      const availableCycles = body.cycles || [];
+      const availableCycles = (body.cycles || []).filter((cycle) => (
+        cycle.count == null || Number(cycle.count) > 0
+      ));
       const requestedCycle = new URLSearchParams(window.location.search)
         .get('cycleCode')?.trim().toUpperCase();
       setCycles(availableCycles);
@@ -217,7 +208,7 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
     setLoadingProposals(true);
     try {
       const [dashboardResponse, reviewerResponse] = await Promise.all([
-        fetch(`/api/workbench/dashboard?cycleCode=${encodeURIComponent(selectedCycle)}&scope=${requestScope}&includeSetAside=1`),
+        fetch(`/api/workbench/dashboard?cycleCode=${encodeURIComponent(selectedCycle)}&scope=${requestScope}`),
         fetch(`/api/review-manager/reviewers?cycleCode=${encodeURIComponent(selectedCycle)}&scope=${requestScope}`),
       ]);
       const [dashboardBody, reviewerBody] = await Promise.all([
@@ -264,11 +255,8 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
   const visibleProposals = useMemo(() => filterReviewerFollowUpProposals(proposals, {
     view,
     search,
-    includeSetAside,
-  }), [includeSetAside, proposals, search, view]);
-  const summary = useMemo(() => summarizeReviewerFollowUp(
-    proposals.filter((proposal) => includeSetAside || !proposal.workbench?.setAside),
-  ), [includeSetAside, proposals]);
+  }), [proposals, search, view]);
+  const summary = useMemo(() => summarizeReviewerFollowUp(proposals), [proposals]);
 
   return (
     <Layout title="Reviewer follow-up">
@@ -295,9 +283,7 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
           >
             {cycles.map((cycle) => (
               <option key={cycle.code} value={cycle.code}>
-                {cycle.label || cycle.code} ({cycle.count || 0} active{cycle.setAsideCount
-                  ? ` + ${cycle.setAsideCount} set aside`
-                  : ''})
+                {cycle.label || cycle.code} ({cycle.count || 0} active)
               </option>
             ))}
           </ToolbarSelect>
@@ -346,15 +332,6 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
             </div>
           </fieldset>
 
-          <label className="flex min-h-11 items-center gap-2 text-sm font-medium text-gray-700">
-            <input
-              type="checkbox"
-              checked={includeSetAside}
-              onChange={(event) => setIncludeSetAside(event.target.checked)}
-              className="h-4 w-4 rounded border-gray-300"
-            />
-            Show set aside
-          </label>
           </div>
           <div className="flex flex-col gap-3 border-t border-gray-100 pt-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="flex min-w-0 flex-1 flex-col gap-1">

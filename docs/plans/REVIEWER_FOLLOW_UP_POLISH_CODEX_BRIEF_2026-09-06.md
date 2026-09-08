@@ -61,8 +61,10 @@ If the polish you want genuinely needs one of those, stop and write the ask into
 
 ## Contracts that must hold
 
-- **Read contract unchanged.** The page reads `/api/workbench/dashboard` (cycle list, then
-  `?cycleCode=&scope=&includeSetAside=1`) and `/api/review-manager/reviewers?cycleCode=&scope=`.
+- **Read contract.** The page reads `/api/workbench/dashboard` (cycle list, then
+  `?cycleCode=&scope=`) and `/api/review-manager/reviewers?cycleCode=&scope=`. Reviewer
+  Follow-up excludes set-aside requests because they have no reviewer roster; the main Workbench
+  dashboard retains its separate set-aside control.
   Do not add parameters, change request shapes, or invent fields. Every value you render must
   come from those two responses as the page already consumes them; do not fabricate identifiers
   or field names (this repo hard-fails on fabricated literals).
