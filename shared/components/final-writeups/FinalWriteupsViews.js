@@ -657,7 +657,9 @@ function NeedsReviewEmptyState({ cycleLabel, pdName, counts, search, onChangeVie
       onClick={() => onChangeView(key)}
       className="font-semibold text-gray-900 underline underline-offset-4 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500"
     >
-      {counts[key]} {key === 'reviewed' ? 'reviewed by you' : 'writeups in all'}
+      {counts[key]} {key === 'reviewed'
+        ? 'reviewed by you'
+        : `writeup${counts[key] === 1 ? '' : 's'} in all`}
     </button>
   );
   return (
