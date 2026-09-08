@@ -6,7 +6,7 @@ status: canonical
 summary: "Canonical Workbench sequence; current cross-request lifecycle navigation and reviewer follow-up work are tracked here."
 canonical: true
 cataloged: 2026-07-26
-last_verified: 2026-09-06
+last_verified: 2026-09-08
 owner: product-engineering
 related:
   - docs/audits/AUDIT_REQUEST_WORKBENCH_TRUTH_2026-07-26.md
@@ -382,10 +382,10 @@ complete.
 The title and institution are authoritative Dataverse metadata rather than
 model output:
 
-- **Institution:** use `akoya_request.wmkf_organizationname` when populated,
-  otherwise the formatted applicant lookup
-  `_akoya_applicantid_value_formatted`. The current Workbench resolver already
-  applies this fallback. All four supplied D26 example rows have a null direct
+- **Institution:** use the formatted applicant lookup
+  `_akoya_applicantid_value_formatted` only (`requestInstitution` in
+  `shared/utils/institution.js`, 2026-09-08). `akoya_request.wmkf_organizationname`
+  is a Bill.com field that held "N/A" on request 1003034 and is no longer read. All four supplied D26 example rows have a null direct
   organization-name field and obtain the expected institution display name
   from the applicant lookup.
 - **Title:** use the applicant-submitted proposal title in

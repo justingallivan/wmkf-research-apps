@@ -35,7 +35,8 @@ preview and send goes out stale.
 
 Stage 6C is merged (`3b2b34d5`): the modal lives in `shared/components/reviewers/ReleaseMaterialsModal.js`; `ReviewerManagePanel.js:NNNN` citations below are pre-6C line numbers into the moved body — relocate at build. `ReleaseEmailModal` is
 NOT a third client (it uses `render-withdraw-emails` → `withdraw-sufficient`). Nothing in-app writes
-`akoya_title`, `wmkf_organizationname`, the PI or the co-PIs; those are CRM-only edits, exactly the
+`akoya_title`, the applicant account (institution; `wmkf_organizationname` left the fingerprint
+2026-09-08), the PI or the co-PIs; those are CRM-only edits, exactly the
 class the fingerprint exists to catch. Co-PI order is deterministic
 (`app-request-person.js:31` `orderby wmkf_authorposition asc, createdon asc`), so "order counts" is
 not a spurious-stale risk.
