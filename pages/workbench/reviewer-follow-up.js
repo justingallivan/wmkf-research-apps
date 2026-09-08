@@ -168,7 +168,6 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
   const [scope, setScope] = useState('my');
   const [view, setView] = useState('attention');
   const [search, setSearch] = useState('');
-  const [includeSetAside, setIncludeSetAside] = useState(false);
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const [loadingCycles, setLoadingCycles] = useState(true);
   const [loadingProposals, setLoadingProposals] = useState(false);
@@ -222,7 +221,7 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
     setLoadingProposals(true);
     try {
       const [dashboardResponse, reviewerResponse] = await Promise.all([
-        fetch(`/api/workbench/dashboard?cycleCode=${encodeURIComponent(selectedCycle)}&scope=${requestScope}&programId=${encodeURIComponent(selectedProgramId)}&includeSetAside=1`),
+        fetch(`/api/workbench/dashboard?cycleCode=${encodeURIComponent(selectedCycle)}&scope=${requestScope}&programId=${encodeURIComponent(selectedProgramId)}`),
         fetch(`/api/review-manager/reviewers?cycleCode=${encodeURIComponent(selectedCycle)}&scope=${requestScope}&programId=${encodeURIComponent(selectedProgramId)}`),
       ]);
       const [dashboardBody, reviewerBody] = await Promise.all([
@@ -282,11 +281,10 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
   const visibleProposals = useMemo(() => filterReviewerFollowUpProposals(proposals, {
     view,
     search,
-    includeSetAside,
-  }), [includeSetAside, proposals, search, view]);
+  }), [proposals, search, view]);
   const summary = useMemo(() => summarizeReviewerFollowUp(
-    proposals.filter((proposal) => includeSetAside || !proposal.workbench?.setAside),
-  ), [includeSetAside, proposals]);
+    proposals.filter((proposal) => !proposal.workbench?.setAside),
+  ), [proposals]);
 
   return (
     <Layout title="Reviewer follow-up">
@@ -325,9 +323,7 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
           >
             {cycles.map((cycle) => (
               <option key={cycle.code} value={cycle.code}>
-                {cycle.label || cycle.code} ({cycle.count || 0} active{cycle.setAsideCount
-                  ? ` + ${cycle.setAsideCount} set aside`
-                  : ''})
+                {cycle.label || cycle.code} ({cycle.count || 0})
               </option>
             ))}
           </ToolbarSelect>
@@ -376,15 +372,6 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
             </div>
           </fieldset>
 
-          <label className="flex min-h-11 items-center gap-2 text-sm font-medium text-gray-700">
-            <input
-              type="checkbox"
-              checked={includeSetAside}
-              onChange={(event) => setIncludeSetAside(event.target.checked)}
-              className="h-4 w-4 rounded border-gray-300"
-            />
-            Show set aside
-          </label>
           </div>
           <div className="flex flex-col gap-3 border-t border-gray-100 pt-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="flex min-w-0 flex-1 flex-col gap-1">
