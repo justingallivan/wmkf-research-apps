@@ -1,193 +1,190 @@
-# Session 495 Prompt: Reconcile the Cycle Dossier Grant Program design
+# Session 494 Prompt: Continue from the reconciled reviewer UI and field-primer integration branch
 
-## Session 494 Summary
+## Session 493 Summary
 
-Session 494 worked on `codex/compact-controls` in
-`/Users/gallivan/Code/WMKF_Apps/.claude/worktrees/compact-controls`. It completed compact Request
-Locator controls, corrected cycle derivation to use meeting dates, hardened aggregate completeness,
-added bounded Workbench text-search support, and tested a temporary Research-only scope. The owner
-subsequently clarified that the hard-coded Research scope is not the intended product design. Do not
-promote this branch unchanged.
-
-The next owner is the Cycle Dossier session. Its first task is design reconciliation, not immediate
-implementation: the Request Workbench needs a live **Grant Program** dropdown that defaults to the
-signed-in PD's program and allows selection of other programs. Keep the owner's existing direction
-that off-cycle meetings do not appear in this Workbench cycle view unless the owner revises it.
+This owner-present session reconciled Codex reviewer-surfacing work with Claude's already-merged
+field-primer/Executor work. The integration branch is clean and pushed; no production promotion was
+performed from this branch.
 
 ### What Was Completed
 
-1. **Compact shared Request Locator filters**
-   - `58f0a191` adopted the compact `ToolbarSelect` treatment for cycle and status, retained native
-     select keyboard behavior, added loading/disabled/error recovery, and versioned local cache
-     handling.
-   - The compact UI and error/retry behavior are complete and are candidates to retain.
-
-2. **Meeting-date cycle correction and complete aggregation**
-   - `9cab8c3e` changed Workbench cycle options from sparse `akoya_fiscalyear` values to UTC-grouped
-     `wmkf_meetingdate` values.
-   - `3472367c` raised the aggregate bound to 5,000 groups and rejects continuation metadata, a full
-     page, malformed rows, or other incomplete results instead of presenting a partial timeline.
-   - The branch currently offers June/December cycles and omits off-cycle/no-date groups.
-
-3. **Temporary Research-only request discovery**
-   - `9cab8c3e` first supplied the two canonical Research program IDs to cycle aggregation.
-   - `889ddf2b` introduced `shared/config/researchPrograms.js` and extended hard-coded Research
-     filtering across Request Locator options/search, dashboard visibility, canonical hydration,
-     PI joins, cache behavior, copy, and tests.
-   - This scope is **OWNER-SUPERSEDED as a final design**. Replace it with a live Grant Program
-     selector only after verifying the program data source and defaulting contract.
-
-4. **Guarded Dataverse Search transport and tooling**
-   - `4fdd8217` classifies only exact normalized `POST /api/search/v1.0/query` as an interlocked
-     semantic read. Every other POST path remains a write; local/Preview reads from production still
-     require `DATAVERSE_ALLOW_PROD_READS=yes`.
-   - The commit also adds guarded Quick Find view probe/apply tooling and tests. The apply tool is
-     dry-run by default.
-
-5. **Safe outside-program acknowledgement**
-   - `903de6b9` makes an exact numeric search acknowledge a valid request outside the temporary
-     scope with only its request number and program, then recommends AkoyaGO. It exposes no request
-     GUID, title, institution, PI, status, cycle, or Workbench link.
-   - Signed-in local smoke: `1003278` showed `Directors' Directed Grant Program` plus the AkoyaGO
-     instruction; Research request `1002915` still navigated to Workbench detail.
-
-6. **Impeccable documentation repair**
-   - `9ecdab1b` refreshed `.impeccable/design.json` generation metadata. `DESIGN.md` was unchanged;
-     schema v2 and the design contract remained consistent.
+1. **Reviewer UI surfacing fixes.** Due-date extension history, meeting-date cycle options, and
+   conserved grant-cycle proposal counts are implemented and tested. Duplicate cycle rows assign a
+   proposal count once; null/off-cycle rows are conserved through an independent proposal total.
+2. **Claude work reconciled.** `origin/main` was merged cleanly, bringing the timeout, Executor budget,
+   and Word/PDF field-primer export commits into this branch without source-file conflicts.
+3. **Verification.** Focused reviewer tests, full type/lint checks, API/DAL/security gates, and docs
+   gates passed. Lint reported 0 errors and 76 existing warnings.
 
 ### Commits
 
-The feature-work range before this stop handoff is `58f0a191^..9ecdab1b` (equivalently
-`30ef052b..9ecdab1b`):
-
-- `58f0a191` — Unify compact request filters and add load recovery
-- `9cab8c3e` — Use meeting dates for workbench cycle options
-- `3472367c` — Keep meeting-date cycle options complete and restriction-checked
-- `889ddf2b` — Scope Workbench discovery to Research programs and regular meeting cycles
-- `4fdd8217` — Allow guarded Dataverse Search reads
-- `903de6b9` — Explain requests outside the Research suite
-- `9ecdab1b` — Refresh Impeccable design sidecar
-
-The stop-time documentation commit follows these commits at the branch tip.
+- `82c42904` through `780649f9` — reviewer UI surfacing work and review corrections
+- `05fd2672` — merge `origin/main` into `codex/reviewer-ui-surfacing`
 
 ## Next Items
 
-### Owner-Directed Design Reconciliation
+1. **Owner smoke required:** signed-in Reviewer Finder cycle counts and Request Workbench cycle
+   filtering; Claude's remaining field-primer export download smoke on Request `1002852`.
+2. **Release decision:** promote the reconciled branch only through the normal reviewed release path;
+   Codex does not push `main`.
+3. **Deferred review follow-ups:** zero-argument count-script ergonomics, shared cycle-parser reuse,
+   aggregate-limit documentation, and stale acceptance comments.
 
-1. **Replace the hard-coded Research scope with a live Grant Program selector before release.**
-   Evidence: owner direction 2026-09-08; `docs/REQUEST_WORKBENCH_SCOPING.md` §3.1;
-   `docs/plans/REVIEWER_UI_SURFACING_HANDOFF_2026-09-er.md` Issue 2; temporary implementation in
-   `shared/config/researchPrograms.js`, `lib/services/workbench/request-search-service.js`, and
-   `lib/services/workbench/dashboard-service.js`.
-   Required outcome: load Grant Program options live, default to the signed-in PD's program, and
-   allow other-program selection. Reconcile option loading, cycle/status dependencies, dashboard
-   and text-search predicates, exact-number behavior, UI copy, cache migration, and tests together.
+## Session 492 Summary
+
+Owner-present session on `main`. Item 1 from the Session 492 prompt (plan Slices 6B + 6C together)
+was planned, built, reviewed, merged, smoked, and closed. The rest of the session was owner-driven
+toolbar and header consistency work across the four Workbench views.
+
+### What Was Completed
+
+1. **Slices 6B and 6C planned and Production-live.** Plan
+   `docs/FINAL_WRITEUPS_DASHBOARD_VIEWS_AND_VERSION_PLAN.md` (`249954c5`); three Codex adversarial
+   plan passes (NEEDS REWORK ×2, then READY WITH NAMED CHANGES), eight findings all accepted and
+   recorded in §12 (`96b536fd`, `0d8919ac`, `2b17cc54`). Built on Tier 1 branch
+   `claude/final-writeups-views-and-version` (`a2047af7`); two Codex diff passes (one medium
+   finding, pd canonicalization, fixed `b8e7dc67`; then approve `bdc815a1`); PR #175 merged
+   `44bdd240`, Production deployment `dpl_2UrsDnydRqudu95wJyLCK7A6FUFR`; docs reconciled `323eb7ae`.
+   **Owner-run signed-in smoke PASSED 2026-09-07** on the three views, the empty state, bookmarked
+   and invalid URLs, the version label ("Version 5.0" on Request `1002788`), and the PD filter
+   (`f4bcb5b6`).
+   - Dashboard opens on Needs my review for every role; Reviewed by me and All writeups are the
+     alternatives; Program director dropdown derived from loaded rows; `view`/`pd` are page-URL
+     state, sanitized on mount, never sent to the API. Every view re-sorts by request number.
+   - `acknowledgedPublicationVersionId` is additive on the dashboard row and both acknowledgement
+     responses (GET via the shared projection, POST from the confirmed row), null for the
+     responsible PD. Rows and the focused page show the verbatim publication version.
+   - Unconfigured matrix rows carry `responsibleProgramDirector` so the PD filter is total; the
+     view selector does not filter the matrix.
+   - Owner defaults (plan §10): Updated rows stay in Reviewed by me; Your writeups collapsed
+     under the first two views, folded into All; walk-back unchanged with an informative empty state.
+2. **Toolbar and header follow-ups (Tier 0 on `main`).** `dccb39b9` view control shares the 48px
+   box; `02bc6a8b` selects opt out of the native menu-button appearance (Safari ignores height and
+   padding on a native `<select>`, so they rendered ~30px) with a drawn chevron, and the persona
+   lens label moved from the eyebrow above the title into the first line of the header's right-hand
+   summary (owner chose this over a chip after a two-option mockup; the eyebrow pattern had no other
+   instance in the suite).
+3. **Shared `ToolbarSelect`.** `shared/components/ToolbarSelect.js` extracted (`314e9426`) and
+   adopted by Final writeups, Reviewer follow-up, Request list, and Initial assessments
+   (`e68bffe9`), so all four Workbench views share one toolbar dropdown; sibling button groups on
+   Reviewer follow-up and Request list brought to the same height and radius. Owner confirmed all
+   four. Suite survey: 54 other native selects in 13 class variants remain (17 compact rounded-lg
+   text-sm, 8 unstyled, 6 rounded-lg base, 23 scattered inline/table/modal); they want a smaller
+   shared variant, not this one.
+
+### Commits (all on `main`)
+`249954c5` `96b536fd` `0d8919ac` `2b17cc54` plan and Codex passes · `a2047af7` `b8e7dc67` `bdc815a1`
+`88369693` build (branch) · `44bdd240` PR #175 merge · `323eb7ae` reconcile · `dccb39b9` `02bc6a8b`
+toolbar/header · `314e9426` `e68bffe9` ToolbarSelect · `f4bcb5b6` smoke record.
+
+## Next Items
+
+### Verified Open
+
+1. **Leadership stage transition (Slice 4): PRODUCTION-LIVE 2026-09-07.** Plan
+   `docs/FINAL_WRITEUP_LEADERSHIP_TRANSITION_PLAN.md` (six Codex plan passes, seven diff passes, D2
+   owner-confirmed 2026-09-07). PR #176 merged as `25dc8645`; deployment `dpl_22eyAD8S4yPmx16iv3Nng2u9sw5T`;
+   owner-run signed-in smoke passed on Request `1002788`, whose Final row now sits at leadership stage
+   (reversal is the owner-run repair in plan §4.7). Nothing remains on this item.
+2. **`J27:` marker convention and `scripts/check-j27-register.js`: MERGED TO `main` 2026-09-08 UTC**
+   (Session 496, PR #180, merge commit `6059118a`; advisory gate + `--root`-isolated self-test,
+   registered in `docs/CI_GATES_REFERENCE.md` and `/start`). Baseline 61 ok / 0 stale /
+   6 unverifiable / 9 closed. All three `J27:` markers found without ids (the third,
+   in `.claude/skills/start/SKILL.md`, surfaced only on plan-closeout re-run) were
+   resolved 2026-09-07 and merged via PR #181 (`5cef9f85`); the memory/wiki pointer
+   exit criterion is also met. §8 owner answers beyond Q0 remain open. Gate follow-ups recorded in
+   register §9: prose-colon false positives, any-fragment/any-file multi-site check.
+   Also merged 2026-09-08 UTC: PR #182 (`f1a5113d`) reconciling the `docs/onboarding/` decks with
+   post-incident reminder behavior, the nine-tab Workbench strip, closeout honorarium disposition,
+   Overview funnel, and page-level access; `python-pptx==1.0.2` pinned. Open follow-ups from its
+   Codex/Opus reviews: `REVIEWER_ENGAGEMENT_SPEC.md:110` stale hold wording, `finance-honoraria.md:41-42`
+   stale "deployment pending". **Decks retired 2026-09-08:** owner decided no one had seen them and they
+   were hopelessly out of date; `docs/onboarding/` deleted (history keeps PR #182's last state), so the
+   parity-check follow-up is moot.
+3. **Write `docs/J27_BUILD_AND_CHANGE_PLAN.md`** once Connor's file-location decision (Q5) lands.
+   Evidence: register §2 deliverables table. Sequence unchanged from the S492 prompt.
+4. **Annotate the pilot passages** coupling "J27 Initial Assessment" to 2026-08-18:
+   DONE 2026-09-07, merged via PR #181 (`5cef9f85`), all 4 of 4 cited sites —
+   `REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md` (two sites), `DATAVERSE_SHAREPOINT_FILE_MODEL.md`,
+   `strategy-roadmap.md`, and memory `project-reviewer-apps-redesign-direction.md` — each now
+   carries a dated `J27: J27-051` note. Register row J27-051 is `done`. Evidence: register J27-051, Q18.
+5. **Smaller shared select variant** for the 54 inline/table/modal selects (optional consistency
+   follow-up). Evidence: S492 survey above; owner asked for consistency but did not direct this.
+   Not urgent; propose before building.
+
+### Owner Decision Needed
+
+1. **Colleague discussion:** PD front-end flip to `Phase II Pending` as primary path (register Q8).
+2. **Connor:** J27 proposal SharePoint location and filename (Q5); back-end status changes; slice G
+   checklist (register §8).
+3. **Filed, not urgent** (register §7 status line): Q1b, Q12, Q13, Q15, Q16, Q20, Q24.
+4. **Dataverse attribute drops** (`wmkf_summarybloburl`, `wmkf_summarypages`) approved 2026-09-06;
+   Connor-applied with its own pre-flight. Tier 0 when convenient.
+5. **Final writeups header structure.** Final writeups is the only Workbench view not using the
+   shared centered `PageHeader`; the other three do. Deliberate since 6A, but a consistency question
+   surfaced in S492. No action unless the owner wants the four headers to match.
+
+### Parked
+
+- Toolbar rebuild (dropdown style), three-state triage dropdown, per-reminder audit trail,
+  automatic reminder un-pause, materials-on-acceptance email (queue 6), 6D fingerprint smoke,
+  custom intake portal, Stage 4 lifecycle plan, Ops eligibility view, one-click PDF conversion,
+  five stale Preview callbacks — all J27 or later; unchanged from the S492 prompt.
 
 ### Verify Before Acting
 
-1. **Signed-in PD → program default source.**
-   The owner specified the behavior, but this session did not verify whether the canonical source is
-   the PD resolver, system-user profile data, program-director assignments, or another Dataverse
-   relationship. Trace the authenticated caller through the dashboard/search services before design.
+1. **D26 residue deletions** (register J27-003…007) approved in principle for after D26 closes.
+   Grep live callers per file; `scripts/probe-triage-filter.mjs:16`, `scripts/smoke-test-candidate.mjs:50`.
+2. **Register SV labels sampled, not exhaustive.** Re-read cited `file:line` before scheduling.
+3. **"You reviewed version X" copy is untested in Production.** Needs a colleague to acknowledge a
+   D26 writeup that is later edited. Pinned by unit tests; observe on first real occurrence.
+4. **Two stashes** (`stash@{0}` on main, `stash@{1}` on `codex/reviewer-promotion-remediation`)
+   predate this work; untouched.
+5. Production Dataverse reads remain owner-run only.
 
-2. **Live Grant Program option source and eligibility.**
-   Do not treat `RESEARCH_PROGRAM_IDS` as the permanent list. Verify which Dataverse entity/query
-   produces the selectable live programs, whether inactive programs are excluded, and whether all
-   programs or only Workbench-compatible programs belong in the dropdown.
+### Do Not Reopen Without New Decision
 
-3. **Non-PD fallback and dependent filters.**
-   The default for CSO, President, superusers, or staff without a PD program is unverified. Decide
-   the fallback and whether changing Grant Program reloads cycle and status options before coding.
+6B view/bucket mapping and §10 defaults; persona label placement (summary line, not eyebrow or
+chip); PD dropdown is existence-only (derived from loaded rows; owner declined a roster-sourced
+list 2026-09-07); 6D/6E closed; D26 hide of Initial Assessments; PD lens warn-not-lock; Set aside
+hidden-but-counted; Concepts pre-Phase-I; `Phase II Pending` gate persists in J27; filename-match
+bridge is Change; Hold step retired S279; automatic Complete from thank-you, Operations/Finance
+remit flag, BILL API onboarding all closed.
 
-4. **Off-cycle behavior.**
-   The owner said off-cycle meetings should not appear in this Workbench view. The branch removes
-   off-cycle/no-date values from the cycle picker, while unrestricted text search may still find such
-   records inside the temporary program scope. Reconcile whether the new program selector should
-   exclude those requests entirely or only omit those cycle choices.
+## Preserve These Contracts
 
-5. **Bounded Dataverse Search candidate window.**
-   Text search hydrates at most the top 100 indexed candidates and filters canonically afterward. A
-   broad query can therefore omit eligible matches below the candidate window. The UI warns when
-   capped; no full-production completeness proof exists.
-
-6. **Quick Find metadata update remains blocked.**
-   The `akoya_request` Quick Find view lacks `akoya_programid`. Two authorized production PATCH
-   attempts failed with HTTP 400 / Dataverse `0x80040216`; readback was unchanged and PublishXml was
-   never called. Do not retry blindly. Ask the owner before opening or inspecting Power Apps or any
-   similar admin interface; the owner does not believe they have credentials.
-
-### Retain Unless Review Finds a Defect
-
-1. Compact Request Locator select styling and load recovery from `58f0a191`.
-2. Meeting-date rather than fiscal-year cycle derivation from `9cab8c3e`.
-3. Complete-or-error aggregate behavior and restriction checks from `3472367c`.
-4. Exact Dataverse Search semantic-read interlock classification from `4fdd8217`.
-5. Minimal outside-program acknowledgement pattern from `903de6b9`, adapted to the selected-program
-   model if still useful.
-6. Impeccable sidecar refresh from `9ecdab1b`.
-
-### Revise Before Promotion
-
-1. Hard-coded program list and predicates introduced by `9cab8c3e` and `889ddf2b`.
-2. Research-specific Request Locator heading/copy, cache key, option contract, and regression fixtures.
-3. The outside-program definition in `903de6b9` so it follows the selected live program rather than a
-   fixed Research suite, if that matches the approved design.
-
-### Do Not Reopen Without New Authorization
-
-1. Do not merge, promote, deploy, or change production from this handoff.
-2. Do not retry the Quick Find metadata PATCH or publish Dataverse customization.
-3. Do not inspect Power Apps or another admin interface without asking the owner first.
-
-## Live External State
-
-- Read-only production and sandbox Dataverse probes were run for Workbench search and Quick Find
-  metadata.
-- Two explicitly authorized production Quick Find PATCH attempts failed. Exact readback proved the
-  view was unchanged; PublishXml was never called.
-- Power Apps was viewed earlier in the session; nothing was changed.
-- No branch deployment, merge, promotion, database migration, or successful production write occurred.
-- A signed-in local dev server at `http://localhost:3000/workbench` was used for smoke testing; local
-  browser observations are not production evidence.
+- Final writeups dashboard: `view`/`pd` never reach the API (route allowlist is `requestId` |
+  `cycleCode`); explicit `cycleCode` never walks back; focused reads skip the global scan;
+  `FINAL_WRITEUPS_DASHBOARD_MAX_ROWS` is per cycle and fails closed.
+- `acknowledgedPublicationVersionId` is null for the responsible PD on every response variant.
+- `visibleToPersona`: PC and PD see all; Leadership sees `leadership-review` only.
+- `ToolbarSelect` is the page-level toolbar dropdown; do not reintroduce page-local select styles
+  on Workbench toolbars.
+- Register rule: nothing schedules unless `[OWNER-CONFIRMED]` or `[SOURCE-VERIFIED]`.
+- Owner voice for error copy; OAuth-only agent sessions; no metered review products without
+  explicit authorization; Codex never pushes `main`.
 
 ## Key Files Reference
 
-| File | Purpose / handoff note |
-|------|-------------------------|
-| `shared/components/ToolbarSelect.js` | Shared compact/native select primitive; retain. |
-| `shared/components/workbench/RequestLocator.js` | Compact controls, cache, search UI, and temporary Research copy/scope behavior. |
-| `shared/config/researchPrograms.js` | Temporary hard-coded Research IDs; revise as part of live program design. |
-| `shared/config/granteeResearchPrograms.js` | Awardees compatibility re-export; do not casually broaden its separate eligibility contract. |
-| `lib/dataverse/adapters/grant-request.js` | Meeting-date aggregate and caller-supplied canonical hydration filters. |
-| `lib/services/workbench/request-search-service.js` | Search options/results, temporary Research predicates, candidate hydration, and outside-program lookup. |
-| `lib/services/workbench/dashboard-service.js` | Temporary Research visibility predicate affecting Reviewer follow-up feed/cycles. |
-| `pages/api/workbench/search-requests.js` | Read-only Request Locator API contract. |
-| `lib/dataverse/core/interlock.js` | Exact Dataverse Search semantic-read classification. |
-| `scripts/probe-request-search-index-config.mjs` | Read-only Quick Find inspection. |
-| `scripts/add-akoya-request-programid-quick-find-column.mjs` | Guarded dry-run/apply tool; apply path is blocked pending diagnosis. |
-| `docs/plans/REVIEWER_UI_SURFACING_HANDOFF_2026-09-er.md` | Detailed implementation, evidence, defects, and retain/revise guidance. |
-| `docs/REQUEST_WORKBENCH_SCOPING.md` | Canonical Workbench design now records the live Grant Program selector direction. |
+| File | Purpose |
+|------|---------|
+| `docs/FINAL_WRITEUPS_DASHBOARD_VIEWS_AND_VERSION_PLAN.md` | 6B/6C plan, Codex dispositions (§12), build and smoke record (§14) |
+| `shared/components/final-writeups/FinalWriteupsViews.js` | VIEWS map, URL state, PD filter, version context, persona summary line |
+| `shared/components/ToolbarSelect.js` | Shared 48px toolbar dropdown used by all four Workbench views |
+| `lib/services/final-writeup/acknowledgement-service.js` | `acknowledgedPublicationVersionId` in projection and POST response |
+| `lib/services/final-writeup/dashboard-service.js` | Row passthrough; PD on unconfigured matrix rows |
+| `docs/J27_TRANSITION_REGISTER.md` | J27 register, owner questions, slice G checklist |
+| `docs/CURRENT_WORK_QUEUE.md` | Item 5 closed for 6B/6C; items 4, 6–8 carry the open work |
 
-## Testing and Gates
+## Testing
 
-During implementation, 235 focused regression tests passed across Request Locator, Workbench search
-service/route, dashboard integration, meeting-date aggregation, adapter hydration, Awardees/export/cron
-consumers, and reviewer-authorization/initial-assessment consumers. The final outside-program slice
-reran 63 focused tests successfully. Focused ESLint passed. The relevant API-route, route-service,
-Dataverse DAL, context-boundary, OData, GUID, Atlas, and interlock gates and their paired self-tests
-passed. The Impeccable sidecar parsed as schema v2 and its drift detector returned no findings.
-
-Stop-time checks passed: agent invariants, docs catalog, doc currency plus self-test, fact consistency
-plus self-test, document-symbol references plus self-test, memory drift, memory health, and memory
-router plus self-test. Memory health remained advisory-only with ten existing routed files flagged;
-the edited reviewer-apps memory was already routed. The claim-evidence pilot report was attempted and
-was unavailable because local state could not be read; no observation row was invented.
+```bash
+npm test -- --runInBand --watch=false --testPathPatterns "final-writeup|reviewer-follow-up"
+npm run check:docs-catalog && npm run check:doc-currency && npm run check:fact-consistency
+```
 
 ## Handoff and Milestone Determination
 
-Owner: Cycle Dossier session after this handoff. Codex releases ownership of the compact-controls,
-Workbench filter/search, and handoff-document surfaces when the branch is pushed. No repository lock
-file or other coordination lock was found.
-
-No `DEVELOPMENT_LOG.md` milestone entry is required: this branch was not merged or deployed and did
-not create a production capability, cutover, architecture, incident outcome, or removal.
+Milestone entry added to DEVELOPMENT_LOG.md: "Final writeups dashboard views and version context
+live; Workbench toolbars unified (Session 492)". Claim-evidence pilot row added for S492 (1 event,
+universal shape, resolved by complement enumeration).

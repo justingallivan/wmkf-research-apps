@@ -45,15 +45,21 @@ sequence.
 
 ## Audit follow-ups — verified open, not silently prioritized
 - **Public/onboarding reviewer-token documentation reconciliation.**
-  **[OWNER-DEFERRED 2026-09-01.]** Internal operating sources now reflect the
-  production incident remediation: review-due reminders are link-free and
-  preserve token authority, manual reminders have resumed, and the automatic
-  schedule remains held. Public/onboarding artifacts were intentionally left
-  untouched during the emergency response. Before their next publication,
-  audit `docs/onboarding/` and any generated public help/decks for stale claims
-  about reminder token rotation, manual-send freezes, or scheduler operation;
-  update the source generators first, regenerate outputs, and verify that no
-  credential/runbook material becomes public accidentally.
+  **[CLOSED BY RETIREMENT 2026-09-08.]** The `docs/onboarding/` Workbench decks
+  (two generated `.pptx` files, their Python generator, and README) were retired
+  and deleted on owner decision 2026-09-08: no one had been shown them, they were
+  still DRAFT v1, and they had drifted from the product repeatedly. PR #182
+  (`f1a5113d`) had reconciled them the day before; that pass stands as the last
+  state in git history. The other public artifacts audited in that pass
+  (`shared/config/guideContent.js`, `pages/guide.js`, the public reviewer portal
+  `pages/external/review/[token].js`) carried no stale reminder, token-rotation,
+  freeze, or scheduler claims [VERIFIED via grep, 2026-09-07]. The generator→deck
+  parity-check follow-up is moot. Residual follow-ups surfaced by that pass and
+  still open: `docs/REVIEWER_ENGAGEMENT_SPEC.md:110` keeps "should not substitute
+  a link-bearing resend during the token-incident hold" while `:64`/`:79` record
+  the freeze lifted and respond-by reminders re-minting; and
+  `docs/agent-wiki/topics/finance-honoraria.md:41` says the closeout honorarium
+  decision is "deployment pending" although the modal and route are on `main`.
 - **Request Document explicit actor tracking (Option B).**
   **[OWNER-APPROVED 2026-08-31; ADVERSARIAL REVIEWED; PRODUCTION-PROVED FOR
   PRE-SITE CREATION.]** Keep Request Document CRUD off staff roles and

@@ -10,7 +10,7 @@ metadata:
 
 ## Recall Rule
 
-Read this when: building or planning the Request Workbench, the cycle dashboard, the reviewer-lifecycle slice, or anything that touches the Finder/Manager → Workbench consolidation.
+Read this when: building or planning the Request Workbench, the cycle dashboard, the reviewer-lifecycle slice, or anything that touches the Finder/Manager → Workbench consolidation. J27-sensitive sites are tracked in `docs/J27_TRANSITION_REGISTER.md`; add there, not here.
 
 Do:
 - Build toward the per-request-holistic destination; the near-term build is the reviewer-lifecycle slice as Workbench v1 (URL `/workbench/[requestId]/...`).
@@ -85,7 +85,10 @@ SharePoint Word artifact and then find/open that same registered file from the
 Workbench and cycle-wide pilot locator. The pilot also exercises one safe
 failure/retry path and proves no false cross-store success. It is
 draft-functional proof, not production readiness, and does not require the
-later lifecycle tabs. The owner chose a controlled production rehearsal using
+later lifecycle tabs. **2026-09-07 note (J27: J27-051):** the 2026-08-18 date
+above was the D26 Phase II proposal due date, not J27 intake — J27 proposals
+arrive in early December 2026, exact date TBD (owner, 2026-09-06); see
+`docs/J27_TRANSITION_REGISTER.md` row J27-051. The owner chose a controlled production rehearsal using
 colleague-created representative dummy requests rather than building the
 existing Dataverse sandbox organization into an integrated application/file
 test environment. Request `1002788` became the authorized target. Generation,
