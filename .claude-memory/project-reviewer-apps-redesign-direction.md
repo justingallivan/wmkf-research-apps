@@ -460,6 +460,7 @@ S194 set direction (replace Finder + Manager with Reviewer Workbench + Reviewer 
 
 - PD identity from session (`dynamics_systemuser_id`), no PD picker.
 - Cycle dropdown, defaults to current open cycle.
+- **Grant Program dropdown (owner direction 2026-09-08):** load the program choices live, default to the signed-in PD's program, and permit other-program selection. The hard-coded Medical Research + Science and Engineering Research filter on `codex/compact-controls` is temporary and must be redesigned before promotion. Verify the live program source, non-PD default, and dependent cycle/status/result refresh behavior before building.
 - Scope dropdown: My-lead / My-lead-or-backup / All — **a personal filter, NOT a security boundary** (S206; the SHAPE below is Justin's decision, but two access BOUNDARIES are still OPEN — see end of bullet. Section revised 3×). The Phase II silo is **partial**: reviewer *management* is the lead PD's domain, but Phase II *content* (proposal, returned reviews, docs) is needed by the whole team for in-depth evaluation. So gating is at the **TAB** level, not the dashboard:
   - **Reading is team-open** (decided: managing reviewers ≠ reading reviews) — a team member can browse all requests + open any request's content. My = your action queue; All = browse everything. Default scope = My if named on ≥1 request this cycle, else All.
   - **The Reviewers *management* tab (Find/Invite/Track/Completed) is the gated surface** — the ONE "assigned PD's domain" piece; everything else open.
