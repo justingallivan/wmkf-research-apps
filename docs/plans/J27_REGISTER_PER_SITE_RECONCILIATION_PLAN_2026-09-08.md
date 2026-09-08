@@ -10,7 +10,7 @@ its fact (fixed by unbinding it). Current: 58 ok / 1 stale (J27-023, owner rulin
 pending), 6 unverifiable, 11 closed, self-test 80/80. See
 `docs/J27_TRANSITION_REGISTER.md` §10 for the full record.
 
-**Owner decision (2026-09-08):** keep the strict per-site rule in `scripts/check-j27-register.js`
+[RECHECKED after scripts/check-j27-register.js change: §2 and §9 track the gate as of 440143d8 — binding syntax, strict unbound, sibling-fallback binding resolution, whitespace-tolerant row detection] **Owner decision (2026-09-08):** keep the strict per-site rule in `scripts/check-j27-register.js`
 and bring `docs/J27_TRANSITION_REGISTER.md` up to it with subagents, rather than weakening the
 gate to warnings. "These things tend to drift and we don't need that now."
 
