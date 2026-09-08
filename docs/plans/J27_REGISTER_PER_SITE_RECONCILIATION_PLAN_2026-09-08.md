@@ -3,8 +3,12 @@
 **Status: executed 2026-09-08, rev 2.** Four parallel Sonnet slice agents reconciled every
 stale row to the binding syntax; two exhaustive Opus matrix reviews returned CONDITIONS on
 all four slices, applied in a follow-up commit (`docs/J27_REGISTER_RECONCILIATION_DECISIONS_2026-09-08.md`).
-Final gate: 59 ok / 0 stale / 6 unverifiable / 11 closed, 0 unbound, 0 vocabulary warnings;
-self-test 72/72. See `docs/J27_TRANSITION_REGISTER.md` §10 for the full record.
+Gate reached 59 ok / 0 stale / 6 unverifiable / 11 closed, 0 unbound, 0 vocabulary
+warnings, self-test 72/72; a subsequent Codex adversarial review (`65eb4bfe`) found a
+row-detection parsing gap (fixed) and that J27-023 was bound to a fragment that is not
+its fact (fixed by unbinding it). Current: 58 ok / 1 stale (J27-023, owner ruling
+pending), 6 unverifiable, 11 closed, self-test 80/80. See
+`docs/J27_TRANSITION_REGISTER.md` §10 for the full record.
 
 **Owner decision (2026-09-08):** keep the strict per-site rule in `scripts/check-j27-register.js`
 and bring `docs/J27_TRANSITION_REGISTER.md` up to it with subagents, rather than weakening the

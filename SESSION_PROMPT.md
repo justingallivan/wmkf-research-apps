@@ -97,13 +97,17 @@ toolbar/header · `314e9426` `e68bffe9` ToolbarSelect · `f4bcb5b6` smoke record
    Also merged 2026-09-08 UTC: PR #182 (`f1a5113d`) reconciling the `docs/onboarding/` decks with
    post-incident reminder behavior, the nine-tab Workbench strip, closeout honorarium disposition,
    Overview funnel, and page-level access; `python-pptx==1.0.2` pinned. Open follow-ups from its
-   Codex/Opus reviews: generator↔deck parity check (owner decision), `REVIEWER_ENGAGEMENT_SPEC.md:110`
-   stale hold wording, `finance-honoraria.md:41-42` stale "deployment pending".
+   Codex/Opus reviews: generator↔deck parity check (owner decision). `REVIEWER_ENGAGEMENT_SPEC.md:110`
+   stale hold wording and `finance-honoraria.md:41-42` stale "deployment pending" — **both resolved
+   2026-09-08 on branch `claude/j27-gate-tighten`, commit `c1f4893d`.**
    **Unmerged, branch `claude/j27-gate-tighten` (2026-09-08):** the two register-§9 gate follow-ups
    above (prose-colon false positives, any-fragment/any-file multi-site check) are fixed, plus a
    site-to-fragment binding schema, STRICT UNBOUND, and full register reconciliation across four
-   parallel slice agents and two Opus matrix reviews. Gate is green again on this branch: 59 ok /
-   0 stale / 6 unverifiable / 11 closed, 0 unbound, 0 vocabulary warnings, self-test 72/72. Not yet
+   parallel slice agents and two Opus matrix reviews, then a Codex adversarial review found four
+   more findings (row-disappearance parsing bypass, J27-023 bound to a non-fact fragment, two stale
+   doc restatements), all fixed. Gate: 58 ok / 1 stale (J27-023, owner ruling pending — see register
+   §10) / 6 unverifiable / 11 closed, 0 unbound apart from that one file, self-test 80/80 (tolerant
+   only of J27-023 via `KNOWN_OWNER_PENDING`). Not yet
    merged to `main`. Next action is the J27 build plan once Q5 lands (item 3 below).
 3. **Write `docs/J27_BUILD_AND_CHANGE_PLAN.md`** once Connor's file-location decision (Q5) lands.
    Evidence: register §2 deliverables table. Sequence unchanged from the S492 prompt.

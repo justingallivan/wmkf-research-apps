@@ -311,9 +311,13 @@ backticked files, or a glob with several matches) is stale unless every resolved
 contains a fragment; any miss makes the row stale, and every miss is listed, not just one.
 Rows whose disposition begins `rejected` or `done` are closed and skipped; rows with no
 backticked path in `site` or no backticked fragment in `excerpt` (Dataverse surfaces,
-work-queue pointers, plain-prose excerpts) are reported as unverifiable and never fail. A
-register row that does not parse into the seven schema columns, or a duplicate id, is a
-configuration error (exit 2). **Advisory:** registered here and in the `/start` battery
+work-queue pointers, plain-prose excerpts) are reported as unverifiable and never fail. Row detection is whitespace-tolerant (2026-09-08, Codex adversarial review of
+`65eb4bfe`): a line that looks like a row — after any leading whitespace, a pipe, optional
+whitespace, and something id-shaped — is always parsed, not silently skipped for using
+non-canonical spacing (no space after the opening pipe, leading whitespace before it). A
+register row that does not parse into the seven schema columns, a malformed id
+(`J27-23`, `J27-0230` — anything not exactly `J27-` plus three digits), or a duplicate id,
+is a configuration error (exit 2). **Advisory:** registered here and in the `/start` battery
 only, not in `test.yml` or any hook; promotion to blocking is an owner decision (plan §7).
 The self-test is `--root`/`--register` isolated to a temp fixture tree.
 
@@ -347,9 +351,16 @@ the bag would have matched. Only a single-file row still falls back to the bag. 
 **Register reconciliation complete (2026-09-08):** four parallel slice agents bound
 every stale row to the new syntax, followed by two exhaustive Opus matrix reviews
 whose CONDITIONS were applied on top (`docs/J27_TRANSITION_REGISTER.md` §10). Current
-baseline: `check:j27-register` reports 59 ok, 0 stale, 6 unverifiable, 11 closed; 0
-multi-site rows with unbound files; 0 rows with a disposition outside the vocabulary.
-The self-test is fully green (72/72 assertions, including the real-repository baseline).
+baseline: `check:j27-register` reports 58 ok, 1 stale (J27-023, owner ruling pending —
+see `docs/J27_TRANSITION_REGISTER.md` §10), 6 unverifiable, 11 closed; 0 multi-site
+rows unbound apart from that one file; 0 rows with a disposition outside the
+vocabulary. The self-test is fully green (80/80 assertions, tolerant only of J27-023
+via the self-test's `KNOWN_OWNER_PENDING` constant, including the real-repository
+baseline). A 2026-09-08 Codex adversarial review also found the row-detection regex
+silently skipped valid rows using non-canonical Markdown spacing (no space after the
+opening pipe, leading whitespace) instead of checking them; row detection is now
+whitespace-tolerant and fails closed (exit 2, configuration error) on a malformed
+`J27-##`/`J27-####`-shaped id rather than either skipping or wrongly accepting it.
 
 ### `check:model-override-warming` — LLM 404-on-tier-alias prevention (S230)
 
@@ -480,7 +491,7 @@ When modifying any `scripts/check-*.js` gate (or building a new one), the matchi
 | `check:scaffolding-tokens` | `check:scaffolding-tokens:self-test` |
 | `check:prompt-injection-tagging` | `check:prompt-injection-tagging:self-test` |
 | `check:reviewer-reminder-hold` | `check:reviewer-reminder-hold:self-test` — safe registry and lookalike-path positives; exact held-route (including query-string registration), invalid JSON, missing/non-array registry, malformed entry, missing-path, and alternate-config negatives. |
-| `check:j27-register` | `check:j27-register:self-test` — unknown-id, stale-excerpt, missing-site, unmatched-glob, swapped-binding, bound-vs-bag (Unicode and ASCII arrow), directory-site, glob-bound-one-fragment, binding-path-unresolved, binding-path-not-in-site, binding-fragment-too-short, path-like-bag-exclusion, strict-unbound (pure-bag and partially-bound multi-file rows, including the two superseded pre-binding fixtures), malformed-row and duplicate-id reds; existing-id, comment-led bare-marker (`//`, `<!--`, and `####`) warning, backtick self-reference, bold-label and mid-line prose non-marker skips, two-site-both-bound, ellipsis-split, wrapped-comment, memory/glob shorthand, ASCII/Unicode arrow parsing, fully-bound multi-file row, closed-row and prose-only greens; `closed.`-disposition-not-closed-plus-vocabulary-warning info case; real-baseline green before and after (register reconciliation complete 2026-09-08 — 59 ok, 0 stale, 6 unverifiable, 11 closed, 0 unbound). |
+| `check:j27-register` | `check:j27-register:self-test` — unknown-id, stale-excerpt, missing-site, unmatched-glob, swapped-binding, bound-vs-bag (Unicode and ASCII arrow), directory-site, glob-bound-one-fragment, binding-path-unresolved, binding-path-not-in-site, binding-fragment-too-short, path-like-bag-exclusion, strict-unbound (pure-bag and partially-bound multi-file rows, including the two superseded pre-binding fixtures), malformed-row and duplicate-id reds; existing-id, comment-led bare-marker (`//`, `<!--`, and `####`) warning, backtick self-reference, bold-label and mid-line prose non-marker skips, two-site-both-bound, ellipsis-split, wrapped-comment, memory/glob shorthand, ASCII/Unicode arrow parsing, fully-bound multi-file row, closed-row and prose-only greens; `closed.`-disposition-not-closed-plus-vocabulary-warning info case; no-space-after-opening-pipe and leading-whitespace rows recognised and checked (not skipped), malformed-id (two- and four-digit) exit-2 reds; real-baseline stale-only-on-`KNOWN_OWNER_PENDING` before and after (register reconciliation complete 2026-09-08 apart from J27-023, owner ruling pending — 58 ok, 1 stale, 6 unverifiable, 11 closed, 0 unbound apart from that one file). |
 
 **When external review catches a structural pattern an existing gate missed, the order is mandatory:**
 
