@@ -89,6 +89,25 @@ test('propagates a rejected guarded aggregate without returning partial options'
   await expect(loadRequestSearchOptions()).rejects.toThrow('Access denied');
 });
 
+test('propagates incomplete meeting-date aggregates instead of returning only statuses', async () => {
+  aggregateMeetingDateCycles.mockRejectedValueOnce(new Error('Incomplete cycle options'));
+  await expect(loadRequestSearchOptions()).rejects.toThrow('Incomplete cycle options');
+});
+
+test.each([
+  ['2026-06-04', 'June 2026', 'wmkf_meetingdate ge 2026-06-01T00:00:00Z and wmkf_meetingdate lt 2026-07-01T00:00:00Z'],
+  ['2025-03-01', 'March 2025 (off-cycle)', 'wmkf_meetingdate ge 2025-03-01T00:00:00Z and wmkf_meetingdate lt 2025-04-01T00:00:00Z'],
+  [null, 'Unclassified (no meeting date)', 'wmkf_meetingdate eq null'],
+])('filters and labels by meeting date %s even when fiscal year disagrees', async (meetingDate, cycle, filter) => {
+  queryRequests.mockResolvedValueOnce({ records: [requestRow('11111111-1111-1111-1111-111111111111', {
+    wmkf_meetingdate: meetingDate,
+    akoya_fiscalyear: 'December 2017',
+  })], totalCount: 1 });
+  const result = await searchWorkbenchRequests({ cycle });
+  expect(queryRequests).toHaveBeenCalledWith(expect.objectContaining({ filter }));
+  expect(result.results[0].cycleLabel).toBe(cycle);
+});
+
 test('text search applies escaped server filters, hydrates rows, and preserves relevance order', async () => {
   const first = '11111111-1111-1111-1111-111111111111';
   const second = '22222222-2222-2222-2222-222222222222';

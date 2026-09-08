@@ -1,7 +1,7 @@
 ---
 title: Reviewer UI surfacing handoff 2026-09-er
 status: active
-summary: "Reviewer history now surfaces extensions; Request Workbench cycles use meeting dates and retain explicit off-cycle/no-date buckets."
+summary: "Reviewer extension history and meeting-date cycle work; compact-controls local review includes the cycle fix and corrects aggregate truncation. Production promotion remains separate."
 ---
 
 # Reviewer UI surfacing handoff
@@ -18,7 +18,10 @@ summary: "Reviewer history now surfaces extensions; Request Workbench cycles use
 ## Issue 2 — Request Workbench cycle dropdown has irregular gaps/order
 
 - Screenshot: Request Workbench → Request list → Cycle dropdown showed scattered fiscal-year labels (December 2026, June 2020, December 2017, etc.) instead of a recent-first timeline.
-- Root cause: `/api/workbench/search-requests` delegated options to `request-search-service`, which grouped and filtered on sparse legacy `akoya_fiscalyear`; production meeting-date data is continuous for June/December 2020–2026 [VERIFIED via production aggregate probe 2026-09-07].
-- Fix: aggregate cycle options from `wmkf_meetingdate`, sort by year/month descending, filter by month ranges, and retain explicit `(off-cycle)` and `Unclassified (no meeting date)` buckets.
+- Root causes: the original service grouped and filtered on sparse legacy `akoya_fiscalyear`. The first meeting-date correction (`ffeafc47`) remained on `codex/reviewer-ui-surfacing`, so the compact-controls review branch did not include it. After that commit was cherry-picked as `9cab8c3e`, signed-in local review exposed a second defect: `buildHeaders` requested 100 aggregate rows and the adapter returned that incomplete page as successful options.
+- Current fix on `codex/compact-controls`: aggregate from `wmkf_meetingdate` in UTC, sort by full year/month descending, and filter by matching month ranges. Request up to 5,000 month groups explicitly; reject continuation metadata, a full page, or a malformed response rather than silently truncating. Table/field restrictions, target interlock, and the shared request timeout remain enforced. This is a bounded complete-or-error query, not a general pager; Dataverse's underlying aggregate-record limit still fails through to the existing filter error/retry UI.
+- Result labels also use the meeting date, even when fiscal year disagrees; missing dates remain `Unclassified (no meeting date)`. Non-June/December months retain `(off-cycle)`. Legacy unrecognized saved filter strings retain the prior escaped fiscal-year query fallback.
 - Sibling surfaces checked: `RequestLocator` option rendering, search route, request projection, project-leader filter path, and sub-agent audit of other `akoya_fiscalyear` consumers. Other consumers are intentional historical/funding displays or separate grant-cycle APIs; none were changed.
-- Owner smoke: signed-in Request Workbench → Request list, confirm cycles are recent-first with no missing June/December 2020–2026 entries; selecting a cycle returns only requests whose `wmkf_meetingdate` is in that month, and off-cycle/no-date buckets remain usable.
+- Local verification 2026-09-07: the signed-in browser at `localhost:3000/workbench` rendered 480 meeting-month groups plus All cycles and Unclassified; all June/December 2020–2026 entries were present. A December 2026 search completed with 618 matches and 25 displayed rows. The source also contains future-dated groups (December 2066 and March 2055); this change preserves their dates and does not alter source records. These observations verify the local branch, not a production deployment.
+- Regression coverage: 81 tests across the grant-request adapter, meeting-date aggregation, search service/route, and compact controls. Cases include more than 100 month groups, incomplete responses, missing context/restricted fields, UTC grouping, and fiscal-year disagreement for regular/off-cycle/no-date results. API, DAL, context-boundary, OData, type, and focused lint checks passed.
+- Release follow-up: the compact-controls branch must carry both `9cab8c3e` and its aggregate-completeness correction into the reviewed release. The reviewer-surfacing branch still needs that correction before promotion. Production smoke remains pending; verify the complete dropdown and regular/off-cycle/no-date searches on the promoted artifact.
