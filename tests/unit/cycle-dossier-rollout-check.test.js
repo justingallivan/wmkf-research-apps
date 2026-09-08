@@ -2,9 +2,16 @@
 
 jest.mock('@vercel/blob', () => ({ list: jest.fn() }));
 
+const mockQueryCurrentRows = jest.fn();
+jest.mock('../../lib/dataverse/adapters/ai-prompt.js', () => ({
+  queryCurrentRows: (...args) => mockQueryCurrentRows(...args),
+}));
+
 import {
   buildSmokePlan,
   expectedPrompt,
+  fetchPublishedPromptForPreflight,
+  defaultReadRoster,
   probeDossierBlobStore,
   runPreflight,
   verifyMigrationContract,
@@ -54,6 +61,27 @@ test('prompt verification pins every seeded field and current identity', () => {
   expect(verifyPromptRow(row, expected)).toEqual({ ok: true, mismatches: [] });
   expect(verifyPromptRow({ ...row, wmkf_ai_promptbody: 'changed' }, expected).mismatches).toContain('wmkf_ai_promptbody');
   expect(verifyPromptRow({ ...row, wmkf_ai_iscurrent: false }, expected).mismatches).toContain('wmkf_ai_iscurrent');
+});
+
+test('default roster uses the dependency-free Workbench visibility predicate', async () => {
+  const queryAllRequests = jest.fn(async () => ({ capped: false, records: [{
+    akoya_requestid: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    akoya_requestnum: 'D26-001',
+    akoya_title: 'A',
+  }] }));
+  await expect(defaultReadRoster({ requestAdapter: { queryAllRequests } })).resolves.toMatchObject([
+    { requestId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', requestNumber: 'D26-001' },
+  ]);
+  expect(queryAllRequests).toHaveBeenCalledWith(expect.objectContaining({
+    filter: "wmkf_meetingdate ge 2026-12-01T00:00:00Z and wmkf_meetingdate lt 2027-01-01T00:00:00Z and (akoya_requeststatus eq 'Phase II Pending' or wmkf_triagestatus eq 100000000) and (wmkf_triagestatus eq null or wmkf_triagestatus ne 100000001)",
+  }));
+});
+
+test('preflight prompt readback uses the admin current-row projection', async () => {
+  const row = { ...expectedPrompt(research, 3000, 'claude-sonnet-4-6'), wmkf_ai_promptid: 'p', wmkf_promptversion: 1, wmkf_ai_iscurrent: true };
+  mockQueryCurrentRows.mockResolvedValue({ records: [row] });
+  await expect(fetchPublishedPromptForPreflight(research.PROMPT_NAME)).resolves.toEqual(row);
+  expect(mockQueryCurrentRows).toHaveBeenCalledWith(research.PROMPT_NAME);
 });
 
 test('environment and cohort guards fail closed', () => {

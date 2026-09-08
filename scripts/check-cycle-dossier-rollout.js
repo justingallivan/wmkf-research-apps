@@ -16,6 +16,7 @@ import { fileURLToPath } from 'node:url';
 import { validateReviewedClaudeModelValue } from '../lib/services/model-review-validation.js';
 import * as research from '../shared/config/prompts/cycle-dossier-research-plan.js';
 import * as entry from '../shared/config/prompts/cycle-dossier-entry.js';
+import { buildVisibilityFilter } from '../shared/config/workbenchVisibility.js';
 import { parseDossierRequestAllowlist, validateDossierEnvironment, dossierRolloutConfig } from '../lib/services/cycle-dossier-rollout.js';
 
 export const MIGRATION_FILE = '038_cycle_dossiers.sql';
@@ -127,10 +128,9 @@ async function defaultReadSchemaState() {
   return { tables, migrationApplied: migrations.length === 1, control };
 }
 
-async function defaultReadRoster() {
-  const requests = await import('../lib/dataverse/adapters/grant-request.js');
+export async function defaultReadRoster({ requestAdapter = null } = {}) {
+  const requests = requestAdapter || await import('../lib/dataverse/adapters/grant-request.js');
   const { cycleCodeToOdataFilter } = await import('../lib/utils/cycle-code.js');
-  const { buildVisibilityFilter } = await import('../lib/services/workbench/dashboard-service.js');
   const result = await requests.queryAllRequests({
     select: 'akoya_requestid,akoya_requestnum,akoya_title,wmkf_organizationname,_wmkf_projectleader_value,_wmkf_programdirector_value',
     filter: `${cycleCodeToOdataFilter('D26')} and ${buildVisibilityFilter(false)}`,
@@ -140,6 +140,15 @@ async function defaultReadRoster() {
   return result.records.map(row => ({ requestId: String(row.akoya_requestid).toLowerCase(), requestNumber: row.akoya_requestnum,
     title: row.akoya_title || '', institution: row.wmkf_organizationname || '', pi: row._wmkf_projectleader_value_formatted || '',
     programDirector: row._wmkf_programdirector_value_formatted || 'Unassigned', programDirectorId: row._wmkf_programdirector_value || null }));
+}
+
+export async function fetchPublishedPromptForPreflight(promptName, queryCurrentRows = null) {
+  const query = queryCurrentRows || (await import('../lib/dataverse/adapters/ai-prompt.js')).queryCurrentRows;
+  const result = await query(promptName);
+  const rows = Array.isArray(result?.records) ? result.records : [];
+  if (rows.length === 0) throw new Error(`No current prompt found for name "${promptName}".`);
+  if (rows.length > 1) throw new Error(`Multiple current prompts found for name "${promptName}".`);
+  return rows[0];
 }
 
 export async function runPreflight({
@@ -193,7 +202,7 @@ export async function runPreflight({
         checks.schema = readinessCheck(schemaReady, schemaReady ? null : 'Migration 038, all dossier tables, and an un-stopped control row are required.');
       } catch (error) { checks.schema = readinessCheck(false, `Schema/control check unavailable: ${error.message}`); }
       try {
-        const fetchCurrentPrompt = dependencies.fetchCurrentPrompt || (await import('../lib/services/prompt-store.js')).fetchCurrentPrompt;
+        const fetchCurrentPrompt = dependencies.fetchCurrentPrompt || fetchPublishedPromptForPreflight;
         for (const item of PROMPTS) {
           const row = await fetchCurrentPrompt(item.definition.PROMPT_NAME);
           const check = verifyPromptRow(row, expectedPrompt(item.definition, item.maxTokens, model));
