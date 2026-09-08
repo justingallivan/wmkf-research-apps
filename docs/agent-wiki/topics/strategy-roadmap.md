@@ -579,7 +579,10 @@ document inventory, and individual implementation plans do not establish priorit
   date was a deliberately early internal buffer, not an external commitment
   (owner, 2026-08-10 / S412), and has passed unmet with the administrator evidence
   still outstanding — expected, not slippage. Do not treat it as a live deadline;
-  the work-queue row 1 completion decision is the real gate.** The 2026-07-29 environment
+  the work-queue row 1 completion decision is the real gate.** **2026-09-07 note
+  (J27-051): the 2026-08-18 date above was the D26 Phase II proposal due date,
+  not J27 intake. J27 proposals arrive in early December 2026, exact date TBD
+  (owner, 2026-09-06). See `docs/J27_TRANSITION_REGISTER.md` row J27-051.** The 2026-07-29 environment
   decision is a controlled production rehearsal using colleague-created
   representative dummy requests; building the existing Dataverse sandbox
   organization into an integrated application/file test environment is out of
