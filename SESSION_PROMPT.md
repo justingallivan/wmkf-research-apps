@@ -7,6 +7,17 @@ implemented on `codex/cycle-dossier-pilot-build`, using Luna implementation and
 Sol review. The earlier owner decisions remain on `codex/cycle-dossier-pilot-design`.
 This build is not promoted or activated.
 
+**[VERIFIED via GitHub and Vercel, 2026-09-07]** Owner-approved push completed;
+draft PR #179 is https://github.com/justingallivan/wmkf-research-apps/pull/179.
+Preview deployment `dpl_8d46FbxyzyywRWVUma9qbcfa6Ffn` for `8aa90f08` is READY,
+and the GitHub Vercel status is successful. The page and API redirect signed-out
+requests to application sign-in. The Preview cron fails closed with HTTP 500,
+`Cron secret not configured`; configure the intended worker environment before
+the controlled integration test. No production promotion or generation ran.
+The first PR Gitleaks run mistook the public `CYCLE_DOSSIER_ENABLED=true`
+documentation literal for a credential; its exception is limited to that exact
+value, document path, and detector rule in `.gitleaks.toml`.
+
 - Superuser selection cards, persistent exclusions, selective rewrites, shared
   entry revisions, private edition history, Word/PDF outputs, and autonomous
   bounded background work are implemented.
