@@ -45,32 +45,80 @@ sequence.
 
 ## Audit follow-ups — verified open, not silently prioritized
 - **Public/onboarding reviewer-token documentation reconciliation.**
-  **[OWNER-DEFERRED 2026-09-01; RECONCILED 2026-09-07.]** Internal operating
-  sources now reflect the production incident remediation: review-due
-  reminders are link-free and preserve token authority, manual reminders have
-  resumed, and the automatic schedule remains held. Public/onboarding
-  artifacts were intentionally left untouched during the emergency response.
-  Audited `docs/onboarding/build_workbench_decks.py` (the sole generator for
+  **[OWNER-DEFERRED 2026-09-01; RECONCILED 2026-09-07; REWORKED 2026-09-07
+  AFTER OPUS REVIEW.]** Internal operating sources now reflect the production
+  incident remediation: review-due reminders are link-free and preserve token
+  authority, manual reminders have resumed, and the automatic schedule
+  remains held. Public/onboarding artifacts were intentionally left untouched
+  during the emergency response. Audited
+  `docs/onboarding/build_workbench_decks.py` (the sole generator for
   `docs/onboarding/*.pptx`) plus the rest of the `docs/onboarding/` tree,
   `shared/config/guideContent.js`, `pages/guide.js`, and the public reviewer
   portal (`pages/external/review/[token].js`) for stale claims about reminder
   token rotation, manual-send freezes, or scheduler operation
-  [VERIFIED via grep, 2026-09-07]. Found and fixed stale claims at six
-  locations in the generator (PD-deck Step 7/8/11/FAQ, technical-deck Step
-  7/11) that still said manual reminders/resends were "frozen during the
-  hold" or that the
-  Re-invite button's removal was caused by the incident pause; corrected to:
-  manual reminders (respond-by and review-due) have resumed via the Track
-  Reviewers "Send reminder" action, only the scheduled automatic cron
-  (`/api/cron/reviewer-reminders`) remains unregistered, and the Re-invite
-  button's removal (S277) predates and is independent of the incident hold.
+  [VERIFIED via grep, 2026-09-07].
+
+  There are two distinct manual reviewer nudges on two different Workbench
+  surfaces, and the first pass conflated them: an unanswered invitation is
+  nudged from **Invite Reviewers**
+  (`shared/components/reviewers/ReviewerInvitePanel.js`, "Send reminder"
+  button `[VERIFIED L641-651]` → `RespondReminderModal`, imported nowhere
+  else `[VERIFIED via repo-wide grep]`; mints a fresh secure link, replacing
+  the reviewer's earlier invitation link, per the button's own tooltip and
+  `docs/REVIEWER_ENGAGEMENT_SPEC.md:79`), while an accepted-but-not-submitted
+  review is nudged from **Track Reviewers** or **Reviews**
+  (`lib/services/reviewer-manual-reminder.js:4-5`; link-free, no mint).
+  Track Reviewers is accepted-reviewer-only
+  (`shared/components/reviewers/ReviewersTab.js:10`,
+  `ReviewerManagePanel.js:145`), so an unanswered invitee never appears
+  there — the first pass's "Send reminder … in Track Reviewers" copy for the
+  respond-by nudge was wrong. Fixed at six locations in the generator
+  (PD-deck Step 7/8/11/FAQ, technical-deck Step 7) and in this file/the
+  README to name each nudge's real surface, and reworded the causal claim
+  about why the Re-invite button was removed: `docs/REVIEWER_ENGAGEMENT_SPEC.md:110`
+  says it was removed **when the automated respond-by reminder was
+  introduced** (S277) — the first pass instead asserted it was "retired in
+  favor of" the newer manual Send-reminder action, a cause the spec does not
+  support; corrected to cite the spec's own reason and describe the manual
+  nudge as today's replacement without claiming it caused the removal.
+
+  Regenerating the decks from the corrected generator also picked up (and
+  flushed to the shipped `.pptx`) the deltas from four earlier generator
+  commits that had edited the `.py` without regenerating: `83b9c68a`
+  (Phase II documents added to the Proposal-tab slide — re-verified current
+  via `ProposalTab.js` `phaseIIDocuments`, still accurate), `c979156c` (an
+  Aug-16 "eight tabs incl. Pre Site Visit" tab-strip edit that was itself
+  stale by 2026-09-07 — see below), `d040a7a3` (render-emails-preview /
+  send-emails-mints token wording, still accurate per spec §2.6), and
+  `a3103b3c` (acceptance fast-response drain wording, still accurate). Only
+  `c979156c`'s tab-strip claim needed a further fix: the tab strip is nine
+  tabs, all live, no placeholders — `[VERIFIED via pages/workbench/[requestId].js:44-52]`
+  TABS array: Overview, Proposal, Initial Assessment, Reviewers, Reviews,
+  Staff Deliberations, Final Writeup, Status, Awardee, all mapped to real
+  imported components; S466 merged the former Pre Site Visit + Site Visit
+  tabs into Staff Deliberations, and Final Writeup shipped separately. Fixed
+  the generator docstring, the PD-deck Step 3 slide, the technical-deck "The
+  shell" slide, and README.md's tab-strip bullet accordingly.
+
   Regenerated both `.pptx` outputs from the corrected generator via a
-  throwaway venv per the README. Confirmed no credential/runbook material is
-  embedded in the generator, aside from one pre-existing, out-of-scope,
-  unrelated line naming the `CRON_SECRET` env var (not its value) in the
-  technical deck's ops appendix — left untouched as unrelated to this
-  reconciliation. Before the decks' next publication, re-diff them against
-  `docs/REVIEWER_ENGAGEMENT_SPEC.md` if reminder/token behavior changes again.
+  throwaway venv per the README; slide counts (33 PD / 31 Technical) and
+  content unchanged in shape, only the corrected copy differs. Confirmed no
+  credential/runbook material is embedded in the generator: the one env-var
+  name present, `CRON_SECRET` (technical deck's ops appendix, name only, no
+  value), is acceptable — the same name already appears in 7+ other tracked
+  public docs — so it was left as-is.
+
+  Known open item, not fixed here per instruction: `docs/REVIEWER_ENGAGEMENT_SPEC.md:110`
+  itself still reads "staff should not substitute a link-bearing resend
+  during the token-incident hold," which is now stale next to the same
+  spec's own `:64` and `:79` (the freeze is lifted; the respond-by nudge
+  re-mints deliberately) — flagging as a follow-up sweep item for that doc,
+  not treating `:110`'s hold language as clean support for any claim here.
+
+  Before the decks' next publication, re-diff them against
+  `docs/REVIEWER_ENGAGEMENT_SPEC.md` if reminder/token behavior changes
+  again, and re-check the tab strip against `[requestId].js` if a tab is
+  added, renamed, or merged.
 - **Request Document explicit actor tracking (Option B).**
   **[OWNER-APPROVED 2026-08-31; ADVERSARIAL REVIEWED; PRODUCTION-PROVED FOR
   PRE-SITE CREATION.]** Keep Request Document CRUD off staff roles and

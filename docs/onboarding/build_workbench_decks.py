@@ -3,7 +3,8 @@
 
 Grounded in source read this session:
 - Shell: pages/workbench/[requestId].js (query-string ?tab=&sub= routing; RequireAppAccess 'reviewers')
-- Live tabs: Overview, Proposal, Reviewers, Reviews, Status, Awardee (4 lifecycle tabs are placeholders)
+- Live tabs (all nine, no placeholders): Overview, Proposal, Initial Assessment, Reviewers,
+  Reviews, Staff Deliberations, Final Writeup, Status, Awardee
 - Reviewers sub-tabs: Find, Invite Reviewers, Track Reviewers (collapsed S280 from 5: Find, Candidates, Invite, Track, Completed)
   - Invite Reviewers = the old Candidates tab (save shortlist + send invitations).
   - Track Reviewers = the old Invite + Completed sub-tabs (release materials, monitor, completion).
@@ -166,11 +167,9 @@ def build_pd():
 
     section_slide(prs, "3", SPINE[2])
     content_slide(prs, "STEP 3", "The tab strip", [
-        "Eight tabs are implemented in source:",
-        (1, "Overview · Proposal · Initial Assessment · Reviewers · Reviews · Pre Site Visit · Status · Awardee"),
-        "Two remain placeholders for the later request lifecycle:",
-        (1, "Site Visit · Final Writeup — they say \"coming in a later update.\""),
-        ("", "Pre Site Visit currently generates a Word file for local download; it is not yet saved back to SharePoint."),
+        "Nine tabs, all live — no placeholders left:",
+        (1, "Overview · Proposal · Initial Assessment · Reviewers · Reviews · Staff Deliberations · Final Writeup · Status · Awardee"),
+        ("", "Staff Deliberations merges the former Pre Site Visit Writeup and Site Visit tabs into one workspace."),
         "You'll spend most of your time on the Reviewers tab.",
     ])
 
@@ -206,7 +205,9 @@ def build_pd():
         (1, "Why they fit, h-index/citations, expertise keywords, Scholar/ORCID/website links."),
         "Select candidates and click Send invitation to invite the ones not yet invited.",
         "Heads-up — there is no longer a \"Re-invite\" button:",
-        (1, "It was retired in favor of the per-reviewer \"Send reminder\" nudge in Track Reviewers."),
+        (1, "It was retired (S277) when the automated respond-by reminder was introduced."),
+        (1, "For an unanswered invitee, use the \"Send reminder\" nudge right here in Invite Reviewers instead."),
+        (1, "That nudge mints a fresh secure link, replacing the reviewer's earlier invitation link."),
     ])
 
     section_slide(prs, "8", SPINE[7])
@@ -214,7 +215,7 @@ def build_pd():
         "Set the timing once for the whole request; invitations inherit it.",
         ("", "Days to respond — how long a reviewer has to accept (an offset, so later waves get the full window)."),
         ("", "Review due date — the fixed deadline reviews are due."),
-        ("", "Reminder controls are not available in this panel; use the \"Send reminder\" action in Track Reviewers instead."),
+        ("", "Reminder controls are not available in this panel: nudge an unanswered invitee from Invite Reviewers, or an accepted-but-not-submitted review from Track Reviewers or Reviews."),
         ("", "Desired count — how many accepted reviewers you're aiming for (drives the quota notice)."),
     ])
 
@@ -238,8 +239,9 @@ def build_pd():
     content_slide(prs, "STEP 11", "Reviewers · Track Reviewers", [
         "Accepted reviewers live here — use Release to reviewers to send the proposal to those awaiting materials.",
         "Track everyone in flight, from materials sent through review received (this one tab absorbed the old Invite and Completed sub-tabs).",
-        "Scheduled automatic reviewer reminders remain paused; nudge reviewers yourself with Send reminder.",
-        (1, "Send reminder works for both an unanswered invitation and an accepted-but-not-submitted review."),
+        "Scheduled automatic reviewer reminders remain paused; here you can nudge an accepted",
+        (1, "reviewer who hasn't submitted with Send reminder — this action is link-free, it doesn't"),
+        (1, "mint or change their existing review link (the invite-stage nudge lives in Invite Reviewers)."),
     ])
 
     section_slide(prs, "12", SPINE[11])
@@ -271,7 +273,7 @@ def build_pd():
     ])
 
     content_slide(prs, "WRAP-UP", "FAQ & where to get help", [
-        "\"Where did the Re-invite button go?\" — it was retired for the Send reminder action; scheduled automatic reminders remain paused separately.",
+        "\"Where did the Re-invite button go?\" — it was retired (S277) when the automated respond-by reminder shipped; nudge an unanswered invitee instead with Send reminder in Invite Reviewers. Scheduled automatic reminders remain paused separately.",
         "\"A change isn't showing\" — hard-refresh; the app updates as we ship.",
         "\"A tab says coming soon\" — that lifecycle stage isn't built yet; it's on the roadmap.",
         "Who to ask: your team lead for workflow; Connor for anything technical.",
@@ -302,9 +304,10 @@ def build_tech():
     content_slide(prs, "ARCHITECTURE", "The shell", [
         "Per-request shell: pages/workbench/[requestId].js (tier-3 page).",
         "Tab + sub-tab selection is query-string driven: ?tab=reviewers&sub=track (deep-linkable; legacy sub=invite/completed normalize to track).",
-        "Implemented tab components:",
-        (1, "OverviewTab · ProposalTab · InitialAssessmentTab · ReviewersTab · ReviewsTab · StatusTab · AwardeeTab (shared/components/...)."),
-        (1, "The other 3 tab keys fall through to a \"coming in a later update\" card."),
+        "Implemented tab components (all nine keys are live, none fall through):",
+        (1, "OverviewTab · ProposalTab · InitialAssessmentTab · ReviewersTab · ReviewsTab ·"),
+        (1, "StaffDeliberationsTab · FinalWriteupTab · StatusTab · AwardeeTab (shared/components/...)."),
+        (1, "Legacy pre-site-visit/site-visit deep links alias to staff-deliberations (S466 merge)."),
         "Consolidation: the Workbench merges the old reviewer-finder + review-manager apps; one app-access grant ('reviewers') now covers them.",
     ])
     content_slide(prs, "ARCHITECTURE", "Access & auth", [
@@ -352,7 +355,8 @@ def build_tech():
         "Component: ReviewerInvitePanel.js; roster from /api/reviewer-finder/my-candidates?requestId=.",
         "Candidate detail maps off the person row wmkf_potentialreviewers (bibliometrics folded on; sidecar dropped S213).",
         "Invite → InviteEmailModal → render-emails / send-emails with templateType:'invitation'.",
-        "S277: the manual \"Re-invite already-invited\" button was removed in favor of the per-reviewer Send reminder action;",
+        "S277: the manual \"Re-invite already-invited\" button was removed when the automated respond-by reminder was introduced;",
+        (1, "RespondReminderModal (imported only here, Invite Reviewers) now covers the unanswered-invitee nudge, minting a fresh link."),
         (1, "allowResend re-mint remains callable server-side (repair-follow-up flow only), independent of the reminder-cron hold."),
     ])
 

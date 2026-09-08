@@ -53,18 +53,26 @@ place. Close the files in PowerPoint first, or the write can collide with the op
 Deck content was read from source during the authoring session (S277), not memory; refreshed
 2026-09-01 for the reviewer-reminder incident hold and the S280 3-sub-tab collapse
 (Find · Invite Reviewers · Track Reviewers) and the now-live Reviews tab; reconciled again
-2026-09-07 to drop stale manual-reminder-freeze/token-regeneration-hold language — manual
-reminders (respond-by and review-due, via the Track Reviewers "Send reminder" action) have
-resumed and are not incident-frozen; only the scheduled automatic reminder cron remains
-unregistered:
+2026-09-07 to drop stale manual-reminder-freeze/token-regeneration-hold language and a stale
+tab-strip count. There are two distinct manual nudges on two different surfaces — do not
+conflate them: an unanswered invitee is nudged from **Invite Reviewers**
+(`RespondReminderModal`, imported only in `ReviewerInvitePanel.js`; mints a fresh secure link,
+replacing the invitation link), and an accepted-but-not-submitted review is nudged from
+**Track Reviewers** or **Reviews** (`lib/services/reviewer-manual-reminder.js`; link-free, no
+mint). Both are live and not incident-frozen; only the scheduled automatic reminder cron
+(`/api/cron/reviewer-reminders`) remains unregistered. Also reconciled 2026-09-07: the tab
+strip is nine tabs, all live, no placeholders (S466 merged Pre Site Visit + Site Visit into
+Staff Deliberations; Final Writeup shipped separately) — the prior "six live, four
+placeholder" count here was stale:
 
-- Shell + tab strip: `pages/workbench/[requestId].js` — live tabs are **Overview, Proposal,
-  Reviewers, Reviews, Status, Awardee**; the other four lifecycle tabs render a "coming in a later
-  update" card.
+- Shell + tab strip: `pages/workbench/[requestId].js` — nine live tabs: **Overview, Proposal,
+  Initial Assessment, Reviewers, Reviews, Staff Deliberations, Final Writeup, Status,
+  Awardee**; legacy `pre-site-visit`/`site-visit` deep links alias to `staff-deliberations`.
 - Reviewers sub-tabs: `shared/components/reviewers/ReviewersTab.js` — Find · Invite
   Reviewers · Track Reviewers (collapsed S280 from 5: Find · Candidates · Invite · Track ·
   Completed).
-- Tab components: `OverviewTab.js`, `ProposalTab.js`, `ReviewsTab.js`, `StatusTab.js`, `AwardeeTab.js`.
+- Tab components: `OverviewTab.js`, `ProposalTab.js`, `InitialAssessmentTab.js`, `ReviewsTab.js`,
+  `StaffDeliberationsTab.js`, `FinalWriteupTab.js`, `StatusTab.js`, `AwardeeTab.js`.
 - Reviewer engagement (campaign config, reminders, token TTL, quota, withdraw):
   `docs/REVIEWER_ENGAGEMENT_SPEC.md` (Phases 1, 2, and 4 live; Phase 3 mechanism
   implemented but its Vercel schedule paused 2026-09-01) and the
