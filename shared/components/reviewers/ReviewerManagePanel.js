@@ -1014,7 +1014,7 @@ export default function ReviewerManagePanel({
                     <th className="whitespace-nowrap px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider" aria-label="Download review">
                       Download
                     </th>
-                    <th className="whitespace-nowrap px-2 py-3 text-center text-xs font-medium text-gray-500 tracking-wider">
+                    <th className="whitespace-nowrap px-2 py-3 text-center text-xs font-medium uppercase text-gray-500 tracking-wider">
                       Actions
                     </th>
                   </>
@@ -1171,16 +1171,18 @@ export default function ReviewerManagePanel({
                         </td>
                         <td className="px-2 py-3 align-top text-center">
                           {/* Secondary magic-link and lifecycle actions. */}
-                          <TokenActionsMenu
-                            reviewer={r}
-                            onRegenerate={() => handleRegenerateToken(r.suggestionId)}
-                            onRevoke={() => handleRevokeToken(r.suggestionId)}
-                            onRemove={() => handleRemoveReviewer(r)}
-                            onStatusChange={(newStatus) => updateStatus(r.suggestionId, newStatus)}
-                            statusPending={pendingStatusTokens.has(r.suggestionId)}
-                            onTransition={(terminalStatus) => transitionTerminal(r, terminalStatus)}
-                            degraded={degraded}
-                          />
+                          <div className="flex justify-center">
+                            <TokenActionsMenu
+                              reviewer={r}
+                              onRegenerate={() => handleRegenerateToken(r.suggestionId)}
+                              onRevoke={() => handleRevokeToken(r.suggestionId)}
+                              onRemove={() => handleRemoveReviewer(r)}
+                              onStatusChange={(newStatus) => updateStatus(r.suggestionId, newStatus)}
+                              statusPending={pendingStatusTokens.has(r.suggestionId)}
+                              onTransition={(terminalStatus) => transitionTerminal(r, terminalStatus)}
+                              degraded={degraded}
+                            />
+                          </div>
                         </td>
                       </>
                     )}
