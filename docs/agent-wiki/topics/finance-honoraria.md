@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-09-04
+last_verified: 2026-09-08
 stale_after_days: 90
 owner: finance-ops
 source_files:
@@ -39,7 +39,7 @@ source, Atlas, and the Power Automate owner before testing against production.
 ## Honorarium Request Creation And BILL Deferral
 
 **Reviewer closeout decision (owner-approved and source-built 2026-09-04;
-deployment pending):** a Program Director records `eligible`, `not_eligible`, or
+deployed on `main` since `d0a5fc07`, verified 2026-09-08):** a Program Director records `eligible`, `not_eligible`, or
 `not_applicable` on the reviewer engagement when closing a received review.
 For a linked honorarium where the reviewer did not opt out, the closeout UI asks
 only whether an honorarium should be paid: Yes maps to `eligible`, while No maps

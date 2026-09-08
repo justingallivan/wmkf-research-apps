@@ -64,11 +64,53 @@ pilot remains a draft and was not promoted.
    Evidence: the Cycle Dossier remains a superuser pilot on a draft branch. Promote only after the
    reconciled build, review, and measured smoke are satisfactory.
 
-### Owner Decision Needed
+5. **`J27:` marker convention and `scripts/check-j27-register.js`: MERGED TO `main` 2026-09-08 UTC**
+   (Session 496, PR #180, merge commit `6059118a`; advisory gate + `--root`-isolated self-test,
+   registered in `docs/CI_GATES_REFERENCE.md` and `/start`). Baseline 61 ok / 0 stale /
+   6 unverifiable / 9 closed. All three `J27:` markers found without ids (the third,
+   in `.claude/skills/start/SKILL.md`, surfaced only on plan-closeout re-run) were
+   resolved 2026-09-07 and merged via PR #181 (`5cef9f85`); the memory/wiki pointer
+   exit criterion is also met. §8 owner answers beyond Q0 remain open. Gate follow-ups recorded in
+   register §9: prose-colon false positives, any-fragment/any-file multi-site check.
+   Also merged 2026-09-08 UTC: PR #182 (`f1a5113d`) reconciling the `docs/onboarding/` decks with
+   post-incident reminder behavior, the nine-tab Workbench strip, closeout honorarium disposition,
+   Overview funnel, and page-level access; `python-pptx==1.0.2` pinned. Open follow-ups from its
+   Codex/Opus reviews: generator↔deck parity check (owner decision). `REVIEWER_ENGAGEMENT_SPEC.md:110`
+   stale hold wording and `finance-honoraria.md:41-42` stale "deployment pending" — **both resolved
+   2026-09-08 on branch `claude/j27-gate-tighten`, commit `c1f4893d`.**
+   **Unmerged, branch `claude/j27-gate-tighten` (2026-09-08):** the two register-§9 gate follow-ups
+   above (prose-colon false positives, any-fragment/any-file multi-site check) are fixed, plus a
+   site-to-fragment binding schema, STRICT UNBOUND, and full register reconciliation across four
+   parallel slice agents and two Opus matrix reviews, then a Codex adversarial review found four
+   more findings (row-disappearance parsing bypass, J27-023 bound to a non-fact fragment, two stale
+   doc restatements), all fixed. Owner ruled 2026-09-08 on J27-023 (option 1: the shortcode-domain
+   audit is not a J27 site; citation dropped, `Ev` back to SV). Gate: 59 ok / 0 stale / 6 unverifiable
+   / 11 closed, 0 unbound, self-test 80/80 with `KNOWN_OWNER_PENDING` empty. Not yet
+   merged to `main`. Next action is the J27 build plan once Q5 lands (item 3 below).
+6. **Write `docs/J27_BUILD_AND_CHANGE_PLAN.md`** once Connor's file-location decision (Q5) lands.
+   Evidence: register §2 deliverables table. Sequence unchanged from the S492 prompt.
+7. **Annotate the pilot passages** coupling "J27 Initial Assessment" to 2026-08-18:
+   DONE 2026-09-07, merged via PR #181 (`5cef9f85`), all 4 of 4 cited sites —
+   `REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md` (two sites), `DATAVERSE_SHAREPOINT_FILE_MODEL.md`,
+   `strategy-roadmap.md`, and memory `project-reviewer-apps-redesign-direction.md` — each now
+   carries a dated `J27: J27-051` note. Register row J27-051 is `done`. Evidence: register J27-051, Q18.
+8. **Smaller shared select variant** for the 54 inline/table/modal selects (optional consistency
+   follow-up). Evidence: S492 survey above; owner asked for consistency but did not direct this.
+   Not urgent; propose before building.
 
+### Owner Decision Needed
 1. **Combined dossier retention policy beyond the pilot.**
    Evidence: the pilot uses app-managed private storage and preserves editions. Confirm eventual
    retention duration and deletion behavior before treating that storage contract as permanent.
+2. **Colleague discussion:** PD front-end flip to `Phase II Pending` as primary path (register Q8).
+3. **Connor:** J27 proposal SharePoint location and filename (Q5); back-end status changes; slice G
+   checklist (register §8). Connor is out as of 2026-09-08; Q5 and this item are parked until he returns.
+4. **Filed, not urgent** (register §7 status line): Q1b, Q12, Q13, Q15, Q16, Q20, Q24.
+5. **Dataverse attribute drops** (`wmkf_summarybloburl`, `wmkf_summarypages`) approved 2026-09-06;
+   Connor-applied with its own pre-flight. Tier 0 when convenient.
+6. **Final writeups header structure.** Final writeups is the only Workbench view not using the
+   shared centered `PageHeader`; the other three do. Deliberate since 6A, but a consistency question
+   surfaced in S492. No action unless the owner wants the four headers to match.
 
 ### Parked
 
