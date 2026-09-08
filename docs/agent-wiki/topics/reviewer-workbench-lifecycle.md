@@ -1623,12 +1623,13 @@ One Final Writeup row per request over the same stable SharePoint Word item; the
   labelled **Record closeout**; Complete with any recorded disposition (`eligible`/`not_eligible`/
   `not_applicable`, or the unrecognised `unknown`) shows no Next-action button at all -- editing
   stays available only through the row's More menu (`TokenActionsMenu.js`), which still offers
-  **Edit closeout** and opens the same `ReviewerCloseoutModal`. This also fixes a latent gap found
-  while verifying the More menu: since the Stage 6C extraction (`70babc04`, 2026-09-05) the panel
-  never passed `onCloseReview` to `TokenActionsMenu`, so the menu's closeout item never rendered for
-  any row; it is now wired, but only for Complete rows, to preserve the `review_received` row's
-  earlier "primary action only, no menu duplicate" design (see the 2026-09-04 note above and the
-  `reviewer-manage-actions-menu.test.js` "surfaces closeout as the primary row action" pin).
+  **Edit closeout** and opens the same `ReviewerCloseoutModal`. That menu item had been deliberately
+  unwired since `5e101861` (2026-09-04), which gave both `review_received` and `complete` rows a
+  primary Next-action button and dropped the menu duplicate for both; because this change removes
+  the Complete row's button, the panel now passes `onCloseReview` to `TokenActionsMenu` for Complete
+  rows only, preserving the `review_received` row's "primary action only, no menu duplicate" design
+  (see the 2026-09-04 note above and the `reviewer-manage-actions-menu.test.js` "surfaces closeout as
+  the primary row action" pin). `70babc04` (2026-09-05) only moved the menu into its own file.
 - **Workbench UI polish (Codex PR #151, `3fc0a936`, production 2026-09-05).** UI-only; no
   `pages/api` or `lib` change, payload shapes and SSE vocabulary unchanged. Durable behavior
   changes: (a) `/workbench/reviewer-follow-up` is now a focused attention queue — request
