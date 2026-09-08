@@ -30,6 +30,9 @@ CREATE TABLE IF NOT EXISTS cycle_dossier_entries (id uuid);
 CREATE TABLE IF NOT EXISTS cycle_dossier_control (id boolean);
 CREATE TABLE IF NOT EXISTS cycle_dossier_editions (id uuid);
 `;
+const syntheticDossierBlobToken = ['vercel', 'blob', 'rw', 'storealpha', 'secret'].join('_');
+const wrongDossierBlobToken = ['vercel', 'blob', 'rw', 'shared', 'secret'].join('_');
+const malformedDossierBlobToken = ['invalid', 'blob', 'token'].join('_');
 
 afterEach(() => {
   delete process.env.CYCLE_DOSSIER_ENABLED;
@@ -78,11 +81,11 @@ test('smoke mode requires one and only one cohort request', () => {
 
 test('Blob probe authenticates read-only and rejects wrong or malformed store tokens', async () => {
   list.mockResolvedValue({ blobs: [] });
-  await expect(probeDossierBlobStore({ DOSSIER_BLOB_READ_WRITE_TOKEN: 'vercel_blob_rw_storealpha_secret', DOSSIER_BLOB_STORE_ID: 'store_storealpha' }))
+  await expect(probeDossierBlobStore({ DOSSIER_BLOB_READ_WRITE_TOKEN: syntheticDossierBlobToken, DOSSIER_BLOB_STORE_ID: 'store_storealpha' }))
     .resolves.toMatchObject({ authenticated: true, storeId: 'store_storealpha' });
-  expect(list).toHaveBeenCalledWith({ prefix: 'cycle-dossier/', limit: 1, token: 'vercel_blob_rw_storealpha_secret' });
-  await expect(probeDossierBlobStore({ DOSSIER_BLOB_READ_WRITE_TOKEN: 'vercel_blob_rw_shared_secret', DOSSIER_BLOB_STORE_ID: 'store_storealpha' })).rejects.toThrow(/dedicated store/i);
-  await expect(probeDossierBlobStore({ DOSSIER_BLOB_READ_WRITE_TOKEN: 'invalid', DOSSIER_BLOB_STORE_ID: 'store_storealpha' })).rejects.toThrow(/dedicated store/i);
+  expect(list).toHaveBeenCalledWith({ prefix: 'cycle-dossier/', limit: 1, token: syntheticDossierBlobToken });
+  await expect(probeDossierBlobStore({ DOSSIER_BLOB_READ_WRITE_TOKEN: wrongDossierBlobToken, DOSSIER_BLOB_STORE_ID: 'store_storealpha' })).rejects.toThrow(/dedicated store/i);
+  await expect(probeDossierBlobStore({ DOSSIER_BLOB_READ_WRITE_TOKEN: malformedDossierBlobToken, DOSSIER_BLOB_STORE_ID: 'store_storealpha' })).rejects.toThrow(/dedicated store/i);
 });
 
 test('worker stop is checked after a run is claimed', async () => {
@@ -101,7 +104,7 @@ test('live preflight verifies both exact prompt rows and one request source/dest
   const result = await runPreflight({
     root: process.cwd(), expectedEnvironment: 'local', vercelEnv: undefined, nodeEnv: 'development', dynamicsUrl: null,
     liveRead: true, smokeRequest: 'D26-001',
-    env: { CYCLE_DOSSIER_ENABLED: 'true', CYCLE_DOSSIER_REQUEST_ALLOWLIST: 'D26-001', CYCLE_DOSSIER_ROLLOUT_MODE: 'smoke', CYCLE_DOSSIER_OPERATOR_PROFILE_ID: '7', DOSSIER_BLOB_READ_WRITE_TOKEN: 'vercel_blob_rw_storealpha_secret', DOSSIER_BLOB_STORE_ID: 'store_storealpha', CRON_SECRET: 'cron' },
+    env: { CYCLE_DOSSIER_ENABLED: 'true', CYCLE_DOSSIER_REQUEST_ALLOWLIST: 'D26-001', CYCLE_DOSSIER_ROLLOUT_MODE: 'smoke', CYCLE_DOSSIER_OPERATOR_PROFILE_ID: '7', DOSSIER_BLOB_READ_WRITE_TOKEN: syntheticDossierBlobToken, DOSSIER_BLOB_STORE_ID: 'store_storealpha', CRON_SECRET: 'cron' },
     dependencies: {
       fetchCurrentPrompt: jest.fn(async name => rows.find(row => row.wmkf_ai_promptname === name)),
       readSchemaState: jest.fn(async () => ({ tables: ['cycle_dossiers', 'cycle_dossier_previews', 'cycle_dossier_entries', 'cycle_dossier_runs', 'cycle_dossier_control', 'cycle_dossier_editions'], migrationApplied: true, control: { stop_requested: false } })),
@@ -122,7 +125,7 @@ test('live preflight verifies both exact prompt rows and one request source/dest
 test('invalid model or failed Blob identity probe blocks preflight', async () => {
   const result = await runPreflight({
     root: process.cwd(), expectedEnvironment: 'local', nodeEnv: 'development', model: 'gpt-4o', liveRead: true,
-    env: { CYCLE_DOSSIER_REQUEST_ALLOWLIST: 'D26-001', DOSSIER_BLOB_READ_WRITE_TOKEN: 'vercel_blob_rw_storealpha_secret', DOSSIER_BLOB_STORE_ID: 'store_storealpha', CRON_SECRET: 'cron' },
+    env: { CYCLE_DOSSIER_REQUEST_ALLOWLIST: 'D26-001', DOSSIER_BLOB_READ_WRITE_TOKEN: syntheticDossierBlobToken, DOSSIER_BLOB_STORE_ID: 'store_storealpha', CRON_SECRET: 'cron' },
     dependencies: {
       readSchemaState: jest.fn(async () => ({ tables: ['cycle_dossiers', 'cycle_dossier_previews', 'cycle_dossier_entries', 'cycle_dossier_runs', 'cycle_dossier_control', 'cycle_dossier_editions'], migrationApplied: true, control: { stop_requested: false } })),
       fetchCurrentPrompt: jest.fn(async name => ({ ...expectedPrompt(name.includes('research') ? research : entry, name.includes('research') ? 3000 : 12000, 'gpt-4o'), wmkf_ai_promptid: 'p', wmkf_promptversion: 1 })),

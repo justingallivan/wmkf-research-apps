@@ -93,8 +93,8 @@ Each provider key is independent; `VRP_ALLOWED_PROVIDERS` further gates which ar
 | `DVX_BLOB_RW_TOKEN` | Dataverse Bulk Export private store (`dvx-export-private`) RW token | Manual — see "Private Blob store provisioning" below |
 | `INTAKE_BLOB_RW_TOKEN` | Applicant intake drain private store (`intake-applicant-private`, `store_Eaui32n6i2wYMS6E`, `iad1`) RW token | Manual — same provisioning shape as DVX |
 | `UPLOADS_BLOB_RW_TOKEN` | Shared private store (`wmkf-uploads-private`, `store_WvoDkxrlWniAuJAj`, `iad1`) RW token — document uploader plus actor-bound portal image staging | Manual — set in **dev + preview + production** (2026-06-11). Private uploads fail closed where unset. Portal staging mints 15-minute single-path client tokens and server-reads only ledger pathnames; `scripts/probe-private-blob-client-access.mjs` must prove public override fails before release. See "Private Blob store provisioning" below |
-| `DOSSIER_BLOB_READ_WRITE_TOKEN` | Dedicated private Blob RW token for Cycle Dossier immutable inputs and Word/PDF artifacts | **Source-built 2026-09-07; not provisioned.** Set independently in each environment after dedicated private-store provisioning; service fails closed when unset. |
-| `DOSSIER_BLOB_STORE_ID` | Managed store identity paired with the dedicated Cycle Dossier Blob token | **Source-built 2026-09-07; not provisioned.** Must be the managed private store ID (`store_<id>`); rollout preflight performs an authenticated read-only list and checks token/store identity. |
+| `DOSSIER_BLOB_READ_WRITE_TOKEN` | Dedicated private Blob RW token for Cycle Dossier immutable inputs and Word/PDF artifacts | **[VERIFIED 2026-09-07]** Connected under the custom `DOSSIER_BLOB` prefix in Development, Preview, and Production for store `wmkf-cycle-dossier-private` (`store_W9WC1TLR7kpl9hty`); managed token authenticated in Development. Do not claim Preview/Production runtime authentication until rollout preflight proves it. |
+| `DOSSIER_BLOB_STORE_ID` | Managed store identity paired with the dedicated Cycle Dossier Blob token | **[VERIFIED 2026-09-07]** `store_W9WC1TLR7kpl9hty`; rollout preflight performs an authenticated read-only list and checks token/store identity. |
 | `CYCLE_DOSSIER_ENABLED` | Cycle Dossier pilot activation flag | **Source-built 2026-09-07; disabled until rollout.** Set literal `true` only after migration 038, private Blob token, and governed prompts are verified; cron remains inert otherwise. |
 | `CYCLE_DOSSIER_REQUEST_ALLOWLIST` | Server-owned comma-separated request IDs or request numbers admitted to the controlled cohort | **Source-built 2026-09-07; not configured.** Required before activation; keep to the explicitly rehearsed request(s). |
 | `CYCLE_DOSSIER_ROLLOUT_MODE` | Cohort mode: `pilot` admits any authenticated superuser; `smoke` requires the configured operator profile and exactly one allowlisted request | **Source-built 2026-09-07; defaults to `pilot`.** Use `smoke` for the first one-request rehearsal. |
@@ -296,7 +296,7 @@ These env vars hold RW tokens for **dedicated PRIVATE** Vercel Blob stores. They
 | `DVX_BLOB_RW_TOKEN` | `dvx-export-private` | (read from dashboard) | `iad1` |
 | `INTAKE_BLOB_RW_TOKEN` | `intake-applicant-private` | `store_Eaui32n6i2wYMS6E` | `iad1` |
 | `UPLOADS_BLOB_RW_TOKEN` | `wmkf-uploads-private` | `store_WvoDkxrlWniAuJAj` | `iad1` |
-| `DOSSIER_BLOB_READ_WRITE_TOKEN` | Dedicated Cycle Dossier private store | **not provisioned** | record at rollout |
+| `DOSSIER_BLOB_READ_WRITE_TOKEN` | Dedicated Cycle Dossier private store (`wmkf-cycle-dossier-private`) | `store_W9WC1TLR7kpl9hty` | Connected all environments; Development authentication verified 2026-09-07; prove Preview/Production runtime during rollout preflight |
 
 `UPLOADS_BLOB_RW_TOKEN` backs the **private-blob migration of the shared document uploader** (Phase 1; `FileUploaderSimple access="private"` → `pages/api/upload-handler.js` mints the client token against this store, and `lib/utils/uploaded-blob.js` reads private blobs with it). **Provisioned 2026-06-11** in **dev + preview + production**, and the **live smoke PASSED** (`node scripts/smoke-private-upload.mjs` + a real expense-reporter upload→extract run locally against the store — receipts landed in the private store; the receipt URL returns HTTP 403 unauthenticated). **Cohort promoted to production 2026-06-11:** the prod token + `NEXT_PUBLIC_PHASE_I_DYNAMICS_PRIVATE_BLOB` + `NEXT_PUBLIC_GRANT_REPORTING_PRIVATE_BLOB` are set in Production and deployed (`dpl_Cd6MGvsGvYgcqW8LHPNV4j7Wg5oA`); grant-reporting prod-verified (live upload → private store, URL 403, extraction ran). **`expense-reporter` also promoted** — `NEXT_PUBLIC_EXPENSE_REPORTER_PRIVATE_BLOB=true` set in Production + deployed (`wmkfresearchapps-njdq4gr5y`); all three Phase-1 consumers now upload private in prod (expense shares the prod-verified store/token/read path). Where the token is unset, `process-expenses` (and any future private consumer) fails closed and the flag must stay `public`.
 
@@ -333,15 +333,16 @@ The Vercel CLI (53.x + 54.x) cannot connect a *second* Blob store under a custom
 
 These stores are private — direct browser fetches against their Blob URLs return 404/403. Retrieval MUST go through an authenticated server-side proxy (`/api/dataverse-export/download?t=<token>` for DVX; the drain's three-call attach dance for intake). The "shipping a short-lived public Blob URL to the browser" pattern is explicitly NOT used for these stores; see the Track B build plan §5 for the rationale. Cycle Dossier artifacts use the dedicated `DOSSIER_BLOB_READ_WRITE_TOKEN` and worker-side exact-path retrieval.
 
-The Cycle Dossier store follows the same dedicated-token rule. Provision a
-separate private store, record its store identity in the rollout receipt, and
-set only `DOSSIER_BLOB_READ_WRITE_TOKEN` in development, preview, and production. Do
-not put it in `BLOB_READ_WRITE_TOKEN` or reuse the intake/uploads token. The
-source-built service fails closed when this token is absent and reads only
-server-persisted exact pathnames with SHA-256/size checks. Keep
-`CYCLE_DOSSIER_ENABLED` false until migration 038, private-store access, and
-both governed prompt rows have been verified; no Blob provisioning or
-unattended dossier generation is claimed by this branch update.
+The Cycle Dossier store follows the same dedicated-token rule. The private
+store `wmkf-cycle-dossier-private` (`store_W9WC1TLR7kpl9hty`) is connected under
+the custom `DOSSIER_BLOB` prefix in all environments, and the managed token was
+authenticated in Development on 2026-09-07. Do not put it in
+`BLOB_READ_WRITE_TOKEN` or reuse the intake/uploads token. The service fails
+closed when this token is absent and reads only server-persisted exact pathnames
+with SHA-256/size checks. Keep `CYCLE_DOSSIER_ENABLED` false until the
+read-only rollout preflight proves each environment's token/store identity and
+the controlled smoke is authorized; no generation, SharePoint artifact
+publication, deployment, or promotion is claimed.
 
 ---
 
@@ -476,7 +477,7 @@ Canonical list lives in `lib/utils/tracked-secrets.js` — both `pages/api/cron/
 | `blob_read_write_token` | Vercel Blob RW Token (shared store) | blob | Vercel-issued; no expiry; rotate via Vercel dashboard if compromised |
 | `dvx_blob_rw_token` | Vercel Blob RW Token (dvx-export-private) | blob | Same as above |
 | `intake_blob_rw_token` | Vercel Blob RW Token (intake-applicant-private) | blob | Same as above |
-| `dossier_blob_read_write_token` | Vercel Blob RW Token (Cycle Dossier private store) | blob | Source-built only; provision and rotate through its dedicated private store before activation |
+| `dossier_blob_read_write_token` | Vercel Blob RW Token (Cycle Dossier private store) | blob | **[VERIFIED 2026-09-07]** Connected under the custom `DOSSIER_BLOB` prefix; Development authentication verified for `store_W9WC1TLR7kpl9hty`. Prove Preview/Production runtime during rollout preflight before activation |
 | `bill_integration_secret` | BILL Integration Secret (respond.js → /api/bill/onboard-reviewer) | hmac | Env var: `BILL_INTEGRATION_SECRET`. **≥32 chars required** — endpoint fails closed below that (`lib/bill/internal-call-auth.js`). HMAC-SHA256 over canonical `v1:${timestamp}:${nonce}:${rawBody}` with ±300s skew window. Generate with `openssl rand -base64 48`. Rotation cadence: 12mo (same as `external_link_secret`). Distinct from `bill_webhook_secret` (BILL→us) and `cron_secret`. |
 
 ---

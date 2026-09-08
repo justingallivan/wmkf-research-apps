@@ -17,7 +17,7 @@ related:
 
 # Postgres Cycle Dossiers
 
-**[VERIFIED 2026-09-07 via migration 038, fresh-install shape, source files, and branch-local service reads]** These six tables are source-built on branch `codex/cycle-dossier-pilot-build`. No live migration, Blob provisioning, prompt seeding, generation, or unattended cron activation is claimed here.
+**[VERIFIED 2026-09-07 via migration readback, fresh-install shape, source files, and branch-local service reads]** These six tables are source-built on branch `codex/cycle-dossier-pilot-build`; migration 038 is applied and verified. The private store `wmkf-cycle-dossier-private` (`store_W9WC1TLR7kpl9hty`) is connected under the custom `DOSSIER_BLOB` prefix in all environments, and both governed prompts are published at version 1 with successful readback. The feature remains disabled; no generation or SharePoint artifact publication is claimed.
 
 | Table | Owner / scope | Stored state | Retention and write contract |
 |---|---|---|---|
@@ -35,5 +35,5 @@ The run model is intentionally bounded: one global run lease claims three reques
 ## Current lifecycle truth
 
 - **Source-built:** migration and service contracts exist on the current branch.
-- **Not live-provisioned:** no existing populated database migration has been run from this branch.
-- **Not activated:** private Blob token, feature flag, prompt publication, generation, and unattended cron are separate rollout steps.
+- **Provisioned and verified:** migration 038, the dedicated private store connection, and prompt v1 publication/readback are complete; the managed token has been authenticated in Development.
+- **Not activated:** `CYCLE_DOSSIER_ENABLED` remains disabled; production/Preview token runtime, generation, SharePoint artifact publication, unattended cron, deployment, and promotion remain pending controlled preflight and smoke.

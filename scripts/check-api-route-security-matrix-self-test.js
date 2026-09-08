@@ -60,6 +60,12 @@ function buildFixtures() {
     `| \`${routePrefix}/${name}\` | POST | ${intendedClass} | ${currentGuard} | Fixture scope | None | Low | self-test fixture |`;
   return [
     {
+      name: 'dossier-cron-guard',
+      source: "import { verifyDossierCronSecret } from '../../lib/services/cycle-dossier-rollout';\nexport default function handler(req, res) { verifyDossierCronSecret(req, res); res.end(); }\n",
+      matrixRow: row('dossier-cron-guard', 'Cron', '`verifyDossierCronSecret`'),
+      expectWarned: false,
+    },
+    {
       name: 'hmac-documented',
       source: "import { verifyBillWebhook } from '../../lib/bill';\nexport default function handler(req, res) { verifyBillWebhook(); res.end(); }\n",
       matrixRow: row('hmac-documented', 'Shared secret (HMAC)', '`x-sig` HMAC-SHA256 verified'),

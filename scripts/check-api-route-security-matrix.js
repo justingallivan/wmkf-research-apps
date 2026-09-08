@@ -15,6 +15,7 @@ const KNOWN_GUARDS = [
   'requireAppAccess',
   'requireSuperuser',
   'verifyCronSecret',
+  'verifyDossierCronSecret',
   'verifySuggestionToken',
   'verifyGranteeToken',
   'getServerSession',
