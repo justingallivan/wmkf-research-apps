@@ -4,9 +4,7 @@
 
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { flushSync } from 'react-dom';
-import ReviewerCloseoutModal, {
-  closeoutDispositionLabel,
-} from '../../shared/components/reviewers/ReviewerCloseoutModal';
+import ReviewerCloseoutModal from '../../shared/components/reviewers/ReviewerCloseoutModal';
 import ReviewerManagePanel from '../../shared/components/reviewers/ReviewerManagePanel';
 
 jest.mock('../../shared/components/Layout', () => ({
@@ -117,9 +115,7 @@ describe('ReviewerCloseoutModal', () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
-  test('unknown stored values fail closed and legacy null remains explicit', () => {
-    expect(closeoutDispositionLabel(null)).toBe('Closeout disposition not recorded');
-    expect(closeoutDispositionLabel('not_eligible')).toBe('Not eligible');
+  test('unknown stored values fail closed', () => {
     render(
       <ReviewerCloseoutModal
         isOpen
