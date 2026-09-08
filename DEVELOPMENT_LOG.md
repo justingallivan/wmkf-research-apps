@@ -10,6 +10,14 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## September 2026 — Workbench discovery gains live Grant Program scope (Session 494)
+
+**Milestone:** Request list, Reviewer follow-up, Request Locator, search/options, exact-number hydration, and caches now share a live Dataverse-backed Grant Program scope. The signed-in program director's newest assignment supplies the default, with Research as the fallback. Reviewer follow-up excludes Set Aside requests entirely and shows active cycle and lens counts; Request list shows a server-resolved `My requests (#)` count with stale-response protection.
+**Sessions:** 494.
+**Ship state:** Luna build and Terra review; PR #183 merged as `bc699284`; Production deployment completed successfully. Signed-in Production reads passed for Research / D26: 23 active requests, `My requests (7)`, and Reviewer follow-up `Needs attention (6)` / `Show all (7)` with no Set Aside control.
+**Why it matters:** Workbench discovery now serves other programs without duplicating Research-specific filters, while each program director starts in the scope relevant to them.
+**Pointers:** `lib/services/workbench/program-scope-service.js`, `shared/config/workbenchVisibility.js`, `docs/atlas/dataverse-akoya-request.md`; commits `bba54eb4`…`fd4ba598`; PR #183 / `bc699284`.
+
 ## September 2026 — Final writeups dashboard views and version context live; Workbench toolbars unified (Session 492)
 
 **Milestone:** The Final writeups dashboard now opens on "Needs my review" for every role, with "Reviewed by me" and "All writeups" as the only alternatives and a Program director filter, all persisted in the page URL and never sent to the API (Slice 6B). Each row and the focused page name the SharePoint publication version that acknowledgements key to, and an Updated-since-review row names the version the viewer acknowledged (Slice 6C); `acknowledgedPublicationVersionId` is additive on every acknowledgement response and null for the responsible PD. The four Workbench views (Request list, Initial assessments, Reviewer follow-up, Final writeups) share one toolbar dropdown, `shared/components/ToolbarSelect.js`, after Safari's native `<select>` appearance was found to ignore height and padding.
