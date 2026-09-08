@@ -6,7 +6,7 @@ status: canonical
 summary: Canonical priority queue separating current commitments, evidence windows, optional work, external dependencies, and parked programs.
 canonical: true
 cataloged: 2026-07-22
-last_verified: 2026-09-06
+last_verified: 2026-09-08
 owner: product-engineering
 related:
   - docs/SYSTEM_MODEL.md
@@ -44,6 +44,15 @@ sequence.
 | 8 | J27 single-phase transition inventory (register of what retires, persists, changes, or must be built) | **[OWNER-DIRECTED 2026-09-06; SWEEP RUN; REGISTER BUILT; GATE GREEN ON BRANCH `claude/j27-gate-tighten` AFTER RECONCILIATION, MATRIX REVIEW, A CODEX ADVERSARIAL REVIEW, AND THE OWNER'S J27-023 RULING.]** The owner asked to collect every J27-sensitive site in one place and plan the June 2027 build and change work. `docs/J27_TRANSITION_REGISTER.md` holds the sweep output across Retire / Persist / Change / Build / Scale, seven recorded contradictions, and owner questions. The `J27:` marker convention and advisory check script `scripts/check-j27-register.js` were built 2026-09-07 and merged to `main` (PR #180/#181). **2026-09-08 (branch `claude/j27-gate-tighten`):** the owner decided to keep the strict per-site excerpt rule and reconcile the register with subagents rather than weaken the gate. A site-to-fragment binding schema (`` `path` → `fragment` ``) was added so a reconciled row cannot pass on a coincidental match, refined through an Opus review (four schema gaps fixed) and the owner's STRICT UNBOUND decision ("we don't need drift": an unbound file in a multi-site row is itself a failure, not an info flag). Applying the fully-fixed gate to the real register initially found 12 ok / 47 stale / 6 unverifiable / 11 closed / 47 unbound rows. Four parallel Sonnet subagents reconciled every stale row to the binding syntax per `docs/plans/J27_REGISTER_PER_SITE_RECONCILIATION_PLAN_2026-09-08.md` Phase 1; two exhaustive Opus matrix reviews then returned CONDITIONS on all four slices, applied in a follow-up commit, reaching 59 ok / 0 stale. A Codex adversarial review of that state (`65eb4bfe`) then found: (1) the row-detection regex silently skipped valid non-canonically-spaced Markdown rows instead of checking them — fixed, now whitespace-tolerant and fails closed (exit 2) on a malformed id; (2) J27-023 was bound to a verbatim-but-not-the-row's-fact fragment — fixed by removing that binding, which honestly makes the row STALE pending an owner ruling (self-test's `KNOWN_OWNER_PENDING` documents the exception); (3) two remaining plan-doc passages still described unbound multi-site files as informational — rewritten to STRICT UNBOUND; (4) two doc restatements of the already-fixed `REVIEWER_ENGAGEMENT_SPEC.md`/`finance-honoraria.md` stale lines were marked resolved. The owner ruled 2026-09-08 (option 1): the shortcode-domain audit is not a J27 site, so its citation was dropped from J27-023 and `Ev` restored to SV. Current baseline: `check:j27-register` reports 59 ok, 0 stale, 6 unverifiable, 11 closed, 0 unbound, 0 disposition-vocabulary warnings; self-test fully green (80/80, `KNOWN_OWNER_PENDING` empty). Not yet merged to `main`. **Next action is the J27 build plan once Q5 lands** — the separate J27 build plan still waits on Connor's file-location decision (parked, he is out). | **Met when:** every register row is labelled and verified, the owner questions are answered or queued, the gate is green on `main` (0 stale, 0 unbound, 0 vocabulary warnings), and the marker check script is referenced from `docs/CI_GATES_REFERENCE.md`. |
 
 ## Audit follow-ups — verified open, not silently prioritized
+- **Reviewer follow-up cards should show the program director.** Owner request
+  2026-09-08 (Session 499): each request card on
+  `/workbench/reviewer-follow-up` shows institution and PI but not the PD, so
+  with All requests selected a reader cannot tell whose request a row is. The
+  page already loads `/api/workbench/dashboard`, whose proposal DTO carries
+  `programDirector` (formatted name) [VERIFIED via
+  `lib/services/workbench/dashboard-service.js:252`], so this is a card-render
+  change in `pages/workbench/reviewer-follow-up.js` (the institution · PI line,
+  ~line 61), plus a render test. Tier 0 UI. Not started.
 - **Public/onboarding reviewer-token documentation reconciliation.**
   **[CLOSED BY RETIREMENT 2026-09-08.]** The `docs/onboarding/` Workbench decks
   (two generated `.pptx` files, their Python generator, and README) were retired
