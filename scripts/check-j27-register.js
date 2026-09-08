@@ -140,6 +140,13 @@ const COMMENT_LEAD_RE = /^\s*(?:\/\/|\/\*|\*|#+|--|<!--)\s*/;
 // after the opening pipe, or leading whitespace before it). Codex adversarial
 // review, 2026-09-08: the old exact-format regex made those a silent
 // row-disappearance bypass (the gate exited 0 having never checked the row).
+// The id token is captured up to the first whitespace or pipe, NOT up to
+// the cell boundary, so a real row whose id cell carries trailing prose
+// after the id (e.g. `J27-037 (toolbar rebuild deferred...)`, an existing
+// register row) still resolves to its id and is checked — the alternative,
+// requiring the whole cell to equal the id, would make that row a
+// configuration error, not a fix. The id-cell-shape self-test fixture below
+// locks this in as intentional, not incidental.
 const CANDIDATE_ROW_RE = /^\s*\|\s*(J27-[^\s|]*)/;
 // The canonical id shape. A candidate row whose id token doesn't match this
 // is a configuration error (exit 2), not a skip — `J27-23` or `J27-0230` is

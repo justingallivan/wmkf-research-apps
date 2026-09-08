@@ -536,6 +536,22 @@ function main() {
     cleanup();
   }
 
+  // ---- id-cell shape: trailing prose after the id is intentional, not a
+  // config error. The real register has a row like this (J27-037: "J27-037
+  // (toolbar rebuild and three-state triage deferred to J27 by owner...)"),
+  // and the id token is captured up to the first whitespace/pipe rather than
+  // requiring the whole cell to equal the id — locking that choice in here
+  // so it is proven deliberate, not an untested accident.
+  {
+    const { dir, cleanup } = registerTmpFixture('j27-register-id-cell-trailing-prose-');
+    write(dir, 'docs/J27_TRANSITION_REGISTER.md', greenFixture(dir)
+      + row('J27-018 (a parenthetical note in the id cell itself)', '`lib/nope.js`', '`anything at all here`'));
+    const r = runGate(['--root', dir]);
+    check('id cell with trailing prose: recognised as J27-018, not a config error (exits 1)', r.status === 1, r.output);
+    check('id cell with trailing prose: J27-018 site path missing', /J27-018 .*site path missing: lib\/nope\.js/.test(r.output), r.output);
+    cleanup();
+  }
+
   // ---- config error: duplicate id
   {
     const { dir, cleanup } = registerTmpFixture('j27-register-duplicate-');
