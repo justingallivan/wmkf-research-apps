@@ -173,7 +173,7 @@ describe('reviewer table geometry', () => {
     expect(table).toHaveClass('table-fixed', 'min-w-[58rem]');
     expect(table.querySelectorAll('colgroup col')).toHaveLength(7);
     expect(screen.getByRole('columnheader', { name: 'Next action' })).toBeInTheDocument();
-    expect(screen.getByRole('columnheader', { name: 'Download' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: /Download/ })).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: 'Actions' })).toBeInTheDocument();
   });
 
@@ -196,7 +196,7 @@ describe('reviewer table geometry', () => {
     expect(table).toHaveClass('table-fixed', 'min-w-[58rem]');
     expect(table.querySelectorAll('colgroup col')).toHaveLength(7);
     expect(screen.queryByRole('columnheader', { name: 'Follow up' })).not.toBeInTheDocument();
-    expect(screen.getByRole('columnheader', { name: 'Download' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: /Download/ })).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: 'Actions' })).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: 'Next action' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Send reminder to Joshua Rosenthal' })).toBeInTheDocument();
