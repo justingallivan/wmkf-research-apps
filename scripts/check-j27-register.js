@@ -12,7 +12,7 @@
  *      convention ("followed by the register ID once one exists") and is
  *      listed as an unregistered marker (warning, exit 0) only when it sits
  *      in a comment: the line, after leading whitespace, begins with a
- *      code-comment leader (`//`, `/*`, `*`, `#`, `--`, `<!--`) and `J27:`
+ *      code-comment leader (`//`, `/*`, `*`, `#` one or more, `--`, `<!--`) and `J27:`
  *      follows that leader immediately (optionally after whitespace). A bare
  *      `J27:` in prose, inside bold (`**J27:**`), or mid-line is not a
  *      marker — it is prose using the term, not a site tag. This keeps
@@ -40,34 +40,54 @@
  *   - `excerpt` fragments may be BOUND to a cited path (2026-09-08 schema
  *     amendment, plan §3/§7): `` `path/or/glob` → `fragment` `` (arrow is
  *     `→` or `->`) binds `fragment` to that path/glob. Unprefixed backticked
- *     fragments remain a shared BAG. Each backtick span (bound or bag) is
- *     split on `…` / `...`, whitespace-normalized, and dropped below
- *     MIN_FRAGMENT_LENGTH. Files are compared with inner backticks and
- *     line-comment sigils (`//`, ` * `, `#`) removed and whitespace
- *     collapsed, so an excerpt can quote a wrapped comment or a backticked
- *     identifier. A bound path resolves independently of `site`: an exact
- *     repo-relative path (`stripSiteDecoration` then existence), or, for a
- *     glob, every tracked file the glob (as written) matches.
+ *     fragments remain a shared BAG, EXCEPT a bare path/glob span (path-like
+ *     per `isPathLike`, no whitespace) that never paired with an arrow: that
+ *     is an orphaned binding attempt, not prose/code content, and is
+ *     dropped rather than silently becoming a bag fragment that could
+ *     vacuously match a file quoting its own path (2026-09-08, Opus review
+ *     C3). A prose fragment that merely mentions a path mid-sentence still
+ *     counts. Each backtick span
+ *     (bound or bag) is split on `…` / `...`, whitespace-normalized, and
+ *     dropped below MIN_FRAGMENT_LENGTH; a bound pair whose fragment drops
+ *     to nothing this way is STALE (`binding fragment too short: <path>`),
+ *     never silently discarded (2026-09-08, Opus review C3). Files are
+ *     compared with inner backticks and line-comment sigils (`//`, ` * `,
+ *     `#`) removed and whitespace collapsed, so an excerpt can quote a
+ *     wrapped comment or a backticked identifier.
+ *   - A bound path token is resolved through the SAME candidate list and
+ *     sibling-directory fallback as `site` tokens (2026-09-08, Opus review
+ *     C1): first, an exact string match (after `stripSiteDecoration`)
+ *     against one of this row's own already-resolved `site` tokens; failing
+ *     that, independent resolution (BARE_NAME_PREFIXES, sibling dir, or a
+ *     glob match against the tracked tree). A token that resolves to
+ *     nothing at all is STALE (`binding path unresolved: <token>`); a token
+ *     that resolves to a real file NOT among this row's `site` citations is
+ *     also STALE (`binding path not in site: <file>`) — a binding must
+ *     target a site the row actually cites, never a coincidental match
+ *     elsewhere in the tree.
  *   - Resolution is PER SITE, not per row: every resolved file (and every
  *     glob match) must contain a fragment.
- *       - If one or more bound fragments target this exact file (by path,
- *         or via a glob binding that matched it), the file must contain one
- *         of THOSE — the shared bag is never consulted for a bound file,
- *         even if a bag fragment happens to appear in it.
- *       - Otherwise the file falls back to the bag and is counted UNBOUND.
- *         A multi-site row (more than one resolved file) with any unbound
- *         file prints an info line (`unbound: <files>`) and a summary count
- *         (`N multi-site rows with unbound files`) — informational, never a
- *         failure. A single-file row is never reported as unbound.
- *   - The first resolved file/match with no matching fragment makes the row
- *     STALE, reported as `no excerpt fragment found in <that file>` (every
- *     miss is listed, not just the first).
+ *       - If one or more bound fragments target this exact file, the file
+ *         must contain one of THOSE — the shared bag is never consulted for
+ *         a bound file, even if a bag fragment happens to appear in it.
+ *       - Otherwise the file is UNBOUND. In a single-file row it falls back
+ *         to the bag (must still match, or the row is stale). In a
+ *         multi-site row (more than one resolved file) an unbound file is
+ *         itself a failure — STRICT UNBOUND (owner decision 2026-09-08,
+ *         "we don't need drift"): the bag is not consulted for it at all,
+ *         and the row is STALE (`unbound: <files>`) even when the bag would
+ *         have matched. The `N multi-site rows with unbound files` summary
+ *         still counts them.
+ *   - Any resolved file/match with no matching fragment makes the row
+ *     STALE, reported as `no excerpt fragment found in <that file>`; every
+ *     such miss is listed, not just one.
  *   - A directory site no longer passes on existence (2026-09-08): it must
  *     be replaced by a specific file inside it, or the row is STALE with
  *     `directory site needs a file: <dir>`.
  *   - A row is also STALE when a path-like token resolves to nothing at all
  *     (the site is gone).
- *   - A row with no resolvable path or no fragment at all (bound + bag) is
+ *   - A row with no resolvable path or no fragment at all (bound + bag,
+ *     counting even a too-short bound attempt as "some content") is
  *     UNVERIFIABLE: counted and printed, never failed. Dataverse surfaces,
  *     "work queue item N", and plain-prose excerpts land here on purpose.
  *   - Rows whose disposition begins `rejected` or `done` are closed; their
@@ -106,7 +126,7 @@ const TAG_RE = /(?<!`)J27:(?:\s*(J27-\d{3})\b)?/g;
 // whitespace, begins with one of these comment leaders and `J27:` follows
 // immediately (optionally after whitespace). Prose and bold-label uses of
 // the bare term are not markers.
-const COMMENT_LEAD_RE = /^\s*(?:\/\/|\/\*|\*|#|--|<!--)\s*/;
+const COMMENT_LEAD_RE = /^\s*(?:\/\/|\/\*|\*|#+|--|<!--)\s*/;
 const ROW_ID_RE = /^\| (J27-\d{3})\b/;
 const REGISTER_COLUMNS = 7; // id · site · excerpt · Dep · Ev · Q · disposition
 
@@ -251,6 +271,15 @@ function isPathLike(token) {
   return token.includes('/') || PATH_EXT_RE.test(token);
 }
 
+// A bare path/glob token, not prose that merely mentions one: no whitespace,
+// and path-like. Real file paths never contain spaces; a prose excerpt that
+// happens to reference "lib/b.js" mid-sentence does, so it stays eligible
+// for the bag. Used only to exclude an orphaned binding attempt (an
+// unpaired left-hand span) from the bag (2026-09-08, Opus review C3).
+function looksLikeBarePathToken(text) {
+  return isPathLike(text) && !/\s/.test(text.trim());
+}
+
 function existsUnder(root, rel) {
   try { return fs.statSync(path.join(root, rel)).isFile() || fs.statSync(path.join(root, rel)).isDirectory(); }
   catch (_e) { return false; }
@@ -261,34 +290,45 @@ function globToRegExp(glob) {
   return new RegExp(`^${escaped}$`);
 }
 
+// Resolve one stripped, path-like token (from `site` OR a binding) against
+// the tracked tree. `lastDir` is the sibling-shorthand fallback directory
+// (the previous resolved token's dirname). Returns:
+//   { kind: 'glob', files: [...] }  -- glob token, files it matched (may be empty)
+//   { kind: 'file', files: [rel] }  -- exact/bare-name/sibling match
+//   { kind: 'missing', files: [] }  -- did not resolve at all
+// Ignored tokens (blank, non-path-like, route-shaped `/...`) return null and
+// are the caller's job to skip.
+function resolveToken(root, rels, rawToken, lastDir) {
+  const token = stripSiteDecoration(rawToken);
+  if (!token || !isPathLike(token) || token.startsWith('/')) return null;
+  if (token.includes('*')) {
+    const re = globToRegExp(token);
+    const hits = rels.filter((rel) => re.test(rel));
+    return { token, kind: hits.length > 0 ? 'glob' : 'missing', files: hits };
+  }
+  const candidates = [token];
+  if (!token.includes('/')) {
+    for (const prefix of BARE_NAME_PREFIXES) candidates.push(path.posix.join(prefix, token));
+    if (lastDir) candidates.push(path.posix.join(lastDir, token));
+  }
+  const hit = candidates.find((c) => existsUnder(root, c));
+  return { token, kind: hit ? 'file' : 'missing', files: hit ? [hit] : [] };
+}
+
 function resolveSitePaths(root, rels, siteCell) {
   const resolved = [];
   const missing = [];
+  const tokenMap = new Map(); // stripped token (as it appeared in `site`) -> resolved files
   let lastDir = null;
   for (const span of backtickSpans(siteCell)) {
-    const token = stripSiteDecoration(span);
-    if (!token || !isPathLike(token) || token.startsWith('/')) continue;
-    if (token.includes('*')) {
-      const re = globToRegExp(token);
-      const hits = rels.filter((rel) => re.test(rel));
-      if (hits.length > 0) resolved.push(...hits);
-      else missing.push(token);
-      continue;
-    }
-    const candidates = [token];
-    if (!token.includes('/')) {
-      for (const prefix of BARE_NAME_PREFIXES) candidates.push(path.posix.join(prefix, token));
-      if (lastDir) candidates.push(path.posix.join(lastDir, token));
-    }
-    const hit = candidates.find((c) => existsUnder(root, c));
-    if (hit) {
-      resolved.push(hit);
-      lastDir = path.posix.dirname(hit);
-    } else {
-      missing.push(token);
-    }
+    const result = resolveToken(root, rels, span, lastDir);
+    if (!result) continue;
+    if (result.kind === 'missing') { missing.push(result.token); continue; }
+    resolved.push(...result.files);
+    tokenMap.set(result.token, result.files);
+    if (result.kind === 'file') lastDir = path.posix.dirname(result.files[0]);
   }
-  return { resolved, missing };
+  return { resolved, missing, tokenMap, lastDir };
 }
 
 function normalizeWs(s) {
@@ -327,10 +367,18 @@ function excerptFragments(excerptCell) {
   return out;
 }
 
-// Parse the excerpt cell into { bound: [{ pathToken, fragments }], bag: [...] }.
+// Parse the excerpt cell into { bound, bag, tooShort }.
+//   bound:    [{ pathToken, fragments }] -- valid bound pairs
+//   bag:      [...]                      -- shared-bag fragments
+//   tooShort: [pathToken, ...]           -- bound pairs whose fragment span
+//             split to zero usable pieces (< MIN_FRAGMENT_LENGTH); the arrow
+//             parsed, so this is a broken binding, not silently dropped.
 // A bound pair is two adjacent backtick spans with only a bind arrow (and
-// optional whitespace) between them: `` `path` → `fragment` ``. Every other
-// backtick span is a bag fragment.
+// optional whitespace) between them: `` `path` → `fragment` ``. Any other
+// backtick span is a bag fragment UNLESS it is itself path-like (per
+// isPathLike) — an unpaired path/glob token is an orphaned binding attempt,
+// not prose/code content, and must not vacuously match a file that quotes
+// its own path (2026-09-08, Opus review C3).
 function parseExcerptBindings(excerptCell) {
   const spanRe = /`([^`]+)`/g;
   const spans = [];
@@ -339,37 +387,41 @@ function parseExcerptBindings(excerptCell) {
     spans.push({ text: m[1], start: m.index, end: m.index + m[0].length });
   }
   const bound = [];
+  const tooShort = [];
   const consumed = new Set();
   for (let i = 0; i < spans.length - 1; i += 1) {
     if (consumed.has(i) || consumed.has(i + 1)) continue;
     const between = excerptCell.slice(spans[i].end, spans[i + 1].start);
     if (!BIND_ARROW_RE.test(between)) continue;
-    const fragments = splitFragmentPieces(spans[i + 1].text);
-    if (fragments.length > 0) bound.push({ pathToken: spans[i].text, fragments });
     consumed.add(i);
     consumed.add(i + 1);
+    const fragments = splitFragmentPieces(spans[i + 1].text);
+    if (fragments.length > 0) bound.push({ pathToken: spans[i].text, fragments });
+    else tooShort.push(spans[i].text);
   }
   const bag = [];
   for (let i = 0; i < spans.length; i += 1) {
     if (consumed.has(i)) continue;
+    if (looksLikeBarePathToken(spans[i].text)) continue; // orphaned path/glob token, never a bag fragment
     bag.push(...splitFragmentPieces(spans[i].text));
   }
-  return { bound, bag };
+  return { bound, bag, tooShort };
 }
 
-// Resolve a bound path/glob token independently of `site`: an exact
-// repo-relative path (stripSiteDecoration then existence as a file), or,
-// for a glob, every tracked file the glob (as written) matches. Returns a
-// list of relative file paths; empty if the token does not resolve.
-function resolveBoundPathToken(root, rels, rawToken) {
-  const token = stripSiteDecoration(rawToken);
-  if (!token || token.startsWith('/')) return [];
-  if (token.includes('*')) {
-    const re = globToRegExp(token);
-    return rels.filter((rel) => re.test(rel));
-  }
-  const full = path.join(root, token);
-  try { return fs.statSync(full).isFile() ? [token] : []; } catch (_e) { return []; }
+// Resolve a bound path/glob token the same way a `site` token resolves:
+// first, an exact string match (after stripSiteDecoration) against one of
+// this row's own already-resolved `site` tokens (siteTokenMap); failing
+// that, independent resolution against the tracked tree (BARE_NAME_PREFIXES,
+// sibling dir via siteLastDir, or a glob match). Returns one of:
+//   { status: 'in-site',     files: [...] }  -- matches a cited site token
+//   { status: 'not-in-site', files: [...] }  -- resolves, but not to a cited site
+//   { status: 'unresolved',  token }          -- does not resolve at all
+function resolveBoundPathToken(root, rels, rawToken, siteTokenMap, siteLastDir) {
+  const stripped = stripSiteDecoration(rawToken);
+  if (siteTokenMap.has(stripped)) return { status: 'in-site', files: siteTokenMap.get(stripped) };
+  const result = resolveToken(root, rels, rawToken, siteLastDir);
+  if (!result || result.kind === 'missing') return { status: 'unresolved', token: stripped };
+  return { status: 'not-in-site', files: result.files };
 }
 
 function fileContainsAnyFragment(root, rel, fragments) {
@@ -391,19 +443,27 @@ function checkRow(root, rels, row) {
     ? dispositionWord
     : null;
   if (CLOSED_DISPOSITION_RE.test(row.disposition)) return { status: 'closed', dispositionWarning };
-  const { resolved, missing } = resolveSitePaths(root, rels, row.site);
+  const { resolved, missing, tokenMap, lastDir } = resolveSitePaths(root, rels, row.site);
   if (missing.length > 0) return { status: 'stale', reason: `site path missing: ${missing.join(', ')}`, dispositionWarning };
 
-  const { bound, bag } = parseExcerptBindings(row.excerpt);
+  const { bound, bag, tooShort } = parseExcerptBindings(row.excerpt);
   const boundFilesMap = new Map(); // rel file -> fragments[] bound to it
+  const unresolvedBindings = [];
+  const notInSiteBindings = [];
   for (const b of bound) {
-    for (const rel of resolveBoundPathToken(root, rels, b.pathToken)) {
+    const res = resolveBoundPathToken(root, rels, b.pathToken, tokenMap, lastDir);
+    if (res.status === 'unresolved') { unresolvedBindings.push(res.token); continue; }
+    if (res.status === 'not-in-site') { notInSiteBindings.push(...res.files); continue; }
+    for (const rel of res.files) {
       if (!boundFilesMap.has(rel)) boundFilesMap.set(rel, []);
       boundFilesMap.get(rel).push(...b.fragments);
     }
   }
+  const tooShortBindings = tooShort.map((t) => stripSiteDecoration(t));
   const totalFragmentCount = bag.length + bound.reduce((n, b) => n + b.fragments.length, 0);
-  if (resolved.length === 0 || totalFragmentCount === 0) return { status: 'unverifiable', dispositionWarning };
+  if (resolved.length === 0 || (totalFragmentCount === 0 && tooShortBindings.length === 0)) {
+    return { status: 'unverifiable', dispositionWarning };
+  }
 
   const dirMisses = [];
   const fragMisses = [];
@@ -415,14 +475,21 @@ function checkRow(root, rels, row) {
     const boundFragments = boundFilesMap.get(rel);
     if (boundFragments && boundFragments.length > 0) {
       if (!fileContainsAnyFragment(root, rel, boundFragments)) fragMisses.push(rel);
-    } else {
-      if (resolved.length > 1) unbound.push(rel);
-      if (!fileContainsAnyFragment(root, rel, bag)) fragMisses.push(rel);
+    } else if (resolved.length > 1) {
+      // STRICT UNBOUND (owner decision 2026-09-08): an unbound file in a
+      // multi-site row is itself a failure; the bag is not consulted for it.
+      unbound.push(rel);
+    } else if (!fileContainsAnyFragment(root, rel, bag)) {
+      fragMisses.push(rel);
     }
   }
 
   const reasonParts = [];
   if (dirMisses.length > 0) reasonParts.push(`directory site needs a file: ${dirMisses.join(', ')}`);
+  if (unresolvedBindings.length > 0) reasonParts.push(`binding path unresolved: ${Array.from(new Set(unresolvedBindings)).join(', ')}`);
+  if (notInSiteBindings.length > 0) reasonParts.push(`binding path not in site: ${Array.from(new Set(notInSiteBindings)).join(', ')}`);
+  if (tooShortBindings.length > 0) reasonParts.push(`binding fragment too short: ${Array.from(new Set(tooShortBindings)).join(', ')}`);
+  if (unbound.length > 0) reasonParts.push(`unbound: ${unbound.join(', ')}`);
   if (fragMisses.length > 0) reasonParts.push(`no excerpt fragment found in ${fragMisses.join(', ')}`);
   if (reasonParts.length > 0) {
     return { status: 'stale', reason: reasonParts.join('; '), dispositionWarning, unbound };
@@ -468,8 +535,10 @@ function main() {
       console.log(`  ? ${row.id} unverifiable (no resolvable path or no backticked excerpt)`);
     }
     if (result.unbound && result.unbound.length > 0) {
+      // STRICT UNBOUND makes any unbound file itself a stale reason (already
+      // printed above via result.reason), so this only feeds the summary
+      // count -- no separate per-row print here.
       unboundRowCount += 1;
-      console.log(`  ? ${row.id} unbound: ${result.unbound.join(', ')}`);
     }
     if (result.dispositionWarning) {
       dispositionWarningCount += 1;

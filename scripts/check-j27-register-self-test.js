@@ -40,11 +40,27 @@
  *   RED    directory-only site fails (no more existence-only pass)
  *   RED    glob-bound fragment present in only one match → stale naming the other
  *   GREEN  `->` (ASCII) and `→` (Unicode) arrows both parse a binding
- *   GREEN  bound + bag mix in one multi-file row passes
- *   INFO   single-file bag-only row (J27-005) has no unbound warning
- *   INFO   multi-file bag-only row (J27-002) passes but prints the unbound warning
+ *   GREEN  a fully-bound multi-file row (every file bound and matching) passes
  *   INFO   `closed.` disposition is NOT closed — the row is checked (goes stale here) —
  *          and prints a disposition-vocabulary warning
+ *
+ * Opus review of Phase 0 (`987ba3c9`) additions, 2026-09-08:
+ *
+ *   RED    C1: binding path that resolves nowhere → stale `binding path unresolved: <token>`
+ *   RED    C1: binding path that resolves, but not to a cited `site` file →
+ *          stale `binding path not in site: <file>`
+ *   RED    C2: bound-vs-bag isolation proven with the ASCII `->` arrow too
+ *          (the prior Unicode-only fixture left `->` mutation-coverage vacuous)
+ *   RED    C3a: a bound pair whose fragment is < 8 chars is STALE
+ *          (`binding fragment too short: <path>`), not silently dropped
+ *   RED    C3b: an unpaired path-like span never becomes a bag fragment, so
+ *          it cannot vacuously match a file that quotes its own path
+ *   STRICT UNBOUND (owner decision 2026-09-08, "we don't need drift"):
+ *   RED    a pure-bag two-file row (no bindings at all) is now stale,
+ *          `unbound: <both files>`, even though the bag matches both
+ *   RED    a partially-bound multi-file row is stale on its unbound file
+ *          even when the bag would have matched that file too
+ *   INFO   `#### J27:` (multiple `#`) is comment-led like `# J27:`
  */
 
 const fs = require('fs');
@@ -107,9 +123,13 @@ function greenFixture(root) {
   write(root, 'lib/mix-bound.js', "export const MIX_BOUND_MARK = true;\n");
   write(root, 'lib/mix-bag.js', "export const MIX_BAG_MARK = true;\n");
   write(root, 'lib/closed-disposition.js', "export const NOTHING_HERE = true;\n");
+  // Opus review (C1/C2/C3/strict-unbound) fixtures.
+  write(root, 'lib/arrow-ascii-bound-vs-bag.js', "const TEMPLATE = 1; // generic 8-char bag word only\n");
+  write(root, 'lib/short-binding.js', "export const IRRELEVANT = true;\n");
+  write(root, 'lib/self-referential.js', "// see lib/self-referential.js for details\n");
   return HEADER
     + row('J27-001', '`lib/a.js:1`', '`D26-only hide`')
-    + row('J27-002', '`lib/b.js`; `lib/c.js:1`', '`NEEDLE_IN_SECOND_FILE`')
+    + row('J27-002', '`lib/b.js`; `lib/c.js:1`', '`lib/b.js` → `NEEDLE_IN_SECOND_FILE` · `lib/c.js` → `NEEDLE_IN_SECOND_FILE`')
     + row('J27-003', '`lib/a.js`', '`absent fragment text` … `const x = 1;`')
     + row('J27-004', '`lib/wrapped.js:1`', '`// Always exclude concept rows — they never need outside reviewers. Uses akoya_requeststatus here.`')
     + row('J27-005', 'memory `project-thing.md` L1', '`Single-submission may change the picker default.`')
@@ -138,7 +158,7 @@ function main() {
     check('green tree: backtick-wrapped `J27:` self-reference is not a tag', !/docs\/notes\.md:1/.test(r.output), r.output);
     check('green tree: mid-line prose "for J27: whether" is not a marker', !/docs\/notes\.md:2/.test(r.output), r.output);
     check('green tree: bold-label "**J27:**" lead-in is not a marker', !/docs\/plan\.md/.test(r.output), r.output);
-    check('green tree: two-file row with fragment in each (J27-002) not stale', !/J27-002 stale/.test(r.output), r.output);
+    check('green tree: two-file row, each file bound to its own fragment (J27-002) not stale', !/J27-002 stale/.test(r.output), r.output);
     check('green tree: ellipsis-split excerpt (J27-003) not stale', !/J27-003 stale/.test(r.output), r.output);
     check('green tree: wrapped comment + inner backticks (J27-004) not stale', !/J27-004 stale/.test(r.output), r.output);
     check('green tree: memory basename shorthand (J27-005) not stale', !/J27-005 stale/.test(r.output), r.output);
@@ -146,8 +166,6 @@ function main() {
     check('green tree: rejected row (J27-008) closed, not stale', !/J27-008/.test(r.output) && /1 closed/.test(r.output), r.output);
     check('green tree: prose-only row (J27-009) unverifiable, not stale', /J27-009 unverifiable/.test(r.output), r.output);
     check('green tree: row counts 6 ok / 0 stale / 1 unverifiable / 1 closed', /rows: 6 ok, 0 stale, 1 unverifiable, 1 closed/.test(r.output), r.output);
-    check('green tree: single-file bag-only row (J27-005) has no unbound warning', !/J27-005 unbound/.test(r.output), r.output);
-    check('green tree: multi-file bag-only row (J27-002) prints the unbound warning for both files', /J27-002 unbound: lib\/b\.js, lib\/c\.js/.test(r.output), r.output);
     cleanup();
   }
 
@@ -196,18 +214,104 @@ function main() {
     cleanup();
   }
 
-  // ---- green: `->` and `→` arrows both parse; bound + bag mix passes
+  // ---- green: `->` and `→` arrows both parse; a fully-bound multi-file row passes
   {
-    const { dir, cleanup } = registerTmpFixture('j27-register-arrows-and-mix-');
+    const { dir, cleanup } = registerTmpFixture('j27-register-arrows-and-fully-bound-');
     write(dir, 'docs/J27_TRANSITION_REGISTER.md', greenFixture(dir)
       + row('J27-096', '`lib/arrow-ascii.js`', '`lib/arrow-ascii.js` -> `ARROW_ASCII_MARK`')
       + row('J27-097', '`lib/arrow-unicode.js`', '`lib/arrow-unicode.js` → `ARROW_UNICODE_MARK`')
-      + row('J27-098', '`lib/mix-bound.js`; `lib/mix-bag.js`', '`lib/mix-bound.js` → `MIX_BOUND_MARK` · `MIX_BAG_MARK`'));
+      + row('J27-098', '`lib/mix-bound.js`; `lib/mix-bag.js`', '`lib/mix-bound.js` → `MIX_BOUND_MARK` · `lib/mix-bag.js` → `MIX_BAG_MARK`'));
     const r = runGate(['--root', dir]);
     check('ASCII "->" arrow binding (J27-096) not stale', !/J27-096 stale/.test(r.output), r.output);
     check('Unicode "→" arrow binding (J27-097) not stale', !/J27-097 stale/.test(r.output), r.output);
-    check('bound + bag mix (J27-098) not stale', !/J27-098 stale/.test(r.output), r.output);
-    check('bound + bag mix (J27-098): unbound bag file is flagged', /J27-098 unbound: lib\/mix-bag\.js/.test(r.output), r.output);
+    check('fully-bound multi-file row (J27-098, every file bound and matching) not stale', !/J27-098 stale/.test(r.output), r.output);
+    cleanup();
+  }
+
+  // ---- STRICT UNBOUND (owner decision 2026-09-08): pure-bag multi-file row is now stale
+  {
+    const { dir, cleanup } = registerTmpFixture('j27-register-strict-unbound-pure-bag-');
+    write(dir, 'docs/J27_TRANSITION_REGISTER.md', greenFixture(dir)
+      + row('J27-089', '`lib/mix-bound.js`; `lib/mix-bag.js`', '`MIX_BOUND_MARK` · `MIX_BAG_MARK`'));
+    const r = runGate(['--root', dir]);
+    check('strict unbound, pure bag: exits 1 even though the bag matches both files', r.status === 1, r.output);
+    check('strict unbound, pure bag: reason names both unbound files', /J27-089 .*unbound: lib\/mix-bound\.js, lib\/mix-bag\.js/.test(r.output), r.output);
+    cleanup();
+  }
+
+  // ---- STRICT UNBOUND: partially-bound row is stale on its unbound file even though the bag matches it
+  {
+    const { dir, cleanup } = registerTmpFixture('j27-register-strict-unbound-partial-');
+    write(dir, 'docs/J27_TRANSITION_REGISTER.md', greenFixture(dir)
+      + row('J27-101', '`lib/mix-bound.js`; `lib/mix-bag.js`', '`lib/mix-bound.js` → `MIX_BOUND_MARK` · `MIX_BAG_MARK`'));
+    const r = runGate(['--root', dir]);
+    check('strict unbound, partial: exits 1 (mix-bag.js is unbound, bag match does not save it)', r.status === 1, r.output);
+    check('strict unbound, partial: reason names only the unbound file', /J27-101 .*unbound: lib\/mix-bag\.js/.test(r.output) && !/J27-101 .*unbound: lib\/mix-bound\.js/.test(r.output), r.output);
+    cleanup();
+  }
+
+  // ---- C1 (Opus review): binding path that resolves nowhere at all
+  {
+    const { dir, cleanup } = registerTmpFixture('j27-register-binding-unresolved-');
+    write(dir, 'docs/J27_TRANSITION_REGISTER.md', greenFixture(dir)
+      + row('J27-102', '`lib/mix-bound.js`', '`lib/does-not-exist-anywhere.js` → `SOME_FRAGMENT_TEXT`'));
+    const r = runGate(['--root', dir]);
+    check('C1 binding unresolved: exits 1', r.status === 1, r.output);
+    check('C1 binding unresolved: names the unresolved token', /J27-102 .*binding path unresolved: lib\/does-not-exist-anywhere\.js/.test(r.output), r.output);
+    cleanup();
+  }
+
+  // ---- C1 (Opus review): binding path resolves, but to a file this row does not cite
+  {
+    const { dir, cleanup } = registerTmpFixture('j27-register-binding-not-in-site-');
+    write(dir, 'docs/J27_TRANSITION_REGISTER.md', greenFixture(dir)
+      + row('J27-103', '`lib/mix-bag.js`', '`lib/swap-a.js` → `SWAP_A_ONLY`'));
+    const r = runGate(['--root', dir]);
+    check('C1 binding not in site: exits 1', r.status === 1, r.output);
+    check('C1 binding not in site: names the real file that is not a cited site', /J27-103 .*binding path not in site: lib\/swap-a\.js/.test(r.output), r.output);
+    cleanup();
+  }
+
+  // ---- C2 (Opus review): bound-vs-bag isolation proven with the ASCII "->" arrow too
+  {
+    const { dir, cleanup } = registerTmpFixture('j27-register-ascii-bound-vs-bag-');
+    write(dir, 'docs/J27_TRANSITION_REGISTER.md', greenFixture(dir)
+      + row('J27-104', '`lib/arrow-ascii-bound-vs-bag.js`', '`lib/arrow-ascii-bound-vs-bag.js` -> `ARROW_ASCII_UNIQUE_MARK` · `TEMPLATE`'));
+    const r = runGate(['--root', dir]);
+    check('C2 ASCII bound-vs-bag: exits 1 (bound file ignores the bag entirely)', r.status === 1, r.output);
+    check('C2 ASCII bound-vs-bag: names the file despite the matching bag token', /J27-104 .*no excerpt fragment found in lib\/arrow-ascii-bound-vs-bag\.js/.test(r.output), r.output);
+    cleanup();
+  }
+
+  // ---- C3a (Opus review): bound pair whose fragment is too short is stale, not silently dropped
+  {
+    const { dir, cleanup } = registerTmpFixture('j27-register-binding-too-short-');
+    write(dir, 'docs/J27_TRANSITION_REGISTER.md', greenFixture(dir)
+      + row('J27-105', '`lib/short-binding.js`', '`lib/short-binding.js` → `abc`'));
+    const r = runGate(['--root', dir]);
+    check('C3a binding too short: exits 1 (not silently dropped as unverifiable)', r.status === 1, r.output);
+    check('C3a binding too short: names the path', /J27-105 .*binding fragment too short: lib\/short-binding\.js/.test(r.output), r.output);
+    cleanup();
+  }
+
+  // ---- C3b (Opus review): an unpaired path-like span never becomes a bag fragment
+  {
+    const { dir, cleanup } = registerTmpFixture('j27-register-path-like-bag-exclusion-');
+    write(dir, 'docs/J27_TRANSITION_REGISTER.md', greenFixture(dir)
+      + row('J27-106', '`lib/self-referential.js`', '`lib/self-referential.js` => `REAL_MARKER_NOT_PRESENT`'));
+    const r = runGate(['--root', dir]);
+    check('C3b path-like bag exclusion: exits 1 (self-referential path text does not vacuously rescue)', r.status === 1, r.output);
+    check('C3b path-like bag exclusion: names the file', /J27-106 .*no excerpt fragment found in lib\/self-referential\.js/.test(r.output), r.output);
+    cleanup();
+  }
+
+  // ---- info: `#### J27:` (multiple `#`) is comment-led like `# J27:`
+  {
+    const { dir, cleanup } = registerTmpFixture('j27-register-multi-hash-marker-');
+    write(dir, 'docs/J27_TRANSITION_REGISTER.md', greenFixture(dir));
+    write(dir, 'docs/multi-hash.md', "#### J27: heading-style marker, no id yet\n");
+    const r = runGate(['--root', dir]);
+    check('"#### J27:" is comment-led, listed as a marker without an id', /docs\/multi-hash\.md:1 → \(no id\)/.test(r.output), r.output);
     cleanup();
   }
 
@@ -229,8 +333,7 @@ function main() {
       + row('J27-090', '`scripts/find-first.js`, `find-second.js`', '`Second sibling script.`'));
     const r = runGate(['--root', dir]);
     check('two-site one-frag: exits 1', r.status === 1, r.output);
-    check('two-site one-frag: J27-090 names the file lacking the fragment', /J27-090 .*no excerpt fragment found in scripts\/find-first\.js/.test(r.output), r.output);
-    check('two-site one-frag: file WITH the fragment is not named', !/no excerpt fragment found in [^\n]*find-second\.js/.test(r.output), r.output);
+    check('two-site one-frag: no bindings at all → STRICT UNBOUND names both files (superseded by the 2026-09-08 owner decision; was a per-site bag miss before bindings existed)', /J27-090 .*unbound: scripts\/find-first\.js, scripts\/find-second\.js/.test(r.output), r.output);
     cleanup();
   }
 
@@ -241,8 +344,7 @@ function main() {
       + row('J27-091', '`tests/unit/glob-*.test.js`', '`GLOB_A_NEEDLE_TEXT`'));
     const r = runGate(['--root', dir]);
     check('glob one-frag: exits 1', r.status === 1, r.output);
-    check('glob one-frag: J27-091 names the match lacking the fragment', /J27-091 .*no excerpt fragment found in tests\/unit\/glob-b\.test\.js/.test(r.output), r.output);
-    check('glob one-frag: matching file is not named', !/no excerpt fragment found in [^\n]*glob-a\.test\.js/.test(r.output), r.output);
+    check('glob one-frag: no bindings at all → STRICT UNBOUND names both matches (superseded by the 2026-09-08 owner decision; was a per-site bag miss before bindings existed)', /J27-091 .*unbound: tests\/unit\/glob-a\.test\.js, tests\/unit\/glob-b\.test\.js/.test(r.output), r.output);
     cleanup();
   }
 

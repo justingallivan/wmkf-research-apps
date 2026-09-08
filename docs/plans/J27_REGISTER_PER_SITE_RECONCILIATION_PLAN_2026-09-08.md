@@ -142,30 +142,43 @@ convention) and §10 (dated line with before/after counts); `docs/J27_SINGLE_PHA
 §3 (schema amendment) and §10; `docs/CI_GATES_REFERENCE.md`; **`docs/CURRENT_WORK_QUEUE.md`
 item 8** (Codex finding 5); `SESSION_PROMPT.md` item 2.
 
-## 7. Slices (43 rows; register line numbers as of `c96a6a27`, re-check after Phase 0)
+## 7. Slices (42 rows after Phase 0's J27-072 normalisation; register line numbers as of
+`c96a6a27`, re-check after Phase 0)
 
 | Slice | Register lines | Rows | Count |
 |---|---|---|---|
 | **A** Retire + Persist | 44–72 | J27-007, 008, 010, 011, 022, 023, 024, 025, 026, 027, 028, 032, 033 | 13 |
 | **B** Change (code-heavy) | 79–92 | J27-035, 036, 037, 038, 039, 040, 041, 042, 043, 044, 045, 047, 048 | 13 |
 | **C** Change (docs/memory) | 94–103 | J27-050, 053, 055, 056, 057, 058, 059 | 7 |
-| **D** Build + Scale | 109–133 | J27-060, 062, 063, 065, 066, 070, 073, 074, 079 (J27-072 leaves via Phase 0 normalisation) | 9 |
+| **D** Build + Scale | 109–133 | J27-060, 062, 063, 065, 066, 070, 073, 074, 079 (J27-072 left this slice via Phase 0's
+disposition normalisation, not a row edit) | 9 |
 
 Known heavy rows: J27-011 (glob over six intake tests: case A each, one bound fragment per
-test, or narrow the glob to the tests that carry the form key); J27-032 (glob over
-`shared/components/reviewers/*`: bind per file or narrow to the components with a "Phase 3"
-comment; case A′ likely); J27-040 / J27-041 (nine and seven Phase I/II sites: one bound
-fragment each); J27-045 (five files sharing the `cycleCode` error string: one bound fragment
-per file even if identical); J27-047 (runbook, security matrix, Atlas: all case A — they
-change when the cycle constant flips).
+test, or narrow the glob to the tests that carry the form key; **its site cell is the only
+real directory citation left in the register, `` `shared/forms/phase-ii-research-2026-06/` ``
+— the gate now stales any directory site on existence alone, so slice A must replace it with
+a specific file inside that directory, not just add fragments elsewhere in the row**);
+J27-032 (glob over `shared/components/reviewers/*`: bind per file or narrow to the components
+with a "Phase 3" comment; case A′ likely); J27-040 / J27-041 (nine and seven Phase I/II sites:
+one bound fragment each); J27-045 (five files sharing the `cycleCode` error string: one bound
+fragment per file even if identical); J27-047 (runbook, security matrix, Atlas: all case A —
+they change when the cycle constant flips).
+
+**STRICT UNBOUND note (Opus review of Phase 0, `987ba3c9`, 2026-09-08):** the gate no longer
+lets a multi-file row pass on a shared bag match; every file needs its own binding. This
+raises the stale count above 42 and changes exactly which rows/files are affected — re-run
+`node scripts/check-j27-register.js` against the Phase 0 commit before re-slicing, and treat
+the counts and the row list above as a starting point, not the final assignment.
 
 ## 8. Exit criteria
 
 - Gate: 0 stale, 0 id-less markers, 0 unbound multi-site rows; self-test exit 0; docs battery
   green; expected-count line in the PR matches the gate's summary.
-- Every one of the 43 rows (and every split row) appears in the diff with a decision-matrix
-  line per cited file; no other row changed; no file outside the register, matrix, and §6
-  record surfaces changed.
+- Every one of the 42 rows (43 before Phase 0's J27-072 normalisation moved it to closed; the
+  exact set to reconcile after STRICT UNBOUND is whatever a fresh gate run against the Phase 0
+  commit reports, per §7's note) — and every split row — appears in the diff with a
+  decision-matrix line per cited file; no other row changed; no file outside the register,
+  matrix, and §6 record surfaces changed.
 - Both Opus reviewers clean on their halves; Codex findings dispositioned; owner has ruled on
   any case-C row.
 - PR merged on owner decision; `/start` runs the gate green afterwards.
@@ -176,3 +189,31 @@ A bound fragment proves the quoted words are still in the file, not that their m
 unchanged. Semantic drift is caught by the evidence labels, the owner questions, and the
 next sweep, not by this string check. The register is an inventory with a freshness alarm,
 not a contract.
+
+**Updated after the Opus review of Phase 0 (`987ba3c9`, 2026-09-08) and the STRICT UNBOUND
+fix — residual gaps that remain even with binding, per-site resolution, and strict unbound:**
+
+- **A generic bound fragment can still be a wrong-but-plausible quote.** Binding proves the
+  words sit in the *right file*; it does not prove they are the *right words for the fact the
+  row states*. A short, common code token (a constant name reused across the codebase, for
+  example) can be bound to the wrong site and still pass if it happens to appear there too —
+  this is why the Opus review of each slice reads the file, not just the gate's exit code.
+- **A shared bag fragment across several bound files still proves nothing about any one of
+  them individually beyond presence.** Two files bound to the same generic fragment (e.g. a
+  cycle-code literal repeated verbatim in five call sites, J27-045) can each satisfy the gate
+  while still being the wrong quote for what changes in J27 — same caveat as above, at the
+  bound-file granularity now that STRICT UNBOUND has closed the row-level version of this gap.
+- **Binding-path resolution follows `site`'s own conventions (BARE_NAME_PREFIXES, sibling
+  dir, globs), which are themselves heuristic.** A binding can resolve to the wrong file of
+  the same basename in an edge case those heuristics do not disambiguate; this is a narrow
+  surface, not eliminated by C1's `binding path not in site` check, which only catches a
+  binding that resolves outside the row's own citations entirely.
+- **Directory-site strictness only forces a *file* citation; it does not know which file in
+  the directory is the load-bearing one.** Replacing a directory with the wrong file inside it
+  still passes if that file happens to contain the bound fragment.
+- **The disposition-vocabulary check is spelling, not judgement.** `open`/`scheduled`/`done`/
+  `rejected` are recognized words; a row can carry a nonsense-but-vocabulary-legal disposition
+  (`done` with no commit reference) and the gate has no way to tell.
+- **STRICT UNBOUND stops a multi-file row from hiding behind a shared bag match, but a
+  single-file row still falls back to the bag** — a lone cited file with only a generic bag
+  fragment is exactly as weakly verified as before this review.
