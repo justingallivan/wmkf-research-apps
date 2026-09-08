@@ -47,12 +47,15 @@ function of the calendar and the cycles that exist — never of the caller's ass
 is visible to them. `lib/utils/cycle-code.js` `resolveWorkingCycle` (earliest meeting on/after today;
 September → D26) and `resolveLastDecidedCycle` (newest meeting before today; September → J26) are
 the only default-cycle rules; `conventionalCycles(today)` supplies the June/December codes to
-callers with no list (an explicit fallback, not existence-aware — used by the Awardees page before
-its first fetch and by the grantee-titles cron). Awardees = last decided; every other Workbench
-view = working. UTC throughout. **Wired (PR #203):** `/api/workbench/dashboard` cycle-list mode
-returns `defaultCycleCode` (working) and `lastDecidedCycleCode` from the organization-wide list
-with each cycle's latest `meetingDate`, replacing the "caller's assigned cycle" rule; Reviewer
-follow-up inherits it. The two disagreeing calendar helpers (Awardees local-time "last past",
+the one caller with no list (the grantee-titles cron — an explicit fallback, not existence-aware).
+Awardees = last decided; every other Workbench view = working. UTC throughout. The precise
+invariant is PER GRANT PROGRAM: two callers viewing the same program on the same day open on the
+same cycle (the cycle list is program-scoped by the PR #183 owner decision). **Wired (PR #203):**
+`/api/workbench/dashboard` cycle-list mode returns `defaultCycleCode` (working) and
+`lastDecidedCycleCode` from that program's cycle list with each cycle's latest `meetingDate`,
+replacing the "caller's assigned cycle" rule; Reviewer follow-up inherits it; the Awardees page
+reads `lastDecidedCycleCode` from the same call (deep link wins; explicit empty state when no
+decided cycle has requests). The two disagreeing calendar helpers (Awardees local-time "last past",
 grantee-titles cron UTC "upcoming") are retired. **Not yet wired:** Final writeups still walks
 back to a visible row (2026-09-06 decision, superseded 2026-09-08 in favor of an in-place message
 with a link — to be applied with the single-page shell) and Initial assessments still defaults to

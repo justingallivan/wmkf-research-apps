@@ -50,6 +50,7 @@ jest.mock('../../lib/services/reviewer-rollup', () => ({
 
 import { loadDashboard } from '../../lib/services/workbench/dashboard-service';
 import { ServiceHttpError } from '../../lib/services/service-http-error';
+import { resolveWorkbenchProgramScope, buildProgramScopeFilter } from '../../lib/services/workbench/program-scope-service.js';
 
 const PD = { systemuserid: 'pd-1', fullName: 'Dr. PD One' };
 
@@ -121,6 +122,24 @@ test('cycle-list mode: the default cycle is the same for every caller regardless
   const anon = await loadDashboard(args({ callerSystemId: null }));
   // D26 is set-aside-only and nobody's "active" cycle; it is still the working cycle.
   expect([pd1.defaultCycleCode, pd2.defaultCycleCode, anon.defaultCycleCode]).toEqual(['D26', 'D26', 'D26']);
+});
+
+test('cycle-list mode: the default is per Grant Program — a caller whose default program differs sees that program\'s cycles', async () => {
+  const otherProgram = '11111111-1111-4111-8111-111111111111';
+  resolveWorkbenchProgramScope.mockResolvedValueOnce({
+    programs: [{ programId: otherProgram, name: 'SoCal' }],
+    defaultProgramId: otherProgram,
+    programId: otherProgram,
+    programName: 'SoCal',
+  });
+  buildProgramScopeFilter.mockImplementationOnce((programId) => `_wmkf_grantprogram_value eq ${programId}`);
+  queryAllRequests.mockResolvedValue({ records: [{ wmkf_meetingdate: '2027-06-10', _wmkf_programdirector_value: 'pd-9' }], capped: false });
+  const body = await loadDashboard(args({ callerSystemId: 'pd-9' }));
+  expect(queryAllRequests).toHaveBeenCalledWith(expect.objectContaining({
+    filter: expect.stringContaining(`_wmkf_grantprogram_value eq ${otherProgram}`),
+  }));
+  // Same calendar rule, applied to that program's own cycle list.
+  expect(body).toMatchObject({ programId: otherProgram, defaultCycleCode: 'J27', lastDecidedCycleCode: null });
 });
 
 test('cycle-list mode: the default flips the day after the working meeting, and falls back to the newest cycle once all have passed', async () => {

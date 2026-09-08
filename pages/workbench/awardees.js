@@ -11,24 +11,22 @@ import Link from 'next/link';
 import Layout, { Card, PageHeader } from '../../shared/components/Layout';
 import RequireAppAccess from '../../shared/components/RequireAppAccess';
 import WorkbenchViewsNav from '../../shared/components/workbench/WorkbenchViewsNav';
-import { resolveLastDecidedCycle, conventionalCycles } from '../../lib/utils/cycle-code';
 
-// Board meets June (J) and December (D); default to the most recent meeting.
 // Awardees open on the last DECIDED cycle (owner decision 2026-09-08); the
-// Workbench's working cycle is the upcoming one. EXPLICIT FALLBACK POLICY:
-// this page has no cycle list before its first fetch, so it resolves against
-// the June/December convention (`conventionalCycles`), not against the cycles
-// that exist. /api/workbench/dashboard already returns `lastDecidedCycleCode`
-// from the organization-wide list; the single-page Workbench shell will pass
-// that down and this calendar fallback goes away with it.
-const currentCycleCode = () => resolveLastDecidedCycle(conventionalCycles(new Date()), new Date());
+// Workbench's working cycle is the upcoming one. The default comes from the
+// live cycle list (`/api/workbench/dashboard` cycle-list mode →
+// `lastDecidedCycleCode`), never from a synthetic calendar, so the page cannot
+// open on a cycle that has no requests. A `?cycleCode=` deep link wins.
+const CYCLE_RE = /^[JD]\d{2}$/;
 
 const contextKey = (code, all) => `${code}:${all ? 'all' : 'mine'}`;
 
 function AwardeesList() {
   const router = useRouter();
-  const [cycleCode, setCycleCode] = useState(currentCycleCode());
-  const [input, setInput] = useState(currentCycleCode());
+  const [cycleCode, setCycleCode] = useState('');
+  const [input, setInput] = useState('');
+  // 'loading' | 'ready' | 'none' (no decided cycle has requests yet) | 'error'
+  const [cycleDefault, setCycleDefault] = useState('loading');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -40,19 +38,46 @@ function AwardeesList() {
   const [errorContextVersion, setErrorContextVersion] = useState(null);
   const [selectionVersion, setSelectionVersion] = useState(0);
 
-  // Honor a ?cycleCode= deep link (e.g. the workbench "View awardees" link) once
-  // the router is ready; falls back to the current-cycle default otherwise.
+  // Resolve the initial cycle once the router is ready: a valid ?cycleCode=
+  // deep link (e.g. the workbench "View awardees" link) wins; otherwise the
+  // live list's last decided cycle. A superseded resolution never lands.
+  const resolveDefaultCycle = useCallback(async (deepLink, isCurrent) => {
+    setCycleDefault('loading');
+    if (deepLink) {
+      if (!isCurrent()) return;
+      setSelectionVersion((version) => version + 1);
+      setCycleCode(deepLink);
+      setInput(deepLink);
+      setCycleDefault('ready');
+      return;
+    }
+    try {
+      const res = await fetch('/api/workbench/dashboard');
+      const body = await res.json().catch(() => ({}));
+      if (!isCurrent()) return;
+      if (!res.ok) throw new Error(body?.error || 'cycle list failed');
+      const code = typeof body.lastDecidedCycleCode === 'string' && CYCLE_RE.test(body.lastDecidedCycleCode)
+        ? body.lastDecidedCycleCode
+        : '';
+      if (!code) { setCycleDefault('none'); return; }
+      setSelectionVersion((version) => version + 1);
+      setCycleCode(code);
+      setInput(code);
+      setCycleDefault('ready');
+    } catch {
+      if (isCurrent()) setCycleDefault('error');
+    }
+  }, []);
+
+  const [defaultAttempt, setDefaultAttempt] = useState(0);
   useEffect(() => {
     if (!router.isReady) return;
     const q = typeof router.query.cycleCode === 'string' ? router.query.cycleCode.trim().toUpperCase() : '';
-    if (!q || !/^[JD]\d{2}$/.test(q)) return;
-    const timer = window.setTimeout(() => {
-      setSelectionVersion((version) => version + 1);
-      setCycleCode(q);
-      setInput(q);
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, [router.isReady, router.query.cycleCode]);
+    const deepLink = q && CYCLE_RE.test(q) ? q : '';
+    let current = true;
+    const timer = window.setTimeout(() => { void resolveDefaultCycle(deepLink, () => current); }, 0);
+    return () => { current = false; window.clearTimeout(timer); };
+  }, [router.isReady, router.query.cycleCode, resolveDefaultCycle, defaultAttempt]);
 
   const load = useCallback(async (code, all, request) => {
     const ownsRequest = () => activeRequestRef.current === request;
@@ -100,6 +125,7 @@ function AwardeesList() {
   }, []);
 
   useEffect(() => {
+    if (!cycleCode) return undefined;
     const controller = new AbortController();
     const request = { controller, version: selectionVersion };
     activeRequestRef.current = request;
@@ -165,6 +191,16 @@ function AwardeesList() {
           )}
         </form>
 
+        {cycleDefault === 'loading' && !cycleCode && <p className="text-sm text-gray-500">Finding the last decided cycle…</p>}
+        {cycleDefault === 'none' && !cycleCode && (
+          <p className="text-sm text-gray-500">No decided cycle has requests yet. Enter a cycle code above to look one up.</p>
+        )}
+        {cycleDefault === 'error' && !cycleCode && (
+          <p role="alert" className="text-sm text-red-700">
+            Could not determine the current cycle.{' '}
+            <button type="button" className="underline" onClick={() => setDefaultAttempt((n) => n + 1)}>Try again</button>
+          </p>
+        )}
         {loading && <p className="text-sm text-gray-500">Loading…</p>}
         {visibleError && <p role="alert" className="text-sm text-red-700">{visibleError}</p>}
 
