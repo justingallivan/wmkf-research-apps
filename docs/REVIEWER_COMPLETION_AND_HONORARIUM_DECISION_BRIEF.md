@@ -251,7 +251,9 @@ contract avoids the current sequential partial-success problem.
   the More menu's **Edit closeout** (owner decision 2026-09-08).
 - Show the disposition on Complete rows as a compact pill beside the status
   badge (**$ Eligible** / **$ None** / **$ N/A**; amber **$ Undecided** for a
-  null legacy row, owner decision 2026-09-08); the modal still says
+  null legacy row; amber **$ Needs review** when the API emits `unknown` for an
+  unrecognized stored picklist value, which needs technical repair rather than
+  a new closeout decision; owner decision 2026-09-08). The modal still says
   **Closeout disposition not recorded** for null. Never infer it from receipt, thank-you, opt-out, or linked-request state.
 - Check `response.ok`, display the server reason, disable duplicate submission
   while pending, and refresh only after a confirmed result.

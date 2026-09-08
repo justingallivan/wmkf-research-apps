@@ -75,7 +75,7 @@ describe('Next-action column wiring through the panel', () => {
     expect(screen.queryByRole('button', { name: 'Record closeout' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Edit closeout' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Mark complete' })).not.toBeInTheDocument();
-    expect(screen.getByRole('img', { name: 'Honorarium eligibility: eligible' })).toBeInTheDocument();
+    expect(screen.getByText('Honorarium eligibility: eligible')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Manage Dr. Closeout Reviewer' }));
     const editButton = screen.getByRole('button', { name: 'Edit closeout' });
@@ -99,7 +99,7 @@ describe('Next-action column wiring through the panel', () => {
       await Promise.resolve();
     });
 
-    expect(screen.getByRole('img', { name: 'Honorarium eligibility not recorded' })).toBeInTheDocument();
+    expect(screen.getByText('Honorarium eligibility not recorded')).toBeInTheDocument();
 
     const button = screen.getByRole('button', { name: 'Record closeout' });
     fireEvent.click(button);
@@ -121,7 +121,7 @@ describe('Next-action column wiring through the panel', () => {
     });
 
     expect(screen.getByRole('button', { name: 'Mark complete' })).toBeInTheDocument();
-    expect(screen.queryByRole('img', { name: /Honorarium eligibility/ })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Honorarium eligibility/)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Manage Dr. Closeout Reviewer' }));
     expect(screen.queryAllByRole('button', { name: 'Mark complete' })).toHaveLength(1);
   });

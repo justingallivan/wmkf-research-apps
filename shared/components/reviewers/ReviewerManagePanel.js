@@ -1102,17 +1102,18 @@ export default function ReviewerManagePanel({
                         />
                         {honorariumPill && (
                           <span
-                            role="img"
                             className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-medium ${
                               honorariumPill.tone === 'amber'
                                 ? 'border-amber-200 bg-amber-50 text-amber-800'
                                 : 'border-gray-200 bg-gray-50 text-gray-700'
                             }`}
                             title={honorariumPill.label}
-                            aria-label={honorariumPill.label}
                           >
+                            {/* Compact visual text is hidden from AT; the sr-only span carries the full wording. */}
                             <span aria-hidden="true">$</span>
-                            {honorariumPill.text}
+                            <span aria-hidden="true">{honorariumPill.text}</span>
+                            <span className="sr-only">{honorariumPill.label}</span>
+                            
                           </span>
                         )}
                         {!receivedReview && (
