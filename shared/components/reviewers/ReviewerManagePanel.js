@@ -100,6 +100,20 @@ export function reviewerHasReceivedReview(reviewer) {
   );
 }
 
+// Next-action button for the closeout flow. A completed review with a
+// disposition already recorded (eligible/not_eligible/not_applicable, or the
+// unrecognised 'unknown' value) has no outstanding to-do, so the Next-action
+// cell shows nothing for it -- editing stays available via the More menu.
+function closeoutNextAction(reviewer) {
+  if (reviewer?.reviewStatus === 'review_received') return { label: 'Mark complete' };
+  if (reviewer?.reviewStatus === 'complete' && reviewer?.honorariumEligibility == null) {
+    return { label: 'Record closeout' };
+  }
+  return null;
+}
+
+export const _managePanelInternals = { closeoutNextAction };
+
 // ─── Decline-referral inline add helpers ────────────────────────────────────
 
 // Map an identity-lookup match/candidate to the resolution the manual-reviewer
@@ -1023,6 +1037,7 @@ export default function ReviewerManagePanel({
                 // without being fabricated as a dated timeline event.
                 const lastEvent = latestActivitySummary(r);
                 const receivedReview = reviewerHasReceivedReview(r);
+                const nextAction = closeoutNextAction(r);
 
                 return (
                   <tr key={r.suggestionId} className="hover:bg-gray-50 transition-colors">
@@ -1133,7 +1148,7 @@ export default function ReviewerManagePanel({
                                 degraded={degraded}
                               />
                             )}
-                            {showActionsColumn && ['review_received', 'complete'].includes(r.reviewStatus) && (
+                            {showActionsColumn && nextAction && (
                               <button
                                 type="button"
                                 onClick={() => setCloseoutReviewerId(r.suggestionId)}
@@ -1141,7 +1156,7 @@ export default function ReviewerManagePanel({
                                 title={degraded ? 'Reviewer data could not be refreshed - retry before making changes' : undefined}
                                 className="min-h-9 whitespace-nowrap rounded-lg bg-gray-900 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2"
                               >
-                                {r.reviewStatus === 'complete' ? 'Edit closeout' : 'Mark complete'}
+                                {nextAction.label}
                               </button>
                             )}
                           </div>
@@ -1176,6 +1191,13 @@ export default function ReviewerManagePanel({
                               onStatusChange={(newStatus) => updateStatus(r.suggestionId, newStatus)}
                               statusPending={pendingStatusTokens.has(r.suggestionId)}
                               onTransition={(terminalStatus) => transitionTerminal(r, terminalStatus)}
+                              // review_received keeps its closeout action primary-only (no
+                              // menu duplicate, per "Refine reviewer follow-up table layout").
+                              // complete rows without a next-action button need the menu as
+                              // their only edit path, so only they get it wired here.
+                              onCloseReview={r.reviewStatus === 'complete'
+                                ? () => setCloseoutReviewerId(r.suggestionId)
+                                : undefined}
                               degraded={degraded}
                             />
                           </div>

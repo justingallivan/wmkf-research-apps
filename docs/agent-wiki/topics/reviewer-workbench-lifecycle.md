@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-09-05
+last_verified: 2026-09-08
 stale_after_days: 90
 owner: reviewers
 source_files:
@@ -1615,6 +1615,20 @@ One Final Writeup row per request over the same stable SharePoint Word item; the
   drawer shows the latest reminder and "N reminders recorded in total"; a per-reminder audit trail
   plus an activity DTO projection needs its own `/contract-reconcile` plan before build. Do not read
   `reminderCount` as evidence of individual reminder timestamps.
+- **Closeout Next-action simplification (owner decision 2026-09-08).** On the Reviewers panel,
+  a Complete row's Next-action button now depends on whether a disposition is already recorded
+  (`shared/components/reviewers/ReviewerManagePanel.js` `closeoutNextAction`, exported via
+  `_managePanelInternals`): `review_received` still shows the primary **Mark complete** button
+  unchanged; Complete with `honorariumEligibility == null` still shows a primary button, now
+  labelled **Record closeout**; Complete with any recorded disposition (`eligible`/`not_eligible`/
+  `not_applicable`, or the unrecognised `unknown`) shows no Next-action button at all -- editing
+  stays available only through the row's More menu (`TokenActionsMenu.js`), which still offers
+  **Edit closeout** and opens the same `ReviewerCloseoutModal`. This also fixes a latent gap found
+  while verifying the More menu: since the Stage 6C extraction (`70babc04`, 2026-09-05) the panel
+  never passed `onCloseReview` to `TokenActionsMenu`, so the menu's closeout item never rendered for
+  any row; it is now wired, but only for Complete rows, to preserve the `review_received` row's
+  earlier "primary action only, no menu duplicate" design (see the 2026-09-04 note above and the
+  `reviewer-manage-actions-menu.test.js` "surfaces closeout as the primary row action" pin).
 - **Workbench UI polish (Codex PR #151, `3fc0a936`, production 2026-09-05).** UI-only; no
   `pages/api` or `lib` change, payload shapes and SSE vocabulary unchanged. Durable behavior
   changes: (a) `/workbench/reviewer-follow-up` is now a focused attention queue — request
