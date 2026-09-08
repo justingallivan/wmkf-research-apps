@@ -96,11 +96,10 @@ toolbar/header · `314e9426` `e68bffe9` ToolbarSelect · `f4bcb5b6` smoke record
 3. **Write `docs/J27_BUILD_AND_CHANGE_PLAN.md`** once Connor's file-location decision (Q5) lands.
    Evidence: register §2 deliverables table. Sequence unchanged from the S492 prompt.
 4. **Annotate the pilot passages** coupling "J27 Initial Assessment" to 2026-08-18:
-   DONE 2026-09-07 (branch `claude/j27-plan-closeout`) for 3 of 4 cited sites —
-   `REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md`, `DATAVERSE_SHAREPOINT_FILE_MODEL.md`,
-   `strategy-roadmap.md` — each now carries a dated note. The fourth cited site, memory
-   `project-reviewer-apps-redesign-direction.md` L82, was left unannotated (out of that
-   session's assigned scope); flag if it needs the same note. Evidence: register J27-051, Q18.
+   DONE 2026-09-07 (branch `claude/j27-plan-closeout`), all 4 of 4 cited sites —
+   `REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md` (two sites), `DATAVERSE_SHAREPOINT_FILE_MODEL.md`,
+   `strategy-roadmap.md`, and memory `project-reviewer-apps-redesign-direction.md` — each now
+   carries a dated `J27: J27-051` note. Register row J27-051 is `done`. Evidence: register J27-051, Q18.
 5. **Smaller shared select variant** for the 54 inline/table/modal selects (optional consistency
    follow-up). Evidence: S492 survey above; owner asked for consistency but did not direct this.
    Not urgent; propose before building.

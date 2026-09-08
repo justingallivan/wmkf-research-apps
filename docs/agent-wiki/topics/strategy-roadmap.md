@@ -598,10 +598,10 @@ document inventory, and individual implementation plans do not establish priorit
   `dpl_HhiYXVFAtsGMwjU9UDcKz22AfvR2`; native version restore and first-stage
   recycle recovery now pass, while administrator policy/access evidence and
   product history/milestone controls remain open. See the near-term plan.
-- **2026-09-07 note (J27-051):** the 2026-08-18 date above was the D26 Phase II
-  proposal due date, not J27 intake. J27 proposals arrive in early December
-  2026, exact date TBD (owner, 2026-09-06). See `docs/J27_TRANSITION_REGISTER.md`
-  row J27-051.
+- **2026-09-07 note (J27: J27-051):** the 2026-08-18 date above was the D26
+  Phase II proposal due date, not J27 intake. J27 proposals arrive in early
+  December 2026, exact date TBD (owner, 2026-09-06). See
+  `docs/J27_TRANSITION_REGISTER.md` row J27-051.
 - Strategy/system model: `project-system-model`, `project-strategy-direction`.
 - Virtual Review Panel: `project-virtual-review-panel`.
 - Roadmap snapshots: `project-app-roadmap-2026-04-25`, `project-phase-i-summary-app-winddown`.

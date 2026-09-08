@@ -807,9 +807,9 @@ proposal intake begins around 2026-08-18. That date was a deliberately early
 has passed unmet with administrator evidence still outstanding — expected, not
 slippage; see `docs/CURRENT_WORK_QUEUE.md` row 1 for the real completion gate.
 
-**2026-09-07 note (J27-051):** the **2026-08-18** date above was the D26 Phase
-II proposal due date, not J27 intake. J27 proposals arrive in early December
-2026, exact date TBD (owner, 2026-09-06). See
+**2026-09-07 note (J27: J27-051):** the **2026-08-18** date above was the D26
+Phase II proposal due date, not J27 intake. J27 proposals arrive in early
+December 2026, exact date TBD (owner, 2026-09-06). See
 `docs/J27_TRANSITION_REGISTER.md` row J27-051.
 
 A human-in-the-loop Initial Assessment pilot must

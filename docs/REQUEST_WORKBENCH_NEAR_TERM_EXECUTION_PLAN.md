@@ -74,9 +74,9 @@ ahead of proposal intake beginning around **2026-08-18**.
 > plan's framing and as records of owner decisions made at the time. Read them
 > against this status note, not as live commitments.
 
-**2026-09-07 note (J27-051):** the **2026-08-18** date above was the D26 Phase
-II proposal due date, not J27 intake. J27 proposals arrive in early December
-2026, exact date TBD (owner, 2026-09-06). See
+**2026-09-07 note (J27: J27-051):** the **2026-08-18** date above was the D26
+Phase II proposal due date, not J27 intake. J27 proposals arrive in early
+December 2026, exact date TBD (owner, 2026-09-06). See
 `docs/J27_TRANSITION_REGISTER.md` row J27-051.
 
 The August 10 acceptance path is a real human-in-the-loop pilot. On
@@ -1174,6 +1174,11 @@ Owner-decided:
     creation and human editing, Dataverse registry/provenance, Workbench
     discovery/opening, cycle-wide pilot-locator discovery/opening, and one
     safe failure/retry path; it does not require later lifecycle tabs;
+
+    **2026-09-07 note (J27: J27-051):** the **2026-08-18** date in item 40
+    above was the D26 Phase II proposal due date, not J27 intake. J27
+    proposals arrive in early December 2026, exact date TBD (owner,
+    2026-09-06). See `docs/J27_TRANSITION_REGISTER.md` row J27-051.
 41. the starting Initial Assessment structure is a one-page Word document with
     the applicant-submitted proposal title, institution, Summary, and a
     Rationale comprising
