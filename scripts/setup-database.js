@@ -986,6 +986,46 @@ const v42Statements = [
   )`,
 ];
 
+// V43: private Cycle Dossier pilot state. JSONB stores immutable source/config
+// snapshots and independently checkpointed item/edition state; bytes remain
+// in the dedicated private Blob store (see migration 038).
+const v43Statements = [
+  `CREATE TABLE IF NOT EXISTS cycle_dossiers (
+    id UUID PRIMARY KEY, owner_profile_id INTEGER NOT NULL REFERENCES user_profiles(id),
+    cycle TEXT NOT NULL DEFAULT 'D26' CHECK (cycle = 'D26'), selection JSONB,
+    latest_edition_id UUID, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), UNIQUE (owner_profile_id, cycle)
+  )`,
+  `CREATE TABLE IF NOT EXISTS cycle_dossier_previews (
+    id UUID PRIMARY KEY, owner_profile_id INTEGER NOT NULL REFERENCES user_profiles(id),
+    dossier_id UUID NOT NULL REFERENCES cycle_dossiers(id), data JSONB NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL DEFAULT NOW() + INTERVAL '30 minutes',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`,
+  `CREATE TABLE IF NOT EXISTS cycle_dossier_entries (
+    id UUID PRIMARY KEY, request_id UUID NOT NULL, cycle TEXT NOT NULL DEFAULT 'D26' CHECK (cycle = 'D26'),
+    revision BIGINT GENERATED ALWAYS AS IDENTITY, created_by INTEGER NOT NULL REFERENCES user_profiles(id),
+    data JSONB NOT NULL, ready BOOLEAN NOT NULL DEFAULT FALSE, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`,
+  `CREATE INDEX IF NOT EXISTS cycle_dossier_entries_latest ON cycle_dossier_entries(request_id, revision DESC) WHERE ready`,
+  `CREATE TABLE IF NOT EXISTS cycle_dossier_runs (
+    id UUID PRIMARY KEY, owner_profile_id INTEGER NOT NULL REFERENCES user_profiles(id),
+    dossier_id UUID NOT NULL REFERENCES cycle_dossiers(id), idempotency_key UUID NOT NULL,
+    launch_hash TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'queued'
+      CHECK (status IN ('queued','running','paused','cancelled','completed','partial','failed')),
+    data JSONB NOT NULL, lease_token UUID, locked_until TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(owner_profile_id, idempotency_key)
+  )`,
+  `CREATE INDEX IF NOT EXISTS cycle_dossier_runs_queue ON cycle_dossier_runs(status, created_at)`,
+  `CREATE TABLE IF NOT EXISTS cycle_dossier_editions (
+    id UUID PRIMARY KEY, owner_profile_id INTEGER NOT NULL REFERENCES user_profiles(id),
+    dossier_id UUID NOT NULL REFERENCES cycle_dossiers(id), run_id UUID NOT NULL REFERENCES cycle_dossier_runs(id),
+    cut_key TEXT NOT NULL, data JSONB NOT NULL, ready BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), UNIQUE(run_id, cut_key)
+  )`,
+];
+
 // V32: model pricing audit history (S181).
 // Monthly drift cron (/api/cron/pricing-refresh) writes one row per
 // (model, token_type) per run. Compared against lib/utils/model-pricing.js;
@@ -1765,6 +1805,24 @@ async function runMigration() {
       }
     }
 
+    // Run V43 table creation (Cycle Dossier pilot)
+    console.log(`\nApplying v43 schema updates - Cycle Dossier pilot (${v43Statements.length} statements)...`);
+    for (let i = 0; i < v43Statements.length; i++) {
+      const statement = v43Statements[i];
+      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
+      try {
+        await sql.query(statement);
+        console.log(`[v43-${i + 1}/${v43Statements.length}] ✓ ${preview}...`);
+      } catch (error) {
+        if (error.message.includes('already exists')) {
+          console.log(`[v43-${i + 1}/${v43Statements.length}] ○ Already exists: ${preview}...`);
+        } else {
+          console.error(`[v43-${i + 1}/${v43Statements.length}] ✗ Error: ${error.message}`);
+          throw error;
+        }
+      }
+    }
+
     console.log('\n✓ Database migration completed successfully!');
     console.log('\nTables created/updated:');
     console.log('  • search_cache (API search result caching)');
@@ -1827,6 +1885,9 @@ async function runMigration() {
     console.log('  • pre_site_distribution_attempts (exact preview + Dynamics send recovery ledger)');
     console.log('\nV41 new table (Scheduled personalized email review):');
     console.log('  • scheduled_email_messages (PD review windows + exact draft/send recovery ledger)');
+    console.log('\nV43 new tables (Cycle Dossier pilot):');
+    console.log('  • cycle_dossiers, cycle_dossier_previews, cycle_dossier_entries,');
+    console.log('    cycle_dossier_runs, cycle_dossier_editions (private state/checkpoints; bytes in private Blob)');
     console.log('\nIndexes created: 64 (plus 7 added in V30, 6 added in V35, 4 added in V37, 3 added in V39, 3 added in V40)');
 
   } catch (error) {

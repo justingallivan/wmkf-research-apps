@@ -11,6 +11,7 @@ jest.mock('../../lib/services/dynamics-service.js', () => ({
 import { DynamicsService } from '../../lib/services/dynamics-service.js';
 import {
   fetchCurrentPrompt,
+  fetchPromptVersion,
   interpolate,
   PROMPT_STORE_ERROR_CODES,
 } from '../../lib/services/prompt-store.js';
@@ -74,5 +75,26 @@ describe('fetchCurrentPrompt', () => {
     const err = await fetchCurrentPrompt('x').catch((e) => e);
     expect(err.message).toBe('network');
     expect(err.code).toBeUndefined();
+  });
+});
+
+describe('fetchPromptVersion', () => {
+  beforeEach(() => DynamicsService.queryRecords.mockReset());
+
+  it('resolves exactly one historical row by id and version', async () => {
+    DynamicsService.queryRecords.mockResolvedValue({ records: [
+      { wmkf_ai_promptid: 'p2', wmkf_ai_promptname: 'cycle-dossier.entry', wmkf_promptversion: 2 },
+    ] });
+    await expect(fetchPromptVersion('cycle-dossier.entry', { promptId: 'p2', version: 2 })).resolves.toMatchObject({ wmkf_ai_promptid: 'p2' });
+    const [, opts] = DynamicsService.queryRecords.mock.calls[0];
+    expect(opts.top).toBe(50);
+  });
+
+  it('fails closed when historical selection is ambiguous', async () => {
+    DynamicsService.queryRecords.mockResolvedValue({ records: [
+      { wmkf_ai_promptid: 'p1', wmkf_ai_promptname: 'x', wmkf_promptversion: 1 },
+      { wmkf_ai_promptid: 'p2', wmkf_ai_promptname: 'x', wmkf_promptversion: 1 },
+    ] });
+    await expect(fetchPromptVersion('x', { version: 1 })).rejects.toThrow(/Expected one historical prompt/);
   });
 });

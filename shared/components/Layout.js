@@ -55,6 +55,7 @@ export default function Layout({
 
     // Admin link only for superusers
     if (isSuperuser) {
+      items.push({ name: 'Cycle Dossier', href: '/cycle-dossier', icon: '📚' });
       items.push({ name: 'Admin', href: '/admin', icon: '⚙️', badge: alertCount > 0 ? alertCount : null });
     }
 

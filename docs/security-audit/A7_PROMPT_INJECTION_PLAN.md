@@ -1,8 +1,8 @@
 # A7: LLM01 prompt-injection hardening — inventory & remediation plan
 
 **Status:** Parts 0–6 SHIPPED (Parts 0–4 Session 174 2026-05-21; Parts 5–6
-Session 176 2026-05-22). All 24 LLM-input surfaces in the registry are
-`migrated`; `check:prompt-injection-tagging` reports 0 pending.
+Session 176 2026-05-22). The original 24-surface inventory below is historical;
+`scripts/check-prompt-injection-tagging.js` is the current source registry.
 Created 2026-05-21 (Session 173). Revised 2026-05-21 (Session 174) after a
 Codex review against the live codebase — see "Revision log" at the foot.
 **Deploy step (Part 2) — DONE 2026-05-22 (S176):** `scripts/seed-phase-i-summary-prompt.js --execute`
@@ -14,7 +14,16 @@ verification checks passed). The Executor now wraps that prompt's proposal text.
 content that reaches an LLM — boundary-tagging of untrusted content,
 system-prompt hardening, and output-schema validation.
 
-This is an inventory + execution plan for a future session. No code yet.
+The findings, inventory, and remediation proposal below describe the May 2026
+pre-implementation assessment. Refer to the shipped Part statuses and current
+registry for implemented controls.
+
+**Cycle Dossier addition [VERIFIED 2026-09-07 via source and gate]:** registry
+surface 31 covers both dossier prompt definitions through the shared Executor.
+Frozen declarations require override-only sources, explicit A7 untrusted
+wrapping, character caps, and pass-through validated outputs. Source-built on
+`codex/cycle-dossier-pilot-build`; prompt publication and live generation remain
+rollout steps. The current gate reports 29 migrated surfaces and zero pending.
 
 ## Key finding: the existing mechanism is NOT an injection defense
 

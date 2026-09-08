@@ -6,7 +6,7 @@ status: canonical
 summary: This document is the living authorization inventory for pages/api. It is meant to do two jobs:.
 canonical: true
 cataloged: 2026-07-02
-last_verified: 2026-09-04
+last_verified: 2026-09-07
 owner: product-engineering
 related:
   - pages/api
@@ -17,7 +17,7 @@ related:
 
 # API Route Security Matrix
 
-Last updated: 2026-09-04
+Last updated: 2026-09-07
 
 > **Wave 18 production boundary:** main includes a nullable per-engagement
 > due-date override and the route behaviors noted below. [VERIFIED via production
@@ -323,6 +323,14 @@ separate server-owned promotion contract. No branch writes Dataverse or accepts 
 - `/api/external/grantee/[token]/context` keeps `abstractFormatted`, `abstractApproved`, and `caption` as exact Markdown and adds response-only `deliverable.abstractHtml` / `deliverable.captionHtml`, rendered through the shared server-side body/inline sanitizers. No HTML is persisted and the token scope is unchanged.
 - `/api/workbench/grantee-deliverables/abstract` GET keeps exact Markdown in `effective` and `caption`, and adds response-only sanitized `effectiveHtml` / `captionHtml` for the staff editor seeds and caption display. PUT still accepts and persists only abstract Markdown, with the existing ETag and effective-field guards; caption writes remain on the separate ETag-conditional `replace-submission` route.
 - The abstract PUT reconciles an ambiguous non-412 Dataverse write by re-reading both abstract fields. An exact value on the same effective field returns 200 with the fresh ETag; a field flip remains a 409 stale conflict; a mismatched or unavailable confirmation returns a typed 503. The Awardee tab preserves the working copy and renders that save-specific failure beside the Save button.
+
+### Cycle Dossier pilot routes
+
+| Route | Methods | Access class / guard | Inputs and persistence |
+|---|---|---|---|
+| `/api/cycle-dossier` | GET, POST | App / `requireAppAccess(req, res, 'cycle-dossier')` | Superuser-only service contract after app access. Reads or changes the caller's private D26 selection/preview/run controls; previews retain bounded source/config references and estimates; no client identity is accepted. Preview writes frozen input bytes to the dedicated private Blob store and metadata to Postgres; generation and document publication occur in the worker. |
+| `/api/cycle-dossier/download` | GET | App / `requireAppAccess(req, res, 'cycle-dossier')` | `entryId` or owner-scoped `editionId` plus `docx`/`pdf`; service reauthorizes private ownership and validates persisted SHA-256/size/path refs before streaming. Private Blob bytes only; `Cache-Control: private, no-store`, `nosniff`. |
+| `/api/cron/drain-cycle-dossiers` | GET, POST | Cron / `verifyCronSecret(req, res)` | No client body authority. Feature flag `CYCLE_DOSSIER_ENABLED=true` is required after cron-secret verification; worker claims one global run lease and independently checkpoints bounded request stages. Postgres checkpoints plus dedicated private Blob artifacts; no public response data. |
 
 ## Regular Maintenance Process
 

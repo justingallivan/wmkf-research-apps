@@ -78,6 +78,12 @@ related:
 | [WORKBENCH_PROPOSAL_TAB_BUILD_PLAN.md](WORKBENCH_PROPOSAL_TAB_BUILD_PLAN.md) | plan | historical |  | Historical S258 build plan for the Workbench Proposal tab and Field Primer persistence, now shipped. | 2026-07-02 |
 | [WORKBENCH_TRIAGE_FIELD_BUILD_PLAN.md](WORKBENCH_TRIAGE_FIELD_BUILD_PLAN.md) | plan | historical |  | Historical S261 build plan for the Workbench triage field, built and deployed. | 2026-07-02 |
 
+## cycle-dossier
+
+| File | Kind | Status | Canonical | Summary | Cataloged |
+|---|---|---|---|---|---|
+| [CYCLE_DOSSIER_PILOT_DESIGN.md](CYCLE_DOSSIER_PILOT_DESIGN.md) | plan | active | yes | D26 private Cycle Dossier pilot design and branch-local implementation status. | 2026-09-07 |
+
 ## data-layer
 
 | File | Kind | Status | Canonical | Summary | Cataloged |

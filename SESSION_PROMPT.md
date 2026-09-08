@@ -1,4 +1,30 @@
-# Session 494 Prompt: Continue from the reconciled reviewer UI and field-primer integration branch
+# Session 495 Prompt: Controlled rollout of the D26 Cycle Dossier pilot
+
+## Cycle Dossier build handoff — 2026-09-07
+
+**[VERIFIED via source, tests, and local production build]** D26 Cycle Dossier is
+implemented on `codex/cycle-dossier-pilot-build`, using Luna implementation and
+Sol review. The earlier owner decisions remain on `codex/cycle-dossier-pilot-design`.
+This build is not promoted or activated.
+
+- Superuser selection cards, persistent exclusions, selective rewrites, shared
+  entry revisions, private edition history, Word/PDF outputs, and autonomous
+  bounded background work are implemented.
+- 140 focused Dossier/Executor tests pass; browser fixtures and all rendered
+  document pages were inspected. Relevant security, schema, prompt, docs, lint,
+  type, and production-build checks pass. The sandboxed compiler stalled; the
+  canonical build completed outside the sandbox.
+- Prompt bootstrap dry-run passed: both families would create version 1;
+  no prompt was published and no paid generation ran.
+- Remaining rollout: dedicated private store/token, migration 038 through the
+  governed existing-database runner, prompt publication, real roster/folder
+  visibility verification, and an explicitly authorized single-request test
+  before promotion and activation. See `docs/CYCLE_DOSSIER_PILOT_DESIGN.md`.
+- Milestone determination: no new production capability shipped in this build;
+  no additional DEVELOPMENT_LOG entry is required. The optional claim-evidence
+  observer was unavailable because its local state could not be read.
+
+## Previous handoff: reconciled reviewer UI and field-primer integration
 
 ## Session 493 Summary
 
