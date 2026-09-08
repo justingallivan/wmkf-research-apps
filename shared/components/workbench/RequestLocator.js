@@ -4,7 +4,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Card } from '../Layout';
 import ToolbarSelect, { COMPACT_CONTROL_HEIGHT_CLASS, COMPACT_CONTROL_FOCUS_CLASS } from '../ToolbarSelect';
 
-const STORAGE_KEY = 'wmkf-workbench-request-locator-v1';
+// Prior caches include other programs and off-cycle filters; do not restore them.
+const STORAGE_KEY = 'wmkf-workbench-request-locator-research-v2';
 const MAX_QUERY_LENGTH = 100;
 const MAX_FILTER_LENGTH = 100;
 const MAX_SAVED_RESULTS = 100;
@@ -135,22 +136,6 @@ export default function RequestLocator() {
     setError(null);
 
     try {
-      if (/^\d+$/.test(normalized.query) && !normalized.cycle && !normalized.status) {
-        const response = await fetch(
-          `/api/workbench/resolve-request?requestNumber=${encodeURIComponent(normalized.query)}`,
-        );
-        const body = await response.json().catch(() => ({}));
-        if (requestIdRef.current !== operationId) return;
-        if (!response.ok) throw new Error(body.error || `Failed to find request (${response.status})`);
-        if (!body.requestId) throw new Error('The request lookup returned no request identity.');
-        await router.push(
-          `/workbench/${encodeURIComponent(body.requestId)}?n=${encodeURIComponent(
-            body.requestNumber || normalized.query,
-          )}`,
-        );
-        return;
-      }
-
       const params = new URLSearchParams();
       if (normalized.query) params.set('q', normalized.query);
       if (normalized.cycle) params.set('cycle', normalized.cycle);
@@ -162,6 +147,14 @@ export default function RequestLocator() {
       if (!response.ok) throw new Error(body.error || `Failed to search requests (${response.status})`);
 
       const returnedResults = Array.isArray(body.results) ? body.results : [];
+      if (/^\d+$/.test(normalized.query) && !normalized.cycle && !normalized.status
+        && returnedResults.length === 1
+        && String(returnedResults[0].requestNumber) === normalized.query) {
+        await router.push(
+          `/workbench/${encodeURIComponent(returnedResults[0].requestId)}?n=${encodeURIComponent(normalized.query)}`,
+        );
+        return;
+      }
       const nextResults = append
         ? [...new Map(
           [...(results || []), ...returnedResults].map((result) => [result.requestId, result]),
@@ -239,10 +232,10 @@ export default function RequestLocator() {
           <span className="mt-0.5 text-gray-500"><SearchIcon /></span>
           <div>
             <h2 id="request-locator-heading" className="text-lg font-semibold text-gray-900">
-              Find any request
+              Find a research request
             </h2>
             <p className="mt-1 text-sm text-gray-600">
-              Search active or historical requests without changing their status or the active-cycle list.
+              Search active or historical Research requests without changing their status or the active-cycle list.
             </p>
           </div>
         </div>
@@ -379,7 +372,7 @@ export default function RequestLocator() {
             )}
             {unavailableCount > 0 && (
               <span className="text-xs font-medium text-amber-700">
-                {unavailableCount} indexed {unavailableCount === 1 ? 'match is' : 'matches are'} no longer available
+                {unavailableCount} indexed {unavailableCount === 1 ? 'match is' : 'matches are'} outside this search or no longer available
               </span>
             )}
           </div>

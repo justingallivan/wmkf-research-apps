@@ -128,7 +128,7 @@ describe('/api/workbench/dashboard', () => {
 
     expect(res.status).toHaveBeenCalledWith(200);
     // Exact filter (scope=all): cycle ∧ (Phase II Pending ∨ Advancing) ∧ hide-Set-aside.
-    expect(proposalFilter).toBe(`(${D26_CYCLE}) and (${TRIAGE_BASE}) and ${HIDE_SET_ASIDE}`);
+    expect(proposalFilter).toBe(`(${D26_CYCLE}) and (_akoya_programid_value eq 8dcab30b-958f-ee11-8179-000d3a341e8f or _akoya_programid_value eq 94cab30b-958f-ee11-8179-000d3a341e8f) and (${TRIAGE_BASE}) and ${HIDE_SET_ASIDE}`);
     expect(proposalFilter).not.toContain('akoya_requestnum'); // allowlist branch is gone
     expect(proposalFilter).not.toContain('_wmkf_programdirector_value'); // scope=all → no PD filter
 
@@ -168,7 +168,7 @@ describe('/api/workbench/dashboard', () => {
 
     expect(res.status).toHaveBeenCalledWith(200);
     // Exact filter: cycle ∧ (Phase II Pending ∨ Advancing ∨ Set aside); no hide clause.
-    expect(proposalFilter).toBe(`(${D26_CYCLE}) and (${TRIAGE_BASE} or wmkf_triagestatus eq 100000001)`);
+    expect(proposalFilter).toBe(`(${D26_CYCLE}) and (_akoya_programid_value eq 8dcab30b-958f-ee11-8179-000d3a341e8f or _akoya_programid_value eq 94cab30b-958f-ee11-8179-000d3a341e8f) and (${TRIAGE_BASE} or wmkf_triagestatus eq 100000001)`);
     expect(proposalFilter).not.toContain('ne 100000001'); // hide clause dropped
     const body = res.json.mock.calls[0][0];
     expect(body.includeSetAside).toBe(true);
@@ -187,7 +187,7 @@ describe('/api/workbench/dashboard', () => {
     await handler(createMockReq({ method: 'GET', query: { cycleCode: 'D26', scope: 'my' } }), res);
     expect(res.status).toHaveBeenCalledWith(200);
     // Exact filter: default + an appended PD AND term; triage OR stays parenthesized.
-    expect(proposalFilter).toBe(`(${D26_CYCLE}) and (${TRIAGE_BASE}) and ${HIDE_SET_ASIDE} and ${PD_FILTER}`);
+    expect(proposalFilter).toBe(`(${D26_CYCLE}) and (_akoya_programid_value eq 8dcab30b-958f-ee11-8179-000d3a341e8f or _akoya_programid_value eq 94cab30b-958f-ee11-8179-000d3a341e8f) and (${TRIAGE_BASE}) and ${HIDE_SET_ASIDE} and ${PD_FILTER}`);
   });
 
   it('default filter cannot surface untriaged Concept rows (visibility requires Phase II Pending or Advancing)', async () => {

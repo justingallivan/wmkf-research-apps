@@ -164,6 +164,17 @@ describe('grant-request.findByIds (characterization)', () => {
     });
   });
 
+  test('ANDs caller scope with the entire ID group so later IDs cannot bypass Research filters', async () => {
+    const q = jest.spyOn(DynamicsService, 'queryRecords').mockResolvedValue({ records: [] });
+    const scope = "akoya_requeststatus eq 'Closed'";
+    await grantRequest.findByIds([GUID_A, GUID_B], { select: 'akoya_requestid', filter: scope });
+    expect(q).toHaveBeenCalledWith('akoya_requests', {
+      select: 'akoya_requestid',
+      filter: `(akoya_requestid eq ${GUID_A} or akoya_requestid eq ${GUID_B}) and (${scope})`,
+      top: 2,
+    });
+  });
+
   test('honors an explicit top cap (the contact-history CHUNK_SIZE shape)', async () => {
     const q = jest.spyOn(DynamicsService, 'queryRecords').mockResolvedValue({ records: [] });
     await grantRequest.findByIds([GUID_A], { select: 'akoya_requestid', top: 50 });

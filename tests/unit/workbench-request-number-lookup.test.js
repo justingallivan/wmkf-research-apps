@@ -72,10 +72,10 @@ async function renderReady() {
   await waitFor(() => expect(screen.getAllByLabelText('Cycle')[0]).not.toBeDisabled());
 }
 
-test('opens an exact historical request through the existing request-number resolver', async () => {
+test('opens an exact historical Research request through the scoped search', async () => {
   global.fetch.mockImplementation(async (url) => {
-    if (url === '/api/workbench/resolve-request?requestNumber=1002379') {
-      return response({ body: { success: true, requestId: REQUEST_ID, requestNumber: '1002379' } });
+    if (url === '/api/workbench/search-requests?q=1002379') {
+      return response({ body: { success: true, results: [{ requestId: REQUEST_ID, requestNumber: '1002379' }] } });
     }
     return baseResponse(url);
   });
@@ -85,7 +85,7 @@ test('opens an exact historical request through the existing request-number reso
   fireEvent.click(screen.getByRole('button', { name: 'Search' }));
 
   await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
-    '/api/workbench/resolve-request?requestNumber=1002379',
+    '/api/workbench/search-requests?q=1002379',
   ));
   await waitFor(() => expect(push).toHaveBeenCalledWith(
     `/workbench/${REQUEST_ID}?n=1002379`,
@@ -93,13 +93,11 @@ test('opens an exact historical request through the existing request-number reso
   expect(screen.getByText(/without changing their status/i)).toBeInTheDocument();
 });
 
-test('keeps an unknown exact request on the dashboard with the server error', async () => {
+test('keeps an unknown or excluded exact request on the dashboard', async () => {
   global.fetch.mockImplementation(async (url) => {
-    if (url === '/api/workbench/resolve-request?requestNumber=9999999') {
+    if (url === '/api/workbench/search-requests?q=9999999') {
       return response({
-        ok: false,
-        status: 404,
-        body: { error: 'No request found for number 9999999' },
+        body: { success: true, results: [], totalCount: 0 },
       });
     }
     return baseResponse(url);
@@ -109,9 +107,7 @@ test('keeps an unknown exact request on the dashboard with the server error', as
   fireEvent.change(screen.getByLabelText(SEARCH_LABEL), { target: { value: '9999999' } });
   fireEvent.click(screen.getByRole('button', { name: 'Search' }));
 
-  expect(await screen.findByRole('alert')).toHaveTextContent(
-    'No request found for number 9999999',
-  );
+  expect(await screen.findByText('No requests matched.')).toBeInTheDocument();
   expect(push).not.toHaveBeenCalled();
 });
 
@@ -163,7 +159,7 @@ test('renders broad results with live cycle/status filters and semantic open lin
     'href',
     `/workbench/${REQUEST_ID}?n=1002959`,
   );
-  expect(JSON.parse(window.sessionStorage.getItem('wmkf-workbench-request-locator-v1')))
+  expect(JSON.parse(window.sessionStorage.getItem('wmkf-workbench-request-locator-research-v2')))
     .toMatchObject({ criteria: { cycle: 'December 2026', status: 'Active' } });
   expect(screen.getByRole('status', { name: 'Request search status' }))
     .toHaveTextContent('Search complete. 1 result; 1 shown.');
@@ -235,12 +231,12 @@ test('loads the next bounded page and appends it to the restored search state', 
   expect(await screen.findByText('Final match')).toBeInTheDocument();
   expect(screen.getByText(/showing 26/i)).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Load 25 more' })).not.toBeInTheDocument();
-  expect(JSON.parse(window.sessionStorage.getItem('wmkf-workbench-request-locator-v1')).results)
+  expect(JSON.parse(window.sessionStorage.getItem('wmkf-workbench-request-locator-research-v2')).results)
     .toHaveLength(26);
 });
 
 test('keeps restored filters visible when live options are missing', async () => {
-  window.sessionStorage.setItem('wmkf-workbench-request-locator-v1', JSON.stringify({
+  window.sessionStorage.setItem('wmkf-workbench-request-locator-research-v2', JSON.stringify({
     criteria: { query: 'regeneration', cycle: 'June 2024', status: 'Archived' },
     results: [{ requestId: REQUEST_ID, requestNumber: '1002959', title: 'Restored request' }],
     totalCount: 1,
@@ -256,7 +252,7 @@ test('keeps restored filters visible when live options are missing', async () =>
     return baseResponse(url);
   });
 
-  await renderReady();
+  render(<WorkbenchDashboard />);
 
   await waitFor(() => expect(screen.getAllByLabelText('Cycle')[0]).toHaveValue('June 2024'));
   expect(screen.getByRole('option', { name: 'June 2024 (saved)' })).toBeInTheDocument();
@@ -265,7 +261,7 @@ test('keeps restored filters visible when live options are missing', async () =>
 });
 
 test('restores the last broad result set after returning to the dashboard', async () => {
-  window.sessionStorage.setItem('wmkf-workbench-request-locator-v1', JSON.stringify({
+  window.sessionStorage.setItem('wmkf-workbench-request-locator-research-v2', JSON.stringify({
     criteria: { query: 'regeneration', cycle: '', status: '' },
     results: [{ requestId: REQUEST_ID, requestNumber: '1002959', title: 'Restored request' }],
     totalCount: 1,
@@ -284,12 +280,12 @@ test('restores the last broad result set after returning to the dashboard', asyn
 test('a slower superseded exact lookup cannot navigate after a newer request opens', async () => {
   let resolveFirst;
   global.fetch.mockImplementation((url) => {
-    if (url === '/api/workbench/resolve-request?requestNumber=1002000') {
+    if (url === '/api/workbench/search-requests?q=1002000') {
       return new Promise((resolve) => { resolveFirst = resolve; });
     }
-    if (url === '/api/workbench/resolve-request?requestNumber=1002379') {
+    if (url === '/api/workbench/search-requests?q=1002379') {
       return Promise.resolve(response({
-        body: { success: true, requestId: REQUEST_ID, requestNumber: '1002379' },
+        body: { success: true, results: [{ requestId: REQUEST_ID, requestNumber: '1002379' }] },
       }));
     }
     return Promise.resolve(baseResponse(url));
@@ -309,8 +305,7 @@ test('a slower superseded exact lookup cannot navigate after a newer request ope
     resolveFirst(response({
       body: {
         success: true,
-        requestId: '22222222-2222-2222-2222-222222222222',
-        requestNumber: '1002000',
+        results: [{ requestId: '22222222-2222-2222-2222-222222222222', requestNumber: '1002000' }],
       },
     }));
   });
@@ -357,7 +352,7 @@ test('a slower superseded broad search cannot replace newer results or saved cri
 
   expect(screen.queryByText('Older result')).not.toBeInTheDocument();
   expect(screen.getByText('Newer result')).toBeInTheDocument();
-  expect(JSON.parse(window.sessionStorage.getItem('wmkf-workbench-request-locator-v1')))
+  expect(JSON.parse(window.sessionStorage.getItem('wmkf-workbench-request-locator-research-v2')))
     .toMatchObject({ criteria: { query: 'newer' } });
 });
 
@@ -444,5 +439,5 @@ test('clearing during a broad search prevents the late response from restoring r
 
   expect(screen.queryByText('Late result')).not.toBeInTheDocument();
   expect(screen.queryByText(/result(?:s)? · showing/i)).not.toBeInTheDocument();
-  expect(window.sessionStorage.getItem('wmkf-workbench-request-locator-v1')).toBeNull();
+  expect(window.sessionStorage.getItem('wmkf-workbench-request-locator-research-v2')).toBeNull();
 });

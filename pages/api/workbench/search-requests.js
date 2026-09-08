@@ -1,13 +1,13 @@
 /**
  * API: /api/workbench/search-requests
  *
- * Read-only, org-open request discovery for Workbench users.
+ * Read-only, org-open Research request discovery for Workbench users.
  *
  *   GET ?mode=options
- *     → live historical cycle and request-status options
+ *     → June/December meeting cycles and live Research request-status options
  *
  *   GET ?q=<text>&cycle=<meeting-month-year>&status=<request-status>&offset=<0..75>
- *     → bounded active/historical request results
+ *     → bounded active/historical Research results (numeric q uses exact lookup)
  */
 
 import { requireAppAccess } from '../../../lib/utils/auth';

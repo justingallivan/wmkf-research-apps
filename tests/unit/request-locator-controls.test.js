@@ -6,7 +6,7 @@ jest.mock('../../shared/components/Layout', () => ({
   Card: ({ children }) => <div>{children}</div>,
 }));
 
-const STORAGE_KEY = 'wmkf-workbench-request-locator-v1';
+const STORAGE_KEY = 'wmkf-workbench-request-locator-research-v2';
 const response = (body, ok = true) => ({ ok, status: ok ? 200 : 503, json: async () => body });
 const options = { cycles: [{ value: 'J26', label: 'June 2026' }], statuses: ['Active'] };
 const emptyResults = { results: [], totalCount: 0 };
@@ -164,4 +164,20 @@ test.each([true, false])('changing a compact filter suppresses a stale search re
   expect(screen.queryByText('Stale request error')).not.toBeInTheDocument();
   expect(window.sessionStorage.getItem(STORAGE_KEY)).toBeNull();
   expect(cycleSelect()).toHaveValue('J26');
+});
+
+
+test('does not restore broad-program results or off-cycle selections from the previous cache', async () => {
+  window.sessionStorage.setItem('wmkf-workbench-request-locator-v1', JSON.stringify({
+    criteria: { query: 'University', cycle: 'March 2025 (off-cycle)', status: 'Active' },
+    results: [{ requestId: 'directors', title: "Directors' Directed Grant Program" }],
+    totalCount: 1,
+  }));
+  fetch.mockResolvedValue(response(options));
+  render(<RequestLocator />);
+  await waitFor(() => expect(cycleSelect()).toBeEnabled());
+  expect(cycleSelect()).toHaveValue('');
+  expect(queryInput()).toHaveValue('');
+  expect(screen.queryByText(/Directors' Directed/)).not.toBeInTheDocument();
+  expect(screen.queryByRole('option', { name: /off-cycle/ })).not.toBeInTheDocument();
 });

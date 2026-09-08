@@ -1,10 +1,9 @@
 /**
  * Grantee deliverables — research-awardee eligibility config.
  *
- * EDITABLE — this is the single place to change which grants count as "research
- * awardees" for the Awardees list (and the optional auto-on-award cron). Program
- * NAMES can change and programs can be added/retired, so the eligibility is NOT
- * hard-wired into route logic — adjust it here.
+ * Research program membership is shared with request discovery in
+ * researchPrograms.js. This file retains Awardees-specific status eligibility
+ * for the Awardees list and optional auto-on-award cron.
  *
  * Keyed by `akoya_programid` GUID, not name, per the Atlas duplicate-name caution
  * (`docs/atlas/dataverse-akoya-request.md` — "Law and Legal Administration" exists
@@ -17,11 +16,7 @@
  * the program set excludes Active-with-a-PI civic grants (e.g. #1002650).
  */
 
-// akoya_program GUIDs that count as research for this workflow.
-export const GRANTEE_RESEARCH_PROGRAM_IDS = [
-  '8dcab30b-958f-ee11-8179-000d3a341e8f', // Science and Engineering Research
-  '94cab30b-958f-ee11-8179-000d3a341e8f', // Medical Research
-];
+export { RESEARCH_PROGRAM_IDS as GRANTEE_RESEARCH_PROGRAM_IDS } from './researchPrograms.js';
 
 // The akoya_requeststatus value that marks a funded/active grant (Atlas:
 // Active = decided-terminal funded grant). String compare against the live field.

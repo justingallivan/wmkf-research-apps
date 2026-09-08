@@ -3,6 +3,7 @@
 import { DynamicsService } from '../../lib/services/dynamics-service';
 import { bypassDynamicsRestrictions, withDynamicsContext } from '../../lib/services/dynamics-context';
 import * as interlock from '../../lib/dataverse/core/interlock';
+import { RESEARCH_PROGRAM_IDS } from '../../shared/config/researchPrograms';
 import { aggregateMeetingDateCycles } from '../../lib/dataverse/adapters/grant-request';
 
 jest.mock('../../lib/dataverse/core/interlock', () => ({
@@ -30,7 +31,7 @@ afterEach(() => {
   else process.env.DYNAMICS_URL = originalUrl;
 });
 
-const load = () => bypassDynamicsRestrictions('meeting-date-test', aggregateMeetingDateCycles);
+const load = () => bypassDynamicsRestrictions('meeting-date-test', () => aggregateMeetingDateCycles({ programIds: RESEARCH_PROGRAM_IDS }));
 
 test('returns every month beyond the ordinary 100-row page, grouped and ordered in UTC', async () => {
   const rows = Array.from({ length: 150 }, (_, index) => ({
@@ -53,6 +54,7 @@ test('returns every month beyond the ordinary 100-row page, grouped and ordered 
   expect(xml).toContain('<order alias="year" descending="true"/>');
   expect(xml).toContain('<order alias="month" descending="true"/>');
   expect(xml).not.toContain('aggregatelimit');
+  expect(xml).toContain(`<condition attribute="akoya_programid" operator="in">${RESEARCH_PROGRAM_IDS.map((id) => `<value>${id}</value>`).join('')}</condition>`);
   expect(options.signal).toBeInstanceOf(AbortSignal);
   expect(interlock.assertDataverseOperationAllowed).toHaveBeenCalled();
 });
@@ -88,7 +90,7 @@ test('refuses calls without restriction context before acquiring a token', async
   expect(fetchMock).not.toHaveBeenCalled();
 });
 
-test.each([null, 'akoya_requestid', 'wmkf_meetingdate'])(
+test.each([null, 'akoya_requestid', 'wmkf_meetingdate', 'akoya_programid'])(
   'enforces the table/field restriction %s before transport', async (fieldName) => {
     await expect(withDynamicsContext({ restrictions: [{
       table_name: 'akoya_request', field_name: fieldName,
@@ -103,5 +105,13 @@ test('preserves target-interlock denial before fetch', async () => {
     throw new Error('Target denied');
   });
   await expect(load()).rejects.toThrow('Target denied');
+  expect(fetchMock).not.toHaveBeenCalled();
+});
+
+
+test.each([undefined, [], ['<value>injection</value>']])('rejects missing or invalid program scope %j before transport', async (programIds) => {
+  await expect(bypassDynamicsRestrictions('meeting-date-test', () => (
+    aggregateMeetingDateCycles({ programIds })
+  ))).rejects.toThrow('requires valid program IDs');
   expect(fetchMock).not.toHaveBeenCalled();
 });
