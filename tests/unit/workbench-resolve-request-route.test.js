@@ -61,7 +61,8 @@ const RECORD = {
   akoya_title: 'A Study',
   wmkf_meetingdate: '2026-06-01',
   akoya_requeststatus: 'Active',
-  wmkf_organizationname: 'Example University',
+  wmkf_organizationname: 'N/A',
+  _akoya_applicantid_value_formatted: 'Example University',
   _wmkf_projectleader_value_formatted: 'Dr. Ada Lovelace',
 };
 
@@ -109,7 +110,7 @@ test('golden path by GUID: resolves and returns the expected DTO shape (full env
     requestStatus: 'Active',
     statusClass: expectedStatusClass,
     institution: 'Example University',
-    applicant: null,
+    applicant: 'Example University',
     projectLeader: 'Dr. Ada Lovelace',
     grantProgram: null,
     programDirector: null,
