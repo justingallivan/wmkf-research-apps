@@ -212,7 +212,7 @@ live surface.** Run each gate and its `:self-test` sequentially.
   `CandidatesPanel.js` → `ReviewerInvitePanel.js` (fits the `ReviewerFindPanel`/`ReviewerManagePanel`
   sibling convention). Moved in the same commit: the two unit tests (renamed to
   `tests/unit/reviewer-invite-panel-*.test.js`), the tab import + JSX in `ReviewersTab.js`, the
-  onboarding deck (`docs/onboarding/build_workbench_decks.py`), the glossary, and the strategy
+  onboarding deck generator (formerly `docs/onboarding/build_workbench_decks.py`; the decks were retired and deleted 2026-09-08), the glossary, and the strategy
   + handoff docs. **Left untouched (contracts):** `/api/reviewer-finder/my-candidates`, the
   sub-tab key `candidates`, and the `?sub=candidates` deep-link. **Deferred to the Phase 4
   `/sweep`:** the bare-symbol `CandidatesPanel` mentions in `.claude-memory` + `docs/agent-wiki`

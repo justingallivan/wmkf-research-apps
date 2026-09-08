@@ -45,132 +45,21 @@ sequence.
 
 ## Audit follow-ups — verified open, not silently prioritized
 - **Public/onboarding reviewer-token documentation reconciliation.**
-  **[OWNER-DEFERRED 2026-09-01; RECONCILED 2026-09-07; REWORKED 2026-09-07
-  AFTER TWO OPUS REVIEW ROUNDS AND A CODEX ADVERSARIAL REVIEW.]** Internal
-  operating sources now reflect the production
-  incident remediation: review-due reminders are link-free and preserve token
-  authority, manual reminders have resumed, and the automatic schedule
-  remains held. Public/onboarding artifacts were intentionally left untouched
-  during the emergency response. Audited
-  `docs/onboarding/build_workbench_decks.py` (the sole generator for
-  `docs/onboarding/*.pptx`) plus the rest of the `docs/onboarding/` tree,
-  `shared/config/guideContent.js`, `pages/guide.js`, and the public reviewer
-  portal (`pages/external/review/[token].js`) for stale claims about reminder
-  token rotation, manual-send freezes, or scheduler operation
-  [VERIFIED via grep, 2026-09-07].
-
-  There are two distinct manual reviewer nudges on two different Workbench
-  surfaces, and the first pass conflated them: an unanswered invitation is
-  nudged from **Invite Reviewers**
-  (`shared/components/reviewers/ReviewerInvitePanel.js`, "Send reminder"
-  button `[VERIFIED L641-651]` → `RespondReminderModal`, imported nowhere
-  else `[VERIFIED via repo-wide grep]`; mints a fresh secure link, replacing
-  the reviewer's earlier invitation link, per the button's own tooltip and
-  `docs/REVIEWER_ENGAGEMENT_SPEC.md:79`), while an accepted-but-not-submitted
-  review is nudged from **Track Reviewers** or **Reviews**
-  (`lib/services/reviewer-manual-reminder.js:4-5`; link-free, no mint).
-  Track Reviewers is accepted-reviewer-only
-  (`shared/components/reviewers/ReviewersTab.js:10`,
-  `ReviewerManagePanel.js:145`), so an unanswered invitee never appears
-  there — the first pass's "Send reminder … in Track Reviewers" copy for the
-  respond-by nudge was wrong. Fixed at five locations in the generator
-  (PD-deck Step 7/8/11/FAQ, technical-deck Step 7) and in this file/the
-  README to name each nudge's real surface, and reworded the causal claim
-  about why the Re-invite button was removed: `docs/REVIEWER_ENGAGEMENT_SPEC.md:110`
-  says it was removed **when the automated respond-by reminder was
-  introduced** (S277) — the first pass instead asserted it was "retired in
-  favor of" the newer manual Send-reminder action, a cause the spec does not
-  support; corrected to cite the spec's own reason and describe the manual
-  nudge as today's replacement without claiming it caused the removal.
-
-  Regenerating the decks from the corrected generator also picked up (and
-  flushed to the shipped `.pptx`) the deltas from four earlier generator
-  commits that had edited the `.py` without regenerating: `83b9c68a`
-  (Phase II documents added to the Proposal-tab slide — re-verified current
-  via `ProposalTab.js` `phaseIIDocuments`, still accurate), `c979156c` (an
-  Aug-16 "eight tabs incl. Pre Site Visit" tab-strip edit that was itself
-  stale by 2026-09-07 — see below), `d040a7a3` (render-emails-preview /
-  send-emails-mints token wording, still accurate per spec §2.6), and
-  `a3103b3c` (acceptance fast-response drain wording, still accurate). Only
-  `c979156c`'s tab-strip claim needed a further fix: the tab strip is nine
-  tabs, all live, no placeholders — `[VERIFIED via pages/workbench/[requestId].js:44-52]`
-  TABS array: Overview, Proposal, Initial Assessment, Reviewers, Reviews,
-  Staff Deliberations, Final Writeup, Status, Awardee, all mapped to real
-  imported components; S466 merged the former Pre Site Visit + Site Visit
-  tabs into Staff Deliberations, and Final Writeup shipped separately. Fixed
-  the generator docstring, the PD-deck Step 3 slide, the technical-deck "The
-  shell" slide, and README.md's tab-strip bullet accordingly.
-
-  Regenerated both `.pptx` outputs from the corrected generator via a
-  throwaway venv per the README; slide counts (33 PD / 31 Technical) and
-  content unchanged in shape, only the corrected copy differs. Confirmed no
-  credential/runbook material is embedded in the generator: the one env-var
-  name present, `CRON_SECRET` (technical deck's ops appendix, name only, no
-  value), is acceptable — the same name already appears in 7+ other tracked
-  public docs — so it was left as-is.
-
-  A Codex adversarial review then found three factual deck errors outside the
-  reminder/tab scope, all now fixed and re-verified from source. (1) The PD
-  deck's Step 13 (Track Reviewers completion) and the technical deck's Steps
-  13-14 slide conflated a returned review with a closed-out one and called
-  closeout "record-keeping only." Live behavior is two distinct
-  `wmkf_reviewstatus` values, `review_received` (100000003) and `complete`
-  (100000004) `[VERIFIED via shared/config/reviewerLifecycle.js:19-26]`;
-  `ReviewerCloseoutModal` requires an explicit honorarium disposition
-  (Yes/No/not-applicable, with a reason required for No) before a review can
-  be closed `[VERIFIED via ReviewerCloseoutModal.js:159-180,245-320]`, and
-  `close-review` → `closeReview` persists `reviewStatus:'complete'` +
-  `completedAt` + `honorariumEligibility` + notes in one ETag-bound write,
-  explicitly never writing the linked honorarium request itself
-  `[VERIFIED via lib/services/reviewer-engagement/close-review.js:1-8,195-210]`.
-  Payment authorization stays outside the app
-  `[VERIFIED via docs/agent-wiki/topics/finance-honoraria.md:39-51: "That is
-  not final authorization to pay... Operations/Finance retains that
-  control."]`. Fixed both decks to describe closeout as a distinct step that
-  records a payment disposition without paying anything. (2) The PD deck's
-  Overview slide (Step 4) listed a five-metric funnel including "materials
-  sent" and "reviews in," but `OverviewTab.js` renders exactly four fields —
-  Candidates, Invited, Accepted, Complete
-  `[VERIFIED via shared/components/workbench/OverviewTab.js:103-111]` — and
-  "Complete" there is the same closeout-derived count as above
-  `[VERIFIED via lib/services/reviewer-rollup.js:119]`, not "review
-  returned." Fixed to the real four metrics with an explicit pointer to the
-  Step 13 distinction. (3) The technical deck's "Access & auth" slide
-  claimed the per-user app-grant filter also gates tab visibility. In fact
-  `RequireAppAccess appKey="reviewers"` wraps the whole page once
-  `[VERIFIED via pages/workbench/[requestId].js:242-247]`, the tab strip
-  renders all nine `TABS` entries unconditionally with no per-tab filter
-  `[VERIFIED via pages/workbench/[requestId].js:152-171]`, and `canManage` is
-  computed once and passed only into the Reviewers tab
-  `[VERIFIED via pages/workbench/[requestId].js: single JSX pass at the
-  Reviewers branch, no other passes in the file]`. Fixed to describe one
-  page-level grant plus route-level authorization, and to state plainly
-  that the tab strip is not filtered per tab.
-
-  Process note: regenerating from source is not currently checked for
-  generator→binary parity by CI — four generator-only commits drifted from
-  the shipped `.pptx` files before this reconciliation pass (see above), and
-  nothing would have caught it. Pinned the build recipe in
-  `docs/onboarding/README.md` to the exact `python-pptx` version used here
-  (`1.0.2`, confirmed via `pip show`) so a regeneration is reproducible.
-  Building an automated parity check (e.g., CI diffs regenerated output
-  against the checked-in `.pptx`) was explicitly out of scope for this pass
-  and is an open follow-up pending an owner decision on whether it's worth
-  the CI cost for two onboarding decks. Status is: reminder/token/scheduler/
-  tab-strip/closeout/funnel/access claims reconciled and re-verified; deck↔
-  generator parity enforcement remains open.
-
-  Known open item, not fixed here per instruction: `docs/REVIEWER_ENGAGEMENT_SPEC.md:110`
-  itself still reads "staff should not substitute a link-bearing resend
-  during the token-incident hold," which is now stale next to the same
-  spec's own `:64` and `:79` (the freeze is lifted; the respond-by nudge
-  re-mints deliberately) — flagging as a follow-up sweep item for that doc,
-  not treating `:110`'s hold language as clean support for any claim here.
-
-  Before the decks' next publication, re-diff them against
-  `docs/REVIEWER_ENGAGEMENT_SPEC.md` if reminder/token behavior changes
-  again, and re-check the tab strip against `[requestId].js` if a tab is
-  added, renamed, or merged.
+  **[CLOSED BY RETIREMENT 2026-09-08.]** The `docs/onboarding/` Workbench decks
+  (two generated `.pptx` files, their Python generator, and README) were retired
+  and deleted on owner decision 2026-09-08: no one had been shown them, they were
+  still DRAFT v1, and they had drifted from the product repeatedly. PR #182
+  (`f1a5113d`) had reconciled them the day before; that pass stands as the last
+  state in git history. The other public artifacts audited in that pass
+  (`shared/config/guideContent.js`, `pages/guide.js`, the public reviewer portal
+  `pages/external/review/[token].js`) carried no stale reminder, token-rotation,
+  freeze, or scheduler claims [VERIFIED via grep, 2026-09-07]. The generator→deck
+  parity-check follow-up is moot. Residual follow-ups surfaced by that pass and
+  still open: `docs/REVIEWER_ENGAGEMENT_SPEC.md:110` keeps "should not substitute
+  a link-bearing resend during the token-incident hold" while `:64`/`:79` record
+  the freeze lifted and respond-by reminders re-minting; and
+  `docs/agent-wiki/topics/finance-honoraria.md:41` says the closeout honorarium
+  decision is "deployment pending" although the modal and route are on `main`.
 - **Request Document explicit actor tracking (Option B).**
   **[OWNER-APPROVED 2026-08-31; ADVERSARIAL REVIEWED; PRODUCTION-PROVED FOR
   PRE-SITE CREATION.]** Keep Request Document CRUD off staff roles and
