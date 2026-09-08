@@ -1014,8 +1014,8 @@ export default function ReviewerManagePanel({
                     <th className="whitespace-nowrap px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider" aria-label="Download review">
                       Download
                     </th>
-                    <th className="whitespace-nowrap px-2 py-3 text-center text-xs font-medium uppercase text-gray-500 tracking-wider">
-                      Actions
+                    <th className="whitespace-nowrap px-2 py-3 text-center text-xs font-medium uppercase text-gray-500 tracking-wider" aria-label="More">
+                      More
                     </th>
                   </>
                 )}
@@ -1171,7 +1171,7 @@ export default function ReviewerManagePanel({
                         </td>
                         <td className="px-2 py-3 align-top text-center">
                           {/* Secondary magic-link and lifecycle actions. */}
-                          <div className="flex justify-center">
+                          <div className="flex w-full justify-center">
                             <TokenActionsMenu
                               reviewer={r}
                               onRegenerate={() => handleRegenerateToken(r.suggestionId)}

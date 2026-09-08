@@ -570,22 +570,6 @@ export default function ReviewersTab({
             onDismissReferral={dismissReferralAction}
           />
           <style jsx global>{`
-            .request-reviewer-table table thead th:last-child {
-              position: relative;
-              padding-right: 4.5rem;
-            }
-            .request-reviewer-table table thead th:last-child::after {
-              content: 'More';
-              position: absolute;
-              right: 1rem;
-              top: 50%;
-              transform: translateY(-50%);
-              color: #9ca3af;
-              font-size: 0.75rem;
-              font-weight: 600;
-              letter-spacing: 0.05em;
-              text-transform: uppercase;
-            }
             .request-reviewer-table table td span.rounded,
             .request-reviewer-table table td span.rounded-full {
               display: inline-flex;
