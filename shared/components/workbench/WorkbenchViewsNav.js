@@ -17,6 +17,16 @@ function withCycle(href, cycleCode) {
   return `${href}?cycleCode=${encodeURIComponent(cycleCode)}`;
 }
 
+// Initial Assessments are not part of the D26 dual-phase workflow (owner
+// decision 2026-09-05). The cycle is unknown until the page's first fetch
+// resolves it, so a cycle-conditional view stays hidden until then rather
+// than flashing in and out on load; unconditional views render immediately.
+function visibleForCycle(view, cycleCode) {
+  if (view.key !== 'initial-assessments') return true;
+  if (!cycleCode) return false;
+  return cycleCode !== 'D26';
+}
+
 function inferActiveKey(pathname) {
   if (pathname === '/workbench') return 'requests';
   if (pathname.startsWith('/workbench/artifacts')) return 'initial-assessments';
@@ -44,7 +54,7 @@ export default function WorkbenchViewsNav({ activeKey, cycleCode, counts = {} })
   return (
     <nav ref={scrollerRef} aria-label="Workbench views" className="mb-6 overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
       <div className="flex min-w-max items-stretch p-1.5">
-        {VIEWS.filter((view) => !(view.key === 'initial-assessments' && cycleCode === 'D26')).map((view) => {
+        {VIEWS.filter((view) => visibleForCycle(view, cycleCode)).map((view) => {
           const active = resolvedActiveKey === view.key;
           const count = counts[view.key];
           return (
