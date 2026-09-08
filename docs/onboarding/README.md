@@ -51,8 +51,12 @@ place. Close the files in PowerPoint first, or the write can collide with the op
 ## Grounding / source of truth
 
 Deck content was read from source during the authoring session (S277), not memory; refreshed
-2026-09-01 for the reviewer-reminder incident hold as well as the S280 3-sub-tab collapse
-(Find · Invite Reviewers · Track Reviewers) and the now-live Reviews tab:
+2026-09-01 for the reviewer-reminder incident hold and the S280 3-sub-tab collapse
+(Find · Invite Reviewers · Track Reviewers) and the now-live Reviews tab; reconciled again
+2026-09-07 to drop stale manual-reminder-freeze/token-regeneration-hold language — manual
+reminders (respond-by and review-due, via the Track Reviewers "Send reminder" action) have
+resumed and are not incident-frozen; only the scheduled automatic reminder cron remains
+unregistered:
 
 - Shell + tab strip: `pages/workbench/[requestId].js` — live tabs are **Overview, Proposal,
   Reviewers, Reviews, Status, Awardee**; the other four lifecycle tabs render a "coming in a later

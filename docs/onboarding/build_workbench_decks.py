@@ -206,7 +206,7 @@ def build_pd():
         (1, "Why they fit, h-index/citations, expertise keywords, Scholar/ORCID/website links."),
         "Select candidates and click Send invitation to invite the ones not yet invited.",
         "Heads-up — there is no longer a \"Re-invite\" button:",
-        (1, "Automatic reminders are paused; do not use a link-bearing resend during the incident hold."),
+        (1, "It was retired in favor of the per-reviewer \"Send reminder\" nudge in Track Reviewers."),
     ])
 
     section_slide(prs, "8", SPINE[7])
@@ -214,7 +214,7 @@ def build_pd():
         "Set the timing once for the whole request; invitations inherit it.",
         ("", "Days to respond — how long a reviewer has to accept (an offset, so later waves get the full window)."),
         ("", "Review due date — the fixed deadline reviews are due."),
-        ("", "Reminder controls are not available in this panel; automatic reminders are paused."),
+        ("", "Reminder controls are not available in this panel; use the \"Send reminder\" action in Track Reviewers instead."),
         ("", "Desired count — how many accepted reviewers you're aiming for (drives the quota notice)."),
     ])
 
@@ -238,9 +238,8 @@ def build_pd():
     content_slide(prs, "STEP 11", "Reviewers · Track Reviewers", [
         "Accepted reviewers live here — use Release to reviewers to send the proposal to those awaiting materials.",
         "Track everyone in flight, from materials sent through review received (this one tab absorbed the old Invite and Completed sub-tabs).",
-        "Automatic reviewer reminders are paused during the token-incident hold.",
-        (1, "Manual token-issuing reminders and resends are also procedurally frozen."),
-        (1, "Do not issue or regenerate reviewer links until the hold is lifted."),
+        "Scheduled automatic reviewer reminders remain paused; nudge reviewers yourself with Send reminder.",
+        (1, "Send reminder works for both an unanswered invitation and an accepted-but-not-submitted review."),
     ])
 
     section_slide(prs, "12", SPINE[11])
@@ -272,7 +271,7 @@ def build_pd():
     ])
 
     content_slide(prs, "WRAP-UP", "FAQ & where to get help", [
-        "\"Where did the Re-invite button go?\" — it was removed; automatic reminders are currently paused.",
+        "\"Where did the Re-invite button go?\" — it was retired for the Send reminder action; scheduled automatic reminders remain paused separately.",
         "\"A change isn't showing\" — hard-refresh; the app updates as we ship.",
         "\"A tab says coming soon\" — that lifecycle stage isn't built yet; it's on the roadmap.",
         "Who to ask: your team lead for workflow; Connor for anything technical.",
@@ -353,8 +352,8 @@ def build_tech():
         "Component: ReviewerInvitePanel.js; roster from /api/reviewer-finder/my-candidates?requestId=.",
         "Candidate detail maps off the person row wmkf_potentialreviewers (bibliometrics folded on; sidecar dropped S213).",
         "Invite → InviteEmailModal → render-emails / send-emails with templateType:'invitation'.",
-        "S277: the manual \"Re-invite already-invited\" button was removed;",
-        (1, "the allowResend re-mint path remains callable but is frozen during the hold."),
+        "S277: the manual \"Re-invite already-invited\" button was removed in favor of the per-reviewer Send reminder action;",
+        (1, "allowResend re-mint remains callable server-side (repair-follow-up flow only), independent of the reminder-cron hold."),
     ])
 
     section_slide(prs, "8", SPINE[7])
@@ -387,7 +386,7 @@ def build_tech():
     content_slide(prs, "STEP 11", "Track Reviewers + token TTL + reminders", [
         "Release/materials send mints a long-lived token (~review-due + 90d); only accepted reviewers receive it.",
         "Non-responder/invite links cap at review-due + grace (lib/external/reviewer-token-ttl.js via send-emails).",
-        "Reminder route is implemented but unscheduled; manual token-issuing reminders/resends are frozen.",
+        "Cron route (/api/cron/reviewer-reminders) is implemented but unscheduled (Vercel cron absent); manual reminders (respond + review-due) are live via send-review-reminder.",
         (1, "respond-by: deadline = emailSentAt + respondOffsetDays - lead; fire-once wmkf_respondremindersentat."),
         (1, "review-due: deadline = reviewDueDate - lead; fire-once via existing wmkf_remindersentat. Claim-before-send (If-Match)."),
     ])

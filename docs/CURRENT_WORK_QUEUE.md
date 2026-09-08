@@ -45,15 +45,32 @@ sequence.
 
 ## Audit follow-ups — verified open, not silently prioritized
 - **Public/onboarding reviewer-token documentation reconciliation.**
-  **[OWNER-DEFERRED 2026-09-01.]** Internal operating sources now reflect the
-  production incident remediation: review-due reminders are link-free and
-  preserve token authority, manual reminders have resumed, and the automatic
-  schedule remains held. Public/onboarding artifacts were intentionally left
-  untouched during the emergency response. Before their next publication,
-  audit `docs/onboarding/` and any generated public help/decks for stale claims
-  about reminder token rotation, manual-send freezes, or scheduler operation;
-  update the source generators first, regenerate outputs, and verify that no
-  credential/runbook material becomes public accidentally.
+  **[OWNER-DEFERRED 2026-09-01; RECONCILED 2026-09-07.]** Internal operating
+  sources now reflect the production incident remediation: review-due
+  reminders are link-free and preserve token authority, manual reminders have
+  resumed, and the automatic schedule remains held. Public/onboarding
+  artifacts were intentionally left untouched during the emergency response.
+  Audited `docs/onboarding/build_workbench_decks.py` (the sole generator for
+  `docs/onboarding/*.pptx`) plus the rest of the `docs/onboarding/` tree,
+  `shared/config/guideContent.js`, `pages/guide.js`, and the public reviewer
+  portal (`pages/external/review/[token].js`) for stale claims about reminder
+  token rotation, manual-send freezes, or scheduler operation
+  [VERIFIED via grep, 2026-09-07]. Found and fixed stale claims at six
+  locations in the generator (PD-deck Step 7/8/11/FAQ, technical-deck Step
+  7/11) that still said manual reminders/resends were "frozen during the
+  hold" or that the
+  Re-invite button's removal was caused by the incident pause; corrected to:
+  manual reminders (respond-by and review-due) have resumed via the Track
+  Reviewers "Send reminder" action, only the scheduled automatic cron
+  (`/api/cron/reviewer-reminders`) remains unregistered, and the Re-invite
+  button's removal (S277) predates and is independent of the incident hold.
+  Regenerated both `.pptx` outputs from the corrected generator via a
+  throwaway venv per the README. Confirmed no credential/runbook material is
+  embedded in the generator, aside from one pre-existing, out-of-scope,
+  unrelated line naming the `CRON_SECRET` env var (not its value) in the
+  technical deck's ops appendix — left untouched as unrelated to this
+  reconciliation. Before the decks' next publication, re-diff them against
+  `docs/REVIEWER_ENGAGEMENT_SPEC.md` if reminder/token behavior changes again.
 - **Request Document explicit actor tracking (Option B).**
   **[OWNER-APPROVED 2026-08-31; ADVERSARIAL REVIEWED; PRODUCTION-PROVED FOR
   PRE-SITE CREATION.]** Keep Request Document CRUD off staff roles and
