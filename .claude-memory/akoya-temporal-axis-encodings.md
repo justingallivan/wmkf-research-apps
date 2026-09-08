@@ -7,7 +7,7 @@ metadata:
   originSessionId: 8050fbb7-13c6-444b-b802-c9bc7a61a3ce
   status: active
   scope: dataverse
-  last_verified: 2026-07-27 via lib/utils/cycle-code.js; population figures remain dated 2026-05-18 probe snapshots
+  last_verified: 2026-09-08 via lib/utils/cycle-code.js; population figures remain dated 2026-05-18 probe snapshots
 ---
 
 ## Recall Rule
@@ -41,5 +41,16 @@ Design consequence for Dataverse Bulk Export / any cohorting UI:
 - Prefer compiling a cycle filter to a `wmkf_meetingdate` *range* (via `cycleCodeToOdataFilter`) rather than string-matching `akoya_fiscalyear`: the string is sparser and not era-robust, whereas meeting date is Bucket A. Fiscal year as a string (`"May 2027"`) degrades gracefully for off-months; the brittleness is *only* the cycle-code path.
 
 Distinct from `akoya_decisiondate`, which is the *business-history / approval-stamp* slice (era-dependent presence, the `[[dataverse-export-floor-scoping]]` `dateBasis` axis) — meeting date is the *board-cycle* handle. Do not conflate the two temporal axes.
+
+**Default cycle (owner decision 2026-09-08, S499).** Which cycle a surface opens on is a pure
+function of the calendar and the cycles that exist — never of the caller's assignments or of what
+is visible to them. `lib/utils/cycle-code.js` `resolveWorkingCycle` (earliest meeting on/after today;
+September → D26) and `resolveLastDecidedCycle` (newest meeting before today; September → J26) are
+the only default-cycle rules; `conventionalCycles(today)` supplies the June/December codes to
+callers with no list. Awardees = last decided; every other Workbench view = working. UTC throughout.
+This superseded three divergent rules (Workbench "caller's assigned cycle", Final writeups
+"walk back to a visible row" — 2026-09-06 decision superseded 2026-09-08 in favor of an in-place
+message with a link — and Initial assessments "newest artifact row") and two disagreeing
+calendar helpers (Awardees local-time "last past", grantee-titles cron UTC "upcoming").
 
 Related: [[dataverse-export-floor-scoping]]

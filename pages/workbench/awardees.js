@@ -11,16 +11,13 @@ import Link from 'next/link';
 import Layout, { Card, PageHeader } from '../../shared/components/Layout';
 import RequireAppAccess from '../../shared/components/RequireAppAccess';
 import WorkbenchViewsNav from '../../shared/components/workbench/WorkbenchViewsNav';
+import { resolveLastDecidedCycle, conventionalCycles } from '../../lib/utils/cycle-code';
 
 // Board meets June (J) and December (D); default to the most recent meeting.
-function currentCycleCode() {
-  const d = new Date();
-  const yy = String(d.getFullYear()).slice(-2);
-  const m = d.getMonth(); // 0 = Jan
-  if (m >= 5 && m < 11) return `J${yy}`;                       // Jun–Nov → June cycle
-  if (m >= 11) return `D${yy}`;                                 // Dec → Dec cycle
-  return `D${String(d.getFullYear() - 1).slice(-2)}`;          // Jan–May → prior Dec cycle
-}
+// Awardees are the last DECIDED cycle (owner decision 2026-09-08); the
+// Workbench's working cycle is the upcoming one. Both come from the shared
+// resolver so no page carries its own calendar arithmetic.
+const currentCycleCode = () => resolveLastDecidedCycle(conventionalCycles(new Date()), new Date());
 
 const contextKey = (code, all) => `${code}:${all ? 'all' : 'mine'}`;
 
