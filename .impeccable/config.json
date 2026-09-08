@@ -21,6 +21,15 @@
         ],
         "createdAt": "2026-09-05T03:27:43.816Z",
         "reason": "Agent: DESIGN.md defines the browser interface typography. This unchanged transactional-email renderer deliberately uses Arial system-font fallbacks in presentation tables with Outlook mso padding; the browser font declaration is not its styling contract."
+      },
+      {
+        "rule": "gray-on-color",
+        "value": "*",
+        "files": [
+          "pages/cycle-dossier.js"
+        ],
+        "createdAt": "2026-09-08T01:05:12.478Z",
+        "reason": "Agent review: the regex detector pairs sibling classes across long JSX lines 473, 477, and 479. Gray text is on white Card or gray-50 surfaces; amber panels use text-amber-900, emerald rows use text-emerald-950/text-emerald-700, and red errors use text-red-800. No gray-on-colored panel exists in these findings."
       }
     ]
   }
