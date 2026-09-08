@@ -14,7 +14,7 @@ import ReviewerManagePanel, {
   _managePanelInternals,
 } from '../../shared/components/reviewers/ReviewerManagePanel';
 
-const { closeoutNextAction } = _managePanelInternals;
+const { closeoutNextAction, honorariumEligibilityPillInfo } = _managePanelInternals;
 
 jest.mock('../../shared/components/Layout', () => ({
   Card: ({ children }) => <div>{children}</div>,
@@ -120,5 +120,18 @@ describe('Next-action column wiring through the panel', () => {
     expect(screen.getByRole('button', { name: 'Mark complete' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Manage Dr. Closeout Reviewer' }));
     expect(screen.queryAllByRole('button', { name: 'Mark complete' })).toHaveLength(1);
+  });
+});
+
+describe('honorariumEligibilityPillInfo', () => {
+  test.each([
+    ['eligible', 'Eligible', 'Honorarium eligibility: eligible', 'neutral'],
+    ['not_eligible', 'None', 'Honorarium eligibility: not eligible', 'neutral'],
+    ['not_applicable', 'N/A', 'Honorarium eligibility: not applicable', 'neutral'],
+    [null, 'Undecided', 'Honorarium eligibility not recorded', 'amber'],
+    [undefined, 'Undecided', 'Honorarium eligibility not recorded', 'amber'],
+    ['bogus', 'Undecided', 'Honorarium eligibility not recorded', 'amber'],
+  ])('%s -> text=%s, label=%s, tone=%s', (value, text, label, tone) => {
+    expect(honorariumEligibilityPillInfo(value)).toEqual({ text, label, tone });
   });
 });
