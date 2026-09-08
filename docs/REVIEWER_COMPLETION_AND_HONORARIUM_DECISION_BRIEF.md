@@ -240,12 +240,15 @@ contract avoids the current sequential partial-success problem.
 
 - Exclude Complete from **Correct recorded status**, hide that generic control
   for an already Complete row, and keep the server rejection as the real guard.
-- For a `review_received` row, show **Close review**. The modal identifies the
+- For a `review_received` row, show **Mark complete** (shipped label; the brief
+  originally said Close review). The modal identifies the
   reviewer/request and, only when a linked honorarium applies, asks **Should an
   honorarium be paid?** with **Yes** and **No** buttons. No makes closeout notes
   required. Opt-out or missing-link cases explain that no decision is needed and
   submit `not_applicable` automatically.
-- For a Complete row, show the disposition and **Edit closeout**.
+- For a Complete row, show the disposition; show **Record closeout** as the
+  Next-action button only while no disposition is recorded, otherwise edit via
+  the More menu's **Edit closeout** (owner decision 2026-09-08).
 - Show null on legacy Complete rows as **Closeout disposition not recorded**;
   never infer it from receipt, thank-you, opt-out, or linked-request state.
 - Check `response.ok`, display the server reason, disable duplicate submission
