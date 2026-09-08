@@ -1,6 +1,49 @@
-# Session 495 Prompt: Reconcile the Cycle Dossier and run a measured one-request smoke
+# Session 497 Prompt: Cycle Dossier reconciliation (Codex lane) and J27 follow-ups (Claude lane)
 
-## Session 494 Summary
+## Session 496 Summary (Claude, 2026-09-07/08)
+
+Owner-present orchestration session: Fable orchestrated, Sonnet built, Opus reviewed, Codex ran
+adversarial reviews (`--model gpt-5.6-sol`). Five PRs merged to `main`, all Tier 0, all through the
+normal reviewed path; production auto-deployed each. Codex worked concurrently on three branches
+(cycle-dossier pilot, reviewer-ui-surfacing, compact-controls → PR #183/#185) and its checkouts were
+never touched.
+
+### What Was Completed
+
+1. **`check:j27-register` advisory gate built, then hardened** (PR #180 `6059118a`, PR #186
+   `999f4baf`). Lists `J27:` tags, fails on unknown ids, and checks every register row's cited
+   files against fragments **bound per file** (`` `path` → `fragment` `` in the excerpt cell):
+   strict unbound on multi-file rows, directory sites fail, disposition vocabulary enforced,
+   whitespace-tolerant row detection that fails closed. Self-test 80/80, mutation-checked at
+   every fix. Advisory only (`/start` battery), not CI/hooks.
+2. **Register reconciled to the strict rule** (PR #186): 47 loosely written rows rebound by four
+   parallel Sonnet slice agents; ~170 per-file decisions recorded in
+   `docs/plans/J27_REGISTER_RECONCILIATION_DECISIONS_2026-09-08.md` and reviewed exhaustively by
+   two Opus passes; owner ruled on J27-023 (non-site citation dropped). Final: 59 ok / 0 stale /
+   6 unverifiable / 11 closed, 0 unbound. Merging `main` first surfaced real drift from Codex
+   PR #183 on J27-020/037 (predicate moved to `shared/config/workbenchVisibility.js`), rebound.
+3. **J27 plan closeout** (PR #181 `5cef9f85`): three bare `J27:` markers resolved, memory/wiki
+   pointer criterion met, J27-051 annotated at all four sites. Q3 answered (Initial Assessments stay
+   hidden for D26); Q5 and slice G parked (Connor out); other §8 questions deferred by owner.
+4. **Onboarding decks reconciled then retired** (PR #182 `f1a5113d`, PR #184 `52e16aa8`): the
+   Codex review found real deck errors (wrong reminder surface, stale tab strip, closeout
+   honorarium omission); fixed, then the owner retired `docs/onboarding/` entirely (never shown to
+   anyone, DRAFT v1).
+5. **Two stale doc lines fixed** (`c1f4893d`): `REVIEWER_ENGAGEMENT_SPEC.md:110` hold wording;
+   `finance-honoraria.md` closeout "deployment pending".
+6. **Memory:** `feedback-codex-model-gpt56-sol` (this account's ChatGPT auth refuses `gpt-5.6` and
+   `gpt-5.4`; owner excludes `gpt-6-astra`; catalog in `~/.codex/models_cache.json`).
+
+### Commits (Claude, all on `main`)
+
+PR #180 `6059118a` · PR #181 `5cef9f85` · PR #182 `f1a5113d` · PR #184 `52e16aa8` · PR #186
+`999f4baf` · handoffs `18fec834`, `e62a8c0a`, `7773656e` · memory `a7c6da51`.
+
+Milestone determination: no `DEVELOPMENT_LOG.md` entry — repo tooling and docs, no production
+capability, cutover, or incident.
+
+## Previous handoff (Session 494, Codex)
+
 
 This owner-present session replaced Research-only Workbench discovery assumptions with live Grant
 Program scope, preserved Research as the default, and shipped the reconciled behavior to Production.
