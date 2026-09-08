@@ -85,8 +85,10 @@ pilot remains a draft and was not promoted.
    more findings (row-disappearance parsing bypass, J27-023 bound to a non-fact fragment, two stale
    doc restatements), all fixed. Owner ruled 2026-09-08 on J27-023 (option 1: the shortcode-domain
    audit is not a J27 site; citation dropped, `Ev` back to SV). Gate: 59 ok / 0 stale / 6 unverifiable
-   / 11 closed, 0 unbound, self-test 80/80 with `KNOWN_OWNER_PENDING` empty. Not yet
-   merged to `main`. Next action is the J27 build plan once Q5 lands (item 3 below).
+   / 11 closed, 0 unbound, self-test 80/80 with `KNOWN_OWNER_PENDING` empty. **MERGED to `main`
+   2026-09-08 as PR #186 (`999f4baf`)**; merging `main` first surfaced real drift from Codex PR #183
+   on J27-020/J27-037 (visibility predicate moved to `shared/config/workbenchVisibility.js`), rebound
+   in the same PR. Next action is the J27 build plan once Q5 lands (item 6 below).
 6. **Write `docs/J27_BUILD_AND_CHANGE_PLAN.md`** once Connor's file-location decision (Q5) lands.
    Evidence: register §2 deliverables table. Sequence unchanged from the S492 prompt.
 7. **Annotate the pilot passages** coupling "J27 Initial Assessment" to 2026-08-18:
