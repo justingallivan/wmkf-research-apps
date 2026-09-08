@@ -151,7 +151,7 @@ export function TokenActionsMenu({
         ref={btnRef}
         onClick={() => setOpen(o => !o)}
         disabled={degraded}
-        className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
+        className="inline-flex items-center justify-center p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
         title={degraded ? degradedTitle : 'Manage reviewer'}
         aria-label={`Manage ${reviewer.name || 'reviewer'}`}
       >
