@@ -122,21 +122,6 @@ function ReviewerGroup({ proposal, previewReadOnly, onRefresh, degraded, loading
                   line-height: 1.25;
                   padding: 0.25rem 0.625rem;
                 }
-                .reviewer-activity-panel table thead th:last-child {
-                  position: relative;
-                  padding-right: 5rem;
-                }
-                .reviewer-activity-panel table thead th:last-child::after {
-                  content: 'More';
-                  position: absolute;
-                  top: 50%;
-                  right: 1rem;
-                  transform: translateY(-50%);
-                  color: #9ca3af;
-                  font-weight: 500;
-                  text-transform: none;
-                  letter-spacing: normal;
-                }
                 .reviewer-activity-panel button[aria-label^='Manage '] {
                   min-width: 2.25rem;
                   min-height: 2.25rem;
