@@ -1010,8 +1010,8 @@ export default function ReviewerManagePanel({
                     <th className="whitespace-nowrap px-2 py-3 text-center text-xs font-medium uppercase text-gray-500 tracking-wider" aria-label="Download review">
                       Download
                     </th>
-                    <th className="whitespace-nowrap px-2 py-3 text-center text-xs font-medium uppercase text-gray-500 tracking-wider">
-                      Actions
+                    <th className="whitespace-nowrap px-2 py-3 text-center text-xs font-medium uppercase text-gray-500 tracking-wider" aria-label="More">
+                      <span className="sr-only">More</span>
                     </th>
                   </>
                 )}
