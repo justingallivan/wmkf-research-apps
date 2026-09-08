@@ -3,7 +3,8 @@
 
 Grounded in source read this session:
 - Shell: pages/workbench/[requestId].js (query-string ?tab=&sub= routing; RequireAppAccess 'reviewers')
-- Live tabs: Overview, Proposal, Reviewers, Reviews, Status, Awardee (4 lifecycle tabs are placeholders)
+- Live tabs (all nine, no placeholders): Overview, Proposal, Initial Assessment, Reviewers,
+  Reviews, Staff Deliberations, Final Writeup, Status, Awardee
 - Reviewers sub-tabs: Find, Invite Reviewers, Track Reviewers (collapsed S280 from 5: Find, Candidates, Invite, Track, Completed)
   - Invite Reviewers = the old Candidates tab (save shortlist + send invitations).
   - Track Reviewers = the old Invite + Completed sub-tabs (release materials, monitor, completion).
@@ -166,18 +167,17 @@ def build_pd():
 
     section_slide(prs, "3", SPINE[2])
     content_slide(prs, "STEP 3", "The tab strip", [
-        "Eight tabs are implemented in source:",
-        (1, "Overview · Proposal · Initial Assessment · Reviewers · Reviews · Pre Site Visit · Status · Awardee"),
-        "Two remain placeholders for the later request lifecycle:",
-        (1, "Site Visit · Final Writeup — they say \"coming in a later update.\""),
-        ("", "Pre Site Visit currently generates a Word file for local download; it is not yet saved back to SharePoint."),
+        "Nine tabs, all live — no placeholders left:",
+        (1, "Overview · Proposal · Initial Assessment · Reviewers · Reviews · Staff Deliberations · Final Writeup · Status · Awardee"),
+        ("", "Staff Deliberations merges the former Pre Site Visit Writeup and Site Visit tabs into one workspace."),
         "You'll spend most of your time on the Reviewers tab.",
     ])
 
     section_slide(prs, "4", SPINE[3])
     content_slide(prs, "STEP 4", "Overview tab — the command center", [
         "A fast answer to \"where is this request and what do I do next?\"",
-        "Reviewer funnel at a glance: how many candidates, invited, accepted, materials sent, reviews in.",
+        "Reviewer funnel at a glance: Candidates, Invited, Accepted, Complete.",
+        ("", "Complete here means closed out, not just \"review returned\" — see Step 13."),
         "A \"what next\" hint based on that funnel.",
         "Key request facts: meeting date, amounts, status.",
         ("", "Use it as your daily starting point for each request."),
@@ -206,7 +206,9 @@ def build_pd():
         (1, "Why they fit, h-index/citations, expertise keywords, Scholar/ORCID/website links."),
         "Select candidates and click Send invitation to invite the ones not yet invited.",
         "Heads-up — there is no longer a \"Re-invite\" button:",
-        (1, "Automatic reminders are paused; do not use a link-bearing resend during the incident hold."),
+        (1, "It was retired (S277) when the automated respond-by reminder was introduced."),
+        (1, "For an unanswered invitee, use the \"Send reminder\" nudge right here in Invite Reviewers instead."),
+        (1, "That nudge mints a fresh secure link, replacing the reviewer's earlier invitation link."),
     ])
 
     section_slide(prs, "8", SPINE[7])
@@ -214,7 +216,7 @@ def build_pd():
         "Set the timing once for the whole request; invitations inherit it.",
         ("", "Days to respond — how long a reviewer has to accept (an offset, so later waves get the full window)."),
         ("", "Review due date — the fixed deadline reviews are due."),
-        ("", "Reminder controls are not available in this panel; automatic reminders are paused."),
+        ("", "Reminder controls are not available in this panel: nudge an unanswered invitee from Invite Reviewers, or an accepted-but-not-submitted review from Track Reviewers or Reviews."),
         ("", "Desired count — how many accepted reviewers you're aiming for (drives the quota notice)."),
     ])
 
@@ -238,9 +240,8 @@ def build_pd():
     content_slide(prs, "STEP 11", "Reviewers · Track Reviewers", [
         "Accepted reviewers live here — use Release to reviewers to send the proposal to those awaiting materials.",
         "Track everyone in flight, from materials sent through review received (this one tab absorbed the old Invite and Completed sub-tabs).",
-        "Automatic reviewer reminders are paused during the token-incident hold.",
-        (1, "Manual token-issuing reminders and resends are also procedurally frozen."),
-        (1, "Do not issue or regenerate reviewer links until the hold is lifted."),
+        "Scheduled automatic reviewer reminders remain paused; here you can nudge an accepted reviewer who hasn't submitted with Send reminder.",
+        (1, "This action is link-free — it doesn't mint or change their existing review link (the invite-stage nudge lives in Invite Reviewers)."),
     ])
 
     section_slide(prs, "12", SPINE[11])
@@ -253,8 +254,10 @@ def build_pd():
 
     section_slide(prs, "13", SPINE[12])
     content_slide(prs, "STEP 13", "Reviewers · Track Reviewers (completion)", [
-        "Completed reviewers (review returned) show within Track Reviewers — there is no separate Completed tab anymore.",
-        "Marking a review complete is record-keeping only; nothing auto-pays or drops the row off.",
+        "Review Received and Complete are two different states — a returned review isn't closed out yet.",
+        "Closing it out asks whether an honorarium should be paid (Yes/No/not applicable), with a reason required when the answer is No.",
+        (1, "That decision doesn't itself create or pay anything — payment stays an Operations/Finance process outside the Workbench."),
+        "There is no separate Completed tab anymore; both states show within Track Reviewers.",
     ])
 
     section_slide(prs, "14", SPINE[13])
@@ -272,9 +275,9 @@ def build_pd():
     ])
 
     content_slide(prs, "WRAP-UP", "FAQ & where to get help", [
-        "\"Where did the Re-invite button go?\" — it was removed; automatic reminders are currently paused.",
+        "\"Where did the Re-invite button go?\" — it was retired (S277) when the automated respond-by reminder shipped; nudge an unanswered invitee instead with Send reminder in Invite Reviewers. Scheduled automatic reminders remain paused separately.",
         "\"A change isn't showing\" — hard-refresh; the app updates as we ship.",
-        "\"A tab says coming soon\" — that lifecycle stage isn't built yet; it's on the roadmap.",
+        "\"Awardee tab looks empty\" — it's research-grants only; other grant types won't populate it.",
         "Who to ask: your team lead for workflow; Connor for anything technical.",
         ("", "This deck is a draft — tell us what's confusing and we'll tighten it."),
     ])
@@ -303,16 +306,16 @@ def build_tech():
     content_slide(prs, "ARCHITECTURE", "The shell", [
         "Per-request shell: pages/workbench/[requestId].js (tier-3 page).",
         "Tab + sub-tab selection is query-string driven: ?tab=reviewers&sub=track (deep-linkable; legacy sub=invite/completed normalize to track).",
-        "Implemented tab components:",
-        (1, "OverviewTab · ProposalTab · InitialAssessmentTab · ReviewersTab · ReviewsTab · StatusTab · AwardeeTab (shared/components/...)."),
-        (1, "The other 3 tab keys fall through to a \"coming in a later update\" card."),
+        "Implemented tab components (all nine keys are live, none fall through):",
+        (1, "OverviewTab · ProposalTab · InitialAssessmentTab · ReviewersTab · ReviewsTab · StaffDeliberationsTab · FinalWriteupTab · StatusTab · AwardeeTab (shared/components/...)."),
+        (1, "Legacy pre-site-visit/site-visit deep links alias to staff-deliberations (S466 merge)."),
         "Consolidation: the Workbench merges the old reviewer-finder + review-manager apps; one app-access grant ('reviewers') now covers them.",
     ])
     content_slide(prs, "ARCHITECTURE", "Access & auth", [
-        "Page is wrapped in RequireAppAccess appKey=\"reviewers\".",
-        "Per-user app grants live in Dataverse (admin-managed); the same filter gates tab visibility.",
+        "Page is wrapped in RequireAppAccess appKey=\"reviewers\" — one gate for the whole page, not per tab.",
+        "Per-user app grants live in Dataverse (admin-managed); the tab strip itself is NOT filtered — all nine tabs render for anyone with the grant.",
         "Identity comes from the authenticated session — never from request input.",
-        "canManage is computed (reviewer-modes) to gate write actions vs. read-only viewers.",
+        "canManage is computed (reviewer-modes) and passed only into the Reviewers tab, to gate write actions vs. read-only viewers there.",
     ])
 
     section_slide(prs, "1-3", "Shell, entry & tab strip")
@@ -353,8 +356,9 @@ def build_tech():
         "Component: ReviewerInvitePanel.js; roster from /api/reviewer-finder/my-candidates?requestId=.",
         "Candidate detail maps off the person row wmkf_potentialreviewers (bibliometrics folded on; sidecar dropped S213).",
         "Invite → InviteEmailModal → render-emails / send-emails with templateType:'invitation'.",
-        "S277: the manual \"Re-invite already-invited\" button was removed;",
-        (1, "the allowResend re-mint path remains callable but is frozen during the hold."),
+        "S277: the manual \"Re-invite already-invited\" button was removed when the automated respond-by reminder was introduced;",
+        (1, "RespondReminderModal (imported only here, Invite Reviewers) now covers the unanswered-invitee nudge, minting a fresh link."),
+        (1, "allowResend re-mint remains callable server-side (repair-follow-up flow only), independent of the reminder-cron hold."),
     ])
 
     section_slide(prs, "8", SPINE[7])
@@ -387,7 +391,7 @@ def build_tech():
     content_slide(prs, "STEP 11", "Track Reviewers + token TTL + reminders", [
         "Release/materials send mints a long-lived token (~review-due + 90d); only accepted reviewers receive it.",
         "Non-responder/invite links cap at review-due + grace (lib/external/reviewer-token-ttl.js via send-emails).",
-        "Reminder route is implemented but unscheduled; manual token-issuing reminders/resends are frozen.",
+        "Cron route (/api/cron/reviewer-reminders) is implemented but unscheduled (Vercel cron absent); manual reminders (respond + review-due) are live via send-review-reminder.",
         (1, "respond-by: deadline = emailSentAt + respondOffsetDays - lead; fire-once wmkf_respondremindersentat."),
         (1, "review-due: deadline = reviewDueDate - lead; fire-once via existing wmkf_remindersentat. Claim-before-send (If-Match)."),
     ])
@@ -402,7 +406,8 @@ def build_tech():
 
     section_slide(prs, "13-14", "Completion (in Track Reviewers) & Status")
     content_slide(prs, "STEPS 13-14", "Completed reviews & Status reflection", [
-        "Completed reviews show within Track Reviewers (no separate Completed tab): reviews returned via the review-manager reviewers feed; wmkf_accepted lifecycle.",
+        "Track Reviewers (no separate Completed tab) holds both states: wmkf_reviewstatus review_received (returned, not yet closed out) and complete.",
+        (1, "ReviewerCloseoutModal -> POST close-review: one ETag-bound write sets reviewStatus:'complete' + completedAt + honorariumEligibility (+ notes); never writes the honorarium request itself."),
         "StatusTab.js: read-only reflection of akoya_requeststatus.",
         (1, "statusClass derived via the value->class map in lib/services/dataverse-export/constants.js."),
         (1, "Unknown status -> UNCLASSIFIED, shown raw (never coerced). Workbench never writes status."),
