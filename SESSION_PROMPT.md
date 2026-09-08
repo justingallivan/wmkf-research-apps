@@ -91,12 +91,18 @@ toolbar/header · `314e9426` `e68bffe9` ToolbarSelect · `f4bcb5b6` smoke record
    registered in `docs/CI_GATES_REFERENCE.md` and `/start`). Baseline 61 ok / 0 stale /
    6 unverifiable / 9 closed. All three `J27:` markers found without ids (the third,
    in `.claude/skills/start/SKILL.md`, surfaced only on plan-closeout re-run) were
-   resolved 2026-09-07 on branch `claude/j27-plan-closeout`; the memory/wiki pointer
-   exit criterion is also met. §8 owner answers beyond Q0 remain open.
+   resolved 2026-09-07 and merged via PR #181 (`5cef9f85`); the memory/wiki pointer
+   exit criterion is also met. §8 owner answers beyond Q0 remain open. Gate follow-ups recorded in
+   register §9: prose-colon false positives, any-fragment/any-file multi-site check.
+   Also merged 2026-09-08 UTC: PR #182 (`f1a5113d`) reconciling the `docs/onboarding/` decks with
+   post-incident reminder behavior, the nine-tab Workbench strip, closeout honorarium disposition,
+   Overview funnel, and page-level access; `python-pptx==1.0.2` pinned. Open follow-ups from its
+   Codex/Opus reviews: generator↔deck parity check (owner decision), `REVIEWER_ENGAGEMENT_SPEC.md:110`
+   stale hold wording, `finance-honoraria.md:41-42` stale "deployment pending".
 3. **Write `docs/J27_BUILD_AND_CHANGE_PLAN.md`** once Connor's file-location decision (Q5) lands.
    Evidence: register §2 deliverables table. Sequence unchanged from the S492 prompt.
 4. **Annotate the pilot passages** coupling "J27 Initial Assessment" to 2026-08-18:
-   DONE 2026-09-07 (branch `claude/j27-plan-closeout`), all 4 of 4 cited sites —
+   DONE 2026-09-07, merged via PR #181 (`5cef9f85`), all 4 of 4 cited sites —
    `REQUEST_WORKBENCH_NEAR_TERM_EXECUTION_PLAN.md` (two sites), `DATAVERSE_SHAREPOINT_FILE_MODEL.md`,
    `strategy-roadmap.md`, and memory `project-reviewer-apps-redesign-direction.md` — each now
    carries a dated `J27: J27-051` note. Register row J27-051 is `done`. Evidence: register J27-051, Q18.
