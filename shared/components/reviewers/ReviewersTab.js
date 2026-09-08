@@ -571,7 +571,9 @@ export default function ReviewersTab({
           />
           <style jsx global>{`
             .request-reviewer-table table td span.rounded,
-            .request-reviewer-table table td span.rounded-full {
+            .request-reviewer-table table td span.rounded-full,
+            .request-reviewer-table table td a.rounded-full,
+            .request-reviewer-table table td button.rounded-full {
               display: inline-flex;
               min-height: 1.75rem;
               align-items: center;

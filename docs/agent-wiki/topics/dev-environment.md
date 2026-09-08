@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-08-30
+last_verified: 2026-09-08
 stale_after_days: 90
 owner: dev-ops
 source_files:
@@ -144,7 +144,10 @@ Claude config sync, and environment-specific operating notes.
   credentials problem; the interlock line is only in the `next dev` console, so
   check there first. Only the literal `'yes'` lifts it
   (`interlock.js:327`), and it gates **reads only** — a local→production write
-  still needs the separate `resolveProdWriteAck` exception.
+  still needs the separate `resolveProdWriteAck` exception. A denied write also
+  surfaces as generic route copy ("Failed to close reviewer engagement" from the
+  closeout route's 500 catch-all, 2026-09-08): the interlock throw is not a
+  `ServiceHttpError`, so the route cannot tell it from a Dataverse fault.
   **Setting that flag is the owner's call, never an agent's**
   (`feedback-never-self-authorize-prod-dataverse-reads`): hand over the command
   and wait. It is a standing permission once set, so it belongs out of

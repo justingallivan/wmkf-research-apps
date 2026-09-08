@@ -31,7 +31,7 @@
 import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import ReviewerDueDateEditor from './ReviewerDueDateEditor';
 import ReviewerActivityDrawer from './ReviewerActivityDrawer';
-import ReviewerCloseoutModal, { closeoutDispositionLabel } from './ReviewerCloseoutModal';
+import ReviewerCloseoutModal from './ReviewerCloseoutModal';
 import { latestActivitySummary } from './reviewer-activity-history';
 import { acceptedReviewerRemoveWarning } from './remove-reviewer-confirm';
 import { Card, Button } from '../Layout';
@@ -92,6 +92,30 @@ export function StatusBadge({ status, href, onClick, ariaLabel }) {
   return <span className={className}>{info.label}</span>;
 }
 
+// Small honorarium-eligibility pill shown next to the status badge for
+// completed reviews (the compact Track Reviewers table rendering).
+const HONORARIUM_PILL_INFO = Object.freeze({
+  eligible: { text: 'Eligible', label: 'Honorarium eligibility: eligible', tone: 'neutral' },
+  not_eligible: { text: 'None', label: 'Honorarium eligibility: not eligible', tone: 'neutral' },
+  not_applicable: { text: 'N/A', label: 'Honorarium eligibility: not applicable', tone: 'neutral' },
+  // The API emits this literal when the stored picklist integer doesn't map
+  // to a known value (lib/services/review-manager/reviewers-service.js) --
+  // distinct from "not recorded"; it needs a technical fix, not a decision.
+  unknown: {
+    text: 'Needs review',
+    label: 'Honorarium eligibility: saved disposition not recognized; technical repair required',
+    tone: 'amber',
+  },
+});
+
+function honorariumEligibilityPillInfo(value) {
+  return HONORARIUM_PILL_INFO[value] || {
+    text: 'Undecided',
+    label: 'Honorarium eligibility not recorded',
+    tone: 'amber',
+  };
+}
+
 export function reviewerHasReceivedReview(reviewer) {
   return Boolean(
     reviewer?.reviewReceivedAt
@@ -99,6 +123,20 @@ export function reviewerHasReceivedReview(reviewer) {
     || ['review_received', 'complete'].includes(reviewer?.reviewStatus),
   );
 }
+
+// Next-action button for the closeout flow. A completed review with a
+// disposition already recorded (eligible/not_eligible/not_applicable, or the
+// unrecognised 'unknown' value) has no outstanding to-do, so the Next-action
+// cell shows nothing for it -- editing stays available via the More menu.
+function closeoutNextAction(reviewer) {
+  if (reviewer?.reviewStatus === 'review_received') return { label: 'Mark complete' };
+  if (reviewer?.reviewStatus === 'complete' && reviewer?.honorariumEligibility == null) {
+    return { label: 'Record closeout' };
+  }
+  return null;
+}
+
+export const _managePanelInternals = { closeoutNextAction, honorariumEligibilityPillInfo };
 
 // ─── Decline-referral inline add helpers ────────────────────────────────────
 
@@ -1023,6 +1061,10 @@ export default function ReviewerManagePanel({
                 // without being fabricated as a dated timeline event.
                 const lastEvent = latestActivitySummary(r);
                 const receivedReview = reviewerHasReceivedReview(r);
+                const nextAction = closeoutNextAction(r);
+                const honorariumPill = r.reviewStatus === 'complete'
+                  ? honorariumEligibilityPillInfo(r.honorariumEligibility)
+                  : null;
 
                 return (
                   <tr key={r.suggestionId} className="hover:bg-gray-50 transition-colors">
@@ -1056,6 +1098,22 @@ export default function ReviewerManagePanel({
                             : undefined}
                           ariaLabel={`View activity history for ${r.name || 'reviewer'}`}
                         />
+                        {honorariumPill && (
+                          <span
+                            className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                              honorariumPill.tone === 'amber'
+                                ? 'bg-amber-100 text-amber-800'
+                                : 'bg-gray-100 text-gray-700'
+                            }`}
+                            title={honorariumPill.label}
+                          >
+                            {/* Compact visual text is hidden from AT; the sr-only span carries the full wording. */}
+                            <span aria-hidden="true">$</span>
+                            <span aria-hidden="true">{honorariumPill.text}</span>
+                            <span className="sr-only">{honorariumPill.label}</span>
+                            
+                          </span>
+                        )}
                         {!receivedReview && (
                           <TokenStateBadge
                             state={r.tokenState}
@@ -1068,11 +1126,6 @@ export default function ReviewerManagePanel({
                           />
                         )}
                       </div>
-                      {r.reviewStatus === 'complete' && (
-                        <span className="mt-1 block text-xs leading-4 text-gray-600">
-                          {closeoutDispositionLabel(r.honorariumEligibility)}
-                        </span>
-                      )}
                       {!receivedReview && r.reminderCount > 0 && (
                         <button
                           type="button"
@@ -1133,7 +1186,7 @@ export default function ReviewerManagePanel({
                                 degraded={degraded}
                               />
                             )}
-                            {showActionsColumn && ['review_received', 'complete'].includes(r.reviewStatus) && (
+                            {showActionsColumn && nextAction && (
                               <button
                                 type="button"
                                 onClick={() => setCloseoutReviewerId(r.suggestionId)}
@@ -1141,7 +1194,7 @@ export default function ReviewerManagePanel({
                                 title={degraded ? 'Reviewer data could not be refreshed - retry before making changes' : undefined}
                                 className="min-h-9 whitespace-nowrap rounded-lg bg-gray-900 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2"
                               >
-                                {r.reviewStatus === 'complete' ? 'Edit closeout' : 'Mark complete'}
+                                {nextAction.label}
                               </button>
                             )}
                           </div>
@@ -1176,6 +1229,13 @@ export default function ReviewerManagePanel({
                               onStatusChange={(newStatus) => updateStatus(r.suggestionId, newStatus)}
                               statusPending={pendingStatusTokens.has(r.suggestionId)}
                               onTransition={(terminalStatus) => transitionTerminal(r, terminalStatus)}
+                              // review_received keeps its closeout action primary-only (no
+                              // menu duplicate, per "Refine reviewer follow-up table layout").
+                              // complete rows without a next-action button need the menu as
+                              // their only edit path, so only they get it wired here.
+                              onCloseReview={r.reviewStatus === 'complete'
+                                ? () => setCloseoutReviewerId(r.suggestionId)
+                                : undefined}
                               degraded={degraded}
                             />
                           </div>
