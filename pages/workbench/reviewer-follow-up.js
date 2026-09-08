@@ -367,7 +367,7 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
                 aria-pressed={view === 'all'}
                 className={`border-l border-gray-300 px-4 py-2 text-sm font-semibold ${view === 'all' ? 'bg-gray-900 text-white' : 'text-gray-700 hover:bg-gray-50'}`}
               >
-                All reviewers
+                Show all ({summary.assignedRequests})
               </button>
             </div>
           </fieldset>
@@ -473,8 +473,8 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
             {scope === 'my' && proposals.length === 0
               ? 'Select All requests to view the full cycle.'
               : view === 'attention'
-              ? 'Switch to All reviewers to see completed reviews and proposals without active reviewer engagements.'
-              : 'Change the cycle, search, or set-aside filter.'}
+              ? 'Show all to see completed reviews and proposals without active reviewer engagements.'
+              : 'Change the cycle or search.'}
           </p>
         </Card>
       ) : visibleProposals.length > 0 ? (

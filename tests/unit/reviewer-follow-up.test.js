@@ -191,7 +191,7 @@ describe('reviewer follow-up request scope', () => {
     expect(global.fetch.mock.calls.some(([url]) => String(url).includes('includeSetAside'))).toBe(false);
 
     expect(screen.getByRole('button', { name: 'My requests' })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByRole('button', { name: 'All reviewers' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { name: 'Show all (0)' })).toHaveAttribute('aria-pressed', 'false');
 
     fireEvent.click(screen.getByRole('button', { name: 'All requests' }));
 
@@ -201,7 +201,7 @@ describe('reviewer follow-up request scope', () => {
     });
     expect(global.fetch.mock.calls.some(([url]) => String(url).includes('includeSetAside'))).toBe(false);
     expect(screen.getByRole('button', { name: 'All requests' })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByRole('button', { name: 'All reviewers' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { name: 'Show all (0)' })).toHaveAttribute('aria-pressed', 'false');
   });
 
   test('uses the server default even when it is not the first cycle, while honoring a valid URL override', async () => {
@@ -262,7 +262,7 @@ describe('reviewer follow-up request scope', () => {
     });
     expect(screen.getByText('0 matching requests')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'All reviewers' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show all (2)' }));
     expect(screen.getByText('1 matching request')).toBeInTheDocument();
     expect(screen.queryByText('Set aside proposal')).not.toBeInTheDocument();
   });
@@ -597,7 +597,7 @@ describe('reviewer follow-up refetch resilience', () => {
     render(<ReviewerFollowUpDashboard />);
     expect(await screen.findByText('Active proposal')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'All reviewers' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show all (2)' }));
     fireEvent.click(screen.getAllByRole('button', { name: 'Show reviewer activity' })[0]);
 
     reviewersShouldFail = true;
