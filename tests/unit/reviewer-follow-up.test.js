@@ -267,6 +267,25 @@ describe('reviewer follow-up request scope', () => {
     expect(screen.queryByText('Set aside proposal')).not.toBeInTheDocument();
   });
 
+  test('request cards show the program director beside institution and PI, and omit it when unassigned', async () => {
+    global.fetch = jest.fn(async (url) => {
+      if (url === '/api/workbench/dashboard') {
+        return { ok: true, json: async () => ({ cycles: [{ code: 'D26', label: 'December 2026' }], defaultCycleCode: 'D26' }) };
+      }
+      if (String(url).startsWith('/api/workbench/dashboard?')) {
+        return { ok: true, json: async () => ({ proposals: dashboardProposals }) };
+      }
+      return { ok: true, json: async () => ({ proposals: reviewerProposals }) };
+    });
+
+    render(<ReviewerFollowUpDashboard />);
+    expect(await screen.findByText('North University · PI: Alex North · PD: Pat Director')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show all (2)' }));
+    expect(screen.getByText('South University')).toBeInTheDocument();
+    expect(screen.queryByText(/PD: $/)).not.toBeInTheDocument();
+  });
+
   test('missing canManage projection fails closed in the rendered reviewer controls', async () => {
     global.fetch = jest.fn(async (url) => {
       if (url === '/api/workbench/dashboard') {
