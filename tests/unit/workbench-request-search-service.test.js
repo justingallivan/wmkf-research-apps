@@ -5,13 +5,28 @@
 const searchRequests = jest.fn();
 const findByIds = jest.fn();
 const queryRequests = jest.fn();
+const findByRequestNumber = jest.fn();
 const aggregateRequests = jest.fn();
+const aggregateMeetingDateCycles = jest.fn();
+const aggregateStatusesByGrantProgram = jest.fn();
 const searchDirectoryByName = jest.fn();
+jest.mock('../../lib/services/workbench/program-scope-service.js', () => ({
+  resolveWorkbenchProgramScope: jest.fn(async () => ({
+    programs: [{ programId: '94cab30b-958f-ee11-8179-000d3a341e8f', name: 'Research' }],
+    defaultProgramId: '94cab30b-958f-ee11-8179-000d3a341e8f',
+    programId: '94cab30b-958f-ee11-8179-000d3a341e8f',
+    programName: 'Research',
+  })),
+  buildProgramScopeFilter: jest.fn(() => '(_akoya_programid_value eq 8dcab30b-958f-ee11-8179-000d3a341e8f or _akoya_programid_value eq 94cab30b-958f-ee11-8179-000d3a341e8f)'),
+}));
 jest.mock('../../lib/dataverse/adapters/grant-request.js', () => ({
   searchRequests: (...args) => searchRequests(...args),
   findByIds: (...args) => findByIds(...args),
   queryRequests: (...args) => queryRequests(...args),
+  findByRequestNumber: (...args) => findByRequestNumber(...args),
   aggregateRequests: (...args) => aggregateRequests(...args),
+  aggregateMeetingDateCycles: (...args) => aggregateMeetingDateCycles(...args),
+  aggregateStatusesByGrantProgram: (...args) => aggregateStatusesByGrantProgram(...args),
 }));
 jest.mock('../../lib/dataverse/adapters/contact.js', () => ({
   searchDirectoryByName: (...args) => searchDirectoryByName(...args),
@@ -22,11 +37,15 @@ import {
   searchWorkbenchRequests,
   REQUEST_SEARCH_MAX_RESULTS,
   REQUEST_SEARCH_OPTIONS_AGGREGATES,
+  REQUEST_SEARCH_OUTSIDE_SELECT,
   REQUEST_SEARCH_ORDER,
   REQUEST_SEARCH_PROJECT_LEADER_ORDER,
   REQUEST_SEARCH_SELECT,
 } from '../../lib/services/workbench/request-search-service';
 import { ServiceHttpError } from '../../lib/services/service-http-error';
+
+const RESEARCH_FILTER = '(_akoya_programid_value eq 8dcab30b-958f-ee11-8179-000d3a341e8f or _akoya_programid_value eq 94cab30b-958f-ee11-8179-000d3a341e8f)';
+const PROGRAM_IDS = ['8dcab30b-958f-ee11-8179-000d3a341e8f', '94cab30b-958f-ee11-8179-000d3a341e8f'];
 
 const requestRow = (id, over = {}) => ({
   akoya_requestid: id,
@@ -37,31 +56,34 @@ const requestRow = (id, over = {}) => ({
   akoya_requeststatus: 'Phase II Pending',
   wmkf_organizationname: 'Example University',
   _wmkf_projectleader_value_formatted: 'Dr. Example',
+  _akoya_programid_value: PROGRAM_IDS[1],
   _akoya_programid_value_formatted: 'Medical Research',
+  _wmkf_grantprogram_value: PROGRAM_IDS[1],
+  _wmkf_grantprogram_value_formatted: 'Research',
   ...over,
 });
 
 beforeEach(() => {
   jest.clearAllMocks();
   aggregateRequests.mockResolvedValue({ results: [] });
+  aggregateMeetingDateCycles.mockResolvedValue([]);
+  aggregateStatusesByGrantProgram.mockResolvedValue({ results: [] });
   searchDirectoryByName.mockResolvedValue([]);
   searchRequests.mockResolvedValue({ results: [], totalCount: 0 });
   findByIds.mockResolvedValue({ records: [] });
   queryRequests.mockResolvedValue({ records: [], totalCount: 0, hasMore: false });
+  findByRequestNumber.mockResolvedValue({ records: [], totalCount: 0, hasMore: false });
 });
 
 test('loads grouped live cycles/statuses and sorts them for the filters', async () => {
-  aggregateRequests
-    .mockResolvedValueOnce({
-      results: [
-        { akoya_fiscalyear: 'June 2026' },
-        { akoya_fiscalyear: 'December 2025' },
-        { akoya_fiscalyear: 'December 2026' },
-        { akoya_fiscalyear: 'June 2026' },
-        { akoya_fiscalyear: null },
-      ],
-    })
-    .mockResolvedValueOnce({
+  aggregateMeetingDateCycles.mockResolvedValueOnce([
+    { year: 2026, month: 6 },
+    { year: 2025, month: 12 },
+    { year: 2026, month: 12 },
+    { year: 2026, month: 6 },
+    { year: 2025, month: 3 },
+  ]);
+  aggregateStatusesByGrantProgram.mockResolvedValueOnce({
       results: [
         { akoya_requeststatus: 'Phase II Pending' },
         { akoya_requeststatus: 'Active' },
@@ -71,6 +93,10 @@ test('loads grouped live cycles/statuses and sorts them for the filters', async 
 
   await expect(loadRequestSearchOptions()).resolves.toEqual({
     success: true,
+    programs: [{ programId: PROGRAM_IDS[1], name: 'Research' }],
+    programId: PROGRAM_IDS[1],
+    defaultProgramId: PROGRAM_IDS[1],
+    programName: 'Research',
     cycles: [
       { value: 'December 2026', label: 'December 2026' },
       { value: 'June 2026', label: 'June 2026' },
@@ -78,13 +104,32 @@ test('loads grouped live cycles/statuses and sorts them for the filters', async 
     ],
     statuses: ['Active', 'Phase II Pending'],
   });
-  expect(aggregateRequests).toHaveBeenNthCalledWith(1, REQUEST_SEARCH_OPTIONS_AGGREGATES.cycles);
-  expect(aggregateRequests).toHaveBeenNthCalledWith(2, REQUEST_SEARCH_OPTIONS_AGGREGATES.statuses);
+  expect(aggregateMeetingDateCycles).toHaveBeenCalledWith({ grantProgramIds: [PROGRAM_IDS[1]] });
+  expect(aggregateStatusesByGrantProgram).toHaveBeenCalledWith(PROGRAM_IDS[1]);
 });
 
 test('propagates a rejected guarded aggregate without returning partial options', async () => {
-  aggregateRequests.mockRejectedValueOnce(new Error('Access denied'));
+  aggregateStatusesByGrantProgram.mockRejectedValueOnce(new Error('Access denied'));
   await expect(loadRequestSearchOptions()).rejects.toThrow('Access denied');
+});
+
+test('propagates incomplete meeting-date aggregates instead of returning only statuses', async () => {
+  aggregateMeetingDateCycles.mockRejectedValueOnce(new Error('Incomplete cycle options'));
+  await expect(loadRequestSearchOptions()).rejects.toThrow('Incomplete cycle options');
+});
+
+test.each([
+  ['2026-06-04', 'June 2026', 'wmkf_meetingdate ge 2026-06-01T00:00:00Z and wmkf_meetingdate lt 2026-07-01T00:00:00Z'],
+  ['2025-03-01', 'March 2025 (off-cycle)', 'wmkf_meetingdate ge 2025-03-01T00:00:00Z and wmkf_meetingdate lt 2025-04-01T00:00:00Z'],
+  [null, 'Unclassified (no meeting date)', 'wmkf_meetingdate eq null'],
+])('filters and labels by meeting date %s even when fiscal year disagrees', async (meetingDate, cycle, filter) => {
+  queryRequests.mockResolvedValueOnce({ records: [requestRow('11111111-1111-1111-1111-111111111111', {
+    wmkf_meetingdate: meetingDate,
+    akoya_fiscalyear: 'December 2017',
+  })], totalCount: 1 });
+  const result = await searchWorkbenchRequests({ cycle });
+  expect(queryRequests).toHaveBeenCalledWith(expect.objectContaining({ filter: `${RESEARCH_FILTER} and ${filter}` }));
+  expect(result.results[0].cycleLabel).toBe(cycle);
 });
 
 test('text search applies escaped server filters, hydrates rows, and preserves relevance order', async () => {
@@ -116,11 +161,11 @@ test('text search applies escaped server filters, hydrates rows, and preserves r
   expect(searchRequests).toHaveBeenCalledWith('regeneration', {
     top: 100,
     orderby: REQUEST_SEARCH_ORDER,
-    filter: "akoya_request:(akoya_fiscalyear eq 'December 2026' and akoya_requeststatus eq 'Director''s Review')",
   });
   expect(findByIds).toHaveBeenCalledWith([second, first], {
     select: REQUEST_SEARCH_SELECT,
     top: 2,
+    filter: `${RESEARCH_FILTER} and wmkf_meetingdate ge 2026-12-01T00:00:00Z and wmkf_meetingdate lt 2027-01-01T00:00:00Z and akoya_requeststatus eq 'Director''s Review'`,
   });
   expect(body.results.map((row) => row.requestId)).toEqual([second, first]);
   expect(body.results[1]).toMatchObject({
@@ -163,6 +208,7 @@ test('deduplicates search hits and reports indexed requests that cannot be hydra
   expect(findByIds).toHaveBeenCalledWith([available, stale], {
     select: REQUEST_SEARCH_SELECT,
     top: 2,
+    filter: RESEARCH_FILTER,
   });
   expect(body.results).toHaveLength(1);
   expect(body.unavailableCount).toBe(1);
@@ -188,10 +234,12 @@ test('text search hydrates bounded chunks and pages the stable ranked hit set', 
   expect(findByIds).toHaveBeenNthCalledWith(1, ids.slice(0, 50), {
     select: REQUEST_SEARCH_SELECT,
     top: 50,
+    filter: RESEARCH_FILTER,
   });
   expect(findByIds).toHaveBeenNthCalledWith(2, ids.slice(50), {
     select: REQUEST_SEARCH_SELECT,
     top: 34,
+    filter: RESEARCH_FILTER,
   });
   expect(body).toMatchObject({
     offset: 25,
@@ -227,7 +275,7 @@ test('unions true project-leader name matches ahead of indexed request-text matc
   expect(searchDirectoryByName).toHaveBeenCalledWith('Cynthia Reinhart-King', { top: 26 });
   expect(queryRequests).toHaveBeenCalledWith({
     select: REQUEST_SEARCH_SELECT,
-    filter: "(_wmkf_projectleader_value eq 33333333-3333-3333-3333-333333333333) and akoya_fiscalyear eq 'June 2020' and akoya_requeststatus eq 'Closed'",
+    filter: "(_wmkf_projectleader_value eq 33333333-3333-3333-3333-333333333333) and (_akoya_programid_value eq 8dcab30b-958f-ee11-8179-000d3a341e8f or _akoya_programid_value eq 94cab30b-958f-ee11-8179-000d3a341e8f) and wmkf_meetingdate ge 2020-06-01T00:00:00Z and wmkf_meetingdate lt 2020-07-01T00:00:00Z and akoya_requeststatus eq 'Closed'",
     orderby: REQUEST_SEARCH_PROJECT_LEADER_ORDER,
     top: 100,
   });
@@ -394,7 +442,7 @@ test('filter-only search stays bounded and reports the 100-result ceiling honest
 
   expect(queryRequests).toHaveBeenCalledWith({
     select: REQUEST_SEARCH_SELECT,
-    filter: "akoya_fiscalyear eq 'June 2026'",
+    filter: "(_akoya_programid_value eq 8dcab30b-958f-ee11-8179-000d3a341e8f or _akoya_programid_value eq 94cab30b-958f-ee11-8179-000d3a341e8f) and wmkf_meetingdate ge 2026-06-01T00:00:00Z and wmkf_meetingdate lt 2026-07-01T00:00:00Z",
     orderby: 'akoya_requestnum desc',
     top: 100,
   });
@@ -414,4 +462,117 @@ test('refuses the unfiltered complement before any Dataverse read', async () => 
   expect(error.httpStatus).toBe(400);
   expect(searchRequests).not.toHaveBeenCalled();
   expect(queryRequests).not.toHaveBeenCalled();
+});
+
+
+test('excludes stale indexed hits reassigned to another program or missing a program ID', async () => {
+  const rows = [
+    requestRow('science', { _akoya_programid_value: PROGRAM_IDS[0].toUpperCase() }),
+    requestRow('medical'),
+    requestRow('directors', { _akoya_programid_value: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', _akoya_programid_value_formatted: "Directors' Directed Grant Program", _wmkf_grantprogram_value: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' }),
+    requestRow('missing', { _akoya_programid_value: null, _wmkf_grantprogram_value: null }),
+  ];
+  searchRequests.mockResolvedValue({ results: rows.map((row) => ({ objectId: row.akoya_requestid })), totalCount: 4 });
+  findByIds.mockResolvedValue({ records: rows });
+  const body = await searchWorkbenchRequests({ query: 'University' });
+  expect(body.results.map((row) => row.requestId)).toEqual(['science', 'medical']);
+  expect(body.unavailableCount).toBe(2);
+  expect(body.totalCount).toBe(2); // excluded programs never inflate Research totals
+});
+
+test('exact request numbers use canonical Research filtering without the text index or contact join', async () => {
+  queryRequests.mockResolvedValue({ records: [requestRow('research', { akoya_requestnum: '1002379' })], totalCount: 1 });
+  const body = await searchWorkbenchRequests({ query: '1002379', status: 'Closed' });
+  expect(queryRequests).toHaveBeenCalledWith(expect.objectContaining({
+    filter: `${RESEARCH_FILTER} and akoya_requeststatus eq 'Closed' and akoya_requestnum eq '1002379'`,
+  }));
+  expect(body.results).toHaveLength(1);
+  expect(searchRequests).not.toHaveBeenCalled();
+  expect(searchDirectoryByName).not.toHaveBeenCalled();
+  expect(findByRequestNumber).not.toHaveBeenCalled();
+});
+
+test('exact numeric misses disclose only the outside program and use one bounded fallback read', async () => {
+  const requestNumber = '1009999';
+  queryRequests.mockResolvedValue({ records: [], totalCount: 0 });
+  findByRequestNumber.mockResolvedValue({ records: [{
+    akoya_requestid: 'outside-id',
+    akoya_requestnum: requestNumber,
+    akoya_title: 'Sensitive title',
+    _akoya_programid_value: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+    _akoya_programid_value_formatted: 'Community Grants',
+    _wmkf_grantprogram_value_formatted: 'Legacy label',
+  }] });
+
+  const body = await searchWorkbenchRequests({ query: requestNumber });
+
+  expect(queryRequests).toHaveBeenCalledWith(expect.objectContaining({
+    filter: `${RESEARCH_FILTER} and akoya_requestnum eq '${requestNumber}'`,
+    top: REQUEST_SEARCH_MAX_RESULTS,
+  }));
+  expect(findByRequestNumber).toHaveBeenCalledWith(requestNumber, {
+    select: REQUEST_SEARCH_OUTSIDE_SELECT,
+    top: 1,
+  });
+  expect(body).toMatchObject({
+    results: [],
+    totalCount: 0,
+    outsideProgramRequest: { requestNumber, program: 'Legacy label' },
+  });
+  expect(JSON.stringify(body)).not.toContain('outside-id');
+  expect(JSON.stringify(body)).not.toContain('Sensitive title');
+});
+
+test('acknowledges an outside exact request even when Research cycle and status filters are selected', async () => {
+  const requestNumber = '1009996';
+  queryRequests.mockResolvedValue({ records: [], totalCount: 0 });
+  findByRequestNumber.mockResolvedValue({ records: [{
+    akoya_requestnum: requestNumber,
+    _akoya_programid_value: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+    _akoya_programid_value_formatted: 'Community Grants',
+  }] });
+
+  const body = await searchWorkbenchRequests({
+    query: requestNumber,
+    cycle: 'December 2026',
+    status: 'Closed',
+  });
+
+  expect(queryRequests).toHaveBeenCalledWith(expect.objectContaining({
+    filter: `${RESEARCH_FILTER} and wmkf_meetingdate ge 2026-12-01T00:00:00Z and wmkf_meetingdate lt 2027-01-01T00:00:00Z and akoya_requeststatus eq 'Closed' and akoya_requestnum eq '${requestNumber}'`,
+  }));
+  expect(body.outsideProgramRequest).toEqual({ requestNumber, program: 'Community Grants' });
+  expect(findByRequestNumber).toHaveBeenCalledTimes(1);
+});
+
+test.each([
+  [{ _akoya_programid_value: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', _wmkf_grantprogram_value_formatted: 'Legacy Program' }, 'Legacy Program'],
+  [{ _akoya_programid_value: 'cccccccc-cccc-cccc-cccc-cccccccccccc' }, 'another program'],
+])('outside exact lookup uses the legacy or safe fallback program label', async (row, program) => {
+  queryRequests.mockResolvedValue({ records: [], totalCount: 0 });
+  findByRequestNumber.mockResolvedValue({ records: [{ akoya_requestnum: '1009998', ...row }] });
+
+  await expect(searchWorkbenchRequests({ query: '1009998' })).resolves.toMatchObject({
+    outsideProgramRequest: { requestNumber: '1009998', program },
+  });
+});
+
+test('does not disclose an exact Research request found by the fallback read', async () => {
+  queryRequests.mockResolvedValue({ records: [], totalCount: 0 });
+  findByRequestNumber.mockResolvedValue({ records: [requestRow('research', { akoya_requestnum: '1009997' })] });
+
+  const body = await searchWorkbenchRequests({ query: '1009997' });
+
+  expect(body.outsideProgramRequest).toBeUndefined();
+});
+
+
+test('reports the broad index ceiling without counting excluded candidates as Research results', async () => {
+  const ids = ['research', 'directors'];
+  searchRequests.mockResolvedValue({ results: ids.map((objectId) => ({ objectId })), totalCount: 500 });
+  findByIds.mockResolvedValue({ records: [requestRow('research')] });
+  const result = await searchWorkbenchRequests({ query: 'University' });
+  expect(result).toMatchObject({ totalCount: 1, returnedCount: 1, capped: true, hasMore: false });
+  expect(searchRequests.mock.calls[0][1]).not.toHaveProperty('filter');
+  expect(findByIds.mock.calls[0][1].filter).toBe(RESEARCH_FILTER);
 });

@@ -223,3 +223,14 @@ components plus `docs/REVIEWER_ENGAGEMENT_SPEC.md` make the register row's 10 si
 | J27-074 | `docs/API_ROUTE_SECURITY_MATRIX.md` | A | `fails 503 if its paginated scan is capped` | L265 row for `/api/workbench/dashboard` states the capped-scan-fails-503 fact directly; the `/api/workbench/dashboard` route citation itself is a route path (starts with `/`) and is ignored by the gate, so only the two docs needed binding. |
 | J27-079 | `docs/STAGED_REVIEW_PIPELINE.md` | A | `"3x volume") may need to be revisited` | Original excerpt fragment omitted the closing paren present in the file's actual text at L17; corrected to the exact substring. |
 | J27-079 | `docs/PDF_INPUT_FOR_BACKEND.md` | A | `300 proposals/year × 3 stages` | Exact verbatim match at L98. |
+
+## Post-integration drift (merge of `main` `af196fc2`, 2026-09-08)
+
+| register id | file | case | fragment or note | reason |
+|---|---|---|---|---|
+| J27-020 | `shared/config/workbenchVisibility.js` | A (new site) | `akoya_requeststatus eq 'Phase II Pending' or wmkf_triagestatus eq ${TRIAGE_STATUS.ADVANCING}` | Predicate moved here from dashboard-service.js:88 by Codex PR #183 (`bba54eb4`). |
+| J27-020 | `lib/services/workbench/dashboard-service.js` | C (rebound) | `the normal reviewer-finding surface (akoya_requeststatus = 'Phase II Pending')` | Filter string gone; the comment at :180 restates the fact verbatim. |
+| J27-037 | `shared/config/workbenchVisibility.js` | A (new site) | `wmkf_triagestatus eq ${TRIAGE_STATUS.SET_ASIDE})` | Set-aside predicate moved here (same PR). |
+| J27-037 | `lib/services/workbench/dashboard-service.js` | C (rebound) | `Set aside is hidden unless includeSetAside.` | Comment at :181 carries the fact; the filter string moved. |
+| J27-037 | `pages/workbench/reviewer-follow-up.js` | C (rebound) | `proposals.filter((proposal) => !proposal.workbench?.setAside)` | "Show set aside" toggle removed by Codex `8376fa56`; page now always hides set-aside rows (:286). |
+

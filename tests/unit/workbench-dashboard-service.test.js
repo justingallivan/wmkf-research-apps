@@ -9,6 +9,15 @@
  */
 
 const queryAllRequests = jest.fn();
+jest.mock('../../lib/services/workbench/program-scope-service.js', () => ({
+  resolveWorkbenchProgramScope: jest.fn(async () => ({
+    programs: [{ programId: '94cab30b-958f-ee11-8179-000d3a341e8f', name: 'Research' }],
+    defaultProgramId: '94cab30b-958f-ee11-8179-000d3a341e8f',
+    programId: '94cab30b-958f-ee11-8179-000d3a341e8f',
+    programName: 'Research',
+  })),
+  buildProgramScopeFilter: jest.fn(() => '(_akoya_programid_value eq 8dcab30b-958f-ee11-8179-000d3a341e8f or _akoya_programid_value eq 94cab30b-958f-ee11-8179-000d3a341e8f)'),
+}));
 jest.mock('../../lib/dataverse/adapters/grant-request.js', () => ({
   queryAllRequests: (...a) => queryAllRequests(...a),
 }));
@@ -76,20 +85,20 @@ test('cycle-list mode: lists organization-wide eligible cycles with honest activ
     records: [
       { wmkf_meetingdate: '2026-06-04', _wmkf_programdirector_value: 'pd-1' },
       { wmkf_meetingdate: '2026-12-11', _wmkf_programdirector_value: 'pd-2' },
-      { wmkf_meetingdate: '2026-12-12', _wmkf_programdirector_value: 'pd-2', wmkf_triagestatus: 100000001 },
+      { wmkf_meetingdate: '2026-12-12', _wmkf_programdirector_value: 'pd-1', wmkf_triagestatus: 100000001 },
       { wmkf_meetingdate: null }, // no code → skipped
     ],
     capped: false,
   });
   const body = await loadDashboard(args());
   expect(body.success).toBe(true);
-  expect(body.cycles.map((c) => [c.code, c.count, c.setAsideCount]))
-    .toEqual([['D26', 1, 1], ['J26', 1, 0]]);
+  expect(body.cycles.map((c) => [c.code, c.count, c.setAsideCount, c.myCount, c.mySetAsideCount]))
+    .toEqual([['D26', 1, 1, 0, 1], ['J26', 1, 0, 1, 0]]);
   expect(body.defaultCycleCode).toBe('J26');
   expect(body.programDirector).toEqual({ systemuserid: 'pd-1', fullName: 'Dr. PD One' });
   expect(queryAllRequests).toHaveBeenCalledWith({
-    select: 'akoya_requestid,wmkf_meetingdate,akoya_requeststatus,_wmkf_programdirector_value,wmkf_triagestatus',
-    filter: "wmkf_meetingdate ne null and (akoya_requeststatus eq 'Phase II Pending' or wmkf_triagestatus eq 100000000 or wmkf_triagestatus eq 100000001)",
+    select: 'akoya_requestid,wmkf_meetingdate,akoya_requeststatus,_wmkf_grantprogram_value,_wmkf_programdirector_value,wmkf_triagestatus',
+    filter: "wmkf_meetingdate ne null and (_akoya_programid_value eq 8dcab30b-958f-ee11-8179-000d3a341e8f or _akoya_programid_value eq 94cab30b-958f-ee11-8179-000d3a341e8f) and (akoya_requeststatus eq 'Phase II Pending' or wmkf_triagestatus eq 100000000 or wmkf_triagestatus eq 100000001)",
     orderby: 'wmkf_meetingdate desc',
   });
 });
@@ -130,6 +139,7 @@ test('proposal mode: superuser gets canManage on rows they do not lead; rollup s
   });
   const body = await loadDashboard(args({ cycleCode: 'D26', scope: 'all' }));
   expect(body.proposals[0].canManage).toBe(true); // superuser override
+  expect(body.proposals[0].isMine).toBe(false);
   expect(body.proposals[0].advancing).toBe(true);
   expect(body.proposals[0].reviewers.needed).toBe(3);
   expect(body.rollup).toEqual({ total: 1, stages: { find: 1, invite: 0, awaiting: 0, review: 0, done: 0 } });
@@ -160,7 +170,7 @@ test('proposal mode: canonical session actor is case-insensitive and missing act
     }],
   });
   await expect(loadDashboard(args({ cycleCode: 'D26', scope: 'all', callerSystemId: 'pd-1' })))
-    .resolves.toMatchObject({ proposals: [{ canManage: true }] });
+    .resolves.toMatchObject({ proposals: [{ canManage: true, isMine: true }] });
   await expect(loadDashboard(args({ cycleCode: 'D26', scope: 'all', callerSystemId: null })))
-    .resolves.toMatchObject({ proposals: [{ canManage: false }] });
+    .resolves.toMatchObject({ proposals: [{ canManage: false, isMine: true }] });
 });

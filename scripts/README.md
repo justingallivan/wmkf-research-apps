@@ -70,6 +70,37 @@ OLD_KEY=<current_key> NEW_KEY=<new_key> node scripts/rotate-encryption-key.js
 
 After rotating, update `USER_PREFS_ENCRYPTION_KEY` in Vercel and redeploy.
 
+## Dataverse Request Search View
+
+| Script | Description |
+|--------|-------------|
+| `probe-request-search-index-config.mjs` | Read-only probe for the exact production `akoya_request` Quick Find view (`Quick Find Active Requests`, id `08b51bf9-47c5-4ef5-a1a5-6af4713bca5b`). Reports whether `akoya_programid` is in the FetchXML projection, Quick Find conditions, or layout. Requires `DATAVERSE_ALLOW_PROD_READS=yes` for production reads. |
+| `add-akoya-request-programid-quick-find-column.mjs` | Dry-run-by-default plan/apply script that adds `akoya_programid` as a FetchXML attribute and layout cell, never as a Quick Find condition; applies the canonical `wmkfResearchReviewAppSuite` solution header, publishes `akoya_request`, and verifies readback. |
+
+The read-only probe verified that the target view is managed and customizable,
+and that `akoya_programid` is absent from both the FetchXML projection and the
+layout. The guarded production PATCH was attempted on 2026-09-08 with and
+without the canonical solution header; both attempts returned Dataverse
+`0x80040216` / HTTP 400, and exact readback showed the view unchanged. PublishXml
+was never called. This path is **BLOCKED** pending diagnosis of that platform
+error; do not blindly retry `--apply`.
+
+```bash
+# Read-only inspection (requires the production-read acknowledgement)
+DATAVERSE_ALLOW_PROD_READS=yes \
+  node scripts/probe-request-search-index-config.mjs --xml
+
+# Local plan only; no write is performed without --apply
+DATAVERSE_ALLOW_PROD_READS=yes \
+  node scripts/add-akoya-request-programid-quick-find-column.mjs --dry-run
+
+# BLOCKED — do not run until the 0x80040216 production metadata error is resolved.
+DATAVERSE_TARGET_INTERLOCK=on \
+DATAVERSE_ALLOW_PROD_READS=yes \
+DATAVERSE_PROD_WRITE_ACK="request Quick Find view $(date -u +%F)" \
+  node scripts/add-akoya-request-programid-quick-find-column.mjs --apply
+```
+
 ## Integrity Screener
 
 | Script | Description |
