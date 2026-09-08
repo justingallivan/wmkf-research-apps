@@ -114,7 +114,9 @@ function ReviewerGroup({ proposal, previewReadOnly, onRefresh, degraded, loading
               />
               <style jsx global>{`
                 .reviewer-activity-panel td span.rounded,
-                .reviewer-activity-panel td span.rounded-full {
+                .reviewer-activity-panel td span.rounded-full,
+                .reviewer-activity-panel td a.rounded-full,
+                .reviewer-activity-panel td button.rounded-full {
                   display: inline-flex;
                   min-height: 1.75rem;
                   align-items: center;
