@@ -5,10 +5,20 @@ import { Card } from '../Layout';
 import ToolbarSelect, { COMPACT_CONTROL_HEIGHT_CLASS, COMPACT_CONTROL_FOCUS_CLASS } from '../ToolbarSelect';
 
 // Prior caches include other programs and off-cycle filters; do not restore them.
-const STORAGE_KEY = 'wmkf-workbench-request-locator-research-v2';
+const STORAGE_KEY = 'wmkf-workbench-request-locator-research-v3';
 const MAX_QUERY_LENGTH = 100;
 const MAX_FILTER_LENGTH = 100;
 const MAX_SAVED_RESULTS = 100;
+
+function sanitizeOutsideProgramRequest(value) {
+  if (!value || typeof value !== 'object'
+    || typeof value.requestNumber !== 'string' || typeof value.program !== 'string') return null;
+  const requestNumber = value.requestNumber.trim();
+  const program = value.program.trim();
+  if (!/^\d+$/.test(requestNumber) || requestNumber.length > MAX_QUERY_LENGTH
+    || !program || program.length > MAX_FILTER_LENGTH) return null;
+  return { requestNumber, program };
+}
 
 function readSavedSearch() {
   try {
@@ -26,6 +36,7 @@ function readSavedSearch() {
       results: saved.results
         .filter((result) => result && typeof result.requestId === 'string')
         .slice(0, MAX_SAVED_RESULTS),
+      outsideProgramRequest: sanitizeOutsideProgramRequest(saved.outsideProgramRequest),
       nextOffset: [25, 50, 75].includes(Number(saved.nextOffset))
         ? Number(saved.nextOffset)
         : null,
@@ -66,6 +77,7 @@ export default function RequestLocator() {
   const [totalCount, setTotalCount] = useState(0);
   const [capped, setCapped] = useState(false);
   const [unavailableCount, setUnavailableCount] = useState(0);
+  const [outsideProgramRequest, setOutsideProgramRequest] = useState(null);
   const [hasMore, setHasMore] = useState(false);
   const [nextOffset, setNextOffset] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -85,6 +97,7 @@ export default function RequestLocator() {
       setTotalCount(Number(saved.totalCount) || 0);
       setCapped(saved.capped === true);
       setUnavailableCount(Number(saved.unavailableCount) || 0);
+      setOutsideProgramRequest(saved.outsideProgramRequest);
       setHasMore(saved.hasMore === true);
       setNextOffset(saved.nextOffset);
     }, 0);
@@ -160,6 +173,9 @@ export default function RequestLocator() {
           [...(results || []), ...returnedResults].map((result) => [result.requestId, result]),
         ).values()].slice(0, MAX_SAVED_RESULTS)
         : returnedResults.slice(0, MAX_SAVED_RESULTS);
+      const nextOutsideProgramRequest = append
+        ? outsideProgramRequest
+        : sanitizeOutsideProgramRequest(body.outsideProgramRequest);
       const nextUnavailableCount = append
         ? unavailableCount + (Number(body.unavailableCount) || 0)
         : (Number(body.unavailableCount) || 0);
@@ -173,6 +189,7 @@ export default function RequestLocator() {
         nextOffset: [25, 50, 75].includes(Number(body.nextOffset))
           ? Number(body.nextOffset)
           : null,
+        outsideProgramRequest: nextOutsideProgramRequest,
       };
       setSubmittedCriteria(normalized);
       setResults(nextResults);
@@ -181,13 +198,14 @@ export default function RequestLocator() {
       setUnavailableCount(saved.unavailableCount);
       setHasMore(saved.hasMore);
       setNextOffset(saved.nextOffset);
+      setOutsideProgramRequest(saved.outsideProgramRequest);
       saveSearch(saved);
     } catch (searchError) {
       if (requestIdRef.current === operationId) setError(searchError.message);
     } finally {
       if (requestIdRef.current === operationId) setBusy(false);
     }
-  }, [results, router, unavailableCount]);
+  }, [outsideProgramRequest, results, router, unavailableCount]);
 
   const submitSearch = useCallback((event) => {
     event.preventDefault();
@@ -206,6 +224,7 @@ export default function RequestLocator() {
     setUnavailableCount(0);
     setHasMore(false);
     setNextOffset(null);
+    setOutsideProgramRequest(null);
     try { window.sessionStorage.removeItem(STORAGE_KEY); } catch { /* convenience only */ }
   }, [invalidatePending]);
 
@@ -221,9 +240,11 @@ export default function RequestLocator() {
       : '';
   const searchAnnouncement = busy
     ? 'Searching requests.'
-    : results
-      ? `Search complete. ${totalCount.toLocaleString()} result${totalCount === 1 ? '' : 's'}; ${showingCount} shown.`
-      : '';
+    : outsideProgramRequest
+      ? `Request #${outsideProgramRequest.requestNumber} is valid, but it is outside the Research suite. Program: ${outsideProgramRequest.program}. Search for request #${outsideProgramRequest.requestNumber} in AkoyaGO for more details.`
+      : results
+        ? `Search complete. ${totalCount.toLocaleString()} result${totalCount === 1 ? '' : 's'}; ${showingCount} shown.`
+        : '';
 
   return (
     <section aria-labelledby="request-locator-heading" className="mb-6">
@@ -361,9 +382,15 @@ export default function RequestLocator() {
         <Card hover={false} className="mt-3" padding="p-0">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 px-5 py-3">
             <p className="text-sm text-gray-600">
-              <span className="font-semibold text-gray-900">{totalCount.toLocaleString()}</span>{' '}
-              result{totalCount === 1 ? '' : 's'}
-              {showingCount > 0 ? ` · showing ${showingCount}` : ''}
+              {outsideProgramRequest ? (
+                <span className="font-semibold text-gray-900">0 Research results</span>
+              ) : (
+                <>
+                  <span className="font-semibold text-gray-900">{totalCount.toLocaleString()}</span>{' '}
+                  result{totalCount === 1 ? '' : 's'}
+                  {showingCount > 0 ? ` · showing ${showingCount}` : ''}
+                </>
+              )}
             </p>
             {capped && (
               <span className="text-xs font-medium text-amber-700">
@@ -379,8 +406,22 @@ export default function RequestLocator() {
 
           {results.length === 0 ? (
             <div className="px-5 py-8 text-center">
-              <p className="text-sm font-medium text-gray-800">No requests matched.</p>
-              <p className="mt-1 text-sm text-gray-500">Check the spelling or remove one of the filters.</p>
+              {outsideProgramRequest ? (
+                <>
+                  <h3 className="text-sm font-medium text-gray-800">
+                    Request #{outsideProgramRequest.requestNumber} is valid, but it is outside the Research suite.
+                  </h3>
+                  <p className="mt-1 text-sm text-gray-600">Program: {outsideProgramRequest.program}</p>
+                  <p className="mt-1 text-sm text-gray-500">
+                    Search for request #{outsideProgramRequest.requestNumber} in AkoyaGO for more details.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm font-medium text-gray-800">No requests matched.</p>
+                  <p className="mt-1 text-sm text-gray-500">Check the spelling or remove one of the filters.</p>
+                </>
+              )}
             </div>
           ) : (
             <ul className="divide-y divide-gray-100">

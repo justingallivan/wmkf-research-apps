@@ -5,6 +5,7 @@
 const searchRequests = jest.fn();
 const findByIds = jest.fn();
 const queryRequests = jest.fn();
+const findByRequestNumber = jest.fn();
 const aggregateRequests = jest.fn();
 const aggregateMeetingDateCycles = jest.fn();
 const searchDirectoryByName = jest.fn();
@@ -12,6 +13,7 @@ jest.mock('../../lib/dataverse/adapters/grant-request.js', () => ({
   searchRequests: (...args) => searchRequests(...args),
   findByIds: (...args) => findByIds(...args),
   queryRequests: (...args) => queryRequests(...args),
+  findByRequestNumber: (...args) => findByRequestNumber(...args),
   aggregateRequests: (...args) => aggregateRequests(...args),
   aggregateMeetingDateCycles: (...args) => aggregateMeetingDateCycles(...args),
 }));
@@ -24,6 +26,7 @@ import {
   searchWorkbenchRequests,
   REQUEST_SEARCH_MAX_RESULTS,
   REQUEST_SEARCH_OPTIONS_AGGREGATES,
+  REQUEST_SEARCH_OUTSIDE_SELECT,
   REQUEST_SEARCH_ORDER,
   REQUEST_SEARCH_PROJECT_LEADER_ORDER,
   REQUEST_SEARCH_SELECT,
@@ -55,6 +58,7 @@ beforeEach(() => {
   searchRequests.mockResolvedValue({ results: [], totalCount: 0 });
   findByIds.mockResolvedValue({ records: [] });
   queryRequests.mockResolvedValue({ records: [], totalCount: 0, hasMore: false });
+  findByRequestNumber.mockResolvedValue({ records: [], totalCount: 0, hasMore: false });
 });
 
 test('loads grouped live cycles/statuses and sorts them for the filters', async () => {
@@ -467,6 +471,81 @@ test('exact request numbers use canonical Research filtering without the text in
   expect(body.results).toHaveLength(1);
   expect(searchRequests).not.toHaveBeenCalled();
   expect(searchDirectoryByName).not.toHaveBeenCalled();
+  expect(findByRequestNumber).not.toHaveBeenCalled();
+});
+
+test('exact numeric misses disclose only the outside program and use one bounded fallback read', async () => {
+  const requestNumber = '1009999';
+  queryRequests.mockResolvedValue({ records: [], totalCount: 0 });
+  findByRequestNumber.mockResolvedValue({ records: [{
+    akoya_requestid: 'outside-id',
+    akoya_requestnum: requestNumber,
+    akoya_title: 'Sensitive title',
+    _akoya_programid_value: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+    _akoya_programid_value_formatted: 'Community Grants',
+    _wmkf_grantprogram_value_formatted: 'Legacy label',
+  }] });
+
+  const body = await searchWorkbenchRequests({ query: requestNumber });
+
+  expect(queryRequests).toHaveBeenCalledWith(expect.objectContaining({
+    filter: `${RESEARCH_FILTER} and akoya_requestnum eq '${requestNumber}'`,
+    top: REQUEST_SEARCH_MAX_RESULTS,
+  }));
+  expect(findByRequestNumber).toHaveBeenCalledWith(requestNumber, {
+    select: REQUEST_SEARCH_OUTSIDE_SELECT,
+    top: 1,
+  });
+  expect(body).toMatchObject({
+    results: [],
+    totalCount: 0,
+    outsideProgramRequest: { requestNumber, program: 'Community Grants' },
+  });
+  expect(JSON.stringify(body)).not.toContain('outside-id');
+  expect(JSON.stringify(body)).not.toContain('Sensitive title');
+});
+
+test('acknowledges an outside exact request even when Research cycle and status filters are selected', async () => {
+  const requestNumber = '1009996';
+  queryRequests.mockResolvedValue({ records: [], totalCount: 0 });
+  findByRequestNumber.mockResolvedValue({ records: [{
+    akoya_requestnum: requestNumber,
+    _akoya_programid_value: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+    _akoya_programid_value_formatted: 'Community Grants',
+  }] });
+
+  const body = await searchWorkbenchRequests({
+    query: requestNumber,
+    cycle: 'December 2026',
+    status: 'Closed',
+  });
+
+  expect(queryRequests).toHaveBeenCalledWith(expect.objectContaining({
+    filter: `${RESEARCH_FILTER} and wmkf_meetingdate ge 2026-12-01T00:00:00Z and wmkf_meetingdate lt 2027-01-01T00:00:00Z and akoya_requeststatus eq 'Closed' and akoya_requestnum eq '${requestNumber}'`,
+  }));
+  expect(body.outsideProgramRequest).toEqual({ requestNumber, program: 'Community Grants' });
+  expect(findByRequestNumber).toHaveBeenCalledTimes(1);
+});
+
+test.each([
+  [{ _akoya_programid_value: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', _wmkf_grantprogram_value_formatted: 'Legacy Program' }, 'Legacy Program'],
+  [{ _akoya_programid_value: 'cccccccc-cccc-cccc-cccc-cccccccccccc' }, 'another program'],
+])('outside exact lookup uses the legacy or safe fallback program label', async (row, program) => {
+  queryRequests.mockResolvedValue({ records: [], totalCount: 0 });
+  findByRequestNumber.mockResolvedValue({ records: [{ akoya_requestnum: '1009998', ...row }] });
+
+  await expect(searchWorkbenchRequests({ query: '1009998' })).resolves.toMatchObject({
+    outsideProgramRequest: { requestNumber: '1009998', program },
+  });
+});
+
+test('does not disclose an exact Research request found by the fallback read', async () => {
+  queryRequests.mockResolvedValue({ records: [], totalCount: 0 });
+  findByRequestNumber.mockResolvedValue({ records: [requestRow('research', { akoya_requestnum: '1009997' })] });
+
+  const body = await searchWorkbenchRequests({ query: '1009997' });
+
+  expect(body.outsideProgramRequest).toBeUndefined();
 });
 
 

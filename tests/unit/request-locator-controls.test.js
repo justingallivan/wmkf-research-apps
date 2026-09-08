@@ -6,7 +6,7 @@ jest.mock('../../shared/components/Layout', () => ({
   Card: ({ children }) => <div>{children}</div>,
 }));
 
-const STORAGE_KEY = 'wmkf-workbench-request-locator-research-v2';
+const STORAGE_KEY = 'wmkf-workbench-request-locator-research-v3';
 const response = (body, ok = true) => ({ ok, status: ok ? 200 : 503, json: async () => body });
 const options = { cycles: [{ value: 'J26', label: 'June 2026' }], statuses: ['Active'] };
 const emptyResults = { results: [], totalCount: 0 };

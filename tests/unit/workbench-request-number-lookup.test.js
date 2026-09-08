@@ -111,6 +111,40 @@ test('keeps an unknown or excluded exact request on the dashboard', async () => 
   expect(push).not.toHaveBeenCalled();
 });
 
+test('shows a minimal AkoyaGO handoff for an exact request outside Research', async () => {
+  global.fetch.mockImplementation(async (url) => {
+    if (url === '/api/workbench/search-requests?q=1009999') {
+      return response({
+        body: {
+          success: true,
+          results: [],
+          totalCount: 0,
+          outsideProgramRequest: { requestNumber: '1009999', program: 'Community Grants' },
+        },
+      });
+    }
+    return baseResponse(url);
+  });
+  await renderReady();
+
+  fireEvent.change(screen.getByLabelText(SEARCH_LABEL), { target: { value: '1009999' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Search' }));
+
+  expect(await screen.findByRole('heading', {
+    name: 'Request #1009999 is valid, but it is outside the Research suite.',
+  })).toBeInTheDocument();
+  expect(screen.getByText('Program: Community Grants')).toBeInTheDocument();
+  expect(screen.getByText('Search for request #1009999 in AkoyaGO for more details.')).toBeInTheDocument();
+  expect(screen.getByText('0 Research results')).toBeInTheDocument();
+  expect(screen.getByRole('status', { name: 'Request search status' })).toHaveTextContent(
+    /outside the Research suite\. Program: Community Grants\. Search for request #1009999 in AkoyaGO/,
+  );
+  expect(screen.queryByText(/Sensitive title|11111111-1111-1111-1111-111111111111/)).not.toBeInTheDocument();
+  expect(push).not.toHaveBeenCalled();
+  expect(JSON.parse(window.sessionStorage.getItem('wmkf-workbench-request-locator-research-v3')))
+    .toMatchObject({ outsideProgramRequest: { requestNumber: '1009999', program: 'Community Grants' } });
+});
+
 test('requires a term or filter without issuing a search request', async () => {
   await renderReady();
   global.fetch.mockClear();
@@ -159,7 +193,7 @@ test('renders broad results with live cycle/status filters and semantic open lin
     'href',
     `/workbench/${REQUEST_ID}?n=1002959`,
   );
-  expect(JSON.parse(window.sessionStorage.getItem('wmkf-workbench-request-locator-research-v2')))
+  expect(JSON.parse(window.sessionStorage.getItem('wmkf-workbench-request-locator-research-v3')))
     .toMatchObject({ criteria: { cycle: 'December 2026', status: 'Active' } });
   expect(screen.getByRole('status', { name: 'Request search status' }))
     .toHaveTextContent('Search complete. 1 result; 1 shown.');
@@ -231,12 +265,12 @@ test('loads the next bounded page and appends it to the restored search state', 
   expect(await screen.findByText('Final match')).toBeInTheDocument();
   expect(screen.getByText(/showing 26/i)).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Load 25 more' })).not.toBeInTheDocument();
-  expect(JSON.parse(window.sessionStorage.getItem('wmkf-workbench-request-locator-research-v2')).results)
+  expect(JSON.parse(window.sessionStorage.getItem('wmkf-workbench-request-locator-research-v3')).results)
     .toHaveLength(26);
 });
 
 test('keeps restored filters visible when live options are missing', async () => {
-  window.sessionStorage.setItem('wmkf-workbench-request-locator-research-v2', JSON.stringify({
+  window.sessionStorage.setItem('wmkf-workbench-request-locator-research-v3', JSON.stringify({
     criteria: { query: 'regeneration', cycle: 'June 2024', status: 'Archived' },
     results: [{ requestId: REQUEST_ID, requestNumber: '1002959', title: 'Restored request' }],
     totalCount: 1,
@@ -261,7 +295,7 @@ test('keeps restored filters visible when live options are missing', async () =>
 });
 
 test('restores the last broad result set after returning to the dashboard', async () => {
-  window.sessionStorage.setItem('wmkf-workbench-request-locator-research-v2', JSON.stringify({
+  window.sessionStorage.setItem('wmkf-workbench-request-locator-research-v3', JSON.stringify({
     criteria: { query: 'regeneration', cycle: '', status: '' },
     results: [{ requestId: REQUEST_ID, requestNumber: '1002959', title: 'Restored request' }],
     totalCount: 1,
@@ -352,7 +386,7 @@ test('a slower superseded broad search cannot replace newer results or saved cri
 
   expect(screen.queryByText('Older result')).not.toBeInTheDocument();
   expect(screen.getByText('Newer result')).toBeInTheDocument();
-  expect(JSON.parse(window.sessionStorage.getItem('wmkf-workbench-request-locator-research-v2')))
+  expect(JSON.parse(window.sessionStorage.getItem('wmkf-workbench-request-locator-research-v3')))
     .toMatchObject({ criteria: { query: 'newer' } });
 });
 
@@ -439,5 +473,5 @@ test('clearing during a broad search prevents the late response from restoring r
 
   expect(screen.queryByText('Late result')).not.toBeInTheDocument();
   expect(screen.queryByText(/result(?:s)? · showing/i)).not.toBeInTheDocument();
-  expect(window.sessionStorage.getItem('wmkf-workbench-request-locator-research-v2')).toBeNull();
+  expect(window.sessionStorage.getItem('wmkf-workbench-request-locator-research-v3')).toBeNull();
 });

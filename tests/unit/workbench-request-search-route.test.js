@@ -80,6 +80,26 @@ test('validated search parameters reach the service as plain values', async () =
   });
 });
 
+test('returns the minimal outside-program acknowledgement from the service', async () => {
+  searchWorkbenchRequests.mockResolvedValueOnce({
+    success: true,
+    results: [],
+    totalCount: 0,
+    outsideProgramRequest: { requestNumber: '1009999', program: 'Community Grants' },
+  });
+  const res = mockRes();
+
+  await handler(req({ q: '1009999' }), res);
+
+  expect(res.statusCode).toBe(200);
+  expect(res.body).toEqual({
+    success: true,
+    results: [],
+    totalCount: 0,
+    outsideProgramRequest: { requestNumber: '1009999', program: 'Community Grants' },
+  });
+});
+
 test.each([
   [{ mode: 'bogus' }, 'Invalid mode'],
   [{ mode: 'options', q: 'ignored' }, 'Invalid request search parameters'],
