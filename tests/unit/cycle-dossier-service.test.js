@@ -90,7 +90,7 @@ beforeEach(() => {
   store.readDossierControl.mockResolvedValue({ stop_requested: false, reason: null, updated_by: 7, updated_at: '2026-09-07T00:00:00Z' });
 });
 
-afterEach(() => { delete process.env.CYCLE_DOSSIER_ENABLED; delete process.env.CYCLE_DOSSIER_REQUEST_ALLOWLIST; });
+afterEach(() => { delete process.env.CYCLE_DOSSIER_ENABLED; delete process.env.CYCLE_DOSSIER_REQUEST_ALLOWLIST; delete process.env.CYCLE_DOSSIER_ROLLOUT_MODE; delete process.env.CYCLE_DOSSIER_OPERATOR_PROFILE_ID; });
 
 test('preview returns the selected and generated DTOs and saves the selection', async () => {
   store.listDossierEntries.mockResolvedValue([{ request_id: ID, id: 'entry-existing', revision: 1, created_at: '2026-09-07T00:00:00Z', created_by: 9 }]);
@@ -123,6 +123,14 @@ test('disabled pilot rejects preview before any private Blob or Postgres write',
 test('disabled pilot rejects selection persistence before Postgres write', async () => {
   process.env.CYCLE_DOSSIER_ENABLED = 'false';
   await expect(cycleDossierAction(7, { action: 'selection', selectedRequestIds: [ID] }))
+    .rejects.toMatchObject({ httpStatus: 503 });
+  expect(store.saveDossierSelection).not.toHaveBeenCalled();
+});
+
+test('smoke mode rejects multi-request selection before persistence', async () => {
+  process.env.CYCLE_DOSSIER_ROLLOUT_MODE = 'smoke';
+  process.env.CYCLE_DOSSIER_OPERATOR_PROFILE_ID = '7';
+  await expect(cycleDossierAction(7, { action: 'selection', selectedRequestIds: [ID, ID2] }))
     .rejects.toMatchObject({ httpStatus: 503 });
   expect(store.saveDossierSelection).not.toHaveBeenCalled();
 });

@@ -1,8 +1,11 @@
 /** @jest-environment node */
 
+jest.mock('@vercel/blob', () => ({ list: jest.fn() }));
+
 import {
   buildSmokePlan,
   expectedPrompt,
+  probeDossierBlobStore,
   runPreflight,
   verifyMigrationContract,
   verifyPromptRow,
@@ -17,6 +20,7 @@ import {
   parseDossierRequestAllowlist,
   validateDossierEnvironment,
 } from '../../lib/services/cycle-dossier-rollout.js';
+import { list } from '@vercel/blob';
 
 const migrationText = `
 CREATE TABLE IF NOT EXISTS cycle_dossiers (id uuid);
@@ -31,6 +35,7 @@ afterEach(() => {
   delete process.env.CYCLE_DOSSIER_ENABLED;
   delete process.env.CYCLE_DOSSIER_OPERATOR_STOP;
   delete process.env.CYCLE_DOSSIER_REQUEST_ALLOWLIST;
+  delete process.env.CYCLE_DOSSIER_ROLLOUT_MODE;
 });
 
 test('migration contract requires manifest inclusion, sorted files, and the control table', () => {
@@ -65,6 +70,21 @@ test('pilot mode admits any superuser while smoke mode pins one operator profile
   expect(() => assertDossierProfileAllowed(8, { CYCLE_DOSSIER_ROLLOUT_MODE: 'smoke', CYCLE_DOSSIER_OPERATOR_PROFILE_ID: '7' })).toThrow(/outside/i);
 });
 
+test('smoke mode requires one and only one cohort request', () => {
+  process.env.CYCLE_DOSSIER_ROLLOUT_MODE = 'smoke';
+  process.env.CYCLE_DOSSIER_REQUEST_ALLOWLIST = 'D26-001,D26-002';
+  expect(() => assertDossierRequestAllowed({ requestNumber: 'D26-001' })).toThrow(/exactly one/i);
+});
+
+test('Blob probe authenticates read-only and rejects wrong or malformed store tokens', async () => {
+  list.mockResolvedValue({ blobs: [] });
+  await expect(probeDossierBlobStore({ DOSSIER_BLOB_READ_WRITE_TOKEN: 'vercel_blob_rw_storealpha_secret', DOSSIER_BLOB_STORE_ID: 'store_storealpha' }))
+    .resolves.toMatchObject({ authenticated: true, storeId: 'store_storealpha' });
+  expect(list).toHaveBeenCalledWith({ prefix: 'cycle-dossier/', limit: 1, token: 'vercel_blob_rw_storealpha_secret' });
+  await expect(probeDossierBlobStore({ DOSSIER_BLOB_READ_WRITE_TOKEN: 'vercel_blob_rw_shared_secret', DOSSIER_BLOB_STORE_ID: 'store_storealpha' })).rejects.toThrow(/dedicated store/i);
+  await expect(probeDossierBlobStore({ DOSSIER_BLOB_READ_WRITE_TOKEN: 'invalid', DOSSIER_BLOB_STORE_ID: 'store_storealpha' })).rejects.toThrow(/dedicated store/i);
+});
+
 test('worker stop is checked after a run is claimed', async () => {
   process.env.CYCLE_DOSSIER_ENABLED = 'true';
   process.env.CYCLE_DOSSIER_OPERATOR_STOP = 'true';
@@ -81,19 +101,41 @@ test('live preflight verifies both exact prompt rows and one request source/dest
   const result = await runPreflight({
     root: process.cwd(), expectedEnvironment: 'local', vercelEnv: undefined, nodeEnv: 'development', dynamicsUrl: null,
     liveRead: true, smokeRequest: 'D26-001',
-    env: { CYCLE_DOSSIER_ENABLED: 'true', CYCLE_DOSSIER_REQUEST_ALLOWLIST: 'D26-001', CYCLE_DOSSIER_ROLLOUT_MODE: 'smoke', CYCLE_DOSSIER_OPERATOR_PROFILE_ID: '7', DOSSIER_BLOB_READ_WRITE_TOKEN: 'blob', CRON_SECRET: 'cron' },
+    env: { CYCLE_DOSSIER_ENABLED: 'true', CYCLE_DOSSIER_REQUEST_ALLOWLIST: 'D26-001', CYCLE_DOSSIER_ROLLOUT_MODE: 'smoke', CYCLE_DOSSIER_OPERATOR_PROFILE_ID: '7', DOSSIER_BLOB_READ_WRITE_TOKEN: 'vercel_blob_rw_storealpha_secret', DOSSIER_BLOB_STORE_ID: 'store_storealpha', CRON_SECRET: 'cron' },
     dependencies: {
       fetchCurrentPrompt: jest.fn(async name => rows.find(row => row.wmkf_ai_promptname === name)),
       readSchemaState: jest.fn(async () => ({ tables: ['cycle_dossiers', 'cycle_dossier_previews', 'cycle_dossier_entries', 'cycle_dossier_runs', 'cycle_dossier_control', 'cycle_dossier_editions'], migrationApplied: true, control: { stop_requested: false } })),
       readRoster: jest.fn(async () => [{ requestId: 'id-1', requestNumber: 'D26-001' }]),
       withReadContext: jest.fn(async fn => fn()),
+      probeBlobStore: jest.fn(async () => ({ authenticated: true, storeId: 'store_storealpha', sampleCount: 0 })),
       prepareRequestInput: jest.fn(async () => ({ narrative: { text: 'frozen', contentHash: 'a'.repeat(64) } })),
       resolveDossierDestination: jest.fn(async () => ({ library: 'akoya_request', folder: 'request', siteId: 'site', driveId: 'drive' })),
     },
   });
   expect(result.ok).toBe(true);
+  expect(result.checks.promptContract.status).toBe('ready');
+  expect(result.checks.blobAccess.status).toBe('ready');
   expect(result.live.request.narrativeHash).toHaveLength(64);
   expect(result.smoke).toMatchObject({ writes: false, paidCalls: false, mode: 'readiness-only' });
+});
+
+test('invalid model or failed Blob identity probe blocks preflight', async () => {
+  const result = await runPreflight({
+    root: process.cwd(), expectedEnvironment: 'local', nodeEnv: 'development', model: 'gpt-4o', liveRead: true,
+    env: { CYCLE_DOSSIER_REQUEST_ALLOWLIST: 'D26-001', DOSSIER_BLOB_READ_WRITE_TOKEN: 'vercel_blob_rw_storealpha_secret', DOSSIER_BLOB_STORE_ID: 'store_storealpha', CRON_SECRET: 'cron' },
+    dependencies: {
+      readSchemaState: jest.fn(async () => ({ tables: ['cycle_dossiers', 'cycle_dossier_previews', 'cycle_dossier_entries', 'cycle_dossier_runs', 'cycle_dossier_control', 'cycle_dossier_editions'], migrationApplied: true, control: { stop_requested: false } })),
+      fetchCurrentPrompt: jest.fn(async name => ({ ...expectedPrompt(name.includes('research') ? research : entry, name.includes('research') ? 3000 : 12000, 'gpt-4o'), wmkf_ai_promptid: 'p', wmkf_promptversion: 1 })),
+      readRoster: jest.fn(async () => [{ requestId: 'id-1', requestNumber: 'D26-001' }]),
+      withReadContext: jest.fn(async fn => fn()),
+      probeBlobStore: jest.fn(async () => { throw new Error('wrong store'); }),
+      prepareRequestInput: jest.fn(async () => ({ narrative: { text: 'frozen', contentHash: 'a'.repeat(64) } })),
+      resolveDossierDestination: jest.fn(async () => ({ library: 'akoya_request', folder: 'request', siteId: 'site', driveId: 'drive' })),
+    },
+  });
+  expect(result.ok).toBe(false);
+  expect(result.checks.promptContract.status).toBe('unavailable');
+  expect(result.checks.blobAccess.status).toBe('unavailable');
 });
 
 test('static preflight reports unavailable live checks and cannot pass', async () => {

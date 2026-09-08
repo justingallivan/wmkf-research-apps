@@ -90,6 +90,34 @@ export function readinessCheck(ok, reason = null) {
   return ok ? { status: 'ready' } : { status: reason ? 'unavailable' : 'not-ready', reason: reason || 'Check did not pass.' };
 }
 
+function dossierStoreIdFromToken(token) {
+  const parts = String(token || '').split('_');
+  return parts.length >= 4 && parts[0] === 'vercel' && parts[1] === 'blob' && parts[2] === 'rw' ? parts[3] : null;
+}
+
+function normalizeDossierStoreId(value) {
+  return String(value || '').replace(/^store_/, '').toLowerCase();
+}
+
+export async function probeDossierBlobStore(env = process.env) {
+  const token = String(env.DOSSIER_BLOB_READ_WRITE_TOKEN || '').trim();
+  const configuredStoreId = String(env.DOSSIER_BLOB_STORE_ID || '').trim();
+  const tokenStoreId = dossierStoreIdFromToken(token);
+  if (!tokenStoreId || !configuredStoreId || normalizeDossierStoreId(tokenStoreId) !== normalizeDossierStoreId(configuredStoreId)) {
+    throw new Error('The dossier Blob token does not identify the configured dedicated store.');
+  }
+  const { list } = await import('@vercel/blob');
+  const result = await list({ prefix: 'cycle-dossier/', limit: 1, token });
+  if (!result || !Array.isArray(result.blobs)) throw new Error('The dedicated dossier Blob store returned an invalid read response.');
+  const expectedHost = `${normalizeDossierStoreId(configuredStoreId)}.private.blob.vercel-storage.com`;
+  for (const blob of result.blobs) {
+    let hostname;
+    try { hostname = new URL(blob.url).hostname.toLowerCase(); } catch { throw new Error('The dedicated dossier Blob store returned an invalid object URL.'); }
+    if (hostname !== expectedHost) throw new Error('The dossier Blob read returned an object from a different store.');
+  }
+  return { authenticated: true, storeId: configuredStoreId, sampleCount: result.blobs.length };
+}
+
 async function defaultReadSchemaState() {
   const { sql } = await import('@vercel/postgres');
   const tables = (await sql.query(`SELECT table_name FROM information_schema.tables
@@ -137,8 +165,10 @@ export async function runPreflight({
   const checks = {
     migration: readinessCheck(migration.ok, 'Migration 038 is missing, unlisted, unsorted, or incomplete.'),
     environment: readinessCheck(environment.ok, environment.reason),
-    cohort: readinessCheck(allowlist.length > 0, 'CYCLE_DOSSIER_REQUEST_ALLOWLIST is empty or malformed.'),
-    blob: readinessCheck(Boolean(String(env.DOSSIER_BLOB_READ_WRITE_TOKEN || '').trim()), 'DOSSIER_BLOB_READ_WRITE_TOKEN is unavailable.'),
+    cohort: readinessCheck(allowlist.length > 0 && (config.mode !== 'smoke' || allowlist.length === 1), config.mode === 'smoke' ? 'Smoke mode requires exactly one allowlisted request.' : 'CYCLE_DOSSIER_REQUEST_ALLOWLIST is empty or malformed.'),
+    promptContract: readinessCheck(promptContract.ok, 'The configured dossier model is not an approved structured-output Claude model.'),
+    blob: readinessCheck(Boolean(String(env.DOSSIER_BLOB_READ_WRITE_TOKEN || '').trim() && String(env.DOSSIER_BLOB_STORE_ID || '').trim()), 'DOSSIER_BLOB_READ_WRITE_TOKEN and DOSSIER_BLOB_STORE_ID are required.'),
+    blobAccess: readinessCheck(false, 'The dedicated Blob store was not authenticated with a read-only probe.'),
     cron: readinessCheck(Boolean(String(env.CRON_SECRET || '').trim()), 'CRON_SECRET is unavailable.'),
     operator: readinessCheck(config.mode === 'pilot' || (config.mode === 'smoke' && Number.isInteger(config.operatorProfileId) && config.operatorProfileId > 0), 'Smoke mode requires CYCLE_DOSSIER_OPERATOR_PROFILE_ID; mode must be pilot or smoke.'),
     schema: readinessCheck(false, 'Live schema/control state was not checked.'),
@@ -172,6 +202,11 @@ export async function runPreflight({
         }
         checks.prompts = readinessCheck(result.prompts.length === PROMPTS.length && result.prompts.every(prompt => prompt.ok), 'Published prompt readback did not match the seeded contract.');
       } catch (error) { checks.prompts = readinessCheck(false, `Prompt check unavailable: ${error.message}`); }
+      try {
+        const probe = dependencies.probeBlobStore || probeDossierBlobStore;
+        await probe(env);
+        checks.blobAccess = readinessCheck(true);
+      } catch (error) { checks.blobAccess = readinessCheck(false, `Dedicated Blob read probe unavailable: ${error.message}`); }
       try {
         const readRoster = dependencies.readRoster || defaultReadRoster;
         const roster = await readRoster();
