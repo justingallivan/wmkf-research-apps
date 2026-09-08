@@ -59,8 +59,7 @@ The six Postgres tables are documented in docs/atlas/postgres-cycle-dossiers.md.
 ## Controlled rollout remaining
 
 1. Run the read-only rollout preflight to prove each environment's dedicated Blob token/store identity, schema/control row, prompt readback, roster, source, and destination; keep CYCLE_DOSSIER_ENABLED disabled during review.
-2. Review the controlled one-request smoke plan and authorize a single request through generation, SharePoint publication, private downloads, and unattended recovery before cycle-wide use.
-3. Verify the actual D26 roster and the authoritative request AI Artifacts destination, including material-listing consumers and existing SharePoint access. Run a single explicitly authorized request through generation, SharePoint publication, private downloads, and unattended recovery before cycle-wide use.
-4. Promote through the Tier 2 release process and enable the worker with literal CYCLE_DOSSIER_ENABLED=true only in the approved environment. A user still launches each dossier after reviewing their inclusion list and budget.
+2. Review the preflight evidence and authorize exactly one controlled request through generation, SharePoint publication, private downloads, and unattended recovery before cycle-wide use; the preflight's roster, source, destination, material-listing, and access checks must cover that request.
+3. Promote through the Tier 2 release process and enable the worker with literal CYCLE_DOSSIER_ENABLED=true only in the approved environment. A user still launches each dossier after reviewing their inclusion list and budget.
 
 The LLM estimate excludes storage/hosting costs and is a dispatch control rather than an exact provider-invoice promise. The pilot retains entries and editions; cleanup of expired previews and unreferenced temporary objects remains deferred. PD groups and their requests currently sort by name and request number; custom group ordering and native SharePoint-edit ingestion are outside this build.
