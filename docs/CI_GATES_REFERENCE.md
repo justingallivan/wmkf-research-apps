@@ -295,6 +295,22 @@ The report's top-level `summary` describes current live drift only. The dated 20
 
 Added S348 (audit Slice 5 from `docs/audits/memory-hygiene-control-audit-2026-07-02.md`). Runs `scripts/check-memory-health.js`. **Read-only, never fails** — complements `check:memory-router` (structure) with semantic-freshness signals. Reports per active leaf memory: `shadow-atlas` (structural claim, no Atlas/source/probe pointer), `weak-basis` (structural claim + explicitly weak `last_verified`, or no acceptable basis), `no-recall-rule`, `oversize-routed`, `stale-routed`. An acceptable basis is either a non-weak `last_verified` value or both a parseable harness `modified:` timestamp and a dated in-body `[VERIFIED ...]` label. Explicit unknown/not-re-probed text still flags even when the alternative evidence shape is present. Parses top-level and `metadata:`-nested frontmatter keys. `--json` emits a machine-readable triage worklist; `--quiet` prints summary only. It is the intended starting point for future memory-triage passes (see `docs/audits/memory-triage-2026-07-08.md`). Wired into the `/start` advisory gate list. Focused coverage: `npm test -- --runInBand tests/unit/check-memory-health.test.js`.
 
+### `check:j27-register` (advisory) — `J27:` marker convention ↔ transition register (S496)
+
+Added 2026-09-07 from `docs/J27_SINGLE_PHASE_TRANSITION_INVENTORY_PLAN.md` §7. Runs
+`scripts/check-j27-register.js` against the tracked tree and
+`docs/J27_TRANSITION_REGISTER.md`. Three behaviors: lists every `J27:` tagged site; fails
+(exit 1) when a tag names a register id that does not exist; fails when a register row's
+`site` no longer resolves to a file containing its `excerpt`. A `J27:` marker without an
+id is listed as a warning, not a failure. Rows whose disposition begins `rejected` or
+`done` are closed and skipped; rows with no backticked path in `site` or no backticked
+fragment in `excerpt` (Dataverse surfaces, work-queue pointers, plain-prose excerpts) are
+reported as unverifiable and never fail. A register row that does not parse into the
+seven schema columns, or a duplicate id, is a configuration error (exit 2). **Advisory:**
+registered here and in the `/start` battery only, not in `test.yml` or any hook;
+promotion to blocking is an owner decision (plan §7). The self-test is `--root`/`--register`
+isolated to a temp fixture tree.
+
 ### `check:model-override-warming` — LLM 404-on-tier-alias prevention (S230)
 
 AST gate (`@babel/parser`). Every `pages/api/**` route that reaches a `getModelForApp` / `getFallbackModelForApp` call — directly or transitively through an imported module — must call an **awaited** `loadModelOverrides()` first (and within a single function, the warm must lexically precede a direct resolver call). Without warming, the synchronous resolver returns the raw tier alias (e.g. `sonnet`) and Anthropic 404s in prod; unit tests never catch it (they mock the LLM). This class recurred 3× (web-suggestions S229; applicant-reviewers + integrity-screener/screen S230) before the gate.
@@ -424,6 +440,7 @@ When modifying any `scripts/check-*.js` gate (or building a new one), the matchi
 | `check:scaffolding-tokens` | `check:scaffolding-tokens:self-test` |
 | `check:prompt-injection-tagging` | `check:prompt-injection-tagging:self-test` |
 | `check:reviewer-reminder-hold` | `check:reviewer-reminder-hold:self-test` — safe registry and lookalike-path positives; exact held-route (including query-string registration), invalid JSON, missing/non-array registry, malformed entry, missing-path, and alternate-config negatives. |
+| `check:j27-register` | `check:j27-register:self-test` — unknown-id, stale-excerpt, missing-site, unmatched-glob, malformed-row and duplicate-id reds; existing-id, bare-marker warning, backtick self-reference, second-file, ellipsis-split, wrapped-comment, memory/sibling/glob shorthand, closed-row and prose-only greens; real-baseline green before and after. |
 
 **When external review catches a structural pattern an existing gate missed, the order is mandatory:**
 
@@ -458,3 +475,4 @@ before its self-test:**
 - `check:reviewer-engagement-boundary` then `check:reviewer-engagement-boundary:self-test` (self-test is `--root`-isolated to a temp dir like the route-service-boundary pair; run sequentially per the universal gate convention)
 - `check:script-suggestion-writers` then `check:script-suggestion-writers:self-test` (self-test is `--root`-isolated to a temp dir; run sequentially per the universal gate convention)
 - `check:secret-scan` then `check:secret-scan:self-test`
+- `check:j27-register` then `check:j27-register:self-test` (self-test is `--root`-isolated to a temp dir; run sequentially per the universal gate convention)

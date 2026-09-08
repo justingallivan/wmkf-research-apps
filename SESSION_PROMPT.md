@@ -86,10 +86,10 @@ toolbar/header · `314e9426` `e68bffe9` ToolbarSelect · `f4bcb5b6` smoke record
    owner-confirmed 2026-09-07). PR #176 merged as `25dc8645`; deployment `dpl_22eyAD8S4yPmx16iv3Nng2u9sw5T`;
    owner-run signed-in smoke passed on Request `1002788`, whose Final row now sits at leadership stage
    (reversal is the owner-run repair in plan §4.7). Nothing remains on this item.
-2. **Build the `J27:` marker convention and `scripts/check-j27-register.js`** (advisory gate).
-   Evidence: `docs/J27_SINGLE_PHASE_TRANSITION_INVENTORY_PLAN.md` §7, register §9, Codex high
-   finding (S491). Register in `docs/CI_GATES_REFERENCE.md` and the `/start` list; gate then
-   self-test sequentially.
+2. **`J27:` marker convention and `scripts/check-j27-register.js`: BUILT 2026-09-07** (Session 496,
+   branch `claude/j27-register-gate`, advisory gate + `--root`-isolated self-test, registered in
+   `docs/CI_GATES_REFERENCE.md` and `/start`). Baseline 61 ok / 0 stale / 6 unverifiable / 9 closed.
+   Remaining plan exit criteria: memory/wiki pointers to the register, §8 answers.
 3. **Write `docs/J27_BUILD_AND_CHANGE_PLAN.md`** once Connor's file-location decision (Q5) lands.
    Evidence: register §2 deliverables table. Sequence unchanged from the S492 prompt.
 4. **Annotate the pilot passages** coupling "J27 Initial Assessment" to 2026-08-18

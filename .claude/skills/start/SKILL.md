@@ -119,6 +119,7 @@ npm run check:request-document-writers && npm run check:request-document-writers
 npm run check:secret-scan && npm run check:secret-scan:self-test              # no real secret-shaped values in tracked files (GHAS-free push protection)
 npm run check:scaffolding-tokens && npm run check:scaffolding-tokens:self-test  # no leaked tool-call scaffolding tags (bare-line </content>/</invoke>/antml:*) in tracked files
 npm run check:harness-framing && npm run check:harness-framing:self-test        # active harness wording stays expert/procedural; rationale lives in sidecars/backups
+npm run check:j27-register && npm run check:j27-register:self-test            # advisory: J27: marker tags name real register ids; register sites still contain their excerpts
 npm run check:memory-drift:no-write                                            # advisory: memory↔code drift (read-only)
 npm run check:memory-drift                                                     # advisory: default memory↔code drift check
 npm run check:memory-health                                                    # advisory: active-memory hygiene worklist (shadow-atlas/weak-basis/no-recall-rule/oversize/stale-routed); never fails
