@@ -67,7 +67,7 @@ test('builds the approved payload from the persisted answer snapshot and caller-
       reviewerTitleAndOrganization: 'Professor, University Two',
       requestNumber: '1002903',
       requestTitle: 'A Proposal',
-      institution: 'University One',
+      institution: 'Fallback University',
       submittedAt: '2026-09-02T17:30:00.000Z',
       generatedAtIso: GENERATED_AT,
     },

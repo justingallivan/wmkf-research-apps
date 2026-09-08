@@ -6,7 +6,7 @@ status: active
 summary: "File storage and linking in AkoyaGO/Dynamics, including governed staff writeups and Site Visit artifacts."
 canonical: true
 cataloged: 2026-07-02
-last_verified: 2026-09-04
+last_verified: 2026-09-08
 owner: product-engineering
 related:
   - scripts/probe-sharepoint-write.js
@@ -446,8 +446,9 @@ visibly outstanding until staff fills it; model-generated filler is not
 authoritative.
 
 Institution and proposal title are structured inputs, not prose to infer. Resolve
-institution from `akoya_request.wmkf_organizationname`, falling back to the
-formatted applicant lookup. Resolve the title from the applicant-submitted
+institution from the formatted Applicant lookup only (`shared/utils/institution.js`
+`requestInstitution`, 2026-09-08); `akoya_request.wmkf_organizationname` is a Bill.com
+field that can hold "N/A" and is no longer read for institution display. Resolve the title from the applicant-submitted
 `akoya_request.akoya_title`; do not use the later house-style Keck title in
 `wmkf_wmkfprojectdescription`. A read-only production probe matched the
 supplied D26 examples to their stored Keck titles and confirmed that those rows

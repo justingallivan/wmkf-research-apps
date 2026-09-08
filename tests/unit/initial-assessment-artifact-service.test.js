@@ -109,7 +109,8 @@ const request = {
   akoya_requestnum: '1003001',
   akoya_title: 'Mechanisms of Discovery',
   wmkf_meetingdate: '2026-06-15',
-  wmkf_organizationname: 'Example University',
+  wmkf_organizationname: 'N/A',
+  _akoya_applicantid_value_formatted: 'Example University',
   _wmkf_currentinitialassessment_value: null,
   _etag: 'W/"request-1"',
 };
@@ -1254,7 +1255,7 @@ it('changes deterministic artifact identity when the authoritative cycle changes
     requestId: REQUEST_ID,
     requestNumber: request.akoya_requestnum,
     title: request.akoya_title,
-    institution: request.wmkf_organizationname,
+    institution: request._akoya_applicantid_value_formatted,
     proposalFilename: 'ProposalNarrative_1003001.pdf',
     proposalText: 'Proposal source material '.repeat(20),
   };
