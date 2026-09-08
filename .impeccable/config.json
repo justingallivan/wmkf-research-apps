@@ -21,6 +21,24 @@
         ],
         "createdAt": "2026-09-05T03:27:43.816Z",
         "reason": "Agent: DESIGN.md defines the browser interface typography. This unchanged transactional-email renderer deliberately uses Arial system-font fallbacks in presentation tables with Outlook mso padding; the browser font declaration is not its styling contract."
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "10px",
+        "files": [
+          "shared/components/Layout.js"
+        ],
+        "createdAt": "2026-09-08T17:25:09.567Z",
+        "reason": "Intentional compact notification badge in shared navigation shell"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#6366f1",
+        "files": [
+          "shared/components/Layout.js"
+        ],
+        "createdAt": "2026-09-08T17:25:09.603Z",
+        "reason": "Intentional established default avatar fallback when no profile color exists"
       }
     ]
   }
