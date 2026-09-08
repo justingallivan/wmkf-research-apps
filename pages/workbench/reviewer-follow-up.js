@@ -58,7 +58,11 @@ function ReviewerGroup({ proposal, previewReadOnly, onRefresh, degraded, loading
               </h2>
             </div>
             <p className="mt-1 text-sm text-gray-600">
-              {[proposal.proposalInstitution, proposal.proposalAuthors && `PI: ${proposal.proposalAuthors}`]
+              {[
+                proposal.proposalInstitution,
+                proposal.proposalAuthors && `PI: ${proposal.proposalAuthors}`,
+                proposal.workbench?.programDirector && `PD: ${proposal.workbench.programDirector}`,
+              ]
                 .filter(Boolean)
                 .join(' · ')}
             </p>
