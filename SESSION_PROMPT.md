@@ -26,8 +26,9 @@ line through the reviewed path.
 
 ### Verify Before Acting
 
-1. **J27 register/site binding contract.** Read `docs/plans/J27_GATE_AND_SESSION_496_CODEX_BRIEF_2026-09-08.md` first: `check:j27-register` is now strict, `shared/config/workbenchVisibility.js` is a register site (J27-020, J27-037), and any dossier change to its predicate text must rebind those rows in the same PR.
-2. **Concurrent release state.** Re-check `origin/main`, active branches, and Vercel deployments before cherry-picking or promoting the reviewer UI commits.
+1. **Codex handed all branches to Claude 2026-09-08; read `docs/plans/CODEX_HANDOVER_TO_CLAUDE_2026-09-08.md` before touching any `codex/*` branch.**
+2. **J27 register/site binding contract.** Read `docs/plans/J27_GATE_AND_SESSION_496_CODEX_BRIEF_2026-09-08.md` first: `check:j27-register` is now strict, `shared/config/workbenchVisibility.js` is a register site (J27-020, J27-037), and any dossier change to its predicate text must rebind those rows in the same PR.
+3. **Concurrent release state.** Re-check `origin/main`, active branches, and Vercel deployments before cherry-picking or promoting the reviewer UI commits.
 
 ### Handoff Notes
 
@@ -126,22 +127,22 @@ pilot remains a draft and was not promoted.
 
 ### Verified Open
 
-1. **Reconcile the Cycle Dossier pilot with the production program-scope contract.**
+1. **Owner: Claude — reconcile the Cycle Dossier pilot with the production program-scope contract.**
    Evidence: draft branch `origin/codex/cycle-dossier-pilot-build` still contains
    `pages/cycle-dossier.js`; PR #179 was not merged during Session 494; `origin/main` is
    `bc699284`. Inspect the current PR diff first, then merge/rebase current `main` and replace any
    dossier-specific roster or program assumptions with `program-scope-service.js` and
    `shared/config/workbenchVisibility.js` where their contracts apply.
-2. **Re-run dossier verification after reconciliation.**
+2. **Owner: Claude — re-run dossier verification after reconciliation.**
    Evidence: the production program filter changed after the dossier branch was built. Run focused
    dossier tests, the affected security/DAL gates, full build, and rollout preflight before any live
    generation.
-3. **Run a controlled one-request dossier smoke and measure actual cost.**
+3. **Owner: Claude — run a controlled one-request dossier smoke and measure actual cost.**
    Evidence: the owner explicitly authorized a real smoke and cost measurement, but paused it for
    Workbench scope reconciliation. After items 1–2 pass, use the existing staged rollout controls
    and a single D26 request, record actual provider cost and output behavior, and preserve all
    generated editions.
-4. **Make a deliberate release decision for PR #179.**
+4. **Owner: Claude — make a deliberate release decision for PR #179.**
    Evidence: the Cycle Dossier remains a superuser pilot on a draft branch. Promote only after the
    reconciled build, review, and measured smoke are satisfactory.
 
