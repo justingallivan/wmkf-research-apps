@@ -52,7 +52,8 @@ sequence.
   `programDirector` (formatted name) [VERIFIED via
   `lib/services/workbench/dashboard-service.js:252`], so this is a card-render
   change in `pages/workbench/reviewer-follow-up.js` (the institution · PI line,
-  ~line 61), plus a render test. Tier 0 UI. Not started.
+  ~line 61), plus a render test. Tier 0 UI. **Built the same session in PR #200**
+  (`claude/follow-up-pd`); closes on merge.
 - **Public/onboarding reviewer-token documentation reconciliation.**
   **[CLOSED BY RETIREMENT 2026-09-08.]** The `docs/onboarding/` Workbench decks
   (two generated `.pptx` files, their Python generator, and README) were retired
