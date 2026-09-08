@@ -5,7 +5,7 @@ import { Card } from '../Layout';
 import ToolbarSelect, { COMPACT_CONTROL_HEIGHT_CLASS, COMPACT_CONTROL_FOCUS_CLASS } from '../ToolbarSelect';
 
 // Prior caches include other programs and off-cycle filters; do not restore them.
-const STORAGE_KEY = 'wmkf-workbench-request-locator-research-v3';
+const STORAGE_KEY = 'wmkf-workbench-request-locator-program-v4';
 const MAX_QUERY_LENGTH = 100;
 const MAX_FILTER_LENGTH = 100;
 const MAX_SAVED_RESULTS = 100;
@@ -32,6 +32,7 @@ function readSavedSearch() {
         query: String(saved.criteria.query || '').slice(0, MAX_QUERY_LENGTH),
         cycle: String(saved.criteria.cycle || '').slice(0, MAX_FILTER_LENGTH),
         status: String(saved.criteria.status || '').slice(0, MAX_FILTER_LENGTH),
+        programId: String(saved.criteria.programId || '').trim().toLowerCase(),
       },
       results: saved.results
         .filter((result) => result && typeof result.requestId === 'string')
@@ -65,6 +66,11 @@ function SearchIcon() {
 export default function RequestLocator() {
   const router = useRouter();
   const [query, setQuery] = useState('');
+  const [programId, setProgramId] = useState(() => (
+    typeof window === 'undefined' ? '' : (readSavedSearch()?.criteria?.programId || '')
+  ));
+  const [programs, setPrograms] = useState([]);
+  const [programName, setProgramName] = useState('Grant Program');
   const [cycle, setCycle] = useState('');
   const [status, setStatus] = useState('');
   const [cycles, setCycles] = useState([]);
@@ -83,15 +89,16 @@ export default function RequestLocator() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const requestIdRef = useRef(0);
+  const skipProgramEffectRef = useRef(false);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      const saved = readSavedSearch();
-      if (!saved) return;
-      const criteria = saved.criteria;
-      setQuery(criteria.query);
-      setCycle(criteria.cycle);
-      setStatus(criteria.status);
+    const saved = readSavedSearch();
+    if (!saved) return;
+    const criteria = saved.criteria;
+    setQuery(criteria.query);
+    setCycle(criteria.cycle);
+    setStatus(criteria.status);
+    if (criteria.programId) {
       setSubmittedCriteria(criteria);
       setResults(saved.results);
       setTotalCount(Number(saved.totalCount) || 0);
@@ -100,28 +107,63 @@ export default function RequestLocator() {
       setOutsideProgramRequest(saved.outsideProgramRequest);
       setHasMore(saved.hasMore === true);
       setNextOffset(saved.nextOffset);
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, []);
+    }
+    if (criteria.programId && criteria.programId !== programId) setProgramId(criteria.programId);
+  }, [programId]);
 
   useEffect(() => {
+    if (skipProgramEffectRef.current) {
+      skipProgramEffectRef.current = false;
+      return undefined;
+    }
     let cancelled = false;
+    const operationId = ++requestIdRef.current;
     (async () => {
       try {
-        const response = await fetch('/api/workbench/search-requests?mode=options');
+        const params = new URLSearchParams({ mode: 'options' });
+        if (programId) params.set('programId', programId);
+        const response = await fetch(`/api/workbench/search-requests?${params}`);
         const body = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(body.error || `Failed to load filters (${response.status})`);
-        if (cancelled) return;
+        if (cancelled || requestIdRef.current !== operationId) return;
+        const selectedProgramId = String(body.programId || '').trim().toLowerCase();
+        if (!selectedProgramId) throw new Error('No active Grant Program was returned');
+        if (selectedProgramId !== programId) {
+          skipProgramEffectRef.current = true;
+          setProgramId(selectedProgramId);
+          setProgramName(String(body.programName || 'Grant Program'));
+          setPrograms(Array.isArray(body.programs) ? body.programs : []);
+          setCycles(Array.isArray(body.cycles) ? body.cycles : []);
+          setStatuses(Array.isArray(body.statuses) ? body.statuses : []);
+          return;
+        }
+        setPrograms(Array.isArray(body.programs) ? body.programs : []);
+        setProgramName(String(body.programName || 'Grant Program'));
         setCycles(Array.isArray(body.cycles) ? body.cycles : []);
         setStatuses(Array.isArray(body.statuses) ? body.statuses : []);
+        const saved = readSavedSearch();
+        if (saved?.criteria?.programId === selectedProgramId) {
+          const criteria = saved.criteria;
+          setQuery(criteria.query);
+          setCycle(criteria.cycle);
+          setStatus(criteria.status);
+          setSubmittedCriteria(criteria);
+          setResults(saved.results);
+          setTotalCount(Number(saved.totalCount) || 0);
+          setCapped(saved.capped === true);
+          setUnavailableCount(Number(saved.unavailableCount) || 0);
+          setOutsideProgramRequest(saved.outsideProgramRequest);
+          setHasMore(saved.hasMore === true);
+          setNextOffset(saved.nextOffset);
+        }
       } catch (loadError) {
-        if (!cancelled) setOptionsError(loadError.message || 'Failed to load filters');
+        if (!cancelled && requestIdRef.current === operationId) setOptionsError(loadError.message || 'Failed to load filters');
       } finally {
-        if (!cancelled) setOptionsBusy(false);
+        if (!cancelled && requestIdRef.current === operationId) setOptionsBusy(false);
       }
     })();
     return () => { cancelled = true; };
-  }, [optionsAttempt]);
+  }, [optionsAttempt, programId]);
 
   useEffect(() => () => {
     requestIdRef.current += 1;
@@ -133,11 +175,30 @@ export default function RequestLocator() {
     setError(null);
   }, []);
 
+  const changeProgram = useCallback((nextProgramId) => {
+    if (!nextProgramId || nextProgramId === programId) return;
+    invalidatePending();
+    setProgramId(nextProgramId);
+    setOptionsBusy(true);
+    setOptionsError(null);
+    setCycle('');
+    setStatus('');
+    setResults(null);
+    setSubmittedCriteria(null);
+    setTotalCount(0);
+    setCapped(false);
+    setUnavailableCount(0);
+    setOutsideProgramRequest(null);
+    setHasMore(false);
+    setNextOffset(null);
+  }, [invalidatePending, programId]);
+
   const runSearch = useCallback(async (criteria, offset = 0, append = false) => {
     const normalized = {
       query: criteria.query.trim(),
       cycle: criteria.cycle.trim(),
       status: criteria.status.trim(),
+      programId,
     };
     if (!normalized.query && !normalized.cycle && !normalized.status) {
       setError('Enter a request number, institution, PI, or title—or select a cycle or status.');
@@ -153,6 +214,7 @@ export default function RequestLocator() {
       if (normalized.query) params.set('q', normalized.query);
       if (normalized.cycle) params.set('cycle', normalized.cycle);
       if (normalized.status) params.set('status', normalized.status);
+      params.set('programId', normalized.programId);
       if (offset) params.set('offset', String(offset));
       const response = await fetch(`/api/workbench/search-requests?${params}`);
       const body = await response.json().catch(() => ({}));
@@ -205,7 +267,7 @@ export default function RequestLocator() {
     } finally {
       if (requestIdRef.current === operationId) setBusy(false);
     }
-  }, [outsideProgramRequest, results, router, unavailableCount]);
+  }, [outsideProgramRequest, programId, results, router, unavailableCount]);
 
   const submitSearch = useCallback((event) => {
     event.preventDefault();
@@ -241,7 +303,7 @@ export default function RequestLocator() {
   const searchAnnouncement = busy
     ? 'Searching requests.'
     : outsideProgramRequest
-      ? `Request #${outsideProgramRequest.requestNumber} is valid, but it is outside the Research suite. Program: ${outsideProgramRequest.program}. Search for request #${outsideProgramRequest.requestNumber} in AkoyaGO for more details.`
+      ? `Request #${outsideProgramRequest.requestNumber} is valid, but it is outside ${programName}. Program: ${outsideProgramRequest.program}. Search for request #${outsideProgramRequest.requestNumber} in AkoyaGO for more details.`
       : results
         ? `Search complete. ${totalCount.toLocaleString()} result${totalCount === 1 ? '' : 's'}; ${showingCount} shown.`
         : '';
@@ -253,10 +315,10 @@ export default function RequestLocator() {
           <span className="mt-0.5 text-gray-500"><SearchIcon /></span>
           <div>
             <h2 id="request-locator-heading" className="text-lg font-semibold text-gray-900">
-              Find a research request
+              Find a request
             </h2>
             <p className="mt-1 text-sm text-gray-600">
-              Search active or historical Research requests without changing their status or the active-cycle list.
+              Search active or historical {programName} requests without changing their status or the active-cycle list.
             </p>
           </div>
         </div>
@@ -285,6 +347,20 @@ export default function RequestLocator() {
           </div>
 
           <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end" aria-busy={optionsBusy}>
+            <ToolbarSelect
+              id="request-locator-program"
+              label="Grant Program"
+              size="compact"
+              className="sm:w-64"
+              value={programId}
+              onChange={(event) => changeProgram(event.target.value)}
+              disabled={optionsBusy || programs.length === 0}
+            >
+              {programs.length === 0 && <option value="">Loading programs…</option>}
+              {programs.map((option) => (
+                <option key={option.programId} value={option.programId}>{option.name}</option>
+              ))}
+            </ToolbarSelect>
             <ToolbarSelect
               id="request-locator-cycle"
               label="Cycle"
@@ -383,7 +459,7 @@ export default function RequestLocator() {
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 px-5 py-3">
             <p className="text-sm text-gray-600">
               {outsideProgramRequest ? (
-                <span className="font-semibold text-gray-900">0 Research results</span>
+                  <span className="font-semibold text-gray-900">0 {programName} results</span>
               ) : (
                 <>
                   <span className="font-semibold text-gray-900">{totalCount.toLocaleString()}</span>{' '}
@@ -409,7 +485,7 @@ export default function RequestLocator() {
               {outsideProgramRequest ? (
                 <>
                   <h3 className="text-sm font-medium text-gray-800">
-                    Request #{outsideProgramRequest.requestNumber} is valid, but it is outside the Research suite.
+                    Request #{outsideProgramRequest.requestNumber} is valid, but it is outside {programName}.
                   </h3>
                   <p className="mt-1 text-sm text-gray-600">Program: {outsideProgramRequest.program}</p>
                   <p className="mt-1 text-sm text-gray-500">

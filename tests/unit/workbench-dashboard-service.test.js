@@ -9,6 +9,15 @@
  */
 
 const queryAllRequests = jest.fn();
+jest.mock('../../lib/services/workbench/program-scope-service.js', () => ({
+  resolveWorkbenchProgramScope: jest.fn(async () => ({
+    programs: [{ programId: '94cab30b-958f-ee11-8179-000d3a341e8f', name: 'Research' }],
+    defaultProgramId: '94cab30b-958f-ee11-8179-000d3a341e8f',
+    programId: '94cab30b-958f-ee11-8179-000d3a341e8f',
+    programName: 'Research',
+  })),
+  buildProgramScopeFilter: jest.fn(() => '(_akoya_programid_value eq 8dcab30b-958f-ee11-8179-000d3a341e8f or _akoya_programid_value eq 94cab30b-958f-ee11-8179-000d3a341e8f)'),
+}));
 jest.mock('../../lib/dataverse/adapters/grant-request.js', () => ({
   queryAllRequests: (...a) => queryAllRequests(...a),
 }));
@@ -88,7 +97,7 @@ test('cycle-list mode: lists organization-wide eligible cycles with honest activ
   expect(body.defaultCycleCode).toBe('J26');
   expect(body.programDirector).toEqual({ systemuserid: 'pd-1', fullName: 'Dr. PD One' });
   expect(queryAllRequests).toHaveBeenCalledWith({
-    select: 'akoya_requestid,wmkf_meetingdate,akoya_requeststatus,_akoya_programid_value,_wmkf_programdirector_value,wmkf_triagestatus',
+    select: 'akoya_requestid,wmkf_meetingdate,akoya_requeststatus,_wmkf_grantprogram_value,_wmkf_programdirector_value,wmkf_triagestatus',
     filter: "wmkf_meetingdate ne null and (_akoya_programid_value eq 8dcab30b-958f-ee11-8179-000d3a341e8f or _akoya_programid_value eq 94cab30b-958f-ee11-8179-000d3a341e8f) and (akoya_requeststatus eq 'Phase II Pending' or wmkf_triagestatus eq 100000000 or wmkf_triagestatus eq 100000001)",
     orderby: 'wmkf_meetingdate desc',
   });

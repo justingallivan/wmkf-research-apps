@@ -6,13 +6,22 @@ jest.mock('../../shared/components/Layout', () => ({
   Card: ({ children }) => <div>{children}</div>,
 }));
 
-const STORAGE_KEY = 'wmkf-workbench-request-locator-research-v3';
+const STORAGE_KEY = 'wmkf-workbench-request-locator-program-v4';
 const response = (body, ok = true) => ({ ok, status: ok ? 200 : 503, json: async () => body });
-const options = { cycles: [{ value: 'J26', label: 'June 2026' }], statuses: ['Active'] };
+const PROGRAM_ID = '11111111-1111-4111-8111-111111111111';
+const options = {
+  programs: [{ programId: PROGRAM_ID, name: 'Research' }],
+  programId: PROGRAM_ID,
+  defaultProgramId: PROGRAM_ID,
+  programName: 'Research',
+  cycles: [{ value: 'J26', label: 'June 2026' }],
+  statuses: ['Active'],
+};
 const emptyResults = { results: [], totalCount: 0 };
 const queryInput = () => screen.getByRole('searchbox');
 const cycleSelect = () => screen.getByRole('combobox', { name: 'Cycle' });
 const statusSelect = () => screen.getByRole('combobox', { name: 'Request status' });
+const programSelect = () => screen.getByRole('combobox', { name: 'Grant Program' });
 
 function deferred() {
   let resolve;
@@ -22,7 +31,7 @@ function deferred() {
 
 function saveCriteria() {
   window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify({
-    criteria: { query: 'University', cycle: 'D26', status: 'Phase II Pending' },
+    criteria: { query: 'University', cycle: 'D26', status: 'Phase II Pending', programId: PROGRAM_ID },
     results: [],
     totalCount: 0,
   }));
@@ -71,7 +80,7 @@ test('loading filters are disabled and described; an empty successful response r
   expect(cycleSelect()).toHaveAccessibleDescription('Loading cycle and status filters…');
   expect(queryInput()).toBeEnabled();
 
-  await act(async () => pending.resolve(response({ cycles: [], statuses: [] })));
+  await act(async () => pending.resolve(response({ ...options, cycles: [], statuses: [] })));
   expect(cycleSelect()).toBeEnabled();
   expect(statusSelect()).toBeEnabled();
   expect(cycleSelect()).toHaveValue('');
@@ -94,7 +103,7 @@ test('failed options retain saved filters in searches, and Clear filters preserv
 
   fireEvent.click(screen.getByRole('button', { name: 'Search', exact: true }));
   await waitFor(() => expect(fetch).toHaveBeenLastCalledWith(
-    '/api/workbench/search-requests?q=University&cycle=D26&status=Phase+II+Pending',
+    `/api/workbench/search-requests?q=University&cycle=D26&status=Phase+II+Pending&programId=${PROGRAM_ID}`,
   ));
   await waitFor(() => expect(screen.getByRole('button', { name: 'Search', exact: true })).toBeEnabled());
   fireEvent.click(screen.getByRole('button', { name: 'Clear filters', exact: true }));
@@ -105,7 +114,7 @@ test('failed options retain saved filters in searches, and Clear filters preserv
   expect(cycleSelect()).toHaveAccessibleDescription(/You can still search/);
 
   fireEvent.click(screen.getByRole('button', { name: 'Search', exact: true }));
-  await waitFor(() => expect(fetch).toHaveBeenLastCalledWith('/api/workbench/search-requests?q=University'));
+  await waitFor(() => expect(fetch).toHaveBeenLastCalledWith(`/api/workbench/search-requests?q=University&programId=${PROGRAM_ID}`));
 });
 
 test('retry disables the controls, makes one request and preserves saved values absent from new options', async () => {
@@ -180,4 +189,37 @@ test('does not restore broad-program results or off-cycle selections from the pr
   expect(queryInput()).toHaveValue('');
   expect(screen.queryByText(/Directors' Directed/)).not.toBeInTheDocument();
   expect(screen.queryByRole('option', { name: /off-cycle/ })).not.toBeInTheDocument();
+});
+
+test('switching Grant Program clears dependent state and requests fresh scoped options', async () => {
+  const socalId = '22222222-2222-4222-8222-222222222222';
+  const socalOptions = {
+    programs: [
+      { programId: PROGRAM_ID, name: 'Research' },
+      { programId: socalId, name: 'Southern California' },
+    ],
+    programId: socalId,
+    defaultProgramId: PROGRAM_ID,
+    programName: 'Southern California',
+    cycles: [{ value: 'D26', label: 'December 2026' }],
+    statuses: ['Closed'],
+  };
+  const nextOptions = deferred();
+  fetch.mockResolvedValueOnce(response({
+    ...options,
+    programs: [
+      { programId: PROGRAM_ID, name: 'Research' },
+      { programId: socalId, name: 'Southern California' },
+    ],
+  })).mockReturnValueOnce(nextOptions.promise);
+  render(<RequestLocator />);
+  await waitFor(() => expect(programSelect()).toBeEnabled());
+  fireEvent.change(programSelect(), { target: { value: socalId } });
+  expect(cycleSelect()).toHaveValue('');
+  expect(screen.queryByText(/No requests matched/)).not.toBeInTheDocument();
+  expect(fetch).toHaveBeenLastCalledWith(`/api/workbench/search-requests?mode=options&programId=${socalId}`);
+  await act(async () => nextOptions.resolve(response(socalOptions)));
+  await waitFor(() => expect(cycleSelect()).toHaveValue(''));
+  expect(screen.getByRole('option', { name: 'December 2026' })).toBeInTheDocument();
+  expect(statusSelect()).toHaveValue('');
 });

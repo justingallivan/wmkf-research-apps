@@ -43,6 +43,16 @@ jest.mock('../../lib/services/program-director-resolver', () => ({
   resolveByEmail: jest.fn(),
 }));
 
+jest.mock('../../lib/services/workbench/program-scope-service.js', () => ({
+  resolveWorkbenchProgramScope: jest.fn(async () => ({
+    programs: [{ programId: '94cab30b-958f-ee11-8179-000d3a341e8f', name: 'Research' }],
+    defaultProgramId: '94cab30b-958f-ee11-8179-000d3a341e8f',
+    programId: '94cab30b-958f-ee11-8179-000d3a341e8f',
+    programName: 'Research',
+  })),
+  buildProgramScopeFilter: jest.fn(() => '(_akoya_programid_value eq 8dcab30b-958f-ee11-8179-000d3a341e8f or _akoya_programid_value eq 94cab30b-958f-ee11-8179-000d3a341e8f)'),
+}));
+
 beforeEach(() => {
   clearAppAccessCache();
   jest.clearAllMocks();

@@ -161,6 +161,8 @@ function ReviewerGroup({ proposal, previewReadOnly, onRefresh, degraded, loading
 
 export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
   const [cycles, setCycles] = useState([]);
+  const [programs, setPrograms] = useState([]);
+  const [programId, setProgramId] = useState('');
   const [cycleCode, setCycleCode] = useState('');
   const [proposals, setProposals] = useState([]);
   const [scope, setScope] = useState('my');
@@ -179,16 +181,19 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
   // needs a cycle) cannot help. The banner's Try again calls this instead in
   // that state (S490 fix; recorded pre-existing in the 6B3d refetch plan).
   const activeCyclesLoadRef = useRef(0);
-  const loadCycles = useCallback(async () => {
+  const loadCycles = useCallback(async (selectedProgramId = programId) => {
     const token = activeCyclesLoadRef.current + 1;
     activeCyclesLoadRef.current = token;
     setLoadingCycles(true);
     try {
-      const response = await fetch('/api/workbench/dashboard');
+      const requestedProgram = selectedProgramId || new URLSearchParams(window.location.search).get('programId') || '';
+      const response = await fetch(`/api/workbench/dashboard${requestedProgram ? `?programId=${encodeURIComponent(requestedProgram)}` : ''}`);
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.error || `Failed to load cycles (${response.status})`);
       if (activeCyclesLoadRef.current !== token) return;
       const availableCycles = body.cycles || [];
+      setPrograms(Array.isArray(body.programs) ? body.programs : []);
+      setProgramId(body.programId || '');
       const requestedCycle = new URLSearchParams(window.location.search)
         .get('cycleCode')?.trim().toUpperCase();
       setCycles(availableCycles);
@@ -203,22 +208,22 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
     } finally {
       if (activeCyclesLoadRef.current === token) setLoadingCycles(false);
     }
-  }, []);
+  }, [programId]);
 
   useEffect(() => {
     void loadCycles();
     return () => { activeCyclesLoadRef.current += 1; };
   }, [loadCycles]);
 
-  const loadProposals = useCallback(async (selectedCycle, selectedScope) => {
+  const loadProposals = useCallback(async (selectedCycle, selectedScope, selectedProgramId = programId) => {
     if (!selectedCycle) return;
     const requestId = ++requestIdRef.current;
     const requestScope = selectedScope === 'all' ? 'all' : 'my';
     setLoadingProposals(true);
     try {
       const [dashboardResponse, reviewerResponse] = await Promise.all([
-        fetch(`/api/workbench/dashboard?cycleCode=${encodeURIComponent(selectedCycle)}&scope=${requestScope}&includeSetAside=1`),
-        fetch(`/api/review-manager/reviewers?cycleCode=${encodeURIComponent(selectedCycle)}&scope=${requestScope}`),
+        fetch(`/api/workbench/dashboard?cycleCode=${encodeURIComponent(selectedCycle)}&scope=${requestScope}&programId=${encodeURIComponent(selectedProgramId)}&includeSetAside=1`),
+        fetch(`/api/review-manager/reviewers?cycleCode=${encodeURIComponent(selectedCycle)}&scope=${requestScope}&programId=${encodeURIComponent(selectedProgramId)}`),
       ]);
       const [dashboardBody, reviewerBody] = await Promise.all([
         dashboardResponse.json().catch(() => ({})),
@@ -235,7 +240,7 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
         dashboardBody.proposals || [],
         reviewerBody.proposals || [],
       ));
-      lastLoadedParamsRef.current = `${selectedCycle}|${requestScope}`;
+      lastLoadedParamsRef.current = `${selectedCycle}|${requestScope}|${selectedProgramId}`;
       setError(null);
     } catch (loadError) {
       if (requestIdRef.current !== requestId) return;
@@ -243,21 +248,34 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
     } finally {
       if (requestIdRef.current === requestId) setLoadingProposals(false);
     }
-  }, []);
+  }, [programId]);
 
   useEffect(() => {
     if (!cycleCode) return undefined;
     const requestScope = scope === 'all' ? 'all' : 'my';
-    const currentParams = `${cycleCode}|${requestScope}`;
+    const currentParams = `${cycleCode}|${requestScope}|${programId}`;
     requestIdRef.current += 1;
     if (lastLoadedParamsRef.current !== null && lastLoadedParamsRef.current !== currentParams) {
       setProposals([]);
       setError(null);
       setLoadingProposals(true);
     }
-    const timer = window.setTimeout(() => { void loadProposals(cycleCode, scope); }, 0);
+    const timer = window.setTimeout(() => { void loadProposals(cycleCode, scope, programId); }, 0);
     return () => window.clearTimeout(timer);
-  }, [cycleCode, loadProposals, scope]);
+  }, [cycleCode, loadProposals, programId, scope]);
+
+  const changeProgram = useCallback(async (nextProgramId) => {
+    if (!nextProgramId || nextProgramId === programId) return;
+    activeCyclesLoadRef.current += 1;
+    requestIdRef.current += 1;
+    setProgramId(nextProgramId);
+    setCycles([]);
+    setCycleCode('');
+    setProposals([]);
+    setLoadingCycles(true);
+    setError(null);
+    await loadCycles(nextProgramId);
+  }, [loadCycles, programId]);
 
   useEffect(() => () => { requestIdRef.current += 1; }, []);
 
@@ -286,6 +304,18 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
       <div className="mb-5 rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
         <div className="flex flex-col gap-3.5">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <ToolbarSelect
+            id="reviewer-follow-up-program"
+            label="Grant Program"
+            value={programId}
+            disabled={loadingCycles || programs.length === 0}
+            onChange={(event) => { void changeProgram(event.target.value); }}
+          >
+            {programs.length === 0 && <option value="">Loading programs…</option>}
+            {programs.map((program) => (
+              <option key={program.programId} value={program.programId}>{program.name}</option>
+            ))}
+          </ToolbarSelect>
           <ToolbarSelect
             id="reviewer-follow-up-cycle"
             label="Cycle"
@@ -417,7 +447,7 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
           {cycleCode ? (
             <button
               type="button"
-              onClick={() => void loadProposals(cycleCode, scope)}
+              onClick={() => void loadProposals(cycleCode, scope, programId)}
               disabled={loadingProposals}
               className="mt-3 min-h-10 rounded-lg bg-gray-900 px-3 py-2 font-semibold text-white hover:bg-gray-800 disabled:opacity-50"
             >
@@ -467,7 +497,7 @@ export function ReviewerFollowUpDashboard({ previewReadOnly = false }) {
               key={proposal.proposalId}
               proposal={proposal}
               previewReadOnly={previewReadOnly}
-              onRefresh={() => loadProposals(cycleCode, scope)}
+              onRefresh={() => loadProposals(cycleCode, scope, programId)}
               degraded={Boolean(error)}
               loading={loadingProposals}
             />

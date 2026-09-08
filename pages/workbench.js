@@ -57,6 +57,8 @@ function TriageControl({ proposal, busy, onSet }) {
 export function WorkbenchDashboard() {
   const router = useRouter();
   const [cycles, setCycles] = useState([]);
+  const [programs, setPrograms] = useState([]);
+  const [programId, setProgramId] = useState('');
   const [cycleCode, setCycleCode] = useState(null);
   const [scope, setScope] = useState('my');
   const [includeSetAside, setIncludeSetAside] = useState(false);
@@ -69,14 +71,15 @@ export function WorkbenchDashboard() {
   const [error, setError] = useState(null);
   // Per-row triage flip: ids currently being saved disable only those controls.
   const [savingIds, setSavingIds] = useState(() => new Set());
-  const filtersRef = useRef({ cycleCode: null, scope: 'my', includeSetAside: false });
+  const filtersRef = useRef({ cycleCode: null, scope: 'my', includeSetAside: false, programId: '' });
 
   // Load the cycle picker once on mount.
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch('/api/workbench/dashboard');
+        const requestedProgram = new URLSearchParams(window.location.search).get('programId') || '';
+        const res = await fetch(`/api/workbench/dashboard${requestedProgram ? `?programId=${encodeURIComponent(requestedProgram)}` : ''}`);
         const body = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(body.error || `Failed to load cycles (${res.status})`);
         if (cancelled) return;
@@ -84,6 +87,8 @@ export function WorkbenchDashboard() {
         const requestedCycle = new URLSearchParams(window.location.search)
           .get('cycleCode')?.trim().toUpperCase();
         setCycles(availableCycles);
+        setPrograms(Array.isArray(body.programs) ? body.programs : []);
+        setProgramId(body.programId || '');
         setCycleCode(
           availableCycles.some((cycle) => cycle.code === requestedCycle)
             ? requestedCycle
@@ -102,13 +107,13 @@ export function WorkbenchDashboard() {
   // request id guards against a slower earlier fetch (e.g. a fast toggle) landing
   // after — and overwriting — the latest one.
   const reqIdRef = useRef(0);
-  const loadProposals = useCallback(async (code, sc, incl) => {
+  const loadProposals = useCallback(async (code, sc, incl, selectedProgramId = programId) => {
     if (!code) return;
     const myReq = ++reqIdRef.current;
     setLoadingProposals(true);
     setError(null);
     try {
-      const res = await fetch(`/api/workbench/dashboard?cycleCode=${encodeURIComponent(code)}&scope=${sc}${incl ? '&includeSetAside=1' : ''}`);
+      const res = await fetch(`/api/workbench/dashboard?cycleCode=${encodeURIComponent(code)}&scope=${sc}&programId=${encodeURIComponent(selectedProgramId)}${incl ? '&includeSetAside=1' : ''}`);
       const body = await res.json().catch(() => ({}));
       if (reqIdRef.current !== myReq) return; // a newer request superseded this one
       if (!res.ok) throw new Error(body.error || `Failed to load requests (${res.status})`);
@@ -122,19 +127,45 @@ export function WorkbenchDashboard() {
     } finally {
       if (reqIdRef.current === myReq) setLoadingProposals(false);
     }
-  }, []);
+  }, [programId]);
 
   useEffect(() => {
-    filtersRef.current = { cycleCode, scope, includeSetAside };
-  }, [cycleCode, scope, includeSetAside]);
+    filtersRef.current = { cycleCode, scope, includeSetAside, programId };
+  }, [cycleCode, scope, includeSetAside, programId]);
 
   useEffect(() => {
     if (!cycleCode) return undefined;
     const timer = window.setTimeout(() => {
-      void loadProposals(cycleCode, scope, includeSetAside);
+      void loadProposals(cycleCode, scope, includeSetAside, programId);
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [cycleCode, scope, includeSetAside, loadProposals]);
+  }, [cycleCode, scope, includeSetAside, loadProposals, programId]);
+
+  const changeProgram = useCallback(async (nextProgramId) => {
+    if (!nextProgramId || nextProgramId === programId) return;
+    const requestId = ++reqIdRef.current;
+    setProgramId(nextProgramId);
+    setCycleCode(null);
+    setCycles([]);
+    setProposals([]);
+    setRollup(null);
+    setLoadingCycles(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/workbench/dashboard?programId=${encodeURIComponent(nextProgramId)}`);
+      const body = await res.json().catch(() => ({}));
+      if (reqIdRef.current !== requestId) return;
+      if (!res.ok) throw new Error(body.error || `Failed to load cycles (${res.status})`);
+      const availableCycles = body.cycles || [];
+      setPrograms(Array.isArray(body.programs) ? body.programs : []);
+      setCycles(availableCycles);
+      setCycleCode(body.defaultCycleCode || availableCycles[0]?.code || null);
+    } catch (e) {
+      if (reqIdRef.current === requestId) setError(e.message);
+    } finally {
+      if (reqIdRef.current === requestId) setLoadingCycles(false);
+    }
+  }, [programId]);
 
   // Flip a request's triage status, then refetch (a row may drop out of the
   // default view once Set aside). The server enforces the hard manage gate.
@@ -154,8 +185,8 @@ export function WorkbenchDashboard() {
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error || `Failed to set triage status (${res.status})`);
-      const { cycleCode: currentCycleCode, scope: currentScope, includeSetAside: currentIncludeSetAside } = filtersRef.current;
-      await loadProposals(currentCycleCode, currentScope, currentIncludeSetAside);
+      const { cycleCode: currentCycleCode, scope: currentScope, includeSetAside: currentIncludeSetAside, programId: currentProgramId } = filtersRef.current;
+      await loadProposals(currentCycleCode, currentScope, currentIncludeSetAside, currentProgramId);
     } catch (e) {
       setError(e.message);
     } finally {
@@ -180,6 +211,18 @@ export function WorkbenchDashboard() {
 
       {/* Controls */}
       <div className="flex flex-wrap items-end gap-4 mb-6">
+        <ToolbarSelect
+          id="workbench-program"
+          label="Grant Program"
+          value={programId}
+          disabled={loadingCycles || programs.length === 0}
+          onChange={(e) => { void changeProgram(e.target.value); }}
+        >
+          {programs.length === 0 && <option value="">Loading programs…</option>}
+          {programs.map((program) => (
+            <option key={program.programId} value={program.programId}>{program.name}</option>
+          ))}
+        </ToolbarSelect>
         <ToolbarSelect
           id="workbench-cycle"
           label="Cycle"

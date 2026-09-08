@@ -103,6 +103,7 @@ test('returns the minimal outside-program acknowledgement from the service', asy
 test.each([
   [{ mode: 'bogus' }, 'Invalid mode'],
   [{ mode: 'options', q: 'ignored' }, 'Invalid request search parameters'],
+  [{ mode: 'options', programId: ['11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222222'] }, 'Invalid request search parameters'],
   [{ q: 'valid', surprise: 'value' }, 'Invalid request search parameters'],
   [{ q: ['one', 'two'] }, 'Invalid request search parameters'],
   [{ q: 'x' }, 'Search terms must contain at least 2 characters'],

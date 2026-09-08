@@ -68,8 +68,11 @@ async function handleWithCorrelation(req, res) {
 
 async function handleGet(req, res, access) {
   try {
-    const { proposalId, requestNumber, cycleCode, status } = req.query;
+    const { proposalId, requestNumber, cycleCode, status, programId } = req.query;
     const scope = req.query.scope === 'all' ? 'all' : 'my';
+    if (Array.isArray(programId)) {
+      return res.status(400).json({ error: 'programId must be a single GUID' });
+    }
 
     // GUID-validate proposalId before it becomes a Dataverse selector
     // (fetchRequestByIdOrNumber → getRecord). requestNumber is an escaped string lookup.
@@ -84,6 +87,7 @@ async function handleGet(req, res, access) {
       status,
       scope,
       azureEmail: access.session?.user?.azureEmail,
+      programId,
     });
     return res.status(200).json(result);
   } catch (error) {

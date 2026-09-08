@@ -90,11 +90,25 @@ test('refuses calls without restriction context before acquiring a token', async
   expect(fetchMock).not.toHaveBeenCalled();
 });
 
-test.each([null, 'akoya_requestid', 'wmkf_meetingdate', 'akoya_programid'])(
+test('supports the broad Grant Program lookup and checks its DAL field', async () => {
+  const grantProgramId = '11111111-1111-4111-8111-111111111111';
+  await expect(bypassDynamicsRestrictions('meeting-date-test', () => (
+    aggregateMeetingDateCycles({ grantProgramIds: [grantProgramId] })
+  ))).resolves.toEqual([]);
+  const xml = new URL(fetchMock.mock.calls[0][0]).searchParams.get('fetchXml');
+  expect(xml).toContain(`<condition attribute="wmkf_grantprogram" operator="in"><value>${grantProgramId}</value></condition>`);
+  await expect(withDynamicsContext({ restrictions: [{
+    table_name: 'akoya_request', field_name: 'wmkf_grantprogram',
+  }] }, () => aggregateMeetingDateCycles({ grantProgramIds: [grantProgramId] }))).rejects.toThrow('Access denied');
+});
+
+test.each([null, 'akoya_requestid', 'wmkf_meetingdate', 'akoya_programid', 'wmkf_grantprogram'])(
   'enforces the table/field restriction %s before transport', async (fieldName) => {
     await expect(withDynamicsContext({ restrictions: [{
       table_name: 'akoya_request', field_name: fieldName,
-    }] }, aggregateMeetingDateCycles)).rejects.toThrow('Access denied');
+    }] }, () => aggregateMeetingDateCycles(fieldName === 'wmkf_grantprogram'
+      ? { grantProgramIds: ['11111111-1111-4111-8111-111111111111'] }
+      : { programIds: RESEARCH_PROGRAM_IDS }))).rejects.toThrow('Access denied');
     expect(tokenMock).not.toHaveBeenCalled();
     expect(fetchMock).not.toHaveBeenCalled();
   },

@@ -9,6 +9,15 @@ const findByRequestNumber = jest.fn();
 const aggregateRequests = jest.fn();
 const aggregateMeetingDateCycles = jest.fn();
 const searchDirectoryByName = jest.fn();
+jest.mock('../../lib/services/workbench/program-scope-service.js', () => ({
+  resolveWorkbenchProgramScope: jest.fn(async () => ({
+    programs: [{ programId: '94cab30b-958f-ee11-8179-000d3a341e8f', name: 'Research' }],
+    defaultProgramId: '94cab30b-958f-ee11-8179-000d3a341e8f',
+    programId: '94cab30b-958f-ee11-8179-000d3a341e8f',
+    programName: 'Research',
+  })),
+  buildProgramScopeFilter: jest.fn(() => '(_akoya_programid_value eq 8dcab30b-958f-ee11-8179-000d3a341e8f or _akoya_programid_value eq 94cab30b-958f-ee11-8179-000d3a341e8f)'),
+}));
 jest.mock('../../lib/dataverse/adapters/grant-request.js', () => ({
   searchRequests: (...args) => searchRequests(...args),
   findByIds: (...args) => findByIds(...args),
@@ -47,6 +56,8 @@ const requestRow = (id, over = {}) => ({
   _wmkf_projectleader_value_formatted: 'Dr. Example',
   _akoya_programid_value: PROGRAM_IDS[1],
   _akoya_programid_value_formatted: 'Medical Research',
+  _wmkf_grantprogram_value: PROGRAM_IDS[1],
+  _wmkf_grantprogram_value_formatted: 'Research',
   ...over,
 });
 
@@ -79,6 +90,10 @@ test('loads grouped live cycles/statuses and sorts them for the filters', async 
 
   await expect(loadRequestSearchOptions()).resolves.toEqual({
     success: true,
+    programs: [{ programId: PROGRAM_IDS[1], name: 'Research' }],
+    programId: PROGRAM_IDS[1],
+    defaultProgramId: PROGRAM_IDS[1],
+    programName: 'Research',
     cycles: [
       { value: 'December 2026', label: 'December 2026' },
       { value: 'June 2026', label: 'June 2026' },
@@ -86,7 +101,7 @@ test('loads grouped live cycles/statuses and sorts them for the filters', async 
     ],
     statuses: ['Active', 'Phase II Pending'],
   });
-  expect(aggregateMeetingDateCycles).toHaveBeenCalledWith({ programIds: PROGRAM_IDS });
+  expect(aggregateMeetingDateCycles).toHaveBeenCalledWith({ grantProgramIds: [PROGRAM_IDS[1]] });
   expect(aggregateRequests).toHaveBeenCalledWith({ ...REQUEST_SEARCH_OPTIONS_AGGREGATES.statuses, filter: RESEARCH_FILTER });
 });
 
@@ -451,8 +466,8 @@ test('excludes stale indexed hits reassigned to another program or missing a pro
   const rows = [
     requestRow('science', { _akoya_programid_value: PROGRAM_IDS[0].toUpperCase() }),
     requestRow('medical'),
-    requestRow('directors', { _akoya_programid_value: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', _akoya_programid_value_formatted: "Directors' Directed Grant Program" }),
-    requestRow('missing', { _akoya_programid_value: null }),
+    requestRow('directors', { _akoya_programid_value: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', _akoya_programid_value_formatted: "Directors' Directed Grant Program", _wmkf_grantprogram_value: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' }),
+    requestRow('missing', { _akoya_programid_value: null, _wmkf_grantprogram_value: null }),
   ];
   searchRequests.mockResolvedValue({ results: rows.map((row) => ({ objectId: row.akoya_requestid })), totalCount: 4 });
   findByIds.mockResolvedValue({ records: rows });
@@ -499,7 +514,7 @@ test('exact numeric misses disclose only the outside program and use one bounded
   expect(body).toMatchObject({
     results: [],
     totalCount: 0,
-    outsideProgramRequest: { requestNumber, program: 'Community Grants' },
+    outsideProgramRequest: { requestNumber, program: 'Legacy label' },
   });
   expect(JSON.stringify(body)).not.toContain('outside-id');
   expect(JSON.stringify(body)).not.toContain('Sensitive title');

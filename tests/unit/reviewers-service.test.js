@@ -11,6 +11,14 @@ const updateLifecycle = jest.fn(async () => {});
 const findByRequest = jest.fn();
 const findAcceptedByPD = jest.fn();
 const findAcceptedByCycle = jest.fn();
+jest.mock('../../lib/services/workbench/program-scope-service.js', () => ({
+  resolveWorkbenchProgramScope: jest.fn(async () => ({
+    programs: [{ programId: '11111111-1111-4111-8111-111111111111', name: 'Research' }],
+    defaultProgramId: '11111111-1111-4111-8111-111111111111',
+    programId: '11111111-1111-4111-8111-111111111111',
+    programName: 'Research',
+  })),
+}));
 jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
   updateLifecycle: (...a) => updateLifecycle(...a),
   findByRequest: (...a) => findByRequest(...a),
@@ -235,7 +243,7 @@ describe('getReviewers', () => {
   test('all scope reads accepted reviewers across the specified cycle without resolving the caller as PD', async () => {
     const out = await getReviewers({ scope: 'all', cycleCode: 'D26', azureEmail: 'staff@wmkeck.org' });
 
-    expect(findAcceptedByCycle).toHaveBeenCalledWith('D26');
+    expect(findAcceptedByCycle).toHaveBeenCalledWith('D26', { programId: '11111111-1111-4111-8111-111111111111' });
     expect(findAcceptedByPD).not.toHaveBeenCalled();
     expect(resolvePD).not.toHaveBeenCalled();
     expect(out).toEqual({ success: true, proposals: [], totalReviewers: 0 });

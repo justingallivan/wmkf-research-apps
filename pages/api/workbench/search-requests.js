@@ -12,6 +12,7 @@
 
 import { requireAppAccess } from '../../../lib/utils/auth';
 import { withDalContext } from '../../../lib/dataverse/core/context';
+import { actorRefFromSession } from '../../../lib/utils/actor-ref';
 import { ServiceHttpError } from '../../../lib/services/service-http-error';
 import {
   loadRequestSearchOptions,
@@ -22,7 +23,7 @@ import {
 
 const MAX_QUERY_LENGTH = 100;
 const MAX_FILTER_LENGTH = 100;
-const ALLOWED_QUERY_KEYS = new Set(['mode', 'q', 'cycle', 'status', 'offset']);
+const ALLOWED_QUERY_KEYS = new Set(['mode', 'q', 'cycle', 'status', 'offset', 'programId']);
 
 function singleQueryValue(value) {
   return Array.isArray(value) ? null : String(value ?? '').trim();
@@ -57,15 +58,16 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Invalid mode' });
   }
   if (mode === 'options'
-    && Object.keys(req.query).some((key) => key !== 'mode')) {
+    && Object.keys(req.query).some((key) => !['mode', 'programId'].includes(key))) {
     return res.status(400).json({ error: 'Invalid request search parameters' });
   }
 
   const query = singleQueryValue(req.query.q);
   const cycle = singleQueryValue(req.query.cycle);
   const status = singleQueryValue(req.query.status);
+  const programId = singleQueryValue(req.query.programId);
   const offset = parseOffset(req.query.offset);
-  if (query === null || cycle === null || status === null || offset === null) {
+  if (query === null || cycle === null || status === null || programId === null || offset === null) {
     return res.status(400).json({ error: 'Invalid request search parameters' });
   }
   if (query.length > MAX_QUERY_LENGTH || cycle.length > MAX_FILTER_LENGTH
@@ -79,8 +81,18 @@ export default async function handler(req, res) {
   return withDalContext('workbench-search-requests', async () => {
     try {
       const body = mode === 'options'
-        ? await loadRequestSearchOptions()
-        : await searchWorkbenchRequests({ query, cycle, status, offset });
+      ? await loadRequestSearchOptions({
+        programId: programId || undefined,
+        callerSystemId: actorRefFromSession(access.session) || undefined,
+      })
+        : await searchWorkbenchRequests({
+          query,
+          cycle,
+          status,
+          offset,
+          programId: programId || undefined,
+          callerSystemId: actorRefFromSession(access.session) || undefined,
+        });
       return res.status(200).json(body);
     } catch (err) {
       if (err instanceof ServiceHttpError) {
