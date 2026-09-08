@@ -160,3 +160,17 @@ test('maps records to awardees with formatted PI/liaison names + deliverable sta
     pi: { name: 'Margaret Stratton' }, liaison: { name: null }, status: null, statusLabel: null, abstractReady: false,
   });
 });
+
+test('no cycleCode → cycle-list mode over the eligibility population (200, no PD clause)', async () => {
+  DynamicsService.queryAllRecords.mockResolvedValue({ records: [{ akoya_requestid: 'a', wmkf_meetingdate: '2026-06-04' }], capped: false });
+  const res = mockRes();
+  await handler({ method: 'GET', query: {}, headers: {} }, res);
+  expect(res.statusCode).toBe(200);
+  expect(res.body.cycles).toEqual([{ code: 'J26', label: 'June 2026', meetingDate: '2026-06-04', count: 1 }]);
+  expect(res.body).toHaveProperty('lastDecidedCycleCode');
+  expect(res.body).toHaveProperty('defaultCycleCode');
+  const { filter } = DynamicsService.queryAllRecords.mock.calls[0][1];
+  expect(filter).toContain("akoya_requeststatus eq 'Active'");
+  expect(filter).not.toContain('_wmkf_programdirector_value');
+  expect(resolveByEmail).not.toHaveBeenCalled();
+});

@@ -14,9 +14,10 @@ import WorkbenchViewsNav from '../../shared/components/workbench/WorkbenchViewsN
 
 // Awardees open on the last DECIDED cycle (owner decision 2026-09-08); the
 // Workbench's working cycle is the upcoming one. The default comes from the
-// live cycle list (`/api/workbench/dashboard` cycle-list mode →
-// `lastDecidedCycleCode`), never from a synthetic calendar, so the page cannot
-// open on a cycle that has no requests. A `?cycleCode=` deep link wins.
+// awardees endpoint's own cycle-list mode (`lastDecidedCycleCode`), computed
+// over the exact population the row query uses, never from a synthetic
+// calendar or a differently scoped list. A `?cycleCode=` deep link wins, and
+// a manual selection made while the default is still resolving wins too.
 const CYCLE_RE = /^[JD]\d{2}$/;
 
 const contextKey = (code, all) => `${code}:${all ? 'all' : 'mine'}`;
@@ -41,6 +42,8 @@ function AwardeesList() {
   // Resolve the initial cycle once the router is ready: a valid ?cycleCode=
   // deep link (e.g. the workbench "View awardees" link) wins; otherwise the
   // live list's last decided cycle. A superseded resolution never lands.
+  // Bumped by any explicit selection so a late default cannot replace it.
+  const manualSelectionRef = useRef(0);
   const resolveDefaultCycle = useCallback(async (deepLink, isCurrent) => {
     setCycleDefault('loading');
     if (deepLink) {
@@ -52,9 +55,11 @@ function AwardeesList() {
       return;
     }
     try {
-      const res = await fetch('/api/workbench/dashboard');
+      // An explicit selection (before or during this read) always wins.
+      if (manualSelectionRef.current) return;
+      const res = await fetch('/api/workbench/grantee-deliverables/awardees');
       const body = await res.json().catch(() => ({}));
-      if (!isCurrent()) return;
+      if (!isCurrent() || manualSelectionRef.current) return;
       if (!res.ok) throw new Error(body?.error || 'cycle list failed');
       const code = typeof body.lastDecidedCycleCode === 'string' && CYCLE_RE.test(body.lastDecidedCycleCode)
         ? body.lastDecidedCycleCode
@@ -160,6 +165,8 @@ function AwardeesList() {
           className="flex items-center gap-2 mb-4"
           onSubmit={(e) => {
             e.preventDefault();
+            manualSelectionRef.current += 1;
+            setCycleDefault('ready');
             setSelectionVersion((version) => version + 1);
             setCycleCode(input.trim().toUpperCase());
           }}

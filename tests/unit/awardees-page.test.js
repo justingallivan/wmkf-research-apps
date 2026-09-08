@@ -40,7 +40,7 @@ const DASHBOARD = {
   defaultCycleCode: 'D26',
   lastDecidedCycleCode: 'J26',
 };
-const isDashboard = (url) => String(url).startsWith('/api/workbench/dashboard');
+const isDashboard = (url) => String(url) === '/api/workbench/grantee-deliverables/awardees';
 // Answers the cycle-list call immediately; every other URL goes to `fn`.
 const withDashboard = (fn, dashboard = DASHBOARD) => jest.fn((url, options) => (
   isDashboard(url) ? Promise.resolve(response(dashboard)) : fn(url, options)
@@ -339,7 +339,7 @@ test('defaults to the live last decided cycle, not a calendar guess', async () =
   global.fetch = withDashboard(async () => response({ cycleCode: 'J26', cycleLabel: 'June 2026', count: 0, awardees: [], scope: 'mine', pdResolved: true }));
   render(<AwardeesPage />);
   await waitFor(() => expect(global.fetch.mock.calls.some(([u]) => cycleCodeFromUrl(String(u)) === 'J26')).toBe(true));
-  expect(global.fetch.mock.calls[0][0]).toBe('/api/workbench/dashboard');
+  expect(global.fetch.mock.calls[0][0]).toBe('/api/workbench/grantee-deliverables/awardees');
   expect(screen.getByLabelText('Cycle code')).toHaveValue('J26');
 });
 
@@ -364,4 +364,24 @@ test('a failed cycle-list read shows an error with a retry that resolves the def
   fail = false;
   fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
   await waitFor(() => expect(screen.getByLabelText('Cycle code')).toHaveValue('J26'));
+});
+
+test('a manual selection made while the default is still resolving is not replaced by the late default', async () => {
+  const cycleList = deferred();
+  const pending = [];
+  global.fetch = jest.fn((url, options) => {
+    if (isDashboard(url)) return cycleList.promise;
+    const d = deferred();
+    pending.push({ url: String(url), options, d });
+    return d.promise;
+  });
+  render(<AwardeesPage />);
+  fireEvent.change(screen.getByLabelText('Cycle code'), { target: { value: 'D25' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Load' }));
+  await waitFor(() => expect(pending).toHaveLength(1));
+  expect(cycleCodeFromUrl(pending[0].url)).toBe('D25');
+  await settle(cycleList, response(DASHBOARD));
+  expect(screen.getByLabelText('Cycle code')).toHaveValue('D25');
+  expect(pending).toHaveLength(1);
+  expect(pending[0].options.signal.aborted).toBe(false);
 });

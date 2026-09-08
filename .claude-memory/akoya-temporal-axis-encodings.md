@@ -53,9 +53,12 @@ invariant is PER GRANT PROGRAM: two callers viewing the same program on the same
 same cycle (the cycle list is program-scoped by the PR #183 owner decision). **Wired (PR #203):**
 `/api/workbench/dashboard` cycle-list mode returns `defaultCycleCode` (working) and
 `lastDecidedCycleCode` from that program's cycle list with each cycle's latest `meetingDate`,
-replacing the "caller's assigned cycle" rule; Reviewer follow-up inherits it; the Awardees page
-reads `lastDecidedCycleCode` from the same call (deep link wins; explicit empty state when no
-decided cycle has requests). The two disagreeing calendar helpers (Awardees local-time "last past",
+replacing the "caller's assigned cycle" rule; Reviewer follow-up inherits it. The Awardees page
+reads `lastDecidedCycleCode` from ITS OWN endpoint's cycle-list mode
+(`/api/workbench/grantee-deliverables/awardees` without `cycleCode`), computed over the exact
+research-awardee eligibility population the row query uses — not from the dashboard, whose list is
+per-caller-program (deep link wins; a manual selection during resolution wins; explicit empty state
+when no decided cycle has awardees). The two disagreeing calendar helpers (Awardees local-time "last past",
 grantee-titles cron UTC "upcoming") are retired. **Not yet wired:** Final writeups still walks
 back to a visible row (2026-09-06 decision, superseded 2026-09-08 in favor of an in-place message
 with a link — to be applied with the single-page shell) and Initial assessments still defaults to
