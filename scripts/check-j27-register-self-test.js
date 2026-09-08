@@ -127,6 +127,8 @@ function greenFixture(root) {
   write(root, 'lib/arrow-ascii-bound-vs-bag.js', "const TEMPLATE = 1; // generic 8-char bag word only\n");
   write(root, 'lib/short-binding.js', "export const IRRELEVANT = true;\n");
   write(root, 'lib/self-referential.js', "// see lib/self-referential.js for details\n");
+  write(root, 'tests/unit/perfile-a.test.js', "const PERFILE_A_MARK = true;\n");
+  write(root, 'tests/unit/perfile-b.test.js', "const PERFILE_B_MARK = true;\n");
   return HEADER
     + row('J27-001', '`lib/a.js:1`', '`D26-only hide`')
     + row('J27-002', '`lib/b.js`; `lib/c.js:1`', '`lib/b.js` → `NEEDLE_IN_SECOND_FILE` · `lib/c.js` → `NEEDLE_IN_SECOND_FILE`')
@@ -269,6 +271,40 @@ function main() {
     const r = runGate(['--root', dir]);
     check('C1 binding not in site: exits 1', r.status === 1, r.output);
     check('C1 binding not in site: names the real file that is not a cited site', /J27-103 .*binding path not in site: lib\/swap-a\.js/.test(r.output), r.output);
+    cleanup();
+  }
+
+  // ---- C1 re-review (2026-09-08): equivalent-spelling binding is in-site, not stale
+  // (site cited via bare memory shorthand; binding spelled as the expanded path)
+  {
+    const { dir, cleanup } = registerTmpFixture('j27-register-binding-equivalent-spelling-');
+    write(dir, 'docs/J27_TRANSITION_REGISTER.md', greenFixture(dir)
+      + row('J27-109', 'memory `project-thing.md` L1', '`.claude-memory/project-thing.md` → `Single-submission may change the picker default.`'));
+    const r = runGate(['--root', dir]);
+    check('C1 re-review, equivalent spelling: not stale', !/J27-109 stale/.test(r.output), r.output);
+    check('C1 re-review, equivalent spelling: not reported not-in-site', !/J27-109 .*binding path not in site/.test(r.output), r.output);
+    cleanup();
+  }
+
+  // ---- C1 re-review (2026-09-08): per-file bindings under a glob site, all matches bound -> ok
+  {
+    const { dir, cleanup } = registerTmpFixture('j27-register-binding-glob-per-file-all-');
+    write(dir, 'docs/J27_TRANSITION_REGISTER.md', greenFixture(dir)
+      + row('J27-107', '`tests/unit/perfile-*.test.js`', '`tests/unit/perfile-a.test.js` → `PERFILE_A_MARK` · `tests/unit/perfile-b.test.js` → `PERFILE_B_MARK`'));
+    const r = runGate(['--root', dir]);
+    check('C1 re-review, glob per-file bindings (all matches bound): not stale', !/J27-107 stale/.test(r.output), r.output);
+    check('C1 re-review, glob per-file bindings (all matches bound): not reported not-in-site', !/J27-107 .*binding path not in site/.test(r.output), r.output);
+    cleanup();
+  }
+
+  // ---- C1 re-review (2026-09-08): per-file bindings under a glob site, one match left unbound -> stale naming it
+  {
+    const { dir, cleanup } = registerTmpFixture('j27-register-binding-glob-per-file-partial-');
+    write(dir, 'docs/J27_TRANSITION_REGISTER.md', greenFixture(dir)
+      + row('J27-108', '`tests/unit/perfile-*.test.js`', '`tests/unit/perfile-a.test.js` → `PERFILE_A_MARK`'));
+    const r = runGate(['--root', dir]);
+    check('C1 re-review, glob per-file bindings (one match unbound): exits 1', r.status === 1, r.output);
+    check('C1 re-review, glob per-file bindings (one match unbound): names it via STRICT UNBOUND', /J27-108 .*unbound: tests\/unit\/perfile-b\.test\.js/.test(r.output), r.output);
     cleanup();
   }
 

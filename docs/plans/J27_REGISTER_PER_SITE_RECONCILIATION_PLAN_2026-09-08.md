@@ -36,13 +36,18 @@ shared bag. Joins stay ` · `. Example:
 `lib/a.js` → `const PHASE_II_FOLDER = 'Phase II';` · `pages/x.js` → `'wmkf_phaseiistatus'` · `shared fallback`
 ```
 
-**Gate rule (Phase 0 build).** For each resolved file (every glob match included):
+**Gate rule (Phase 0 build, STRICT UNBOUND per owner decision "we don't need drift", added
+same day as a follow-up fix).** For each resolved file (every glob match included):
 - if one or more fragments are bound to a path that resolves to this file (exact rel path, or
-  the glob that matched it), the file must contain at least one of **those** fragments;
-- otherwise the file falls back to the shared bag, and the gate counts it as **unbound**.
-- A multi-file row with any unbound file is reported as a warning line (`unbound: <files>`);
-  the summary prints `N multi-site rows with unbound files`. After this plan completes that
-  number must be 0 for the 43 rows and is a drift signal thereafter.
+  the glob that matched it, matched by FILE MEMBERSHIP in the row's own resolved `site` set —
+  not by string-equality on the raw token spelling, fixed in a same-day re-review), the file
+  must contain at least one of **those** fragments;
+- otherwise the file is **unbound**. In a single-file row it still falls back to the shared
+  bag (must match, or the row is stale). In a multi-file row (more than one resolved file) an
+  unbound file is itself a failure — the bag is NOT consulted for it — and the row is STALE
+  (`unbound: <files>`), even when the bag would have matched.
+- The summary prints `N multi-site rows with unbound files`. After this plan completes that
+  number must be 0 for the rows in scope and is a drift signal thereafter.
 - Directory sites no longer pass on existence: a directory in `site` must be replaced by a
   specific file inside it (or the row is stale with `directory site needs a file`).
 - Dispositions: `closed` is **not** a vocabulary word (plan §3 is `open` · `scheduled` · `done` ·
@@ -53,8 +58,11 @@ shared bag. Joins stay ` · `. Example:
 `a.js` present only in `b.js`); a bound fragment absent from its file fails even when a bag
 fragment matches; a common eight-character token in the bag does not rescue a bound file;
 directory-only existence fails; a glob-bound fragment must appear in every glob match;
-`closed.` is not treated as closed. Positive: bound + bag mix passes; single-file row with bag
-only passes with no unbound warning.
+`closed.` is not treated as closed; a pure-bag or partially-bound multi-file row is STALE
+(STRICT UNBOUND) even when the bag would have matched the unbound file; an equivalent-spelling
+binding (site cited via shorthand, bound via the expanded path) and a per-file binding under a
+glob site are in-site, not stale. Positive: a fully-bound multi-file row (every file bound and
+matching) passes; single-file row with bag only passes.
 
 **Also in Phase 0:** `docs/CURRENT_WORK_QUEUE.md` item 8 is corrected (gate baseline is red on
 this branch, reconciliation is prerequisite work, next action is this plan) and

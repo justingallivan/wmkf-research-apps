@@ -56,15 +56,21 @@
  *     wrapped comment or a backticked identifier.
  *   - A bound path token is resolved through the SAME candidate list and
  *     sibling-directory fallback as `site` tokens (2026-09-08, Opus review
- *     C1): first, an exact string match (after `stripSiteDecoration`)
- *     against one of this row's own already-resolved `site` tokens; failing
- *     that, independent resolution (BARE_NAME_PREFIXES, sibling dir, or a
- *     glob match against the tracked tree). A token that resolves to
- *     nothing at all is STALE (`binding path unresolved: <token>`); a token
- *     that resolves to a real file NOT among this row's `site` citations is
- *     also STALE (`binding path not in site: <file>`) — a binding must
- *     target a site the row actually cites, never a coincidental match
- *     elsewhere in the tree.
+ *     C1; membership fixed 2026-09-08 in a same-day re-review): the token is
+ *     resolved (BARE_NAME_PREFIXES, sibling dir, or a glob match against the
+ *     tracked tree) and then each file it resolves to is checked for
+ *     membership in this row's own resolved `site` FILE SET — not a string
+ *     match against the raw `site` token text, which missed equivalent
+ *     spellings (`.claude-memory/x.md` binding a `site` cited via the bare
+ *     memory shorthand `x.md`) and per-file bindings under a glob `site`
+ *     (`tests/unit/intake-a.test.js` binding when `site` cites the glob
+ *     `tests/unit/intake-*.test.js`) — plan §2 explicitly promises "an exact
+ *     rel path, or the glob that matched it". A token that resolves to
+ *     nothing at all is STALE (`binding path unresolved: <token>`); a
+ *     resolved file NOT a member of this row's `site` files is also STALE
+ *     (`binding path not in site: <file>`) — a coincidental match elsewhere
+ *     in the tree still does not count, even when some other file the same
+ *     glob matched does.
  *   - Resolution is PER SITE, not per row: every resolved file (and every
  *     glob match) must contain a fragment.
  *       - If one or more bound fragments target this exact file, the file
@@ -408,20 +414,33 @@ function parseExcerptBindings(excerptCell) {
   return { bound, bag, tooShort };
 }
 
-// Resolve a bound path/glob token the same way a `site` token resolves:
-// first, an exact string match (after stripSiteDecoration) against one of
-// this row's own already-resolved `site` tokens (siteTokenMap); failing
-// that, independent resolution against the tracked tree (BARE_NAME_PREFIXES,
-// sibling dir via siteLastDir, or a glob match). Returns one of:
-//   { status: 'in-site',     files: [...] }  -- matches a cited site token
-//   { status: 'not-in-site', files: [...] }  -- resolves, but not to a cited site
-//   { status: 'unresolved',  token }          -- does not resolve at all
-function resolveBoundPathToken(root, rels, rawToken, siteTokenMap, siteLastDir) {
-  const stripped = stripSiteDecoration(rawToken);
-  if (siteTokenMap.has(stripped)) return { status: 'in-site', files: siteTokenMap.get(stripped) };
+// Resolve a bound path/glob token the same way a `site` token resolves
+// (BARE_NAME_PREFIXES, sibling dir via siteLastDir, or a glob match against
+// the tracked tree), then classify each resolved file against this row's
+// own `resolved` set (2026-09-08, Opus re-review of 987ba3c9: membership
+// must be checked against the row's actually-resolved FILES, not against a
+// string-equality match on the raw site token -- that missed both
+// equivalent-spelling bindings (`.claude-memory/x.md` binding a `site` cited
+// as memory shorthand `x.md`) and per-file bindings under a glob site
+// (`tests/unit/intake-a.test.js` binding when `site` cites the glob
+// `tests/unit/intake-*.test.js`), which plan Sec2 explicitly promises: "an
+// exact rel path, or the glob that matched it"). Returns:
+//   { unresolvedToken: <token> | null, inSiteFiles: [...], outsideFiles: [...] }
+// A file the token resolves to that IS in `resolvedSet` is inSiteFiles (the
+// binding applies to it); one that resolves but is NOT a member is
+// outsideFiles (STALE `binding path not in site`) -- a coincidental match
+// elsewhere in the tree still does not count, even if some other file the
+// same glob matched does.
+function resolveBoundPathToken(root, rels, rawToken, resolvedSet, siteLastDir) {
   const result = resolveToken(root, rels, rawToken, siteLastDir);
-  if (!result || result.kind === 'missing') return { status: 'unresolved', token: stripped };
-  return { status: 'not-in-site', files: result.files };
+  if (!result || result.kind === 'missing') {
+    return { unresolvedToken: stripSiteDecoration(rawToken), inSiteFiles: [], outsideFiles: [] };
+  }
+  return {
+    unresolvedToken: null,
+    inSiteFiles: result.files.filter((f) => resolvedSet.has(f)),
+    outsideFiles: result.files.filter((f) => !resolvedSet.has(f)),
+  };
 }
 
 function fileContainsAnyFragment(root, rel, fragments) {
@@ -443,18 +462,19 @@ function checkRow(root, rels, row) {
     ? dispositionWord
     : null;
   if (CLOSED_DISPOSITION_RE.test(row.disposition)) return { status: 'closed', dispositionWarning };
-  const { resolved, missing, tokenMap, lastDir } = resolveSitePaths(root, rels, row.site);
+  const { resolved, missing, lastDir } = resolveSitePaths(root, rels, row.site);
   if (missing.length > 0) return { status: 'stale', reason: `site path missing: ${missing.join(', ')}`, dispositionWarning };
+  const resolvedSet = new Set(resolved);
 
   const { bound, bag, tooShort } = parseExcerptBindings(row.excerpt);
   const boundFilesMap = new Map(); // rel file -> fragments[] bound to it
   const unresolvedBindings = [];
   const notInSiteBindings = [];
   for (const b of bound) {
-    const res = resolveBoundPathToken(root, rels, b.pathToken, tokenMap, lastDir);
-    if (res.status === 'unresolved') { unresolvedBindings.push(res.token); continue; }
-    if (res.status === 'not-in-site') { notInSiteBindings.push(...res.files); continue; }
-    for (const rel of res.files) {
+    const res = resolveBoundPathToken(root, rels, b.pathToken, resolvedSet, lastDir);
+    if (res.unresolvedToken) { unresolvedBindings.push(res.unresolvedToken); continue; }
+    notInSiteBindings.push(...res.outsideFiles);
+    for (const rel of res.inSiteFiles) {
       if (!boundFilesMap.has(rel)) boundFilesMap.set(rel, []);
       boundFilesMap.get(rel).push(...b.fragments);
     }
