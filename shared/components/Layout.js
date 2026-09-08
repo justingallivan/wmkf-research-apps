@@ -92,7 +92,8 @@ export default function Layout({
                   <Link
                     key={item.href}
                     href={item.href}
-                    className="relative flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-all duration-200"
+                    aria-current={router.pathname === item.href ? 'page' : undefined}
+                    className={`relative flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200 ${router.pathname === item.href ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}
                   >
                     <span className="text-base">{item.icon}</span>
                     <span>{item.name}</span>
@@ -111,7 +112,7 @@ export default function Layout({
                     </summary>
                     <div className="absolute left-0 top-full z-50 mt-2 grid w-80 grid-cols-1 gap-1 rounded-xl border border-gray-200 bg-white p-2 shadow-lg">
                       {desktopNavigation.secondary.map((item) => (
-                        <Link key={item.href} href={item.href} className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900">
+                        <Link key={item.href} href={item.href} aria-current={router.pathname === item.href ? 'page' : undefined} className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium ${router.pathname === item.href ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}>
                           <span className="text-base" aria-hidden="true">{item.icon}</span><span>{item.name}</span>
                         </Link>
                       ))}
@@ -289,7 +290,8 @@ export default function Layout({
                   <Link
                     key={item.href}
                     href={item.href}
-                    className="flex items-center gap-3 px-3 py-2 text-base font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-all duration-200"
+                    aria-current={router.pathname === item.href ? 'page' : undefined}
+                    className={`flex items-center gap-3 rounded-lg px-3 py-2 text-base font-medium transition-all duration-200 ${router.pathname === item.href ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
                     <span className="text-lg">{item.icon}</span>

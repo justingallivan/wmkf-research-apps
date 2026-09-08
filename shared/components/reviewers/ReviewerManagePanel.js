@@ -969,6 +969,9 @@ export default function ReviewerManagePanel({
         </Card>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+          <p className="border-b border-gray-100 px-4 py-2 text-xs text-gray-500 sm:hidden">
+            Swipe horizontally to view actions for each reviewer.
+          </p>
           <table className={`w-full table-fixed divide-y divide-gray-200 ${tableMinWidth}`}>
             {/* Status and link form one progress signal; reminders, closeout,
                 downloads, and secondary controls share one action lane. This
@@ -1009,10 +1012,10 @@ export default function ReviewerManagePanel({
                 {showActionsColumn && (
                   <>
                     <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider" aria-label="Download review">
-                      <span className="sr-only">Download</span>
+                      Download
                     </th>
                     <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 tracking-wider">
-                      More
+                      Actions
                     </th>
                   </>
                 )}

@@ -140,6 +140,10 @@ export function WorkbenchDashboard() {
   // default view once Set aside). The server enforces the hard manage gate.
   const setTriage = useCallback(async (requestId, key) => {
     const triageStatus = key === 'advancing' ? TRIAGE_STATUS.ADVANCING : TRIAGE_STATUS.SET_ASIDE;
+    const triageFilters = filtersRef.current;
+    const proposal = proposals.find((item) => item.requestId === requestId);
+    const wasSetAside = proposal?.setAside === true;
+    const isSetAside = triageStatus === TRIAGE_STATUS.SET_ASIDE;
     setSavingIds((prev) => {
       const next = new Set(prev);
       next.add(requestId);
@@ -204,7 +208,7 @@ export function WorkbenchDashboard() {
                 scope === s ? 'bg-gray-900 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'
               }`}
             >
-              {s === 'my' ? 'My requests' : 'All'}
+              {s === 'my' ? 'My requests' : 'All requests'}
             </button>
           ))}
         </div>
@@ -229,14 +233,35 @@ export function WorkbenchDashboard() {
       </div>
 
       {error && (
-        <div className="mb-6 p-4 rounded-lg bg-red-50 border border-red-200 text-red-800 text-sm">{error}</div>
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800" role="alert">
+          <span>{error}</span>
+          {cycleCode && (
+            <button
+              type="button"
+              onClick={() => loadProposals(cycleCode, scope, includeSetAside)}
+              className="min-h-10 rounded-lg border border-red-300 bg-white px-3 py-2 font-semibold text-red-900 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+            >
+              Retry
+            </button>
+          )}
+        </div>
       )}
 
       {loadingCycles || loadingProposals ? (
         <Card hover={false}><p className="text-gray-500">Loading…</p></Card>
       ) : proposals.length === 0 ? (
         <Card hover={false}>
-          <p className="text-gray-500">No requests to show for this cycle and scope.</p>
+          <p className="font-semibold text-gray-900">No requests match these filters.</p>
+          <p className="mt-1 text-sm text-gray-500">Try another cycle or switch to all requests if you’re looking for work outside your queue.</p>
+          {scope === 'my' && (
+            <button
+              type="button"
+              onClick={() => setScope('all')}
+              className="mt-4 min-h-10 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-900 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+            >
+              Show all requests
+            </button>
+          )}
         </Card>
       ) : (
         <div className="space-y-3">
@@ -266,7 +291,7 @@ export function WorkbenchDashboard() {
                         {p.grantProgram && <span className="text-xs text-gray-500">· {p.grantProgram}</span>}
                         {p.advancing && (
                           <span className="inline-flex min-h-7 items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-100 text-purple-800">
-                            going-forward
+                            Advancing
                           </span>
                         )}
                         {p.setAside && (
