@@ -82,3 +82,13 @@ test('statusClass: unmapped status → UNCLASSIFIED; null status → null', asyn
   expect(body2.statusClass).toBeNull();
   expect(body2.requestStatus).toBeNull();
 });
+
+test('institution: applicant lookup replaces Dataverse N/A placeholder', async () => {
+  getById.mockResolvedValue({
+    ...RECORD,
+    wmkf_organizationname: 'N/A',
+    _akoya_applicantid_value_formatted: 'University of Texas Southwestern Medical Center',
+  });
+  const body = await resolveWorkbenchRequest({ requestId: REQ, requestNumber: '' });
+  expect(body.institution).toBe('University of Texas Southwestern Medical Center');
+});

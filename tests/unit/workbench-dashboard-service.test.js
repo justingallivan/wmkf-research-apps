@@ -150,6 +150,20 @@ test('proposal mode: non-lead non-superuser rows project canManage false', async
   expect(body.proposals[0].canManage).toBe(false);
 });
 
+test('proposal mode: applicant lookup replaces Dataverse N/A institution placeholder', async () => {
+  queryAllRequests.mockResolvedValue({
+    records: [{
+      akoya_requestid: 'r-1',
+      akoya_requestnum: '1003034',
+      wmkf_meetingdate: '2026-12-11',
+      wmkf_organizationname: 'N/A',
+      _akoya_applicantid_value_formatted: 'University of Texas Southwestern Medical Center',
+    }],
+  });
+  const body = await loadDashboard(args({ cycleCode: 'D26', scope: 'all' }));
+  expect(body.proposals[0].institution).toBe('University of Texas Southwestern Medical Center');
+});
+
 test('proposal mode: canonical session actor is case-insensitive and missing actor fails closed', async () => {
   queryAllRequests.mockResolvedValue({
     records: [{
