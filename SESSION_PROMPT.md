@@ -97,8 +97,10 @@ toolbar/header · `314e9426` `e68bffe9` ToolbarSelect · `f4bcb5b6` smoke record
    Also merged 2026-09-08 UTC: PR #182 (`f1a5113d`) reconciling the `docs/onboarding/` decks with
    post-incident reminder behavior, the nine-tab Workbench strip, closeout honorarium disposition,
    Overview funnel, and page-level access; `python-pptx==1.0.2` pinned. Open follow-ups from its
-   Codex/Opus reviews: generator↔deck parity check (owner decision), `REVIEWER_ENGAGEMENT_SPEC.md:110`
-   stale hold wording, `finance-honoraria.md:41-42` stale "deployment pending".
+   Codex/Opus reviews: `REVIEWER_ENGAGEMENT_SPEC.md:110` stale hold wording, `finance-honoraria.md:41-42`
+   stale "deployment pending". **Decks retired 2026-09-08:** owner decided no one had seen them and they
+   were hopelessly out of date; `docs/onboarding/` deleted (history keeps PR #182's last state), so the
+   parity-check follow-up is moot.
 3. **Write `docs/J27_BUILD_AND_CHANGE_PLAN.md`** once Connor's file-location decision (Q5) lands.
    Evidence: register §2 deliverables table. Sequence unchanged from the S492 prompt.
 4. **Annotate the pilot passages** coupling "J27 Initial Assessment" to 2026-08-18:
