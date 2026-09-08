@@ -174,7 +174,7 @@ describe('reviewer table geometry', () => {
     expect(table.querySelectorAll('colgroup col')).toHaveLength(7);
     expect(screen.getByRole('columnheader', { name: 'Next action' })).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: /Download/ })).toBeInTheDocument();
-    expect(screen.getByRole('columnheader', { name: 'Actions' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'More' })).toBeInTheDocument();
   });
 
   test('keeps follow-up controls separate from download and secondary actions', async () => {
@@ -197,7 +197,7 @@ describe('reviewer table geometry', () => {
     expect(table.querySelectorAll('colgroup col')).toHaveLength(7);
     expect(screen.queryByRole('columnheader', { name: 'Follow up' })).not.toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: /Download/ })).toBeInTheDocument();
-    expect(screen.getByRole('columnheader', { name: 'Actions' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'More' })).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: 'Next action' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Send reminder to Joshua Rosenthal' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Manage Joshua Rosenthal' })).toBeInTheDocument();
