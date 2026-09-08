@@ -133,7 +133,18 @@ const TAG_RE = /(?<!`)J27:(?:\s*(J27-\d{3})\b)?/g;
 // immediately (optionally after whitespace). Prose and bold-label uses of
 // the bare term are not markers.
 const COMMENT_LEAD_RE = /^\s*(?:\/\/|\/\*|\*|#+|--|<!--)\s*/;
-const ROW_ID_RE = /^\| (J27-\d{3})\b/;
+// A line that LOOKS like a register row: after any leading whitespace, a
+// pipe, optional whitespace, and something id-shaped. Intentionally loose —
+// used only to decide whether a line must be parsed as a row at all, so a
+// row is never silently skipped for using non-canonical spacing (no space
+// after the opening pipe, or leading whitespace before it). Codex adversarial
+// review, 2026-09-08: the old exact-format regex made those a silent
+// row-disappearance bypass (the gate exited 0 having never checked the row).
+const CANDIDATE_ROW_RE = /^\s*\|\s*(J27-[^\s|]*)/;
+// The canonical id shape. A candidate row whose id token doesn't match this
+// is a configuration error (exit 2), not a skip — `J27-23` or `J27-0230` is
+// far more likely a typo in a real row than an unrelated pipe-led line.
+const VALID_ROW_ID_RE = /^J27-\d{3}$/;
 const REGISTER_COLUMNS = 7; // id · site · excerpt · Dep · Ev · Q · disposition
 
 // Files that describe the convention itself, or are this gate. Their `J27:`
@@ -245,17 +256,21 @@ function parseRegister(registerPath) {
   const rows = [];
   const seen = new Set();
   text.split('\n').forEach((line, i) => {
-    const m = line.match(ROW_ID_RE);
-    if (!m) return;
+    const cand = line.match(CANDIDATE_ROW_RE);
+    if (!cand) return;
+    const idToken = cand[1];
+    if (!VALID_ROW_ID_RE.test(idToken)) {
+      throw new Error(`j27-register configuration error: ${path.basename(registerPath)}:${i + 1} malformed register id: ${idToken}`);
+    }
     const cells = splitRow(line);
     if (cells.length !== REGISTER_COLUMNS) {
-      throw new Error(`j27-register configuration error: ${path.basename(registerPath)}:${i + 1} row ${m[1]} has ${cells.length} cells, expected ${REGISTER_COLUMNS}`);
+      throw new Error(`j27-register configuration error: ${path.basename(registerPath)}:${i + 1} row ${idToken} has ${cells.length} cells, expected ${REGISTER_COLUMNS}`);
     }
-    if (seen.has(m[1])) {
-      throw new Error(`j27-register configuration error: ${path.basename(registerPath)}:${i + 1} duplicate register id ${m[1]}`);
+    if (seen.has(idToken)) {
+      throw new Error(`j27-register configuration error: ${path.basename(registerPath)}:${i + 1} duplicate register id ${idToken}`);
     }
-    seen.add(m[1]);
-    rows.push({ id: m[1], lineNo: i + 1, site: cells[1], excerpt: cells[2], disposition: cells[6] });
+    seen.add(idToken);
+    rows.push({ id: idToken, lineNo: i + 1, site: cells[1], excerpt: cells[2], disposition: cells[6] });
   });
   return rows;
 }

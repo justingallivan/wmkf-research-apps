@@ -29,7 +29,9 @@
  *   GREEN  glob site with a match; route-shaped `/api/...` token ignored
  *   SKIP   `rejected` row with an absent excerpt is closed, not stale
  *   INFO   prose-only row is unverifiable, exit 0
- *   BASE   the real repository baseline is green before and after
+ *   BASE   the real repository baseline is green before and after, tolerant
+ *          only of stale rows named in KNOWN_OWNER_PENDING (2026-09-08:
+ *          J27-023, owner ruling pending — see docs/J27_TRANSITION_REGISTER.md §10)
  *
  * Phase 0 additions (2026-09-08, site-to-fragment binding —
  * docs/plans/J27_REGISTER_PER_SITE_RECONCILIATION_PLAN_2026-09-08.md §2):
@@ -71,6 +73,16 @@ const { registerTmpFixture } = require('./lib/selftest-fixture');
 const repoRoot = path.resolve(__dirname, '..');
 const GATE = path.join(repoRoot, 'scripts', 'check-j27-register.js');
 
+// Rows the real register is KNOWINGLY stale on, pending an owner ruling —
+// see docs/J27_TRANSITION_REGISTER.md §10 (matrix-review conditions
+// follow-up, Codex adversarial review at 65eb4bfe, finding 2). J27-023's
+// `scripts/audit-grant-cycle-shortcode-domain.js` binding was removed
+// because the file's fragment, while verbatim, is not this row's fact; the
+// citation stays in `site` with a drift note and AS evidence, and the file
+// is left unbound so the row is honestly STALE rather than green on a
+// non-fact match. Remove the entry here the same commit the owner rules.
+const KNOWN_OWNER_PENDING = ['J27-023'];
+
 let failures = 0;
 function check(label, cond, detail) {
   if (cond) { console.log(`  ✓ ${label}`); return; }
@@ -84,6 +96,16 @@ function runGate(args) {
   } catch (e) {
     return { status: e.status || 1, output: (e.stdout || '') + (e.stderr || '') };
   }
+}
+
+// True when the gate's stale-row list contains nothing but ids from
+// KNOWN_OWNER_PENDING (the real-register baseline case) — used instead of
+// a bare `status === 0` check for the real-repository baseline runs, since
+// KNOWN_OWNER_PENDING rows make the gate legitimately exit 1.
+function staleIdsOnlyKnownPending(output) {
+  const staleIds = [...output.matchAll(/^ {2}✗ (J27-\d{3}) stale\b/gm)].map((m) => m[1]);
+  const unexpected = staleIds.filter((id) => !KNOWN_OWNER_PENDING.includes(id));
+  return { ok: staleIds.length > 0 && unexpected.length === 0, staleIds, unexpected };
 }
 
 function write(root, rel, body) {
@@ -146,7 +168,14 @@ function main() {
   console.log('check-j27-register self-test');
 
   const baseline = runGate([]);
-  check('real repository baseline is green before fixtures', baseline.status === 0, baseline.output.split('\n').slice(-6).join('\n'));
+  const baselineTolerance = staleIdsOnlyKnownPending(baseline.output);
+  check(
+    'real repository baseline before fixtures: stale only on KNOWN_OWNER_PENDING rows',
+    baseline.status === 0 || baselineTolerance.ok,
+    baseline.status === 0
+      ? '(baseline is fully green — remove KNOWN_OWNER_PENDING once true)'
+      : `unexpected stale: ${JSON.stringify(baselineTolerance.unexpected)}\n${baseline.output.split('\n').slice(-6).join('\n')}`,
+  );
 
   // ---- green tree
   {
@@ -460,6 +489,53 @@ function main() {
     cleanup();
   }
 
+  // ---- Codex adversarial review, 2026-09-08: row-disappearance bypass.
+  // ROW_ID_RE required exact `| J27-###` spacing; a row using any other
+  // valid-Markdown spacing was silently skipped (never parsed, never
+  // checked, gate exits 0) instead of being recognised and evaluated.
+  // Both fixtures below cite a missing site file, so a SKIPPED row would
+  // leave the gate green (wrong) while a RECOGNISED row goes red naming it.
+
+  // ---- red: no space after the opening pipe must still be recognised
+  {
+    const { dir, cleanup } = registerTmpFixture('j27-register-no-space-after-pipe-');
+    write(dir, 'docs/J27_TRANSITION_REGISTER.md', greenFixture(dir)
+      + '|J27-014|`lib/nope.js`|`anything at all here`|D26|SV|–|open.|\n');
+    const r = runGate(['--root', dir]);
+    check('no space after opening pipe: recognised as a row, not skipped (exits 1)', r.status === 1, r.output);
+    check('no space after opening pipe: J27-014 site path missing', /J27-014 .*site path missing: lib\/nope\.js/.test(r.output), r.output);
+    cleanup();
+  }
+
+  // ---- red: leading whitespace before the pipe must still be recognised
+  {
+    const { dir, cleanup } = registerTmpFixture('j27-register-leading-whitespace-row-');
+    write(dir, 'docs/J27_TRANSITION_REGISTER.md', greenFixture(dir)
+      + row('J27-015', '`lib/also-nope.js`', '`anything at all here`').replace(/^\| /, '  | '));
+    const r = runGate(['--root', dir]);
+    check('leading whitespace before pipe: recognised as a row, not skipped (exits 1)', r.status === 1, r.output);
+    check('leading whitespace before pipe: J27-015 site path missing', /J27-015 .*site path missing: lib\/also-nope\.js/.test(r.output), r.output);
+    cleanup();
+  }
+
+  // ---- config error: malformed J27-like id fails closed, not silently skipped
+  {
+    const { dir, cleanup } = registerTmpFixture('j27-register-malformed-id-short-');
+    write(dir, 'docs/J27_TRANSITION_REGISTER.md', greenFixture(dir) + row('J27-16', '`lib/a.js`', '`D26-only hide`'));
+    const r = runGate(['--root', dir]);
+    check('malformed id (two digits): exits 2 (configuration error)', r.status === 2, r.output);
+    check('malformed id (two digits): message names the bad id', /malformed register id: J27-16\b/.test(r.output), r.output);
+    cleanup();
+  }
+  {
+    const { dir, cleanup } = registerTmpFixture('j27-register-malformed-id-long-');
+    write(dir, 'docs/J27_TRANSITION_REGISTER.md', greenFixture(dir) + row('J27-0170', '`lib/a.js`', '`D26-only hide`'));
+    const r = runGate(['--root', dir]);
+    check('malformed id (four digits): exits 2 (configuration error)', r.status === 2, r.output);
+    check('malformed id (four digits): message names the bad id', /malformed register id: J27-0170\b/.test(r.output), r.output);
+    cleanup();
+  }
+
   // ---- config error: duplicate id
   {
     const { dir, cleanup } = registerTmpFixture('j27-register-duplicate-');
@@ -480,7 +556,14 @@ function main() {
   }
 
   const after = runGate([]);
-  check('real repository baseline is green after fixtures', after.status === 0, after.output.split('\n').slice(-6).join('\n'));
+  const afterTolerance = staleIdsOnlyKnownPending(after.output);
+  check(
+    'real repository baseline after fixtures: stale only on KNOWN_OWNER_PENDING rows',
+    after.status === 0 || afterTolerance.ok,
+    after.status === 0
+      ? '(baseline is fully green — remove KNOWN_OWNER_PENDING once true)'
+      : `unexpected stale: ${JSON.stringify(afterTolerance.unexpected)}\n${after.output.split('\n').slice(-6).join('\n')}`,
+  );
 
   if (failures > 0) {
     console.error(`check-j27-register self-test FAILED: ${failures} assertion(s).`);
