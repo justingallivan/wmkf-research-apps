@@ -577,9 +577,9 @@ export default function ReviewersTab({
             .request-reviewer-table table thead th:last-child::after {
               content: 'More';
               position: absolute;
-              right: 1rem;
+              left: 50%;
               top: 50%;
-              transform: translateY(-50%);
+              transform: translate(-50%, -50%);
               color: #9ca3af;
               font-size: 0.75rem;
               font-weight: 600;
