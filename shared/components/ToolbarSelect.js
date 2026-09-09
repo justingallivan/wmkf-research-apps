@@ -35,8 +35,10 @@ export default function ToolbarSelect({
   className = '',
   size = 'toolbar',
   'aria-describedby': describedBy,
+  hint,
 }) {
   const compact = size === 'compact';
+  const hintId = hint ? `${id}-hint` : undefined;
   return (
     <div className={`flex flex-col gap-1.5 ${compact ? 'min-w-0' : ''} ${className}`}>
       <label htmlFor={id} className="text-sm font-medium text-gray-700">{label}</label>
@@ -46,7 +48,7 @@ export default function ToolbarSelect({
           value={value}
           disabled={disabled}
           onChange={onChange}
-          aria-describedby={describedBy}
+          aria-describedby={describedBy || hintId}
           className={compact ? COMPACT_SELECT_CLASS : TOOLBAR_SELECT_CLASS}
         >
           {children}
@@ -55,6 +57,7 @@ export default function ToolbarSelect({
           <ChevronsIcon />
         </span>
       </div>
+      {hint && <p id={hintId} className="text-xs text-gray-500">{hint}</p>}
     </div>
   );
 }

@@ -162,6 +162,8 @@ If a global disclosure is too large for the first implementation slice, use a co
 | Final writeups | **Final writeups** — “Review current writeups and acknowledge the latest versions.” |
 | Awardees | **Awardees** — “Track grantee deliverables for awardees in the selected program and cycle.” |
 
+*Amended at build (2026-09-08): research awardees in the selected cycle; the Awardees scope's second option reads All program directors.*
+
 ### Controls, search, and counts
 
 | Current idea | Proposed label/copy |

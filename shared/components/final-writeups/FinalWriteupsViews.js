@@ -20,6 +20,7 @@ import { cycleCodeToLabel } from '../../../lib/utils/cycle-code.js';
 import ToolbarSelect, { TOOLBAR_CONTROL_HEIGHT_CLASS } from '../ToolbarSelect';
 import { buildWorkbenchHref } from '../workbench/workbench-location';
 import { useUrlMirroredInput } from '../workbench/useUrlMirroredInput';
+import ViewFilterInput from '../workbench/ViewFilterInput';
 
 const DATE_FORMATTER = new Intl.DateTimeFormat('en-US', {
   month: 'short',
@@ -32,15 +33,6 @@ const DATE_FORMATTER = new Intl.DateTimeFormat('en-US', {
 function formatDate(value) {
   const timestamp = Date.parse(value || '');
   return Number.isFinite(timestamp) ? DATE_FORMATTER.format(new Date(timestamp)) : null;
-}
-
-function SearchIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5">
-      <circle cx="11" cy="11" r="7" />
-      <path d="m16.5 16.5 4 4" />
-    </svg>
-  );
 }
 
 function ArrowIcon({ direction = 'right' }) {
@@ -493,7 +485,7 @@ function ProgramDirectorSelector({ options, value, disabled, onChange }) {
   return (
     <ToolbarSelect
       id="final-writeup-pd"
-      label="Program director"
+      label="Responsible program director"
       value={value || ''}
       disabled={disabled}
       onChange={(event) => onChange(event.target.value || null)}
@@ -601,7 +593,7 @@ function personaViewLabel(viewer) {
 }
 
 function NeedsReviewEmptyState({ cycleLabel, pdName, counts, search, onChangeView }) {
-  if (search) return <>No open writeups match your search.</>;
+  if (search) return <>No writeups match this filter. Clear the filter or try another term.</>;
   if (pdName === PD_ABSENT_LABEL) {
     return <>No writeups for the selected Program Director{cycleLabel ? ` in ${cycleLabel}` : ''}. Choose All program directors to clear the filter.</>;
   }
@@ -611,7 +603,7 @@ function NeedsReviewEmptyState({ cycleLabel, pdName, counts, search, onChangeVie
       onClick={() => onChangeView(key)}
       className="font-semibold text-gray-900 underline underline-offset-4 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500"
     >
-      {counts[key]} {key === 'reviewed' ? 'reviewed by you' : 'writeups in all'}
+      {counts[key]} {key === 'reviewed' ? `reviewed by you` : `writeup${counts[key] === 1 ? '' : 's'} in all`}
     </button>
   );
   return (
@@ -706,15 +698,23 @@ export function FinalWriteupsPanel({
     [data],
   );
   const pdOptions = useMemo(() => programDirectorOptions(serverQueues), [serverQueues]);
-  const filteredQueues = useMemo(() => Object.fromEntries(
+  // Program Director-filtered, but not text-filtered: queue counts and the
+  // lead sentence are computed from this so they hold still while typing.
+  const pdFilteredQueues = useMemo(() => Object.fromEntries(
     Object.entries(serverQueues).map(([key, value]) => [
       key,
-      (value || []).filter((row) => matchesProgramDirector(row, pdValue) && matchesSearch(row, searchInput)),
+      (value || []).filter((row) => matchesProgramDirector(row, pdValue)),
     ]),
-  ), [serverQueues, pdValue, searchInput]);
+  ), [serverQueues, pdValue]);
+  const filteredQueues = useMemo(() => Object.fromEntries(
+    Object.entries(pdFilteredQueues).map(([key, value]) => [
+      key,
+      value.filter((row) => matchesSearch(row, searchInput)),
+    ]),
+  ), [pdFilteredQueues, searchInput]);
   const viewCounts = useMemo(() => Object.fromEntries(
-    VIEW_KEYS.map((key) => [key, VIEWS[key].select(filteredQueues).length]),
-  ), [filteredQueues]);
+    VIEW_KEYS.map((key) => [key, VIEWS[key].select(pdFilteredQueues).length]),
+  ), [pdFilteredQueues]);
   const mainRows = useMemo(
     () => [...VIEWS[view].select(filteredQueues)].sort(byRequestNumber),
     [filteredQueues, view],
@@ -723,12 +723,29 @@ export function FinalWriteupsPanel({
     () => [...(filteredQueues.stewardship || [])].sort(byRequestNumber),
     [filteredQueues],
   );
+  // "Your writeups" (stewardship) can surface rows the main queue doesn't
+  // (or the reverse); when it's shown (every view but "all"), the filter's
+  // "Showing X of Y" counts the union of both sections, deduped by
+  // requestId — the row's true identity (used for React keys and links
+  // throughout this file) rather than requestNumber, which is a display
+  // field. "all" has no stewardship section, so it keeps the simple count.
+  const filterShown = view === 'all'
+    ? mainRows.length
+    : new Set([...mainRows, ...stewardshipRows].map((row) => row.requestId)).size;
+  const filterTotal = view === 'all'
+    ? (viewCounts[view] ?? 0)
+    : new Set([
+      ...VIEWS[view].select(pdFilteredQueues),
+      ...(pdFilteredQueues.stewardship || []),
+    ].map((row) => row.requestId)).size;
   const pdName = pdValue
     ? (pdOptions.find((option) => option.id === pdValue)?.name || PD_ABSENT_LABEL)
     : null;
   const cycleLabel = data ? cycleLabelFor(data.cycles, data.cycles?.selected) : null;
   const current = VIEWS[view];
   const cycleEmpty = data && (data.counts?.total ?? 0) === 0;
+  const activeCount = viewCounts[view] ?? 0;
+  const activeCountVerb = view === 'reviewed' ? 'reviewed by you' : view === 'all' ? '' : 'awaiting your review';
   // No cycle and not loading one: the shell's alert carries the retry; render nothing here.
   if (!selector && !loadingCycles) return null;
   const busy = loadingCycles || !selector || loading;
@@ -741,7 +758,8 @@ export function FinalWriteupsPanel({
             <p className="mb-1 font-medium text-gray-700">{personaViewLabel(data.viewer)}</p>
           )}
           <p>
-            <span className="font-semibold tabular-nums text-gray-900">{viewCounts['needs-review']}</span> awaiting your review
+            <span className="font-semibold tabular-nums text-gray-900">{activeCount}</span> writeup{activeCount === 1 ? '' : 's'}
+            {activeCountVerb && ` ${activeCountVerb}`}
             {cycleLabel && ` in ${cycleLabel}`}
             {pdName && pdName !== PD_ABSENT_LABEL && ` for ${pdName}`}
           </p>
@@ -765,28 +783,22 @@ export function FinalWriteupsPanel({
           <div className="flex flex-col gap-4 lg:flex-row lg:flex-wrap lg:items-end">
             <ProgramDirectorSelector options={pdOptions} value={pdValue} disabled={busy} onChange={(id) => onPdChange(id ? String(id).toLowerCase() : '')} />
             <div className="flex flex-col gap-1.5">
-              <span id="final-writeup-view-label" className="text-sm font-medium text-gray-700">View</span>
+              <span id="final-writeup-view-label" className="text-sm font-medium text-gray-700">Review queue</span>
               <ViewSelector view={view} counts={viewCounts} disabled={busy} onChange={changeView} />
             </div>
           </div>
         )}
-        <label htmlFor="final-writeup-search" className="sr-only">Search Final Writeups</label>
-        <div className="relative max-w-2xl">
-          <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-gray-400"><SearchIcon /></span>
-          <input
-            id="final-writeup-search"
-            type="search"
-            value={searchInput}
-            onChange={(event) => setSearchInput(event.target.value)}
-            placeholder="Search writeups"
-            className="min-h-12 w-full rounded-xl border border-gray-300 bg-white py-3 pl-11 pr-4 text-base text-gray-900 shadow-sm placeholder:text-gray-500 focus:border-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-400/30"
-          />
-        </div>
-        {searchInput && data && (
-          <p className="mt-2 text-sm text-gray-500" aria-live="polite">
-            {mainRows.length} matching writeup{mainRows.length === 1 ? '' : 's'}
-          </p>
-        )}
+        <ViewFilterInput
+          id="final-writeup-search"
+          label="Filter final writeups"
+          placeholder="Request #, title, institution, PI, or program director"
+          value={searchInput}
+          onChange={setSearchInput}
+          shown={filterShown}
+          total={filterTotal}
+          unitSingular="writeup"
+          unitPlural="writeups"
+        />
       </div>
 
       {busy ? <LoadingSurface /> : error ? (
@@ -816,7 +828,7 @@ export function FinalWriteupsPanel({
               />
             ) : (
               searchInput
-                ? 'No writeups match your search.'
+                ? 'No writeups match this filter. Clear the filter or try another term.'
                 : pdName === PD_ABSENT_LABEL
                   ? `No writeups for the selected Program Director${cycleLabel ? ` in ${cycleLabel}` : ''}. Choose All program directors to clear the filter.`
                   : `${current.emptyCopy}${cycleLabel ? ` in ${cycleLabel}` : ''}${pdName ? ` for ${pdName}` : ''}.`

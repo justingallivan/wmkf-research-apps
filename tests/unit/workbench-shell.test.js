@@ -94,7 +94,7 @@ const rowFetches = () => global.fetch.mock.calls.map(([url]) => String(url)).fil
 
 test('plain visit resolves the working cycle and writes it into the URL with replace', async () => {
   render(<WorkbenchShell />);
-  await waitFor(() => expect(screen.getByLabelText('Cycle')).toHaveValue('D26'));
+  await waitFor(() => expect(screen.getByLabelText('Grant cycle')).toHaveValue('D26'));
   expect(replace).toHaveBeenCalledWith('/workbench?cycleCode=D26', undefined, { shallow: true, scroll: false });
   expect(push).not.toHaveBeenCalled();
   await waitFor(() => expect(rowFetches()).toEqual(['/api/workbench/dashboard?cycleCode=D26&scope=my&programId=p1']));
@@ -104,9 +104,9 @@ test('a deep-linked cycle the program lists is honored without rewriting the URL
   routerState.query = { cycleCode: 'J26', scope: 'all', setAside: '1' };
   routerState.asPath = '/workbench?cycleCode=J26&scope=all&setAside=1';
   render(<WorkbenchShell />);
-  await waitFor(() => expect(screen.getByLabelText('Cycle')).toHaveValue('J26'));
+  await waitFor(() => expect(screen.getByLabelText('Grant cycle')).toHaveValue('J26'));
   expect(replace).not.toHaveBeenCalled();
-  expect(screen.getByLabelText('Show set aside')).toBeChecked();
+  expect(screen.getByLabelText('Include set-aside requests')).toBeChecked();
   await waitFor(() => expect(rowFetches()).toEqual(['/api/workbench/dashboard?cycleCode=J26&scope=all&programId=p1&includeSetAside=1']));
 });
 
@@ -114,7 +114,7 @@ test('an unlisted deep-linked cycle is honored and rendered as an extra option (
   routerState.query = { cycleCode: 'J25' };
   routerState.asPath = '/workbench?cycleCode=J25';
   render(<WorkbenchShell />);
-  await waitFor(() => expect(screen.getByLabelText('Cycle')).toHaveValue('J25'));
+  await waitFor(() => expect(screen.getByLabelText('Grant cycle')).toHaveValue('J25'));
   expect(screen.getByRole('option', { name: 'June 2025' })).toBeInTheDocument();
   expect(replace).not.toHaveBeenCalled();
   await waitFor(() => expect(rowFetches()).toEqual(['/api/workbench/dashboard?cycleCode=J25&scope=my&programId=p1']));
@@ -122,32 +122,32 @@ test('an unlisted deep-linked cycle is honored and rendered as an extra option (
 
 test('cycle and program changes push history entries; filter changes replace', async () => {
   render(<WorkbenchShell />);
-  await waitFor(() => expect(screen.getByLabelText('Cycle')).toHaveValue('D26'));
+  await waitFor(() => expect(screen.getByLabelText('Grant cycle')).toHaveValue('D26'));
 
-  fireEvent.change(screen.getByLabelText('Cycle'), { target: { value: 'J26' } });
+  fireEvent.change(screen.getByLabelText('Grant cycle'), { target: { value: 'J26' } });
   expect(push).toHaveBeenLastCalledWith('/workbench?cycleCode=J26', undefined, expect.any(Object));
 
-  fireEvent.click(screen.getByRole('button', { name: 'All' }));
+  fireEvent.click(screen.getByRole('button', { name: 'All in program' }));
   expect(replace).toHaveBeenLastCalledWith('/workbench?cycleCode=J26&scope=all', undefined, expect.any(Object));
-  fireEvent.click(screen.getByLabelText('Show set aside'));
+  fireEvent.click(screen.getByLabelText('Include set-aside requests'));
   expect(replace).toHaveBeenLastCalledWith('/workbench?cycleCode=J26&scope=all&setAside=1', undefined, expect.any(Object));
 
-  fireEvent.change(screen.getByLabelText('Grant Program'), { target: { value: 'p2' } });
+  fireEvent.change(screen.getByLabelText('Grant program'), { target: { value: 'p2' } });
   // The program change drops the cycle; the new program's working cycle is written back.
   expect(push).toHaveBeenLastCalledWith('/workbench?programId=p2&scope=all&setAside=1', undefined, expect.any(Object));
-  await waitFor(() => expect(screen.getByLabelText('Cycle')).toHaveValue('J27'));
+  await waitFor(() => expect(screen.getByLabelText('Grant cycle')).toHaveValue('J27'));
   expect(replace).toHaveBeenLastCalledWith('/workbench?programId=p2&cycleCode=J27&scope=all&setAside=1', undefined, expect.any(Object));
   await waitFor(() => expect(rowFetches().at(-1)).toBe('/api/workbench/dashboard?cycleCode=J27&scope=all&programId=p2&includeSetAside=1'));
 });
 
 test('an external navigation (back button) is adopted from the URL', async () => {
   const { rerender } = render(<WorkbenchShell />);
-  await waitFor(() => expect(screen.getByLabelText('Cycle')).toHaveValue('D26'));
+  await waitFor(() => expect(screen.getByLabelText('Grant cycle')).toHaveValue('D26'));
   routerState.query = { cycleCode: 'J26', scope: 'all' };
   routerState.asPath = '/workbench?cycleCode=J26&scope=all';
   rerender(<WorkbenchShell />);
-  await waitFor(() => expect(screen.getByLabelText('Cycle')).toHaveValue('J26'));
-  expect(screen.getByRole('button', { name: 'All' })).toHaveClass('bg-gray-900');
+  await waitFor(() => expect(screen.getByLabelText('Grant cycle')).toHaveValue('J26'));
+  expect(screen.getByRole('button', { name: 'All in program' })).toHaveClass('bg-gray-900');
   await waitFor(() => expect(rowFetches().at(-1)).toBe('/api/workbench/dashboard?cycleCode=J26&scope=all&programId=p1'));
 });
 
@@ -165,7 +165,7 @@ test('a cycle-list failure shows an alert with Try again and never loads rows', 
   expect(await screen.findByRole('alert')).toHaveTextContent('Dataverse unavailable');
   expect(rowFetches()).toEqual([]);
   fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
-  await waitFor(() => expect(screen.getByLabelText('Cycle')).toHaveValue('D26'));
+  await waitFor(() => expect(screen.getByLabelText('Grant cycle')).toHaveValue('D26'));
 });
 
 test('a cycle-list failure on the Final writeups view shows only the shell alert, never a stuck loading surface', async () => {
@@ -182,7 +182,7 @@ test('the Awardees view shows the working cycle, links the last decided cycle wh
   routerState.query = { view: 'awardees' };
   routerState.asPath = '/workbench?view=awardees';
   render(<WorkbenchShell />);
-  await waitFor(() => expect(screen.getByLabelText('Cycle')).toHaveValue('D26'));
+  await waitFor(() => expect(screen.getByLabelText('Grant cycle')).toHaveValue('D26'));
   expect(screen.getByRole('link', { name: 'Awardees' })).toHaveAttribute('aria-current', 'page');
   expect(await screen.findByText('No awardees for December 2026 yet.')).toBeInTheDocument();
   expect(rowFetches().some((u) => u.startsWith('/api/workbench/dashboard?'))).toBe(false);
@@ -191,7 +191,7 @@ test('the Awardees view shows the working cycle, links the last decided cycle wh
   expect(push).toHaveBeenLastCalledWith('/workbench?view=awardees&cycleCode=J26', undefined, expect.any(Object));
   expect(await screen.findByText('June awardee')).toBeInTheDocument();
 
-  fireEvent.click(screen.getByLabelText(/show all programs/i));
+  fireEvent.click(screen.getByRole('button', { name: 'All program directors' }));
   expect(replace).toHaveBeenLastCalledWith('/workbench?view=awardees&cycleCode=J26&scope=all', undefined, expect.any(Object));
   await waitFor(() => expect(global.fetch).toHaveBeenLastCalledWith('/api/workbench/grantee-deliverables/awardees?cycleCode=J26&scope=all', expect.any(Object)));
 });
@@ -227,15 +227,15 @@ test('the Reviewer follow-up view carries its reviewer-state view and search in 
     routerState.query = { view: 'reviewer-follow-up', cycleCode: 'J26', scope: 'all' };
     routerState.asPath = '/workbench?view=reviewer-follow-up&cycleCode=J26&scope=all';
     render(<WorkbenchShell />);
-    await waitFor(() => expect(screen.getByLabelText('Cycle')).toHaveValue('J26'));
+    await waitFor(() => expect(screen.getByLabelText('Grant cycle')).toHaveValue('J26'));
     expect(screen.getByRole('link', { name: 'Reviewer follow-up' })).toHaveAttribute('aria-current', 'page');
-    expect(screen.getByRole('button', { name: 'All requests' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'All in program' })).toHaveAttribute('aria-pressed', 'true');
     await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/review-manager/reviewers?cycleCode=J26&scope=all&programId=p1'));
 
-    fireEvent.click(screen.getByRole('button', { name: /Show all/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'All (0)' }));
     expect(replace).toHaveBeenLastCalledWith('/workbench?view=reviewer-follow-up&cycleCode=J26&scope=all&reviewers=all', undefined, expect.any(Object));
 
-    fireEvent.change(screen.getByLabelText('Search requests and reviewers'), { target: { value: 'north' } });
+    fireEvent.change(screen.getByLabelText('Filter reviewer follow-up'), { target: { value: 'north' } });
     expect(replace).not.toHaveBeenCalledWith(expect.stringContaining('q=north'), undefined, expect.any(Object));
     await act(async () => { jest.advanceTimersByTime(400); });
     expect(replace).toHaveBeenLastCalledWith('/workbench?view=reviewer-follow-up&cycleCode=J26&scope=all&reviewers=all&q=north', undefined, expect.any(Object));
@@ -254,16 +254,16 @@ test('the Final writeups view carries writeups/pd/uncycled in the URL, keeps the
 
   fireEvent.click(screen.getByRole('button', { name: 'June 2026' }));
   expect(push).toHaveBeenLastCalledWith('/workbench?view=final-writeups&cycleCode=J26', undefined, expect.any(Object));
-  await waitFor(() => expect(screen.getByLabelText('Cycle')).toHaveValue('J26'));
+  await waitFor(() => expect(screen.getByLabelText('Grant cycle')).toHaveValue('J26'));
   expect(await screen.findByText('June writeup')).toBeInTheDocument();
 
   fireEvent.click(screen.getByRole('button', { name: /All writeups/ }));
   expect(replace).toHaveBeenLastCalledWith('/workbench?view=final-writeups&cycleCode=J26&writeups=all', undefined, expect.any(Object));
-  fireEvent.change(screen.getByLabelText('Program director'), { target: { value: '33333333-3333-4333-8333-333333333331' } });
+  fireEvent.change(screen.getByLabelText('Responsible program director'), { target: { value: '33333333-3333-4333-8333-333333333331' } });
   expect(replace).toHaveBeenLastCalledWith('/workbench?view=final-writeups&cycleCode=J26&writeups=all&pd=33333333-3333-4333-8333-333333333331', undefined, expect.any(Object));
 
   // A cycle change keeps the view's filters.
-  fireEvent.change(screen.getByLabelText('Cycle'), { target: { value: 'D26' } });
+  fireEvent.change(screen.getByLabelText('Grant cycle'), { target: { value: 'D26' } });
   expect(push).toHaveBeenLastCalledWith('/workbench?view=final-writeups&cycleCode=D26&writeups=all&pd=33333333-3333-4333-8333-333333333331', undefined, expect.any(Object));
 
   fireEvent.click(await screen.findByRole('button', { name: 'Writeups without a cycle' }));
@@ -282,4 +282,44 @@ test('the legacy Final writeups route redirects into the shell, translating its 
   await expect(getServerSideProps({ query: {} })).resolves.toEqual({
     redirect: { destination: '/workbench?view=final-writeups', permanent: false },
   });
+});
+
+test('cycle options never show a count suffix', async () => {
+  render(<WorkbenchShell />);
+  await waitFor(() => expect(screen.getByLabelText('Grant cycle')).toHaveValue('D26'));
+  expect(screen.getByRole('option', { name: 'December 2026' })).toBeInTheDocument();
+  expect(screen.getByRole('option', { name: 'June 2026' })).toBeInTheDocument();
+  expect(screen.queryByText(/\(4\)/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/\(9\)/)).not.toBeInTheDocument();
+});
+
+test('the Grant program select stays enabled with a note on Final writeups and Awardees, and has no note on Request list', async () => {
+  routerState.query = { view: 'final-writeups' };
+  routerState.asPath = '/workbench?view=final-writeups';
+  const { unmount } = render(<WorkbenchShell />);
+  await waitFor(() => expect(screen.getByLabelText('Grant program')).not.toBeDisabled());
+  expect(screen.getByText('Not filtered by program')).toBeInTheDocument();
+  unmount();
+
+  routerState.query = { view: 'awardees' };
+  routerState.asPath = '/workbench?view=awardees';
+  const { unmount: unmountAwardees } = render(<WorkbenchShell />);
+  await waitFor(() => expect(screen.getByLabelText('Grant program')).not.toBeDisabled());
+  expect(screen.getByText('Research programs only')).toBeInTheDocument();
+  unmountAwardees();
+
+  routerState.query = {};
+  routerState.asPath = '/workbench';
+  const { unmount: unmountRequestList } = render(<WorkbenchShell />);
+  await waitFor(() => expect(screen.getByLabelText('Grant program')).not.toBeDisabled());
+  expect(screen.queryByText('Not filtered by program')).not.toBeInTheDocument();
+  expect(screen.queryByText('Research programs only')).not.toBeInTheDocument();
+  unmountRequestList();
+
+  routerState.query = { view: 'reviewer-follow-up' };
+  routerState.asPath = '/workbench?view=reviewer-follow-up';
+  render(<WorkbenchShell />);
+  await waitFor(() => expect(screen.getByLabelText('Grant program')).not.toBeDisabled());
+  expect(screen.queryByText('Not filtered by program')).not.toBeInTheDocument();
+  expect(screen.queryByText('Research programs only')).not.toBeInTheDocument();
 });

@@ -112,13 +112,13 @@ test('shows the signed-in PD request count for the selected cycle and set-aside 
   });
 
   render(<WorkbenchDashboard />);
-  await waitFor(() => expect(screen.getByRole('button', { name: 'My requests (2)' })).toBeInTheDocument());
-  expect(screen.getByRole('button', { name: 'My requests (2)' })).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'All' })).toBeInTheDocument();
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Assigned to me (2)' })).toBeInTheDocument());
+  expect(screen.getByRole('button', { name: 'Assigned to me (2)' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'All in program' })).toBeInTheDocument();
 
-  fireEvent.click(screen.getByLabelText('Show set aside'));
-  expect(screen.getByRole('button', { name: 'My requests (3)' })).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'All' })).toBeInTheDocument();
+  fireEvent.click(screen.getByLabelText('Include set-aside requests'));
+  expect(screen.getByRole('button', { name: 'Assigned to me (3)' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'All in program' })).toBeInTheDocument();
 });
 
 test('updates the personal count when a personal request moves into and out of Set Aside', async () => {
@@ -152,18 +152,18 @@ test('updates the personal count when a personal request moves into and out of S
   });
 
   render(<WorkbenchDashboard />);
-  await waitFor(() => expect(screen.getByRole('button', { name: 'My requests (1)' })).toBeInTheDocument());
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Assigned to me (1)' })).toBeInTheDocument());
   await waitFor(() => expect(screen.getByTitle('Set triage status')).toBeInTheDocument());
   fireEvent.change(screen.getByTitle('Set triage status'), { target: { value: 'setAside' } });
-  await waitFor(() => expect(screen.getByRole('button', { name: 'My requests (0)' })).toBeInTheDocument());
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Assigned to me (0)' })).toBeInTheDocument());
 
-  fireEvent.click(screen.getByLabelText('Show set aside'));
-  await waitFor(() => expect(screen.getByRole('button', { name: 'My requests (1)' })).toBeInTheDocument());
+  fireEvent.click(screen.getByLabelText('Include set-aside requests'));
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Assigned to me (1)' })).toBeInTheDocument());
   await waitFor(() => expect(screen.getByTitle('Set triage status')).toBeInTheDocument());
   fireEvent.change(screen.getByTitle('Set triage status'), { target: { value: 'advancing' } });
-  await waitFor(() => expect(screen.getByRole('button', { name: 'My requests (1)' })).toBeInTheDocument());
-  fireEvent.click(screen.getByLabelText('Show set aside'));
-  expect(screen.getByRole('button', { name: 'My requests (1)' })).toBeInTheDocument();
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Assigned to me (1)' })).toBeInTheDocument());
+  fireEvent.click(screen.getByLabelText('Include set-aside requests'));
+  expect(screen.getByRole('button', { name: 'Assigned to me (1)' })).toBeInTheDocument();
 });
 
 test('keeps the personal count transition when set-aside visibility changes during triage', async () => {
@@ -201,19 +201,19 @@ test('keeps the personal count transition when set-aside visibility changes duri
   });
 
   render(<WorkbenchDashboard />);
-  await waitFor(() => expect(screen.getByRole('button', { name: 'My requests (2)' })).toBeInTheDocument());
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Assigned to me (2)' })).toBeInTheDocument());
   await waitFor(() => expect(screen.getByTitle('Set triage status')).toBeInTheDocument());
   fireEvent.change(screen.getByTitle('Set triage status'), { target: { value: 'setAside' } });
   await waitFor(() => expect(triageStarted).toBe(true));
-  fireEvent.click(screen.getByLabelText('Show set aside'));
+  fireEvent.click(screen.getByLabelText('Include set-aside requests'));
 
   await act(async () => {
     triage.resolve(response({ body: { success: true } }));
     await triage.promise;
   });
-  await waitFor(() => expect(screen.getByRole('button', { name: 'My requests (2)' })).toBeInTheDocument());
-  fireEvent.click(screen.getByLabelText('Show set aside'));
-  await waitFor(() => expect(screen.getByRole('button', { name: 'My requests (1)' })).toBeInTheDocument());
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Assigned to me (2)' })).toBeInTheDocument());
+  fireEvent.click(screen.getByLabelText('Include set-aside requests'));
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Assigned to me (1)' })).toBeInTheDocument());
 });
 
 test('does not apply a delayed triage count patch after returning to the original program', async () => {
@@ -269,25 +269,25 @@ test('does not apply a delayed triage count patch after returning to the origina
   });
 
   render(<WorkbenchDashboard />);
-  await waitFor(() => expect(screen.getByRole('button', { name: 'My requests (0)' })).toBeInTheDocument());
-  fireEvent.click(screen.getByLabelText('Show set aside'));
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Assigned to me (0)' })).toBeInTheDocument());
+  fireEvent.click(screen.getByLabelText('Include set-aside requests'));
   await waitFor(() => expect(screen.getByTitle('Set triage status')).toBeInTheDocument());
   fireEvent.change(screen.getByTitle('Set triage status'), { target: { value: 'advancing' } });
   await waitFor(() => expect(triageStarted).toBe(true));
 
-  const mainProgram = () => screen.getAllByLabelText('Grant Program')[0];
+  const mainProgram = () => screen.getByLabelText('Grant program');
   fireEvent.change(mainProgram(), { target: { value: 'p2' } });
   await waitFor(() => expect(mainProgram()).toHaveValue('p2'));
   fireEvent.change(mainProgram(), { target: { value: 'p1' } });
   await waitFor(() => expect(mainProgram()).toHaveValue('p1'));
-  await waitFor(() => expect(screen.getByRole('button', { name: 'My requests (1)' })).toBeInTheDocument());
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Assigned to me (1)' })).toBeInTheDocument());
 
   await act(async () => {
     triage.resolve(response({ body: { success: true } }));
     await triage.promise;
   });
-  await waitFor(() => expect(screen.getByRole('button', { name: 'My requests (1)' })).toBeInTheDocument());
-  expect(screen.queryByRole('button', { name: 'My requests (2)' })).not.toBeInTheDocument();
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Assigned to me (1)' })).toBeInTheDocument());
+  expect(screen.queryByRole('button', { name: 'Assigned to me (2)' })).not.toBeInTheDocument();
 });
 
 test('opens an exact historical Research request through the scoped search', async () => {
