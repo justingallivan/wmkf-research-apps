@@ -265,7 +265,8 @@ is decorative and does not count):
   handoff documentation); `1cb5ecb4` (remote-main drift verification); and
   `fe63ddc8` (ETag-bound regeneration, 412 mapping, unknown-lifecycle DTO
   validity, and concurrency/UI regressions). The implementation and handoff
-  commits are pushed to
+  commits are followed by handoff verification commit `75fc2098` and are pushed
+  to
   `origin/codex/reviewer-release-reason`.
 - Files changed: `lib/services/review-manager/withdraw-sufficient-service.js`,
   `lib/services/reviewer-engagement/withdraw-pending-invitation.js`,
@@ -308,8 +309,8 @@ is decorative and does not count):
   `check:route-service-boundary` + self-test; `check:route-lifecycle-auth` +
   self-test; and `git diff --check` all pass.
 - Open questions / recommendations for the owner: the branch was based on
-  `a3bda092`; unrelated `origin/main` advanced to `936b6a55` during the build,
-  so this branch remains four commits behind `main` by design. The requested
+  `a3bda092`; unrelated `origin/main` advanced to `7e06e4a1` during the build,
+  so this branch remains seven commits behind `main` by design. The requested
   release branch is pushed and ready for review; do not merge it here.
 - P1 history reachability/attribution is resolved within the authorized scope.
   `reviewers-service.js:202-204` retains accepted and review-received rows and
