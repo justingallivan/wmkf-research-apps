@@ -47,7 +47,8 @@ function of the calendar and the cycles that exist — never of the caller's ass
 is visible to them. `lib/utils/cycle-code.js` `resolveWorkingCycle` (earliest meeting on/after today;
 September → D26) and `resolveLastDecidedCycle` (newest meeting before today; September → J26) are
 the only default-cycle rules; `conventionalCycles(today)` supplies the June/December codes to
-the one caller with no list (the grantee-titles cron — an explicit fallback, not existence-aware).
+the callers with no list (the grantee-titles cron and, since S499, the Expertise Finder Batch tab —
+explicit fallbacks, not existence-aware).
 Awardees = last decided; every other Workbench view = working. UTC throughout. The precise
 invariant is PER GRANT PROGRAM: two callers viewing the same program on the same day open on the
 same cycle (the cycle list is program-scoped by the PR #183 owner decision). **Wired (PR #203):**
