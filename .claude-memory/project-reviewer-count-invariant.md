@@ -35,7 +35,7 @@ proof of acceptance.
 - The lifecycle ledger (`wmkf_appreviewersuggestion`) is where accept/decline
   state lives. The current Workbench dashboard/Overview already renders its
   accepted count against `reviewers.needed`
-  (`lib/services/workbench/dashboard-service.js`, `pages/workbench.js`,
+  (`lib/services/workbench/dashboard-service.js`, `shared/components/workbench/RequestListPanel.js`,
   `shared/components/workbench/OverviewTab.js`); preserve that source.
 - Goal-state for "this proposal is good" = 3 acceptances logged in the ledger, not "all 5 slots populated."
 
