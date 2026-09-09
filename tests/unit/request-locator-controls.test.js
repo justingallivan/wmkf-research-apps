@@ -320,5 +320,5 @@ test('the results block is labeled "Request search results"', async () => {
   fireEvent.change(queryInput(), { target: { value: '1002000' } });
   fireEvent.click(screen.getByRole('button', { name: 'Search requests', exact: true }));
   await screen.findByText('A proposal');
-  expect(screen.getByRole('heading', { name: 'Request search results' })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Request search results · Research' })).toBeInTheDocument();
 });

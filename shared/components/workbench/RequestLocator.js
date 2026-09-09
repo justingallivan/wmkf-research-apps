@@ -70,8 +70,12 @@ function ChevronIcon({ open }) {
  * fetch and any restored search never run on a view that never opens it.
  *
  * `programId` seeds the *initial* search program from the shell's resolved
- * Grant Program. If a saved search belongs to a different program, the
- * shell's program wins and the saved criteria/results are not restored — a
+ * Grant Program at mount only — the shell mounts this component only once a
+ * program has resolved, and does not remount it on a later program change,
+ * so the locator deliberately keeps its own program if the shell's changes
+ * while the disclosure stays open (close and reopen the disclosure to
+ * reseed it). If a saved search belongs to a different program than the
+ * seed, the seed wins and the saved criteria/results are not restored — a
  * stale result set from another program would contradict the shell's
  * "Search options do not change the Workbench context" promise. The locator
  * keeps its own Program select (under Search options) so a PD can still
@@ -493,7 +497,7 @@ export function RequestLocator({ programId: initialProgramIdProp = '' }) {
         <Card hover={false} className="mt-3" padding="p-0">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 px-5 py-3">
             <div>
-              <h3 className="text-sm font-semibold text-gray-900">Request search results</h3>
+              <h2 className="text-sm font-semibold text-gray-900">Request search results · {programName}</h2>
               <p className="mt-0.5 text-sm text-gray-600">
                 {outsideProgramRequest ? (
                     <span className="font-semibold text-gray-900">0 {programName} results</span>
@@ -522,9 +526,9 @@ export function RequestLocator({ programId: initialProgramIdProp = '' }) {
             <div className="px-5 py-8 text-center">
               {outsideProgramRequest ? (
                 <>
-                  <h4 className="text-sm font-medium text-gray-800">
+                  <h3 className="text-sm font-medium text-gray-800">
                     Request #{outsideProgramRequest.requestNumber} is valid, but it is outside {programName}.
-                  </h4>
+                  </h3>
                   <p className="mt-1 text-sm text-gray-600">Program: {outsideProgramRequest.program}</p>
                   <p className="mt-1 text-sm text-gray-500">
                     Search for request #{outsideProgramRequest.requestNumber} in AkoyaGO for more details.
@@ -593,5 +597,3 @@ export function RequestLocator({ programId: initialProgramIdProp = '' }) {
     </div>
   );
 }
-
-export default RequestLocator;

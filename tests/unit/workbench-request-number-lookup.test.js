@@ -54,7 +54,7 @@ function deferred() {
 
 function baseResponse(url) {
   if (url === '/api/workbench/dashboard') {
-    return response({ body: { success: true, cycles: [], defaultCycleCode: null } });
+    return response({ body: { success: true, programId: 'program-1', cycles: [], defaultCycleCode: null } });
   }
   if (url === '/api/workbench/search-requests?mode=options'
     || String(url).startsWith('/api/workbench/search-requests?mode=options&')) {
@@ -88,6 +88,7 @@ async function renderReady() {
   render(<WorkbenchDashboard />);
   fireEvent.click(screen.getByRole('button', { name: 'Find and open a request' }));
   await screen.findByLabelText(SEARCH_LABEL);
+  await waitFor(() => expect(screen.queryByText('Loading cycle and status filters…')).not.toBeInTheDocument());
 }
 
 function openSearchOptions() {
@@ -302,7 +303,7 @@ test('the locator search-options fetch does not fire until the disclosure is ope
   expect(global.fetch.mock.calls.some(([url]) => String(url).includes('search-requests'))).toBe(false);
 
   fireEvent.click(screen.getByRole('button', { name: 'Find and open a request' }));
-  await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/workbench/search-requests?mode=options'));
+  await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/workbench/search-requests?mode=options&programId=program-1'));
 });
 
 test('opens an exact historical Research request through the scoped search', async () => {

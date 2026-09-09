@@ -27,7 +27,6 @@ jest.mock('../../shared/components/Layout', () => ({
 }));
 jest.mock('../../shared/components/workbench/RequestLocator', () => ({
   __esModule: true,
-  default: () => null,
   RequestLocator: (props) => <div data-testid="request-locator-mock" data-program-id={props.programId || ''} />,
 }));
 jest.mock('../../shared/components/workbench/ReviewerStatusIndicator', () => ({ __esModule: true, default: () => null }));
@@ -369,4 +368,24 @@ test('opening the locator on a non-Request-list view mounts the body, and it sur
   await waitFor(() => expect(screen.getByRole('link', { name: 'Final writeups' })).toHaveAttribute('aria-current', 'page'));
   expect(screen.getByRole('button', { name: 'Find and open a request' })).toHaveAttribute('aria-expanded', 'true');
   expect(screen.getByTestId('request-locator-mock')).toBeInTheDocument();
+});
+
+test('opening the disclosure before the shell\'s program resolves defers mounting the locator body until it does', async () => {
+  let resolveDashboard;
+  const pending = new Promise((resolve) => { resolveDashboard = resolve; });
+  mockFetch({ '/api/workbench/dashboard': () => pending });
+  render(<WorkbenchShell />);
+
+  const toggle = screen.getByRole('button', { name: 'Find and open a request' });
+  fireEvent.click(toggle);
+  expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  // The seed guard (programId={programId}) would be inert if the body mounted
+  // before the dashboard fetch resolved a program to seed it with.
+  expect(screen.queryByTestId('request-locator-mock')).not.toBeInTheDocument();
+
+  await act(async () => {
+    resolveDashboard(response({ success: true, programs, programId: 'p1', cycles: CYCLES, defaultCycleCode: 'D26' }));
+    await pending;
+  });
+  await waitFor(() => expect(screen.getByTestId('request-locator-mock')).toHaveAttribute('data-program-id', 'p1'));
 });

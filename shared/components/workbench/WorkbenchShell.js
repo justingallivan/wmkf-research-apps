@@ -202,6 +202,7 @@ export function WorkbenchShell({ previewReadOnly = false }) {
       <div className="mb-6">
         <button
           type="button"
+          id="workbench-locator-toggle"
           aria-expanded={locatorOpen}
           aria-controls="workbench-locator-panel"
           onClick={() => setLocatorOpen((open) => !open)}
@@ -213,8 +214,8 @@ export function WorkbenchShell({ previewReadOnly = false }) {
           </svg>
           Find and open a request
         </button>
-        {locatorOpen && (
-          <div id="workbench-locator-panel" className="mt-3">
+        {locatorOpen && programId && (
+          <div id="workbench-locator-panel" role="region" aria-labelledby="workbench-locator-toggle" className="mt-3">
             <p className="mb-3 text-sm text-gray-600">
               Search current and past requests. Search options do not change the Workbench context.
             </p>
