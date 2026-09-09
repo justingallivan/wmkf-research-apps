@@ -261,9 +261,11 @@ is decorative and does not count):
   closure); `7b39352f` (history handoff evidence correction); `3df82bc2`
   (branch-drift record); `36f43a82` (complete prior commit inventory); and
   `98e065d7` (terminal token-regeneration guard, lifecycle projection, and
-  discriminating service/route/UI tests); and `4ac8e722` (token-regeneration
-  handoff documentation). This final handoff update is this commit. All commits
-  are pushed to
+  discriminating service/route/UI tests); `4ac8e722` (token-regeneration
+  handoff documentation); `1cb5ecb4` (remote-main drift verification); and
+  `fe63ddc8` (ETag-bound regeneration, 412 mapping, unknown-lifecycle DTO
+  validity, and concurrency/UI regressions). The implementation and handoff
+  commits are pushed to
   `origin/codex/reviewer-release-reason`.
 - Files changed: `lib/services/review-manager/withdraw-sufficient-service.js`,
   `lib/services/reviewer-engagement/withdraw-pending-invitation.js`,
@@ -293,9 +295,11 @@ is decorative and does not count):
   with 20 tests across 2 suites. The latter retains only the pre-existing React
   `act(...)` warning from the `ReviewerInvitePanel` VIP-load effect. The P1
   service/component/history command passes with 137 tests across 4 suites. The
-  token-regeneration command passes with 69 tests across 4 suites (including the
-  terminal response complement, unknown-state fall-through, revoked no-response
-  route fixture, adapter projection, and UI menu assertions);
+  token-regeneration command passes with 150 tests across 6 suites (including the
+  terminal response complement, unknown-state fall-through, missing-ETag and
+  exact-ifMatch controls, conditional 412 race mapping, revoked no-response
+  route fixture, adapter annotation projection, lifecycle DTO signal, token
+  forwarding, and UI menu assertions);
   `npm run lint`;
   `npm run check:types`;
   `check:api-routes` + self-test; `check:status-enum-parity` + self-test;
