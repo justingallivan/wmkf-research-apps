@@ -66,9 +66,16 @@ sequence.
   `defaultResolvedBy` tests untouched), and the legacy index redirects; the shell now honors an
   unlisted `?cycleCode=` (reverses a PR #204 rule) so cross-view cycle links work; (4) Awardees + Initial assessments
   panels (Initial assessments moves onto the cycle resolver; a D26 deep link
-  renders the existing explanatory card); (5) the approved stragglers: Expertise
-  Finder fiscal-year filter and hard-coded 'December 2025', request-search
-  fiscal-year fallback, client-supplied stored `wmkf_grantcyclecode` preference.
+  renders the existing explanatory card); (5) the approved stragglers, split read-side / write-side: (5a) read-side —
+  **built 2026-09-08 (`claude/cycle-stragglers-read`)**: Expertise Finder's Batch tab
+  opens on the working cycle and `/api/expertise-finder/proposals` takes `cycleCode`
+  (compiled to a `wmkf_meetingdate` range) instead of the `akoya_fiscalyear` string,
+  and request search rejects an unknown cycle label with a 400 instead of falling
+  back to a fiscal-year match; (5b) write-side, **not started**: prefer a
+  server-derived cycle code over the client-supplied stored `wmkf_grantcyclecode`
+  on reviewer suggestions (`my-candidates-service.js` / `save-candidates.js`) —
+  a suggestion-row write-path change, so `/contract-reconcile` first and expect
+  `check:reviewer-engagement-boundary` / `check:script-suggestion-writers` to care.
   **Owner decided 2026-09-08 (yes to the proposal):** Awardees opens on the *last decided*
   cycle while every other view opens on the *working* cycle; with one cycle in
   the URL both cannot hold, so the Awardees panel shows
