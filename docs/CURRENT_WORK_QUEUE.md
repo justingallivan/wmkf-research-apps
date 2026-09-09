@@ -547,6 +547,15 @@ These are valid directions but are not current app-team delivery commitments:
   are buildable on owner go, but final field names and the form work wait on the Justin×Connor
   reconciliation meeting (agenda in the plan §6).
 
+- **Site Visit Materials / applicant additional materials — planning complete, not built.**
+  Codex's plan lives on `origin/codex/applicant-additional-materials` (`b6005273`,
+  `docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md`); no PR opened. Owner decisions are recorded in the
+  plan's §2 and in `.claude-memory/project-site-visit-materials-planning-handoff.md`; the open
+  items (§12: baseline checklist, due offset, file limits after inspecting real decks, external
+  representations, SharePoint depth test in AkoyaGo, go/no-go date, reconcile the July language in
+  `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`) need Justin before Slice 0. First Site Visit is about
+  twenty days from 2026-09-08. Do not touch the Codex worktree or branch without Justin's ask.
+
 ## Parked — do not resurface without a new decision
 
 - Applicant intake product build — parked while WMKF evaluates the GOApply
