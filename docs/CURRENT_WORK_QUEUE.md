@@ -65,7 +65,7 @@ sequence.
   `docs/FINAL_WRITEUPS_DASHBOARD_CYCLE_SCOPING_PLAN.md` reconciled; service and its
   `defaultResolvedBy` tests untouched), and the legacy index redirects; the shell now honors an
   unlisted `?cycleCode=` (reverses a PR #204 rule) so cross-view cycle links work — PR #206; (4) Awardees + Initial assessments
-  panels — **built 2026-09-08 (`claude/workbench-shell-awardees`)**: `AwardeesPanel.js`
+  panels — **built 2026-09-08 in PR #207 (`claude/workbench-shell-awardees`)**: `AwardeesPanel.js`
   applies the owner's Awardees rule below; `InitialAssessmentsPanel.js` takes the shell's
   cycle and a D26 deep link renders the existing explanatory card; the two legacy pages
   redirect; (5) the approved stragglers: Expertise

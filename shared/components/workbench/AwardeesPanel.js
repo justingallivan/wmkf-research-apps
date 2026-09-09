@@ -110,11 +110,14 @@ export default function AwardeesPanel({ cycleCode, loadingCycles, scope, onScope
   // last decided cycle (and how many awardees it holds).
   const [cycleList, setCycleList] = useState(null); // { cycles, lastDecidedCycleCode } | 'error'
   const cycleEmpty = visibleData && !loading && visibleData.awardees.length === 0;
-  const cycleHasNoAwardees = cycleEmpty && (showAll || visibleData.pdResolved === false
+  // An unresolved PD gets only the "could not match" guidance: the cycle may
+  // well have awardees, so the last-decided link would contradict it.
+  const pdUnresolved = cycleEmpty && visibleData.pdResolved === false;
+  const cycleHasNoAwardees = cycleEmpty && !pdUnresolved && (showAll
     ? true
     : cycleList && cycleList !== 'error' && !cycleList.cycles.some((c) => c.code === cycleCode && (c.count ?? 1) > 0));
   useEffect(() => {
-    if (!cycleEmpty || cycleList) return undefined;
+    if (!cycleEmpty || pdUnresolved || cycleList) return undefined;
     let current = true;
     (async () => {
       try {
@@ -161,7 +164,7 @@ export default function AwardeesPanel({ cycleCode, loadingCycles, scope, onScope
 
       {cycleEmpty && (
         <div className="text-sm text-gray-500" role="status">
-          {visibleData.pdResolved === false ? (
+          {pdUnresolved ? (
             <p>Could not match your account to a Program Director — tick “Show all programs” to see the full list.</p>
           ) : cycleHasNoAwardees ? (
             <p>{`No awardees for ${cycleLabel} yet.`}</p>

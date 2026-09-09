@@ -165,6 +165,10 @@ test('PD-unresolved empty state prompts to show all', async () => {
   global.fetch = withCycleList(async () => ({ ok: true, json: async () => ({ cycleCode: 'D25', cycleLabel: 'December 2025', count: 0, awardees: [], scope: 'mine', pdResolved: false, programDirector: null }) }));
   renderPanel();
   await waitFor(() => expect(screen.getByText(/could not match your account/i)).toBeInTheDocument());
+  // Only that guidance: no last-decided link, and the cycle list is not consulted.
+  await act(async () => { await Promise.resolve(); });
+  expect(screen.queryByRole('button', { name: /awardees in/ })).not.toBeInTheDocument();
+  expect(global.fetch.mock.calls.some(([u]) => isCycleList(u))).toBe(false);
 });
 
 test('toggling "Show all programs" hands the shell scope=all and refetches with it', async () => {
