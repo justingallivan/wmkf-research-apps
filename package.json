@@ -122,7 +122,7 @@
     "brace-expansion-upstream": "npm:brace-expansion@5.0.9",
     "busboy": "^1.6.0",
     "cors": "^2.8.6",
-    "csv-parse": "^6.2.1",
+    "csv-parse": "^7.0.2",
     "docx": "^9.7.1",
     "dompurify": "^3.4.13",
     "exceljs": "^4.4.0",
