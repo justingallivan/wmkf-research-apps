@@ -36,7 +36,6 @@ export default async function handler(req, res) {
     proposalTitle,
     programArea,
     requestId,
-    grantCycleCode,
     candidates,
   } = req.body;
 
@@ -55,7 +54,6 @@ export default async function handler(req, res) {
         proposalTitle,
         programArea,
         requestId,
-        grantCycleCode,
         candidates,
         actingUserSystemId,
       });

@@ -20,7 +20,7 @@ Do:
 - Verify callers (e.g. `my-proposals.js`, `reviewer-suggestion.js findByPD`) before relying on existing cycle filters.
 
 Do not:
-- Expose `akoya_fiscalyear` as a separate filter axis (it's just month+year of `wmkf_meetingdate`). The last two runtime readers that did — Expertise Finder's proposals query and request search's unknown-label fallback — were moved onto `cycleCodeToOdataFilter` / a 400 on 2026-09-08 (S499).
+- Expose `akoya_fiscalyear` as a separate filter axis (it's just month+year of `wmkf_meetingdate`). The last two runtime readers that did — Expertise Finder's proposals query and request search's unknown-label fallback — were moved onto `cycleCodeToOdataFilter` / a 400 on 2026-09-08 (S499). The one write path that stored a client-supplied cycle code on suggestion rows (`save-candidates`) now derives it from the request's meeting date (same day).
 - Treat `Jxx`/`Dxx` as a schema invariant — it's a June/Dec convention; non-June/Dec months return null and vanish from cycle-grouped views.
 - Conflate `wmkf_meetingdate` (board-cycle) with `akoya_decisiondate` (approval-stamp/business-history axis).
 

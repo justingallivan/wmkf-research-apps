@@ -73,11 +73,14 @@ sequence.
   opens on the working cycle and `/api/expertise-finder/proposals` takes `cycleCode`
   (compiled to a `wmkf_meetingdate` range) instead of the `akoya_fiscalyear` string,
   and request search rejects an unknown cycle label with a 400 instead of falling
-  back to a fiscal-year match; (5b) write-side, **not started**: prefer a
-  server-derived cycle code over the client-supplied stored `wmkf_grantcyclecode`
-  on reviewer suggestions (`my-candidates-service.js` / `save-candidates.js`) —
-  a suggestion-row write-path change, so `/contract-reconcile` first and expect
-  `check:reviewer-engagement-boundary` / `check:script-suggestion-writers` to care.
+  back to a fiscal-year match; (5b) write-side — **built 2026-09-08
+  (`claude/cycle-stragglers-write`)**: `save-candidates` stamps `wmkf_grantcyclecode`
+  from the request's meeting date (`loadCoiContext.cycleCode`) and no longer reads
+  it from the body (the Find panel stopped sending it), and `my-candidates` shows
+  the meeting-date-derived code first, using the stored value only for a request
+  with no meeting date. Not done: rows stamped by an earlier stale page value stay
+  filed under that code in the by-cycle My Candidates list until re-saved (a data
+  question for the owner; no probe run).
   **Owner decided 2026-09-08 (yes to the proposal):** Awardees opens on the *last decided*
   cycle while every other view opens on the *working* cycle; with one cycle in
   the URL both cannot hold, so the Awardees panel shows

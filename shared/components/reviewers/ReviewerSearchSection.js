@@ -28,7 +28,6 @@
  *   - requestId             : akoya_request GUID (save target)
  *   - blobUrl               : proposal blob URL from load-proposal (required to search)
  *   - proposalKey           : stable SharePoint file key (`library::folder::name`) for applicant-enrichment cache
- *   - cycleCode             : grant cycle code (persisted with saved candidates)
  *   - excludedNames         : string[] of applicant-excluded names (prefills the editable box)
  *   - exclusionsUnavailable : true when ingestion failed to produce the exclude list
  *   - excludedRaw           : the applicant's original free-text exclusion field (shown as a disclosure under the box)
@@ -1273,7 +1272,6 @@ export default function ReviewerSearchSection({
   requestId,
   blobUrl,
   proposalKey = null,
-  cycleCode,
   excludedNames = [],
   exclusionsUnavailable = false,
   excludedRaw = null,
@@ -2540,7 +2538,6 @@ export default function ReviewerSearchSection({
               requestId,
               proposalTitle: analysis?.proposalInfo?.title || null,
               programArea: analysis?.proposalInfo?.programArea || null,
-              grantCycleCode: cycleCode || null,
               candidates: toSave,
             }),
           });
@@ -2946,7 +2943,6 @@ export default function ReviewerSearchSection({
     selected,
     requestId,
     analysis,
-    cycleCode,
     onSaved,
     pushProgress,
     refreshExpiredVerification,
