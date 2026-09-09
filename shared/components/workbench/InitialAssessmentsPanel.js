@@ -1,19 +1,14 @@
 /**
  * Initial assessments panel — cycle-wide governed artifact visibility, mounted
- * inside the Request Workbench shell, which owns the cycle.
- *
- * Initial Assessments are not part of the D26 dual-phase workflow (owner
- * decision 2026-09-05): for D26 the panel renders the explanatory card and
- * calls no API. The views nav hides this view for D26, so this card is what a
- * deep link to it shows.
+ * inside the Request Workbench shell, which owns the cycle. Lists every
+ * Initial Assessment (the pre-site draft writeup) in the cycle with its
+ * operation and lifecycle state, linking to the per-request tab.
  */
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Card } from '../Layout';
 import ArtifactFileMetadata from './ArtifactFileMetadata';
-
-export const INITIAL_ASSESSMENTS_EXCLUDED_CYCLE = 'D26';
 
 export default function InitialAssessmentsPanel({ cycleCode, loadingCycles }) {
   const [artifacts, setArtifacts] = useState([]);
@@ -22,7 +17,7 @@ export default function InitialAssessmentsPanel({ cycleCode, loadingCycles }) {
   const requestSequence = useRef(0);
 
   useEffect(() => {
-    if (!cycleCode || cycleCode === INITIAL_ASSESSMENTS_EXCLUDED_CYCLE) {
+    if (!cycleCode) {
       requestSequence.current += 1;
       setArtifacts([]);
       setError(null);
@@ -62,12 +57,7 @@ export default function InitialAssessmentsPanel({ cycleCode, loadingCycles }) {
           {error}
         </div>
       )}
-      {cycleCode === INITIAL_ASSESSMENTS_EXCLUDED_CYCLE ? (
-        <Card hover={false}>
-          <p className="font-medium text-gray-900">Initial assessments are not part of the D26 dual-phase workflow.</p>
-          <p className="mt-1 text-sm text-gray-500">This workspace becomes available for J27, where every complete single-submission proposal receives an Initial Assessment before advancement.</p>
-        </Card>
-      ) : loadingCycles || loading ? (
+      {loadingCycles || loading ? (
         <Card hover={false}><p className="text-gray-500">Loading artifacts…</p></Card>
       ) : artifacts.length === 0 ? (
         <Card hover={false}><p className="text-gray-500">No Initial Assessments for this cycle.</p></Card>
