@@ -13,10 +13,10 @@ metadata:
 ## Recall Rule
 
 Read this when: any work touches Site Visit materials, applicant additional materials, the
-external briefing room, or `docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md`.
+external briefing room, or `docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md`. <!-- doc-symbol-refs:ignore reason=on-codex-branch-not-main -->
 
 Do:
-- Start from the plan on `origin/codex/applicant-additional-materials` (commits `3f0d497c` plan, `b6005273` Site Visit alignment); read it with `git show origin/codex/applicant-additional-materials:docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md`.
+- Start from the plan on `origin/codex/applicant-additional-materials` (commits `3f0d497c` plan, `b6005273` Site Visit alignment); read it with `git show origin/codex/applicant-additional-materials:docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md`, and the brief with `git show origin/codex/applicant-additional-materials:docs/plans/CODEX_BRIEF_APPLICANT_ADDITIONAL_MATERIALS_2026-09-08.md`. <!-- doc-symbol-refs:ignore reason=on-codex-branch-not-main -->
 - Treat §2 of that plan as decided owner contract and §12 as the open items; re-confirm §12 with Justin before building.
 - Leave the Codex worktree `../WMKF_Apps-codex` and its branch alone unless Justin asks (no checkout, merge, wind-down).
 
@@ -26,7 +26,7 @@ Do not:
 
 ## Handoff (2026-09-08, owner message to Claude)
 
-Codex completed the planning work in `../WMKF_Apps-codex` on `codex/applicant-additional-materials`; committed and pushed, clean tree, no PR. Claude owns continuity only. Canonical artifacts on the branch (not yet on main, so read them via `git show origin/codex/applicant-additional-materials:<path>`): the plan (`origin/codex/applicant-additional-materials:docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md`; Site Visit Materials is the defining workflow, later additional-material requests reuse the same capability), the brief (`origin/codex/applicant-additional-materials:docs/plans/CODEX_BRIEF_APPLICANT_ADDITIONAL_MATERIALS_2026-09-08.md`), and a regenerated `docs/DOCS_CATALOG.md`. Codex verified docs-catalog, doc-symbol-refs, fact-consistency, build-claim-freshness, agent-invariants green on the branch.
+Codex completed the planning work in `../WMKF_Apps-codex` on `codex/applicant-additional-materials`; committed and pushed, clean tree, no PR. Claude owns continuity only. Canonical artifacts on the branch, not yet on main: the plan and the brief named in the Recall Rule above (Site Visit Materials is the defining workflow; later additional-material requests reuse the same capability), plus a regenerated docs catalog. Codex verified docs-catalog, doc-symbol-refs, fact-consistency, build-claim-freshness, agent-invariants green on the branch.
 
 **Owner decisions (plan §2):** a PC manually starts collection for an already scheduled Site Visit (scheduling later); minimum set = applicant PDF presentation + source presentation (PPTX/Keynote) + participant bios; PC may add/waive/mark optional, applicants may add bounded other materials; PI and liaison share one forwardable contributor link (uploader identity not proven); PC owns follow-up, render sanity check, publication, PD has visibility; PDF and source advance independently with prior SharePoint versions kept and a soft out-of-sync warning; materials due ~3 days before the visit; contributor and briefing access close 7 days after; first release includes collection AND an external briefing room (selected applicant materials, exact Pre-Site Writeup version, selected peer reviews) behind one shared expiring read-only link for Board/consultants/staff without app login; point at canonical SharePoint items and exact versions, no audience copies; internal names request-numbered, external labels institution-led without request numbers; email/Dropbox is the first-cycle fallback; scheduling and Datto retirement deferred. First Site Visit ~20 days from 2026-09-08.
 
