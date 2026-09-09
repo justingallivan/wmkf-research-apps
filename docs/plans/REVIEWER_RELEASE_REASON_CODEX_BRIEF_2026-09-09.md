@@ -261,8 +261,9 @@ is decorative and does not count):
   closure); `7b39352f` (history handoff evidence correction); `3df82bc2`
   (branch-drift record); `36f43a82` (complete prior commit inventory); and
   `98e065d7` (terminal token-regeneration guard, lifecycle projection, and
-  discriminating service/route/UI tests). This final handoff update is this
-  commit. All commits are pushed to
+  discriminating service/route/UI tests); and `4ac8e722` (token-regeneration
+  handoff documentation). This final handoff update is this commit. All commits
+  are pushed to
   `origin/codex/reviewer-release-reason`.
 - Files changed: `lib/services/review-manager/withdraw-sufficient-service.js`,
   `lib/services/reviewer-engagement/withdraw-pending-invitation.js`,
@@ -303,8 +304,8 @@ is decorative and does not count):
   `check:route-service-boundary` + self-test; `check:route-lifecycle-auth` +
   self-test; and `git diff --check` all pass.
 - Open questions / recommendations for the owner: the branch was based on
-  `a3bda092`; unrelated `origin/main` advanced to `c5f04ecb` during the build,
-  so this branch remains two commits behind `main` by design. The requested
+  `a3bda092`; unrelated `origin/main` advanced to `936b6a55` during the build,
+  so this branch remains four commits behind `main` by design. The requested
   release branch is pushed and ready for review; do not merge it here.
 - P1 history reachability/attribution is resolved within the authorized scope.
   `reviewers-service.js:202-204` retains accepted and review-received rows and
