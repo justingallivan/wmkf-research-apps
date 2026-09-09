@@ -46,6 +46,7 @@ describe('reviewer management actions menu', () => {
     expect(screen.getByText('Use only to fix the recorded stage. No email is sent.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Record reviewer withdrawal' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Release from assignment' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Regenerate link & copy' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Revoke link' })).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText('Correct status for Dr. Test Reviewer'), {
@@ -110,6 +111,27 @@ describe('reviewer management actions menu', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Revoke link' }));
     expect(onRevoke).toHaveBeenCalledTimes(1);
+  });
+
+  test.each([
+    ['unknown response type', { responseType: 'unknown', reviewStatus: 'accepted' }],
+    ['unknown review status', { responseType: 'accepted', reviewStatus: 'unknown' }],
+  ])('unknown lifecycle %s cannot regenerate a revoked row', (_label, lifecycle) => {
+    render(
+      <TokenActionsMenu
+        reviewer={{
+          ...reviewer,
+          ...lifecycle,
+          tokenState: 'revoked',
+          lifecycleValid: false,
+        }}
+        onRegenerate={jest.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Manage Dr. Test Reviewer' }));
+
+    expect(screen.queryByRole('button', { name: 'Regenerate link & copy' })).not.toBeInTheDocument();
   });
 });
 

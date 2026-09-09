@@ -63,6 +63,12 @@ export default async function handler(req, res) {
       const result = await regenerateToken({ suggestionId, actingUserSystemId });
       return res.status(200).json(result);
     } catch (error) {
+      // A lifecycle transition can win between the guarded read and the
+      // conditional token write. Keep that optimistic-concurrency conflict
+      // on the stable eligibility envelope; never expose transport details.
+      if (error?.status === 412) {
+        return res.status(409).json({ ok: false, reason: 'not_eligible' });
+      }
       if (error instanceof ServiceHttpError) {
         return res.status(error.httpStatus).json(error.body ?? { error: error.message });
       }

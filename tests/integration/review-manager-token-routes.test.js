@@ -100,6 +100,7 @@ describe('/api/review-manager/regenerate-token', () => {
       return {
         wmkf_appreviewersuggestionid: SUGGESTION_ID,
         _wmkf_request_value: REQUEST_ID,
+        _etag: 'W/"route-1"',
         wmkf_accepted: true,
         wmkf_reviewduedateoverride: null,
       };
@@ -136,6 +137,7 @@ describe('/api/review-manager/regenerate-token', () => {
       requestId: REQUEST_ID,
       expiresAt,
       actingUserSystemId: null,
+      ifMatch: 'W/"route-1"',
     });
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.json).toHaveBeenCalledWith({
@@ -157,7 +159,7 @@ describe('/api/review-manager/regenerate-token', () => {
   it('does not touch the saved draft while issuing a replacement token', async () => {
     mockAuthenticatedUser(2, ['review-manager']);
     DynamicsService.getRecord.mockResolvedValue({
-      wmkf_appreviewersuggestionid: SUGGESTION_ID, _wmkf_request_value: REQUEST_ID,
+      wmkf_appreviewersuggestionid: SUGGESTION_ID, _wmkf_request_value: REQUEST_ID, _etag: 'W/"route-2"',
     });
     mintAndStore.mockResolvedValue({ url: 'https://app.example/x', expiresAt: new Date(Date.now() + 60_000), jti: 'j' });
 
@@ -176,6 +178,7 @@ describe('/api/review-manager/regenerate-token', () => {
       return {
         wmkf_appreviewersuggestionid: SUGGESTION_ID,
         _wmkf_request_value: REQUEST_ID,
+        _etag: 'W/"route-3"',
         wmkf_accepted: true,
       };
     });
@@ -202,6 +205,7 @@ describe('/api/review-manager/regenerate-token', () => {
     DynamicsService.getRecord.mockResolvedValue({
       wmkf_appreviewersuggestionid: SUGGESTION_ID,
       _wmkf_request_value: REQUEST_ID,
+      _etag: 'W/"route-4"',
       wmkf_applicantdisposition: null,
     });
     const expiresAt = new Date(Date.now() + 60_000);
@@ -222,6 +226,7 @@ describe('/api/review-manager/regenerate-token', () => {
     DynamicsService.getRecord.mockResolvedValue({
       wmkf_appreviewersuggestionid: SUGGESTION_ID,
       _wmkf_request_value: REQUEST_ID,
+      _etag: 'W/"route-5"',
       wmkf_applicantdisposition: 100000001,
     });
 
@@ -254,6 +259,30 @@ describe('/api/review-manager/regenerate-token', () => {
     expect(res.json).toHaveBeenCalledWith({ ok: false, reason: 'not_eligible' });
     expect(DynamicsService.getRecord).toHaveBeenCalledTimes(1);
     expect(mintAndStore).not.toHaveBeenCalled();
+  });
+
+  it('maps a conditional token-write race to stable not_eligible without leaking the 412', async () => {
+    mockAuthenticatedUser(2, ['review-manager']);
+    DynamicsService.getRecord.mockImplementation(async (entitySet) => {
+      if (entitySet === 'akoya_requests') return { wmkf_reviewduedate: REQUEST_DUE };
+      return {
+        wmkf_appreviewersuggestionid: SUGGESTION_ID,
+        _wmkf_request_value: REQUEST_ID,
+        _etag: 'W/"race-1"',
+        wmkf_accepted: true,
+      };
+    });
+    const conflict = Object.assign(new Error('Dataverse If-Match failed for released row'), { status: 412 });
+    mintAndStore.mockRejectedValueOnce(conflict);
+
+    const req = createMockReq({ method: 'POST', body: { suggestionId: SUGGESTION_ID } });
+    const res = createMockRes();
+
+    await handler(req, res);
+
+    expect(mintAndStore).toHaveBeenCalledWith(expect.objectContaining({ ifMatch: 'W/"race-1"' }));
+    expect(res.status).toHaveBeenCalledWith(409);
+    expect(res.json).toHaveBeenCalledWith({ ok: false, reason: 'not_eligible' });
   });
 
   it('rejects a non-GUID suggestionId with 400 before any Dataverse lookup', async () => {

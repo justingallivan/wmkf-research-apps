@@ -382,6 +382,41 @@ describe('getReviewers', () => {
     expect(out.proposals[0].statusSummary).toEqual({ materials_sent: 1, released: 1, review_received: 1 });
   });
 
+  test('preserves an invalid lifecycle signal for unknown response and review-status options', async () => {
+    getRequestById.mockResolvedValueOnce({
+      akoya_requestid: REQ,
+      _wmkf_grantprogram_value: '11111111-1111-4111-8111-111111111111',
+      akoya_requestnum: 'R-1001',
+      akoya_title: 'T',
+      wmkf_reviewduedate: '2026-09-09',
+    });
+    findByRequest.mockResolvedValueOnce([
+      {
+        wmkf_appreviewersuggestionid: IDS[0],
+        _wmkf_request_value: REQ,
+        _wmkf_potentialreviewer_value: 'person-1',
+        wmkf_accepted: true,
+        wmkf_responsetype: 999999998,
+        wmkf_reviewstatus: REVIEW_STATUS_MAP.materials_sent,
+      },
+      {
+        wmkf_appreviewersuggestionid: IDS[1],
+        _wmkf_request_value: REQ,
+        _wmkf_potentialreviewer_value: 'person-2',
+        wmkf_accepted: true,
+        wmkf_responsetype: 100000000,
+        wmkf_reviewstatus: 999999997,
+      },
+    ]);
+
+    const out = await getReviewers({ proposalId: REQ, azureEmail: 'pd@wmkeck.org' });
+    const rows = out.proposals[0].reviewers;
+
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toMatchObject({ responseType: null, reviewStatus: 'materials_sent', lifecycleValid: false });
+    expect(rows[1]).toMatchObject({ responseType: 'accepted', reviewStatus: 'accepted', lifecycleValid: false });
+  });
+
   test('unavailable synthesis dependency preserves reviewer DTO and returns the logged fallback without SQL or network', async () => {
     getRequestById.mockResolvedValueOnce({
       akoya_requestid: REQ, _wmkf_grantprogram_value: '11111111-1111-4111-8111-111111111111', akoya_requestnum: 'R-1001', akoya_title: 'T',

@@ -20,6 +20,7 @@ describe('getForTokenRegeneration', () => {
       wmkf_appreviewersuggestionid: SUGGESTION_ID,
       _wmkf_request_value: REQUEST_ID,
       wmkf_applicantdisposition: null,
+      _etag: 'W/"etag-1"',
     });
 
     const row = await getForTokenRegeneration(SUGGESTION_ID);
@@ -28,6 +29,7 @@ describe('getForTokenRegeneration', () => {
       select: 'wmkf_appreviewersuggestionid,_wmkf_request_value,wmkf_applicantdisposition,wmkf_accepted,wmkf_reviewduedateoverride,wmkf_responsetype,wmkf_reviewstatus',
     });
     expect(row._wmkf_request_value).toBe(REQUEST_ID);
+    expect(row._etag).toBe('W/"etag-1"');
   });
 
   it('propagates a 404 error unchanged', async () => {

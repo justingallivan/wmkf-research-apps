@@ -78,7 +78,9 @@ export function TokenActionsMenu({
   const isActive = reviewer.tokenState === 'active';
   const hasInvalidTokenMetadata = reviewer.tokenState === 'invalid';
   const hasTerminalResponse = TERMINAL_RESPONSE_TYPES.has(reviewer.responseType);
+  const hasUnknownLifecycle = reviewer.lifecycleValid === false;
   const canRegenerate = !hasInvalidTokenMetadata
+    && !hasUnknownLifecycle
     && !hasTerminalResponse
     && !TERMINAL_REVIEW_STATUSES.includes(reviewer.reviewStatus);
   const canRevoke = isActive || hasInvalidTokenMetadata;
