@@ -1,5 +1,9 @@
 /**
  * API: GET /api/workbench/grantee-deliverables/awardees?cycleCode=J26
+ *      GET /api/workbench/grantee-deliverables/awardees  (no cycleCode →
+ *      cycle-list mode: { cycles, defaultCycleCode, lastDecidedCycleCode,
+ *      uncycledCount } over the same eligibility population; owner decision
+ *      2026-09-08 — the page's default cycle comes from here, never a calendar)
  *
  * Lists the research AWARDEES for a board cycle so staff can drive the grantee
  * deliverables workflow without hunting for request GUIDs. Scope (S271):
@@ -21,7 +25,7 @@ import { withDalContext } from '../../../../lib/dataverse/core/context';
 import { cycleCodeToOdataFilter } from '../../../../lib/utils/cycle-code';
 import { GRANTEE_RESEARCH_PROGRAM_IDS } from '../../../../shared/config/granteeResearchPrograms';
 import { ServiceHttpError } from '../../../../lib/services/service-http-error';
-import { listGranteeAwardees } from '../../../../lib/services/workbench/grantee-deliverables/awardees-service';
+import { listGranteeAwardees, listGranteeAwardeeCycles } from '../../../../lib/services/workbench/grantee-deliverables/awardees-service';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -33,8 +37,9 @@ export default async function handler(req, res) {
   if (!access) return;
 
   const cycleCode = typeof req.query?.cycleCode === 'string' ? req.query.cycleCode.trim() : '';
-  const cycleFilter = cycleCodeToOdataFilter(cycleCode, 'wmkf_meetingdate');
-  if (!cycleFilter) {
+  const cycleListMode = cycleCode === '';
+  const cycleFilter = cycleListMode ? null : cycleCodeToOdataFilter(cycleCode, 'wmkf_meetingdate');
+  if (!cycleListMode && !cycleFilter) {
     return res.status(400).json({ error: 'cycleCode must be a valid cycle (e.g. J26 or D26)' });
   }
   if (!GRANTEE_RESEARCH_PROGRAM_IDS.length) {
@@ -46,7 +51,9 @@ export default async function handler(req, res) {
 
   return withDalContext('grantee-awardees', async () => {
     try {
-      const body = await listGranteeAwardees({ cycleCode, showAll, azureEmail });
+      const body = cycleListMode
+        ? await listGranteeAwardeeCycles()
+        : await listGranteeAwardees({ cycleCode, showAll, azureEmail });
       return res.status(200).json(body);
     } catch (error) {
       if (error instanceof ServiceHttpError) {

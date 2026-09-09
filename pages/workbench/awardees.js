@@ -12,22 +12,22 @@ import Layout, { Card, PageHeader } from '../../shared/components/Layout';
 import RequireAppAccess from '../../shared/components/RequireAppAccess';
 import WorkbenchViewsNav from '../../shared/components/workbench/WorkbenchViewsNav';
 
-// Board meets June (J) and December (D); default to the most recent meeting.
-function currentCycleCode() {
-  const d = new Date();
-  const yy = String(d.getFullYear()).slice(-2);
-  const m = d.getMonth(); // 0 = Jan
-  if (m >= 5 && m < 11) return `J${yy}`;                       // Jun–Nov → June cycle
-  if (m >= 11) return `D${yy}`;                                 // Dec → Dec cycle
-  return `D${String(d.getFullYear() - 1).slice(-2)}`;          // Jan–May → prior Dec cycle
-}
+// Awardees open on the last DECIDED cycle (owner decision 2026-09-08); the
+// Workbench's working cycle is the upcoming one. The default comes from the
+// awardees endpoint's own cycle-list mode (`lastDecidedCycleCode`), computed
+// over the exact population the row query uses, never from a synthetic
+// calendar or a differently scoped list. A `?cycleCode=` deep link wins, and
+// a manual selection made while the default is still resolving wins too.
+const CYCLE_RE = /^[JD]\d{2}$/;
 
 const contextKey = (code, all) => `${code}:${all ? 'all' : 'mine'}`;
 
 function AwardeesList() {
   const router = useRouter();
-  const [cycleCode, setCycleCode] = useState(currentCycleCode());
-  const [input, setInput] = useState(currentCycleCode());
+  const [cycleCode, setCycleCode] = useState('');
+  const [input, setInput] = useState('');
+  // 'loading' | 'ready' | 'none' (no decided cycle has requests yet) | 'error'
+  const [cycleDefault, setCycleDefault] = useState('loading');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -39,19 +39,50 @@ function AwardeesList() {
   const [errorContextVersion, setErrorContextVersion] = useState(null);
   const [selectionVersion, setSelectionVersion] = useState(0);
 
-  // Honor a ?cycleCode= deep link (e.g. the workbench "View awardees" link) once
-  // the router is ready; falls back to the current-cycle default otherwise.
+  // Resolve the initial cycle once the router is ready: a valid ?cycleCode=
+  // deep link (e.g. the workbench "View awardees" link) wins; otherwise the
+  // live list's last decided cycle. A superseded resolution never lands.
+  // Bumped by any explicit selection so a late default cannot replace it.
+  const manualSelectionRef = useRef(0);
+  const resolveDefaultCycle = useCallback(async (deepLink, isCurrent) => {
+    setCycleDefault('loading');
+    if (deepLink) {
+      if (!isCurrent()) return;
+      setSelectionVersion((version) => version + 1);
+      setCycleCode(deepLink);
+      setInput(deepLink);
+      setCycleDefault('ready');
+      return;
+    }
+    try {
+      // An explicit selection (before or during this read) always wins.
+      if (manualSelectionRef.current) return;
+      const res = await fetch('/api/workbench/grantee-deliverables/awardees');
+      const body = await res.json().catch(() => ({}));
+      if (!isCurrent() || manualSelectionRef.current) return;
+      if (!res.ok) throw new Error(body?.error || 'cycle list failed');
+      const code = typeof body.lastDecidedCycleCode === 'string' && CYCLE_RE.test(body.lastDecidedCycleCode)
+        ? body.lastDecidedCycleCode
+        : '';
+      if (!code) { setCycleDefault('none'); return; }
+      setSelectionVersion((version) => version + 1);
+      setCycleCode(code);
+      setInput(code);
+      setCycleDefault('ready');
+    } catch {
+      if (isCurrent()) setCycleDefault('error');
+    }
+  }, []);
+
+  const [defaultAttempt, setDefaultAttempt] = useState(0);
   useEffect(() => {
     if (!router.isReady) return;
     const q = typeof router.query.cycleCode === 'string' ? router.query.cycleCode.trim().toUpperCase() : '';
-    if (!q || !/^[JD]\d{2}$/.test(q)) return;
-    const timer = window.setTimeout(() => {
-      setSelectionVersion((version) => version + 1);
-      setCycleCode(q);
-      setInput(q);
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, [router.isReady, router.query.cycleCode]);
+    const deepLink = q && CYCLE_RE.test(q) ? q : '';
+    let current = true;
+    const timer = window.setTimeout(() => { void resolveDefaultCycle(deepLink, () => current); }, 0);
+    return () => { current = false; window.clearTimeout(timer); };
+  }, [router.isReady, router.query.cycleCode, resolveDefaultCycle, defaultAttempt]);
 
   const load = useCallback(async (code, all, request) => {
     const ownsRequest = () => activeRequestRef.current === request;
@@ -99,6 +130,7 @@ function AwardeesList() {
   }, []);
 
   useEffect(() => {
+    if (!cycleCode) return undefined;
     const controller = new AbortController();
     const request = { controller, version: selectionVersion };
     activeRequestRef.current = request;
@@ -133,6 +165,8 @@ function AwardeesList() {
           className="flex items-center gap-2 mb-4"
           onSubmit={(e) => {
             e.preventDefault();
+            manualSelectionRef.current += 1;
+            setCycleDefault('ready');
             setSelectionVersion((version) => version + 1);
             setCycleCode(input.trim().toUpperCase());
           }}
@@ -164,6 +198,16 @@ function AwardeesList() {
           )}
         </form>
 
+        {cycleDefault === 'loading' && !cycleCode && <p className="text-sm text-gray-500">Finding the last decided cycle…</p>}
+        {cycleDefault === 'none' && !cycleCode && (
+          <p className="text-sm text-gray-500">No decided cycle has requests yet. Enter a cycle code above to look one up.</p>
+        )}
+        {cycleDefault === 'error' && !cycleCode && (
+          <p role="alert" className="text-sm text-red-700">
+            Could not determine the current cycle.{' '}
+            <button type="button" className="underline" onClick={() => setDefaultAttempt((n) => n + 1)}>Try again</button>
+          </p>
+        )}
         {loading && <p className="text-sm text-gray-500">Loading…</p>}
         {visibleError && <p role="alert" className="text-sm text-red-700">{visibleError}</p>}
 

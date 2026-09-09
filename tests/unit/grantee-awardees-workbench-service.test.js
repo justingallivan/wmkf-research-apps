@@ -22,7 +22,7 @@ jest.mock('../../lib/services/grantee-deliverable-record', () => ({
   getDeliverableForRequest: (...a) => getDeliverableForRequest(...a),
 }));
 
-import { listGranteeAwardees } from '../../lib/services/workbench/grantee-deliverables/awardees-service';
+import { listGranteeAwardees, listGranteeAwardeeCycles } from '../../lib/services/workbench/grantee-deliverables/awardees-service';
 import { GRANTEE_DELIVERABLE_STATUS } from '../../shared/config/granteeDeliverableStatus';
 
 beforeEach(() => {
@@ -138,4 +138,44 @@ test.each([
   await expect(listGranteeAwardees({ cycleCode: 'J26', showAll: true, azureEmail: null }))
     .rejects.toMatchObject({ httpStatus: 503, body: { cycleCode: 'J26' } });
   expect(getDeliverableForRequest).not.toHaveBeenCalled();
+});
+
+test('cycle-list mode groups the eligibility population by meeting-date cycle and resolves calendar defaults from it', async () => {
+  queryAllRequests.mockResolvedValue({ records: [
+    { akoya_requestid: 'a', wmkf_meetingdate: '2026-12-11' },
+    { akoya_requestid: 'b', wmkf_meetingdate: '2026-06-04' },
+    { akoya_requestid: 'c', wmkf_meetingdate: '2026-06-04' },
+    { akoya_requestid: 'd', wmkf_meetingdate: '2026-03-15' }, // off-month: counted, never coded
+  ], capped: false });
+  const body = await listGranteeAwardeeCycles({ today: new Date('2026-09-08T12:00:00Z') });
+  const { filter } = queryAllRequests.mock.calls[0][0];
+  // Same population as the row query: Active + PI present + research programs; no cycle window, no PD clause.
+  expect(filter).toContain("akoya_requeststatus eq 'Active'");
+  expect(filter).toContain('_wmkf_projectleader_value ne null');
+  expect(filter).toContain('_akoya_programid_value eq');
+  expect(filter).not.toContain('_wmkf_programdirector_value');
+  expect(filter).not.toContain('wmkf_meetingdate ge');
+  expect(body).toEqual({
+    cycles: [
+      { code: 'D26', label: 'December 2026', meetingDate: '2026-12-11', count: 1 },
+      { code: 'J26', label: 'June 2026', meetingDate: '2026-06-04', count: 2 },
+    ],
+    defaultCycleCode: 'D26',
+    lastDecidedCycleCode: 'J26',
+    uncycledCount: 1,
+  });
+});
+
+test('cycle-list mode fails closed with a typed 503 on a capped scan', async () => {
+  queryAllRequests.mockResolvedValue({ records: [], capped: true });
+  await expect(listGranteeAwardeeCycles()).rejects.toMatchObject({ httpStatus: 503 });
+});
+
+test('the cycle-list predicate and the row predicate share the eligibility clause verbatim', async () => {
+  queryAllRequests.mockResolvedValue({ records: [], capped: false });
+  await listGranteeAwardeeCycles();
+  await listGranteeAwardees({ cycleCode: 'J26', showAll: true, azureEmail: null });
+  const [cycleFilter, rowFilter] = queryAllRequests.mock.calls.map(([a]) => a.filter);
+  const eligibility = cycleFilter.replace('wmkf_meetingdate ne null and ', '');
+  expect(rowFilter).toContain(eligibility);
 });

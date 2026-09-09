@@ -34,6 +34,18 @@ import AwardeesPage from '../../pages/workbench/awardees';
 beforeEach(() => { mockRouter = { isReady: true, query: {} }; });
 afterEach(() => { if (global.fetch?.mockRestore) global.fetch.mockRestore(); });
 
+// Live cycle list the page consults for its default (last decided cycle).
+const DASHBOARD = {
+  cycles: [{ code: 'D26', meetingDate: '2026-12-11' }, { code: 'J26', meetingDate: '2026-06-04' }],
+  defaultCycleCode: 'D26',
+  lastDecidedCycleCode: 'J26',
+};
+const isDashboard = (url) => String(url) === '/api/workbench/grantee-deliverables/awardees';
+// Answers the cycle-list call immediately; every other URL goes to `fn`.
+const withDashboard = (fn, dashboard = DASHBOARD) => jest.fn((url, options) => (
+  isDashboard(url) ? Promise.resolve(response(dashboard)) : fn(url, options)
+));
+
 function deferred() {
   let resolve;
   let reject;
@@ -84,7 +96,7 @@ function awardee(title, requestId = title.toLowerCase()) {
 }
 
 test('renders the awardee rows with PI/liaison and an Open link to each Awardee tab', async () => {
-  global.fetch = jest.fn(async () => ({
+  global.fetch = withDashboard(async () => ({
     ok: true,
     json: async () => ({
       cycleCode: 'J26', cycleLabel: 'June 2026', count: 2,
@@ -109,7 +121,7 @@ test('renders the awardee rows with PI/liaison and an Open link to each Awardee 
 });
 
 test('empty state (mine scope, default) prompts to show all', async () => {
-  global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ cycleCode: 'D25', cycleLabel: 'December 2025', count: 0, awardees: [], scope: 'mine', pdResolved: true }) }));
+  global.fetch = withDashboard(async () => ({ ok: true, json: async () => ({ cycleCode: 'D25', cycleLabel: 'December 2025', count: 0, awardees: [], scope: 'mine', pdResolved: true }) }));
   render(<AwardeesPage />);
   await waitFor(() => expect(screen.getByText(/no awardees assigned to you/i)).toBeInTheDocument());
   // default fetch is mine-scoped (no scope=all param)
@@ -117,13 +129,13 @@ test('empty state (mine scope, default) prompts to show all', async () => {
 });
 
 test('PD-unresolved empty state prompts to show all', async () => {
-  global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ cycleCode: 'D25', cycleLabel: 'December 2025', count: 0, awardees: [], scope: 'mine', pdResolved: false, programDirector: null }) }));
+  global.fetch = withDashboard(async () => ({ ok: true, json: async () => ({ cycleCode: 'D25', cycleLabel: 'December 2025', count: 0, awardees: [], scope: 'mine', pdResolved: false, programDirector: null }) }));
   render(<AwardeesPage />);
   await waitFor(() => expect(screen.getByText(/could not match your account/i)).toBeInTheDocument());
 });
 
 test('toggling "Show all programs" refetches with scope=all', async () => {
-  global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ cycleCode: 'J26', cycleLabel: 'June 2026', count: 0, awardees: [], scope: 'mine', pdResolved: true }) }));
+  global.fetch = withDashboard(async () => ({ ok: true, json: async () => ({ cycleCode: 'J26', cycleLabel: 'June 2026', count: 0, awardees: [], scope: 'mine', pdResolved: true }) }));
   render(<AwardeesPage />);
   await waitFor(() => expect(screen.getByText(/show all programs/i)).toBeInTheDocument());
   fireEvent.click(screen.getByLabelText(/show all programs/i));
@@ -132,7 +144,7 @@ test('toggling "Show all programs" refetches with scope=all', async () => {
 
 test('a stale success cannot overwrite a newer cycle and its request is aborted', async () => {
   const pending = [];
-  global.fetch = jest.fn((url, options) => {
+  global.fetch = withDashboard((url, options) => {
     const d = deferred();
     pending.push({ url: String(url), options, d });
     return d.promise;
@@ -158,7 +170,7 @@ test('a stale success cannot overwrite a newer cycle and its request is aborted'
 test('stale HTTP and JSON failures cannot replace the latest result or loading state', async () => {
   const pending = [];
   const staleJson = deferred();
-  global.fetch = jest.fn((url, options) => {
+  global.fetch = withDashboard((url, options) => {
     const d = deferred();
     pending.push({ url: String(url), options, d });
     return d.promise;
@@ -184,7 +196,7 @@ test('stale HTTP and JSON failures cannot replace the latest result or loading s
 
 test('a stale HTTP error cannot replace a newer loading request', async () => {
   const pending = [];
-  global.fetch = jest.fn((url, options) => {
+  global.fetch = withDashboard((url, options) => {
     const d = deferred();
     pending.push({ url: String(url), options, d });
     return d.promise;
@@ -208,7 +220,7 @@ test('a stale HTTP error cannot replace a newer loading request', async () => {
 
 test('a same-cycle scope change clears mine rows and keeps the all-scope result authoritative', async () => {
   const pending = [];
-  global.fetch = jest.fn((url, options) => {
+  global.fetch = withDashboard((url, options) => {
     const d = deferred();
     pending.push({ url: String(url), options, d });
     return d.promise;
@@ -229,7 +241,7 @@ test('a same-cycle scope change clears mine rows and keeps the all-scope result 
 
 test('returning to a prior cycle cannot revive its old rows while a fresh request is pending', async () => {
   const pending = [];
-  global.fetch = jest.fn((url, options) => {
+  global.fetch = withDashboard((url, options) => {
     const d = deferred();
     pending.push({ url: String(url), options, d });
     return d.promise;
@@ -261,7 +273,7 @@ test('returning to a prior cycle cannot revive its old rows while a fresh reques
 
 test('returning to a prior cycle cannot revive its old error while a fresh request is pending', async () => {
   const pending = [];
-  global.fetch = jest.fn((url, options) => {
+  global.fetch = withDashboard((url, options) => {
     const d = deferred();
     pending.push({ url: String(url), options, d });
     return d.promise;
@@ -291,44 +303,85 @@ test('returning to a prior cycle cannot revive its old error while a fresh reque
 });
 
 test('honors a ?cycleCode= deep link (workbench "View awardees" link)', async () => {
-  const defaultCycle = (() => {
-    const d = new Date();
-    const yy = String(d.getFullYear()).slice(-2);
-    const m = d.getMonth();
-    if (m >= 5 && m < 11) return `J${yy}`;
-    if (m >= 11) return `D${yy}`;
-    return `D${String(d.getFullYear() - 1).slice(-2)}`;
-  })();
+  const defaultCycle = DASHBOARD.lastDecidedCycleCode;
   const deepLinkCycle = alternateCycle(defaultCycle);
   mockRouter = { isReady: true, query: { cycleCode: deepLinkCycle } };
   const pending = [];
-  global.fetch = jest.fn((url, options) => {
+  global.fetch = withDashboard((url, options) => {
     const d = deferred();
     pending.push({ url: String(url), options, d });
     return d.promise;
   });
   render(<AwardeesPage />);
-  await waitFor(() => expect(pending.length).toBeGreaterThanOrEqual(2));
-  expect(pending.some(({ url }) => url.includes(`cycleCode=${deepLinkCycle}`))).toBe(true);
-  const deepLinkRequest = pending.find(({ url }) => url.includes(`cycleCode=${deepLinkCycle}`));
+  await waitFor(() => expect(pending).toHaveLength(1));
+  // The deep link wins outright: no request is ever issued for the default cycle.
+  const deepLinkRequest = pending[0];
+  expect(cycleCodeFromUrl(deepLinkRequest.url)).toBe(deepLinkCycle);
+  expect(pending.some(({ url }) => cycleCodeFromUrl(url) === defaultCycle)).toBe(false);
   await settle(deepLinkRequest.d, response({ cycleCode: deepLinkCycle, cycleLabel: deepLinkCycle, count: 1, awardees: [awardee('Deep link row')] }));
   expect(screen.getByText('Deep link row')).toBeInTheDocument();
-  const defaultRequest = pending.find(({ url }) => cycleCodeFromUrl(url) === defaultCycle);
-  if (defaultRequest) {
-    await settle(defaultRequest.d, response({ cycleCode: defaultCycle, cycleLabel: defaultCycle, count: 1, awardees: [awardee('Stale default row')] }));
-    expect(screen.queryByText('Stale default row')).not.toBeInTheDocument();
-  }
   expect(deepLinkRequest.options.signal.aborted).toBe(false);
 });
 
 test('unmount aborts the active request and ignores a delayed response', async () => {
   const pending = deferred();
   let options;
-  global.fetch = jest.fn((_url, init) => { options = init; return pending.promise; });
+  global.fetch = withDashboard((_url, init) => { options = init; return pending.promise; });
 
   const { unmount } = render(<AwardeesPage />);
-  await waitFor(() => expect(global.fetch).toHaveBeenCalled());
+  await waitFor(() => expect(options).toBeDefined());
   unmount();
   expect(options.signal.aborted).toBe(true);
   await settle(pending, response({ cycleCode: 'J26', cycleLabel: 'June 2026', count: 1, awardees: [awardee('Unmounted row')] }));
+});
+
+test('defaults to the live last decided cycle, not a calendar guess', async () => {
+  global.fetch = withDashboard(async () => response({ cycleCode: 'J26', cycleLabel: 'June 2026', count: 0, awardees: [], scope: 'mine', pdResolved: true }));
+  render(<AwardeesPage />);
+  await waitFor(() => expect(global.fetch.mock.calls.some(([u]) => cycleCodeFromUrl(String(u)) === 'J26')).toBe(true));
+  expect(global.fetch.mock.calls[0][0]).toBe('/api/workbench/grantee-deliverables/awardees');
+  expect(screen.getByLabelText('Cycle code')).toHaveValue('J26');
+});
+
+test('with no decided cycle in the live list it shows an explicit empty state and requests nothing', async () => {
+  global.fetch = withDashboard(async () => { throw new Error('must not fetch awardees'); }, { cycles: [{ code: 'D26' }], defaultCycleCode: 'D26', lastDecidedCycleCode: null });
+  render(<AwardeesPage />);
+  await waitFor(() => expect(screen.getByText(/no decided cycle has requests yet/i)).toBeInTheDocument());
+  expect(global.fetch.mock.calls.every(([u]) => isDashboard(u))).toBe(true);
+});
+
+test('a failed cycle-list read shows an error with a retry that resolves the default', async () => {
+  let fail = true;
+  global.fetch = jest.fn(async (url) => {
+    if (isDashboard(url)) {
+      if (fail) return response({ error: 'down' }, false);
+      return response(DASHBOARD);
+    }
+    return response({ cycleCode: 'J26', cycleLabel: 'June 2026', count: 0, awardees: [], scope: 'mine', pdResolved: true });
+  });
+  render(<AwardeesPage />);
+  await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/could not determine the current cycle/i));
+  fail = false;
+  fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+  await waitFor(() => expect(screen.getByLabelText('Cycle code')).toHaveValue('J26'));
+});
+
+test('a manual selection made while the default is still resolving is not replaced by the late default', async () => {
+  const cycleList = deferred();
+  const pending = [];
+  global.fetch = jest.fn((url, options) => {
+    if (isDashboard(url)) return cycleList.promise;
+    const d = deferred();
+    pending.push({ url: String(url), options, d });
+    return d.promise;
+  });
+  render(<AwardeesPage />);
+  fireEvent.change(screen.getByLabelText('Cycle code'), { target: { value: 'D25' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Load' }));
+  await waitFor(() => expect(pending).toHaveLength(1));
+  expect(cycleCodeFromUrl(pending[0].url)).toBe('D25');
+  await settle(cycleList, response(DASHBOARD));
+  expect(screen.getByLabelText('Cycle code')).toHaveValue('D25');
+  expect(pending).toHaveLength(1);
+  expect(pending[0].options.signal.aborted).toBe(false);
 });

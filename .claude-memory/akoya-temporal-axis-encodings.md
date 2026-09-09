@@ -7,7 +7,7 @@ metadata:
   originSessionId: 8050fbb7-13c6-444b-b802-c9bc7a61a3ce
   status: active
   scope: dataverse
-  last_verified: 2026-07-27 via lib/utils/cycle-code.js; population figures remain dated 2026-05-18 probe snapshots
+  last_verified: 2026-09-08 via lib/utils/cycle-code.js; population figures remain dated 2026-05-18 probe snapshots
 ---
 
 ## Recall Rule
@@ -41,5 +41,27 @@ Design consequence for Dataverse Bulk Export / any cohorting UI:
 - Prefer compiling a cycle filter to a `wmkf_meetingdate` *range* (via `cycleCodeToOdataFilter`) rather than string-matching `akoya_fiscalyear`: the string is sparser and not era-robust, whereas meeting date is Bucket A. Fiscal year as a string (`"May 2027"`) degrades gracefully for off-months; the brittleness is *only* the cycle-code path.
 
 Distinct from `akoya_decisiondate`, which is the *business-history / approval-stamp* slice (era-dependent presence, the `[[dataverse-export-floor-scoping]]` `dateBasis` axis) — meeting date is the *board-cycle* handle. Do not conflate the two temporal axes.
+
+**Default cycle (owner decision 2026-09-08, S499).** Which cycle a surface opens on is a pure
+function of the calendar and the cycles that exist — never of the caller's assignments or of what
+is visible to them. `lib/utils/cycle-code.js` `resolveWorkingCycle` (earliest meeting on/after today;
+September → D26) and `resolveLastDecidedCycle` (newest meeting before today; September → J26) are
+the only default-cycle rules; `conventionalCycles(today)` supplies the June/December codes to
+the one caller with no list (the grantee-titles cron — an explicit fallback, not existence-aware).
+Awardees = last decided; every other Workbench view = working. UTC throughout. The precise
+invariant is PER GRANT PROGRAM: two callers viewing the same program on the same day open on the
+same cycle (the cycle list is program-scoped by the PR #183 owner decision). **Wired (PR #203):**
+`/api/workbench/dashboard` cycle-list mode returns `defaultCycleCode` (working) and
+`lastDecidedCycleCode` from that program's cycle list with each cycle's latest `meetingDate`,
+replacing the "caller's assigned cycle" rule; Reviewer follow-up inherits it. The Awardees page
+reads `lastDecidedCycleCode` from ITS OWN endpoint's cycle-list mode
+(`/api/workbench/grantee-deliverables/awardees` without `cycleCode`), computed over the exact
+research-awardee eligibility population the row query uses — not from the dashboard, whose list is
+per-caller-program (deep link wins; a manual selection during resolution wins; explicit empty state
+when no decided cycle has awardees). The two disagreeing calendar helpers (Awardees local-time "last past",
+grantee-titles cron UTC "upcoming") are retired. **Not yet wired:** Final writeups still walks
+back to a visible row (2026-09-06 decision, superseded 2026-09-08 in favor of an in-place message
+with a link — to be applied with the single-page shell) and Initial assessments still defaults to
+the newest artifact row.
 
 Related: [[dataverse-export-floor-scoping]]
