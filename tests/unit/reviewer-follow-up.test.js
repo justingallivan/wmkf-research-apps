@@ -287,6 +287,29 @@ describe('reviewer follow-up request scope', () => {
     expect(screen.queryByText('Set aside proposal')).not.toBeInTheDocument();
   });
 
+  test('a filter that hides every attention row shows the filter empty state, not the needs-attention copy', async () => {
+    global.fetch = jest.fn(async (url) => {
+      if (url === '/api/workbench/dashboard') {
+        return { ok: true, json: async () => ({ cycles: [{ code: 'D26', label: 'December 2026' }], defaultCycleCode: 'D26' }) };
+      }
+      if (String(url).startsWith('/api/workbench/dashboard?')) {
+        return { ok: true, json: async () => ({ proposals: dashboardProposals }) };
+      }
+      return { ok: true, json: async () => ({ proposals: reviewerProposals }) };
+    });
+
+    render(<ReviewerFollowUpDashboard />);
+    await screen.findByText('Active proposal');
+
+    fireEvent.change(screen.getByLabelText('Filter reviewer follow-up'), {
+      target: { value: 'no request matches this text' },
+    });
+
+    expect(await screen.findByText('No requests match this filter.')).toBeInTheDocument();
+    expect(screen.getByText('Clear the filter or try another term.')).toBeInTheDocument();
+    expect(screen.queryByText('No reviewer follow-up needs attention.')).not.toBeInTheDocument();
+  });
+
   test('request cards show the program director beside institution and PI, and omit it when unassigned', async () => {
     global.fetch = jest.fn(async (url) => {
       if (url === '/api/workbench/dashboard') {
@@ -652,7 +675,9 @@ describe('reviewer follow-up refetch resilience', () => {
     });
 
     expect(screen.queryByText('Active proposal')).not.toBeInTheDocument();
-    expect(screen.getByText('No assigned requests match this view.')).toBeInTheDocument();
+    // An active search filter takes precedence over the view's own empty copy.
+    expect(screen.getByText('No requests match this filter.')).toBeInTheDocument();
+    expect(screen.queryByText('No assigned requests match this view.')).not.toBeInTheDocument();
     expect(screen.getByText('Reviewer follow-up could not be refreshed')).toBeInTheDocument();
   });
 

@@ -293,23 +293,31 @@ test('cycle options never show a count suffix', async () => {
   expect(screen.queryByText(/\(9\)/)).not.toBeInTheDocument();
 });
 
-test('the Grant program select is disabled with a note on Final writeups and Awardees, and enabled on Request list', async () => {
+test('the Grant program select stays enabled with a note on Final writeups and Awardees, and has no note on Request list', async () => {
   routerState.query = { view: 'final-writeups' };
   routerState.asPath = '/workbench?view=final-writeups';
   const { unmount } = render(<WorkbenchShell />);
-  await waitFor(() => expect(screen.getByLabelText('Grant program')).toBeDisabled());
+  await waitFor(() => expect(screen.getByLabelText('Grant program')).not.toBeDisabled());
   expect(screen.getByText('Not filtered by program')).toBeInTheDocument();
   unmount();
 
   routerState.query = { view: 'awardees' };
   routerState.asPath = '/workbench?view=awardees';
   const { unmount: unmountAwardees } = render(<WorkbenchShell />);
-  await waitFor(() => expect(screen.getByLabelText('Grant program')).toBeDisabled());
+  await waitFor(() => expect(screen.getByLabelText('Grant program')).not.toBeDisabled());
   expect(screen.getByText('Research programs only')).toBeInTheDocument();
   unmountAwardees();
 
   routerState.query = {};
   routerState.asPath = '/workbench';
+  const { unmount: unmountRequestList } = render(<WorkbenchShell />);
+  await waitFor(() => expect(screen.getByLabelText('Grant program')).not.toBeDisabled());
+  expect(screen.queryByText('Not filtered by program')).not.toBeInTheDocument();
+  expect(screen.queryByText('Research programs only')).not.toBeInTheDocument();
+  unmountRequestList();
+
+  routerState.query = { view: 'reviewer-follow-up' };
+  routerState.asPath = '/workbench?view=reviewer-follow-up';
   render(<WorkbenchShell />);
   await waitFor(() => expect(screen.getByLabelText('Grant program')).not.toBeDisabled());
   expect(screen.queryByText('Not filtered by program')).not.toBeInTheDocument();

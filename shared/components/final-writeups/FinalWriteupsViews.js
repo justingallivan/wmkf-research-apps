@@ -723,6 +723,21 @@ export function FinalWriteupsPanel({
     () => [...(filteredQueues.stewardship || [])].sort(byRequestNumber),
     [filteredQueues],
   );
+  // "Your writeups" (stewardship) can surface rows the main queue doesn't
+  // (or the reverse); when it's shown (every view but "all"), the filter's
+  // "Showing X of Y" counts the union of both sections, deduped by
+  // requestId — the row's true identity (used for React keys and links
+  // throughout this file) rather than requestNumber, which is a display
+  // field. "all" has no stewardship section, so it keeps the simple count.
+  const filterShown = view === 'all'
+    ? mainRows.length
+    : new Set([...mainRows, ...stewardshipRows].map((row) => row.requestId)).size;
+  const filterTotal = view === 'all'
+    ? (viewCounts[view] ?? 0)
+    : new Set([
+      ...VIEWS[view].select(pdFilteredQueues),
+      ...(pdFilteredQueues.stewardship || []),
+    ].map((row) => row.requestId)).size;
   const pdName = pdValue
     ? (pdOptions.find((option) => option.id === pdValue)?.name || PD_ABSENT_LABEL)
     : null;
@@ -779,8 +794,8 @@ export function FinalWriteupsPanel({
           placeholder="Request #, title, institution, PI, or program director"
           value={searchInput}
           onChange={setSearchInput}
-          shown={mainRows.length}
-          total={viewCounts[view] ?? 0}
+          shown={filterShown}
+          total={filterTotal}
           unitSingular="writeup"
           unitPlural="writeups"
         />

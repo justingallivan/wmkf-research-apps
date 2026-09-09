@@ -371,14 +371,18 @@ export default function ReviewerFollowUpPanel({
       ) : visibleProposals.length === 0 && cycleCode && (!error || proposals.length > 0) ? (
         <Card hover={false}>
           <p className="font-medium text-gray-900">
-            {scope === 'my' && proposals.length === 0
+            {searchInput.trim()
+              ? 'No requests match this filter.'
+              : scope === 'my' && proposals.length === 0
               ? 'No requests are assigned to you in this cycle.'
               : reviewersView === 'attention'
               ? 'No reviewer follow-up needs attention.'
               : `No ${scope === 'all' ? 'cycle' : 'assigned'} requests match this view.`}
           </p>
           <p className="mt-1 text-sm text-gray-500">
-            {scope === 'my' && proposals.length === 0
+            {searchInput.trim()
+              ? 'Clear the filter or try another term.'
+              : scope === 'my' && proposals.length === 0
               ? 'Select All in program to view the full cycle.'
               : reviewersView === 'attention'
               ? 'Select All under Reviewer status to see completed reviews and proposals without active reviewer engagements.'

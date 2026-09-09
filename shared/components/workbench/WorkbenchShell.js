@@ -149,10 +149,9 @@ export function WorkbenchShell({ previewReadOnly = false }) {
   };
 
   // Final writeups and Awardees do not accept a program filter (their data
-  // contracts are cycle-only, not program-scoped); the Program select stays
-  // visible for cross-view consistency but is disabled with a short note
-  // rather than implying it constrains those two views.
-  const programReadOnly = location.view === 'final-writeups' || location.view === 'awardees';
+  // contracts are cycle-only, not program-scoped), but the select still
+  // drives which cycle list loads, so it stays live on those views; the
+  // hint explains that the rows themselves are not filtered by program.
   const programHint = location.view === 'final-writeups'
     ? 'Not filtered by program'
     : location.view === 'awardees'
@@ -173,7 +172,7 @@ export function WorkbenchShell({ previewReadOnly = false }) {
           id="workbench-program"
           label="Grant program"
           value={programId}
-          disabled={!cyclesReady || programs.length === 0 || programReadOnly}
+          disabled={!cyclesReady || programs.length === 0}
           onChange={(e) => changeProgram(e.target.value)}
           hint={programHint}
         >

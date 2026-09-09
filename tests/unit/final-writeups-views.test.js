@@ -161,13 +161,29 @@ test('dashboard search filters the active view without adding controls other tha
   fireEvent.change(search, { target: { value: 'second' } });
   expect(screen.queryByText('Cellular repair after tissue injury')).not.toBeInTheDocument();
   expect(screen.queryByText('A second proposal')).not.toBeInTheDocument();
-  expect(screen.getByText('Showing 0 of 1 writeup')).toBeInTheDocument();
+  // Total counts the union of the main queue (1: the open row) and "Your
+  // writeups" below it (1: the stewardship row) — two distinct requests.
+  expect(screen.getByText('Showing 0 of 2 writeups')).toBeInTheDocument();
 
   fireEvent.click(screen.getByRole('button', { name: /All writeups/ }));
   expect(screen.getByText('A second proposal')).toBeInTheDocument();
   expect(screen.getByText('Showing 1 of 3 writeups')).toBeInTheDocument();
   expect(screen.getAllByRole('combobox')).toHaveLength(1);
   expect(screen.getByRole('group', { name: 'Review queue' }).querySelectorAll('button')).toHaveLength(3);
+});
+
+test('a search that matches only a "Your writeups" row still counts as a shown match', async () => {
+  global.fetch.mockResolvedValueOnce(response(dashboard()));
+  renderPanel();
+  const search = await screen.findByRole('searchbox');
+
+  // "My proposal" is the stewardship-only row; it doesn't appear in the
+  // default Needs my review queue, but it is visible in the "Your
+  // writeups" section below, so the count must not read 0.
+  fireEvent.change(search, { target: { value: 'My proposal' } });
+  expect(screen.queryByText('Cellular repair after tissue injury')).not.toBeInTheDocument();
+  expect(screen.getByText('My proposal')).toBeInTheDocument();
+  expect(screen.getByText('Showing 1 of 2 writeups')).toBeInTheDocument();
 });
 
 test('the cycle comes from the shell: a change reloads with the new code', async () => {
@@ -713,7 +729,11 @@ describe('views, Program director filter, and version context (Slices 6B/6C)', (
     expect(screen.getByText(/awaiting your review in December 2026 for Program Director B/).textContent).toMatch(/^1 writeup awaiting/);
     expect(screen.getByRole('button', { name: /Needs my review/ }).textContent).toContain('1');
     expect(screen.getByRole('button', { name: /All writeups/ }).textContent).toContain('3');
-    expect(screen.getByText('Showing 0 of 1 writeup')).toBeInTheDocument();
+    // The "Showing X of Y" total now covers the union of the main queue and
+    // the "Your writeups" (stewardship) section shown below it: openB (the
+    // Needs my review row for PD B) plus stewardshipB (PD B's own
+    // stewardship row) are two distinct requests, so the total is 2.
+    expect(screen.getByText('Showing 0 of 2 writeups')).toBeInTheDocument();
   });
 
   test('Needs my review empty state offers the other views with counts', async () => {
