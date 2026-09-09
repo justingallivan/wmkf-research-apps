@@ -555,6 +555,17 @@ These are valid directions but are not current app-team delivery commitments:
   representations, SharePoint depth test in AkoyaGo, go/no-go date, reconcile the July language in
   `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`) need Justin before Slice 0. First Site Visit is about
   twenty days from 2026-09-08. Do not touch the Codex worktree or branch without Justin's ask.
+  **To do 2026-09-09 (owner ask 2026-09-08): Claude reviews the plan** read-only from the pushed
+  branch (`git show origin/codex/applicant-additional-materials:docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md`
+  after `git fetch origin`; works from any machine with the remote). Codex's PC/Ops discussion
+  deck is a gitignored local file in the Codex worktree on the original machine only.
+- **Request Workbench top-matter reconciliation — owner chose Codex's recommendation 2026-09-08,
+  not yet built.** The recommendation travels as
+  `docs/plans/CODEX_WORKBENCH_TOP_MATTER_RECOMMENDATION_2026-09-08.md`. Amendments: no new
+  Initial assessments top matter until J27; Program select is read-only context on Final writeups
+  and Awardees. Build order: quick fixes (cycle count, subtitle, pluralization, Final writeups
+  count behaviour, Awardees checkbox), then shared view anatomy, scope preserved across its three
+  views, two labelled search patterns, locator as a shell-level disclosure.
 
 ## Parked — do not resurface without a new decision
 
