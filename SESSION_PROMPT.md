@@ -37,7 +37,7 @@ most. Merges are the owner's. `main` is at the docs commit `a184506f` plus this 
      "Find a request" card becomes a closed-by-default "Find and open a request" disclosure on
      every view, body mounted only when open and once the program resolved, Program seeded from
      the shell and remounted on program change, Program/Cycle/Status behind "Search options",
-     results titled "Request search results · {program}". Fixed a pre-existing race the lazy
+     results titled "Request search results · {program}". Fixed a pre-existing race the on-demand
      mount made routine (query edits invalidated the options load). Commits `55e8f074`,
      `4ac542e3`, `5a73c603`.
    - Review trail: Opus READY WITH NAMED CHANGES on both; Codex three findings on #210 and two
