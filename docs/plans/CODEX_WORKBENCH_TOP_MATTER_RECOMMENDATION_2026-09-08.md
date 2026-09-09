@@ -25,7 +25,7 @@ This was a source-only Operate-mode review using Impeccable's consistency, cogni
 
 ### Shared shell on all five views
 
-The shell renders the page title and reviewer-specific subtitle, then the five-view navigation, then the Grant Program and Cycle selectors. [VERIFIED via shared/components/workbench/WorkbenchShell.js:151-186] The view strip offers Request list, Initial assessments, Reviewer follow-up, Final writeups, and Awardees; Initial assessments is hidden for D26. [VERIFIED via shared/components/workbench/WorkbenchViewsNav.js:5-26] (Superseded 2026-09-09: the owner reversed the hide; the view now renders for D26 between Reviewer follow-up and Final writeups with an intro.)
+The shell renders the page title and reviewer-specific subtitle, then the five-view navigation, then the Grant Program and Cycle selectors. [VERIFIED via shared/components/workbench/WorkbenchShell.js:151-186] The view strip offers Request list, Initial assessments, Reviewer follow-up, Final writeups, and Awardees; Initial assessments is hidden for D26. [VERIFIED via shared/components/workbench/WorkbenchViewsNav.js:5-26] (2026-09-09: briefly unhidden then re-hidden; a sixth view, Staff deliberations, now sits between Reviewer follow-up and Final writeups.)
 
 The Cycle options append `cycle.count` when it is truthy. [VERIFIED via shared/components/workbench/WorkbenchShell.js:173-185] That count is the number of non-set-aside, Workbench-eligible requests across the selected program—not a count of assessments, reviewer follow-ups, writeups, or awardees. [VERIFIED via lib/services/workbench/dashboard-service.js:92-105] [VERIFIED via lib/services/workbench/dashboard-service.js:127-161]
 

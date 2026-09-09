@@ -19,7 +19,7 @@
  * Every view is a shell panel; the old per-view pages redirect here.
  */
 
-export const WORKBENCH_VIEW_KEYS = ['requests', 'initial-assessments', 'reviewer-follow-up', 'final-writeups', 'awardees'];
+export const WORKBENCH_VIEW_KEYS = ['requests', 'reviewer-follow-up', 'staff-deliberations', 'initial-assessments', 'final-writeups', 'awardees'];
 export const DEFAULT_WORKBENCH_VIEW = 'requests';
 
 /** Views rendered inside the shell page (all of them since step 4). */
