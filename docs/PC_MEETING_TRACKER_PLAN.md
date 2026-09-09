@@ -56,6 +56,9 @@ does nothing.
 | D3 | Sessions are **squishy by design**: one date/time/duration with N ordered slots; a request may hold slots in more than one session; the rail reads the **latest** slot; 90 minutes and 15 minutes are defaults, not limits (over-full is a quiet warning, never a refusal). | Slot is its own row with a request lookup; no uniqueness constraint on request. |
 | D4 | **Grant means edit.** The org-open posture applies (see `project-reviewer-org-open-access-by-design`); the grant controls dashboard visibility, not authority. No PC role. Every write is stamped with the acting user. | One server-side write gate ("holds the grant") that can later tighten without UI change. |
 | D5 | **"Shared" means locked** (the Start-sharing transition to lifecycle Review), not "first email sent". "Not yet sent" is a substate. | Rail stop 2 keys on lifecycle; distribution is a substate. |
+| D7 | **"Visited" is date-derived.** The visit happened when the Activity's scheduled start is in the past. No confirmation, no Word-version signal. If the PC moves the date, the rail follows. | Stop 3 reads one field; no new status, no write. |
+| D8 | **Every advancing D26 request gets a site visit.** Visits are scheduled before the reviews are in this cycle, so "no visit scheduled" is a PC to-do and the cycle view counts it. **J27 changes this:** proposals may go out for review and then not be visited, so stop 3 must be allowed to be absent next cycle. Build the D26 assumption behind one predicate, not scattered. | One `visitExpected(request)` predicate, D26 = always true; a J27 register row binds it. |
+| D9 | **No confirmation step.** After the date passes the rail simply says visited. No "awaiting confirmation" interim state. | Simplest display; the tracker's date edit is the only correction path. |
 | D6 | Stage **labels are not load-bearing**. Code carries stable stage keys; display labels live in one admin-editable catalog entry per stage (the existing editable-text mechanism, `shared/config/editableTextDefaults.js`), read by both the tab and the cycle view. Placeholders: AI draft ready · Shared · Visit · Final. Adding, merging, or reordering stops is code; the words are free. | Parity test: every derivable key has a label. |
 
 Two earlier decisions are **superseded in part** and must be read with this plan:
@@ -162,13 +165,13 @@ and re-read server-side (`check:trust-boundary-guid`).
   lead line; Scope control as on Request list. Reads the same two records.
 - **Materials composer.** Unchanged; it already reads the Activity.
 
-### 5.5 The "visited" question is still open
+### 5.5 "Visited" — decided 2026-09-09 (D7–D9)
 
-Three ways to know a visit happened were put to the owner on 2026-09-09 and not yet decided:
-(A) date passed on the Activity, no writes; (B) a person marks it; (C) A plus a derived "observations
-in progress" signal from a Word version bump after the date. Also open: whether every advancing
-request gets a visit, and whether a date-derived "visited" is acceptable. **Do not build stop 3's
-post-visit behaviour until these are answered**; build the schedule display first.
+Date-derived from the Activity's scheduled start; every advancing D26 request is visited; no
+confirmation step and no Word-version signal. Stop 3 therefore has exactly three displays:
+"Visit not scheduled" (PC to-do), "Visit <date>" (future), "Visited <date>" (past). The
+`visitExpected` predicate is the single place J27's "reviewed but not visited" case will land;
+register it under the J27 transition register when slice 3 builds it.
 
 ## 6. Security contract [PLANNED — do not add matrix rows until the routes exist]
 
@@ -187,7 +190,7 @@ post-visit behaviour until these are answered**; build the schedule display firs
 | 1 | Schema wave for session + slot; Atlas pages; readiness flag; sandbox apply and readback per `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md`. | 2 |
 | 2 | App registry entry, grant, list page, session page, slot moves; site-visit editor via the existing service. | 2 |
 | 3 | Rail and cycle view read both dates; stage-key catalog with editable labels; parity test. | 1 |
-| 4 | Post-visit behaviour once §5.5 is decided. | later |
+| 4 | (Retired 2026-09-09: §5.5 decided; stop 3's three displays fold into slice 3.) | — |
 
 Slices 0 and 3 can start before 1 and 2 land: 3 degrades to "not scheduled" when the tables do
 not exist yet, gated on the readiness flag.
@@ -204,7 +207,7 @@ not exist yet, gated on the readiness flag.
 
 ## 9. Open questions for the owner
 
-1. §5.5, the three "visited" questions.
+1. ~~§5.5, the three "visited" questions.~~ Decided 2026-09-09: D7–D9.
 2. Who attends deliberation sessions by default: a fixed staff list plus per-session Board members,
    or per-session only?
 3. Should the session page open the review bundle (shared document, reviews, proposal) directly, or
