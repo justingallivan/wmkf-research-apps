@@ -560,13 +560,17 @@ These are valid directions but are not current app-team delivery commitments:
   after `git fetch origin`; works from any machine with the remote). Codex's PC/Ops discussion
   deck is on the same branch since `e0166296` (`docs/plans/site-visit-materials/`, pushed
   2026-09-08), so plan, brief, and deck all travel together.
-- **Request Workbench top-matter reconciliation — owner chose Codex's recommendation 2026-09-08,
-  not yet built.** The recommendation travels as
-  `docs/plans/CODEX_WORKBENCH_TOP_MATTER_RECOMMENDATION_2026-09-08.md`. Amendments: no new
-  Initial assessments top matter until J27; Program select is read-only context on Final writeups
-  and Awardees. Build order: quick fixes (cycle count, subtitle, pluralization, Final writeups
-  count behaviour, Awardees checkbox), then shared view anatomy, scope preserved across its three
-  views, two labelled search patterns, locator as a shell-level disclosure.
+- **Request Workbench top-matter reconciliation — owner chose Codex's recommendation 2026-09-08;
+  built overnight 2026-09-08, awaiting the owner's merge.** The recommendation travels as
+  `docs/plans/CODEX_WORKBENCH_TOP_MATTER_RECOMMENDATION_2026-09-08.md` (amendment notes added at
+  build). PR #210 (`claude/workbench-top-matter`, Slices A+B: cycle count, subtitle, view intros,
+  shared Scope control and live filter, Final writeups count behaviour, pluralization) and
+  PR #211 (`claude/workbench-locator-disclosure`, Slice C: locator as a shell-level disclosure,
+  stacked on #210). Merge #210 first; then confirm #211's base is `main` (`gh pr view 211 --json
+  baseRefName`; retarget with `gh pr edit 211 --base main` if it still points at the merged
+  branch) before merging #211. One deviation from the amendment, recorded in the #210 body for
+  the owner: the Program select on Final writeups and Awardees stays live with a note, because
+  disabling it also froze the shell's per-program cycle list.
 
 ## Parked — do not resurface without a new decision
 

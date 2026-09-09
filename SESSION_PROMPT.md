@@ -68,7 +68,9 @@ meeting date everywhere; the Request Workbench becomes one shell").
    `git show origin/codex/applicant-additional-materials:docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md`
    (tip `e0166296`; deck under `docs/plans/site-visit-materials/` on that branch). Eight
    open items in its §12; §2 is the decided owner contract. Produce an assessment; no implementation, no PR.
-2. **After the owner merges #210 and #211 (in that order):** watch the post-merge `main` runs
+2. **After the owner merges #210 and #211 (in that order; the repo does not delete branches on
+   merge, so after #210 confirm `gh pr view 211 --json baseRefName -q .baseRefName` prints
+   `main`, else `gh pr edit 211 --base main` before merging):** watch the post-merge `main` runs
    (`gh run list --branch main`), then carry the #210 open items: whether the Program select on
    Final writeups/Awardees should be truly read-only (needs its own cycle source per view), and
    whether the locator disclosure should default open on Request list.
