@@ -25,7 +25,10 @@ jest.mock('../../shared/components/Layout', () => ({
   PageHeader: ({ title }) => <h1>{title}</h1>,
   Card: ({ children }) => <div>{children}</div>,
 }));
-jest.mock('../../shared/components/workbench/RequestLocator', () => ({ __esModule: true, default: () => null }));
+jest.mock('../../shared/components/workbench/RequestLocator', () => ({
+  __esModule: true,
+  RequestLocator: (props) => <div data-testid="request-locator-mock" data-program-id={props.programId || ''} />,
+}));
 jest.mock('../../shared/components/workbench/ReviewerStatusIndicator', () => ({ __esModule: true, default: () => null }));
 jest.mock('../../shared/components/reviewers/ReviewerManagePanel', () => ({ __esModule: true, default: () => null }));
 jest.mock('../../shared/components/reviewers/EmailTemplatesModal', () => ({ __esModule: true, default: () => null }));
@@ -322,4 +325,80 @@ test('the Grant program select stays enabled with a note on Final writeups and A
   await waitFor(() => expect(screen.getByLabelText('Grant program')).not.toBeDisabled());
   expect(screen.queryByText('Not filtered by program')).not.toBeInTheDocument();
   expect(screen.queryByText('Research programs only')).not.toBeInTheDocument();
+});
+
+test('the "Find and open a request" disclosure is closed by default on Request list and does not mount the locator body', async () => {
+  render(<WorkbenchShell />);
+  await waitFor(() => expect(screen.getByLabelText('Grant cycle')).toHaveValue('D26'));
+  const toggle = screen.getByRole('button', { name: 'Find and open a request' });
+  expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  expect(screen.queryByTestId('request-locator-mock')).not.toBeInTheDocument();
+});
+
+test('the "Find and open a request" disclosure is closed by default on Awardees, and opening it mounts the locator body with the shell programId', async () => {
+  routerState.query = { view: 'awardees' };
+  routerState.asPath = '/workbench?view=awardees';
+  render(<WorkbenchShell />);
+  await waitFor(() => expect(screen.getByLabelText('Grant cycle')).toHaveValue('D26'));
+  const toggle = screen.getByRole('button', { name: 'Find and open a request' });
+  expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  expect(screen.queryByTestId('request-locator-mock')).not.toBeInTheDocument();
+
+  fireEvent.click(toggle);
+  expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  expect(screen.getByTestId('request-locator-mock')).toHaveAttribute('data-program-id', 'p1');
+});
+
+test('opening the locator on a non-Request-list view mounts the body, and it survives a shallow view switch', async () => {
+  routerState.query = { view: 'reviewer-follow-up' };
+  routerState.asPath = '/workbench?view=reviewer-follow-up';
+  const { rerender } = render(<WorkbenchShell />);
+  await waitFor(() => expect(screen.getByLabelText('Grant cycle')).toHaveValue('D26'));
+  await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/review-manager/reviewers?cycleCode=D26&scope=my&programId=p1'));
+  fireEvent.click(screen.getByRole('button', { name: 'Find and open a request' }));
+  expect(screen.getByTestId('request-locator-mock')).toBeInTheDocument();
+
+  // The shell does not remount on a view switch (same component instance, no
+  // `key`), so the open disclosure stays open; simulate the switch the way
+  // the nav link's shallow navigation would (see the "external navigation"
+  // test above for the same rerender pattern).
+  routerState.query = { view: 'final-writeups' };
+  routerState.asPath = '/workbench?view=final-writeups';
+  rerender(<WorkbenchShell />);
+  await waitFor(() => expect(screen.getByRole('link', { name: 'Final writeups' })).toHaveAttribute('aria-current', 'page'));
+  expect(screen.getByRole('button', { name: 'Find and open a request' })).toHaveAttribute('aria-expanded', 'true');
+  expect(screen.getByTestId('request-locator-mock')).toBeInTheDocument();
+});
+
+test('opening the disclosure before the shell\'s program resolves defers mounting the locator body until it does', async () => {
+  let resolveDashboard;
+  const pending = new Promise((resolve) => { resolveDashboard = resolve; });
+  mockFetch({ '/api/workbench/dashboard': () => pending });
+  render(<WorkbenchShell />);
+
+  const toggle = screen.getByRole('button', { name: 'Find and open a request' });
+  fireEvent.click(toggle);
+  expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  // The seed guard (programId={programId}) would be inert if the body mounted
+  // before the dashboard fetch resolved a program to seed it with.
+  expect(screen.queryByTestId('request-locator-mock')).not.toBeInTheDocument();
+
+  await act(async () => {
+    resolveDashboard(response({ success: true, programs, programId: 'p1', cycles: CYCLES, defaultCycleCode: 'D26' }));
+    await pending;
+  });
+  await waitFor(() => expect(screen.getByTestId('request-locator-mock')).toHaveAttribute('data-program-id', 'p1'));
+});
+
+test('changing the shell\'s Grant program remounts the open locator with the new programId', async () => {
+  render(<WorkbenchShell />);
+  await waitFor(() => expect(screen.getByLabelText('Grant cycle')).toHaveValue('D26'));
+  fireEvent.click(screen.getByRole('button', { name: 'Find and open a request' }));
+  expect(screen.getByTestId('request-locator-mock')).toHaveAttribute('data-program-id', 'p1');
+
+  fireEvent.change(screen.getByLabelText('Grant program'), { target: { value: 'p2' } });
+  await waitFor(() => expect(screen.getByLabelText('Grant cycle')).toHaveValue('J27'));
+  // key={programId} on the shell's <RequestLocator> forces a remount (fresh
+  // seed) rather than leaving a stale program mounted behind the disclosure.
+  expect(screen.getByTestId('request-locator-mock')).toHaveAttribute('data-program-id', 'p2');
 });

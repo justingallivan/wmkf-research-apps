@@ -15,7 +15,6 @@ import { useRouter } from 'next/router';
 import { Card } from '../Layout';
 import ReviewerStatusIndicator from './ReviewerStatusIndicator';
 import { TOOLBAR_CONTROL_HEIGHT_CLASS } from '../ToolbarSelect';
-import RequestLocator from './RequestLocator';
 import ScopeSegment from './ScopeSegment';
 import { TRIAGE_STATUS } from '../../config/triageStatus';
 
@@ -185,8 +184,6 @@ export default function RequestListPanel({
 
   return (
     <>
-      <RequestLocator />
-
       <div className="flex flex-wrap items-end gap-4 mb-2">
         <ScopeSegment scope={scope} onChange={onScopeChange} myCount={myRequestCount} />
 

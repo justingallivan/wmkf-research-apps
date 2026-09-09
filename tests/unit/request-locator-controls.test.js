@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import RequestLocator from '../../shared/components/workbench/RequestLocator';
+import { RequestLocator } from '../../shared/components/workbench/RequestLocator';
 import ToolbarSelect from '../../shared/components/ToolbarSelect';
 
 jest.mock('../../shared/components/Layout', () => ({
@@ -19,9 +19,13 @@ const options = {
 };
 const emptyResults = { results: [], totalCount: 0 };
 const queryInput = () => screen.getByRole('searchbox');
-const cycleSelect = () => screen.getByRole('combobox', { name: 'Cycle' });
+const searchOptionsToggle = () => screen.getByRole('button', { name: 'Search options' });
+const openSearchOptions = () => {
+  if (searchOptionsToggle().getAttribute('aria-expanded') === 'false') fireEvent.click(searchOptionsToggle());
+};
+const cycleSelect = () => screen.getByRole('combobox', { name: 'Grant cycle' });
 const statusSelect = () => screen.getByRole('combobox', { name: 'Request status' });
-const programSelect = () => screen.getByRole('combobox', { name: 'Grant Program' });
+const programSelect = () => screen.getByRole('combobox', { name: 'Grant program' });
 
 function deferred() {
   let resolve;
@@ -50,8 +54,8 @@ test('both select sizes keep native labels, option values, events and disabled s
       <option value="J26">June 2026</option>
     </ToolbarSelect>,
   );
-  expect(cycleSelect()).toHaveClass('h-12', 'rounded-xl', 'appearance-none');
-  fireEvent.change(cycleSelect(), { target: { value: 'J26' } });
+  expect(screen.getByRole('combobox', { name: 'Cycle' })).toHaveClass('h-12', 'rounded-xl', 'appearance-none');
+  fireEvent.change(screen.getByRole('combobox', { name: 'Cycle' }), { target: { value: 'J26' } });
   expect(onChange).toHaveBeenCalledTimes(1);
   expect(onChange.mock.results[0].value).toBe('J26');
 
@@ -64,17 +68,24 @@ test('both select sizes keep native labels, option values, events and disabled s
       </ToolbarSelect>
     </>,
   );
-  expect(cycleSelect()).toHaveClass('h-11', 'rounded-lg', 'appearance-none');
-  expect(cycleSelect()).not.toHaveClass('h-12');
-  expect(cycleSelect()).toHaveValue('J26');
-  expect(cycleSelect()).toBeDisabled();
-  expect(cycleSelect()).toHaveAccessibleDescription('Loading filters');
+  const select = screen.getByRole('combobox', { name: 'Cycle' });
+  expect(select).toHaveClass('h-11', 'rounded-lg', 'appearance-none');
+  expect(select).not.toHaveClass('h-12');
+  expect(select).toHaveValue('J26');
+  expect(select).toBeDisabled();
+  expect(select).toHaveAccessibleDescription('Loading filters');
 });
 
-test('loading filters are disabled and described; an empty successful response remains usable', async () => {
+test('Search options is closed by default and reveals the filter selects when opened', async () => {
   const pending = deferred();
   fetch.mockReturnValue(pending.promise);
   render(<RequestLocator />);
+  expect(fetch).toHaveBeenCalledTimes(1);
+  expect(screen.queryByRole('combobox', { name: 'Grant cycle' })).not.toBeInTheDocument();
+  expect(searchOptionsToggle()).toHaveAttribute('aria-expanded', 'false');
+
+  fireEvent.click(searchOptionsToggle());
+  expect(searchOptionsToggle()).toHaveAttribute('aria-expanded', 'true');
   expect(cycleSelect()).toBeDisabled();
   expect(statusSelect()).toBeDisabled();
   expect(cycleSelect()).toHaveAccessibleDescription('Loading cycle and status filters…');
@@ -88,11 +99,29 @@ test('loading filters are disabled and described; an empty successful response r
   expect(screen.queryByRole('button', { name: 'Retry filters' })).not.toBeInTheDocument();
 });
 
+test('typing a query while options are still loading does not strand the options load', async () => {
+  const pending = deferred();
+  fetch.mockReturnValue(pending.promise);
+  render(<RequestLocator />);
+  openSearchOptions();
+  expect(cycleSelect()).toBeDisabled();
+
+  // A keystroke fires invalidatePending(), which must not cancel the
+  // in-flight options fetch (a separate generation counter now covers it).
+  fireEvent.change(queryInput(), { target: { value: 'Uni' } });
+
+  await act(async () => pending.resolve(response({ ...options, cycles: [], statuses: [] })));
+  expect(cycleSelect()).toBeEnabled();
+  expect(statusSelect()).toBeEnabled();
+  expect(queryInput()).toHaveValue('Uni');
+});
+
 test('failed options retain saved filters in searches, and Clear filters preserves the query', async () => {
   saveCriteria();
   fetch.mockResolvedValueOnce(response({ error: 'Unavailable' }, false))
     .mockResolvedValue(response(emptyResults));
   render(<RequestLocator />);
+  // A restored cycle/status criterion opens Search options automatically.
   await waitFor(() => expect(cycleSelect()).toHaveValue('D26'));
   await screen.findByRole('button', { name: 'Retry filters' });
   expect(cycleSelect()).toBeDisabled();
@@ -101,11 +130,11 @@ test('failed options retain saved filters in searches, and Clear filters preserv
   expect(statusSelect()).toHaveValue('Phase II Pending');
   expect(cycleSelect()).toHaveAccessibleDescription(/Selected filters still apply/);
 
-  fireEvent.click(screen.getByRole('button', { name: 'Search', exact: true }));
+  fireEvent.click(screen.getByRole('button', { name: 'Search requests', exact: true }));
   await waitFor(() => expect(fetch).toHaveBeenLastCalledWith(
     `/api/workbench/search-requests?q=University&cycle=D26&status=Phase+II+Pending&programId=${PROGRAM_ID}`,
   ));
-  await waitFor(() => expect(screen.getByRole('button', { name: 'Search', exact: true })).toBeEnabled());
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Search requests', exact: true })).toBeEnabled());
   fireEvent.click(screen.getByRole('button', { name: 'Clear filters', exact: true }));
   expect(queryInput()).toHaveValue('University');
   expect(cycleSelect()).toHaveValue('');
@@ -113,7 +142,7 @@ test('failed options retain saved filters in searches, and Clear filters preserv
   expect(cycleSelect()).toBeDisabled();
   expect(cycleSelect()).toHaveAccessibleDescription(/You can still search/);
 
-  fireEvent.click(screen.getByRole('button', { name: 'Search', exact: true }));
+  fireEvent.click(screen.getByRole('button', { name: 'Search requests', exact: true }));
   await waitFor(() => expect(fetch).toHaveBeenLastCalledWith(`/api/workbench/search-requests?q=University&programId=${PROGRAM_ID}`));
 });
 
@@ -150,6 +179,7 @@ test('a failed retry stays disabled and can be retried again', async () => {
   render(<RequestLocator />);
   fireEvent.click(await screen.findByRole('button', { name: 'Retry filters' }));
   fireEvent.click(await screen.findByRole('button', { name: 'Retry filters' }));
+  openSearchOptions();
   await waitFor(() => expect(cycleSelect()).toBeEnabled());
   expect(fetch).toHaveBeenCalledTimes(3);
 });
@@ -158,11 +188,12 @@ test.each([true, false])('changing a compact filter suppresses a stale search re
   const search = deferred();
   fetch.mockResolvedValueOnce(response(options)).mockReturnValueOnce(search.promise);
   render(<RequestLocator />);
+  openSearchOptions();
   await waitFor(() => expect(cycleSelect()).toBeEnabled());
   fireEvent.change(queryInput(), { target: { value: 'University' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Search', exact: true }));
+  fireEvent.click(screen.getByRole('button', { name: 'Search requests', exact: true }));
   fireEvent.change(cycleSelect(), { target: { value: 'J26' } });
-  expect(screen.getByRole('button', { name: 'Search', exact: true })).toBeEnabled();
+  expect(screen.getByRole('button', { name: 'Search requests', exact: true })).toBeEnabled();
 
   await act(async () => search.resolve(response({
     results: [{ requestId: 'stale-fixture', title: 'Stale proposal' }],
@@ -184,6 +215,7 @@ test('does not restore broad-program results or off-cycle selections from the pr
   }));
   fetch.mockResolvedValue(response(options));
   render(<RequestLocator />);
+  openSearchOptions();
   await waitFor(() => expect(cycleSelect()).toBeEnabled());
   expect(cycleSelect()).toHaveValue('');
   expect(queryInput()).toHaveValue('');
@@ -191,7 +223,7 @@ test('does not restore broad-program results or off-cycle selections from the pr
   expect(screen.queryByRole('option', { name: /off-cycle/ })).not.toBeInTheDocument();
 });
 
-test('switching Grant Program clears dependent state and requests fresh scoped options', async () => {
+test('switching Grant program clears dependent state and requests fresh scoped options', async () => {
   const socalId = '22222222-2222-4222-8222-222222222222';
   const socalOptions = {
     programs: [
@@ -213,6 +245,7 @@ test('switching Grant Program clears dependent state and requests fresh scoped o
     ],
   })).mockReturnValueOnce(nextOptions.promise);
   render(<RequestLocator />);
+  openSearchOptions();
   await waitFor(() => expect(programSelect()).toBeEnabled());
   fireEvent.change(programSelect(), { target: { value: socalId } });
   expect(cycleSelect()).toHaveValue('');
@@ -240,8 +273,9 @@ test('cached Research results cannot revive after switching to Southern Californ
     ],
   })).mockReturnValueOnce(pending.promise);
   render(<RequestLocator />);
+  await waitFor(() => expect(screen.getByText('Research-only cached row')).toBeInTheDocument());
+  openSearchOptions();
   await waitFor(() => expect(programSelect()).toBeEnabled());
-  expect(screen.getByText('Research-only cached row')).toBeInTheDocument();
   fireEvent.change(programSelect(), { target: { value: socalId } });
   expect(screen.queryByText('Research-only cached row')).not.toBeInTheDocument();
   await act(async () => pending.resolve(response({
@@ -254,4 +288,54 @@ test('cached Research results cannot revive after switching to Southern Californ
     programName: 'Southern California',
   })));
   await waitFor(() => expect(programSelect()).toHaveValue(socalId));
+});
+
+test('the shell programId seeds the locator program on first mount', async () => {
+  fetch.mockResolvedValue(response(options));
+  render(<RequestLocator programId={PROGRAM_ID} />);
+  await waitFor(() => expect(fetch).toHaveBeenCalledWith(`/api/workbench/search-requests?mode=options&programId=${PROGRAM_ID}`));
+});
+
+test('a saved search for a different program is not restored when the shell passes another programId', async () => {
+  const socalId = '22222222-2222-4222-8222-222222222222';
+  window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify({
+    criteria: { query: 'cached', cycle: 'D26', status: 'Active', programId: socalId },
+    results: [{ requestId: 'socal-row', title: 'Southern California cached row' }],
+    totalCount: 1,
+  }));
+  fetch.mockResolvedValue(response(options));
+  render(<RequestLocator programId={PROGRAM_ID} />);
+  await waitFor(() => expect(fetch).toHaveBeenCalledWith(`/api/workbench/search-requests?mode=options&programId=${PROGRAM_ID}`));
+  expect(queryInput()).toHaveValue('');
+  expect(screen.queryByText('Southern California cached row')).not.toBeInTheDocument();
+  expect(searchOptionsToggle()).toHaveAttribute('aria-expanded', 'false');
+});
+
+test('Search options is closed by default and opens automatically when restoring a saved cycle or status', async () => {
+  saveCriteria();
+  fetch.mockResolvedValue(response(options));
+  render(<RequestLocator />);
+  await waitFor(() => expect(searchOptionsToggle()).toHaveAttribute('aria-expanded', 'true'));
+  expect(cycleSelect()).toHaveValue('D26');
+});
+
+test('Search options stays closed by default without a restored cycle or status', async () => {
+  fetch.mockResolvedValue(response(options));
+  render(<RequestLocator />);
+  await waitFor(() => expect(fetch).toHaveBeenCalled());
+  expect(searchOptionsToggle()).toHaveAttribute('aria-expanded', 'false');
+});
+
+test('the results block is labeled "Request search results"', async () => {
+  fetch.mockResolvedValueOnce(response(options)).mockResolvedValueOnce(response({
+    success: true,
+    results: [{ requestId: 'r1', requestNumber: '1002959', title: 'A proposal' }],
+    totalCount: 1,
+  }));
+  render(<RequestLocator />);
+  await waitFor(() => expect(queryInput()).toBeEnabled());
+  fireEvent.change(queryInput(), { target: { value: '1002000' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Search requests', exact: true }));
+  await screen.findByText('A proposal');
+  expect(screen.getByRole('heading', { name: 'Request search results · Research' })).toBeInTheDocument();
 });
