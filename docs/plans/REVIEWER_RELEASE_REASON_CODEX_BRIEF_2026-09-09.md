@@ -248,8 +248,36 @@ is decorative and does not count):
 
 ## Handoff (fill in at the end)
 
-- Commits on `codex/reviewer-release-reason`:
-- Files changed:
-- Verification run and results:
-- Open questions / recommendations for the owner:
-- Anything you wanted to change but could not within the owned surface:
+- Commits on `codex/reviewer-release-reason`: `12e3d01a` (service, writer, route,
+  lifecycle constants, and tests); `981a1a0f` (release reason controls and tests);
+  `6f6deb46` (history copy and attribution tests); final docs commit follows this
+  handoff edit. All commits are pushed to `origin/codex/reviewer-release-reason`.
+- Files changed: `lib/services/review-manager/withdraw-sufficient-service.js`,
+  `lib/services/reviewer-engagement/withdraw-pending-invitation.js`,
+  `pages/api/review-manager/withdraw-sufficient.js`,
+  `shared/config/reviewerLifecycle.js`,
+  `shared/components/reviewers/ReleaseEmailModal.js`,
+  `shared/components/reviewers/ReviewerInvitePanel.js`,
+  `shared/components/reviewers/reviewer-activity-history.js`, the five focused
+  unit-test files for service/route/writer/modal/history plus
+  `tests/unit/verify-suggestion-token.test.js`, and the API matrix, Atlas, and
+  terminal-status plan docs. No portal, schema, sweep, rollup, readiness, or
+  session-prompt files were changed.
+- Verification run and results: the brief baseline/focused suite passes with
+  107 tests across 9 suites; `npm run lint`; `npm run check:types`;
+  `check:api-routes` + self-test; `check:status-enum-parity` + self-test;
+  `check:atlas` + self-test; `check:docs-catalog`; `check:doc-symbol-refs`;
+  `check:reviewer-engagement-boundary` + self-test;
+  `check:route-service-boundary` + self-test; `check:route-lifecycle-auth`;
+  and `git diff --check` all pass. Existing panel tests emit the pre-existing
+  React `act(...)` warning from the VIP-load effect.
+- Open questions / recommendations for the owner: the branch was based on
+  `a3bda092`; unrelated `origin/main` advanced to `e7c0eb27` during the build,
+  so this branch remains one commit behind `main` by design. The requested
+  release branch is pushed and ready for review; do not merge it here.
+- Anything you wanted to change but could not within the owned surface: the
+  reviewer DTO does not expose Dataverse field-audit actor identity or the
+  request meeting date. History therefore uses an optional actor name when a
+  future DTO supplies one, otherwise the available pre-meeting timestamp
+  heuristic, and falls back to automated cycle-close attribution. A proper
+  actor field would require a separate DTO/adapter surface outside this brief.
