@@ -1604,8 +1604,13 @@ One Final Writeup row per request over the same stable SharePoint Word item; the
   changes push history entries; scope and Set Aside replace. An external navigation (back button,
   a nav link) is adopted from `router.query` once no write of the shell's own is in flight — the
   first cut had a same-commit race where the cycle fallback effect undid an adoption, so the
-  fallback compares against the render's `location.cycleCode`, never the ref. Only the Request
-  list is a panel so far (`RequestListPanel.js`, `SHELL_PANEL_VIEWS`); `WorkbenchViewsNav` links
+  fallback compares against the render's `location.cycleCode`, never the ref. Panels so far:
+  Request list (`RequestListPanel.js`, PR #204) and Reviewer follow-up (`ReviewerFollowUpPanel.js`,
+  step 2: shares the shell's `scope`, owns `reviewers=attention|all` and `q=` in the URL with the
+  search box mirrored after a 300 ms pause; `previewReadOnly` now comes from the shell page's
+  `getServerSideProps` via `lib/services/workbench/preview-read-only.js`; the legacy
+  `/workbench/reviewer-follow-up` route redirects into the shell carrying cycle and program)
+  (`SHELL_PANEL_VIEWS`); `WorkbenchViewsNav` links
   shell-backed views into the shell (shallow) and the rest to their own pages. Tests:
   `tests/unit/workbench-shell.test.js`, `workbench-location.test.js`, `workbench-views-nav.test.js`,
   and the request-locator suite (stateful router mock). Remaining panels and the Awardees
@@ -1651,7 +1656,8 @@ One Final Writeup row per request over the same stable SharePoint Word item; the
   changes: (a) `/workbench/reviewer-follow-up` is now a focused attention queue — request
   cards start collapsed ("Show reviewer activity"), the per-card **Campaign settings** button,
   the **Open full reviewer panel** link and the page-level `WorkbenchViewsNav` were removed,
-  and search sits in the toolbar; the panel it mounts is still `ReviewerManagePanel` in
+  and search sits in the toolbar (the views strip returned 2026-09-08 when the view moved
+  inside the single-page shell, owner decision — see the shell note above); the panel it mounts is still `ReviewerManagePanel` in
   `track` mode; its refetch-error handling was fixed in PR #152 (see the 6B3d note above).
   (b) `/workbench/artifacts` is retitled **Initial assessments** and renders a "not part of
   the D26 dual-phase workflow / available for J27" card for `cycleCode === 'D26'` without

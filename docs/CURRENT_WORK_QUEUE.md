@@ -54,9 +54,12 @@ sequence.
   `shared/components/workbench/WorkbenchShell.js` owns `view`, `programId`,
   `cycleCode`, `scope`, `setAside` in the URL (`workbench-location.js`), resolves
   the working cycle from the dashboard cycle list, and mounts
-  `RequestListPanel.js`; (2) Reviewer follow-up panel (restores the views strip
-  on that view, reversing that part of PR #151; carries attention/all and search
-  in the URL); (3) Final writeups panel, replacing the walk-back to an older
+  `RequestListPanel.js`; (2) Reviewer follow-up panel — **owner approved the
+  strip restore 2026-09-08; built the same day in PR #205 (`claude/workbench-shell-follow-up`)**:
+  `ReviewerFollowUpPanel.js` shares the shell's `scope`, carries `reviewers=` and
+  `q=` in the URL, `previewReadOnly` comes from the shell page's
+  `getServerSideProps`, and `/workbench/reviewer-follow-up` redirects into the
+  shell; (3) Final writeups panel, replacing the walk-back to an older
   cycle with an in-place message and link (supersedes the 2026-09-06 walk-back
   decision; reconcile `docs/FINAL_WRITEUPS_DASHBOARD_CYCLE_SCOPING_PLAN.md`
   §3.3 and its `defaultResolvedBy` tests); (4) Awardees + Initial assessments
@@ -64,9 +67,9 @@ sequence.
   renders the existing explanatory card); (5) the approved stragglers: Expertise
   Finder fiscal-year filter and hard-coded 'December 2025', request-search
   fiscal-year fallback, client-supplied stored `wmkf_grantcyclecode` preference.
-  **Owner decision needed before (4):** Awardees opens on the *last decided*
-  cycle (owner 2026-09-08) while every other view opens on the *working* cycle;
-  with one cycle in the URL both cannot hold. Proposed: the Awardees panel shows
+  **Owner decided 2026-09-08 (yes to the proposal):** Awardees opens on the *last decided*
+  cycle while every other view opens on the *working* cycle; with one cycle in
+  the URL both cannot hold, so the Awardees panel shows
   the shell's cycle and, when that cycle has no awardees yet, one line naming
   the last decided cycle as a link that changes the shell's cycle (the awardees
   endpoint's cycle-list mode already returns `lastDecidedCycleCode`).

@@ -5,7 +5,7 @@
  * list filters, so back navigation and shared links land where the PD was.
  */
 
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { WorkbenchShell } from '../../shared/components/workbench/WorkbenchShell';
 
 const routerState = { pathname: '/workbench', asPath: '/workbench', query: {}, isReady: true };
@@ -27,6 +27,8 @@ jest.mock('../../shared/components/Layout', () => ({
 }));
 jest.mock('../../shared/components/workbench/RequestLocator', () => ({ __esModule: true, default: () => null }));
 jest.mock('../../shared/components/workbench/ReviewerStatusIndicator', () => ({ __esModule: true, default: () => null }));
+jest.mock('../../shared/components/reviewers/ReviewerManagePanel', () => ({ __esModule: true, default: () => null }));
+jest.mock('../../shared/components/reviewers/EmailTemplatesModal', () => ({ __esModule: true, default: () => null }));
 
 const response = (body, ok = true) => ({ ok, status: ok ? 200 : 500, json: async () => body });
 const CYCLES = [
@@ -48,6 +50,7 @@ function mockFetch(overrides = {}) {
     if (href.startsWith('/api/workbench/dashboard?cycleCode=')) {
       return response({ success: true, proposals: [], rollup: { total: 0, stages: {} } });
     }
+    if (href.startsWith('/api/review-manager/reviewers?')) return response({ success: true, proposals: [] });
     throw new Error(`Unexpected fetch: ${href}`);
   });
 }
@@ -144,4 +147,27 @@ test('a non-panel view in the URL keeps the shell toolbar and points at the tabs
   expect(screen.getByText(/opens on its own page/)).toBeInTheDocument();
   expect(screen.getByRole('link', { name: 'Awardees' })).toHaveAttribute('aria-current', 'page');
   expect(rowFetches()).toEqual([]);
+});
+
+test('the Reviewer follow-up view carries its reviewer-state view and search in the URL, sharing request scope', async () => {
+  jest.useFakeTimers();
+  try {
+    routerState.query = { view: 'reviewer-follow-up', cycleCode: 'J26', scope: 'all' };
+    routerState.asPath = '/workbench?view=reviewer-follow-up&cycleCode=J26&scope=all';
+    render(<WorkbenchShell />);
+    await waitFor(() => expect(screen.getByLabelText('Cycle')).toHaveValue('J26'));
+    expect(screen.getByRole('link', { name: 'Reviewer follow-up' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('button', { name: 'All requests' })).toHaveAttribute('aria-pressed', 'true');
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/review-manager/reviewers?cycleCode=J26&scope=all&programId=p1'));
+
+    fireEvent.click(screen.getByRole('button', { name: /Show all/ }));
+    expect(replace).toHaveBeenLastCalledWith('/workbench?view=reviewer-follow-up&cycleCode=J26&scope=all&reviewers=all', undefined, expect.any(Object));
+
+    fireEvent.change(screen.getByLabelText('Search requests and reviewers'), { target: { value: 'north' } });
+    expect(replace).not.toHaveBeenCalledWith(expect.stringContaining('q=north'), undefined, expect.any(Object));
+    await act(async () => { jest.advanceTimersByTime(400); });
+    expect(replace).toHaveBeenLastCalledWith('/workbench?view=reviewer-follow-up&cycleCode=J26&scope=all&reviewers=all&q=north', undefined, expect.any(Object));
+  } finally {
+    jest.useRealTimers();
+  }
 });

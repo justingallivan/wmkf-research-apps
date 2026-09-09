@@ -5,10 +5,29 @@ import {
   proposalNeedsAttention,
   summarizeReviewerFollowUp,
 } from '../../shared/utils/reviewer-follow-up';
-import { getServerSideProps } from '../../pages/workbench/reviewer-follow-up';
-import { ReviewerFollowUpDashboard } from '../../pages/workbench/reviewer-follow-up';
+import { getServerSideProps } from '../../pages/workbench';
+import { getServerSideProps as legacyFollowUpRedirect } from '../../pages/workbench/reviewer-follow-up';
+import { WorkbenchShell } from '../../shared/components/workbench/WorkbenchShell';
 import { PRODUCTION_HOSTS, SANDBOX_HOSTS } from '../../lib/dataverse/core/target-registry';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+
+// Reviewer follow-up renders inside the Request Workbench shell; the shell
+// mirrors its state into the URL through a stateful router mock.
+const routerState = { pathname: '/workbench', asPath: '/workbench?view=reviewer-follow-up', query: { view: 'reviewer-follow-up' }, isReady: true };
+const applyHref = (href) => {
+  const url = new URL(href, 'http://localhost');
+  routerState.asPath = href;
+  routerState.query = Object.fromEntries(url.searchParams.entries());
+  return Promise.resolve(true);
+};
+const routerPush = jest.fn(applyHref);
+const routerReplace = jest.fn(applyHref);
+jest.mock('next/router', () => ({ useRouter: () => ({ ...routerState, push: routerPush, replace: routerReplace }) }));
+function resetFollowUpRoute(extraQuery = {}) {
+  routerState.query = { view: 'reviewer-follow-up', ...extraQuery };
+  routerState.asPath = `/workbench?${new URLSearchParams(routerState.query).toString()}`;
+}
+const ReviewerFollowUpDashboard = WorkbenchShell;
 
 jest.mock('../../shared/components/Layout', () => {
   const React = require('react');
@@ -165,7 +184,7 @@ describe('reviewer follow-up request scope', () => {
 
   afterEach(() => {
     global.fetch = originalFetch;
-    window.history.replaceState({}, '', '/workbench/reviewer-follow-up');
+    resetFollowUpRoute();
   });
 
   test('keeps request scope separate from reviewer-state view and refetches both feeds for All requests', async () => {
@@ -220,11 +239,11 @@ describe('reviewer follow-up request scope', () => {
     const { unmount } = render(<ReviewerFollowUpDashboard />);
     await waitFor(() => expect(screen.getByRole('combobox', { name: 'Cycle' })).toHaveValue('J26'));
     expect(screen.getByRole('option', { name: 'December 2026 (44)' })).toBeInTheDocument();
-    expect(screen.getByRole('option', { name: 'June 2026 (0)' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'June 2026' })).toBeInTheDocument();
     expect(screen.queryByLabelText('Show set aside')).not.toBeInTheDocument();
     unmount();
 
-    window.history.replaceState({}, '', '/workbench/reviewer-follow-up?cycleCode=D26');
+    resetFollowUpRoute({ cycleCode: 'D26' });
     render(<ReviewerFollowUpDashboard />);
     await waitFor(() => expect(screen.getByRole('combobox', { name: 'Cycle' })).toHaveValue('D26'));
   });
@@ -319,7 +338,7 @@ describe('reviewer follow-up refetch resilience', () => {
 
   afterEach(() => {
     global.fetch = originalFetch;
-    window.history.replaceState({}, '', '/workbench/reviewer-follow-up');
+    resetFollowUpRoute();
   });
 
   test('announces the initial loading state', async () => {
@@ -334,7 +353,10 @@ describe('reviewer follow-up refetch resilience', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Loading reviewer activity…');
 
     resolveCycles({ ok: false, status: 503, json: async () => ({ error: 'cycles down' }) });
-    expect(await screen.findByText('Reviewer follow-up could not be loaded')).toBeInTheDocument();
+    expect(await screen.findByRole('alert')).toHaveTextContent('cycles down');
+    expect(screen.queryByText('Reviewer follow-up could not be loaded')).not.toBeInTheDocument();
+    // No cycle → no empty-state guidance either; the shell's alert is the only message.
+    expect(screen.queryByText('No requests are assigned to you in this cycle.')).not.toBeInTheDocument();
   });
 
   test('initial load failure shows the banner only', async () => {
@@ -373,16 +395,17 @@ describe('reviewer follow-up refetch resilience', () => {
 
     render(<ReviewerFollowUpDashboard />);
 
-    expect(await screen.findByText('Reviewer follow-up could not be loaded')).toBeInTheDocument();
-    expect(screen.getByText('cycles down')).toBeInTheDocument();
-    // Pre-fix: no cycleCode → no button at all, and the proposals effect never ran.
+    // The cycle list is the shell's: its alert carries the retry, and the
+    // panel's own banner never appears for a cycles failure.
+    expect(await screen.findByRole('alert')).toHaveTextContent('cycles down');
+    expect(screen.queryByText('Reviewer follow-up could not be loaded')).not.toBeInTheDocument();
     const retry = screen.getByRole('button', { name: 'Try again' });
     expect(global.fetch.mock.calls.filter(([u]) => String(u).startsWith('/api/review-manager/reviewers'))).toHaveLength(0);
 
     cyclesShouldFail = false;
     fireEvent.click(retry);
 
-    await waitFor(() => expect(screen.queryByText('Reviewer follow-up could not be loaded')).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
     await waitFor(() => expect(
       global.fetch.mock.calls.filter(([u]) => String(u).startsWith('/api/review-manager/reviewers')),
     ).toHaveLength(1));
@@ -713,6 +736,15 @@ describe('reviewer follow-up preview safety', () => {
     process.env.DYNAMICS_URL = `https://${PRODUCTION_HOSTS[0]}`;
     await expect(getServerSideProps()).resolves.toEqual({
       props: { previewReadOnly: false },
+    });
+  });
+
+  test('the legacy follow-up route redirects into the shell, carrying cycle and program', async () => {
+    await expect(legacyFollowUpRedirect({ query: { cycleCode: 'd26', programId: 'p1' } })).resolves.toEqual({
+      redirect: { destination: '/workbench?view=reviewer-follow-up&programId=p1&cycleCode=D26', permanent: false },
+    });
+    await expect(legacyFollowUpRedirect({ query: {} })).resolves.toEqual({
+      redirect: { destination: '/workbench?view=reviewer-follow-up', permanent: false },
     });
   });
 

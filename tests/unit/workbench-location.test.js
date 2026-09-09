@@ -2,14 +2,14 @@ import { buildWorkbenchHref, readWorkbenchQuery } from '../../shared/components/
 
 describe('readWorkbenchQuery', () => {
   test('defaults: Request list, server program, unresolved cycle, my requests, Set Aside hidden', () => {
-    expect(readWorkbenchQuery({})).toEqual({ view: 'requests', programId: '', cycleCode: '', scope: 'my', includeSetAside: false });
+    expect(readWorkbenchQuery({})).toEqual({ view: 'requests', programId: '', cycleCode: '', scope: 'my', includeSetAside: false, reviewersView: 'attention', search: '' });
   });
 
   test('reads every key, normalizing the cycle code and rejecting unknown values', () => {
     expect(readWorkbenchQuery({ view: 'awardees', programId: 'p1', cycleCode: ' d26 ', scope: 'all', setAside: '1' }))
-      .toEqual({ view: 'awardees', programId: 'p1', cycleCode: 'D26', scope: 'all', includeSetAside: true });
+      .toEqual({ view: 'awardees', programId: 'p1', cycleCode: 'D26', scope: 'all', includeSetAside: true, reviewersView: 'attention', search: '' });
     expect(readWorkbenchQuery({ view: 'nope', cycleCode: 'M27', scope: 'theirs', setAside: 'yes' }))
-      .toEqual({ view: 'requests', programId: '', cycleCode: '', scope: 'my', includeSetAside: false });
+      .toEqual({ view: 'requests', programId: '', cycleCode: '', scope: 'my', includeSetAside: false, reviewersView: 'attention', search: '' });
   });
 
   test('accepts repeated keys (first wins) and URLSearchParams', () => {
@@ -26,9 +26,9 @@ describe('buildWorkbenchHref', () => {
   });
 
   test('round-trips through readWorkbenchQuery', () => {
-    const state = { view: 'final-writeups', programId: 'p2', cycleCode: 'D26', scope: 'all', includeSetAside: true };
+    const state = { view: 'reviewer-follow-up', programId: 'p2', cycleCode: 'D26', scope: 'all', includeSetAside: true, reviewersView: 'all', search: 'south university' };
     const href = buildWorkbenchHref(state);
-    expect(href).toBe('/workbench?view=final-writeups&programId=p2&cycleCode=D26&scope=all&setAside=1');
+    expect(href).toBe('/workbench?view=reviewer-follow-up&programId=p2&cycleCode=D26&scope=all&setAside=1&reviewers=all&q=south+university');
     expect(readWorkbenchQuery(new URL(href, 'http://x').searchParams)).toEqual(state);
   });
 });
