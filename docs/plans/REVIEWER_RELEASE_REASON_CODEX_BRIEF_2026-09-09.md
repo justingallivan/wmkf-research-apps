@@ -254,8 +254,11 @@ is decorative and does not count):
   and terminal-status documentation); `e775935e` (initial handoff); and
   `54af336d` (modal decoupling, stable result sanitization, and discriminating
   tests); `37902746` (handoff and P1 residual-risk record); and `8daef53f`
-  (deferred-preview test cleanup). This final handoff update is this commit. All
-  commits are pushed to `origin/codex/reviewer-release-reason`.
+  (deferred-preview test cleanup); and `483af4e9` (single-proposal no-response
+  history reachability and attribution); and `5233ef5c` (post-meeting automated
+  attribution regression test); and `f0a16e8b` (no-response non-actionable
+  status hardening). This final handoff update is this commit. All commits are
+  pushed to `origin/codex/reviewer-release-reason`.
 - Files changed: `lib/services/review-manager/withdraw-sufficient-service.js`,
   `lib/services/reviewer-engagement/withdraw-pending-invitation.js`,
   `pages/api/review-manager/withdraw-sufficient.js`,
@@ -263,13 +266,17 @@ is decorative and does not count):
   `shared/components/reviewers/ReleaseEmailModal.js`,
   `shared/components/reviewers/ReviewerInvitePanel.js`,
   `shared/components/reviewers/reviewer-activity-history.js`, the focused unit and
-  integration tests for service/route/writer/modal/history, and the API matrix,
-  Atlas, and terminal-status plan docs. No portal, schema, sweep, rollup, readiness,
-  or session-prompt files were changed.
+  integration tests for service/route/writer/modal/history, including
+  `tests/unit/reviewers-service.test.js` and
+  `tests/unit/reviewer-manage-actions-menu.test.js`, and the API matrix, Atlas,
+  and terminal-status plan docs. No portal, schema, sweep, rollup, readiness, or
+  session-prompt files were changed.
 - Verification run and results: the focused release suite passes cleanly with 103
   tests across 8 suites; the route and release-button characterization suites pass
   with 20 tests across 2 suites. The latter retains only the pre-existing React
-  `act(...)` warning from the `ReviewerInvitePanel` VIP-load effect. `npm run lint`;
+  `act(...)` warning from the `ReviewerInvitePanel` VIP-load effect. The P1
+  service/component/history command passes with 137 tests across 4 suites;
+  `npm run lint`;
   `npm run check:types`;
   `check:api-routes` + self-test; `check:status-enum-parity` + self-test;
   `check:atlas` + self-test; `check:docs-catalog`; `check:doc-symbol-refs`;
@@ -280,14 +287,15 @@ is decorative and does not count):
   `a3bda092`; unrelated `origin/main` advanced to `e7c0eb27` during the build,
   so this branch remains one commit behind `main` by design. The requested
   release branch is pushed and ready for review; do not merge it here.
-- Anything you wanted to change but could not within the owned surface: the P1
-  history reachability/attribution issue is confirmed and remains blocked. The
-  `no_response` writer records `responseType` and `responseReceivedAt`, but
-  `lib/services/review-manager/reviewers-service.js:194` includes a single-proposal
-  row only when `wmkf_accepted === true` or `wmkf_reviewreceivedat` is set. The
-  `ReviewerManagePanel.js:480-482` history row is derived from that filtered DTO,
-  so the released row cannot reach the existing drawer. The DTO also supplies
-  neither the field-audit actor nor the request meeting date. The history helper
-  retains the permitted optional-actor/pre-meeting fallback, but it cannot make
-  an excluded production row reachable. Fixing this requires the out-of-scope
-  reviewer DTO/filter/panel surface and was not attempted.
+- P1 history reachability/attribution is resolved within the authorized scope.
+  `reviewers-service.js:198-201` retains accepted and review-received rows and
+  additionally includes `no_response` lifecycle rows. `reviewers-service.js:290-293`
+  projects those rows as `released` when they have no explicit review status, and
+  `reviewers-service.js:342-346` carries the trusted request `meetingDate` onto each
+  row. The existing panel history trigger at `ReviewerManagePanel.js:480-482` can
+  therefore find the row, while its accepted-only selection/release controls remain
+  excluded. The history helper reports `Recorded by staff` for a no-response stamp
+  before the meeting date and keeps `Recorded by automated cycle close` for the
+  post-meeting sweep fallback. Dataverse actor/modified-by data is not selected for
+  this DTO; no adapter expansion was required because the permitted timestamp marker
+  is available from the existing request projection.
