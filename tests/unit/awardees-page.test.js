@@ -122,7 +122,7 @@ test('empty state (mine scope) in a cycle that has awardees prompts to show all'
   global.fetch = withCycleList(async () => ({ ok: true, json: async () => ({ cycleCode: 'J26', cycleLabel: 'June 2026', count: 0, awardees: [], scope: 'mine', pdResolved: true }) }));
   renderPanel();
   await waitFor(() => expect(screen.getByText(/no awardees assigned to you for June 2026/i)).toBeInTheDocument());
-  expect(await screen.findByText(/Choose “All in program”/)).toBeInTheDocument();
+  expect(await screen.findByText(/Choose “All program directors”/)).toBeInTheDocument();
   expect(global.fetch.mock.calls.every(([u]) => !String(u).includes('scope=all'))).toBe(true);
   expect(screen.queryByRole('button', { name: /awardees in/ })).not.toBeInTheDocument();
 });
@@ -136,7 +136,7 @@ test('the working cycle with no awardees yet names itself and links the last dec
   });
   renderPanel({ cycleCode: 'D26' });
   expect(await screen.findByText('No awardees for December 2026 yet.')).toBeInTheDocument();
-  expect(screen.queryByText(/Choose “All in program”/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/Choose “All program directors”/)).not.toBeInTheDocument();
   const link = await screen.findByRole('button', { name: '14 awardees in June 2026' });
 
   fireEvent.click(link);
@@ -144,7 +144,7 @@ test('the working cycle with no awardees yet names itself and links the last dec
   expect(await screen.findByText('June row')).toBeInTheDocument();
 });
 
-test('an empty cycle under Show all programs is empty for everyone: no prompt to show all, the last decided link renders', async () => {
+test('an empty cycle under All program directors is empty for everyone: no prompt to show all, the last decided link renders', async () => {
   global.fetch = withCycleList(async () => response({ cycleCode: 'D26', cycleLabel: 'December 2026', count: 0, awardees: [], scope: 'all', pdResolved: true }));
   renderPanel({ cycleCode: 'D26', scope: 'all' });
   expect(await screen.findByText('No awardees for December 2026 yet.')).toBeInTheDocument();
@@ -171,11 +171,11 @@ test('PD-unresolved empty state prompts to show all', async () => {
   expect(global.fetch.mock.calls.some(([u]) => isCycleList(u))).toBe(false);
 });
 
-test('toggling "Show all programs" hands the shell scope=all and refetches with it', async () => {
+test('toggling "All program directors" hands the shell scope=all and refetches with it', async () => {
   global.fetch = withCycleList(async () => ({ ok: true, json: async () => ({ cycleCode: 'J26', cycleLabel: 'June 2026', count: 0, awardees: [], scope: 'mine', pdResolved: true }) }));
   renderPanel();
-  await waitFor(() => expect(screen.getByRole('button', { name: 'All in program' })).toBeInTheDocument());
-  fireEvent.click(screen.getByRole('button', { name: 'All in program' }));
+  await waitFor(() => expect(screen.getByRole('button', { name: 'All program directors' })).toBeInTheDocument());
+  fireEvent.click(screen.getByRole('button', { name: 'All program directors' }));
   expect(harness.state.scope).toBe('all');
   await waitFor(() => expect(global.fetch.mock.calls.some(([u]) => String(u).includes('scope=all'))).toBe(true));
 });
@@ -216,10 +216,10 @@ test('a same-cycle scope change clears mine rows and keeps the all-scope result 
   await waitFor(() => expect(pending).toHaveLength(1));
   await settle(pending[0].d, response({ cycleCode: cycleCodeFromUrl(pending[0].url), cycleLabel: 'Current cycle', count: 1, scope: 'mine', awardees: [awardee('Mine row')] }));
   expect(screen.getByText('Mine row')).toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', { name: 'All in program' }));
+  fireEvent.click(screen.getByRole('button', { name: 'All program directors' }));
   await waitFor(() => expect(pending).toHaveLength(2));
   expect(screen.queryByText('Mine row')).not.toBeInTheDocument();
-  expect(screen.queryByText(/1 awardee \(yours\)/i)).not.toBeInTheDocument();
+  expect(screen.queryByText('Current cycle · 1 awardee')).not.toBeInTheDocument();
 
   await settle(pending[1].d, response({ cycleCode: cycleCodeFromUrl(pending[1].url), cycleLabel: 'Current cycle', count: 1, scope: 'all', awardees: [awardee('All row')] }));
   expect(screen.getByText('All row')).toBeInTheDocument();

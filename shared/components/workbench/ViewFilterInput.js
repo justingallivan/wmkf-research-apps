@@ -20,10 +20,12 @@
  * @param {Function} props.onChange  (value) => void
  * @param {number} props.shown       rows visible after the filter
  * @param {number} props.total       rows visible before the filter (same program/cycle/structural filters)
- * @param {string} props.unit        plural noun, e.g. "requests" or "writeups"
+ * @param {string} props.unitSingular  singular noun, e.g. "request" or "writeup"
+ * @param {string} props.unitPlural    plural noun, e.g. "requests" or "writeups"
  */
-export default function ViewFilterInput({ id, label, placeholder, value, onChange, shown, total, unit }) {
+export default function ViewFilterInput({ id, label, placeholder, value, onChange, shown, total, unitSingular, unitPlural }) {
   const active = value.trim().length > 0;
+  const unit = total === 1 ? unitSingular : unitPlural;
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-1">
       <label htmlFor={id} className="text-sm font-medium text-gray-700">{label}</label>

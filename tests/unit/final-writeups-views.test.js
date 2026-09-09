@@ -161,7 +161,7 @@ test('dashboard search filters the active view without adding controls other tha
   fireEvent.change(search, { target: { value: 'second' } });
   expect(screen.queryByText('Cellular repair after tissue injury')).not.toBeInTheDocument();
   expect(screen.queryByText('A second proposal')).not.toBeInTheDocument();
-  expect(screen.getByText('Showing 0 of 1 writeups')).toBeInTheDocument();
+  expect(screen.getByText('Showing 0 of 1 writeup')).toBeInTheDocument();
 
   fireEvent.click(screen.getByRole('button', { name: /All writeups/ }));
   expect(screen.getByText('A second proposal')).toBeInTheDocument();
@@ -713,7 +713,7 @@ describe('views, Program director filter, and version context (Slices 6B/6C)', (
     expect(screen.getByText(/awaiting your review in December 2026 for Program Director B/).textContent).toMatch(/^1 writeup awaiting/);
     expect(screen.getByRole('button', { name: /Needs my review/ }).textContent).toContain('1');
     expect(screen.getByRole('button', { name: /All writeups/ }).textContent).toContain('3');
-    expect(screen.getByText('Showing 0 of 1 writeups')).toBeInTheDocument();
+    expect(screen.getByText('Showing 0 of 1 writeup')).toBeInTheDocument();
   });
 
   test('Needs my review empty state offers the other views with counts', async () => {

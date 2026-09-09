@@ -8,7 +8,7 @@
  *   programId Grant Program GUID; absent = the server's default program
  *   cycleCode Jyy/Dyy; absent = the working cycle for the program (resolved
  *             by the dashboard cycle list, then written back with replace)
- *   scope     my (default) | all           — request scope (Request list, Reviewer follow-up)
+ *   scope     my (default) | all           — request scope (Request list, Reviewer follow-up, Awardees)
  *   setAside  1                            — Request list shows Set Aside rows
  *   reviewers attention (default) | all    — Reviewer follow-up reviewer-state view
  *   q         free text                    — search box of the open view (follow-up, Final writeups)

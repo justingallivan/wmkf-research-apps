@@ -304,7 +304,8 @@ export default function ReviewerFollowUpPanel({
               onChange={setSearchInput}
               shown={visibleProposals.length}
               total={statusFilteredProposals.length}
-              unit="requests"
+              unitSingular="request"
+              unitPlural="requests"
             />
             {!previewReadOnly && (
           <button
@@ -380,7 +381,7 @@ export default function ReviewerFollowUpPanel({
             {scope === 'my' && proposals.length === 0
               ? 'Select All in program to view the full cycle.'
               : reviewersView === 'attention'
-              ? 'Select All to see completed reviews and proposals without active reviewer engagements.'
+              ? 'Select All under Reviewer status to see completed reviews and proposals without active reviewer engagements.'
               : 'Change the cycle or search.'}
           </p>
         </Card>

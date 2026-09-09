@@ -191,7 +191,7 @@ test('the Awardees view shows the working cycle, links the last decided cycle wh
   expect(push).toHaveBeenLastCalledWith('/workbench?view=awardees&cycleCode=J26', undefined, expect.any(Object));
   expect(await screen.findByText('June awardee')).toBeInTheDocument();
 
-  fireEvent.click(screen.getByRole('button', { name: 'All in program' }));
+  fireEvent.click(screen.getByRole('button', { name: 'All program directors' }));
   expect(replace).toHaveBeenLastCalledWith('/workbench?view=awardees&cycleCode=J26&scope=all', undefined, expect.any(Object));
   await waitFor(() => expect(global.fetch).toHaveBeenLastCalledWith('/api/workbench/grantee-deliverables/awardees?cycleCode=J26&scope=all', expect.any(Object)));
 });

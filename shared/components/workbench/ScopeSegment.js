@@ -12,8 +12,9 @@ import { TOOLBAR_CONTROL_HEIGHT_CLASS } from '../ToolbarSelect';
  * @param {'my'|'all'} props.scope
  * @param {Function} props.onChange   (scope) => void
  * @param {number} [props.myCount]    optional count appended to "Assigned to me"
+ * @param {string} [props.allLabel]   label for the "all" option (default "All in program")
  */
-export default function ScopeSegment({ scope, onChange, myCount }) {
+export default function ScopeSegment({ scope, onChange, myCount, allLabel = 'All in program' }) {
   return (
     <fieldset className="flex flex-col gap-1.5">
       <legend className="text-sm font-medium text-gray-700">Scope</legend>
@@ -32,7 +33,7 @@ export default function ScopeSegment({ scope, onChange, myCount }) {
           aria-pressed={scope === 'all'}
           className={`border-l border-gray-300 px-4 py-2 text-sm font-semibold ${scope === 'all' ? 'bg-gray-900 text-white' : 'text-gray-700 hover:bg-gray-50'}`}
         >
-          All in program
+          {allLabel}
         </button>
       </div>
     </fieldset>

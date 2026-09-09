@@ -730,7 +730,7 @@ export function FinalWriteupsPanel({
   const current = VIEWS[view];
   const cycleEmpty = data && (data.counts?.total ?? 0) === 0;
   const activeCount = viewCounts[view] ?? 0;
-  const activeCountVerb = view === 'reviewed' ? 'reviewed by you' : view === 'all' ? 'in all' : 'awaiting your review';
+  const activeCountVerb = view === 'reviewed' ? 'reviewed by you' : view === 'all' ? '' : 'awaiting your review';
   // No cycle and not loading one: the shell's alert carries the retry; render nothing here.
   if (!selector && !loadingCycles) return null;
   const busy = loadingCycles || !selector || loading;
@@ -743,7 +743,8 @@ export function FinalWriteupsPanel({
             <p className="mb-1 font-medium text-gray-700">{personaViewLabel(data.viewer)}</p>
           )}
           <p>
-            <span className="font-semibold tabular-nums text-gray-900">{activeCount}</span> writeup{activeCount === 1 ? '' : 's'} {activeCountVerb}
+            <span className="font-semibold tabular-nums text-gray-900">{activeCount}</span> writeup{activeCount === 1 ? '' : 's'}
+            {activeCountVerb && ` ${activeCountVerb}`}
             {cycleLabel && ` in ${cycleLabel}`}
             {pdName && pdName !== PD_ABSENT_LABEL && ` for ${pdName}`}
           </p>
@@ -780,7 +781,8 @@ export function FinalWriteupsPanel({
           onChange={setSearchInput}
           shown={mainRows.length}
           total={viewCounts[view] ?? 0}
-          unit="writeups"
+          unitSingular="writeup"
+          unitPlural="writeups"
         />
       </div>
 

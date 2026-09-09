@@ -144,7 +144,7 @@ export default function AwardeesPanel({ cycleCode, loadingCycles, scope, onScope
   return (
     <>
       <div className="flex flex-wrap items-end gap-4 mb-4">
-        <ScopeSegment scope={scope} onChange={onScopeChange} />
+        <ScopeSegment scope={scope} onChange={onScopeChange} allLabel="All program directors" />
         {visibleData?.cycleLabel && (
           <span className="text-sm text-gray-500">
             {visibleData.cycleLabel} · {visibleData.count} awardee{visibleData.count === 1 ? '' : 's'}
@@ -159,11 +159,11 @@ export default function AwardeesPanel({ cycleCode, loadingCycles, scope, onScope
       {cycleEmpty && (
         <div className="text-sm text-gray-500" role="status">
           {pdUnresolved ? (
-            <p>Could not match your account to a Program Director — choose “All in program” to see the full list.</p>
+            <p>Could not match your account to a Program Director — choose “All program directors” to see the full list.</p>
           ) : cycleHasNoAwardees ? (
             <p>{`No awardees for ${cycleLabel} yet.`}</p>
           ) : cycleHasNoAwardees === false ? (
-            <p>{`No awardees assigned to you for ${cycleLabel}. Choose “All in program” to see everyone’s.`}</p>
+            <p>{`No awardees assigned to you for ${cycleLabel}. Choose “All program directors” to see everyone’s.`}</p>
           ) : (
             <p>{`No awardees assigned to you for ${cycleLabel}.`}</p>
           )}

@@ -187,7 +187,7 @@ describe('reviewer follow-up request scope', () => {
     resetFollowUpRoute();
   });
 
-  test('keeps request scope separate from reviewer-state view and refetches both feeds for All requests', async () => {
+  test('keeps request scope separate from reviewer-state view and refetches both feeds for All in program', async () => {
     global.fetch = jest.fn(async (url) => {
       if (url === '/api/workbench/dashboard') {
         return {
@@ -240,7 +240,7 @@ describe('reviewer follow-up request scope', () => {
     await waitFor(() => expect(screen.getByRole('combobox', { name: 'Grant cycle' })).toHaveValue('J26'));
     expect(screen.getByRole('option', { name: 'December 2026' })).toBeInTheDocument();
     expect(screen.getByRole('option', { name: 'June 2026' })).toBeInTheDocument();
-    expect(screen.queryByLabelText('Show set aside')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Include set-aside requests')).not.toBeInTheDocument();
     unmount();
 
     resetFollowUpRoute({ cycleCode: 'D26' });
@@ -248,7 +248,7 @@ describe('reviewer follow-up request scope', () => {
     await waitFor(() => expect(screen.getByRole('combobox', { name: 'Grant cycle' })).toHaveValue('D26'));
   });
 
-  test('guides an unassigned user to All requests from the initial My requests view', async () => {
+  test('guides an unassigned user to All in program from the initial Assigned to me view', async () => {
     global.fetch = jest.fn(async (url) => ({
       ok: true,
       json: async () => url === '/api/workbench/dashboard'
@@ -280,7 +280,7 @@ describe('reviewer follow-up request scope', () => {
     fireEvent.change(screen.getByLabelText('Filter reviewer follow-up'), {
       target: { value: 'south university' },
     });
-    expect(screen.getByText('Showing 0 of 1 requests')).toBeInTheDocument();
+    expect(screen.getByText('Showing 0 of 1 request')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'All (2)' }));
     expect(screen.getByText('Showing 1 of 2 requests')).toBeInTheDocument();

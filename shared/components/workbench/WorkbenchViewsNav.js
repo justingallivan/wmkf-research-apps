@@ -27,7 +27,7 @@ export const VIEWS = {
   },
   awardees: {
     label: 'Awardees',
-    description: 'Track grantee deliverables for awardees in the selected program and cycle.',
+    description: 'Track grantee deliverables for research awardees in the selected cycle.',
   },
 };
 
