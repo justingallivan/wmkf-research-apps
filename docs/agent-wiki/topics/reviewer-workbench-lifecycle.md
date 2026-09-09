@@ -1594,6 +1594,22 @@ One Final Writeup row per request over the same stable SharePoint Word item; the
 
 ## Operating Notes
 
+- **Single-page Workbench shell (PR #204, `claude/workbench-shell`, 2026-09-08).** `pages/workbench.js`
+  is a guard around `shared/components/workbench/WorkbenchShell.js`. The URL owns the shell state
+  (`shared/components/workbench/workbench-location.js`: `view`, `programId`, `cycleCode`, `scope`,
+  `setAside`; defaults omitted). The shell loads the program's cycle list once from
+  `/api/workbench/dashboard`, honors a listed `?cycleCode=` deep link, otherwise falls back to the
+  list's `defaultCycleCode` (the working cycle, `lib/utils/cycle-code.js` `resolveWorkingCycle`)
+  and writes it back with `router.replace` so the address is always shareable. Cycle and program
+  changes push history entries; scope and Set Aside replace. An external navigation (back button,
+  a nav link) is adopted from `router.query` once no write of the shell's own is in flight — the
+  first cut had a same-commit race where the cycle fallback effect undid an adoption, so the
+  fallback compares against the render's `location.cycleCode`, never the ref. Only the Request
+  list is a panel so far (`RequestListPanel.js`, `SHELL_PANEL_VIEWS`); `WorkbenchViewsNav` links
+  shell-backed views into the shell (shallow) and the rest to their own pages. Tests:
+  `tests/unit/workbench-shell.test.js`, `workbench-location.test.js`, `workbench-views-nav.test.js`,
+  and the request-locator suite (stateful router mock). Remaining panels and the Awardees
+  cycle question: `docs/CURRENT_WORK_QUEUE.md` audit follow-ups.
 - **Reviewer follow-up polish (Codex worktree branch, merged `f0494607` + `d0a5fc07`, production
   2026-09-06).** Owner requested and approved the changes, including edits to the shared reviewer
   components used by both `/workbench/reviewer-follow-up` and the request page Reviewers tab.

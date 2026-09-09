@@ -1,0 +1,201 @@
+/**
+ * Request Workbench shell — one page a PD moves across left to right through a
+ * cycle. The shell owns the Grant Program and cycle (in the URL, see
+ * workbench-location.js), loads the program's cycle list once, and mounts the
+ * selected view as a panel below a shared toolbar. Views not yet moved inside
+ * the shell still open their own pages from the views nav.
+ *
+ * Cycle default: the dashboard cycle list's `defaultCycleCode` (the working
+ * cycle = the upcoming board meeting, per lib/utils/cycle-code.js). A deep link
+ * to a cycle the program does not list falls back to that default; the resolved
+ * cycle is written back into the URL so the address is always shareable.
+ *
+ * Data: /api/workbench/dashboard (no cycleCode = cycle list for a program).
+ */
+
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useRouter } from 'next/router';
+import Layout, { PageHeader, Card } from '../Layout';
+import ToolbarSelect from '../ToolbarSelect';
+import WorkbenchViewsNav from './WorkbenchViewsNav';
+import RequestListPanel from './RequestListPanel';
+import { buildWorkbenchHref, readWorkbenchQuery } from './workbench-location';
+
+const sameLocation = (a, b) => ['view', 'programId', 'cycleCode', 'scope', 'includeSetAside'].every((key) => a[key] === b[key]);
+
+export function WorkbenchShell() {
+  const router = useRouter();
+
+  // URL-mirrored state. Local state is the render source; every change is
+  // written to the URL (push for navigations, replace for filter tweaks), and
+  // an external navigation (back/forward, a nav link) is adopted from the URL
+  // once no write of ours is still in flight.
+  const [location, setLocation] = useState(() => readWorkbenchQuery(router.query));
+  const [ready, setReady] = useState(false);
+  const locationRef = useRef(location);
+  const pendingWritesRef = useRef(0);
+
+  useEffect(() => {
+    if (!router.isReady) return;
+    if (ready && pendingWritesRef.current > 0) return;
+    const next = readWorkbenchQuery(router.query);
+    if (ready && sameLocation(next, locationRef.current)) return;
+    locationRef.current = next;
+    setLocation(next);
+    setReady(true);
+  }, [router.isReady, router.query, ready]);
+
+  const routerRef = useRef(router);
+  routerRef.current = router;
+  const navigate = useCallback((patch, { push = false } = {}) => {
+    const next = { ...locationRef.current, ...patch };
+    locationRef.current = next;
+    setLocation(next);
+    pendingWritesRef.current += 1;
+    const { push: routerPush, replace: routerReplace } = routerRef.current;
+    Promise.resolve((push ? routerPush : routerReplace)(buildWorkbenchHref(next), undefined, { shallow: true, scroll: false }))
+      .catch(() => {})
+      .finally(() => { pendingWritesRef.current -= 1; });
+  }, []);
+
+  // Cycle list for the program in the URL (absent = the server's default).
+  const [cycles, setCycles] = useState([]);
+  const [programs, setPrograms] = useState([]);
+  const [resolvedProgramId, setResolvedProgramId] = useState('');
+  const [defaultCycleCode, setDefaultCycleCode] = useState(null);
+  const [loadingCycles, setLoadingCycles] = useState(true);
+  const [cyclesError, setCyclesError] = useState(null);
+  const cyclesGenerationRef = useRef(0);
+  const [cyclesGeneration, setCyclesGeneration] = useState(0);
+  const cyclesLoadRef = useRef(0);
+  const [cyclesAttempt, setCyclesAttempt] = useState(0);
+
+  const requestedProgramId = location.programId;
+  useEffect(() => {
+    if (!ready) return undefined;
+    const token = ++cyclesLoadRef.current;
+    setLoadingCycles(true);
+    setCyclesError(null);
+    setCycles([]);
+    setDefaultCycleCode(null);
+    (async () => {
+      try {
+        const res = await fetch(`/api/workbench/dashboard${requestedProgramId ? `?programId=${encodeURIComponent(requestedProgramId)}` : ''}`);
+        const body = await res.json().catch(() => ({}));
+        if (cyclesLoadRef.current !== token) return;
+        if (!res.ok) throw new Error(body.error || `Failed to load cycles (${res.status})`);
+        cyclesGenerationRef.current += 1;
+        setCyclesGeneration(cyclesGenerationRef.current);
+        setCycles(body.cycles || []);
+        setPrograms(Array.isArray(body.programs) ? body.programs : []);
+        setResolvedProgramId(body.programId || '');
+        setDefaultCycleCode(body.defaultCycleCode || (body.cycles || [])[0]?.code || null);
+      } catch (e) {
+        if (cyclesLoadRef.current === token) setCyclesError(e.message);
+      } finally {
+        if (cyclesLoadRef.current === token) setLoadingCycles(false);
+      }
+    })();
+    return () => { cyclesLoadRef.current += 1; };
+  }, [ready, requestedProgramId, cyclesAttempt]);
+
+  // The cycle the panels see: the URL's cycle when the program lists it, else
+  // the working cycle. A fallback is written back so the URL stays honest.
+  // Compared against this render's location (not the ref) so an adoption
+  // committed by the effect above cannot be undone by this one.
+  const urlCycleCode = location.cycleCode;
+  const listed = urlCycleCode && cycles.some((cycle) => cycle.code === urlCycleCode);
+  const cycleCode = loadingCycles ? null : (listed ? urlCycleCode : defaultCycleCode);
+  useEffect(() => {
+    if (loadingCycles || !cycleCode || cycleCode === urlCycleCode) return;
+    navigate({ cycleCode });
+  }, [loadingCycles, cycleCode, urlCycleCode, navigate]);
+
+  const patchCycleCounts = useCallback((code, { myDelta = 0, mySetAsideDelta = 0 }, generation) => {
+    if (generation !== cyclesGenerationRef.current) return;
+    setCycles((previousCycles) => previousCycles.map((cycle) => {
+      if (cycle.code !== code) return cycle;
+      const myCount = Math.max(0, Number(cycle.myCount) || 0);
+      const mySetAsideCount = Math.max(0, Number(cycle.mySetAsideCount) || 0);
+      return {
+        ...cycle,
+        myCount: Math.max(0, myCount + myDelta),
+        mySetAsideCount: Math.max(0, mySetAsideCount + mySetAsideDelta),
+      };
+    }));
+  }, []);
+
+  // The URL's program shows immediately on a change; otherwise the server's default.
+  const programId = location.programId || resolvedProgramId;
+  const changeProgram = (nextProgramId) => {
+    if (!nextProgramId || nextProgramId === programId) return;
+    // A new program has its own cycle list; the cycle resolves from it.
+    navigate({ programId: nextProgramId, cycleCode: '' }, { push: true });
+  };
+
+  return (
+    <Layout title="Request Workbench">
+      <PageHeader
+        title="Request Workbench"
+        subtitle="Find and manage peer reviewers for your grant requests, one cycle at a time."
+        icon="🗂️"
+      />
+      <WorkbenchViewsNav activeKey={location.view} cycleCode={cycleCode} programId={location.programId} />
+
+      <div className="flex flex-wrap items-end gap-4 mb-6">
+        <ToolbarSelect
+          id="workbench-program"
+          label="Grant Program"
+          value={programId}
+          disabled={loadingCycles || programs.length === 0}
+          onChange={(e) => changeProgram(e.target.value)}
+        >
+          {programs.length === 0 && <option value="">Loading programs…</option>}
+          {programs.map((program) => (
+            <option key={program.programId} value={program.programId}>{program.name}</option>
+          ))}
+        </ToolbarSelect>
+        <ToolbarSelect
+          id="workbench-cycle"
+          label="Cycle"
+          value={cycleCode || ''}
+          disabled={loadingCycles || cycles.length === 0}
+          onChange={(e) => navigate({ cycleCode: e.target.value }, { push: true })}
+        >
+          {cycles.map((c) => (
+            <option key={c.code} value={c.code}>
+              {c.label || c.code}{c.count ? ` (${c.count})` : ''}
+            </option>
+          ))}
+        </ToolbarSelect>
+      </div>
+
+      {cyclesError && (
+        <div className="mb-6 p-4 rounded-lg bg-red-50 border border-red-200 text-red-800 text-sm" role="alert">
+          {cyclesError}{' '}
+          <button type="button" className="underline font-medium" onClick={() => setCyclesAttempt((n) => n + 1)}>Try again</button>
+        </div>
+      )}
+
+      {location.view === 'requests' ? (
+        <RequestListPanel
+          key={programId}
+          programId={programId}
+          cycleCode={cycleCode}
+          cycles={cycles}
+          cyclesGeneration={cyclesGeneration}
+          patchCycleCounts={patchCycleCounts}
+          loadingCycles={loadingCycles}
+          scope={location.scope}
+          includeSetAside={location.includeSetAside}
+          onScopeChange={(scope) => navigate({ scope })}
+          onIncludeSetAsideChange={(includeSetAside) => navigate({ includeSetAside })}
+        />
+      ) : (
+        <Card hover={false}><p className="text-gray-500">This view opens on its own page from the tabs above.</p></Card>
+      )}
+    </Layout>
+  );
+}
+
+export default WorkbenchShell;

@@ -44,6 +44,32 @@ sequence.
 | 8 | J27 single-phase transition inventory (register of what retires, persists, changes, or must be built) | **[OWNER-DIRECTED 2026-09-06; SWEEP RUN; REGISTER BUILT; GATE GREEN ON BRANCH `claude/j27-gate-tighten` AFTER RECONCILIATION, MATRIX REVIEW, A CODEX ADVERSARIAL REVIEW, AND THE OWNER'S J27-023 RULING.]** The owner asked to collect every J27-sensitive site in one place and plan the June 2027 build and change work. `docs/J27_TRANSITION_REGISTER.md` holds the sweep output across Retire / Persist / Change / Build / Scale, seven recorded contradictions, and owner questions. The `J27:` marker convention and advisory check script `scripts/check-j27-register.js` were built 2026-09-07 and merged to `main` (PR #180/#181). **2026-09-08 (branch `claude/j27-gate-tighten`):** the owner decided to keep the strict per-site excerpt rule and reconcile the register with subagents rather than weaken the gate. A site-to-fragment binding schema (`` `path` → `fragment` ``) was added so a reconciled row cannot pass on a coincidental match, refined through an Opus review (four schema gaps fixed) and the owner's STRICT UNBOUND decision ("we don't need drift": an unbound file in a multi-site row is itself a failure, not an info flag). Applying the fully-fixed gate to the real register initially found 12 ok / 47 stale / 6 unverifiable / 11 closed / 47 unbound rows. Four parallel Sonnet subagents reconciled every stale row to the binding syntax per `docs/plans/J27_REGISTER_PER_SITE_RECONCILIATION_PLAN_2026-09-08.md` Phase 1; two exhaustive Opus matrix reviews then returned CONDITIONS on all four slices, applied in a follow-up commit, reaching 59 ok / 0 stale. A Codex adversarial review of that state (`65eb4bfe`) then found: (1) the row-detection regex silently skipped valid non-canonically-spaced Markdown rows instead of checking them — fixed, now whitespace-tolerant and fails closed (exit 2) on a malformed id; (2) J27-023 was bound to a verbatim-but-not-the-row's-fact fragment — fixed by removing that binding, which honestly makes the row STALE pending an owner ruling (self-test's `KNOWN_OWNER_PENDING` documents the exception); (3) two remaining plan-doc passages still described unbound multi-site files as informational — rewritten to STRICT UNBOUND; (4) two doc restatements of the already-fixed `REVIEWER_ENGAGEMENT_SPEC.md`/`finance-honoraria.md` stale lines were marked resolved. The owner ruled 2026-09-08 (option 1): the shortcode-domain audit is not a J27 site, so its citation was dropped from J27-023 and `Ev` restored to SV. Current baseline: `check:j27-register` reports 59 ok, 0 stale, 6 unverifiable, 11 closed, 0 unbound, 0 disposition-vocabulary warnings; self-test fully green (80/80, `KNOWN_OWNER_PENDING` empty). Not yet merged to `main`. **Next action is the J27 build plan once Q5 lands** — the separate J27 build plan still waits on Connor's file-location decision (parked, he is out). | **Met when:** every register row is labelled and verified, the owner questions are answered or queued, the gate is green on `main` (0 stale, 0 unbound, 0 vocabulary warnings), and the marker check script is referenced from `docs/CI_GATES_REFERENCE.md`. |
 
 ## Audit follow-ups — verified open, not silently prioritized
+- **Single-page Request Workbench shell (owner direction 2026-09-08, Session 499).**
+  The Workbench was conceived as one page a PD moves across left to right through
+  a cycle; the Request list kept its content in place while Reviewer follow-up,
+  Final writeups, and Awardees opened separate pages, which made back navigation
+  hard. Owner: "Why not do 2 now?" (build the shell). Sequence, one PR each,
+  every one independently green: (1) shell + URL state + Request list panel +
+  nav links into the shell — **built in PR #204 (`claude/workbench-shell`)**:
+  `shared/components/workbench/WorkbenchShell.js` owns `view`, `programId`,
+  `cycleCode`, `scope`, `setAside` in the URL (`workbench-location.js`), resolves
+  the working cycle from the dashboard cycle list, and mounts
+  `RequestListPanel.js`; (2) Reviewer follow-up panel (restores the views strip
+  on that view, reversing that part of PR #151; carries attention/all and search
+  in the URL); (3) Final writeups panel, replacing the walk-back to an older
+  cycle with an in-place message and link (supersedes the 2026-09-06 walk-back
+  decision; reconcile `docs/FINAL_WRITEUPS_DASHBOARD_CYCLE_SCOPING_PLAN.md`
+  §3.3 and its `defaultResolvedBy` tests); (4) Awardees + Initial assessments
+  panels (Initial assessments moves onto the cycle resolver; a D26 deep link
+  renders the existing explanatory card); (5) the approved stragglers: Expertise
+  Finder fiscal-year filter and hard-coded 'December 2025', request-search
+  fiscal-year fallback, client-supplied stored `wmkf_grantcyclecode` preference.
+  **Owner decision needed before (4):** Awardees opens on the *last decided*
+  cycle (owner 2026-09-08) while every other view opens on the *working* cycle;
+  with one cycle in the URL both cannot hold. Proposed: the Awardees panel shows
+  the shell's cycle and, when that cycle has no awardees yet, one line naming
+  the last decided cycle as a link that changes the shell's cycle (the awardees
+  endpoint's cycle-list mode already returns `lastDecidedCycleCode`).
 - **Reviewer follow-up cards should show the program director.** Owner request
   2026-09-08 (Session 499): each request card on
   `/workbench/reviewer-follow-up` shows institution and PI but not the PD, so

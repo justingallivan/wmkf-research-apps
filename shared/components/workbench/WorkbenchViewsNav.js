@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useEffect, useRef } from 'react';
+import { SHELL_PANEL_VIEWS, buildWorkbenchHref } from './workbench-location';
 
 const VIEWS = [
   { key: 'requests', label: 'Request list', href: '/workbench' },
@@ -10,11 +11,13 @@ const VIEWS = [
   { key: 'awardees', label: 'Awardees', href: '/workbench/awardees' },
 ];
 
-function withCycle(href, cycleCode) {
-  if (!cycleCode || !['/workbench', '/workbench/artifacts', '/workbench/reviewer-follow-up', '/workbench/awardees'].includes(href)) {
-    return href;
-  }
-  return `${href}?cycleCode=${encodeURIComponent(cycleCode)}`;
+// Views that live inside the shell page link to it with the shell's program
+// and cycle; the others still open their own page, carrying the cycle where
+// that page reads it (Final writeups resolves its own cycle).
+function hrefFor(view, cycleCode, programId) {
+  if (SHELL_PANEL_VIEWS.has(view.key)) return buildWorkbenchHref({ view: view.key, programId, cycleCode });
+  if (!cycleCode || view.href === '/workbench/final-writeups') return view.href;
+  return `${view.href}?cycleCode=${encodeURIComponent(cycleCode)}`;
 }
 
 // Initial Assessments are not part of the D26 dual-phase workflow (owner
@@ -36,7 +39,7 @@ function inferActiveKey(pathname) {
   return null;
 }
 
-export default function WorkbenchViewsNav({ activeKey, cycleCode, counts = {} }) {
+export default function WorkbenchViewsNav({ activeKey, cycleCode, programId = '', counts = {} }) {
   const router = useRouter();
   const resolvedActiveKey = activeKey || inferActiveKey(router.pathname);
   const scrollerRef = useRef(null);
@@ -60,7 +63,8 @@ export default function WorkbenchViewsNav({ activeKey, cycleCode, counts = {} })
           return (
             <Link
               key={view.key}
-              href={withCycle(view.href, cycleCode)}
+              href={hrefFor(view, cycleCode, programId)}
+              shallow={SHELL_PANEL_VIEWS.has(view.key)}
               aria-current={active ? 'page' : undefined}
               className={`inline-flex min-h-11 items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold whitespace-nowrap transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-1 ${
                 active

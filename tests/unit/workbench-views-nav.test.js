@@ -24,3 +24,19 @@ describe('WorkbenchViewsNav cycle-conditional views', () => {
     expect(labels()).toHaveLength(5);
   });
 });
+
+describe('WorkbenchViewsNav shell links', () => {
+  test('shell-backed views link into the shell with the program and cycle; the rest still open their pages', () => {
+    render(<WorkbenchViewsNav activeKey="requests" cycleCode="D26" programId="p1" />);
+    expect(screen.getByRole('link', { name: 'Request list' })).toHaveAttribute('href', '/workbench?programId=p1&cycleCode=D26');
+    expect(screen.getByRole('link', { name: 'Reviewer follow-up' })).toHaveAttribute('href', '/workbench/reviewer-follow-up?cycleCode=D26');
+    expect(screen.getByRole('link', { name: 'Awardees' })).toHaveAttribute('href', '/workbench/awardees?cycleCode=D26');
+    expect(screen.getByRole('link', { name: 'Final writeups' })).toHaveAttribute('href', '/workbench/final-writeups');
+  });
+
+  test('marks the active view for assistive tech', () => {
+    render(<WorkbenchViewsNav activeKey="requests" cycleCode="D26" />);
+    expect(screen.getByRole('link', { name: 'Request list' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('link', { name: 'Awardees' })).not.toHaveAttribute('aria-current');
+  });
+});
