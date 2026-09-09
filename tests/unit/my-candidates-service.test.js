@@ -136,6 +136,7 @@ describe('getMyCandidates', () => {
 
   test.each([
     ['meeting-date-derived code wins over a disagreeing stored code', '2026-06-15', 'J99', 'J26'],
+    ['an off-month meeting date shows no cycle, never the stored code', '2026-03-01', 'J99', null],
     ['stored code fills in only when the request has no meeting date', null, 'D25', 'D25'],
     ['no meeting date and no stored code is null, never a guess', null, null, null],
   ])('grantCycleCode: %s', async (_label, meetingDate, storedCode, expected) => {
