@@ -3,6 +3,7 @@ import Layout, { PageHeader, Card, Button } from '../shared/components/Layout';
 import FileUploaderSimple from '../shared/components/FileUploaderSimple';
 import RequireAppAccess from '../shared/components/RequireAppAccess';
 import ErrorAlert from '../shared/components/ErrorAlert';
+import { conventionalCycles, resolveWorkingCycle, cycleCodeToLabel } from '../lib/utils/cycle-code.js';
 
 // ─── Tab Component ───
 
@@ -643,7 +644,8 @@ function RosterForm({ initialData, onChange, onSubmit, onCancel, saving, roleTyp
 // ─── Batch Tab ───
 
 function BatchTab() {
-  const [fiscalYear, setFiscalYear] = useState('December 2025');
+  // Opens on the working cycle (the upcoming board meeting), like the Workbench.
+  const [cycleCode, setCycleCode] = useState(() => resolveWorkingCycle(conventionalCycles()));
   const [program, setProgram] = useState('SE');
   const [proposals, setProposals] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -654,13 +656,13 @@ function BatchTab() {
   const [expandedId, setExpandedId] = useState(null);
   const abortRef = useRef(false);
 
-  // Generate cycle options (current year back to 2020)
+  // Cycle options: next year's meetings back to 2020, newest first.
   const cycleOptions = useMemo(() => {
     const cycles = [];
-    const currentYear = new Date().getFullYear();
-    for (let year = currentYear; year >= 2020; year--) {
-      cycles.push({ value: `December ${year}`, label: `D${year % 100} - December ${year}` });
-      cycles.push({ value: `June ${year}`, label: `J${year % 100} - June ${year}` });
+    const currentYear = new Date().getUTCFullYear();
+    for (let year = currentYear + 1; year >= 2020; year--) {
+      const yy = String(year % 100).padStart(2, '0');
+      for (const code of [`D${yy}`, `J${yy}`]) cycles.push({ value: code, label: `${code} - ${cycleCodeToLabel(code)}` });
     }
     return cycles;
   }, []);
@@ -673,7 +675,7 @@ function BatchTab() {
     setExpandedId(null);
 
     try {
-      const params = new URLSearchParams({ fiscalYear, program });
+      const params = new URLSearchParams({ cycleCode, program });
       const response = await fetch(`/api/expertise-finder/proposals?${params}`);
       const data = await response.json();
 
@@ -784,7 +786,7 @@ function BatchTab() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `expertise_batch_${program}_${fiscalYear.replace(/\s/g, '_')}.csv`;
+    a.download = `expertise_batch_${program}_${cycleCode}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -799,10 +801,11 @@ function BatchTab() {
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Query Dynamics Proposals</h3>
         <div className="flex flex-col sm:flex-row gap-3 items-end">
           <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Grant Cycle</label>
+            <label htmlFor="batch-cycle" className="block text-sm font-medium text-gray-700 mb-1">Grant Cycle</label>
             <select
-              value={fiscalYear}
-              onChange={(e) => setFiscalYear(e.target.value)}
+              id="batch-cycle"
+              value={cycleCode}
+              onChange={(e) => setCycleCode(e.target.value)}
               className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
               {cycleOptions.map(c => (

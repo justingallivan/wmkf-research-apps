@@ -20,7 +20,7 @@ Do:
 - Verify callers (e.g. `my-proposals.js`, `reviewer-suggestion.js findByPD`) before relying on existing cycle filters.
 
 Do not:
-- Expose `akoya_fiscalyear` as a separate filter axis (it's just month+year of `wmkf_meetingdate`).
+- Expose `akoya_fiscalyear` as a separate filter axis (it's just month+year of `wmkf_meetingdate`). The last two runtime readers that did — Expertise Finder's proposals query and request search's unknown-label fallback — were moved onto `cycleCodeToOdataFilter` / a 400 on 2026-09-08 (S499).
 - Treat `Jxx`/`Dxx` as a schema invariant — it's a June/Dec convention; non-June/Dec months return null and vanish from cycle-grouped views.
 - Conflate `wmkf_meetingdate` (board-cycle) with `akoya_decisiondate` (approval-stamp/business-history axis).
 
@@ -47,7 +47,8 @@ function of the calendar and the cycles that exist — never of the caller's ass
 is visible to them. `lib/utils/cycle-code.js` `resolveWorkingCycle` (earliest meeting on/after today;
 September → D26) and `resolveLastDecidedCycle` (newest meeting before today; September → J26) are
 the only default-cycle rules; `conventionalCycles(today)` supplies the June/December codes to
-the one caller with no list (the grantee-titles cron — an explicit fallback, not existence-aware).
+the callers with no list (the grantee-titles cron and, since S499, the Expertise Finder Batch tab —
+explicit fallbacks, not existence-aware).
 Awardees = last decided; every other Workbench view = working. UTC throughout. The precise
 invariant is PER GRANT PROGRAM: two callers viewing the same program on the same day open on the
 same cycle (the cycle list is program-scoped by the PR #183 owner decision). **Wired (PR #203):**

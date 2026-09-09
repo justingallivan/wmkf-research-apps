@@ -49,17 +49,17 @@ describe('GET /api/expertise-finder/proposals (grant-request adapter contract)',
     });
 
     const res = mockRes();
-    await handler(reqOf({ fiscalYear: 'December 2025' }), res);
+    await handler(reqOf({ cycleCode: 'D25' }), res);
 
     expect(res.statusCode).toBe(200);
     expect(DynamicsService.queryAllRecords).toHaveBeenCalledWith('akoya_requests', {
       select: [
-        'akoya_requestid', 'akoya_requestnum', 'akoya_title', 'akoya_fiscalyear',
+        'akoya_requestid', 'akoya_requestnum', 'akoya_title', 'wmkf_meetingdate',
         'wmkf_phaseistatus', 'wmkf_phaseiistatus',
         '_akoya_programid_value', '_akoya_applicantid_value', '_wmkf_projectleader_value',
         '_wmkf_programdirector_value',
       ].join(','),
-      filter: "akoya_fiscalyear eq 'December 2025' and wmkf_request_type eq 100000001",
+      filter: 'wmkf_meetingdate ge 2025-12-01T00:00:00Z and wmkf_meetingdate lt 2026-01-01T00:00:00Z and wmkf_request_type eq 100000001',
       orderby: 'akoya_requestnum asc',
     });
     expect(res.body).toEqual({
@@ -69,17 +69,37 @@ describe('GET /api/expertise-finder/proposals (grant-request adapter contract)',
         pi: 'Dr. PI', actualPd: 'Dr. PD', phaseIStatus: 'Invited', phaseIIStatus: 'Pending',
       }],
       totalCount: 1,
-      fiscalYear: 'December 2025',
+      cycleCode: 'D25',
       program: 'all',
     });
   });
 
-  test('failure: missing fiscalYear -> 400, envelope pinned, no query issued', async () => {
+  test('failure: missing cycleCode -> 400, envelope pinned, no query issued', async () => {
     const res = mockRes();
     await handler(reqOf({}), res);
     expect(res.statusCode).toBe(400);
-    expect(res.body).toEqual({ error: 'fiscalYear is required' });
+    expect(res.body).toEqual({ error: 'cycleCode is required' });
     expect(DynamicsService.queryAllRecords).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    ['a fiscal-year label', 'December 2025'],
+    ['an OData fragment', "D25' or akoya_requestnum ne '"],
+    ['a repeated parameter', ['D25', 'J25']],
+  ])('failure: %s as cycleCode -> 400, no query issued', async (_label, cycleCode) => {
+    const res = mockRes();
+    await handler(reqOf({ cycleCode }), res);
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toEqual({ error: 'cycleCode must be a grant cycle code such as D26' });
+    expect(DynamicsService.queryAllRecords).not.toHaveBeenCalled();
+  });
+
+  test('cycleCode is case- and whitespace-tolerant', async () => {
+    DynamicsService.queryAllRecords.mockResolvedValueOnce({ records: [] });
+    const res = mockRes();
+    await handler(reqOf({ cycleCode: ' d25 ' }), res);
+    expect(res.statusCode).toBe(200);
+    expect(res.body.cycleCode).toBe('D25');
   });
 
   test('405 on non-GET, no auth check performed', async () => {
@@ -93,7 +113,7 @@ describe('GET /api/expertise-finder/proposals (grant-request adapter contract)',
   test('unauth: requireAppAccess short-circuits, no query issued', async () => {
     requireAppAccess.mockResolvedValueOnce(null);
     const res = mockRes();
-    await handler(reqOf({ fiscalYear: 'December 2025' }), res);
+    await handler(reqOf({ cycleCode: 'D25' }), res);
     expect(DynamicsService.queryAllRecords).not.toHaveBeenCalled();
     expect(requireAppAccess).toHaveBeenCalledWith(expect.anything(), expect.anything(), 'expertise-finder');
   });
@@ -104,7 +124,7 @@ describe('GET /api/expertise-finder/proposals (grant-request adapter contract)',
     DynamicsService.queryAllRecords.mockRejectedValueOnce(new Error('Dynamics timeout'));
     const res = mockRes();
     try {
-      await handler(reqOf({ fiscalYear: 'December 2025' }), res);
+      await handler(reqOf({ cycleCode: 'D25' }), res);
     } finally {
       process.env.NODE_ENV = prevEnv;
     }
