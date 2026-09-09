@@ -44,7 +44,7 @@ a *suspicious waiver-token failure* — a blocked submit, not a completed one. T
 `lib/services/grantee-upload.js` for `notif|sendEmail|createEmailActivity` — the two hits are both the
 waiver-block path; the writer has none.
 
-**Status is pull-only.** `[VERIFIED via pages/workbench/awardees.js:117, awardees-service.js:78-87, AwardeeTab.js:345]`
+**Status is pull-only.** `[VERIFIED via shared/components/workbench/AwardeesPanel.js:206 (formerly pages/workbench/awardees.js:117), awardees-service.js:78-87, AwardeeTab.js:345]`
 `/workbench/awardees?cycleCode=` renders a per-award "Deliverables" column from the package status,
 and the Awardee tab repeats it. A PD learns a grantee responded only by loading one of those pages.
 
@@ -135,7 +135,7 @@ grantee's submit outcome depend on PD resolution.
 deep link has to travel in `message` (and in `metadata` for the dashboard row). Both are listed above.
 
 The path is `/workbench/<requestId>?tab=awardee`, matching the link the awardees list already builds
-`[VERIFIED via pages/workbench/awardees.js:119]`. It must be made **absolute** for an email, and the
+`[VERIFIED via shared/components/workbench/AwardeesPanel.js:208 (formerly pages/workbench/awardees.js:119)]`. It must be made **absolute** for an email, and the
 origin is not obvious:
 
 - Use `process.env.NEXTAUTH_URL` (trailing slash stripped) — the staff app origin.

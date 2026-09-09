@@ -1,22 +1,19 @@
 import Link from 'next/link';
-import { useRouter } from 'next/router';
 import { useEffect, useRef } from 'react';
-import { SHELL_PANEL_VIEWS, buildWorkbenchHref } from './workbench-location';
+import { buildWorkbenchHref } from './workbench-location';
 
 const VIEWS = [
-  { key: 'requests', label: 'Request list', href: '/workbench' },
-  { key: 'initial-assessments', label: 'Initial assessments', href: '/workbench/artifacts' },
-  { key: 'reviewer-follow-up', label: 'Reviewer follow-up', href: '/workbench/reviewer-follow-up' },
-  { key: 'final-writeups', label: 'Final writeups', href: '/workbench/final-writeups' },
-  { key: 'awardees', label: 'Awardees', href: '/workbench/awardees' },
+  { key: 'requests', label: 'Request list' },
+  { key: 'initial-assessments', label: 'Initial assessments' },
+  { key: 'reviewer-follow-up', label: 'Reviewer follow-up' },
+  { key: 'final-writeups', label: 'Final writeups' },
+  { key: 'awardees', label: 'Awardees' },
 ];
 
-// Views that live inside the shell page link to it with the shell's program
-// and cycle; the others still open their own page, carrying the cycle.
+// Every view lives inside the shell page: links carry the shell's program and
+// cycle and switch the view shallowly (per-view filters reset on a switch).
 function hrefFor(view, cycleCode, programId) {
-  if (SHELL_PANEL_VIEWS.has(view.key)) return buildWorkbenchHref({ view: view.key, programId, cycleCode });
-  if (!cycleCode) return view.href;
-  return `${view.href}?cycleCode=${encodeURIComponent(cycleCode)}`;
+  return buildWorkbenchHref({ view: view.key, programId, cycleCode });
 }
 
 // Initial Assessments are not part of the D26 dual-phase workflow (owner
@@ -29,18 +26,8 @@ function visibleForCycle(view, cycleCode) {
   return cycleCode !== 'D26';
 }
 
-function inferActiveKey(pathname) {
-  if (pathname === '/workbench') return 'requests';
-  if (pathname.startsWith('/workbench/artifacts')) return 'initial-assessments';
-  if (pathname.startsWith('/workbench/reviewer-follow-up')) return 'reviewer-follow-up';
-  if (pathname.startsWith('/workbench/final-writeups')) return 'final-writeups';
-  if (pathname.startsWith('/workbench/awardees')) return 'awardees';
-  return null;
-}
-
 export default function WorkbenchViewsNav({ activeKey, cycleCode, programId = '', counts = {} }) {
-  const router = useRouter();
-  const resolvedActiveKey = activeKey || inferActiveKey(router.pathname);
+  const resolvedActiveKey = activeKey;
   const scrollerRef = useRef(null);
 
   useEffect(() => {
@@ -63,7 +50,7 @@ export default function WorkbenchViewsNav({ activeKey, cycleCode, programId = ''
             <Link
               key={view.key}
               href={hrefFor(view, cycleCode, programId)}
-              shallow={SHELL_PANEL_VIEWS.has(view.key)}
+              shallow
               aria-current={active ? 'page' : undefined}
               className={`inline-flex min-h-11 items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold whitespace-nowrap transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-1 ${
                 active

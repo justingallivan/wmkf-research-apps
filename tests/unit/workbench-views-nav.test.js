@@ -2,8 +2,6 @@
 import { render, screen } from '@testing-library/react';
 import WorkbenchViewsNav from '../../shared/components/workbench/WorkbenchViewsNav';
 
-jest.mock('next/router', () => ({ useRouter: () => ({ pathname: '/workbench' }) }));
-
 const labels = () => screen.getAllByRole('link').map((link) => link.textContent.trim());
 
 describe('WorkbenchViewsNav cycle-conditional views', () => {
@@ -20,17 +18,17 @@ describe('WorkbenchViewsNav cycle-conditional views', () => {
   test('shows Initial assessments for a later cycle, carrying the cycle in the link', () => {
     render(<WorkbenchViewsNav activeKey="requests" cycleCode="J27" />);
     const link = screen.getByRole('link', { name: /Initial assessments/ });
-    expect(link).toHaveAttribute('href', '/workbench/artifacts?cycleCode=J27');
+    expect(link).toHaveAttribute('href', '/workbench?view=initial-assessments&cycleCode=J27');
     expect(labels()).toHaveLength(5);
   });
 });
 
 describe('WorkbenchViewsNav shell links', () => {
-  test('shell-backed views link into the shell with the program and cycle; the rest still open their pages', () => {
+  test('every view links into the shell with the program and cycle', () => {
     render(<WorkbenchViewsNav activeKey="requests" cycleCode="D26" programId="p1" />);
     expect(screen.getByRole('link', { name: 'Request list' })).toHaveAttribute('href', '/workbench?programId=p1&cycleCode=D26');
     expect(screen.getByRole('link', { name: 'Reviewer follow-up' })).toHaveAttribute('href', '/workbench?view=reviewer-follow-up&programId=p1&cycleCode=D26');
-    expect(screen.getByRole('link', { name: 'Awardees' })).toHaveAttribute('href', '/workbench/awardees?cycleCode=D26');
+    expect(screen.getByRole('link', { name: 'Awardees' })).toHaveAttribute('href', '/workbench?view=awardees&programId=p1&cycleCode=D26');
     expect(screen.getByRole('link', { name: 'Final writeups' })).toHaveAttribute('href', '/workbench?view=final-writeups&programId=p1&cycleCode=D26');
   });
 

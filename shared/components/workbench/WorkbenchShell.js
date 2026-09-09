@@ -2,8 +2,8 @@
  * Request Workbench shell — one page a PD moves across left to right through a
  * cycle. The shell owns the Grant Program and cycle (in the URL, see
  * workbench-location.js), loads the program's cycle list once, and mounts the
- * selected view as a panel below a shared toolbar. Views not yet moved inside
- * the shell still open their own pages from the views nav.
+ * selected view as a panel below a shared toolbar. Every view is a panel; the
+ * old per-view pages redirect here.
  *
  * Cycle default: the dashboard cycle list's `defaultCycleCode` (the working
  * cycle = the upcoming board meeting, per lib/utils/cycle-code.js) when the
@@ -17,12 +17,14 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/router';
-import Layout, { PageHeader, Card } from '../Layout';
+import Layout, { PageHeader } from '../Layout';
 import ToolbarSelect from '../ToolbarSelect';
 import WorkbenchViewsNav from './WorkbenchViewsNav';
 import RequestListPanel from './RequestListPanel';
 import ReviewerFollowUpPanel from './ReviewerFollowUpPanel';
 import { FinalWriteupsPanel } from '../final-writeups/FinalWriteupsViews';
+import AwardeesPanel from './AwardeesPanel';
+import InitialAssessmentsPanel from './InitialAssessmentsPanel';
 import { cycleCodeToLabel } from '../../../lib/utils/cycle-code.js';
 import { WORKBENCH_LOCATION_KEYS, buildWorkbenchHref, readWorkbenchQuery } from './workbench-location';
 
@@ -232,8 +234,16 @@ export function WorkbenchShell({ previewReadOnly = false }) {
           onUncycledChange={(uncycled) => navigate({ uncycled }, { push: true })}
           onCycleChange={(code) => navigate({ cycleCode: code, uncycled: false }, { push: true })}
         />
+      ) : location.view === 'awardees' ? (
+        <AwardeesPanel
+          cycleCode={cycleCode}
+          loadingCycles={!cyclesReady && !cyclesError}
+          scope={location.scope}
+          onScopeChange={(scope) => navigate({ scope })}
+          onCycleChange={(code) => navigate({ cycleCode: code }, { push: true })}
+        />
       ) : (
-        <Card hover={false}><p className="text-gray-500">This view opens on its own page from the tabs above.</p></Card>
+        <InitialAssessmentsPanel cycleCode={cycleCode} loadingCycles={!cyclesReady && !cyclesError} />
       )}
     </Layout>
   );
