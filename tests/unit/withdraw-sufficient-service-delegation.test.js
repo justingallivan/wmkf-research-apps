@@ -139,3 +139,20 @@ test('success → withdrawn count increments and the email path proceeds', async
   expect(createAndSendEmail).toHaveBeenCalledTimes(1);
   expect(out.results[0]).toMatchObject({ suggestionId: SUG, status: 'withdrawn_emailed' });
 });
+
+test('threads no_response to the lifecycle command and skips email by default', async () => {
+  findById.mockResolvedValue(pendingRow());
+  withdrawPendingInvitation.mockResolvedValueOnce(undefined);
+
+  const out = await withdrawSufficient({ ...ARGS, reason: 'no_response' });
+
+  expect(withdrawPendingInvitation).toHaveBeenCalledWith({
+    id: SUG,
+    nowIso: expect.any(String),
+    ifMatch: 'W/"1"',
+    actingUserSystemId: 'u-1',
+    reason: 'no_response',
+  });
+  expect(out.results).toEqual([{ suggestionId: SUG, status: 'withdrawn_no_email_by_reason', reason: 'no_response' }]);
+  expect(createAndSendEmail).not.toHaveBeenCalled();
+});

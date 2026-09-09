@@ -118,6 +118,66 @@ test('happy path: withdrawn_emailed, lifecycle write with ifMatch BEFORE the ema
   }));
 });
 
+test('no-response release records a deliberate email skip without rendering or sending', async () => {
+  findById.mockResolvedValue(pendingRow());
+
+  const out = await withdrawSufficient({ ...ARGS, reason: 'no_response' });
+
+  expect(out).toEqual({
+    ok: true,
+    withdrawn: 1,
+    results: [{ suggestionId: SUG, status: 'withdrawn_no_email_by_reason', reason: 'no_response' }],
+  });
+  expect(updateLifecycle).toHaveBeenCalledWith(
+    SUG,
+    expect.objectContaining({
+      responseType: 'no_response',
+      responseReceivedAt: expect.any(String),
+      respondReminderSentAt: null,
+      externalTokenRevoked: true,
+    }),
+    expect.objectContaining({ ifMatch: 'W/"1"', actingUserSystemId: 'u-1' }),
+  );
+  expect(readRequiredEmailDefaults).not.toHaveBeenCalled();
+  expect(renderWithdrawSufficient).not.toHaveBeenCalled();
+  expect(createAndSendEmail).not.toHaveBeenCalled();
+});
+
+test('no-response release with reviewed email sends only after the lifecycle write', async () => {
+  findById.mockResolvedValue(pendingRow());
+  const overrides = {
+    [SUG]: {
+      subject: 'Reviewed subject', bodyText: 'Reviewed body', to: 'rev@example.org',
+      from: 'pd@keck.org', senderId: 'pd-1',
+    },
+  };
+
+  const out = await withdrawSufficient({ ...ARGS, reason: 'no_response', overrides });
+
+  expect(out.results).toEqual([{ suggestionId: SUG, status: 'withdrawn_emailed', reason: 'no_response' }]);
+  expect(updateLifecycle.mock.invocationCallOrder[0]).toBeLessThan(createAndSendEmail.mock.invocationCallOrder[0]);
+  expect(updateLifecycle.mock.calls[0][1]).toEqual({
+    responseType: 'no_response',
+    responseReceivedAt: expect.any(String),
+    respondReminderSentAt: null,
+    externalTokenRevoked: true,
+  });
+});
+
+test('no-response release still skips a row that accepts before the ETag-guarded write', async () => {
+  findById.mockResolvedValue(pendingRow());
+  updateLifecycle.mockRejectedValueOnce(Object.assign(new Error('precondition failed'), { status: 412 }));
+
+  const out = await withdrawSufficient({ ...ARGS, reason: 'no_response' });
+
+  expect(out).toEqual({
+    ok: true,
+    withdrawn: 0,
+    results: [{ suggestionId: SUG, status: 'changed_skipped', error: 'precondition failed', reason: 'no_response' }],
+  });
+  expect(createAndSendEmail).not.toHaveBeenCalled();
+});
+
 test('missing suggestion → not_found, no write', async () => {
   findById.mockResolvedValue(null);
   const out = await withdrawSufficient(ARGS);

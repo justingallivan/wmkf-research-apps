@@ -33,13 +33,14 @@ beforeEach(() => {
   withdrawSufficient.mockClear();
 });
 
-async function run(overrides) {
+async function run(overrides, reason) {
   const req = createMockReq({
     method: 'POST',
     body: {
       requestId: REQUEST_ID,
       suggestionIds: [SUGGESTION_ID],
       overrides,
+      ...(reason === undefined ? {} : { reason }),
     },
   });
   const res = createMockRes();
@@ -101,5 +102,24 @@ test('rejects incomplete or non-string selected overrides', async () => {
 
   expect(res.statusCode).toBe(400);
   expect(res._data.error).toMatch(/requires complete .* overrides/i);
+  expect(withdrawSufficient).not.toHaveBeenCalled();
+});
+
+test('omitted reason passes no_longer_needed semantics to the service', async () => {
+  const res = await run(null);
+
+  expect(res.statusCode).toBe(200);
+  expect(withdrawSufficient).toHaveBeenCalledWith(expect.objectContaining({
+    requestId: REQUEST_ID,
+    suggestionIds: [SUGGESTION_ID],
+    reason: 'no_longer_needed',
+  }));
+});
+
+test('rejects an unknown reason before calling the service', async () => {
+  const res = await run(null, 'made_up_reason');
+
+  expect(res.statusCode).toBe(400);
+  expect(res._data.error).toMatch(/reason must be no_longer_needed or no_response/);
   expect(withdrawSufficient).not.toHaveBeenCalled();
 });
