@@ -9,6 +9,7 @@ import {
 } from '../../shared/config/requestDocument';
 import { SITE_VISIT_FORMAT } from '../../shared/config/siteVisit';
 import { PARTY_NAVIGATION_PROPERTY } from '../../lib/dataverse/adapters/site-visit';
+import { TRIAGE_STATUS } from '../../shared/config/triageStatus';
 
 const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
 const ACTIVITY_ID = '22222222-2222-4222-8222-222222222222';
@@ -57,6 +58,12 @@ function dependencies(overrides = {}) {
   };
   return {
     schemaReady: jest.fn(() => true),
+    getRequest: jest.fn(async () => ({
+      akoya_requestid: REQUEST_ID,
+      akoya_requeststatus: 'Phase II Pending',
+      wmkf_triagestatus: null,
+      wmkf_meetingdate: '2026-12-11T00:00:00Z',
+    })),
     getArtifactStatus: jest.fn(async () => ({
       currentArtifact: {
         artifactId: '55555555-5555-4555-8555-555555555555',
@@ -234,13 +241,9 @@ test('still fails closed when neither the app map nor usable parties exist', asy
   }))).rejects.toMatchObject({ code: 'site_visit_attendee_map_invalid' });
 });
 
-test('requires an active stage, mapped actor, and non-duplicated recipient emails', async () => {
+test('requires a mapped actor and non-duplicated recipient emails', async () => {
   await expect(saveSiteVisitLogistics(input, { actingUserSystemId: null }, dependencies()))
     .rejects.toMatchObject({ code: 'site_visit_actor_required' });
-
-  await expect(getSiteVisitLogistics({ requestId: REQUEST_ID }, dependencies({
-    getArtifactStatus: jest.fn(async () => ({ currentArtifact: null })),
-  }))).rejects.toMatchObject({ code: 'site_visit_stage_not_active' });
 
   const duplicateDirectory = dependencies({
     resolveRecipientRefs: jest.fn(async (inputRefs) => inputRefs.map((ref) => ({
@@ -249,4 +252,101 @@ test('requires an active stage, mapped actor, and non-duplicated recipient email
   });
   await expect(saveSiteVisitLogistics(input, { actingUserSystemId: ACTOR_ID }, duplicateDirectory))
     .rejects.toMatchObject({ code: 'site_visit_attendee_duplicate' });
+});
+
+// Owner decision 2026-09-09 (PC_MEETING_TRACKER_PLAN.md §4): a Program
+// Coordinator schedules the visit weeks before the draft is shared, so
+// logistics are gated on the REQUEST (advancing, in a cycle with a meeting
+// date), not on the Pre-Site document's lifecycle stage.
+describe('request-schedulable gate (tracker slice 0)', () => {
+  test('saves successfully even when the current Pre-Site artifact is still Draft (not Review)', async () => {
+    const deps = dependencies({
+      getArtifactStatus: jest.fn(async () => ({
+        currentArtifact: {
+          artifactId: '55555555-5555-4555-8555-555555555555',
+          lifecycleState: REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT,
+        },
+      })),
+    });
+    const result = await saveSiteVisitLogistics(input, { actingUserSystemId: ACTOR_ID }, deps);
+
+    expect(result.siteVisit.activityId).toBe(ACTIVITY_ID);
+    expect(deps.createSiteVisit).toHaveBeenCalled();
+  });
+
+  test('getSiteVisitLogistics no longer rejects when there is no current artifact; materials still project', async () => {
+    const eligible = {
+      wmkf_requestdocumentid: '66666666-6666-4666-8666-666666666666',
+      _wmkf_request_value: REQUEST_ID,
+      wmkf_artifacttype: REQUEST_DOCUMENT_ARTIFACT_TYPE.APPLICANT_SLIDES,
+      wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+      wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW,
+      wmkf_filename: 'slides.pdf',
+      wmkf_sharepointweburl: 'https://example.sharepoint.com/slides.pdf',
+    };
+    const deps = dependencies({
+      getArtifactStatus: jest.fn(async () => ({ currentArtifact: null })),
+      findDocumentsByRequest: jest.fn(async () => ({ records: [eligible] })),
+    });
+    const result = await getSiteVisitLogistics({ requestId: REQUEST_ID }, deps);
+
+    expect(result.materials).toEqual([expect.objectContaining({
+      artifactId: eligible.wmkf_requestdocumentid,
+    })]);
+  });
+
+  test('missing wmkf_meetingdate is refused with no write', async () => {
+    const deps = dependencies({
+      getRequest: jest.fn(async () => ({
+        akoya_requestid: REQUEST_ID,
+        akoya_requeststatus: 'Phase II Pending',
+        wmkf_triagestatus: null,
+        wmkf_meetingdate: null,
+      })),
+    });
+    await expect(saveSiteVisitLogistics(input, { actingUserSystemId: ACTOR_ID }, deps))
+      .rejects.toMatchObject({ code: 'site_visit_request_not_schedulable' });
+    expect(deps.createSiteVisit).not.toHaveBeenCalled();
+    expect(deps.updateSiteVisit).not.toHaveBeenCalled();
+    expect(deps.replaceSiteVisitWithParties).not.toHaveBeenCalled();
+  });
+
+  test('a set-aside request is refused with no write', async () => {
+    const deps = dependencies({
+      getRequest: jest.fn(async () => ({
+        akoya_requestid: REQUEST_ID,
+        akoya_requeststatus: 'Phase I Pending',
+        wmkf_triagestatus: TRIAGE_STATUS.SET_ASIDE,
+        wmkf_meetingdate: '2026-12-11T00:00:00Z',
+      })),
+    });
+    await expect(saveSiteVisitLogistics(input, { actingUserSystemId: ACTOR_ID }, deps))
+      .rejects.toMatchObject({ code: 'site_visit_request_not_schedulable' });
+    expect(deps.createSiteVisit).not.toHaveBeenCalled();
+    expect(deps.updateSiteVisit).not.toHaveBeenCalled();
+    expect(deps.replaceSiteVisitWithParties).not.toHaveBeenCalled();
+  });
+
+  test('a non-Phase-II-Pending advancing request is allowed', async () => {
+    const deps = dependencies({
+      getRequest: jest.fn(async () => ({
+        akoya_requestid: REQUEST_ID,
+        akoya_requeststatus: 'Phase I Pending',
+        wmkf_triagestatus: TRIAGE_STATUS.ADVANCING,
+        wmkf_meetingdate: '2026-12-11T00:00:00Z',
+      })),
+    });
+    const result = await saveSiteVisitLogistics(input, { actingUserSystemId: ACTOR_ID }, deps);
+    expect(result.siteVisit.activityId).toBe(ACTIVITY_ID);
+    expect(deps.createSiteVisit).toHaveBeenCalled();
+  });
+
+  test('a missing request is 404 request_not_found with no write', async () => {
+    const deps = dependencies({ getRequest: jest.fn(async () => null) });
+    await expect(saveSiteVisitLogistics(input, { actingUserSystemId: ACTOR_ID }, deps))
+      .rejects.toMatchObject({ code: 'request_not_found', httpStatus: 404 });
+    expect(deps.createSiteVisit).not.toHaveBeenCalled();
+    expect(deps.updateSiteVisit).not.toHaveBeenCalled();
+    expect(deps.replaceSiteVisitWithParties).not.toHaveBeenCalled();
+  });
 });
