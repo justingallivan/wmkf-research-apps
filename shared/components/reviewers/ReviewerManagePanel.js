@@ -342,6 +342,7 @@ export default function ReviewerManagePanel({
   previewReadOnly = false,
   degraded = false,
   declineReferrals = [],
+  pendingInvites = [],
   referralActions = {},
   onAddReferral,
   onDismissDeclineReferral,
@@ -892,6 +893,45 @@ export default function ReviewerManagePanel({
           backward-readable for legacy free text. They surface only on Track
           Reviewers — the home base once invites are out. "Add as candidate"
           routes through the normal identity-resolution flow. */}
+      {mode === 'track' && pendingInvites.length > 0 && (
+        <section
+          className="rounded-lg border border-amber-200 bg-amber-50 p-4"
+          aria-labelledby="pending-invites-heading"
+          data-testid="pending-invites"
+        >
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p id="pending-invites-heading" className="text-sm font-semibold text-amber-900">
+                {pendingInvites.length} invited, awaiting response
+              </p>
+              <p className="text-xs text-amber-800 mt-1">
+                Synthesis waits on every open invitation. Send a reminder, or remove the invitation if no answer is expected.
+              </p>
+            </div>
+            {onGoToInvite && (
+              <button
+                type="button"
+                onClick={onGoToInvite}
+                className="text-xs font-medium text-amber-900 underline hover:text-amber-950"
+              >
+                Manage in Invite Reviewers
+              </button>
+            )}
+          </div>
+          <ul className="mt-3 space-y-1.5">
+            {pendingInvites.map((c) => (
+              <li key={c.suggestionId || c.id || c.email} className="rounded-md bg-white/70 border border-amber-100 px-3 py-2 text-sm">
+                <span className="font-medium text-gray-900">{c.name || 'Unnamed reviewer'}</span>
+                {c.affiliation && <span className="text-gray-600"> — {c.affiliation}</span>}
+                <span className="block text-xs text-gray-500">
+                  {c.emailSentAt ? `Invited ${new Date(c.emailSentAt).toLocaleDateString()}` : 'Invited'}
+                  {c.email ? ` · ${c.email}` : ''}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       {mode === 'track' && declineReferrals.length > 0 && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
           <p className="text-sm font-semibold text-amber-900 mb-1">

@@ -108,6 +108,11 @@ export default function ReviewersTab({
   ], [candidates, removedCandidates]);
   // Candidates badge: saved candidates not yet invited (and not accepted/declined).
   const candidatesToInvite = candidates.filter((c) => !c.invited && !c.accepted && !c.declined).length;
+  // Invited, no answer yet, not closed by a response type. These never reach
+  // the reviewers roster (accepted onward), yet synthesis waits on them, so
+  // Track Reviewers lists them as a trailing group and counts them (owner,
+  // 2026-09-09: an unanswered invite was invisible everywhere but Invite).
+  const pendingInvites = candidates.filter((c) => c.invited && !c.accepted && !c.declined && !c.responseType);
 
   const subParam = typeof router.query.sub === 'string' ? router.query.sub : null;
   const normalizedSubParam = subParam === 'invite' || subParam === 'completed' ? 'track' : subParam;
@@ -455,8 +460,8 @@ export default function ReviewersTab({
                   // otherwise the badge reads 0 and staff never open the tab where
                   // the referral callout lives (the all-declined-before-accept case).
                   <SubTabBadge
-                    count={countForMode(reviewers, t.key) + (t.key === 'track' ? declineReferrals.length : 0)}
-                    workRemaining={workRemainingForMode(reviewers, t.key) + (t.key === 'track' ? declineReferrals.length : 0)}
+                    count={countForMode(reviewers, t.key) + (t.key === 'track' ? declineReferrals.length + pendingInvites.length : 0)}
+                    workRemaining={workRemainingForMode(reviewers, t.key) + (t.key === 'track' ? declineReferrals.length + pendingInvites.length : 0)}
                   />
                 ) : null}
               </button>
@@ -562,6 +567,7 @@ export default function ReviewersTab({
             previewReadOnly={previewReadOnly}
             degraded={Boolean(error)}
             declineReferrals={declineReferrals}
+            pendingInvites={pendingInvites}
             referralActions={referralActions}
             onAddReferral={addReferralCandidate}
             onDismissDeclineReferral={dismissDeclineReferral}
