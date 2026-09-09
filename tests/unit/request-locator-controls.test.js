@@ -99,6 +99,23 @@ test('Search options is closed by default and reveals the filter selects when op
   expect(screen.queryByRole('button', { name: 'Retry filters' })).not.toBeInTheDocument();
 });
 
+test('typing a query while options are still loading does not strand the options load', async () => {
+  const pending = deferred();
+  fetch.mockReturnValue(pending.promise);
+  render(<RequestLocator />);
+  openSearchOptions();
+  expect(cycleSelect()).toBeDisabled();
+
+  // A keystroke fires invalidatePending(), which must not cancel the
+  // in-flight options fetch (a separate generation counter now covers it).
+  fireEvent.change(queryInput(), { target: { value: 'Uni' } });
+
+  await act(async () => pending.resolve(response({ ...options, cycles: [], statuses: [] })));
+  expect(cycleSelect()).toBeEnabled();
+  expect(statusSelect()).toBeEnabled();
+  expect(queryInput()).toHaveValue('Uni');
+});
+
 test('failed options retain saved filters in searches, and Clear filters preserves the query', async () => {
   saveCriteria();
   fetch.mockResolvedValueOnce(response({ error: 'Unavailable' }, false))

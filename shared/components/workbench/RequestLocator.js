@@ -71,11 +71,11 @@ function ChevronIcon({ open }) {
  *
  * `programId` seeds the *initial* search program from the shell's resolved
  * Grant Program at mount only — the shell mounts this component only once a
- * program has resolved, and does not remount it on a later program change,
- * so the locator deliberately keeps its own program if the shell's changes
- * while the disclosure stays open (close and reopen the disclosure to
- * reseed it). If a saved search belongs to a different program than the
- * seed, the seed wins and the saved criteria/results are not restored — a
+ * program has resolved, and (via `key={programId}` on the shell's
+ * `<RequestLocator>`) remounts it with a fresh seed whenever the shell's
+ * program changes, even while the disclosure stays open. If a saved search
+ * belongs to a different program than the seed, the seed wins and the saved
+ * criteria/results are not restored — a
  * stale result set from another program would contradict the shell's
  * "Search options do not change the Workbench context" promise. The locator
  * keeps its own Program select (under Search options) so a PD can still
@@ -115,6 +115,14 @@ export function RequestLocator({ programId: initialProgramIdProp = '' }) {
   const [error, setError] = useState(null);
   const [searchOptionsOpen, setSearchOptionsOpen] = useState(false);
   const requestIdRef = useRef(0);
+  // Separate generation counter for the options (cycle/status filter) load.
+  // invalidatePending() — fired on every query keystroke and on cycle/status
+  // change — must NOT bump this: it only cancels in-flight *search*
+  // requests via requestIdRef. Options loads are cancelled by re-running
+  // this effect (programId or optionsAttempt changing), which mints a new
+  // operationId here and makes the prior closure's comparison fail —
+  // changeProgram and the Retry handler rely on that, not on a manual bump.
+  const optionsRequestRef = useRef(0);
   const skipProgramEffectRef = useRef(false);
 
   useEffect(() => {
@@ -148,7 +156,7 @@ export function RequestLocator({ programId: initialProgramIdProp = '' }) {
       return undefined;
     }
     let cancelled = false;
-    const operationId = ++requestIdRef.current;
+    const operationId = ++optionsRequestRef.current;
     (async () => {
       try {
         const params = new URLSearchParams({ mode: 'options' });
@@ -156,7 +164,7 @@ export function RequestLocator({ programId: initialProgramIdProp = '' }) {
         const response = await fetch(`/api/workbench/search-requests?${params}`);
         const body = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(body.error || `Failed to load filters (${response.status})`);
-        if (cancelled || requestIdRef.current !== operationId) return;
+        if (cancelled || optionsRequestRef.current !== operationId) return;
         const selectedProgramId = String(body.programId || '').trim().toLowerCase();
         if (!selectedProgramId) throw new Error('No active Grant Program was returned');
         if (selectedProgramId !== programId) {
@@ -189,9 +197,9 @@ export function RequestLocator({ programId: initialProgramIdProp = '' }) {
           setNextOffset(saved.nextOffset);
         }
       } catch (loadError) {
-        if (!cancelled && requestIdRef.current === operationId) setOptionsError(loadError.message || 'Failed to load filters');
+        if (!cancelled && optionsRequestRef.current === operationId) setOptionsError(loadError.message || 'Failed to load filters');
       } finally {
-        if (!cancelled && requestIdRef.current === operationId) setOptionsBusy(false);
+        if (!cancelled && optionsRequestRef.current === operationId) setOptionsBusy(false);
       }
     })();
     return () => { cancelled = true; };
@@ -199,6 +207,7 @@ export function RequestLocator({ programId: initialProgramIdProp = '' }) {
 
   useEffect(() => () => {
     requestIdRef.current += 1;
+    optionsRequestRef.current += 1;
   }, []);
 
   const invalidatePending = useCallback(() => {

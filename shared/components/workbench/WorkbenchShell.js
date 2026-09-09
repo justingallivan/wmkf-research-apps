@@ -219,7 +219,7 @@ export function WorkbenchShell({ previewReadOnly = false }) {
             <p className="mb-3 text-sm text-gray-600">
               Search current and past requests. Search options do not change the Workbench context.
             </p>
-            <RequestLocator programId={programId} />
+            <RequestLocator key={programId} programId={programId} />
           </div>
         )}
       </div>

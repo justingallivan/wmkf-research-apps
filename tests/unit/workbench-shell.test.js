@@ -389,3 +389,16 @@ test('opening the disclosure before the shell\'s program resolves defers mountin
   });
   await waitFor(() => expect(screen.getByTestId('request-locator-mock')).toHaveAttribute('data-program-id', 'p1'));
 });
+
+test('changing the shell\'s Grant program remounts the open locator with the new programId', async () => {
+  render(<WorkbenchShell />);
+  await waitFor(() => expect(screen.getByLabelText('Grant cycle')).toHaveValue('D26'));
+  fireEvent.click(screen.getByRole('button', { name: 'Find and open a request' }));
+  expect(screen.getByTestId('request-locator-mock')).toHaveAttribute('data-program-id', 'p1');
+
+  fireEvent.change(screen.getByLabelText('Grant program'), { target: { value: 'p2' } });
+  await waitFor(() => expect(screen.getByLabelText('Grant cycle')).toHaveValue('J27'));
+  // key={programId} on the shell's <RequestLocator> forces a remount (fresh
+  // seed) rather than leaving a stale program mounted behind the disclosure.
+  expect(screen.getByTestId('request-locator-mock')).toHaveAttribute('data-program-id', 'p2');
+});
