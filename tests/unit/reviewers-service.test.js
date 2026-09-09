@@ -354,6 +354,7 @@ describe('getReviewers', () => {
         ...synthesisNotStarted,
         ready: false, canRunManually: false, participantCount: 1,
         submittedCount: 0, resolvedCount: 0, blockingCount: 1,
+        blockers: [{ suggestionId: IDS[0], reason: 'missing_current_token', name: null, accepted: true, emailSentAt: null }],
         status: 'unavailable', lastError: 'Synthesis status is temporarily unavailable.',
       });
       expect(getReviewSynthesisJobState).toHaveBeenCalledTimes(1);

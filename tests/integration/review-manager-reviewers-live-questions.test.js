@@ -216,6 +216,7 @@ test('GET success returns the full proposal + reviewer envelope', async () => {
         submittedCount: 1,
         resolvedCount: 1,
         blockingCount: 0,
+        blockers: [],
         current: false,
         status: 'not_started',
         mode: null,
