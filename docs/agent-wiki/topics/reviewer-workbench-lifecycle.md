@@ -1609,8 +1609,18 @@ One Final Writeup row per request over the same stable SharePoint Word item; the
   step 2: shares the shell's `scope`, owns `reviewers=attention|all` and `q=` in the URL with the
   search box mirrored after a 300 ms pause; `previewReadOnly` now comes from the shell page's
   `getServerSideProps` via `lib/services/workbench/preview-read-only.js`; the legacy
-  `/workbench/reviewer-follow-up` route redirects into the shell carrying cycle and program)
-  (`SHELL_PANEL_VIEWS`); `WorkbenchViewsNav` links
+  `/workbench/reviewer-follow-up` route redirects into the shell carrying cycle and program), and
+  Final writeups (`shared/components/final-writeups/FinalWriteupsViews.js` `FinalWriteupsPanel`,
+  step 3: keys `writeups=`, `pd=`, `q=`, `uncycled=1` (sent as `cycleCode=none`); the API's
+  default-cycle walk-back is no longer used by the UI — an empty cycle renders one in-place notice
+  linking the newest other cycle with writeups and the uncycled rows; the legacy
+  `/workbench/final-writeups` index redirects into the shell translating its old `view`/`pd` keys;
+  both search boxes share `useUrlMirroredInput.js`) (`SHELL_PANEL_VIEWS`). **Shell rule change in
+  step 3:** a well-formed `?cycleCode=` is honored even when the program's dashboard list omits it
+  (rendered as an extra option) — Final writeups and Awardees cycles need not have pending
+  requests; only a missing cycle falls back to the working cycle. Readiness after a program change
+  is derived from which program the loaded list belongs to (`loadedProgramKey`), because the
+  fallback effect otherwise ran one render early on the previous program's default; `WorkbenchViewsNav` links
   shell-backed views into the shell (shallow) and the rest to their own pages. Tests:
   `tests/unit/workbench-shell.test.js`, `workbench-location.test.js`, `workbench-views-nav.test.js`,
   and the request-locator suite (stateful router mock). Remaining panels and the Awardees

@@ -31,7 +31,7 @@ describe('WorkbenchViewsNav shell links', () => {
     expect(screen.getByRole('link', { name: 'Request list' })).toHaveAttribute('href', '/workbench?programId=p1&cycleCode=D26');
     expect(screen.getByRole('link', { name: 'Reviewer follow-up' })).toHaveAttribute('href', '/workbench?view=reviewer-follow-up&programId=p1&cycleCode=D26');
     expect(screen.getByRole('link', { name: 'Awardees' })).toHaveAttribute('href', '/workbench/awardees?cycleCode=D26');
-    expect(screen.getByRole('link', { name: 'Final writeups' })).toHaveAttribute('href', '/workbench/final-writeups');
+    expect(screen.getByRole('link', { name: 'Final writeups' })).toHaveAttribute('href', '/workbench?view=final-writeups&programId=p1&cycleCode=D26');
   });
 
   test('marks the active view for assistive tech', () => {

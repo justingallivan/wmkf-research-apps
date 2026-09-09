@@ -5,9 +5,10 @@
  *   Counts are navigation, never denominators (Slice 6B, owner-shaped 2026-09-06).
  * OWN-WORLD: white paper surfaces, ink actions, fine gray rules, semantic amber/green.
  * STORY: find open work, review the document, record review, then move to the next item.
- * FIRST VIEWPORT: compact title, cycle / Program Director / view controls and one search field,
- *   then the selected view's list at full width. View and filter state live in the page URL and
- *   are never sent to the API.
+ * FIRST VIEWPORT: the Workbench shell's program / cycle row, then Program Director / view
+ *   controls and one search field, then the selected view's list at full width. View and filter
+ *   state live in the shell URL (`writeups`, `pd`, `q`, `uncycled`) and are never sent to the
+ *   API; the cycle always comes from the shell, so the API's default-cycle walk-back is unused here.
  * FORM: an editorial task list; each row names the publication version acknowledgements key to
  *   (Slice 6C) so "Updated since review" is explainable without opening Word.
  */
@@ -15,10 +16,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import Layout from '../Layout';
-import WorkbenchViewsNav from '../workbench/WorkbenchViewsNav';
 import { cycleCodeToLabel } from '../../../lib/utils/cycle-code.js';
-import { isGuid } from '../../../lib/utils/guid.js';
 import ToolbarSelect, { TOOLBAR_CONTROL_HEIGHT_CLASS } from '../ToolbarSelect';
+import { buildWorkbenchHref } from '../workbench/workbench-location';
+import { useUrlMirroredInput } from '../workbench/useUrlMirroredInput';
 
 const DATE_FORMATTER = new Intl.DateTimeFormat('en-US', {
   month: 'short',
@@ -476,74 +477,6 @@ function cycleLabelFor(cycles, code) {
   return match?.label || cycleCodeToLabel(code) || code;
 }
 
-/**
- * Read the page's own query state. `view` must be a known key and `pd` a GUID;
- * anything else is dropped (and `invalid` tells the caller to rewrite the
- * address bar immediately so a bookmarked bad value never survives a reload).
- * None of these values is ever sent to the API: the fetch is built from
- * `cycleCode` alone, and the route rejects any other key.
- */
-function readLocationState() {
-  if (typeof window === 'undefined') return { cycleCode: null, view: DEFAULT_VIEW, pd: null, invalid: false };
-  const params = new URLSearchParams(window.location.search);
-  const cycleRaw = params.get('cycleCode');
-  const viewRaw = params.get('view');
-  const pdRaw = params.get('pd');
-  const view = isViewKey(viewRaw) ? viewRaw : DEFAULT_VIEW;
-  // Canonical form is the trimmed, lowercased GUID; anything else (including a
-  // valid GUID with stray whitespace or uppercase) is rewritten so the stored
-  // value always equals what the rows are compared against.
-  const pdCanonical = String(pdRaw || '').trim().toLowerCase();
-  const pd = isGuid(pdCanonical) ? pdCanonical : null;
-  const invalid = (viewRaw !== null && (!isViewKey(viewRaw) || viewRaw === DEFAULT_VIEW))
-    || (pdRaw !== null && pdRaw !== pd);
-  return { cycleCode: cycleRaw ? cycleRaw.trim() : null, view, pd, invalid };
-}
-
-function writeLocationState({ cycleCode, view, pd }) {
-  if (typeof window === 'undefined') return;
-  const url = new URL(window.location.href);
-  if (cycleCode) url.searchParams.set('cycleCode', cycleCode);
-  else url.searchParams.delete('cycleCode');
-  if (view && view !== DEFAULT_VIEW) url.searchParams.set('view', view);
-  else url.searchParams.delete('view');
-  if (pd) url.searchParams.set('pd', pd);
-  else url.searchParams.delete('pd');
-  window.history.replaceState(window.history.state, '', url);
-}
-
-/**
- * Server-resolved cycle picker. Options come only from the response; the
- * selected value is what the server scoped to, never a client inference. The
- * controlled value is always one of the rendered options: a bookmarked cycle
- * absent from the list, or `none` with no uncycled rows, still gets an option
- * so the picker never shows a cycle other than the one the data is scoped to.
- */
-function CycleSelector({ cycles, disabled, onChange }) {
-  const options = [...(cycles?.available || [])];
-  if (cycles?.selected && cycles.selected !== NO_CYCLE
-    && !options.some((cycle) => cycle.code === cycles.selected)) {
-    options.push({ code: cycles.selected, label: cycleLabelFor(cycles, cycles.selected) });
-  }
-  return (
-    <ToolbarSelect
-      id="final-writeup-cycle"
-      label="Cycle"
-      value={cycles?.selected || ''}
-      disabled={disabled}
-      onChange={(event) => onChange(event.target.value)}
-    >
-      {options.length === 0 && <option value="">No cycles with current writeups</option>}
-      {options.map((cycle) => (
-        <option key={cycle.code} value={cycle.code}>{cycle.label}</option>
-      ))}
-      {(cycles?.hasUncycled || cycles?.selected === NO_CYCLE) && (
-        <option value={NO_CYCLE}>No cycle</option>
-      )}
-    </ToolbarSelect>
-  );
-}
-
 const PD_ABSENT_LABEL = 'Program director not in this cycle';
 
 /**
@@ -622,16 +555,38 @@ function programDirectorOptions(queues) {
   return [...seen.values()].sort((left, right) => left.name.localeCompare(right.name));
 }
 
-function cycleResolutionCopy(cycles) {
-  if (!cycles) return null;
-  const newest = cycles.available?.[0];
-  if (cycles.defaultResolvedBy === 'visible' && newest && cycles.selected !== newest.code) {
-    return `No current writeups visible to you in ${newest.label}; showing ${cycleLabelFor(cycles, cycles.selected)}.`;
-  }
-  if (cycles.defaultResolvedBy === 'exhausted' && newest) {
-    return 'No current writeups visible to you in the most recent cycles; choose a cycle to look further back.';
-  }
-  return null;
+/**
+ * The cycle the shell chose holds nothing the viewer can see. Name it and
+ * offer the newest other cycle that has current writeups (`available` is
+ * existence-only and not persona-filtered, so say "with writeups", not
+ * "visible to you"), plus the uncycled rows when any exist.
+ */
+function EmptyCycleNotice({ cycles, cycleLabel, uncycled, onCycleChange, onUncycledChange }) {
+  const alternative = (cycles?.available || []).find((cycle) => cycle.code !== cycles?.selected) || null;
+  const linkClass = 'font-semibold text-gray-900 underline underline-offset-4 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500';
+  return (
+    <div className="rounded-xl border border-gray-200 bg-white px-5 py-6 text-sm text-gray-600" role="status">
+      <p>
+        {uncycled
+          ? 'No current writeups visible to you without a cycle.'
+          : `No current writeups visible to you in ${cycleLabel || 'this cycle'}.`}
+      </p>
+      {(alternative || (cycles?.hasUncycled && !uncycled)) && (
+        <p className="mt-2">
+          {alternative && (
+            <>
+              Newest cycle with writeups:{' '}
+              <button type="button" className={linkClass} onClick={() => onCycleChange(alternative.code)}>{alternative.label}</button>
+            </>
+          )}
+          {alternative && cycles?.hasUncycled && !uncycled && ' · '}
+          {cycles?.hasUncycled && !uncycled && (
+            <button type="button" className={linkClass} onClick={() => onUncycledChange(true)}>Writeups without a cycle</button>
+          )}
+        </p>
+      )}
+    </div>
+  );
 }
 
 function personaViewLabel(viewer) {
@@ -667,31 +622,54 @@ function NeedsReviewEmptyState({ cycleLabel, pdName, counts, search, onChangeVie
   );
 }
 
-export function FinalWriteupsDashboardView() {
+/**
+ * Final writeups panel, mounted inside the Request Workbench shell. The shell
+ * owns the cycle; this panel owns the view, Program Director filter, search,
+ * and the "no cycle" lens, all mirrored into the shell URL through the
+ * callbacks. The fetch is built from the cycle alone.
+ *
+ * @param {object} props
+ * @param {string|null} props.cycleCode        null while the shell resolves it
+ * @param {boolean} props.loadingCycles
+ * @param {'needs-review'|'reviewed'|'all'} props.writeupsView
+ * @param {string} props.pd                    canonical lowercase GUID or ''
+ * @param {string} props.search
+ * @param {boolean} props.uncycled             show rows with no meeting date (`cycleCode=none`)
+ * @param {Function} props.onWriteupsViewChange
+ * @param {Function} props.onPdChange          (guid or '')
+ * @param {Function} props.onSearchChange      debounced
+ * @param {Function} props.onUncycledChange
+ * @param {Function} props.onCycleChange       (code) — the empty-cycle link
+ */
+export function FinalWriteupsPanel({
+  cycleCode,
+  loadingCycles = false,
+  writeupsView = DEFAULT_VIEW,
+  pd = '',
+  search = '',
+  uncycled = false,
+  onWriteupsViewChange,
+  onPdChange,
+  onSearchChange,
+  onUncycledChange,
+  onCycleChange,
+}) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [search, setSearch] = useState('');
-  const [location] = useState(readLocationState);
-  const [cycleCode, setCycleCode] = useState(location.cycleCode);
-  const [view, setView] = useState(location.view);
-  const [pd, setPd] = useState(location.pd);
+  const [searchInput, setSearchInput] = useUrlMirroredInput(search, onSearchChange);
   const requestIdRef = useRef(0);
-
-  // Normalize a bookmarked bad `view` or `pd` immediately, not on the next write.
-  useEffect(() => {
-    if (location.invalid) {
-      writeLocationState({ cycleCode: location.cycleCode, view: location.view, pd: location.pd });
-    }
-  }, [location]);
+  const view = isViewKey(writeupsView) ? writeupsView : DEFAULT_VIEW;
+  const pdValue = pd || null;
+  const selector = uncycled ? NO_CYCLE : cycleCode;
 
   const load = useCallback(async () => {
+    if (!selector) return;
     const requestId = ++requestIdRef.current;
     setLoading(true);
     setError(null);
     try {
-      const query = cycleCode ? `?cycleCode=${encodeURIComponent(cycleCode)}` : '';
-      const response = await fetch(`/api/workbench/final-writeups${query}`);
+      const response = await fetch(`/api/workbench/final-writeups?cycleCode=${encodeURIComponent(selector)}`);
       const body = await response.json().catch(() => ({}));
       if (requestIdRef.current !== requestId) return;
       if (!response.ok) throw new Error(body.error || `Failed to load Final Writeups (${response.status})`);
@@ -704,32 +682,24 @@ export function FinalWriteupsDashboardView() {
     } finally {
       if (requestIdRef.current === requestId) setLoading(false);
     }
-  }, [cycleCode]);
-
-  const changeCycle = useCallback((code) => {
-    writeLocationState({ cycleCode: code || null, view, pd });
-    setCycleCode(code || null);
-  }, [view, pd]);
-
-  const changeView = useCallback((key) => {
-    const next = isViewKey(key) ? key : DEFAULT_VIEW;
-    writeLocationState({ cycleCode, view: next, pd });
-    setView(next);
-  }, [cycleCode, pd]);
-
-  const changePd = useCallback((id) => {
-    const next = id ? String(id).toLowerCase() : null;
-    writeLocationState({ cycleCode, view, pd: next });
-    setPd(next);
-  }, [cycleCode, view]);
+  }, [selector]);
 
   useEffect(() => {
+    if (!selector) {
+      // The shell is resolving a cycle: drop any response still in flight.
+      requestIdRef.current += 1;
+      return undefined;
+    }
     const timer = window.setTimeout(() => { void load(); }, 0);
     return () => {
       window.clearTimeout(timer);
       requestIdRef.current += 1;
     };
-  }, [load]);
+  }, [load, selector]);
+
+  const changeView = useCallback((key) => {
+    onWriteupsViewChange(isViewKey(key) ? key : DEFAULT_VIEW);
+  }, [onWriteupsViewChange]);
 
   const serverQueues = useMemo(
     () => data?.queues || { open: [], history: [], stewardship: [] },
@@ -739,9 +709,9 @@ export function FinalWriteupsDashboardView() {
   const filteredQueues = useMemo(() => Object.fromEntries(
     Object.entries(serverQueues).map(([key, value]) => [
       key,
-      (value || []).filter((row) => matchesProgramDirector(row, pd) && matchesSearch(row, search)),
+      (value || []).filter((row) => matchesProgramDirector(row, pdValue) && matchesSearch(row, searchInput)),
     ]),
-  ), [serverQueues, pd, search]);
+  ), [serverQueues, pdValue, searchInput]);
   const viewCounts = useMemo(() => Object.fromEntries(
     VIEW_KEYS.map((key) => [key, VIEWS[key].select(filteredQueues).length]),
   ), [filteredQueues]);
@@ -753,112 +723,127 @@ export function FinalWriteupsDashboardView() {
     () => [...(filteredQueues.stewardship || [])].sort(byRequestNumber),
     [filteredQueues],
   );
-  const pdName = pd
-    ? (pdOptions.find((option) => option.id === pd)?.name || PD_ABSENT_LABEL)
+  const pdName = pdValue
+    ? (pdOptions.find((option) => option.id === pdValue)?.name || PD_ABSENT_LABEL)
     : null;
   const cycleLabel = data ? cycleLabelFor(data.cycles, data.cycles?.selected) : null;
   const current = VIEWS[view];
+  const cycleEmpty = data && (data.counts?.total ?? 0) === 0;
+  const busy = loadingCycles || !selector || loading;
 
   return (
-    <Layout title="Final Writeups" description="Review current grant writeups and return to completed work.">
-      <div className="pb-16 pt-6 sm:pt-8">
-        <header className="border-b border-gray-200 pb-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <h1 className="text-3xl font-bold tracking-[-0.03em] text-gray-900 sm:text-4xl">Final Writeups</h1>
-              <p className="mt-2 max-w-2xl text-base leading-7 text-gray-600">
-                Review colleagues’ current writeups, or return to your own for editing.
-              </p>
-            </div>
-            {data && (
-              <div className="text-sm text-gray-500 sm:text-right">
-                {personaViewLabel(data.viewer) && (
-                  <p className="mb-1 font-medium text-gray-700">{personaViewLabel(data.viewer)}</p>
-                )}
-                <p>
-                  <span className="font-semibold tabular-nums text-gray-900">{viewCounts['needs-review']}</span> awaiting your review
-                  {cycleLabel && ` in ${cycleLabel}`}
-                  {pdName && pdName !== PD_ABSENT_LABEL && ` for ${pdName}`}
-                </p>
-                {cycleResolutionCopy(data.cycles) && (
-                  <p className="mt-1 text-gray-600">{cycleResolutionCopy(data.cycles)}</p>
-                )}
-              </div>
-            )}
-          </div>
-        </header>
-        <div className="mt-6">
-          <WorkbenchViewsNav activeKey="final-writeups" />
-        </div>
-
-        <div className="my-6 space-y-4">
-          {data && (
-            <div className="flex flex-col gap-4 lg:flex-row lg:flex-wrap lg:items-end">
-              <CycleSelector cycles={data.cycles} disabled={loading} onChange={changeCycle} />
-              <ProgramDirectorSelector options={pdOptions} value={pd} disabled={loading} onChange={changePd} />
-              <div className="flex flex-col gap-1.5">
-                <span id="final-writeup-view-label" className="text-sm font-medium text-gray-700">View</span>
-                <ViewSelector view={view} counts={viewCounts} disabled={loading} onChange={changeView} />
-              </div>
-            </div>
+    <div className="pb-16">
+      {data && (
+        <div className="mb-6 text-sm text-gray-500">
+          {personaViewLabel(data.viewer) && (
+            <p className="mb-1 font-medium text-gray-700">{personaViewLabel(data.viewer)}</p>
           )}
-          <label htmlFor="final-writeup-search" className="sr-only">Search Final Writeups</label>
-          <div className="relative max-w-2xl">
-            <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-gray-400"><SearchIcon /></span>
-            <input
-              id="final-writeup-search"
-              type="search"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search writeups"
-              className="min-h-12 w-full rounded-xl border border-gray-300 bg-white py-3 pl-11 pr-4 text-base text-gray-900 shadow-sm placeholder:text-gray-500 focus:border-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-400/30"
-            />
-          </div>
-          {search && data && (
-            <p className="mt-2 text-sm text-gray-500" aria-live="polite">
-              {mainRows.length} matching writeup{mainRows.length === 1 ? '' : 's'}
+          <p>
+            <span className="font-semibold tabular-nums text-gray-900">{viewCounts['needs-review']}</span> awaiting your review
+            {cycleLabel && ` in ${cycleLabel}`}
+            {pdName && pdName !== PD_ABSENT_LABEL && ` for ${pdName}`}
+          </p>
+          {uncycled && (
+            <p className="mt-1">
+              Showing writeups without a cycle.{' '}
+              <button
+                type="button"
+                className="font-semibold text-gray-900 underline underline-offset-4 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500"
+                onClick={() => onUncycledChange(false)}
+              >
+                Back to {cycleCodeToLabel(cycleCode) || cycleCode || 'the cycle'}
+              </button>
             </p>
           )}
         </div>
+      )}
 
-        {loading ? <LoadingSurface /> : error ? (
-          <ErrorSurface message={error} onRetry={load} />
-        ) : (
-          <div className="space-y-6">
-            <CoordinatorMatrix matrix={data.coordinatorMatrix} search={search} pd={pd} />
-            <QueueSection
-              title={current.label}
-              description={current.description}
-              rows={mainRows}
-              emptyCopy={view === DEFAULT_VIEW ? (
-                <NeedsReviewEmptyState
-                  cycleLabel={cycleLabel}
-                  pdName={pdName}
-                  counts={viewCounts}
-                  search={search}
-                  onChangeView={changeView}
-                />
-              ) : (
-                search
-                  ? 'No writeups match your search.'
-                  : pdName === PD_ABSENT_LABEL
-                    ? `No writeups for the selected Program Director${cycleLabel ? ` in ${cycleLabel}` : ''}. Choose All program directors to clear the filter.`
-                    : `${current.emptyCopy}${cycleLabel ? ` in ${cycleLabel}` : ''}${pdName ? ` for ${pdName}` : ''}.`
-              )}
-            />
-            {view !== 'all' && (
-              <QueueSection
-                secondary
-                title="Your writeups"
-                description="These are the writeups for which you are the responsible Program Director."
-                rows={stewardshipRows}
-                emptyCopy="No current writeups are assigned to you."
-              />
-            )}
+      <div className="my-6 space-y-4">
+        {data && (
+          <div className="flex flex-col gap-4 lg:flex-row lg:flex-wrap lg:items-end">
+            <ProgramDirectorSelector options={pdOptions} value={pdValue} disabled={busy} onChange={(id) => onPdChange(id ? String(id).toLowerCase() : '')} />
+            <div className="flex flex-col gap-1.5">
+              <span id="final-writeup-view-label" className="text-sm font-medium text-gray-700">View</span>
+              <ViewSelector view={view} counts={viewCounts} disabled={busy} onChange={changeView} />
+            </div>
           </div>
         )}
+        <label htmlFor="final-writeup-search" className="sr-only">Search Final Writeups</label>
+        <div className="relative max-w-2xl">
+          <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-gray-400"><SearchIcon /></span>
+          <input
+            id="final-writeup-search"
+            type="search"
+            value={searchInput}
+            onChange={(event) => setSearchInput(event.target.value)}
+            placeholder="Search writeups"
+            className="min-h-12 w-full rounded-xl border border-gray-300 bg-white py-3 pl-11 pr-4 text-base text-gray-900 shadow-sm placeholder:text-gray-500 focus:border-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-400/30"
+          />
+        </div>
+        {searchInput && data && (
+          <p className="mt-2 text-sm text-gray-500" aria-live="polite">
+            {mainRows.length} matching writeup{mainRows.length === 1 ? '' : 's'}
+          </p>
+        )}
       </div>
-    </Layout>
+
+      {busy ? <LoadingSurface /> : error ? (
+        <ErrorSurface message={error} onRetry={load} />
+      ) : cycleEmpty ? (
+        <EmptyCycleNotice
+          cycles={data.cycles}
+          cycleLabel={cycleLabel}
+          uncycled={uncycled}
+          onCycleChange={onCycleChange}
+          onUncycledChange={onUncycledChange}
+        />
+      ) : (
+        <div className="space-y-6">
+          <CoordinatorMatrix matrix={data.coordinatorMatrix} search={searchInput} pd={pdValue} />
+          <QueueSection
+            title={current.label}
+            description={current.description}
+            rows={mainRows}
+            emptyCopy={view === DEFAULT_VIEW ? (
+              <NeedsReviewEmptyState
+                cycleLabel={cycleLabel}
+                pdName={pdName}
+                counts={viewCounts}
+                search={searchInput}
+                onChangeView={changeView}
+              />
+            ) : (
+              searchInput
+                ? 'No writeups match your search.'
+                : pdName === PD_ABSENT_LABEL
+                  ? `No writeups for the selected Program Director${cycleLabel ? ` in ${cycleLabel}` : ''}. Choose All program directors to clear the filter.`
+                  : `${current.emptyCopy}${cycleLabel ? ` in ${cycleLabel}` : ''}${pdName ? ` for ${pdName}` : ''}.`
+            )}
+          />
+          {view !== 'all' && (
+            <QueueSection
+              secondary
+              title="Your writeups"
+              description="These are the writeups for which you are the responsible Program Director."
+              rows={stewardshipRows}
+              emptyCopy="No current writeups are assigned to you."
+            />
+          )}
+          {data.cycles?.hasUncycled && !uncycled && (
+            <p className="text-sm text-gray-500">
+              Some current writeups have no cycle.{' '}
+              <button
+                type="button"
+                className="font-semibold text-gray-900 underline underline-offset-4 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500"
+                onClick={() => onUncycledChange(true)}
+              >
+                Writeups without a cycle
+              </button>
+            </p>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -1110,7 +1095,14 @@ export function FinalWriteupFocusedView({ requestId }) {
   return (
     <Layout title={writeup?.requestNumber ? `Final Writeup #${writeup.requestNumber}` : 'Final Writeup'} description="Focused Final Writeup review.">
       <div className="pb-16 pt-6 sm:pt-8">
-        <Link href="/workbench/final-writeups" className="text-sm font-medium text-gray-500 underline-offset-4 hover:text-gray-900 hover:underline">
+        <Link
+          href={buildWorkbenchHref({
+            view: 'final-writeups',
+            cycleCode: data?.cycles?.selected && data.cycles.selected !== NO_CYCLE ? data.cycles.selected : '',
+            uncycled: data?.cycles?.selected === NO_CYCLE,
+          })}
+          className="text-sm font-medium text-gray-500 underline-offset-4 hover:text-gray-900 hover:underline"
+        >
           ← Final Writeups
         </Link>
         <div className="mt-6">

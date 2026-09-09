@@ -26,8 +26,7 @@ import {
   mergeReviewerFollowUpProposals,
   summarizeReviewerFollowUp,
 } from '../../utils/reviewer-follow-up';
-
-const SEARCH_URL_DEBOUNCE_MS = 300;
+import { useUrlMirroredInput } from './useUrlMirroredInput';
 
 function ReviewerGroup({ proposal, previewReadOnly, onRefresh, degraded, loading }) {
   const [open, setOpen] = useState(false);
@@ -186,24 +185,7 @@ export default function ReviewerFollowUpPanel({
   const requestIdRef = useRef(0);
   const lastLoadedParamsRef = useRef(null);
 
-  // The search box is typed locally and mirrored into the URL after a pause;
-  // an external URL change (back button) re-seeds the box.
-  const [searchInput, setSearchInput] = useState(search);
-  const lastEmittedSearchRef = useRef(search);
-  useEffect(() => {
-    if (search !== lastEmittedSearchRef.current) {
-      lastEmittedSearchRef.current = search;
-      setSearchInput(search);
-    }
-  }, [search]);
-  useEffect(() => {
-    if (searchInput === lastEmittedSearchRef.current) return undefined;
-    const timer = window.setTimeout(() => {
-      lastEmittedSearchRef.current = searchInput;
-      onSearchChange(searchInput);
-    }, SEARCH_URL_DEBOUNCE_MS);
-    return () => window.clearTimeout(timer);
-  }, [searchInput, onSearchChange]);
+  const [searchInput, setSearchInput] = useUrlMirroredInput(search, onSearchChange);
 
   const loadProposals = useCallback(async (selectedCycle, selectedScope, selectedProgramId) => {
     if (!selectedCycle) return;

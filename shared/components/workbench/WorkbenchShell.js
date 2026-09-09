@@ -6,9 +6,11 @@
  * the shell still open their own pages from the views nav.
  *
  * Cycle default: the dashboard cycle list's `defaultCycleCode` (the working
- * cycle = the upcoming board meeting, per lib/utils/cycle-code.js). A deep link
- * to a cycle the program does not list falls back to that default; the resolved
- * cycle is written back into the URL so the address is always shareable.
+ * cycle = the upcoming board meeting, per lib/utils/cycle-code.js) when the
+ * URL carries no cycle; the resolved cycle is written back into the URL so
+ * the address is always shareable. A well-formed `?cycleCode=` is honored
+ * even when the program's list omits it (a Final writeups or Awardees cycle
+ * need not have pending requests) and is rendered as an extra option.
  *
  * Data: /api/workbench/dashboard (no cycleCode = cycle list for a program).
  */
@@ -20,6 +22,8 @@ import ToolbarSelect from '../ToolbarSelect';
 import WorkbenchViewsNav from './WorkbenchViewsNav';
 import RequestListPanel from './RequestListPanel';
 import ReviewerFollowUpPanel from './ReviewerFollowUpPanel';
+import { FinalWriteupsPanel } from '../final-writeups/FinalWriteupsViews';
+import { cycleCodeToLabel } from '../../../lib/utils/cycle-code.js';
 import { WORKBENCH_LOCATION_KEYS, buildWorkbenchHref, readWorkbenchQuery } from './workbench-location';
 
 const sameLocation = (a, b) => WORKBENCH_LOCATION_KEYS.every((key) => a[key] === b[key]);
@@ -65,6 +69,10 @@ export function WorkbenchShell({ previewReadOnly = false }) {
   const [resolvedProgramId, setResolvedProgramId] = useState('');
   const [defaultCycleCode, setDefaultCycleCode] = useState(null);
   const [loadingCycles, setLoadingCycles] = useState(true);
+  // Which program the loaded list belongs to. Derived readiness (rather than
+  // the loading flag alone) keeps the render after a program change from
+  // reading the previous program's default cycle before its effect resets it.
+  const [loadedProgramKey, setLoadedProgramKey] = useState(null);
   const [cyclesError, setCyclesError] = useState(null);
   const cyclesGenerationRef = useRef(0);
   const [cyclesGeneration, setCyclesGeneration] = useState(0);
@@ -91,6 +99,7 @@ export function WorkbenchShell({ previewReadOnly = false }) {
         setPrograms(Array.isArray(body.programs) ? body.programs : []);
         setResolvedProgramId(body.programId || '');
         setDefaultCycleCode(body.defaultCycleCode || (body.cycles || [])[0]?.code || null);
+        setLoadedProgramKey(requestedProgramId);
       } catch (e) {
         if (cyclesLoadRef.current === token) setCyclesError(e.message);
       } finally {
@@ -100,17 +109,20 @@ export function WorkbenchShell({ previewReadOnly = false }) {
     return () => { cyclesLoadRef.current += 1; };
   }, [ready, requestedProgramId, cyclesAttempt]);
 
-  // The cycle the panels see: the URL's cycle when the program lists it, else
-  // the working cycle. A fallback is written back so the URL stays honest.
-  // Compared against this render's location (not the ref) so an adoption
-  // committed by the effect above cannot be undone by this one.
+  // The cycle the panels see: the URL's cycle when it has one, else the
+  // working cycle, which is written back so the URL stays honest. Compared
+  // against this render's location (not the ref) so an adoption committed by
+  // the effect above cannot be undone by this one.
+  const cyclesReady = !loadingCycles && loadedProgramKey === requestedProgramId;
   const urlCycleCode = location.cycleCode;
-  const listed = urlCycleCode && cycles.some((cycle) => cycle.code === urlCycleCode);
-  const cycleCode = loadingCycles ? null : (listed ? urlCycleCode : defaultCycleCode);
+  const cycleCode = cyclesReady ? (urlCycleCode || defaultCycleCode) : null;
+  const cycleOptions = cycleCode && !cycles.some((cycle) => cycle.code === cycleCode)
+    ? [...cycles, { code: cycleCode, label: cycleCodeToLabel(cycleCode) || cycleCode }]
+    : cycles;
   useEffect(() => {
-    if (loadingCycles || !cycleCode || cycleCode === urlCycleCode) return;
+    if (!cyclesReady || !cycleCode || cycleCode === urlCycleCode) return;
     navigate({ cycleCode });
-  }, [loadingCycles, cycleCode, urlCycleCode, navigate]);
+  }, [cyclesReady, cycleCode, urlCycleCode, navigate]);
 
   const patchCycleCounts = useCallback((code, { myDelta = 0, mySetAsideDelta = 0 }, generation) => {
     if (generation !== cyclesGenerationRef.current) return;
@@ -148,7 +160,7 @@ export function WorkbenchShell({ previewReadOnly = false }) {
           id="workbench-program"
           label="Grant Program"
           value={programId}
-          disabled={loadingCycles || programs.length === 0}
+          disabled={!cyclesReady || programs.length === 0}
           onChange={(e) => changeProgram(e.target.value)}
         >
           {programs.length === 0 && <option value="">Loading programs…</option>}
@@ -160,10 +172,10 @@ export function WorkbenchShell({ previewReadOnly = false }) {
           id="workbench-cycle"
           label="Cycle"
           value={cycleCode || ''}
-          disabled={loadingCycles || cycles.length === 0}
-          onChange={(e) => navigate({ cycleCode: e.target.value }, { push: true })}
+          disabled={!cyclesReady || cycleOptions.length === 0}
+          onChange={(e) => navigate({ cycleCode: e.target.value, uncycled: false }, { push: true })}
         >
-          {cycles.map((c) => (
+          {cycleOptions.map((c) => (
             <option key={c.code} value={c.code}>
               {c.label || c.code}{c.count ? ` (${c.count})` : ''}
             </option>
@@ -186,7 +198,7 @@ export function WorkbenchShell({ previewReadOnly = false }) {
           cycles={cycles}
           cyclesGeneration={cyclesGeneration}
           patchCycleCounts={patchCycleCounts}
-          loadingCycles={loadingCycles}
+          loadingCycles={!cyclesReady && !cyclesError}
           scope={location.scope}
           includeSetAside={location.includeSetAside}
           onScopeChange={(scope) => navigate({ scope })}
@@ -197,7 +209,7 @@ export function WorkbenchShell({ previewReadOnly = false }) {
           key={programId}
           programId={programId}
           cycleCode={cycleCode}
-          loadingCycles={loadingCycles}
+          loadingCycles={!cyclesReady && !cyclesError}
           previewReadOnly={previewReadOnly}
           scope={location.scope}
           reviewersView={location.reviewersView}
@@ -205,6 +217,20 @@ export function WorkbenchShell({ previewReadOnly = false }) {
           onScopeChange={(scope) => navigate({ scope })}
           onReviewersViewChange={(reviewersView) => navigate({ reviewersView })}
           onSearchChange={(search) => navigate({ search })}
+        />
+      ) : location.view === 'final-writeups' ? (
+        <FinalWriteupsPanel
+          cycleCode={cycleCode}
+          loadingCycles={!cyclesReady && !cyclesError}
+          writeupsView={location.writeupsView}
+          pd={location.pd}
+          search={location.search}
+          uncycled={location.uncycled}
+          onWriteupsViewChange={(writeupsView) => navigate({ writeupsView })}
+          onPdChange={(pd) => navigate({ pd })}
+          onSearchChange={(search) => navigate({ search })}
+          onUncycledChange={(uncycled) => navigate({ uncycled }, { push: true })}
+          onCycleChange={(code) => navigate({ cycleCode: code, uncycled: false }, { push: true })}
         />
       ) : (
         <Card hover={false}><p className="text-gray-500">This view opens on its own page from the tabs above.</p></Card>
