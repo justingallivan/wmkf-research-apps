@@ -265,8 +265,9 @@ is decorative and does not count):
   handoff documentation); `1cb5ecb4` (remote-main drift verification); and
   `fe63ddc8` (ETag-bound regeneration, 412 mapping, unknown-lifecycle DTO
   validity, and concurrency/UI regressions). The implementation and handoff
-  commits are followed by handoff verification commit `75fc2098` and are pushed
-  to
+  commits are followed by handoff verification commit `75fc2098` and final
+  remote-main drift evidence commit `8e1874eb` (records the latest verified
+  main ref and branch divergence); all are pushed to
   `origin/codex/reviewer-release-reason`.
 - Files changed: `lib/services/review-manager/withdraw-sufficient-service.js`,
   `lib/services/reviewer-engagement/withdraw-pending-invitation.js`,
@@ -291,11 +292,10 @@ is decorative and does not count):
   or mint. The menu mirrors the existing response-type map and terminal review-
   status constants, so terminal rows cannot expose Regenerate. No portal, schema,
   sweep, rollup, readiness, or session-prompt files were changed.
-- Verification run and results: the focused release suite passes cleanly with 103
-  tests across 8 suites; the route and release-button characterization suites pass
-  with 20 tests across 2 suites. The latter retains only the pre-existing React
-  `act(...)` warning from the `ReviewerInvitePanel` VIP-load effect. The P1
-  service/component/history command passes with 137 tests across 4 suites. The
+- Verification run and results: the focused release suite passes cleanly with 78
+  tests across 8 suites; the history/UI command passes with 146 tests across 4
+  suites. The history/UI run retains only the pre-existing React `act(...)`
+  warning from the `ReviewerInvitePanel` VIP-load effect. The
   token-regeneration command passes with 150 tests across 6 suites (including the
   terminal response complement, unknown-state fall-through, missing-ETag and
   exact-ifMatch controls, conditional 412 race mapping, revoked no-response
