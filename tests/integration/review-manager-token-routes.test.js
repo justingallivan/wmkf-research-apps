@@ -124,7 +124,7 @@ describe('/api/review-manager/regenerate-token', () => {
     expect(DynamicsService.getRecord).toHaveBeenCalledWith(
       'wmkf_appreviewersuggestions',
       SUGGESTION_ID,
-      { select: 'wmkf_appreviewersuggestionid,_wmkf_request_value,wmkf_applicantdisposition,wmkf_accepted,wmkf_reviewduedateoverride' },
+      { select: 'wmkf_appreviewersuggestionid,_wmkf_request_value,wmkf_applicantdisposition,wmkf_accepted,wmkf_reviewduedateoverride,wmkf_responsetype,wmkf_reviewstatus' },
     );
     expect(DynamicsService.getRecord).toHaveBeenCalledWith(
       'akoya_requests',
@@ -232,6 +232,27 @@ describe('/api/review-manager/regenerate-token', () => {
 
     expect(res.status).toHaveBeenCalledWith(409);
     expect(res.json).toHaveBeenCalledWith({ ok: false, reason: 'excluded' });
+    expect(mintAndStore).not.toHaveBeenCalled();
+  });
+
+  it('refuses a revoked no-response suggestion before request lookup or mint', async () => {
+    mockAuthenticatedUser(2, ['review-manager']);
+    DynamicsService.getRecord.mockResolvedValue({
+      wmkf_appreviewersuggestionid: SUGGESTION_ID,
+      _wmkf_request_value: REQUEST_ID,
+      wmkf_accepted: false,
+      wmkf_responsetype: 100000002,
+      wmkf_externaltokenrevoked: true,
+    });
+
+    const req = createMockReq({ method: 'POST', body: { suggestionId: SUGGESTION_ID } });
+    const res = createMockRes();
+
+    await handler(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(409);
+    expect(res.json).toHaveBeenCalledWith({ ok: false, reason: 'not_eligible' });
+    expect(DynamicsService.getRecord).toHaveBeenCalledTimes(1);
     expect(mintAndStore).not.toHaveBeenCalled();
   });
 

@@ -268,6 +268,7 @@ describe('reviewer table geometry', () => {
     expect(screen.queryByText('Correct recorded status')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Record reviewer withdrawal' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Release from assignment' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Regenerate link & copy' })).not.toBeInTheDocument();
   });
 });
 

@@ -11,6 +11,29 @@ const getForTokenRegeneration = jest.fn();
 jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
   getForTokenRegeneration: (...a) => getForTokenRegeneration(...a),
   APPLICANT_DISPOSITION_EXCLUDED: 100000002,
+  RESPONSE_TYPE_MAP: {
+    accepted: 100000000,
+    declined: 100000001,
+    no_response: 100000002,
+    withdrawn_sufficient: 100000003,
+    held: 100000004,
+  },
+  RESPONSE_TYPE_BY_VALUE: {
+    100000000: 'accepted',
+    100000001: 'declined',
+    100000002: 'no_response',
+    100000003: 'withdrawn_sufficient',
+    100000004: 'held',
+  },
+  REVIEW_STATUS_MAP: {
+    accepted: 100000000,
+    materials_sent: 100000001,
+    under_review: 100000002,
+    review_received: 100000003,
+    complete: 100000004,
+    withdrew: 100000005,
+    released: 100000006,
+  },
 }));
 const mintAndStore = jest.fn();
 jest.mock('../../lib/external/token-lifecycle', () => ({
@@ -88,6 +111,58 @@ test('applicant-excluded engagement fails closed: 409 { ok:false, reason:"exclud
   expect(err).toBeInstanceOf(RegenerateTokenError);
   expect(err.httpStatus).toBe(409);
   expect(err.body).toEqual({ ok: false, reason: 'excluded' });
+  expect(mintAndStore).not.toHaveBeenCalled();
+});
+
+test.each([
+  ['declined', 100000001],
+  ['no_response', 100000002],
+  ['withdrawn_sufficient', 100000003],
+  ['held', 100000004],
+])('terminal response %s fails closed before request lookup or mint', async (_label, responseType) => {
+  getForTokenRegeneration.mockResolvedValueOnce({
+    _wmkf_request_value: REQ,
+    wmkf_applicantdisposition: null,
+    wmkf_accepted: false,
+    wmkf_responsetype: responseType,
+    wmkf_externaltokenrevoked: true,
+  });
+
+  const err = await regenerateToken({ suggestionId: SUG, actingUserSystemId: ACTOR }).catch((e) => e);
+
+  expect(err).toBeInstanceOf(RegenerateTokenError);
+  expect(err.httpStatus).toBe(409);
+  expect(err.body).toEqual({ ok: false, reason: 'not_eligible' });
+  expect(getRequestById).not.toHaveBeenCalled();
+  expect(mintAndStore).not.toHaveBeenCalled();
+});
+
+test('unknown response type fails closed before any mint', async () => {
+  getForTokenRegeneration.mockResolvedValueOnce({
+    _wmkf_request_value: REQ,
+    wmkf_applicantdisposition: null,
+    wmkf_responsetype: 999999999,
+  });
+
+  const err = await regenerateToken({ suggestionId: SUG, actingUserSystemId: ACTOR }).catch((e) => e);
+
+  expect(err.body).toEqual({ ok: false, reason: 'not_eligible' });
+  expect(mintAndStore).not.toHaveBeenCalled();
+});
+
+test('terminal review status fails closed even when response type is accepted', async () => {
+  getForTokenRegeneration.mockResolvedValueOnce({
+    _wmkf_request_value: REQ,
+    wmkf_applicantdisposition: null,
+    wmkf_accepted: true,
+    wmkf_responsetype: 100000000,
+    wmkf_reviewstatus: 100000006,
+  });
+
+  const err = await regenerateToken({ suggestionId: SUG, actingUserSystemId: ACTOR }).catch((e) => e);
+
+  expect(err.body).toEqual({ ok: false, reason: 'not_eligible' });
+  expect(getRequestById).not.toHaveBeenCalled();
   expect(mintAndStore).not.toHaveBeenCalled();
 });
 
