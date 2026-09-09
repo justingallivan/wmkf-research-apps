@@ -57,7 +57,11 @@ most. Merges are the owner's. `main` is at the docs commit `a184506f` plus this 
 ### Commits (Claude)
 
 Merged to `main`: PRs #203–#209 (hashes above); docs `04142042`, `38586849`, `098c2a19`,
-`72c20898`, `a184506f`. Open: PR #210 (three commits), PR #211 (three commits).
+`72c20898`, `a184506f`. Owner-merged 2026-09-09: PR #210 (`0fb2e47b`), PR #211 (`7c647b52`,
+retargeted to `main` first). Session-close docs on `main`: `dbae65fe`, `a7fdac38`, `c69295ce`
+(harness-framing wording fix; the two post-merge `Tests` runs were red on that wording only),
+`5f9d08cd` (memory: run `check:harness-framing` before handoff commits), `b38fc0e0` (owner
+brief `docs/plans/OWNER_BRIEF_2026-09-09.md`).
 
 Milestone determination: `DEVELOPMENT_LOG.md` entry added ("Grant cycle derives from the
 meeting date everywhere; the Request Workbench becomes one shell").
