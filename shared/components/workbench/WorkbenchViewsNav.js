@@ -12,11 +12,10 @@ const VIEWS = [
 ];
 
 // Views that live inside the shell page link to it with the shell's program
-// and cycle; the others still open their own page, carrying the cycle where
-// that page reads it (Final writeups resolves its own cycle).
+// and cycle; the others still open their own page, carrying the cycle.
 function hrefFor(view, cycleCode, programId) {
   if (SHELL_PANEL_VIEWS.has(view.key)) return buildWorkbenchHref({ view: view.key, programId, cycleCode });
-  if (!cycleCode || view.href === '/workbench/final-writeups') return view.href;
+  if (!cycleCode) return view.href;
   return `${view.href}?cycleCode=${encodeURIComponent(cycleCode)}`;
 }
 

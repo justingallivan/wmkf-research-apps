@@ -11,7 +11,10 @@
  *   scope     my (default) | all           — request scope (Request list, Reviewer follow-up)
  *   setAside  1                            — Request list shows Set Aside rows
  *   reviewers attention (default) | all    — Reviewer follow-up reviewer-state view
- *   q         free text                    — Reviewer follow-up search
+ *   q         free text                    — search box of the open view (follow-up, Final writeups)
+ *   writeups  needs-review (default) | reviewed | all — Final writeups view
+ *   pd        Program Director GUID        — Final writeups filter (canonical lowercase)
+ *   uncycled  1                            — Final writeups: rows with no meeting date
  *
  * Views that are not yet mounted as shell panels keep their own pages; the
  * views nav links out to them until each one moves inside the shell.
@@ -21,14 +24,17 @@ export const WORKBENCH_VIEW_KEYS = ['requests', 'initial-assessments', 'reviewer
 export const DEFAULT_WORKBENCH_VIEW = 'requests';
 
 /** Views rendered inside the shell page; the rest still link to their own pages. */
-export const SHELL_PANEL_VIEWS = new Set(['requests', 'reviewer-follow-up']);
+export const SHELL_PANEL_VIEWS = new Set(['requests', 'reviewer-follow-up', 'final-writeups']);
 
 /** Every key of the shell state, for equality checks. */
-export const WORKBENCH_LOCATION_KEYS = ['view', 'programId', 'cycleCode', 'scope', 'includeSetAside', 'reviewersView', 'search'];
+export const WORKBENCH_LOCATION_KEYS = ['view', 'programId', 'cycleCode', 'scope', 'includeSetAside', 'reviewersView', 'search', 'writeupsView', 'pd', 'uncycled'];
+
+export const WRITEUPS_VIEW_KEYS = ['needs-review', 'reviewed', 'all'];
 
 export const WORKBENCH_PATH = '/workbench';
 
 const CYCLE_RE = /^[JD]\d{2}$/;
+const GUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 function first(value) {
   return Array.isArray(value) ? value[0] : value;
@@ -48,6 +54,8 @@ export function normalizeCycleCode(value) {
 export function readWorkbenchQuery(query = {}) {
   const get = (key) => (typeof query.get === 'function' ? query.get(key) : first(query[key]));
   const view = cleanString(get('view'));
+  const writeups = cleanString(get('writeups'));
+  const pd = cleanString(get('pd')).toLowerCase();
   return {
     view: WORKBENCH_VIEW_KEYS.includes(view) ? view : DEFAULT_WORKBENCH_VIEW,
     programId: cleanString(get('programId')),
@@ -56,6 +64,11 @@ export function readWorkbenchQuery(query = {}) {
     includeSetAside: cleanString(get('setAside')) === '1',
     reviewersView: cleanString(get('reviewers')) === 'all' ? 'all' : 'attention',
     search: cleanString(get('q'), 200),
+    writeupsView: WRITEUPS_VIEW_KEYS.includes(writeups) ? writeups : 'needs-review',
+    // Canonical form is the lowercased GUID; anything else is dropped so the
+    // stored value always equals what rows are compared against.
+    pd: GUID_RE.test(pd) ? pd : '',
+    uncycled: cleanString(get('uncycled')) === '1',
   };
 }
 
@@ -69,6 +82,9 @@ export function buildWorkbenchHref(state = {}) {
   if (state.includeSetAside) params.set('setAside', '1');
   if (state.reviewersView === 'all') params.set('reviewers', 'all');
   if (state.search) params.set('q', state.search);
+  if (state.writeupsView && state.writeupsView !== 'needs-review') params.set('writeups', state.writeupsView);
+  if (state.pd) params.set('pd', state.pd);
+  if (state.uncycled) params.set('uncycled', '1');
   const search = params.toString();
   return search ? `${WORKBENCH_PATH}?${search}` : WORKBENCH_PATH;
 }

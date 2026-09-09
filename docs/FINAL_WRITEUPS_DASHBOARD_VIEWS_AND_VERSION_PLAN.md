@@ -38,7 +38,8 @@ first D26 Final exists means the first real reviewers meet the intended shape.
   filter, both client-side over the already-loaded cycle and persisted in the page URL; each row
   and the focused acknowledgement panel gain the acknowledged publication version.
 - **Entry points:** `shared/components/final-writeups/FinalWriteupsViews.js`
-  (`FinalWriteupsDashboardView`, `WriteupRow`, `AcknowledgementPanel`, `FocusedDocument`);
+  (`FinalWriteupsPanel` — the former `FinalWriteupsDashboardView`, mounted in the Workbench shell
+  since 2026-09-08 — `WriteupRow`, `AcknowledgementPanel`, `FocusedDocument`);
   `lib/services/final-writeup/acknowledgement-service.js` (`projectAcknowledgementState`, one
   additive field); `lib/services/final-writeup/dashboard-service.js` (`projectRequestRow`, one
   additive field; `unconfiguredMatrixRow`, one additive field so the PD filter covers every matrix

@@ -51,6 +51,21 @@ function mockFetch(overrides = {}) {
       return response({ success: true, proposals: [], rollup: { total: 0, stages: {} } });
     }
     if (href.startsWith('/api/review-manager/reviewers?')) return response({ success: true, proposals: [] });
+    if (href.startsWith('/api/workbench/final-writeups?')) {
+      const code = new URL(href, 'http://x').searchParams.get('cycleCode');
+      const empty = code === 'D26';
+      return response({
+        success: true,
+        viewer: { id: 'v', name: 'V', personas: [], personaLensesEnabled: false, isSuperuser: false },
+        cycles: { selected: code, available: [{ code: 'D26', label: 'December 2026' }, { code: 'J26', label: 'June 2026' }], hasUncycled: true, defaultResolvedBy: 'explicit' },
+        limits: { maximumRows: 100, scope: 'cycle' },
+        counts: empty ? { total: 0, open: 0, history: 0, stewardship: 0 } : { total: 1, open: 1, history: 0, stewardship: 0 },
+        queues: { open: empty ? [] : [{ requestId: 'r1', requestNumber: '1', title: 'June writeup', bucket: 'open', personalState: 'unreviewed', stage: { key: 'group-review', label: 'Group review' }, cycleLabel: 'June 2026', responsibleProgramDirector: { id: '33333333-3333-4333-8333-333333333331', name: 'PD A' }, document: { url: 'https://example.sharepoint.com/final.docx', publicationVersionId: '1.0', lastModified: '2026-08-31T12:00:00.000Z' }, reviewers: [], primaryAction: { key: 'review', label: 'Open review' }, supportingMaterials: [] }], history: [], stewardship: [] },
+        coordinatorMatrix: null,
+        selected: null,
+        navigation: null,
+      });
+    }
     throw new Error(`Unexpected fetch: ${href}`);
   });
 }
@@ -82,13 +97,14 @@ test('a deep-linked cycle the program lists is honored without rewriting the URL
   await waitFor(() => expect(rowFetches()).toEqual(['/api/workbench/dashboard?cycleCode=J26&scope=all&programId=p1&includeSetAside=1']));
 });
 
-test('an unlisted deep-linked cycle falls back to the working cycle and corrects the URL', async () => {
+test('an unlisted deep-linked cycle is honored and rendered as an extra option (a Final writeups or Awardees cycle need not have pending requests)', async () => {
   routerState.query = { cycleCode: 'J25' };
   routerState.asPath = '/workbench?cycleCode=J25';
   render(<WorkbenchShell />);
-  await waitFor(() => expect(screen.getByLabelText('Cycle')).toHaveValue('D26'));
-  expect(replace).toHaveBeenCalledWith('/workbench?cycleCode=D26', undefined, expect.any(Object));
-  expect(rowFetches().some((u) => u.includes('cycleCode=J25'))).toBe(false);
+  await waitFor(() => expect(screen.getByLabelText('Cycle')).toHaveValue('J25'));
+  expect(screen.getByRole('option', { name: 'June 2025' })).toBeInTheDocument();
+  expect(replace).not.toHaveBeenCalled();
+  await waitFor(() => expect(rowFetches()).toEqual(['/api/workbench/dashboard?cycleCode=J25&scope=my&programId=p1']));
 });
 
 test('cycle and program changes push history entries; filter changes replace', async () => {
@@ -139,6 +155,16 @@ test('a cycle-list failure shows an alert with Try again and never loads rows', 
   await waitFor(() => expect(screen.getByLabelText('Cycle')).toHaveValue('D26'));
 });
 
+test('a cycle-list failure on the Final writeups view shows only the shell alert, never a stuck loading surface', async () => {
+  mockFetch({ '/api/workbench/dashboard': () => response({ error: 'Dataverse unavailable' }, false) });
+  routerState.query = { view: 'final-writeups' };
+  routerState.asPath = '/workbench?view=final-writeups';
+  render(<WorkbenchShell />);
+  expect(await screen.findByRole('alert')).toHaveTextContent('Dataverse unavailable');
+  expect(screen.queryByText(/Loading Final Writeups/)).not.toBeInTheDocument();
+  expect(global.fetch.mock.calls.some(([u]) => String(u).includes('final-writeups'))).toBe(false);
+});
+
 test('a non-panel view in the URL keeps the shell toolbar and points at the tabs', async () => {
   routerState.query = { view: 'awardees', cycleCode: 'D26' };
   routerState.asPath = '/workbench?view=awardees&cycleCode=D26';
@@ -170,4 +196,44 @@ test('the Reviewer follow-up view carries its reviewer-state view and search in 
   } finally {
     jest.useRealTimers();
   }
+});
+
+test('the Final writeups view carries writeups/pd/uncycled in the URL, keeps them across a cycle change, and the empty-cycle link changes the shell cycle', async () => {
+  routerState.query = { view: 'final-writeups' };
+  routerState.asPath = '/workbench?view=final-writeups';
+  render(<WorkbenchShell />);
+  // Working cycle D26 has nothing visible: the in-place notice names it and links June.
+  expect(await screen.findByText('No current writeups visible to you in December 2026.')).toBeInTheDocument();
+  expect(global.fetch).toHaveBeenCalledWith('/api/workbench/final-writeups?cycleCode=D26');
+
+  fireEvent.click(screen.getByRole('button', { name: 'June 2026' }));
+  expect(push).toHaveBeenLastCalledWith('/workbench?view=final-writeups&cycleCode=J26', undefined, expect.any(Object));
+  await waitFor(() => expect(screen.getByLabelText('Cycle')).toHaveValue('J26'));
+  expect(await screen.findByText('June writeup')).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: /All writeups/ }));
+  expect(replace).toHaveBeenLastCalledWith('/workbench?view=final-writeups&cycleCode=J26&writeups=all', undefined, expect.any(Object));
+  fireEvent.change(screen.getByLabelText('Program director'), { target: { value: '33333333-3333-4333-8333-333333333331' } });
+  expect(replace).toHaveBeenLastCalledWith('/workbench?view=final-writeups&cycleCode=J26&writeups=all&pd=33333333-3333-4333-8333-333333333331', undefined, expect.any(Object));
+
+  // A cycle change keeps the view's filters.
+  fireEvent.change(screen.getByLabelText('Cycle'), { target: { value: 'D26' } });
+  expect(push).toHaveBeenLastCalledWith('/workbench?view=final-writeups&cycleCode=D26&writeups=all&pd=33333333-3333-4333-8333-333333333331', undefined, expect.any(Object));
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Writeups without a cycle' }));
+  expect(push).toHaveBeenLastCalledWith('/workbench?view=final-writeups&cycleCode=D26&writeups=all&pd=33333333-3333-4333-8333-333333333331&uncycled=1', undefined, expect.any(Object));
+  await waitFor(() => expect(global.fetch).toHaveBeenLastCalledWith('/api/workbench/final-writeups?cycleCode=none'));
+});
+
+test('the legacy Final writeups route redirects into the shell, translating its old keys', async () => {
+  const { getServerSideProps } = require('../../pages/workbench/final-writeups/index');
+  await expect(getServerSideProps({ query: { cycleCode: 'j26', view: 'reviewed', pd: ' 33333333-3333-4333-8333-333333333331 ' } })).resolves.toEqual({
+    redirect: { destination: '/workbench?view=final-writeups&cycleCode=J26&writeups=reviewed&pd=33333333-3333-4333-8333-333333333331', permanent: false },
+  });
+  await expect(getServerSideProps({ query: { cycleCode: 'none', view: 'bogus', pd: 'not-a-guid' } })).resolves.toEqual({
+    redirect: { destination: '/workbench?view=final-writeups&uncycled=1', permanent: false },
+  });
+  await expect(getServerSideProps({ query: {} })).resolves.toEqual({
+    redirect: { destination: '/workbench?view=final-writeups', permanent: false },
+  });
 });

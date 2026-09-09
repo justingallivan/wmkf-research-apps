@@ -1,9 +1,10 @@
 /** @jest-environment jsdom */
 
+import { useState } from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import {
   FinalWriteupFocusedView,
-  FinalWriteupsDashboardView,
+  FinalWriteupsPanel,
 } from '../../shared/components/final-writeups/FinalWriteupsViews';
 
 jest.mock('../../shared/components/Layout', () => ({
@@ -101,23 +102,48 @@ function dashboard(overrides = {}) {
   };
 }
 
-function setLocation(search) {
-  window.history.replaceState(null, '', `/workbench/final-writeups${search}`);
+// The panel is driven by the Workbench shell through props; this harness plays
+// the shell: it holds the URL-mirrored state and applies the panel's callbacks.
+const DEFAULT_STATE = { cycleCode: 'D26', writeupsView: 'needs-review', pd: '', search: '', uncycled: false };
+const harness = { state: null, set: null };
+function Harness({ initial }) {
+  const [state, setState] = useState(initial);
+  harness.state = state;
+  harness.set = (patch) => setState((prev) => ({ ...prev, ...patch }));
+  return (
+    <FinalWriteupsPanel
+      cycleCode={state.cycleCode}
+      loadingCycles={false}
+      writeupsView={state.writeupsView}
+      pd={state.pd}
+      search={state.search}
+      uncycled={state.uncycled}
+      onWriteupsViewChange={(writeupsView) => harness.set({ writeupsView })}
+      onPdChange={(pd) => harness.set({ pd })}
+      onSearchChange={(search) => harness.set({ search })}
+      onUncycledChange={(uncycled) => harness.set({ uncycled })}
+      onCycleChange={(cycleCode) => harness.set({ cycleCode, uncycled: false })}
+    />
+  );
 }
+function renderPanel(initial = {}) {
+  return render(<Harness initial={{ ...DEFAULT_STATE, ...initial }} />);
+}
+const panelState = () => harness.state;
 
 beforeEach(() => {
   jest.clearAllMocks();
   global.fetch = jest.fn();
-  setLocation('');
 });
 
 afterEach(() => jest.restoreAllMocks());
 
 test('dashboard leads with one search field and server-derived task queues', async () => {
   global.fetch.mockResolvedValueOnce(response(dashboard()));
-  render(<FinalWriteupsDashboardView />);
+  renderPanel();
 
   expect(await screen.findByRole('heading', { name: 'Needs my review' })).toBeInTheDocument();
+  expect(global.fetch).toHaveBeenCalledWith('/api/workbench/final-writeups?cycleCode=D26');
   expect(screen.getAllByRole('searchbox')).toHaveLength(1);
   expect(screen.getAllByRole('link', { name: 'Open review' })[0])
     .toHaveAttribute('href', `/workbench/final-writeups/${REQUEST_ID}`);
@@ -127,9 +153,9 @@ test('dashboard leads with one search field and server-derived task queues', asy
   expect(screen.queryByText(/Science and Engineering|Medical Research/i)).not.toBeInTheDocument();
 });
 
-test('dashboard search filters the active view without adding controls other than the cycle select, view selector, and Program director filter', async () => {
+test('dashboard search filters the active view without adding controls other than the view selector and Program director filter (the cycle select is the shell\'s)', async () => {
   global.fetch.mockResolvedValueOnce(response(dashboard()));
-  render(<FinalWriteupsDashboardView />);
+  renderPanel();
   const search = await screen.findByRole('searchbox');
 
   fireEvent.change(search, { target: { value: 'second' } });
@@ -140,11 +166,11 @@ test('dashboard search filters the active view without adding controls other tha
   fireEvent.click(screen.getByRole('button', { name: /All writeups/ }));
   expect(screen.getByText('A second proposal')).toBeInTheDocument();
   expect(screen.getByText('1 matching writeup')).toBeInTheDocument();
-  expect(screen.getAllByRole('combobox')).toHaveLength(2);
+  expect(screen.getAllByRole('combobox')).toHaveLength(1);
   expect(screen.getByRole('group', { name: 'View' }).querySelectorAll('button')).toHaveLength(3);
 });
 
-test('cycle selector reflects the server list, defaults to the selected cycle, and reloads with the chosen code', async () => {
+test('the cycle comes from the shell: a change reloads with the new code', async () => {
   global.fetch
     .mockResolvedValueOnce(response(dashboard()))
     .mockResolvedValueOnce(response(dashboard({
@@ -154,122 +180,75 @@ test('cycle selector reflects the server list, defaults to the selected cycle, a
         hasUncycled: false,
         defaultResolvedBy: 'explicit',
       },
-      counts: { total: 0, open: 0, history: 0, stewardship: 0 },
-      queues: { open: [], history: [], stewardship: [] },
+      counts: { total: 1, open: 0, history: 0, stewardship: 1 },
+      queues: { open: [], history: [], stewardship: [writeup({ bucket: 'stewardship', relationship: 'responsible-pd', personalState: 'not-applicable', mayAcknowledge: false })] },
     })));
-  render(<FinalWriteupsDashboardView />);
+  renderPanel();
+  expect(await screen.findByText(/awaiting your review in December 2026/)).toBeInTheDocument();
+  expect(screen.queryByRole('combobox', { name: 'Cycle' })).not.toBeInTheDocument();
 
-  const select = await screen.findByRole('combobox', { name: 'Cycle' });
-  expect(global.fetch).toHaveBeenCalledWith('/api/workbench/final-writeups');
-  expect(select).toHaveValue('D26');
-  expect(screen.getByText(/awaiting your review in December 2026/)).toBeInTheDocument();
-  expect(screen.queryByRole('option', { name: 'No cycle' })).not.toBeInTheDocument();
-
-  fireEvent.change(select, { target: { value: 'J26' } });
+  harness.set({ cycleCode: 'J26' });
   await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2));
   expect(global.fetch).toHaveBeenLastCalledWith('/api/workbench/final-writeups?cycleCode=J26');
-  expect(window.location.search).toBe('?cycleCode=J26');
-  await waitFor(() => expect(screen.getByRole('combobox', { name: 'Cycle' })).toHaveValue('J26'));
-  expect(screen.getByText(/Nothing needs your review in June 2026\./)).toBeInTheDocument();
+  expect(await screen.findByText(/Nothing needs your review in June 2026\./)).toBeInTheDocument();
 });
 
-test('dashboard reads cycleCode from the URL on mount and passes it as the only query parameter', async () => {
-  setLocation('?cycleCode=J26');
+test('the shell cycle is passed as the only query parameter', async () => {
   global.fetch.mockResolvedValueOnce(response(dashboard()));
-  render(<FinalWriteupsDashboardView />);
-  await screen.findByRole('combobox', { name: 'Cycle' });
+  renderPanel({ cycleCode: 'J26', writeupsView: 'reviewed', pd: '33333333-3333-4333-8333-333333333331', search: 'x' });
+  await screen.findByRole('combobox', { name: 'Program director' });
+  expect(global.fetch).toHaveBeenCalledTimes(1);
   expect(global.fetch).toHaveBeenCalledWith('/api/workbench/final-writeups?cycleCode=J26');
 });
 
-test('No cycle option renders only when uncycled rows exist and round-trips to the URL', async () => {
+test('the "writeups without a cycle" link renders only when uncycled rows exist and switches the fetch to none', async () => {
   global.fetch
     .mockResolvedValueOnce(response(dashboard({
-      cycles: {
-        selected: 'D26',
-        available: [{ code: 'D26', label: 'December 2026' }],
-        hasUncycled: true,
-        defaultResolvedBy: 'visible',
-      },
+      cycles: { selected: 'D26', available: [{ code: 'D26', label: 'December 2026' }], hasUncycled: true, defaultResolvedBy: 'explicit' },
     })))
     .mockResolvedValueOnce(response(dashboard({
-      cycles: {
-        selected: 'none',
-        available: [{ code: 'D26', label: 'December 2026' }],
-        hasUncycled: true,
-        defaultResolvedBy: 'explicit',
-      },
+      cycles: { selected: 'none', available: [{ code: 'D26', label: 'December 2026' }], hasUncycled: true, defaultResolvedBy: 'explicit' },
     })));
-  render(<FinalWriteupsDashboardView />);
-  const select = await screen.findByRole('combobox', { name: 'Cycle' });
-  expect(screen.getByRole('option', { name: 'No cycle' })).toBeInTheDocument();
+  renderPanel();
+  const link = await screen.findByRole('button', { name: 'Writeups without a cycle' });
 
-  fireEvent.change(select, { target: { value: 'none' } });
+  fireEvent.click(link);
+  expect(panelState().uncycled).toBe(true);
   await waitFor(() => expect(global.fetch).toHaveBeenLastCalledWith('/api/workbench/final-writeups?cycleCode=none'));
-  expect(window.location.search).toBe('?cycleCode=none');
-  await waitFor(() => expect(screen.getByRole('combobox', { name: 'Cycle' })).toHaveValue('none'));
-  expect(screen.getByText(/awaiting your review in No cycle/)).toBeInTheDocument();
+  expect(await screen.findByText(/awaiting your review in No cycle/)).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Writeups without a cycle' })).not.toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Back to December 2026' }));
+  expect(panelState().uncycled).toBe(false);
 });
 
-test('the controlled cycle value always has an option: bookmarked none without uncycled rows, and a cycle absent from the list', async () => {
-  global.fetch.mockResolvedValueOnce(response(dashboard({
-    cycles: {
-      selected: 'none',
-      available: [{ code: 'D26', label: 'December 2026' }],
-      hasUncycled: false,
-      defaultResolvedBy: 'explicit',
-    },
-    counts: { total: 0, open: 0, history: 0, stewardship: 0 },
-    queues: { open: [], history: [], stewardship: [] },
-  })));
-  const { unmount } = render(<FinalWriteupsDashboardView />);
-  const select = await screen.findByRole('combobox', { name: 'Cycle' });
-  expect(select).toHaveValue('none');
-  expect(screen.getByRole('option', { name: 'No cycle' })).toBeInTheDocument();
-  unmount();
-
-  global.fetch.mockResolvedValueOnce(response(dashboard({
-    cycles: {
-      selected: 'J25',
-      available: [{ code: 'D26', label: 'December 2026' }],
-      hasUncycled: false,
-      defaultResolvedBy: 'explicit',
-    },
-    counts: { total: 0, open: 0, history: 0, stewardship: 0 },
-    queues: { open: [], history: [], stewardship: [] },
-  })));
-  render(<FinalWriteupsDashboardView />);
-  const absent = await screen.findByRole('combobox', { name: 'Cycle' });
-  expect(absent).toHaveValue('J25');
-  expect(screen.getByRole('option', { name: 'June 2025' })).toBeInTheDocument();
-  expect(screen.getByText(/awaiting your review in June 2025/)).toBeInTheDocument();
-  expect(screen.queryByRole('option', { name: 'No cycle' })).not.toBeInTheDocument();
+test('no uncycled link without uncycled rows', async () => {
+  global.fetch.mockResolvedValueOnce(response(dashboard()));
+  renderPanel();
+  await screen.findByRole('heading', { name: 'Needs my review' });
+  expect(screen.queryByRole('button', { name: 'Writeups without a cycle' })).not.toBeInTheDocument();
 });
 
-test('walk-back outcomes are rendered from response fields only', async () => {
-  global.fetch.mockResolvedValueOnce(response(dashboard({
-    cycles: {
-      selected: 'J26',
-      available: [{ code: 'D26', label: 'December 2026' }, { code: 'J26', label: 'June 2026' }],
-      hasUncycled: false,
-      defaultResolvedBy: 'visible',
-    },
-  })));
-  const { unmount } = render(<FinalWriteupsDashboardView />);
-  expect(await screen.findByText('No current writeups visible to you in December 2026; showing June 2026.')).toBeInTheDocument();
-  unmount();
+test('an empty cycle shows one in-place notice naming it, linking the newest other cycle with writeups and the uncycled rows', async () => {
+  global.fetch
+    .mockResolvedValueOnce(response(dashboard({
+      cycles: { selected: 'D26', available: [{ code: 'D26', label: 'December 2026' }, { code: 'J26', label: 'June 2026' }], hasUncycled: true, defaultResolvedBy: 'explicit' },
+      counts: { total: 0, open: 0, history: 0, stewardship: 0 },
+      queues: { open: [], history: [], stewardship: [] },
+    })))
+    .mockResolvedValueOnce(response(dashboard({
+      cycles: { selected: 'J26', available: [{ code: 'D26', label: 'December 2026' }, { code: 'J26', label: 'June 2026' }], hasUncycled: true, defaultResolvedBy: 'explicit' },
+    })));
+  renderPanel();
+  expect(await screen.findByText('No current writeups visible to you in December 2026.')).toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: 'Needs my review' })).not.toBeInTheDocument();
+  expect(screen.queryByText(/showing June 2026/)).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Writeups without a cycle' })).toBeInTheDocument();
 
-  global.fetch.mockResolvedValueOnce(response(dashboard({
-    cycles: {
-      selected: 'D26',
-      available: [{ code: 'D26', label: 'December 2026' }],
-      hasUncycled: false,
-      defaultResolvedBy: 'exhausted',
-    },
-    counts: { total: 0, open: 0, history: 0, stewardship: 0 },
-    queues: { open: [], history: [], stewardship: [] },
-  })));
-  render(<FinalWriteupsDashboardView />);
-  expect(await screen.findByText('No current writeups visible to you in the most recent cycles; choose a cycle to look further back.')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'June 2026' }));
+  expect(panelState()).toMatchObject({ cycleCode: 'J26', uncycled: false });
+  await waitFor(() => expect(global.fetch).toHaveBeenLastCalledWith('/api/workbench/final-writeups?cycleCode=J26'));
+  expect(await screen.findByRole('heading', { name: 'Needs my review' })).toBeInTheDocument();
 });
 
 test('dashboard ignores a late response after the cycle changes', async () => {
@@ -286,12 +265,12 @@ test('dashboard ignores a late response after the cycle changes', async () => {
       },
       queues: { open: [writeup({ title: 'Back on December' })], history: [], stewardship: [] },
     })));
-  render(<FinalWriteupsDashboardView />);
-  const select = await screen.findByRole('combobox', { name: 'Cycle' });
+  renderPanel();
+  await screen.findByRole('heading', { name: 'Needs my review' });
 
-  fireEvent.change(select, { target: { value: 'J26' } });
+  harness.set({ cycleCode: 'J26' });
   await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2));
-  fireEvent.change(select, { target: { value: 'D26' } });
+  harness.set({ cycleCode: 'D26' });
   expect(await screen.findByText('Back on December')).toBeInTheDocument();
 
   resolveSecond(response(dashboard({
@@ -351,7 +330,7 @@ test('enabled overlapping persona lenses are named without adding another contro
       isSuperuser: false,
     },
   })));
-  render(<FinalWriteupsDashboardView />);
+  renderPanel();
 
   expect(await screen.findByText('Program Director + Leadership view')).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: /persona|lens/i })).not.toBeInTheDocument();
@@ -387,7 +366,7 @@ test('superuser dashboard renders a complete neutral coordinator matrix with dir
       unconfiguredRows: [],
     },
   })));
-  render(<FinalWriteupsDashboardView />);
+  renderPanel();
 
   expect(await screen.findByRole('heading', { name: 'Coordinator matrix' })).toBeInTheDocument();
   expect(screen.getByRole('heading', { name: 'Research' })).toBeInTheDocument();
@@ -407,7 +386,7 @@ test('reviewer initials expose current and earlier-version meaning without color
   global.fetch.mockResolvedValueOnce(response(dashboard({
     queues: { open: [mixed], history: [], stewardship: [] },
   })));
-  render(<FinalWriteupsDashboardView />);
+  renderPanel();
 
   expect(await screen.findByText('1 current · 1 earlier version')).toBeInTheDocument();
   expect(screen.getByLabelText('Review activity: 1 current · 1 earlier version')).toBeInTheDocument();
@@ -424,7 +403,7 @@ test('review activity pluralizes earlier versions', async () => {
   global.fetch.mockResolvedValueOnce(response(dashboard({
     queues: { open: [several], history: [], stewardship: [] },
   })));
-  render(<FinalWriteupsDashboardView />);
+  renderPanel();
   expect(await screen.findByText('3 earlier versions')).toBeInTheDocument();
 });
 
@@ -579,31 +558,29 @@ describe('views, Program director filter, and version context (Slices 6B/6C)', (
   }
 
   test('dashboard opens on Needs my review for every persona and never sends view or pd to the API', async () => {
-    setLocation(`?cycleCode=D26&view=reviewed&pd=${PD_A}`);
     global.fetch.mockResolvedValueOnce(response(twoPdDashboard()));
-    const first = render(<FinalWriteupsDashboardView />);
+    const first = renderPanel({ writeupsView: 'reviewed', pd: PD_A });
     await screen.findByRole('heading', { name: 'Reviewed by me' });
     expect(global.fetch).toHaveBeenCalledTimes(1);
     expect(global.fetch).toHaveBeenCalledWith('/api/workbench/final-writeups?cycleCode=D26');
-    expect(window.location.search).toBe(`?cycleCode=D26&view=reviewed&pd=${PD_A}`);
+    expect(panelState()).toMatchObject({ writeupsView: 'reviewed', pd: PD_A });
     first.unmount();
 
     for (const personas of [['program-director'], ['program-coordinator'], ['leadership']]) {
-      setLocation('');
       global.fetch.mockResolvedValueOnce(response(twoPdDashboard({
         viewer: { id: 'reviewer-1', name: 'Ada', personas, personaLensesEnabled: true, isSuperuser: false },
       })));
-      const view = render(<FinalWriteupsDashboardView />);
+      const view = renderPanel();
       await screen.findByRole('heading', { name: 'Needs my review' });
       expect(pressed(/Needs my review/)).toBe('true');
-      expect(window.location.search).toBe('');
+      expect(panelState()).toMatchObject({ writeupsView: 'needs-review', pd: '' });
       view.unmount();
     }
   });
 
   test('view selector partitions by bucket: updated rows stay in Reviewed by me, stewardship only in All', async () => {
     global.fetch.mockResolvedValueOnce(response(dashboard()));
-    render(<FinalWriteupsDashboardView />);
+    renderPanel();
     await screen.findByRole('heading', { name: 'Needs my review' });
     expect(screen.getByText('Cellular repair after tissue injury')).toBeInTheDocument();
     expect(screen.queryByText('A second proposal')).not.toBeInTheDocument();
@@ -615,7 +592,7 @@ describe('views, Program director filter, and version context (Slices 6B/6C)', (
     expect(screen.getByText('A second proposal')).toBeInTheDocument();
     expect(screen.getByText('Updated since review')).toBeInTheDocument();
     expect(screen.queryByText('Cellular repair after tissue injury')).not.toBeInTheDocument();
-    expect(window.location.search).toBe('?view=reviewed');
+    expect(panelState().writeupsView).toBe('reviewed');
 
     fireEvent.click(screen.getByRole('button', { name: /All writeups/ }));
     expect(screen.getByRole('heading', { name: 'All writeups' })).toBeInTheDocument();
@@ -623,10 +600,10 @@ describe('views, Program director filter, and version context (Slices 6B/6C)', (
     expect(screen.getByText('A second proposal')).toBeInTheDocument();
     expect(screen.getByText('My proposal')).toBeInTheDocument();
     expect(screen.queryByText('Your writeups')).not.toBeInTheDocument();
-    expect(window.location.search).toBe('?view=all');
+    expect(panelState().writeupsView).toBe('all');
 
     fireEvent.click(screen.getByRole('button', { name: /Needs my review/ }));
-    expect(window.location.search).toBe('');
+    expect(panelState().writeupsView).toBe('needs-review');
   });
 
   test('All writeups merges the buckets and sorts by request number', async () => {
@@ -637,45 +614,25 @@ describe('views, Program director filter, and version context (Slices 6B/6C)', (
         stewardship: [writeup({ requestId: 's', requestNumber: '150', title: 'One fifty', bucket: 'stewardship', relationship: 'responsible-pd', personalState: 'not-applicable', mayAcknowledge: false, primaryAction: { key: 'edit', label: 'Edit in Word' } })],
       },
     })));
-    render(<FinalWriteupsDashboardView />);
+    renderPanel();
     await screen.findByRole('heading', { name: 'Needs my review' });
     fireEvent.click(screen.getByRole('button', { name: /All writeups/ }));
     const titles = screen.getAllByRole('heading', { level: 3 }).map((heading) => heading.textContent);
     expect(titles).toEqual(['One hundred', 'One fifty', 'Two hundred']);
   });
 
-  test('invalid view and pd are sanitized on mount and the address bar is rewritten immediately', async () => {
-    setLocation('?cycleCode=D26&view=bogus&pd=not-a-guid');
-    global.fetch.mockResolvedValueOnce(response(twoPdDashboard()));
-    const first = render(<FinalWriteupsDashboardView />);
-    await screen.findByRole('heading', { name: 'Needs my review' });
-    expect(window.location.search).toBe('?cycleCode=D26');
-    expect(pressed(/Needs my review/)).toBe('true');
-    expect(screen.getByRole('combobox', { name: 'Program director' })).toHaveValue('');
-    expect(screen.getByText('Open for A')).toBeInTheDocument();
-    expect(global.fetch).toHaveBeenCalledWith('/api/workbench/final-writeups?cycleCode=D26');
-    first.unmount();
-
-    // The default view written explicitly is normalized away: a clean URL stays clean.
-    setLocation('?view=needs-review');
-    global.fetch.mockResolvedValueOnce(response(twoPdDashboard()));
-    render(<FinalWriteupsDashboardView />);
-    await screen.findByRole('heading', { name: 'Needs my review' });
-    expect(window.location.search).toBe('');
-  });
-
   test('Program director options derive from loaded rows and filter list, Your writeups, configured and unconfigured matrix rows', async () => {
     const data = twoPdDashboard();
     data.coordinatorMatrix = matrixFor(data.queues.open[0], data.queues.history[0]);
     global.fetch.mockResolvedValueOnce(response(data));
-    render(<FinalWriteupsDashboardView />);
+    renderPanel();
     const select = await screen.findByRole('combobox', { name: 'Program director' });
     expect([...select.options].map((option) => option.textContent))
       .toEqual(['All program directors', 'Program Director A', 'Program Director B']);
     expect(screen.getByText('Audience configuration needed')).toBeInTheDocument();
 
     fireEvent.change(select, { target: { value: PD_B } });
-    expect(window.location.search).toBe(`?pd=${PD_B}`);
+    expect(panelState().pd).toBe(PD_B);
     expect(screen.queryByText('Open for A')).not.toBeInTheDocument();
     expect(screen.getByText(/Nothing needs your review in December 2026 for Program Director B\./)).toBeInTheDocument();
     expect(screen.getByText('Stewardship for B')).toBeInTheDocument();
@@ -693,35 +650,32 @@ describe('views, Program director filter, and version context (Slices 6B/6C)', (
     expect(screen.getByRole('link', { name: 'Open in Word' })).toBeInTheDocument();
   });
 
-  test('a valid pd GUID with whitespace or uppercase is canonicalized, filters correctly, and the address bar is rewritten', async () => {
-    setLocation(`?pd=%20${PD_B.toUpperCase()}%20`);
+  test('a bookmarked pd filters on mount', async () => {
     global.fetch.mockResolvedValueOnce(response(twoPdDashboard()));
-    render(<FinalWriteupsDashboardView />);
+    renderPanel({ pd: PD_B });
     const select = await screen.findByRole('combobox', { name: 'Program director' });
     expect(select).toHaveValue(PD_B);
-    expect(window.location.search).toBe(`?pd=${PD_B}`);
     expect(screen.queryByRole('option', { name: 'Program director not in this cycle' })).not.toBeInTheDocument();
     expect(screen.getByText('Stewardship for B')).toBeInTheDocument();
     expect(screen.queryByText('Open for A')).not.toBeInTheDocument();
   });
 
-  test('non-GUID pd is dropped; a GUID absent from the cycle keeps an option and shows the empty copy', async () => {
-    setLocation(`?pd=${PD_ABSENT}`);
+  test('a GUID absent from the cycle keeps an option and shows the empty copy', async () => {
     global.fetch.mockResolvedValueOnce(response(twoPdDashboard()));
-    render(<FinalWriteupsDashboardView />);
+    renderPanel({ pd: PD_ABSENT });
     const select = await screen.findByRole('combobox', { name: 'Program director' });
     expect(select).toHaveValue(PD_ABSENT);
     expect(screen.getByRole('option', { name: 'Program director not in this cycle' })).toBeInTheDocument();
     expect(screen.getByText(/No writeups for the selected Program Director in December 2026\. Choose All program directors to clear the filter\./)).toBeInTheDocument();
     expect(screen.queryByText('Open for A')).not.toBeInTheDocument();
-    expect(window.location.search).toBe(`?pd=${PD_ABSENT}`);
+    expect(panelState().pd).toBe(PD_ABSENT);
   });
 
   test('view does not filter the coordinator matrix', async () => {
     const data = twoPdDashboard();
     data.coordinatorMatrix = matrixFor(data.queues.open[0], data.queues.history[0]);
     global.fetch.mockResolvedValueOnce(response(data));
-    render(<FinalWriteupsDashboardView />);
+    renderPanel();
     await screen.findByRole('heading', { name: 'Coordinator matrix' });
     const matrixLinks = () => screen.getAllByRole('link', { name: 'Open in Word' }).length
       + (screen.queryByText('Audience configuration needed') ? 1 : 0);
@@ -743,7 +697,7 @@ describe('views, Program director filter, and version context (Slices 6B/6C)', (
     data.queues.open.push(openB);
     data.counts = { total: 4, open: 42, history: 1, stewardship: 1 };
     global.fetch.mockResolvedValueOnce(response(data));
-    render(<FinalWriteupsDashboardView />);
+    renderPanel();
     await screen.findByRole('heading', { name: 'Needs my review' });
     expect(screen.getByText(/awaiting your review in December 2026/).textContent).toMatch(/^2 awaiting/);
     expect(screen.getByRole('button', { name: /Needs my review/ }).textContent).toContain('2');
@@ -758,30 +712,11 @@ describe('views, Program director filter, and version context (Slices 6B/6C)', (
     expect(screen.getByRole('button', { name: /All writeups/ }).textContent).toContain('0');
   });
 
-  test('cycle change preserves view and pd in the URL', async () => {
-    setLocation(`?view=reviewed&pd=${PD_B}`);
-    global.fetch
-      .mockResolvedValueOnce(response(twoPdDashboard()))
-      .mockResolvedValueOnce(response(twoPdDashboard({
-        cycles: { selected: 'J26', available: [{ code: 'D26', label: 'December 2026' }, { code: 'J26', label: 'June 2026' }], hasUncycled: false, defaultResolvedBy: 'explicit' },
-      })));
-    render(<FinalWriteupsDashboardView />);
-    const cycle = await screen.findByRole('combobox', { name: 'Cycle' });
-    fireEvent.change(cycle, { target: { value: 'J26' } });
-    await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2));
-    expect(global.fetch).toHaveBeenLastCalledWith('/api/workbench/final-writeups?cycleCode=J26');
-    const params = new URLSearchParams(window.location.search);
-    expect(params.get('cycleCode')).toBe('J26');
-    expect(params.get('view')).toBe('reviewed');
-    expect(params.get('pd')).toBe(PD_B);
-    expect([...params.keys()]).toHaveLength(3);
-  });
-
   test('Needs my review empty state offers the other views with counts', async () => {
     const data = twoPdDashboard();
     data.queues.open = [];
     global.fetch.mockResolvedValueOnce(response(data));
-    render(<FinalWriteupsDashboardView />);
+    renderPanel();
     await screen.findByText(/Nothing needs your review in December 2026\./);
     fireEvent.click(screen.getByRole('button', { name: '1 reviewed by you' }));
     expect(pressed(/Reviewed by me/)).toBe('true');
@@ -797,7 +732,7 @@ describe('views, Program director filter, and version context (Slices 6B/6C)', (
     data.queues.history[0].document.publicationVersionId = '2.0';
     data.queues.stewardship[0].document.publicationVersionId = '5.0';
     global.fetch.mockResolvedValueOnce(response(data));
-    render(<FinalWriteupsDashboardView />);
+    renderPanel();
     await screen.findByText('Open for A');
     expect(screen.getByText(/Version abc/)).toBeInTheDocument();
     expect(screen.queryByText(/You reviewed version/)).not.toBeInTheDocument();

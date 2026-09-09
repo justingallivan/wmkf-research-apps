@@ -59,10 +59,12 @@ sequence.
   `ReviewerFollowUpPanel.js` shares the shell's `scope`, carries `reviewers=` and
   `q=` in the URL, `previewReadOnly` comes from the shell page's
   `getServerSideProps`, and `/workbench/reviewer-follow-up` redirects into the
-  shell; (3) Final writeups panel, replacing the walk-back to an older
-  cycle with an in-place message and link (supersedes the 2026-09-06 walk-back
-  decision; reconcile `docs/FINAL_WRITEUPS_DASHBOARD_CYCLE_SCOPING_PLAN.md`
-  §3.3 and its `defaultResolvedBy` tests); (4) Awardees + Initial assessments
+  shell; (3) Final writeups panel — **built 2026-09-08 (`claude/workbench-shell-final-writeups`)**:
+  `FinalWriteupsPanel` takes the shell's cycle, carries `writeups=`/`pd=`/`q=`/`uncycled=1`,
+  replaces the walk-back with an in-place notice and link (§3.3 of
+  `docs/FINAL_WRITEUPS_DASHBOARD_CYCLE_SCOPING_PLAN.md` reconciled; service and its
+  `defaultResolvedBy` tests untouched), and the legacy index redirects; the shell now honors an
+  unlisted `?cycleCode=` (reverses a PR #204 rule) so cross-view cycle links work; (4) Awardees + Initial assessments
   panels (Initial assessments moves onto the cycle resolver; a D26 deep link
   renders the existing explanatory card); (5) the approved stragglers: Expertise
   Finder fiscal-year filter and hard-coded 'December 2025', request-search
