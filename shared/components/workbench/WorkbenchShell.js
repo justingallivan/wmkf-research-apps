@@ -20,6 +20,7 @@ import { useRouter } from 'next/router';
 import Layout, { PageHeader } from '../Layout';
 import ToolbarSelect from '../ToolbarSelect';
 import WorkbenchViewsNav, { VIEWS } from './WorkbenchViewsNav';
+import { RequestLocator } from './RequestLocator';
 import RequestListPanel from './RequestListPanel';
 import ReviewerFollowUpPanel from './ReviewerFollowUpPanel';
 import { FinalWriteupsPanel } from '../final-writeups/FinalWriteupsViews';
@@ -39,6 +40,10 @@ export function WorkbenchShell({ previewReadOnly = false }) {
   // once no write of ours is still in flight.
   const [location, setLocation] = useState(() => readWorkbenchQuery(router.query));
   const [ready, setReady] = useState(false);
+  // Local, not URL-mirrored: resets on a full page load, survives a shallow
+  // view switch (this component does not remount when `location.view`
+  // changes — it re-renders the same instance with a different panel below).
+  const [locatorOpen, setLocatorOpen] = useState(false);
   const locationRef = useRef(location);
   const pendingWritesRef = useRef(0);
 
@@ -192,6 +197,30 @@ export function WorkbenchShell({ previewReadOnly = false }) {
             <option key={c.code} value={c.code}>{c.label || c.code}</option>
           ))}
         </ToolbarSelect>
+      </div>
+
+      <div className="mb-6">
+        <button
+          type="button"
+          aria-expanded={locatorOpen}
+          aria-controls="workbench-locator-panel"
+          onClick={() => setLocatorOpen((open) => !open)}
+          className="inline-flex items-center gap-1.5 text-sm font-semibold text-gray-900 hover:text-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2 rounded"
+        >
+          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"
+            className={`h-4 w-4 transition-transform ${locatorOpen ? 'rotate-180' : ''}`}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="m6 9 6 6 6-6" />
+          </svg>
+          Find and open a request
+        </button>
+        {locatorOpen && (
+          <div id="workbench-locator-panel" className="mt-3">
+            <p className="mb-3 text-sm text-gray-600">
+              Search current and past requests. Search options do not change the Workbench context.
+            </p>
+            <RequestLocator programId={programId} />
+          </div>
+        )}
       </div>
 
       {cyclesError && (

@@ -55,20 +55,41 @@ function saveSearch(state) {
   }
 }
 
-function SearchIcon() {
+function ChevronIcon({ open }) {
   return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-5 w-5">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="m21 21-4.35-4.35m2.1-5.4a7.5 7.5 0 1 1-15 0 7.5 7.5 0 0 1 15 0Z" />
+    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"
+      className={`h-4 w-4 transition-transform ${open ? 'rotate-180' : ''}`}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="m6 9 6 6 6-6" />
     </svg>
   );
 }
 
-export default function RequestLocator() {
+/**
+ * Locator body — the "Find and open a request" utility. Mounted by
+ * WorkbenchShell only while its disclosure is open, so the search-options
+ * fetch and any restored search never run on a view that never opens it.
+ *
+ * `programId` seeds the *initial* search program from the shell's resolved
+ * Grant Program. If a saved search belongs to a different program, the
+ * shell's program wins and the saved criteria/results are not restored — a
+ * stale result set from another program would contradict the shell's
+ * "Search options do not change the Workbench context" promise. The locator
+ * keeps its own Program select (under Search options) so a PD can still
+ * search another program deliberately; changing it here does not affect the
+ * shell's selected program or cycle.
+ */
+export function RequestLocator({ programId: initialProgramIdProp = '' }) {
+  // Normalized the same way readSavedSearch/the options fetch normalize
+  // programId, so a saved criteria match/mismatch compares like with like.
+  const initialProgramId = String(initialProgramIdProp || '').trim().toLowerCase();
   const router = useRouter();
   const [query, setQuery] = useState('');
-  const [programId, setProgramId] = useState(() => (
-    typeof window === 'undefined' ? '' : (readSavedSearch()?.criteria?.programId || '')
-  ));
+  const [programId, setProgramId] = useState(() => {
+    if (typeof window === 'undefined') return initialProgramId;
+    const savedProgramId = readSavedSearch()?.criteria?.programId || '';
+    if (initialProgramId && savedProgramId && savedProgramId !== initialProgramId) return initialProgramId;
+    return savedProgramId || initialProgramId;
+  });
   const [programs, setPrograms] = useState([]);
   const [programName, setProgramName] = useState('Grant Program');
   const [cycle, setCycle] = useState('');
@@ -88,6 +109,7 @@ export default function RequestLocator() {
   const [nextOffset, setNextOffset] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  const [searchOptionsOpen, setSearchOptionsOpen] = useState(false);
   const requestIdRef = useRef(0);
   const skipProgramEffectRef = useRef(false);
 
@@ -95,9 +117,13 @@ export default function RequestLocator() {
     const saved = readSavedSearch();
     if (!saved) return;
     const criteria = saved.criteria;
+    // A saved search for a program other than the shell's current one is
+    // stale in this context: the shell's program wins and nothing restores.
+    if (initialProgramId && criteria.programId && criteria.programId !== initialProgramId) return;
     setQuery(criteria.query);
     setCycle(criteria.cycle);
     setStatus(criteria.status);
+    if (criteria.cycle || criteria.status) setSearchOptionsOpen(true);
     if (criteria.programId) {
       setSubmittedCriteria(criteria);
       setResults(saved.results);
@@ -109,6 +135,7 @@ export default function RequestLocator() {
       setNextOffset(saved.nextOffset);
     }
     if (criteria.programId) setProgramId(criteria.programId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -147,6 +174,7 @@ export default function RequestLocator() {
           setQuery(criteria.query);
           setCycle(criteria.cycle);
           setStatus(criteria.status);
+          if (criteria.cycle || criteria.status) setSearchOptionsOpen(true);
           setSubmittedCriteria(criteria);
           setResults(saved.results);
           setTotalCount(Number(saved.totalCount) || 0);
@@ -309,115 +337,121 @@ export default function RequestLocator() {
         : '';
 
   return (
-    <section aria-labelledby="request-locator-heading" className="mb-6">
-      <Card hover={false}>
-        <div className="flex items-start gap-3">
-          <span className="mt-0.5 text-gray-500"><SearchIcon /></span>
-          <div>
-            <h2 id="request-locator-heading" className="text-lg font-semibold text-gray-900">
-              Find a request
-            </h2>
-            <p className="mt-1 text-sm text-gray-600">
-              Search active or historical {programName} requests without changing their status or the active-cycle list.
-            </p>
-          </div>
+    <div>
+      <form onSubmit={submitSearch} className="space-y-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+          <label className="flex min-w-0 flex-1 flex-col gap-1.5 text-sm font-medium text-gray-700">
+            Request number, institution, PI, or title
+            <input
+              type="search"
+              autoComplete="off"
+              maxLength={MAX_QUERY_LENGTH}
+              value={query}
+              onChange={(event) => { invalidatePending(); setQuery(event.target.value); }}
+              placeholder="e.g., 1002959 or University of Washington"
+              className={`${COMPACT_CONTROL_HEIGHT_CLASS} block w-full rounded-lg border border-gray-300 bg-white px-3 text-base font-normal text-gray-900 placeholder:text-gray-500 sm:text-sm ${COMPACT_CONTROL_FOCUS_CLASS}`}
+            />
+          </label>
+          <button
+            type="submit"
+            disabled={busy}
+            className={`${COMPACT_CONTROL_HEIGHT_CLASS} inline-flex shrink-0 items-center justify-center rounded-lg bg-gray-900 px-5 text-base font-semibold text-white hover:bg-gray-800 sm:text-sm ${COMPACT_CONTROL_FOCUS_CLASS} disabled:cursor-wait disabled:opacity-50`}
+          >
+            {busy ? 'Searching…' : 'Search requests'}
+          </button>
+          {(query || cycle || status || results) && (
+            <button
+              type="button"
+              onClick={clearSearch}
+              className={`${COMPACT_CONTROL_HEIGHT_CLASS} shrink-0 rounded-lg px-2 text-base font-medium text-gray-600 hover:text-gray-900 sm:text-sm ${COMPACT_CONTROL_FOCUS_CLASS}`}
+            >
+              Clear
+            </button>
+          )}
         </div>
 
-        <form onSubmit={submitSearch} className="mt-5 space-y-3">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-            <label className="flex min-w-0 flex-1 flex-col gap-1.5 text-sm font-medium text-gray-700">
-              Request number, institution, PI, or proposal title
-              <input
-                type="search"
-                autoComplete="off"
-                maxLength={MAX_QUERY_LENGTH}
-                value={query}
-                onChange={(event) => { invalidatePending(); setQuery(event.target.value); }}
-                placeholder="For example, 1002959 or University of Washington"
-                className={`${COMPACT_CONTROL_HEIGHT_CLASS} block w-full rounded-lg border border-gray-300 bg-white px-3 text-base font-normal text-gray-900 placeholder:text-gray-500 sm:text-sm ${COMPACT_CONTROL_FOCUS_CLASS}`}
-              />
-            </label>
-            <button
-              type="submit"
-              disabled={busy}
-              className={`${COMPACT_CONTROL_HEIGHT_CLASS} inline-flex shrink-0 items-center justify-center rounded-lg bg-gray-900 px-5 text-base font-semibold text-white hover:bg-gray-800 sm:text-sm ${COMPACT_CONTROL_FOCUS_CLASS} disabled:cursor-wait disabled:opacity-50`}
-            >
-              {busy ? 'Searching…' : 'Search'}
-            </button>
-          </div>
+        <div>
+          <button
+            type="button"
+            aria-expanded={searchOptionsOpen}
+            aria-controls="request-locator-search-options"
+            onClick={() => setSearchOptionsOpen((open) => !open)}
+            className="inline-flex items-center gap-1.5 text-sm font-semibold text-gray-700 hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2 rounded"
+          >
+            <ChevronIcon open={searchOptionsOpen} />
+            Search options
+          </button>
 
-          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end" aria-busy={optionsBusy}>
-            <ToolbarSelect
-              id="request-locator-program"
-              label="Grant Program"
-              size="compact"
-              className="sm:w-64"
-              value={programId}
-              onChange={(event) => changeProgram(event.target.value)}
-              disabled={optionsBusy || programs.length === 0}
-            >
-              {programs.length === 0 && <option value="">Loading programs…</option>}
-              {programs.map((option) => (
-                <option key={option.programId} value={option.programId}>{option.name}</option>
-              ))}
-            </ToolbarSelect>
-            <ToolbarSelect
-              id="request-locator-cycle"
-              label="Cycle"
-              size="compact"
-              className="sm:w-56"
-              value={cycle}
-              onChange={(event) => { invalidatePending(); setCycle(event.target.value); }}
-              disabled={filtersUnavailable}
-              aria-describedby={filtersUnavailable ? 'request-locator-filters-status' : undefined}
-            >
-              <option value="">All cycles</option>
-              {cycle && !cycles.some((option) => option.value === cycle) && (
-                <option value={cycle}>{cycle} (saved)</option>
-              )}
-              {cycles.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </ToolbarSelect>
-            <ToolbarSelect
-              id="request-locator-status"
-              label="Request status"
-              size="compact"
-              className="sm:w-64"
-              value={status}
-              onChange={(event) => { invalidatePending(); setStatus(event.target.value); }}
-              disabled={filtersUnavailable}
-              aria-describedby={filtersUnavailable ? 'request-locator-filters-status' : undefined}
-            >
-              <option value="">All statuses</option>
-              {status && !statuses.includes(status) && (
-                <option value={status}>{status} (saved)</option>
-              )}
-              {statuses.map((option) => <option key={option} value={option}>{option}</option>)}
-            </ToolbarSelect>
-            {(query || cycle || status || results) && (
-              <button
-                type="button"
-                onClick={clearSearch}
-                className={`${COMPACT_CONTROL_HEIGHT_CLASS} shrink-0 rounded-lg px-2 text-base font-medium text-gray-600 hover:text-gray-900 sm:text-sm ${COMPACT_CONTROL_FOCUS_CLASS}`}
-              >
-                Clear
-              </button>
-            )}
-          </div>
-        </form>
+          {searchOptionsOpen && (
+            <div id="request-locator-search-options" className="mt-3 space-y-3">
+              <p className="text-xs text-gray-500">
+                These options do not change the Workbench&rsquo;s selected program or cycle.
+              </p>
+              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end" aria-busy={optionsBusy}>
+                <ToolbarSelect
+                  id="request-locator-program"
+                  label="Grant program"
+                  size="compact"
+                  className="sm:w-64"
+                  value={programId}
+                  onChange={(event) => changeProgram(event.target.value)}
+                  disabled={optionsBusy || programs.length === 0}
+                >
+                  {programs.length === 0 && <option value="">Loading programs…</option>}
+                  {programs.map((option) => (
+                    <option key={option.programId} value={option.programId}>{option.name}</option>
+                  ))}
+                </ToolbarSelect>
+                <ToolbarSelect
+                  id="request-locator-cycle"
+                  label="Grant cycle"
+                  size="compact"
+                  className="sm:w-56"
+                  value={cycle}
+                  onChange={(event) => { invalidatePending(); setCycle(event.target.value); }}
+                  disabled={filtersUnavailable}
+                  aria-describedby={filtersUnavailable ? 'request-locator-filters-status' : undefined}
+                >
+                  <option value="">All cycles</option>
+                  {cycle && !cycles.some((option) => option.value === cycle) && (
+                    <option value={cycle}>{cycle} (saved)</option>
+                  )}
+                  {cycles.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </ToolbarSelect>
+                <ToolbarSelect
+                  id="request-locator-status"
+                  label="Request status"
+                  size="compact"
+                  className="sm:w-64"
+                  value={status}
+                  onChange={(event) => { invalidatePending(); setStatus(event.target.value); }}
+                  disabled={filtersUnavailable}
+                  aria-describedby={filtersUnavailable ? 'request-locator-filters-status' : undefined}
+                >
+                  <option value="">All statuses</option>
+                  {status && !statuses.includes(status) && (
+                    <option value={status}>{status} (saved)</option>
+                  )}
+                  {statuses.map((option) => <option key={option} value={option}>{option}</option>)}
+                </ToolbarSelect>
+              </div>
+            </div>
+          )}
+        </div>
 
         <p
           id="request-locator-filters-status"
           role="status"
           aria-live="polite"
           aria-atomic="true"
-          className={filtersFeedback ? `mt-3 text-sm ${optionsError ? 'text-amber-800' : 'text-gray-600'}` : 'sr-only'}
+          className={filtersFeedback ? `text-sm ${optionsError ? 'text-amber-800' : 'text-gray-600'}` : 'sr-only'}
         >
           {filtersFeedback}
         </p>
         {(optionsError || (optionsBusy && optionsAttempt > 0)) && (
-          <div className="mt-2 flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2">
             <button
               type="button"
               disabled={optionsBusy}
@@ -442,32 +476,36 @@ export default function RequestLocator() {
             )}
           </div>
         )}
-        {error && <p className="mt-3 text-sm text-red-700" role="alert">{error}</p>}
-        <p
-          className="sr-only"
-          role="status"
-          aria-label="Request search status"
-          aria-live="polite"
-          aria-atomic="true"
-        >
-          {searchAnnouncement}
-        </p>
-      </Card>
+      </form>
+
+      {error && <p className="mt-3 text-sm text-red-700" role="alert">{error}</p>}
+      <p
+        className="sr-only"
+        role="status"
+        aria-label="Request search status"
+        aria-live="polite"
+        aria-atomic="true"
+      >
+        {searchAnnouncement}
+      </p>
 
       {results && (
         <Card hover={false} className="mt-3" padding="p-0">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 px-5 py-3">
-            <p className="text-sm text-gray-600">
-              {outsideProgramRequest ? (
-                  <span className="font-semibold text-gray-900">0 {programName} results</span>
-              ) : (
-                <>
-                  <span className="font-semibold text-gray-900">{totalCount.toLocaleString()}</span>{' '}
-                  result{totalCount === 1 ? '' : 's'}
-                  {showingCount > 0 ? ` · showing ${showingCount}` : ''}
-                </>
-              )}
-            </p>
+            <div>
+              <h3 className="text-sm font-semibold text-gray-900">Request search results</h3>
+              <p className="mt-0.5 text-sm text-gray-600">
+                {outsideProgramRequest ? (
+                    <span className="font-semibold text-gray-900">0 {programName} results</span>
+                ) : (
+                  <>
+                    <span className="font-semibold text-gray-900">{totalCount.toLocaleString()}</span>{' '}
+                    result{totalCount === 1 ? '' : 's'}
+                    {showingCount > 0 ? ` · showing ${showingCount}` : ''}
+                  </>
+                )}
+              </p>
+            </div>
             {capped && (
               <span className="text-xs font-medium text-amber-700">
                 Results are limited; narrow the search to see more precise matches
@@ -484,9 +522,9 @@ export default function RequestLocator() {
             <div className="px-5 py-8 text-center">
               {outsideProgramRequest ? (
                 <>
-                  <h3 className="text-sm font-medium text-gray-800">
+                  <h4 className="text-sm font-medium text-gray-800">
                     Request #{outsideProgramRequest.requestNumber} is valid, but it is outside {programName}.
-                  </h3>
+                  </h4>
                   <p className="mt-1 text-sm text-gray-600">Program: {outsideProgramRequest.program}</p>
                   <p className="mt-1 text-sm text-gray-500">
                     Search for request #{outsideProgramRequest.requestNumber} in AkoyaGO for more details.
@@ -552,6 +590,8 @@ export default function RequestLocator() {
           )}
         </Card>
       )}
-    </section>
+    </div>
   );
 }
+
+export default RequestLocator;
