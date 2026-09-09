@@ -32,6 +32,6 @@ Codex completed the planning work in `../WMKF_Apps-codex` on `codex/applicant-ad
 
 **Open (plan §12):** exact baseline checklist from the current applicant email; 3-day due rule and reminder cadence; inspect large PPTX/Keynote before setting limits; which representations and peer-review labels the external audience sees; test the nested SharePoint structure in signed-in AkoyaGo (fall back to flat "Site Visit - <Category>" folders); first-cycle go/no-go date and fallback procedure; reconcile the July language in `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`.
 
-**Deck:** Codex built an eight-slide PC/Ops discussion deck, local and gitignored, at `../WMKF_Apps-codex/outputs/site-visit-materials/final/Site_Visit_Materials_Discussion_2026-09-09_v2.pptx` (proposed SharePoint hierarchy; how the briefing manifest points at exact files and versions).
+**Deck:** Codex built an eight-slide PC/Ops discussion deck (proposed SharePoint hierarchy; how the briefing manifest points at exact files and versions), committed on the branch at `e0166296` under `docs/plans/site-visit-materials/` and pushed 2026-09-08, so it travels with the plan.
 
 Related: [[project-j27-doc-capture-evolution]] (J27-061/063 applicant capture rows), [[feedback-codex-delegation-review-vs-rescue-routing]].

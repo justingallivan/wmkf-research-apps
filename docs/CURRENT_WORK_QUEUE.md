@@ -558,7 +558,8 @@ These are valid directions but are not current app-team delivery commitments:
   **To do 2026-09-09 (owner ask 2026-09-08): Claude reviews the plan** read-only from the pushed
   branch (`git show origin/codex/applicant-additional-materials:docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md`
   after `git fetch origin`; works from any machine with the remote). Codex's PC/Ops discussion
-  deck is a gitignored local file in the Codex worktree on the original machine only.
+  deck is on the same branch since `e0166296` (`docs/plans/site-visit-materials/`, pushed
+  2026-09-08), so plan, brief, and deck all travel together.
 - **Request Workbench top-matter reconciliation — owner chose Codex's recommendation 2026-09-08,
   not yet built.** The recommendation travels as
   `docs/plans/CODEX_WORKBENCH_TOP_MATTER_RECOMMENDATION_2026-09-08.md`. Amendments: no new
