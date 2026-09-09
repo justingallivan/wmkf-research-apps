@@ -8,8 +8,10 @@
  *   programId Grant Program GUID; absent = the server's default program
  *   cycleCode Jyy/Dyy; absent = the working cycle for the program (resolved
  *             by the dashboard cycle list, then written back with replace)
- *   scope     my (default) | all           — Request list rows
+ *   scope     my (default) | all           — request scope (Request list, Reviewer follow-up)
  *   setAside  1                            — Request list shows Set Aside rows
+ *   reviewers attention (default) | all    — Reviewer follow-up reviewer-state view
+ *   q         free text                    — Reviewer follow-up search
  *
  * Views that are not yet mounted as shell panels keep their own pages; the
  * views nav links out to them until each one moves inside the shell.
@@ -19,7 +21,10 @@ export const WORKBENCH_VIEW_KEYS = ['requests', 'initial-assessments', 'reviewer
 export const DEFAULT_WORKBENCH_VIEW = 'requests';
 
 /** Views rendered inside the shell page; the rest still link to their own pages. */
-export const SHELL_PANEL_VIEWS = new Set(['requests']);
+export const SHELL_PANEL_VIEWS = new Set(['requests', 'reviewer-follow-up']);
+
+/** Every key of the shell state, for equality checks. */
+export const WORKBENCH_LOCATION_KEYS = ['view', 'programId', 'cycleCode', 'scope', 'includeSetAside', 'reviewersView', 'search'];
 
 export const WORKBENCH_PATH = '/workbench';
 
@@ -49,6 +54,8 @@ export function readWorkbenchQuery(query = {}) {
     cycleCode: normalizeCycleCode(get('cycleCode')),
     scope: cleanString(get('scope')) === 'all' ? 'all' : 'my',
     includeSetAside: cleanString(get('setAside')) === '1',
+    reviewersView: cleanString(get('reviewers')) === 'all' ? 'all' : 'attention',
+    search: cleanString(get('q'), 200),
   };
 }
 
@@ -60,6 +67,8 @@ export function buildWorkbenchHref(state = {}) {
   if (state.cycleCode) params.set('cycleCode', state.cycleCode);
   if (state.scope === 'all') params.set('scope', 'all');
   if (state.includeSetAside) params.set('setAside', '1');
+  if (state.reviewersView === 'all') params.set('reviewers', 'all');
+  if (state.search) params.set('q', state.search);
   const search = params.toString();
   return search ? `${WORKBENCH_PATH}?${search}` : WORKBENCH_PATH;
 }

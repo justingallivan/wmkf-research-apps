@@ -19,11 +19,12 @@ import Layout, { PageHeader, Card } from '../Layout';
 import ToolbarSelect from '../ToolbarSelect';
 import WorkbenchViewsNav from './WorkbenchViewsNav';
 import RequestListPanel from './RequestListPanel';
-import { buildWorkbenchHref, readWorkbenchQuery } from './workbench-location';
+import ReviewerFollowUpPanel from './ReviewerFollowUpPanel';
+import { WORKBENCH_LOCATION_KEYS, buildWorkbenchHref, readWorkbenchQuery } from './workbench-location';
 
-const sameLocation = (a, b) => ['view', 'programId', 'cycleCode', 'scope', 'includeSetAside'].every((key) => a[key] === b[key]);
+const sameLocation = (a, b) => WORKBENCH_LOCATION_KEYS.every((key) => a[key] === b[key]);
 
-export function WorkbenchShell() {
+export function WorkbenchShell({ previewReadOnly = false }) {
   const router = useRouter();
 
   // URL-mirrored state. Local state is the render source; every change is
@@ -190,6 +191,20 @@ export function WorkbenchShell() {
           includeSetAside={location.includeSetAside}
           onScopeChange={(scope) => navigate({ scope })}
           onIncludeSetAsideChange={(includeSetAside) => navigate({ includeSetAside })}
+        />
+      ) : location.view === 'reviewer-follow-up' ? (
+        <ReviewerFollowUpPanel
+          key={programId}
+          programId={programId}
+          cycleCode={cycleCode}
+          loadingCycles={loadingCycles}
+          previewReadOnly={previewReadOnly}
+          scope={location.scope}
+          reviewersView={location.reviewersView}
+          search={location.search}
+          onScopeChange={(scope) => navigate({ scope })}
+          onReviewersViewChange={(reviewersView) => navigate({ reviewersView })}
+          onSearchChange={(search) => navigate({ search })}
         />
       ) : (
         <Card hover={false}><p className="text-gray-500">This view opens on its own page from the tabs above.</p></Card>

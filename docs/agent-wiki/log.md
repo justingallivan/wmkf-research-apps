@@ -1,7 +1,7 @@
 ---
 agent_wiki: log
 status: active
-last_verified: 2026-06-10
+last_verified: 2026-09-08
 stale_after_days: 90
 owner: agent-operations
 source_files:
@@ -30,3 +30,11 @@ update_triggers:
   accumulated in `.claude-memory/MEMORY.md`; the memory router lines were collapsed to
   terse triggers that point here. Per the Codex handoff brief
   `docs/archive/MEMORY_ROUTER_WIKI_RECOMMENDATIONS_2026-06-11.md`.
+
+## 2026-09-08
+
+- Verified the log against the live wiki (`docs/agent-wiki/index.md` routes every topic page;
+  the topic pages have grown well past the four listed above and each carries its own
+  `last_verified`). The reviewer-workbench-lifecycle topic gained an operating note for the
+  single-page Workbench shell (PR #204 and its follow-up panel step). No structural change
+  to the wiki.

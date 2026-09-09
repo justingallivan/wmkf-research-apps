@@ -7,11 +7,16 @@
 
 import RequireAppAccess from '../shared/components/RequireAppAccess';
 import { WorkbenchShell } from '../shared/components/workbench/WorkbenchShell';
+import { resolvePreviewReadOnly } from '../lib/services/workbench/preview-read-only';
 
-export default function WorkbenchGuard() {
+export async function getServerSideProps() {
+  return { props: { previewReadOnly: resolvePreviewReadOnly() } };
+}
+
+export default function WorkbenchGuard(props) {
   return (
     <RequireAppAccess appKey="reviewers">
-      <WorkbenchShell />
+      <WorkbenchShell {...props} />
     </RequireAppAccess>
   );
 }
