@@ -1620,9 +1620,10 @@ One Final Writeup row per request over the same stable SharePoint Word item; the
   empty it reads the awardees endpoint's cycle-list mode once and links `lastDecidedCycleCode`
   ("N awardees in June 2026") which changes the shell cycle — owner decision 2026-09-08; the
   standalone page's own default-cycle resolution is gone), and Initial assessments
-  (`InitialAssessmentsPanel.js`, step 4: takes the shell's cycle; renders the D26 explanatory card
-  without calling the API, which is what a `view=initial-assessments&cycleCode=D26` deep link shows
-  while the tab stays hidden for D26). All five views are panels (`SHELL_PANEL_VIEWS` =
+  (`InitialAssessmentsPanel.js`, step 4: takes the shell's cycle and lists every cycle; the D26
+  explanatory card and the nav hide were retired 2026-09-09 by owner reversal, and the view now
+  sits between Reviewer follow-up and Final writeups with its own intro — in J27 it moves left of
+  Request list and a Find reviewers view surfaces). All five views are panels (`SHELL_PANEL_VIEWS` =
   every view); `pages/workbench/{artifacts,awardees,reviewer-follow-up,final-writeups/index}.js` are
   redirects; `WorkbenchViewsNav` no longer reads the router. **Shell rule change in
   step 3:** a well-formed `?cycleCode=` is honored even when the program's dashboard list omits it

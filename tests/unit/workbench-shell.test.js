@@ -199,14 +199,16 @@ test('the Awardees view shows the working cycle, links the last decided cycle wh
   await waitFor(() => expect(global.fetch).toHaveBeenLastCalledWith('/api/workbench/grantee-deliverables/awardees?cycleCode=J26&scope=all', expect.any(Object)));
 });
 
-test('the Initial assessments view renders the D26 card without calling the API, and loads artifacts for a later cycle', async () => {
+test('the Initial assessments view loads D26 artifacts with its intro, and loads a later cycle the same way', async () => {
   routerState.query = { view: 'initial-assessments', cycleCode: 'D26' };
   routerState.asPath = '/workbench?view=initial-assessments&cycleCode=D26';
   const { unmount } = render(<WorkbenchShell />);
-  expect(await screen.findByText(/not part of the D26 dual-phase workflow/)).toBeInTheDocument();
-  // The tab is hidden for D26, but the deep link still renders the explanation.
-  expect(screen.queryByRole('link', { name: 'Initial assessments' })).not.toBeInTheDocument();
-  expect(global.fetch.mock.calls.some(([u]) => String(u).includes('initial-assessment'))).toBe(false);
+  expect(await screen.findByText(/#1003001 — Assessed proposal/)).toBeInTheDocument();
+  expect(global.fetch).toHaveBeenCalledWith('/api/workbench/initial-assessment?cycleCode=D26');
+  expect(screen.getByRole('heading', { name: 'Initial assessments' })).toBeInTheDocument();
+  expect(screen.getByText('Track pre-site draft writeups and their lifecycle for the selected cycle.')).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Initial assessments' })).toHaveAttribute('aria-current', 'page');
+  expect(screen.queryByText(/not part of the D26 dual-phase workflow/)).not.toBeInTheDocument();
   unmount();
 
   routerState.query = { view: 'initial-assessments', cycleCode: 'J27' };
@@ -214,7 +216,6 @@ test('the Initial assessments view renders the D26 card without calling the API,
   render(<WorkbenchShell />);
   expect(await screen.findByText(/#1003001 — Assessed proposal/)).toBeInTheDocument();
   expect(global.fetch).toHaveBeenCalledWith('/api/workbench/initial-assessment?cycleCode=J27');
-  expect(screen.getByRole('link', { name: 'Initial assessments' })).toHaveAttribute('aria-current', 'page');
 });
 
 test('the legacy artifacts route redirects into the shell', async () => {

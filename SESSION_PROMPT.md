@@ -141,8 +141,9 @@ meeting date everywhere; the Request Workbench becomes one shell").
 
 ### Do Not Reopen Without New Decision
 
-1. **Initial assessments hidden for D26** by design (owner, 2026-09-05; reconfirmed
-   2026-09-08); returns in J27 as a real feature. No top matter for it until then.
+1. **Initial assessments hidden for D26** — REVERSED 2026-09-09 (owner): the view is shown for
+   D26 between Reviewer follow-up and Final writeups with an intro (`claude/initial-assessments-resurface`).
+   The J27 reorder (view moves left of Request list; Find reviewers view surfaces) still waits for J27.
 2. **Program filter on Final writeups / Awardees / Initial assessments** is a separate contract
    slice (route → service → Dataverse filter), not a UI toggle.
 3. **`wmkf_meetingdate` is the single temporal axis**; `akoya_fiscalyear` is never a filter

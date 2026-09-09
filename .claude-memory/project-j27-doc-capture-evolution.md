@@ -113,13 +113,16 @@ a pre-J27-scale checkpoint rather than manufacturing Production evidence now.
 
 ## Sequencing / urgency (user, S258)
 
-**Initial Assessments are hidden in the UI for D26 (owner decision 2026-09-05, S489).**
-`/workbench/artifacts` (now titled "Initial assessments") and its `WorkbenchViewsNav` entry
-show a "not part of the D26 dual-phase workflow / available for J27" card for `cycleCode
-=== 'D26'` (Codex PR #151, `3fc0a936`). Justin: the D26 pilot proved the plumbing; its output
-was not needed by this cycle's business processes, so hiding it is safe. In J27 Initial
-Assessment becomes a real feature (every complete single-submission proposal gets one before
-advancement) — plan it as product work then, and do not treat the D26 hide as a regression.
+**Initial Assessments are VISIBLE for D26 again (owner reversal 2026-09-09; the 2026-09-05 hide
+is retired).** The cycle-wide "Initial assessments" view (formerly `/workbench/artifacts`) had been
+hidden for D26 by Codex PR #151 (`3fc0a936`) on the reasoning that the pilot's output was not
+needed by D26 business processes. That turned out to conflate two things: the pre-site draft
+writeups do need a cycle-wide surface in D26, and the *reorder* is what belongs to J27. The view
+now renders for every cycle between Reviewer follow-up and Final writeups with its own intro
+(`WorkbenchViewsNav.js` registry order; J27-001/J27-002 closed). In J27 Initial Assessment becomes a real
+feature (every complete single-submission proposal gets one before advancement) and precedes
+reviewer identification, so the view moves left of Request list then and a Find reviewers view
+surfaces alongside it — plan that reorder as J27 product work.
 
 J27 design is a **large planning effort with many moving parts** that must **start soon after the bulk of the D26 Workbench work lands** — treat it as the next major planning push, not a someday item. J27 specifics (exactly what is collected up front, timing, final table shape) are **not yet decided** — re-confirm with Justin/Connor before building.
 

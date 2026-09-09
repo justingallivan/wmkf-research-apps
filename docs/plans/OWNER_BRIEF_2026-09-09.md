@@ -41,8 +41,8 @@ production. Preview cannot write to production, and reads are yours to authorize
   Proposals for D26 and J26 returns at least what the old month-name selections did.
 
 **PR #207, Awardees and Initial assessments panels**
-- Awardees: the "awardees in June 2026" link works. Initial assessments stays hidden for D26;
-  `/workbench?view=initial-assessments&cycleCode=D26` shows the explanatory state.
+- Awardees: the "awardees in June 2026" link works. Initial assessments was hidden for D26 when
+  this brief was written; you reversed that on 2026-09-09 and the view now shows for D26.
 
 ## 2. Decisions
 

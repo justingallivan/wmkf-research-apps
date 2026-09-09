@@ -4,22 +4,23 @@ import WorkbenchViewsNav from '../../shared/components/workbench/WorkbenchViewsN
 
 const labels = () => screen.getAllByRole('link').map((link) => link.textContent.trim());
 
-describe('WorkbenchViewsNav cycle-conditional views', () => {
-  test('holds back Initial assessments until the cycle is known, but renders every other view immediately', () => {
+describe('WorkbenchViewsNav view order', () => {
+  const ORDER = ['Request list', 'Reviewer follow-up', 'Initial assessments', 'Final writeups', 'Awardees'];
+
+  test('renders all five views immediately, before the cycle is known', () => {
     render(<WorkbenchViewsNav activeKey="requests" cycleCode={null} />);
-    expect(labels()).toEqual(['Request list', 'Reviewer follow-up', 'Final writeups', 'Awardees']);
+    expect(labels()).toEqual(ORDER);
   });
 
-  test('hides Initial assessments for D26', () => {
+  test('shows Initial assessments for D26 between Reviewer follow-up and Final writeups (owner reversal 2026-09-09)', () => {
     render(<WorkbenchViewsNav activeKey="requests" cycleCode="D26" />);
-    expect(screen.queryByRole('link', { name: /Initial assessments/ })).not.toBeInTheDocument();
+    expect(labels()).toEqual(ORDER);
+    expect(screen.getByRole('link', { name: 'Initial assessments' })).toHaveAttribute('href', '/workbench?view=initial-assessments&cycleCode=D26');
   });
 
-  test('shows Initial assessments for a later cycle, carrying the cycle in the link', () => {
+  test('carries a later cycle in the Initial assessments link', () => {
     render(<WorkbenchViewsNav activeKey="requests" cycleCode="J27" />);
-    const link = screen.getByRole('link', { name: /Initial assessments/ });
-    expect(link).toHaveAttribute('href', '/workbench?view=initial-assessments&cycleCode=J27');
-    expect(labels()).toHaveLength(5);
+    expect(screen.getByRole('link', { name: 'Initial assessments' })).toHaveAttribute('href', '/workbench?view=initial-assessments&cycleCode=J27');
   });
 });
 
