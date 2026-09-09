@@ -288,7 +288,7 @@ is decorative and does not count):
   so this branch remains one commit behind `main` by design. The requested
   release branch is pushed and ready for review; do not merge it here.
 - P1 history reachability/attribution is resolved within the authorized scope.
-  `reviewers-service.js:198-201` retains accepted and review-received rows and
+  `reviewers-service.js:202-204` retains accepted and review-received rows and
   additionally includes `no_response` lifecycle rows. `reviewers-service.js:290-293`
   projects those rows as `released` when they have no explicit review status, and
   `reviewers-service.js:342-346` carries the trusted request `meetingDate` onto each
