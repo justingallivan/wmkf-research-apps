@@ -242,5 +242,8 @@ test('no response without a courtesy note does not wait for the preview request'
     reason: 'no_response',
   });
   expect(onClose).toHaveBeenCalled();
-  resolvePreview(response({ ok: true, drafts: [] }));
+  await act(async () => {
+    resolvePreview(response({ ok: true, drafts: [] }));
+    await previewPending;
+  });
 });
