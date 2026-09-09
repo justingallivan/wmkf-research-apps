@@ -1,145 +1,165 @@
-# Session 499 Prompt: Reviewer closeout UI landed; dossier and Codex-branch decisions still owner-gated
+# Session 500 Prompt: Two Workbench top-matter PRs await merge; Site Visit plan review is today's to-do
 
-## Session 498 Summary (Claude, 2026-09-08)
+## Session 499 Summary (Claude, 2026-09-08)
 
-Owner-present orchestration session, continuing the Session 496 conversation after Codex handed
-all branches to Claude (PR #194). Fable orchestrated, Sonnet built, Opus reviewed, Codex ran the
-adversarial pass (`--model gpt-5.6-sol`). Six PRs merged to `main`, all Tier 0 UI/docs/cleanup,
-all through the normal reviewed path; production auto-deployed each. CI on `main` was green after
-every merge (verified via `gh run list`, five workflows each).
+Owner-present for the first two thirds (cycle provenance, Workbench shell, Codex planning
+handoff), then an overnight autonomous run under the owner's plan: Fable orchestrated, Sonnet
+built, Opus reviewed, Codex ran the adversarial pass (`gpt-5.6-sol`), two fix rounds per PR at
+most. Merges are the owner's. `main` is at the docs commit `a184506f` plus this handoff.
 
 ### What Was Completed
 
-1. **Codex handover absorbed** (PR #194). Claude now owns every `codex/*` branch; the handover
-   brief is `docs/plans/CODEX_HANDOVER_TO_CLAUDE_2026-09-08.md`.
-2. **Closeout next-action rule** (PR #195 `2018d4b1`). Track Reviewers shows `Mark complete` for
-   `review_received`, `Record closeout` for a Complete row with no eligibility, nothing otherwise;
-   `Edit closeout` lives in the More menu for Complete rows only. Helper `closeoutNextAction`
-   exported via `_managePanelInternals`.
-3. **Duplicate "More" header removed** on the reviewer follow-up page (PR #196 `276b0254`).
-4. **Closeout "failure" diagnosed as designed behavior.** The owner's "Failed to close reviewer
-   engagement" came from a local `npm run start` on port 3000, not production: the Dataverse
-   target interlock denies local→production writes and the closeout route's catch-all turns that
-   throw into generic 500 copy. No production request existed in Vercel logs (filtered pulls,
-   see memory `reference-vercel-logs-filtering`). The same closeout then succeeded in production.
-5. **Honorarium-eligibility pill** (PR #197 `0db75856`, PR #198 `56c90462`, PR #199 `16a0a8b4`).
-   Complete rows show a pill beside the status badge: `$ Eligible` / `$ None` / `$ N/A` (gray),
-   amber `$ Undecided` for a legacy null, amber `$ Needs review` for the API's `unknown`
-   sentinel. Full wording is in `title` and an `sr-only` span. Opus caught the `unknown`
-   mis-map, an inert `aria-label` on a bare span, and missing render tests; Codex caught
-   `role="img"` announcing a status as an image and a brief omission; all fixed. The dead
-   `closeoutDispositionLabel` helper and map were then removed. The residual height mismatch was
-   the page-level badge-geometry rule (`8ca77bdc`) matching only `span.rounded-full`; both the
-   follow-up page and the Reviewers tab now also match `a`/`button` pills (measured in Chromium:
-   20px vs 28px before, 28px/28px after).
-6. **Owner-authorized read-only production probe** (owner ran it via `!` after the auto-mode
-   classifier refused): 2 Complete reviewer rows in production, 1 with null eligibility
-   (completed 2026-09-02, pre-contract, one request). The owner's colleague will record that
-   closeout herself.
-7. **Durable docs:** `docs/REVIEWER_COMPLETION_AND_HONORARIUM_DECISION_BRIEF.md` reconciled with the
-   pill (and corrected: the modal never rendered "Closeout disposition not recorded");
-   `docs/agent-wiki/topics/dev-environment.md` notes the interlock write symptom; memory
-   `reference-vercel-logs-filtering` added.
+1. **Cycle provenance shipped to production** (PRs #203–#209, all owner-merged, post-merge
+   `main` runs green). The dashboard default-cycle helper (`resolveWorkingCycle`, #203
+   `715601d8`); the Request Workbench shell owning program and cycle in the URL with every
+   view as a panel: Request list (#204 `dedaa5ac`), Reviewer follow-up (#205 `cccd5759`),
+   Final writeups (#206 `495a1501`), Awardees and Initial assessments (#207 `888ac5cf`);
+   read-side stragglers, Expertise Finder and request search filter by meeting date, no
+   fiscal-year fallback (#208 `d01ecac0`); write-side straggler, suggestion rows stamped from
+   the request's meeting date server-side, the client-supplied `grantCycleCode` removed, an
+   off-month meeting date shows no cycle (#209 `e9ecf1d7`).
+2. **Codex Site Visit Materials planning handoff absorbed** (planning only, no PR). Memory
+   `.claude-memory/project-site-visit-materials-planning-handoff.md`; plan and eight-slide deck
+   live on `origin/codex/applicant-additional-materials` (tip `e0166296`). Queue entry and
+   to-do recorded (`04142042`…`a184506f`).
+3. **Workbench top matter reconciled** from Codex's recommendation
+   (`docs/plans/CODEX_WORKBENCH_TOP_MATTER_RECOMMENDATION_2026-09-08.md`, owner-chosen over
+   Claude's, with amendments: Initial assessments untouched until J27; Program select on Final
+   writeups and Awardees is context with a note, not a filter).
+   - **PR #210** (`claude/workbench-top-matter`, Slices A+B, all checks green): no counts in
+     the cycle dropdown (the "June 2026 (1)" vs two awardees bug), new subtitle, view heading
+     and purpose under the strip, shared Scope control "Assigned to me / All in program"
+     ("All program directors" on Awardees) preserved across its three views, shared live filter
+     with visible label, Clear, and "Showing X of Y", Final writeups queue counts stable while
+     typing and the lead sentence following the active queue, real pluralization ("1 writeup",
+     "2 awardees"). Commits `d8d9e0c9`, `330094a1`, `f83303aa`.
+   - **PR #211** (`claude/workbench-locator-disclosure`, Slice C, stacked on #210): the
+     "Find a request" card becomes a closed-by-default "Find and open a request" disclosure on
+     every view, body mounted only when open and once the program resolved, Program seeded from
+     the shell and remounted on program change, Program/Cycle/Status behind "Search options",
+     results titled "Request search results · {program}". Fixed a pre-existing race the lazy
+     mount made routine (query edits invalidated the options load). Commits `55e8f074`,
+     `4ac542e3`, `5a73c603`.
+   - Review trail: Opus READY WITH NAMED CHANGES on both; Codex three findings on #210 and two
+     on #211, all applied. The one deviation from the owner's amendment: both reviewers found
+     that disabling the Program select also froze the cycle list (the shell loads cycles per
+     program), so the select stays live with the note. Recorded as an owner decision in the
+     #210 body.
+4. **Process:** the Codex worktree was parked prematurely mid-session and restored; standing
+   instruction recorded below. Two handoff-memory pushes went to `main` with doc-symbol-refs
+   red before the ignore markers landed (`098c2a19`); gate before commit, never chain a commit
+   after a failing gate loop.
 
-### Commits (Claude, all merged to `main`)
+### Commits (Claude)
 
-PR #194 handover · PR #195 `2018d4b1` · PR #196 `276b0254` · PR #197 `0db75856` (`f97df047`,
-`54101fc6`, `8f862bfa`, `954fbfa6`) · PR #198 `56c90462` (`e00d69a0`, `b99cd73b`) · PR #199
-`16a0a8b4` (`45ba7306`).
+Merged to `main`: PRs #203–#209 (hashes above); docs `04142042`, `38586849`, `098c2a19`,
+`72c20898`, `a184506f`. Open: PR #210 (three commits), PR #211 (three commits).
 
-Milestone determination: no `DEVELOPMENT_LOG.md` entry. UI polish, cleanup, and docs; no
-production capability, cutover, or incident.
-
-Process note: PR #198 was merged while its Jest/Playwright/claude-review checks were still
-pending (branch protection allowed it); the post-merge `main` runs were watched and were green.
-PR #199 waited for all checks. Wait for checks before merging.
+Milestone determination: `DEVELOPMENT_LOG.md` entry added ("Grant cycle derives from the
+meeting date everywhere; the Request Workbench becomes one shell").
 
 ## Next Items
 
 ### Verified Open
 
-1. **Surface interlock and Dataverse write failures in the closeout route instead of a generic 500.**
-   Evidence: `pages/api/review-manager/close-review.js:64-71` maps only `ServiceHttpError`;
-   `lib/services/reviewer-engagement/close-review.js:70-84` `mapWriteError` maps only 412 and two
-   guard messages. An interlock denial or a Dataverse 400/403 reads as "Failed to close reviewer
-   engagement" with no status in the UI. Small, Tier 0; consider the sibling engagement routes.
-2. **Reconcile Codex's three reviewer UI commits (`b5f353de`, `ab426be6`, `7f1ee13d`) from
-   `codex/UI-audit` onto current `main`.** Evidence: `origin/codex/UI-audit` is 20 commits ahead
-   of `origin/main`; PR #192 from it is CLOSED unmerged; `main` has since changed the same
-   follow-up page (PR #196 removed the CSS "More" pseudo-header, PR #199 widened the badge rule).
-   Inspect the diff first and cherry-pick only the three; never merge the branch wholesale.
-3. **Cycle Dossier reconciliation** (carried from Session 496/497). Evidence: local branch
-   `claude/cycle-dossier-reconcile` at `81675ccd` (11 ahead / 16 behind `origin/main`, not
-   pushed) in worktree `.claude/worktrees/agent-abe4c30babd201d76`; PR #179 still OPEN from
-   `codex/cycle-dossier-pilot-build`. Blocked on the roster-scope decision below; then re-verify,
-   push, update PR #179, and only then the owner-authorized one-request smoke.
-4. **`docs/J27_BUILD_AND_CHANGE_PLAN.md`** once Connor's Q5 lands (parked, see below).
+1. **Review the Site Visit Materials plan (to-do 2026-09-09), read-only.** Evidence: queue
+   entry (`docs/CURRENT_WORK_QUEUE.md`, Site Visit item) and memory
+   `project-site-visit-materials-planning-handoff.md`. Read with
+   `git show origin/codex/applicant-additional-materials:docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md`
+   (tip `e0166296`; deck under `docs/plans/site-visit-materials/` on that branch). Eight
+   open items in its §12; §2 is the decided owner contract. Produce an assessment; no implementation, no PR.
+2. **After the owner merges #210 and #211 (in that order):** watch the post-merge `main` runs
+   (`gh run list --branch main`), then carry the #210 open items: whether the Program select on
+   Final writeups/Awardees should be truly read-only (needs its own cycle source per view), and
+   whether the locator disclosure should default open on Request list.
+3. **Surface interlock and Dataverse write failures in the closeout route instead of a generic
+   500.** Evidence: `pages/api/review-manager/close-review.js:64-71` maps only
+   `ServiceHttpError`. Unchanged from Session 498; small, Tier 0.
+4. **Reconcile Codex's three reviewer UI commits (`b5f353de`, `ab426be6`, `7f1ee13d`) from
+   `codex/UI-audit`.** Evidence: Session 498 prompt; PR #192 CLOSED unmerged. Inspect the diff
+   first; cherry-pick only the three.
+5. **Cycle Dossier reconciliation.** Evidence: worktree `.claude/worktrees/agent-abe4c30babd201d76`
+   now at `2e202725` on `claude/cycle-dossier-reconcile` (moved since Session 498's `81675ccd`;
+   re-inspect before use); PR #179 still OPEN from `codex/cycle-dossier-pilot-build`. Blocked on
+   the roster-scope decision.
 
 ### Owner Decision Needed
 
-1. **Dossier roster scope.** `loadDossierRoster` (`lib/services/cycle-dossier-service.js:24-41`)
-   applies `buildVisibilityFilter` but not `buildProgramScopeFilter`. Options: (a) Research-only
-   via the program-scope filter, (b) cross-program, (c) authorize a read-only `--live-read`
-   rollout check first.
-2. **Codex branches to abandon or keep:** `codex/UI-audit` (after item 2 above),
-   `codex/reviewer-ui-surfacing`, `codex/c0-4-action-policy-foundation`,
-   `codex/ror-api-production-shadow`. Evidence: handover brief; all still on `origin`.
-3. **`.impeccable/config.json`** is dirty in the main checkout (Codex's two design-exception
-   entries, +18 lines, uncommitted since 2026-09-08 17:25). Commit or discard; not Claude's edit.
-4. **Combined dossier retention policy beyond the pilot** (unchanged from Session 494).
-5. **Colleague discussion:** PD front-end flip to `Phase II Pending` (J27 register Q8).
-6. **Filed, not urgent** (register §7): Q1b, Q12, Q13, Q15, Q16, Q20, Q24; Dataverse attribute
-   drops (`wmkf_summarybloburl`, `wmkf_summarypages`) Connor-applied Tier 0 when convenient;
-   Final writeups header consistency; smaller shared select variant (S492 survey).
+1. **Program select on Final writeups / Awardees** (PR #210 body, open item 1): live with a
+   note (shipped in the PR) versus truly read-only with a per-view cycle source.
+2. **Historic suggestion rows with a stale `wmkf_grantcyclecode`.** Evidence: PR #209 removed
+   the client-supplied code and the stored-value preference in My Candidates; rows written
+   before #209 keep whatever code the client sent. Reads now derive from the meeting date, so
+   this is a data-hygiene question (backfill or leave), not a runtime one.
+3. **Dossier roster scope** (`lib/services/cycle-dossier-service.js:24-41`): Research-only,
+   cross-program, or a read-only rollout check first. Unchanged from Session 498.
+4. **Codex branches to abandon or keep:** `codex/UI-audit`, `codex/reviewer-ui-surfacing`,
+   `codex/c0-4-action-policy-foundation`, `codex/ror-api-production-shadow`.
+5. **Site Visit plan open items** (eight, §12 of the plan) after item 1 above.
+6. **Combined dossier retention policy**; **PD front-end flip to `Phase II Pending`** (J27 Q8);
+   filed-not-urgent register items (Session 498 list).
+
+### Owner's own checks (recorded so they are not forgotten)
+
+- Production check for #209: save a candidate, confirm the My Candidates cycle.
+- Preview click-throughs for #207/#208 (the click-through lists are in those PR bodies) and
+  for #210/#211 (lists in their bodies). Preview cannot write to production (interlock).
+- PR #179 review.
 
 ### Parked
 
 1. **Connor items** (J27 Q5 proposal location/filename, back-end status changes, slice G).
-   Re-open when Connor returns.
-2. **Request Quick Find metadata repair.** Two HTTP 400 / `0x80040216` attempts; do not retry
+2. **Request Quick Find metadata repair.** Two HTTP 400 / `0x80040216` attempts; no retry
    without a new owner decision.
-3. **Legacy Complete row with null eligibility (1 row, request-scoped).** Owner's colleague will
-   record it via `Record closeout`; the amber `$ Undecided` pill clears on save. Do not backfill.
+3. **Legacy Complete row with null eligibility (1 row).** Colleague records it; do not backfill.
 
 ### Verify Before Acting
 
-1. **Worktrees.** Only `.claude/worktrees/agent-abe4c30babd201d76` (`claude/cycle-dossier-reconcile`)
-   remains besides the main checkout; the Session 498 worktrees were removed after merge. Codex's
-   checkouts are gone from this machine's worktree list; re-check `git worktree list` anyway.
-2. **Dossier rollout configuration and candidate identity.** Earlier work referenced rollout
-   profile 2 and Request `1002963`; re-read source and live read-only state before reuse.
-3. **J27 register/site binding contract.** `check:j27-register` is strict;
-   `shared/config/workbenchVisibility.js` is a register site (J27-020, J27-037). Any change to
-   its predicate text must rebind those rows in the same PR.
-4. **Auto-mode classifier refuses Node scripts that read production Dataverse** even with owner
-   authorization. Write the probe to the scratchpad and hand the owner a `! node <path>` line.
+1. **Codex worktree: do not touch.** `/Users/gallivan/Code/WMKF_Apps-codex` on
+   `codex/applicant-additional-materials` (`e0166296`). Standing owner instruction 2026-09-08:
+   do not modify, switch, merge, wind down, or otherwise operate in it unless asked. Read the
+   branch via `git show origin/...` only.
+2. **Worktrees.** `git worktree list` shows the main checkout, the Codex worktree, and the
+   dossier worktree; re-check before creating any.
+3. **Auto-mode classifier** refuses `gh pr merge` and Node scripts that read production
+   Dataverse even with owner authorization; hand the owner a `! <command>` line.
+4. **Codex delegations** through the `codex-rescue` Agent need `[INTENTIONAL-RESCUE: <reason>]`
+   plus the "CODEX RESCUE HANDOFF" preface when review-shaped; adversarial reviews need a
+   committed diff and `--wait` when unattended.
+5. **J27 register/site binding** (`check:j27-register` strict); `shared/config/workbenchVisibility.js`
+   is a register site.
 
 ### Do Not Reopen Without New Decision
 
-1. **Pill wording.** Owner confirmed `$ None` / `$ N/A` over Codex's longer labels (2026-09-08).
-2. **`$ Undecided` amber state kept** (owner, after the probe showed one legacy row).
-3. **Set Aside in Reviewer follow-up** removed by owner decision (`8376fa56`).
-4. **Hard-coded Research-only filtering** rejected; PR #183 program selector is live.
-5. **Onboarding decks retired** (PR #184); J27-023 citation dropped (owner ruling, PR #186).
-6. **Codex model:** `gpt-5.6-sol`; never `gpt-6-astra`; never edit `~/.codex/config.toml`.
+1. **Initial assessments hidden for D26** by design (owner, 2026-09-05; reconfirmed
+   2026-09-08); returns in J27 as a real feature. No top matter for it until then.
+2. **Program filter on Final writeups / Awardees / Initial assessments** is a separate contract
+   slice (route → service → Dataverse filter), not a UI toggle.
+3. **`wmkf_meetingdate` is the single temporal axis**; `akoya_fiscalyear` is never a filter
+   axis; off-month meetings surface loudly as no cycle (memory
+   `akoya-temporal-axis-encodings`).
+4. **Codex's top-matter recommendation chosen over Claude's** (owner, 2026-09-08).
+5. Pill wording, `$ Undecided` state, Set Aside removal from Reviewer follow-up, Research-only
+   filtering rejection, onboarding decks retired, Codex model `gpt-5.6-sol` (Session 498 list).
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `shared/components/reviewers/ReviewerManagePanel.js` | Track table: StatusBadge, honorarium pill (`honorariumEligibilityPillInfo`), `closeoutNextAction` |
-| `shared/components/reviewers/ReviewerCloseoutModal.js` | Closeout modal (helper/map removed in #198) |
-| `pages/workbench/reviewer-follow-up.js`, `shared/components/reviewers/ReviewersTab.js` | Page-level badge geometry rules (span/a/button `.rounded-full`) |
-| `pages/api/review-manager/close-review.js`, `lib/services/reviewer-engagement/close-review.js` | Closeout route and service; generic-500 catch-all (next item 1) |
-| `lib/dataverse/core/interlock.js` | Local→production write denial (`evaluatePolicy`) |
-| `lib/services/cycle-dossier-service.js` | Dossier roster (`loadDossierRoster`, scope decision pending) |
-| `docs/REVIEWER_COMPLETION_AND_HONORARIUM_DECISION_BRIEF.md` | Closeout/honorarium contract, reconciled with the pill |
-| `docs/plans/CODEX_HANDOVER_TO_CLAUDE_2026-09-08.md` | Codex branch handover |
+| `shared/components/workbench/WorkbenchShell.js` | Shell: program/cycle in URL, view intro, locator disclosure (#211) |
+| `shared/components/workbench/WorkbenchViewsNav.js` | `VIEWS` registry (label, description); `scope` carried for its three consumers |
+| `shared/components/workbench/ScopeSegment.js`, `ViewFilterInput.js` | Shared Scope control and live filter (#210) |
+| `shared/components/workbench/RequestLocator.js` | Find and open a request body; separate generation refs for options load and search |
+| `shared/components/final-writeups/FinalWriteupsViews.js` | Queue counts before text filter; active-queue lead sentence |
+| `lib/utils/cycle-code.js` | Cycle helpers (`meetingDateToCycleCode`, `resolveWorkingCycle`, `conventionalCycles`) |
+| `lib/services/reviewer-finder/save-candidates-service.js` | Cycle code derived server-side from the request's meeting date (#209) |
+| `docs/plans/CODEX_WORKBENCH_TOP_MATTER_RECOMMENDATION_2026-09-08.md` | Build basis with amendment notes |
+| `.claude-memory/project-site-visit-materials-planning-handoff.md` | Site Visit plan handoff (branch, decisions, open items) |
 
 ## Testing
 
 ```bash
-npx jest tests/unit/reviewer-closeout-next-action.test.js tests/unit/reviewer-closeout-modal.test.js
-npm run check:docs-catalog && npm run check:doc-symbol-refs && npm run check:agent-invariants
-npm run check:j27-register
+npx jest tests/unit/workbench-shell.test.js tests/unit/workbench-views-nav.test.js tests/unit/final-writeups-views.test.js tests/unit/reviewer-follow-up.test.js tests/unit/awardees-page.test.js tests/unit/request-locator-controls.test.js tests/unit/workbench-request-number-lookup.test.js
+npm run check:docs-catalog && npm run check:doc-symbol-refs && npm run check:build-claim-freshness
+gh pr checks 210 && gh pr checks 211
 ```

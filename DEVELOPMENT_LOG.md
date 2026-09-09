@@ -10,6 +10,14 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## September 2026 — Grant cycle derives from the meeting date everywhere; the Request Workbench becomes one shell (Session 499)
+
+**Milestone:** Every cycle-scoped surface now derives the grant cycle from `wmkf_meetingdate` through `lib/utils/cycle-code.js`: the dashboard default cycle, Expertise Finder, request search (no fiscal-year fallback), and reviewer-suggestion writes (the client-supplied `grantCycleCode` is gone; the service stamps rows from the request's meeting date, and an off-month meeting shows no cycle). The Request Workbench is one shell page owning program and cycle in the URL, with Request list, Initial assessments, Reviewer follow-up, Final writeups, and Awardees as panels and the old per-view pages redirecting.
+**Sessions:** 499.
+**Ship state:** PRs #203–#209 owner-merged (`715601d8`, `dedaa5ac`, `cccd5759`, `495a1501`, `888ac5cf`, `d01ecac0`, `e9ecf1d7`); post-merge `main` runs green; owner production check for #209 (save a candidate, confirm the My Candidates cycle) still pending. Top-matter reconciliation (PR #210, PR #211) open for merge.
+**Why it matters:** One temporal axis ends the fiscal-year/cycle drift that produced wrong counts and stale stored codes, and one shell makes program and cycle shareable in a link across every Workbench view.
+**Pointers:** `lib/utils/cycle-code.js`, `shared/components/workbench/WorkbenchShell.js`, `shared/components/workbench/workbench-location.js`, `.claude-memory/akoya-temporal-axis-encodings.md`, `docs/plans/CODEX_WORKBENCH_TOP_MATTER_RECOMMENDATION_2026-09-08.md`.
+
 ## September 2026 — Workbench discovery gains live Grant Program scope (Session 494)
 
 **Milestone:** Request list, Reviewer follow-up, Request Locator, search/options, exact-number hydration, and caches now share a live Dataverse-backed Grant Program scope. The signed-in program director's newest assignment supplies the default, with Research as the fallback. Reviewer follow-up excludes Set Aside requests entirely and shows active cycle and lens counts; Request list shows a server-resolved `My requests (#)` count with stale-response protection.
