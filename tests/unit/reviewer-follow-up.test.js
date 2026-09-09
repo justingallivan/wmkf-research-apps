@@ -355,6 +355,8 @@ describe('reviewer follow-up refetch resilience', () => {
     resolveCycles({ ok: false, status: 503, json: async () => ({ error: 'cycles down' }) });
     expect(await screen.findByRole('alert')).toHaveTextContent('cycles down');
     expect(screen.queryByText('Reviewer follow-up could not be loaded')).not.toBeInTheDocument();
+    // No cycle → no empty-state guidance either; the shell's alert is the only message.
+    expect(screen.queryByText('No requests are assigned to you in this cycle.')).not.toBeInTheDocument();
   });
 
   test('initial load failure shows the banner only', async () => {

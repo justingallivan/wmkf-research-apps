@@ -401,7 +401,7 @@ export default function ReviewerFollowUpPanel({
             <p className="text-sm text-gray-600">Loading reviewer activity…</p>
           </div>
         </Card>
-      ) : visibleProposals.length === 0 && (!error || proposals.length > 0) ? (
+      ) : visibleProposals.length === 0 && cycleCode && (!error || proposals.length > 0) ? (
         <Card hover={false}>
           <p className="font-medium text-gray-900">
             {scope === 'my' && proposals.length === 0

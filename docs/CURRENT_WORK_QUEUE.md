@@ -55,7 +55,7 @@ sequence.
   `cycleCode`, `scope`, `setAside` in the URL (`workbench-location.js`), resolves
   the working cycle from the dashboard cycle list, and mounts
   `RequestListPanel.js`; (2) Reviewer follow-up panel — **owner approved the
-  strip restore 2026-09-08; built the same day (`claude/workbench-shell-follow-up`)**:
+  strip restore 2026-09-08; built the same day in PR #205 (`claude/workbench-shell-follow-up`)**:
   `ReviewerFollowUpPanel.js` shares the shell's `scope`, carries `reviewers=` and
   `q=` in the URL, `previewReadOnly` comes from the shell page's
   `getServerSideProps`, and `/workbench/reviewer-follow-up` redirects into the
