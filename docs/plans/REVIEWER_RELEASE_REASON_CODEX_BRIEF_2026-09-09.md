@@ -253,8 +253,9 @@ is decorative and does not count):
   `6f6deb46` (history copy and attribution tests); `a287f196` (API matrix, Atlas,
   and terminal-status documentation); `e775935e` (initial handoff); and
   `54af336d` (modal decoupling, stable result sanitization, and discriminating
-  tests). The final handoff update is this commit. All commits are pushed to
-  `origin/codex/reviewer-release-reason`.
+  tests); `37902746` (handoff and P1 residual-risk record); and `8daef53f`
+  (deferred-preview test cleanup). This final handoff update is this commit. All
+  commits are pushed to `origin/codex/reviewer-release-reason`.
 - Files changed: `lib/services/review-manager/withdraw-sufficient-service.js`,
   `lib/services/reviewer-engagement/withdraw-pending-invitation.js`,
   `pages/api/review-manager/withdraw-sufficient.js`,
@@ -265,15 +266,16 @@ is decorative and does not count):
   integration tests for service/route/writer/modal/history, and the API matrix,
   Atlas, and terminal-status plan docs. No portal, schema, sweep, rollup, readiness,
   or session-prompt files were changed.
-- Verification run and results: the focused release suite passes with 103 tests
-  across 8 suites; the route and release-button characterization suites pass with
-  20 tests across 2 suites; `npm run lint`; `npm run check:types`;
+- Verification run and results: the focused release suite passes cleanly with 103
+  tests across 8 suites; the route and release-button characterization suites pass
+  with 20 tests across 2 suites. The latter retains only the pre-existing React
+  `act(...)` warning from the `ReviewerInvitePanel` VIP-load effect. `npm run lint`;
+  `npm run check:types`;
   `check:api-routes` + self-test; `check:status-enum-parity` + self-test;
   `check:atlas` + self-test; `check:docs-catalog`; `check:doc-symbol-refs`;
   `check:reviewer-engagement-boundary` + self-test;
   `check:route-service-boundary` + self-test; `check:route-lifecycle-auth` +
-  self-test; and `git diff --check` all pass. Existing panel tests emit the
-  pre-existing React `act(...)` warning from the VIP-load effect.
+  self-test; and `git diff --check` all pass.
 - Open questions / recommendations for the owner: the branch was based on
   `a3bda092`; unrelated `origin/main` advanced to `e7c0eb27` during the build,
   so this branch remains one commit behind `main` by design. The requested
