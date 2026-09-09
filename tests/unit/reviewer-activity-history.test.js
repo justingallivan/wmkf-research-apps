@@ -208,6 +208,18 @@ describe('buildActivityHistory', () => {
     expect(response.unprovenNote).toBe('Recorded by staff');
   });
 
+  it('keeps a post-meeting no-response sweep attributed to automated cycle close', () => {
+    const events = buildActivityHistory({
+      suggestionId: 's15',
+      responseReceivedAt: '2026-09-12T12:00:00Z',
+      meetingDate: '2026-09-10T00:00:00Z',
+      responseType: 'no_response',
+    });
+    const response = events.find(e => e.key === 'response_received');
+
+    expect(response.unprovenNote).toBe('Recorded by automated cycle close');
+  });
+
   it('singularizes a single reminder', () => {
     const [event] = buildActivityHistory({
       suggestionId: 's8',
