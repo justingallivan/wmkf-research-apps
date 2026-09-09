@@ -1,5 +1,5 @@
 /**
- * ReleaseEmailModal — review and edit the "no longer needed" courtesy emails
+ * ReleaseEmailModal — choose a reason and optionally review courtesy emails
  * before releasing pending reviewers.
  *
  * Staff asked for a tune-up step: the release previously sent a fixed
@@ -26,6 +26,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { RELEASE_REASONS } from '../../config/reviewerLifecycle';
 
 const EXCLUDED_REASON = {
   not_found: 'No longer in this request',
@@ -40,6 +41,7 @@ const SEND_RESULT_REASON = {
   withdrawn_email_failed: 'The reviewer was released, but the email failed',
   withdrawn_email_skipped: 'The reviewer was released, but the email template was unavailable',
   withdrawn_no_email: 'The reviewer was released, but no email address was available',
+  withdrawn_no_email_by_reason: 'The reviewer was released without an email by choice',
   withdrawn_no_pd: 'The reviewer was released, but no active Program Director could send the email',
   invalid_override: 'The reviewed email was incomplete; reopen and review it again',
   recipient_changed: 'The reviewer’s email address changed after preview; reopen and review the updated recipient',
@@ -59,6 +61,8 @@ export default function ReleaseEmailModal({ requestId, suggestionIds, onClose, o
   const [loadError, setLoadError] = useState(null);
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState(null);
+  const [reason, setReason] = useState(RELEASE_REASONS.no_longer_needed);
+  const [sendCourtesyEmail, setSendCourtesyEmail] = useState(false);
   const mountedRef = useRef(true);
   const sendGenerationRef = useRef(0);
   const sendingRef = useRef(false);
@@ -92,6 +96,11 @@ export default function ReleaseEmailModal({ requestId, suggestionIds, onClose, o
 
   const sendable = useMemo(() => (drafts || []).filter((d) => d.status === 'ok'), [drafts]);
   const excluded = useMemo(() => (drafts || []).filter((d) => d.status !== 'ok'), [drafts]);
+  const showPreviews = reason === RELEASE_REASONS.no_longer_needed || sendCourtesyEmail;
+  const releaseWithoutEmail = reason === RELEASE_REASONS.no_response && !sendCourtesyEmail;
+  const releaseableIds = releaseWithoutEmail
+    ? suggestionIds
+    : sendable.map((d) => d.suggestionId);
 
   const valueFor = (draft, field) => edits[draft.suggestionId]?.[field] ?? draft[field] ?? '';
 
@@ -101,7 +110,8 @@ export default function ReleaseEmailModal({ requestId, suggestionIds, onClose, o
 
   // An edit that is blank/whitespace would fall back to the template server-side,
   // which is not what someone who just cleared the box expects. Block instead.
-  const blankEdit = sendable.some((d) => !String(valueFor(d, 'subject')).trim() || !String(valueFor(d, 'bodyText')).trim());
+  const blankEdit = showPreviews
+    && sendable.some((d) => !String(valueFor(d, 'subject')).trim() || !String(valueFor(d, 'bodyText')).trim());
 
   const requestClose = () => {
     if (sendingRef.current) return;
@@ -109,11 +119,12 @@ export default function ReleaseEmailModal({ requestId, suggestionIds, onClose, o
   };
 
   const handleSend = async () => {
-    if (sendable.length === 0 || sendingRef.current || blankEdit) return;
-    const n = sendable.length;
+    if (releaseableIds.length === 0 || sendingRef.current || blankEdit) return;
+    const n = releaseableIds.length;
     const ok = window.confirm(
-      `Send and release ${n} reviewer${n === 1 ? '' : 's'}? `
-      + 'Each receives the email shown and their invitation is closed — they can no longer respond.',
+      releaseWithoutEmail
+        ? `Release ${n} reviewer${n === 1 ? '' : 's'}? The invitation will be recorded as unanswered and the link will be disabled.`
+        : `Release ${n} reviewer${n === 1 ? '' : 's'}? Each receives the email shown and their invitation is closed — they can no longer respond.`,
     );
     if (!ok) return;
 
@@ -127,14 +138,16 @@ export default function ReleaseEmailModal({ requestId, suggestionIds, onClose, o
       // server still re-derives recipient and sender and treats these values
       // only as expected-value guards; they can never redirect the email.
       const overrides = {};
-      for (const draft of sendable) {
-        overrides[draft.suggestionId] = {
-          subject: valueFor(draft, 'subject'),
-          bodyText: valueFor(draft, 'bodyText'),
-          to: draft.to,
-          from: draft.from,
-          senderId: draft.senderId,
-        };
+      if (showPreviews) {
+        for (const draft of sendable) {
+          overrides[draft.suggestionId] = {
+            subject: valueFor(draft, 'subject'),
+            bodyText: valueFor(draft, 'bodyText'),
+            to: draft.to,
+            from: draft.from,
+            senderId: draft.senderId,
+          };
+        }
       }
 
       const resp = await fetch('/api/review-manager/withdraw-sufficient', {
@@ -142,7 +155,8 @@ export default function ReleaseEmailModal({ requestId, suggestionIds, onClose, o
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           requestId,
-          suggestionIds: sendable.map((d) => d.suggestionId),
+          suggestionIds: releaseableIds,
+          reason,
           ...(Object.keys(overrides).length > 0 ? { overrides } : {}),
         }),
       });
@@ -157,16 +171,17 @@ export default function ReleaseEmailModal({ requestId, suggestionIds, onClose, o
       // including all "withdrawn_*" email failures, remains named and visible.
       const resultById = new Map((Array.isArray(data.results) ? data.results : [])
         .map((result) => [String(result.suggestionId).toLowerCase(), result]));
-      const outcomes = sendable.map((draft) => ({
-        draft,
-        result: resultById.get(String(draft.suggestionId).toLowerCase())
-          || { suggestionId: draft.suggestionId, status: 'missing_result' },
+      const outcomes = releaseableIds.map((suggestionId) => ({
+        draft: sendable.find((candidate) => candidate.suggestionId === suggestionId) || { suggestionId },
+        result: resultById.get(String(suggestionId).toLowerCase())
+          || { suggestionId, status: 'missing_result' },
       }));
-      const failed = outcomes.filter(({ result }) => result.status !== 'withdrawn_emailed');
+      const successStatus = releaseWithoutEmail ? 'withdrawn_no_email_by_reason' : 'withdrawn_emailed';
+      const failed = outcomes.filter(({ result }) => result.status !== successStatus);
       if (failed.length > 0) {
-        const emailed = outcomes.length - failed.length;
         setSendError(
-          `${emailed} emailed. ${failed.length} issue${failed.length === 1 ? '' : 's'}: `
+          `${releaseWithoutEmail ? `${outcomes.length - failed.length} recorded. ` : `${outcomes.length - failed.length} emailed. `}`
+          + `${failed.length} issue${failed.length === 1 ? '' : 's'}: `
           + failed.map(({ draft, result }) => (
             `${draft.name || draft.suggestionId} — ${SEND_RESULT_REASON[result.status] || result.status}`
           )).join('; '),
@@ -207,14 +222,51 @@ export default function ReleaseEmailModal({ requestId, suggestionIds, onClose, o
 
         <div className="p-4 space-y-4">
           <p className="text-sm text-gray-700">
-            Edit any message before it goes out. Sending also closes each invitation —
-            these reviewers will no longer be able to respond.
+            Choose why these invitations are being released.
           </p>
 
-          {loading && <p className="text-sm text-gray-400">Rendering emails…</p>}
-          {loadError && <p className="text-sm text-red-600">{loadError}</p>}
+          <fieldset className="space-y-2">
+            <legend className="sr-only">Release reason</legend>
+            <label className="flex items-start gap-2 text-sm text-gray-700">
+              <input
+                type="radio"
+                name="release-reason"
+                value={RELEASE_REASONS.no_longer_needed}
+                checked={reason === RELEASE_REASONS.no_longer_needed}
+                onChange={() => { setReason(RELEASE_REASONS.no_longer_needed); setSendCourtesyEmail(false); }}
+              />
+              <span><span className="font-medium text-gray-900">No longer needed</span> — We have enough reviewers. A courtesy note goes to each released reviewer.</span>
+            </label>
+            <label className="flex items-start gap-2 text-sm text-gray-700">
+              <input
+                type="radio"
+                name="release-reason"
+                value={RELEASE_REASONS.no_response}
+                checked={reason === RELEASE_REASONS.no_response}
+                onChange={() => { setReason(RELEASE_REASONS.no_response); setSendCourtesyEmail(false); }}
+              />
+              <span><span className="font-medium text-gray-900">No response</span> — The reviewer never answered the invitation. This is recorded on their reviewer history.</span>
+            </label>
+            {reason === RELEASE_REASONS.no_response && (
+              <label className="ml-6 flex items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={sendCourtesyEmail}
+                  onChange={(e) => setSendCourtesyEmail(e.target.checked)}
+                />
+                Also send a courtesy note
+              </label>
+            )}
+          </fieldset>
 
-          {excluded.length > 0 && (
+          {showPreviews && loading && <p className="text-sm text-gray-400">Rendering emails…</p>}
+          {showPreviews && loadError && <p className="text-sm text-red-600">{loadError}</p>}
+
+          {releaseWithoutEmail && !loading && (
+            <p className="text-sm text-gray-600">No email will be sent. The link is disabled and the invitation is recorded as unanswered.</p>
+          )}
+
+          {showPreviews && excluded.length > 0 && (
             <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
               <p className="font-medium">
                 {excluded.length} selected reviewer{excluded.length === 1 ? '' : 's'} will not be emailed:
@@ -229,7 +281,7 @@ export default function ReleaseEmailModal({ requestId, suggestionIds, onClose, o
             </div>
           )}
 
-          {sendable.map((draft) => (
+          {showPreviews && sendable.map((draft) => (
             <div key={draft.suggestionId} className="rounded-md border border-gray-200 p-3 space-y-2">
               <div className="text-sm">
                 <span className="font-medium text-gray-900">{draft.name || 'Reviewer'}</span>{' '}
@@ -256,7 +308,7 @@ export default function ReleaseEmailModal({ requestId, suggestionIds, onClose, o
             </div>
           ))}
 
-          {!loading && !loadError && sendable.length === 0 && (
+          {showPreviews && !loading && !loadError && sendable.length === 0 && (
             <p className="text-sm text-gray-600">There is nothing to send.</p>
           )}
 
@@ -277,10 +329,10 @@ export default function ReleaseEmailModal({ requestId, suggestionIds, onClose, o
             <button
               type="button"
               onClick={handleSend}
-              disabled={loading || sending || sendable.length === 0 || blankEdit}
+              disabled={loading || sending || releaseableIds.length === 0 || blankEdit}
               className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-md"
             >
-              {sending ? 'Sending…' : `Send and release ${sendable.length || ''}`.trim()}
+              {sending ? 'Releasing…' : `Release (${releaseableIds.length})`}
             </button>
           </div>
         </div>

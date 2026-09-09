@@ -461,16 +461,16 @@ function ReviewerInvitePanelForRequest({ requestId, candidates = [], removedCand
   );
   // Still-pending = invited, no response yet (not accepted/declined, and no resolved
   // responseType — excludes already-withdrawn/no_response). The only rows the PD may
-  // "no longer needed"-release (reviewer-engagement Phase 4 §3.C). Server re-guards this.
+  // release (reviewer-engagement Phase 4 §3.C). Server re-guards this.
   const selectedPending = selectedRows.filter((c) => c.invited && !c.accepted && !c.declined && !c.responseType);
   // A selection mixing not-yet-invited and still-pending rows disables BOTH
   // actions (owner decision 2026-08-20): each button silently acting on only
   // its own subset read as ambiguous. Staff pick one kind at a time.
   const mixedSelection = selectedNotInvited.length > 0 && selectedPending.length > 0;
 
-  // Staff review the rendered emails and can tune each one before anything is
-  // sent (staff request, 2026-07-27). The release itself still happens
-  // server-side in the same call as the send — see ReleaseEmailModal.
+  // Staff choose the release reason and can tune each courtesy email before
+  // anything is sent (staff request, 2026-07-27). The release itself still
+  // happens server-side in the same call as the optional send.
   const handleWithdraw = () => {
     if (selectedPending.length === 0) return;
     setReleaseModal({ suggestionIds: selectedPending.map((c) => c.suggestionId) });
@@ -796,7 +796,7 @@ function ReviewerInvitePanelForRequest({ requestId, candidates = [], removedCand
                   ? 'Selection mixes reviewers to invite and to release — uncheck one kind to continue'
                   : selectedPending.length === 0
                     ? 'Select an invited reviewer who has not yet responded to release them with a polite "no longer needed" note'
-                    : "Review and edit the 'no longer needed' note, then send it and close these pending invitations"
+                    : 'Choose the release reason, review the optional courtesy note, then close these pending invitations'
               }
             >
               {selectedPending.length > 0
