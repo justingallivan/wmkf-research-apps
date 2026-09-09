@@ -24,7 +24,7 @@ jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
   findByRequest: (...a) => findByRequest(...a),
   findAcceptedByPD: (...a) => findAcceptedByPD(...a),
   findAcceptedByCycle: (...a) => findAcceptedByCycle(...a),
-  RESPONSE_TYPE_BY_VALUE: { 100000000: 'accepted' },
+  RESPONSE_TYPE_BY_VALUE: { 100000000: 'accepted', 100000002: 'no_response' },
   HONORARIUM_ELIGIBILITY_BY_VALUE: {
     100000000: 'eligible',
     100000001: 'not_eligible',
@@ -326,6 +326,58 @@ describe('getReviewers', () => {
     expect(out.liveQuestions).toEqual([{ key: 'impact', order: 1, text: 'Impact?', type: 'picklist' }]);
     expect(getReviewSynthesisJobState).toHaveBeenCalledWith(REQ, expect.stringMatching(/^[0-9a-f]{64}$/));
     expect(out.proposals[0].reviewSynthesisState).toMatchObject(synthesisNotStarted);
+  });
+
+  test('single-proposal scope retains no_response rows for history without changing accepted or received rows', async () => {
+    getRequestById.mockResolvedValueOnce({
+      akoya_requestid: REQ,
+      _wmkf_grantprogram_value: '11111111-1111-4111-8111-111111111111',
+      akoya_requestnum: 'R-1001',
+      akoya_title: 'T',
+      wmkf_meetingdate: '2026-09-10T00:00:00Z',
+      wmkf_reviewduedate: '2026-09-09',
+    });
+    findByRequest.mockResolvedValueOnce([
+      {
+        wmkf_appreviewersuggestionid: IDS[0],
+        _wmkf_request_value: REQ,
+        _wmkf_potentialreviewer_value: 'person-1',
+        wmkf_accepted: true,
+        wmkf_reviewstatus: 100000001,
+      },
+      {
+        wmkf_appreviewersuggestionid: IDS[1],
+        _wmkf_request_value: REQ,
+        _wmkf_potentialreviewer_value: 'person-2',
+        wmkf_accepted: false,
+        wmkf_responsetype: 100000002,
+        wmkf_responsereceivedat: '2026-09-05T12:00:00Z',
+      },
+      {
+        wmkf_appreviewersuggestionid: IDS[2],
+        _wmkf_request_value: REQ,
+        _wmkf_potentialreviewer_value: 'person-3',
+        wmkf_accepted: false,
+        wmkf_reviewreceivedat: '2026-09-06T12:00:00Z',
+        wmkf_reviewstatus: 100000003,
+      },
+    ]);
+
+    const out = await getReviewers({ proposalId: REQ, azureEmail: 'pd@wmkeck.org' });
+    const rows = out.proposals[0].reviewers;
+
+    expect(rows).toHaveLength(3);
+    expect(rows.map((row) => row.suggestionId)).toEqual(IDS);
+    expect(rows[0]).toMatchObject({ reviewStatus: 'materials_sent', responseType: null });
+    expect(rows[1]).toMatchObject({
+      reviewStatus: 'released',
+      responseType: 'no_response',
+      responseReceivedAt: '2026-09-05T12:00:00Z',
+      meetingDate: '2026-09-10T00:00:00Z',
+      submitted: false,
+    });
+    expect(rows[2]).toMatchObject({ reviewStatus: 'review_received', submitted: true });
+    expect(out.proposals[0].statusSummary).toEqual({ materials_sent: 1, released: 1, review_received: 1 });
   });
 
   test('unavailable synthesis dependency preserves reviewer DTO and returns the logged fallback without SQL or network', async () => {

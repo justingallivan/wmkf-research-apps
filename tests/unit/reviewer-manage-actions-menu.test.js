@@ -225,6 +225,50 @@ describe('reviewer table geometry', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Manage Joshua Rosenthal' }));
     expect(screen.queryAllByRole('button', { name: 'Mark complete' })).toHaveLength(1);
   });
+
+  test('keeps a released no-response row history-reachable without accepted actions', async () => {
+    const noResponse = {
+      suggestionId: 'S-no-response',
+      name: 'No Response Reviewer',
+      affiliation: 'Research Institute',
+      email: 'no-response@example.org',
+      reviewStatus: 'released',
+      responseType: 'no_response',
+      responseReceivedAt: '2026-09-05T12:00:00Z',
+      meetingDate: '2026-09-10T00:00:00Z',
+      withdrawnSufficientAt: null,
+      tokenState: 'revoked',
+      reviewDueReminderEligibility: 'not_due',
+      submitted: false,
+      reviewReceivedAt: null,
+    };
+
+    await act(async () => {
+      render(
+        <ReviewerManagePanel
+          proposal={proposal}
+          reviewers={[noResponse]}
+          canManage
+          mode="track"
+        />,
+      );
+      await Promise.resolve();
+    });
+
+    expect(screen.getByText('Released')).toBeInTheDocument();
+    expect(screen.queryByRole('checkbox', { name: /Select No Response Reviewer/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /release proposal/i })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'View activity history for No Response Reviewer' }));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByText('No response to invitation')).toBeInTheDocument();
+    expect(screen.getByText('Recorded by staff')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Manage No Response Reviewer' }));
+    expect(screen.queryByText('Correct recorded status')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Record reviewer withdrawal' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Release from assignment' })).not.toBeInTheDocument();
+  });
 });
 
 describe('direct review follow-up action', () => {
