@@ -46,9 +46,10 @@ and ETag `W/"95328121"`.
 `pages/api/workbench/site-visit/logistics.js` establishes app access and the
 Dataverse restriction context, then delegates to
 `lib/services/site-visit/logistics-service.js`. The service independently
-requires the Request's current Pre-Site artifact to be Ready/Review, permits at
-most one active Site Visit, resolves every organizer/attendee server-side, and
-binds the Activity to the Request.
+requires the request to be an advancing request in a cycle with a meeting date
+(`isVisibleRequestRow`, the Request-list predicate; owner 2026-09-09, PC
+scheduling precedes sharing), permits at most one active Site Visit, resolves
+every organizer/attendee server-side, and binds the Activity to the Request.
 
 First save creates the Activity with nested ActivityParty rows. Field-only edits
 use `If-Match` parent PATCH. Dataverse rejects direct ActivityParty create/update/

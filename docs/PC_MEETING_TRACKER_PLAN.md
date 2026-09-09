@@ -82,8 +82,9 @@ Two earlier decisions are **superseded in part** and must be read with this plan
   (`docs/atlas/dataverse-wmkf-sitevisit.md`). Readiness flag `SITE_VISIT_LOGISTICS_SCHEMA_READY`
   is literal `on` in Preview and Production.
 - **The writer.** `lib/services/site-visit/logistics-service.js::saveSiteVisitLogistics` requires a
-  mapped staff actor, the readiness flag, **and the request's current Pre-Site artifact in lifecycle
-  Review** (`assertActiveStage`, error `site_visit_stage_not_active`); permits one active visit;
+  mapped staff actor, the readiness flag, **and the request to be an advancing request in a cycle
+  with a meeting date** (`assertSchedulableRequest`, error `site_visit_request_not_schedulable`;
+  built 2026-09-09, slice 0); permits one active visit;
   resolves organizer and attendees server-side; field edits are ETag-fenced PATCHes; attendee-role
   changes are one atomic same-ID delete-and-recreate changeset because Dataverse rejects direct
   ActivityParty writes. Route: `PATCH /api/workbench/site-visit/logistics`, live, **no in-app caller**.
@@ -110,6 +111,8 @@ predicate the Request list uses, `shared/config/workbenchVisibility.js`). Keep e
 guard: actor required, readiness flag, one active visit, ETag fence, server-side recipient
 resolution. The Workbench route keeps working unchanged; the tracker's route is a sibling that
 calls the same service.
+
+**Built 2026-09-09 on `claude/site-visit-schedulable-gate` (slice 0).** Review note (Opus): the gate applies to the **write** path only; `getSiteVisitLogistics` is not gated on schedulability, so a visit recorded while a request was advancing stays readable (calendar invite, materials) after a later triage change.
 
 ## 5. Target model
 
@@ -186,7 +189,7 @@ register it under the J27 transition register when slice 3 builds it.
 
 | Slice | Content | Tier |
 |---|---|---|
-| 0 | Replace `assertActiveStage` with the request precondition; keep the Workbench route green; tests for both preconditions. | 1 (branch + PR) |
+| 0 | **[BUILT 2026-09-09 on `claude/site-visit-schedulable-gate`.]** Replace `assertActiveStage` with the request precondition; keep the Workbench route green; tests for both preconditions. | 1 (branch + PR) |
 | 1 | Schema wave for session + slot; Atlas pages; readiness flag; sandbox apply and readback per `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md`. | 2 |
 | 2 | App registry entry, grant, list page, session page, slot moves; site-visit editor via the existing service. | 2 |
 | 3 | Rail and cycle view read both dates; stage-key catalog with editable labels; parity test. | 1 |
