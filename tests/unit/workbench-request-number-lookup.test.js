@@ -3,13 +3,23 @@
  */
 
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { WorkbenchDashboard } from '../../pages/workbench';
+import { WorkbenchShell as WorkbenchDashboard } from '../../shared/components/workbench/WorkbenchShell';
 import { TRIAGE_STATUS } from '../../shared/config/triageStatus';
 
-const push = jest.fn();
+// A stateful router: the shell mirrors its view/program/cycle/filters into the
+// URL, so replace/push update the query the next render reads back.
+const routerState = { pathname: '/workbench', asPath: '/workbench', query: {}, isReady: true };
+const applyHref = (href) => {
+  const url = new URL(href, 'http://localhost');
+  routerState.asPath = href;
+  routerState.query = Object.fromEntries(url.searchParams.entries());
+  return Promise.resolve(true);
+};
+const push = jest.fn((href) => (typeof href === 'string' && href.startsWith('/workbench?') ? applyHref(href) : Promise.resolve(true)));
+const replace = jest.fn(applyHref);
 
 jest.mock('next/router', () => ({
-  useRouter: () => ({ push, pathname: '/workbench' }),
+  useRouter: () => ({ ...routerState, push, replace }),
 }));
 
 jest.mock('../../shared/components/Layout', () => ({
@@ -64,6 +74,8 @@ function baseResponse(url) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  routerState.asPath = '/workbench';
+  routerState.query = {};
   window.sessionStorage.clear();
   global.fetch = jest.fn(async (url) => baseResponse(url));
 });
@@ -74,7 +86,7 @@ afterEach(() => {
 
 async function renderReady() {
   render(<WorkbenchDashboard />);
-  await waitFor(() => expect(screen.getAllByLabelText('Cycle')[0]).not.toBeDisabled());
+  await waitFor(() => expect(screen.getAllByLabelText('Cycle').at(-1)).not.toBeDisabled());
 }
 
 test('shows the signed-in PD request count for the selected cycle and set-aside state', async () => {
@@ -263,7 +275,7 @@ test('does not apply a delayed triage count patch after returning to the origina
   fireEvent.change(screen.getByTitle('Set triage status'), { target: { value: 'advancing' } });
   await waitFor(() => expect(triageStarted).toBe(true));
 
-  const mainProgram = () => screen.getAllByLabelText('Grant Program').at(-1);
+  const mainProgram = () => screen.getAllByLabelText('Grant Program')[0];
   fireEvent.change(mainProgram(), { target: { value: 'p2' } });
   await waitFor(() => expect(mainProgram()).toHaveValue('p2'));
   fireEvent.change(mainProgram(), { target: { value: 'p1' } });
@@ -389,7 +401,7 @@ test('renders broad results with live cycle/status filters and semantic open lin
   fireEvent.change(screen.getByLabelText(SEARCH_LABEL), {
     target: { value: 'University of Washington' },
   });
-  fireEvent.change(screen.getAllByLabelText('Cycle')[0], { target: { value: 'December 2026' } });
+  fireEvent.change(screen.getAllByLabelText('Cycle').at(-1), { target: { value: 'December 2026' } });
   fireEvent.change(screen.getByLabelText('Request status'), { target: { value: 'Active' } });
   fireEvent.click(screen.getByRole('button', { name: 'Search' }));
 
@@ -494,7 +506,7 @@ test('keeps restored filters visible when live options are missing', async () =>
 
   render(<WorkbenchDashboard />);
 
-  await waitFor(() => expect(screen.getAllByLabelText('Cycle')[0]).toHaveValue('June 2024'));
+  await waitFor(() => expect(screen.getAllByLabelText('Cycle').at(-1)).toHaveValue('June 2024'));
   expect(screen.getByRole('option', { name: 'June 2024 (saved)' })).toBeInTheDocument();
   expect(screen.getByLabelText('Request status')).toHaveValue('Archived');
   expect(screen.getByRole('option', { name: 'Archived (saved)' })).toBeInTheDocument();
