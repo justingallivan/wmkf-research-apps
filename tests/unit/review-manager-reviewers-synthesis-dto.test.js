@@ -182,11 +182,14 @@ test('stored synthesis remains visible when no selected reviewer is accepted', a
     wmkf_selected: true,
     wmkf_invited: true,
     wmkf_accepted: false,
+    _wmkf_potentialreviewer_value: '44444444-4444-4444-8444-444444444444',
+    wmkf_emailsentat: '2026-08-20T00:00:00Z',
     wmkf_externaltokenhash: 'active-token',
     wmkf_externaltokenissued: '2026-07-01T00:00:00Z',
     wmkf_externaltokenexpires: '2099-07-01T00:00:00Z',
     wmkf_externaltokenrevoked: false,
   }]);
+  DynamicsService.queryRecords.mockResolvedValueOnce({ records: [{ wmkf_potentialreviewersid: '44444444-4444-4444-8444-444444444444', wmkf_name: 'Invited Only' }] });
   const { req, res } = get({ proposalId: REQUEST_ID });
   await handler(req, res);
   expect(res.statusCode).toBe(200);
@@ -200,6 +203,15 @@ test('stored synthesis remains visible when no selected reviewer is accepted', a
     participantCount: 1,
     blockingCount: 1,
   });
+  // The blocker is named even though the invited-only row never reaches the
+  // reviewers list, so the Reviews tab can say who is holding synthesis up.
+  expect(res._data.proposals[0].reviewSynthesisState.blockers).toEqual([{
+    suggestionId: '33333333-3333-3333-8333-333333333333',
+    reason: 'active_invitation',
+    name: 'Invited Only',
+    accepted: false,
+    emailSentAt: '2026-08-20T00:00:00Z',
+  }]);
 });
 
 test('a selected participant with a receipt remains in the submitted DTO when accepted is stale false', async () => {
