@@ -18,13 +18,31 @@ import { TOOLBAR_CONTROL_HEIGHT_CLASS } from '../ToolbarSelect';
 import ScopeSegment from './ScopeSegment';
 import { TRIAGE_STATUS } from '../../config/triageStatus';
 
+// `done` means the request has enough completed reviews (REVIEWERS_NEEDED in
+// lib/services/reviewer-rollup.js), not that every accepted reviewer has
+// returned one — a fourth reviewer can still be open and flagged on the
+// Reviewer follow-up view. The label says "coverage", never "complete".
 const STAGE_META = {
   find: { label: 'Find reviewers', cls: 'bg-rose-100 text-rose-800' },
   invite: { label: 'Invite', cls: 'bg-amber-100 text-amber-800' },
   awaiting: { label: 'Awaiting replies', cls: 'bg-blue-100 text-blue-800' },
   review: { label: 'In review', cls: 'bg-indigo-100 text-indigo-800' },
-  done: { label: 'Complete', cls: 'bg-green-100 text-green-800' },
+  done: { label: 'Sufficient coverage', cls: 'bg-green-100 text-green-800' },
 };
+
+/**
+ * Secondary metrics line under the request count: requests still at Find and
+ * requests with sufficient review coverage. Returns null when neither applies
+ * so the line is omitted rather than rendered empty.
+ */
+export function describeStageCounts(stages) {
+  const find = stages?.find || 0;
+  const done = stages?.done || 0;
+  const parts = [];
+  if (find) parts.push(`${find} need reviewers`);
+  if (done) parts.push(`${done} ${done === 1 ? 'has' : 'have'} sufficient review coverage`);
+  return parts.length ? parts.join(' · ') : null;
+}
 
 function StageChip({ stage }) {
   const m = STAGE_META[stage] || { label: stage, cls: 'bg-gray-100 text-gray-700' };
@@ -203,12 +221,8 @@ export default function RequestListPanel({
           <p className="text-gray-900">
             <span className="font-semibold">{rollup.total}</span> request{rollup.total === 1 ? '' : 's'}
           </p>
-          {(rollup.stages?.find || rollup.stages?.done) && (
-            <p className="mt-0.5 text-gray-500">
-              {rollup.stages?.find ? `${rollup.stages.find} need reviewers` : null}
-              {rollup.stages?.find && rollup.stages?.done ? ' · ' : null}
-              {rollup.stages?.done ? `${rollup.stages.done} complete` : null}
-            </p>
+          {describeStageCounts(rollup.stages) && (
+            <p className="mt-0.5 text-gray-500">{describeStageCounts(rollup.stages)}</p>
           )}
         </div>
       )}
