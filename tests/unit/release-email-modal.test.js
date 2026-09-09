@@ -209,3 +209,38 @@ test('no response with courtesy note restores previews and posts reviewed overri
     senderId: first.senderId,
   });
 });
+
+test('no response without a courtesy note does not wait for the preview request', async () => {
+  let resolvePreview;
+  const previewPending = new Promise((resolve) => { resolvePreview = resolve; });
+  global.fetch
+    .mockImplementationOnce(() => previewPending)
+    .mockResolvedValueOnce(response({
+      ok: true,
+      withdrawn: 1,
+      results: [{ suggestionId: FIRST_ID, status: 'withdrawn_no_email_by_reason', reason: 'no_response' }],
+    }));
+  const onClose = jest.fn();
+  render(
+    <ReleaseEmailModal
+      requestId={REQUEST_ID}
+      suggestionIds={[FIRST_ID]}
+      onClose={onClose}
+      onReleased={jest.fn()}
+    />,
+  );
+
+  fireEvent.click(screen.getByRole('radio', { name: /^No response/ }));
+  expect(screen.getByText('No email will be sent. The link is disabled and the invitation is recorded as unanswered.')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Release (1)' })).toBeEnabled();
+  fireEvent.click(screen.getByRole('button', { name: 'Release (1)' }));
+
+  await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2));
+  expect(JSON.parse(global.fetch.mock.calls[1][1].body)).toEqual({
+    requestId: REQUEST_ID,
+    suggestionIds: [FIRST_ID],
+    reason: 'no_response',
+  });
+  expect(onClose).toHaveBeenCalled();
+  resolvePreview(response({ ok: true, drafts: [] }));
+});

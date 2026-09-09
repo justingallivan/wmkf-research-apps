@@ -262,7 +262,7 @@ export default function ReleaseEmailModal({ requestId, suggestionIds, onClose, o
           {showPreviews && loading && <p className="text-sm text-gray-400">Rendering emails…</p>}
           {showPreviews && loadError && <p className="text-sm text-red-600">{loadError}</p>}
 
-          {releaseWithoutEmail && !loading && (
+          {releaseWithoutEmail && (
             <p className="text-sm text-gray-600">No email will be sent. The link is disabled and the invitation is recorded as unanswered.</p>
           )}
 
@@ -329,7 +329,7 @@ export default function ReleaseEmailModal({ requestId, suggestionIds, onClose, o
             <button
               type="button"
               onClick={handleSend}
-              disabled={loading || sending || releaseableIds.length === 0 || blankEdit}
+              disabled={(showPreviews && loading) || sending || releaseableIds.length === 0 || blankEdit}
               className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-md"
             >
               {sending ? 'Releasing…' : `Release (${releaseableIds.length})`}

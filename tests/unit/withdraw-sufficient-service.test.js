@@ -104,7 +104,7 @@ test('request lookup error is swallowed and also maps to the 404 domain error', 
 test('happy path: withdrawn_emailed, lifecycle write with ifMatch BEFORE the email', async () => {
   findById.mockResolvedValue(pendingRow());
   const out = await withdrawSufficient(ARGS);
-  expect(out).toEqual({ ok: true, withdrawn: 1, results: [{ suggestionId: SUG, status: 'withdrawn_emailed' }] });
+  expect(out).toEqual({ ok: true, withdrawn: 1, results: [{ suggestionId: SUG, status: 'withdrawn_emailed', reason: 'no_longer_needed' }] });
   expect(updateLifecycle).toHaveBeenCalledWith(
     SUG,
     expect.objectContaining({ responseType: 'withdrawn_sufficient', withdrawnSufficientAt: expect.any(String), respondReminderSentAt: null }),
@@ -173,7 +173,7 @@ test('no-response release still skips a row that accepts before the ETag-guarded
   expect(out).toEqual({
     ok: true,
     withdrawn: 0,
-    results: [{ suggestionId: SUG, status: 'changed_skipped', error: 'precondition failed', reason: 'no_response' }],
+    results: [{ suggestionId: SUG, status: 'changed_skipped', reason: 'no_response' }],
   });
   expect(createAndSendEmail).not.toHaveBeenCalled();
 });
@@ -181,14 +181,14 @@ test('no-response release still skips a row that accepts before the ETag-guarded
 test('missing suggestion → not_found, no write', async () => {
   findById.mockResolvedValue(null);
   const out = await withdrawSufficient(ARGS);
-  expect(out).toEqual({ ok: true, withdrawn: 0, results: [{ suggestionId: SUG, status: 'not_found' }] });
+  expect(out).toEqual({ ok: true, withdrawn: 0, results: [{ suggestionId: SUG, status: 'not_found', reason: 'no_longer_needed' }] });
   expect(updateLifecycle).not.toHaveBeenCalled();
 });
 
 test('row from another request → wrong_request, no write', async () => {
   findById.mockResolvedValue(pendingRow({ _wmkf_request_value: '33333333-3333-4333-8333-333333333333' }));
   const out = await withdrawSufficient(ARGS);
-  expect(out.results).toEqual([{ suggestionId: SUG, status: 'wrong_request' }]);
+  expect(out.results).toEqual([{ suggestionId: SUG, status: 'wrong_request', reason: 'no_longer_needed' }]);
   expect(updateLifecycle).not.toHaveBeenCalled();
 });
 
@@ -198,7 +198,7 @@ test.each([
 ])('%s request relationship → wrong_request, no write', async (_label, requestValue) => {
   findById.mockResolvedValue(pendingRow({ _wmkf_request_value: requestValue }));
   const out = await withdrawSufficient(ARGS);
-  expect(out.results).toEqual([{ suggestionId: SUG, status: 'wrong_request' }]);
+  expect(out.results).toEqual([{ suggestionId: SUG, status: 'wrong_request', reason: 'no_longer_needed' }]);
   expect(updateLifecycle).not.toHaveBeenCalled();
   expect(createAndSendEmail).not.toHaveBeenCalled();
 });
@@ -206,7 +206,7 @@ test.each([
 test('accepted row → not_pending, never touched', async () => {
   findById.mockResolvedValue(pendingRow({ wmkf_accepted: true }));
   const out = await withdrawSufficient(ARGS);
-  expect(out).toEqual({ ok: true, withdrawn: 0, results: [{ suggestionId: SUG, status: 'not_pending' }] });
+  expect(out).toEqual({ ok: true, withdrawn: 0, results: [{ suggestionId: SUG, status: 'not_pending', reason: 'no_longer_needed' }] });
   expect(updateLifecycle).not.toHaveBeenCalled();
   expect(createAndSendEmail).not.toHaveBeenCalled();
 });
@@ -216,25 +216,26 @@ test('412 on the conditional write → changed_skipped, no email', async () => {
   updateLifecycle.mockRejectedValueOnce(Object.assign(new Error('precondition failed'), { status: 412 }));
   const out = await withdrawSufficient(ARGS);
   expect(out.withdrawn).toBe(0);
-  expect(out.results[0]).toMatchObject({ suggestionId: SUG, status: 'changed_skipped' });
+  expect(out.results[0]).toEqual({ suggestionId: SUG, status: 'changed_skipped', reason: 'no_longer_needed' });
   expect(createAndSendEmail).not.toHaveBeenCalled();
 });
 
-test('non-412 write failure → write_failed with truncated error, no email', async () => {
+test('non-412 write failure → write_failed without leaking upstream diagnostics, no email', async () => {
   findById.mockResolvedValue(pendingRow());
   updateLifecycle.mockRejectedValueOnce(new Error('boom'));
   const out = await withdrawSufficient(ARGS);
   expect(out.withdrawn).toBe(0);
-  expect(out.results[0]).toMatchObject({ status: 'write_failed', error: expect.stringContaining('boom') });
+  expect(out.results[0]).toEqual({ suggestionId: SUG, status: 'write_failed', reason: 'no_longer_needed' });
   expect(createAndSendEmail).not.toHaveBeenCalled();
 });
 
-test('email send failure → withdrawn_email_failed, lifecycle write NOT rolled back (state-before-email)', async () => {
+test('email send failure → withdrawn_email_failed without leaking diagnostics, lifecycle write NOT rolled back (state-before-email)', async () => {
   findById.mockResolvedValue(pendingRow());
-  createAndSendEmail.mockRejectedValueOnce(new Error('SMTP down'));
+  createAndSendEmail.mockRejectedValueOnce(new Error('SMTP down for reviewer@example.org'));
   const out = await withdrawSufficient(ARGS);
   expect(out.withdrawn).toBe(1);
-  expect(out.results[0]).toMatchObject({ suggestionId: SUG, status: 'withdrawn_email_failed' });
+  expect(out.results[0]).toEqual({ suggestionId: SUG, status: 'withdrawn_email_failed', reason: 'no_longer_needed' });
+  expect(JSON.stringify(out)).not.toContain('reviewer@example.org');
   expect(updateLifecycle).toHaveBeenCalledTimes(1);
 });
 
@@ -242,7 +243,7 @@ test('email defaults not ok → withdrawn_email_skipped after the write', async 
   findById.mockResolvedValue(pendingRow());
   readRequiredEmailDefaults.mockResolvedValue({ ok: false });
   const out = await withdrawSufficient(ARGS);
-  expect(out).toEqual({ ok: true, withdrawn: 1, results: [{ suggestionId: SUG, status: 'withdrawn_email_skipped' }] });
+  expect(out).toEqual({ ok: true, withdrawn: 1, results: [{ suggestionId: SUG, status: 'withdrawn_email_skipped', reason: 'no_longer_needed' }] });
   expect(createAndSendEmail).not.toHaveBeenCalled();
 });
 
@@ -250,14 +251,14 @@ test('reviewer has no email address → withdrawn_no_email (still withdrawn)', a
   findById.mockResolvedValue(pendingRow());
   getReviewerByIdWithSelect.mockResolvedValue({ wmkf_name: 'Dr. Reviewer', wmkf_emailaddress: null });
   const out = await withdrawSufficient(ARGS);
-  expect(out).toEqual({ ok: true, withdrawn: 1, results: [{ suggestionId: SUG, status: 'withdrawn_no_email' }] });
+  expect(out).toEqual({ ok: true, withdrawn: 1, results: [{ suggestionId: SUG, status: 'withdrawn_no_email', reason: 'no_longer_needed' }] });
 });
 
 test('no usable PD (disabled) → withdrawn_no_pd, no reviewer lookup, no email', async () => {
   findById.mockResolvedValue(pendingRow());
   getSystemUserById.mockResolvedValue({ systemuserid: 'pd-1', internalemailaddress: 'pd@keck.org', isdisabled: true });
   const out = await withdrawSufficient(ARGS);
-  expect(out).toEqual({ ok: true, withdrawn: 1, results: [{ suggestionId: SUG, status: 'withdrawn_no_pd' }] });
+  expect(out).toEqual({ ok: true, withdrawn: 1, results: [{ suggestionId: SUG, status: 'withdrawn_no_pd', reason: 'no_longer_needed' }] });
   expect(getReviewerByIdWithSelect).not.toHaveBeenCalled();
   expect(createAndSendEmail).not.toHaveBeenCalled();
 });
@@ -271,8 +272,8 @@ test('mixed batch accumulates per-suggestion partial success in order', async ()
     ok: true,
     withdrawn: 1,
     results: [
-      { suggestionId: SUG, status: 'withdrawn_emailed' },
-      { suggestionId: SUG2, status: 'not_found' },
+      { suggestionId: SUG, status: 'withdrawn_emailed', reason: 'no_longer_needed' },
+      { suggestionId: SUG2, status: 'not_found', reason: 'no_longer_needed' },
     ],
   });
 });
