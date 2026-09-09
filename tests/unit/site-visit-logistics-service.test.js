@@ -311,11 +311,11 @@ describe('request-schedulable gate (tracker slice 0)', () => {
     expect(deps.replaceSiteVisitWithParties).not.toHaveBeenCalled();
   });
 
-  test('a set-aside request is refused with no write', async () => {
+  test('a set-aside request is refused with no write (Phase II Pending, so only the set-aside clause refuses it)', async () => {
     const deps = dependencies({
       getRequest: jest.fn(async () => ({
         akoya_requestid: REQUEST_ID,
-        akoya_requeststatus: 'Phase I Pending',
+        akoya_requeststatus: 'Phase II Pending',
         wmkf_triagestatus: TRIAGE_STATUS.SET_ASIDE,
         wmkf_meetingdate: '2026-12-11T00:00:00Z',
       })),
@@ -325,6 +325,49 @@ describe('request-schedulable gate (tracker slice 0)', () => {
     expect(deps.createSiteVisit).not.toHaveBeenCalled();
     expect(deps.updateSiteVisit).not.toHaveBeenCalled();
     expect(deps.replaceSiteVisitWithParties).not.toHaveBeenCalled();
+  });
+
+  test('a request that is neither Phase II Pending nor advancing is refused with no write', async () => {
+    const deps = dependencies({
+      getRequest: jest.fn(async () => ({
+        akoya_requestid: REQUEST_ID,
+        akoya_requeststatus: 'Phase I Pending',
+        wmkf_triagestatus: null,
+        wmkf_meetingdate: '2026-12-11T00:00:00Z',
+      })),
+    });
+    await expect(saveSiteVisitLogistics(input, { actingUserSystemId: ACTOR_ID }, deps))
+      .rejects.toMatchObject({ code: 'site_visit_request_not_schedulable' });
+    expect(deps.createSiteVisit).not.toHaveBeenCalled();
+  });
+
+  test('a Phase II Pending request with the triage field absent (unset picklist under $select) is allowed', async () => {
+    const deps = dependencies({
+      getRequest: jest.fn(async () => ({
+        akoya_requestid: REQUEST_ID,
+        akoya_requeststatus: 'Phase II Pending',
+        wmkf_meetingdate: '2026-12-11T00:00:00Z',
+      })),
+    });
+    const result = await saveSiteVisitLogistics(input, { actingUserSystemId: ACTOR_ID }, deps);
+    expect(result.siteVisit.activityId).toBe(ACTIVITY_ID);
+    expect(deps.createSiteVisit).toHaveBeenCalled();
+  });
+
+  test('the read path is not gated on schedulability: a set-aside request with a visit still reads', async () => {
+    const deps = dependencies({
+      getRequest: jest.fn(async () => ({
+        akoya_requestid: REQUEST_ID,
+        akoya_requeststatus: 'Phase II Pending',
+        wmkf_triagestatus: TRIAGE_STATUS.SET_ASIDE,
+        wmkf_meetingdate: '2026-12-11T00:00:00Z',
+      })),
+      getArtifactStatus: jest.fn(async () => undefined),
+    });
+    const result = await getSiteVisitLogistics({ requestId: REQUEST_ID }, deps);
+    expect(result).toHaveProperty('siteVisit');
+    expect(result).toHaveProperty('materials');
+    expect(deps.getRequest).not.toHaveBeenCalled();
   });
 
   test('a non-Phase-II-Pending advancing request is allowed', async () => {
@@ -341,10 +384,10 @@ describe('request-schedulable gate (tracker slice 0)', () => {
     expect(deps.createSiteVisit).toHaveBeenCalled();
   });
 
-  test('a missing request is 404 request_not_found with no write', async () => {
+  test('a missing request is 404 site_visit_logistics_request_not_found with no write', async () => {
     const deps = dependencies({ getRequest: jest.fn(async () => null) });
     await expect(saveSiteVisitLogistics(input, { actingUserSystemId: ACTOR_ID }, deps))
-      .rejects.toMatchObject({ code: 'request_not_found', httpStatus: 404 });
+      .rejects.toMatchObject({ code: 'site_visit_logistics_request_not_found', httpStatus: 404 });
     expect(deps.createSiteVisit).not.toHaveBeenCalled();
     expect(deps.updateSiteVisit).not.toHaveBeenCalled();
     expect(deps.replaceSiteVisitWithParties).not.toHaveBeenCalled();

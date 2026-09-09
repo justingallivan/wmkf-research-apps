@@ -2,34 +2,47 @@ import { buildVisibilityFilter, isVisibleRequestRow } from '../../shared/config/
 import { TRIAGE_STATUS } from '../../shared/config/triageStatus';
 
 // Pins that `isVisibleRequestRow` (row-level predicate) and
-// `buildVisibilityFilter` (OData filter string) agree in meaning. This is a
-// structural agreement check, not a full OData evaluator: it hand-derives the
-// expected boolean per fixture and separately asserts the filter string
-// mentions the same clauses.
-const STATUSES = ['Phase II Pending', 'Phase I Pending'];
-const TRIAGES = [null, TRIAGE_STATUS.ADVANCING, TRIAGE_STATUS.SET_ASIDE];
-const INCLUDE_SET_ASIDE = [false, true];
+// `buildVisibilityFilter` (OData filter string) agree in meaning. The expected
+// values are a LITERAL table derived by hand from the OData semantics
+// (`(status eq 'Phase II Pending' or triage eq ADVANCING) and (triage eq null
+// or triage ne SET_ASIDE)`), not a copy of the implementation, so a shared
+// misreading of the null/`ne` cell cannot hide on both sides. The second
+// describe is a structural check on the filter string, not an OData evaluator.
+const P2 = 'Phase II Pending';
+const P1 = 'Phase I Pending';
+const ADV = TRIAGE_STATUS.ADVANCING;
+const SET = TRIAGE_STATUS.SET_ASIDE;
 
-function expectedVisible(status, triage, includeSetAside) {
-  const base = status === 'Phase II Pending' || triage === TRIAGE_STATUS.ADVANCING;
-  if (includeSetAside) return base || triage === TRIAGE_STATUS.SET_ASIDE;
-  return base && triage !== TRIAGE_STATUS.SET_ASIDE;
-}
+// [status, triage, includeSetAside, expected]
+const TRUTH_TABLE = [
+  [P2, null, false, true],
+  [P2, ADV, false, true],
+  [P2, SET, false, false],
+  [P1, null, false, false],
+  [P1, ADV, false, true],
+  [P1, SET, false, false],
+  [P2, null, true, true],
+  [P2, ADV, true, true],
+  [P2, SET, true, true],
+  [P1, null, true, false],
+  [P1, ADV, true, true],
+  [P1, SET, true, true],
+];
 
-describe('isVisibleRequestRow matches the hand-derived truth table', () => {
-  for (const status of STATUSES) {
-    for (const triage of TRIAGES) {
-      for (const includeSetAside of INCLUDE_SET_ASIDE) {
-        const label = `status=${status} triage=${triage} includeSetAside=${includeSetAside}`;
-        test(label, () => {
-          const row = { akoya_requeststatus: status, wmkf_triagestatus: triage };
-          expect(isVisibleRequestRow(row, includeSetAside)).toBe(
-            expectedVisible(status, triage, includeSetAside),
-          );
-        });
-      }
-    }
-  }
+describe('isVisibleRequestRow matches the literal truth table', () => {
+  test.each(TRUTH_TABLE)('status=%s triage=%s includeSetAside=%s → %s', (status, triage, includeSetAside, expected) => {
+    expect(isVisibleRequestRow({ akoya_requeststatus: status, wmkf_triagestatus: triage }, includeSetAside)).toBe(expected);
+  });
+
+  test('an absent triage field (unset picklist under $select) behaves as null', () => {
+    expect(isVisibleRequestRow({ akoya_requeststatus: P2 }, false)).toBe(true);
+    expect(isVisibleRequestRow({ akoya_requeststatus: P1 }, false)).toBe(false);
+  });
+
+  test('the table covers every cell exactly once', () => {
+    const keys = new Set(TRUTH_TABLE.map(([s, t, i]) => `${s}|${t}|${i}`));
+    expect(keys.size).toBe(12);
+  });
 });
 
 describe('buildVisibilityFilter mentions the same clauses as the row predicate', () => {

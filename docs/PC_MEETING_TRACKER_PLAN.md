@@ -112,7 +112,7 @@ guard: actor required, readiness flag, one active visit, ETag fence, server-side
 resolution. The Workbench route keeps working unchanged; the tracker's route is a sibling that
 calls the same service.
 
-**Built 2026-09-09 on `claude/site-visit-schedulable-gate` (slice 0).**
+**Built 2026-09-09 on `claude/site-visit-schedulable-gate` (slice 0).** Review note (Opus): the gate applies to the **write** path only; `getSiteVisitLogistics` is not gated on schedulability, so a visit recorded while a request was advancing stays readable (calendar invite, materials) after a later triage change.
 
 ## 5. Target model
 
