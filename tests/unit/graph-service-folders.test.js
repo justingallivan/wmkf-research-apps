@@ -227,6 +227,49 @@ it('returns null when a stable Graph item no longer exists', async () => {
     .resolves.toBeNull();
 });
 
+it('uploadFile reads the item back by stable id for its publication version and never returns the content tag', async () => {
+  jest.spyOn(GraphService, 'getSiteId').mockResolvedValue('site');
+  jest.spyOn(GraphService, 'getDriveId').mockResolvedValue('drive');
+  jest.spyOn(GraphService, 'getAccessToken').mockResolvedValue('token');
+  global.fetch = jest.fn()
+    .mockResolvedValueOnce(response(201, {
+      id: 'new-item',
+      name: 'Draft.docx',
+      size: 100,
+      webUrl: 'https://example.sharepoint.com/draft',
+      eTag: '"upload-etag"',
+      cTag: '"c:{GUID},2"',
+      lastModifiedDateTime: '2026-09-09T18:00:00Z',
+    }))
+    .mockResolvedValueOnce(response(200, {
+      id: 'new-item',
+      size: 100,
+      eTag: '"upload-etag"',
+      lastModifiedDateTime: '2026-09-09T18:00:01Z',
+      publication: { versionId: '1.0' },
+    }));
+
+  const result = await GraphService.uploadFile('akoya_request', '1003001_REQUEST/Artifacts', 'Draft.docx', Buffer.from('x'));
+
+  expect(result).toMatchObject({ id: 'new-item', versionId: '1.0', eTag: '"upload-etag"', lastModified: '2026-09-09T18:00:01Z' });
+  expect(result.versionId).not.toMatch(/^"c:/);
+  const [putCall, getCall] = global.fetch.mock.calls;
+  expect(putCall[1].method).toBe('PUT');
+  expect(String(getCall[0])).toContain('/drives/drive/items/new-item?$select=id,size,eTag,lastModifiedDateTime,publication');
+});
+
+it('uploadFile returns a null version, not the content tag, when the stable read has no publication facet', async () => {
+  jest.spyOn(GraphService, 'getSiteId').mockResolvedValue('site');
+  jest.spyOn(GraphService, 'getDriveId').mockResolvedValue('drive');
+  jest.spyOn(GraphService, 'getAccessToken').mockResolvedValue('token');
+  global.fetch = jest.fn()
+    .mockResolvedValueOnce(response(201, { id: 'new-item', name: 'Draft.docx', size: 1, webUrl: 'u', cTag: '"c:{GUID},2"' }))
+    .mockResolvedValueOnce(response(200, { id: 'new-item', size: 1 }));
+
+  await expect(GraphService.uploadFile('akoya_request', 'folder', 'Draft.docx', Buffer.from('x')))
+    .resolves.toMatchObject({ versionId: null });
+});
+
 it('does not present a Graph content tag as a SharePoint version', async () => {
   jest.spyOn(GraphService, 'getAccessToken').mockResolvedValue('token');
   global.fetch = jest.fn().mockResolvedValueOnce(response(200, {
