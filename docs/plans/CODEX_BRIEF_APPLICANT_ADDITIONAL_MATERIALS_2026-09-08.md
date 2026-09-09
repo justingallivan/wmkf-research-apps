@@ -119,3 +119,10 @@ planning. Start from:
 One committed, pushed plan document that passes the four doc gates, with every
 state claim labeled, three compared approaches and a recommendation, and a numbered
 list of owner decisions. Append a five-line outcome summary to this brief.
+
+## Outcome (2026-09-08)
+
+- Created the canonical `docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md` planning artifact.
+- Recommended a revocable, request-ledger-backed token link with actor-bound private staging.
+- Kept applicant materials staff-only by default and preserved exact reviewer and Initial Assessment inputs.
+- Passed all five named documentation/invariant gates; implementation files and live systems were untouched.

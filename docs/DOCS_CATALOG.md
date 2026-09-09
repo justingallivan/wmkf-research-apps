@@ -35,6 +35,12 @@ related:
 | [CODEX_REVIEW_PROMPT_hook-self-review.md](CODEX_REVIEW_PROMPT_hook-self-review.md) | draft | draft |  | ✅ COMPLETED (S259, 2026-06-15). This review was run, relayed verbatim, and acted on. | 2026-07-02 |
 | [HARNESS_INSTRUCTION_AUDIT_S322.md](HARNESS_INSTRUCTION_AUDIT_S322.md) | audit | historical |  | Historical S322 harness audit; approved hook and skill changes shipped, while the remaining removal was explicitly rejected. | 2026-07-26 |
 
+## applicant-materials
+
+| File | Kind | Status | Canonical | Summary | Cataloged |
+|---|---|---|---|---|---|
+| [APPLICANT_ADDITIONAL_MATERIALS_PLAN.md](APPLICANT_ADDITIONAL_MATERIALS_PLAN.md) | plan | active | yes | Planning contract for secure, staff-requested applicant uploads after proposal submission, with explicit storage and visibility boundaries. | 2026-09-08 |
+
 ## architecture
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
