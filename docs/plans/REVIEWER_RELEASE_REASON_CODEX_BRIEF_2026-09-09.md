@@ -253,12 +253,14 @@ is decorative and does not count):
   `6f6deb46` (history copy and attribution tests); `a287f196` (API matrix, Atlas,
   and terminal-status documentation); `e775935e` (initial handoff); and
   `54af336d` (modal decoupling, stable result sanitization, and discriminating
-  tests); `37902746` (handoff and P1 residual-risk record); and `8daef53f`
-  (deferred-preview test cleanup); and `483af4e9` (single-proposal no-response
-  history reachability and attribution); and `5233ef5c` (post-meeting automated
-  attribution regression test); and `f0a16e8b` (no-response non-actionable
-  status hardening). This final handoff update is this commit. All commits are
-  pushed to `origin/codex/reviewer-release-reason`.
+  tests); `37902746` (handoff and P1 residual-risk record); `8daef53f`
+  (deferred-preview test cleanup); `d45d4021` (handoff verification update);
+  `483af4e9` (single-proposal no-response history reachability and attribution);
+  `5233ef5c` (post-meeting automated attribution regression test); `f0a16e8b`
+  (no-response non-actionable status hardening); `6e55563e` (history handoff
+  closure); and `7b39352f` (history handoff evidence correction). This final
+  handoff update is this commit. All commits are pushed to
+  `origin/codex/reviewer-release-reason`.
 - Files changed: `lib/services/review-manager/withdraw-sufficient-service.js`,
   `lib/services/reviewer-engagement/withdraw-pending-invitation.js`,
   `pages/api/review-manager/withdraw-sufficient.js`,
