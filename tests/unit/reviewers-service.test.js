@@ -352,6 +352,8 @@ describe('getReviewers', () => {
         wmkf_accepted: false,
         wmkf_responsetype: 100000002,
         wmkf_responsereceivedat: '2026-09-05T12:00:00Z',
+        // A stale pre-release status must not expose follow-up actions.
+        wmkf_reviewstatus: 100000001,
       },
       {
         wmkf_appreviewersuggestionid: IDS[2],
