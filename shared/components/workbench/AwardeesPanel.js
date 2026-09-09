@@ -17,6 +17,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { Card } from '../Layout';
+import ScopeSegment from './ScopeSegment';
 
 const contextKey = (code, all) => `${code}:${all ? 'all' : 'mine'}`;
 
@@ -141,35 +142,28 @@ export default function AwardeesPanel({ cycleCode, loadingCycles, scope, onScope
   const cycleLabel = visibleData?.cycleLabel || cycleCode;
 
   return (
-    <Card hover={false}>
-      <div className="flex flex-wrap items-center gap-4 mb-4">
-        <h2 className="text-lg font-semibold text-gray-900">Grant deliverables — awardees</h2>
-        <label className="flex items-center gap-1 text-sm text-gray-700">
-          <input
-            type="checkbox"
-            checked={showAll}
-            onChange={(e) => onScopeChange(e.target.checked ? 'all' : 'my')}
-          />
-          Show all programs
-        </label>
+    <>
+      <div className="flex flex-wrap items-end gap-4 mb-4">
+        <ScopeSegment scope={scope} onChange={onScopeChange} />
         {visibleData?.cycleLabel && (
           <span className="text-sm text-gray-500">
-            {visibleData.cycleLabel} · {visibleData.count} awardee(s){showAll ? ' (all PDs)' : ' (yours)'}
+            {visibleData.cycleLabel} · {visibleData.count} awardee{visibleData.count === 1 ? '' : 's'}
           </span>
         )}
       </div>
 
+      <Card hover={false}>
       {(loadingCycles || loading) && <p className="text-sm text-gray-500">Loading…</p>}
       {visibleError && <p role="alert" className="text-sm text-red-700">{visibleError}</p>}
 
       {cycleEmpty && (
         <div className="text-sm text-gray-500" role="status">
           {pdUnresolved ? (
-            <p>Could not match your account to a Program Director — tick “Show all programs” to see the full list.</p>
+            <p>Could not match your account to a Program Director — choose “All in program” to see the full list.</p>
           ) : cycleHasNoAwardees ? (
             <p>{`No awardees for ${cycleLabel} yet.`}</p>
           ) : cycleHasNoAwardees === false ? (
-            <p>{`No awardees assigned to you for ${cycleLabel}. Tick “Show all programs” to see everyone’s.`}</p>
+            <p>{`No awardees assigned to you for ${cycleLabel}. Choose “All in program” to see everyone’s.`}</p>
           ) : (
             <p>{`No awardees assigned to you for ${cycleLabel}.`}</p>
           )}
@@ -217,6 +211,7 @@ export default function AwardeesPanel({ cycleCode, loadingCycles, scope, onScope
           </tbody>
         </table>
       )}
-    </Card>
+      </Card>
+    </>
   );
 }

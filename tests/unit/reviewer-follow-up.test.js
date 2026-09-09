@@ -209,18 +209,18 @@ describe('reviewer follow-up request scope', () => {
     });
     expect(global.fetch.mock.calls.some(([url]) => String(url).includes('includeSetAside'))).toBe(false);
 
-    expect(screen.getByRole('button', { name: 'My requests' })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByRole('button', { name: 'Show all (0)' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { name: 'Assigned to me' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'All (0)' })).toHaveAttribute('aria-pressed', 'false');
 
-    fireEvent.click(screen.getByRole('button', { name: 'All requests' }));
+    fireEvent.click(screen.getByRole('button', { name: 'All in program' }));
 
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('/api/workbench/dashboard?cycleCode=D26&scope=all'));
       expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('/api/review-manager/reviewers?cycleCode=D26&scope=all'));
     });
     expect(global.fetch.mock.calls.some(([url]) => String(url).includes('includeSetAside'))).toBe(false);
-    expect(screen.getByRole('button', { name: 'All requests' })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByRole('button', { name: 'Show all (0)' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { name: 'All in program' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'All (0)' })).toHaveAttribute('aria-pressed', 'false');
   });
 
   test('uses the server default even when it is not the first cycle, while honoring a valid URL override', async () => {
@@ -237,15 +237,15 @@ describe('reviewer follow-up request scope', () => {
     }));
 
     const { unmount } = render(<ReviewerFollowUpDashboard />);
-    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Cycle' })).toHaveValue('J26'));
-    expect(screen.getByRole('option', { name: 'December 2026 (44)' })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Grant cycle' })).toHaveValue('J26'));
+    expect(screen.getByRole('option', { name: 'December 2026' })).toBeInTheDocument();
     expect(screen.getByRole('option', { name: 'June 2026' })).toBeInTheDocument();
     expect(screen.queryByLabelText('Show set aside')).not.toBeInTheDocument();
     unmount();
 
     resetFollowUpRoute({ cycleCode: 'D26' });
     render(<ReviewerFollowUpDashboard />);
-    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Cycle' })).toHaveValue('D26'));
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Grant cycle' })).toHaveValue('D26'));
   });
 
   test('guides an unassigned user to All requests from the initial My requests view', async () => {
@@ -258,7 +258,7 @@ describe('reviewer follow-up request scope', () => {
 
     render(<ReviewerFollowUpDashboard />);
     expect(await screen.findByText('No requests are assigned to you in this cycle.')).toBeInTheDocument();
-    expect(screen.getByText('Select All requests to view the full cycle.')).toBeInTheDocument();
+    expect(screen.getByText('Select All in program to view the full cycle.')).toBeInTheDocument();
   });
 
   test('shows search result context for the current reviewer view', async () => {
@@ -273,16 +273,17 @@ describe('reviewer follow-up request scope', () => {
     });
 
     render(<ReviewerFollowUpDashboard />);
-    expect(await screen.findByText('1 request in this view')).toBeInTheDocument();
+    await screen.findByText('Active proposal');
+    expect(screen.queryByText(/^Showing/)).not.toBeInTheDocument();
     expect(screen.queryByText('Set aside proposal')).not.toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText('Search requests and reviewers'), {
+    fireEvent.change(screen.getByLabelText('Filter reviewer follow-up'), {
       target: { value: 'south university' },
     });
-    expect(screen.getByText('0 matching requests')).toBeInTheDocument();
+    expect(screen.getByText('Showing 0 of 1 requests')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Show all (2)' }));
-    expect(screen.getByText('1 matching request')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'All (2)' }));
+    expect(screen.getByText('Showing 1 of 2 requests')).toBeInTheDocument();
     expect(screen.queryByText('Set aside proposal')).not.toBeInTheDocument();
   });
 
@@ -300,7 +301,7 @@ describe('reviewer follow-up request scope', () => {
     render(<ReviewerFollowUpDashboard />);
     expect(await screen.findByText('North University · PI: Alex North · PD: Pat Director')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Show all (2)' }));
+    fireEvent.click(screen.getByRole('button', { name: 'All (2)' }));
     expect(screen.getByText('South University')).toBeInTheDocument();
     expect(screen.queryByText(/PD: $/)).not.toBeInTheDocument();
   });
@@ -511,7 +512,7 @@ describe('reviewer follow-up refetch resilience', () => {
     expect(await screen.findByText('Active proposal')).toBeInTheDocument();
 
     proposalsShouldFail = true;
-    fireEvent.click(screen.getByRole('button', { name: 'All requests' }));
+    fireEvent.click(screen.getByRole('button', { name: 'All in program' }));
 
     expect(await screen.findByText('Reviewer follow-up could not be loaded')).toBeInTheDocument();
     expect(screen.queryByText('Reviewer follow-up could not be refreshed')).not.toBeInTheDocument();
@@ -559,7 +560,7 @@ describe('reviewer follow-up refetch resilience', () => {
     newScopeShouldFail = true;
     fireEvent.click(screen.getByRole('button', { name: 'Mock refresh' }));
 
-    fireEvent.click(screen.getByRole('button', { name: 'All requests' }));
+    fireEvent.click(screen.getByRole('button', { name: 'All in program' }));
 
     // Resolve the superseded (stale) same-params fetch with the ORIGINAL fixtures
     // after the scope change has already cleared the list and bumped requestIdRef.
@@ -639,14 +640,14 @@ describe('reviewer follow-up refetch resilience', () => {
     render(<ReviewerFollowUpDashboard />);
     expect(await screen.findByText('Active proposal')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Show all (2)' }));
+    fireEvent.click(screen.getByRole('button', { name: 'All (2)' }));
     fireEvent.click(screen.getAllByRole('button', { name: 'Show reviewer activity' })[0]);
 
     reviewersShouldFail = true;
     fireEvent.click(screen.getByRole('button', { name: 'Mock refresh' }));
     expect(await screen.findByText('Reviewer follow-up could not be refreshed')).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText('Search requests and reviewers'), {
+    fireEvent.change(screen.getByLabelText('Filter reviewer follow-up'), {
       target: { value: 'no such reviewer or institution' },
     });
 
@@ -694,7 +695,7 @@ describe('reviewer follow-up refetch resilience', () => {
     });
 
     allScopeShouldFail = true;
-    fireEvent.click(screen.getByRole('button', { name: 'All requests' }));
+    fireEvent.click(screen.getByRole('button', { name: 'All in program' }));
 
     // Resolve the superseded initial load's fetch with the ORIGINAL fixtures
     // after the scope change already bumped requestIdRef.

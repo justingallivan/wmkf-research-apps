@@ -38,3 +38,19 @@ describe('WorkbenchViewsNav shell links', () => {
     expect(screen.getByRole('link', { name: 'Awardees' })).not.toHaveAttribute('aria-current');
   });
 });
+
+describe('WorkbenchViewsNav scope preservation', () => {
+  test('carries scope for the three scope consumers, but not for Final writeups or Initial assessments', () => {
+    render(<WorkbenchViewsNav activeKey="requests" cycleCode="J27" programId="p1" scope="all" />);
+    expect(screen.getByRole('link', { name: 'Request list' })).toHaveAttribute('href', '/workbench?programId=p1&cycleCode=J27&scope=all');
+    expect(screen.getByRole('link', { name: 'Reviewer follow-up' })).toHaveAttribute('href', '/workbench?view=reviewer-follow-up&programId=p1&cycleCode=J27&scope=all');
+    expect(screen.getByRole('link', { name: 'Awardees' })).toHaveAttribute('href', '/workbench?view=awardees&programId=p1&cycleCode=J27&scope=all');
+    expect(screen.getByRole('link', { name: 'Final writeups' })).toHaveAttribute('href', '/workbench?view=final-writeups&programId=p1&cycleCode=J27');
+    expect(screen.getByRole('link', { name: 'Initial assessments' })).toHaveAttribute('href', '/workbench?view=initial-assessments&programId=p1&cycleCode=J27');
+  });
+
+  test('omits scope entirely when it is the default (my)', () => {
+    render(<WorkbenchViewsNav activeKey="requests" cycleCode="D26" programId="p1" scope="my" />);
+    expect(screen.getByRole('link', { name: 'Awardees' })).toHaveAttribute('href', '/workbench?view=awardees&programId=p1&cycleCode=D26');
+  });
+});

@@ -19,7 +19,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Layout, { PageHeader } from '../Layout';
 import ToolbarSelect from '../ToolbarSelect';
-import WorkbenchViewsNav from './WorkbenchViewsNav';
+import WorkbenchViewsNav, { VIEWS } from './WorkbenchViewsNav';
 import RequestListPanel from './RequestListPanel';
 import ReviewerFollowUpPanel from './ReviewerFollowUpPanel';
 import { FinalWriteupsPanel } from '../final-writeups/FinalWriteupsViews';
@@ -148,22 +148,34 @@ export function WorkbenchShell({ previewReadOnly = false }) {
     navigate({ programId: nextProgramId, cycleCode: '' }, { push: true });
   };
 
+  // Final writeups and Awardees do not accept a program filter (their data
+  // contracts are cycle-only, not program-scoped); the Program select stays
+  // visible for cross-view consistency but is disabled with a short note
+  // rather than implying it constrains those two views.
+  const programReadOnly = location.view === 'final-writeups' || location.view === 'awardees';
+  const programHint = location.view === 'final-writeups'
+    ? 'Not filtered by program'
+    : location.view === 'awardees'
+      ? 'Research programs only'
+      : undefined;
+  const activeViewMeta = VIEWS[location.view];
+
   return (
     <Layout title="Request Workbench">
       <PageHeader
         title="Request Workbench"
-        subtitle="Find and manage peer reviewers for your grant requests, one cycle at a time."
+        subtitle="Manage requests and the work around them by grant program and cycle."
         icon="🗂️"
       />
-      <WorkbenchViewsNav activeKey={location.view} cycleCode={cycleCode} programId={location.programId} />
 
       <div className="flex flex-wrap items-end gap-4 mb-6">
         <ToolbarSelect
           id="workbench-program"
-          label="Grant Program"
+          label="Grant program"
           value={programId}
-          disabled={!cyclesReady || programs.length === 0}
+          disabled={!cyclesReady || programs.length === 0 || programReadOnly}
           onChange={(e) => changeProgram(e.target.value)}
+          hint={programHint}
         >
           {programs.length === 0 && <option value="">Loading programs…</option>}
           {programs.map((program) => (
@@ -172,15 +184,13 @@ export function WorkbenchShell({ previewReadOnly = false }) {
         </ToolbarSelect>
         <ToolbarSelect
           id="workbench-cycle"
-          label="Cycle"
+          label="Grant cycle"
           value={cycleCode || ''}
           disabled={!cyclesReady || cycleOptions.length === 0}
           onChange={(e) => navigate({ cycleCode: e.target.value, uncycled: false }, { push: true })}
         >
           {cycleOptions.map((c) => (
-            <option key={c.code} value={c.code}>
-              {c.label || c.code}{c.count ? ` (${c.count})` : ''}
-            </option>
+            <option key={c.code} value={c.code}>{c.label || c.code}</option>
           ))}
         </ToolbarSelect>
       </div>
@@ -189,6 +199,15 @@ export function WorkbenchShell({ previewReadOnly = false }) {
         <div className="mb-6 p-4 rounded-lg bg-red-50 border border-red-200 text-red-800 text-sm" role="alert">
           {cyclesError}{' '}
           <button type="button" className="underline font-medium" onClick={() => setCyclesAttempt((n) => n + 1)}>Try again</button>
+        </div>
+      )}
+
+      <WorkbenchViewsNav activeKey={location.view} cycleCode={cycleCode} programId={location.programId} scope={location.scope} />
+
+      {activeViewMeta?.description && (
+        <div className="mb-6">
+          <h2 className="text-lg font-semibold text-gray-900">{activeViewMeta.label}</h2>
+          <p className="mt-1 text-sm text-gray-600">{activeViewMeta.description}</p>
         </div>
       )}
 

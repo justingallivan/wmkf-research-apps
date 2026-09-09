@@ -16,6 +16,7 @@ import { Card } from '../Layout';
 import ReviewerStatusIndicator from './ReviewerStatusIndicator';
 import { TOOLBAR_CONTROL_HEIGHT_CLASS } from '../ToolbarSelect';
 import RequestLocator from './RequestLocator';
+import ScopeSegment from './ScopeSegment';
 import { TRIAGE_STATUS } from '../../config/triageStatus';
 
 const STAGE_META = {
@@ -186,21 +187,8 @@ export default function RequestListPanel({
     <>
       <RequestLocator />
 
-      <div className="flex flex-wrap items-end gap-4 mb-6">
-        <div className={`inline-flex ${TOOLBAR_CONTROL_HEIGHT_CLASS} rounded-xl border border-gray-300 overflow-hidden`}>
-          {['my', 'all'].map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => onScopeChange(s)}
-              className={`px-4 py-2 text-sm font-medium ${
-                scope === s ? 'bg-gray-900 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              {s === 'my' ? `My requests (${myRequestCount})` : 'All'}
-            </button>
-          ))}
-        </div>
+      <div className="flex flex-wrap items-end gap-4 mb-2">
+        <ScopeSegment scope={scope} onChange={onScopeChange} myCount={myRequestCount} />
 
         <label className={`flex ${TOOLBAR_CONTROL_HEIGHT_CLASS} items-center gap-2 text-sm font-medium text-gray-700`}>
           <input
@@ -209,17 +197,24 @@ export default function RequestListPanel({
             checked={includeSetAside}
             onChange={(e) => onIncludeSetAsideChange(e.target.checked)}
           />
-          Show set aside
+          Include set-aside requests
         </label>
-
-        {rollup && (
-          <div className={`ml-auto flex ${TOOLBAR_CONTROL_HEIGHT_CLASS} items-center text-sm text-gray-600`}>
-            <span className="font-semibold text-gray-900">{rollup.total}</span> request{rollup.total === 1 ? '' : 's'}
-            {rollup.stages?.find ? <span className="ml-3">· {rollup.stages.find} need reviewers</span> : null}
-            {rollup.stages?.done ? <span className="ml-3">· {rollup.stages.done} complete</span> : null}
-          </div>
-        )}
       </div>
+
+      {rollup && (
+        <div className="mb-6 text-sm">
+          <p className="text-gray-900">
+            <span className="font-semibold">{rollup.total}</span> request{rollup.total === 1 ? '' : 's'}
+          </p>
+          {(rollup.stages?.find || rollup.stages?.done) && (
+            <p className="mt-0.5 text-gray-500">
+              {rollup.stages?.find ? `${rollup.stages.find} need reviewers` : null}
+              {rollup.stages?.find && rollup.stages?.done ? ' · ' : null}
+              {rollup.stages?.done ? `${rollup.stages.done} complete` : null}
+            </p>
+          )}
+        </div>
+      )}
 
       {error && (
         <div className="mb-6 p-4 rounded-lg bg-red-50 border border-red-200 text-red-800 text-sm">{error}</div>

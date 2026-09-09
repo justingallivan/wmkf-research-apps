@@ -19,6 +19,8 @@ import { Card } from '../Layout';
 import { TOOLBAR_CONTROL_HEIGHT_CLASS } from '../ToolbarSelect';
 import ReviewerManagePanel from '../reviewers/ReviewerManagePanel';
 import EmailTemplatesModal from '../reviewers/EmailTemplatesModal';
+import ScopeSegment from './ScopeSegment';
+import ViewFilterInput from './ViewFilterInput';
 import {
   filterReviewerFollowUpProposals,
   isOpenReviewer,
@@ -242,6 +244,12 @@ export default function ReviewerFollowUpPanel({
 
   useEffect(() => () => { requestIdRef.current += 1; }, []);
 
+  // Counts computed after the reviewer-status filter but before the live
+  // text filter, so "Showing X of Y" has a stable denominator while typing.
+  const statusFilteredProposals = useMemo(() => filterReviewerFollowUpProposals(proposals, {
+    view: reviewersView,
+    search: '',
+  }), [proposals, reviewersView]);
   const visibleProposals = useMemo(() => filterReviewerFollowUpProposals(proposals, {
     view: reviewersView,
     search: searchInput,
@@ -262,30 +270,10 @@ export default function ReviewerFollowUpPanel({
       <div className="mb-5 rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
         <div className="flex flex-col gap-3.5">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-          <fieldset className="flex flex-col gap-1.5">
-            <legend className="text-sm font-medium text-gray-700">Requests</legend>
-            <div className={`inline-flex ${TOOLBAR_CONTROL_HEIGHT_CLASS} overflow-hidden rounded-xl border border-gray-300 bg-white`}>
-              <button
-                type="button"
-                onClick={() => onScopeChange('my')}
-                aria-pressed={scope === 'my'}
-                className={`px-4 py-2 text-sm font-semibold ${scope === 'my' ? 'bg-gray-900 text-white' : 'text-gray-700 hover:bg-gray-50'}`}
-              >
-                My requests
-              </button>
-              <button
-                type="button"
-                onClick={() => onScopeChange('all')}
-                aria-pressed={scope === 'all'}
-                className={`border-l border-gray-300 px-4 py-2 text-sm font-semibold ${scope === 'all' ? 'bg-gray-900 text-white' : 'text-gray-700 hover:bg-gray-50'}`}
-              >
-                All requests
-              </button>
-            </div>
-          </fieldset>
+          <ScopeSegment scope={scope} onChange={onScopeChange} />
 
           <fieldset className="flex flex-col gap-1.5">
-            <legend className="text-sm font-medium text-gray-700">Reviewers</legend>
+            <legend className="text-sm font-medium text-gray-700">Reviewer status</legend>
             <div className={`inline-flex ${TOOLBAR_CONTROL_HEIGHT_CLASS} overflow-hidden rounded-xl border border-gray-300 bg-white`}>
               <button
                 type="button"
@@ -301,27 +289,23 @@ export default function ReviewerFollowUpPanel({
                 aria-pressed={reviewersView === 'all'}
                 className={`border-l border-gray-300 px-4 py-2 text-sm font-semibold ${reviewersView === 'all' ? 'bg-gray-900 text-white' : 'text-gray-700 hover:bg-gray-50'}`}
               >
-                Show all ({summary.assignedRequests})
+                All ({summary.assignedRequests})
               </button>
             </div>
           </fieldset>
 
           </div>
           <div className="flex flex-col gap-3 border-t border-gray-100 pt-3 sm:flex-row sm:items-start sm:justify-between">
-            <div className="flex min-w-0 flex-1 flex-col gap-1">
-              <label htmlFor="reviewer-follow-up-search" className="sr-only">Search requests and reviewers</label>
-              <input
-                id="reviewer-follow-up-search"
-                type="search"
-                value={searchInput}
-                onChange={(event) => setSearchInput(event.target.value)}
-                placeholder="Search requests, institutions, PIs, or reviewers"
-                className="min-h-11 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-500 focus:border-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-400/30"
-              />
-              <p className="text-xs text-gray-500" aria-live="polite">
-                {searchInput.trim() ? `${visibleProposals.length} matching ${visibleProposals.length === 1 ? 'request' : 'requests'}` : `${visibleProposals.length} ${visibleProposals.length === 1 ? 'request' : 'requests'} in this view`}
-              </p>
-            </div>
+            <ViewFilterInput
+              id="reviewer-follow-up-search"
+              label="Filter reviewer follow-up"
+              placeholder="Request #, institution, PI, or reviewer"
+              value={searchInput}
+              onChange={setSearchInput}
+              shown={visibleProposals.length}
+              total={statusFilteredProposals.length}
+              unit="requests"
+            />
             {!previewReadOnly && (
           <button
             type="button"
@@ -394,9 +378,9 @@ export default function ReviewerFollowUpPanel({
           </p>
           <p className="mt-1 text-sm text-gray-500">
             {scope === 'my' && proposals.length === 0
-              ? 'Select All requests to view the full cycle.'
+              ? 'Select All in program to view the full cycle.'
               : reviewersView === 'attention'
-              ? 'Show all to see completed reviews and proposals without active reviewer engagements.'
+              ? 'Select All to see completed reviews and proposals without active reviewer engagements.'
               : 'Change the cycle or search.'}
           </p>
         </Card>

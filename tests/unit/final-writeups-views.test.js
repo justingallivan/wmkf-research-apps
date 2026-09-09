@@ -161,13 +161,13 @@ test('dashboard search filters the active view without adding controls other tha
   fireEvent.change(search, { target: { value: 'second' } });
   expect(screen.queryByText('Cellular repair after tissue injury')).not.toBeInTheDocument();
   expect(screen.queryByText('A second proposal')).not.toBeInTheDocument();
-  expect(screen.getByText('0 matching writeups')).toBeInTheDocument();
+  expect(screen.getByText('Showing 0 of 1 writeups')).toBeInTheDocument();
 
   fireEvent.click(screen.getByRole('button', { name: /All writeups/ }));
   expect(screen.getByText('A second proposal')).toBeInTheDocument();
-  expect(screen.getByText('1 matching writeup')).toBeInTheDocument();
+  expect(screen.getByText('Showing 1 of 3 writeups')).toBeInTheDocument();
   expect(screen.getAllByRole('combobox')).toHaveLength(1);
-  expect(screen.getByRole('group', { name: 'View' }).querySelectorAll('button')).toHaveLength(3);
+  expect(screen.getByRole('group', { name: 'Review queue' }).querySelectorAll('button')).toHaveLength(3);
 });
 
 test('the cycle comes from the shell: a change reloads with the new code', async () => {
@@ -196,7 +196,7 @@ test('the cycle comes from the shell: a change reloads with the new code', async
 test('the shell cycle is passed as the only query parameter', async () => {
   global.fetch.mockResolvedValueOnce(response(dashboard()));
   renderPanel({ cycleCode: 'J26', writeupsView: 'reviewed', pd: '33333333-3333-4333-8333-333333333331', search: 'x' });
-  await screen.findByRole('combobox', { name: 'Program director' });
+  await screen.findByRole('combobox', { name: 'Responsible program director' });
   expect(global.fetch).toHaveBeenCalledTimes(1);
   expect(global.fetch).toHaveBeenCalledWith('/api/workbench/final-writeups?cycleCode=J26');
 });
@@ -626,7 +626,7 @@ describe('views, Program director filter, and version context (Slices 6B/6C)', (
     data.coordinatorMatrix = matrixFor(data.queues.open[0], data.queues.history[0]);
     global.fetch.mockResolvedValueOnce(response(data));
     renderPanel();
-    const select = await screen.findByRole('combobox', { name: 'Program director' });
+    const select = await screen.findByRole('combobox', { name: 'Responsible program director' });
     expect([...select.options].map((option) => option.textContent))
       .toEqual(['All program directors', 'Program Director A', 'Program Director B']);
     expect(screen.getByText('Audience configuration needed')).toBeInTheDocument();
@@ -653,7 +653,7 @@ describe('views, Program director filter, and version context (Slices 6B/6C)', (
   test('a bookmarked pd filters on mount', async () => {
     global.fetch.mockResolvedValueOnce(response(twoPdDashboard()));
     renderPanel({ pd: PD_B });
-    const select = await screen.findByRole('combobox', { name: 'Program director' });
+    const select = await screen.findByRole('combobox', { name: 'Responsible program director' });
     expect(select).toHaveValue(PD_B);
     expect(screen.queryByRole('option', { name: 'Program director not in this cycle' })).not.toBeInTheDocument();
     expect(screen.getByText('Stewardship for B')).toBeInTheDocument();
@@ -663,7 +663,7 @@ describe('views, Program director filter, and version context (Slices 6B/6C)', (
   test('a GUID absent from the cycle keeps an option and shows the empty copy', async () => {
     global.fetch.mockResolvedValueOnce(response(twoPdDashboard()));
     renderPanel({ pd: PD_ABSENT });
-    const select = await screen.findByRole('combobox', { name: 'Program director' });
+    const select = await screen.findByRole('combobox', { name: 'Responsible program director' });
     expect(select).toHaveValue(PD_ABSENT);
     expect(screen.getByRole('option', { name: 'Program director not in this cycle' })).toBeInTheDocument();
     expect(screen.getByText(/No writeups for the selected Program Director in December 2026\. Choose All program directors to clear the filter\./)).toBeInTheDocument();
@@ -686,7 +686,7 @@ describe('views, Program director filter, and version context (Slices 6B/6C)', (
     expect(matrixLinks()).toBe(2);
   });
 
-  test('header count and view counts reflect the PD filter and search together', async () => {
+  test('header count and view counts reflect the PD filter, but stay stable while typing a text search', async () => {
     const openB = writeup({
       requestId: '11111111-1111-4111-8111-111111111114',
       requestNumber: '1002791',
@@ -699,17 +699,21 @@ describe('views, Program director filter, and version context (Slices 6B/6C)', (
     global.fetch.mockResolvedValueOnce(response(data));
     renderPanel();
     await screen.findByRole('heading', { name: 'Needs my review' });
-    expect(screen.getByText(/awaiting your review in December 2026/).textContent).toMatch(/^2 awaiting/);
+    expect(screen.getByText(/awaiting your review in December 2026/).textContent).toMatch(/^2 writeups awaiting/);
     expect(screen.getByRole('button', { name: /Needs my review/ }).textContent).toContain('2');
 
-    fireEvent.change(screen.getByRole('combobox', { name: 'Program director' }), { target: { value: PD_B } });
-    expect(screen.getByText(/awaiting your review in December 2026 for Program Director B/).textContent).toMatch(/^1 awaiting/);
+    fireEvent.change(screen.getByRole('combobox', { name: 'Responsible program director' }), { target: { value: PD_B } });
+    expect(screen.getByText(/awaiting your review in December 2026 for Program Director B/).textContent).toMatch(/^1 writeup awaiting/);
     expect(screen.getByRole('button', { name: /Needs my review/ }).textContent).toContain('1');
     expect(screen.getByRole('button', { name: /All writeups/ }).textContent).toContain('3');
 
+    // A text search narrows the visible rows and shows "Showing X of Y", but
+    // must never move the queue counts or the lead sentence (Slice B contract).
     fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'zzz' } });
-    expect(screen.getByText(/awaiting your review/).textContent).toMatch(/^0 awaiting/);
-    expect(screen.getByRole('button', { name: /All writeups/ }).textContent).toContain('0');
+    expect(screen.getByText(/awaiting your review in December 2026 for Program Director B/).textContent).toMatch(/^1 writeup awaiting/);
+    expect(screen.getByRole('button', { name: /Needs my review/ }).textContent).toContain('1');
+    expect(screen.getByRole('button', { name: /All writeups/ }).textContent).toContain('3');
+    expect(screen.getByText('Showing 0 of 1 writeups')).toBeInTheDocument();
   });
 
   test('Needs my review empty state offers the other views with counts', async () => {
