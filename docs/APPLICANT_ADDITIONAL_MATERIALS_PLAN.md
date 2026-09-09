@@ -3,564 +3,479 @@ title: Applicant Additional Materials Plan
 domain: applicant-materials
 kind: plan
 status: active
-summary: "Planning contract for secure, staff-requested applicant uploads after proposal submission, with explicit storage and visibility boundaries."
+summary: "Canonical Site Visit-led plan for applicant material collection, staff follow-up, and a shared external briefing room."
 canonical: true
 cataloged: 2026-09-08
 owner: product-engineering
 related:
   - docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md
-  - docs/GRANTEE_PORTAL_SPEC.md
+  - docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md
   - docs/REVIEWER_MATERIALS_FOLDER_SPEC.md
   - docs/API_ROUTE_SECURITY_MATRIX.md
-  - docs/J27_TRANSITION_REGISTER.md
   - docs/atlas/dataverse-wmkf-requestdocument.md
+  - docs/atlas/dataverse-wmkf-sitevisit.md
   - docs/atlas/postgres-infra-tables.md
 ---
 
 # Applicant Additional Materials Plan
 
-## 1. Status, recommendation, and labels
+## 1. Status and recommendation
 
 **Planning only. No implementation is authorized by this document.**
 
-**Recommendation:** build a narrow, staff-triggered, revocable token-link upload page. A
-staff member requests material from a server-resolved request contact; the recipient uses
-an expiring bearer link; browser bytes travel to private Blob staging; a JSON-only finalizer
-re-verifies the link and staged object, scans the file, writes it to the request's SharePoint
-folder, and registers one stable `wmkf_requestdocument` row per accepted file. **[PLANNED]**
+Build one **Site Visit Materials** workflow that collects applicant files, lets a Program
+Coordinator (PC) verify that the required files are present and render, and publishes selected
+materials plus the Pre-Site Visit Writeup and peer reviews through a shared read-only briefing
+page. Site Visit is the defining use case; a later staff request for other proposal materials is
+another invocation of the same collection capability, not a parallel product. **[VERIFIED via
+owner decisions recorded 2026-09-08; implementation PLANNED]**
 
-This plan uses these labels:
+Use two deliberately different bearer links bound to one Site Visit:
 
-- **[VERIFIED via ...]** describes evidence read from current source, the Atlas, or a
-  current canonical document on 2026-09-08.
-- **[ASSUMED]** identifies an unresolved operating fact that must not drive a build until
-  the owner or Connor confirms it.
-- **[PLANNED]** describes the recommended future contract, never built state.
+- a shared, forwardable **contributor link** for the applicant PI, liaison, and anyone to whom
+  they delegate the upload; and
+- a shared, read-only **briefing link** for the small group of Board members, consultants, and
+  staff who need the published package without signing into the app suite.
 
-The recommended default is **staff-only visibility**. An applicant upload does not become
-reviewer-visible and does not change an Initial Assessment input merely because it exists in
-the request folder. **[PLANNED]**
+The system is strict about request/Site Visit scope, file safety, exact document identity, and
+read-versus-write authority. It does not try to prove which applicant-side person clicked Upload.
+The operational goal is a complete, usable package with everyone informed about missing work.
+**[VERIFIED via owner decisions recorded 2026-09-08; implementation PLANNED]**
 
-## 2. Problem and actors
+The first Site Visit is approximately twenty days from the planning date, and materials are
+normally requested three days before the meeting. The first release therefore has roughly
+seventeen days of business runway and must include both collection and the minimal briefing room.
+Email/Dropbox remains the explicit fallback for an unsafe or late pilot; scheduling and Datto
+retirement do not block this cycle. **[VERIFIED via owner direction 2026-09-08; exact calendar
+dates ASSUMED until read from the Site Visit Activity]**
 
-After a proposal exists in AkoyaGO, a Program Director (PD) or program coordinator may need
-a corrected document, slide deck, letter, or other supplementary material from the applicant.
-Email attachments leave receipt, file identity, malware handling, request association, and
-downstream visibility to manual judgment. **[ASSUMED — workflow need supplied in the planning
-brief; frequency and material mix have not been measured]**
+## 2. Product contract decided by the owner
 
-The actors are:
+The following decisions supersede conflicting recommendations elsewhere in this document's
+2026-09-08 first revision. They also supersede the unbuilt July Site Visit upload proposal where
+that proposal called for a different first-release boundary. **[VERIFIED via owner decisions
+recorded 2026-09-08]**
 
-- **Requester:** the request's lead PD, the request's program coordinator, or a superuser.
-  The exact authorization rule is an owner decision; the recommendation is in Decision 3.
-  **[PLANNED]**
-- **Submitter:** the applicant PI (`wmkf_projectleader`) or institutional/primary contact
-  (`akoya_primarycontactid`) selected from the request and resolved server-side. These
-  request relationships exist today. **[VERIFIED via
-  `docs/atlas/dataverse-akoya-request.md`]**
-- **Primary consumers:** staff in the Request Workbench. **[PLANNED]**
-- **Conditional consumers:** external reviewers only after an explicit staff packaging
-  decision; Initial Assessment generation only after its governed canonical input changes.
-  **[PLANNED]**
+| Area | Decided contract |
+|---|---|
+| Workflow anchor | A PC manually initiates materials collection for an already scheduled Site Visit. Scheduling remains outside the first release. |
+| Minimum requested set | A native applicant-supplied PDF presentation, a source presentation (normally PPTX or Keynote), and a participant/bios document. Exact checklist copy remains TBD. |
+| Flexible requirements | Staff starts from a bare-minimum template, may add or waive request-specific items, and permits bounded applicant-initiated Other materials. |
+| Staff ownership | PC owns creation, follow-up, render sanity check, and publication. PD has visibility. |
+| Applicant responsibility | PI and liaison share responsibility. Both receive the requirements and reminders; either may upload or forward the contributor link. |
+| Attribution | Record the active collection link and its intended contacts, not an unprovable human uploader identity. |
+| Presentation revisions | PDF and source presentation advance independently. Retain prior SharePoint versions and show a soft out-of-sync reminder when only one side changes; do not block the newer file. |
+| Readiness | Presence is primary. A PC confirms required files open/render; no substantive approval workflow is needed. |
+| External package | A small, named but trusted external audience receives one expiring read-only briefing link. Forwarding risk is owner-accepted because recipients are covered by NDAs or similar agreements. |
+| Briefing contents | PC-published applicant materials, exact Pre-Site Visit Writeup version, and selected peer reviews. |
+| Physical-file rule | Prefer one canonical SharePoint file plus stable item/version pointers. Do not create audience copies merely to assemble a package. |
+| Naming | Applicant filename is receipt metadata; SharePoint uses stable request-numbered canonical names; external labels and download names use institution and omit the internal request number. |
+| Sunset | Contributor and briefing access close automatically seven days after the Site Visit. No manual closeout is required. |
+| Current-cycle exclusions | Do not build Site Visit scheduling or a Datto migration. Exceptional applicant formats may be handled through the existing email fallback. |
 
 ## 3. Evidence-first current state
 
-| Surface | Current state | Planning consequence |
+| Surface | Current state | Consequence |
 |---|---|---|
-| Applicant intake | The `/apply` foundation has applicant sessions, membership checks, draft persistence, direct-to-private-Blob upload, server-side byte verification, and submit/drain pieces, but the intake product is parked. The historical June 2026 pilot is not an operating applicant portal. **[VERIFIED via `docs/agent-wiki/topics/intake-portal.md`, `docs/INTAKE_PORTAL_DESIGN.md`, `pages/api/intake/draft/upload-token.js`, `pages/api/intake/draft/attach.js`, and `pages/api/intake/submit.js`]** | Reuse verified security ideas, not the draft or submission lifecycle. Do not revive the parked product incidentally. |
-| Applicant identity | NextAuth supports an `entra-external` applicant session carrying server-issued `userType: 'applicant'`, `contactOid`, and contact email; the intake routes bridge that identity to Dataverse and check `wmkf_portalmembership`. **[VERIFIED via `pages/api/auth/[...nextauth].js` and the intake routes]** | A signed-in approach is technically possible but would make this small workflow depend on the parked portal's onboarding and membership model. |
-| Intake attachments | Mint derives the opaque pathname and constrains content type, maximum bytes, overwrite, and expiry. Finalize re-downloads private bytes, recomputes size/hash, validates magic bytes, and scans before atomic pending-to-clean promotion. When virus scanning is disabled, the current dormant intake path records `scanner: 'skipped'` and treats the file as clean. **[VERIFIED via `pages/api/intake/draft/upload-token.js`, `pages/api/intake/draft/attach.js`, and `docs/API_ROUTE_SECURITY_MATRIX.md`]** | Preserve the direct-upload and verification pattern. A public launch of this new feature must instead fail closed when scanning is disabled or unavailable. |
-| Portal staging | `portal_upload_staging` provides actor/resource/scope ownership, a finalize lease, staged-byte facts, a downstream candidate receipt, terminal replay, exact-path cleanup, and no raw external-token storage. Its deployed scope constraint admits only `grantee_image` and `staff_grantee_image`; the current service admits only PNG/JPEG/WebP. **[VERIFIED via `lib/db/migrations/031_portal_upload_staging.sql`, `lib/services/portal-upload-staging.js`, and `docs/atlas/postgres-infra-tables.md`]** | Reuse the ledger and lease/idempotency design, but an implementation needs an additive document scope and a document verifier. It cannot call the image-only flow unchanged. |
-| External grantee link | The grantee portal uses an audience-scoped 30-day JWT but intentionally stores no token hash and offers no revocation. Its finalize route independently re-verifies the token, package state, staging ownership, exact private object, and write preconditions. **[VERIFIED via `lib/external/grantee-token-lifecycle.js`, `pages/api/external/grantee/[token]/upload-token.js`, and `pages/api/external/grantee/[token]/submit.js`]** | Reuse the audience/op and independent-finalize pattern. Do not reuse its stateless lifecycle for requested proposal materials, where staff need revocation and reissue. |
-| Request document registry | `wmkf_requestdocument` already defines `Applicant Slides` and `Other Applicant Materials`, plus stable SharePoint identity, hashes, content facts, operation/lifecycle state, request binding, and producer provenance. Production rows currently exercise Initial Assessment, Pre-Site, and Final Writeup—not applicant capture. **[VERIFIED via `shared/config/requestDocument.js` and `docs/atlas/dataverse-wmkf-requestdocument.md`]** | Register each accepted applicant file using the existing applicant artifact kinds. Treat the producer and applicant-attribution shape as new contract work. |
-| Workbench documents | The Proposal listing finds historical Phase I slots, all Phase II files, the exact reviewer package, and exact AI Materials. It does not read generic additional-material registry rows. **[VERIFIED via `lib/services/workbench-proposal-documents.js` and `shared/components/workbench/ProposalTab.js`]** | Add a registry-backed Additional materials panel/list; do not depend on accidental folder enumeration. |
-| Reviewer package | The external reviewer allow-set exposes only exact `Reviewer Materials/Proposal_{Request#}.pdf`; every other file, even in that folder, is rejected. **[VERIFIED via `lib/external/reviewer-materials.js`, `pages/api/external/review/[token]/proposal.js`, and `docs/REVIEWER_MATERIALS_FOLDER_SPEC.md`]** | Keep supplemental uploads out of `Reviewer Materials`. Reviewer inclusion means deliberately rebuilding the canonical package, not widening folder access. |
-| Initial Assessment | Generation reads and fingerprints only exact `AI Materials/ProposalNarrative_{Request#}.pdf`; it fails closed rather than substituting the reviewer package, Phase I display document, archive copy, or another file. **[VERIFIED via `lib/services/workbench-proposal-documents.js` and `lib/services/initial-assessment/artifact-service.js`]** | A new upload must not silently enter an Initial Assessment. Any inclusion requires a governed narrative rebuild and then explicit generation/reuse behavior. |
-| J27 | GOApply remains the J27 intake system until further notice; every J27 proposal is expected to receive a mostly AI-generated Initial Assessment before advancement; broader applicant capture through `wmkf_requestdocument` and the exact J27 proposal path remain open work. **[VERIFIED via `docs/J27_TRANSITION_REGISTER.md` rows J27-060, J27-061, and J27-063]** | Keep this capability independent of a custom J27 form, and make its Initial Assessment interaction an explicit policy decision. |
+| Site Visit Activity | `wmkf_sitevisit` is a live custom Activity with Request binding, scheduled start/end, format/location, and organizer/attendee parties. Workbench reads it; visits are maintained outside the current Workbench editor. **[VERIFIED via `docs/atlas/dataverse-wmkf-sitevisit.md`]** | Bind collection and both links to the exact active Activity, not merely a client-supplied request or date. |
+| Governed Pre-Site document | The current Pre-Site Word workspace is registered through `wmkf_requestdocument`, lives under `Artifacts/Pre-Site Visit/`, and retains stable SharePoint item/version identity. A live distribution path can create retained Word/PDF snapshots. **[VERIFIED via `shared/config/requestDocument.js`, `docs/atlas/dataverse-wmkf-requestdocument.md`, and `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`]** | The briefing manifest may pin a native version. Create a distinct PDF only when that representation is actually required; do not duplicate it merely for access. |
+| Peer reviews | Completed generated review files use the request-level `Reviews` folder and stable review-suggestion pointers. **[VERIFIED via `lib/services/review-documents/individual-file-service.js` and `docs/APPLICATION_STATE_ATLAS.md`]** | Pin selected exact review items/versions in the briefing manifest; do not expose the folder broadly. |
+| Request Document registry | Existing artifact choices include Applicant Slides and Other Applicant Materials, and rows retain request binding, stable Graph identity, version/eTag, content facts, operation/lifecycle, and provenance. There is no dedicated Participant Bios choice. **[VERIFIED via `shared/config/requestDocument.js` and `docs/atlas/dataverse-wmkf-requestdocument.md`]** | Reuse the registry; propose a Participant Bios artifact choice rather than permanently hiding a baseline requirement under Other. |
+| Applicant upload | The July Site Visit upload contract is planned, not built. Current route inventory has no Site Visit applicant-material contributor page or routes. **[VERIFIED via `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` and `rg --files pages shared lib`]** | The first release must build the external contributor surface. |
+| Applicant portal | `/apply` has identity, draft, upload, and submit foundations, but the new-application portal is parked and J27 remains in GOApply. **[VERIFIED via `docs/agent-wiki/topics/intake-portal.md` and `docs/INTAKE_PORTAL_DESIGN.md`]** | Reuse reviewed safety ideas, not applicant sign-in, memberships, draft forms, or submission lifecycle. |
+| Shared staging | `portal_upload_staging` has actor/resource/scope ownership, lease, downstream-candidate, replay, and exact cleanup semantics, but currently admits only grantee-image scopes and image types. **[VERIFIED via `lib/db/migrations/031_portal_upload_staging.sql`, `lib/services/portal-upload-staging.js`, and `docs/atlas/postgres-infra-tables.md`]** | Extend the state-machine pattern additively; do not call the image-only contract unchanged. |
+| Reviewer and AI boundaries | External reviewer delivery exposes one exact reviewer PDF; Initial Assessment reads one exact Proposal Narrative. **[VERIFIED via `lib/external/reviewer-materials.js` and `lib/services/initial-assessment/artifact-service.js`]** | Site Visit collection/publication never widens either allow-set or silently changes AI inputs. |
+| AkoyaGo legibility | The request's active SharePoint folder is linked by Dataverse, but signed-in behavior for root files, nested folders, additional Document Locations, and link-like representations is still discovery-gated. **[VERIFIED via `docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md`, “AkoyaGo publication projection”]** | The logical file model is decided below; exact physical folder depth remains blocked on immediate signed-in discovery. |
 
-### 3.1 Reuse boundary
+## 4. Problem, actors, and boundaries
 
-The existing planned Site Visit Materials Upload contract describes a closely related but
-unbuilt surface, including the existing applicant artifact kinds and governed Site Visit
-folders. **[VERIFIED via `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`, “Site Visit Materials
-Upload contract”]** This plan does not claim those routes or state exist, and it does not
-silently broaden a Site Visit link into a proposal-wide link. **[PLANNED]**
+When the Foundation is sufficiently interested in a proposal, it schedules a “Site Visit,” which
+is now usually remote but remains the working process name. For the current cycle, dates and the
+general requested material types are already known. Staff need usable materials a few days before
+the meeting to prepare questions and request corrections. Applicants may still change the deck at
+the last minute and present from their own equipment; WMKF is collecting a reviewable snapshot,
+not certifying the deck shown during the meeting. Post-meeting deck reconciliation is rare and is
+not a routine workflow. **[VERIFIED via owner decisions recorded 2026-09-08]**
 
-Implementation should reuse common reviewed primitives only after the first additional-
-materials slice proves its narrower contract. A later design review may consolidate the two
-link workflows if their recipient, expiry, replacement, category, and large-file rules truly
-match. **[PLANNED]**
+Actors:
 
-## 4. Goals and non-goals
+- **PC:** creates the collection, communicates requirements, monitors missing items, checks that
+  files render, requests replacement when necessary, and publishes the briefing package.
+  **[VERIFIED via owner decision 2026-09-08]**
+- **PD:** can see status and materials but does not own routine follow-up. **[VERIFIED via owner
+  decision 2026-09-08]**
+- **Applicant team:** PI and liaison share a contributor link and may delegate it. The system is
+  agnostic about who uploads each item. **[VERIFIED via owner decision 2026-09-08]**
+- **Briefing audience:** a few Board members and consultants, plus staff who may use the same
+  external page shortly before the meeting. **[VERIFIED via owner decision 2026-09-08]**
 
-### Goals **[PLANNED]**
-
-1. Let authorized staff create, send, inspect, resend, and reissue a request-bound material
-   request without accepting a client-supplied request identity or recipient address.
-2. Let an external recipient upload allowed files without a staff account or SharePoint access.
-3. Make every successful file a stable, request-bound record with byte hash, SharePoint identity,
-   applicant-link provenance, and an auditable staff-visible receipt.
-4. Preserve retry safety across Blob, scanning, SharePoint, Dataverse, and email boundaries.
-5. Make staff/reviewer/AI visibility deliberate and legible.
-
-### Non-goals **[PLANNED]**
-
-- Replacing GOApply or reviving the parked intake portal.
-- A general applicant account, draft form, or institution-membership administration surface.
-- Letting an applicant browse a request, Dataverse, SharePoint, staff history, or reviewer data.
-- Uploading directly into `Reviewer Materials` or `AI Materials`.
-- Automatically regenerating the canonical proposal package or an Initial Assessment.
-- Large-file/resumable upload, delete/replace, and multi-recipient collaboration in the first
-  thin slice.
+Non-goals for the first release: Site Visit scheduling, applicant accounts, replacing GOApply,
+full Datto retirement, arbitrary SharePoint browsing, Board/consultant login, a permanent external
+document room, or automated ingestion into reviewer/AI proposal inputs. **[PLANNED]**
 
 ## 5. Candidate approaches
 
-| Approach | What it reuses | What it must build | Benefits | Costs/risks | Verdict |
-|---|---|---|---|---|---|
-| **A. Staff-triggered token link** | Audience/op JWT pattern; external rate limits; actor-bound private staging state machine; Blob-to-SharePoint verification; request-document registry; Dynamics email transport patterns. **[VERIFIED reuse candidates via the sources in §3]** | Revocable material-request ledger; document staging scope/verifier; external page and routes; Workbench request/status panel; applicant-contact provenance; email template/composer. **[PLANNED]** | Lowest applicant friction; request and authorization remain server-bound; narrow surface; supports exact audit/reissue. | Bearer links can be forwarded; cross-store recovery and scanning must be correct; recipient identity is link-level unless sign-in is added. | **Recommend.** |
-| **B. Revive the intake portal draft/attach flow** | `entra-external` login, contact bridge, membership checks, private intake Blob, draft attachment workflow, submit/drain machinery. **[VERIFIED via intake source]** | Post-submission request binding; staff invitation; reactivation of parked onboarding/membership UX; a new non-draft lifecycle; SharePoint/registry writer. **[PLANNED]** | Stronger account continuity and person attribution; suitable if a broad applicant portal returns. | Couples a narrow need to a parked product and draft/submission semantics; higher support and identity-administration cost; J27 remains in GOApply. | Do not choose for this feature alone. Reconsider only with a separately authorized portal revival. |
-| **C. Staff-mediated upload** | Existing staff auth, Workbench access, SharePoint writer patterns, request-document registry, and staff image-replacement staging pattern. **[VERIFIED via `pages/api/workbench/grantee-deliverables/replacement-upload-token.js` and registry source]** | A staff document upload UI and document verifier; an operating procedure for applicant email; manual provenance/receipt capture. **[PLANNED]** | Smallest external attack surface and fastest emergency fallback. | Applicant attachments still travel through email; staff become a bottleneck; sender/consent and exact applicant provenance are weaker; the existing replacement flow is image-specific, not a ready document uploader. | Keep as manual fallback, not primary product. |
+| Approach | Reuse/build | Benefits | Costs and risks | Verdict |
+|---|---|---|---|---|
+| **A. Site Visit collection plus briefing room** | Reuse Site Visit Activity, external-token patterns, staging/recovery semantics, Request Documents, Pre-Site/review identities, and Workbench. Build collection/checklist state, contributor routes, briefing manifest/link/routes, and PC UI. **[VERIFIED reuse candidates via §3; build PLANNED]** | Solves receipt, follow-up, staff access, oversized email/Dropbox distribution, and consistent external access in one bounded workflow. | Cross-store finalize/publication must remain recoverable; AkoyaGo folder behavior must be discovered immediately. | **Recommend.** |
+| **B. Collection only; retain email/Dropbox/Datto distribution** | Build upload/checklist only and continue today’s external delivery. **[PLANNED]** | Smaller release. | Leaves the hodgepodge that motivated the work; does not validate exact external access or include Pre-Site/reviews. | Keep only as launch fallback. |
+| **C. Revive the parked applicant portal** | Reuse Entra applicant sessions, membership, drafts, and submit/drain. Build post-submission binding, staff requests, SharePoint registry, and briefing delivery. **[VERIFIED reuse candidates via intake source; build PLANNED]** | Stronger person identity and future new-application continuity. | Couples a time-sensitive Site Visit need to a parked product and unnecessary onboarding/identity administration. | Reject for this workflow. |
 
-## 6. Recommended end-to-end contract
+## 6. End-to-end workflow
 
-### 6.1 Staff request and link lifecycle **[PLANNED]**
+### 6.1 Create and communicate **[PLANNED]**
 
-1. Workbench loads the request and server-resolved PI, primary contact, lead PD, and program
-   coordinator. Missing or duplicate recipient addresses fail closed.
-2. An authorized staff user selects one eligible recipient, material category, bounded
-   instructions, a business deadline, and allowed file policy. The server re-reads the request
-   and contacts before preview and again before send.
-3. The service creates a durable pending request/link record before any external send. The record
-   owns the request GUID, recipient Contact GUID, initiating staff system-user GUID, sender,
-   deadline, link expiry, allowed types/count/bytes, token digest, audience/ops, and lifecycle.
-   The implementation name for this new Postgres ledger is deliberately not chosen in this plan.
-4. The raw token exists only long enough to render the recipient email. It is never stored in
-   Postgres, Dataverse, logs, query strings in staff UI, or analytics.
-5. The link becomes active only after Dynamics accepts the email send. A send failure leaves a
-   retryable unsent record and no falsely active link.
-6. Resend reuses an active link and its original expiry. Reissue stages a replacement; only after
-   its email is accepted does the service revoke the old link and activate the new one. An expired
-   or revoked link cannot mint or finalize uploads.
+1. PC opens the Request Workbench and manually creates a collection from the exact active
+   `wmkf_sitevisit` Activity. The server re-reads the Activity, Request, PI, liaison, institution,
+   and dates.
+2. A baseline template supplies Presentation PDF, Presentation Source, and Participant Bios.
+   The PC may add bounded request-specific items, mark an item optional, or waive it.
+3. The server creates durable collection/checklist and pending link state before email.
+4. The same contributor link is addressed to the server-resolved PI and liaison. Forwarding is
+   accepted. Link activation occurs only after transport accepts the invitation.
+5. Staff sees sent time, intended contacts, due date, missing-item summary, and last reminder.
 
-### 6.2 Applicant upload and finalization **[PLANNED]**
+### 6.2 Upload and revise **[PLANNED]**
 
-1. The external context route verifies signature, audience, operation, expiry, stored digest,
-   active ledger state, request binding, and deadline before returning a minimal request label,
-   staff instructions, allowed file policy, and current successful uploads for that link.
-2. The upload-token route repeats those checks. The browser may supply only a filename, declared
-   type, and byte count. The server supplies the staging UUID, exact private pathname, scope,
-   resource/link binding, byte cap, allowed type, token TTL, and no-overwrite policy.
-3. Browser bytes go directly to the private store governed by `UPLOADS_BLOB_RW_TOKEN`; the client
-   never chooses or echoes an authoritative pathname.
-4. The JSON-only finalizer repeats link authorization and claims staging by staging UUID plus
-   exact scope, link resource, and SHA-256 token binding. It downloads only the persisted private
-   pathname and verifies object privacy, declared versus actual type, extension, magic bytes,
-   actual size, hash, and malware result.
-5. Scanner disabled, missing, or unavailable is a fail-closed retryable error for this public
-   surface. “Skipped” never becomes an accepted Request Document.
-6. The server resolves exactly one active `akoya_request` SharePoint parent and a dedicated
-   additional-materials subfolder. The exact folder/filename convention is held for Decision 6;
-   neither the client nor a token claim supplies it.
-7. SharePoint upload identity is written to the staging candidate receipt before the Dataverse
-   registry write. The new `wmkf_requestdocument` row binds the verified request, stable Graph
-   site/drive/item/version/eTag, filename, size, content type, content hash, applicant artifact
-   type, operation/lifecycle state, and provenance.
-8. The finalizer marks staging consumed and stores the durable response before exact-path Blob
-   cleanup. A response-drop retry returns the same result. If SharePoint committed but Dataverse
-   did not, the candidate receipt drives reconciliation or exact orphan cleanup; it never uploads
-   a blind duplicate.
-9. Each file finalizes independently. One failed file does not roll back accepted siblings, and
-   the UI shows per-file truth. “Request complete” is a separate server transition allowed only
-   when no upload is in flight and at least one accepted file exists.
+1. Contributor context reveals only institution, Site Visit date, instructions, checklist, current
+   accepted files, and completion state.
+2. Each upload-token request repeats link/activity/collection/deadline checks. The browser supplies
+   filename, declared type, and byte count; the server owns staging identity and pathname.
+3. Browser bytes travel directly to a private staging store. Finalize repeats authorization,
+   claims the exact staging row, downloads only its persisted path, verifies size/type/extension/
+   magic/hash, and requires a successful malware result.
+4. The server assigns the canonical destination and filename. It records the SharePoint stable
+   identity and byte facts before the registry write so retry can reconcile a partial success.
+5. Same-format replacement advances the canonical SharePoint item’s native version history when
+   safely supported. A source-format change creates the new canonical source item and supersedes
+   the prior format. The external client never chooses the item or overwrite target.
+6. PDF and source presentation have independent latest versions. If only one changes, both
+   contributor and PC receive a soft “may be out of sync” notice; the newer file remains usable.
+7. Optional Other uploads do not affect checklist completion. Required items determine presence.
 
-### 6.3 First-slice file policy **[PLANNED]**
+### 6.3 Follow up and sanity-check **[PLANNED]**
 
-- PDF and PPTX only, because the existing applicant artifact categories and Site Visit design use
-  those formats and both can receive magic-byte checks. **[VERIFIED precedent via
-  `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`; limit choice remains planned]**
-- Recommended first-slice cap: **25 MiB per file, 10 accepted files per active request**. This is
-  a deliberately conservative product proposal, not a current platform limit. It limits first-
-  slice memory and scanning exposure while the real applicant material mix and scanner limits are
-  measured.
-- A later resumable Graph-upload slice may adopt a larger cap only with a streaming/chunked
-  malware contract, crash recovery, and target-library proof. Raising a constant on an in-memory
-  writer is not acceptable.
-- Pending staging expires after the same short operational window used by the reviewed staging
-  primitive; terminal staging metadata and exact bytes follow its existing cleanup contract.
-  The durable request/link ledger retention remains Decision 10. SharePoint and Request Document
-  retention follow the governed request-record policy, not staging TTL.
+The first release uses PC-triggered reminders rather than a new scheduler. A reminder goes to PI
+and liaison, reuses the active link, and lists each required item as received, missing, or needing
+replacement. It records transport receipt and last-notified time. Once all required items are
+present, ordinary missing-item reminders stop.
 
-## 7. File model and downstream visibility
+Collection display uses five plain states:
 
-### 7.1 SharePoint and `wmkf_requestdocument` **[PLANNED]**
+- **Missing** — at least one non-waived required item is absent.
+- **Received** — every non-waived required item has a current file.
+- **Needs replacement** — PC found a file that does not open or render adequately.
+- **Ready** — required items are present and the PC completed the sanity check.
+- **Closed** — seven days have elapsed after the Site Visit.
 
-- Durable bytes live in the active request's `akoya_request` SharePoint library. Private Blob is
-  transit only.
-- Generic review-stage uploads live in a dedicated request-root additional-materials folder whose
-  exact path is selected with Connor. They do not land under `Reviewer Materials`, `AI Materials`,
-  or the governed Site Visit paths by default.
-- One file equals one `wmkf_requestdocument` row. Slides use the existing Applicant Slides kind;
-  all other first-slice files use the existing Other Applicant Materials kind.
-- Use the registry's existing request binding, operation/lifecycle, stable SharePoint identity,
-  file facts, content hash, generation key, and producer fields. A deterministic key derived from
-  the material-request identity and staging identity makes a retry converge on one row.
-- Do not add a current pointer to `akoya_request`: supplementary material is inherently one-to-many.
-- Add one nullable applicant Contact relationship to `wmkf_requestdocument`, subject to schema
-  review, so settled provenance survives Postgres operational-retention cleanup. The logical and
-  schema names are intentionally deferred to implementation review. If the owner declines this
-  attribute, the plan must explicitly accept link-level—not person-level—provenance after ledger
-  expiry.
+The PC’s check is operational, not substantive approval. A change request reopens the affected
+item without deleting its prior usable version. **[PLANNED]**
 
-The Request Document operation should become Ready only after SharePoint identity and byte facts
-are recorded. Its initial lifecycle should be Review, meaning available for staff review, not
-reviewer-visible. Those are existing option values, but their applicant-material semantics still
-require an implementation-time schema/Atlas review. **[PLANNED]**
+### 6.4 Publish and view **[PLANNED]**
 
-### 7.2 Staff visibility **[PLANNED]**
+1. PC opens package assembly after applicant materials are usable.
+2. PC selects exact applicant document versions, the exact Pre-Site Visit Writeup version, and
+   the appropriate peer-review files/versions.
+3. Publication writes a new manifest version only after every selected identity remains valid.
+   A failure leaves the previously published manifest active.
+4. The stable briefing link serves only the active manifest. It is read-only, needs no app-suite
+   login, displays its last-published time, and expires seven days after the Site Visit.
+5. “Open external view” in Workbench opens the same page used by Board members and consultants.
+6. A later applicant or internal-document change appears in Workbench as unpublished. External
+   users continue seeing the prior published manifest until the PC checks and republishes.
 
-The Proposal tab gains an Additional materials panel backed by Request Document rows plus link
-status—not by a raw folder scan. It shows requester, intended recipient, deadline/link state,
-instructions, material kind, filename, size, received time, submitter Contact when available,
-scan receipt, and a request-scoped download action. Staff can distinguish pending, expired,
-revoked, partially received, complete, and failed requests.
+## 7. SharePoint and naming contract
 
-### 7.3 Reviewer visibility **[PLANNED]**
+### 7.1 One physical source **[PLANNED]**
 
-Default: **staff-only**. Existing reviewer delivery exposes one exact canonical PDF, so placing a
-supplement beside it would not make it visible and widening the allow-set would weaken a proven
-security boundary. **[VERIFIED via `lib/external/reviewer-materials.js`]**
+One canonical physical item plus a stable version reference is the default. The briefing package
+is a logical manifest, not a second folder of copies. Existing governed Pre-Site and review files
+remain in their current canonical locations. Create a new physical artifact only for a genuinely
+different representation—such as a requested PDF derived from Word—not because another audience
+needs access.
 
-If the owner chooses reviewer inclusion, staff explicitly marks an accepted file for package
-assembly. The existing/updated Power Automate packaging process must create a new exact canonical
-`Proposal_{Request#}.pdf`; preflight, send history, and external download continue to expose only
-that file. The feature must never expose a supplementary folder wholesale. **[PLANNED]**
+### 7.2 Candidate request-relative structure **[PLANNED; physical depth UNKNOWN]**
 
-### 7.4 Initial Assessment visibility **[PLANNED]**
+```text
+Site Visit/
+└── Applicant Materials/
+    ├── Slides/
+    ├── Participant Bios/
+    └── Other/
+```
 
-Default: no automatic inclusion or regeneration. The Initial Assessment producer's exact
-Proposal Narrative input remains authoritative. **[VERIFIED via
-`lib/services/initial-assessment/artifact-service.js`]**
+The existing July plan already reserves `Site Visit/Applicant Materials/Slides` and `/Other`.
+This plan adds the baseline Participant Bios category. Each accepted file receives a Request
+Document row and stable Graph identity; folder or filename is never its durable key. **[VERIFIED
+precedent via `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`; extension PLANNED]**
 
-If staff decide a new material changes proposal analysis, the governed upstream assembly process
-must publish a new exact Proposal Narrative version. Only then may staff explicitly generate or
-reuse an Initial Assessment under its existing input-fingerprint/lineage rules. The additional-
-materials finalizer must not write `AI Materials` or call the producer itself.
+Before locking the folder depth, inspect representative current requests in signed-in AkoyaGo and
+prove whether nested folders are visible and usable. If AkoyaGo obscures the second nesting level,
+the approved fallback is a flatter, still server-owned `Site Visit - <Category>` structure. Do not
+choose an additional Document Location or shortcut representation without the same proof.
 
-For J27, Workbench may show “additional material requested/received” as a pre-advancement fact.
-Whether an unresolved request blocks advancement is Decision 9; it cannot be inferred from file
-arrival alone. **[PLANNED]**
+### 7.3 Three naming layers **[PLANNED]**
 
-## 8. Security contract
+1. **Applicant filename:** retained as operational receipt metadata, never authoritative.
+2. **Canonical staff filename:** server-minted and stable, for example
+   `{Request#} Site Visit Presentation.pdf`, `{Request#} Site Visit Presentation.pptx`, and
+   `{Request#} Site Visit Participant Bios.docx`. Revisions do not gain `final-v2` suffixes.
+3. **External label/download name:** institution-led and request-number-free, for example
+   `UCLA — Presentation.pdf` and `UCLA — Participant Bios.pdf`.
 
-### 8.1 Trust boundaries **[PLANNED]**
+Institution is the primary external identifier. Proposal title may be secondary context. If two
+active proposals from one institution would be ambiguous, add a recognizable program/proposal
+qualifier rather than the internal request number. **[VERIFIED via owner decision 2026-09-08]**
 
-- Staff endpoints require `requireAppAccess('reviewers')`, an active profile, a current Dynamics
-  system-user identity, and the request-level authorization in Decision 3.
-- External tokens use a distinct audience and narrow operations. Verification checks signature,
-  audience, expiry, operation, token digest, link lifecycle, request/link binding, and deadline.
-- A bearer link proves possession of a recipient-specific link, not the human at the keyboard.
-  UI and audit language must say “link issued to” unless an applicant session is later added.
-- Recipient Contact, recipient email, request GUID, SharePoint library/folder/item, staging scope,
-  pathname, submitter identity, sender, and registry bindings are server-derived. Request JSON
-  containing any of those authority fields is rejected.
-- Mint and finalize independently authorize. A successful mint is not authority to finalize after
-  revocation, expiry, deadline, request reassignment, or policy change.
-- External context, mint, finalize, and failure-report routes use Postgres-backed per-token and
-  per-IP rate limits before expensive work. Invalid-token outcomes remain observable without
-  logging tokens.
-- Tokens and client upload credentials are redacted from logs and operational events. External
-  responses never include private Blob URLs or SharePoint credentials.
-- Filename normalization is display-only input. Stable Graph item identity and registry identity,
-  never filename/path alone, anchor the accepted record.
-- MIME, extension, magic, size, count, malware, and staging privacy checks all fail closed.
-- All Dataverse writes run inside an explicit DAL context and the Dataverse target/write interlock;
-  external input cannot select or bypass either target.
+## 8. Briefing-manifest and consumer contract
 
-### 8.2 Proposed route inventory and matrix-row shape **[PLANNED — do not add yet]**
+The active manifest binds one exact Site Visit and contains an ordered set of permitted document
+references. Each reference records its source kind, stable SharePoint drive/item identity, pinned
+version, content facts, audience label/download name, and inclusion order. The external route
+resolves those server-side references and streams bytes; it never returns a raw SharePoint or
+Dataverse URL. **[PLANNED]**
 
-Every implementation route must be registered in `docs/API_ROUTE_SECURITY_MATRIX.md` in the same
-change that creates it, using the existing columns **Route | Methods | Auth | Guard | Data scope |
-Persistence | Risk | Notes**. The public paths also require an explicit `proxy.js` allow rule.
+Default first-release sections:
 
-| Proposed route | Methods | Auth | Guard | Data scope | Persistence | Risk | Notes |
-|---|---|---|---|---|---|---|---|
-| `/api/workbench/additional-materials` | GET, POST | App | `requireAppAccess('reviewers')`; GET request-scoped read; POST action allowlist plus current request-level staff authorization | One validated `akoya_request` and server-resolved contacts | GET reads request/link ledger + `wmkf_requestdocument`; POST creates/previews/sends/resends/reissues link ledger rows and Dynamics email activity | High | POST never accepts free-form recipient or sender; send receipt controls link activation; idempotency key/action version required. |
-| `/api/external/additional-materials/[token]/context` | GET | External token | Dedicated verifier + per-token/IP rate limit | One active recipient-specific link and its request label/material policy | Reads link ledger/request and current accepted registry rows; writes rate-limit counters | Low | No SharePoint URL, staff history, contact details, or raw token persistence. |
-| `/api/external/additional-materials/[token]/upload-token` | POST | External token | Dedicated verifier repeated; active/deadline/op checks; closed body allowlist | One link; filename/type/declared size only | Inserts actor/link/scope-bound `portal_upload_staging`; returns one short-lived exact-path private client token | Medium | No client request/path/scope; no overwrite/random suffix. |
-| `/api/external/additional-materials/[token]/upload-failure` | POST | External token | Dedicated verifier + rate limit + closed diagnostic enum | One link and bounded client stage/category/status | Best-effort redacted Operational Event | Low | No raw error text, filename, pathname, URL, token, instructions, or bytes. |
-| `/api/external/additional-materials/[token]/finalize` | POST | External token | Dedicated verifier repeated; active/deadline/op checks; staging ownership/lease; fail-closed byte policy | One link plus one opaque staging UUID | Reads/deletes private Blob; writes SharePoint candidate, `wmkf_requestdocument`, link receipt, staging terminal result, rate-limit counters | High | JSON-only; durable candidate-before-registry recovery; consumed retry returns same result. |
+1. Meeting context
+2. Pre-Site Visit Writeup
+3. Peer reviews
+4. Applicant presentation
+5. Participant bios
+6. Selected additional applicant materials
 
-## 9. Proposed data model
+The manifest may reference heterogeneous existing owners: Request Document rows for governed and
+applicant artifacts, and current review-suggestion file identities for peer reviews. The build
+must define and gate that closed source-type union; an unknown type fails closed. It must not solve
+the problem with folder enumeration. **[PLANNED]**
 
-### 9.1 Postgres request/link ledger **[PLANNED]**
+The external page does not automatically include the presentation source. The PC normally
+publishes the applicant-supplied PDF for viewing/printing and may deliberately include the source
+when useful. Exact peer-review display labels and whether any representation must suppress reviewer
+identity remain open product decisions. **[ASSUMED — owner has not yet settled representation and
+label policy]**
 
-Add one operational coordination ledger; choose its table and column identifiers during the
-implementation design so this planning document does not fabricate schema. It needs to represent:
+## 9. Security contract
 
-- immutable UUID identity and the bound `akoya_request` GUID;
-- initiating staff profile/system-user identity and server-resolved recipient Contact identity;
-- sender identity and accepted Dynamics email activity/transport receipt;
-- bounded instructions, category, deadline, expiry, allowed MIME/extensions, per-file byte cap,
-  and file-count cap;
-- token identifier and SHA-256 digest, never the raw token;
-- pending/active/expired/revoked/complete/failed lifecycle with optimistic version, reissue
-  lineage, timestamps, and bounded failure evidence;
-- accepted Request Document identities and a completion receipt, or a normalized relationship
-  that can list them without storing bytes;
-- idempotency keys for create/send/action retries and a lease or equivalent single-writer fence
-  around cross-system send/reissue transitions.
+### 9.1 Trust boundaries **[PLANNED]**
 
-Postgres owns expiring-link workflow and recovery only. It is not the long-term file or proposal
-record. **[PLANNED]**
+- Contributor and briefing links use separate audiences/operations and token digests. A viewer
+  token can never upload; a contributor token can never read internal briefing materials.
+- Both are bearer links and may be forwarded. Do not claim visitor identity from link use.
+- Every request rechecks signature, audience, operation, expiry, stored digest, active collection,
+  exact Site Visit/Request binding, and route-specific rate limits.
+- Server resolves Activity, Request, contacts, SharePoint drive/folder/item, canonical pathname,
+  and package allowlist. None comes from external request input.
+- Finalize repeats authorization and staging ownership after browser upload. A mint-time check is
+  not sufficient.
+- Scanner disabled, unavailable, or inconclusive fails closed. The dormant intake path’s
+  skipped-clean behavior is not inherited.
+- Viewer responses use exact pinned versions, safe content types, `nosniff`, bounded disposition
+  filenames, and private/no-store caching. No folder listing or neighboring file fallback exists.
+- Expiry blocks new context, upload, finalize, and download operations. Staff may reissue; raw
+  tokens are never stored or logged.
 
-### 9.2 `portal_upload_staging` **[PLANNED]**
+### 9.2 Proposed route-matrix shapes **[PLANNED — do not add yet]**
 
-Reuse the current table and status/lease/candidate/result fields through an additive migration:
+Each implementation route must enter `docs/API_ROUTE_SECURITY_MATRIX.md` in the same change using
+the registered columns Route | Methods | Auth | Guard | Data scope | Persistence | Risk | Notes.
+Candidate route names are planning identifiers, not built state:
 
-- add one controlled document-upload scope value;
-- bind `resource_id` to the exact request/link-ledger UUID, not a client-selected request;
-- bind `actor_binding` to a SHA-256 digest of the raw external token with a surface-specific
-  prefix;
-- generalize allowed content types through a document-specific verifier while preserving the
-  current image callers byte-for-byte;
-- keep existing expiry, lease, candidate-before-Dataverse, durable replay, and exact cleanup
-  contracts.
+| Route family | Methods | Auth/guard | Scope and persistence | Risk |
+|---|---|---|---|---|
+| `/api/workbench/site-visit/materials` | GET, POST | staff app access plus PC/PD action allowlist | Reads Activity/Request/contacts/documents; creates collection, sends/reminds, checks/publishes | High |
+| `/api/external/site-visit-materials/[token]/context` | GET | contributor verifier + rate limit | Minimal one-collection checklist/current applicant files | Low |
+| `/api/external/site-visit-materials/[token]/upload-token` | POST | contributor verifier repeated | Creates exact collection-bound private staging row | Medium |
+| `/api/external/site-visit-materials/[token]/finalize` | POST | contributor verifier + staging lease + byte policy | Private Blob → SharePoint → Request Document → terminal replay | High |
+| `/api/external/site-visit-briefing/[token]/context` | GET | viewer verifier + rate limit | One active published manifest and minimal meeting context | Low |
+| `/api/external/site-visit-briefing/[token]/document` | GET | viewer verifier + manifest membership | Streams one exact pinned file version; no broad folder/file identifier | Medium |
 
-This is reuse with an additive contract, not evidence that the current image-only service already
-accepts documents. **[VERIFIED limitation via `lib/db/migrations/031_portal_upload_staging.sql`
-and `lib/services/portal-upload-staging.js`]**
+## 10. Proposed data model
 
-### 9.3 Dataverse **[PLANNED]**
+### 10.1 Dataverse **[PLANNED]**
 
-- Reuse `wmkf_requestdocument`; use existing Applicant Slides and Other Applicant Materials kinds.
-- Propose one nullable lookup from Request Document to the submitting applicant Contact. Exact
-  logical/schema names require the normal schema review, schema-as-code, adapter projection,
-  Atlas, and live-readiness sequence.
-- Do not add fields to `akoya_request` for this one-to-many file set.
-- Do not store token state or file bytes in Dataverse.
+- Existing `wmkf_sitevisit` remains the durable meeting/date/party anchor.
+- Existing `akoya_request` remains the proposal and SharePoint-parent anchor.
+- Existing `wmkf_requestdocument` owns applicant-file identity, request binding, artifact kind,
+  stable Graph identity/version/content facts, operation/lifecycle, and provenance.
+- Add a Participant Bios artifact choice after schema review. Continue using Applicant Slides for
+  both PDF and source; representation comes from content type and controlled checklist slot.
+- Do not add a current-file pointer to `akoya_request`. Collection/checklist and manifest state are
+  one-to-many and operational.
 
-## 10. Staff workflow and email voice
+The current registry has no Site Visit lookup. The implementation design must decide whether exact
+Activity association lives only in the collection/manifest ledger or also needs a nullable Request
+Document relationship. **[VERIFIED absence via registry Atlas/schema search; decision OPEN]**
 
-### 10.1 Workbench flow **[PLANNED]**
+### 10.2 Postgres operational coordination **[PLANNED]**
 
-1. Staff opens a request's Proposal tab and chooses **Request additional material**.
-2. Workbench displays server-resolved eligible contacts and current email addresses. Staff chooses
-   one recipient, category, instructions, deadline, and allowed file policy.
-3. Staff previews the exact email and link-expiry statement. The server re-resolves request,
-   recipient, sender, authorization, and policy at send.
-4. On accepted transport, Workbench shows Active with recipient, deadline, expiry, requester,
-   sender, and resend/reissue actions.
-5. Each successful finalize appears immediately in Additional materials with scan/identity facts
-   and a request-scoped download. Failures remain visible and retryable without false success.
-6. Staff reviews each file, decides whether the request is complete, and separately decides whether
-   the material belongs in a reviewer package or a governed Proposal Narrative rebuild.
-7. Completion closes new uploads for that link. Reopening requires a deliberate new/reissued link.
+Use one bounded coordination model, with exact identifiers selected during implementation design,
+for:
 
-### 10.2 Email contract **[PLANNED]**
+- collection identity, Request/Site Visit binding, PC owner, due/access-close times, and state;
+- ordered checklist items, required/optional/waived status, accepted file references, and PC sanity
+  check/replacement state;
+- shared contributor link and viewer link digests, lifecycle, send/reissue receipts, and expiry;
+- invitation/reminder attempts, PI/liaison recipients, last-notified time, and recovery evidence;
+- versioned briefing manifests and ordered, exact pinned document references; and
+- idempotency keys, leases, attempts, and bounded partial-failure evidence.
 
-Use mustache syntax for a new editable template and keep the existing dual-syntax resolvers intact.
-That is the current template rule. **[VERIFIED via
-`.claude-memory/project-email-template-token-syntax.md`]**
+Do not store bytes or raw bearer tokens. Terminal operational retention remains an owner/security
+decision; accepted files remain governed by SharePoint/Dataverse retention. **[PLANNED]**
 
-The message should be concise, personal, deadline-driven, and read as coming from the named PD,
-not a generic Foundation mailbox. If that sender cannot be resolved, block rather than fall back.
-That is the current grantee-message voice precedent. **[VERIFIED via
-`.claude-memory/project-grantee-deliverable-email-voice.md`]**
+### 10.3 Private staging **[PLANNED]**
 
-Recommended copy shape, using existing token vocabulary where it already fits:
+Extend `portal_upload_staging` or its reviewed state-machine pattern with a controlled document
+scope, collection/link ownership, declared/verified byte facts, candidate-before-registry identity,
+terminal replay, and exact-path cleanup. Preserve existing image callers unchanged. Keynote and
+large presentation validation/scanning require explicit proof before the size cap is settled.
 
-> **Subject:** Additional material requested for {{proposalTitle}}
->
-> {{greeting}}
->
-> I am writing to request additional material for “{{proposalTitle}}.” Please use the secure
-> link below to submit the requested material by {{reviewDueDate}}.
->
-> [Bounded staff instructions rendered by the server]
->
-> {{externalLink}}
->
-> Please contact me if you have questions or need additional time.
->
-> Thank you,
-> {{signature}}
+## 11. Failure, concurrency, and partial success
 
-The implementation must add only the template/resolver entries it actually supports, validate
-required placeholders before send, inject the secure link at send rather than preview, and avoid
-exposing the internal request number. **[PLANNED]**
-
-## 11. Failure, idempotency, and async contract
-
-| Failure edge | Required behavior **[PLANNED]** |
+| Event | Required behavior **[PLANNED]** |
 |---|---|
-| Ledger create succeeds; email fails | Row remains unsent/retryable; link is not active; no success UI. |
-| Replacement email fails | Prior active link remains active; replacement never supersedes it. |
-| Client token minted; browser PUT fails | Pending staging expires and exact-path cleanup runs; bounded client failure evidence is best effort. |
-| Browser PUT succeeds; finalize never arrives | Staging expires; cleanup selects only the persisted exact pathname. |
-| Scan unavailable or scanner disabled | No SharePoint/Dataverse write; staging remains retryable or rejects according to error permanence; staff sees degraded state. |
-| SharePoint upload succeeds; registry write fails | Candidate identity is durable before registry write; retry reconciles or deletes only the exact unreferenced candidate. |
-| Registry write succeeds; response drops | Deterministic registry key plus candidate/terminal readback returns the same accepted file; no second row or upload. |
-| One of several files fails | Successful siblings remain accepted; request stays partial; no aggregate false success. |
-| Completion races a finalize | Version/lease fence allows one ordering; completion refuses while staging is pending/finalizing. |
-| Link revoked/expired after mint | Finalize reauthorization rejects; a minted client credential is not sufficient authority. |
-| Filename collision | Server-controlled destination naming and stable registry identity avoid overwrite; no client overwrite flag. |
-| Dataverse target/context unknown | Target interlock/DAL enforcement fails closed before registry write. |
+| One file in a batch fails | Successful files remain received; failed item remains retryable with its own error. |
+| Same link used concurrently | Checklist/file writes use version or ETag fences; stale replacement refreshes instead of silently overwriting. |
+| SharePoint succeeds; registry fails | Persist exact candidate identity first; retry reconciles that item or removes only the proven orphan. |
+| Registry succeeds; response drops | Deterministic staging/operation identity returns the same accepted result. |
+| One presentation half changes | Publish the accepted file, retain the other current half, and show the soft out-of-sync warning. |
+| Package publication validation fails | Keep the previous manifest active; publish no partial external package. |
+| Source changes after publication | Mark newer source available in Workbench; external page remains on the pinned manifest until republish. |
+| Link expires during upload | Finalize rechecks expiry and refuses the write; PC reissues if the business window remains open. |
+| Pilot is not safe by go/no-go | Use the documented email/Dropbox fallback; do not waive auth, scan, or recovery invariants. |
 
-No notification or cleanup promise may be fire-and-forget unless the function lifetime is explicitly
-held and the durable state already makes retry safe. Email acceptance, SharePoint candidate identity,
-registry identity, staging terminal state, and request completion are separate receipts. **[PLANNED]**
+No handler returns overall success when every requested operation failed. Response payloads identify
+per-file/per-action success and failure so the client updates only committed items. **[PLANNED]**
 
-## 12. Owner decisions
+## 12. Immediate owner/operating decisions still open
 
-1. **Primary access model.** Choose token link, applicant sign-in, or staff-only handling.
-   **Recommendation:** token link; do not revive intake for this feature alone.
-2. **Recipient default and attribution.** Decide PI versus primary/institutional contact and whether
-   two recipients ever need access. **Recommendation:** one server-resolved recipient per link in
-   the first slice; issue separate links later rather than one shared bearer link. Audit says
-   “link issued to,” not “person submitted.”
-3. **Who may request and whose mailbox sends.** **Recommendation:** lead PD, request program
-   coordinator, and superuser may initiate; email sends from the lead PD with no fallback, while
-   history records the initiating staff member. If coordinators must send as themselves, approve
-   that as a separate sender rule before build.
-4. **Material kinds.** **Recommendation:** first slice accepts PDF/PPTX and maps slides to Applicant
-   Slides, everything else to Other Applicant Materials. Defer bespoke categories.
-5. **Limits.** **Recommendation:** start at 25 MiB/file and 10 accepted files per active request;
-   measure real usage before authorizing resumable large-file work.
-6. **SharePoint path and naming.** **Recommendation:** a dedicated generic request-root folder,
-   outside Reviewer Materials, AI Materials, and Site Visit; settle the exact name and collision
-   convention with Connor before implementation. Do not reuse J27's still-open canonical proposal
-   path decision.
-7. **Reviewer visibility.** **Recommendation:** staff-only by default; reviewer inclusion only
-   through explicit canonical package rebuild and existing one-file allow-set.
-8. **Initial Assessment interaction.** **Recommendation:** no automatic regeneration. Require an
-   explicit governed Proposal Narrative rebuild followed by the existing fingerprinted producer.
-9. **Advancement/completion policy.** Decide whether an unresolved additional-material request
-   blocks a J27 advancement. **Recommendation:** informational by default; staff may explicitly
-   mark a request blocking when they create it, and Workbench must display that state before the
-   advancement action.
-10. **Link and audit retention.** **Recommendation:** expiry is the business deadline plus seven
-    days, capped at 30 days from send; retain terminal workflow/audit metadata for one year, retain
-    no raw token, and let SharePoint/Dataverse record retention govern accepted files. Confirm with
-    records/security owners before migration.
-11. **First-slice mutation scope.** **Recommendation:** additive upload plus staff completion only.
-    Defer applicant delete/replace until replacement lineage, recycle behavior, and audit UX are
-    explicitly designed.
-12. **Scanner launch gate.** **Recommendation:** scanning enabled and positively exercised is a
-    hard launch gate; the intake path's current skipped-clean posture is not inherited.
-13. **Applicant Contact provenance.** **Recommendation:** add the nullable Request Document lookup
-    proposed in §9.3. If declined, record the deliberate loss of durable person attribution after
-    Postgres retention.
+1. **Exact baseline checklist and instructions.** Current working minimum is PDF presentation,
+   source presentation, and one participant/bios document. Confirm against the current email when
+   available. **Recommendation:** keep one cycle template plus PC add/waive controls.
+2. **Review-due offset.** “A few days” is not yet exact. **Recommendation:** three calendar days
+   before the Site Visit for this cycle, with access still open until seven days after.
+3. **File-size ceiling and Keynote proof.** **Recommendation:** inspect several historical decks,
+   including the largest, before fixing the first-release cap; retain email/Dropbox only for
+   exceptional oversize or unsupported files.
+4. **External representations.** Decide Word versus PDF for the Pre-Site Writeup and peer reviews,
+   whether source slides are normally included, and the external peer-review labels/anonymity rule.
+   **Recommendation:** browser-friendly PDF where already available/proven; otherwise serve the
+   exact native document rather than adding a risky conversion to the deadline.
+5. **Physical SharePoint depth.** **Recommendation:** test the candidate hierarchy immediately in
+   signed-in AkoyaGo; choose the nested form only if it is visibly navigable.
+6. **Email sender and copy.** **Recommendation:** PC initiates, both PI and liaison receive every
+   requirements/reminder message, and the visible sender/reply-to follows the current staff email
+   convention once the existing example is reviewed.
+7. **Update communication to Board/consultants.** **Recommendation:** stable link plus visible
+   last-published timestamp; do not send a new message on every republish unless staff explicitly
+   chooses Notify.
+8. **First-cycle go/no-go date.** **Recommendation:** set a date that still gives the first applicant
+   enough time to use the fallback process; no production launch merely because the meeting is near.
 
-## 13. Build slicing and release tier
+## 13. Build slices and release tier
 
-The **plan document itself is Tier 0**. The eventual feature is **Tier 2** because it combines
-authentication/authorization, external links, email, uploads, Postgres coordination, SharePoint,
-Dataverse writes, and cross-layer recovery. **[VERIFIED tier definition via
+The plan is Tier 0. The feature is Tier 2 because it combines external bearer authorization,
+email, untrusted file upload, Postgres coordination, private Blob, SharePoint, Dataverse, Workbench,
+and cross-store recovery. **[VERIFIED tier definition via
 `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md`]**
 
-### Slice 0 — decisions and contracts **[PLANNED]**
+### Slice 0 — immediate discovery and contract freeze **[PLANNED]**
 
-- Resolve Decisions 1–13, especially authorization, recipient, path, limits, visibility, and
-  retention.
-- Confirm representative material sizes/types and scanner constraints without a production write.
-- Complete schema/API/security designs: ledger migration + manifest/fresh-install mirror/Atlas;
-  additive staging scope; Request Document Contact lookup; route matrix; proxy allowlist; env and
-  retention contracts.
-- Characterize the current staging image callers before changing their shared primitive.
+- Obtain the current request email/checklist and representative PPTX/Keynote/PDF/bios files.
+- Read the exact active Site Visit date and recipients from a representative Activity.
+- Inspect AkoyaGo Documents and select nested versus flat physical folder form.
+- Set due offset, size/type limits, external representations, review labels, and go/no-go date.
+- Design migrations, Atlas/matrix/catalog changes, retention, route allowlist, and failure recovery.
 
-### Slice 1 — one-request thin slice **[PLANNED]**
+### Slice 1 — collection and staff control **[PLANNED]**
 
-- One staff-created request, one server-resolved recipient, one active link, one PDF no larger than
-  25 MiB, one successful finalize, one dedicated SharePoint destination, one Other Applicant
-  Materials registry row, one Workbench receipt/download, and staff-only visibility.
-- Include send failure, invalid/expired/revoked token, browser failure, scan rejection/unavailable,
-  SharePoint-before-Dataverse recovery, response-drop replay, and completion/finalize race tests.
-- No delete/replace, PPTX, multiple recipients, reviewer-package rebuild, Initial Assessment
-  regeneration, digest, or large-file upload.
-- Rehearse in an isolated branch and integrated Preview/local approved-data mode; then run one
-  owner-approved request smoke with a naive external user. Record last-known-good deployment and
-  rollback before any deliberate Production promotion. This plan does not authorize that smoke or
-  promotion.
+- PC creates one collection from one existing Site Visit.
+- Shared contributor invitation goes to PI and liaison.
+- Baseline checklist, PDF/source/bios upload, independent versions, Other, and soft mismatch warning.
+- PC sees missing/received/problem/ready, previews/downloads, and sends exact missing-item reminders.
+- Include scan unavailable/reject, oversize, response-drop, duplicate finalize, concurrent replace,
+  and SharePoint-before-Dataverse recovery tests.
 
-### Slice 2 — practical workflow **[PLANNED]**
+### Slice 2 — briefing room in the first release **[PLANNED]**
 
-- PPTX, multiple files, resend/reissue, staff blocking flag, applicant Contact provenance, bounded
-  staff notifications, and operational/admin recovery.
-- If owner-approved, explicit reviewer-package inclusion and explicit governed Proposal Narrative
-  refresh hooks, each with separate acceptance tests and history.
+- PC selects exact applicant, Pre-Site, and review versions into an atomic manifest.
+- One stable shared read-only viewer link, institution-led labels, pinned-version download/preview,
+  last-published time, and external-view preview from Workbench.
+- Include unauthorized neighboring document, stale source, partial publish, republish, expired link,
+  revoked link, response-drop, and same-link concurrent-read tests.
 
-### Slice 3 — measured expansion **[PLANNED]**
+Slices 1 and 2 together define the minimum current-cycle release. Slice 2 is not a later Datto-
+retirement enhancement. **[VERIFIED via owner decision 2026-09-08]**
 
-- Delete/replace lineage, multi-recipient access, resumable large files, and possible consolidation
-  with the planned Site Visit Materials Upload—only after observed need and a fresh contract review.
+### Slice 3 — post-pilot improvements **[PLANNED]**
 
-## 14. Contract reconciliation review
+- Automated reminder cadence, richer package update notifications, large/resumable uploads if
+  measured need justifies them, and practical recovery/admin tools.
+- Reuse the collection capability for staff-requested non-Site-Visit additional materials.
+- Add calendar invitation integration and retire Site Visit dependence on Dropbox/Datto only after
+  the new path is exercised and the remaining Datto scope is inventoried.
+- Consider Site Visit scheduling only as a separately authorized workflow.
 
-### 14.1 Caller → persistence → consumer trace
+## 14. Contract reconciliation
 
-| Stage | Contract **[PLANNED]** |
+| Stage | Producer/entry | Persistence | Consumer |
+|---|---|---|---|
+| Schedule | PC in current external/AkoyaGo process | `wmkf_sitevisit` Activity | Workbench collection creation |
+| Collection | PC Workbench action | Postgres coordination linked to Activity/Request | Contributor page, PC/PD status |
+| File intake | Shared contributor link | Private staging → canonical SharePoint item → Request Document | PC/PD Workbench and package composer |
+| Publication | PC package action | Versioned manifest of exact source identities/versions | External briefing context/document routes |
+| Viewing | Shared briefing link | Read-only manifest and exact source bytes | Board, consultants, and staff external view |
+
+### Prior requirements disposition
+
+| Earlier requirement | Current disposition |
 |---|---|
-| Caller | Authorized Workbench staff creates/sends one request; recipient-specific external link mints/finalizes one file. |
-| Operational persistence | New Postgres request/link ledger owns expiry, revocation, send/reissue, policy, partial state, and recovery. `portal_upload_staging` owns private-byte transit, leases, candidates, and replay. |
-| Settled persistence | SharePoint owns bytes/version history; `wmkf_requestdocument` owns stable identity/type/request/provenance; optional applicant Contact lookup preserves submitter reference. |
-| Consumers | Workbench reads link + registry truth. Reviewer portal remains exact-package-only. Initial Assessment remains exact-Proposal-Narrative-only. |
+| Parked intake portal must not be revived | Preserved; applicant login/membership/forms remain out. |
+| Site Visit should be the narrow external precedent | Promoted: it is now the defining product workflow. |
+| One shared applicant link | Preserved and explicitly accepts forwarding/lightweight attribution. |
+| Fixed 60-day link | Superseded by seven days after the actual Site Visit; due date remains a separate earlier milestone. |
+| 1 GB / 20-file contract | Not accepted without representative-file and scanner evidence; exact cap is an immediate decision. |
+| Applicant delete/replace | Replacement is required; destructive delete/restore UI is not required for the first cycle. |
+| Physical briefing copies | Rejected by default; use exact item/version pointers and create only genuinely distinct representations. |
+| Staff-only generic-material default | Site Visit applicant intake is staff-visible; selected versions are deliberately published to the trusted briefing audience. |
+| Reviewer/AI exact allow-sets | Preserved; this package is a separate audience and does not widen either path. |
 
-### 14.2 Prior-findings ledger
+### Review findings
 
-| Prior finding | Disposition |
-|---|---|
-| Parked intake product must not be described as live | Preserved: Approach B is explicitly not recommended. |
-| `portal_upload_staging` is image-only today | Preserved: additive scope/verifier required; current callers stay unchanged. |
-| Grantee token is stateless/no revocation | Preserved as precedent only; new ledger-backed verifier required. |
-| Reviewer folder allow-set exposes one exact PDF | Preserved: staff-only default and package rebuild for inclusion. |
-| Initial Assessment exact input is one Proposal Narrative | Preserved: no silent supplemental ingestion. |
-| J27 proposal path and applicant capture remain open | Preserved: exact destination is Decision 6; no custom J27 intake dependency. |
-| Public launch cannot inherit scanner-skipped acceptance | Converted into Decision 12 and a hard thin-slice gate. |
+1. The earlier general-additional-material framing put Site Visit reuse too late. Owner discussion
+   establishes the larger overlap and makes Site Visit the primary workflow. **[RESOLVED in this
+   plan; other durable restatements remain outside the brief-owned edit surface]**
+2. A physical Briefing Package folder would duplicate mutable applicant, Pre-Site, and review
+   files. The package is now a pinned-version manifest; copies exist only for distinct derived
+   representations. **[RESOLVED in this plan]**
+3. Exact AkoyaGo folder visibility remains unproved, so a final physical schema cannot be called
+   verified. **[OPEN discovery gate; candidate and flat fallback are explicit in §7]**
+4. Participant Bios is a baseline material but the Request Document option set has no typed choice.
+   **[OPEN additive schema design; verified via current constants]**
+5. The first-release briefing manifest must read both Request Document and peer-review pointer
+   sources. That closed heterogeneous-reference contract is not built today. **[OPEN build design]**
 
-### 14.3 New issues found during review
+**Final verdict: READY WITH NAMED CHANGES.** Product purpose and first-release boundaries are
+decided. Implementation remains blocked on Slice 0’s AkoyaGo discovery, actual file-size/type
+evidence, external representation/label policy, exact schema design, and a safe go/no-go date.
 
-1. The closest shared staging primitive cannot accept documents without both a database constraint
-   change and service generalization. **[VERIFIED via migration/service source]**
-2. Existing Request Document explicit actor fields describe staff system users, not an applicant
-   Contact. Durable person attribution therefore needs the proposed lookup or an explicit accepted
-   loss after operational-ledger retention. **[VERIFIED via
-   `lib/dataverse/adapters/request-document.js`; schema change remains planned]**
-3. A folder-only Workbench change would miss the typed registry and could conflate D26 Phase II
-   documents, generic additional materials, and Site Visit materials. **[VERIFIED via current
-   Proposal listing source; conclusion is planned design]**
-4. “Received” and “included for reviewers/AI” are separate events. Collapsing them would bypass two
-   existing fail-closed exact-file contracts. **[VERIFIED via reviewer-materials and Initial
-   Assessment source]**
+## 15. Sweep report
 
-### 14.4 Recommendation evidence and verdict
-
-| Recommendation | Evidence |
-|---|---|
-| Token link over portal revival | Narrow external patterns are live; full intake is parked; GOApply remains J27 intake. **[VERIFIED via §3]** |
-| Stateful/revocable link | Existing grantee JWT is intentionally stateless and cannot meet staff reissue/revocation needs. **[VERIFIED via §3]** |
-| Extend staging rather than invent byte transit | Existing staging already solves actor binding, leases, candidate reconciliation, replay, and cleanup, but its scope/type contract must be extended. **[VERIFIED via §3]** |
-| Registry row per file | Existing applicant artifact kinds and stable SharePoint identity fields match a one-to-many settled file record. **[VERIFIED via §3]** |
-| Staff-only default | Reviewer and Initial Assessment consumers both enforce exact canonical inputs today. **[VERIFIED via §3]** |
-
-**Final verdict: READY WITH NAMED CHANGES.** The token-link approach is ready for owner scope
-selection, not implementation. Implementation remains blocked on Decisions 1–13 and must include
-the additive staging, durable link, applicant-provenance, route-security, recovery, and downstream-
-visibility contracts above.
-
-## 15. Sweep reconciliation report
-
-- **Mode:** evidence-first planning sweep, limited to the new canonical plan and the brief's owned
-  documentation surface. No production probe or write was run.
-- **Authoritative evidence read:** current intake/auth/upload source; staging migration/service;
-  external token routes; Request Document schema/constants/adapter/Atlas; SharePoint file model;
-  reviewer allow-set; Workbench Proposal and Initial Assessment consumers; J27 register; release
-  strategy; email memories.
-- **Contradictions reconciled:** intake foundation exists but product is parked; Site Visit upload
-  is planned but not built; Applicant Slides/Other Applicant Materials option values exist but
-  applicant capture does not; current portal staging is reusable in shape but not document-ready.
-- **Durable surfaces intentionally unchanged:** source, schemas, API matrix, Atlas, wiki, memory,
-  work queue, session prompt, and implementation files. Their changes belong to a separately
-  authorized build/sweep.
-- **Residual unknowns:** the numbered owner decisions, Connor's exact SharePoint convention, real
-  material sizes/types, scanner limits, and whether requested material should ever block J27
-  advancement.
+- **Mode:** changed-product-fact reconciliation within the brief-owned documentation surface.
+- **Authoritative evidence:** owner decisions in the 2026-09-08 planning discussion; current Site
+  Visit Activity Atlas; Request Document Atlas/constants; Pre-Site distribution contract; review
+  file writer; applicant/staging/external-token source; AkoyaGo publication discovery gate.
+- **Structural changes:** Site Visit now drives the product; first release includes collection and
+  briefing distribution; shared contributor/viewer bearer links are explicit; package assembly is
+  pointer/version based; naming has staff and external layers; launch slicing reflects the current
+  cycle deadline.
+- **Semantic omissions found:** Participant Bios has no current artifact choice; briefing manifest
+  spans two current document-owner shapes; AkoyaGo nested-folder usability is unverified.
+- **Excluded durable surfaces:** `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md`, Atlas, API matrix, wiki,
+  memory, source, schemas, and migrations remain unchanged under the planning brief’s file-ownership
+  restriction. Reconcile them in the separately authorized implementation/change set.
+- **Residual conflict:** the July unbuilt Site Visit subsection retains earlier 60-day, 1 GB,
+  physical-path, and delete semantics. This canonical applicant-materials plan records the newer
+  owner decisions; the older subsection requires structural reconciliation before implementation.
+- **Verdict:** CLAIM NOT RECONCILED repo-wide because the owned surface excludes the older canonical
+  file-model restatement; the new plan itself is internally reconciled and names that dependency.

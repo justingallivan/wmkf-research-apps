@@ -39,7 +39,7 @@ related:
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
-| [APPLICANT_ADDITIONAL_MATERIALS_PLAN.md](APPLICANT_ADDITIONAL_MATERIALS_PLAN.md) | plan | active | yes | Planning contract for secure, staff-requested applicant uploads after proposal submission, with explicit storage and visibility boundaries. | 2026-09-08 |
+| [APPLICANT_ADDITIONAL_MATERIALS_PLAN.md](APPLICANT_ADDITIONAL_MATERIALS_PLAN.md) | plan | active | yes | Canonical Site Visit-led plan for applicant material collection, staff follow-up, and a shared external briefing room. | 2026-09-08 |
 
 ## architecture
 

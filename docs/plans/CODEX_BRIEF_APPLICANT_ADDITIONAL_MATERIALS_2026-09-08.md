@@ -122,7 +122,8 @@ list of owner decisions. Append a five-line outcome summary to this brief.
 
 ## Outcome (2026-09-08)
 
-- Created the canonical `docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md` planning artifact.
-- Recommended a revocable, request-ledger-backed token link with actor-bound private staging.
-- Kept applicant materials staff-only by default and preserved exact reviewer and Initial Assessment inputs.
+- Created and owner-reconciled the canonical `docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md` planning artifact.
+- Made Site Visit the defining workflow: PC-owned checklist/follow-up, shared applicant contribution, and independent presentation versions.
+- Included a first-release read-only briefing room for exact applicant, Pre-Site Writeup, and peer-review versions.
+- Chose one canonical SharePoint file plus pinned-version package references, with AkoyaGo folder depth held for immediate signed-in discovery.
 - Passed all five named documentation/invariant gates; implementation files and live systems were untouched.
