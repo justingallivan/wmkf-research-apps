@@ -284,8 +284,8 @@ is decorative and does not count):
   `check:route-service-boundary` + self-test; `check:route-lifecycle-auth` +
   self-test; and `git diff --check` all pass.
 - Open questions / recommendations for the owner: the branch was based on
-  `a3bda092`; unrelated `origin/main` advanced to `e7c0eb27` during the build,
-  so this branch remains one commit behind `main` by design. The requested
+  `a3bda092`; unrelated `origin/main` advanced to `c5f04ecb` during the build,
+  so this branch remains two commits behind `main` by design. The requested
   release branch is pushed and ready for review; do not merge it here.
 - P1 history reachability/attribution is resolved within the authorized scope.
   `reviewers-service.js:202-204` retains accepted and review-received rows and
