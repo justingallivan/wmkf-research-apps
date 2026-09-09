@@ -172,7 +172,7 @@ export function WorkbenchShell({ previewReadOnly = false }) {
         icon="🗂️"
       />
 
-      <div className="flex flex-wrap items-end gap-4 mb-6">
+      <div className="flex flex-wrap items-start gap-4 mb-6">
         <ToolbarSelect
           id="workbench-program"
           label="Grant program"
