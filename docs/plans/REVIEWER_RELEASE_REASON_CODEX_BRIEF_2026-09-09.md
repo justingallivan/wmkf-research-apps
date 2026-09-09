@@ -250,8 +250,8 @@ is decorative and does not count):
 
 - Commits on `codex/reviewer-release-reason`: `12e3d01a` (service, writer, route,
   lifecycle constants, and tests); `981a1a0f` (release reason controls and tests);
-  `6f6deb46` (history copy and attribution tests); final docs commit follows this
-  handoff edit. All commits are pushed to `origin/codex/reviewer-release-reason`.
+  `6f6deb46` (history copy and attribution tests); `a287f196` (docs, including
+  this handoff). All commits are pushed to `origin/codex/reviewer-release-reason`.
 - Files changed: `lib/services/review-manager/withdraw-sufficient-service.js`,
   `lib/services/reviewer-engagement/withdraw-pending-invitation.js`,
   `pages/api/review-manager/withdraw-sufficient.js`,
