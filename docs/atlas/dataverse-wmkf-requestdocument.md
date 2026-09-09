@@ -16,6 +16,7 @@ related:
   - lib/services/initial-assessment/artifact-service.js
   - lib/services/initial-assessment/controls-service.js
   - lib/services/pre-site-visit/distribution-service.js
+  - lib/services/pre-site-visit/cycle-list-service.js
   - lib/services/final-writeup/transition-service.js
   - lib/db/migrations/034_pre_site_distribution_attempts.sql
   - docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md

@@ -26,6 +26,7 @@ import ReviewerFollowUpPanel from './ReviewerFollowUpPanel';
 import { FinalWriteupsPanel } from '../final-writeups/FinalWriteupsViews';
 import AwardeesPanel from './AwardeesPanel';
 import InitialAssessmentsPanel from './InitialAssessmentsPanel';
+import StaffDeliberationsPanel from './StaffDeliberationsPanel';
 import { cycleCodeToLabel } from '../../../lib/utils/cycle-code.js';
 import { WORKBENCH_LOCATION_KEYS, buildWorkbenchHref, readWorkbenchQuery } from './workbench-location';
 
@@ -282,6 +283,8 @@ export function WorkbenchShell({ previewReadOnly = false }) {
           onUncycledChange={(uncycled) => navigate({ uncycled }, { push: true })}
           onCycleChange={(code) => navigate({ cycleCode: code, uncycled: false }, { push: true })}
         />
+      ) : location.view === 'staff-deliberations' ? (
+        <StaffDeliberationsPanel cycleCode={cycleCode} loadingCycles={!cyclesReady && !cyclesError} />
       ) : location.view === 'awardees' ? (
         <AwardeesPanel
           cycleCode={cycleCode}

@@ -5,10 +5,12 @@ import { buildWorkbenchHref } from './workbench-location';
 /**
  * View metadata registry — key, nav label, and a one-sentence description the
  * shell renders as the view intro. Order is the nav order and follows the
- * cycle's working sequence. Initial assessments sits between Reviewer
- * follow-up and Final writeups for D26 (owner, 2026-09-09, reversing the
- * 2026-09-05 hide); in J27 an Initial Assessment precedes reviewer
- * identification, so the view moves left of Request list then and a Find
+ * cycle's working sequence. Staff deliberations (the cycle-wide list of
+ * Pre-Site Visit drafts) sits between Reviewer follow-up and Final writeups
+ * (owner, 2026-09-09). Initial assessments stays registered but hidden for
+ * D26 (owner, 2026-09-05; reconfirmed 2026-09-09 after a brief unhide — for
+ * D26 it lists only pilot test rows); in J27 an Initial Assessment precedes
+ * reviewer identification, so it moves left of Request list then and a Find
  * reviewers view surfaces alongside it. That reorder is J27 work, not this.
  */
 export const VIEWS = {
@@ -20,9 +22,13 @@ export const VIEWS = {
     label: 'Reviewer follow-up',
     description: 'Track invitations, overdue reviews, and received reviews for the selected program and cycle.',
   },
+  'staff-deliberations': {
+    label: 'Staff deliberations',
+    description: 'Track pre-site draft writeups and their stage for the selected cycle.',
+  },
   'initial-assessments': {
     label: 'Initial assessments',
-    description: 'Track pre-site draft writeups and their lifecycle for the selected cycle.',
+    description: 'Track governed Initial Assessments and their lifecycle for the selected cycle.',
   },
   'final-writeups': {
     label: 'Final writeups',
@@ -52,6 +58,16 @@ function hrefFor(view, cycleCode, programId, scope) {
   });
 }
 
+// Initial Assessments are not part of the D26 dual-phase workflow (owner
+// decision 2026-09-05). The cycle is unknown until the page's first fetch
+// resolves it, so a cycle-conditional view stays hidden until then rather
+// than flashing in and out on load; unconditional views render immediately.
+function visibleForCycle(view, cycleCode) {
+  if (view.key !== 'initial-assessments') return true;
+  if (!cycleCode) return false;
+  return cycleCode !== 'D26';
+}
+
 export default function WorkbenchViewsNav({ activeKey, cycleCode, programId = '', scope = 'my', counts = {} }) {
   const resolvedActiveKey = activeKey;
   const scrollerRef = useRef(null);
@@ -69,7 +85,7 @@ export default function WorkbenchViewsNav({ activeKey, cycleCode, programId = ''
   return (
     <nav ref={scrollerRef} aria-label="Workbench views" className="mb-6 overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
       <div className="flex min-w-max items-stretch p-1.5">
-        {VIEW_LIST.map((view) => {
+        {VIEW_LIST.filter((view) => visibleForCycle(view, cycleCode)).map((view) => {
           const active = resolvedActiveKey === view.key;
           const count = counts[view.key];
           return (
