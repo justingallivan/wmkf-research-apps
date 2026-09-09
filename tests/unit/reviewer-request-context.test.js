@@ -106,6 +106,7 @@ describe('reviewer request context', () => {
       _akoya_applicantid_value_formatted: 'Applicant University',
       _wmkf_projectleader_value_formatted: 'Dr. PI',
       _akoya_programid_value_formatted: 'Science and Engineering Research',
+      wmkf_meetingdate: '2026-12-03',
     });
     fetchCoPIs.mockResolvedValue(['Dr. Co A']);
 
@@ -114,6 +115,7 @@ describe('reviewer request context', () => {
     expect(getRecord).toHaveBeenCalledWith('akoya_requests', REQUEST_ID, expect.objectContaining({
       select: expect.stringContaining('akoya_requestid'),
     }));
+    expect(getRecord.mock.calls[0][2].select.split(',')).toContain('wmkf_meetingdate');
     expect(fetchCoPIs).toHaveBeenCalledWith(REQUEST_ID);
     expect(context).toMatchObject({
       requestId: REQUEST_ID,
@@ -122,7 +124,14 @@ describe('reviewer request context', () => {
       principalInvestigator: 'Dr. PI',
       coInvestigators: 'Dr. Co A',
       abstract: 'Request abstract',
+      meetingDate: '2026-12-03',
+      cycleCode: 'D26',
     });
+  });
+
+  test('a request without a meeting date projects a null cycle code (never a guess)', () => {
+    const context = projectReviewerRequestContext({ akoya_requestid: REQUEST_ID, akoya_title: 'T' });
+    expect(context).toMatchObject({ meetingDate: null, cycleCode: null });
   });
 
   test('applicant account fetch failure warns and falls back to formatted institution names', async () => {
