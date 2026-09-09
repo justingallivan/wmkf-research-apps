@@ -16,15 +16,14 @@
  *   pd        Program Director GUID        — Final writeups filter (canonical lowercase)
  *   uncycled  1                            — Final writeups: rows with no meeting date
  *
- * Views that are not yet mounted as shell panels keep their own pages; the
- * views nav links out to them until each one moves inside the shell.
+ * Every view is a shell panel; the old per-view pages redirect here.
  */
 
 export const WORKBENCH_VIEW_KEYS = ['requests', 'initial-assessments', 'reviewer-follow-up', 'final-writeups', 'awardees'];
 export const DEFAULT_WORKBENCH_VIEW = 'requests';
 
-/** Views rendered inside the shell page; the rest still link to their own pages. */
-export const SHELL_PANEL_VIEWS = new Set(['requests', 'reviewer-follow-up', 'final-writeups']);
+/** Views rendered inside the shell page (all of them since step 4). */
+export const SHELL_PANEL_VIEWS = new Set(WORKBENCH_VIEW_KEYS);
 
 /** Every key of the shell state, for equality checks. */
 export const WORKBENCH_LOCATION_KEYS = ['view', 'programId', 'cycleCode', 'scope', 'includeSetAside', 'reviewersView', 'search', 'writeupsView', 'pd', 'uncycled'];

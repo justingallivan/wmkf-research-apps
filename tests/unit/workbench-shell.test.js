@@ -29,6 +29,7 @@ jest.mock('../../shared/components/workbench/RequestLocator', () => ({ __esModul
 jest.mock('../../shared/components/workbench/ReviewerStatusIndicator', () => ({ __esModule: true, default: () => null }));
 jest.mock('../../shared/components/reviewers/ReviewerManagePanel', () => ({ __esModule: true, default: () => null }));
 jest.mock('../../shared/components/reviewers/EmailTemplatesModal', () => ({ __esModule: true, default: () => null }));
+jest.mock('../../shared/components/workbench/ArtifactFileMetadata', () => ({ __esModule: true, default: () => null }));
 
 const response = (body, ok = true) => ({ ok, status: ok ? 200 : 500, json: async () => body });
 const CYCLES = [
@@ -51,6 +52,18 @@ function mockFetch(overrides = {}) {
       return response({ success: true, proposals: [], rollup: { total: 0, stages: {} } });
     }
     if (href.startsWith('/api/review-manager/reviewers?')) return response({ success: true, proposals: [] });
+    if (href === '/api/workbench/grantee-deliverables/awardees') {
+      return response({ cycles: [{ code: 'D26', label: 'December 2026', count: 0 }, { code: 'J26', label: 'June 2026', count: 14 }], defaultCycleCode: 'D26', lastDecidedCycleCode: 'J26', uncycledCount: 0 });
+    }
+    if (href.startsWith('/api/workbench/grantee-deliverables/awardees?')) {
+      const code = new URL(href, 'http://x').searchParams.get('cycleCode');
+      return code === 'J26'
+        ? response({ cycleCode: 'J26', cycleLabel: 'June 2026', count: 1, awardees: [{ requestId: 'a1', requestNumber: '1', title: 'June awardee', pi: { name: 'PI' }, liaison: { name: 'L' }, statusLabel: null }], scope: 'mine', pdResolved: true })
+        : response({ cycleCode: code, cycleLabel: 'December 2026', count: 0, awardees: [], scope: 'mine', pdResolved: true });
+    }
+    if (href.startsWith('/api/workbench/initial-assessment?')) {
+      return response({ success: true, artifacts: [{ artifactId: 'x1', requestId: 'r1', requestNumber: '1003001', title: 'Assessed proposal', institution: 'U', programDirector: 'PD', operationLabel: 'Generated', lifecycleLabel: 'Current', file: null }] });
+    }
     if (href.startsWith('/api/workbench/final-writeups?')) {
       const code = new URL(href, 'http://x').searchParams.get('cycleCode');
       const empty = code === 'D26';
@@ -165,14 +178,47 @@ test('a cycle-list failure on the Final writeups view shows only the shell alert
   expect(global.fetch.mock.calls.some(([u]) => String(u).includes('final-writeups'))).toBe(false);
 });
 
-test('a non-panel view in the URL keeps the shell toolbar and points at the tabs', async () => {
-  routerState.query = { view: 'awardees', cycleCode: 'D26' };
-  routerState.asPath = '/workbench?view=awardees&cycleCode=D26';
+test('the Awardees view shows the working cycle, links the last decided cycle when empty, and shares scope with the shell', async () => {
+  routerState.query = { view: 'awardees' };
+  routerState.asPath = '/workbench?view=awardees';
   render(<WorkbenchShell />);
   await waitFor(() => expect(screen.getByLabelText('Cycle')).toHaveValue('D26'));
-  expect(screen.getByText(/opens on its own page/)).toBeInTheDocument();
   expect(screen.getByRole('link', { name: 'Awardees' })).toHaveAttribute('aria-current', 'page');
-  expect(rowFetches()).toEqual([]);
+  expect(await screen.findByText('No awardees for December 2026 yet.')).toBeInTheDocument();
+  expect(rowFetches().some((u) => u.startsWith('/api/workbench/dashboard?'))).toBe(false);
+
+  fireEvent.click(await screen.findByRole('button', { name: '14 awardees in June 2026' }));
+  expect(push).toHaveBeenLastCalledWith('/workbench?view=awardees&cycleCode=J26', undefined, expect.any(Object));
+  expect(await screen.findByText('June awardee')).toBeInTheDocument();
+
+  fireEvent.click(screen.getByLabelText(/show all programs/i));
+  expect(replace).toHaveBeenLastCalledWith('/workbench?view=awardees&cycleCode=J26&scope=all', undefined, expect.any(Object));
+  await waitFor(() => expect(global.fetch).toHaveBeenLastCalledWith('/api/workbench/grantee-deliverables/awardees?cycleCode=J26&scope=all', expect.any(Object)));
+});
+
+test('the Initial assessments view renders the D26 card without calling the API, and loads artifacts for a later cycle', async () => {
+  routerState.query = { view: 'initial-assessments', cycleCode: 'D26' };
+  routerState.asPath = '/workbench?view=initial-assessments&cycleCode=D26';
+  const { unmount } = render(<WorkbenchShell />);
+  expect(await screen.findByText(/not part of the D26 dual-phase workflow/)).toBeInTheDocument();
+  // The tab is hidden for D26, but the deep link still renders the explanation.
+  expect(screen.queryByRole('link', { name: 'Initial assessments' })).not.toBeInTheDocument();
+  expect(global.fetch.mock.calls.some(([u]) => String(u).includes('initial-assessment'))).toBe(false);
+  unmount();
+
+  routerState.query = { view: 'initial-assessments', cycleCode: 'J27' };
+  routerState.asPath = '/workbench?view=initial-assessments&cycleCode=J27';
+  render(<WorkbenchShell />);
+  expect(await screen.findByText(/#1003001 — Assessed proposal/)).toBeInTheDocument();
+  expect(global.fetch).toHaveBeenCalledWith('/api/workbench/initial-assessment?cycleCode=J27');
+  expect(screen.getByRole('link', { name: 'Initial assessments' })).toHaveAttribute('aria-current', 'page');
+});
+
+test('the legacy artifacts route redirects into the shell', async () => {
+  const { getServerSideProps } = require('../../pages/workbench/artifacts');
+  await expect(getServerSideProps({ query: { cycleCode: 'J27' } })).resolves.toEqual({
+    redirect: { destination: '/workbench?view=initial-assessments&cycleCode=J27', permanent: false },
+  });
 });
 
 test('the Reviewer follow-up view carries its reviewer-state view and search in the URL, sharing request scope', async () => {

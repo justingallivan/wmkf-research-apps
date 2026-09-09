@@ -64,9 +64,11 @@ sequence.
   replaces the walk-back with an in-place notice and link (§3.3 of
   `docs/FINAL_WRITEUPS_DASHBOARD_CYCLE_SCOPING_PLAN.md` reconciled; service and its
   `defaultResolvedBy` tests untouched), and the legacy index redirects; the shell now honors an
-  unlisted `?cycleCode=` (reverses a PR #204 rule) so cross-view cycle links work; (4) Awardees + Initial assessments
-  panels (Initial assessments moves onto the cycle resolver; a D26 deep link
-  renders the existing explanatory card); (5) the approved stragglers: Expertise
+  unlisted `?cycleCode=` (reverses a PR #204 rule) so cross-view cycle links work — PR #206; (4) Awardees + Initial assessments
+  panels — **built 2026-09-08 (`claude/workbench-shell-awardees`)**: `AwardeesPanel.js`
+  applies the owner's Awardees rule below; `InitialAssessmentsPanel.js` takes the shell's
+  cycle and a D26 deep link renders the existing explanatory card; the two legacy pages
+  redirect; (5) the approved stragglers: Expertise
   Finder fiscal-year filter and hard-coded 'December 2025', request-search
   fiscal-year fallback, client-supplied stored `wmkf_grantcyclecode` preference.
   **Owner decided 2026-09-08 (yes to the proposal):** Awardees opens on the *last decided*
