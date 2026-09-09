@@ -729,6 +729,8 @@ export function FinalWriteupsPanel({
   const cycleLabel = data ? cycleLabelFor(data.cycles, data.cycles?.selected) : null;
   const current = VIEWS[view];
   const cycleEmpty = data && (data.counts?.total ?? 0) === 0;
+  // No cycle and not loading one: the shell's alert carries the retry; render nothing here.
+  if (!selector && !loadingCycles) return null;
   const busy = loadingCycles || !selector || loading;
 
   return (

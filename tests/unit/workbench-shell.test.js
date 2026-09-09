@@ -155,6 +155,16 @@ test('a cycle-list failure shows an alert with Try again and never loads rows', 
   await waitFor(() => expect(screen.getByLabelText('Cycle')).toHaveValue('D26'));
 });
 
+test('a cycle-list failure on the Final writeups view shows only the shell alert, never a stuck loading surface', async () => {
+  mockFetch({ '/api/workbench/dashboard': () => response({ error: 'Dataverse unavailable' }, false) });
+  routerState.query = { view: 'final-writeups' };
+  routerState.asPath = '/workbench?view=final-writeups';
+  render(<WorkbenchShell />);
+  expect(await screen.findByRole('alert')).toHaveTextContent('Dataverse unavailable');
+  expect(screen.queryByText(/Loading Final Writeups/)).not.toBeInTheDocument();
+  expect(global.fetch.mock.calls.some(([u]) => String(u).includes('final-writeups'))).toBe(false);
+});
+
 test('a non-panel view in the URL keeps the shell toolbar and points at the tabs', async () => {
   routerState.query = { view: 'awardees', cycleCode: 'D26' };
   routerState.asPath = '/workbench?view=awardees&cycleCode=D26';
