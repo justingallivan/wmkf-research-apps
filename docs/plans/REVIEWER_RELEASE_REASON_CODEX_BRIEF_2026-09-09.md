@@ -258,26 +258,43 @@ is decorative and does not count):
   `483af4e9` (single-proposal no-response history reachability and attribution);
   `5233ef5c` (post-meeting automated attribution regression test); `f0a16e8b`
   (no-response non-actionable status hardening); `6e55563e` (history handoff
-  closure); and `7b39352f` (history handoff evidence correction). This final
-  handoff update is this commit. All commits are pushed to
+  closure); `7b39352f` (history handoff evidence correction); `3df82bc2`
+  (branch-drift record); `36f43a82` (complete prior commit inventory); and
+  `98e065d7` (terminal token-regeneration guard, lifecycle projection, and
+  discriminating service/route/UI tests). This final handoff update is this
+  commit. All commits are pushed to
   `origin/codex/reviewer-release-reason`.
 - Files changed: `lib/services/review-manager/withdraw-sufficient-service.js`,
   `lib/services/reviewer-engagement/withdraw-pending-invitation.js`,
+  `lib/services/review-manager/regenerate-token-service.js`,
+  `lib/dataverse/adapters/reviewer-suggestion.js`,
   `pages/api/review-manager/withdraw-sufficient.js`,
   `shared/config/reviewerLifecycle.js`,
   `shared/components/reviewers/ReleaseEmailModal.js`,
   `shared/components/reviewers/ReviewerInvitePanel.js`,
+  `shared/components/reviewers/TokenActionsMenu.js`,
   `shared/components/reviewers/reviewer-activity-history.js`, the focused unit and
   integration tests for service/route/writer/modal/history, including
   `tests/unit/reviewers-service.test.js` and
-  `tests/unit/reviewer-manage-actions-menu.test.js`, and the API matrix, Atlas,
-  and terminal-status plan docs. No portal, schema, sweep, rollup, readiness, or
-  session-prompt files were changed.
+  `tests/unit/reviewer-manage-actions-menu.test.js`,
+  `tests/unit/regenerate-token-service.test.js`,
+  `tests/integration/review-manager-token-routes.test.js`,
+  `tests/unit/reviewer-suggestion-token-regeneration.test.js`, and the API matrix,
+  Atlas, and terminal-status plan docs. The regeneration named read now selects
+  `wmkf_responsetype` and `wmkf_reviewstatus`; the server rejects mapped terminal
+  response outcomes, post-accept terminal statuses, and unknown non-null lifecycle
+  values with stable `{ ok: false, reason: 'not_eligible' }` before request lookup
+  or mint. The menu mirrors the existing response-type map and terminal review-
+  status constants, so terminal rows cannot expose Regenerate. No portal, schema,
+  sweep, rollup, readiness, or session-prompt files were changed.
 - Verification run and results: the focused release suite passes cleanly with 103
   tests across 8 suites; the route and release-button characterization suites pass
   with 20 tests across 2 suites. The latter retains only the pre-existing React
   `act(...)` warning from the `ReviewerInvitePanel` VIP-load effect. The P1
-  service/component/history command passes with 137 tests across 4 suites;
+  service/component/history command passes with 137 tests across 4 suites. The
+  token-regeneration command passes with 69 tests across 4 suites (including the
+  terminal response complement, unknown-state fall-through, revoked no-response
+  route fixture, adapter projection, and UI menu assertions);
   `npm run lint`;
   `npm run check:types`;
   `check:api-routes` + self-test; `check:status-enum-parity` + self-test;
@@ -299,5 +316,9 @@ is decorative and does not count):
   excluded. The history helper reports `Recorded by staff` for a no-response stamp
   before the meeting date and keeps `Recorded by automated cycle close` for the
   post-meeting sweep fallback. Dataverse actor/modified-by data is not selected for
-  this DTO; no adapter expansion was required because the permitted timestamp marker
-  is available from the existing request projection.
+  this DTO; no adapter expansion was required for history because the permitted
+  timestamp marker is available from the existing request projection. The separate
+  token-regeneration P1 is also resolved within the authorized scope: its named
+  Dataverse read now includes the lifecycle fields, the service independently blocks
+  all mapped terminal response outcomes plus terminal/unknown statuses before any
+  request read or mint, and the UI hides the action for those rows.
