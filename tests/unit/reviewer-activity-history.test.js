@@ -169,7 +169,7 @@ describe('buildActivityHistory', () => {
     expect(response.label).not.toBe('Reviewer declined invitation');
   });
 
-  it('labels cron no-response close-out without asserting a reviewer response', () => {
+  it('labels automated no-response close-out without asserting a reviewer response', () => {
     const events = buildActivityHistory({
       suggestionId: 's12',
       responseReceivedAt: '2026-08-03T12:00:00Z',
@@ -177,10 +177,35 @@ describe('buildActivityHistory', () => {
     });
     const response = events.find(e => e.key === 'response_received');
 
-    expect(response.label).toBe('No response recorded at cycle close');
+    expect(response.label).toBe('No response to invitation');
     expect(response.deliveryProven).toBe(false);
     expect(response.unprovenNote).toMatch(/automated cycle close/);
     expect(response.label).not.toMatch(/received|accepted|declined/i);
+  });
+
+  it('attributes a PD-recorded no-response release when the actor is available', () => {
+    const events = buildActivityHistory({
+      suggestionId: 's13',
+      responseReceivedAt: '2026-08-03T12:00:00Z',
+      responseType: 'no_response',
+      releaseActorName: 'Jordan Lee',
+    });
+    const response = events.find(e => e.key === 'response_received');
+
+    expect(response.label).toBe('No response to invitation');
+    expect(response.unprovenNote).toBe('Recorded by Jordan Lee');
+  });
+
+  it('uses pre-meeting timing to distinguish staff recording when no actor field is exposed', () => {
+    const events = buildActivityHistory({
+      suggestionId: 's14',
+      responseReceivedAt: '2026-08-03T12:00:00Z',
+      meetingDate: '2026-08-10T00:00:00Z',
+      responseType: 'no_response',
+    });
+    const response = events.find(e => e.key === 'response_received');
+
+    expect(response.unprovenNote).toBe('Recorded by staff');
   });
 
   it('singularizes a single reminder', () => {

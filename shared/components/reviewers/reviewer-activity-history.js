@@ -46,7 +46,9 @@
  * fields that survive reset must never be used to strengthen an event's provenance.
  *
  * Actor identity is absent by construction — the reviewer DTO carries no acting-user
- * field. Attribution would mean reading Dataverse field audit (finding 7/10).
+ * field. A future DTO may provide `releaseActorName`; until then the pre-meeting
+ * timestamp is the narrowest available distinction between a staff release and the
+ * post-meeting automated cycle close.
  */
 
 /**
@@ -161,9 +163,8 @@ const RESPONSE_EVENT_BY_TYPE = Object.freeze({
     deliveryProven: true,
   },
   no_response: {
-    label: 'No response recorded at cycle close',
+    label: 'No response to invitation',
     deliveryProven: false,
-    unprovenNote: 'Recorded by automated cycle close; no reviewer response on record.',
   },
   withdrawn_sufficient: {
     label: 'Withdrawn — sufficient reviews received',
@@ -235,6 +236,13 @@ export function responseEventEvidence(reviewer) {
   }
 
   if (responseType && RESPONSE_EVENT_BY_TYPE[responseType]) {
+    if (responseType === 'no_response') {
+      return {
+        ...RESPONSE_EVENT_BY_TYPE[responseType],
+        detail: 'Response: no_response',
+        unprovenNote: noResponseAttribution(reviewer),
+      };
+    }
     return {
       ...RESPONSE_EVENT_BY_TYPE[responseType],
       detail: `Response: ${responseType}`,
@@ -247,6 +255,18 @@ export function responseEventEvidence(reviewer) {
     unprovenNote: 'Response type is missing; timestamp alone does not prove a reviewer response.',
     detail: null,
   };
+}
+
+function noResponseAttribution(reviewer) {
+  const actor = reviewer?.releaseActorName || reviewer?.actingUserName || reviewer?.recordedByName;
+  if (typeof actor === 'string' && actor.trim()) return `Recorded by ${actor.trim()}`;
+
+  const responseAt = parseTime(reviewer?.responseReceivedAt);
+  const meetingAt = parseTime(reviewer?.meetingDate || reviewer?.requestMeetingDate);
+  if (!reviewer?.withdrawnSufficientAt && responseAt !== null && meetingAt !== null && responseAt < meetingAt) {
+    return 'Recorded by staff';
+  }
+  return 'Recorded by automated cycle close';
 }
 
 export function reviewReceiptEvidence(reviewer) {
