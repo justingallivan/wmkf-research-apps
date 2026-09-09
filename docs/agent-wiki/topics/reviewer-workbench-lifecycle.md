@@ -1615,7 +1615,16 @@ One Final Writeup row per request over the same stable SharePoint Word item; the
   default-cycle walk-back is no longer used by the UI — an empty cycle renders one in-place notice
   linking the newest other cycle with writeups and the uncycled rows; the legacy
   `/workbench/final-writeups` index redirects into the shell translating its old `view`/`pd` keys;
-  both search boxes share `useUrlMirroredInput.js`) (`SHELL_PANEL_VIEWS`). **Shell rule change in
+  both search boxes share `useUrlMirroredInput.js`), Awardees (`AwardeesPanel.js`, step 4: shows the
+  shell's working cycle and shares its `scope` ("Show all programs" = `scope=all`); when a cycle is
+  empty it reads the awardees endpoint's cycle-list mode once and links `lastDecidedCycleCode`
+  ("N awardees in June 2026") which changes the shell cycle — owner decision 2026-09-08; the
+  standalone page's own default-cycle resolution is gone), and Initial assessments
+  (`InitialAssessmentsPanel.js`, step 4: takes the shell's cycle; renders the D26 explanatory card
+  without calling the API, which is what a `view=initial-assessments&cycleCode=D26` deep link shows
+  while the tab stays hidden for D26). All five views are panels (`SHELL_PANEL_VIEWS` =
+  every view); `pages/workbench/{artifacts,awardees,reviewer-follow-up,final-writeups/index}.js` are
+  redirects; `WorkbenchViewsNav` no longer reads the router. **Shell rule change in
   step 3:** a well-formed `?cycleCode=` is honored even when the program's dashboard list omits it
   (rendered as an extra option) — Final writeups and Awardees cycles need not have pending
   requests; only a missing cycle falls back to the working cycle. Readiness after a program change
