@@ -1,4 +1,8 @@
-# Session 500 Prompt: Two Workbench top-matter PRs await merge; Site Visit plan review is today's to-do
+# Session 500 Prompt: Workbench top-matter PRs #210 and #211 merged; owner brief first, then the Site Visit plan review
+
+> **Read `docs/plans/OWNER_BRIEF_2026-09-09.md` first.** It holds the owner's production
+> click-throughs, the five decisions waiting on the owner, and today's agent task. This prompt
+> is the agent-side record.
 
 ## Session 499 Summary (Claude, 2026-09-08)
 
@@ -68,7 +72,7 @@ meeting date everywhere; the Request Workbench becomes one shell").
    `git show origin/codex/applicant-additional-materials:docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md`
    (tip `e0166296`; deck under `docs/plans/site-visit-materials/` on that branch). Eight
    open items in its §12; §2 is the decided owner contract. Produce an assessment; no implementation, no PR.
-2. **After the owner merges #210 and #211 (in that order; the repo does not delete branches on
+2. **DONE 2026-09-09: #210 (`0fb2e47b`) and #211 (`7c647b52`) merged by the owner; post-merge `main` green at `5f9d08cd`.** Remaining from the original item (the repo does not delete branches on
    merge, so after #210 confirm `gh pr view 211 --json baseRefName -q .baseRefName` prints
    `main`, else `gh pr edit 211 --base main` before merging):** watch the post-merge `main` runs
    (`gh run list --branch main`), then carry the #210 open items: whether the Program select on
