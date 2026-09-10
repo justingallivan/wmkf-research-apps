@@ -23,6 +23,14 @@ function trackerHref(path, { cycleCode, programId, requestId } = {}) {
 }
 
 export function MeetingTrackerRequestRow({ proposal, cycleCode, programId }) {
+  // Slice 2b: the site visit is edited from the tracker too (plan §5.1).
+  const visitHref = (() => {
+    const query = new URLSearchParams();
+    if (cycleCode) query.set('cycleCode', cycleCode);
+    if (programId) query.set('programId', programId);
+    if (proposal.requestNumber) query.set('n', proposal.requestNumber);
+    return `/meeting-tracker/visits/${proposal.requestId}${query.size ? `?${query}` : ''}`;
+  })();
   const sessionHref = trackerHref(
     proposal.deliberation
       ? `/meeting-tracker/sessions/${proposal.deliberation.sessionId}`
@@ -45,9 +53,14 @@ export function MeetingTrackerRequestRow({ proposal, cycleCode, programId }) {
             {proposal.projectLeader ? ` · ${proposal.projectLeader}` : ''}
           </p>
         </div>
-        <Link href={sessionHref} className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2">
-          {proposal.deliberation ? 'Open session' : 'Schedule'}
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link href={sessionHref} className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2">
+            {proposal.deliberation ? 'Open session' : 'Schedule session'}
+          </Link>
+          <Link href={visitHref} className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2">
+            {proposal.siteVisit ? 'Edit visit' : 'Schedule visit'}
+          </Link>
+        </div>
       </div>
 
       <div className="mt-5 grid gap-4 border-t border-gray-100 pt-4 md:grid-cols-3">
