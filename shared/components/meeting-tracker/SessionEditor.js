@@ -335,6 +335,13 @@ export default function SessionEditor() {
           {slots.length ? <ol className="mt-4 space-y-3">{slots.map((slot, index) => <SlotRow key={slot.wmkf_deliberationslotid} slot={slot} proposal={proposalById.get(String(slot._wmkf_request_value).toLowerCase())} leadOptions={leadOptions} sessions={sessions} sessionId={sessionId} busy={busy} index={index} count={slots.length} onShift={shiftSlot} onChange={(row, patch) => runSlotChange(() => sendJson(`/api/meeting-tracker/slots/${row.wmkf_deliberationslotid}`, 'PATCH', { etag: row._etag, ...patch }))} onMove={(row, targetSessionId) => runSlotChange(() => sendJson(`/api/meeting-tracker/slots/${row.wmkf_deliberationslotid}`, 'PATCH', { etag: row._etag, targetSessionId }))} onRemove={(row) => runSlotChange(() => sendJson(`/api/meeting-tracker/slots/${row.wmkf_deliberationslotid}`, 'DELETE', { etag: row._etag }))} />)}</ol> : <div className="mt-4 rounded-xl border border-dashed border-gray-300 bg-white p-8 text-center text-sm text-gray-600">No proposals are in this session yet.</div>}
         </section>
       )}
+
+      {/* The page is long: the exit and the save confirmation are reachable at
+          the bottom as well as in the header (owner, 2026-09-10). */}
+      <div className="mt-8 flex flex-wrap items-center justify-between gap-4 border-t border-gray-200 pt-6">
+        <Link href={{ pathname: '/meeting-tracker', query: { ...(cycleCode ? { cycleCode } : {}), ...(programId ? { programId } : {}) } }} className="text-sm font-semibold text-gray-600 underline decoration-gray-300 underline-offset-4 hover:text-gray-900">Back to the cycle schedule</Link>
+        {notice && <p role="status" className="text-sm font-medium text-blue-800">{notice}</p>}
+      </div>
     </Layout>
   );
 }
