@@ -1,0 +1,98 @@
+{
+  "name": "wmkf_deliberationsession",
+  "kind": "new-entity",
+  "schemaName": "wmkf_DeliberationSession",
+  "displayName": "Deliberation Session",
+  "displayCollectionName": "Deliberation Sessions",
+  "description": "One internal deliberation meeting with a scheduled range, Zoom link, attendee reference map, and ordered proposal slots.",
+  "ownershipType": "OrganizationOwned",
+  "primaryNameAttribute": {
+    "schemaName": "wmkf_Name",
+    "displayName": "Name",
+    "description": "Synthetic display name for the deliberation session.",
+    "maxLength": 200,
+    "requiredLevel": "ApplicationRequired"
+  },
+  "attributes": [
+    {
+      "type": "DateTime",
+      "schemaName": "wmkf_ScheduledStart",
+      "displayName": "Scheduled Start",
+      "description": "UTC date/time when the deliberation session starts.",
+      "format": "DateAndTime",
+      "behavior": "UserLocal",
+      "requiredLevel": "ApplicationRequired"
+    },
+    {
+      "type": "DateTime",
+      "schemaName": "wmkf_ScheduledEnd",
+      "displayName": "Scheduled End",
+      "description": "UTC date/time when the deliberation session ends.",
+      "format": "DateAndTime",
+      "behavior": "UserLocal",
+      "requiredLevel": "ApplicationRequired"
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_IanaTimeZone",
+      "displayName": "IANA Time Zone",
+      "description": "IANA time-zone identifier used to interpret and round-trip the entered local session time.",
+      "maxLength": 100,
+      "requiredLevel": "ApplicationRequired"
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_Location",
+      "displayName": "Location",
+      "description": "Physical location or short attendance instructions for the deliberation session.",
+      "maxLength": 2000
+    },
+    {
+      "type": "String",
+      "schemaName": "wmkf_MeetingLink",
+      "displayName": "Meeting Link",
+      "description": "Absolute HTTPS Zoom or other virtual-meeting URL stored verbatim after server-side validation.",
+      "format": "Url",
+      "maxLength": 1000
+    },
+    {
+      "type": "Memo",
+      "schemaName": "wmkf_AttendeeRefsJson",
+      "displayName": "Attendee References (JSON)",
+      "description": "Server-owned versioned identity map for fixed staff and per-session Board attendees. References resolve through the recipient directory; email text is not authoritative.",
+      "maxLength": 32000
+    },
+    {
+      "type": "Memo",
+      "schemaName": "wmkf_Notes",
+      "displayName": "Notes",
+      "description": "Internal planning notes for the deliberation session.",
+      "maxLength": 10000
+    },
+    {
+      "type": "Picklist",
+      "schemaName": "wmkf_Status",
+      "displayName": "Status",
+      "description": "Deliberation session lifecycle. Mirrors shared/config/meetingTracker.js.",
+      "requiredLevel": "ApplicationRequired",
+      "defaultValue": 100000000,
+      "options": [
+        { "value": 100000000, "label": "Planned", "description": "The session is scheduled and expected to occur." },
+        { "value": 100000001, "label": "Held", "description": "The session occurred." },
+        { "value": 100000002, "label": "Cancelled", "description": "The session will not occur and is excluded from schedule readers." }
+      ]
+    }
+  ],
+  "relationships": [
+    {
+      "kind": "N:1",
+      "schemaName": "wmkf_deliberationsession_updatedby",
+      "referencedEntity": "systemuser",
+      "lookupSchemaName": "wmkf_UpdatedBy",
+      "lookupDisplayName": "Updated By",
+      "lookupDescription": "Authenticated staff systemuser who created or most recently changed this session through the application.",
+      "required": "ApplicationRequired"
+    }
+  ],
+  "alternateKeys": []
+}

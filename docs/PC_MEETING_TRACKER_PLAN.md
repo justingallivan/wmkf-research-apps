@@ -6,7 +6,7 @@ status: active
 summary: "A PC-owned app records each proposal's deliberation slot and site visit once, so the Staff Deliberations rail and cycle view read dates from one source."
 canonical: false
 cataloged: 2026-09-09
-last_verified: 2026-09-09
+last_verified: 2026-09-10
 owner: product-engineering
 related:
   - docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md
@@ -95,7 +95,10 @@ Two earlier decisions are **superseded in part** and must be read with this plan
   derived from the first transport-accepted materials send (`currentSourceEverSent`), and the
   tab renders **no visit date at all**. The 2026-09-09 cycle view (`StaffDeliberationsPanel.js`)
   shows registry lifecycle/operation only. (Superseded by slice 3, 2026-09-09; see §7.)
-- **Deliberation sessions** exist nowhere in the system.
+- **[SANDBOX SCHEMA EXACT 2026-09-09; SOURCE-BUILT 2026-09-10.]** Wave 28
+  provides deliberation session and slot tables in sandbox, and
+  `codex/meeting-tracker` provides the readiness-gated runtime and UI. The flag
+  remains unset and Production is unapplied, so this is not yet a live app.
 - **Recording / transcript / transcript-summary** artifact types exist in the registry but have no
   producer; only distribution and logistics reference them as material categories.
 
@@ -205,7 +208,7 @@ UI is designed now so the tracker fills it without a second design. The email al
 request's deliberation briefing link (`docs/DELIBERATION_BRIEFING_PAGE_PLAN.md`, built S502):
 that link is the carrier for reviews and the proposal narrative, which are never attached.
 
-## 6. Security contract [PLANNED — do not add matrix rows until the routes exist]
+## 6. Security contract [SOURCE-BUILT 2026-09-10 on `codex/meeting-tracker`]
 
 - All tracker routes: `requireAppAccess('meeting-tracker')`, `withDalContext`, actor from session.
 - Reads are org-open by posture (D4) but still behind the grant.
@@ -219,20 +222,19 @@ that link is the carrier for reviews and the proposal narrative, which are never
 | Slice | Content | Tier |
 |---|---|---|
 | 0 | **[BUILT 2026-09-09 on `claude/site-visit-schedulable-gate`.]** Replace `assertActiveStage` with the request precondition; keep the Workbench route green; tests for both preconditions. | 1 (branch + PR) |
-| 1 | Schema wave for session + slot; Atlas pages; readiness flag; sandbox apply and readback per `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md`. | 2 |
-| 2 | App registry entry, grant, list page, session page (date, time, duration, location, Zoom link, attendees, ordered slots), slot add/remove/reorder/move, the §5.4 reader. | 2 |
+| 1 | **[BUILT AND VERIFIED IN SANDBOX 2026-09-09 on `codex/meeting-tracker`.]** Wave 28 declares session + slot with no alternate keys, required explicit Updated By actor lookups, a read-only 22-check preflight, Atlas pages, and the literal-on readiness flag contract. The owner-run post-apply readback reported 22 exact, 0 absent, and 0 divergent. The readiness flag remains unset pending deliberate runtime promotion. | 2 |
+| 2 | **[SOURCE-BUILT 2026-09-10 on `codex/meeting-tracker`; promotion pending.]** App registry/grant, advancing-request cycle list, session editor, staff-plus-Board attendee picker, Zoom link, ordered slot add/remove/reorder/move, Site Visit and share-state joins, and the fixed §5.4 reader. Routes fail 503 and the tile says **Not yet enabled** while the readiness flag remains unset. | 2 |
 | 2b | Site-visit editor in the tracker via the existing logistics service. The slot's briefing link no longer waits on this slice: read it with `getLiveBriefingLink({ requestId })` from `lib/services/deliberation-briefing/briefing-link-service.js` (built S502 on `feature/deliberation-briefing-page`, `docs/DELIBERATION_BRIEFING_PAGE_PLAN.md`; null until the owner sets `DELIBERATION_BRIEFING_SCHEMA_READY=on`). | 2 |
-| 3 | **[BUILT 2026-09-09 on `claude/deliberations-stage-rail`.]** Rail and cycle view read both dates; stage-key catalog with editable labels; parity test. Deliberation-session line pending slice 1 (no session table exists yet; the rail's visit stop shows the site visit only, with a TODO comment naming this plan). | 1 |
+| 3 | **[BUILT 2026-09-09 on `claude/deliberations-stage-rail`; Meeting Tracker reader source-built 2026-09-10.]** Rail and cycle view read both dates; stage-key catalog with editable labels; parity test. The deliberation-session line remains safely empty until both branches are promoted and the Wave 28 readiness flag is enabled. | 1 |
 | 4 | (Retired 2026-09-09: §5.5 decided; stop 3's three displays fold into slice 3.) | — |
 
 **Deadline (owner 2026-09-09):** the first deliberation session is the week of 2026-09-14; the
-first site visit is roughly three weeks out. Slices 1 and 2 are the crunch path and are briefed to
-Codex in `docs/plans/MEETING_TRACKER_CODEX_BRIEF_2026-09-09.md`; slice 2b follows. If slice 2
-misses the first session, the fallback is the existing Share composer with the session time and
-Zoom link typed into the body by the PD.
+first site visit is roughly three weeks out. Slices 1 and 2 are source-built on
+`codex/meeting-tracker`; deliberate Tier-2 promotion, Production schema apply/readback, security-role
+verification, and the readiness flip remain. Slice 2b follows separately.
 
-Slices 0 and 3 can start before 1 and 2 land: 3 degrades to "not scheduled" when the tables do
-not exist yet, gated on the readiness flag.
+Slice 3 remains safely degraded to "not scheduled" until the Wave 28 runtime is promoted and the
+readiness flag is enabled for that target.
 
 ## 8. Explicitly out of scope
 

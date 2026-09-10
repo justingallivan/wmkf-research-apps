@@ -315,11 +315,11 @@ const CANONICAL_FACTS = [
       },
     ],
     knownMissFixtures: [
-      'suite of 13 web-based tools',
+      'suite of 1013 web-based tools',
       'All 14 applications',
       'all 14 app pages',
       '16 in current registry',
-      'across all 13 apps',
+      'across all 1013 apps',
       'across 17 apps',
     ],
     knownNonMatches: [
