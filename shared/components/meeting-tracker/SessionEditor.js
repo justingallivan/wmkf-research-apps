@@ -41,6 +41,12 @@ export async function reorderSessionSlots({ sessionId, slots, fetchImpl = fetch 
   }, fetchImpl);
 }
 
+// D11: the slot's link is the request's live briefing page (writeup, reviews,
+// proposal, materials). It exists only once the PD has shared the writeup.
+export function slotBriefingText(slot) {
+  return slot?.briefing?.url ? 'Open briefing' : 'Briefing not yet shared — the lead PD shares the writeup from Staff Deliberations.';
+}
+
 function sameRef(left, right) {
   return left.kind === right.kind
     && (left.kind === 'staff' ? left.profileId === right.profileId : left.rosterId === right.rosterId);
@@ -83,7 +89,11 @@ function SlotRow({ slot, proposal, leadOptions, sessions, sessionId, busy, onCha
         <div className="min-w-[13rem] flex-1">
           <p className="font-semibold text-gray-900">#{proposal?.requestNumber || slot.wmkf_Request?.akoya_requestnum || slot._wmkf_request_value}</p>
           <p className="mt-1 text-sm text-gray-700">{proposal?.title || slot.wmkf_Request?.akoya_title || 'Request details are not available.'}</p>
-          <p className="mt-2 text-xs font-medium text-gray-500">Briefing not yet available.</p>
+          {slot.briefing?.url ? (
+            <a href={slot.briefing.url} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-xs font-semibold text-blue-800 underline">Open briefing</a>
+          ) : (
+            <p className="mt-2 text-xs font-medium text-gray-500">{slotBriefingText(slot)}</p>
+          )}
         </div>
         <div className="grid min-w-[17rem] flex-1 gap-3 sm:grid-cols-2">
           <label className="text-sm font-medium text-gray-700">

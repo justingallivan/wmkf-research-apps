@@ -17,7 +17,7 @@ jest.mock('../../shared/components/Layout', () => ({
 jest.mock('next/link', () => function MockLink({ children, href }) {
   return <a href={typeof href === 'string' ? href : href.pathname}>{children}</a>;
 });
-import { reorderSessionSlots } from '../../shared/components/meeting-tracker/SessionEditor';
+import { reorderSessionSlots, slotBriefingText } from '../../shared/components/meeting-tracker/SessionEditor';
 
 const SESSION_ID = '11111111-1111-4111-8111-111111111111';
 const FIRST_SLOT_ID = '22222222-2222-4222-8222-222222222222';
@@ -140,4 +140,9 @@ test('arriving with a cycle in the URL still loads the cycle picker (the session
   // Discriminating: the picker payload was fetched once, without a cycle.
   const pickerCalls = global.fetch.mock.calls.filter(([u]) => String(u).includes('/dashboard') && !String(u).includes('cycleCode='));
   expect(pickerCalls).toHaveLength(1);
+});
+
+test('a slot without a live briefing link says who shares it; with one it offers Open briefing', () => {
+  expect(slotBriefingText({ briefing: null })).toMatch(/not yet shared.*lead PD shares the writeup/);
+  expect(slotBriefingText({ briefing: { url: 'https://apps.test/external/briefing/t' } })).toBe('Open briefing');
 });

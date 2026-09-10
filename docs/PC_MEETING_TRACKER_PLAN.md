@@ -269,6 +269,8 @@ readiness flag is enabled for that target.
    shared expiring link; Board members and consultants have no Dataverse login). The same link
    goes in the Share email. Staff who want the full request open the Workbench themselves. Built
    S502 as the deliberation briefing page (`docs/DELIBERATION_BRIEFING_PAGE_PLAN.md`, D13–D16);
-   the slot reads `getLiveBriefingLink({ requestId })` and renders "Briefing not yet available"
-   for null.
+   the slot reads `getLiveBriefingLink({ requestId })` (wired 2026-09-10, S503: the session read
+   attaches `briefing` to every slot, one link read per request, fail-open per slot) and renders
+   "Open briefing" or "Briefing not yet shared — the lead PD shares the writeup from Staff
+   Deliberations." for null.
 4. ~~App key and name.~~ **Decided 2026-09-09 (D12):** key `meeting-tracker`, name "Meeting Tracker".

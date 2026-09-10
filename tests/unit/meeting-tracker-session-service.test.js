@@ -2,6 +2,7 @@
 
 import {
   createDeliberationSession,
+  getDeliberationSession,
   validateMeetingLink,
 } from '../../lib/services/meeting-tracker/session-service';
 
@@ -148,4 +149,29 @@ test('an unknown session id is a 404, not a 500', async () => {
   await expect(getDeliberationSession({ sessionId: SESSION_ID }, deps)).rejects.toMatchObject({ httpStatus: 404 });
   await expect(updateDeliberationSession({ sessionId: SESSION_ID, etag: 'W/"1"', notes: 'x' }, { actingUserSystemId: ACTOR_ID }, deps))
     .rejects.toMatchObject({ httpStatus: 404 });
+});
+
+test('each slot carries its request\'s live briefing link (D11), read once per request and fail-open per slot', async () => {
+  const R1 = 'aaaaaaaa-0000-4000-8000-000000000001';
+  const R2 = 'aaaaaaaa-0000-4000-8000-000000000002';
+  const getBriefingLink = jest.fn(async (requestId) => {
+    if (requestId === R1) return { id: 'l1', url: 'https://apps.test/external/briefing/tok1', expiresAt: '2026-12-18T00:00:00.000Z' };
+    throw new Error('link store down');
+  });
+  const deps = dependencies({
+    getSession: jest.fn(async () => storedRow()),
+    getRecipientDirectory: jest.fn(async () => ({ staff: [], external: [] })),
+    resolveAttendeesLenient: jest.fn(async () => ({ attendees: [], issues: [] })),
+    findSlotsBySession: jest.fn(async () => ({ records: [
+      { wmkf_deliberationslotid: 's1', _wmkf_request_value: R1, wmkf_order: 1 },
+      { wmkf_deliberationslotid: 's2', _wmkf_request_value: R1.toUpperCase(), wmkf_order: 2 },
+      { wmkf_deliberationslotid: 's3', _wmkf_request_value: R2, wmkf_order: 3 },
+    ] })),
+    getBriefingLink,
+  });
+  const { slots } = await getDeliberationSession({ sessionId: SESSION_ID }, deps);
+  expect(getBriefingLink).toHaveBeenCalledTimes(2);
+  expect(slots[0].briefing).toEqual({ url: 'https://apps.test/external/briefing/tok1', expiresAt: '2026-12-18T00:00:00.000Z' });
+  expect(slots[1].briefing).toEqual(slots[0].briefing);
+  expect(slots[2].briefing).toBeNull();
 });
