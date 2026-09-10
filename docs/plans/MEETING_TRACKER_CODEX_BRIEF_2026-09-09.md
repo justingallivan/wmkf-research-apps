@@ -224,7 +224,29 @@ Add, with the discriminating fixture in each:
 ## Handoff (fill in at the end)
 
 - Commits on `codex/meeting-tracker`:
-- Files changed:
-- Verification run and results:
-- Ready-for-apply statement for slice 1 (target, preflight command, expected exact count):
-- Open questions / recommendations for the owner:
+  - `052c304b` — Add Meeting Tracker Wave 28 schema.
+- Files changed: Wave 28 session/slot specs; the read-only preflight; shared
+  readiness/status/default config; focused config/schema tests; the two new
+  Atlas pages; the readiness runbook row; plan §7 status.
+- Verification run and results: `/start` all green; Wave 28 preflight self-test
+  PASS; focused Jest 3/3 PASS; lint 0 errors (86 pre-existing warnings);
+  `check:types`, `check:atlas` + self-test, `check:docs-catalog`,
+  `check:doc-symbol-refs` + self-test, `check:build-claim-freshness` +
+  self-test, `check:fact-consistency` + self-test, `check:doc-currency` +
+  self-test, `check:status-enum-parity` + self-test, `check:secret-scan` +
+  self-test, and `git diff --check` all PASS.
+- Ready-for-apply statement for slice 1: **ready for an owner-run sandbox
+  preflight and apply; no apply was run by Codex.** Run
+  `node scripts/preflight-meeting-tracker-schema.mjs --target=sandbox`; on an
+  untouched sandbox expect 20 absent / 2 exact no-alternate-key checks / 0
+  divergent. After an explicitly approved
+  `node scripts/apply-dataverse-schema.js --target=sandbox --wave=28-meeting-tracker --execute`,
+  rerun the preflight and require **22 exact / 0 absent / 0 divergent** before
+  setting `MEETING_TRACKER_SCHEMA_READY=on`. The Codex worktree could not run
+  the live sandbox preflight because its inherited local environment has no
+  `DYNAMICS_SANDBOX_URL`.
+- Open questions / recommendations for the owner: confirm the sandbox apply
+  and exact readback before asking Codex to start slice 2. Before runtime
+  promotion, verify the application/impersonated staff security role has the
+  required Read/Create/Write/Append/Append To privileges on both new entities
+  and their lookup targets; the brief did not authorize a role manifest.
