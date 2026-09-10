@@ -252,7 +252,7 @@ allowlists, 503 after auth, actor from session, separate sent/pending GET projec
 - **[VERIFIED via commit `35f2cef8` and documentation gates]** The API security
   matrix, canonical counts, Postgres Atlas, and Meeting Tracker plan describe the
   built source and its runtime boundary. Canonical counts are 125 guarded API
-  endpoints and 203 API route files.
+  endpoints and 208 API route files.
 - **[VERIFIED via local execution]** The 17 Meeting Tracker/parity suites passed
   after final remediation (106 tests); every gate named in this brief passed after
   remediation, with each available self-test run sequentially. Type checking,
