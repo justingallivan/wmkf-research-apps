@@ -1,6 +1,7 @@
 /**
- * ReleaseEmailModal — choose a reason and optionally review courtesy emails
- * before releasing pending reviewers.
+ * ReleaseEmailModal — choose why pending reviewers are being released, then
+ * optionally review the courtesy emails before releasing them. No reason is
+ * preselected; previews render only once a choice calls for an email.
  *
  * Staff asked for a tune-up step: the release previously sent a fixed
  * server-rendered template straight from a confirm dialog, unlike the invitation
@@ -54,25 +55,49 @@ const SEND_RESULT_REASON = {
   missing_result: 'The server did not return a result for this reviewer',
 };
 
+const REASON_OPTIONS = [
+  {
+    value: RELEASE_REASONS.no_longer_needed,
+    title: 'No longer needed',
+    description: 'We have enough reviewers. A courtesy note goes to each released reviewer.',
+  },
+  {
+    value: RELEASE_REASONS.no_response,
+    title: 'No response',
+    description: 'The reviewer never answered the invitation. This is recorded on their reviewer history.',
+  },
+];
+
 export default function ReleaseEmailModal({ requestId, suggestionIds, onClose, onReleased }) {
   const [drafts, setDrafts] = useState(null);
   const [edits, setEdits] = useState({}); // suggestionId -> { subject?, bodyText? }
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState(null);
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState(null);
-  const [reason, setReason] = useState(RELEASE_REASONS.no_longer_needed);
+  // No preselected reason (owner, 2026-09-09): the modal used to open on the
+  // email editor before staff had said why they were releasing. Nothing loads
+  // and nothing can be released until a reason is chosen.
+  const [reason, setReason] = useState(null);
   const [sendCourtesyEmail, setSendCourtesyEmail] = useState(false);
   const mountedRef = useRef(true);
   const sendGenerationRef = useRef(0);
   const sendingRef = useRef(false);
+  const previewsRequestedRef = useRef(false);
+
+  const showPreviews = reason === RELEASE_REASONS.no_longer_needed
+    || (reason === RELEASE_REASONS.no_response && sendCourtesyEmail);
+  const releaseWithoutEmail = reason === RELEASE_REASONS.no_response && !sendCourtesyEmail;
 
   useEffect(() => {
-    // No setLoading(true)/setLoadError(null) here: initial state already is
-    // loading + no-error, and `requestId`/`suggestionIds` are fixed for the
-    // modal's lifetime (the parent stores the selection when opening it), so
-    // this effect runs exactly once.
+    // Previews render lazily, the first time a choice calls for an email, and
+    // exactly once: `requestId`/`suggestionIds` are fixed for the modal's
+    // lifetime (the parent stores the selection when opening it), so switching
+    // reasons afterwards reuses the drafts already loaded.
+    if (!showPreviews || previewsRequestedRef.current) return undefined;
+    previewsRequestedRef.current = true;
     let cancelled = false;
+    setLoading(true);
     fetch('/api/review-manager/render-withdraw-emails', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -87,7 +112,7 @@ export default function ReleaseEmailModal({ requestId, suggestionIds, onClose, o
       .catch((err) => { if (!cancelled) setLoadError(`Network error: ${err.message}`); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [requestId, suggestionIds]);
+  }, [showPreviews, requestId, suggestionIds]);
 
   useEffect(() => () => {
     mountedRef.current = false;
@@ -96,11 +121,13 @@ export default function ReleaseEmailModal({ requestId, suggestionIds, onClose, o
 
   const sendable = useMemo(() => (drafts || []).filter((d) => d.status === 'ok'), [drafts]);
   const excluded = useMemo(() => (drafts || []).filter((d) => d.status !== 'ok'), [drafts]);
-  const showPreviews = reason === RELEASE_REASONS.no_longer_needed || sendCourtesyEmail;
-  const releaseWithoutEmail = reason === RELEASE_REASONS.no_response && !sendCourtesyEmail;
-  const releaseableIds = releaseWithoutEmail
-    ? suggestionIds
-    : sendable.map((d) => d.suggestionId);
+  const releaseableIds = !reason
+    ? []
+    : releaseWithoutEmail
+      ? suggestionIds
+      : sendable.map((d) => d.suggestionId);
+  // The count staff see on the button: the selection until a reason narrows it.
+  const releaseCount = reason ? releaseableIds.length : suggestionIds.length;
 
   const valueFor = (draft, field) => edits[draft.suggestionId]?.[field] ?? draft[field] ?? '';
 
@@ -208,7 +235,7 @@ export default function ReleaseEmailModal({ requestId, suggestionIds, onClose, o
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50" onClick={requestClose}>
       <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full mx-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-50">
-          <h3 className="font-semibold text-gray-900">Review release emails</h3>
+          <h3 className="font-semibold text-gray-900">Release invitations</h3>
           <button
             type="button"
             onClick={requestClose}
@@ -221,38 +248,40 @@ export default function ReleaseEmailModal({ requestId, suggestionIds, onClose, o
         </div>
 
         <div className="p-4 space-y-4">
-          <p className="text-sm text-gray-700">
-            Choose why these invitations are being released.
-          </p>
-
           <fieldset className="space-y-2">
-            <legend className="sr-only">Release reason</legend>
-            <label className="flex items-start gap-2 text-sm text-gray-700">
-              <input
-                type="radio"
-                name="release-reason"
-                value={RELEASE_REASONS.no_longer_needed}
-                checked={reason === RELEASE_REASONS.no_longer_needed}
-                onChange={() => { setReason(RELEASE_REASONS.no_longer_needed); setSendCourtesyEmail(false); }}
-              />
-              <span><span className="font-medium text-gray-900">No longer needed</span> — We have enough reviewers. A courtesy note goes to each released reviewer.</span>
-            </label>
-            <label className="flex items-start gap-2 text-sm text-gray-700">
-              <input
-                type="radio"
-                name="release-reason"
-                value={RELEASE_REASONS.no_response}
-                checked={reason === RELEASE_REASONS.no_response}
-                onChange={() => { setReason(RELEASE_REASONS.no_response); setSendCourtesyEmail(false); }}
-              />
-              <span><span className="font-medium text-gray-900">No response</span> — The reviewer never answered the invitation. This is recorded on their reviewer history.</span>
-            </label>
+            <legend className="text-sm font-medium text-gray-900">Why are these invitations being released?</legend>
+            {REASON_OPTIONS.map((option) => {
+              const selected = reason === option.value;
+              return (
+                <label
+                  key={option.value}
+                  className={`flex cursor-pointer items-start gap-3 rounded-lg border-2 px-3 py-2.5 transition-colors focus-within:ring-2 focus-within:ring-blue-600 focus-within:ring-offset-2 ${selected ? 'border-blue-600 bg-blue-50' : 'border-gray-300 bg-white hover:border-gray-500 hover:bg-gray-50'}`}
+                >
+                  <input
+                    type="radio"
+                    name="release-reason"
+                    value={option.value}
+                    checked={selected}
+                    onChange={() => { setReason(option.value); setSendCourtesyEmail(false); }}
+                    aria-describedby={`release-reason-${option.value}-description`}
+                    className="mt-0.5 h-4 w-4 shrink-0 accent-blue-600"
+                  />
+                  <span className="min-w-0">
+                    <span className="block text-sm font-semibold text-gray-900">{option.title}</span>
+                    <span id={`release-reason-${option.value}-description`} className="mt-0.5 block text-sm text-gray-600">
+                      {option.description}
+                    </span>
+                  </span>
+                </label>
+              );
+            })}
             {reason === RELEASE_REASONS.no_response && (
-              <label className="ml-6 flex items-center gap-2 text-sm text-gray-700">
+              <label className="ml-[2.625rem] flex cursor-pointer items-center gap-2 text-sm text-gray-700">
                 <input
                   type="checkbox"
                   checked={sendCourtesyEmail}
                   onChange={(e) => setSendCourtesyEmail(e.target.checked)}
+                  className="h-4 w-4 accent-blue-600"
                 />
                 Also send a courtesy note
               </label>
@@ -329,10 +358,10 @@ export default function ReleaseEmailModal({ requestId, suggestionIds, onClose, o
             <button
               type="button"
               onClick={handleSend}
-              disabled={(showPreviews && loading) || sending || releaseableIds.length === 0 || blankEdit}
+              disabled={!reason || (showPreviews && (loading || drafts === null)) || sending || releaseableIds.length === 0 || blankEdit}
               className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-md"
             >
-              {sending ? 'Releasing…' : `Release (${releaseableIds.length})`}
+              {sending ? 'Releasing…' : `Release (${releaseCount})`}
             </button>
           </div>
         </div>
