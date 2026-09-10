@@ -344,6 +344,9 @@ describe('getReviewers', () => {
         _wmkf_potentialreviewer_value: 'person-1',
         wmkf_accepted: true,
         wmkf_reviewstatus: 100000001,
+        // Malformed overlap: no_response must remain ordinary because accepted
+        // is authoritative for the roster/history partition.
+        wmkf_responsetype: 100000002,
         wmkf_externaltokenrevoked: true,
       },
       {
@@ -366,6 +369,8 @@ describe('getReviewers', () => {
         wmkf_accepted: false,
         wmkf_reviewreceivedat: '2026-09-06T12:00:00Z',
         wmkf_reviewstatus: 100000003,
+        // A received review also keeps this no_response row out of history.
+        wmkf_responsetype: 100000002,
         wmkf_externaltokenrevoked: false,
       },
     ]);
@@ -378,7 +383,7 @@ describe('getReviewers', () => {
     expect(rows.map((row) => row.suggestionId)).toEqual([IDS[0], IDS[2]]);
     expect(history).toHaveLength(1);
     expect(history[0].suggestionId).toBe(IDS[1]);
-    expect(rows[0]).toMatchObject({ reviewStatus: 'materials_sent', responseType: null, tokenRevoked: true });
+    expect(rows[0]).toMatchObject({ reviewStatus: 'materials_sent', responseType: 'no_response', tokenRevoked: true });
     expect(history[0]).toMatchObject({
       reviewStatus: null,
       responseType: 'no_response',
@@ -386,11 +391,49 @@ describe('getReviewers', () => {
       meetingDate: '2026-09-10T00:00:00Z',
       submitted: false,
       tokenRevoked: null,
+      answers: [],
     });
-    expect(rows[1]).toMatchObject({ reviewStatus: 'review_received', submitted: true });
+    expect(rows[1]).toMatchObject({ reviewStatus: 'review_received', responseType: 'no_response', submitted: true });
     expect(rows[1].tokenRevoked).toBe(false);
     expect(out.proposals[0].statusSummary).toEqual({ materials_sent: 1, review_received: 1 });
     expect(out.totalReviewers).toBe(2);
+  });
+
+  test('keeps malformed no_response overlaps in exactly one ordinary roster partition', async () => {
+    getRequestById.mockResolvedValueOnce({
+      akoya_requestid: REQ,
+      _wmkf_grantprogram_value: '11111111-1111-4111-8111-111111111111',
+      akoya_requestnum: 'R-1001',
+      akoya_title: 'T',
+      wmkf_meetingdate: '2026-09-10T00:00:00Z',
+    });
+    findByRequest.mockResolvedValueOnce([
+      {
+        wmkf_appreviewersuggestionid: IDS[0],
+        _wmkf_request_value: REQ,
+        wmkf_accepted: true,
+        wmkf_responsetype: 100000002,
+        wmkf_reviewstatus: 100000001,
+      },
+      {
+        wmkf_appreviewersuggestionid: IDS[1],
+        _wmkf_request_value: REQ,
+        wmkf_accepted: false,
+        wmkf_responsetype: 100000002,
+        wmkf_reviewreceivedat: '2026-09-06T12:00:00Z',
+        wmkf_reviewstatus: 100000003,
+      },
+    ]);
+
+    const out = await getReviewers({ proposalId: REQ, azureEmail: 'pd@wmkeck.org' });
+    const ordinary = out.proposals[0].reviewers;
+    const history = out.proposals[0].noResponseHistory;
+
+    expect(ordinary.map((row) => row.suggestionId)).toEqual([IDS[0], IDS[1]]);
+    expect(new Set(ordinary.map((row) => row.suggestionId)).size).toBe(ordinary.length);
+    expect(history).toEqual([]);
+    expect(out.totalReviewers).toBe(2);
+    expect(ordinary.every((row) => Array.isArray(row.answers))).toBe(true);
   });
 
   test('preserves an invalid lifecycle signal for unknown response and review-status options', async () => {
