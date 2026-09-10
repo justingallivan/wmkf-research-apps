@@ -59,3 +59,13 @@ Verdict: needs-attention, one medium finding. Verified; addressed in the next co
 | # | Finding (Codex) | Verified? | Fix |
 |---|---|---|---|
 | 1 | A link expiring between the two send checks failed after `send_requested_at` was stamped, so the unsent attempt read as an unresolved send and blocked reissue for 24 hours | Yes | Final source/material/link rechecks now run before send intent is stamped and the lease renewed; a retry of a send-requested attempt reconciles Dynamics status first (an accepted send records `sent` without any liveness check). Two regression tests. |
+
+## Seventh pass (after the sixth fix)
+
+Verdict: needs-attention, one medium finding. Verified as described; **not changed**, recorded for the owner.
+
+| # | Finding (Codex) | Verified? | Disposition |
+|---|---|---|---|
+| 1 | Ledger `sent` includes Dynamics Pending Send/Sending (status 6/7), so a reissue can revoke the link inside an email Dynamics has accepted but not yet delivered | Yes, by design of the production-proved ledger (`sent` = transport accepted, statuses 3/6/7, unchanged since 2026-08-24) | Left as is. Reissue is an explicit staff action whose confirm copy already says earlier emails stop working and the materials must be sent again; a queued email's recipient gets the same experience as a delivered one. Changing the ledger's terminal semantics would alter a production-proved path outside this PR. Owner may ask for a short post-send hold on reissue if they disagree. |
+
+Stopping point: seven passes, 18 findings fixed, one accepted as designed.
