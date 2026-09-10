@@ -241,8 +241,9 @@ allowlists, 503 after auth, actor from session, separate sent/pending GET projec
 
 ### Codex handoff — 2026-09-10
 
-- **[VERIFIED via source commit `2c08222c`, two Claude Opus adversarial reviews,
-  remediation commits `81f417c9` and `ee25264b`, and 40 focused tests]** The complete
+- **[VERIFIED via source commit `2c08222c`, three Claude Opus adversarial passes,
+  remediation commits `81f417c9`, `ee25264b`, and `3f0f6f8e`, and 43 focused
+  tests]** The complete
   source feature is built: migration/fresh-install schema, exact-email ledger,
   session agenda calculation and HTML/text rendering, drift read, lease-fenced
   Dynamics create/recovery/send, guarded GET/prepare/send route, fixed-preview
@@ -253,13 +254,18 @@ allowlists, 503 after auth, actor from session, separate sent/pending GET projec
   built source and its runtime boundary. Canonical counts are 125 guarded API
   endpoints and 203 API route files.
 - **[VERIFIED via local execution]** The 17 Meeting Tracker/parity suites passed
-  after final remediation (103 tests); every gate named in this brief passed after
+  after final remediation (106 tests); every gate named in this brief passed after
   remediation, with each available self-test run sequentially. Type checking,
   status-enum parity, secret scan, targeted lint, and the production build also
   passed. The build retains the pre-existing Turbopack dynamic-filesystem-access
   warning for `pre-site-visit/docx-renderer.js`; the existing
   `MeetingTrackerList` missing-key React warning still appears in its
   pre-existing page test. Both are outside this brief's owned files.
+- **[VERIFIED via the final Claude Opus acceptance pass]** Verdict `PASS`: no
+  P0/P1/P2 defects. Its five non-blocking P3 observations were closed in
+  `3f0f6f8e` and this handoff: normal stale sends retain PC edits, sent receipts
+  hide editable fields, failed rows cannot be claimed, the fresh-install index
+  summary is exact, and the constraint readback uses `pg_constraint`.
 - **[VERIFIED by this Codex session]** No migration was applied, no readiness or
   production-acknowledgement environment variable was set, and no deployment or
   merge was performed. **[ASSUMED externally]** Migration 041 remains unapplied
@@ -293,11 +299,10 @@ WHERE table_schema = 'public'
   AND table_name = 'deliberation_agenda_sends'
 ORDER BY ordinal_position;
 
-SELECT constraint_name, constraint_type
-FROM information_schema.table_constraints
-WHERE table_schema = 'public'
-  AND table_name = 'deliberation_agenda_sends'
-ORDER BY constraint_name;
+SELECT conname AS constraint_name, contype AS constraint_type
+FROM pg_constraint
+WHERE conrelid = 'public.deliberation_agenda_sends'::regclass
+ORDER BY conname;
 
 SELECT indexname, indexdef
 FROM pg_indexes
