@@ -240,6 +240,38 @@ object-key-order defect fixed in commit `f5b7efc2`; they are not additional
 sends. This receipt proves Dynamics transport acceptance, not independent
 inbox/calendar-client delivery.
 
+### `deliberation_agenda_sends` — SOURCE-BUILT; MIGRATION 041 NOT APPLIED BY CODEX
+
+**Source of truth:** Postgres exact-email and cross-system recovery ledger for
+Meeting Tracker session agendas; Dynamics remains email-activity/transport
+authority and Dataverse remains session/slot authority. Migration
+`041_deliberation_agenda_sends.sql` is mirrored in fresh-install v46.
+One operation UUID freezes the session start/end/zone/HTTPS meeting link,
+location, ordered proposal identities/details/minutes/computed windows/HTTPS
+briefing links, normalized To/Cc, subject, exact text/HTML, sender, and
+session-derived Dynamics actor. States are `prepared`, `activity_created`,
+`send_requested`, `sent`, and terminal `failed`. A lease fence,
+correlation-key recovery, durable
+activity ID, and durable send intent prevent a retry from creating a second
+activity. A retry reconciles Dynamics first: status 3/6/7 records transport
+acceptance, confirmed Draft resumes SendEmail on the same activity, and an
+unknown or unreadable status remains unresolved and does not send. Known closed
+status 2/4/5/8 records `failed` and permits a new preview without reusing that
+activity. GET reads the latest sent row for
+the receipt/drift note and separately returns the latest unresolved
+`send_requested` row; prepare refuses a different operation until that pending
+send is resolved. Send has the same guard, and unique partial index
+`uq_deliberation_agenda_one_unresolved` enforces at most one `send_requested`
+row per session under concurrency. Drift compares the live start as an instant plus ordered
+request/minutes tuples with the frozen sent snapshot. Read/write
+paths are `lib/services/meeting-tracker/agenda-store.js` and
+`lib/services/meeting-tracker/agenda-service.js`; the guarded API is
+`/api/meeting-tracker/sessions/[id]/agenda`. No cleanup is scheduled; rows
+remain audit history until a retention policy is explicitly approved.
+**[VERIFIED 2026-09-10 via migration/fresh-install parity, focused service,
+route, and panel tests. ASSUMED externally: migration 041 remains unapplied;
+this Codex build did not apply it or change any readiness flag.]**
+
 ### `scheduled_email_messages` — MIGRATION 036 APPLIED 2026-08-26; CODE NOT DEPLOYED
 
 **Source of truth:** Postgres coordination and audit ledger for personalized

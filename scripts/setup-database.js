@@ -1066,6 +1066,54 @@ const v45Statements = [
      'Per-canonical-slot finalize leases: {slot:{token,expiresAt}}; five-minute expiry, conditionally acquired and released.'`,
 ];
 
+// V46: exact agenda-email and Dynamics send-recovery ledger for deliberation
+// sessions. Existing databases use migration 041_deliberation_agenda_sends.sql.
+const v46Statements = [
+  `CREATE TABLE IF NOT EXISTS deliberation_agenda_sends (
+    operation_id UUID PRIMARY KEY,
+    session_id UUID NOT NULL,
+    agenda_snapshot JSONB NOT NULL,
+    to_recipients JSONB NOT NULL,
+    cc_recipients JSONB NOT NULL DEFAULT '[]'::jsonb,
+    subject TEXT NOT NULL,
+    body_text TEXT NOT NULL,
+    body_html TEXT NOT NULL,
+    from_email TEXT NOT NULL,
+    acting_user_system_id UUID,
+    state TEXT NOT NULL DEFAULT 'prepared',
+    dynamics_email_id UUID,
+    dynamics_statecode INTEGER,
+    dynamics_statuscode INTEGER,
+    send_requested_at TIMESTAMPTZ,
+    sent_at TIMESTAMPTZ,
+    attempt_count INTEGER NOT NULL DEFAULT 0,
+    lease_token UUID,
+    locked_until TIMESTAMPTZ,
+    last_error_code TEXT,
+    last_error_message TEXT,
+    last_failed_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT deliberation_agenda_state_check
+      CHECK (state IN ('prepared', 'activity_created', 'send_requested', 'sent', 'failed')),
+    CONSTRAINT deliberation_agenda_recipient_shape CHECK (
+      jsonb_typeof(to_recipients) = 'array'
+      AND jsonb_array_length(to_recipients) > 0
+      AND jsonb_typeof(cc_recipients) = 'array'
+    ),
+    CONSTRAINT deliberation_agenda_lease_shape CHECK (
+      (lease_token IS NULL AND locked_until IS NULL)
+      OR (lease_token IS NOT NULL AND locked_until IS NOT NULL)
+    )
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_deliberation_agenda_session_history
+     ON deliberation_agenda_sends (session_id, created_at DESC)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS uq_deliberation_agenda_one_unresolved
+     ON deliberation_agenda_sends (session_id)
+     WHERE state = 'send_requested'`,
+];
+
+
 // V32: model pricing audit history (S181).
 // Monthly drift cron (/api/cron/pricing-refresh) writes one row per
 // (model, token_type) per run. Compared against lib/utils/model-pricing.js;
@@ -1899,6 +1947,24 @@ async function runMigration() {
       }
     }
 
+    // Run V46 table creation (deliberation session agenda send ledger)
+    console.log(`\nApplying v46 schema updates - Deliberation agenda sends (${v46Statements.length} statements)...`);
+    for (let i = 0; i < v46Statements.length; i++) {
+      const statement = v46Statements[i];
+      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
+      try {
+        await sql.query(statement);
+        console.log(`[v46-${i + 1}/${v46Statements.length}] ✓ ${preview}...`);
+      } catch (error) {
+        if (error.message.includes('already exists')) {
+          console.log(`[v46-${i + 1}/${v46Statements.length}] ○ Already exists: ${preview}...`);
+        } else {
+          console.error(`[v46-${i + 1}/${v46Statements.length}] ✗ Error: ${error.message}`);
+          throw error;
+        }
+      }
+    }
+
     console.log('\n✓ Database migration completed successfully!');
     console.log('\nTables created/updated:');
     console.log('  • search_cache (API search result caching)');
@@ -1962,7 +2028,9 @@ async function runMigration() {
     console.log('\nV41 new table (Scheduled personalized email review):');
     console.log('  • scheduled_email_messages (PD review windows + exact draft/send recovery ledger)');
     console.log('  • deliberation_briefing_links (expiring, revocable briefing-page links; sealed token, digest, revocation)');
-    console.log('\nIndexes created: 64 (plus 7 added in V30, 6 added in V35, 4 added in V37, 3 added in V39, 3 added in V40)');
+    console.log('\nV46 new table (Deliberation session agenda email):');
+    console.log('  • deliberation_agenda_sends (frozen session agenda + Dynamics send recovery ledger)');
+    console.log('\nIndexes created: 64 (plus 7 added in V30, 6 added in V35, 4 added in V37, 3 added in V39, 3 added in V40, 2 added in V44)');
 
   } catch (error) {
     console.error('\n✗ Migration failed:', error.message);
