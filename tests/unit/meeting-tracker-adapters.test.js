@@ -3,6 +3,7 @@
 import { DynamicsService } from '../../lib/services/dynamics-service';
 import {
   findByRequestIds,
+  findBySession,
   update,
   updateOrders,
 } from '../../lib/dataverse/adapters/deliberation-slot';
@@ -48,6 +49,16 @@ test('slot update passes the exact ETag and authenticated actor to one PATCH', a
     { wmkf_order: 4 },
     { ifMatch: 'W/"10"', actingUserSystemId: ACTOR_ID },
   );
+});
+
+test('session slot read expands request and lead PD display details without party data', async () => {
+  const query = jest.spyOn(DynamicsService, 'queryAllRecords').mockResolvedValue({ records: [] });
+  await findBySession(REQUEST_ID);
+
+  const options = query.mock.calls[0][1];
+  expect(options.expand).toContain('wmkf_Request($select=');
+  expect(options.expand).toContain('wmkf_LeadPd($select=');
+  expect(options.expand.toLowerCase()).not.toContain('activitypart');
 });
 
 test('reorder is one atomic changeset with an ETag and explicit actor per row', async () => {
