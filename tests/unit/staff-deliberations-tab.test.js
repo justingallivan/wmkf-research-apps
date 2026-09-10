@@ -17,11 +17,32 @@ jest.mock('../../shared/components/Layout', () => ({
 let distributionHistoryFeed = null;
 jest.mock('../../shared/components/workbench/PreSiteDistributionPanel', () => {
   const { useEffect } = require('react');
+  const { useState } = require('react');
   function MockDistributionPanel(props) {
+    const [lockError, setLockError] = useState(null);
     useEffect(() => {
       if (distributionHistoryFeed) props.onHistory?.(distributionHistoryFeed);
     }, [props]);
-    return <div>{props.collapsed ? 'Frozen distribution panel (collapsed)' : 'Frozen distribution panel'}</div>;
+    return (
+      <div>
+        <span>{`Distribution panel: ${props.composer}${props.record ? ' (record)' : ''}${props.needsLock ? ' (lock required)' : ''}`}</span>
+        {props.composer === 'dialog' && (
+          <>
+            <button type="button" onClick={() => props.onCloseComposer?.()}>mock-close</button>
+            <button
+              type="button"
+              onClick={async () => {
+                setLockError(null);
+                try { await props.beforePrepare?.(); } catch (error) { setLockError(error.message); }
+              }}
+            >
+              mock-prepare
+            </button>
+            {lockError && <p role="alert">{`mock-error: ${lockError}`}</p>}
+          </>
+        )}
+      </div>
+    );
   }
   return { __esModule: true, default: MockDistributionPanel };
 });
@@ -109,13 +130,14 @@ afterEach(() => {
 
 // ── Generation (ported from pre-site-visit-tab) ──────────────────────────────
 
-test('shows compact actions and keeps generation details behind help', async () => {
+test('draft stage: one sentence, Edit in Word primary, Share… secondary, Download and Regenerate under More', async () => {
   render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
 
-  expect(screen.queryByText(/current published Admin prompt/i)).not.toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', { name: 'About Staff Deliberations' }));
-  expect(screen.getByText(/current published Admin prompt/i)).toBeInTheDocument();
-  expect(screen.getByText(/saved in SharePoint/i)).toBeInTheDocument();
+  // The help popover is gone; the sentence carries what a PD needs.
+  expect(screen.queryByRole('button', { name: 'About Staff Deliberations' })).not.toBeInTheDocument();
+  expect(await screen.findByTestId('deliberations-stage-sentence'))
+    .toHaveTextContent('Generate the AI draft in Word to start staff deliberations for this proposal.');
+  expect(screen.getByTestId('deliberations-session-line')).toHaveTextContent('Deliberation session: not yet scheduled.');
   fireEvent.click(screen.getByRole('button', { name: 'Generate Word Draft' }));
 
   await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
@@ -126,12 +148,21 @@ test('shows compact actions and keeps generation details behind help', async () 
       signal: expect.any(AbortSignal),
     }),
   ));
-  const edit = await screen.findByRole('link', { name: 'Edit' });
+  const edit = await screen.findByRole('link', { name: 'Edit in Word' });
   expect(edit).toHaveAttribute('href', 'https://sharepoint.test/pre-site.docx');
   expect(edit).toHaveAttribute('target', '_blank');
-  expect(screen.getByRole('link', { name: 'Download' }))
+  expect(screen.getByRole('button', { name: 'Share…' })).toBeInTheDocument();
+  expect(screen.getByTestId('deliberations-stage-sentence'))
+    .toHaveTextContent('Review and edit the AI draft in Word, then share it for the deliberation session. The draft leaves the recommendation, referee comments, and presentation for you to complete.');
+  // Download and Regenerate are tucked under More, not in the action row.
+  expect(screen.queryByRole('link', { name: 'Download' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Regenerate Word Draft' })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
+  expect(screen.getByRole('menuitem', { name: 'Download' }))
     .toHaveAttribute('href', 'https://sharepoint.test/pre-site.docx?download=1');
-  expect(screen.getByRole('button', { name: 'Regenerate Word Draft' })).toBeEnabled();
+  expect(screen.getByRole('menuitem', { name: 'Regenerate Word Draft' })).toBeEnabled();
+  fireEvent.keyDown(document, { key: 'Escape' });
+  expect(screen.queryByRole('menu')).not.toBeInTheDocument();
   expect(screen.getByText('Latest draft:')).toBeInTheDocument();
   // Display label, not the raw SharePoint filename; identity in tooltip + details.
   const draftLink = screen.getByRole('link', { name: 'Word draft' });
@@ -139,18 +170,22 @@ test('shows compact actions and keeps generation details behind help', async () 
   expect(draftLink).toHaveAttribute('title', '1002379 Pre-Site Visit.docx');
   expect(screen.getByText('File details')).toBeInTheDocument();
   expect(screen.getByText(/1002379 Pre-Site Visit\.docx/)).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Start sharing' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Start sharing' })).not.toBeInTheDocument();
   expect(screen.getByTestId('stage-rail')).toHaveTextContent('● AI draft ready');
+  // The composer is mounted hidden at the draft stage so Share… can open it; the
+  // briefing-link card and history stay out of the way until the draft is shared.
+  expect(screen.getByText('Distribution panel: hidden (lock required)')).toBeInTheDocument();
 });
 
 test('loads existing Ready actions without another generation request', async () => {
   global.fetch.mockResolvedValueOnce(statusResponse({ currentArtifact: readyArtifact() }));
   render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
 
-  const link = await screen.findByRole('link', { name: 'Edit' });
+  const link = await screen.findByRole('link', { name: 'Edit in Word' });
   expect(link).toHaveAttribute('href', 'https://sharepoint.test/pre-site.docx');
-  expect(screen.getByRole('link', { name: 'Download' })).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Regenerate Word Draft' })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
+  expect(screen.getByRole('menuitem', { name: 'Download' })).toBeInTheDocument();
+  expect(screen.getByRole('menuitem', { name: 'Regenerate Word Draft' })).toBeInTheDocument();
   expect(global.fetch).toHaveBeenCalledTimes(1);
   expect(global.fetch).toHaveBeenCalledWith(
     `/api/workbench/pre-site-visit?requestId=${REQUEST_ID}`,
@@ -173,7 +208,7 @@ test('shows durable Ready warnings beside the Word link', async () => {
   expect(await screen.findByRole('heading', { name: 'Draft needs a quick edit check' }))
     .toBeInTheDocument();
   expect(screen.getByText(/longer than suggested/i)).toBeInTheDocument();
-  expect(screen.getByRole('link', { name: 'Edit' })).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Edit in Word' })).toBeInTheDocument();
 });
 
 test('recovers a Ready Word link after the generation connection is interrupted', async () => {
@@ -190,7 +225,7 @@ test('recovers a Ready Word link after the generation connection is interrupted'
 
   fireEvent.click(screen.getByRole('button', { name: 'Generate Word Draft' }));
 
-  const link = await screen.findByRole('link', { name: 'Edit' });
+  const link = await screen.findByRole('link', { name: 'Edit in Word' });
   expect(link).toHaveAttribute('href', 'https://sharepoint.test/pre-site.docx');
   expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   expect(global.fetch.mock.calls.filter(([, options = {}]) => options.method === 'POST')).toHaveLength(1);
@@ -250,7 +285,8 @@ test('regenerate opens a confirmation dialog and cancel performs no generation',
   global.fetch.mockResolvedValueOnce(statusResponse({ currentArtifact: readyArtifact() }));
   render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
 
-  fireEvent.click(await screen.findByRole('button', { name: 'Regenerate Word Draft' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'More actions' }));
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Regenerate Word Draft' }));
 
   const dialog = screen.getByRole('dialog', { name: 'Regenerate this draft?' });
   expect(dialog).toHaveTextContent('starts a new Claude call');
@@ -266,7 +302,8 @@ test('confirming regenerate starts one generation request', async () => {
     .mockResolvedValueOnce(successResponse());
   render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
 
-  fireEvent.click(await screen.findByRole('button', { name: 'Regenerate Word Draft' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'More actions' }));
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Regenerate Word Draft' }));
   fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Regenerate' }));
 
   await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
@@ -290,34 +327,26 @@ test('a late response for a prior request cannot publish a stale Word link', asy
   await act(async () => { resolveFirst(successResponse()); });
 
   await waitFor(() => expect(screen.getByRole('button', { name: 'Generate Word Draft' })).toBeEnabled());
-  expect(screen.queryByRole('link', { name: 'Edit' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: 'Edit in Word' })).not.toBeInTheDocument();
 });
 
-// ── Share hand-off (ported from both retired suites; single modal now) ───────
+// ── Share hand-off (tab redesign: Share… opens the composer; lock at preview) ─
 
-test('opens an explanatory share modal and cancel performs no transition', async () => {
+test('Share… opens the composer as a dialog with the lock required, and Close performs no transition', async () => {
   global.fetch.mockResolvedValueOnce(statusResponse({ currentArtifact: readyArtifact() }));
   render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
 
-  fireEvent.click(await screen.findByRole('button', { name: 'Start sharing' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Share…' }));
+  expect(screen.getByText('Distribution panel: dialog (lock required)')).toBeInTheDocument();
+  expect(screen.queryByRole('dialog', { name: 'Start sharing this draft?' })).not.toBeInTheDocument();
 
-  const dialog = screen.getByRole('dialog', { name: 'Start sharing this draft?' });
-  expect(dialog).toHaveTextContent('This exact Word document will become the Site Visit workspace.');
-  expect(dialog).toHaveTextContent('current SharePoint version will be recorded in Dataverse');
-  expect(dialog).toHaveTextContent('Staff can continue editing this same document in Word.');
-  expect(dialog).toHaveTextContent('can no longer be regenerated after this change');
-  expect(within(dialog).getByRole('button', { name: 'Start sharing' })).toHaveFocus();
-  fireEvent.keyDown(document, { key: 'Tab' });
-  expect(within(dialog).getByRole('button', { name: 'Cancel' })).toHaveFocus();
-  fireEvent.keyDown(document, { key: 'Tab', shiftKey: true });
-  expect(within(dialog).getByRole('button', { name: 'Start sharing' })).toHaveFocus();
-
-  fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'mock-close' }));
+  expect(screen.getByText('Distribution panel: hidden (lock required)')).toBeInTheDocument();
   expect(global.fetch).toHaveBeenCalledTimes(1);
+  expect(screen.getByTestId('stage-rail')).toHaveTextContent('● AI draft ready');
 });
 
-test('confirms the displayed artifact through the guarded route and enters the Share stage', async () => {
+test('the composer locks the displayed artifact through the guarded route before preview and enters Shared', async () => {
   global.fetch
     .mockResolvedValueOnce(statusResponse({ currentArtifact: readyArtifact() }))
     .mockResolvedValueOnce(response({
@@ -327,8 +356,8 @@ test('confirms the displayed artifact through the guarded route and enters the S
     }));
   render(<StaffDeliberationsTab requestId={REQUEST_ID} requestNumber="1002379" />);
 
-  fireEvent.click(await screen.findByRole('button', { name: 'Start sharing' }));
-  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Start sharing' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Share…' }));
+  fireEvent.click(screen.getByRole('button', { name: 'mock-prepare' }));
 
   await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
     '/api/workbench/pre-site-visit/start-site-visit',
@@ -343,30 +372,31 @@ test('confirms the displayed artifact through the guarded route and enters the S
   ));
   expect(await screen.findByText('Working document:')).toBeInTheDocument();
   expect(screen.getByTestId('stage-rail')).toHaveTextContent('● Shared');
-  expect(screen.getByText('Frozen distribution panel')).toBeInTheDocument();
-  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  expect(screen.getByTestId('deliberations-stage-sentence'))
+    .toHaveTextContent(`Shared on ${new Date('2026-08-17T21:05:00Z').toLocaleDateString()}. This exact version is locked as the working document. Send the deliberation email when you are ready.`);
+  // The composer stays open (still a dialog) but no longer needs a lock; the
+  // record (briefing link, history) now shows below the card.
+  expect(screen.getByText('Distribution panel: dialog (record)')).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Regenerate Word Draft' })).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Start sharing' })).not.toBeInTheDocument();
 });
 
-test('keeps the modal open and shows a transition failure for retry', async () => {
+test('a lock failure is thrown to the composer and the tab stays at the draft stage for retry', async () => {
   global.fetch
     .mockResolvedValueOnce(statusResponse({ currentArtifact: readyArtifact() }))
     .mockResolvedValueOnce(response({ error: 'The Word draft changed. Reload and retry.' }, 409));
   render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
 
-  fireEvent.click(await screen.findByRole('button', { name: 'Start sharing' }));
-  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Start sharing' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Share…' }));
+  fireEvent.click(screen.getByRole('button', { name: 'mock-prepare' }));
 
-  expect(await screen.findByRole('alert')).toHaveTextContent(
-    'The Word draft changed. Reload and retry.',
-  );
-  const dialog = screen.getByRole('dialog');
-  expect(dialog).toBeInTheDocument();
-  expect(within(dialog).getByRole('button', { name: 'Start sharing' })).toBeEnabled();
+  expect(await screen.findByRole('alert')).toHaveTextContent('mock-error: The Word draft changed. Reload and retry.');
+  expect(screen.getByText('Distribution panel: dialog (lock required)')).toBeInTheDocument();
+  expect(screen.getByTestId('stage-rail')).toHaveTextContent('● AI draft ready');
+  expect(screen.getByRole('link', { name: 'Edit in Word' })).toBeInTheDocument();
 });
 
-test('a late share transition cannot publish workspace state after the request changes', async () => {
+test('a late lock response cannot publish workspace state after the request changes', async () => {
   let resolvePromotion;
   global.fetch.mockImplementation((_url, options = {}) => {
     if (options.method !== 'POST') {
@@ -376,8 +406,8 @@ test('a late share transition cannot publish workspace state after the request c
   });
   const { rerender } = render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
 
-  fireEvent.click(await screen.findByRole('button', { name: 'Start sharing' }));
-  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Start sharing' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Share…' }));
+  fireEvent.click(screen.getByRole('button', { name: 'mock-prepare' }));
   rerender(<StaffDeliberationsTab requestId={OTHER_REQUEST_ID} />);
   await act(async () => {
     resolvePromotion(response({
@@ -387,8 +417,9 @@ test('a late share transition cannot publish workspace state after the request c
     }));
   });
 
-  await waitFor(() => expect(screen.getByRole('button', { name: 'Start sharing' })).toBeEnabled());
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Share…' })).toBeEnabled());
   expect(screen.queryByText('Working document:')).not.toBeInTheDocument();
+  expect(screen.getByTestId('stage-rail')).toHaveTextContent('● AI draft ready');
 });
 
 // ── Share stage and Wrap Up derivation ───────────────────────────────────────
@@ -406,20 +437,24 @@ test('a shared document shows the working workspace with logistics and distribut
   render(<StaffDeliberationsTab requestId={REQUEST_ID} requestNumber="1002379" />);
 
   expect(await screen.findByText('Working document:')).toBeInTheDocument();
-  expect(screen.getByRole('link', { name: 'Edit' }))
+  // Locked but not yet sent: Share… stays the primary action.
+  expect(screen.getByRole('button', { name: 'Share…' })).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Open working document' }))
     .toHaveAttribute('href', 'https://sharepoint.test/pre-site.docx');
-  expect(screen.getByRole('link', { name: 'Download' }))
-    .toHaveAttribute('href', 'https://sharepoint.test/pre-site.docx?download=1');
   const docLink = screen.getByRole('link', { name: 'Word document' });
   expect(docLink).toHaveAttribute('title', '1002379 Pre-Site Visit.docx');
-  expect(screen.getByText(/Sharing began/)).toBeInTheDocument();
+  expect(screen.getByTestId('deliberations-stage-sentence'))
+    .toHaveTextContent(`Shared on ${new Date('2026-08-17T21:05:00Z').toLocaleDateString()}.`);
   expect(screen.getByRole('heading', { name: 'Working document needs a quick edit check' }))
     .toBeInTheDocument();
   expect(screen.getByText(/longer than suggested/i)).toBeInTheDocument();
   expect(screen.getByTestId('stage-rail')).toHaveTextContent('✓ AI draft ready');
   expect(screen.getByTestId('stage-rail')).toHaveTextContent('● Shared');
-  expect(screen.getByText('Frozen distribution panel')).toBeInTheDocument();
-  expect(screen.queryByRole('button', { name: 'Regenerate Word Draft' })).not.toBeInTheDocument();
+  expect(screen.getByText('Distribution panel: hidden (record)')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
+  expect(screen.getByRole('menuitem', { name: 'Download' }))
+    .toHaveAttribute('href', 'https://sharepoint.test/pre-site.docx?download=1');
+  expect(screen.queryByRole('menuitem', { name: 'Regenerate Word Draft' })).not.toBeInTheDocument();
 });
 
 test('a transport-accepted send for the current document sets substate sent (rail stays on Shared)', async () => {
@@ -432,17 +467,66 @@ test('a transport-accepted send for the current document sets substate sent (rai
   }));
   render(<StaffDeliberationsTab requestId={REQUEST_ID} requestNumber="1002379" />);
 
-  // Slim note, not a banner: a small chip + guidance under the working document.
-  expect(await screen.findByText('Materials sent')).toBeInTheDocument();
-  expect(screen.getByText(/starting draft for the final writeup/i)).toBeInTheDocument();
+  await waitFor(() => expect(screen.getByTestId('deliberations-stage-sentence'))
+    .toHaveTextContent('The deliberation email has gone out; keep editing the working document in Word.'));
   // D5: "Shared" means locked, not "first email sent" — the rail stays on the
-  // Shared stop; sent/not-sent is a substate shown as text, not a fifth stop.
+  // Shared stop; sent/not-sent is a substate shown in the sentence, not a fifth stop.
   expect(screen.getByTestId('stage-rail')).toHaveTextContent('● Shared');
-  expect(screen.queryByText('Not yet sent.')).not.toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Open working document' })).toBeInTheDocument();
+  // No Resend without a failure; sending again is secondary, under More.
+  expect(screen.queryByRole('button', { name: 'Resend' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Share…' })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
+  expect(screen.getByRole('menuitem', { name: 'Send the deliberation email again…' })).toBeInTheDocument();
   // The Final Writeup tab owns the handoff; Staff Deliberations never duplicates it.
   expect(screen.queryByRole('button', { name: /Move to Final Writeup/ })).not.toBeInTheDocument();
-  // After a send, composing another send is secondary: the composer collapses.
-  expect(screen.getByText('Frozen distribution panel (collapsed)')).toBeInTheDocument();
+});
+
+test('a failed latest send shows a red line and a Resend action that opens the composer', async () => {
+  distributionHistoryFeed = {
+    attempts: [{ operationId: 'op-2', transportAccepted: false, lastError: 'Dynamics refused the send.' }],
+    currentSourceEverSent: true,
+    latestSendFailure: { operationId: 'op-2', message: 'Dynamics refused the send.' },
+  };
+  global.fetch.mockResolvedValueOnce(statusResponse({ currentArtifact: readyArtifact(100000001) }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} requestNumber="1002379" />);
+
+  expect(await screen.findByTestId('deliberations-send-failure'))
+    .toHaveTextContent('The last send failed: Dynamics refused the send.');
+  fireEvent.click(screen.getByRole('button', { name: 'Resend' }));
+  expect(screen.getByText('Distribution panel: dialog (record)')).toBeInTheDocument();
+});
+
+test('the session line reads the status payload once the tracker supplies a slot', async () => {
+  global.fetch.mockResolvedValueOnce({
+    ok: true,
+    status: 200,
+    json: async () => ({
+      success: true,
+      currentArtifact: readyArtifact(100000001),
+      pendingArtifact: null,
+      reopenHistory: [],
+      session: { scheduledStartIso: '2026-12-01T18:00:00Z', scheduledEndIso: null, ianaTimeZone: 'America/Los_Angeles', meetingLink: null, location: null },
+    }),
+  });
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+
+  await waitFor(() => expect(screen.getByTestId('deliberations-session-line'))
+    .toHaveTextContent(/^Deliberation session: .*Dec 1, 2026.*10:00.*AM\.$/));
+});
+
+test('a Final document offers one action, Open Final Writeup, and no More menu', async () => {
+  const onSelectTab = jest.fn();
+  global.fetch.mockResolvedValueOnce(statusResponse({
+    currentArtifact: { ...readyArtifact(), lifecycleState: 100000004 },
+  }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} onSelectTab={onSelectTab} />);
+
+  await waitFor(() => expect(screen.getByTestId('deliberations-stage-sentence')).toHaveTextContent('This proposal moved to Final Writeup.'));
+  fireEvent.click(screen.getByRole('button', { name: 'Open Final Writeup' }));
+  expect(onSelectTab).toHaveBeenCalledWith('final-writeup');
+  expect(screen.queryByRole('button', { name: 'More actions' })).not.toBeInTheDocument();
+  expect(screen.queryByTestId('deliberations-session-line')).not.toBeInTheDocument();
 });
 
 test('sends for a superseded source document do not set the current document to sent', async () => {
@@ -459,8 +543,8 @@ test('sends for a superseded source document do not set the current document to 
 
   await screen.findByText('Working document:');
   expect(screen.getByTestId('stage-rail')).toHaveTextContent('● Shared');
-  expect(screen.getByTestId('deliberations-visit-line')).toHaveTextContent('Not yet sent.');
-  expect(screen.queryByText('Materials sent')).not.toBeInTheDocument();
+  expect(screen.getByTestId('deliberations-stage-sentence')).toHaveTextContent('Send the deliberation email when you are ready.');
+  expect(screen.getByRole('button', { name: 'Share…' })).toBeInTheDocument();
 });
 
 // ── Fail-closed states (ported) ──────────────────────────────────────────────
@@ -592,7 +676,7 @@ test('validates confirmation and submits one guarded reopen, returning the works
   });
   // The workspace returns to Draft in place — no tab navigation exists anymore.
   await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Guarded reopen' })).not.toBeInTheDocument());
-  expect(await screen.findByRole('button', { name: 'Start sharing' })).toBeInTheDocument();
+  expect(await screen.findByRole('button', { name: 'Share…' })).toBeInTheDocument();
   expect(screen.getByTestId('stage-rail')).toHaveTextContent('● AI draft ready');
   expect(screen.getByTestId('stage-rail')).toHaveTextContent('reopened');
 });
@@ -762,11 +846,14 @@ test('a shared document with a past scheduled visit moves the rail to Visit and 
   expect(screen.getByTestId('stage-rail')).toHaveTextContent('✓ AI draft ready');
   expect(screen.getByTestId('stage-rail')).toHaveTextContent('✓ Shared');
   expect(screen.getByTestId('stage-rail')).toHaveTextContent('● Visit');
-  expect(screen.getByTestId('deliberations-visit-line'))
-    .toHaveTextContent(`Visited ${new Date('2020-01-01T00:00:00Z').toLocaleDateString()}. Add observations in Word.`);
+  expect(screen.getByTestId('deliberations-stage-sentence'))
+    .toHaveTextContent(`Visited ${new Date('2020-01-01T00:00:00Z').toLocaleDateString()}. Add your site-visit edits to the working document in Word, then continue in Final Writeup to start group review.`);
+  // The visit date lives in the sentence at this stage; no duplicate line.
+  expect(screen.queryByTestId('deliberations-visit-line')).not.toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'Add site-visit edits in Word' }))
+    .toHaveAttribute('href', 'https://sharepoint.test/pre-site.docx');
 
-  const link = screen.getByRole('button', { name: 'Continue in Final Writeup →' });
-  fireEvent.click(link);
+  fireEvent.click(screen.getByRole('button', { name: 'Continue in Final Writeup' }));
   expect(onSelectTab).toHaveBeenCalledWith('final-writeup');
 });
 

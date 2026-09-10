@@ -122,3 +122,73 @@ export function deriveDeliberationStage({
   // group/count by stage key must treat this as its own bucket.
   return { stage: 'beyond', substate: 'unknown-lifecycle', visit };
 }
+
+/**
+ * Shape the server payloads carry for the request's latest deliberation slot
+ * (tracker plan §5.4 reader, reduced to what the card shows). Null when the
+ * tracker is not enabled or nothing is scheduled.
+ */
+export function projectDeliberationSession(schedule) {
+  if (!schedule?.scheduledStartIso) return null;
+  return {
+    scheduledStartIso: schedule.scheduledStartIso,
+    scheduledEndIso: schedule.scheduledEndIso || null,
+    ianaTimeZone: schedule.ianaTimeZone || null,
+    meetingLink: schedule.meetingLink || null,
+    location: schedule.location || null,
+  };
+}
+
+/**
+ * "Deliberation session: not yet scheduled." names the PC as the actor (a
+ * normal state, not a warning); with a slot it reads the date and time in the
+ * session's own time zone.
+ */
+export function deliberationSessionLine(session) {
+  const startMs = Date.parse(session?.scheduledStartIso || '');
+  if (!Number.isFinite(startMs)) return 'Deliberation session: not yet scheduled.';
+  let when;
+  try {
+    when = new Intl.DateTimeFormat(undefined, {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+      ...(session.ianaTimeZone ? { timeZone: session.ianaTimeZone } : {}),
+    }).format(new Date(startMs));
+  } catch {
+    when = new Date(startMs).toLocaleString();
+  }
+  return `Deliberation session: ${when}.`;
+}
+
+export function deliberationVisitLine(visit) {
+  if (!visit || visit.status === 'not-scheduled') return 'Visit not scheduled.';
+  const date = new Date(visit.startIso).toLocaleDateString();
+  return visit.status === 'visited' ? `Visited ${date}.` : `Visit ${date}.`;
+}
+
+/**
+ * The one sentence under the rail (shape brief 2026-09-09, owner-approved
+ * 2026-09-10): what to do next at this stage. Code-owned copy; the rail's
+ * labels stay admin-editable.
+ */
+export function deliberationStageSentence({ stage, substate, sharedAtIso = null, visit = null }) {
+  if (stage === 'final') return 'This proposal moved to Final Writeup.';
+  if (stage === 'visit') {
+    const visited = visit?.startIso ? `Visited ${new Date(visit.startIso).toLocaleDateString()}. ` : '';
+    return `${visited}Add your site-visit edits to the working document in Word, then continue in Final Writeup to start group review.`;
+  }
+  if (stage === 'shared') {
+    const sharedAt = Number.isFinite(Date.parse(sharedAtIso || ''))
+      ? `Shared on ${new Date(sharedAtIso).toLocaleDateString()}.`
+      : 'Shared.';
+    return substate === 'sent'
+      ? `${sharedAt} The deliberation email has gone out; keep editing the working document in Word.`
+      : `${sharedAt} This exact version is locked as the working document. Send the deliberation email when you are ready.`;
+  }
+  if (substate === 'ready') {
+    return 'Review and edit the AI draft in Word, then share it for the deliberation session. The draft leaves the recommendation, referee comments, and presentation for you to complete.';
+  }
+  if (substate === 'generating') return 'The draft is being generated. The Word link will be available when generation finishes.';
+  if (substate === 'failed') return 'The latest Word-draft attempt failed. Generate the draft again when the cause is resolved.';
+  return 'Generate the AI draft in Word to start staff deliberations for this proposal.';
+}

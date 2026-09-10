@@ -6,12 +6,14 @@ jest.mock('../../lib/dataverse/adapters/grant-request.js', () => ({ findByIds: j
 jest.mock('../../lib/dataverse/adapters/site-visit.js', () => ({ findActiveByRequests: jest.fn() }));
 jest.mock('../../lib/services/pre-site-visit/distribution-store.js', () => ({ sentSourceDocumentIds: jest.fn() }));
 jest.mock('../../lib/services/deliberation-stage-labels.js', () => ({ readDeliberationStageLabels: jest.fn() }));
+jest.mock('../../lib/services/meeting-tracker/schedule-reader.js', () => ({ getDeliberationScheduleByRequests: jest.fn(async (ids) => new Map(ids.map((id) => [id, null]))) }));
 
 import * as requestDocumentAdapter from '../../lib/dataverse/adapters/request-document.js';
 import * as grantRequestAdapter from '../../lib/dataverse/adapters/grant-request.js';
 import * as siteVisitAdapter from '../../lib/dataverse/adapters/site-visit.js';
 import { sentSourceDocumentIds } from '../../lib/services/pre-site-visit/distribution-store.js';
 import { readDeliberationStageLabels } from '../../lib/services/deliberation-stage-labels.js';
+import { getDeliberationScheduleByRequests } from '../../lib/services/meeting-tracker/schedule-reader.js';
 import { listPreSiteVisitDrafts } from '../../lib/services/pre-site-visit/cycle-list-service';
 import {
   PRE_SITE_VISIT_CONTRACT,
@@ -224,4 +226,37 @@ describe('counts', () => {
     const result = await listPreSiteVisitDrafts({ cycleCode: 'D26' });
     expect(result.counts).toEqual({ draft: 1, shared: 0, visit: 0, final: 1 });
   });
+});
+
+it('joins the tracker schedule once per list (batched by request id) and projects the card-shaped session, null where nothing is scheduled', async () => {
+  requestDocumentAdapter.findByCycle.mockResolvedValue({ records: [
+    row({ wmkf_requestdocumentid: 'current', wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW, wmkf_milestonecreatedat: '2026-09-10T16:03:28Z' }),
+    row({ wmkf_requestdocumentid: 'r2', _wmkf_request_value: R2 }),
+  ] });
+  getDeliberationScheduleByRequests.mockImplementationOnce(async (ids) => new Map(ids.map((id) => [id, id === R1 ? {
+    sessionId: 's-1', scheduledStartIso: '2026-12-01T18:00:00Z', scheduledEndIso: '2026-12-01T18:30:00Z',
+    ianaTimeZone: 'America/Los_Angeles', meetingLink: 'https://zoom.example/j/1', location: '', order: 1, minutes: 30,
+    attendees: [{ name: 'A', email: 'a@example.org' }],
+  } : null])));
+
+  const result = await listPreSiteVisitDrafts({ cycleCode: 'D26' });
+
+  expect(getDeliberationScheduleByRequests).toHaveBeenCalledTimes(1);
+  expect(getDeliberationScheduleByRequests.mock.calls[0][0].sort()).toEqual([R1, R2].sort());
+  const [first, second] = result.artifacts;
+  expect(first.session).toEqual({
+    scheduledStartIso: '2026-12-01T18:00:00Z', scheduledEndIso: '2026-12-01T18:30:00Z',
+    ianaTimeZone: 'America/Los_Angeles', meetingLink: 'https://zoom.example/j/1', location: null,
+  });
+  expect(first.session).not.toHaveProperty('attendees');
+  expect(first.sharedAtIso).toBe('2026-09-10T16:03:28Z');
+  expect(second.session).toBeNull();
+});
+
+it('a schedule-reader failure leaves every session null instead of failing the list', async () => {
+  requestDocumentAdapter.findByCycle.mockResolvedValue({ records: [row()] });
+  getDeliberationScheduleByRequests.mockRejectedValueOnce(new Error('tracker down'));
+  const result = await listPreSiteVisitDrafts({ cycleCode: 'D26' });
+  expect(result.artifacts).toHaveLength(1);
+  expect(result.artifacts[0].session).toBeNull();
 });

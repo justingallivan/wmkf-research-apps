@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-09-08
+last_verified: 2026-09-10
 stale_after_days: 90
 owner: reviewers
 source_files:
@@ -1643,7 +1643,21 @@ One Final Writeup row per request over the same stable SharePoint Word item; the
   draft exists — `draftStopText` in `shared/utils/deliberation-stage.js`) → `shared` (Shared; D5, locked not
   "first sent") → `visit` (date-derived "visited", D7) → `final` — with admin-editable labels
   (D6, `shared/config/editableTextDefaults.js` keys `stage.deliberations.*`); the old
-  Draft/Draft ready/Share/Wrap Up hard-coded labels are gone. The panel gained a `scope=my|all`
+  Draft/Draft ready/Share/Wrap Up hard-coded labels are gone. **Tab redesign 2026-09-10 (S503,
+  `docs/plans/STAFF_DELIBERATIONS_TAB_SHAPE_BRIEF_2026-09-09.md`):** stage → sentence → one primary
+  action. A code-owned stage sentence (`deliberationStageSentence` in
+  `shared/utils/deliberation-stage.js`) sits under the rail with a "Deliberation session: …" line
+  (tracker §5.4 via the status payload / cycle list) and the visit line; the action row is one dark
+  button plus at most one outline button (draft: Edit in Word + Share…; shared not-sent: Share… +
+  Open working document; shared sent: Open working document, Resend only after a failed send;
+  visit: Add site-visit edits in Word + Continue in Final Writeup; final: Open Final Writeup), with
+  Download / Regenerate / Send again under a portalled More menu
+  (`shared/components/workbench/OverflowMenu.js`). Share… opens `PreSiteDistributionPanel` in
+  `composer="dialog"` mode; the composer's first button is "Lock and preview" at the draft stage and
+  calls the tab's `lockForShare` (guarded `start-site-visit`) before `prepare`, so the order is lock →
+  preview → send and a lock failure lands in the composer. The help popover, "Start sharing" block,
+  Shared/Materials sent chips, and the cycle view's registry block are gone; the email carries no
+  attachment (PR #224, migration 039). The panel gained a `scope=my|all`
   ScopeSegment like Request list/Reviewer follow-up/Awardees, stage-grouped cards, and a lead
   count line; a deliberation-session line is deferred to tracker slice 1.) All six views are
   panels (`SHELL_PANEL_VIEWS` =

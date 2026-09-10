@@ -5,7 +5,7 @@ kind: plan
 status: active
 summary: "Design brief for restructuring the per-request Staff Deliberations tab so each stage states the PD's next step with one primary action, and Share becomes one step that locks the draft and sends the deliberation email."
 cataloged: 2026-09-09
-last_verified: 2026-09-09
+last_verified: 2026-09-10
 owner: product-engineering
 related:
   - shared/components/workbench/StaffDeliberationsTab.js
@@ -17,7 +17,7 @@ related:
 
 # Staff Deliberations tab — shape brief
 
-Status: **owner-approved 2026-09-10 (S503); building.** Produced by the impeccable `shape` pass on
+Status: **BUILT 2026-09-10 (S503) on `claude/deliberations-tab-redesign`; owner click-through pending before merge.** Lock-at-preview deviation (owner-accepted): the composer's first button locks the draft and builds the preview from the locked version, then Send sends; the server never prepares a preview for an unlocked draft. Produced by the impeccable `shape` pass on
 2026-09-09 after the owner's production click-through of PR #218.
 
 Owner decisions 2026-09-10 (S503), folded into this brief:

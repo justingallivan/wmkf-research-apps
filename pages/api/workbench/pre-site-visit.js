@@ -15,6 +15,8 @@ import {
   getPreSiteVisitArtifactStatus,
 } from '../../../lib/services/pre-site-visit/artifact-service';
 import { readDeliberationStageLabels } from '../../../lib/services/deliberation-stage-labels';
+import { getDeliberationSessionForRequest } from '../../../lib/services/deliberation-briefing/session-reader';
+import { projectDeliberationSession } from '../../../shared/utils/deliberation-stage';
 import { REQUEST_DOCUMENT_OPERATION_STATUS } from '../../../shared/config/requestDocument';
 
 export const config = {
@@ -78,8 +80,13 @@ export default async function handler(req, res) {
         }
         const status = await getPreSiteVisitArtifactStatus({ requestId });
         const payload = includeCorrectionAudit ? status : staffSafePayload(status);
-        const stageLabels = await readDeliberationStageLabels();
-        return res.status(200).json({ success: true, ...payload, stageLabels });
+        // Session line (tracker §5.4 via the briefing seam): fail-open null
+        // until the tracker is enabled or a slot exists.
+        const [stageLabels, session] = await Promise.all([
+          readDeliberationStageLabels(),
+          getDeliberationSessionForRequest(requestId).catch(() => null),
+        ]);
+        return res.status(200).json({ success: true, ...payload, stageLabels, session: projectDeliberationSession(session) });
       }
 
       if (!req.body
