@@ -986,6 +986,36 @@ const v42Statements = [
   )`,
 ];
 
+// V43: deliberation briefing links (docs/DELIBERATION_BRIEFING_PAGE_PLAN.md).
+// One expiring, revocable link per request for the read-only briefing page;
+// stores a token digest and sealed token, never the raw token. Also binds the
+// link an exact Pre-Site preview carried. Mirrors migration 038.
+const v43Statements = [
+  `CREATE TABLE IF NOT EXISTS deliberation_briefing_links (
+    id UUID PRIMARY KEY,
+    request_id UUID NOT NULL,
+    jti TEXT NOT NULL UNIQUE,
+    token_digest CHAR(64) NOT NULL UNIQUE,
+    token_ciphertext TEXT NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    created_by UUID NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    revoked_at TIMESTAMPTZ,
+    revoked_by UUID,
+    superseded_by UUID,
+    CONSTRAINT deliberation_briefing_digest_shape CHECK (token_digest ~ '^[0-9a-f]{64}$'),
+    CONSTRAINT deliberation_briefing_revocation_shape CHECK (
+      (revoked_at IS NULL AND revoked_by IS NULL AND superseded_by IS NULL)
+      OR revoked_at IS NOT NULL
+    )
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_deliberation_briefing_live_per_request
+     ON deliberation_briefing_links (request_id)
+     WHERE revoked_at IS NULL`,
+  `ALTER TABLE pre_site_distribution_attempts
+     ADD COLUMN IF NOT EXISTS briefing_link_id UUID`,
+];
+
 // V32: model pricing audit history (S181).
 // Monthly drift cron (/api/cron/pricing-refresh) writes one row per
 // (model, token_type) per run. Compared against lib/utils/model-pricing.js;
@@ -1765,6 +1795,24 @@ async function runMigration() {
       }
     }
 
+    // Run V43 table creation (deliberation briefing links)
+    console.log(`\nApplying v43 schema updates - Deliberation briefing links (${v43Statements.length} statements)...`);
+    for (let i = 0; i < v43Statements.length; i++) {
+      const statement = v43Statements[i];
+      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
+      try {
+        await sql.query(statement);
+        console.log(`[v43-${i + 1}/${v43Statements.length}] ✓ ${preview}...`);
+      } catch (error) {
+        if (error.message.includes('already exists')) {
+          console.log(`[v43-${i + 1}/${v43Statements.length}] ○ Already exists: ${preview}...`);
+        } else {
+          console.error(`[v43-${i + 1}/${v43Statements.length}] ✗ Error: ${error.message}`);
+          throw error;
+        }
+      }
+    }
+
     console.log('\n✓ Database migration completed successfully!');
     console.log('\nTables created/updated:');
     console.log('  • search_cache (API search result caching)');
@@ -1827,6 +1875,7 @@ async function runMigration() {
     console.log('  • pre_site_distribution_attempts (exact preview + Dynamics send recovery ledger)');
     console.log('\nV41 new table (Scheduled personalized email review):');
     console.log('  • scheduled_email_messages (PD review windows + exact draft/send recovery ledger)');
+    console.log('  • deliberation_briefing_links (expiring, revocable briefing-page links; sealed token, digest, revocation)');
     console.log('\nIndexes created: 64 (plus 7 added in V30, 6 added in V35, 4 added in V37, 3 added in V39, 3 added in V40)');
 
   } catch (error) {

@@ -1,3 +1,9 @@
+/**
+ * @jest-environment node
+ *
+ * Node environment: the service now imports the deliberation briefing link
+ * service, whose token primitive resolves `jose` to its Node build.
+ */
 import {
   distributionBodyHtml,
   getPreSiteDistributionHistory,
@@ -1209,5 +1215,91 @@ test('a missing persisted Dynamics activity fails closed without creating a repl
     fromEmail: 'sender@example.org',
     actingUserSystemId: ACTOR_ID,
   }, dependencies)).rejects.toMatchObject({ code: 'distribution_email_missing' });
+  expect(dependencies.createEmailActivity).not.toHaveBeenCalled();
+});
+
+// ---------------------------------------------------------------------------
+// Deliberation briefing link integration (docs/DELIBERATION_BRIEFING_PAGE_PLAN.md
+// §2.2, §4): the link appears in the body only when minted, joins the exact
+// preview hash, and a replaced link fails the send.
+// ---------------------------------------------------------------------------
+
+test('body html carries the briefing section only when a link was minted', () => {
+  const without = distributionBodyHtml('Hello', OPERATION_ID, []);
+  expect(without).not.toContain('Briefing page');
+  const link = { id: 'l', url: 'https://apps.test/external/briefing/abc<>', expiresAt: '2026-10-08T20:00:00Z' };
+  const withLink = distributionBodyHtml('Hello', OPERATION_ID, [], link);
+  expect(withLink).toContain('<strong>Briefing page:</strong>');
+  expect(withLink).toContain('href="https://apps.test/external/briefing/abc&lt;&gt;"');
+  expect(withLink).toContain('expires on October 8, 2026');
+  expect(withLink.indexOf('Briefing page')).toBeLessThan(withLink.indexOf('wmkf-pre-site-distribution'));
+});
+
+test('prepare mints the briefing link, binds it to the attempt, and folds it into the preview hash', async () => {
+  const plain = createPrepareHarness();
+  const plainResult = await preparePreSiteDistribution({
+    requestId: REQUEST_ID,
+    expectedArtifactId: '44444444-4444-4444-8444-444444444444',
+    operationId: OPERATION_ID,
+    attachmentMode: 'pdf',
+    to: 'staff@example.org',
+    subject: 'Frozen materials',
+    bodyText: 'Attached.',
+    fromEmail: 'sender@example.org',
+    actingUserSystemId: ACTOR_ID,
+  }, plain.dependencies);
+  expect(plainResult.briefingLink).toBeNull();
+
+  const linked = createPrepareHarness();
+  const briefing = { id: '99999999-9999-4999-8999-999999999999', url: 'https://apps.test/external/briefing/tok', expiresAt: '2026-10-08T20:00:00.000Z' };
+  linked.dependencies.briefingReady = () => true;
+  linked.dependencies.ensureBriefingLink = jest.fn(async () => ({ link: briefing, reused: false }));
+  let bound = null;
+  linked.dependencies.recordBriefingLink = jest.fn(async (operationId, briefingLinkId) => {
+    bound = briefingLinkId;
+    const current = await linked.dependencies.createOrGetAttempt({ operationId });
+    return { ...current, briefing_link_id: briefingLinkId };
+  });
+  const linkedResult = await preparePreSiteDistribution({
+    requestId: REQUEST_ID,
+    expectedArtifactId: '44444444-4444-4444-8444-444444444444',
+    operationId: OPERATION_ID,
+    attachmentMode: 'pdf',
+    to: 'staff@example.org',
+    subject: 'Frozen materials',
+    bodyText: 'Attached.',
+    fromEmail: 'sender@example.org',
+    actingUserSystemId: ACTOR_ID,
+  }, linked.dependencies);
+  expect(linked.dependencies.ensureBriefingLink).toHaveBeenCalledWith(REQUEST_ID, ACTOR_ID);
+  expect(bound).toBe(briefing.id);
+  expect(linkedResult.briefingLink).toEqual(briefing);
+  expect(linkedResult.attempt.previewHash).not.toBe(plainResult.attempt.previewHash);
+  const created = linked.dependencies.createOrGetAttempt.mock.calls[0][0];
+  expect(created.bodyHtml).toContain('href="https://apps.test/external/briefing/tok"');
+});
+
+test('send refuses a prepared attempt whose briefing link was replaced', async () => {
+  let row = attemptFixture({ briefing_link_id: '99999999-9999-4999-8999-999999999999' });
+  const dependencies = {
+    ...currentSourceDependencies(row),
+    isBriefingLinkLive: jest.fn(async () => false),
+    getAttempt: jest.fn(async () => row),
+    claimSend: jest.fn(async () => {
+      row = { ...row, lease_token: '77777777-7777-4777-8777-777777777777' };
+      return row;
+    }),
+    findEmailByCorrelation: jest.fn(),
+    createEmailActivity: jest.fn(),
+    recordFailure: jest.fn(async () => row),
+  };
+  await expect(sendPreSiteDistribution({
+    requestId: REQUEST_ID,
+    operationId: OPERATION_ID,
+    previewHash: 'a'.repeat(64),
+    fromEmail: 'sender@example.org',
+    actingUserSystemId: ACTOR_ID,
+  }, dependencies)).rejects.toMatchObject({ code: 'distribution_briefing_stale' });
+  expect(dependencies.isBriefingLinkLive).toHaveBeenCalledWith(REQUEST_ID, '99999999-9999-4999-8999-999999999999');
   expect(dependencies.createEmailActivity).not.toHaveBeenCalled();
 });

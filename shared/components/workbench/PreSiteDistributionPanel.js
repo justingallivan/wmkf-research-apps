@@ -9,6 +9,7 @@ const STALE_PREVIEW_CODES = new Set([
   'distribution_material_stale',
   'distribution_site_visit_stale',
   'distribution_preview_changed',
+  'distribution_briefing_stale',
 ]);
 const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -57,6 +58,92 @@ function newOperationId() {
   const hex = Array.from(bytes, (value) => value.toString(16).padStart(2, '0')).join('');
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}`
     + `-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+function briefingExpiryLabel(iso) {
+  if (!iso) return null;
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+}
+
+/**
+ * Live briefing link header (docs/DELIBERATION_BRIEFING_PAGE_PLAN.md §2.4,
+ * D16). Copy is one click; "Issue new link" is a two-step inline confirm that
+ * names the consequence, because earlier emails stop working the moment the
+ * replacement exists.
+ */
+function BriefingLinkCard({ link, onReissue, busy, error }) {
+  const [confirming, setConfirming] = useState(false);
+  const [copied, setCopied] = useState(false);
+  if (!link?.url) return null;
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(link.url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopied(false);
+    }
+  };
+  const expires = briefingExpiryLabel(link.expiresAt);
+  return (
+    <Card hover={false}>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="text-base font-semibold text-gray-900">Briefing page link</h3>
+          <p className="mt-1 text-sm text-gray-600">
+            Board members and consultants open the writeup, every completed review, and the proposal narrative here without a login.
+            {expires ? ` Live until ${expires}.` : ''}
+          </p>
+          <p className="mt-2 truncate font-mono text-xs text-gray-500" title={link.url}>{link.url}</p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={copy}
+            className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-800 hover:bg-gray-50"
+          >
+            {copied ? 'Copied' : 'Copy link'}
+          </button>
+          {!confirming && (
+            <button
+              type="button"
+              onClick={() => setConfirming(true)}
+              disabled={busy}
+              className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50"
+            >
+              Issue new link
+            </button>
+          )}
+        </div>
+      </div>
+      {confirming && (
+        <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+          <p>Issuing a new link stops the current one immediately. Anyone holding an earlier email will need the new link, so send the materials again afterward.</p>
+          <div className="mt-2 flex gap-2">
+            <button
+              type="button"
+              onClick={async () => { await onReissue(); setConfirming(false); }}
+              disabled={busy}
+              className="rounded-lg bg-amber-700 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+            >
+              {busy ? 'Issuing…' : 'Issue new link'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirming(false)}
+              disabled={busy}
+              className="rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-sm font-medium text-amber-900"
+            >
+              Keep current link
+            </button>
+          </div>
+        </div>
+      )}
+      {error && <p className="mt-2 text-sm text-red-700">{error}</p>}
+    </Card>
+  );
 }
 
 function downloadUrl(webUrl) {
@@ -133,6 +220,9 @@ export default function PreSiteDistributionPanel({
   const [notice, setNotice] = useState(null);
   const [preparing, setPreparing] = useState(false);
   const [sending, setSending] = useState(false);
+  const [briefingLink, setBriefingLink] = useState(null);
+  const [reissuing, setReissuing] = useState(false);
+  const [briefingError, setBriefingError] = useState(null);
   const [recipientPickerTarget, setRecipientPickerTarget] = useState(null);
   const sequence = useRef(0);
   const controllerRef = useRef(null);
@@ -146,6 +236,7 @@ export default function PreSiteDistributionPanel({
     if (!response.ok) throw new Error(body.error || 'Email history could not be loaded.');
     if (sequence.current !== expectedSequence || id !== requestId) return;
     setHistory(body.attempts || []);
+    setBriefingLink(body.briefingLink || null);
     setHistoryError(null);
     onHistory?.({
       attempts: body.attempts || [],
@@ -241,6 +332,7 @@ export default function PreSiteDistributionPanel({
       if (!response.ok) throw new Error(body.error || `Preview preparation failed (${response.status})`);
       if (sequence.current !== currentSequence || id !== requestId) return;
       setPreview(body.attempt || null);
+      if (body.briefingLink) setBriefingLink(body.briefingLink);
     } catch (prepareError) {
       if (prepareError?.name !== 'AbortError'
         && sequence.current === currentSequence
@@ -250,6 +342,31 @@ export default function PreSiteDistributionPanel({
         setPreparing(false);
         if (controllerRef.current === controller) controllerRef.current = null;
       }
+    }
+  };
+
+  const reissueBriefingLink = async () => {
+    if (reissuing) return;
+    const id = requestId;
+    setReissuing(true);
+    setBriefingError(null);
+    try {
+      const response = await fetch('/api/workbench/pre-site-visit/briefing-link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId: id, action: 'reissue' }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error || `The new link could not be issued (${response.status})`);
+      if (id !== requestId) return;
+      setBriefingLink(body.link || null);
+      // Any prepared preview carried the old link; it can no longer be sent.
+      setPreview(null);
+      setConfirmed(false);
+    } catch (reissueError) {
+      if (id === requestId) setBriefingError(reissueError.message);
+    } finally {
+      if (id === requestId) setReissuing(false);
     }
   };
 
@@ -279,7 +396,9 @@ export default function PreSiteDistributionPanel({
         if (sequence.current === currentSequence && id === requestId) {
           setPreview(null);
           setConfirmed(false);
-          setNotice('This preview is out of date because the visit details or materials changed. Create a new preview, review it, and then send.');
+          setNotice(body.code === 'distribution_briefing_stale'
+            ? 'This preview carried a briefing link that has since been replaced. Create a new preview, review it, and then send.'
+            : 'This preview is out of date because the visit details or materials changed. Create a new preview, review it, and then send.');
         }
         return;
       }
@@ -446,6 +565,14 @@ export default function PreSiteDistributionPanel({
               {preview.cc.length > 0 && <div><dt className="inline font-medium">Cc:</dt> <dd className="inline">{preview.cc.join(', ')}</dd></div>}
               <div><dt className="inline font-medium">Subject:</dt> <dd className="inline">{preview.subject}</dd></div>
               <div><dt className="inline font-medium">Snapshot source:</dt> <dd className="inline">Word version {preview.sourceVersionId}; later edits are not included</dd></div>
+              {preview.briefingLinkId && (
+                <div>
+                  <dt className="inline font-medium">Briefing page:</dt>{' '}
+                  <dd className="inline">
+                    Link included{briefingExpiryLabel(briefingLink?.expiresAt) ? ` — live until ${briefingExpiryLabel(briefingLink?.expiresAt)}` : ''}
+                  </dd>
+                </div>
+              )}
               <div>
                 <dt className="font-medium">Message:</dt>
                 <dd className="mt-1 whitespace-pre-wrap rounded border border-blue-100 bg-white p-3">{preview.bodyText}</dd>
@@ -525,6 +652,12 @@ export default function PreSiteDistributionPanel({
         ccValue={form.cc}
         onAdd={addDirectoryRecipients}
         onClose={closeRecipientPicker}
+      />
+      <BriefingLinkCard
+        link={briefingLink}
+        onReissue={reissueBriefingLink}
+        busy={reissuing}
+        error={briefingError}
       />
       <Card hover={false}>
         {collapsed ? (

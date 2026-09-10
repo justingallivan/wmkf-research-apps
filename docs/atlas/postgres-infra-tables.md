@@ -435,3 +435,31 @@ Dedup gate for BILL.com webhook deliveries at `/api/webhooks/bill`. Compound `UN
 ### `bill_onboarding_state` (0 rows — pre-launch)
 **Source of truth:** Postgres-only. `017_bill_onboarding_state.sql` (S199, 2026-05-29). Design: `docs/BILL_CHUNK_4_DESIGN.md` Thread 3.
 Durable state for the BILL honorarium onboarding flow (`lib/bill/onboard-reviewer-service.js`), one row per honorarium `akoya_request` (PK `honorarium_request_id`). Closes the three S198 P1s (`docs/REVIEWER_BILL_HARDENING_FINDINGS.md`): the row is RESERVED (`INSERT ... ON CONFLICT DO NOTHING RETURNING`) **before** `createBillVendor` so a concurrent second caller loses the PK race and never reaches BILL; `vendor_id` is written the instant the vendor is created, **before** the contact `wmkf_billcomid` PATCH, so a failed contact PATCH can't lose it (→ no duplicate vendor on retry); `dynamics_pending` is the torn-state marker (BILL side done, `akoya_request` writeback still owed) that the daily `MaintenanceService.sweepBillOnboarding` resumes idempotently (`pending_match` true → write PNI + "Yes"; false → "No"; **NULL → sweep fails closed, never defaults to "No"**). Written/read by `lib/bill/onboarding-state.js`. TTL: completed (`dynamics_pending = false`) rows pruned after 30 days by `MaintenanceService.cleanupBillOnboardingState`.
+
+### `deliberation_briefing_links` — SOURCE-BUILT (branch `feature/deliberation-briefing-page`); MIGRATION 038 NOT YET APPLIED
+
+**Source of truth:** Postgres. One expiring, revocable link per request to the
+read-only deliberation briefing page (`docs/DELIBERATION_BRIEFING_PAGE_PLAN.md`,
+owner decisions D13–D16, 2026-09-09), added by migration
+`038_deliberation_briefing_links.sql` (mirrored in fresh-install v43), which also
+adds `pre_site_distribution_attempts.briefing_link_id`. **[PLANNED — the
+migration exists in source; the owner applies it and sets
+`DELIBERATION_BRIEFING_SCHEMA_READY=on`; nothing reads or writes the table until
+that flag is literal `on`.]**
+
+Columns: `id`, `request_id`, `jti`, `token_digest` (SHA-256 of the JWT, unique;
+verified on every external request), `token_ciphertext` (the JWT sealed with
+`lib/utils/encryption.js` so Share can carry the same link again and staff can
+copy it — the raw token is never stored), `expires_at`, `created_by`,
+`created_at`, `revoked_at`, `revoked_by`, `superseded_by`. Partial unique index
+on `request_id WHERE revoked_at IS NULL` holds at most one live row per request.
+Written by `lib/services/deliberation-briefing/briefing-link-store.js` through
+`briefing-link-service.js` (`ensureLiveBriefingLink` from the Share prepare path
+and `/api/workbench/pre-site-visit/briefing-link`; `reissueBriefingLink`
+revokes-and-replaces in one transaction). Read by
+`lib/external/verify-briefing-token.js` for `/api/external/briefing/[token]/*`.
+The row holds identity, expiry, and revocation only: the writeup the page serves
+is pinned by the latest send-requested `pre_site_distribution_attempts` row,
+reviews resolve live from `wmkf_appreviewersuggestion`, and the proposal
+narrative resolves by governed path. Cleanup: none scheduled; revoked and expired
+rows stay as audit history (bounded by one live row per request).
