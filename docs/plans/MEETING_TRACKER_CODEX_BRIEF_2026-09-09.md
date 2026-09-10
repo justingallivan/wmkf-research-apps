@@ -225,11 +225,14 @@ Add, with the discriminating fixture in each:
 
 - Commits on `codex/meeting-tracker`:
   - `052c304b` — Add Meeting Tracker Wave 28 schema.
+  - `1ba57eb3` — Use the registered sandbox host for the read-only preflight.
 - Files changed: Wave 28 session/slot specs; the read-only preflight; shared
   readiness/status/default config; focused config/schema tests; the two new
   Atlas pages; the readiness runbook row; plan §7 status.
 - Verification run and results: `/start` all green; Wave 28 preflight self-test
-  PASS; focused Jest 3/3 PASS; lint 0 errors (86 pre-existing warnings);
+  PASS; live read-only sandbox preflight PASS with 20 absent / 2 exact
+  no-alternate-key checks / 0 divergent; focused Jest 3/3 PASS; lint 0 errors
+  (86 pre-existing warnings);
   `check:types`, `check:atlas` + self-test, `check:docs-catalog`,
   `check:doc-symbol-refs` + self-test, `check:build-claim-freshness` +
   self-test, `check:fact-consistency` + self-test, `check:doc-currency` +
@@ -242,9 +245,9 @@ Add, with the discriminating fixture in each:
   divergent. After an explicitly approved
   `node scripts/apply-dataverse-schema.js --target=sandbox --wave=28-meeting-tracker --execute`,
   rerun the preflight and require **22 exact / 0 absent / 0 divergent** before
-  setting `MEETING_TRACKER_SCHEMA_READY=on`. The Codex worktree could not run
-  the live sandbox preflight because its inherited local environment has no
-  `DYNAMICS_SANDBOX_URL`.
+  setting `MEETING_TRACKER_SCHEMA_READY=on`. The preflight falls back to the
+  tracked sandbox hostname when `DYNAMICS_SANDBOX_URL` is absent; credentials
+  remain sourced from the environment.
 - Open questions / recommendations for the owner: confirm the sandbox apply
   and exact readback before asking Codex to start slice 2. Before runtime
   promotion, verify the application/impersonated staff security role has the

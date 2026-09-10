@@ -217,7 +217,7 @@ UI is designed now so the tracker fills it without a second design.
 | Slice | Content | Tier |
 |---|---|---|
 | 0 | **[BUILT 2026-09-09 on `claude/site-visit-schedulable-gate`.]** Replace `assertActiveStage` with the request precondition; keep the Workbench route green; tests for both preconditions. | 1 (branch + PR) |
-| 1 | **[VERIFIED IN SOURCE 2026-09-09 on `codex/meeting-tracker`; sandbox apply/readback pending owner action.]** Wave 28 declares session + slot with no alternate keys, required explicit Updated By actor lookups, a read-only 22-check preflight, Atlas pages, and the literal-on readiness flag contract. | 2 |
+| 1 | **[VERIFIED IN SOURCE AND SANDBOX PREFLIGHT 2026-09-09 on `codex/meeting-tracker`; sandbox apply/readback pending owner action.]** Wave 28 declares session + slot with no alternate keys, required explicit Updated By actor lookups, a read-only 22-check preflight, Atlas pages, and the literal-on readiness flag contract. The pre-apply sandbox result is 20 absent, 2 exact no-key checks, and 0 divergent. | 2 |
 | 2 | App registry entry, grant, list page, session page (date, time, duration, location, Zoom link, attendees, ordered slots), slot add/remove/reorder/move, the §5.4 reader. | 2 |
 | 2b | Site-visit editor in the tracker via the existing logistics service; briefing-room link on the slot (depends on the Site Visit Materials build). | 2 |
 | 3 | **[BUILT 2026-09-09 on `claude/deliberations-stage-rail`.]** Rail and cycle view read both dates; stage-key catalog with editable labels; parity test. Deliberation-session line pending slice 1 (no session table exists yet; the rail's visit stop shows the site visit only, with a TODO comment naming this plan). | 1 |

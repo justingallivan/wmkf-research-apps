@@ -19,11 +19,12 @@ related:
 
 **[VERIFIED IN SOURCE 2026-09-09.]** Wave 28 declares the organization-owned
 `wmkf_deliberationslot` entity and the read-only preflight validates its
-complete metadata contract. The preflight self-test passes. **[UNKNOWN LIVE
-STATE.]** No schema apply is authorized by the source build. The local worktree
-does not have `DYNAMICS_SANDBOX_URL`, so it could not run the sandbox metadata
-preflight. Keep `MEETING_TRACKER_SCHEMA_READY` unset until an owner-run sandbox
-apply is followed by 22 exact Wave 28 checks with zero absent or divergent.
+complete metadata contract. The preflight self-test passes. **[VERIFIED IN
+SANDBOX 2026-09-09 via the read-only Wave 28 preflight.]** The entity and its
+fields and relationships are absent; the no-alternate-key check is exact. No
+schema apply has run. Keep `MEETING_TRACKER_SCHEMA_READY` unset until an
+owner-run sandbox apply is followed by 22 exact Wave 28 checks with zero absent
+or divergent.
 
 Expected entity set after apply: `wmkf_deliberationslots`.
 
@@ -80,6 +81,7 @@ readback:
 node scripts/preflight-meeting-tracker-schema.mjs --target=sandbox
 ```
 
-The combined Wave 28 success result is 22 exact, 0 absent, and 0 divergent.
-This page records schema-as-code and planned runtime ownership; it does not
-assert that either Dataverse target contains the entity.
+Before apply, the verified sandbox result was 20 absent, 2 exact
+no-alternate-key checks, and 0 divergent. The combined Wave 28 success result
+after apply is 22 exact, 0 absent, and 0 divergent. Production remains
+unverified.
