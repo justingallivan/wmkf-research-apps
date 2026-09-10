@@ -73,6 +73,9 @@ test('POST rejects unknown actions and extra fields', async () => {
     { requestId: REQUEST_ID, action: 'revoke-all' },
     { requestId: REQUEST_ID, action: 'ensure', actorId: ACTOR_ID },
     { requestId: REQUEST_ID },
+    // A pre-CAS client omitting the inspected link id must not revoke blindly.
+    { requestId: REQUEST_ID, action: 'reissue' },
+    { requestId: REQUEST_ID, action: 'reissue', expectedLinkId: '' },
   ]) {
     const res = mockRes();
     await handler({ method: 'POST', body }, res);

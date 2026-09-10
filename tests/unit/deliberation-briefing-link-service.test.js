@@ -102,7 +102,7 @@ test('ensure replaces an expired live row instead of reusing it', async () => {
 test('reissue always revokes and replaces, and the old id is no longer live', async () => {
   const deps = harness();
   const first = await ensureLiveBriefingLink({ requestId: REQUEST_ID, actorId: ACTOR_ID }, deps);
-  const second = await reissueBriefingLink({ requestId: REQUEST_ID, actorId: ACTOR_ID }, deps);
+  const second = await reissueBriefingLink({ requestId: REQUEST_ID, actorId: ACTOR_ID, expectedLinkId: first.link.id }, deps);
   expect(second.link.id).not.toBe(first.link.id);
   expect(deps.replaceLiveLink).toHaveBeenCalledTimes(1);
   const live = await getLiveBriefingLink({ requestId: REQUEST_ID }, deps);
@@ -169,7 +169,9 @@ test('staff reissue passes the inspected link id and surfaces a superseded refus
   await expect(reissueBriefingLink({ requestId: REQUEST_ID, actorId: ACTOR_ID, expectedLinkId: first.link.id }, deps))
     .rejects.toMatchObject({ code: 'briefing_link_superseded', httpStatus: 409 });
   await expect(reissueBriefingLink({ requestId: REQUEST_ID, actorId: ACTOR_ID, expectedLinkId: 'nope' }, deps))
-    .rejects.toMatchObject({ code: 'briefing_request_invalid' });
+    .rejects.toMatchObject({ code: 'briefing_expected_link_required', httpStatus: 400 });
+  await expect(reissueBriefingLink({ requestId: REQUEST_ID, actorId: ACTOR_ID }, deps))
+    .rejects.toMatchObject({ code: 'briefing_expected_link_required', httpStatus: 400 });
 });
 
 test('reissue surfaces the store refusal while a send bound to the live link holds a lease', async () => {
@@ -177,7 +179,7 @@ test('reissue surfaces the store refusal while a send bound to the live link hol
   await ensureLiveBriefingLink({ requestId: REQUEST_ID, actorId: ACTOR_ID }, deps);
   const { sendInProgressError } = await import('../../lib/services/deliberation-briefing/briefing-link-store');
   deps.replaceLiveLink = jest.fn(async () => { throw sendInProgressError(); });
-  await expect(reissueBriefingLink({ requestId: REQUEST_ID, actorId: ACTOR_ID }, deps))
+  await expect(reissueBriefingLink({ requestId: REQUEST_ID, actorId: ACTOR_ID, expectedLinkId: '55555555-5555-4555-8555-555555555555' }, deps))
     .rejects.toMatchObject({ code: 'briefing_send_in_progress', httpStatus: 409 });
 });
 

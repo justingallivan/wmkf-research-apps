@@ -4,8 +4,8 @@
  * Staff read and lifecycle for the deliberation briefing link
  * (docs/DELIBERATION_BRIEFING_PAGE_PLAN.md §2.3, D15/D16).
  *   GET  ?requestId=   → { success, link: {id,url,expiresAt,createdAt}|null }
- *   POST { requestId, action: 'ensure' | 'reissue', expectedLinkId? } → { success, link, reused }
- *   (`expectedLinkId` makes reissue a compare-and-swap on the link the tab showed)
+ *   POST { requestId, action: 'ensure' | 'reissue', expectedLinkId } → { success, link, reused }
+ *   (`expectedLinkId` is required for reissue: a compare-and-swap on the link the tab showed)
  * The actor comes only from the authenticated session; the raw token leaves
  * the server only inside `link.url` for the signed-in staff caller.
  */
@@ -55,15 +55,15 @@ export default async function handler(req, res) {
     || !ACTIONS.has(req.body.action)) {
     return res.status(400).json({ error: 'The briefing link request contains unsupported fields.' });
   }
+  if (req.body.action === 'reissue' && (typeof req.body.expectedLinkId !== 'string' || !req.body.expectedLinkId.trim())) {
+    return res.status(400).json({ error: 'Reissue must name the link being replaced. Refresh and try again.', code: 'briefing_expected_link_required' });
+  }
   const actorId = access.session?.user?.dynamicsSystemuserId || null;
   const input = { requestId: String(req.body.requestId || '').trim(), actorId };
   return withDalContext('workbench-briefing-link-write', async () => {
     try {
       const result = req.body.action === 'reissue'
-        ? await reissueBriefingLink({
-          ...input,
-          expectedLinkId: typeof req.body.expectedLinkId === 'string' ? req.body.expectedLinkId.trim() : undefined,
-        })
+        ? await reissueBriefingLink({ ...input, expectedLinkId: req.body.expectedLinkId.trim() })
         : await ensureLiveBriefingLink(input);
       return res.status(200).json({ success: true, ...result });
     } catch (error) {

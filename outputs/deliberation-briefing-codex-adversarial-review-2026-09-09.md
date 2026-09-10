@@ -34,3 +34,12 @@ Verdict: needs-attention, two findings. Both verified; both addressed in the nex
 |---|---|---|---|
 | 1 | Reissue guard only blocked on an unexpired lease; an ambiguous SendEmail clears the lease with the state unresolved | Yes | Guard also blocks on any unsent attempt bound to the link with `send_requested_at` within the last 24 hours [ASSUMED window]; error text tells staff to retry the send first. |
 | 2 | Unreadable/expired-row recovery replaced whichever row was live, so concurrent recoveries could revoke each other's fresh link | Yes | `replaceLiveLink` takes `expectedLiveId` (compare-and-swap under `FOR UPDATE`) and refuses 409 `briefing_link_superseded`; `ensure` adopts the current readable row on refusal; staff reissue passes the inspected id and the tab refreshes on refusal. |
+
+## Fourth pass (after the third fixes)
+
+Verdict: needs-attention, two findings. Both verified; both addressed in the next commit.
+
+| # | Finding (Codex) | Verified? | Fix |
+|---|---|---|---|
+| 1 | The reissue transaction locked only attempts already leased or recently send-requested; a merely prepared attempt could claim a lease mid-replacement | Yes | Lock every unsent attempt bound to the link `FOR UPDATE` first, then evaluate the lease / unresolved-send blockers on the locked rows. |
+| 2 | Reissue without `expectedLinkId` (a pre-deploy browser bundle) bypassed the compare-and-swap | Yes | `expectedLinkId` is required for reissue at the route (400) and the service (`briefing_expected_link_required`). |
