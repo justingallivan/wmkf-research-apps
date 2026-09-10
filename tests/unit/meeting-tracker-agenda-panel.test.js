@@ -137,6 +137,26 @@ test('a stale send destroys the preview and requires a new confirmation', async 
   expect(screen.getByRole('button', { name: 'Create preview' })).toBeInTheDocument();
 });
 
+test('a 202 unconfirmed transport status stays an error instead of rendering a sent receipt', async () => {
+  global.fetch
+    .mockResolvedValueOnce(response({ lastAgenda: null, scheduleChanged: false }))
+    .mockResolvedValueOnce(response({ success: true, agenda: prepared() }))
+    .mockResolvedValueOnce(response({
+      error: 'Dynamics has not confirmed transport acceptance for this agenda.',
+      code: 'agenda_send_unconfirmed',
+    }, 202));
+  render(<SessionAgendaPanel sessionId={SESSION_ID} session={session} slots={slots} recipients={recipients} />);
+  await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
+  fireEvent.click(screen.getByRole('button', { name: 'Send agenda…' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Create preview' }));
+  await screen.findByText(/First proposal/);
+  fireEvent.click(screen.getByLabelText(/I reviewed the recipients/));
+  fireEvent.click(screen.getByRole('button', { name: 'Send agenda' }));
+
+  expect(await screen.findByRole('alert')).toHaveTextContent('has not confirmed transport acceptance');
+  expect(screen.queryByText(/Dynamics accepted this exact email for transport/)).not.toBeInTheDocument();
+});
+
 test('shows the sent summary and drift note returned by the server', async () => {
   global.fetch.mockResolvedValueOnce(response({
     lastAgenda: prepared({ state: 'sent', transportAccepted: true, sentAt: '2026-09-10T19:00:00.000Z' }),

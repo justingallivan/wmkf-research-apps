@@ -228,5 +228,69 @@ confirmation gate, receipt, stale notice, drift note).
 
 ## Handoff (fill in at the end)
 
-_Codex: record commits, what is built, what is not, open questions, and the exact readback the
-owner should run. Label every state claim [VERIFIED via …] or [ASSUMED]._
+### Codex handoff — 2026-09-10
+
+- **[VERIFIED via commit `2c08222c` and 23 focused tests]** The complete
+  source feature is built: migration/fresh-install schema, exact-email ledger,
+  session agenda calculation and HTML/text rendering, drift read, lease-fenced
+  Dynamics create/recovery/send, guarded GET/prepare/send route, fixed-preview
+  composer, directory recipient picker, receipt, and the minimal session-editor
+  mount.
+- **[VERIFIED via commit `35f2cef8` and documentation gates]** The API security
+  matrix, canonical counts, Postgres Atlas, and Meeting Tracker plan describe the
+  built source and its runtime boundary. Canonical counts are 125 guarded API
+  endpoints and 203 API route files.
+- **[VERIFIED via local execution]** The 17 Meeting Tracker/parity suites passed
+  (87 tests); every gate named in this brief passed, with each available
+  self-test run sequentially. Type checking, status-enum parity, and secret scan
+  also passed. The existing `MeetingTrackerList` missing-key React warning still
+  appears in its pre-existing page test and is outside this brief's owned files.
+- **[VERIFIED by this Codex session]** No migration was applied, no readiness or
+  production-acknowledgement environment variable was set, and no deployment or
+  merge was performed. **[ASSUMED externally]** Migration 041 remains unapplied
+  until the owner performs the controlled apply/readback below.
+- **[VERIFIED via `gh repo view`]** `origin` is the public repository
+  `justingallivan/wmkf-research-apps`. The branch has not been pushed because
+  publishing the new source/history to a public remote requires the owner's
+  explicit approval after that risk is stated.
+
+Open questions: none within D21–D25. An unresolved durable `send_requested`
+receipt deliberately does not call SendEmail again; it remains retryable for
+status reconciliation so an ambiguous response cannot become a duplicate send.
+
+After reviewing the branch, the owner should apply through the existing-database
+runner and read back the tracker row, all 24 columns, four constraints (primary
+key plus the three named checks), and two indexes (primary key plus the session
+history index):
+
+```bash
+node scripts/apply-migrations.js
+psql "${POSTGRES_URL:-$DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+SELECT name, applied_at, applied_by
+FROM schema_migrations
+WHERE name = '041_deliberation_agenda_sends.sql';
+
+SELECT ordinal_position, column_name, data_type, is_nullable, column_default
+FROM information_schema.columns
+WHERE table_schema = 'public'
+  AND table_name = 'deliberation_agenda_sends'
+ORDER BY ordinal_position;
+
+SELECT constraint_name, constraint_type
+FROM information_schema.table_constraints
+WHERE table_schema = 'public'
+  AND table_name = 'deliberation_agenda_sends'
+ORDER BY constraint_name;
+
+SELECT indexname, indexdef
+FROM pg_indexes
+WHERE schemaname = 'public'
+  AND tablename = 'deliberation_agenda_sends'
+ORDER BY indexname;
+SQL
+```
+
+Expected exact names: constraints `deliberation_agenda_sends_pkey`,
+`deliberation_agenda_state_check`, `deliberation_agenda_recipient_shape`, and
+`deliberation_agenda_lease_shape`; indexes `deliberation_agenda_sends_pkey` and
+`idx_deliberation_agenda_session_history`.
