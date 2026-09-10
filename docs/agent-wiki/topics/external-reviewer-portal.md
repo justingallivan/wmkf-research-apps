@@ -435,8 +435,8 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   non-accepted, terminal/unknown, and already-delivered rows before mint; manual
   reminders freshly reauthorize; and review-due reminders are link-free and never mint.
   `regenerate-token` remains the deliberate staff replacement-link action when
-  response type is unset, `accepted`, or `held`, review status is known and
-  nonterminal, and a concrete ETag is present; it can restore access only after
+  response type is unset, `accepted`, or `held`, review status is unset or a
+  known nonterminal value, and a concrete ETag is present; it can restore access only after
   those server-side lifecycle checks and is not a routine follow-up substitute.
   `complete` and a received/submitted timestamp are not separate regeneration
   guards. The automatic

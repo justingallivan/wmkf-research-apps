@@ -1406,7 +1406,7 @@ not accepted, unresolved duplicates, and malformed/unknown lifecycle or token
 state. Unselected, applicant-excluded, and explicitly merged/removed duplicates
 do not participate. `mintAndStore` clears revocation and writes a future expiry, but
 token regeneration is independently fail-closed to response type unset/accepted/held,
-a known nonterminal review status, and a concrete ETag; it does not reselect a removed row or undo
+an unset or known nonterminal review status, and a concrete ETag; it does not reselect a removed row or undo
 decline/no-response/withdraw/release, and a concurrent lifecycle change cannot be
 overwritten. An existing synthesis remains
 visible but is not current until synthesis runs again after genuine reactivation

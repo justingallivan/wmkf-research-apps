@@ -20,8 +20,8 @@
  * Thin route shell (Route→Service Consolidation Plan, Stage 2): method
  * dispatch → auth guard → input validation →
  * withDalContext → one service call → result/error→HTTP mapping. All
- * business logic (excluded fail-closed chokepoint, mint, best-effort draft
- * cleanup) lives in lib/services/review-manager/regenerate-token-service.js.
+ * business logic (excluded fail-closed chokepoint and mint; this route performs
+ * no draft cleanup) lives in lib/services/review-manager/regenerate-token-service.js.
  */
 
 import { requireAppAccess } from '../../../lib/utils/auth';

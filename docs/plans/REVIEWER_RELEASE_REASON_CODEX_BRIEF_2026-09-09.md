@@ -272,7 +272,9 @@ is decorative and does not count):
   commit is `16ca526c`; `60263d75` (names the durable-documentation handoff
   commit in this inventory); `df13f0d4` (completes the prior final commit
   inventory); `6bee8d5c` (preserves token-revocation tri-state evidence and
-  adds the unknown-review-status regeneration regression); and `ee085e2c`
+  adds the unknown-review-status regeneration regression); `95d26aea` (records
+  final lifecycle verification); `d2db1a07` (clarifies the final handoff
+  snapshot); and `ee085e2c`
   (predicate-partitioned no-response history, explicit answers, exact
   regeneration/reset documentation, overlap, and unknown-status regressions).
   Verification snapshot (2026-09-09, before this final docs-only update): the
