@@ -94,6 +94,11 @@ export default function MeetingTrackerList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const loadToken = useRef(0);
+  // The cycle picker's options come only from the dashboard's no-cycle
+  // response. Arriving with a cycle already in the URL (the session page's
+  // "Back to the cycle schedule" link does this) must still load them, or the
+  // Grant cycle select renders disabled (owner, 2026-09-10).
+  const cyclesRef = useRef([]);
 
   const load = useCallback(async (selectedProgramId, selectedCycleCode, selectedScope) => {
     const token = ++loadToken.current;
@@ -104,17 +109,24 @@ export default function MeetingTrackerList() {
       if (selectedProgramId) query.set('programId', selectedProgramId);
       if (selectedCycleCode) query.set('cycleCode', selectedCycleCode);
       if (selectedScope === 'all') query.set('scope', 'all');
-      const [dashboardResponse, sessionsResponse] = await Promise.all([
+      const needsPicker = Boolean(selectedCycleCode) && cyclesRef.current.length === 0;
+      const pickerQuery = new URLSearchParams();
+      if (selectedProgramId) pickerQuery.set('programId', selectedProgramId);
+      const [dashboardResponse, sessionsResponse, pickerResponse] = await Promise.all([
         fetch(`/api/meeting-tracker/dashboard${query.size ? `?${query}` : ''}`),
         fetch('/api/meeting-tracker/sessions'),
+        needsPicker ? fetch(`/api/meeting-tracker/dashboard${pickerQuery.size ? `?${pickerQuery}` : ''}`) : Promise.resolve(null),
       ]);
       const dashboard = await dashboardResponse.json().catch(() => ({}));
       const sessionBody = await sessionsResponse.json().catch(() => ({}));
+      const picker = pickerResponse?.ok ? await pickerResponse.json().catch(() => ({})) : null;
       if (token !== loadToken.current) return;
       if (!dashboardResponse.ok) throw new Error(dashboard.error || 'The meeting schedule could not be loaded. Please try again.');
       if (!sessionsResponse.ok) throw new Error(sessionBody.error || 'The meeting sessions could not be loaded. Please try again.');
-      setPrograms(dashboard.programs || []);
-      setCycles((current) => dashboard.cycles || current);
+      setPrograms((current) => dashboard.programs || picker?.programs || current);
+      const nextCycles = dashboard.cycles || picker?.cycles || cyclesRef.current;
+      cyclesRef.current = nextCycles;
+      setCycles(nextCycles);
       setSessions(sessionBody.sessions || []);
       if (!selectedProgramId && dashboard.programId) setProgramId(dashboard.programId);
       if (!selectedCycleCode) {

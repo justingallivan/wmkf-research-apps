@@ -1,8 +1,22 @@
 /** @jest-environment jsdom */
 
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { AppCard, getServerSideProps as getLandingProps } from '../../pages/index';
-import { MeetingTrackerRequestRow } from '../../shared/components/meeting-tracker/MeetingTrackerList';
+import MeetingTrackerList, { MeetingTrackerRequestRow } from '../../shared/components/meeting-tracker/MeetingTrackerList';
+
+let routerQuery = {};
+const routerReplace = jest.fn(async () => true);
+jest.mock('next/router', () => ({
+  useRouter: () => ({ isReady: true, query: routerQuery, replace: routerReplace, pathname: '/meeting-tracker' }),
+}));
+jest.mock('../../shared/components/Layout', () => ({
+  __esModule: true,
+  default: ({ children }) => <div>{children}</div>,
+  PageHeader: ({ title }) => <h1>{title}</h1>,
+}));
+jest.mock('next/link', () => function MockLink({ children, href }) {
+  return <a href={typeof href === 'string' ? href : href.pathname}>{children}</a>;
+});
 import { reorderSessionSlots } from '../../shared/components/meeting-tracker/SessionEditor';
 
 const SESSION_ID = '11111111-1111-4111-8111-111111111111';
@@ -98,4 +112,26 @@ test('landing tile remains visible and disabled while readiness is unset', async
   }} />);
   expect(screen.getAllByText('Not yet enabled')).toHaveLength(2);
   expect(screen.queryByRole('link')).not.toBeInTheDocument();
+});
+
+test('arriving with a cycle in the URL still loads the cycle picker (the session page links back this way)', async () => {
+  routerQuery = { cycleCode: 'D26', programId: 'p1' };
+  global.fetch = jest.fn(async (url) => {
+    const target = String(url);
+    const body = target.includes('/sessions')
+      ? { sessions: [] }
+      : target.includes('cycleCode=')
+        ? { programs: [{ id: 'p1', name: 'Research' }], programId: 'p1', cycleCode: 'D26', proposals: [], notices: [] }
+        : { programs: [{ id: 'p1', name: 'Research' }], programId: 'p1', cycles: [{ code: 'D26', label: 'December 2026' }, { code: 'J27', label: 'June 2027' }], defaultCycleCode: 'D26' };
+    return { ok: true, status: 200, json: async () => body };
+  });
+  render(<MeetingTrackerList />);
+
+  const cycleSelect = await screen.findByLabelText('Grant cycle');
+  await waitFor(() => expect(cycleSelect).toBeEnabled());
+  expect(cycleSelect).toHaveValue('D26');
+  expect(screen.getByRole('option', { name: 'June 2027' })).toBeInTheDocument();
+  // Discriminating: the picker payload was fetched once, without a cycle.
+  const pickerCalls = global.fetch.mock.calls.filter(([u]) => String(u).includes('/dashboard') && !String(u).includes('cycleCode='));
+  expect(pickerCalls).toHaveLength(1);
 });
