@@ -270,7 +270,11 @@ is decorative and does not count):
   attribution, held regeneration control, durable documentation wording, and
   discriminating tests). The durable-documentation and final handoff correction
   commit is `16ca526c`; `60263d75` (names the durable-documentation handoff
-  commit in this inventory). All listed commits are pushed to
+  commit in this inventory); `df13f0d4` (completes the prior final commit
+  inventory); and `6bee8d5c` (preserves token-revocation tri-state evidence and
+  adds the unknown-review-status regeneration regression). The verified feature
+  predecessor is `6bee8d5c`; the handoff-finalizing documentation commit follows
+  it and is explicitly identified by its delivery SHA. All listed commits are pushed to
   `origin/codex/reviewer-release-reason`.
 - Files changed: `lib/services/review-manager/withdraw-sufficient-service.js`,
   `lib/services/reviewer-engagement/withdraw-pending-invitation.js`,
@@ -280,6 +284,8 @@ is decorative and does not count):
   `shared/config/reviewerLifecycle.js`,
   `shared/components/reviewers/ReleaseEmailModal.js`,
   `shared/components/reviewers/ReviewerInvitePanel.js`,
+  `shared/components/reviewers/ReviewerManagePanel.js`,
+  `shared/components/reviewers/ReviewersTab.js`,
   `shared/components/reviewers/TokenActionsMenu.js`,
   `shared/components/reviewers/reviewer-activity-history.js`, the focused unit and
   integration tests for service/route/writer/modal/history, including
@@ -308,7 +314,7 @@ is decorative and does not count):
   tests/integration/review-manager-token-routes.test.js
   tests/unit/reviewer-suggestion-token-regeneration.test.js
   tests/unit/reviewer-manage-actions-menu.test.js tests/unit/reviewer-activity-history.test.js
-  tests/unit/reviewers-service.test.js --runInBand --silent` passes with 164 tests across 6 suites
+  tests/unit/reviewers-service.test.js --runInBand --silent` passes with 165 tests across 6 suites
   (including the terminal response complement with held control, unknown-state
   fall-through, missing-ETag and exact-ifMatch controls, conditional 412 race
   mapping, concrete-ETag revoked no-response route fixture, adapter annotation
@@ -323,7 +329,7 @@ is decorative and does not count):
   `check:route-service-boundary` + self-test; `check:route-lifecycle-auth` +
   self-test; and `git diff --check` all pass. The branch was based on `a3bda092`,
   and `git ls-remote` verified `origin/main` at `7e06e4a1` and the pushed branch
-  at `f7fb526a` before the final docs commit.
+  predecessor at `6bee8d5c` before the handoff-finalizing docs commit.
 - Open questions / recommendations for the owner: the branch was based on
   `a3bda092`; unrelated `origin/main` is `7e06e4a1`, so the branch remains behind
   `main` by design. The requested release branch
