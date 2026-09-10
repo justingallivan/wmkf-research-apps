@@ -35,6 +35,8 @@ test('a new visit: the form posts the fields the logistics service expects, with
 
   expect(await screen.findByRole('heading', { name: /Schedule the site visit · #1003222/ })).toBeInTheDocument();
   expect(await screen.findByLabelText('Subject')).toHaveValue('Site Visit — #1003222');
+  // Virtual by default (owner 2026-09-10).
+  expect(screen.getByLabelText('Format')).toHaveValue('100000001');
   const save = screen.getByRole('button', { name: 'Schedule site visit' });
   expect(save).toBeDisabled();
 
@@ -55,7 +57,7 @@ test('a new visit: the form posts the fields the logistics service expects, with
   const payload = JSON.parse(options.body);
   expect(payload).toEqual({
     subject: 'Site Visit — #1003222', description: '', startLocal: '2026-10-01T09:00', endLocal: '2026-10-01T12:00',
-    timeZone: 'America/Los_Angeles', format: 100000000, locationOrLink: 'Campus',
+    timeZone: 'America/Los_Angeles', format: 100000001, locationOrLink: 'Campus',
     organizer: { kind: 'staff', profileId: 7 },
     requiredAttendees: [{ kind: 'manual', name: 'PI', email: 'pi@example.edu' }],
     optionalAttendees: [],

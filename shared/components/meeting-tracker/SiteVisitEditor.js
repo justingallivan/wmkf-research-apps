@@ -21,7 +21,9 @@ function emptyForm(requestNumber) {
     startLocal: '',
     endLocal: '',
     timeZone: DEFAULT_TIME_ZONE,
-    format: SITE_VISIT_FORMAT.IN_PERSON,
+    // Virtual by default (owner 2026-09-10): most visits are Zoom, and a
+    // pasted link with "In person" left in place was the first thing seen.
+    format: SITE_VISIT_FORMAT.VIRTUAL,
     locationOrLink: '',
     organizer: null,
     requiredAttendees: [],
@@ -37,7 +39,7 @@ function formFromVisit(visit, requestNumber) {
     startLocal: visit.startLocal || '',
     endLocal: visit.endLocal || '',
     timeZone: visit.timeZone || DEFAULT_TIME_ZONE,
-    format: visit.format ?? SITE_VISIT_FORMAT.IN_PERSON,
+    format: visit.format ?? SITE_VISIT_FORMAT.VIRTUAL,
     locationOrLink: visit.locationOrLink || '',
     organizer: visit.organizer || null,
     requiredAttendees: visit.requiredAttendees || [],
