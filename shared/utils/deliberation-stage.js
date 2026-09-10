@@ -28,6 +28,29 @@ export const DELIBERATION_STAGE_DEFAULT_LABELS = Object.freeze({
 });
 
 /**
+ * Code-owned first-stop text for the draft substates that are *not* "ready".
+ * The admin-editable `draft` label (D6) only describes a draft that exists;
+ * before one does, the rail must not claim it (S503: a request with no draft
+ * at all read "AI draft ready"). `ready` falls through to the label.
+ */
+export const DELIBERATION_DRAFT_SUBSTATE_TEXT = Object.freeze({
+  none: 'No draft yet',
+  generating: 'Generating draft',
+  failed: 'Draft failed',
+});
+
+/**
+ * The text the rail shows for the first stop given the current stage/substate:
+ * the (admin-editable) draft label once a draft exists or the stage has moved
+ * on, otherwise the code-owned substate text.
+ */
+export function draftStopText({ stage, substate, labels = {} }) {
+  const label = labels.draft || DELIBERATION_STAGE_DEFAULT_LABELS.draft;
+  if (stage !== 'draft') return label;
+  return DELIBERATION_DRAFT_SUBSTATE_TEXT[substate] || label;
+}
+
+/**
  * D8: every advancing D26 request is visited, so stop 3 is never expected to
  * be absent this cycle. J27 changes this (a proposal may go out for review
  * and then not be visited) — this is the single predicate that register row

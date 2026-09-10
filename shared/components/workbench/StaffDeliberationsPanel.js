@@ -71,7 +71,7 @@ function DeliberationCard({ artifact, stageLabels }) {
           {artifact.institution && <p className="text-sm text-gray-600 mt-1">{artifact.institution}</p>}
           {artifact.programDirector && <p className="text-xs text-gray-500 mt-1">PD: {artifact.programDirector}</p>}
           {DELIBERATION_STAGE_KEYS.includes(artifact.stage) && (
-            <DeliberationStageRail stage={artifact.stage} labels={stageLabels} />
+            <DeliberationStageRail stage={artifact.stage} substate={artifact.substate} labels={stageLabels} />
           )}
           {visitLineVisible(artifact.stage) && (
             <p className="mt-1 text-xs text-gray-500" data-testid="deliberations-visit-line">

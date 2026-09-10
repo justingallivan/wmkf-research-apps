@@ -393,8 +393,12 @@ export default function StaffDeliberationsTab({
   // every existing gate above (`shared`, `draftReady`) stays lifecycle-derived
   // so the working controls and distribution panel are unaffected by the
   // visit having happened.
+  // With no current document, an in-flight or failed generation lives in
+  // `pendingArtifact`; feed it so the first stop can say generating/failed
+  // instead of "No draft yet". Once a draft exists it wins (a regeneration in
+  // flight does not un-ready the existing draft).
   const { stage, substate, visit } = deriveDeliberationStage({
-    currentArtifact: artifact,
+    currentArtifact: artifact || pendingArtifact,
     siteVisitStartIso,
     everSent,
   });
@@ -623,6 +627,7 @@ export default function StaffDeliberationsTab({
               <>
                 <DeliberationStageRail
                   stage={stage}
+                  substate={substate}
                   labels={stageLabels}
                   reopened={draftReady && reopenHistory.length > 0}
                 />

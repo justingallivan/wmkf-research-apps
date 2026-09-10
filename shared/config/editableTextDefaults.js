@@ -177,7 +177,7 @@ export const EDITABLE_TEXT_DEFAULTS = [
   {
     key: 'stage.deliberations.draft',
     label: 'Deliberations stage label: draft',
-    description: 'Display label for the Staff Deliberations rail\'s first stop (default "AI draft ready"). Read by both the Staff Deliberations tab and the cycle view (docs/PC_MEETING_TRACKER_PLAN.md D6).',
+    description: 'Display label for the Staff Deliberations rail\'s first stop once a draft exists (default "AI draft ready"; before that the stop reads "No draft yet" / "Generating draft" / "Draft failed"). Read by both the Staff Deliberations tab and the cycle view (docs/PC_MEETING_TRACKER_PLAN.md D6).',
     multiline: false,
     placeholders: [],
   },
