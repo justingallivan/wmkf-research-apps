@@ -488,6 +488,36 @@ test('a different staff actor cannot resume a confirmed Draft activity', async (
   expect(deps.sendEmail).not.toHaveBeenCalled();
 });
 
+test.each([
+  [6, 'sent'],
+  [8, 'failed'],
+])('a different staff actor may reconcile status %s to %s without transport', async (statuscode, state) => {
+  const baseRow = row(undefined, {
+    state: 'send_requested',
+    dynamics_email_id: EMAIL_ID,
+    send_requested_at: '2026-09-10T12:01:00Z',
+  });
+  const deps = sendDependencies(baseRow, {
+    getEmailActivity: jest.fn(async () => emailActivity(baseRow, statuscode)),
+  });
+  const action = sendAgendaEmail({
+    ...actorInput,
+    fromEmail: 'other@example.org',
+    actingUserSystemId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+  }, deps);
+  if (state === 'sent') {
+    await expect(action).resolves.toMatchObject({ agenda: { state: 'sent' }, reused: true });
+  } else {
+    await expect(action).rejects.toMatchObject({
+      httpStatus: 409,
+      code: 'agenda_send_terminal',
+      body: { failedSend: expect.objectContaining({ state: 'failed' }) },
+    });
+  }
+  expect(deps.recordDraftReconciled).not.toHaveBeenCalled();
+  expect(deps.sendEmail).not.toHaveBeenCalled();
+});
+
 test.each([2, 4, 5, 8])('a retry with terminal Dynamics status %s resolves failed without transport', async (statuscode) => {
   const baseRow = row(undefined, {
     state: 'send_requested',
@@ -525,6 +555,28 @@ test('a terminal failed row requires a new preview and cannot be sent again', as
   });
   expect(deps.getLatestUnresolvedAgenda).not.toHaveBeenCalled();
   expect(deps.claimSend).not.toHaveBeenCalled();
+  expect(deps.sendEmail).not.toHaveBeenCalled();
+});
+
+test('a row that becomes failed before claim is reported as terminal without claiming', async () => {
+  const preparedRow = row();
+  const failedRow = row(undefined, {
+    state: 'failed',
+    dynamics_email_id: EMAIL_ID,
+    dynamics_statuscode: 8,
+    last_error_code: 'agenda_send_terminal',
+  });
+  const deps = sendDependencies(preparedRow, {
+    getAgenda: jest.fn()
+      .mockResolvedValueOnce(preparedRow)
+      .mockResolvedValueOnce(failedRow),
+    claimSend: jest.fn(async () => null),
+  });
+  await expect(sendAgendaEmail(actorInput, deps)).rejects.toMatchObject({
+    httpStatus: 409,
+    code: 'agenda_send_terminal',
+  });
+  expect(deps.createEmailActivity).not.toHaveBeenCalled();
   expect(deps.sendEmail).not.toHaveBeenCalled();
 });
 

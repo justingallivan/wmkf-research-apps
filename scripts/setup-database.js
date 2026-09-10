@@ -1946,7 +1946,7 @@ async function runMigration() {
     console.log('  • deliberation_briefing_links (expiring, revocable briefing-page links; sealed token, digest, revocation)');
     console.log('\nV44 new table (Deliberation session agenda email):');
     console.log('  • deliberation_agenda_sends (frozen session agenda + Dynamics send recovery ledger)');
-    console.log('\nIndexes created: 64 (plus 7 added in V30, 6 added in V35, 4 added in V37, 3 added in V39, 3 added in V40, 1 added in V44)');
+    console.log('\nIndexes created: 64 (plus 7 added in V30, 6 added in V35, 4 added in V37, 3 added in V39, 3 added in V40, 2 added in V44)');
 
   } catch (error) {
     console.error('\n✗ Migration failed:', error.message);

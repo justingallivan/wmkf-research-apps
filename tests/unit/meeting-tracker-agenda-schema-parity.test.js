@@ -58,6 +58,7 @@ test('migration 041 and fresh install pin the agenda ledger columns and named co
   expect(setup).toContain("state IN ('prepared', 'activity_created', 'send_requested', 'sent', 'failed')");
   expect(migration).toContain("WHERE state = 'send_requested'");
   expect(setup).toContain("WHERE state = 'send_requested'");
+  expect(store).toContain("state NOT IN ('sent', 'failed')");
 });
 
 test('agenda status store queries keep sent receipts separate from unresolved sends', () => {

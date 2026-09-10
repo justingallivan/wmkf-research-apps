@@ -315,12 +315,14 @@ export default function SessionAgendaPanel({ sessionId, session, slots, recipien
       if (!response.ok && body.code === 'agenda_operation_stale') {
         if (sequence.current === currentSequence) {
           setPendingSend(null);
-          setForm({
-            to: attendeeEmails(session),
-            cc: '',
-            subject: defaultSubject(session),
-            bodyText: DEFAULT_MESSAGE,
-          });
+          if (recoveringPending) {
+            setForm({
+              to: attendeeEmails(session),
+              cc: '',
+              subject: defaultSubject(session),
+              bodyText: DEFAULT_MESSAGE,
+            });
+          }
           setPreview(null);
           setConfirmed(false);
           setNotice('The session schedule changed after this preview. Create a new preview, review it, and then send.');
@@ -330,12 +332,14 @@ export default function SessionAgendaPanel({ sessionId, session, slots, recipien
       if (!response.ok && body.code === 'agenda_send_terminal') {
         if (sequence.current === currentSequence) {
           setPendingSend(null);
-          setForm({
-            to: attendeeEmails(session),
-            cc: '',
-            subject: defaultSubject(session),
-            bodyText: DEFAULT_MESSAGE,
-          });
+          if (recoveringPending) {
+            setForm({
+              to: attendeeEmails(session),
+              cc: '',
+              subject: defaultSubject(session),
+              bodyText: DEFAULT_MESSAGE,
+            });
+          }
           setPreview(null);
           setConfirmed(false);
           setNotice(body.error || 'Dynamics closed the prior email. Create a new preview before sending again.');
@@ -372,6 +376,7 @@ export default function SessionAgendaPanel({ sessionId, session, slots, recipien
   const recoveringPending = Boolean(
     pendingSend?.operationId && preview?.operationId === pendingSend.operationId,
   );
+  const showEditableFields = !recoveringPending && !preview?.transportAccepted;
 
   return (
     <>
@@ -403,7 +408,7 @@ export default function SessionAgendaPanel({ sessionId, session, slots, recipien
       {composerOpen && (
         <ComposerDialog busy={Boolean(busy)} directoryOpen={directoryTarget !== null} onClose={closeComposer}>
           {error && <div role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</div>}
-          {!recoveringPending && <div className="mt-5 grid gap-4 md:grid-cols-2">
+          {showEditableFields && <div className="mt-5 grid gap-4 md:grid-cols-2">
             {[['to', 'To'], ['cc', 'Cc']].map(([field, label]) => (
               <div key={field}>
                 <div className="flex items-center justify-between gap-2">
@@ -414,7 +419,7 @@ export default function SessionAgendaPanel({ sessionId, session, slots, recipien
               </div>
             ))}
           </div>}
-          {!recoveringPending && (
+          {showEditableFields && (
             <>
               <label htmlFor="agenda-subject" className="mt-4 block text-sm font-medium text-gray-800">Subject</label>
               <input id="agenda-subject" value={form.subject} onChange={(event) => edit({ subject: event.target.value })} disabled={Boolean(busy)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />

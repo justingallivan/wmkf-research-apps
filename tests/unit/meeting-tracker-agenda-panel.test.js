@@ -129,6 +129,9 @@ test('a stale send destroys the preview and requires a new confirmation', async 
   render(<SessionAgendaPanel sessionId={SESSION_ID} session={session} slots={slots} recipients={recipients} />);
   await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
   fireEvent.click(screen.getByRole('button', { name: 'Send agenda…' }));
+  fireEvent.change(screen.getByLabelText('To'), { target: { value: 'custom@example.org' } });
+  fireEvent.change(screen.getByLabelText('Subject'), { target: { value: 'Custom agenda subject' } });
+  fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'Custom agenda message' } });
   fireEvent.click(screen.getByRole('button', { name: 'Create preview' }));
   await screen.findByText(/First proposal/);
   fireEvent.click(screen.getByLabelText(/I reviewed the recipients/));
@@ -136,6 +139,9 @@ test('a stale send destroys the preview and requires a new confirmation', async 
 
   expect(await screen.findByText(/Create a new preview, review it, and then send/)).toBeInTheDocument();
   expect(screen.queryByText(/First proposal/)).not.toBeInTheDocument();
+  expect(screen.getByLabelText('To')).toHaveValue('custom@example.org');
+  expect(screen.getByLabelText('Subject')).toHaveValue('Custom agenda subject');
+  expect(screen.getByLabelText('Message')).toHaveValue('Custom agenda message');
   expect(screen.getByRole('button', { name: 'Create preview' })).toBeInTheDocument();
 });
 
@@ -189,6 +195,7 @@ test('a prepare-time unresolved conflict pins the existing operation', async () 
   fireEvent.click(screen.getByLabelText(/I reviewed the recipients/));
   fireEvent.click(screen.getByRole('button', { name: 'Send agenda' }));
   expect(await screen.findByText(/Dynamics accepted this exact email for transport/)).toBeInTheDocument();
+  expect(screen.queryByLabelText('To')).not.toBeInTheDocument();
   const sendCall = global.fetch.mock.calls.find(([, options]) => options?.method === 'PATCH');
   expect(JSON.parse(sendCall[1].body)).toEqual({ operationId: pending.operationId });
 });
@@ -249,6 +256,7 @@ test('a 202 unconfirmed transport status stays recoverable on the same operation
   fireEvent.click(screen.getByLabelText(/I reviewed the recipients/));
   fireEvent.click(screen.getByRole('button', { name: 'Send agenda' }));
   expect(await screen.findByText(/Dynamics accepted this exact email for transport/)).toBeInTheDocument();
+  expect(screen.queryByLabelText('To')).not.toBeInTheDocument();
   const prepareCalls = global.fetch.mock.calls.filter(([, options]) => options?.method === 'POST');
   const sendCalls = global.fetch.mock.calls.filter(([, options]) => options?.method === 'PATCH');
   expect(prepareCalls).toHaveLength(1);
