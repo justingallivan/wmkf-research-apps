@@ -274,3 +274,27 @@ readiness flag is enabled for that target.
    "Open briefing" or "Briefing not yet shared — the lead PD shares the writeup from Staff
    Deliberations." for null.
 4. ~~App key and name.~~ **Decided 2026-09-09 (D12):** key `meeting-tracker`, name "Meeting Tracker".
+5. **Session agenda email — decided 2026-09-10 (D21–D25, S503).** Board members often join for
+   part of a session and need to know when their proposals come up; the per-proposal Share email
+   does not say. So:
+   - **D21 One agenda email per session**, sent by the PC from the session page. Body: the
+     session date and time in its zone, the Zoom "Join meeting" link, location if any, then the
+     proposals in slot order, each with a computed start–end window (session start plus the
+     cumulative minutes of earlier slots), request number, title, lead PD, and "Open briefing"
+     when the request's briefing link is live, else "briefing link to follow by email".
+   - **D22 The email is a snapshot.** Times are computed at send from the slots as they are then.
+     The session page shows "Agenda sent <when> to <n> recipients" and, when the start, order,
+     or minutes have changed since, "Schedule changed since the last agenda"; the PC sends again.
+     No automatic resend, no staleness enforcement beyond that note.
+   - **D23 Transport and ledger** mirror the deliberation email: a Dynamics email activity plus
+     SendEmail from the PC's mailbox with the session-minted actor, no regarding record (the
+     session entity has no activities), no attachments, a correlation key on the activity
+     subcategory, and a Postgres ledger row (`deliberation_agenda_sends`, migration 041) with a
+     lease-fenced send so a retry reconciles instead of double-sending.
+   - **D24 Recipients** default to the session's attendees (staff plus the Board members added
+     to that session); the PC can edit To/Cc before sending; the server normalizes and
+     de-duplicates as the deliberation email does; an empty To refuses.
+   - **D25 One agenda for everyone.** No per-recipient filtering; Board members find their
+     proposals by the times.
+   Built by Codex on `codex/session-agenda` from
+   `docs/plans/SESSION_AGENDA_EMAIL_CODEX_BRIEF_2026-09-10.md`.
