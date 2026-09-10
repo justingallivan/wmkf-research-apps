@@ -231,8 +231,9 @@ Add, with the discriminating fixture in each:
   Atlas pages; the readiness runbook row; plan §7 status.
 - Verification run and results: `/start` all green; Wave 28 preflight self-test
   PASS; live read-only sandbox preflight PASS with 20 absent / 2 exact
-  no-alternate-key checks / 0 divergent; focused Jest 3/3 PASS; lint 0 errors
-  (86 pre-existing warnings);
+  no-alternate-key checks / 0 divergent; the sandbox apply command with the
+  process-scoped registered URL completed in dry-run mode; focused Jest 3/3
+  PASS; lint 0 errors (86 pre-existing warnings);
   `check:types`, `check:atlas` + self-test, `check:docs-catalog`,
   `check:doc-symbol-refs` + self-test, `check:build-claim-freshness` +
   self-test, `check:fact-consistency` + self-test, `check:doc-currency` +
@@ -243,7 +244,7 @@ Add, with the discriminating fixture in each:
   `node scripts/preflight-meeting-tracker-schema.mjs --target=sandbox`; on an
   untouched sandbox expect 20 absent / 2 exact no-alternate-key checks / 0
   divergent. After an explicitly approved
-  `node scripts/apply-dataverse-schema.js --target=sandbox --wave=28-meeting-tracker --execute`,
+  `DYNAMICS_SANDBOX_URL=https://orgd9e66399.crm.dynamics.com node scripts/apply-dataverse-schema.js --target=sandbox --wave=28-meeting-tracker --execute`,
   rerun the preflight and require **22 exact / 0 absent / 0 divergent** before
   setting `MEETING_TRACKER_SCHEMA_READY=on`. The preflight falls back to the
   tracked sandbox hostname when `DYNAMICS_SANDBOX_URL` is absent; credentials
