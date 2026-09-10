@@ -51,3 +51,11 @@ Verdict: needs-attention, one medium finding. Verified; addressed in the next co
 | # | Finding (Codex) | Verified? | Fix |
 |---|---|---|---|
 | 1 | A preview prepared before the flag was enabled (no bound link) could be sent after enablement without the briefing section | Yes | With the flag on, an unbound unsent preview is refused `distribution_briefing_stale` (re-prepare); an already send-requested legacy attempt still reconciles. Flag off unchanged. |
+
+## Sixth pass (after the fifth fix)
+
+Verdict: needs-attention, one medium finding. Verified; addressed in the next commit.
+
+| # | Finding (Codex) | Verified? | Fix |
+|---|---|---|---|
+| 1 | A link expiring between the two send checks failed after `send_requested_at` was stamped, so the unsent attempt read as an unresolved send and blocked reissue for 24 hours | Yes | Final source/material/link rechecks now run before send intent is stamped and the lease renewed; a retry of a send-requested attempt reconciles Dynamics status first (an accepted send records `sent` without any liveness check). Two regression tests. |

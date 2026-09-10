@@ -1121,7 +1121,10 @@ test('transport is not called when the source changes after activity recovery bu
     fromEmail: 'sender@example.org',
     actingUserSystemId: ACTOR_ID,
   }, dependencies)).rejects.toMatchObject({ code: 'distribution_stale_source' });
-  expect(dependencies.renewSendLease).toHaveBeenCalledTimes(1);
+  // The final rechecks now run before send intent is stamped or the lease is
+  // renewed, so a pre-transport failure leaves the attempt provably unsent.
+  expect(dependencies.recordSendRequested).not.toHaveBeenCalled();
+  expect(dependencies.renewSendLease).not.toHaveBeenCalled();
   expect(dependencies.sendEmail).not.toHaveBeenCalled();
 });
 
@@ -1379,9 +1382,9 @@ test('send renders the live link into the activity body only at creation, and a 
     findEmailAttachments: jest.fn(async () => []),
     downloadFile: jest.fn(async () => ({ buffer: Buffer.from('word-bytes') })),
     addEmailAttachment: jest.fn(async () => {}),
-    recordAttachment: jest.fn(async (attempt) => { row = { ...attempt, docx_attached_at: new Date() }; return row; }),
+    recordAttachment: jest.fn(async (attempt) => { liveId = 'replaced'; row = { ...attempt, docx_attached_at: new Date() }; return row; }),
     recordSendRequested: jest.fn(async (attempt) => { row = { ...attempt, state: 'send_requested', send_requested_at: new Date() }; return row; }),
-    renewSendLease: jest.fn(async (attempt) => { liveId = 'replaced'; return attempt; }),
+    renewSendLease: jest.fn(async (attempt) => attempt),
     sendEmail: jest.fn(),
     recordSent: jest.fn(),
     recordFailure: jest.fn(async () => row),
@@ -1401,4 +1404,35 @@ test('send renders the live link into the activity body only at creation, and a 
   expect(calls[0]).not.toContain(BRIEFING_LINK_PLACEHOLDER);
   expect(dependencies.sendEmail).not.toHaveBeenCalled();
   expect(dependencies.getLiveBriefingLink).toHaveBeenCalledTimes(2);
+  // The failure happened before send intent, so the attempt is provably unsent
+  // and cannot block a reissue as an "unresolved" send.
+  expect(dependencies.recordSendRequested).not.toHaveBeenCalled();
+});
+
+test('a retry of a send-requested attempt reconciles an accepted Dynamics send before requiring link liveness', async () => {
+  const linkId = '99999999-9999-4999-8999-999999999999';
+  let row = attemptFixture({
+    briefing_link_id: linkId, state: 'send_requested', send_requested_at: new Date(),
+    dynamics_email_id: '88888888-8888-4888-8888-888888888888', docx_attached_at: new Date(), pdf_attached_at: new Date(),
+  });
+  const dependencies = {
+    ...currentSourceDependencies(row),
+    // The link expired after the send went out: liveness would now fail.
+    getLiveBriefingLink: jest.fn(async () => null),
+    getAttempt: jest.fn(async () => row),
+    claimSend: jest.fn(async () => { row = { ...row, lease_token: '77777777-7777-4777-8777-777777777777' }; return row; }),
+    getEmailActivity: jest.fn(async () => ({ statuscode: 6, statecode: 0 })),
+    recordSent: jest.fn(async (attempt, status) => { row = { ...attempt, ...status, state: 'sent', sent_at: new Date(), lease_token: null }; return row; }),
+    findEmailByCorrelation: jest.fn(),
+    createEmailActivity: jest.fn(),
+    sendEmail: jest.fn(),
+    recordFailure: jest.fn(async () => row),
+  };
+  const result = await sendPreSiteDistribution({
+    requestId: REQUEST_ID, operationId: OPERATION_ID, previewHash: 'a'.repeat(64), fromEmail: 'sender@example.org', actingUserSystemId: ACTOR_ID,
+  }, dependencies);
+  expect(result.attempt.transportAccepted).toBe(true);
+  expect(result.reused).toBe(true);
+  expect(dependencies.getLiveBriefingLink).not.toHaveBeenCalled();
+  expect(dependencies.sendEmail).not.toHaveBeenCalled();
 });
