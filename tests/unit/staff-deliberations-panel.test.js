@@ -121,3 +121,27 @@ it('when visitExpected() is false, the visit line is hidden at draft/shared but 
   // The lead line omits the visit stop entirely rather than showing "0 visit".
   expect(screen.getByText('1 ai draft ready · 1 shared · 1 final')).toBeInTheDocument();
 });
+
+test('cycle-view rails read the draft substate on the first stop (S503)', async () => {
+  global.fetch.mockResolvedValue(mockResponse({
+    success: true,
+    cycleCode: 'D26',
+    scope: 'all',
+    stageLabels: STAGE_LABELS,
+    counts: { draft: 3, shared: 0, visit: 0, final: 0 },
+    artifacts: [
+      artifact({ artifactId: 'a-none', requestNumber: '1', stage: 'draft', substate: 'none', file: null }),
+      artifact({ artifactId: 'a-gen', requestNumber: '2', stage: 'draft', substate: 'generating', file: null }),
+      artifact({ artifactId: 'a-ready', requestNumber: '3', stage: 'draft', substate: 'ready' }),
+    ],
+  }));
+  render(<StaffDeliberationsPanel cycleCode="D26" loadingCycles={false} scope="all" />);
+
+  await screen.findByText(/#3/);
+  const rails = screen.getAllByTestId('stage-rail');
+  expect(rails.map((rail) => rail.textContent)).toEqual([
+    expect.stringContaining('● No draft yet'),
+    expect.stringContaining('● Generating draft'),
+    expect.stringContaining('● AI draft ready'),
+  ]);
+});

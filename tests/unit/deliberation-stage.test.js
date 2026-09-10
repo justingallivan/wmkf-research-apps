@@ -2,8 +2,10 @@ import {
   DELIBERATION_STAGE_KEYS,
   DELIBERATION_STAGE_TEXT_KEYS,
   DELIBERATION_STAGE_DEFAULT_LABELS,
+  DELIBERATION_DRAFT_SUBSTATE_TEXT,
   visitExpected,
   deriveDeliberationStage,
+  draftStopText,
 } from '../../shared/utils/deliberation-stage';
 import { EDITABLE_TEXT_DEFAULTS_BY_KEY } from '../../shared/config/editableTextDefaults';
 import {
@@ -129,4 +131,27 @@ it('every DELIBERATION_STAGE_KEYS entry has an editable-text default entry (D6 p
 it('the label maps carry no extra keys beyond DELIBERATION_STAGE_KEYS', () => {
   expect(Object.keys(DELIBERATION_STAGE_TEXT_KEYS).sort()).toEqual([...DELIBERATION_STAGE_KEYS].sort());
   expect(Object.keys(DELIBERATION_STAGE_DEFAULT_LABELS).sort()).toEqual([...DELIBERATION_STAGE_KEYS].sort());
+});
+
+describe('draftStopText (S503: the first stop must not claim a draft that does not exist)', () => {
+  const labels = { draft: 'Custom ready label' };
+
+  it.each([
+    ['none', 'No draft yet'],
+    ['generating', 'Generating draft'],
+    ['failed', 'Draft failed'],
+  ])('draft/%s reads the code-owned substate text, ignoring the admin label', (substate, expected) => {
+    expect(DELIBERATION_DRAFT_SUBSTATE_TEXT[substate]).toBe(expected);
+    expect(draftStopText({ stage: 'draft', substate, labels })).toBe(expected);
+  });
+
+  it('draft/ready reads the admin-editable label (default when unset)', () => {
+    expect(draftStopText({ stage: 'draft', substate: 'ready', labels })).toBe('Custom ready label');
+    expect(draftStopText({ stage: 'draft', substate: 'ready' })).toBe('AI draft ready');
+  });
+
+  it('once the stage has moved on, the completed first stop keeps the label', () => {
+    expect(draftStopText({ stage: 'shared', substate: 'not-sent', labels })).toBe('Custom ready label');
+    expect(draftStopText({ stage: 'final', substate: 'moved' })).toBe('AI draft ready');
+  });
 });

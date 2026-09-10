@@ -5,15 +5,21 @@
  * in from the caller (falls back to DELIBERATION_STAGE_DEFAULT_LABELS).
  * Used by both StaffDeliberationsTab.js (per-request) and
  * StaffDeliberationsPanel.js (one compact rail per cycle-view row).
+ *
+ * At the draft stage the first stop reads the substate (No draft yet /
+ * Generating draft / Draft failed) in neutral gray; the green admin label is
+ * reserved for a draft that actually exists (`ready`).
  */
 
 import {
   DELIBERATION_STAGE_KEYS,
   DELIBERATION_STAGE_DEFAULT_LABELS,
+  draftStopText,
 } from '../../utils/deliberation-stage';
 
-export default function DeliberationStageRail({ stage, labels = {}, reopened = false }) {
+export default function DeliberationStageRail({ stage, substate = null, labels = {}, reopened = false }) {
   const currentIndex = DELIBERATION_STAGE_KEYS.indexOf(stage);
+  const noDraftYet = stage === 'draft' && substate !== 'ready';
   return (
     <p className="mt-1 flex flex-wrap items-center gap-2 text-xs font-semibold" data-testid="stage-rail">
       {DELIBERATION_STAGE_KEYS.map((key, index) => (
@@ -22,11 +28,13 @@ export default function DeliberationStageRail({ stage, labels = {}, reopened = f
           <span className={index < currentIndex
             ? 'text-gray-500'
             : index === currentIndex
-              ? 'text-green-800'
+              ? (noDraftYet ? 'text-gray-700' : 'text-green-800')
               : 'text-gray-300'}
           >
             {index < currentIndex ? '✓' : index === currentIndex ? '●' : '○'}{' '}
-            {labels[key] || DELIBERATION_STAGE_DEFAULT_LABELS[key]}
+            {key === 'draft'
+              ? draftStopText({ stage, substate, labels })
+              : (labels[key] || DELIBERATION_STAGE_DEFAULT_LABELS[key])}
           </span>
         </span>
       ))}

@@ -732,7 +732,7 @@ test('the site-visit hook is consulted with the requestId even at the draft stag
   // A future visit line shows up before the document is ever shared, proving
   // the hook's result was used for a plain draft-stage render.
   expect(await screen.findByText(`Visit ${new Date('2099-01-01T00:00:00Z').toLocaleDateString()}.`)).toBeInTheDocument();
-  expect(screen.getByTestId('stage-rail')).toHaveTextContent('● AI draft ready');
+  expect(screen.getByTestId('stage-rail')).toHaveTextContent('● No draft yet');
   // Not decorative: the mock actually receives the real requestId, not a
   // stage-gated null (restoring the old `shared && readyFile ? requestId :
   // null` gate would make this assertion fail even though every other
@@ -772,10 +772,52 @@ test('a shared document with a past scheduled visit moves the rail to Visit and 
 
 test('admin-editable stageLabels override the code-owned defaults on the rail', async () => {
   global.fetch.mockResolvedValueOnce(statusResponse({
-    currentArtifact: null,
+    currentArtifact: readyArtifact(),
     stageLabels: { draft: 'Draft in progress', shared: 'Shared', visit: 'Visit', final: 'Final' },
   }));
   render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
 
   await waitFor(() => expect(screen.getByTestId('stage-rail')).toHaveTextContent('● Draft in progress'));
+});
+
+test('with no draft at all the first stop reads "No draft yet", not the admin label (S503)', async () => {
+  global.fetch.mockResolvedValueOnce(statusResponse({
+    currentArtifact: null,
+    stageLabels: { draft: 'Draft in progress', shared: 'Shared', visit: 'Visit', final: 'Final' },
+  }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+
+  await waitFor(() => expect(screen.getByTestId('stage-rail')).toHaveTextContent('● No draft yet'));
+  expect(screen.getByTestId('stage-rail')).not.toHaveTextContent('Draft in progress');
+  expect(screen.getByTestId('stage-rail')).not.toHaveTextContent('AI draft ready');
+});
+
+test('a pending generation with no current draft reads "Generating draft" on the first stop', async () => {
+  global.fetch.mockResolvedValueOnce(statusResponse({
+    currentArtifact: null,
+    pendingArtifact: { artifactId: 'pending-artifact', operationStatus: 100000000 },
+  }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+
+  await waitFor(() => expect(screen.getByTestId('stage-rail')).toHaveTextContent('● Generating draft'));
+});
+
+test('a failed generation with no current draft reads "Draft failed" on the first stop', async () => {
+  global.fetch.mockResolvedValueOnce(statusResponse({
+    currentArtifact: null,
+    pendingArtifact: { artifactId: 'failed-artifact', operationStatus: 100000002, retryable: true },
+  }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+
+  await waitFor(() => expect(screen.getByTestId('stage-rail')).toHaveTextContent('● Draft failed'));
+});
+
+test('a ready draft keeps "AI draft ready" even while a regeneration is pending', async () => {
+  global.fetch.mockResolvedValueOnce(statusResponse({
+    currentArtifact: readyArtifact(),
+    pendingArtifact: { artifactId: 'pending-artifact', operationStatus: 100000000 },
+  }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+
+  await waitFor(() => expect(screen.getByTestId('stage-rail')).toHaveTextContent('● AI draft ready'));
 });

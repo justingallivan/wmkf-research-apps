@@ -1638,7 +1638,9 @@ One Final Writeup row per request over the same stable SharePoint Word item; the
   one row per request — the `wmkf_CurrentPreSiteVisit` pointer row, else the newest active draft —
   linking to the per-request Staff Deliberations tab, which owns every write. PC Meeting Tracker
   slice 3, 2026-09-09 (`docs/PC_MEETING_TRACKER_PLAN.md`): both the tab and this panel now render a
-  shared four-keyed-stop rail — `draft` (AI draft ready) → `shared` (Shared; D5, locked not
+  shared four-keyed-stop rail — `draft` (AI draft ready; since 2026-09-10 the first stop reads the
+  code-owned substate text "No draft yet" / "Generating draft" / "Draft failed" in gray until a
+  draft exists — `draftStopText` in `shared/utils/deliberation-stage.js`) → `shared` (Shared; D5, locked not
   "first sent") → `visit` (date-derived "visited", D7) → `final` — with admin-editable labels
   (D6, `shared/config/editableTextDefaults.js` keys `stage.deliberations.*`); the old
   Draft/Draft ready/Share/Wrap Up hard-coded labels are gone. The panel gained a `scope=my|all`
