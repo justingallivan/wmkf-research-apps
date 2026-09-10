@@ -86,7 +86,12 @@ export default async function handler(req, res) {
           readDeliberationStageLabels(),
           getDeliberationSessionForRequest(requestId).catch(() => null),
         ]);
-        return res.status(200).json({ success: true, ...payload, stageLabels, session: projectDeliberationSession(session) });
+        // Tracker §5.6: the session's attendees are the Share email's default
+        // recipients, so the tab gets their addresses alongside the card shape.
+        const sessionAttendees = Array.isArray(session?.attendees)
+          ? session.attendees.map((person) => ({ name: person?.name || '', email: String(person?.email || '').trim().toLowerCase() })).filter((person) => person.email)
+          : [];
+        return res.status(200).json({ success: true, ...payload, stageLabels, session: projectDeliberationSession(session), sessionAttendees });
       }
 
       if (!req.body

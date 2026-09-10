@@ -660,3 +660,39 @@ test('dialog mode: Add from directory opens the picker above the composer, and E
   fireEvent.keyDown(document, { key: 'Escape' });
   expect(onCloseComposer).toHaveBeenCalledTimes(1);
 });
+
+test('the composer shows the deliberation session slot read-only, and the preview reports the session the server bound', async () => {
+  const session = { scheduledStartIso: '2026-09-11T18:45:00.000Z', scheduledEndIso: null, ianaTimeZone: 'America/Los_Angeles', meetingLink: 'https://zoom.example/j/1', location: null };
+  global.fetch
+    .mockResolvedValueOnce(response({ success: true, attempts: [] }))
+    .mockResolvedValueOnce(response({ success: true, attempt: { ...preparedAttempt(), session: { ...session, sessionId: 's1' } } }));
+  render(
+    <PreSiteDistributionPanel
+      requestId={REQUEST_ID}
+      requestNumber="1002379"
+      sourceArtifact={{ artifactId: ARTIFACT_ID }}
+      session={session}
+    />,
+  );
+  const slot = await screen.findByTestId('composer-session-slot');
+  expect(slot).toHaveTextContent(/Deliberation session: .*Sep 11, 2026.*11:45.*AM\./);
+  expect(slot).toHaveTextContent('Join link included.');
+
+  fireEvent.change(screen.getByLabelText('To'), { target: { value: 'staff@example.org' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Create preview' }));
+  expect(await screen.findByText('Email preview')).toBeInTheDocument();
+  expect(screen.getByText('Deliberation session:').parentElement).toHaveTextContent(/Sep 11, 2026.*Join link included/);
+});
+
+test('with no session the slot says not yet scheduled and names the PC', async () => {
+  render(
+    <PreSiteDistributionPanel
+      requestId={REQUEST_ID}
+      requestNumber="1002379"
+      sourceArtifact={{ artifactId: ARTIFACT_ID }}
+    />,
+  );
+  const slot = await screen.findByTestId('composer-session-slot');
+  expect(slot).toHaveTextContent('Deliberation session: not yet scheduled.');
+  expect(slot).toHaveTextContent('the PC schedules sessions in Meeting Tracker');
+});

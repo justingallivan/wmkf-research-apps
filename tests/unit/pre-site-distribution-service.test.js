@@ -102,6 +102,98 @@ test('the preview hash pins both snapshot identities even when nothing is attach
   expect(third.attempt.previewHash).not.toBe(first.attempt.previewHash);
 });
 
+const SESSION = {
+  sessionId: 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa',
+  scheduledStartIso: '2026-09-11T18:45:00.000Z',
+  scheduledEndIso: '2026-09-11T20:00:00.000Z',
+  ianaTimeZone: 'America/Los_Angeles',
+  meetingLink: 'https://zoom.example/j/123',
+  location: '',
+  order: 1,
+  minutes: 15,
+  attendees: [{ name: 'A', email: 'a@example.org' }],
+};
+
+test('the email carries the request\'s deliberation session (tracker §5.6): body line with Join link, snapshot persisted, both hashes bound', async () => {
+  const withSession = createPrepareHarness();
+  withSession.dependencies.getSession = jest.fn(async () => SESSION);
+  const result = await preparePreSiteDistribution(prepareInput(), withSession.dependencies);
+  expect(withSession.dependencies.getSession).toHaveBeenCalledWith(REQUEST_ID);
+  const created = withSession.dependencies.createOrGetAttempt.mock.calls[0][0];
+  expect(created.bodyHtml).toContain('<strong>Deliberation session:</strong>');
+  expect(created.bodyHtml).toContain('September 11, 2026');
+  expect(created.bodyHtml).toContain('11:45');
+  expect(created.bodyHtml).toContain('<a href="https://zoom.example/j/123">Join meeting</a>');
+  expect(created.sessionSnapshot).toEqual({
+    sessionId: SESSION.sessionId,
+    scheduledStartIso: SESSION.scheduledStartIso,
+    scheduledEndIso: SESSION.scheduledEndIso,
+    ianaTimeZone: 'America/Los_Angeles',
+    meetingLink: 'https://zoom.example/j/123',
+    location: '',
+  });
+  expect(created.sessionSnapshot).not.toHaveProperty('attendees');
+
+  const without = createPrepareHarness();
+  without.dependencies.getSession = jest.fn(async () => null);
+  const plain = await preparePreSiteDistribution(prepareInput(), without.dependencies);
+  const plainCreated = without.dependencies.createOrGetAttempt.mock.calls[0][0];
+  expect(plainCreated.bodyHtml).toContain('<strong>Deliberation session:</strong> not yet scheduled.');
+  expect(plainCreated.bodyHtml).not.toContain('Join meeting');
+  expect(plainCreated.sessionSnapshot).toBeNull();
+  // Discriminating: only the session differs between the two harnesses.
+  expect(created.draftHash).not.toBe(plainCreated.draftHash);
+  expect(result.attempt.previewHash).not.toBe(plain.attempt.previewHash);
+});
+
+test('a non-https meeting link is dropped from the email and the snapshot; a session-reader failure reads as not scheduled', async () => {
+  const harness = createPrepareHarness();
+  harness.dependencies.getSession = jest.fn(async () => ({ ...SESSION, meetingLink: 'javascript:alert(1)' }));
+  await preparePreSiteDistribution(prepareInput(), harness.dependencies);
+  const created = harness.dependencies.createOrGetAttempt.mock.calls[0][0];
+  expect(created.bodyHtml).not.toContain('Join meeting');
+  expect(created.sessionSnapshot.meetingLink).toBe('');
+
+  const failing = createPrepareHarness();
+  failing.dependencies.getSession = jest.fn(async () => { throw new Error('tracker down'); });
+  await preparePreSiteDistribution(prepareInput(), failing.dependencies);
+  expect(failing.dependencies.createOrGetAttempt.mock.calls[0][0].sessionSnapshot).toBeNull();
+});
+
+test('send refuses when the deliberation session moved, appeared, or was removed since preview; unchanged passes the check', async () => {
+  const snapshot = {
+    sessionId: SESSION.sessionId, scheduledStartIso: SESSION.scheduledStartIso, scheduledEndIso: SESSION.scheduledEndIso,
+    ianaTimeZone: 'America/Los_Angeles', meetingLink: 'https://zoom.example/j/123', location: '',
+  };
+  const input = { requestId: REQUEST_ID, operationId: OPERATION_ID, previewHash: 'a'.repeat(64), fromEmail: 'sender@example.org', actingUserSystemId: ACTOR_ID };
+  const attempt = (session_snapshot) => attemptFixture({ session_snapshot });
+  const deps = (row, live) => ({
+    ...currentSourceDependencies(row),
+    getSession: jest.fn(async () => live),
+    getAttempt: jest.fn(async () => row),
+    claimSend: jest.fn(async () => ({ ...row, lease_token: '77777777-7777-4777-8777-777777777777' })),
+    findEmailByCorrelation: jest.fn(async () => []),
+    createEmailActivity: jest.fn(),
+    recordFailure: jest.fn(async () => row),
+  });
+
+  for (const [stored, live] of [
+    [snapshot, { ...SESSION, scheduledStartIso: '2026-09-12T18:45:00.000Z' }],
+    [snapshot, null],
+    [null, SESSION],
+    [snapshot, { ...SESSION, meetingLink: 'https://zoom.example/j/999' }],
+  ]) {
+    const d = deps(attempt(stored), live);
+    await expect(sendPreSiteDistribution(input, d)).rejects.toMatchObject({ code: 'distribution_session_stale' });
+    expect(d.createEmailActivity).not.toHaveBeenCalled();
+  }
+
+  for (const [stored, live] of [[snapshot, SESSION], [null, null], [JSON.stringify(snapshot), SESSION]]) {
+    const d = deps(attempt(stored), live);
+    await expect(sendPreSiteDistribution(input, d)).rejects.not.toMatchObject({ code: 'distribution_session_stale' });
+  }
+});
+
 test('prepare refuses when the briefing page is not enabled, before any persistence or file work', async () => {
   const off = createPrepareHarness();
   off.dependencies.briefingReady = () => false;

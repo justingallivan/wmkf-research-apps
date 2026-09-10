@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Card } from '../Layout';
 import CuratedRecipientPicker from './CuratedRecipientPicker';
+import { deliberationSessionLine } from '../../utils/deliberation-stage';
 
 const DEFAULT_BODY = 'The deliberation briefing page linked below has the Site Visit writeup, every completed review, the proposal narrative, and the site visit materials.';
 const EMPTY_LIST = Object.freeze([]);
@@ -10,6 +11,7 @@ const STALE_PREVIEW_CODES = new Set([
   'distribution_site_visit_stale',
   'distribution_preview_changed',
   'distribution_briefing_stale',
+  'distribution_session_stale',
 ]);
 const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -266,6 +268,9 @@ export default function PreSiteDistributionPanel({
   requestNumber,
   sourceArtifact,
   siteVisit = null,
+  // Tracker §5.6: the request's latest deliberation slot, shown read-only in
+  // the form and bound into the preview by the server.
+  session = null,
   // Material links retired 2026-09-10 (owner): the briefing page carries the
   // site visit materials; the composer no longer offers them.
   suggestedTo = EMPTY_LIST,
@@ -509,7 +514,9 @@ export default function PreSiteDistributionPanel({
           setConfirmed(false);
           setNotice(body.code === 'distribution_briefing_stale'
             ? 'The briefing page link for this preview is out of date. Create a new preview, review it, and then send.'
-            : 'This preview is out of date because the visit details or materials changed. Create a new preview, review it, and then send.');
+            : body.code === 'distribution_session_stale'
+              ? 'The deliberation session changed after this preview. Create a new preview, review it, and then send.'
+              : 'This preview is out of date because the visit details or materials changed. Create a new preview, review it, and then send.');
         }
         return;
       }
@@ -539,6 +546,12 @@ export default function PreSiteDistributionPanel({
             {error}
           </div>
         )}
+
+        <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-800" data-testid="composer-session-slot">
+          <span className="font-medium">{deliberationSessionLine(session)}</span>
+          {session?.meetingLink && <span className="text-gray-600"> Join link included.</span>}
+          {!session?.scheduledStartIso && <span className="text-gray-600"> The email will say so; the PC schedules sessions in Meeting Tracker.</span>}
+        </div>
 
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           <div>
@@ -636,6 +649,7 @@ export default function PreSiteDistributionPanel({
               {preview.cc.length > 0 && <div><dt className="inline font-medium">Cc:</dt> <dd className="inline">{preview.cc.join(', ')}</dd></div>}
               <div><dt className="inline font-medium">Subject:</dt> <dd className="inline">{preview.subject}</dd></div>
               <div><dt className="inline font-medium">Snapshot source:</dt> <dd className="inline">Word version {preview.sourceVersionId}; later edits are not included</dd></div>
+              <div><dt className="inline font-medium">Deliberation session:</dt> <dd className="inline">{deliberationSessionLine(preview.session).replace('Deliberation session: ', '')}{preview.session?.meetingLink ? ' · Join link included' : ''}</dd></div>
               <div>
                 <dt className="inline font-medium">Briefing page:</dt>{' '}
                 <dd className="inline">
