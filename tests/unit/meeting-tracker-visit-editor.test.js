@@ -28,6 +28,7 @@ test('a new visit: the form posts the fields the logistics service expects, with
   global.fetch = jest.fn(async (url, options = {}) => {
     const target = String(url);
     if (target.includes('/recipients')) return response(recipients);
+    if (target.endsWith('/materials')) return response({ error: 'not enabled' }, 503);
     if (options.method === 'PATCH') return response({ success: true, siteVisit: { activityId: 'a1', etag: 'W/"1"', subject: 'Site Visit — #1003222', startLocal: '2026-10-01T09:00', endLocal: '2026-10-01T12:00', timeZone: 'America/Los_Angeles', format: 100000000, locationOrLink: 'Campus', organizer: { kind: 'staff', profileId: 7 }, requiredAttendees: [{ kind: 'manual', name: 'PI', email: 'pi@example.edu' }], optionalAttendees: [] } });
     return response({ success: true, siteVisit: null });
   });
@@ -74,6 +75,7 @@ test('an existing visit: the form loads it, sends activityId + etag, and a write
   global.fetch = jest.fn(async (url, options = {}) => {
     const target = String(url);
     if (target.includes('/recipients')) return response(recipients);
+    if (target.endsWith('/materials')) return response({ error: 'not enabled' }, 503);
     if (options.method === 'PATCH') return response({ error: 'The Site Visit changed or a different activity is active. Reload before saving.', code: 'site_visit_write_conflict' }, 409);
     gets += 1;
     return response({ success: true, siteVisit: { ...visit, etag: gets === 1 ? 'W/"1"' : 'W/"2"' } });

@@ -8,6 +8,7 @@ import PromptTemplatesSection from '../shared/components/admin/PromptTemplatesSe
 import EmailDefaultsSection from '../shared/components/admin/EmailDefaultsSection';
 import SiteVisitRecipientsSection from '../shared/components/admin/SiteVisitRecipientsSection';
 import MeetingTrackerDefaultsSection from '../shared/components/admin/MeetingTrackerDefaultsSection';
+import SiteVisitMaterialsDefaultsSection from '../shared/components/admin/SiteVisitMaterialsDefaultsSection';
 import FinalWriteupMatrixAudiencesSection from '../shared/components/admin/FinalWriteupMatrixAudiencesSection';
 import ReviewerRepairAlertDetails from '../shared/components/admin/ReviewerRepairAlertDetails';
 import DynamicsExplorerRestrictionsSection from '../shared/components/admin/DynamicsExplorerRestrictionsSection';
@@ -93,6 +94,13 @@ const MEETING_TRACKER_DEFAULTS_DATAVERSE_FIELDS = [
     'Default deliberation attendees',
     'meeting_tracker.default_attendees',
     'Stores only active staff profile IDs (reference map v1); names and emails are resolved live from the recipient directory.',
+  ),
+];
+const SITE_VISIT_MATERIALS_DEFAULTS_DATAVERSE_FIELDS = [
+  appSystemSettingField(
+    'Applicant materials upload cap',
+    'site_visit_materials.upload_max_mb',
+    'Whole number of megabytes (1–500). Unset reads as the 100 MB default. The briefing page opens files up to 50 MB and lists larger ones with a note.',
   ),
 ];
 
@@ -3124,6 +3132,15 @@ function WorkflowsWorkspace({ view }) {
             dataverseFields={MEETING_TRACKER_DEFAULTS_DATAVERSE_FIELDS}
           >
             <MeetingTrackerDefaultsSection />
+          </AdminEditorPanel>
+          <AdminEditorPanel
+            id="site-visit-materials-upload-cap"
+            title="Applicant materials upload cap"
+            description="Largest file an applicant can upload for a site visit through the materials link."
+            scope="Global setting"
+            dataverseFields={SITE_VISIT_MATERIALS_DEFAULTS_DATAVERSE_FIELDS}
+          >
+            <SiteVisitMaterialsDefaultsSection />
           </AdminEditorPanel>
         </div>
       );

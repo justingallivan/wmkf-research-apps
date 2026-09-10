@@ -11,6 +11,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import Layout, { Button } from '../Layout';
 import { SITE_VISIT_FORMAT, SITE_VISIT_FORMAT_LABEL } from '../../config/siteVisit';
+import SiteVisitMaterialsCard from './SiteVisitMaterialsCard';
 
 const DEFAULT_TIME_ZONE = 'America/Los_Angeles';
 
@@ -277,6 +278,8 @@ export default function SiteVisitEditor() {
           </div>
         </form>
       )}
+
+      {!loading && visit && <SiteVisitMaterialsCard requestId={requestId} requestNumber={requestNumber} />}
     </Layout>
   );
 }

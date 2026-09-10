@@ -474,3 +474,18 @@ is pinned by the latest `sent` `pre_site_distribution_attempts` row,
 reviews resolve live from `wmkf_appreviewersuggestion`, and the proposal
 narrative resolves by governed path. Cleanup: none scheduled; revoked and expired
 rows stay as audit history (bounded by one live row per request).
+
+
+### `site_visit_material_collections` (migration 042, S503)
+
+Owner: applicant materials collection (`lib/services/site-visit-materials/collection-service.js`
++ `collection-store.js`; docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md §16). One row per collection
+the PC starts from a request's active `wmkf_sitevisit`: request and Activity ids, `status`
+(`open | ready | closed`), `due_at` (two business days before the visit in its zone) and
+`closes_at` (visit end + 7 days), the checklist template with per-item waivers, the PI/liaison
+contacts snapshot, the sealed contributor link (`jti`, `token_digest`, `token_ciphertext`; raw
+token never stored), invitation and reminder receipts (Dynamics email ids, counts, timestamps),
+and the PC's ready confirmation. One non-closed row per request (partial unique index). Files are
+never here: accepted uploads are SharePoint items registered in `wmkf_requestdocument`, which the
+service reads back by artifact type and canonical filename. Readiness flag
+`SITE_VISIT_MATERIALS_SCHEMA_READY` (literal `on`).
