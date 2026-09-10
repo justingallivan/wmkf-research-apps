@@ -29,7 +29,8 @@ import finalizeHandler from '../../pages/api/external/materials/[token]/finalize
 
 const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
 const STAGING_ID = '22222222-2222-4222-8222-222222222222';
-const collection = { request_id: REQUEST_ID, status: 'open', checklist: [{ key: 'presentation_pdf', waived: false }, { key: 'participant_bios', waived: true }] };
+const collection = { id: '33333333-3333-4333-8333-333333333333', request_id: REQUEST_ID, status: 'open', checklist: [{ key: 'presentation_pdf', waived: false }, { key: 'participant_bios', waived: true }] };
+const candidate = { requestId: REQUEST_ID, slot: 'presentation_pdf', itemId: 'item' };
 
 function res() { return { statusCode: 200, body: null, headers: {}, status(c) { this.statusCode = c; return this; }, json(b) { this.body = b; return this; }, setHeader(k, v) { this.headers[k] = v; } }; }
 const req = (method, body = {}) => ({ method, body, query: { token: 'jwt' }, headers: {} });
@@ -40,7 +41,7 @@ beforeEach(() => {
   verifyMaterialsToken.mockResolvedValue({ ok: true, requestId: REQUEST_ID, collection });
   buildContributorContext.mockResolvedValue({ ok: true, checklist: [] });
   staging.createPortalUpload.mockResolvedValue({ stagingId: STAGING_ID, pathname: 'p', clientToken: 'ct', contentType: 'application/pdf' });
-  staging.claimPortalUpload.mockResolvedValue({ state: 'claimed', row: { id: STAGING_ID }, leaseToken: 'lease' });
+  staging.claimPortalUpload.mockResolvedValue({ state: 'claimed', row: { id: STAGING_ID, candidate_result: candidate }, leaseToken: 'lease' });
   staging.loadClaimedPortalImage.mockResolvedValue({ buffer: Buffer.from('%PDF'), filename: 'deck.pdf', sha256: 'abc' });
   finalizeMaterialUpload.mockResolvedValue({ ok: true, slot: 'presentation_pdf', filename: '1003222 Site Visit Presentation.pdf', receivedAt: '2026-11-21T09:00:00Z', artifactId: 'doc', sha256: 'abc' });
 });
@@ -79,7 +80,14 @@ test('upload-token: server derives scope, resource, binding, and cap; waived or 
 test('finalize: claims by the ownership tuple, persists, completes the row with the public result; consumed rows replay', async () => {
   const ok = res(); await finalizeHandler(req('POST', { stagingId: STAGING_ID, slot: 'presentation_pdf' }), ok);
   expect(staging.claimPortalUpload).toHaveBeenCalledWith({ stagingId: STAGING_ID, scope: 'site_visit_material', resourceId: REQUEST_ID, actorBinding: 'materials:hash' });
-  expect(finalizeMaterialUpload).toHaveBeenCalledWith({ collection, slotKey: 'presentation_pdf', file: expect.objectContaining({ filename: 'deck.pdf' }) });
+  expect(finalizeMaterialUpload).toHaveBeenCalledWith({
+    collection,
+    slotKey: 'presentation_pdf',
+    file: expect.objectContaining({ filename: 'deck.pdf' }),
+    stagingId: STAGING_ID,
+    leaseToken: 'lease',
+    candidateResult: candidate,
+  });
   const body = { ok: true, slot: 'presentation_pdf', filename: '1003222 Site Visit Presentation.pdf', receivedAt: '2026-11-21T09:00:00Z' };
   expect(staging.completePortalUpload).toHaveBeenCalledWith({ stagingId: STAGING_ID, leaseToken: 'lease', resultCode: 'ok', resultPayload: body });
   expect(ok.body).toEqual(body);
@@ -100,8 +108,17 @@ test('finalize: permanent byte and validation failures reject the row; transient
   finalizeMaterialUpload.mockRejectedValueOnce(new ServiceHttpError('scan', { httpStatus: 503, code: 'scan_unavailable', body: { ok: false, reason: 'scan_unavailable' } }));
   const scan = res(); await finalizeHandler(req('POST', { stagingId: STAGING_ID, slot: 'presentation_pdf' }), scan);
   expect(scan.statusCode).toBe(503); expect(staging.releasePortalUpload).toHaveBeenCalledWith({ stagingId: STAGING_ID, leaseToken: 'lease' });
+  finalizeMaterialUpload.mockRejectedValueOnce(new ServiceHttpError('scan config', { httpStatus: 500, code: 'scan_misconfigured', body: { ok: false, reason: 'scan_misconfigured' } }));
+  const scanConfig = res(); await finalizeHandler(req('POST', { stagingId: STAGING_ID, slot: 'presentation_pdf' }), scanConfig);
+  expect(scanConfig.statusCode).toBe(500); expect(scanConfig.body.reason).toBe('scan_misconfigured'); expect(staging.releasePortalUpload).toHaveBeenCalledTimes(2);
+  finalizeMaterialUpload.mockRejectedValueOnce(new ServiceHttpError('busy', { httpStatus: 409, code: 'slot_busy', body: { ok: false, reason: 'slot_busy' } }));
+  const busy = res(); await finalizeHandler(req('POST', { stagingId: STAGING_ID, slot: 'presentation_pdf' }), busy);
+  expect(busy.statusCode).toBe(409); expect(staging.releasePortalUpload).toHaveBeenCalledTimes(3);
+  finalizeMaterialUpload.mockRejectedValueOnce(new ServiceHttpError('ambiguous', { httpStatus: 409, code: 'replay_ambiguous', body: { ok: false, reason: 'replay_ambiguous' } }));
+  const ambiguous = res(); await finalizeHandler(req('POST', { stagingId: STAGING_ID, slot: 'presentation_pdf' }), ambiguous);
+  expect(ambiguous.statusCode).toBe(409); expect(staging.releasePortalUpload).toHaveBeenCalledTimes(3);
   finalizeMaterialUpload.mockRejectedValueOnce(new Error('graph down'));
   const graph = res(); await finalizeHandler(req('POST', { stagingId: STAGING_ID, slot: 'presentation_pdf' }), graph);
-  expect(graph.statusCode).toBe(503); expect(graph.body.reason).toBe('persist_failed'); expect(staging.releasePortalUpload).toHaveBeenCalledTimes(2);
+  expect(graph.statusCode).toBe(503); expect(graph.body.reason).toBe('persist_failed'); expect(staging.releasePortalUpload).toHaveBeenCalledTimes(4);
   expect(staging.completePortalUpload).not.toHaveBeenCalled();
 });

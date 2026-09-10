@@ -509,17 +509,17 @@ needs no manifest and no viewer work; a finalized upload appears on the page on 
 - Direct upload: `portal_upload_staging` with a new document scope (`site_visit_material`), the
   `UPLOADS_BLOB_RW_TOKEN` store, actor binding = the collection link digest; finalize claims the
   row, downloads only its persisted pathname, verifies size/type/magic, scans through
-  `lib/services/cloudmersive-scan.js` (`scanBytes`), uploads with `GraphService.uploadFile`, then
+  `lib/services/cloudmersive-scan.js` (`scanBytes`), uploads with `GraphService.uploadFileLarge`, then
   creates the `wmkf_requestdocument` row (Applicant Slides for both presentation formats, Other
-  Applicant Materials for bios and Other) with the explicit-actor convention.
+  Applicant Materials for bios and Other) with the external contributor's unattributed actor policy.
 - Email: Dynamics email activity from the PC's mailbox (`createEmailActivity` + `sendEmail`),
   plain-text body rendered with `lib/external/plain-text-email-html.js`.
-- Admin setting: `lib/services/settings-service.js` `getSetting`/`setSetting`, surfaced like
+- Admin setting: `lib/services/settings-service.js` `getSettingStrict`/`setSetting`, surfaced like
   `shared/components/admin/MeetingTrackerDefaultsSection.js`.
 - Tracker surface: the collection is started, watched, and reminded from the tracker's visit page
   (`shared/components/meeting-tracker/SiteVisitEditor.js`, slice 2b), with a status cue on the list row.
 
-### 16.2 Data model (migration 042) [PLANNED]
+### 16.2 Data model (migrations 042, 044) [SOURCE-BUILT; owner migration pending]
 
 `site_visit_material_collections`: `id UUID PK`, `request_id UUID NOT NULL`,
 `site_visit_activity_id UUID NOT NULL`, `status TEXT` in `open | ready | closed`, `due_at TIMESTAMPTZ
@@ -529,8 +529,10 @@ NOT NULL`, `closes_at TIMESTAMPTZ NOT NULL`, `checklist JSONB NOT NULL` (ordered
 `jti TEXT UNIQUE`, `token_digest CHAR(64) UNIQUE`, `token_ciphertext TEXT`, `created_by UUID`,
 `invited_at`, `invitation_email_id UUID`, `last_reminder_at`, `reminder_count INTEGER DEFAULT 0`,
 `ready_confirmed_at`, `created_at`, `updated_at`. One non-closed collection per request (partial
-unique index). Received files are not duplicated here: the collection reads the registry rows of the
-material types whose filename carries the request's canonical name for each checklist slot.
+unique index). Migration 044 adds `slot_leases JSONB NOT NULL DEFAULT '{}'::jsonb` for five-minute
+per-canonical-slot finalize leases. Received files are not duplicated here: the collection reads
+the registry rows of the material types whose filename carries the request's canonical name for
+each checklist slot.
 
 ### 16.3 Slices
 
@@ -551,9 +553,15 @@ migration + flag + merge pending. PR 3 is planned.
   `lib/services/site-visit-materials/contributor-service.js` files under the canonical name with
   `replace` (SharePoint version history), registers a READY/DRAFT `wmkf_requestdocument` row
   (producer `site-visit-materials-portal`, unattributed actor policy), supersedes the slot's prior
-  row, and flags PDF/source receipts more than an hour apart as out of sync. Codex adversarial
-  review (2026-09-10) hardened it: clean-only scan verdicts, cap read failure is 503 not the
-  default, generation key from the staging id so a retry reuses the row, supersede failure is
-  a retryable 503, and PPTX/DOCX must carry the OOXML content-types entry and part root.
+  row, and flags PDF/source receipts more than an hour apart as out of sync. A conditional
+  five-minute lease in `site_visit_material_collections.slot_leases` serializes each canonical
+  request slot. Before the Dataverse create, staging `candidate_result` freezes the predecessor
+  artifact id plus exact Graph drive/item/version/filename; replay accepts only the matching
+  request-bound READY, non-superseded generation row and retires that recorded predecessor, while
+  ambiguous state stays held for staff attention. Codex adversarial review (2026-09-10) also made
+  cap reads strict (only an absent setting uses the 100 MB default), requires the settings writer
+  to confirm success, classifies thrown scanner failures, retains the same staging id in browser
+  session storage for transient finalize retry, and validates PPTX/DOCX through bounded exact ZIP
+  central-directory entries rather than marker substrings.
 - **PR 3 — visibility and closeout:** "Materials: 2 of 3 received" line on the Staff Deliberations
   tab and cycle view; auto-close by `closes_at`; reminder cron (owner follow-up).

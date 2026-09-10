@@ -360,9 +360,12 @@ One row authorizes one private Blob pathname for one server-derived actor,
 scope, and request. Statuses are `pending`, `finalizing`, `consumed`, `rejected`,
 and `expired`; a five-minute lease serializes finalization. Verified Blob ETag,
 SHA-256, and actual bytes are recorded before domain processing. If SharePoint
-upload succeeds, `candidate_result` records the exact drive/item/image reference
-before the Dataverse write, allowing an expired-lease retry to recognize a
-committed response drop or delete only the exact unreferenced candidate.
+upload succeeds, `candidate_result` records the scope-specific exact candidate
+before the Dataverse write: image flows store the drive/item/image reference;
+applicant materials store the intended predecessor artifact id plus the Graph
+drive/item/version/filename. This lets an expired-lease retry recognize a
+committed response drop, retire only the recorded predecessor, or delete only
+an exact unreferenced candidate where that scope supports candidate cleanup.
 `result_payload` makes consumed retries idempotent.
 
 Write/read paths: `lib/services/portal-upload-staging.js`; external grantee mint
@@ -479,7 +482,7 @@ narrative resolves by governed path. Cleanup: none scheduled; revoked and expire
 rows stay as audit history (bounded by one live row per request).
 
 
-### `site_visit_material_collections` (migration 042, S503)
+### `site_visit_material_collections` (migrations 042, 044; S503)
 
 Owner: applicant materials collection (`lib/services/site-visit-materials/collection-service.js`
 + `collection-store.js`; docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md §16). One row per collection
@@ -490,5 +493,9 @@ contacts snapshot, the sealed contributor link (`jti`, `token_digest`, `token_ci
 token never stored), invitation and reminder receipts (Dynamics email ids, counts, timestamps),
 and the PC's ready confirmation. One non-closed row per request (partial unique index). Files are
 never here: accepted uploads are SharePoint items registered in `wmkf_requestdocument`, which the
-service reads back by artifact type and canonical filename. Readiness flag
+service reads back by artifact type and canonical filename. Migration 044 adds `slot_leases JSONB
+NOT NULL DEFAULT '{}'::jsonb`: one server-owned token/expiry object per canonical checklist slot.
+`collection-store.js` acquires an absent or expired entry with one conditional UPDATE before the
+finalize re-read and removes only the matching token afterward; the five-minute expiry recovers a
+crashed holder while live contention returns `slot_busy`. Readiness flag
 `SITE_VISIT_MATERIALS_SCHEMA_READY` (literal `on`).

@@ -27,6 +27,7 @@ export const config = { api: { bodyParser: { sizeLimit: '16kb' } }, maxDuration:
 
 const PERMANENT_BYTE_CODES = new Set(['empty_image', 'image_too_large', 'staged_upload_mismatch', 'staging_publicly_readable']);
 const PERMANENT_RESULT_CODES = new Set(['file_too_large', 'extension_not_allowed', 'signature_mismatch', 'empty_file', 'scan_infected', 'slot_not_open', 'unknown_slot', 'filename_required']);
+const HOLD_STAGING_CODES = new Set(['replay_ambiguous']);
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -74,7 +75,14 @@ export default async function handler(req, res) {
 
   try {
     const result = await withDalContext('external-materials-finalize', () =>
-      finalizeMaterialUpload({ collection: verified.collection, slotKey: slot, file: { ...file, stagingId } }));
+      finalizeMaterialUpload({
+        collection: verified.collection,
+        slotKey: slot,
+        file,
+        stagingId,
+        leaseToken: claim.leaseToken,
+        candidateResult: claim.row?.candidate_result || null,
+      }));
     const body = { ok: true, slot: result.slot, filename: result.filename, receivedAt: result.receivedAt };
     await completePortalUpload({ stagingId, leaseToken: claim.leaseToken, resultCode: 'ok', resultPayload: body });
     return res.status(200).json(body);
@@ -82,7 +90,7 @@ export default async function handler(req, res) {
     if (error instanceof ServiceHttpError) {
       const code = error.code || error.body?.reason || 'persist_failed';
       if (PERMANENT_RESULT_CODES.has(code)) await rejectPortalUpload({ stagingId, leaseToken: claim.leaseToken, resultCode: code });
-      else await releasePortalUpload({ stagingId, leaseToken: claim.leaseToken });
+      else if (!HOLD_STAGING_CODES.has(code)) await releasePortalUpload({ stagingId, leaseToken: claim.leaseToken });
       return res.status(error.httpStatus).json(error.body ?? { ok: false, reason: code });
     }
     await releasePortalUpload({ stagingId, leaseToken: claim.leaseToken });

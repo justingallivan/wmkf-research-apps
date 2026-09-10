@@ -26,11 +26,45 @@ const UPLOAD_MESSAGE = {
   empty_file: 'That file is empty.',
   scan_infected: 'That file failed the malware scan and was not accepted.',
   scan_unavailable: 'The file could not be scanned right now. Please try again in a few minutes.',
+  scan_misconfigured: 'Uploads are temporarily unavailable while the file scanner is repaired.',
   content_type_not_allowed: 'That file type is not accepted.',
   staging_unavailable: 'Uploads are unavailable right now. Please try again shortly.',
   staged_upload_missing: 'The upload did not complete. Please try again.',
   finalize_in_progress: 'That upload is still being processed. Please wait a moment.',
+  slot_busy: 'Another upload for this item is being processed. Please wait a moment and retry.',
+  replay_ambiguous: 'This upload needs staff attention before it can be finalized.',
+  cap_unavailable: 'The upload limit is unavailable right now. Please try again shortly.',
 };
+
+function pendingStorageKey(token, slot) {
+  return `site-visit-materials:pending:${token}:${slot}`;
+}
+
+function readPendingUpload(token, slot) {
+  try {
+    const raw = window.sessionStorage.getItem(pendingStorageKey(token, slot));
+    const value = raw ? JSON.parse(raw) : null;
+    return value?.slot === slot && typeof value?.stagingId === 'string' ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function writePendingUpload(token, slot, value) {
+  try {
+    window.sessionStorage.setItem(pendingStorageKey(token, slot), JSON.stringify(value));
+  } catch {
+    // A blocked/full storage area must not prevent an in-page retry.
+  }
+}
+
+function removePendingUpload(token, slot) {
+  try {
+    window.sessionStorage.removeItem(pendingStorageKey(token, slot));
+  } catch {
+    // The in-memory state still clears for this page load.
+  }
+}
 
 function formatDate(iso) {
   const date = new Date(iso || '');
@@ -54,6 +88,44 @@ function SlotUploader({ token, slot, label, required, received, maxMb, disabled,
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [progress, setProgress] = useState(null);
+  const [pending, setPending] = useState(null);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setPending(readPendingUpload(token, slot)), 0);
+    return () => window.clearTimeout(timer);
+  }, [token, slot]);
+
+  const finalize = async (pendingUpload) => {
+    setBusy(true);
+    setError(null);
+    setProgress('Checking the file…');
+    try {
+      const finalizeRes = await fetch(`/api/external/materials/${encodeURIComponent(token)}/finalize`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stagingId: pendingUpload.stagingId, slot }),
+      });
+      const result = await finalizeRes.json().catch(() => ({}));
+      if (!finalizeRes.ok) {
+        if (finalizeRes.status >= 400 && finalizeRes.status < 500 && finalizeRes.status !== 409) {
+          removePendingUpload(token, slot);
+          setPending(null);
+        }
+        setError(UPLOAD_MESSAGE[result.reason] || REASON_MESSAGE[result.reason] || 'The file could not be saved.');
+        return;
+      }
+      removePendingUpload(token, slot);
+      setPending(null);
+      await onDone?.();
+    } catch {
+      // Network failures retain the exact staging id so Retry never mints a
+      // second upload or loses the server's replay/candidate state.
+      setError('The file could not be saved. Please retry this same upload.');
+    } finally {
+      setBusy(false);
+      setProgress(null);
+    }
+  };
 
   const upload = async (file) => {
     if (!file) return;
@@ -71,15 +143,10 @@ function SlotUploader({ token, slot, label, required, received, maxMb, disabled,
       setProgress('Uploading…');
       const { put } = await import('@vercel/blob/client');
       await put(tokenData.pathname, file, { access: 'private', token: tokenData.clientToken, contentType: tokenData.contentType });
-      setProgress('Checking the file…');
-      const finalizeRes = await fetch(`/api/external/materials/${encodeURIComponent(token)}/finalize`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ stagingId: tokenData.stagingId, slot }),
-      });
-      const result = await finalizeRes.json().catch(() => ({}));
-      if (!finalizeRes.ok) throw new Error(UPLOAD_MESSAGE[result.reason] || REASON_MESSAGE[result.reason] || 'The file could not be saved.');
-      onDone?.();
+      const nextPending = { stagingId: tokenData.stagingId, slot };
+      writePendingUpload(token, slot, nextPending);
+      setPending(nextPending);
+      await finalize(nextPending);
     } catch (uploadError) {
       setError(uploadError.message);
     } finally {
@@ -99,7 +166,17 @@ function SlotUploader({ token, slot, label, required, received, maxMb, disabled,
           {progress && <p className="mt-1 text-sm text-blue-800" role="status">{progress}</p>}
           {error && <p className="mt-1 text-sm text-red-700" role="alert">{error}</p>}
         </div>
-        {!disabled && (
+        {!disabled && pending && (
+          <button
+            type="button"
+            disabled={busy}
+            className={`rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800 ${busy ? 'opacity-50' : ''}`}
+            onClick={() => { void finalize(pending); }}
+          >
+            {busy ? 'Working…' : 'Retry'}
+          </button>
+        )}
+        {!disabled && !pending && (
           <label className={`cursor-pointer rounded-lg px-4 py-2 text-sm font-semibold ${received ? 'border border-gray-300 bg-white text-gray-800 hover:bg-gray-50' : 'bg-gray-900 text-white hover:bg-gray-800'} ${busy ? 'opacity-50' : ''}`}>
             {busy ? 'Working…' : received ? 'Replace file' : 'Choose file'}
             <input type="file" className="sr-only" disabled={busy} aria-label={`${label} file`} onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ''; void upload(file); }} />
