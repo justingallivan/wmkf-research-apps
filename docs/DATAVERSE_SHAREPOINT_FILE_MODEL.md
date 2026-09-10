@@ -6,7 +6,7 @@ status: active
 summary: "File storage and linking in AkoyaGO/Dynamics, including governed staff writeups and Site Visit artifacts."
 canonical: true
 cataloged: 2026-07-02
-last_verified: 2026-09-09
+last_verified: 2026-09-10
 owner: product-engineering
 related:
   - scripts/probe-sharepoint-write.js
@@ -474,6 +474,16 @@ authoritative, so the server applies syntax validation, lowercase
 normalization, deduplication, and To/CC conflict checks without an
 identity-confidence or directory-membership gate. Any invalid recipient rejects
 the whole operation before a send.
+
+**[OWNER DIRECTION 2026-09-10 (S503).]** The email no longer carries a writeup
+attachment. The Word/PDF selection above is historical: the composer offers no
+attachment choice, the ledger records `attachment_mode = 'none'` (migration
+`039_pre_site_distribution_no_attachment.sql`), and the deliberation briefing
+page (`DELIBERATION_BRIEFING_PAGE_PLAN.md`) carries the writeup, reviews, and
+narrative. The retained Word and PDF snapshots are still created and pinned on
+every prepared row because the briefing page serves them, and a preview that
+cannot carry a live briefing link refuses to prepare rather than send a bare
+email. Rows sent before this date keep their legacy mode and remain readable.
 
 Migration `034_pre_site_distribution_attempts.sql` added the live, schema-read-
 back Postgres coordination ledger. Production Request `1002379`, operation

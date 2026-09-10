@@ -184,12 +184,16 @@ SharePoint plus `wmkf_requestdocument` remain retained-file authority, and
 Dynamics remains email-activity/transport authority.
 
 One client operation UUID binds one Request, exact editable source Word
-identity/version/governed hash/raw byte hash, attachment mode (`docx`, `pdf`, or
-`both`), exact retained Word/PDF identities and byte hashes, normalized To/Cc,
+identity/version/governed hash/raw byte hash, attachment mode (`none` for every
+attempt prepared since 2026-09-10, migration 039, the email carrying the
+briefing page link instead; `docx`, `pdf`, or `both` remain on earlier rows),
+exact retained Word/PDF identities and byte hashes (pinned on every prepared row
+regardless of mode because the briefing page serves them), normalized To/Cc,
 subject/body/template/sender/actor, preview hash, Dynamics activity/status, and
 bounded error evidence. Attachment bytes are never stored. States are
 `preparing`, `prepared`, `activity_created`, `attachments_added`,
-`send_requested`, and `sent`; per-kind attachment timestamps plus a lease fence
+`send_requested`, and `sent` (a `none` row skips `attachments_added`); per-kind
+attachment timestamps plus a lease fence
 allow recovery between Word and PDF or after an ambiguous SendEmail response.
 The Dynamics activity ID becomes durable before exact activity assertions, and
 the same fenced lease is renewed immediately before transport; a lost renewal

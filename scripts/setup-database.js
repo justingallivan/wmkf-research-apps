@@ -741,7 +741,7 @@ const v40Statements = [
     source_filename TEXT,
     attachment_mode TEXT NOT NULL
       CONSTRAINT pre_site_distribution_mode_check
-      CHECK (attachment_mode IN ('docx', 'pdf', 'both')),
+      CHECK (attachment_mode IN ('none', 'docx', 'pdf', 'both')),
     to_recipients JSONB NOT NULL,
     cc_recipients JSONB NOT NULL DEFAULT '[]'::jsonb,
     subject TEXT NOT NULL,

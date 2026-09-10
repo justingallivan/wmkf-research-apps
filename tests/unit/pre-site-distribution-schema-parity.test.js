@@ -11,6 +11,10 @@ const logisticsMigration = fs.readFileSync(
   path.join(ROOT, 'lib/db/migrations/035_site_visit_logistics.sql'),
   'utf8',
 );
+const noAttachmentMigration = fs.readFileSync(
+  path.join(ROOT, 'lib/db/migrations/039_pre_site_distribution_no_attachment.sql'),
+  'utf8',
+);
 
 const CONSTRAINT_NAMES = [
   'pre_site_distribution_mode_check',
@@ -64,4 +68,15 @@ test('migration 035 and fresh install declare the same calendar/link extension c
     expect(logisticsMigration).toContain(column);
     expect(setup).toContain(column);
   }
+});
+
+test("migration 039 and fresh install both admit attachment_mode 'none' under the same constraint name", () => {
+  const admitsNone = /CHECK \(attachment_mode IN \('none', 'docx', 'pdf', 'both'\)\)/;
+  expect(noAttachmentMigration).toContain('DROP CONSTRAINT IF EXISTS pre_site_distribution_mode_check');
+  expect(noAttachmentMigration).toContain('ADD CONSTRAINT pre_site_distribution_mode_check');
+  expect(noAttachmentMigration).toMatch(admitsNone);
+  expect(setup).toMatch(admitsNone);
+  // The prepared-shape constraint requires the PDF snapshot whenever the mode is
+  // not 'docx', so a 'none' row must carry both snapshots (the briefing page serves them).
+  expect(setup).toContain("attachment_mode = 'docx' OR (");
 });
