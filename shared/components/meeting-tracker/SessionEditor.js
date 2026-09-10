@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import Layout, { Button } from '../Layout';
 import { formatZonedLocalInput, resolveZonedDateTime } from '../../../lib/utils/zoned-date-time';
+import SessionAgendaPanel from './SessionAgendaPanel';
 
 const EMPTY_FORM = {
   startLocal: '',
@@ -344,6 +345,15 @@ export default function SessionEditor() {
           </div>
           {slots.length ? <ol className="mt-4 space-y-3">{slots.map((slot, index) => <SlotRow key={slot.wmkf_deliberationslotid} slot={slot} proposal={proposalById.get(String(slot._wmkf_request_value).toLowerCase())} leadOptions={leadOptions} sessions={sessions} sessionId={sessionId} busy={busy} index={index} count={slots.length} onShift={shiftSlot} onChange={(row, patch) => runSlotChange(() => sendJson(`/api/meeting-tracker/slots/${row.wmkf_deliberationslotid}`, 'PATCH', { etag: row._etag, ...patch }))} onMove={(row, targetSessionId) => runSlotChange(() => sendJson(`/api/meeting-tracker/slots/${row.wmkf_deliberationslotid}`, 'PATCH', { etag: row._etag, targetSessionId }))} onRemove={(row) => runSlotChange(() => sendJson(`/api/meeting-tracker/slots/${row.wmkf_deliberationslotid}`, 'DELETE', { etag: row._etag }))} />)}</ol> : <div className="mt-4 rounded-xl border border-dashed border-gray-300 bg-white p-8 text-center text-sm text-gray-600">No proposals are in this session yet.</div>}
         </section>
+      )}
+
+      {!isNew && session && (
+        <SessionAgendaPanel
+          sessionId={sessionId}
+          session={session}
+          slots={slots}
+          recipients={recipients}
+        />
       )}
 
       {/* The page is long: the exit and the save confirmation are reachable at

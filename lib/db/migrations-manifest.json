@@ -38,6 +38,7 @@
     "037_reviewer_vip_flags.sql",
     "038_deliberation_briefing_links.sql",
     "039_pre_site_distribution_no_attachment.sql",
-    "040_pre_site_distribution_session_snapshot.sql"
+    "040_pre_site_distribution_session_snapshot.sql",
+    "041_deliberation_agenda_sends.sql"
   ]
 }
