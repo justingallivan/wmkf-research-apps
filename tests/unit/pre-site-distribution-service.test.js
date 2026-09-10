@@ -368,7 +368,7 @@ test('prepare accepts the settled stable-ID eTag when the upload response eTag i
   expect(harness.snapshots[0].wmkf_sharepointetag).toBe('word-etag');
 });
 
-test('prepare binds server-resolved material links and one informational calendar to the preview', async () => {
+test('prepare refuses a material selection (retired) and binds one informational calendar to the preview', async () => {
   const harness = createPrepareHarness();
   const materialId = '99999999-9999-4999-8999-999999999999';
   const sourceResult = await harness.dependencies.findDocumentsByRequest();
@@ -413,24 +413,34 @@ test('prepare binds server-resolved material links and one informational calenda
     }],
   }));
 
-  const result = await preparePreSiteDistribution(prepareInput({
+  // Material links are retired (owner 2026-09-10): a selection is refused
+  // before any persistence, even for an eligible Ready material.
+  await expect(preparePreSiteDistribution(prepareInput({
     attachmentMode: 'none',
     includeCalendar: true,
     siteVisitId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
     selectedMaterialIds: [materialId],
+  }), harness.dependencies)).rejects.toMatchObject({ code: 'distribution_material_links_retired', httpStatus: 400 });
+  expect(harness.dependencies.createOrGetAttempt).not.toHaveBeenCalled();
+
+  const result = await preparePreSiteDistribution(prepareInput({
+    attachmentMode: 'none',
+    includeCalendar: true,
+    siteVisitId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
   }), harness.dependencies);
 
-  // Nothing but the informational calendar is attached; the writeup rides the briefing page.
+  // Nothing but the informational calendar is attached; the writeup and the
+  // materials ride the briefing page.
   expect(result.attempt.attachments.map((attachment) => attachment.kind))
     .toEqual(['calendar']);
-  expect(result.attempt.materialLinks).toEqual([expect.objectContaining({ artifactId: materialId })]);
+  expect(result.attempt.materialLinks).toEqual([]);
   expect(result.attempt.calendarEnabled).toBe(true);
   expect(result.attempt.bodyText).toBe('Attached.');
   const persisted = harness.dependencies.createOrGetAttempt.mock.calls[0][0];
   expect(persisted.toRecipients).toEqual(['staff@example.org', 'organizer@wmkeck.org']);
   expect(persisted.ccRecipients).toEqual(['consultant@example.org']);
-  expect(persisted.bodyHtml).toContain('Applicant &lt;Slides&gt;.pdf');
-  expect(persisted.bodyHtml).toContain('a=1&amp;b=2');
+  expect(persisted.bodyHtml).not.toContain('Applicant');
+  expect(persisted.bodyHtml).toContain('the site visit materials, no login required');
   expect(persisted.calendar.content.toString('utf8')).toContain('METHOD:PUBLISH');
   expect(persisted.calendar.content.toString('utf8'))
     .toContain('ORGANIZER:mailto:organizer@wmkeck.org');
@@ -473,7 +483,7 @@ test('calendar organizer is moved from Cc to To before preview persistence', asy
   expect(persisted.ccRecipients).toEqual(['consultant@example.org']);
 });
 
-test('calendar and material selections participate in the draft identity', async () => {
+test('the calendar selection participates in the draft identity; a material selection is refused', async () => {
   const base = createPrepareHarness();
   await preparePreSiteDistribution(prepareInput({ attachmentMode: 'none' }), base.dependencies);
   const baseHash = base.dependencies.createOrGetAttempt.mock.calls[0][0].draftHash;
@@ -498,12 +508,13 @@ test('calendar and material selections participate in the draft identity', async
       },
     ],
   });
-  await preparePreSiteDistribution(prepareInput({
+  // Material links are retired: a selection is refused before the draft
+  // identity is ever computed (the calendar still participates below).
+  await expect(preparePreSiteDistribution(prepareInput({
     attachmentMode: 'none',
     selectedMaterialIds: [materialId],
-  }), material.dependencies);
-  const materialHash = material.dependencies.createOrGetAttempt.mock.calls[0][0].draftHash;
-  expect(materialHash).not.toBe(baseHash);
+  }), material.dependencies)).rejects.toMatchObject({ code: 'distribution_material_links_retired' });
+  expect(material.dependencies.createOrGetAttempt).not.toHaveBeenCalled();
 
   const extended = createPrepareHarness();
   extended.dependencies.schemaReady = jest.fn(() => true);

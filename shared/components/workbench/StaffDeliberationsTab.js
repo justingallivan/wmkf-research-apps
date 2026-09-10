@@ -788,7 +788,6 @@ export default function StaffDeliberationsTab({
           requestNumber={requestNumber}
           sourceArtifact={artifact}
           siteVisit={siteVisitContext?.siteVisit || null}
-          materials={siteVisitContext?.materials || EMPTY_LIST}
           suggestedTo={siteVisitContext?.suggestedTo || EMPTY_LIST}
           suggestedCc={siteVisitContext?.suggestedCc || EMPTY_LIST}
           onHistory={onDistributionHistory}

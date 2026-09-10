@@ -68,33 +68,26 @@ test('offers no attachment choice; the default message names the briefing page a
   expect(screen.queryByRole('group', { name: 'Document attachment' })).not.toBeInTheDocument();
   expect(screen.queryByRole('radio')).not.toBeInTheDocument();
   expect(screen.getByLabelText('Message')).toHaveValue(
-    'The deliberation briefing page linked below has the Site Visit writeup, every completed review, and the proposal narrative.',
+    'The deliberation briefing page linked below has the Site Visit writeup, every completed review, the proposal narrative, and the site visit materials.',
   );
 });
 
-test('offers material links by display label with no calendar controls', async () => {
+test('offers no material checkboxes and no calendar controls; the briefing page is the carrier', async () => {
   render(
     <PreSiteDistributionPanel
       requestId={REQUEST_ID}
       requestNumber="1002379"
       sourceArtifact={{ artifactId: ARTIFACT_ID }}
-      materials={[{
-        artifactId: '44444444-4444-4444-8444-444444444444',
-        filename: 'Applicant Slides.pdf',
-        artifactTypeLabel: 'Applicant Slides',
-      }]}
     />,
   );
 
   expect(await screen.findByRole('heading', { name: 'Send Site Visit materials' })).toBeInTheDocument();
   // Calendar attachments have no UI (owner decision S466: unused).
   expect(screen.queryByText(/add-to-calendar/i)).not.toBeInTheDocument();
-  expect(screen.queryByText(/Calendar and material links/)).not.toBeInTheDocument();
-  // Materials show the display label; the SharePoint filename stays in a tooltip.
-  expect(screen.getByRole('group', { name: 'Include links to materials' })).toBeInTheDocument();
-  const materialLabel = screen.getByText('Applicant Slides');
-  expect(materialLabel).toHaveAttribute('title', 'Applicant Slides.pdf');
-  expect(screen.queryByText(/Applicant Slides\.pdf/)).not.toBeInTheDocument();
+  // Material links retired (owner 2026-09-10): no "Include links to materials" group.
+  expect(screen.queryByRole('group', { name: 'Include links to materials' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+  expect(screen.getByLabelText('Message').value).toContain('the site visit materials');
 });
 
 test('prepare carries no attachment mode, the preview shows the briefing link and no attachments, and send needs exact-preview confirmation', async () => {

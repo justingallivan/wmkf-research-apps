@@ -169,6 +169,29 @@ export default function BriefingPage() {
         )}
       </section>
 
+      <section className="mt-6 rounded-xl border border-gray-200 bg-white p-5">
+        <h2 className="text-base font-semibold text-gray-900">Site visit materials</h2>
+        {data.materials?.length ? (
+          <ul className="mt-2 space-y-1 text-sm">
+            {data.materials.map((material) => (
+              <li key={material.member}>
+                <span className="font-medium text-gray-800">{material.label}:</span>{' '}
+                {material.available ? (
+                  <a className="text-blue-800 underline" href={documentHref(material.member)} target="_blank" rel="noreferrer noopener">
+                    {material.filename}
+                  </a>
+                ) : (
+                  <span className="text-gray-700">{material.filename} <span className="text-gray-500">(too large to open here; ask staff for a copy)</span></span>
+                )}
+                {formatSize(material.size) && <span className="text-gray-500"> · {formatSize(material.size)}</span>}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="mt-2 text-sm text-gray-600">No site visit materials yet. Slides, recordings, and transcripts appear here as staff add them.</p>
+        )}
+      </section>
+
       <section className="mt-6">
         <h2 className="text-base font-semibold text-gray-900">
           Reviews{data.reviews?.length ? ` (${data.reviews.length})` : ''}
