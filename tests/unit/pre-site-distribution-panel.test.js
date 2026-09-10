@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import PreSiteDistributionPanel from '../../shared/components/workbench/PreSiteDistributionPanel';
 
 jest.mock('../../shared/components/Layout', () => ({
@@ -627,4 +627,41 @@ test('a superseded reissue refreshes the header from history instead of revoking
   await screen.findByText('https://apps.test/external/briefing/newer');
   expect(screen.getByText(/replaced by another action/)).toBeInTheDocument();
   expect(global.fetch).toHaveBeenCalledTimes(3);
+});
+
+test('dialog mode: Add from directory opens the picker above the composer, and Escape closes the picker first', async () => {
+  global.fetch = jest.fn(async (url) => {
+    if (String(url).includes('/history')) return response({ success: true, attempts: [] });
+    if (String(url).includes('/recipient-options')) {
+      return response({ success: true, recipients: [{ key: 'r0', category: 'staff', name: 'Alice Staff', email: 'alice@example.org' }] });
+    }
+    return response({ success: true });
+  });
+  const onCloseComposer = jest.fn();
+  render(
+    <PreSiteDistributionPanel
+      requestId={REQUEST_ID}
+      requestNumber="1002379"
+      sourceArtifact={{ artifactId: ARTIFACT_ID }}
+      composer="dialog"
+      onCloseComposer={onCloseComposer}
+      needsLock
+    />,
+  );
+  const composer = await screen.findByRole('dialog', { name: 'Share for the deliberation session' });
+  expect(within(composer).getByTestId('composer-lock-note')).toBeInTheDocument();
+  expect(within(composer).getByRole('button', { name: 'Lock and preview' })).toBeInTheDocument();
+
+  fireEvent.click(within(composer).getAllByRole('button', { name: 'Add from directory' })[0]);
+  const picker = await screen.findByRole('dialog', { name: /directory|recipients/i });
+  // Stacked above the composer (z-60 over z-50), so it is visible, not painted under.
+  expect(picker.closest('[class*="z-[60]"]')).not.toBeNull();
+
+  fireEvent.keyDown(document, { key: 'Escape' });
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: /directory|recipients/i })).not.toBeInTheDocument());
+  expect(onCloseComposer).not.toHaveBeenCalled();
+  expect(screen.getByRole('dialog', { name: 'Share for the deliberation session' })).toBeInTheDocument();
+
+  fireEvent.keyDown(document, { key: 'Escape' });
+  expect(onCloseComposer).toHaveBeenCalledTimes(1);
 });

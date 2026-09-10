@@ -202,20 +202,24 @@ function attemptPresentation(attempt) {
  * dismiss it unless a prepare or send is in flight; focus lands on Close and
  * returns to the opener on unmount.
  */
-function ComposerDialog({ onClose, busy, children }) {
+function ComposerDialog({ onClose, busy, escapeDisabled = false, children }) {
   const closeRef = useRef(null);
   useEffect(() => {
     const previouslyFocused = document.activeElement;
     closeRef.current?.focus();
-    const onKey = (event) => {
-      if (event.key === 'Escape' && !busy) onClose?.();
-    };
-    document.addEventListener('keydown', onKey);
     return () => {
-      document.removeEventListener('keydown', onKey);
       if (previouslyFocused?.focus) previouslyFocused.focus();
     };
-  }, [busy, onClose]);
+  }, []);
+  useEffect(() => {
+    // Escape closes the composer unless a nested dialog (the recipient
+    // picker, stacked above at z-60) owns the key right now.
+    const onKey = (event) => {
+      if (event.key === 'Escape' && !busy && !escapeDisabled) onClose?.();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [busy, escapeDisabled, onClose]);
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4" role="presentation">
       <div
@@ -748,7 +752,7 @@ export default function PreSiteDistributionPanel({
         />
       )}
       {composer === 'dialog' && (
-        <ComposerDialog onClose={onCloseComposer} busy={preparing || sending}>
+        <ComposerDialog onClose={onCloseComposer} busy={preparing || sending} escapeDisabled={recipientPickerTarget !== null}>
           {composerBody}
         </ComposerDialog>
       )}
