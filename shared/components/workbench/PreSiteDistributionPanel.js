@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Card } from '../Layout';
 import CuratedRecipientPicker from './CuratedRecipientPicker';
 
-const DEFAULT_BODY = 'The deliberation briefing page linked below has the Site Visit writeup, every completed review, and the proposal narrative.';
+const DEFAULT_BODY = 'The deliberation briefing page linked below has the Site Visit writeup, every completed review, the proposal narrative, and the site visit materials.';
 const EMPTY_LIST = Object.freeze([]);
 const STALE_PREVIEW_CODES = new Set([
   'distribution_stale_source',
@@ -99,7 +99,7 @@ function BriefingLinkCard({ link, onReissue, busy, error }) {
             </p>
           ) : (
             <p className="mt-1 text-sm text-gray-600">
-              Board members and consultants open the writeup, every completed review, and the proposal narrative here without a login.
+              Board members and consultants open the writeup, every completed review, the proposal narrative, and the site visit materials here without a login.
               {expires ? ` Live until ${expires}.` : ''}
             </p>
           )}
@@ -232,7 +232,7 @@ function ComposerDialog({ onClose, busy, escapeDisabled = false, children }) {
           <div>
             <h3 id="share-composer-title" className="text-lg font-semibold text-gray-900">Share for the deliberation session</h3>
             <p className="mt-1 text-sm text-gray-600">
-              The email carries the briefing page link; the writeup, every completed review, and the proposal narrative open there without a login.
+              The email carries the briefing page link; the writeup, every completed review, the proposal narrative, and the site visit materials open there without a login.
             </p>
           </div>
           <button
@@ -256,7 +256,8 @@ export default function PreSiteDistributionPanel({
   requestNumber,
   sourceArtifact,
   siteVisit = null,
-  materials = EMPTY_LIST,
+  // Material links retired 2026-09-10 (owner): the briefing page carries the
+  // site visit materials; the composer no longer offers them.
   suggestedTo = EMPTY_LIST,
   suggestedCc = EMPTY_LIST,
   onHistory = null,
@@ -286,7 +287,6 @@ export default function PreSiteDistributionPanel({
     bodyText: DEFAULT_BODY,
     includeCalendar: false,
     siteVisitId: null,
-    selectedMaterialIds: [],
   });
   const [preview, setPreview] = useState(null);
   const [confirmed, setConfirmed] = useState(false);
@@ -356,11 +356,8 @@ export default function PreSiteDistributionPanel({
       // pins the calendar off while the server contract stays intact.
       siteVisitId: siteVisit?.activityId || null,
       includeCalendar: false,
-      selectedMaterialIds: current.selectedMaterialIds.filter((id) => (
-        materials.some((material) => material.artifactId === id)
-      )),
     }));
-  }, [materials, siteVisit?.activityId, suggestedCc, suggestedTo]);
+  }, [siteVisit?.activityId, suggestedCc, suggestedTo]);
 
   const edit = (patch) => {
     setForm((current) => ({ ...current, ...patch }));
@@ -533,30 +530,6 @@ export default function PreSiteDistributionPanel({
           </div>
         )}
 
-        {materials.length > 0 && (
-          <fieldset className="mt-4">
-            <legend className="text-sm font-medium text-gray-800">Include links to materials</legend>
-            <div className="mt-2 space-y-2">
-              {materials.map((material) => (
-                <label key={material.artifactId} className="flex items-start gap-2 text-sm text-gray-700">
-                  <input
-                    type="checkbox"
-                    checked={form.selectedMaterialIds.includes(material.artifactId)}
-                    onChange={(event) => edit({
-                      selectedMaterialIds: event.target.checked
-                        ? [...form.selectedMaterialIds, material.artifactId]
-                        : form.selectedMaterialIds.filter((id) => id !== material.artifactId),
-                    })}
-                    disabled={preparing || sending}
-                    className="mt-0.5"
-                  />
-                  <span title={material.filename}>{material.artifactTypeLabel}</span>
-                </label>
-              ))}
-            </div>
-          </fieldset>
-        )}
-
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           <div>
             <div className="flex items-center justify-between gap-2">
@@ -716,7 +689,7 @@ export default function PreSiteDistributionPanel({
                     disabled={preparing || sending}
                     className="mt-0.5"
                   />
-                  I reviewed the recipients, message, briefing page link, and material links shown above.
+                  I reviewed the recipients, message, and briefing page link shown above.
                 </label>
                 <button
                   type="button"

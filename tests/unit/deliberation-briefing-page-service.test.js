@@ -10,6 +10,22 @@ const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
 const RECEIVED_ID = '22222222-2222-4222-8222-222222222222';
 const PENDING_ID = '33333333-3333-4333-8333-333333333333';
 const FOREIGN_ID = '44444444-4444-4444-8444-444444444444';
+const SLIDES_ID = '55555555-5555-4555-8555-555555555555';
+const RECORDING_ID = '66666666-6666-4666-8666-666666666666';
+const WRITEUP_ROW_ID = '77777777-7777-4777-8777-777777777777';
+const FOREIGN_MATERIAL_ID = '88888888-8888-4888-8888-888888888888';
+
+// Registry rows: one servable deck, one oversize recording (listed, not
+// served), the writeup row itself (never a material), and a foreign request's
+// slides (never in this request's set).
+function materialRows() {
+  return [
+    { wmkf_requestdocumentid: SLIDES_ID, _wmkf_request_value: REQUEST_ID, wmkf_artifacttype: 100000003, wmkf_operationstatus: 100000001, wmkf_lifecyclestate: 100000001, wmkf_filename: 'Applicant Slides.pdf', wmkf_filesize: 2048, wmkf_sharepointdriveid: 'mat-drive', wmkf_sharepointitemid: 'slides-item' },
+    { wmkf_requestdocumentid: RECORDING_ID, _wmkf_request_value: REQUEST_ID, wmkf_artifacttype: 100000005, wmkf_operationstatus: 100000001, wmkf_lifecyclestate: 100000001, wmkf_filename: 'Visit.mp4', wmkf_filesize: 900 * 1024 * 1024, wmkf_sharepointdriveid: 'mat-drive', wmkf_sharepointitemid: 'recording-item' },
+    { wmkf_requestdocumentid: WRITEUP_ROW_ID, _wmkf_request_value: REQUEST_ID, wmkf_artifacttype: 100000001, wmkf_operationstatus: 100000001, wmkf_lifecyclestate: 100000001, wmkf_filename: 'Writeup.docx', wmkf_filesize: 100, wmkf_sharepointdriveid: 'mat-drive', wmkf_sharepointitemid: 'writeup-item' },
+    { wmkf_requestdocumentid: FOREIGN_MATERIAL_ID, _wmkf_request_value: FOREIGN_ID, wmkf_artifacttype: 100000003, wmkf_operationstatus: 100000001, wmkf_lifecyclestate: 100000001, wmkf_filename: 'Other.pdf', wmkf_filesize: 100, wmkf_sharepointdriveid: 'mat-drive', wmkf_sharepointitemid: 'other-item' },
+  ];
+}
 
 function suggestions() {
   return [
@@ -54,6 +70,7 @@ function deps(overrides = {}) {
     findActiveSiteVisit: jest.fn(async () => ({ scheduledstart: '2026-10-01T16:00:00Z', scheduledend: '2026-10-01T20:00:00Z' })),
     getSession: jest.fn(async () => null),
     getLatestAttempt: jest.fn(async () => null),
+    findDocuments: jest.fn(async () => ({ records: materialRows() })),
     resolveNarrativeFolder: jest.fn(async () => ({ library: 'akoya_request', folder: 'Requests/1002379/AI Materials' })),
     getFileMetadataByPath: jest.fn(async () => ({ id: 'narrative-item', driveId: 'drive-1', name: 'ProposalNarrative_1002379.pdf', size: 1234 })),
     downloadFile: jest.fn(async () => ({ buffer: Buffer.from('%PDF-'), mimeType: 'application/pdf', filename: 'x.pdf', size: 5 })),
@@ -160,4 +177,40 @@ test('the proposal member resolves by governed path and 404s when the narrative 
   const missing = deps({ getFileMetadataByPath: jest.fn(async () => null) });
   await expect(resolveBriefingMember({ requestId: REQUEST_ID, member: 'proposal' }, missing)).rejects.toMatchObject({ httpStatus: 404 });
   expect(missing.downloadFile).not.toHaveBeenCalled();
+});
+
+test('materials: the context lists this request\'s Ready applicant/visit files by label, never the writeup row, and flags oversize files as unavailable', async () => {
+  const d = deps();
+  const context = await buildBriefingContext({ requestId: REQUEST_ID, link: LINK }, d);
+  expect(context.materials).toEqual([
+    { member: `material:${SLIDES_ID}`, label: 'Applicant Slides', filename: 'Applicant Slides.pdf', size: 2048, available: true },
+    { member: `material:${RECORDING_ID}`, label: 'Recording', filename: 'Visit.mp4', size: 900 * 1024 * 1024, available: false },
+  ]);
+  expect(JSON.stringify(context.materials)).not.toMatch(/drive|item|sharepoint|Writeup\.docx|Other\.pdf/i);
+  // A registry failure leaves the section empty rather than failing the page.
+  const broken = deps({ findDocuments: jest.fn(async () => { throw new Error('dataverse down'); }) });
+  expect((await buildBriefingContext({ requestId: REQUEST_ID, link: LINK }, broken)).materials).toEqual([]);
+});
+
+test('materials: a member in the eligible set downloads the registry row\'s file; writeup, foreign, oversize, and unknown ids are 404 before any Graph call', async () => {
+  const d = deps({ downloadFile: jest.fn(async () => ({ buffer: Buffer.from('%PDF-'), mimeType: 'application/pdf', filename: 'x.pdf', size: 2048 })) });
+  const file = await resolveBriefingMember({ requestId: REQUEST_ID, member: `material:${SLIDES_ID}` }, d);
+  expect(d.downloadFile).toHaveBeenCalledWith('mat-drive', 'slides-item');
+  expect(file.filename).toBe('Applicant Slides.pdf');
+  expect(file.inline).toBe(true);
+
+  for (const member of [`material:${WRITEUP_ROW_ID}`, `material:${FOREIGN_MATERIAL_ID}`, `material:${RECORDING_ID}`, 'material:not-a-guid', `material:${PENDING_ID}`]) {
+    const fresh = deps();
+    await expect(resolveBriefingMember({ requestId: REQUEST_ID, member }, fresh)).rejects.toMatchObject({ httpStatus: 404 });
+    expect(fresh.downloadFile).not.toHaveBeenCalled();
+  }
+});
+
+test('materials: a file whose actual bytes exceed the cap is refused even when the registry size was unknown', async () => {
+  const rows = materialRows().map((row) => (row.wmkf_requestdocumentid === SLIDES_ID ? { ...row, wmkf_filesize: null } : row));
+  const d = deps({
+    findDocuments: jest.fn(async () => ({ records: rows })),
+    downloadFile: jest.fn(async () => ({ buffer: Buffer.alloc(10), mimeType: 'video/mp4', filename: 'big.mp4', size: 900 * 1024 * 1024 })),
+  });
+  await expect(resolveBriefingMember({ requestId: REQUEST_ID, member: `material:${SLIDES_ID}` }, d)).rejects.toMatchObject({ httpStatus: 404 });
 });

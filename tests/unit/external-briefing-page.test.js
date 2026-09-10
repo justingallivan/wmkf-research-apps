@@ -78,3 +78,21 @@ test('links every member through the document route and only renders an https me
   expect(screen.queryByText('Join meeting')).toBeNull();
   await waitFor(() => expect(screen.getByText(/Reviews \(1\)/)).toBeInTheDocument());
 });
+
+test('site visit materials list by label; oversize files show without a link', async () => {
+  global.fetch = jest.fn().mockResolvedValue(response({
+    ok: true, title: 'Example University', proposalTitle: null, expiresAt: null,
+    session: null, siteVisit: null, writeup: null, reviews: [], proposal: null,
+    materials: [
+      { member: 'material:55555555-5555-4555-8555-555555555555', label: 'Applicant Slides', filename: 'Applicant Slides.pdf', size: 2048, available: true },
+      { member: 'material:66666666-6666-4666-8666-666666666666', label: 'Recording', filename: 'Visit.mp4', size: 900 * 1024 * 1024, available: false },
+    ],
+  }));
+  render(<BriefingPage />);
+  const slides = await screen.findByRole('link', { name: 'Applicant Slides.pdf' });
+  expect(slides).toHaveAttribute('href', '/api/external/briefing/tok/document?member=material%3A55555555-5555-4555-8555-555555555555');
+  expect(screen.getByText('Applicant Slides:')).toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: 'Visit.mp4' })).not.toBeInTheDocument();
+  expect(screen.getByText(/Visit\.mp4/)).toBeInTheDocument();
+  expect(screen.getByText(/too large to open here/)).toBeInTheDocument();
+});
