@@ -271,14 +271,17 @@ is decorative and does not count):
   discriminating tests). The durable-documentation and final handoff correction
   commit is `16ca526c`; `60263d75` (names the durable-documentation handoff
   commit in this inventory); `df13f0d4` (completes the prior final commit
-  inventory); and `6bee8d5c` (preserves token-revocation tri-state evidence and
-  adds the unknown-review-status regeneration regression). The verified feature
-  predecessor is `6bee8d5c`. Verification snapshot (2026-09-09, before this
-  final docs-only update): remote branch `95d26aeafcc5e5b9364d97392069e1623d6556fd`,
-  `origin/main` `7e06e4a1f65a864244279b521168059f672066c0`, divergence 7 behind /
-  29 ahead. The final docs-only commit containing this snapshot cannot list its
-  own hash; its delivered SHA is reported in the orchestrator handoff and is not
-  represented as part of this snapshot. All listed commits are pushed to
+  inventory); `6bee8d5c` (preserves token-revocation tri-state evidence and
+  adds the unknown-review-status regeneration regression); and `ee085e2c`
+  (predicate-partitioned no-response history, explicit answers, exact
+  regeneration/reset documentation, overlap, and unknown-status regressions).
+  Verification snapshot (2026-09-09, before this final docs-only update): the
+  verified feature/documentation predecessor is
+  `ee085e2ce4e1e6adeeb1b50d32912152215a5664`, remote branch matches that SHA,
+  `origin/main` is `14b2ba2e5bef20b9db3cd3dde8507ea53c383b0b`, and divergence is
+  10 behind / 31 ahead. The final docs-only commit containing this snapshot
+  cannot list its own hash; its delivered SHA is reported in the orchestrator
+  handoff and is not represented as part of this snapshot. All listed commits are pushed to
   `origin/codex/reviewer-release-reason`.
 - Files changed (summarized surface list; includes this brief and focused release,
   history, UI, service, route, adapter, and regeneration test categories):
@@ -315,12 +318,12 @@ is decorative and does not count):
   tests/unit/reviewer-invite-panel-release-button.test.js --runInBand` passes cleanly with 78
   tests across 8 suites. `npx jest tests/unit/reviewer-activity-history.test.js
   tests/unit/reviewer-manage-actions-menu.test.js tests/unit/reviewers-service.test.js
-  tests/unit/reviewer-modes.test.js --runInBand` passes with 166 tests across 4 suites.
+  tests/unit/reviewer-modes.test.js --runInBand` passes with 167 tests across 4 suites.
   `npx jest tests/unit/regenerate-token-service.test.js
   tests/integration/review-manager-token-routes.test.js
   tests/unit/reviewer-suggestion-token-regeneration.test.js
   tests/unit/reviewer-manage-actions-menu.test.js tests/unit/reviewer-activity-history.test.js
-  tests/unit/reviewers-service.test.js --runInBand --silent` passes with 165 tests across 6 suites
+  tests/unit/reviewers-service.test.js --runInBand --silent` passes with 166 tests across 6 suites
   (including the terminal response complement with held control, unknown-state
   fall-through, missing-ETag and exact-ifMatch controls, conditional 412 race
   mapping, concrete-ETag revoked no-response route fixture, adapter annotation
@@ -334,10 +337,10 @@ is decorative and does not count):
   `check:reviewer-engagement-boundary` + self-test;
   `check:route-service-boundary` + self-test; `check:route-lifecycle-auth` +
   self-test; and `git diff --check` all pass. The branch was based on `a3bda092`,
-  and `git ls-remote` verified `origin/main` at `7e06e4a1` and the pushed branch
-  predecessor at `6bee8d5c` before the handoff-finalizing docs commit.
+  and `git ls-remote` verified `origin/main` at `14b2ba2e` and the pushed branch
+  predecessor at `ee085e2c` before the handoff-finalizing docs commit.
 - Open questions / recommendations for the owner: the branch was based on
-  `a3bda092`; unrelated `origin/main` is `7e06e4a1`, so the branch remains behind
+  `a3bda092`; unrelated `origin/main` is `14b2ba2e`, so the branch remains behind
   `main` by design. The requested release branch
   is pushed and ready for review; do not merge it here. Residual risk: activity
   history remains a current-row operational summary, not an append-only audit log;
