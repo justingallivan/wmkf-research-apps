@@ -44,7 +44,7 @@ beforeEach(() => {
   global.fetch = jest.fn();
 });
 
-it('renders the unconditional ArtifactFileMetadata cue for a registry-snapshot (unchecked) file, not a plain link', async () => {
+it('renders the stage sentence, session and visit lines, and a plain Open document link (no registry block or metadata cue)', async () => {
   global.fetch.mockResolvedValue(mockResponse({
     success: true,
     cycleCode: 'D26',
@@ -55,9 +55,36 @@ it('renders the unconditional ArtifactFileMetadata cue for a registry-snapshot (
   }));
   render(<StaffDeliberationsPanel cycleCode="D26" loadingCycles={false} scope="all" />);
 
-  const link = await screen.findByRole('link', { name: /Open document →/ });
-  expect(link).toHaveTextContent('(recorded link)');
-  expect(screen.getByText(/has not been checked/)).toBeInTheDocument();
+  const link = await screen.findByRole('link', { name: 'Open document →' });
+  expect(link).toHaveAttribute('href', 'https://sp/doc.docx');
+  expect(screen.queryByText(/has not been checked/)).not.toBeInTheDocument();
+  expect(screen.queryByText('Ready')).not.toBeInTheDocument();
+  expect(screen.getByTestId('deliberations-stage-sentence'))
+    .toHaveTextContent('Review and edit the AI draft in Word, then share it for the deliberation session.');
+  expect(screen.getByTestId('deliberations-session-line')).toHaveTextContent('Deliberation session: not yet scheduled.');
+  expect(screen.getByTestId('deliberations-visit-line')).toHaveTextContent('Visit not scheduled.');
+});
+
+it('a scheduled session renders its date and time in the session\'s own time zone', async () => {
+  global.fetch.mockResolvedValue(mockResponse({
+    success: true,
+    cycleCode: 'D26',
+    scope: 'all',
+    stageLabels: STAGE_LABELS,
+    counts: { draft: 0, shared: 1, visit: 0, final: 0 },
+    artifacts: [artifact({
+      stage: 'shared',
+      substate: 'sent',
+      sharedAtIso: '2026-09-10T16:03:28Z',
+      session: { scheduledStartIso: '2026-12-01T18:00:00Z', scheduledEndIso: null, ianaTimeZone: 'America/Los_Angeles', meetingLink: null, location: null },
+    })],
+  }));
+  render(<StaffDeliberationsPanel cycleCode="D26" loadingCycles={false} scope="all" />);
+
+  const line = await screen.findByTestId('deliberations-session-line');
+  expect(line).toHaveTextContent(/^Deliberation session: .*Dec 1, 2026.*10:00.*AM\.$/);
+  expect(screen.getByTestId('deliberations-stage-sentence'))
+    .toHaveTextContent(`Shared on ${new Date('2026-09-10T16:03:28Z').toLocaleDateString()}. The deliberation email has gone out`);
 });
 
 it('guards a missing artifact.visit and renders "Visit not scheduled." instead of crashing', async () => {
@@ -114,10 +141,11 @@ it('when visitExpected() is false, the visit line is hidden at draft/shared but 
   render(<StaffDeliberationsPanel cycleCode="D26" loadingCycles={false} scope="all" />);
 
   await screen.findByText(/#1/);
-  const visitLines = screen.getAllByTestId('deliberations-visit-line');
-  // Only the real (already-visited) row keeps its visit line.
-  expect(visitLines).toHaveLength(1);
-  expect(visitLines[0]).toHaveTextContent('Visited');
+  // No anticipatory visit line at draft/shared; the visited row states the
+  // real date in its stage sentence instead of a separate line.
+  expect(screen.queryAllByTestId('deliberations-visit-line')).toHaveLength(0);
+  const sentences = screen.getAllByTestId('deliberations-stage-sentence');
+  expect(sentences[2]).toHaveTextContent(`Visited ${new Date('2020-01-01T00:00:00Z').toLocaleDateString()}. Add your site-visit edits`);
   // The lead line omits the visit stop entirely rather than showing "0 visit".
   expect(screen.getByText('1 ai draft ready · 1 shared · 1 final')).toBeInTheDocument();
 });

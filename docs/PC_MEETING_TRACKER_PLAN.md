@@ -181,7 +181,13 @@ view's visit join. This contract is fixed so the two tracks can build in paralle
 - **Staff Deliberations tab (rail).** Stops keyed `draft | shared | visit | final`; labels from
   the catalog (D6). Stop 3 shows the **site visit** date from the Activity and the **deliberation**
   date from the latest slot, as two lines under one stop or two sub-stops — a form decision. "Not
-  scheduled" is a normal state that names the PC as the actor, not a warning.
+  scheduled" is a normal state that names the PC as the actor, not a warning. **[BUILT 2026-09-10,
+  S503, tab redesign]** Both the tab and the cycle view render a "Deliberation session: …" line
+  under the stage sentence at draft/shared, fed by this reader: the per-request GET
+  `/api/workbench/pre-site-visit` payload carries `session` via the briefing seam
+  (`lib/services/deliberation-briefing/session-reader.js`), and the cycle list batches
+  `getDeliberationScheduleByRequests` once per list. Both read null ("not yet scheduled") until
+  `MEETING_TRACKER_SCHEMA_READY` is on.
 - **Cycle view (`staff-deliberations`).** One row per advancing request, the same rail, the date
   that matters for its stop, edit-check count, and one next-action link; grouped by stop with a
   lead line; Scope control as on Request list. Reads the same two records.

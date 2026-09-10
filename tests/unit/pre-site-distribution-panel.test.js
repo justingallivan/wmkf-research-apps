@@ -538,6 +538,7 @@ test('reports loaded history and the server-derived sent flag through onHistory'
   await waitFor(() => expect(onHistory).toHaveBeenCalledWith({
     attempts,
     currentSourceEverSent: true,
+    latestSendFailure: null,
   }));
 });
 

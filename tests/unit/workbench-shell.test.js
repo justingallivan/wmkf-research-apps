@@ -240,8 +240,13 @@ test('the Staff deliberations view lists the cycle\'s pre-site drafts with its i
   expect(screen.getByText('Track pre-site draft writeups and their stage for the selected cycle.')).toBeInTheDocument();
   expect(screen.getByRole('link', { name: 'Staff deliberations' })).toHaveAttribute('aria-current', 'page');
   expect(screen.getByRole('link', { name: /#1002959/ })).toHaveAttribute('href', '/workbench/r9?tab=staff-deliberations&n=1002959');
-  expect(screen.getByText('Draft')).toBeInTheDocument();
-  expect(screen.getByText('Ready')).toBeInTheDocument();
+  // Tab redesign: the registry block (lifecycle/operation labels) is gone; the
+  // card states the next step instead.
+  expect(screen.queryByText('Draft')).not.toBeInTheDocument();
+  expect(screen.queryByText('Ready')).not.toBeInTheDocument();
+  expect(screen.getByTestId('deliberations-stage-sentence'))
+    .toHaveTextContent('Review and edit the AI draft in Word, then share it for the deliberation session.');
+  expect(screen.getByText('Deliberation session: not yet scheduled.')).toBeInTheDocument();
   expect(screen.getByText('1 ai draft ready · 0 shared · 0 visit · 0 final')).toBeInTheDocument();
   expect(screen.getByTestId('stage-rail')).toHaveTextContent('● AI draft ready');
   expect(screen.getByText('Visit not scheduled.')).toBeInTheDocument();

@@ -12,12 +12,14 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Card } from '../Layout';
-import ArtifactFileMetadata from './ArtifactFileMetadata';
 import DeliberationStageRail from './DeliberationStageRail';
 import ScopeSegment from './ScopeSegment';
 import {
   DELIBERATION_STAGE_KEYS,
   DELIBERATION_STAGE_DEFAULT_LABELS,
+  deliberationSessionLine,
+  deliberationStageSentence,
+  deliberationVisitLine,
   visitExpected,
 } from '../../utils/deliberation-stage';
 
@@ -47,16 +49,26 @@ function visitLineVisible(stage) {
   return visitExpected() || stage === 'visit' || stage === 'final';
 }
 
-function visitLineText(artifact) {
-  const visit = artifact.visit || NOT_SCHEDULED_VISIT;
-  const { stage } = artifact;
-  if (visit.status === 'not-scheduled') return 'Visit not scheduled.';
-  const date = new Date(visit.startIso).toLocaleDateString();
-  const base = visit.status === 'visited' ? `Visited ${date}.` : `Visit ${date}.`;
-  return stage === 'shared' && artifact.substate === 'not-sent' ? `${base} Not yet sent.` : base;
+// Tab redesign (shape brief, owner 2026-09-10): the card carries the same
+// stage sentence and session/visit lines as the per-request tab; the old
+// registry block (lifecycle/operation labels, SharePoint-metadata sentence)
+// is gone. Draft-stage cards use the shorter sentence so a list of many stays
+// scannable.
+function cardSentence(artifact) {
+  if (artifact.stage === 'draft' && artifact.substate === 'ready') {
+    return 'Review and edit the AI draft in Word, then share it for the deliberation session.';
+  }
+  return deliberationStageSentence({
+    stage: artifact.stage,
+    substate: artifact.substate,
+    sharedAtIso: artifact.sharedAtIso || null,
+    visit: artifact.visit || NOT_SCHEDULED_VISIT,
+  });
 }
 
 function DeliberationCard({ artifact, stageLabels }) {
+  const keyed = DELIBERATION_STAGE_KEYS.includes(artifact.stage);
+  const showLines = keyed && artifact.stage !== 'final';
   return (
     <Card hover={false}>
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -70,22 +82,45 @@ function DeliberationCard({ artifact, stageLabels }) {
           </Link>
           {artifact.institution && <p className="text-sm text-gray-600 mt-1">{artifact.institution}</p>}
           {artifact.programDirector && <p className="text-xs text-gray-500 mt-1">PD: {artifact.programDirector}</p>}
-          {DELIBERATION_STAGE_KEYS.includes(artifact.stage) && (
+          {keyed && (
             <DeliberationStageRail stage={artifact.stage} substate={artifact.substate} labels={stageLabels} />
           )}
-          {visitLineVisible(artifact.stage) && (
-            <p className="mt-1 text-xs text-gray-500" data-testid="deliberations-visit-line">
-              {visitLineText(artifact)}
+          {keyed && (
+            <p className="mt-2 max-w-2xl text-sm text-gray-700" data-testid="deliberations-stage-sentence">
+              {cardSentence(artifact)}
             </p>
+          )}
+          {!keyed && (
+            <p className="mt-2 text-sm text-gray-700">
+              {artifact.lifecycleLabel} · {artifact.operationLabel}
+            </p>
+          )}
+          {showLines && artifact.stage !== 'visit' && (
+            <p className="mt-1 text-xs text-gray-500" data-testid="deliberations-session-line">
+              {deliberationSessionLine(artifact.session)}
+            </p>
+          )}
+          {showLines && artifact.stage !== 'visit' && visitLineVisible(artifact.stage) && (
+            <p className="mt-1 text-xs text-gray-500" data-testid="deliberations-visit-line">
+              {deliberationVisitLine(artifact.visit || NOT_SCHEDULED_VISIT)}
+            </p>
+          )}
+          {!artifact.isCurrent && (
+            <p className="mt-1 text-xs text-amber-700">Not the current draft.</p>
           )}
         </div>
         <div className="text-right text-sm">
-          <div className="font-medium text-gray-900">{artifact.lifecycleLabel}</div>
-          <div className="text-gray-500">
-            {artifact.operationLabel}
-            {artifact.isCurrent ? '' : ' · not the current draft'}
-          </div>
-          <ArtifactFileMetadata file={artifact.file} linkLabel="Open document →" />
+          {artifact.file?.webUrl && (
+            <a
+              href={artifact.file.webUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              title={artifact.file.name || undefined}
+              className="block text-xs font-medium text-gray-700 hover:underline"
+            >
+              Open document →
+            </a>
+          )}
           <Link href={requestHref(artifact)} className="mt-2 block text-xs font-medium text-indigo-600 hover:underline">
             {NEXT_ACTION_TAB[artifact.stage] === 'final-writeup' ? 'Open Final Writeup →' : 'Open Staff Deliberations →'}
           </Link>

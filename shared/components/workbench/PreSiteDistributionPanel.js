@@ -197,6 +197,56 @@ function attemptPresentation(attempt) {
   return { label: 'Sending', pillClass: 'bg-gray-100 text-gray-700', superseded: false, unconfirmed: false };
 }
 
+/**
+ * Modal shell for the composer (tab redesign). Escape and the Close button
+ * dismiss it unless a prepare or send is in flight; focus lands on Close and
+ * returns to the opener on unmount.
+ */
+function ComposerDialog({ onClose, busy, children }) {
+  const closeRef = useRef(null);
+  useEffect(() => {
+    const previouslyFocused = document.activeElement;
+    closeRef.current?.focus();
+    const onKey = (event) => {
+      if (event.key === 'Escape' && !busy) onClose?.();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      if (previouslyFocused?.focus) previouslyFocused.focus();
+    };
+  }, [busy, onClose]);
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4" role="presentation">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="share-composer-title"
+        className="my-6 w-full max-w-3xl rounded-xl bg-white p-6 shadow-xl"
+      >
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h3 id="share-composer-title" className="text-lg font-semibold text-gray-900">Share for the deliberation session</h3>
+            <p className="mt-1 text-sm text-gray-600">
+              The email carries the briefing page link; the writeup, every completed review, and the proposal narrative open there without a login.
+            </p>
+          </div>
+          <button
+            ref={closeRef}
+            type="button"
+            onClick={onClose}
+            disabled={busy}
+            className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50"
+          >
+            Close
+          </button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
 export default function PreSiteDistributionPanel({
   requestId,
   requestNumber,
@@ -210,6 +260,17 @@ export default function PreSiteDistributionPanel({
   // send is a secondary action: the composer folds behind a closed disclosure
   // instead of presenting as the stage's main job (owner, S466).
   collapsed = false,
+  // Tab redesign (shape brief, owner 2026-09-10): the Staff Deliberations tab
+  // keeps the briefing-link card and history inline and opens the composer as
+  // a dialog from its Share action. 'inline' is the legacy layout.
+  composer = 'inline', // 'inline' | 'dialog' | 'hidden'
+  onCloseComposer = null,
+  // Runs before the prepare request; the tab locks the draft here (lock, then
+  // preview, then send), so a lock failure surfaces in the composer.
+  beforePrepare = null,
+  needsLock = false,
+  // Briefing-link card and email history; the tab hides them until the draft is shared.
+  record = true,
 }) {
   // No attachment field: since 2026-09-10 the email carries the briefing page
   // link instead of the writeup (owner; shape brief). The server records
@@ -249,9 +310,17 @@ export default function PreSiteDistributionPanel({
     setHistory(body.attempts || []);
     setBriefingLink(body.briefingLink || null);
     setHistoryError(null);
+    const attempts = body.attempts || [];
+    const latest = attempts[0] || null;
+    const latestPresentation = latest ? attemptPresentation(latest) : null;
     onHistory?.({
-      attempts: body.attempts || [],
+      attempts,
       currentSourceEverSent: body.currentSourceEverSent === true,
+      // A real (non-stale) failure on the newest attempt: the tab shows it in
+      // red with a Resend action.
+      latestSendFailure: latestPresentation?.label === 'Failed'
+        ? { operationId: latest.operationId, message: latest.lastError }
+        : null,
     });
   }, [requestId, onHistory]);
 
@@ -327,6 +396,10 @@ export default function PreSiteDistributionPanel({
     setNotice(null);
     setConfirmed(false);
     try {
+      // Lock first (owner 2026-09-10): the preview is built from the locked
+      // version, so the lock happens here, before prepare, never after.
+      if (beforePrepare) await beforePrepare();
+      if (sequence.current !== currentSequence || id !== requestId) return;
       const response = await fetch('/api/workbench/pre-site-visit/distribution/prepare', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -547,13 +620,20 @@ export default function PreSiteDistributionPanel({
             className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
           />
         </div>
+        {needsLock && (
+          <p className="mt-4 text-sm text-gray-600" data-testid="composer-lock-note">
+            Creating the preview locks this exact Word version as the working document and turns off regeneration.
+          </p>
+        )}
         <button
           type="button"
           onClick={prepare}
           disabled={preparing || sending || !form.to.trim() || !form.subject.trim() || !form.bodyText.trim()}
           className="mt-4 rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
         >
-          {preparing ? 'Creating preview…' : preview ? 'Create new preview' : 'Create preview'}
+          {preparing
+            ? (needsLock ? 'Locking and creating preview…' : 'Creating preview…')
+            : needsLock ? 'Lock and preview' : preview ? 'Create new preview' : 'Create preview'}
         </button>
         {notice && (
           <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900" role="status" aria-live="polite">
@@ -659,12 +739,20 @@ export default function PreSiteDistributionPanel({
         onAdd={addDirectoryRecipients}
         onClose={closeRecipientPicker}
       />
-      <BriefingLinkCard
-        link={briefingLink}
-        onReissue={reissueBriefingLink}
-        busy={reissuing || preparing || sending}
-        error={briefingError}
-      />
+      {record && (
+        <BriefingLinkCard
+          link={briefingLink}
+          onReissue={reissueBriefingLink}
+          busy={reissuing || preparing || sending}
+          error={briefingError}
+        />
+      )}
+      {composer === 'dialog' && (
+        <ComposerDialog onClose={onCloseComposer} busy={preparing || sending}>
+          {composerBody}
+        </ComposerDialog>
+      )}
+      {composer === 'inline' && (
       <Card hover={false}>
         {collapsed ? (
           <details>
@@ -687,7 +775,9 @@ export default function PreSiteDistributionPanel({
           </>
         )}
       </Card>
+      )}
 
+      {record && (
       <Card hover={false}>
         <details>
           <summary className="cursor-pointer select-none text-base font-semibold text-gray-900">
@@ -769,6 +859,7 @@ export default function PreSiteDistributionPanel({
         )}
         </details>
       </Card>
+      )}
     </>
   );
 }

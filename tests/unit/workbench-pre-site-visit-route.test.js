@@ -16,6 +16,10 @@ jest.mock('../../lib/services/pre-site-visit/artifact-service', () => ({
 jest.mock('../../lib/services/deliberation-stage-labels', () => ({
   readDeliberationStageLabels: jest.fn(),
 }));
+jest.mock('../../lib/services/deliberation-briefing/session-reader', () => ({
+  getDeliberationSessionForRequest: jest.fn(async () => null),
+}));
+import { getDeliberationSessionForRequest } from '../../lib/services/deliberation-briefing/session-reader';
 
 import { getUserRole, requireAppAccess } from '../../lib/utils/auth';
 import { withDalContext } from '../../lib/dataverse/core/context';
@@ -109,7 +113,41 @@ test('reads current/pending status without invoking generation', async () => {
     pendingArtifact: null,
     reopenHistory: [],
     stageLabels: STAGE_LABELS,
+    session: null,
   });
+});
+
+test('the GET payload carries the tracker session line through the briefing seam, reduced to the card shape (fail-open null on error)', async () => {
+  getDeliberationSessionForRequest.mockResolvedValueOnce({
+    sessionId: 's-1',
+    scheduledStartIso: '2026-12-01T18:00:00Z',
+    scheduledEndIso: '2026-12-01T18:30:00Z',
+    ianaTimeZone: 'America/Los_Angeles',
+    meetingLink: 'https://zoom.example/j/1',
+    location: '',
+    order: 1,
+    minutes: 30,
+    attendees: [{ name: 'A', email: 'a@example.org' }],
+  });
+  getPreSiteVisitArtifactStatus.mockResolvedValueOnce({ currentArtifact: null, pendingArtifact: null, reopenHistory: [] });
+  const res = mockRes();
+  await handler(get(), res);
+  expect(getDeliberationSessionForRequest).toHaveBeenCalledWith(REQUEST_ID);
+  expect(res.body.session).toEqual({
+    scheduledStartIso: '2026-12-01T18:00:00Z',
+    scheduledEndIso: '2026-12-01T18:30:00Z',
+    ianaTimeZone: 'America/Los_Angeles',
+    meetingLink: 'https://zoom.example/j/1',
+    location: null,
+  });
+  expect(res.body.session).not.toHaveProperty('attendees');
+
+  getDeliberationSessionForRequest.mockRejectedValueOnce(new Error('tracker down'));
+  getPreSiteVisitArtifactStatus.mockResolvedValueOnce({ currentArtifact: null, pendingArtifact: null, reopenHistory: [] });
+  const failed = mockRes();
+  await handler(get(), failed);
+  expect(failed.statusCode).toBe(200);
+  expect(failed.body.session).toBeNull();
 });
 
 test('adds stageLabels to the GET success payload from the shared admin-editable catalog', async () => {
@@ -146,6 +184,7 @@ test('omits guarded-reopen audit history for non-superusers', async () => {
     currentArtifact: { artifactId: 'current-artifact' },
     pendingArtifact: null,
     stageLabels: STAGE_LABELS,
+    session: null,
   });
 });
 
@@ -169,6 +208,7 @@ test('keeps a regular pending generation visible to non-superusers without corre
     currentArtifact: null,
     pendingArtifact: { artifactId: 'pending-generation' },
     stageLabels: STAGE_LABELS,
+    session: null,
   });
 });
 
