@@ -14,6 +14,7 @@ import {
   generatePreSiteVisitArtifact,
   getPreSiteVisitArtifactStatus,
 } from '../../../lib/services/pre-site-visit/artifact-service';
+import { readDeliberationStageLabels } from '../../../lib/services/deliberation-stage-labels';
 import { REQUEST_DOCUMENT_OPERATION_STATUS } from '../../../shared/config/requestDocument';
 
 export const config = {
@@ -77,7 +78,8 @@ export default async function handler(req, res) {
         }
         const status = await getPreSiteVisitArtifactStatus({ requestId });
         const payload = includeCorrectionAudit ? status : staffSafePayload(status);
-        return res.status(200).json({ success: true, ...payload });
+        const stageLabels = await readDeliberationStageLabels();
+        return res.status(200).json({ success: true, ...payload, stageLabels });
       }
 
       if (!req.body

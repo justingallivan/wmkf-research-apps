@@ -41,6 +41,7 @@ import {
   REVIEWER_THANKYOU_SEED_SUBJECT,
   REVIEWER_THANKYOU_SEED_BODY,
 } from '../lib/seed/email-defaults/reviewer-templates.js';
+import { DELIBERATION_STAGE_DEFAULT_LABELS } from '../shared/utils/deliberation-stage.js';
 
 export const EMAIL_DEFAULT_SEED_TEXT = Object.freeze({
   'email.grantee_invite.subject': GRANTEE_INVITE_SEED_SUBJECT,
@@ -67,6 +68,15 @@ export const EMAIL_DEFAULT_SEED_TEXT = Object.freeze({
   'email.reviewer_thankyou.body': REVIEWER_THANKYOU_SEED_BODY,
   'email.grantee_reminder.subject': GRANTEE_REMINDER_SEED_SUBJECT,
   'email.grantee_reminder.body': GRANTEE_REMINDER_SEED_BODY,
+  // Staff Deliberations stage labels (D6, docs/PC_MEETING_TRACKER_PLAN.md):
+  // unlike the email defaults above, these already have a code-owned fallback
+  // (DELIBERATION_STAGE_DEFAULT_LABELS) read at request time when unset, so
+  // seeding is a convenience for admin-panel discoverability, not a
+  // functional requirement.
+  'stage.deliberations.draft': DELIBERATION_STAGE_DEFAULT_LABELS.draft,
+  'stage.deliberations.shared': DELIBERATION_STAGE_DEFAULT_LABELS.shared,
+  'stage.deliberations.visit': DELIBERATION_STAGE_DEFAULT_LABELS.visit,
+  'stage.deliberations.final': DELIBERATION_STAGE_DEFAULT_LABELS.final,
 });
 
 export function loadEnvLocal() {

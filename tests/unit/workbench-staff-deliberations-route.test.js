@@ -25,8 +25,8 @@ function responseHarness() {
 
 beforeEach(() => {
   jest.clearAllMocks();
-  requireAppAccess.mockResolvedValue({ session: { user: {} } });
-  listPreSiteVisitDrafts.mockResolvedValue({ success: true, cycleCode: 'D26', artifacts: [] });
+  requireAppAccess.mockResolvedValue({ session: { user: { dynamicsSystemuserId: 'cccccccc-0000-4000-8000-000000000001' } } });
+  listPreSiteVisitDrafts.mockResolvedValue({ success: true, cycleCode: 'D26', scope: 'all', stageLabels: {}, counts: {}, artifacts: [] });
 });
 
 it('guards with the reviewers app and returns the service body for a valid cycle', async () => {
@@ -34,9 +34,36 @@ it('guards with the reviewers app and returns the service body for a valid cycle
   await handler({ method: 'GET', query: { cycleCode: 'D26' } }, res);
   expect(requireAppAccess).toHaveBeenCalledWith(expect.anything(), res, 'reviewers');
   expect(withDalContext).toHaveBeenCalledWith('workbench-staff-deliberations', expect.any(Function));
-  expect(listPreSiteVisitDrafts).toHaveBeenCalledWith({ cycleCode: 'D26' });
+  expect(listPreSiteVisitDrafts).toHaveBeenCalledWith({
+    cycleCode: 'D26',
+    scope: 'all',
+    callerSystemId: 'cccccccc-0000-4000-8000-000000000001',
+  });
   expect(res.statusCode).toBe(200);
-  expect(res.body).toEqual({ success: true, cycleCode: 'D26', artifacts: [] });
+  expect(res.body).toEqual({ success: true, cycleCode: 'D26', scope: 'all', stageLabels: {}, counts: {}, artifacts: [] });
+});
+
+it('passes scope=my through and resolves callerSystemId from the session (actorRefFromSession)', async () => {
+  const res = responseHarness();
+  await handler({ method: 'GET', query: { cycleCode: 'D26', scope: 'my' } }, res);
+  expect(listPreSiteVisitDrafts).toHaveBeenCalledWith({
+    cycleCode: 'D26',
+    scope: 'my',
+    callerSystemId: 'cccccccc-0000-4000-8000-000000000001',
+  });
+});
+
+it('defaults an unrecognized scope value to all', async () => {
+  const res = responseHarness();
+  await handler({ method: 'GET', query: { cycleCode: 'D26', scope: 'bogus' } }, res);
+  expect(listPreSiteVisitDrafts).toHaveBeenCalledWith(expect.objectContaining({ scope: 'all' }));
+});
+
+it('resolves callerSystemId to null when the session has no linked systemuser', async () => {
+  requireAppAccess.mockResolvedValue({ session: { user: {} } });
+  const res = responseHarness();
+  await handler({ method: 'GET', query: { cycleCode: 'D26' } }, res);
+  expect(listPreSiteVisitDrafts).toHaveBeenCalledWith(expect.objectContaining({ callerSystemId: null }));
 });
 
 it('rejects a missing or malformed cycle code before the service runs', async () => {

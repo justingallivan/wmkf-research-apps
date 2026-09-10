@@ -3,9 +3,15 @@
  */
 jest.mock('../../lib/dataverse/adapters/request-document.js', () => ({ findByCycle: jest.fn() }));
 jest.mock('../../lib/dataverse/adapters/grant-request.js', () => ({ findByIds: jest.fn() }));
+jest.mock('../../lib/dataverse/adapters/site-visit.js', () => ({ findActiveByRequests: jest.fn() }));
+jest.mock('../../lib/services/pre-site-visit/distribution-store.js', () => ({ sentSourceDocumentIds: jest.fn() }));
+jest.mock('../../lib/services/deliberation-stage-labels.js', () => ({ readDeliberationStageLabels: jest.fn() }));
 
 import * as requestDocumentAdapter from '../../lib/dataverse/adapters/request-document.js';
 import * as grantRequestAdapter from '../../lib/dataverse/adapters/grant-request.js';
+import * as siteVisitAdapter from '../../lib/dataverse/adapters/site-visit.js';
+import { sentSourceDocumentIds } from '../../lib/services/pre-site-visit/distribution-store.js';
+import { readDeliberationStageLabels } from '../../lib/services/deliberation-stage-labels.js';
 import { listPreSiteVisitDrafts } from '../../lib/services/pre-site-visit/cycle-list-service';
 import {
   PRE_SITE_VISIT_CONTRACT,
@@ -17,7 +23,10 @@ import {
 
 const R1 = 'aaaaaaaa-0000-4000-8000-000000000001';
 const R2 = 'aaaaaaaa-0000-4000-8000-000000000002';
+const PD_A = 'bbbbbbbb-0000-4000-8000-0000000000aa';
+const PD_B = 'bbbbbbbb-0000-4000-8000-0000000000bb';
 const WORD = PRE_SITE_VISIT_CONTRACT.contentType;
+const STAGE_LABELS = { draft: 'AI draft ready', shared: 'Shared', visit: 'Visit', final: 'Final' };
 
 function row(overrides) {
   return {
@@ -42,6 +51,7 @@ function request(id, overrides = {}) {
     akoya_requestnum: id === R1 ? '1002959' : '1003001',
     akoya_title: 'Title',
     _akoya_applicantid_value_formatted: 'Uni',
+    _wmkf_programdirector_value: PD_A,
     _wmkf_programdirector_value_formatted: 'PD',
     ...overrides,
   };
@@ -52,6 +62,9 @@ beforeEach(() => {
   grantRequestAdapter.findByIds.mockImplementation(async (ids) => ({
     records: ids.map((id) => request(id, id === R1 ? { _wmkf_currentpresitevisit_value: 'CURRENT' } : {})),
   }));
+  siteVisitAdapter.findActiveByRequests.mockResolvedValue([]);
+  sentSourceDocumentIds.mockResolvedValue(new Set());
+  readDeliberationStageLabels.mockResolvedValue(STAGE_LABELS);
 });
 
 it('rejects a malformed cycle code before any read', async () => {
@@ -72,11 +85,14 @@ it('lists one row per request: the pointer row when it resolves, else the newest
 
   expect(requestDocumentAdapter.findByCycle).toHaveBeenCalledWith('D26', { artifactType: REQUEST_DOCUMENT_ARTIFACT_TYPE.PRE_SITE_VISIT });
   expect(result.cycleCode).toBe('D26');
+  expect(result.scope).toBe('all');
+  expect(result.stageLabels).toEqual(STAGE_LABELS);
   expect(result.artifacts).toHaveLength(2);
   const [first, second] = result.artifacts;
-  expect(first).toMatchObject({ artifactId: 'current', requestNumber: '1002959', isCurrent: true, lifecycleLabel: 'Review', operationLabel: 'Ready', institution: 'Uni', programDirector: 'PD' });
+  expect(first).toMatchObject({ artifactId: 'current', requestNumber: '1002959', isCurrent: true, lifecycleLabel: 'Review', operationLabel: 'Ready', institution: 'Uni', programDirector: 'PD', stage: 'shared', substate: 'not-sent' });
   expect(first.file).toMatchObject({ webUrl: 'https://sp/doc.docx', name: 'doc.docx', metadataStatus: 'unchecked' });
-  expect(second).toMatchObject({ artifactId: 'r2-fail', requestNumber: '1003001', isCurrent: false, operationLabel: 'Failed', file: null });
+  expect(second).toMatchObject({ artifactId: 'r2-fail', requestNumber: '1003001', isCurrent: false, operationLabel: 'Failed', file: null, stage: 'draft' });
+  expect(result.counts).toEqual({ draft: 1, shared: 1, visit: 0, final: 0 });
 });
 
 it('drops distribution snapshots and non-Word rows, and returns an empty list when nothing remains', async () => {
@@ -93,4 +109,88 @@ it('fails loud when a draft row has no resolvable owner request', async () => {
   requestDocumentAdapter.findByCycle.mockResolvedValue({ records: [row()] });
   grantRequestAdapter.findByIds.mockResolvedValue({ records: [] });
   await expect(listPreSiteVisitDrafts({ cycleCode: 'D26' })).rejects.toMatchObject({ httpStatus: 500 });
+});
+
+describe('scope filtering (D4 org-open posture, my/all)', () => {
+  beforeEach(() => {
+    requestDocumentAdapter.findByCycle.mockResolvedValue({ records: [
+      row({ wmkf_requestdocumentid: 'r1-doc', _wmkf_request_value: R1 }),
+      row({ wmkf_requestdocumentid: 'r2-doc', _wmkf_request_value: R2 }),
+    ] });
+    grantRequestAdapter.findByIds.mockImplementation(async (ids) => ({
+      records: ids.map((id) => request(id, {
+        _wmkf_programdirector_value: id === R1 ? PD_A : PD_B,
+        _wmkf_currentpresitevisit_value: null,
+      })),
+    }));
+  });
+
+  it('scope=all returns both PDs\' rows', async () => {
+    const result = await listPreSiteVisitDrafts({ cycleCode: 'D26', scope: 'all' });
+    expect(result.artifacts.map((a) => a.requestId).sort()).toEqual([R1, R2].sort());
+  });
+
+  it('scope=my filters to the caller\'s own program-director rows (case-insensitive)', async () => {
+    const result = await listPreSiteVisitDrafts({ cycleCode: 'D26', scope: 'my', callerSystemId: PD_A.toUpperCase() });
+    expect(result.artifacts).toHaveLength(1);
+    expect(result.artifacts[0].requestId).toBe(R1);
+  });
+
+  it('scope=my with no caller id fails closed to an empty list without reading the registry', async () => {
+    const result = await listPreSiteVisitDrafts({ cycleCode: 'D26', scope: 'my', callerSystemId: null });
+    expect(result.artifacts).toEqual([]);
+    expect(result.counts).toEqual({ draft: 0, shared: 0, visit: 0, final: 0 });
+    expect(requestDocumentAdapter.findByCycle).not.toHaveBeenCalled();
+  });
+});
+
+describe('site visit join', () => {
+  beforeEach(() => {
+    requestDocumentAdapter.findByCycle.mockResolvedValue({ records: [
+      row({ wmkf_requestdocumentid: 'r1-doc', _wmkf_request_value: R1, wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW }),
+      row({ wmkf_requestdocumentid: 'r2-doc', _wmkf_request_value: R2, wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW }),
+    ] });
+    grantRequestAdapter.findByIds.mockImplementation(async (ids) => ({
+      records: ids.map((id) => request(id, { _wmkf_currentpresitevisit_value: null })),
+    }));
+  });
+
+  it('a past visit moves the request to the visit stage; a future visit keeps it shared', async () => {
+    siteVisitAdapter.findActiveByRequests.mockResolvedValue([
+      { _regardingobjectid_value: R1, scheduledstart: '2020-01-01T00:00:00Z', scheduledend: null, wmkf_visitformat: 1, wmkf_locationorlink: 'Lab A' },
+      { _regardingobjectid_value: R2, scheduledstart: '2099-01-01T00:00:00Z', scheduledend: null, wmkf_visitformat: 1, wmkf_locationorlink: 'Lab B' },
+    ]);
+    const result = await listPreSiteVisitDrafts({ cycleCode: 'D26' });
+    const byRequest = Object.fromEntries(result.artifacts.map((a) => [a.requestId, a]));
+    expect(byRequest[R1]).toMatchObject({ stage: 'visit', substate: 'awaiting-observations' });
+    expect(byRequest[R1].siteVisit).toMatchObject({ startIso: '2020-01-01T00:00:00Z', locationOrLink: 'Lab A' });
+    expect(byRequest[R2]).toMatchObject({ stage: 'shared', substate: 'not-sent' });
+    expect(byRequest[R2].visit).toMatchObject({ status: 'scheduled' });
+  });
+});
+
+describe('everSent join', () => {
+  it('marks a shared, sent document as substate sent', async () => {
+    requestDocumentAdapter.findByCycle.mockResolvedValue({ records: [
+      row({ wmkf_requestdocumentid: 'r1-doc', _wmkf_request_value: R1, wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW }),
+    ] });
+    grantRequestAdapter.findByIds.mockResolvedValue({ records: [request(R1, { _wmkf_currentpresitevisit_value: null })] });
+    sentSourceDocumentIds.mockResolvedValue(new Set(['r1-doc']));
+    const result = await listPreSiteVisitDrafts({ cycleCode: 'D26' });
+    expect(result.artifacts[0]).toMatchObject({ everSent: true, stage: 'shared', substate: 'sent' });
+  });
+});
+
+describe('counts', () => {
+  it('tallies artifacts by stage', async () => {
+    requestDocumentAdapter.findByCycle.mockResolvedValue({ records: [
+      row({ wmkf_requestdocumentid: 'd1', _wmkf_request_value: R1, wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT }),
+      row({ wmkf_requestdocumentid: 'd2', _wmkf_request_value: R2, wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.FINAL }),
+    ] });
+    grantRequestAdapter.findByIds.mockImplementation(async (ids) => ({
+      records: ids.map((id) => request(id, { _wmkf_currentpresitevisit_value: null })),
+    }));
+    const result = await listPreSiteVisitDrafts({ cycleCode: 'D26' });
+    expect(result.counts).toEqual({ draft: 1, shared: 0, visit: 0, final: 1 });
+  });
 });

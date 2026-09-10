@@ -1,20 +1,33 @@
 /**
  * Staff Deliberations — the merged workspace for the site-visit writeup's whole
  * life (S466; replaces PreSiteVisitTab + SiteVisitTab). One header card answers
- * what stage the document is at (Draft → Share → Wrap Up), what the current
- * document is, and what the next action is; sections appear by stage.
+ * what stage the document is at, what the current document is, and what the
+ * next action is; sections appear by stage.
  *
- * Stage backing: Draft/Share map to the document lifecycle (DRAFT / REVIEW via
- * the guarded start-site-visit lock). Wrap Up is DERIVED — the first
- * transport-accepted materials send promotes the rail (owner decision
- * 2026-08-27); no new document state exists. Final lifecycle is a receipt here;
- * the Final Writeup tab owns its separate Word launch.
+ * Stage backing (PC Meeting Tracker slice 3, docs/PC_MEETING_TRACKER_PLAN.md
+ * D5-D9): four keyed stops — draft | shared | visit | final — derived by
+ * shared/utils/deliberation-stage.js from the document lifecycle (DRAFT /
+ * REVIEW via the guarded start-site-visit lock / FINAL) and the wmkf_sitevisit
+ * Activity's scheduled start (date-derived "visited", D7). Display labels are
+ * admin-editable (D6; shared/config/editableTextDefaults.js) and arrive on the
+ * GET /api/workbench/pre-site-visit payload as `stageLabels`. "Shared" means
+ * locked (D5) — a substate ("not-sent"/"sent") tracks whether materials have
+ * actually gone out, fed by the distribution panel's onHistory callback.
+ *
+ * TODO(docs/PC_MEETING_TRACKER_PLAN.md slice 1): once deliberation sessions
+ * exist, add a line here for the request's latest session slot date. Until
+ * then the visit stop only shows the site visit.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Card } from '../Layout';
 import PreSiteDistributionPanel from './PreSiteDistributionPanel';
 import useSiteVisitContext from './useSiteVisitContext';
+import DeliberationStageRail from './DeliberationStageRail';
+import {
+  DELIBERATION_STAGE_DEFAULT_LABELS,
+  deriveDeliberationStage,
+} from '../../utils/deliberation-stage';
 import {
   PRE_SITE_REOPEN_CONTRACT,
   PRE_SITE_REOPEN_REASON_LABEL,
@@ -25,6 +38,7 @@ import {
 const STATUS_POLL_INTERVAL_MS = 3000;
 const STATUS_POLL_ATTEMPTS = 20;
 const EMPTY_LIST = Object.freeze([]);
+const EMPTY_STAGE_LABELS = DELIBERATION_STAGE_DEFAULT_LABELS;
 
 async function readStatus(requestId, signal) {
   const response = await fetch(
@@ -91,37 +105,6 @@ function newClientOperationId() {
     + `-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
-function StageRail({ stage, reopened }) {
-  const currentIndex = stage === 'share' ? 1 : stage === 'wrap-up' ? 2 : 0;
-  const items = [
-    { label: stage === 'draft-ready' ? 'Draft ready' : 'Draft', index: 0 },
-    { label: 'Share', index: 1 },
-    { label: 'Wrap Up', index: 2 },
-  ];
-  return (
-    <p className="mt-1 flex flex-wrap items-center gap-2 text-xs font-semibold" data-testid="stage-rail">
-      {items.map((item, position) => (
-        <span key={item.label} className="flex items-center gap-2">
-          {position > 0 && <span className="text-gray-300">──</span>}
-          <span className={item.index < currentIndex
-            ? 'text-gray-500'
-            : item.index === currentIndex
-              ? 'text-green-800'
-              : 'text-gray-300'}
-          >
-            {item.index < currentIndex ? '✓' : item.index === currentIndex ? '●' : '○'} {item.label}
-          </span>
-        </span>
-      ))}
-      {reopened && (
-        <span className="inline-flex min-h-6 items-center rounded-full bg-amber-100 px-2 py-0.5 font-medium text-amber-800">
-          reopened
-        </span>
-      )}
-    </p>
-  );
-}
-
 // The SharePoint filename carries idempotency hex staff shouldn't have to
 // read; links show a display label and the real identity lives one click
 // away here (Download still saves under the real filename).
@@ -139,12 +122,18 @@ function FileDetails({ file }) {
   );
 }
 
-export default function StaffDeliberationsTab({ requestId, requestNumber = '', isSuperuser = false }) {
+export default function StaffDeliberationsTab({
+  requestId,
+  requestNumber = '',
+  isSuperuser = false,
+  onSelectTab = null,
+}) {
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState(null);
   const [artifact, setArtifact] = useState(null);
   const [pendingArtifact, setPendingArtifact] = useState(null);
   const [reopenHistory, setReopenHistory] = useState(EMPTY_LIST);
+  const [stageLabels, setStageLabels] = useState(EMPTY_STAGE_LABELS);
   const [checkingStatus, setCheckingStatus] = useState(false);
   const [recoveryMessage, setRecoveryMessage] = useState(null);
   const [showHelp, setShowHelp] = useState(false);
@@ -177,6 +166,7 @@ export default function StaffDeliberationsTab({ requestId, requestNumber = '', i
     setReopenForm(null);
     setReopenError(null);
     setCurrentSourceEverSent(false);
+    setStageLabels(EMPTY_STAGE_LABELS);
     const id = requestId;
     if (id) {
       const sequence = generationSequence.current;
@@ -189,6 +179,7 @@ export default function StaffDeliberationsTab({ requestId, requestNumber = '', i
           setArtifact(status.currentArtifact || null);
           setPendingArtifact(status.pendingArtifact || null);
           setReopenHistory(status.reopenHistory || EMPTY_LIST);
+          if (status.stageLabels) setStageLabels(status.stageLabels);
           if (status.pendingArtifact?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.FAILED) {
             setError(failureMessage(
               status.pendingArtifact,
@@ -257,6 +248,7 @@ export default function StaffDeliberationsTab({ requestId, requestNumber = '', i
       const pending = status.pendingArtifact || null;
       if (current) setArtifact(current);
       setPendingArtifact(pending);
+      if (status.stageLabels) setStageLabels(status.stageLabels);
 
       if (pending?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.FAILED) {
         throw new Error(failureMessage(pending, 'The latest Word-draft attempt failed.'));
@@ -380,15 +372,15 @@ export default function StaffDeliberationsTab({ requestId, requestNumber = '', i
   const draftReady = artifact?.lifecycleState === REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT;
   const movedToFinal = artifact?.lifecycleState === REQUEST_DOCUMENT_LIFECYCLE_STATE.FINAL;
   const beyondDeliberations = Boolean(artifact) && !draftReady && !shared;
+  // A lifecycle outside the four keyed stops (Board Ready/Superseded/unknown —
+  // never produced for the *current* artifact in practice; distribution
+  // snapshots that use Board Ready are separate rows, not this one). The rail
+  // has nothing meaningful to show for it, so it stays hidden (fail closed).
+  const unknownLifecycle = beyondDeliberations && !movedToFinal;
   // Server-derived (uncapped EXISTS, scoped to the current source document) so
   // a superseded document's sends never promote its reopen successor and the
   // display cap cannot regress the stage (Codex S466).
   const everSent = currentSourceEverSent;
-  const stage = shared
-    ? (everSent ? 'wrap-up' : 'share')
-    : readyFile && draftReady
-      ? 'draft-ready'
-      : 'draft';
   const downloadUrl = downloadUrlFor(readyFile);
   const workingControlsAvailable = readyFile && (draftReady || shared);
 
@@ -397,8 +389,21 @@ export default function StaffDeliberationsTab({ requestId, requestNumber = '', i
   }, []);
 
   // Headless read of the wmkf_sitevisit Activity (maintained outside this
-  // workspace) feeding the composer's calendar/materials/suggestions.
-  const siteVisitContext = useSiteVisitContext(shared && readyFile ? requestId : null);
+  // workspace) feeding the composer's calendar/materials/suggestions, and the
+  // rail's visit stop. Fail-open, so this is safe to call for every stage.
+  const siteVisitContext = useSiteVisitContext(requestId);
+  const siteVisitStartIso = siteVisitContext?.siteVisit?.startIso || null;
+
+  // PC Meeting Tracker slice 3 (docs/PC_MEETING_TRACKER_PLAN.md D5-D9): the
+  // four-stop rail derivation. `stage`/`substate`/`visit` drive display only —
+  // every existing gate above (`shared`, `draftReady`, `movedToFinal`) stays
+  // lifecycle-derived so the working controls and distribution panel are
+  // unaffected by the visit having happened.
+  const { stage, substate, visit } = deriveDeliberationStage({
+    currentArtifact: artifact,
+    siteVisitStartIso,
+    everSent,
+  });
 
   const startShare = async () => {
     if (!requestId || !readyFile || !draftReady || startingShare) return;
@@ -572,10 +577,10 @@ export default function StaffDeliberationsTab({ requestId, requestNumber = '', i
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <div className="relative flex items-center gap-2">
-              <h2 className="text-lg font-semibold text-gray-900">Site Visit Writeup</h2>
+              <h2 className="text-lg font-semibold text-gray-900">Staff Deliberations</h2>
               <button
                 type="button"
-                aria-label="About the site visit writeup"
+                aria-label="About Staff Deliberations"
                 aria-expanded={showHelp}
                 aria-controls="staff-deliberations-help"
                 onClick={() => setShowHelp((visible) => !visible)}
@@ -608,8 +613,34 @@ export default function StaffDeliberationsTab({ requestId, requestNumber = '', i
                 </div>
               )}
             </div>
-            {!beyondDeliberations && (
-              <StageRail stage={stage} reopened={draftReady && reopenHistory.length > 0} />
+            {!unknownLifecycle && (
+              <>
+                <DeliberationStageRail
+                  stage={stage}
+                  labels={stageLabels}
+                  reopened={draftReady && reopenHistory.length > 0}
+                />
+                <p className="mt-1 text-xs text-gray-500" data-testid="deliberations-visit-line">
+                  {visit.status === 'not-scheduled' && 'Visit not scheduled.'}
+                  {visit.status === 'scheduled' && `Visit ${new Date(visit.startIso).toLocaleDateString()}.`}
+                  {visit.status === 'visited' && `Visited ${new Date(visit.startIso).toLocaleDateString()}.`}
+                  {stage === 'visit' && ' Add observations in Word.'}
+                  {stage === 'shared' && substate === 'not-sent' && ' Not yet sent.'}
+                </p>
+                {stage === 'visit' && (
+                  onSelectTab ? (
+                    <button
+                      type="button"
+                      onClick={() => onSelectTab('final-writeup')}
+                      className="mt-1 text-xs font-medium text-indigo-600 hover:underline"
+                    >
+                      Continue in Final Writeup →
+                    </button>
+                  ) : (
+                    <span className="mt-1 block text-xs text-gray-400">Open the Final Writeup tab to continue →</span>
+                  )
+                )}
+              </>
             )}
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -758,7 +789,7 @@ export default function StaffDeliberationsTab({ requestId, requestNumber = '', i
           )}
           {shared && !readyFile && (
             <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
-              <h3 className="font-semibold">Site visit writeup is read-only</h3>
+              <h3 className="font-semibold">Staff Deliberations is read-only</h3>
               <p className="mt-1">
                 No current Word link was returned for this record, so working controls are not
                 available. Reload to retry, or contact an administrator if this persists.
@@ -771,7 +802,7 @@ export default function StaffDeliberationsTab({ requestId, requestNumber = '', i
               : 'mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950'}
             >
               <h3 className="font-semibold">
-                {movedToFinal ? 'Moved to Final Writeup' : 'Site visit writeup is read-only'}
+                {movedToFinal ? 'Moved to Final Writeup' : 'Staff Deliberations is read-only'}
               </h3>
               <p className="mt-1">
                 {movedToFinal
