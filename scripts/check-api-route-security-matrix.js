@@ -17,6 +17,7 @@ const KNOWN_GUARDS = [
   'verifyCronSecret',
   'verifySuggestionToken',
   'verifyGranteeToken',
+  'verifyBriefingToken',
   'getServerSession',
   'NextAuth',
 ];

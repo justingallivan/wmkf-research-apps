@@ -492,6 +492,21 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   modal opens (no build-time constant); the admin panel's "Reviewer Release
   Attachments" section (superuser-gated) is the only write path.
 
+## Deliberation briefing page (third external surface, S502)
+
+`pages/external/briefing/[token].js` + `/api/external/briefing/[token]/{context,document}`
+serve a read-only per-request page (shared writeup snapshot, every received review with
+author and re-sanitized answers, the proposal narrative) to Board members and consultants
+who have no Dataverse login. Plan and owner decisions D13–D16:
+`docs/DELIBERATION_BRIEFING_PAGE_PLAN.md`. Verifier
+`lib/external/verify-briefing-token.js` is the stored-digest pattern keyed on Postgres
+`deliberation_briefing_links` (`aud:'briefing'`, digest, revocation, row expiry, request
+binding, re-run on every request). Links are minted by Share
+(`lib/services/deliberation-briefing/briefing-link-service.js`, one live row per request,
+reissue = revoke-and-replace) and everything is inert until the owner sets
+`DELIBERATION_BRIEFING_SCHEMA_READY=on` after applying migration 038. Same route order as
+the other external routes: method → rate-limit → verify → record outcome → shape.
+
 ## Durable Memory
 
 - File access and SharePoint: `project-external-reviewer-file-access`, `project-sharepoint-integration`.

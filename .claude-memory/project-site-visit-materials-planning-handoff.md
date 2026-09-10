@@ -1,13 +1,13 @@
 ---
 name: project-site-visit-materials-planning-handoff
-description: Codex planning handoff (2026-09-08, S499) for Site Visit Materials / applicant additional materials — plan lives on branch codex/applicant-additional-materials (b6005273), owner decisions decided, no PR, no implementation authorized; Claude owns continuity only
+description: Site Visit Materials / applicant additional materials plan lives on branch codex/applicant-additional-materials (b6005273); the briefing-room subset for deliberation sessions was authorized and source-built on feature/deliberation-briefing-page (S502, 2026-09-09, D13–D16); applicant materials collection remains unbuilt
 metadata:
   node_type: memory
   type: project
   originSessionId: 4645a5a6-2b0a-4200-94ed-4ddc0e8c0b83
   status: active
   scope: site-visit-materials
-  last_verified: 2026-09-08 via origin/codex/applicant-additional-materials b6005273 and the owner's handoff message
+  last_verified: 2026-09-09 via docs/DELIBERATION_BRIEFING_PAGE_PLAN.md on feature/deliberation-briefing-page and the owner's D13–D16 answers (S502)
 ---
 
 ## Recall Rule
@@ -21,7 +21,11 @@ Do:
 - Leave the Codex worktree `../WMKF_Apps-codex` and its branch alone unless Justin asks (no checkout, merge, wind-down).
 
 Do not:
-- Begin implementation, open a PR, or merge the branch on your own; the plan is Tier 0 docs, the feature is Tier 2.
+- Begin implementation of the applicant-materials collection, open a PR, or merge the Codex branch on your own; that plan is Tier 0 docs, the feature is Tier 2.
+
+## Briefing-room subset built (2026-09-09, S502)
+
+The owner authorized the deliberation-session subset of the briefing room ahead of the first session (week of 2026-09-14): D13 every recipient sees full reviews and authors; D14 all completed reviews; D15 Share mints the link; D16 revoke-and-reissue from the tab. Built on `feature/deliberation-briefing-page` per `docs/DELIBERATION_BRIEFING_PAGE_PLAN.md`: migration 038 `deliberation_briefing_links`, `lib/services/deliberation-briefing/*`, `lib/external/verify-briefing-token.js`, `/api/external/briefing/[token]/{context,document}`, `/api/workbench/pre-site-visit/briefing-link`, `pages/external/briefing/[token].js`, Share integration in `distribution-service.js`. Departure from the Codex plan §8: no stored manifest; the writeup is pinned by the latest send-requested distribution attempt and reviews resolve live. Flag `DELIBERATION_BRIEFING_SCHEMA_READY` (owner-set) gates everything; unset = byte-identical to before.
 - Treat the July Site Visit upload language in `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` as current; it carries superseded assumptions (expiry, file limits, paths, deletion) that the plan says must be reconciled before implementation.
 
 ## Handoff (2026-09-08, owner message to Claude)
