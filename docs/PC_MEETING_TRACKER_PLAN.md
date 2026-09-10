@@ -306,9 +306,11 @@ readiness flag is enabled for that target.
    Migration `041_deliberation_agenda_sends.sql` plus fresh-install v44 provide
    the ledger. GET keeps the last sent receipt separate from any unresolved
    send; the composer pins that unresolved operation for retry and prepare
-   blocks a competing operation. Retry records an accepted status, resumes a
-   confirmed Draft on the same Dynamics activity, and never sends when status
-   is unknown or unreadable. **[VERIFIED via the focused agenda schema/service/route/panel
+   and send block a competing operation, with a partial unique index as the
+   concurrency backstop. Retry records an accepted status, lets the same sender
+   resume a confirmed Draft on the same Dynamics activity, records a known
+   closed status as terminal `failed`, and never sends when status is unknown
+   or unreadable. **[VERIFIED via the focused agenda schema/service/route/panel
    suites; external schema state remains ASSUMED until the owner applies and
    reads back migration 041.]** Build brief:
    `docs/plans/SESSION_AGENDA_EMAIL_CODEX_BRIEF_2026-09-10.md`.

@@ -132,14 +132,16 @@ briefing services, or any migration below 041.
   computed start/end ISO, briefing url or null), `to_recipients JSONB NOT NULL`, `cc_recipients
   JSONB NOT NULL DEFAULT '[]'`, `subject TEXT NOT NULL`, `body_text TEXT NOT NULL`, `body_html
   TEXT NOT NULL`, `from_email TEXT NOT NULL`, `acting_user_system_id UUID`, `state TEXT NOT NULL`
-  in `prepared | activity_created | send_requested | sent`, `dynamics_email_id UUID`,
+  in `prepared | activity_created | send_requested | sent | failed`, `dynamics_email_id UUID`,
   `dynamics_statecode INTEGER`, `dynamics_statuscode INTEGER`, `send_requested_at`, `sent_at`,
   `attempt_count INTEGER NOT NULL DEFAULT 0`, `lease_token UUID`, `locked_until TIMESTAMPTZ`,
   `last_error_code TEXT`, `last_error_message TEXT`, `last_failed_at`, `created_at`,
   `updated_at`; CHECK constraints named `deliberation_agenda_state_check`,
   `deliberation_agenda_recipient_shape` (To is a non-empty array, Cc an array), and
   `deliberation_agenda_lease_shape` (lease token and lock set together or not at all). Index on
-  `(session_id, created_at DESC)`.
+  `(session_id, created_at DESC)` plus unique partial index
+  `uq_deliberation_agenda_one_unresolved` on `session_id` where state is
+  `send_requested`.
 - **Prepare then send, with a fixed preview.** POST prepare computes the snapshot from the live
   session and slots, normalizes recipients, renders body text and HTML, inserts the row
   (`ON CONFLICT (operation_id) DO NOTHING`, then read back; a different session or subject under
@@ -151,8 +153,10 @@ briefing services, or any migration below 041.
   SendEmail, reads the status, records sent when the status is in 3/6/7. A retry on a row with
   a durable activity id reconciles the Dynamics status first and never creates a second
   activity. Accepted status closes the receipt; confirmed Draft resumes SendEmail on the same
-  activity; unknown or unreadable status never sends. Failures record `last_error_*` and
-  release the lease.
+  activity for the same sender; known closed status 2/4/5/8 records terminal `failed` and
+  permits a new preview; unknown or unreadable status remains unresolved and never sends.
+  Failures record `last_error_*` and release the lease. Prepare and send both refuse a sibling
+  operation while one send is unresolved; the partial unique index closes the concurrent race.
 - **Body HTML escapes every value** (`escapeHtml` pattern in `distribution-service.js`) and
   carries only https links (the Zoom link and briefing URLs are already https-validated
   upstream; re-check with `new URL(...).protocol === 'https:'` and drop anything else).
@@ -160,7 +164,8 @@ briefing services, or any migration below 041.
   carries one; do not persist them anywhere except the ledger's `body_html`/snapshot (owner D18
   in the briefing plan accepts that the token appears in transport artifacts).
 - **Drift note and pending recovery (D22):** GET returns the latest sent row for the receipt and
-  separately the latest unresolved `send_requested` row. `scheduleChanged: boolean` compares
+  separately the latest unresolved `send_requested` row. Failed rows remain audit history but
+  do not mask the sent receipt or block a new preview. `scheduleChanged: boolean` compares
   the current session start as an instant plus the current ordered `(requestId, minutes)` list
   against the sent snapshot. The panel pins an unresolved operation for exact retry rather than
   allowing a new preview.
@@ -226,17 +231,18 @@ Unit tests under `tests/unit/`, jsdom for components (`/** @jest-environment jsd
 for services and routes. Minimum: `computeAgenda` (order, cumulative times, zone formatting,
 over-length sessions, missing lead PD, missing briefing → "to follow" text, https-only links);
 prepare (snapshot content, recipient normalization, empty To refused, no slots refused,
-operation conflict); send (happy path call order, recovery by correlation key, lease held,
-status not accepted leaves `send_requested`, retry reconciles); routes (id validated before
-auth, allowlists, 503 after auth, actor from session); panel (defaults, prepare payload,
-confirmation gate, receipt, stale notice, drift note).
+operation conflict, unresolved sibling refused); send (happy path call order, recovery by
+correlation key, lease held, sibling operation refused, unknown status stays `send_requested`,
+known closed status becomes `failed`, Draft retry reconciles); routes (id validated before auth,
+allowlists, 503 after auth, actor from session, separate sent/pending GET projection); panel
+(defaults, prepare payload, confirmation gate, receipt, pending recovery, stale reset, drift note).
 
 ## Handoff (fill in at the end)
 
 ### Codex handoff — 2026-09-10
 
-- **[VERIFIED via source commit `2c08222c`, Claude Opus adversarial review,
-  remediation commit `81f417c9`, and 24 focused tests]** The complete
+- **[VERIFIED via source commit `2c08222c`, two Claude Opus adversarial reviews,
+  remediation commits `81f417c9` and `ee25264b`, and 40 focused tests]** The complete
   source feature is built: migration/fresh-install schema, exact-email ledger,
   session agenda calculation and HTML/text rendering, drift read, lease-fenced
   Dynamics create/recovery/send, guarded GET/prepare/send route, fixed-preview
@@ -247,7 +253,7 @@ confirmation gate, receipt, stale notice, drift note).
   built source and its runtime boundary. Canonical counts are 125 guarded API
   endpoints and 203 API route files.
 - **[VERIFIED via local execution]** The 17 Meeting Tracker/parity suites passed
-  after remediation (92 tests); every gate named in this brief passed after
+  after final remediation (103 tests); every gate named in this brief passed after
   remediation, with each available self-test run sequentially. Type checking,
   status-enum parity, secret scan, targeted lint, and the production build also
   passed. The build retains the pre-existing Turbopack dynamic-filesystem-access
@@ -266,12 +272,13 @@ confirmation gate, receipt, stale notice, drift note).
 Open questions: none within D21–D25. An unresolved durable `send_requested`
 row remains visible and blocks a competing operation. A retry closes an accepted
 receipt, resumes SendEmail only when Dynamics confirms the same activity is
-still Draft, and does not send when status is unknown or unreadable.
+still Draft and the same sender acts, records a known closed status as `failed`,
+and does not send when status is unknown or unreadable.
 
 After reviewing the branch, the owner should apply through the existing-database
 runner and read back the tracker row, all 24 columns, four constraints (primary
-key plus the three named checks), and two indexes (primary key plus the session
-history index):
+key plus the three named checks), and three indexes (primary key, session
+history, and one-unresolved partial unique index):
 
 ```bash
 node scripts/apply-migrations.js
@@ -303,4 +310,5 @@ SQL
 Expected exact names: constraints `deliberation_agenda_sends_pkey`,
 `deliberation_agenda_state_check`, `deliberation_agenda_recipient_shape`, and
 `deliberation_agenda_lease_shape`; indexes `deliberation_agenda_sends_pkey` and
-`idx_deliberation_agenda_session_history`.
+`idx_deliberation_agenda_session_history`, and
+`uq_deliberation_agenda_one_unresolved`.
