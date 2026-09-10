@@ -94,7 +94,7 @@ Two earlier decisions are **superseded in part** and must be read with this plan
 - **The rail today.** `StaffDeliberationsTab.js` derives Draft → Share → Wrap Up; Wrap Up is
   derived from the first transport-accepted materials send (`currentSourceEverSent`), and the
   tab renders **no visit date at all**. The 2026-09-09 cycle view (`StaffDeliberationsPanel.js`)
-  shows registry lifecycle/operation only.
+  shows registry lifecycle/operation only. (Superseded by slice 3, 2026-09-09; see §7.)
 - **Deliberation sessions** exist nowhere in the system.
 - **Recording / transcript / transcript-summary** artifact types exist in the registry but have no
   producer; only distribution and logistics reference them as material categories.
@@ -192,7 +192,7 @@ register it under the J27 transition register when slice 3 builds it.
 | 0 | **[BUILT 2026-09-09 on `claude/site-visit-schedulable-gate`.]** Replace `assertActiveStage` with the request precondition; keep the Workbench route green; tests for both preconditions. | 1 (branch + PR) |
 | 1 | Schema wave for session + slot; Atlas pages; readiness flag; sandbox apply and readback per `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md`. | 2 |
 | 2 | App registry entry, grant, list page, session page, slot moves; site-visit editor via the existing service. | 2 |
-| 3 | Rail and cycle view read both dates; stage-key catalog with editable labels; parity test. | 1 |
+| 3 | **[BUILT 2026-09-09 on `claude/deliberations-stage-rail`.]** Rail and cycle view read both dates; stage-key catalog with editable labels; parity test. Deliberation-session line pending slice 1 (no session table exists yet; the rail's visit stop shows the site visit only, with a TODO comment naming this plan). | 1 |
 | 4 | (Retired 2026-09-09: §5.5 decided; stop 3's three displays fold into slice 3.) | — |
 
 Slices 0 and 3 can start before 1 and 2 land: 3 degrades to "not scheduled" when the tables do

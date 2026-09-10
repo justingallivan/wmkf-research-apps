@@ -60,6 +60,15 @@ fallback.
 
 ## Consumers
 
+- `listPreSiteVisitDrafts` (`lib/services/pre-site-visit/cycle-list-service.js`,
+  PC Meeting Tracker slice 3, 2026-09-09) is a READ-ONLY multi-request
+  consumer for the Staff Deliberations cycle view: `site-visit.js::
+  findActiveByRequests(requestIds)` chunks the OR filter at 25 ids and reads
+  `activityid, _regardingobjectid_value, scheduledstart, scheduledend,
+  wmkf_visitformat, wmkf_locationorlink` for every advancing request in the
+  cycle at once — no ActivityParty expand, since the cycle view only needs the
+  scheduled date to derive the rail's `visit` stop (D7: date-derived), not
+  attendees.
 - `useSiteVisitContext` (`shared/components/workbench/useSiteVisitContext.js`)
   is the Workbench's READ-ONLY consumer since S466: the logistics editor
   (`SiteVisitLogisticsPanel`) was removed 2026-08-28 by owner decision —

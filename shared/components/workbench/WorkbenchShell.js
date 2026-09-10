@@ -284,7 +284,12 @@ export function WorkbenchShell({ previewReadOnly = false }) {
           onCycleChange={(code) => navigate({ cycleCode: code, uncycled: false }, { push: true })}
         />
       ) : location.view === 'staff-deliberations' ? (
-        <StaffDeliberationsPanel cycleCode={cycleCode} loadingCycles={!cyclesReady && !cyclesError} />
+        <StaffDeliberationsPanel
+          cycleCode={cycleCode}
+          loadingCycles={!cyclesReady && !cyclesError}
+          scope={location.scope}
+          onScopeChange={(scope) => navigate({ scope })}
+        />
       ) : location.view === 'awardees' ? (
         <AwardeesPanel
           cycleCode={cycleCode}

@@ -26,9 +26,16 @@ jest.mock('../../shared/components/workbench/PreSiteDistributionPanel', () => {
   return { __esModule: true, default: MockDistributionPanel };
 });
 let siteVisitContextFeed = null;
+const siteVisitContextMock = jest.fn(() => siteVisitContextFeed);
 jest.mock('../../shared/components/workbench/useSiteVisitContext', () => ({
   __esModule: true,
-  default: () => siteVisitContextFeed,
+  default: (...args) => siteVisitContextMock(...args),
+}));
+
+let visitExpectedFeed = true;
+jest.mock('../../shared/utils/deliberation-stage', () => ({
+  ...jest.requireActual('../../shared/utils/deliberation-stage'),
+  visitExpected: () => visitExpectedFeed,
 }));
 
 const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
@@ -52,11 +59,22 @@ function readyArtifact(lifecycleState = 100000000) {
   };
 }
 
-function statusResponse({ currentArtifact = null, pendingArtifact = null, reopenHistory = [] } = {}) {
+function statusResponse({
+  currentArtifact = null,
+  pendingArtifact = null,
+  reopenHistory = [],
+  stageLabels = null,
+} = {}) {
   return {
     ok: true,
     status: 200,
-    json: async () => ({ success: true, currentArtifact, pendingArtifact, reopenHistory }),
+    json: async () => ({
+      success: true,
+      currentArtifact,
+      pendingArtifact,
+      reopenHistory,
+      ...(stageLabels ? { stageLabels } : {}),
+    }),
   };
 }
 
@@ -79,6 +97,8 @@ function response(body, status = 200) {
 beforeEach(() => {
   jest.clearAllMocks();
   distributionHistoryFeed = null;
+  siteVisitContextFeed = null;
+  visitExpectedFeed = true;
   global.fetch = jest.fn(async (_url, options = {}) => (
     options.method === 'POST' ? successResponse() : statusResponse()
   ));
@@ -93,7 +113,7 @@ test('shows compact actions and keeps generation details behind help', async () 
   render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
 
   expect(screen.queryByText(/current published Admin prompt/i)).not.toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', { name: 'About the site visit writeup' }));
+  fireEvent.click(screen.getByRole('button', { name: 'About Staff Deliberations' }));
   expect(screen.getByText(/current published Admin prompt/i)).toBeInTheDocument();
   expect(screen.getByText(/saved in SharePoint/i)).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Generate Word Draft' }));
@@ -120,7 +140,7 @@ test('shows compact actions and keeps generation details behind help', async () 
   expect(screen.getByText('File details')).toBeInTheDocument();
   expect(screen.getByText(/1002379 Pre-Site Visit\.docx/)).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Start sharing' })).toBeInTheDocument();
-  expect(screen.getByTestId('stage-rail')).toHaveTextContent('● Draft ready');
+  expect(screen.getByTestId('stage-rail')).toHaveTextContent('● AI draft ready');
 });
 
 test('loads existing Ready actions without another generation request', async () => {
@@ -322,7 +342,7 @@ test('confirms the displayed artifact through the guarded route and enters the S
     }),
   ));
   expect(await screen.findByText('Working document:')).toBeInTheDocument();
-  expect(screen.getByTestId('stage-rail')).toHaveTextContent('● Share');
+  expect(screen.getByTestId('stage-rail')).toHaveTextContent('● Shared');
   expect(screen.getByText('Frozen distribution panel')).toBeInTheDocument();
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Regenerate Word Draft' })).not.toBeInTheDocument();
@@ -396,13 +416,13 @@ test('a shared document shows the working workspace with logistics and distribut
   expect(screen.getByRole('heading', { name: 'Working document needs a quick edit check' }))
     .toBeInTheDocument();
   expect(screen.getByText(/longer than suggested/i)).toBeInTheDocument();
-  expect(screen.getByTestId('stage-rail')).toHaveTextContent('✓ Draft');
-  expect(screen.getByTestId('stage-rail')).toHaveTextContent('● Share');
+  expect(screen.getByTestId('stage-rail')).toHaveTextContent('✓ AI draft ready');
+  expect(screen.getByTestId('stage-rail')).toHaveTextContent('● Shared');
   expect(screen.getByText('Frozen distribution panel')).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Regenerate Word Draft' })).not.toBeInTheDocument();
 });
 
-test('a transport-accepted send for the current document promotes the rail to Wrap Up', async () => {
+test('a transport-accepted send for the current document sets substate sent (rail stays on Shared)', async () => {
   distributionHistoryFeed = {
     attempts: [{ operationId: 'op-1', transportAccepted: true }],
     currentSourceEverSent: true,
@@ -414,19 +434,20 @@ test('a transport-accepted send for the current document promotes the rail to Wr
 
   // Slim note, not a banner: a small chip + guidance under the working document.
   expect(await screen.findByText('Materials sent')).toBeInTheDocument();
-  expect(screen.queryByRole('heading', { name: 'Wrap Up' })).not.toBeInTheDocument();
   expect(screen.getByText(/starting draft for the final writeup/i)).toBeInTheDocument();
-  expect(screen.getByTestId('stage-rail')).toHaveTextContent('✓ Share');
-  expect(screen.getByTestId('stage-rail')).toHaveTextContent('● Wrap Up');
+  // D5: "Shared" means locked, not "first email sent" — the rail stays on the
+  // Shared stop; sent/not-sent is a substate shown as text, not a fifth stop.
+  expect(screen.getByTestId('stage-rail')).toHaveTextContent('● Shared');
+  expect(screen.queryByText('Not yet sent.')).not.toBeInTheDocument();
   // The Final Writeup tab owns the handoff; Staff Deliberations never duplicates it.
   expect(screen.queryByRole('button', { name: /Move to Final Writeup/ })).not.toBeInTheDocument();
   // After a send, composing another send is secondary: the composer collapses.
   expect(screen.getByText('Frozen distribution panel (collapsed)')).toBeInTheDocument();
 });
 
-test('sends for a superseded source document do not promote the current document to Wrap Up', async () => {
+test('sends for a superseded source document do not set the current document to sent', async () => {
   // Server flag is authoritative: attempts exist (from the pre-reopen document)
-  // but none belong to the CURRENT source, so the rail stays in Share.
+  // but none belong to the CURRENT source, so the rail stays "not yet sent".
   distributionHistoryFeed = {
     attempts: [{ operationId: 'op-old', transportAccepted: true }],
     currentSourceEverSent: false,
@@ -437,7 +458,8 @@ test('sends for a superseded source document do not promote the current document
   render(<StaffDeliberationsTab requestId={REQUEST_ID} requestNumber="1002379" />);
 
   await screen.findByText('Working document:');
-  expect(screen.getByTestId('stage-rail')).toHaveTextContent('● Share');
+  expect(screen.getByTestId('stage-rail')).toHaveTextContent('● Shared');
+  expect(screen.getByTestId('deliberations-visit-line')).toHaveTextContent('Not yet sent.');
   expect(screen.queryByText('Materials sent')).not.toBeInTheDocument();
 });
 
@@ -453,7 +475,7 @@ test.each([
   }));
   render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
 
-  expect(await screen.findByRole('heading', { name: 'Site visit writeup is read-only' }))
+  expect(await screen.findByRole('heading', { name: 'Staff Deliberations is read-only' }))
     .toBeInTheDocument();
   expect(screen.queryByRole('link', { name: 'Edit' })).not.toBeInTheDocument();
   expect(screen.queryByRole('link', { name: 'Download' })).not.toBeInTheDocument();
@@ -484,7 +506,7 @@ test('a shared artifact without a current Word URL fails closed with an explanat
   }));
   render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
 
-  expect(await screen.findByRole('heading', { name: 'Site visit writeup is read-only' }))
+  expect(await screen.findByRole('heading', { name: 'Staff Deliberations is read-only' }))
     .toBeInTheDocument();
   expect(screen.getByText(/No current Word link was returned/i)).toBeInTheDocument();
   expect(screen.queryByRole('link', { name: 'Edit' })).not.toBeInTheDocument();
@@ -571,7 +593,7 @@ test('validates confirmation and submits one guarded reopen, returning the works
   // The workspace returns to Draft in place — no tab navigation exists anymore.
   await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Guarded reopen' })).not.toBeInTheDocument());
   expect(await screen.findByRole('button', { name: 'Start sharing' })).toBeInTheDocument();
-  expect(screen.getByTestId('stage-rail')).toHaveTextContent('● Draft ready');
+  expect(screen.getByTestId('stage-rail')).toHaveTextContent('● AI draft ready');
   expect(screen.getByTestId('stage-rail')).toHaveTextContent('reopened');
 });
 
@@ -682,4 +704,78 @@ test('labels a guarded reopen without an explicit actor as Not captured', async 
   fireEvent.click(screen.getByText(/Administration — guarded reopen/));
   expect(screen.getByText(/Not captured/)).toBeInTheDocument();
   expect(screen.queryByText('Recorded staff actor')).not.toBeInTheDocument();
+});
+
+// ── PC Meeting Tracker slice 3: the visit stop and admin-editable labels ─────
+
+test('a draft-stage request with no scheduled visit shows "Visit not scheduled"', async () => {
+  siteVisitContextFeed = null;
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+
+  expect(await screen.findByText('Visit not scheduled.')).toBeInTheDocument();
+});
+
+test('when visitExpected() is false, the visit line is not rendered at the draft stage (discriminating fixture)', async () => {
+  visitExpectedFeed = false;
+  siteVisitContextFeed = null;
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+
+  await screen.findByTestId('stage-rail');
+  expect(screen.queryByTestId('deliberations-visit-line')).not.toBeInTheDocument();
+  expect(screen.queryByText('Visit not scheduled.')).not.toBeInTheDocument();
+});
+
+test('the site-visit hook is consulted with the requestId even at the draft stage (fail-open, unconditional per §5.4)', async () => {
+  siteVisitContextFeed = { siteVisit: { startIso: '2099-01-01T00:00:00Z' } };
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+
+  // A future visit line shows up before the document is ever shared, proving
+  // the hook's result was used for a plain draft-stage render.
+  expect(await screen.findByText(`Visit ${new Date('2099-01-01T00:00:00Z').toLocaleDateString()}.`)).toBeInTheDocument();
+  expect(screen.getByTestId('stage-rail')).toHaveTextContent('● AI draft ready');
+  // Not decorative: the mock actually receives the real requestId, not a
+  // stage-gated null (restoring the old `shared && readyFile ? requestId :
+  // null` gate would make this assertion fail even though every other
+  // assertion above stays green).
+  expect(siteVisitContextMock).toHaveBeenCalledWith(REQUEST_ID);
+  expect(siteVisitContextMock).not.toHaveBeenCalledWith(null);
+});
+
+test('a shared document with a future scheduled visit shows the visit date, not yet visited', async () => {
+  siteVisitContextFeed = { siteVisit: { startIso: '2099-06-15T00:00:00Z' } };
+  global.fetch.mockResolvedValueOnce(statusResponse({ currentArtifact: readyArtifact(100000001) }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+
+  await screen.findByText('Working document:');
+  expect(screen.getByTestId('stage-rail')).toHaveTextContent('● Shared');
+  expect(screen.getByTestId('deliberations-visit-line'))
+    .toHaveTextContent(`Visit ${new Date('2099-06-15T00:00:00Z').toLocaleDateString()}.`);
+});
+
+test('a shared document with a past scheduled visit moves the rail to Visit and offers Continue in Final Writeup', async () => {
+  const onSelectTab = jest.fn();
+  siteVisitContextFeed = { siteVisit: { startIso: '2020-01-01T00:00:00Z' } };
+  global.fetch.mockResolvedValueOnce(statusResponse({ currentArtifact: readyArtifact(100000001) }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} onSelectTab={onSelectTab} />);
+
+  await screen.findByText('Working document:');
+  expect(screen.getByTestId('stage-rail')).toHaveTextContent('✓ AI draft ready');
+  expect(screen.getByTestId('stage-rail')).toHaveTextContent('✓ Shared');
+  expect(screen.getByTestId('stage-rail')).toHaveTextContent('● Visit');
+  expect(screen.getByTestId('deliberations-visit-line'))
+    .toHaveTextContent(`Visited ${new Date('2020-01-01T00:00:00Z').toLocaleDateString()}. Add observations in Word.`);
+
+  const link = screen.getByRole('button', { name: 'Continue in Final Writeup →' });
+  fireEvent.click(link);
+  expect(onSelectTab).toHaveBeenCalledWith('final-writeup');
+});
+
+test('admin-editable stageLabels override the code-owned defaults on the rail', async () => {
+  global.fetch.mockResolvedValueOnce(statusResponse({
+    currentArtifact: null,
+    stageLabels: { draft: 'Draft in progress', shared: 'Shared', visit: 'Visit', final: 'Final' },
+  }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+
+  await waitFor(() => expect(screen.getByTestId('stage-rail')).toHaveTextContent('● Draft in progress'));
 });

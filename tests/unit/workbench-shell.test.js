@@ -65,8 +65,35 @@ function mockFetch(overrides = {}) {
         : response({ cycleCode: code, cycleLabel: 'December 2026', count: 0, awardees: [], scope: 'mine', pdResolved: true });
     }
     if (href.startsWith('/api/workbench/staff-deliberations?')) {
-      const code = new URL(href, 'http://x').searchParams.get('cycleCode');
-      return response({ success: true, cycleCode: code, artifacts: code === 'D26' ? [{ artifactId: 'p1', requestId: 'r9', requestNumber: '1002959', title: 'Drafted proposal', institution: 'U', programDirector: 'PD', isCurrent: true, operationLabel: 'Ready', lifecycleLabel: 'Draft', file: null }] : [] });
+      const url = new URL(href, 'http://x');
+      const code = url.searchParams.get('cycleCode');
+      const rowScope = url.searchParams.get('scope');
+      const stageLabels = { draft: 'AI draft ready', shared: 'Shared', visit: 'Visit', final: 'Final' };
+      const artifacts = code === 'D26' ? [{
+        artifactId: 'p1',
+        requestId: 'r9',
+        requestNumber: '1002959',
+        title: 'Drafted proposal',
+        institution: 'U',
+        programDirector: 'PD',
+        isCurrent: true,
+        operationLabel: 'Ready',
+        lifecycleLabel: 'Draft',
+        stage: 'draft',
+        substate: 'ready',
+        visit: { status: 'not-scheduled', startIso: null },
+        everSent: false,
+        siteVisit: null,
+        file: null,
+      }] : [];
+      return response({
+        success: true,
+        cycleCode: code,
+        scope: rowScope || 'my',
+        stageLabels,
+        counts: { draft: artifacts.length, shared: 0, visit: 0, final: 0 },
+        artifacts,
+      });
     }
     if (href.startsWith('/api/workbench/initial-assessment?')) {
       return response({ success: true, artifacts: [{ artifactId: 'x1', requestId: 'r1', requestNumber: '1003001', title: 'Assessed proposal', institution: 'U', programDirector: 'PD', operationLabel: 'Generated', lifecycleLabel: 'Current', file: null }] });
@@ -203,18 +230,25 @@ test('the Awardees view shows the working cycle, links the last decided cycle wh
   await waitFor(() => expect(global.fetch).toHaveBeenLastCalledWith('/api/workbench/grantee-deliverables/awardees?cycleCode=J26&scope=all', expect.any(Object)));
 });
 
-test('the Staff deliberations view lists the cycle\'s pre-site drafts with its intro and links each to the request tab', async () => {
+test('the Staff deliberations view lists the cycle\'s pre-site drafts with its intro, groups by stage, and links each to the request tab', async () => {
   routerState.query = { view: 'staff-deliberations', cycleCode: 'D26' };
   routerState.asPath = '/workbench?view=staff-deliberations&cycleCode=D26';
   render(<WorkbenchShell />);
   expect(await screen.findByText(/#1002959 — Drafted proposal/)).toBeInTheDocument();
-  expect(global.fetch).toHaveBeenCalledWith('/api/workbench/staff-deliberations?cycleCode=D26');
+  expect(global.fetch).toHaveBeenCalledWith('/api/workbench/staff-deliberations?cycleCode=D26&scope=my');
   expect(screen.getByRole('heading', { name: 'Staff deliberations' })).toBeInTheDocument();
   expect(screen.getByText('Track pre-site draft writeups and their stage for the selected cycle.')).toBeInTheDocument();
   expect(screen.getByRole('link', { name: 'Staff deliberations' })).toHaveAttribute('aria-current', 'page');
   expect(screen.getByRole('link', { name: /#1002959/ })).toHaveAttribute('href', '/workbench/r9?tab=staff-deliberations&n=1002959');
   expect(screen.getByText('Draft')).toBeInTheDocument();
   expect(screen.getByText('Ready')).toBeInTheDocument();
+  expect(screen.getByText('1 ai draft ready · 0 shared · 0 visit · 0 final')).toBeInTheDocument();
+  expect(screen.getByTestId('stage-rail')).toHaveTextContent('● AI draft ready');
+  expect(screen.getByText('Visit not scheduled.')).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: 'All program directors' }));
+  expect(replace).toHaveBeenLastCalledWith('/workbench?view=staff-deliberations&cycleCode=D26&scope=all', undefined, expect.any(Object));
+  await waitFor(() => expect(global.fetch).toHaveBeenLastCalledWith('/api/workbench/staff-deliberations?cycleCode=D26&scope=all'));
 });
 
 test('the Initial assessments view renders the D26 card without calling the API, and loads artifacts for a later cycle', async () => {
