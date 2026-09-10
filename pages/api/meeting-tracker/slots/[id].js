@@ -11,9 +11,9 @@ import {
 import { isMeetingTrackerSchemaReady } from '../../../../shared/config/meetingTracker';
 
 const PATCH_FIELDS = new Set([
-  'etag', 'order', 'minutes', 'notes', 'leadPdId', 'targetSessionId', 'actingUserSystemId',
+  'etag', 'order', 'minutes', 'notes', 'leadPdId', 'targetSessionId',
 ]);
-const DELETE_FIELDS = new Set(['etag', 'actingUserSystemId']);
+const DELETE_FIELDS = new Set(['etag']);
 
 function exactBody(body, allowed) {
   return body && typeof body === 'object' && !Array.isArray(body)
@@ -25,18 +25,19 @@ export default async function handler(req, res) {
     res.setHeader('Allow', 'PATCH, DELETE');
     return res.status(405).json({ error: 'Method not allowed' });
   }
-  if (!isMeetingTrackerSchemaReady()) {
-    return res.status(503).json({
-      error: 'Meeting Tracker is not enabled for this environment.',
-      code: 'meeting_tracker_schema_not_ready',
-    });
-  }
   const slotId = Array.isArray(req.query.id) ? '' : req.query.id;
   if (!isGuid(slotId || '')) {
     return res.status(400).json({ error: 'A valid slot id is required.' });
   }
   const access = await requireAppAccess(req, res, 'meeting-tracker');
   if (!access) return;
+  // Authenticated callers only learn whether the tracker is enabled (review finding 6).
+  if (!isMeetingTrackerSchemaReady()) {
+    return res.status(503).json({
+      error: 'Meeting Tracker is not enabled for this environment.',
+      code: 'meeting_tracker_schema_not_ready',
+    });
+  }
   const allowed = req.method === 'PATCH' ? PATCH_FIELDS : DELETE_FIELDS;
   if (!exactBody(req.body, allowed)) {
     return res.status(400).json({ error: 'The slot request contains unsupported fields.' });
@@ -44,7 +45,7 @@ export default async function handler(req, res) {
 
   return withDalContext('meeting-tracker-slot', async () => {
     try {
-      const { actingUserSystemId: _ignored, ...input } = req.body;
+      const input = req.body;
       const actor = { actingUserSystemId: actorRefFromSession(access.session) };
       if (req.method === 'DELETE') {
         return res.status(200).json(await removeDeliberationSlot({ slotId, ...input }, actor));

@@ -7,6 +7,7 @@ import ReviewQuestionsSection from '../shared/components/admin/ReviewQuestionsSe
 import PromptTemplatesSection from '../shared/components/admin/PromptTemplatesSection';
 import EmailDefaultsSection from '../shared/components/admin/EmailDefaultsSection';
 import SiteVisitRecipientsSection from '../shared/components/admin/SiteVisitRecipientsSection';
+import MeetingTrackerDefaultsSection from '../shared/components/admin/MeetingTrackerDefaultsSection';
 import FinalWriteupMatrixAudiencesSection from '../shared/components/admin/FinalWriteupMatrixAudiencesSection';
 import ReviewerRepairAlertDetails from '../shared/components/admin/ReviewerRepairAlertDetails';
 import DynamicsExplorerRestrictionsSection from '../shared/components/admin/DynamicsExplorerRestrictionsSection';
@@ -84,6 +85,14 @@ const ALERT_RECIPIENT_DATAVERSE_FIELDS = [
     'Per-category recipient JSON',
     'alertRecipientsByCategory',
     'The active-superuser fallback roster is Postgres-backed, not Dataverse.',
+  ),
+];
+
+const MEETING_TRACKER_DEFAULTS_DATAVERSE_FIELDS = [
+  appSystemSettingField(
+    'Default deliberation attendees',
+    'meeting_tracker.default_attendees',
+    'Stores only active staff profile IDs (reference map v1); names and emails are resolved live from the recipient directory.',
   ),
 ];
 
@@ -3097,6 +3106,7 @@ function WorkflowsWorkspace({ view }) {
       );
     case 'site-visits':
       return (
+        <div className="space-y-6">
         <AdminEditorPanel
           id="site-visit-recipient-directory"
           title="Site Visit recipient directory"
@@ -3106,6 +3116,16 @@ function WorkflowsWorkspace({ view }) {
         >
           <SiteVisitRecipientsSection />
         </AdminEditorPanel>
+          <AdminEditorPanel
+            id="meeting-tracker-default-attendees"
+            title="Meeting Tracker default attendees"
+            description="Choose the staff who attend every deliberation session by default. Board members are added per session in the Meeting Tracker."
+            scope="Global setting"
+            dataverseFields={MEETING_TRACKER_DEFAULTS_DATAVERSE_FIELDS}
+          >
+            <MeetingTrackerDefaultsSection />
+          </AdminEditorPanel>
+        </div>
       );
     case 'governance':
       return (

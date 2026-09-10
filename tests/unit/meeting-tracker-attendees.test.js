@@ -112,3 +112,41 @@ test('recipient picker checks readiness before reading the directory', async () 
   });
   expect(deps.getRecipientDirectory).not.toHaveBeenCalled();
 });
+
+// Review findings 1, 2, 4 (S503).
+import {
+  parseMeetingAttendeeRefsLenient,
+  resolveMeetingAttendeesLenient,
+  writeDefaultMeetingAttendees,
+} from '../../lib/services/meeting-tracker/attendee-service';
+
+test('lenient parse and resolve never throw and name what could not be resolved', async () => {
+  expect(parseMeetingAttendeeRefsLenient('nope')).toMatchObject({ refs: { version: 1, attendees: [] }, issue: expect.any(String) });
+  const deps = dependencies({
+    resolveRecipientRefs: jest.fn(async ([ref]) => {
+      if (ref.kind === 'staff') return [{ name: 'Alex Staff', email: 'alex@example.org', roleType: 'Staff' }];
+      if (ref.rosterId === 9) return [{ name: 'Former Board', email: 'former@example.org', roleType: 'Consultant' }];
+      throw new Error('unresolved');
+    }),
+  });
+  const result = await resolveMeetingAttendeesLenient(
+    { version: 1, attendees: [{ kind: 'staff', profileId: 7 }, { kind: 'roster', rosterId: 9 }, { kind: 'roster', rosterId: 10 }] },
+    deps,
+  );
+  expect(result.attendees).toEqual([{ name: 'Alex Staff', email: 'alex@example.org' }]);
+  expect(result.issues).toEqual([
+    'roster entry 9 is no longer a current Board member.',
+    'roster entry 10 could not be resolved from the current directory.',
+  ]);
+});
+
+test('the admin writer stores staff references only after resolving them', async () => {
+  const setSetting = jest.fn(async () => true);
+  const deps = dependencies({ setSetting });
+  const result = await writeDefaultMeetingAttendees({ attendees: [{ kind: 'staff', profileId: 7 }] }, { updatedBy: 3 }, deps);
+  expect(setSetting).toHaveBeenCalledWith(MEETING_TRACKER_DEFAULT_ATTENDEES_SETTING, JSON.stringify({ version: 1, attendees: [{ kind: 'staff', profileId: 7 }] }), 3);
+  expect(result.attendees).toEqual([{ name: 'Alex Staff', email: 'alex@example.org' }]);
+  await expect(writeDefaultMeetingAttendees({ attendees: [{ kind: 'roster', rosterId: 9 }] }, { updatedBy: 3 }, deps))
+    .rejects.toMatchObject({ httpStatus: 400 });
+  expect(setSetting).toHaveBeenCalledTimes(1);
+});

@@ -24,16 +24,16 @@ afterEach(() => {
   else process.env.MEETING_TRACKER_SCHEMA_READY = originalReady;
 });
 
-test('batched request read expands only the session fields and excludes cancelled sessions', async () => {
-  const query = jest.spyOn(DynamicsService, 'queryRecords').mockResolvedValue({ records: [] });
+test('batched request read pages the full result, expands only the session fields, and excludes cancelled sessions', async () => {
+  const query = jest.spyOn(DynamicsService, 'queryAllRecords').mockResolvedValue({ records: [], capped: false });
   await findByRequestIds([REQUEST_ID]);
 
   expect(query).toHaveBeenCalledWith('wmkf_deliberationslots', expect.objectContaining({
-    top: 100,
     filter: expect.stringContaining('wmkf_Session/wmkf_status ne 100000002'),
     expand: expect.stringContaining('wmkf_Session($select='),
   }));
   const options = query.mock.calls[0][1];
+  expect(options.top).toBeUndefined();
   expect(options.expand).toContain('wmkf_attendeerefsjson');
   expect(options.expand.toLowerCase()).not.toContain('activitypart');
 });

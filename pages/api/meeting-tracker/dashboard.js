@@ -11,15 +11,16 @@ export default async function handler(req, res) {
     res.setHeader('Allow', 'GET');
     return res.status(405).json({ error: 'Method not allowed' });
   }
+
+  const access = await requireAppAccess(req, res, 'meeting-tracker');
+  if (!access) return;
+  // Authenticated callers only learn whether the tracker is enabled (review finding 6).
   if (!isMeetingTrackerSchemaReady()) {
     return res.status(503).json({
       error: 'Meeting Tracker is not enabled for this environment.',
       code: 'meeting_tracker_schema_not_ready',
     });
   }
-
-  const access = await requireAppAccess(req, res, 'meeting-tracker');
-  if (!access) return;
   const azureEmail = access.session?.user?.azureEmail;
   if (!azureEmail) {
     return res.status(400).json({ error: 'Could not determine your email from the session. Sign out and back in.' });

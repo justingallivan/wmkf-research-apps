@@ -73,15 +73,26 @@ beforeEach(() => {
   reorderDeliberationSlots.mockResolvedValue({ slots: [] });
 });
 
-test('readiness off returns 503 before authentication or a session service call', async () => {
+test('readiness off returns 503 to an authenticated grantee, after auth and before any service call', async () => {
   mockSchemaReady = false;
   const res = mockRes();
 
   await sessionsHandler({ method: 'GET', query: {} }, res);
 
+  expect(requireAppAccess).toHaveBeenCalledWith(expect.any(Object), res, 'meeting-tracker');
   expect(res.statusCode).toBe(503);
-  expect(requireAppAccess).not.toHaveBeenCalled();
   expect(getDeliberationSession).not.toHaveBeenCalled();
+});
+
+test('readiness off is not disclosed to an unauthenticated caller', async () => {
+  mockSchemaReady = false;
+  requireAppAccess.mockImplementationOnce(async (_req, res) => {
+    res.status(401).json({ error: 'Unauthorized' });
+    return null;
+  });
+  const res = mockRes();
+  await sessionsHandler({ method: 'GET', query: {} }, res);
+  expect(res.statusCode).toBe(401);
 });
 
 test('invalid session GUID returns 400 before service read', async () => {
@@ -94,25 +105,28 @@ test('invalid session GUID returns 400 before service read', async () => {
   expect(getDeliberationSession).not.toHaveBeenCalled();
 });
 
-test('session create ignores body identity and passes the exact session actor', async () => {
+test('session create rejects body identity outright and passes the exact session actor', async () => {
+  const spoofed = mockRes();
+  await sessionsHandler({ method: 'POST', query: {}, body: {
+    scheduledStartIso: '2026-09-14T16:00:00.000Z',
+    scheduledEndIso: '2026-09-14T17:00:00.000Z',
+    ianaTimeZone: 'America/Chicago',
+    actingUserSystemId: SPOOFED_ACTOR_ID,
+  } }, spoofed);
+  expect(spoofed.statusCode).toBe(400);
+  expect(createDeliberationSession).not.toHaveBeenCalled();
+
   const res = mockRes();
   const input = {
     scheduledStartIso: '2026-09-14T16:00:00.000Z',
     scheduledEndIso: '2026-09-14T17:00:00.000Z',
     ianaTimeZone: 'America/Chicago',
     meetingLink: 'https://zoom.us/j/123',
-    actingUserSystemId: SPOOFED_ACTOR_ID,
   };
-
   await sessionsHandler({ method: 'POST', query: {}, body: input }, res);
 
   expect(requireAppAccess).toHaveBeenCalledWith(expect.any(Object), res, 'meeting-tracker');
-  expect(createDeliberationSession).toHaveBeenCalledWith({
-    scheduledStartIso: input.scheduledStartIso,
-    scheduledEndIso: input.scheduledEndIso,
-    ianaTimeZone: input.ianaTimeZone,
-    meetingLink: input.meetingLink,
-  }, { actingUserSystemId: ACTOR_ID });
+  expect(createDeliberationSession).toHaveBeenCalledWith(input, { actingUserSystemId: ACTOR_ID });
   expect(res.statusCode).toBe(201);
 });
 
@@ -120,7 +134,7 @@ test('slot routes dispatch add, update, move, remove, and full reorder operation
   await slotsHandler({
     method: 'POST',
     query: {},
-    body: { sessionId: SESSION_ID, requestId: REQUEST_ID, actingUserSystemId: SPOOFED_ACTOR_ID },
+    body: { sessionId: SESSION_ID, requestId: REQUEST_ID },
   }, mockRes());
   expect(addDeliberationSlot).toHaveBeenCalledWith(
     { sessionId: SESSION_ID, requestId: REQUEST_ID },

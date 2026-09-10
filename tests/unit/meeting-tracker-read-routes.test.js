@@ -82,12 +82,12 @@ test('dashboard passes Workbench-compatible cycle, program, scope, and session i
   expect(res.statusCode).toBe(200);
 });
 
-test('recipients route is readiness-gated before auth and calls one aggregate service', async () => {
+test('recipients route authenticates first, then readiness-gates, and calls one aggregate service', async () => {
   mockSchemaReady = false;
   const blocked = mockRes();
   await recipientsHandler({ method: 'GET', query: {} }, blocked);
   expect(blocked.statusCode).toBe(503);
-  expect(requireAppAccess).not.toHaveBeenCalled();
+  expect(requireAppAccess).toHaveBeenCalledTimes(1);
   expect(loadMeetingTrackerRecipientPicker).not.toHaveBeenCalled();
 
   mockSchemaReady = true;

@@ -72,6 +72,7 @@ export function MeetingTrackerRequestRow({ proposal, cycleCode, programId }) {
             <div className="mt-1 text-sm text-gray-700">
               <p>{formatDate(proposal.siteVisit.scheduledStartIso)}</p>
               <p className="mt-1 text-gray-500">{[proposal.siteVisit.formatLabel, proposal.siteVisit.location].filter(Boolean).join(' · ') || 'Details not set'}</p>
+              {proposal.siteVisitNeedsReconciliation && <p className="mt-1 font-medium text-amber-800">More than one active Site Visit; showing the earliest. Reconcile in the Workbench.</p>}
             </div>
           ) : <p className="mt-1 text-sm font-medium text-amber-700">No site visit</p>}
         </section>
@@ -88,6 +89,7 @@ export default function MeetingTrackerList() {
   const [programs, setPrograms] = useState([]);
   const [cycles, setCycles] = useState([]);
   const [proposals, setProposals] = useState([]);
+  const [notices, setNotices] = useState([]);
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -130,6 +132,7 @@ export default function MeetingTrackerList() {
         }
       } else {
         setProposals(dashboard.proposals || []);
+        setNotices(dashboard.notices || []);
       }
     } catch (loadError) {
       if (token === loadToken.current) setError(loadError.message);
@@ -198,6 +201,11 @@ export default function MeetingTrackerList() {
         <div role="alert" className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
           {error} <button type="button" onClick={() => load(programId, cycleCode, scope)} className="font-semibold underline underline-offset-4">Try again</button>. If the problem continues, contact an administrator.
         </div>
+      )}
+      {!loading && notices.length > 0 && (
+        <ul role="status" className="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          {notices.map((item) => <li key={item.code + (item.requestIds || []).join(',')}>{item.message}</li>)}
+        </ul>
       )}
       {loading ? (
         <div className="rounded-xl border border-gray-200 bg-white p-8 text-center text-gray-500">Loading the cycle schedule…</div>

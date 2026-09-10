@@ -89,3 +89,13 @@ test('a Dataverse stale ETag becomes an HTTP 409 service error', async () => {
     code: 'meeting_tracker_slot_write_conflict',
   });
 });
+
+// Review finding 9 (S503): a move without an explicit order appends.
+test('move without an order appends to the end of the target session', async () => {
+  const deps = dependencies({
+    findSlotsBySession: jest.fn(async () => ({ records: [{ wmkf_deliberationslotid: 'a', wmkf_minutes: 15 }, { wmkf_deliberationslotid: 'b', wmkf_minutes: 15 }] })),
+  });
+  const result = await moveDeliberationSlot({ slotId: SLOT_ID, targetSessionId: SESSION_ID, etag: 'W/"10"' }, { actingUserSystemId: ACTOR_ID }, deps);
+  expect(result.order).toBe(3);
+  expect(deps.updateSlot).toHaveBeenCalledWith(SLOT_ID, 'W/"10"', expect.objectContaining({ wmkf_order: 3 }), { actingUserSystemId: ACTOR_ID });
+});

@@ -106,3 +106,26 @@ test('an adapter or recipient-resolution failure returns a complete all-null map
   const result = await getDeliberationScheduleByRequests([REQUEST_A, REQUEST_B], deps);
   expect([...result.values()]).toEqual([null, null]);
 });
+
+// Review finding 2 (S503): attendee failures are isolated per session.
+test('a stale attendee reference in one session empties only that session\'s attendees', async () => {
+  const deps = dependencies({
+    findSlotsByRequestIds: jest.fn(async () => ({ records: [
+      slot(REQUEST_A, SESSION_A, '2026-09-16T16:00:00.000Z'),
+      slot(REQUEST_B, SESSION_B, '2026-09-17T16:00:00.000Z', { wmkf_attendeerefsjson: 'not json' }),
+    ] })),
+    resolveAttendees: jest.fn(async (refs) => (refs.attendees.length ? [{ name: 'Alex Staff', email: 'alex@example.org' }] : [])),
+  });
+  const result = await getDeliberationScheduleByRequests([REQUEST_A, REQUEST_B], deps);
+  expect(result.get(REQUEST_A)).toMatchObject({ sessionId: SESSION_A, attendees: [{ name: 'Alex Staff', email: 'alex@example.org' }] });
+  expect(result.get(REQUEST_B)).toMatchObject({ sessionId: SESSION_B, attendees: [] });
+});
+
+test('a directory outage keeps every schedule entry and only empties attendees', async () => {
+  const deps = dependencies({
+    findSlotsByRequestIds: jest.fn(async () => ({ records: [slot(REQUEST_A, SESSION_A, '2026-09-16T16:00:00.000Z')] })),
+    getRecipientDirectory: jest.fn(async () => { throw new Error('directory down'); }),
+  });
+  const result = await getDeliberationScheduleByRequests([REQUEST_A], deps);
+  expect(result.get(REQUEST_A)).toMatchObject({ sessionId: SESSION_A, attendees: [] });
+});

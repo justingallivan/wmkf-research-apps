@@ -89,3 +89,31 @@ test('readiness fails before the Workbench selector or any join runs', async () 
   expect(deps.loadWorkbenchDashboard).not.toHaveBeenCalled();
   expect(deps.getSchedules).not.toHaveBeenCalled();
 });
+
+// Review finding 3 (S503): data conditions are shown, not fatal.
+test('a duplicate active Site Visit picks the earliest-ending one and flags the row', async () => {
+  const VISIT_B = '66666666-6666-4666-8666-666666666666';
+  const deps = dependencies({
+    findActiveSiteVisits: jest.fn(async () => [
+      { activityid: VISIT_B, _regardingobjectid_value: REQUEST_A, scheduledstart: '2026-09-25T16:00:00.000Z', scheduledend: '2026-09-25T17:00:00.000Z' },
+      { activityid: VISIT_A, _regardingobjectid_value: REQUEST_A, scheduledstart: '2026-09-20T16:00:00.000Z', scheduledend: '2026-09-20T17:00:00.000Z' },
+    ]),
+  });
+  const result = await loadMeetingTrackerDashboard({ cycleCode: 'D26' }, deps);
+  expect(deps.getSiteVisitById).toHaveBeenCalledTimes(1);
+  expect(deps.getSiteVisitById).toHaveBeenCalledWith(VISIT_A);
+  expect(result.proposals[0]).toMatchObject({ siteVisitNeedsReconciliation: true, siteVisit: { activityId: VISIT_A } });
+  expect(result.proposals[1].siteVisitNeedsReconciliation).toBe(false);
+});
+
+test('an unresolvable request is listed with a notice instead of failing the cycle', async () => {
+  const deps = dependencies({
+    findRequestsByIds: jest.fn(async () => ({ records: [
+      { akoya_requestid: REQUEST_A, akoya_title: 'Proposal A', _wmkf_currentpresitevisit_value: DOC_A },
+    ] })),
+  });
+  const result = await loadMeetingTrackerDashboard({ cycleCode: 'D26' }, deps);
+  expect(result.proposals).toHaveLength(2);
+  expect(result.proposals.find((row) => row.requestId === REQUEST_B)).toMatchObject({ requestUnresolved: true, title: null, shareState: null });
+  expect(result.notices).toEqual([expect.objectContaining({ code: 'meeting_tracker_request_unresolved', requestIds: [REQUEST_B] })]);
+});

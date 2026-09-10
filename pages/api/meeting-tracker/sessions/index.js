@@ -10,7 +10,7 @@ import { isMeetingTrackerSchemaReady } from '../../../../shared/config/meetingTr
 
 const CREATE_FIELDS = new Set([
   'scheduledStartIso', 'scheduledEndIso', 'ianaTimeZone', 'location',
-  'meetingLink', 'notes', 'status', 'attendees', 'actingUserSystemId',
+  'meetingLink', 'notes', 'status', 'attendees',
 ]);
 
 function exactBody(body, allowed) {
@@ -23,14 +23,15 @@ export default async function handler(req, res) {
     res.setHeader('Allow', 'GET, POST');
     return res.status(405).json({ error: 'Method not allowed' });
   }
+  const access = await requireAppAccess(req, res, 'meeting-tracker');
+  if (!access) return;
+  // Authenticated callers only learn whether the tracker is enabled (review finding 6).
   if (!isMeetingTrackerSchemaReady()) {
     return res.status(503).json({
       error: 'Meeting Tracker is not enabled for this environment.',
       code: 'meeting_tracker_schema_not_ready',
     });
   }
-  const access = await requireAppAccess(req, res, 'meeting-tracker');
-  if (!access) return;
   if (req.method === 'POST' && !exactBody(req.body, CREATE_FIELDS)) {
     return res.status(400).json({ error: 'The session request contains unsupported fields.' });
   }
@@ -40,7 +41,7 @@ export default async function handler(req, res) {
       if (req.method === 'GET') {
         return res.status(200).json(await listDeliberationSessions());
       }
-      const { actingUserSystemId: _ignored, ...input } = req.body;
+      const input = req.body;
       const body = await createDeliberationSession(input, {
         actingUserSystemId: actorRefFromSession(access.session),
       });
