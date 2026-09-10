@@ -93,10 +93,10 @@ writes, and what the surfaces say about it.
   terminal review statuses into `progress.released`; `lib/services/review-synthesis-readiness.js:24-28`
   treats both as resolved; `shared/components/reviewers/ReviewerInvitePanel.js:59-66` labels them
   "Released — no longer needed" and "No response".
-- **History drawer copy assumes only the sweep writes `no_response`:**
-  `shared/components/reviewers/reviewer-activity-history.js:163-167` labels it
-  "No response recorded at cycle close" with the note "Recorded by automated cycle close".
-  That becomes false once a PD can record it.
+- **History drawer copy now distinguishes the two producers from production evidence:**
+  `shared/components/reviewers/reviewer-activity-history.js` labels it "No response to
+  invitation" and uses token revocation plus trusted meeting/response dates to distinguish
+  staff recording, automated cycle close, and incomplete evidence.
 
 ## Owned file surface (the safety boundary)
 
@@ -181,12 +181,10 @@ Track Reviewers panel, Dataverse schema, or anything under `lib/dataverse/schema
   unanswered."
 - Button label: "Release (N)" for either reason; the reason radio makes the verb clear. Keep
   "Release invitee (N)" on the panel button.
-- History drawer: `no_response` label becomes **"No response to invitation"**; the note
-  distinguishes actor: "Recorded by <PD name>" when the row carries an acting user, otherwise
-  "Recorded by automated cycle close". If the DTO does not expose the actor for this stamp, use
-  "Recorded by staff" vs "Recorded by automated cycle close" keyed on `withdrawnSufficientAt`
-  being null AND `responseReceivedAt` being set before the meeting date — and say in the handoff
-  that a proper actor field is missing.
+- History drawer: `no_response` label becomes **"No response to invitation"**. Attribute from
+  production evidence: token revocation, a missing meeting date, or a pre-meeting stamp is
+  "Recorded by staff"; only a dated post-meeting stamp on a non-revoked row is "Recorded by
+  automated cycle close"; otherwise use the neutral "Recorded by staff or automated cycle close".
 - Sentences, not labels with colons. No exclamation marks. Voice per
   `.claude-memory/feedback-user-facing-error-copy-voice.md`.
 
@@ -267,7 +265,12 @@ is decorative and does not count):
   validity, and concurrency/UI regressions). The implementation and handoff
   commits are followed by handoff verification commit `75fc2098` and final
   remote-main drift evidence commit `8e1874eb` (records the latest verified
-  main ref and branch divergence); all are pushed to
+  main ref and branch divergence); `fe7042ac` (corrected final handoff counts);
+  and `f7fb526a` (dedicated count-neutral no-response history group, evidence-based
+  attribution, held regeneration control, durable documentation wording, and
+  discriminating tests). The durable-documentation and final handoff correction
+  commit follows `f7fb526a`; its exact SHA is reported with the delivery. All
+  listed commits are pushed to
   `origin/codex/reviewer-release-reason`.
 - Files changed: `lib/services/review-manager/withdraw-sufficient-service.js`,
   `lib/services/reviewer-engagement/withdraw-pending-invitation.js`,
@@ -285,46 +288,56 @@ is decorative and does not count):
   `tests/unit/regenerate-token-service.test.js`,
   `tests/integration/review-manager-token-routes.test.js`,
   `tests/unit/reviewer-suggestion-token-regeneration.test.js`, and the API matrix,
-  Atlas, and terminal-status plan docs. The regeneration named read now selects
+  Atlas, agent-wiki, and terminal-status plan docs. The regeneration named read now selects
   `wmkf_responsetype` and `wmkf_reviewstatus`; the server rejects mapped terminal
   response outcomes, post-accept terminal statuses, and unknown non-null lifecycle
   values with stable `{ ok: false, reason: 'not_eligible' }` before request lookup
-  or mint. The menu mirrors the existing response-type map and terminal review-
-  status constants, so terminal rows cannot expose Regenerate. No portal, schema,
-  sweep, rollup, readiness, or session-prompt files were changed.
-- Verification run and results: the focused release suite passes cleanly with 78
-  tests across 8 suites; the history/UI command passes with 146 tests across 4
-  suites. The history/UI run retains only the pre-existing React `act(...)`
-  warning from the `ReviewerInvitePanel` VIP-load effect. The
-  token-regeneration command passes with 150 tests across 6 suites (including the
-  terminal response complement, unknown-state fall-through, missing-ETag and
-  exact-ifMatch controls, conditional 412 race mapping, revoked no-response
-  route fixture, adapter annotation projection, lifecycle DTO signal, token
-  forwarding, and UI menu assertions);
-  `npm run lint`;
+  or mint, while held remains eligible and forwards the exact ETag. The menu mirrors
+  the existing response-type map and terminal review-status constants, so terminal or
+  unknown-lifecycle rows cannot expose Regenerate. No external portal, schema, sweep,
+  rollup, readiness, or session-prompt files were changed.
+- Verification run and results: `npx jest tests/unit/withdraw-sufficient-service.test.js
+  tests/integration/withdraw-sufficient-route.test.js tests/unit/withdraw-sufficient-route-overrides.test.js
+  tests/unit/withdraw-sufficient-preview.test.js tests/unit/withdraw-sufficient-service-delegation.test.js
+  tests/unit/withdraw-pending-invitation.test.js tests/unit/release-email-modal.test.js
+  tests/unit/reviewer-invite-panel-release-button.test.js --runInBand` passes cleanly with 78
+  tests across 8 suites. `npx jest tests/unit/reviewer-activity-history.test.js
+  tests/unit/reviewer-manage-actions-menu.test.js tests/unit/reviewers-service.test.js
+  tests/unit/reviewer-modes.test.js --runInBand` passes with 166 tests across 4 suites.
+  `npx jest tests/unit/regenerate-token-service.test.js
+  tests/integration/review-manager-token-routes.test.js
+  tests/unit/reviewer-suggestion-token-regeneration.test.js
+  tests/unit/reviewer-manage-actions-menu.test.js tests/unit/reviewer-activity-history.test.js
+  tests/unit/reviewers-service.test.js --runInBand --silent` passes with 164 tests across 6 suites
+  (including the terminal response complement with held control, unknown-state
+  fall-through, missing-ETag and exact-ifMatch controls, conditional 412 race
+  mapping, concrete-ETag revoked no-response route fixture, adapter annotation
+  projection, lifecycle DTO signal, token forwarding, and UI menu assertions).
+  The history/UI run has no new act warning from the deferred-preview test;
+  repository lint retains the existing warning baseline. Also run:
+  `npm run lint` (0 errors, 86 existing warnings);
   `npm run check:types`;
   `check:api-routes` + self-test; `check:status-enum-parity` + self-test;
   `check:atlas` + self-test; `check:docs-catalog`; `check:doc-symbol-refs`;
   `check:reviewer-engagement-boundary` + self-test;
   `check:route-service-boundary` + self-test; `check:route-lifecycle-auth` +
-  self-test; and `git diff --check` all pass.
+  self-test; and `git diff --check` all pass. The branch was based on `a3bda092`,
+  and `git ls-remote` verified `origin/main` at `7e06e4a1` and the pushed branch
+  at `f7fb526a` before the final docs commit.
 - Open questions / recommendations for the owner: the branch was based on
-  `a3bda092`; unrelated `origin/main` advanced to `7e06e4a1` during the build,
-  so this branch remains seven commits behind `main` by design. The requested
-  release branch is pushed and ready for review; do not merge it here.
+  `a3bda092`; unrelated `origin/main` is `7e06e4a1`, so the branch remains behind
+  `main` by design. The requested release branch
+  is pushed and ready for review; do not merge it here. Residual risk: activity
+  history remains a current-row operational summary, not an append-only audit log;
+  the neutral attribution sentence intentionally covers incomplete evidence.
 - P1 history reachability/attribution is resolved within the authorized scope.
-  `reviewers-service.js:202-204` retains accepted and review-received rows and
-  additionally includes `no_response` lifecycle rows. `reviewers-service.js:290-293`
-  projects those rows as `released` when they have no explicit review status, and
-  `reviewers-service.js:342-346` carries the trusted request `meetingDate` onto each
-  row. The existing panel history trigger at `ReviewerManagePanel.js:480-482` can
-  therefore find the row, while its accepted-only selection/release controls remain
-  excluded. The history helper reports `Recorded by staff` for a no-response stamp
-  before the meeting date and keeps `Recorded by automated cycle close` for the
-  post-meeting sweep fallback. Dataverse actor/modified-by data is not selected for
-  this DTO; no adapter expansion was required for history because the permitted
-  timestamp marker is available from the existing request projection. The separate
-  token-regeneration P1 is also resolved within the authorized scope: its named
-  Dataverse read now includes the lifecycle fields, the service independently blocks
-  all mapped terminal response outcomes plus terminal/unknown statuses before any
-  request read or mint, and the UI hides the action for those rows.
+  `reviewers-service.js` keeps accepted/review-received rows in `reviewers` and
+  projects single-proposal `no_response` lifecycle rows only into
+  `noResponseHistory`; the dedicated Track group is count-neutral, non-selectable,
+  non-actionable, and opens the existing activity drawer. Ordinary status summaries,
+  totals, filters, synthesis lifecycle data, and default modes remain unchanged.
+  Attribution uses actual production DTO evidence: `tokenRevoked`, request
+  `meetingDate`, and `responseReceivedAt` as specified above. The separate
+  token-regeneration fix remains fail-closed server-side and in the UI, requires a
+  concrete lifecycle ETag, maps stale 412 writes to stable 409 `not_eligible`, and
+  preserves held as an eligible recovery state.

@@ -434,8 +434,10 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   filters selected/non-revoked rows; Materials delivery refuses revoked,
   non-accepted, terminal/unknown, and already-delivered rows before mint; manual
   reminders freshly reauthorize; and review-due reminders are link-free and never mint.
-  `regenerate-token` remains the deliberate staff replacement-link action and can
-  restore access, so it is not a routine follow-up substitute. The automatic
+  `regenerate-token` remains the deliberate staff replacement-link action for
+  eligible accepted/held nonterminal engagements and can restore access only
+  after its server-side lifecycle and ETag checks; it is not a routine follow-up
+  substitute. The automatic
   reminder route is safe from execution because it is absent from the Vercel cron
   registry under the hold gate—not because configuration is null. A 2026-09-01
   read-only probe instead found 92 current-cycle active requests with both reminder

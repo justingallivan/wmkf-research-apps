@@ -162,10 +162,11 @@ also refuses terminal rows so ordinary candidate removal cannot erase durable
 engagement history.
 
 The Invite Reviewers release action may also record `no_response` when a Program
-Director confirms that a pending invitee never answered. Reliability readers treat
-that existing response type as negative-leaning non-response evidence, distinct from
-the neutral `withdrawn_sufficient` choice that means WMKF had enough reviewers. The
-release revokes the external token in the same lifecycle write, so the recorded
+Director confirms that a pending invitee never answered. Reliability evidence may
+treat that existing response type as negative-leaning non-response evidence,
+distinct from the neutral `withdrawn_sufficient` choice that means WMKF had enough
+reviewers; this is lifecycle evidence, not a built score-reader or scoring rule.
+The release revokes the external token in the same lifecycle write, so the recorded
 non-response cannot later become an acceptance.
 
 ### Review-receipt races

@@ -659,9 +659,13 @@ the reset set from the adapter source rather than trusting a copied list.
 external reviewer accept/decline, staff-recorded withdrawal, and the stale-invite cron
 that writes `responseType=no_response` at cycle close. The activity history therefore
 classifies the response event from `responseType` plus `reviewStatus`: accepted and
-ordinary declined rows read as reviewer responses, `no_response` reads as automated
-cycle close, and `declined` + `withdrew` reads as staff-recorded withdrawal. The bare
-timestamp must not be treated as proof that a reviewer responded.
+ordinary declined rows read as reviewer responses, and `declined` + `withdrew` reads as
+staff-recorded withdrawal. No-response attribution uses direct evidence: token
+revocation, a missing meeting date, or a pre-meeting stamp is staff-recorded; only a
+dated post-meeting stamp on a non-revoked row is an automated cycle close; otherwise
+the drawer stays neutral. The bare timestamp must not be treated as proof that a
+reviewer responded. On Track, no-response rows appear in a dedicated history-only
+group outside ordinary status buckets, counts, selection, and actions.
 
 `wmkf_reviewreceivedat` alone still does not prove a portal submission. The
 current source-built closeout contract requires an existing received-review
@@ -1397,10 +1401,11 @@ a currently revoked or expired token resolve without content. Every other
 participant without a receipt blocks, including live-token invitees who have
 not accepted, unresolved duplicates, and malformed/unknown lifecycle or token
 state. Unselected, applicant-excluded, and explicitly merged/removed duplicates
-do not participate. `mintAndStore` clears revocation and writes a future expiry,
-but regeneration reopens readiness only when token state was the
-otherwise-participating, nonterminal row's sole resolution; it does not reselect
-a removed row or undo decline/withdraw/release. An existing synthesis remains
+do not participate. `mintAndStore` clears revocation and writes a future expiry, but
+token regeneration is independently fail-closed to accepted/held nonterminal rows
+with a concrete ETag; it does not reselect a removed row or undo
+decline/no-response/withdraw/release, and a concurrent lifecycle change cannot be
+overwritten. An existing synthesis remains
 visible but is not current until synthesis runs again after genuine reactivation
 and resolution. The exact answer digest plus lifecycle classification is hashed;
 a matching completed ledger row establishes Current state. The feature-gated
