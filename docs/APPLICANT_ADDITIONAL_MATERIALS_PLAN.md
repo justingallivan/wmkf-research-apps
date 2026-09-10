@@ -551,6 +551,9 @@ migration + flag + merge pending. PR 3 is planned.
   `lib/services/site-visit-materials/contributor-service.js` files under the canonical name with
   `replace` (SharePoint version history), registers a READY/DRAFT `wmkf_requestdocument` row
   (producer `site-visit-materials-portal`, unattributed actor policy), supersedes the slot's prior
-  row, and flags PDF/source receipts more than an hour apart as out of sync.
+  row, and flags PDF/source receipts more than an hour apart as out of sync. Codex adversarial
+  review (2026-09-10) hardened it: clean-only scan verdicts, cap read failure is 503 not the
+  default, generation key from the staging id so a retry reuses the row, supersede failure is
+  a retryable 503, and PPTX/DOCX must carry the OOXML content-types entry and part root.
 - **PR 3 — visibility and closeout:** "Materials: 2 of 3 received" line on the Staff Deliberations
   tab and cycle view; auto-close by `closes_at`; reminder cron (owner follow-up).

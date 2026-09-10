@@ -74,7 +74,7 @@ export default async function handler(req, res) {
 
   try {
     const result = await withDalContext('external-materials-finalize', () =>
-      finalizeMaterialUpload({ collection: verified.collection, slotKey: slot, file }));
+      finalizeMaterialUpload({ collection: verified.collection, slotKey: slot, file: { ...file, stagingId } }));
     const body = { ok: true, slot: result.slot, filename: result.filename, receivedAt: result.receivedAt };
     await completePortalUpload({ stagingId, leaseToken: claim.leaseToken, resultCode: 'ok', resultPayload: body });
     return res.status(200).json(body);

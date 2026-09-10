@@ -21,13 +21,14 @@ beforeEach(() => {
   requireSuperuser.mockResolvedValue({ profileId: 3 });
 });
 
-test('the cap reads the setting when it is a whole number in range, else the default of 100 MB', async () => {
+test('the cap reads the setting when it is a whole number in range, else the default of 100 MB; a read failure is 503', async () => {
   for (const [raw, expected] of [['250', { maxMb: 250, source: 'setting' }], [null, { maxMb: 100, source: 'default' }], ['abc', { maxMb: 100, source: 'default' }], ['0', { maxMb: 100, source: 'default' }], ['501', { maxMb: 100, source: 'default' }], ['12.5', { maxMb: 100, source: 'default' }]]) {
     getSetting.mockResolvedValueOnce(raw);
     expect(await getUploadMaxMb()).toEqual(expected);
   }
+  // A read failure must not widen a lower configured cap: fail closed, never default.
   getSetting.mockRejectedValueOnce(new Error('dataverse down'));
-  expect(await getUploadMaxMb()).toEqual({ maxMb: 100, source: 'default' });
+  await expect(getUploadMaxMb()).rejects.toMatchObject({ httpStatus: 503, code: 'site_visit_materials_cap_unavailable' });
   expect(uploadMaxBytes(100)).toBe(104857600);
 });
 

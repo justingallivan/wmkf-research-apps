@@ -19,6 +19,7 @@ jest.mock('../../lib/services/portal-upload-staging', () => ({
 
 import { checkRateLimit, recordTokenOutcome } from '../../lib/external/rate-limit';
 import { verifyMaterialsToken } from '../../lib/external/verify-materials-token';
+import { getUploadMaxMb } from '../../lib/services/site-visit-materials/upload-cap';
 import { buildContributorContext, finalizeMaterialUpload } from '../../lib/services/site-visit-materials/contributor-service';
 import { ServiceHttpError } from '../../lib/services/service-http-error';
 import * as staging from '../../lib/services/portal-upload-staging';
@@ -68,6 +69,9 @@ test('upload-token: server derives scope, resource, binding, and cap; waived or 
   const big = res(); await uploadTokenHandler(req('POST', { slot: 'presentation_pdf', filename: 'deck.pdf', size: 101 * 1024 * 1024 }), big); expect(big.statusCode).toBe(400); expect(big.body).toEqual({ ok: false, reason: 'file_too_large', maxMb: 100 });
   const other = res(); await uploadTokenHandler(req('POST', { slot: 'other', filename: 'map.docx', size: 10 }), other); expect(other.statusCode).toBe(200);
   expect(staging.createPortalUpload).toHaveBeenCalledTimes(2);
+  getUploadMaxMb.mockRejectedValueOnce(new ServiceHttpError('cap', { httpStatus: 503, code: 'site_visit_materials_cap_unavailable', body: { ok: false, reason: 'cap_unavailable' } }));
+  const capDown = res(); await uploadTokenHandler(req('POST', { slot: 'presentation_pdf', filename: 'deck.pdf', size: 10 }), capDown);
+  expect(capDown.statusCode).toBe(503); expect(capDown.body.reason).toBe('cap_unavailable'); expect(staging.createPortalUpload).toHaveBeenCalledTimes(2);
   verifyMaterialsToken.mockResolvedValueOnce({ ok: false, reason: 'closed' });
   const closed = res(); await uploadTokenHandler(req('POST', { slot: 'presentation_pdf', filename: 'deck.pdf', size: 10 }), closed); expect(closed.statusCode).toBe(401);
 });

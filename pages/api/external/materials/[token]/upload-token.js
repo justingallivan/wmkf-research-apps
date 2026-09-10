@@ -8,6 +8,7 @@
 import { verifyMaterialsToken } from '../../../../../lib/external/verify-materials-token';
 import { checkRateLimit, recordTokenOutcome } from '../../../../../lib/external/rate-limit';
 import { withDalContext } from '../../../../../lib/dataverse/core/context';
+import { ServiceHttpError } from '../../../../../lib/services/service-http-error';
 import { getUploadMaxMb, uploadMaxBytes } from '../../../../../lib/services/site-visit-materials/upload-cap';
 import { slotExtensions } from '../../../../../lib/utils/site-visit-material-file';
 import {
@@ -60,6 +61,7 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, slot, ...upload });
   } catch (error) {
     if (error instanceof PortalUploadStagingError) return res.status(error.httpStatus).json({ ok: false, reason: error.code });
+    if (error instanceof ServiceHttpError) return res.status(error.httpStatus).json(error.body ?? { ok: false, reason: error.code });
     console.error('[materials/upload-token] failed:', error?.message || error);
     return res.status(503).json({ ok: false, reason: 'staging_unavailable' });
   }

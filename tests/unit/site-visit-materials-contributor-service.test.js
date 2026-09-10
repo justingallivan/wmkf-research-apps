@@ -17,6 +17,7 @@ function deps(overrides = {}) {
   return {
     getRequest: jest.fn(async () => REQUEST),
     findDocumentsByRequest: jest.fn(async () => ({ records: [] })),
+    findDocumentByGenerationKey: jest.fn(async () => ({ records: [] })),
     getSharePointBuckets: jest.fn(async () => [{ library: 'akoya_request', folder: 'Neural dust_ABC123', source: 'dynamics' }, { library: 'Archive', folder: 'x', source: 'archive' }]),
     ensureFolderPath: jest.fn(async () => ({})),
     uploadFile: jest.fn(async (_lib, _folder, name) => ({ siteId: 'site', driveId: 'drive', id: 'item-1', name, size: 9, webUrl: 'https://sp/x', eTag: '"1"', versionId: '2.0', lastModified: '2026-11-21T09:00:00Z' })),
@@ -75,6 +76,8 @@ test('finalize validates, scans, uploads under the canonical name with replace, 
     wmkf_sharepointfolderpath: 'Neural dust_ABC123/Site Visit - Slides',
   });
   expect(payload.wmkf_inputfingerprint).toMatch(/^[0-9a-f]{64}$/);
+  expect(payload.wmkf_generationkey).toMatch(/^[0-9a-f]{64}$/);
+  expect(d.findDocumentByGenerationKey).toHaveBeenCalledWith(payload.wmkf_generationkey);
   expect(payload.wmkf_contenthash).toBe(payload.wmkf_inputfingerprint);
   expect(options.actorPolicy).toBe('allow-unattributed');
   expect(d.supersedeDocument).toHaveBeenCalledWith(ROW_PDF.wmkf_requestdocumentid);
@@ -89,10 +92,14 @@ test('finalize refuses: waived slot, oversize, wrong bytes, infected scan, no ac
   await expect(finalizeMaterialUpload({ collection: collection(), slotKey: 'presentation_pdf', file: { filename: 'a.pdf', buffer: Buffer.alloc(1024 * 1024 + 1) } }, tiny)).rejects.toMatchObject({ code: 'file_too_large' });
   await expect(finalizeMaterialUpload({ collection: collection(), slotKey: 'presentation_pdf', file: { filename: 'a.pdf', buffer: ZIP } }, d)).rejects.toMatchObject({ code: 'signature_mismatch', httpStatus: 422 });
   const infected = deps({ scanBytes: async () => ({ scan_result: 'infected' }) });
+  const unknown = deps({ scanBytes: async () => ({}) });
+  await expect(finalizeMaterialUpload({ collection: collection(), slotKey: 'presentation_pdf', file: { filename: 'a.pdf', buffer: PDF } }, unknown)).rejects.toMatchObject({ code: 'scan_unavailable', httpStatus: 503 });
+  const errored = deps({ scanBytes: async () => ({ scan_result: 'error' }) });
+  await expect(finalizeMaterialUpload({ collection: collection(), slotKey: 'presentation_pdf', file: { filename: 'a.pdf', buffer: PDF } }, errored)).rejects.toMatchObject({ code: 'scan_unavailable' });
   await expect(finalizeMaterialUpload({ collection: collection(), slotKey: 'presentation_pdf', file: { filename: 'a.pdf', buffer: PDF } }, infected)).rejects.toMatchObject({ code: 'scan_infected' });
   const noBucket = deps({ getSharePointBuckets: async () => [{ library: 'Archive', folder: 'x', source: 'archive' }] });
   await expect(finalizeMaterialUpload({ collection: collection(), slotKey: 'presentation_pdf', file: { filename: 'a.pdf', buffer: PDF } }, noBucket)).rejects.toMatchObject({ code: 'folder_unavailable', httpStatus: 503 });
-  for (const x of [d, tiny, infected, noBucket]) { expect(x.uploadFile).not.toHaveBeenCalled(); expect(x.createDocument).not.toHaveBeenCalled(); }
+  for (const x of [d, tiny, infected, unknown, errored, noBucket]) { expect(x.uploadFile).not.toHaveBeenCalled(); expect(x.createDocument).not.toHaveBeenCalled(); }
 });
 
 test('other slot keeps a sanitized original name under Site Visit - Other and never supersedes', async () => {
@@ -103,4 +110,34 @@ test('other slot keeps a sanitized original name under Site Visit - Other and ne
   expect(result.filename).not.toMatch(/[<>]/);
   expect(d.createDocument.mock.calls[0][0].wmkf_artifacttype).toBe(REQUEST_DOCUMENT_ARTIFACT_TYPE.OTHER_APPLICANT_MATERIALS);
   expect(d.supersedeDocument).not.toHaveBeenCalled();
+});
+
+test('the generation key is derived from the staging id: a retry after a lost response reuses the row and only redoes the supersede', async () => {
+  const stagingId = '33333333-3333-4333-8333-333333333333';
+  const first = deps({ findDocumentsByRequest: async () => ({ records: [ROW_PDF] }) });
+  await finalizeMaterialUpload({ collection: collection(), slotKey: 'presentation_pdf', file: { filename: 'a.pdf', buffer: PDF, stagingId } }, first);
+  const key = first.createDocument.mock.calls[0][0].wmkf_generationkey;
+  const again = deps({ findDocumentsByRequest: async () => ({ records: [ROW_PDF] }) });
+  await finalizeMaterialUpload({ collection: collection(), slotKey: 'presentation_pdf', file: { filename: 'a.pdf', buffer: PDF, stagingId } }, again);
+  expect(again.createDocument.mock.calls[0][0].wmkf_generationkey).toBe(key);
+  const createdRow = { wmkf_requestdocumentid: 'bbbbbbbb-0000-4000-8000-000000000002', wmkf_filename: '1003222 Site Visit Presentation.pdf', wmkf_sharepointlastmodified: '2026-11-21T09:00:00Z' };
+  const retry = deps({ findDocumentsByRequest: async () => ({ records: [ROW_PDF] }), findDocumentByGenerationKey: async () => ({ records: [createdRow] }) });
+  const result = await finalizeMaterialUpload({ collection: collection(), slotKey: 'presentation_pdf', file: { filename: 'a.pdf', buffer: PDF, stagingId } }, retry);
+  expect(retry.uploadFile).not.toHaveBeenCalled();
+  expect(retry.createDocument).not.toHaveBeenCalled();
+  expect(retry.supersedeDocument).toHaveBeenCalledWith(ROW_PDF.wmkf_requestdocumentid);
+  expect(result).toMatchObject({ ok: true, replayed: true, artifactId: createdRow.wmkf_requestdocumentid, filename: createdRow.wmkf_filename });
+});
+
+test('a failed supersede is not success: the finalize throws a transient 503 so the staging row is released for retry', async () => {
+  const d = deps({ findDocumentsByRequest: async () => ({ records: [ROW_PDF] }), supersedeDocument: async () => { throw new Error('412'); } });
+  await expect(finalizeMaterialUpload({ collection: collection(), slotKey: 'presentation_pdf', file: { filename: 'a.pdf', buffer: PDF } }, d)).rejects.toMatchObject({ code: 'supersede_failed', httpStatus: 503 });
+  expect(d.createDocument).toHaveBeenCalledTimes(1);
+});
+
+test('scanning off skips the scan, matching the grantee and reviewer upload paths', async () => {
+  const d = deps({ scanEnabled: () => false, scanBytes: jest.fn() });
+  await finalizeMaterialUpload({ collection: collection(), slotKey: 'presentation_pdf', file: { filename: 'a.pdf', buffer: PDF } }, d);
+  expect(d.scanBytes).not.toHaveBeenCalled();
+  expect(d.createDocument).toHaveBeenCalledTimes(1);
 });
