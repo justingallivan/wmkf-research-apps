@@ -135,7 +135,9 @@ calls the same service.
 Two tables, Dataverse, following the wave conventions under `lib/dataverse/schema/`:
 
 - `wmkf_deliberationsession`: `scheduledstart`, `scheduledend` (or duration), `wmkf_ianatimezone`,
-  `wmkf_locationorlink`, `wmkf_notes`, status (planned / held / cancelled). Attendees: **decide in
+  `wmkf_locationorlink`, `wmkf_meetinglink` (owner, 2026-09-09: the PC saves the Zoom link here;
+  the Share email carries it the way it carries the site-visit calendar entry, see §5.6),
+  `wmkf_notes`, status (planned / held / cancelled). Attendees: **decide in
   the build** between ActivityParty (make it an Activity, visible on timelines) and a reference map
   like `wmkf_attendeerefsjson` (simpler, already has a resolver). Recommendation: a plain table with
   the reference map; a session is not "regarding" one request, so the Activity timeline gains little.
@@ -175,6 +177,17 @@ confirmation step and no Word-version signal. Stop 3 therefore has exactly three
 "Visit not scheduled" (PC to-do), "Visit <date>" (future), "Visited <date>" (past). The
 `visitExpected` predicate is the single place J27's "reviewed but not visited" case will land;
 register it under the J27 transition register when slice 3 builds it.
+
+### 5.6 What the Share email reads from the tracker (owner, 2026-09-09)
+
+The Staff Deliberations tab's Share action becomes one step: lock the draft, then send the
+deliberation email (brief: `docs/plans/STAFF_DELIBERATIONS_TAB_SHAPE_BRIEF_2026-09-09.md`).
+That email already carries the draft, the request's material links, and the site-visit
+calendar entry. From this tracker it additionally reads, for the request's latest slot:
+the session date and time (`scheduledstart`, `wmkf_ianatimezone`), the Zoom link
+(`wmkf_meetinglink`), and the attendee list as the default recipients. Until slice 1 ships,
+each of those renders as "not yet scheduled" in the email and on the card; the slot in the
+UI is designed now so the tracker fills it without a second design.
 
 ## 6. Security contract [PLANNED — do not add matrix rows until the routes exist]
 
