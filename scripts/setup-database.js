@@ -1048,7 +1048,7 @@ const v44Statements = [
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CONSTRAINT deliberation_agenda_state_check
-      CHECK (state IN ('prepared', 'activity_created', 'send_requested', 'sent')),
+      CHECK (state IN ('prepared', 'activity_created', 'send_requested', 'sent', 'failed')),
     CONSTRAINT deliberation_agenda_recipient_shape CHECK (
       jsonb_typeof(to_recipients) = 'array'
       AND jsonb_array_length(to_recipients) > 0
@@ -1061,6 +1061,9 @@ const v44Statements = [
   )`,
   `CREATE INDEX IF NOT EXISTS idx_deliberation_agenda_session_history
      ON deliberation_agenda_sends (session_id, created_at DESC)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS uq_deliberation_agenda_one_unresolved
+     ON deliberation_agenda_sends (session_id)
+     WHERE state = 'send_requested'`,
 ];
 
 // V32: model pricing audit history (S181).

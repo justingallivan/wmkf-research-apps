@@ -43,7 +43,11 @@ beforeEach(() => {
   const session = { user: { azureEmail: 'PC@Example.org', dynamicsSystemuserId: ACTOR_ID } };
   requireAppAccess.mockResolvedValue({ session });
   actorRefFromSession.mockReturnValue(ACTOR_ID);
-  getAgendaStatus.mockResolvedValue({ lastAgenda: null, scheduleChanged: false });
+  getAgendaStatus.mockResolvedValue({
+    lastAgenda: { operationId: OPERATION_ID, state: 'sent' },
+    pendingSend: { operationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', state: 'send_requested' },
+    scheduleChanged: false,
+  });
   prepareAgendaEmail.mockResolvedValue({ agenda: { operationId: OPERATION_ID } });
   sendAgendaEmail.mockResolvedValue({ agenda: { operationId: OPERATION_ID, state: 'sent' } });
 });
@@ -62,11 +66,15 @@ test('validates the path id before auth and discloses readiness only after auth'
   expect(getAgendaStatus).not.toHaveBeenCalled();
 });
 
-test('GET returns the latest agenda projection', async () => {
+test('GET returns sent and unresolved agenda projections separately', async () => {
   const res = mockRes();
   await handler({ method: 'GET', query: { id: SESSION_ID } }, res);
   expect(getAgendaStatus).toHaveBeenCalledWith({ sessionId: SESSION_ID });
   expect(res.statusCode).toBe(200);
+  expect(res.body).toMatchObject({
+    lastAgenda: { operationId: OPERATION_ID, state: 'sent' },
+    pendingSend: { state: 'send_requested' },
+  });
 });
 
 test('POST rejects body identity and derives sender identity from the authenticated session', async () => {

@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS deliberation_agenda_sends (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
   CONSTRAINT deliberation_agenda_state_check
-    CHECK (state IN ('prepared', 'activity_created', 'send_requested', 'sent')),
+    CHECK (state IN ('prepared', 'activity_created', 'send_requested', 'sent', 'failed')),
   CONSTRAINT deliberation_agenda_recipient_shape CHECK (
     jsonb_typeof(to_recipients) = 'array'
     AND jsonb_array_length(to_recipients) > 0
@@ -44,7 +44,11 @@ CREATE TABLE IF NOT EXISTS deliberation_agenda_sends (
 CREATE INDEX IF NOT EXISTS idx_deliberation_agenda_session_history
   ON deliberation_agenda_sends (session_id, created_at DESC);
 
+CREATE UNIQUE INDEX IF NOT EXISTS uq_deliberation_agenda_one_unresolved
+  ON deliberation_agenda_sends (session_id)
+  WHERE state = 'send_requested';
+
 COMMENT ON TABLE deliberation_agenda_sends IS
   'Frozen deliberation-session agenda emails and lease-fenced Dynamics send recovery state.';
 COMMENT ON COLUMN deliberation_agenda_sends.sent_at IS
-  'When Dynamics accepted the SendEmail request or readback proved Pending Send, Sending, or Sent; not proof of inbox delivery.';
+  'When Dynamics readback proved Pending Send, Sending, or Sent; not proof of inbox delivery.';

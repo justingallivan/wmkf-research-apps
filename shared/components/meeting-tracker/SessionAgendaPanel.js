@@ -303,12 +303,42 @@ export default function SessionAgendaPanel({ sessionId, session, slots, recipien
         signal: controller.signal,
       });
       const body = await response.json().catch(() => ({}));
+      if (!response.ok && body.code === 'agenda_send_unresolved' && body.pendingSend) {
+        if (sequence.current === currentSequence) {
+          setPendingSend(body.pendingSend);
+          setPreview(body.pendingSend);
+          setConfirmed(false);
+          setNotice('Another session agenda send is unresolved. Review and retry that same agenda before creating or sending another one.');
+        }
+        throw new Error(body.error);
+      }
       if (!response.ok && body.code === 'agenda_operation_stale') {
         if (sequence.current === currentSequence) {
           setPendingSend(null);
+          setForm({
+            to: attendeeEmails(session),
+            cc: '',
+            subject: defaultSubject(session),
+            bodyText: DEFAULT_MESSAGE,
+          });
           setPreview(null);
           setConfirmed(false);
           setNotice('The session schedule changed after this preview. Create a new preview, review it, and then send.');
+        }
+        return;
+      }
+      if (!response.ok && body.code === 'agenda_send_terminal') {
+        if (sequence.current === currentSequence) {
+          setPendingSend(null);
+          setForm({
+            to: attendeeEmails(session),
+            cc: '',
+            subject: defaultSubject(session),
+            bodyText: DEFAULT_MESSAGE,
+          });
+          setPreview(null);
+          setConfirmed(false);
+          setNotice(body.error || 'Dynamics closed the prior email. Create a new preview before sending again.');
         }
         return;
       }

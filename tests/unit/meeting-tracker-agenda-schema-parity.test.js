@@ -49,12 +49,15 @@ test('migration 041 and fresh install pin the agenda ledger columns and named co
     'deliberation_agenda_recipient_shape',
     'deliberation_agenda_lease_shape',
     'idx_deliberation_agenda_session_history',
+    'uq_deliberation_agenda_one_unresolved',
   ]) {
     expect(migration).toContain(name);
     expect(setup).toContain(name);
   }
-  expect(migration).toContain("state IN ('prepared', 'activity_created', 'send_requested', 'sent')");
-  expect(setup).toContain("state IN ('prepared', 'activity_created', 'send_requested', 'sent')");
+  expect(migration).toContain("state IN ('prepared', 'activity_created', 'send_requested', 'sent', 'failed')");
+  expect(setup).toContain("state IN ('prepared', 'activity_created', 'send_requested', 'sent', 'failed')");
+  expect(migration).toContain("WHERE state = 'send_requested'");
+  expect(setup).toContain("WHERE state = 'send_requested'");
 });
 
 test('agenda status store queries keep sent receipts separate from unresolved sends', () => {

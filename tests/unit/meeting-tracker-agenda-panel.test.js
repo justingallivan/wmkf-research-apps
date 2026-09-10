@@ -6,6 +6,7 @@ import SessionAgendaPanel from '../../shared/components/meeting-tracker/SessionA
 const SESSION_ID = '11111111-1111-4111-8111-111111111111';
 const OPERATION_ID = '22222222-2222-4222-8222-222222222222';
 const REQUEST_ID = '33333333-3333-4333-8333-333333333333';
+const DEFAULT_MESSAGE = "Here is the agenda for our deliberation session. Each proposal's briefing page opens without a login.";
 
 const session = {
   sessionId: SESSION_ID,
@@ -136,6 +137,83 @@ test('a stale send destroys the preview and requires a new confirmation', async 
   expect(await screen.findByText(/Create a new preview, review it, and then send/)).toBeInTheDocument();
   expect(screen.queryByText(/First proposal/)).not.toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Create preview' })).toBeInTheDocument();
+});
+
+test('a stale unresolved retry restores usable composer defaults', async () => {
+  const pending = prepared({
+    state: 'send_requested',
+    sendRequestedAt: '2026-09-10T19:00:00.000Z',
+  });
+  global.fetch
+    .mockResolvedValueOnce(response({ lastAgenda: null, pendingSend: pending, scheduleChanged: false }))
+    .mockResolvedValueOnce(response({
+      error: 'The session schedule changed after this preview.',
+      code: 'agenda_operation_stale',
+    }, 409));
+  render(<SessionAgendaPanel sessionId={SESSION_ID} session={session} slots={slots} recipients={recipients} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Review unresolved send…' }));
+  fireEvent.click(screen.getByLabelText(/I reviewed the recipients/));
+  fireEvent.click(screen.getByRole('button', { name: 'Send agenda' }));
+
+  expect(await screen.findByLabelText('To')).toHaveValue('alex@example.org, bailey@example.org');
+  expect(screen.getByLabelText('Subject')).toHaveValue('Deliberation session agenda — Monday, September 14');
+  expect(screen.getByLabelText('Message')).toHaveValue(DEFAULT_MESSAGE);
+  expect(screen.getByRole('button', { name: 'Create preview' })).toBeEnabled();
+});
+
+test('a prepare-time unresolved conflict pins the existing operation', async () => {
+  const pending = prepared({
+    operationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    state: 'send_requested',
+    sendRequestedAt: '2026-09-10T19:00:00.000Z',
+  });
+  global.fetch
+    .mockResolvedValueOnce(response({ lastAgenda: null, scheduleChanged: false }))
+    .mockResolvedValueOnce(response({
+      error: 'A session agenda send is still unresolved.',
+      code: 'agenda_send_unresolved',
+      pendingSend: pending,
+    }, 409))
+    .mockResolvedValueOnce(response({
+      success: true,
+      agenda: prepared({ state: 'sent', transportAccepted: true, sentAt: '2026-09-10T19:02:00.000Z' }),
+    }));
+  render(<SessionAgendaPanel sessionId={SESSION_ID} session={session} slots={slots} recipients={recipients} />);
+  await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
+  fireEvent.click(screen.getByRole('button', { name: 'Send agenda…' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Create preview' }));
+
+  expect(await screen.findByText(/Another session agenda send is unresolved/)).toBeInTheDocument();
+  expect(screen.queryByLabelText('To')).not.toBeInTheDocument();
+  expect(screen.getByText(pending.subject)).toBeInTheDocument();
+  fireEvent.click(screen.getByLabelText(/I reviewed the recipients/));
+  fireEvent.click(screen.getByRole('button', { name: 'Send agenda' }));
+  expect(await screen.findByText(/Dynamics accepted this exact email for transport/)).toBeInTheDocument();
+  const sendCall = global.fetch.mock.calls.find(([, options]) => options?.method === 'PATCH');
+  expect(JSON.parse(sendCall[1].body)).toEqual({ operationId: pending.operationId });
+});
+
+test('a terminal retry unblocks a new preview without retaining the failed operation', async () => {
+  const pending = prepared({
+    state: 'send_requested',
+    sendRequestedAt: '2026-09-10T19:00:00.000Z',
+  });
+  global.fetch
+    .mockResolvedValueOnce(response({ lastAgenda: null, pendingSend: pending, scheduleChanged: false }))
+    .mockResolvedValueOnce(response({
+      error: 'Dynamics closed this agenda email without an accepted transport status. Create a new preview before sending again.',
+      code: 'agenda_send_terminal',
+      failedSend: prepared({ state: 'failed' }),
+    }, 409));
+  render(<SessionAgendaPanel sessionId={SESSION_ID} session={session} slots={slots} recipients={recipients} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Review unresolved send…' }));
+  fireEvent.click(screen.getByLabelText(/I reviewed the recipients/));
+  fireEvent.click(screen.getByRole('button', { name: 'Send agenda' }));
+
+  expect(await screen.findByText(/Dynamics closed this agenda email/)).toBeInTheDocument();
+  expect(screen.getByLabelText('To')).toHaveValue('alex@example.org, bailey@example.org');
+  expect(screen.getByRole('button', { name: 'Create preview' })).toBeEnabled();
+  expect(screen.queryByRole('button', { name: 'Review unresolved send…' })).not.toBeInTheDocument();
 });
 
 test('a 202 unconfirmed transport status stays recoverable on the same operation', async () => {

@@ -118,6 +118,7 @@ function sendDependencies(baseRow, overrides = {}) {
   const claimed = { ...baseRow, lease_token: '99999999-9999-4999-8999-999999999999' };
   return {
     getAgenda: jest.fn(async () => baseRow),
+    getLatestUnresolvedAgenda: jest.fn(async () => null),
     claimSend: jest.fn(async () => claimed),
     getSession: jest.fn(async () => ({ session: session(), slots: slots() })),
     findEmailByCorrelation: jest.fn(async () => []),
@@ -131,6 +132,16 @@ function sendDependencies(baseRow, overrides = {}) {
       send_requested_at: null,
       dynamics_statecode: status.statecode,
       dynamics_statuscode: status.statuscode,
+    })),
+    recordTerminalFailure: jest.fn(async (attempt, status, message) => ({
+      ...attempt,
+      state: 'failed',
+      dynamics_statecode: status.statecode ?? null,
+      dynamics_statuscode: status.statuscode ?? null,
+      lease_token: null,
+      locked_until: null,
+      last_error_code: 'agenda_send_terminal',
+      last_error_message: message,
     })),
     renewSendLease: jest.fn(async (attempt) => attempt),
     sendEmail: jest.fn(async () => undefined),
@@ -287,6 +298,51 @@ test('prepare blocks a second operation while a durable send is unresolved', asy
   expect(deps.createOrGetAgenda).not.toHaveBeenCalled();
 });
 
+test('send blocks a prepared sibling operation while another send is unresolved', async () => {
+  const baseRow = row();
+  const pending = row(undefined, {
+    operation_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    state: 'send_requested',
+    dynamics_email_id: EMAIL_ID,
+    send_requested_at: '2026-09-10T12:01:00.000Z',
+  });
+  const deps = sendDependencies(baseRow, {
+    getLatestUnresolvedAgenda: jest.fn(async () => pending),
+  });
+  await expect(sendAgendaEmail(actorInput, deps)).rejects.toMatchObject({
+    httpStatus: 409,
+    code: 'agenda_send_unresolved',
+    body: { pendingSend: expect.objectContaining({ operationId: pending.operation_id }) },
+  });
+  expect(deps.claimSend).not.toHaveBeenCalled();
+  expect(deps.createEmailActivity).not.toHaveBeenCalled();
+  expect(deps.sendEmail).not.toHaveBeenCalled();
+});
+
+test('a concurrent unresolved send constraint is mapped before transport', async () => {
+  const baseRow = row();
+  const pending = row(undefined, {
+    operation_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    state: 'send_requested',
+    dynamics_email_id: EMAIL_ID,
+    send_requested_at: '2026-09-10T12:01:00.000Z',
+  });
+  const deps = sendDependencies(baseRow, {
+    getLatestUnresolvedAgenda: jest.fn()
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(pending),
+    getEmailActivity: jest.fn(async () => emailActivity(baseRow, 1)),
+    recordSendRequested: jest.fn(async () => { throw new Error('unique violation'); }),
+  });
+  await expect(sendAgendaEmail(actorInput, deps)).rejects.toMatchObject({
+    httpStatus: 409,
+    code: 'agenda_send_unresolved',
+    body: { pendingSend: expect.objectContaining({ operationId: pending.operation_id }) },
+  });
+  expect(deps.createEmailActivity).toHaveBeenCalledTimes(1);
+  expect(deps.sendEmail).not.toHaveBeenCalled();
+});
+
 test('status reports the last sent receipt separately from a newer unresolved send', async () => {
   const sent = row(undefined, {
     state: 'sent',
@@ -409,6 +465,67 @@ test('a retry with confirmed Draft status resumes transport on the same activity
   expect(deps.createEmailActivity).not.toHaveBeenCalled();
   expect(deps.sendEmail).toHaveBeenCalledTimes(1);
   expect(result.agenda).toMatchObject({ state: 'sent', transportAccepted: true });
+});
+
+test('a different staff actor cannot resume a confirmed Draft activity', async () => {
+  const baseRow = row(undefined, {
+    state: 'send_requested',
+    dynamics_email_id: EMAIL_ID,
+    send_requested_at: '2026-09-10T12:01:00Z',
+  });
+  const deps = sendDependencies(baseRow, {
+    getEmailActivity: jest.fn(async () => emailActivity(baseRow, 1)),
+  });
+  await expect(sendAgendaEmail({
+    ...actorInput,
+    fromEmail: 'other@example.org',
+    actingUserSystemId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+  }, deps)).rejects.toMatchObject({
+    httpStatus: 403,
+    code: 'agenda_actor_mismatch',
+  });
+  expect(deps.recordDraftReconciled).not.toHaveBeenCalled();
+  expect(deps.sendEmail).not.toHaveBeenCalled();
+});
+
+test.each([2, 4, 5, 8])('a retry with terminal Dynamics status %s resolves failed without transport', async (statuscode) => {
+  const baseRow = row(undefined, {
+    state: 'send_requested',
+    dynamics_email_id: EMAIL_ID,
+    send_requested_at: '2026-09-10T12:01:00Z',
+  });
+  const deps = sendDependencies(baseRow, {
+    getEmailActivity: jest.fn(async () => emailActivity(baseRow, statuscode)),
+  });
+  await expect(sendAgendaEmail(actorInput, deps)).rejects.toMatchObject({
+    httpStatus: 409,
+    code: 'agenda_send_terminal',
+    body: { failedSend: expect.objectContaining({ state: 'failed' }) },
+  });
+  expect(deps.recordTerminalFailure).toHaveBeenCalledWith(
+    expect.objectContaining({ operation_id: OPERATION_ID }),
+    expect.objectContaining({ statuscode }),
+    expect.stringContaining(`status ${statuscode}`),
+  );
+  expect(deps.createEmailActivity).not.toHaveBeenCalled();
+  expect(deps.sendEmail).not.toHaveBeenCalled();
+});
+
+test('a terminal failed row requires a new preview and cannot be sent again', async () => {
+  const baseRow = row(undefined, {
+    state: 'failed',
+    dynamics_email_id: EMAIL_ID,
+    dynamics_statuscode: 8,
+    last_error_code: 'agenda_send_terminal',
+  });
+  const deps = sendDependencies(baseRow);
+  await expect(sendAgendaEmail(actorInput, deps)).rejects.toMatchObject({
+    httpStatus: 409,
+    code: 'agenda_send_terminal',
+  });
+  expect(deps.getLatestUnresolvedAgenda).not.toHaveBeenCalled();
+  expect(deps.claimSend).not.toHaveBeenCalled();
+  expect(deps.sendEmail).not.toHaveBeenCalled();
 });
 
 test('lease contention and stale schedules fail closed without transport', async () => {
