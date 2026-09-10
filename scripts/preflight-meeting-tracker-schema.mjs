@@ -15,6 +15,7 @@
 
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
+import { SANDBOX_HOSTS } from '../lib/dataverse/core/target-registry.js';
 
 for (const envFile of ['.env', '.env.local']) {
   try {
@@ -38,8 +39,10 @@ if (!selfTest && !['sandbox', 'prod'].includes(target)) {
   throw new Error('Pass --target=sandbox, --target=prod, or --self-test.');
 }
 
+const sandboxUrl = process.env.DYNAMICS_SANDBOX_URL
+  || (SANDBOX_HOSTS[0] ? `https://${SANDBOX_HOSTS[0]}` : null);
 const resourceUrl = target === 'sandbox'
-  ? process.env.DYNAMICS_SANDBOX_URL
+  ? sandboxUrl
   : target === 'prod'
     ? process.env.DYNAMICS_URL
     : null;
