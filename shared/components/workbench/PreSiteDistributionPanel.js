@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Card } from '../Layout';
 import CuratedRecipientPicker from './CuratedRecipientPicker';
 
-const DEFAULT_BODY = 'Please find the Site Visit materials attached.';
+const DEFAULT_BODY = 'The deliberation briefing page linked below has the Site Visit writeup, every completed review, and the proposal narrative.';
 const EMPTY_LIST = Object.freeze([]);
 const STALE_PREVIEW_CODES = new Set([
   'distribution_stale_source',
@@ -211,8 +211,10 @@ export default function PreSiteDistributionPanel({
   // instead of presenting as the stage's main job (owner, S466).
   collapsed = false,
 }) {
+  // No attachment field: since 2026-09-10 the email carries the briefing page
+  // link instead of the writeup (owner; shape brief). The server records
+  // attachment_mode 'none' when the field is absent.
   const [form, setForm] = useState({
-    attachmentMode: 'pdf',
     to: '',
     cc: '',
     subject: `Site Visit materials${requestNumber ? ` — ${requestNumber}` : ''}`,
@@ -396,7 +398,7 @@ export default function PreSiteDistributionPanel({
   };
 
   const send = async () => {
-    if (!preview?.operationId || !preview.previewHash || !confirmed || notice || preparing || sending) return;
+    if (!preview?.operationId || !preview.previewHash || !preview.briefingLinkId || !confirmed || notice || preparing || sending) return;
     const id = requestId;
     const currentSequence = ++sequence.current;
     controllerRef.current?.abort();
@@ -453,29 +455,6 @@ export default function PreSiteDistributionPanel({
             {error}
           </div>
         )}
-
-        <fieldset className="mt-4">
-          <legend className="text-sm font-medium text-gray-800">Document attachment</legend>
-          <div className="mt-2 flex flex-wrap gap-4">
-            {[
-              ['docx', 'Word document'],
-              ['pdf', 'PDF'],
-              ['both', 'Word and PDF'],
-            ].map(([value, label]) => (
-              <label key={value} className="flex items-center gap-2 text-sm text-gray-700">
-                <input
-                  type="radio"
-                  name="distribution-attachment-mode"
-                  value={value}
-                  checked={form.attachmentMode === value}
-                  onChange={() => edit({ attachmentMode: value })}
-                  disabled={preparing || sending}
-                />
-                {label}
-              </label>
-            ))}
-          </div>
-        </fieldset>
 
         {materials.length > 0 && (
           <fieldset className="mt-4">
@@ -590,18 +569,19 @@ export default function PreSiteDistributionPanel({
               {preview.cc.length > 0 && <div><dt className="inline font-medium">Cc:</dt> <dd className="inline">{preview.cc.join(', ')}</dd></div>}
               <div><dt className="inline font-medium">Subject:</dt> <dd className="inline">{preview.subject}</dd></div>
               <div><dt className="inline font-medium">Snapshot source:</dt> <dd className="inline">Word version {preview.sourceVersionId}; later edits are not included</dd></div>
-              {preview.briefingLinkId && (
-                <div>
-                  <dt className="inline font-medium">Briefing page:</dt>{' '}
-                  <dd className="inline">
-                    Link included{briefingExpiryLabel(briefingLink?.expiresAt) ? ` — live until ${briefingExpiryLabel(briefingLink?.expiresAt)}` : ''}
-                  </dd>
-                </div>
-              )}
+              <div>
+                <dt className="inline font-medium">Briefing page:</dt>{' '}
+                <dd className="inline">
+                  {preview.briefingLinkId
+                    ? `Link included${briefingExpiryLabel(briefingLink?.expiresAt) ? ` — live until ${briefingExpiryLabel(briefingLink?.expiresAt)}` : ''}`
+                    : 'No link — this preview cannot be sent'}
+                </dd>
+              </div>
               <div>
                 <dt className="font-medium">Message:</dt>
                 <dd className="mt-1 whitespace-pre-wrap rounded border border-blue-100 bg-white p-3">{preview.bodyText}</dd>
               </div>
+              {preview.attachments.length > 0 && (
               <div>
                 <dt className="font-medium">Attachments:</dt>
                 <dd className="mt-1 flex flex-wrap gap-2">
@@ -624,6 +604,7 @@ export default function PreSiteDistributionPanel({
                   ))}
                 </dd>
               </div>
+              )}
               {preview.materialLinks?.length > 0 && (
                 <div>
                   <dt className="font-medium">Material links:</dt>
@@ -651,7 +632,7 @@ export default function PreSiteDistributionPanel({
                     disabled={preparing || sending}
                     className="mt-0.5"
                   />
-                  I reviewed the recipients, message, material links, and attachment{preview.attachments.length === 1 ? '' : 's'} shown above.
+                  I reviewed the recipients, message, briefing page link, and material links shown above.
                 </label>
                 <button
                   type="button"
@@ -700,7 +681,7 @@ export default function PreSiteDistributionPanel({
           <>
             <h3 className="text-base font-semibold text-gray-900">Send Site Visit materials</h3>
             <p className="mt-1 text-sm text-gray-600">
-              Create a fixed preview, review the recipients and attachments, then send through Dynamics.
+              Create a fixed preview, review the recipients and the briefing page link, then send through Dynamics.
             </p>
             {composerBody}
           </>

@@ -20,8 +20,12 @@ function response(body, status = 200) {
   };
 }
 
-function preparedAttempt(mode = 'both') {
-  const attachments = [
+const BRIEFING_LINK_ID = '12121212-1212-4212-8212-121212121212';
+
+// Since 2026-09-10 a prepared attempt attaches nothing and always carries the
+// briefing link; `mode` is kept only so legacy-shaped history rows can be built.
+function preparedAttempt(mode = 'none') {
+  const attachments = mode === 'none' ? [] : [
     ...(mode === 'pdf' ? [] : [{
       kind: 'docx', filename: 'PreSite_1002379.docx', webUrl: 'https://sharepoint.test/frozen.docx', size: 2048,
     }]),
@@ -34,10 +38,11 @@ function preparedAttempt(mode = 'both') {
     requestId: REQUEST_ID,
     previewHash: 'a'.repeat(64),
     attachmentMode: mode,
+    briefingLinkId: BRIEFING_LINK_ID,
     to: ['staff@example.org'],
     cc: ['consultant@example.org'],
     subject: 'Pre-Site Visit materials — 1002379',
-    bodyText: 'Please find the frozen materials attached.',
+    bodyText: 'The briefing page linked below has the materials.',
     state: 'prepared',
     transportAccepted: false,
     attachments,
@@ -51,7 +56,7 @@ beforeEach(() => {
 
 afterEach(() => jest.restoreAllMocks());
 
-test('offers Word, PDF, and both as explicit attachment choices', async () => {
+test('offers no attachment choice; the default message names the briefing page as the carrier', async () => {
   render(
     <PreSiteDistributionPanel
       requestId={REQUEST_ID}
@@ -59,10 +64,12 @@ test('offers Word, PDF, and both as explicit attachment choices', async () => {
       sourceArtifact={{ artifactId: ARTIFACT_ID }}
     />,
   );
-  expect(await screen.findByLabelText('Word document')).toBeInTheDocument();
-  expect(screen.getByRole('heading', { name: 'Send Site Visit materials' })).toBeInTheDocument();
-  expect(screen.getByLabelText('PDF')).toBeChecked();
-  expect(screen.getByLabelText('Word and PDF')).toBeInTheDocument();
+  expect(await screen.findByRole('heading', { name: 'Send Site Visit materials' })).toBeInTheDocument();
+  expect(screen.queryByRole('group', { name: 'Document attachment' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('radio')).not.toBeInTheDocument();
+  expect(screen.getByLabelText('Message')).toHaveValue(
+    'The deliberation briefing page linked below has the Site Visit writeup, every completed review, and the proposal narrative.',
+  );
 });
 
 test('offers material links by display label with no calendar controls', async () => {
@@ -79,7 +86,7 @@ test('offers material links by display label with no calendar controls', async (
     />,
   );
 
-  expect(await screen.findByRole('group', { name: 'Document attachment' })).toBeInTheDocument();
+  expect(await screen.findByRole('heading', { name: 'Send Site Visit materials' })).toBeInTheDocument();
   // Calendar attachments have no UI (owner decision S466: unused).
   expect(screen.queryByText(/add-to-calendar/i)).not.toBeInTheDocument();
   expect(screen.queryByText(/Calendar and material links/)).not.toBeInTheDocument();
@@ -90,17 +97,17 @@ test('offers material links by display label with no calendar controls', async (
   expect(screen.queryByText(/Applicant Slides\.pdf/)).not.toBeInTheDocument();
 });
 
-test('binds the chosen mode into prepare and requires exact-preview confirmation before send', async () => {
+test('prepare carries no attachment mode, the preview shows the briefing link and no attachments, and send needs exact-preview confirmation', async () => {
   global.fetch
     .mockResolvedValueOnce(response({ success: true, attempts: [] }))
-    .mockResolvedValueOnce(response({ success: true, attempt: preparedAttempt('both') }))
+    .mockResolvedValueOnce(response({ success: true, attempt: preparedAttempt() }))
     .mockResolvedValueOnce(response({
       success: true,
-      attempt: { ...preparedAttempt('both'), state: 'sent', transportAccepted: true },
+      attempt: { ...preparedAttempt(), state: 'sent', transportAccepted: true },
     }))
     .mockResolvedValueOnce(response({
       success: true,
-      attempts: [{ ...preparedAttempt('both'), state: 'sent', transportAccepted: true, createdAt: '2026-08-23T12:00:00Z' }],
+      attempts: [{ ...preparedAttempt(), state: 'sent', transportAccepted: true, createdAt: '2026-08-23T12:00:00Z' }],
     }));
   render(
     <PreSiteDistributionPanel
@@ -110,22 +117,23 @@ test('binds the chosen mode into prepare and requires exact-preview confirmation
     />,
   );
   await screen.findByText(/No email previews/);
-  fireEvent.click(screen.getByLabelText('Word and PDF'));
   fireEvent.change(screen.getByLabelText('To'), { target: { value: 'staff@example.org' } });
   fireEvent.change(screen.getByLabelText('Cc'), { target: { value: 'consultant@example.org' } });
   fireEvent.click(screen.getByRole('button', { name: 'Create preview' }));
 
   expect(await screen.findByText('Email preview')).toBeInTheDocument();
   const prepareCall = global.fetch.mock.calls.find(([url]) => url.endsWith('/prepare'));
-  expect(JSON.parse(prepareCall[1].body)).toMatchObject({
+  const prepareBody = JSON.parse(prepareCall[1].body);
+  expect(prepareBody).toMatchObject({
     requestId: REQUEST_ID,
     expectedArtifactId: ARTIFACT_ID,
-    attachmentMode: 'both',
     to: 'staff@example.org',
     cc: 'consultant@example.org',
   });
-  expect(screen.getByText(/PreSite_1002379.docx/)).toBeInTheDocument();
-  expect(screen.getByText(/PreSite_1002379.pdf/)).toBeInTheDocument();
+  expect(prepareBody).not.toHaveProperty('attachmentMode');
+  expect(screen.getByText(/Link included/)).toBeInTheDocument();
+  expect(screen.queryByText('Attachments:')).not.toBeInTheDocument();
+  expect(screen.queryByText(/PreSite_1002379/)).not.toBeInTheDocument();
   expect(screen.getByText(/later edits are not included/i)).toBeInTheDocument();
   const send = screen.getByRole('button', { name: 'Send email' });
   expect(send).toBeDisabled();
@@ -146,10 +154,10 @@ test('binds the chosen mode into prepare and requires exact-preview confirmation
   expect(await screen.findByText(/accepted this exact email for transport/i)).toBeInTheDocument();
 });
 
-test('changing attachment selection invalidates a prepared preview', async () => {
+test('editing the message after a preview invalidates it', async () => {
   global.fetch
     .mockResolvedValueOnce(response({ success: true, attempts: [] }))
-    .mockResolvedValueOnce(response({ success: true, attempt: preparedAttempt('pdf') }));
+    .mockResolvedValueOnce(response({ success: true, attempt: preparedAttempt() }));
   render(
     <PreSiteDistributionPanel
       requestId={REQUEST_ID}
@@ -161,8 +169,28 @@ test('changing attachment selection invalidates a prepared preview', async () =>
   fireEvent.change(screen.getByLabelText('To'), { target: { value: 'staff@example.org' } });
   fireEvent.click(screen.getByRole('button', { name: 'Create preview' }));
   expect(await screen.findByText('Email preview')).toBeInTheDocument();
-  fireEvent.click(screen.getByLabelText('Word document'));
+  fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'Edited after preview.' } });
   expect(screen.queryByText('Email preview')).not.toBeInTheDocument();
+});
+
+test('a preview without a briefing link cannot be sent (defense: the server refuses to prepare one)', async () => {
+  global.fetch
+    .mockResolvedValueOnce(response({ success: true, attempts: [] }))
+    .mockResolvedValueOnce(response({ success: true, attempt: { ...preparedAttempt(), briefingLinkId: null } }));
+  render(
+    <PreSiteDistributionPanel
+      requestId={REQUEST_ID}
+      requestNumber="1002379"
+      sourceArtifact={{ artifactId: ARTIFACT_ID }}
+    />,
+  );
+  await screen.findByText(/No email previews/);
+  fireEvent.change(screen.getByLabelText('To'), { target: { value: 'staff@example.org' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Create preview' }));
+  expect(await screen.findByText(/No link — this preview cannot be sent/)).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('checkbox', { name: /I reviewed the recipients/ }));
+  fireEvent.click(screen.getByRole('button', { name: 'Send email' }));
+  expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith('/send'))).toBe(false);
 });
 
 test('adds curated recipients without replacing manual addresses or creating To/Cc conflicts', async () => {
