@@ -269,7 +269,8 @@ is decorative and does not count):
   and `f7fb526a` (dedicated count-neutral no-response history group, evidence-based
   attribution, held regeneration control, durable documentation wording, and
   discriminating tests). The durable-documentation and final handoff correction
-  commit is `16ca526c`. All listed commits are pushed to
+  commit is `16ca526c`; `60263d75` (names the durable-documentation handoff
+  commit in this inventory). All listed commits are pushed to
   `origin/codex/reviewer-release-reason`.
 - Files changed: `lib/services/review-manager/withdraw-sufficient-service.js`,
   `lib/services/reviewer-engagement/withdraw-pending-invitation.js`,
