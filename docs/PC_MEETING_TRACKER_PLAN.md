@@ -122,11 +122,13 @@ calls the same service.
   "Meeting Tracker", href `/meeting-tracker`, category `phase-ii`. Grant through the existing
   Admin app-access panel.
 - One list page per cycle: every advancing request (Request-list predicate), one row each, showing
-  PD, share state, deliberation slot (session date · order · minutes), site visit (date · time ·
+  PD, share state, deliberation slot (session date · order · minutes · link present or missing), site visit (date · time ·
   format · location), and a "needs scheduling" cue when either is missing. Sort by next meeting.
-- One session page: date, time, duration, location, attendees (staff and Board, using the existing
-  recipient directory), and the ordered slot list with per-slot minutes and lead PD. Add, remove,
-  reorder, and move a slot to another session in place.
+- One session page: date, time, duration, location, **meeting link** (the Zoom URL the PC pastes
+  in; validated as an https URL, shown as a "Join" link on the page and carried into the Share
+  email per §5.6; owner 2026-09-09), attendees (staff and Board, using the existing recipient
+  directory), and the ordered slot list with per-slot minutes and lead PD. Add, remove, reorder,
+  and move a slot to another session in place.
 - One visit editor per request: the fields the Activity already has, written through the existing
   logistics service.
 
