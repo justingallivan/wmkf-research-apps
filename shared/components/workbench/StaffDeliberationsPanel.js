@@ -40,7 +40,7 @@ function requestHref(artifact) {
   return `/workbench/${artifact.requestId}?${params.toString()}`;
 }
 
-// D8/J27: at draft/shared the line is anticipatory ("not scheduled" as a PC
+// D8/J27-083: at draft/shared the line is anticipatory ("not scheduled" as a PC
 // to-do); once a visit has actually happened or landed on Final, it is real
 // and always shown regardless of whether one was expected.
 function visitLineVisible(stage) {

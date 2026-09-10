@@ -58,6 +58,7 @@
 - Auth / admin / access / security / private Blob: ../docs/agent-wiki/topics/security-auth.md; ../docs/Q9_PREFS_APPACCESS_DAL_MIGRATION_PLAN.md; project-reviewer-org-open-access-by-design.md
 - Intake portal / attachments / institution match / virus scan: ../docs/agent-wiki/topics/intake-portal.md
 - Site Visit materials / applicant additional materials / briefing room (Codex plan on branch, decisions decided, not built): project-site-visit-materials-planning-handoff.md
+- PC Meeting Tracker / deliberation sessions / site-visit scheduling / Staff Deliberations rail (D1–D9 decided; slices 0+3 shipped 2026-09-09): ../docs/PC_MEETING_TRACKER_PLAN.md; release-reason Codex brief: ../docs/plans/REVIEWER_RELEASE_REASON_CODEX_BRIEF_2026-09-09.md
 - Integrity screener / Retraction Watch / PubPeer / News: ../docs/agent-wiki/topics/integrity-screener.md
 - Grantee / email templates: ../docs/GRANTEE_PORTAL_SPEC.md; project-grantee-deliverable-email-voice.md; project-email-template-token-syntax.md
 - Deferred cleanup / dead code: project-deferred-code-cleanup.md
