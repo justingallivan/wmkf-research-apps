@@ -557,8 +557,9 @@ migration + flag + merge pending. PR 3 is planned.
   five-minute lease in `site_visit_material_collections.slot_leases` serializes each canonical
   request slot. Before the Dataverse create, staging `candidate_result` freezes the predecessor
   artifact id plus exact Graph drive/item/version/filename; replay accepts only the matching
-  request-bound READY, non-superseded generation row and retires that recorded predecessor, while
-  ambiguous state stays held for staff attention. Codex adversarial review (2026-09-10) also made
+  request-bound READY, non-superseded generation row and retires that recorded predecessor; a
+  candidate with no generation row is redone from the top, while a superseded or mismatched row
+  stays held for staff attention. Codex adversarial review (2026-09-10) also made
   cap reads strict (only an absent setting uses the 100 MB default), requires the settings writer
   to confirm success, classifies thrown scanner failures, retains the same staging id in browser
   session storage for transient finalize retry, and validates PPTX/DOCX through bounded exact ZIP

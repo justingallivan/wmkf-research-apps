@@ -193,13 +193,8 @@ test('a stale replay never retires a newer current row and remains ambiguous whe
   expect(stale.supersedeDocument).not.toHaveBeenCalled();
   expect(stale.releaseSlotLease).toHaveBeenCalledTimes(1);
 
-  const missing = deps({
-    findDocumentsByRequest: async () => ({ records: [newer] }),
-    findDocumentByGenerationKey: async () => ({ records: [] }),
-  });
-  await expect(finalizeMaterialUpload(finalizeArgs('presentation_pdf', undefined, { candidateResult: candidate }), missing))
-    .rejects.toMatchObject({ code: 'replay_ambiguous', httpStatus: 409 });
-  expect(missing.supersedeDocument).not.toHaveBeenCalled();
+  // A candidate whose registry row never committed is not ambiguous: the
+  // finalize is redone from the top (see the dedicated test below).
 });
 
 test('a failed supersede is not success: the finalize throws a transient 503 so the staging row is released for retry', async () => {
@@ -211,8 +206,9 @@ test('a failed supersede is not success: the finalize throws a transient 503 so 
 
 test('a lease release failure does not replace a replay ambiguity with an unclassified error', async () => {
   const log = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+  const unbound = { ...ROW_PDF, wmkf_requestdocumentid: 'eeeeeeee-0000-4000-8000-000000000005', wmkf_sharepointitemid: 'someone-else' };
   const d = deps({
-    findDocumentByGenerationKey: async () => ({ records: [] }),
+    findDocumentByGenerationKey: async () => ({ records: [unbound] }),
     releaseSlotLease: async () => { throw new Error('database detail'); },
   });
   await expect(finalizeMaterialUpload(finalizeArgs('presentation_pdf', undefined, {
@@ -248,4 +244,16 @@ test('scanning off skips the scan, matching the grantee and reviewer upload path
   await finalizeMaterialUpload(finalizeArgs(), d);
   expect(d.scanBytes).not.toHaveBeenCalled();
   expect(d.createDocument).toHaveBeenCalledTimes(1);
+});
+
+test('a recorded candidate with no registry row is redone from the top, not held as ambiguous', async () => {
+  const stagingId = '33333333-3333-4333-8333-333333333333';
+  const candidate = { requestId: REQUEST_ID, slot: 'presentation_pdf', generationKey: 'stale', predecessorArtifactId: ROW_PDF.wmkf_requestdocumentid, driveId: 'drive', itemId: 'item-1', versionId: '2.0', filename: '1003222 Site Visit Presentation.pdf' };
+  const d = deps({ findDocumentsByRequest: async () => ({ records: [ROW_PDF] }), findDocumentByGenerationKey: async () => ({ records: [] }) });
+  const result = await finalizeMaterialUpload({ collection: collection(), slotKey: 'presentation_pdf', file: { filename: 'a.pdf', buffer: PDF }, stagingId, leaseToken: 'lease', candidateResult: candidate }, d);
+  expect(result.ok).toBe(true);
+  expect(result.replayed).toBeUndefined();
+  expect(d.uploadFile).toHaveBeenCalledTimes(1);
+  expect(d.createDocument).toHaveBeenCalledTimes(1);
+  expect(d.supersedeDocument).toHaveBeenCalledWith(ROW_PDF.wmkf_requestdocumentid);
 });
