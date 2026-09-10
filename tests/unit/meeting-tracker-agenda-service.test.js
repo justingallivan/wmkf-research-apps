@@ -3,6 +3,7 @@
 import {
   agendaScheduleChanged,
   computeAgenda,
+  getAgendaStatus,
   prepareAgendaEmail,
   renderAgendaEmail,
   sendAgendaEmail,
@@ -92,6 +93,7 @@ function emailActivity(attempt, statuscode = 1) {
 function prepareDependencies(overrides = {}) {
   return {
     getSession: jest.fn(async () => ({ session: session(), slots: slots() })),
+    getLatestUnresolvedAgenda: jest.fn(async () => null),
     createOrGetAgenda: jest.fn(async (input) => ({
       operation_id: input.operationId,
       session_id: input.sessionId,
@@ -123,6 +125,13 @@ function sendDependencies(baseRow, overrides = {}) {
     recordEmailActivity: jest.fn(async (attempt) => ({ ...attempt, dynamics_email_id: EMAIL_ID, state: 'activity_created' })),
     getEmailActivity: jest.fn(async () => emailActivity(baseRow, 6)),
     recordSendRequested: jest.fn(async (attempt) => ({ ...attempt, state: 'send_requested', send_requested_at: '2026-09-10T12:01:00.000Z' })),
+    recordDraftReconciled: jest.fn(async (attempt, status) => ({
+      ...attempt,
+      state: 'activity_created',
+      send_requested_at: null,
+      dynamics_statecode: status.statecode,
+      dynamics_statuscode: status.statuscode,
+    })),
     renewSendLease: jest.fn(async (attempt) => attempt),
     sendEmail: jest.fn(async () => undefined),
     recordSent: jest.fn(async (attempt, status) => ({
@@ -179,11 +188,43 @@ test('computeAgenda drops non-HTTPS links and rendered HTML escapes every propos
 test('drift compares session start and ordered request/minutes tuples only', () => {
   const snapshot = computeAgenda(session(), slots());
   expect(agendaScheduleChanged(session({ location: 'Changed room' }), slots(), snapshot)).toBe(false);
+  expect(agendaScheduleChanged(session({ scheduledStartIso: '2026-09-14T16:00:00Z' }), slots(), snapshot)).toBe(false);
   expect(agendaScheduleChanged(session({ scheduledStartIso: '2026-09-14T16:05:00.000Z' }), slots(), snapshot)).toBe(true);
   const reordered = slots().map((slot, index) => ({ ...slot, wmkf_order: index + 1 }));
   expect(agendaScheduleChanged(session(), reordered, snapshot)).toBe(true);
   const longer = slots().map((slot, index) => (index === 0 ? { ...slot, wmkf_minutes: 25 } : slot));
   expect(agendaScheduleChanged(session(), longer, snapshot)).toBe(true);
+});
+
+test('prepare accepts an idempotent JSONB row even when object keys are reordered', async () => {
+  const reverseKeys = (value) => {
+    if (Array.isArray(value)) return value.map(reverseKeys);
+    if (!value || typeof value !== 'object') return value;
+    return Object.fromEntries(Object.entries(value).reverse().map(([key, nested]) => [key, reverseKeys(nested)]));
+  };
+  const deps = prepareDependencies({
+    createOrGetAgenda: jest.fn(async (input) => ({
+      ...row(reverseKeys(input.agendaSnapshot)),
+      operation_id: input.operationId,
+      session_id: input.sessionId,
+      to_recipients: input.toRecipients,
+      cc_recipients: input.ccRecipients,
+      subject: input.subject,
+      body_text: input.bodyText,
+      body_html: input.bodyHtml,
+      from_email: input.fromEmail,
+      acting_user_system_id: input.actingUserSystemId,
+      inserted: false,
+    })),
+  });
+  const result = await prepareAgendaEmail({
+    ...actorInput,
+    to: 'board@example.org',
+    cc: 'staff@example.org',
+    subject: 'Agenda subject',
+    bodyText: 'Agenda message',
+  }, deps);
+  expect(result.reused).toBe(true);
 });
 
 test('prepare freezes the normalized recipients, rendered body, and exact snapshot', async () => {
@@ -222,6 +263,54 @@ test('prepare refuses empty To, no slots, and operation reuse with different con
     ...actorInput, to: 'board@example.org', cc: '', subject: 'New subject', bodyText: 'Message',
   }, prepareDependencies({ createOrGetAgenda: jest.fn(async () => row(undefined, { subject: 'Old subject' })) })))
     .rejects.toMatchObject({ httpStatus: 409, code: 'agenda_operation_conflict' });
+});
+
+test('prepare blocks a second operation while a durable send is unresolved', async () => {
+  const pending = row(undefined, {
+    operation_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    state: 'send_requested',
+    dynamics_email_id: EMAIL_ID,
+    send_requested_at: '2026-09-10T12:01:00.000Z',
+  });
+  const deps = prepareDependencies({ getLatestUnresolvedAgenda: jest.fn(async () => pending) });
+  await expect(prepareAgendaEmail({
+    ...actorInput,
+    to: 'board@example.org',
+    cc: '',
+    subject: 'Agenda subject',
+    bodyText: 'Agenda message',
+  }, deps)).rejects.toMatchObject({
+    httpStatus: 409,
+    code: 'agenda_send_unresolved',
+    body: { pendingSend: expect.objectContaining({ operationId: pending.operation_id }) },
+  });
+  expect(deps.createOrGetAgenda).not.toHaveBeenCalled();
+});
+
+test('status reports the last sent receipt separately from a newer unresolved send', async () => {
+  const sent = row(undefined, {
+    state: 'sent',
+    sent_at: '2026-09-10T12:00:00.000Z',
+  });
+  const pending = row(undefined, {
+    operation_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    state: 'send_requested',
+    dynamics_email_id: EMAIL_ID,
+    send_requested_at: '2026-09-10T12:05:00.000Z',
+  });
+  const result = await getAgendaStatus({ sessionId: SESSION_ID }, {
+    getSession: jest.fn(async () => ({
+      session: session({ scheduledStartIso: '2026-09-14T16:00:00Z' }),
+      slots: slots(),
+    })),
+    getLatestSentAgenda: jest.fn(async () => sent),
+    getLatestUnresolvedAgenda: jest.fn(async () => pending),
+  });
+  expect(result).toMatchObject({
+    lastAgenda: { state: 'sent', sentAt: sent.sent_at },
+    pendingSend: { state: 'send_requested', operationId: pending.operation_id },
+    scheduleChanged: false,
+  });
 });
 
 test('send persists each fence before transport and returns the accepted receipt', async () => {
@@ -282,14 +371,14 @@ test('a retry with durable send intent reconciles accepted status before schedul
   expect(deps.sendEmail).not.toHaveBeenCalled();
 });
 
-test('a retry with unresolved durable send intent never requests transport again', async () => {
+test('a retry with unreadable durable send intent never requests transport again', async () => {
   const baseRow = row(undefined, {
     state: 'send_requested',
     dynamics_email_id: EMAIL_ID,
     send_requested_at: '2026-09-10T12:01:00Z',
   });
   const deps = sendDependencies(baseRow, {
-    getEmailActivity: jest.fn(async () => emailActivity(baseRow, 1)),
+    getEmailActivity: jest.fn(async () => null),
   });
   await expect(sendAgendaEmail(actorInput, deps)).rejects.toMatchObject({
     httpStatus: 202, code: 'agenda_send_unconfirmed',
@@ -297,6 +386,29 @@ test('a retry with unresolved durable send intent never requests transport again
   expect(deps.createEmailActivity).not.toHaveBeenCalled();
   expect(deps.sendEmail).not.toHaveBeenCalled();
   expect(deps.recordFailure).toHaveBeenCalled();
+});
+
+test('a retry with confirmed Draft status resumes transport on the same activity', async () => {
+  const baseRow = row(undefined, {
+    state: 'send_requested',
+    dynamics_email_id: EMAIL_ID,
+    send_requested_at: '2026-09-10T12:01:00Z',
+  });
+  let reads = 0;
+  const deps = sendDependencies(baseRow, {
+    getEmailActivity: jest.fn(async () => {
+      reads += 1;
+      return emailActivity(baseRow, reads >= 4 ? 6 : 1);
+    }),
+  });
+  const result = await sendAgendaEmail(actorInput, deps);
+  expect(deps.recordDraftReconciled).toHaveBeenCalledWith(
+    expect.objectContaining({ operation_id: OPERATION_ID }),
+    expect.objectContaining({ activityid: EMAIL_ID, statuscode: 1 }),
+  );
+  expect(deps.createEmailActivity).not.toHaveBeenCalled();
+  expect(deps.sendEmail).toHaveBeenCalledTimes(1);
+  expect(result.agenda).toMatchObject({ state: 'sent', transportAccepted: true });
 });
 
 test('lease contention and stale schedules fail closed without transport', async () => {

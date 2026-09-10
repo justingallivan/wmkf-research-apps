@@ -41,6 +41,7 @@ function prepared(overrides = {}) {
     subject: 'Deliberation session agenda — Monday, September 14',
     bodyText: 'Exact body\n\nDeliberation session: Monday.\n\nAgenda\n\n9:00 AM–9:15 AM · #1001 · First proposal · Lead PD: Alex Staff · Open briefing',
     state: 'prepared',
+    sendRequestedAt: null,
     sentAt: null,
     transportAccepted: false,
     agenda: {
@@ -137,14 +138,23 @@ test('a stale send destroys the preview and requires a new confirmation', async 
   expect(screen.getByRole('button', { name: 'Create preview' })).toBeInTheDocument();
 });
 
-test('a 202 unconfirmed transport status stays an error instead of rendering a sent receipt', async () => {
+test('a 202 unconfirmed transport status stays recoverable on the same operation', async () => {
+  const pending = prepared({
+    state: 'send_requested',
+    sendRequestedAt: '2026-09-10T19:00:00.000Z',
+  });
   global.fetch
     .mockResolvedValueOnce(response({ lastAgenda: null, scheduleChanged: false }))
     .mockResolvedValueOnce(response({ success: true, agenda: prepared() }))
     .mockResolvedValueOnce(response({
       error: 'Dynamics has not confirmed transport acceptance for this agenda.',
       code: 'agenda_send_unconfirmed',
-    }, 202));
+      pendingSend: pending,
+    }, 202))
+    .mockResolvedValueOnce(response({
+      success: true,
+      agenda: prepared({ state: 'sent', transportAccepted: true, sentAt: '2026-09-10T19:02:00.000Z' }),
+    }));
   render(<SessionAgendaPanel sessionId={SESSION_ID} session={session} slots={slots} recipients={recipients} />);
   await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
   fireEvent.click(screen.getByRole('button', { name: 'Send agenda…' }));
@@ -155,6 +165,20 @@ test('a 202 unconfirmed transport status stays an error instead of rendering a s
 
   expect(await screen.findByRole('alert')).toHaveTextContent('has not confirmed transport acceptance');
   expect(screen.queryByText(/Dynamics accepted this exact email for transport/)).not.toBeInTheDocument();
+  fireEvent.click(screen.getAllByRole('button', { name: 'Close' })[0]);
+  fireEvent.click(screen.getByRole('button', { name: 'Review unresolved send…' }));
+  expect(screen.queryByLabelText('To')).not.toBeInTheDocument();
+  fireEvent.click(screen.getByLabelText(/I reviewed the recipients/));
+  fireEvent.click(screen.getByRole('button', { name: 'Send agenda' }));
+  expect(await screen.findByText(/Dynamics accepted this exact email for transport/)).toBeInTheDocument();
+  const prepareCalls = global.fetch.mock.calls.filter(([, options]) => options?.method === 'POST');
+  const sendCalls = global.fetch.mock.calls.filter(([, options]) => options?.method === 'PATCH');
+  expect(prepareCalls).toHaveLength(1);
+  expect(sendCalls).toHaveLength(2);
+  expect(sendCalls.map(([, options]) => JSON.parse(options.body).operationId)).toEqual([
+    OPERATION_ID,
+    OPERATION_ID,
+  ]);
 });
 
 test('shows the sent summary and drift note returned by the server', async () => {
@@ -166,6 +190,23 @@ test('shows the sent summary and drift note returned by the server', async () =>
   expect(await screen.findByText(/Agenda sent Sep 10, 2026/)).toHaveTextContent('to 2 recipients');
   expect(screen.getByText('Schedule changed since the last agenda.')).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Send agenda again…' })).toBeInTheDocument();
+});
+
+test('shows the last sent receipt and a newer unresolved send independently', async () => {
+  global.fetch.mockResolvedValueOnce(response({
+    lastAgenda: prepared({ state: 'sent', transportAccepted: true, sentAt: '2026-09-10T18:00:00.000Z' }),
+    pendingSend: prepared({
+      operationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      state: 'send_requested',
+      sendRequestedAt: '2026-09-10T19:00:00.000Z',
+    }),
+    scheduleChanged: true,
+  }));
+  render(<SessionAgendaPanel sessionId={SESSION_ID} session={session} slots={slots} recipients={recipients} />);
+  expect(await screen.findByText(/Agenda sent Sep 10, 2026/)).toBeInTheDocument();
+  expect(screen.getByText('Schedule changed since the last agenda.')).toBeInTheDocument();
+  expect(screen.getByText(/is unresolved/)).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Review unresolved send…' })).toBeInTheDocument();
 });
 
 test('adds tracker directory recipients without creating To/Cc conflicts', async () => {

@@ -9,6 +9,10 @@ const migration = fs.readFileSync(
   'utf8',
 );
 const setup = fs.readFileSync(path.join(root, 'scripts/setup-database.js'), 'utf8');
+const store = fs.readFileSync(
+  path.join(root, 'lib/services/meeting-tracker/agenda-store.js'),
+  'utf8',
+);
 
 test('migration 041 and fresh install pin the agenda ledger columns and named constraints', () => {
   for (const field of [
@@ -51,4 +55,9 @@ test('migration 041 and fresh install pin the agenda ledger columns and named co
   }
   expect(migration).toContain("state IN ('prepared', 'activity_created', 'send_requested', 'sent')");
   expect(setup).toContain("state IN ('prepared', 'activity_created', 'send_requested', 'sent')");
+});
+
+test('agenda status store queries keep sent receipts separate from unresolved sends', () => {
+  expect(store).toMatch(/getLatestSentAgendaSend[\s\S]*?AND state = 'sent'[\s\S]*?ORDER BY sent_at DESC NULLS LAST/);
+  expect(store).toMatch(/getLatestUnresolvedAgendaSend[\s\S]*?AND state = 'send_requested'[\s\S]*?ORDER BY send_requested_at DESC NULLS LAST/);
 });

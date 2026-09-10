@@ -156,6 +156,7 @@ function ComposerDialog({ children, busy, directoryOpen, onClose }) {
 
 export default function SessionAgendaPanel({ sessionId, session, slots, recipients }) {
   const [lastAgenda, setLastAgenda] = useState(null);
+  const [pendingSend, setPendingSend] = useState(null);
   const [changed, setChanged] = useState(false);
   const [loadError, setLoadError] = useState(null);
   const [composerOpen, setComposerOpen] = useState(false);
@@ -176,6 +177,7 @@ export default function SessionAgendaPanel({ sessionId, session, slots, recipien
     if (!response.ok) throw new Error(body.error || 'The last agenda could not be loaded.');
     if (sequence.current !== expectedSequence) return;
     setLastAgenda(body.lastAgenda || null);
+    setPendingSend(body.pendingSend || null);
     setChanged(body.scheduleChanged === true);
     setLoadError(null);
   }, [sessionId]);
@@ -198,6 +200,16 @@ export default function SessionAgendaPanel({ sessionId, session, slots, recipien
   }, [currentScheduleKey, loadStatus]);
 
   const openComposer = () => {
+    if (pendingSend?.operationId) {
+      setForm({ to: '', cc: '', subject: '', bodyText: '' });
+      setPreview(pendingSend);
+      setConfirmed(false);
+      setError(null);
+      setNotice('Dynamics has not confirmed this send. Review and retry the same agenda before creating another one.');
+      setDirectoryTarget(null);
+      setComposerOpen(true);
+      return;
+    }
     setForm({
       to: attendeeEmails(session),
       cc: '',
@@ -251,6 +263,15 @@ export default function SessionAgendaPanel({ sessionId, session, slots, recipien
         signal: controller.signal,
       });
       const body = await response.json().catch(() => ({}));
+      if (!response.ok && body.code === 'agenda_send_unresolved' && body.pendingSend) {
+        if (sequence.current === currentSequence) {
+          setPendingSend(body.pendingSend);
+          setPreview(body.pendingSend);
+          setConfirmed(false);
+          setNotice('Another session agenda send is unresolved. Review and retry that same agenda before creating another one.');
+        }
+        return;
+      }
       if (!response.ok) throw new Error(body.error || 'The agenda preview could not be created.');
       if (sequence.current !== currentSequence) return;
       setPreview(body.agenda || null);
@@ -284,16 +305,25 @@ export default function SessionAgendaPanel({ sessionId, session, slots, recipien
       const body = await response.json().catch(() => ({}));
       if (!response.ok && body.code === 'agenda_operation_stale') {
         if (sequence.current === currentSequence) {
+          setPendingSend(null);
           setPreview(null);
           setConfirmed(false);
           setNotice('The session schedule changed after this preview. Create a new preview, review it, and then send.');
         }
         return;
       }
+      if (body.code === 'agenda_send_unconfirmed' && body.pendingSend) {
+        if (sequence.current === currentSequence) {
+          setPendingSend(body.pendingSend);
+          setPreview(body.pendingSend);
+          setConfirmed(false);
+        }
+      }
       if (!response.ok || body.error) throw new Error(body.error || 'The agenda could not be sent.');
       if (sequence.current !== currentSequence) return;
       setPreview(body.agenda || preview);
       setLastAgenda(body.agenda || null);
+      setPendingSend(null);
       setChanged(false);
       setConfirmed(false);
       setNotice(null);
@@ -309,6 +339,10 @@ export default function SessionAgendaPanel({ sessionId, session, slots, recipien
     }
   };
 
+  const recoveringPending = Boolean(
+    pendingSend?.operationId && preview?.operationId === pendingSend.operationId,
+  );
+
   return (
     <>
       <section className="mt-6 rounded-xl border border-gray-200 bg-white p-5 shadow-sm" aria-labelledby="agenda-email-title">
@@ -321,20 +355,25 @@ export default function SessionAgendaPanel({ sessionId, session, slots, recipien
         ) : (
           <p className="mt-1 text-sm text-gray-600">Send the agenda to the session&apos;s attendees so Board members know when their proposals come up.</p>
         )}
+        {pendingSend?.operationId && (
+          <p role="status" className="mt-2 text-sm font-medium text-amber-800">
+            A send from {formatReceipt(pendingSend.sendRequestedAt, session?.ianaTimeZone)} is unresolved. Review and retry this same send before creating another agenda.
+          </p>
+        )}
         {loadError && <p role="alert" className="mt-2 text-sm text-red-700">{loadError} Please try again. If the problem continues, contact an administrator.</p>}
         <button
           type="button"
           onClick={openComposer}
           className={`mt-4 rounded-lg px-4 py-2 text-sm font-semibold ${lastAgenda?.sentAt ? 'border border-gray-300 bg-white text-gray-900' : 'bg-gray-900 text-white'}`}
         >
-          {lastAgenda?.sentAt ? 'Send agenda again…' : 'Send agenda…'}
+          {pendingSend?.operationId ? 'Review unresolved send…' : lastAgenda?.sentAt ? 'Send agenda again…' : 'Send agenda…'}
         </button>
       </section>
 
       {composerOpen && (
         <ComposerDialog busy={Boolean(busy)} directoryOpen={directoryTarget !== null} onClose={closeComposer}>
           {error && <div role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</div>}
-          <div className="mt-5 grid gap-4 md:grid-cols-2">
+          {!recoveringPending && <div className="mt-5 grid gap-4 md:grid-cols-2">
             {[['to', 'To'], ['cc', 'Cc']].map(([field, label]) => (
               <div key={field}>
                 <div className="flex items-center justify-between gap-2">
@@ -344,11 +383,15 @@ export default function SessionAgendaPanel({ sessionId, session, slots, recipien
                 <textarea id={`agenda-${field}`} rows={2} value={form[field]} onChange={(event) => edit({ [field]: event.target.value })} disabled={Boolean(busy)} placeholder={field === 'cc' ? 'Optional' : 'One or more addresses'} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
               </div>
             ))}
-          </div>
-          <label htmlFor="agenda-subject" className="mt-4 block text-sm font-medium text-gray-800">Subject</label>
-          <input id="agenda-subject" value={form.subject} onChange={(event) => edit({ subject: event.target.value })} disabled={Boolean(busy)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
-          <label htmlFor="agenda-message" className="mt-4 block text-sm font-medium text-gray-800">Message</label>
-          <textarea id="agenda-message" rows={4} value={form.bodyText} onChange={(event) => edit({ bodyText: event.target.value })} disabled={Boolean(busy)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+          </div>}
+          {!recoveringPending && (
+            <>
+              <label htmlFor="agenda-subject" className="mt-4 block text-sm font-medium text-gray-800">Subject</label>
+              <input id="agenda-subject" value={form.subject} onChange={(event) => edit({ subject: event.target.value })} disabled={Boolean(busy)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+              <label htmlFor="agenda-message" className="mt-4 block text-sm font-medium text-gray-800">Message</label>
+              <textarea id="agenda-message" rows={4} value={form.bodyText} onChange={(event) => edit({ bodyText: event.target.value })} disabled={Boolean(busy)} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+            </>
+          )}
 
           <div className="mt-5 rounded-lg border border-gray-200 bg-gray-50 p-4">
             <h4 className="font-semibold text-gray-900">Agenda preview</h4>
