@@ -3,7 +3,7 @@ import { Card } from '../Layout';
 import CuratedRecipientPicker from './CuratedRecipientPicker';
 import { deliberationSessionLine } from '../../utils/deliberation-stage';
 
-const DEFAULT_BODY = 'The deliberation briefing page linked below has the Site Visit writeup, every completed review, the proposal narrative, and the site visit materials.';
+const DEFAULT_BODY = 'The deliberation briefing page linked below has the Site Visit writeup, every completed review, the proposal, and the site visit materials.';
 const EMPTY_LIST = Object.freeze([]);
 const STALE_PREVIEW_CODES = new Set([
   'distribution_stale_source',
@@ -101,7 +101,7 @@ function BriefingLinkCard({ link, onReissue, busy, error }) {
             </p>
           ) : (
             <p className="mt-1 text-sm text-gray-600">
-              Board members and consultants open the writeup, every completed review, the proposal narrative, and the site visit materials here without a login.
+              Board members and consultants open the writeup, every completed review, the proposal, and the site visit materials here without a login.
               {expires ? ` Live until ${expires}.` : ''}
             </p>
           )}
@@ -234,7 +234,7 @@ function ComposerDialog({ onClose, busy, escapeDisabled = false, children }) {
           <div>
             <h3 id="share-composer-title" className="text-lg font-semibold text-gray-900">Share for the deliberation session</h3>
             <p className="mt-1 text-sm text-gray-600">
-              The email carries the briefing page link; the writeup, every completed review, the proposal narrative, and the site visit materials open there without a login.
+              The email carries the briefing page link; the writeup, every completed review, the proposal, and the site visit materials open there without a login.
             </p>
           </div>
           <button

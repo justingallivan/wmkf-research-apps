@@ -156,7 +156,7 @@ export default function BriefingPage() {
       </section>
 
       <section className="mt-6 rounded-xl border border-gray-200 bg-white p-5">
-        <h2 className="text-base font-semibold text-gray-900">Proposal narrative</h2>
+        <h2 className="text-base font-semibold text-gray-900">Proposal</h2>
         {data.proposal ? (
           <p className="mt-2 text-sm">
             <a className="text-blue-800 underline" href={documentHref(data.proposal.member)} target="_blank" rel="noreferrer noopener">
@@ -165,7 +165,7 @@ export default function BriefingPage() {
             {formatSize(data.proposal.size) && <span className="text-gray-500"> · {formatSize(data.proposal.size)}</span>}
           </p>
         ) : (
-          <p className="mt-2 text-sm text-gray-600">The proposal narrative is not available for this request.</p>
+          <p className="mt-2 text-sm text-gray-600">The proposal is not available for this request.</p>
         )}
       </section>
 

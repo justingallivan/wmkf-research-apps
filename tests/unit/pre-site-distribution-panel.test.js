@@ -68,7 +68,7 @@ test('offers no attachment choice; the default message names the briefing page a
   expect(screen.queryByRole('group', { name: 'Document attachment' })).not.toBeInTheDocument();
   expect(screen.queryByRole('radio')).not.toBeInTheDocument();
   expect(screen.getByLabelText('Message')).toHaveValue(
-    'The deliberation briefing page linked below has the Site Visit writeup, every completed review, the proposal narrative, and the site visit materials.',
+    'The deliberation briefing page linked below has the Site Visit writeup, every completed review, the proposal, and the site visit materials.',
   );
 });
 

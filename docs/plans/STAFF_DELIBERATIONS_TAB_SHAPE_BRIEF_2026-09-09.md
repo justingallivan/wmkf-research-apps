@@ -75,7 +75,7 @@ becomes "Deliberation session: date, time" once the tracker exists; "Visit not s
 (suggested recipients, the draft, material links, the site-visit calendar entry), with the
 session slot rendering "not yet scheduled" until the tracker supplies date, time, Zoom link,
 and attendees (tracker plan §5.6). The email carries one thing: the briefing page link, which
-carries the writeup, the reviews, the proposal narrative, and the site visit materials (owner
+carries the writeup, the reviews, the proposal, and the site visit materials (owner
 2026-09-10, briefing plan D19; the material-link checkboxes are gone and nothing is attached).
 The calendar entry has no UI (S466). Sending both locks the version and sends. The confirm
 copy says both. Order of operations is unchanged from today's two clicks: lock first, then

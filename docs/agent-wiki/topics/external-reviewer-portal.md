@@ -496,7 +496,7 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
 
 `pages/external/briefing/[token].js` + `/api/external/briefing/[token]/{context,document}`
 serve a read-only per-request page (shared writeup snapshot, every received review with
-author and re-sanitized answers, the proposal narrative) to Board members and consultants
+author and re-sanitized answers, the proposal as `Reviewer Materials/Proposal_<num>.pdf` since 2026-09-10 D20) to Board members and consultants
 who have no Dataverse login. Plan and owner decisions D13–D16:
 `docs/DELIBERATION_BRIEFING_PAGE_PLAN.md`. Verifier
 `lib/external/verify-briefing-token.js` is the stored-digest pattern keyed on Postgres

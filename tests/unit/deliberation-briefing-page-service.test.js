@@ -71,8 +71,17 @@ function deps(overrides = {}) {
     getSession: jest.fn(async () => null),
     getLatestAttempt: jest.fn(async () => null),
     findDocuments: jest.fn(async () => ({ records: materialRows() })),
-    resolveNarrativeFolder: jest.fn(async () => ({ library: 'akoya_request', folder: 'Requests/1002379/AI Materials' })),
-    getFileMetadataByPath: jest.fn(async () => ({ id: 'narrative-item', driveId: 'drive-1', name: 'ProposalNarrative_1002379.pdf', size: 1234 })),
+    // Active bucket first, then an archive bucket: the proposal is looked up in
+    // each bucket's Reviewer Materials folder by the reviewer portal's filename rule.
+    getSharePointBuckets: jest.fn(async () => ([
+      { library: 'akoya_request', folder: 'Requests/1002379', source: 'active' },
+      { library: 'akoya_request_archive', folder: 'Archive/1002379', source: 'archive' },
+    ])),
+    getFileMetadataByPath: jest.fn(async (library, folder, filename) => (
+      library === 'akoya_request' && folder === 'Requests/1002379/Reviewer Materials' && filename === 'Proposal_1002379.pdf'
+        ? { id: 'proposal-item', driveId: 'drive-1', name: 'Proposal_1002379.pdf', size: 1234 }
+        : null
+    )),
     downloadFile: jest.fn(async () => ({ buffer: Buffer.from('%PDF-'), mimeType: 'application/pdf', filename: 'x.pdf', size: 5 })),
     downloadReview: jest.fn(async () => ({ buffer: Buffer.from('r'), mimeType: 'application/pdf', filename: 'review.pdf', size: 1 })),
     ...overrides,
@@ -97,7 +106,7 @@ test('context carries only received reviews with authors, no URL-shaped fields, 
     file: { member: `review:${RECEIVED_ID}`, filename: 'review.pdf' },
   });
   expect(context.reviews[0].answers[0]).toEqual({ questionText: 'Strengths?', questionType: 'richtext', answerText: 'Strong', answerHtml: '<p>Strong</p>' });
-  expect(context.proposal).toEqual({ member: 'proposal', filename: 'ProposalNarrative_1002379.pdf', size: 1234 });
+  expect(context.proposal).toEqual({ member: 'proposal', filename: 'Proposal_1002379.pdf', size: 1234 });
   expect(context.expiresAt).toBe('2026-10-08T20:00:00.000Z');
   const serialized = JSON.stringify(context);
   expect(serialized).not.toMatch(/sharepoint|driveId|itemId|webUrl|folder/i);
@@ -169,11 +178,24 @@ test('a review member in the received set streams through the existing review re
   expect(file.filename).toBe('review.pdf');
 });
 
-test('the proposal member resolves by governed path and 404s when the narrative is absent', async () => {
+test('the proposal member resolves Reviewer Materials/Proposal_<num>.pdf by governed path (D20) and 404s when it is absent', async () => {
   const d = deps();
   const file = await resolveBriefingMember({ requestId: REQUEST_ID, member: 'proposal' }, d);
-  expect(d.downloadFile).toHaveBeenCalledWith('drive-1', 'narrative-item');
+  expect(d.getFileMetadataByPath).toHaveBeenCalledWith('akoya_request', 'Requests/1002379/Reviewer Materials', 'Proposal_1002379.pdf');
+  expect(d.downloadFile).toHaveBeenCalledWith('drive-1', 'proposal-item');
+  expect(file.filename).toBe('Proposal_1002379.pdf');
   expect(file.inline).toBe(true);
+
+  // Found only in the archive bucket: still served; a bucket that throws is skipped.
+  const archived = deps({
+    getFileMetadataByPath: jest.fn(async (library) => {
+      if (library === 'akoya_request') throw new Error('library unavailable');
+      return { id: 'archive-item', driveId: 'drive-2', name: 'Proposal_1002379.pdf', size: 99 };
+    }),
+  });
+  await resolveBriefingMember({ requestId: REQUEST_ID, member: 'proposal' }, archived);
+  expect(archived.downloadFile).toHaveBeenCalledWith('drive-2', 'archive-item');
+
   const missing = deps({ getFileMetadataByPath: jest.fn(async () => null) });
   await expect(resolveBriefingMember({ requestId: REQUEST_ID, member: 'proposal' }, missing)).rejects.toMatchObject({ httpStatus: 404 });
   expect(missing.downloadFile).not.toHaveBeenCalled();

@@ -34,7 +34,7 @@ test('renders the placeholder states before any share, review, or schedule exist
   expect(screen.getAllByText('Not yet scheduled')).toHaveLength(2);
   expect(screen.getByText(/The writeup will appear here once staff share it/)).toBeInTheDocument();
   expect(screen.getByText(/No completed reviews yet/)).toBeInTheDocument();
-  expect(screen.getByText(/The proposal narrative is not available/)).toBeInTheDocument();
+  expect(screen.getByText(/The proposal is not available/)).toBeInTheDocument();
   expect(screen.queryByText('Join meeting')).toBeNull();
 });
 
@@ -67,13 +67,13 @@ test('links every member through the document route and only renders an https me
     siteVisit: { scheduledStart: '2026-10-01T16:00:00Z' },
     writeup: { docx: null, pdf: { member: 'writeup-pdf', filename: 'PreSite_1002379.pdf', size: 4096 }, sharedAt: '2026-09-09T01:00:00Z' },
     reviews: [{ id: 'r1', reviewerName: 'Ada Lovelace', affiliation: 'Analytical Engines', receivedAt: '2026-09-01T10:00:00Z', answers: [{ questionText: 'Strengths?', answerHtml: '<p>Strong</p>' }], file: { member: 'review:r1', filename: 'review.pdf' } }],
-    proposal: { member: 'proposal', filename: 'ProposalNarrative_1002379.pdf', size: 100 },
+    proposal: { member: 'proposal', filename: 'Proposal_1002379.pdf', size: 100 },
   }));
   render(<BriefingPage />);
   await screen.findByText('Ada Lovelace');
   expect(screen.getByText('PreSite_1002379.pdf').closest('a')).toHaveAttribute('href', '/api/external/briefing/tok/document?member=writeup-pdf');
   expect(screen.getByText('Open uploaded review').closest('a')).toHaveAttribute('href', '/api/external/briefing/tok/document?member=review%3Ar1');
-  expect(screen.getByText('ProposalNarrative_1002379.pdf').closest('a')).toHaveAttribute('href', '/api/external/briefing/tok/document?member=proposal');
+  expect(screen.getByText('Proposal_1002379.pdf').closest('a')).toHaveAttribute('href', '/api/external/briefing/tok/document?member=proposal');
   expect(screen.getByText('Strong')).toBeInTheDocument();
   expect(screen.queryByText('Join meeting')).toBeNull();
   await waitFor(() => expect(screen.getByText(/Reviews \(1\)/)).toBeInTheDocument());

@@ -461,7 +461,7 @@ related:
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
-| [DELIBERATION_BRIEFING_PAGE_PLAN.md](DELIBERATION_BRIEFING_PAGE_PLAN.md) | plan | active |  | Share mints one expiring, revocable link per proposal serving the shared writeup, all completed reviews with authors, and the proposal narrative, no login. | 2026-09-09 |
+| [DELIBERATION_BRIEFING_PAGE_PLAN.md](DELIBERATION_BRIEFING_PAGE_PLAN.md) | plan | active |  | Share mints one expiring, revocable link per proposal serving the shared writeup, completed reviews with authors, the proposal, and site visit materials. | 2026-09-09 |
 | [FINAL_WRITEUP_LEADERSHIP_TRANSITION_PLAN.md](FINAL_WRITEUP_LEADERSHIP_TRANSITION_PLAN.md) | plan | active |  | PD-triggered Ready for leadership review: the current Final row moves from lifecycle Review to Final with explicit actor/time; every reader accepts the stage. | 2026-09-07 |
 | [FINAL_WRITEUP_PERSONA_CONFIGURATION_PLAN.md](FINAL_WRITEUP_PERSONA_CONFIGURATION_PLAN.md) | plan | active |  | Version-2 staffing and explicit Final Writeup persona lenses are Production-live; live-data smoke and natural signed-in staff observation passed. | 2026-08-31 |
 | [FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md](FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md) | plan | active |  | Final runtime, staffing, lenses, and dashboard Slices 6A–6C are Production-live; the leadership-review transition (Slice 4) is Production-live since 2026-09-07. | 2026-08-28 |
