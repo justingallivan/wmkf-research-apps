@@ -19,7 +19,8 @@ paths = [
 description = "Fixture EXTERNAL_LINK_SECRET values in focused external-token verifier unit tests (never real; set on process.env inside the test)."
 targetRules = ["generic-api-key"]
 condition = "AND"
-regexes = ['''^(briefing-verifier-)?test-secret-''']
+regexTarget = "line"
+regexes = ['''const SECRET = '[a-z0-9-]*test-secret-[a-z0-9-]*';''']
 paths = [
   '''^tests/unit/verify-briefing-token\.test\.js$''',
 ]
