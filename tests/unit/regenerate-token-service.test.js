@@ -169,6 +169,25 @@ test('unknown response type fails closed before any mint', async () => {
   expect(mintAndStore).not.toHaveBeenCalled();
 });
 
+test('unknown review status fails closed before request lookup or mint', async () => {
+  getForTokenRegeneration.mockResolvedValueOnce({
+    _wmkf_request_value: REQ,
+    _etag: 'W/"unknown-status"',
+    wmkf_applicantdisposition: null,
+    wmkf_accepted: true,
+    wmkf_responsetype: 100000000,
+    wmkf_reviewstatus: 999999997,
+  });
+
+  const err = await regenerateToken({ suggestionId: SUG, actingUserSystemId: ACTOR }).catch((e) => e);
+
+  expect(err).toBeInstanceOf(RegenerateTokenError);
+  expect(err.httpStatus).toBe(409);
+  expect(err.body).toEqual({ ok: false, reason: 'not_eligible' });
+  expect(getRequestById).not.toHaveBeenCalled();
+  expect(mintAndStore).not.toHaveBeenCalled();
+});
+
 test('terminal review status fails closed even when response type is accepted', async () => {
   getForTokenRegeneration.mockResolvedValueOnce({
     _wmkf_request_value: REQ,

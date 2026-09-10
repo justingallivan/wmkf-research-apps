@@ -344,6 +344,7 @@ describe('getReviewers', () => {
         _wmkf_potentialreviewer_value: 'person-1',
         wmkf_accepted: true,
         wmkf_reviewstatus: 100000001,
+        wmkf_externaltokenrevoked: true,
       },
       {
         wmkf_appreviewersuggestionid: IDS[1],
@@ -352,6 +353,9 @@ describe('getReviewers', () => {
         wmkf_accepted: false,
         wmkf_responsetype: 100000002,
         wmkf_responsereceivedat: '2026-09-05T12:00:00Z',
+        // Source null must remain null in the history-only projection so the
+        // attribution helper can stay neutral when revocation evidence is absent.
+        wmkf_externaltokenrevoked: null,
         // A stale pre-release status must not expose follow-up actions.
         wmkf_reviewstatus: 100000001,
       },
@@ -362,6 +366,7 @@ describe('getReviewers', () => {
         wmkf_accepted: false,
         wmkf_reviewreceivedat: '2026-09-06T12:00:00Z',
         wmkf_reviewstatus: 100000003,
+        wmkf_externaltokenrevoked: false,
       },
     ]);
 
@@ -373,15 +378,17 @@ describe('getReviewers', () => {
     expect(rows.map((row) => row.suggestionId)).toEqual([IDS[0], IDS[2]]);
     expect(history).toHaveLength(1);
     expect(history[0].suggestionId).toBe(IDS[1]);
-    expect(rows[0]).toMatchObject({ reviewStatus: 'materials_sent', responseType: null });
+    expect(rows[0]).toMatchObject({ reviewStatus: 'materials_sent', responseType: null, tokenRevoked: true });
     expect(history[0]).toMatchObject({
       reviewStatus: null,
       responseType: 'no_response',
       responseReceivedAt: '2026-09-05T12:00:00Z',
       meetingDate: '2026-09-10T00:00:00Z',
       submitted: false,
+      tokenRevoked: null,
     });
     expect(rows[1]).toMatchObject({ reviewStatus: 'review_received', submitted: true });
+    expect(rows[1].tokenRevoked).toBe(false);
     expect(out.proposals[0].statusSummary).toEqual({ materials_sent: 1, review_received: 1 });
     expect(out.totalReviewers).toBe(2);
   });
