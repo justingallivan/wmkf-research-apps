@@ -4,7 +4,7 @@ domain: dataverse
 kind: source-of-truth
 status: canonical
 owner: product-engineering
-last_verified: 2026-09-09
+last_verified: 2026-09-10
 related:
   - docs/PC_MEETING_TRACKER_PLAN.md
   - docs/CREDENTIALS_RUNBOOK.md
@@ -23,8 +23,8 @@ complete metadata contract. The preflight self-test passes. **[VERIFIED IN
 SANDBOX 2026-09-09 via owner-run apply and read-only Wave 28 readback.]** The
 entity, its fields and relationships, and its no-alternate-key contract are
 exact. The combined readback reported 22 exact, 0 absent, and 0 divergent.
-Keep `MEETING_TRACKER_SCHEMA_READY` unset until the runtime implementation is
-ready to use this schema.
+The slice-2 runtime is source-built on `codex/meeting-tracker`; keep
+`MEETING_TRACKER_SCHEMA_READY` unset until that branch is deliberately promoted.
 
 Expected entity set after apply: `wmkf_deliberationslots`.
 
@@ -56,18 +56,18 @@ Expected entity set after apply: `wmkf_deliberationslots`.
 - No alternate keys are allowed. In particular, there is no uniqueness on the
   Request lookup: one request may appear in more than one session by design.
 
-## Planned producers and consumers
+## Producers and consumers
 
-**[PLANNED — Meeting Tracker slice 2.]** Authenticated tracker routes will call
-named slot adapter/service operations. Add, remove, reorder, and move are
+**[VERIFIED IN SOURCE 2026-09-10 on `codex/meeting-tracker`.]** Authenticated
+tracker routes call named slot adapter/service operations. Add, remove, reorder, and move are
 ETag-guarded writes; a move is one PATCH of the Session lookup and Order. Reorder
 is a batch of individually fenced order PATCHes. An over-full session returns a
 warning after the write and does not reject the operation.
 
-**[PLANNED — Meeting Tracker slice 2.]** The session page will render the ordered
-slot list. `getDeliberationScheduleByRequests()` will read at most 25 request IDs
-per Dataverse query and choose each request's latest non-cancelled session by
-scheduled start.
+**[VERIFIED IN SOURCE 2026-09-10 on `codex/meeting-tracker`.]** The session page
+renders the ordered slot list and posts a complete ETag-bearing set for reorder.
+`getDeliberationScheduleByRequests()` reads at most 25 request IDs per Dataverse
+query and chooses each request's latest non-cancelled session by scheduled start.
 
 ## Readiness and deployment gate
 

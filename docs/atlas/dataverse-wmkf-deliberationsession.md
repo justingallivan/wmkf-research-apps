@@ -4,7 +4,7 @@ domain: dataverse
 kind: source-of-truth
 status: canonical
 owner: product-engineering
-last_verified: 2026-09-09
+last_verified: 2026-09-10
 related:
   - docs/PC_MEETING_TRACKER_PLAN.md
   - docs/CREDENTIALS_RUNBOOK.md
@@ -23,8 +23,8 @@ complete metadata contract. The preflight self-test passes. **[VERIFIED IN
 SANDBOX 2026-09-09 via owner-run apply and read-only Wave 28 readback.]** The
 entity, its fields and relationship, and its no-alternate-key contract are
 exact. The combined readback reported 22 exact, 0 absent, and 0 divergent.
-Keep `MEETING_TRACKER_SCHEMA_READY` unset until the runtime implementation is
-ready to use this schema.
+The slice-2 runtime is source-built on `codex/meeting-tracker`; keep
+`MEETING_TRACKER_SCHEMA_READY` unset until that branch is deliberately promoted.
 
 Expected entity set after apply: `wmkf_deliberationsessions`.
 
@@ -58,17 +58,20 @@ Expected entity set after apply: `wmkf_deliberationsessions`.
 - No alternate keys are allowed. Sessions are identified by their Dataverse
   primary key.
 
-## Planned producers and consumers
+## Producers and consumers
 
-**[PLANNED — Meeting Tracker slice 2.]** Authenticated tracker routes will call
+**[VERIFIED IN SOURCE 2026-09-10 on `codex/meeting-tracker`.]**
+`/api/meeting-tracker/sessions` and `/api/meeting-tracker/sessions/[id]` call
 named session adapter/service operations. Create and edit require the
 `meeting-tracker` grant, a session-derived enabled `systemuser`, and an ETag for
 updates. Cancel changes `wmkf_status`; it does not delete the row.
 
-**[PLANNED — Meeting Tracker slice 2.]** The tracker session page will read and
-edit the row. `getDeliberationScheduleByRequests()` will join slots to sessions,
-exclude Cancelled sessions, and return the latest session by scheduled start to
-the Staff Deliberations tab and Share email.
+**[VERIFIED IN SOURCE 2026-09-10 on `codex/meeting-tracker`.]** The tracker
+session page reads and edits the row. `getDeliberationScheduleByRequests()`
+joins slots to sessions, excludes Cancelled sessions, and returns the latest
+session by scheduled start through the fixed all-null fail-open reader contract.
+The Staff Deliberations tab and Share email consume that reader on their own
+runtime track.
 
 ## Readiness and deployment gate
 

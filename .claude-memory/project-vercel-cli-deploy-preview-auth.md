@@ -62,7 +62,7 @@ configuration afterward.
 `https://wmkfresearchapps-preview.vercel.app/api/auth/callback/azure-ad`.
 Deployment `dpl_4AKs6sf5UcRMUn9f6Vy2AKkmDjuZ` authenticated successfully after
 that stable alias was temporarily moved from recorded target
-`dpl_A8JPHtBc8ApPtYJ3kzxDYLjsffE9`; the dashboard loaded all 12 apps. Workbench
+`dpl_A8JPHtBc8ApPtYJ3kzxDYLjsffE9`; the dashboard loaded all 12 apps. <!-- fact-consistency:ignore fact=app-definition-count as-of=2026-08-23 --> Workbench
 production reads then failed closed because Preview omitted
 `DATAVERSE_ALLOW_PROD_READS`, as the interlock requires. The alias was restored
 and re-inspected at its exact prior deployment. No Entra URI or application data

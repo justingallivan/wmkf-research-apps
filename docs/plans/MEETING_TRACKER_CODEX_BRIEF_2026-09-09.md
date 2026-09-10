@@ -5,7 +5,7 @@ kind: plan
 status: active
 summary: "Codex build brief: the Meeting Tracker app (deliberation sessions with ordered slots, Zoom link, attendees) as the schedule of record, plus the fixed reader contract the Staff Deliberations tab consumes. First session is the week of 2026-09-14."
 cataloged: 2026-09-09
-last_verified: 2026-09-09
+last_verified: 2026-09-10
 owner: product-engineering
 related:
   - docs/PC_MEETING_TRACKER_PLAN.md
@@ -225,21 +225,40 @@ Add, with the discriminating fixture in each:
 
 - Commits on `codex/meeting-tracker`:
   - `052c304b` — Add Meeting Tracker Wave 28 schema.
+  - `0ebc8d19` — Record Meeting Tracker slice 1 handoff.
   - `1ba57eb3` — Use the registered sandbox host for the read-only preflight.
-- Files changed: Wave 28 session/slot specs; the read-only preflight; shared
-  readiness/status/default config; focused config/schema tests; the two new
-  Atlas pages; the readiness runbook row; plan §7 status.
+  - `393ef4bc` — Record Meeting Tracker sandbox baseline.
+  - `9a5caae6` — Correct Meeting Tracker sandbox apply command.
+  - `1ad7ffee` — Record exact Meeting Tracker sandbox schema.
+  - `a7716ecc` — Build Meeting Tracker data services.
+  - `249eda35` — Add Meeting Tracker dashboard aggregation.
+  - `4643418c` — Add Meeting Tracker API routes.
+  - `7f98954b` — Build Meeting Tracker scheduling interface.
+  - The final documentation reconciliation is this handoff commit.
+- Files changed: Wave 28 session/slot specs and read-only preflight; readiness,
+  status, app-registry, entity-registry, Dynamics constant, and OData config;
+  session/slot adapters; attendee, dashboard, session, slot, and fixed-shape
+  schedule-reader services; seven API route files; the list and session pages
+  plus their components; the landing-page readiness state; focused unit and
+  route tests; the route security matrix; the application-state Atlas and three
+  entity Atlas pages; the credentials runbook; plan §7; the generated canonical
+  counts and dated historical-count annotations required by the app-registry
+  addition; and this handoff.
 - Verification run and results: `/start` all green; Wave 28 preflight self-test
   PASS; live read-only sandbox preflight PASS with 20 absent / 2 exact
   no-alternate-key checks / 0 divergent; the sandbox apply command with the
   process-scoped registered URL completed in dry-run mode; owner-run apply and
-  readback then reported 22 exact / 0 absent / 0 divergent; focused Jest 3/3
-  PASS; lint 0 errors (86 pre-existing warnings);
-  `check:types`, `check:atlas` + self-test, `check:docs-catalog`,
-  `check:doc-symbol-refs` + self-test, `check:build-claim-freshness` +
-  self-test, `check:fact-consistency` + self-test, `check:doc-currency` +
-  self-test, `check:status-enum-parity` + self-test, `check:secret-scan` +
-  self-test, and `git diff --check` all PASS.
+  readback then reported 22 exact / 0 absent / 0 divergent. Production build
+  PASS. Full Jest PASS: 838 suites, 12,195 tests, 0 snapshots. Lint PASS with
+  0 errors under `--quiet`; `check:types` PASS. `check:api-routes`,
+  `check:atlas`, `check:trust-boundary-guid`, `check:dataverse-access-layer`,
+  `check:route-service-boundary`, `check:route-lifecycle-auth`,
+  `check:odata-escape`, `check:status-enum-parity`, `check:doc-symbol-refs`,
+  and `check:secret-scan`, each followed sequentially by its self-test, PASS;
+  `check:docs-catalog`, `check:build-claim-freshness`,
+  `check:fact-consistency`, `check:doc-currency`, and `git diff --check` PASS.
+  Focused Meeting Tracker service, route, page, readiness, link-safety, and
+  adapter suites also PASS.
 - Slice 1 sandbox statement: **the owner applied Wave 28 and reported an exact
   readback; no apply was run by Codex.** Run
   `node scripts/preflight-meeting-tracker-schema.mjs --target=sandbox`; on an
@@ -254,3 +273,13 @@ Add, with the discriminating fixture in each:
   verify the application/impersonated staff security role has the
   required Read/Create/Write/Append/Append To privileges on both new entities
   and their lookup targets; the brief did not authorize a role manifest.
+  Production Wave 28 remains unapplied and unverified. Rehearse the authenticated
+  flow in a protected Preview deployment, then apply Wave 28 to production and
+  require a 22 exact / 0 absent / 0 divergent readback before the owner explicitly
+  enables `MEETING_TRACKER_SCHEMA_READY=on`. The site-visit editor and briefing
+  room remain later slices by design. Rollback before the flag is enabled is to
+  leave it unset; after promotion, turn the flag off first and revert the runtime
+  commits while retaining the additive Dataverse schema and any created rows.
+  `docs/CURRENT_WORK_QUEUE.md` remains outside this brief's owned surface and
+  still describes slices 1–3 as not built; reconcile that row when this branch
+  is promoted.
