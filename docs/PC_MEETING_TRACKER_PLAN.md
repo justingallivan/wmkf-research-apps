@@ -163,6 +163,18 @@ and re-read server-side (`check:trust-boundary-guid`).
 
 ### 5.4 Readers
 
+**Reader contract the Workbench consumes (owner 2026-09-09; built by the tracker, consumed by
+the Staff Deliberations tab, the cycle view, and the Share email):**
+
+`lib/services/meeting-tracker/schedule-reader.js` →
+`getDeliberationScheduleByRequests(requestIds: string[]) → Map<requestId, DeliberationSchedule | null>`
+where `DeliberationSchedule = { sessionId, scheduledStartIso, scheduledEndIso, ianaTimeZone,
+meetingLink, location, order, minutes, attendees: [{ name, email }] }` taken from the request's
+**latest** slot by session start (D3). Fail-open: when `MEETING_TRACKER_SCHEMA_READY` is not
+literal `on`, or the read fails, every entry is `null` and the caller renders "not yet
+scheduled". One Dataverse read per 25 requests, no party expand, same shape as the cycle
+view's visit join. This contract is fixed so the two tracks can build in parallel.
+
 - **Staff Deliberations tab (rail).** Stops keyed `draft | shared | visit | final`; labels from
   the catalog (D6). Stop 3 shows the **site visit** date from the Activity and the **deliberation**
   date from the latest slot, as two lines under one stop or two sub-stops — a form decision. "Not
@@ -206,9 +218,16 @@ UI is designed now so the tracker fills it without a second design.
 |---|---|---|
 | 0 | **[BUILT 2026-09-09 on `claude/site-visit-schedulable-gate`.]** Replace `assertActiveStage` with the request precondition; keep the Workbench route green; tests for both preconditions. | 1 (branch + PR) |
 | 1 | Schema wave for session + slot; Atlas pages; readiness flag; sandbox apply and readback per `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md`. | 2 |
-| 2 | App registry entry, grant, list page, session page, slot moves; site-visit editor via the existing service. | 2 |
+| 2 | App registry entry, grant, list page, session page (date, time, duration, location, Zoom link, attendees, ordered slots), slot add/remove/reorder/move, the §5.4 reader. | 2 |
+| 2b | Site-visit editor in the tracker via the existing logistics service; briefing-room link on the slot (depends on the Site Visit Materials build). | 2 |
 | 3 | **[BUILT 2026-09-09 on `claude/deliberations-stage-rail`.]** Rail and cycle view read both dates; stage-key catalog with editable labels; parity test. Deliberation-session line pending slice 1 (no session table exists yet; the rail's visit stop shows the site visit only, with a TODO comment naming this plan). | 1 |
 | 4 | (Retired 2026-09-09: §5.5 decided; stop 3's three displays fold into slice 3.) | — |
+
+**Deadline (owner 2026-09-09):** the first deliberation session is the week of 2026-09-14; the
+first site visit is roughly three weeks out. Slices 1 and 2 are the crunch path and are briefed to
+Codex in `docs/plans/MEETING_TRACKER_CODEX_BRIEF_2026-09-09.md`; slice 2b follows. If slice 2
+misses the first session, the fallback is the existing Share composer with the session time and
+Zoom link typed into the body by the PD.
 
 Slices 0 and 3 can start before 1 and 2 land: 3 degrades to "not scheduled" when the tables do
 not exist yet, gated on the readiness flag.
@@ -226,8 +245,12 @@ not exist yet, gated on the readiness flag.
 ## 9. Open questions for the owner
 
 1. ~~§5.5, the three "visited" questions.~~ Decided 2026-09-09: D7–D9.
-2. Who attends deliberation sessions by default: a fixed staff list plus per-session Board members,
-   or per-session only?
-3. Should the session page open the review bundle (shared document, reviews, proposal) directly, or
-   link to each request's Workbench tabs? (Affects whether slice 2 needs a read model beyond links.)
-4. App key and name.
+2. ~~Who attends deliberation sessions by default?~~ **Decided 2026-09-09 (D10):** a fixed staff
+   list plus per-session Board members. The staff list is an admin-editable setting, not code.
+3. ~~Should the session page open the review bundle directly, or link to Workbench tabs?~~
+   **Decided 2026-09-09 (D11):** neither. Each slot carries one link, the request's **external
+   briefing room** from the Site Visit Materials plan (one read-only page per request behind a
+   shared expiring link; Board members and consultants have no Dataverse login). The same link
+   goes in the Share email. Staff who want the full request open the Workbench themselves. Until
+   the briefing room exists, the slot renders "Briefing not yet available."
+4. ~~App key and name.~~ **Decided 2026-09-09 (D12):** key `meeting-tracker`, name "Meeting Tracker".
