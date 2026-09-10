@@ -201,7 +201,9 @@ calendar entry. From this tracker it additionally reads, for the request's lates
 the session date and time (`scheduledstart`, `wmkf_ianatimezone`), the Zoom link
 (`wmkf_meetinglink`), and the attendee list as the default recipients. Until slice 1 ships,
 each of those renders as "not yet scheduled" in the email and on the card; the slot in the
-UI is designed now so the tracker fills it without a second design.
+UI is designed now so the tracker fills it without a second design. The email also carries the
+request's deliberation briefing link (`docs/DELIBERATION_BRIEFING_PAGE_PLAN.md`, built S502):
+that link is the carrier for reviews and the proposal narrative, which are never attached.
 
 ## 6. Security contract [PLANNED — do not add matrix rows until the routes exist]
 
@@ -219,7 +221,7 @@ UI is designed now so the tracker fills it without a second design.
 | 0 | **[BUILT 2026-09-09 on `claude/site-visit-schedulable-gate`.]** Replace `assertActiveStage` with the request precondition; keep the Workbench route green; tests for both preconditions. | 1 (branch + PR) |
 | 1 | Schema wave for session + slot; Atlas pages; readiness flag; sandbox apply and readback per `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md`. | 2 |
 | 2 | App registry entry, grant, list page, session page (date, time, duration, location, Zoom link, attendees, ordered slots), slot add/remove/reorder/move, the §5.4 reader. | 2 |
-| 2b | Site-visit editor in the tracker via the existing logistics service; briefing-room link on the slot (depends on the Site Visit Materials build). | 2 |
+| 2b | Site-visit editor in the tracker via the existing logistics service. The slot's briefing link no longer waits on this slice: read it with `getLiveBriefingLink({ requestId })` from `lib/services/deliberation-briefing/briefing-link-service.js` (built S502 on `feature/deliberation-briefing-page`, `docs/DELIBERATION_BRIEFING_PAGE_PLAN.md`; null until the owner sets `DELIBERATION_BRIEFING_SCHEMA_READY=on`). | 2 |
 | 3 | **[BUILT 2026-09-09 on `claude/deliberations-stage-rail`.]** Rail and cycle view read both dates; stage-key catalog with editable labels; parity test. Deliberation-session line pending slice 1 (no session table exists yet; the rail's visit stop shows the site visit only, with a TODO comment naming this plan). | 1 |
 | 4 | (Retired 2026-09-09: §5.5 decided; stop 3's three displays fold into slice 3.) | — |
 
@@ -235,8 +237,8 @@ not exist yet, gated on the readiness flag.
 ## 8. Explicitly out of scope
 
 - Site visit **scheduling automation** (calendar negotiation with applicants).
-- The external briefing room and applicant-materials collection (Codex plan; the deliberation
-  session is where its bundle will eventually be opened from, nothing more).
+- The applicant-materials collection (Codex plan). The deliberation briefing page itself is
+  built separately (`docs/DELIBERATION_BRIEFING_PAGE_PLAN.md`); the tracker only reads its live link.
 - Distribution email and logistics copy edits (owner: "noting for later").
 - Recording / transcript producers.
 - A PC role. D4 stands until evidence says otherwise.
@@ -251,6 +253,8 @@ not exist yet, gated on the readiness flag.
    **Decided 2026-09-09 (D11):** neither. Each slot carries one link, the request's **external
    briefing room** from the Site Visit Materials plan (one read-only page per request behind a
    shared expiring link; Board members and consultants have no Dataverse login). The same link
-   goes in the Share email. Staff who want the full request open the Workbench themselves. Until
-   the briefing room exists, the slot renders "Briefing not yet available."
+   goes in the Share email. Staff who want the full request open the Workbench themselves. Built
+   S502 as the deliberation briefing page (`docs/DELIBERATION_BRIEFING_PAGE_PLAN.md`, D13–D16);
+   the slot reads `getLiveBriefingLink({ requestId })` and renders "Briefing not yet available"
+   for null.
 4. ~~App key and name.~~ **Decided 2026-09-09 (D12):** key `meeting-tracker`, name "Meeting Tracker".

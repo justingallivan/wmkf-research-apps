@@ -61,7 +61,10 @@ becomes "Deliberation session: date, time" once the tracker exists; "Visit not s
 "Share…" opens the existing distribution composer as a dialog, pre-filled as it is today
 (suggested recipients, the draft, material links, the site-visit calendar entry), with the
 session slot rendering "not yet scheduled" until the tracker supplies date, time, Zoom link,
-and attendees (tracker plan §5.6). Sending both locks the version and sends. The confirm
+and attendees (tracker plan §5.6). The Include list holds the writeup attachment (Word, PDF,
+or both), the calendar entry, the material links (login required), and the briefing page
+link; reviews and the proposal narrative are never attachment rows, the briefing page
+(`docs/DELIBERATION_BRIEFING_PAGE_PLAN.md`, built S502) carries them. Sending both locks the version and sends. The confirm
 copy says both. Order of operations is unchanged from today's two clicks: lock first, then
 send. If the send fails after the lock, the card shows Shared with a red line naming the
 failure and a Resend button; the composer's send history already supports this.

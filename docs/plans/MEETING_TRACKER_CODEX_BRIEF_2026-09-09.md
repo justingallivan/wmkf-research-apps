@@ -55,8 +55,12 @@ Slice 1 and slice 2 of plan §7, in this order, each a separate PR-sized commit 
    script and a readiness flag. No apply by you (see "Verify before acting").
 2. **The app**: registry entry `meeting-tracker` / "Meeting Tracker", grant via the existing
    Admin app-access panel, one list page per cycle, one session page, slot operations, and the
-   §4 reader. The site-visit editor and the briefing-room link (slice 2b) are **not** in this
-   brief; render the slot's briefing link as "Briefing not yet available."
+   §4 reader. The site-visit editor (slice 2b) is **not** in this brief. The slot's briefing
+   link IS available to you: call `getLiveBriefingLink({ requestId })` from
+   `lib/services/deliberation-briefing/briefing-link-service.js` (on `main` once
+   `feature/deliberation-briefing-page` merges; flag-gated, returns `null` when
+   `DELIBERATION_BRIEFING_SCHEMA_READY` is not `on`) and render "Briefing not yet available"
+   for `null`. Do not mint or reissue from the tracker; Share owns that.
 
 ## Current state you are building on (all [VERIFIED 2026-09-09 via source])
 
@@ -172,7 +176,7 @@ templates, anything under `lib/dataverse/schema/wave1..27`.
 ## Decisions that are the owner's, not yours
 
 - Whether a PC role should exist (D4 says no; grant means edit).
-- The briefing-room link content and access model (Site Visit Materials plan).
+- The briefing-room link content and access model (decided D13–D16, built in `docs/DELIBERATION_BRIEFING_PAGE_PLAN.md`; you only read the live link).
 - Whether the tracker writes site visits (slice 2b).
 - Any production apply or flag flip.
 
@@ -200,8 +204,9 @@ templates, anything under `lib/dataverse/schema/wave1..27`.
   `*_SCHEMA_READY` value yourself.
 - `check:agent-wiki` fails in a fresh worktree unless `.agents/skills` is symlinked (the
   `ln -s` above); that failure is not a code failure.
-- The Site Visit Materials plan and its briefing room live on `origin/codex/applicant-additional-materials`,
-  not on `main`; read with `git show`, do not check it out.
+- The Site Visit Materials plan lives on `origin/codex/applicant-additional-materials`, not on
+  `main`; read with `git show`, do not check it out. Its briefing-room subset for deliberation
+  sessions is built on `feature/deliberation-briefing-page` (`docs/DELIBERATION_BRIEFING_PAGE_PLAN.md`).
 
 ## Tests
 

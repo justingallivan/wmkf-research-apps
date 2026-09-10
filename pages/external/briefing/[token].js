@@ -89,6 +89,7 @@ export default function BriefingPage() {
     ? formatDateTime(data.session.scheduledStart, data.session.timeZone)
     : null;
   const visitLine = data.siteVisit?.scheduledStart ? formatDate(data.siteVisit.scheduledStart) : null;
+  const meetingLink = /^https?:\/\//i.test(String(data.session?.meetingLink || '')) ? data.session.meetingLink : null;
 
   return (
     <Shell title={data.title}>
@@ -101,10 +102,10 @@ export default function BriefingPage() {
             <dt className="inline font-medium">Deliberation session:</dt>{' '}
             <dd className="inline">
               {sessionLine || 'Not yet scheduled'}
-              {data.session?.meetingLink && (
+              {meetingLink && (
                 <>
                   {' · '}
-                  <a className="text-blue-800 underline" href={data.session.meetingLink} rel="noreferrer noopener">Join meeting</a>
+                  <a className="text-blue-800 underline" href={meetingLink} rel="noreferrer noopener">Join meeting</a>
                 </>
               )}
             </dd>

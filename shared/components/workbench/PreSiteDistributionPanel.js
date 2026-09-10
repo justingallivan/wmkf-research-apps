@@ -348,6 +348,10 @@ export default function PreSiteDistributionPanel({
   const reissueBriefingLink = async () => {
     if (reissuing) return;
     const id = requestId;
+    const currentSequence = ++sequence.current;
+    controllerRef.current?.abort();
+    const controller = new AbortController();
+    controllerRef.current = controller;
     setReissuing(true);
     setBriefingError(null);
     try {
@@ -355,18 +359,24 @@ export default function PreSiteDistributionPanel({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ requestId: id, action: 'reissue' }),
+        signal: controller.signal,
       });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.error || `The new link could not be issued (${response.status})`);
-      if (id !== requestId) return;
+      if (sequence.current !== currentSequence || id !== requestId) return;
       setBriefingLink(body.link || null);
       // Any prepared preview carried the old link; it can no longer be sent.
       setPreview(null);
       setConfirmed(false);
     } catch (reissueError) {
-      if (id === requestId) setBriefingError(reissueError.message);
+      if (reissueError?.name !== 'AbortError'
+        && sequence.current === currentSequence
+        && id === requestId) setBriefingError(reissueError.message);
     } finally {
-      if (id === requestId) setReissuing(false);
+      if (sequence.current === currentSequence && id === requestId) {
+        setReissuing(false);
+        if (controllerRef.current === controller) controllerRef.current = null;
+      }
     }
   };
 

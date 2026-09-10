@@ -206,6 +206,11 @@ selected links and the live Site Visit ETag are re-resolved under the lease.
 request, not inbox delivery. Read/write paths:
 `lib/services/pre-site-visit/distribution-store.js` and
 `lib/services/pre-site-visit/distribution-service.js`.
+Migration 038 **[PLANNED, not applied]** adds nullable `briefing_link_id`
+(the `deliberation_briefing_links.id` an exact preview carried; send refuses
+when that link is no longer live). The column is only named by a separate
+UPDATE that runs when `DELIBERATION_BRIEFING_SCHEMA_READY=on`, so an
+environment without the migration behaves exactly as before.
 
 **[PRODUCTION-PROVED 2026-08-24.]** Request `1002379`, PDF-only operation
 `85f52fc5-fb48-4ceb-84d6-0f246af0b6fb`, moved through `prepared` to `sent` in

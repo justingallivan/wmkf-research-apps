@@ -126,3 +126,17 @@ test('actor and request identity are required before any store read', async () =
   await expect(ensureLiveBriefingLink({ requestId: REQUEST_ID, actorId: null }, deps)).rejects.toMatchObject({ code: 'briefing_actor_required' });
   expect(deps.getLiveLink).not.toHaveBeenCalled();
 });
+
+test('a racing first insert that loses the partial unique index adopts the winner', async () => {
+  const deps = harness();
+  const winnerJwt = 'jwt-winner';
+  const winner = { id: '55555555-5555-4555-8555-555555555555', request_id: REQUEST_ID, token_digest: hashToken(winnerJwt), token_ciphertext: `sealed:${winnerJwt}`, expires_at: new Date(NOW.getTime() + DAY), revoked_at: null, created_at: NOW, created_by: ACTOR_ID };
+  deps.getLiveLink = jest.fn()
+    .mockResolvedValueOnce(null)
+    .mockResolvedValueOnce(winner);
+  deps.insertLink = jest.fn(async () => { const e = new Error('duplicate'); e.code = '23505'; throw e; });
+  const result = await ensureLiveBriefingLink({ requestId: REQUEST_ID, actorId: ACTOR_ID }, deps);
+  expect(result.reused).toBe(true);
+  expect(result.link.id).toBe(winner.id);
+  expect(result.link.url).toBe(`https://apps.test/external/briefing/${winnerJwt}`);
+});
