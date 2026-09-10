@@ -44,6 +44,12 @@ function proposal(overrides = {}) {
   };
 }
 
+test('list row links to the tracker\'s visit editor with the request number and cycle context (slice 2b)', () => {
+  render(<MeetingTrackerRequestRow proposal={proposal({ siteVisit: null })} cycleCode="D26" programId="p1" />);
+  expect(screen.getByRole('link', { name: 'Schedule visit' }))
+    .toHaveAttribute('href', `/meeting-tracker/visits/${proposal().requestId}?cycleCode=D26&programId=p1&n=1002003`);
+});
+
 test('list row shows scheduling and missing-link cues when either meeting is missing', () => {
   const { rerender } = render(<MeetingTrackerRequestRow proposal={proposal()} cycleCode="D26" programId={SESSION_ID} />);
 

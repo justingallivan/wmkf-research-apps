@@ -1657,7 +1657,10 @@ One Final Writeup row per request over the same stable SharePoint Word item; the
   calls the tab's `lockForShare` (guarded `start-site-visit`) before `prepare`, so the order is lock →
   preview → send and a lock failure lands in the composer. The help popover, "Start sharing" block,
   Shared/Materials sent chips, and the cycle view's registry block are gone; the email carries no
-  attachment (PR #224, migration 039). The panel gained a `scope=my|all`
+  attachment (PR #224, migration 039). **Meeting Tracker slice 2b (2026-09-10):** the site visit is
+  scheduled from the tracker (`/meeting-tracker/visits/[requestId]`, route
+  `/api/meeting-tracker/visits/[requestId]` over the existing logistics service); the Activity is
+  still the record every reader here uses. The panel gained a `scope=my|all`
   ScopeSegment like Request list/Reviewer follow-up/Awardees, stage-grouped cards, and a lead
   count line; a deliberation-session line is deferred to tracker slice 1.) All six views are
   panels (`SHELL_PANEL_VIEWS` =
