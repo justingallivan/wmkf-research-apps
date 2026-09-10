@@ -17,8 +17,21 @@ related:
 
 # Staff Deliberations tab — shape brief
 
-Status: **awaiting owner sign-off; no code.** Produced by the impeccable `shape` pass on
+Status: **owner-approved 2026-09-10 (S503); building.** Produced by the impeccable `shape` pass on
 2026-09-09 after the owner's production click-through of PR #218.
+
+Owner decisions 2026-09-10 (S503), folded into this brief:
+
+- **Download lives in More** at the draft stage (the brief's assumption stands).
+- **The deliberation email carries no writeup attachment.** The briefing page
+  (`docs/DELIBERATION_BRIEFING_PAGE_PLAN.md`) is the only carrier for the writeup, reviews, and
+  narrative; the attachment-mode chooser (Word / PDF / both) and the attach steps go. The
+  ledger still pins DOCX and PDF snapshots on every send because the page serves them.
+  A send that cannot include a live briefing link refuses rather than sending a bare email.
+  Rationale: one access path that Issue new link actually revokes; a simpler composer;
+  fewer send-path failure modes. The exact bytes remain on the ledger and in the SharePoint
+  Distribution Snapshots folder, so the request record does not depend on the Dynamics
+  attachment.
 
 ## Job and audience
 
@@ -61,10 +74,10 @@ becomes "Deliberation session: date, time" once the tracker exists; "Visit not s
 "Share…" opens the existing distribution composer as a dialog, pre-filled as it is today
 (suggested recipients, the draft, material links, the site-visit calendar entry), with the
 session slot rendering "not yet scheduled" until the tracker supplies date, time, Zoom link,
-and attendees (tracker plan §5.6). The Include list holds the writeup attachment (Word, PDF,
-or both), the calendar entry, the material links (login required), and the briefing page
-link; reviews and the proposal narrative are never attachment rows, the briefing page
-(`docs/DELIBERATION_BRIEFING_PAGE_PLAN.md`, built S502) carries them. Sending both locks the version and sends. The confirm
+and attendees (tracker plan §5.6). The Include list holds the briefing page link (required; it
+carries the writeup, the reviews, and the proposal narrative), the calendar entry, and the
+material links (login required). Nothing is attached (owner 2026-09-10); the briefing page
+(`docs/DELIBERATION_BRIEFING_PAGE_PLAN.md`, built S502) is the carrier. Sending both locks the version and sends. The confirm
 copy says both. Order of operations is unchanged from today's two clicks: lock first, then
 send. If the send fails after the lock, the card shows Shared with a red line naming the
 failure and a Resend button; the composer's send history already supports this.
