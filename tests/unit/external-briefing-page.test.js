@@ -38,6 +38,28 @@ test('renders the placeholder states before any share, review, or schedule exist
   expect(screen.queryByText('Join meeting')).toBeNull();
 });
 
+test.each(['http://zoom.example/j/1', '//zoom.example/j/1', 'javascript:alert(1)', 'ftp://x', 'not a url'])('never renders a meeting link for %s', async (meetingLink) => {
+  global.fetch = jest.fn().mockResolvedValue(response({
+    ok: true, title: 'Example University', proposalTitle: null, expiresAt: null,
+    session: { scheduledStart: '2026-09-16T17:00:00Z', timeZone: 'America/Los_Angeles', meetingLink },
+    siteVisit: null, writeup: null, reviews: [], proposal: null,
+  }));
+  render(<BriefingPage />);
+  await screen.findByText('Example University');
+  expect(screen.queryByText('Join meeting')).toBeNull();
+});
+
+test('renders an https meeting link', async () => {
+  global.fetch = jest.fn().mockResolvedValue(response({
+    ok: true, title: 'Example University', proposalTitle: null, expiresAt: null,
+    session: { scheduledStart: '2026-09-16T17:00:00Z', timeZone: 'America/Los_Angeles', meetingLink: 'https://zoom.example/j/1' },
+    siteVisit: null, writeup: null, reviews: [], proposal: null,
+  }));
+  render(<BriefingPage />);
+  await screen.findByText('Join meeting');
+  expect(screen.getByText('Join meeting').closest('a')).toHaveAttribute('href', 'https://zoom.example/j/1');
+});
+
 test('links every member through the document route and only renders an https meeting link', async () => {
   global.fetch = jest.fn().mockResolvedValue(response({
     ok: true, title: 'Example University', proposalTitle: null, expiresAt: null,

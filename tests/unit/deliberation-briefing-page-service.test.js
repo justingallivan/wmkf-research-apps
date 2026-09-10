@@ -87,14 +87,20 @@ test('context carries only received reviews with authors, no URL-shaped fields, 
   expect(d.fetchAnswers).toHaveBeenCalledWith([RECEIVED_ID]);
 });
 
-test('writeup descriptors come from the latest send-requested attempt', async () => {
-  const d = deps({
-    getLatestAttempt: jest.fn(async () => ({
-      docx_drive_id: 'd', docx_item_id: 'i', docx_filename: 'PreSite_1002379.docx', docx_size: '2048', docx_content_type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      pdf_drive_id: 'd', pdf_item_id: 'p', pdf_filename: 'PreSite_1002379.pdf', pdf_size: '4096', pdf_content_type: 'application/pdf',
-      sent_at: '2026-09-09T01:00:00Z', send_requested_at: '2026-09-09T00:59:00Z',
-    })),
-  });
+const PDF_BYTES = Buffer.from('%PDF-');
+const PDF_HASH = require('node:crypto').createHash('sha256').update(PDF_BYTES).digest('hex');
+
+function sentAttempt(overrides = {}) {
+  return {
+    docx_drive_id: 'd', docx_item_id: 'i', docx_filename: 'PreSite_1002379.docx', docx_size: '2048', docx_content_type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', docx_byte_hash: 'f'.repeat(64),
+    pdf_drive_id: 'd', pdf_item_id: 'p', pdf_filename: 'PreSite_1002379.pdf', pdf_size: '4096', pdf_content_type: 'application/pdf', pdf_byte_hash: PDF_HASH,
+    sent_at: '2026-09-09T01:00:00Z', send_requested_at: '2026-09-09T00:59:00Z',
+    ...overrides,
+  };
+}
+
+test('writeup descriptors come from the latest send-requested attempt and downloads verify the pinned bytes', async () => {
+  const d = deps({ getLatestAttempt: jest.fn(async () => sentAttempt()) });
   const context = await buildBriefingContext({ requestId: REQUEST_ID, link: LINK }, d);
   expect(context.writeup).toEqual({
     docx: { member: 'writeup-docx', filename: 'PreSite_1002379.docx', size: 2048 },
@@ -104,6 +110,18 @@ test('writeup descriptors come from the latest send-requested attempt', async ()
   const pdf = await resolveBriefingMember({ requestId: REQUEST_ID, member: 'writeup-pdf' }, d);
   expect(d.downloadFile).toHaveBeenCalledWith('d', 'p');
   expect(pdf).toMatchObject({ filename: 'PreSite_1002379.pdf', mimeType: 'application/pdf', inline: true });
+});
+
+test('a snapshot whose bytes no longer match the pinned hash is refused', async () => {
+  const mutated = deps({
+    getLatestAttempt: jest.fn(async () => sentAttempt()),
+    downloadFile: jest.fn(async () => ({ buffer: Buffer.from('%PDF-edited'), mimeType: 'application/pdf', filename: 'x.pdf', size: 11 })),
+  });
+  await expect(resolveBriefingMember({ requestId: REQUEST_ID, member: 'writeup-pdf' }, mutated))
+    .rejects.toMatchObject({ httpStatus: 409, body: { ok: false, reason: 'snapshot_mismatch' } });
+  const noHash = deps({ getLatestAttempt: jest.fn(async () => sentAttempt({ pdf_byte_hash: null })) });
+  await expect(resolveBriefingMember({ requestId: REQUEST_ID, member: 'writeup-pdf' }, noHash))
+    .rejects.toMatchObject({ httpStatus: 409 });
 });
 
 test('unknown members and reviews outside the request set are 404 before any Graph call', async () => {

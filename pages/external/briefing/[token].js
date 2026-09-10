@@ -44,6 +44,17 @@ function formatDate(iso) {
   return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 }
 
+/** Render a meeting link only when it parses as an absolute https URL. */
+function httpsOnly(value) {
+  if (typeof value !== 'string' || !value) return null;
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
 function formatSize(bytes) {
   if (!bytes || bytes <= 0) return null;
   if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
@@ -89,7 +100,7 @@ export default function BriefingPage() {
     ? formatDateTime(data.session.scheduledStart, data.session.timeZone)
     : null;
   const visitLine = data.siteVisit?.scheduledStart ? formatDate(data.siteVisit.scheduledStart) : null;
-  const meetingLink = /^https?:\/\//i.test(String(data.session?.meetingLink || '')) ? data.session.meetingLink : null;
+  const meetingLink = httpsOnly(data.session?.meetingLink);
 
   return (
     <Shell title={data.title}>

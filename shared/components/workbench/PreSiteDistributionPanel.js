@@ -666,7 +666,7 @@ export default function PreSiteDistributionPanel({
       <BriefingLinkCard
         link={briefingLink}
         onReissue={reissueBriefingLink}
-        busy={reissuing}
+        busy={reissuing || preparing || sending}
         error={briefingError}
       />
       <Card hover={false}>

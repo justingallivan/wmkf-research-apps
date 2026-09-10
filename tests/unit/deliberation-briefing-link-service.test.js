@@ -9,7 +9,6 @@ import {
   computeBriefingExpiry,
   ensureLiveBriefingLink,
   getLiveBriefingLink,
-  isBriefingLinkLive,
   projectBriefingLink,
   reissueBriefingLink,
 } from '../../lib/services/deliberation-briefing/briefing-link-service';
@@ -60,9 +59,13 @@ describe('computeBriefingExpiry', () => {
     const expiry = computeBriefingExpiry({ siteVisitEnd: null, meetingDate: '2026-12-01T00:00:00Z', now: NOW });
     expect(expiry.toISOString()).toBe(new Date(Date.parse('2026-12-01T00:00:00Z') + 7 * DAY).toISOString());
   });
-  test('falls back to 60 days when nothing is scheduled or the dates are past', () => {
+  test('a past visit falls through to a future meeting date before the 60-day default', () => {
+    expect(computeBriefingExpiry({ siteVisitEnd: '2026-01-01T00:00:00Z', meetingDate: '2026-12-01T00:00:00Z', now: NOW }).toISOString())
+      .toBe(new Date(Date.parse('2026-12-01T00:00:00Z') + 7 * DAY).toISOString());
+  });
+  test('falls back to 60 days only when nothing scheduled is still ahead', () => {
     expect(computeBriefingExpiry({ now: NOW }).toISOString()).toBe(new Date(NOW.getTime() + 60 * DAY).toISOString());
-    expect(computeBriefingExpiry({ siteVisitEnd: '2026-01-01T00:00:00Z', now: NOW }).toISOString())
+    expect(computeBriefingExpiry({ siteVisitEnd: '2026-01-01T00:00:00Z', meetingDate: '2026-02-01T00:00:00Z', now: NOW }).toISOString())
       .toBe(new Date(NOW.getTime() + 60 * DAY).toISOString());
   });
 });
@@ -97,8 +100,17 @@ test('reissue always revokes and replaces, and the old id is no longer live', as
   const second = await reissueBriefingLink({ requestId: REQUEST_ID, actorId: ACTOR_ID }, deps);
   expect(second.link.id).not.toBe(first.link.id);
   expect(deps.replaceLiveLink).toHaveBeenCalledTimes(1);
-  expect(await isBriefingLinkLive({ requestId: REQUEST_ID, briefingLinkId: first.link.id }, deps)).toBe(false);
-  expect(await isBriefingLinkLive({ requestId: REQUEST_ID, briefingLinkId: second.link.id }, deps)).toBe(true);
+  const live = await getLiveBriefingLink({ requestId: REQUEST_ID }, deps);
+  expect(live.id).toBe(second.link.id);
+  expect(live.id).not.toBe(first.link.id);
+});
+
+test('a failed site-visit read refuses to mint instead of widening the window', async () => {
+  const deps = harness();
+  deps.findActiveSiteVisit = jest.fn(async () => { throw new Error('Dataverse 503'); });
+  await expect(ensureLiveBriefingLink({ requestId: REQUEST_ID, actorId: ACTOR_ID }, deps)).rejects.toThrow('Dataverse 503');
+  expect(deps.mint).not.toHaveBeenCalled();
+  expect(deps.insertLink).not.toHaveBeenCalled();
 });
 
 test('flag off refuses mint and reads as null', async () => {
@@ -106,7 +118,6 @@ test('flag off refuses mint and reads as null', async () => {
   await expect(ensureLiveBriefingLink({ requestId: REQUEST_ID, actorId: ACTOR_ID }, deps))
     .rejects.toMatchObject({ code: 'briefing_schema_not_ready', httpStatus: 503 });
   expect(await getLiveBriefingLink({ requestId: REQUEST_ID }, deps)).toBeNull();
-  expect(await isBriefingLinkLive({ requestId: REQUEST_ID, briefingLinkId: 'anything' }, deps)).toBe(false);
 });
 
 test('a sealed token whose digest no longer matches the row is refused rather than served', async () => {
