@@ -1,11 +1,12 @@
 /**
- * Review Manager — PD selective decline ("no longer needed") (reviewer-engagement Phase 4)
+ * Review Manager — PD selective release (reviewer-engagement Phase 4)
  *
  * POST /api/review-manager/withdraw-sufficient
  *   body: { requestId: <GUID>, suggestionIds: <GUID[]>,
+ *           reason?: 'no_longer_needed'|'no_response',
  *           overrides?: { <suggestionId>:
  *             { subject, bodyText, to, from, senderId } } }
- *   → { ok: true, withdrawn: N, results: [{ suggestionId, status }] }
+ *   → { ok: true, withdrawn: N, results: [{ suggestionId, status, reason }] }
  *
  * `overrides` carries complete staff-reviewed copy plus the previewed recipient
  * and sender. Identity values are expected-value guards only and can never
@@ -28,6 +29,7 @@ import { isGuid, allGuids } from '../../../lib/utils/guid';
 import { withDalContext } from '../../../lib/dataverse/core/context';
 import { ServiceHttpError } from '../../../lib/services/service-http-error';
 import { withdrawSufficient } from '../../../lib/services/review-manager/withdraw-sufficient-service';
+import { RELEASE_REASON_VALUES, RELEASE_REASONS } from '../../../shared/config/reviewerLifecycle';
 
 const MAX_BATCH = 100;
 
@@ -54,6 +56,13 @@ export default async function handler(req, res) {
   }
   if (!allGuids(suggestionIds)) {
     return res.status(400).json({ error: 'suggestionIds must all be valid GUIDs' });
+  }
+
+  const reason = req.body?.reason === undefined
+    ? RELEASE_REASONS.no_longer_needed
+    : req.body.reason;
+  if (!RELEASE_REASON_VALUES.includes(reason)) {
+    return res.status(400).json({ error: 'reason must be no_longer_needed or no_response' });
   }
 
   // Staff edits, keyed by suggestion. Keys are GUID-validated and narrowed to the
@@ -111,7 +120,7 @@ export default async function handler(req, res) {
 
   return withDalContext('review-manager-withdraw-sufficient', async () => {
     try {
-      const result = await withdrawSufficient({ requestId, suggestionIds, actingUserSystemId, overrides });
+      const result = await withdrawSufficient({ requestId, suggestionIds, actingUserSystemId, overrides, reason });
       return res.status(200).json(result);
     } catch (error) {
       if (error instanceof ServiceHttpError) {

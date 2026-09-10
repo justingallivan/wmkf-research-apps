@@ -132,6 +132,28 @@ describe('verifySuggestionToken', () => {
     expect(result).toEqual({ ok: false, reason: 'revoked' });
   });
 
+  test('a PD-recorded no-response row is closed only by its revoked flag', async () => {
+    const { jwt, hash } = await mintToken({
+      suggestionId: SUGGESTION_ID,
+      requestId: REQUEST_ID,
+      ops: ['upload_review'],
+      expiresAt: new Date(Date.now() + 60_000),
+    });
+    DynamicsService.getRecord.mockResolvedValueOnce(suggestionRow({
+      hash,
+      override: { wmkf_responsetype: 100000002, wmkf_externaltokenrevoked: false },
+    }));
+    const live = await verifySuggestionToken(jwt);
+    expect(live.ok).toBe(true);
+
+    DynamicsService.getRecord.mockResolvedValueOnce(suggestionRow({
+      hash,
+      override: { wmkf_responsetype: 100000002, wmkf_externaltokenrevoked: true },
+    }));
+    const revoked = await verifySuggestionToken(jwt);
+    expect(revoked).toEqual({ ok: false, reason: 'revoked' });
+  });
+
   test('rejects an applicant-excluded row even with a valid live token', async () => {
     // 100000001 = APPLICANT_DISPOSITION_EXCLUDED. A token minted before the row
     // was excluded must still fail closed at this single external chokepoint;

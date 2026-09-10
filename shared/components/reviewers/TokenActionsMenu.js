@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { STATUS_PIPELINE, TERMINAL_REVIEW_STATUSES, canTransitionToTerminal } from './reviewer-modes';
+import { RESPONSE_TYPE_MAP } from '../../config/reviewerLifecycle';
 
 // ─── Magic-link Token State ─────────────────────────────────────────────────
 
@@ -54,6 +55,11 @@ export function TokenStateBadge({ state, expiresAt, firstAccessedAt, onClick, ar
 }
 
 const MENU_WIDTH = 288; // w-72
+const TERMINAL_RESPONSE_TYPES = new Set(
+  Object.keys(RESPONSE_TYPE_MAP).filter(responseType => (
+    responseType !== 'accepted' && responseType !== 'held'
+  )),
+);
 
 export function TokenActionsMenu({
   reviewer,
@@ -73,7 +79,12 @@ export function TokenActionsMenu({
 
   const isActive = reviewer.tokenState === 'active';
   const hasInvalidTokenMetadata = reviewer.tokenState === 'invalid';
-  const canRegenerate = !hasInvalidTokenMetadata;
+  const hasTerminalResponse = TERMINAL_RESPONSE_TYPES.has(reviewer.responseType);
+  const hasUnknownLifecycle = reviewer.lifecycleValid === false;
+  const canRegenerate = !hasInvalidTokenMetadata
+    && !hasUnknownLifecycle
+    && !hasTerminalResponse
+    && !TERMINAL_REVIEW_STATUSES.includes(reviewer.reviewStatus);
   const canRevoke = isActive || hasInvalidTokenMetadata;
   const canCorrectStatus = Boolean(
     onStatusChange

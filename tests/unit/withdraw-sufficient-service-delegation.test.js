@@ -104,7 +104,7 @@ test('delegates the write to withdrawPendingInvitation once with the etag, befor
   });
   expect(withdrawPendingInvitation.mock.invocationCallOrder[0])
     .toBeLessThan(createAndSendEmail.mock.invocationCallOrder[0]);
-  expect(out).toEqual({ ok: true, withdrawn: 1, results: [{ suggestionId: SUG, status: 'withdrawn_emailed' }] });
+  expect(out).toEqual({ ok: true, withdrawn: 1, results: [{ suggestionId: SUG, status: 'withdrawn_emailed', reason: 'no_longer_needed' }] });
 });
 
 test('thrown 412 from the command → changed_skipped, no email', async () => {
@@ -114,18 +114,18 @@ test('thrown 412 from the command → changed_skipped, no email', async () => {
   const out = await withdrawSufficient(ARGS);
 
   expect(out.withdrawn).toBe(0);
-  expect(out.results[0]).toMatchObject({ suggestionId: SUG, status: 'changed_skipped' });
+  expect(out.results[0]).toEqual({ suggestionId: SUG, status: 'changed_skipped', reason: 'no_longer_needed' });
   expect(createAndSendEmail).not.toHaveBeenCalled();
 });
 
-test('thrown other error from the command → write_failed, no email', async () => {
+test('thrown other error from the command → write_failed without diagnostics, no email', async () => {
   findById.mockResolvedValue(pendingRow());
   withdrawPendingInvitation.mockRejectedValueOnce(new Error('boom'));
 
   const out = await withdrawSufficient(ARGS);
 
   expect(out.withdrawn).toBe(0);
-  expect(out.results[0]).toMatchObject({ suggestionId: SUG, status: 'write_failed', error: expect.stringContaining('boom') });
+  expect(out.results[0]).toEqual({ suggestionId: SUG, status: 'write_failed', reason: 'no_longer_needed' });
   expect(createAndSendEmail).not.toHaveBeenCalled();
 });
 
@@ -137,5 +137,22 @@ test('success → withdrawn count increments and the email path proceeds', async
 
   expect(out.withdrawn).toBe(1);
   expect(createAndSendEmail).toHaveBeenCalledTimes(1);
-  expect(out.results[0]).toMatchObject({ suggestionId: SUG, status: 'withdrawn_emailed' });
+  expect(out.results[0]).toEqual({ suggestionId: SUG, status: 'withdrawn_emailed', reason: 'no_longer_needed' });
+});
+
+test('threads no_response to the lifecycle command and skips email by default', async () => {
+  findById.mockResolvedValue(pendingRow());
+  withdrawPendingInvitation.mockResolvedValueOnce(undefined);
+
+  const out = await withdrawSufficient({ ...ARGS, reason: 'no_response' });
+
+  expect(withdrawPendingInvitation).toHaveBeenCalledWith({
+    id: SUG,
+    nowIso: expect.any(String),
+    ifMatch: 'W/"1"',
+    actingUserSystemId: 'u-1',
+    reason: 'no_response',
+  });
+  expect(out.results).toEqual([{ suggestionId: SUG, status: 'withdrawn_no_email_by_reason', reason: 'no_response' }]);
+  expect(createAndSendEmail).not.toHaveBeenCalled();
 });

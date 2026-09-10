@@ -46,6 +46,7 @@ describe('reviewer management actions menu', () => {
     expect(screen.getByText('Use only to fix the recorded stage. No email is sent.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Record reviewer withdrawal' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Release from assignment' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Regenerate link & copy' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Revoke link' })).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText('Correct status for Dr. Test Reviewer'), {
@@ -110,6 +111,46 @@ describe('reviewer management actions menu', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Revoke link' }));
     expect(onRevoke).toHaveBeenCalledTimes(1);
+  });
+
+  test.each([
+    ['unknown response type', { responseType: 'unknown', reviewStatus: 'accepted' }],
+    ['unknown review status', { responseType: 'accepted', reviewStatus: 'unknown' }],
+  ])('unknown lifecycle %s cannot regenerate a revoked row', (_label, lifecycle) => {
+    render(
+      <TokenActionsMenu
+        reviewer={{
+          ...reviewer,
+          ...lifecycle,
+          tokenState: 'revoked',
+          lifecycleValid: false,
+        }}
+        onRegenerate={jest.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Manage Dr. Test Reviewer' }));
+
+    expect(screen.queryByRole('button', { name: 'Regenerate link & copy' })).not.toBeInTheDocument();
+  });
+
+  test('keeps held rows eligible for regeneration', () => {
+    const onRegenerate = jest.fn();
+    render(
+      <TokenActionsMenu
+        reviewer={{
+          ...reviewer,
+          responseType: 'held',
+          tokenState: 'revoked',
+          lifecycleValid: true,
+        }}
+        onRegenerate={onRegenerate}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Manage Dr. Test Reviewer' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Regenerate link & copy' }));
+    expect(onRegenerate).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -224,6 +265,50 @@ describe('reviewer table geometry', () => {
     expect(screen.getByRole('button', { name: 'Mark complete' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Manage Joshua Rosenthal' }));
     expect(screen.queryAllByRole('button', { name: 'Mark complete' })).toHaveLength(1);
+  });
+
+  test('keeps a no-response row in the dedicated history group without accepted actions', async () => {
+    const noResponse = {
+      suggestionId: 'S-no-response',
+      name: 'No Response Reviewer',
+      affiliation: 'Research Institute',
+      email: 'no-response@example.org',
+      reviewStatus: null,
+      responseType: 'no_response',
+      responseReceivedAt: '2026-09-05T12:00:00Z',
+      meetingDate: '2026-09-10T00:00:00Z',
+      withdrawnSufficientAt: null,
+      tokenState: 'revoked',
+      reviewDueReminderEligibility: 'not_due',
+      submitted: false,
+      reviewReceivedAt: null,
+    };
+
+    await act(async () => {
+      render(
+        <ReviewerManagePanel
+          proposal={proposal}
+          reviewers={[reviewer]}
+          noResponseHistory={[noResponse]}
+          canManage
+          mode="track"
+        />,
+      );
+      await Promise.resolve();
+    });
+
+    expect(screen.getByTestId('no-response-history')).toBeInTheDocument();
+    expect(screen.getByText('No-response history (1)')).toBeInTheDocument();
+    expect(screen.queryByText('Released')).not.toBeInTheDocument();
+    expect(screen.queryByRole('checkbox', { name: /Select No Response Reviewer/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /release proposal/i })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'View activity history for No Response Reviewer' }));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByText('No response to invitation')).toBeInTheDocument();
+    expect(screen.getByText('Recorded by staff')).toBeInTheDocument();
+
+    expect(screen.queryByRole('button', { name: 'Manage No Response Reviewer' })).not.toBeInTheDocument();
   });
 });
 

@@ -228,7 +228,7 @@ describe('withdrawSufficient overrides', () => {
     expect(result).toEqual({
       ok: true,
       withdrawn: 0,
-      results: [{ suggestionId: SUG, status: 'recipient_changed' }],
+      results: [{ suggestionId: SUG, status: 'recipient_changed', reason: 'no_longer_needed' }],
     });
     expect(updateLifecycle).not.toHaveBeenCalled();
     expect(createAndSendEmail).not.toHaveBeenCalled();
@@ -248,7 +248,7 @@ describe('withdrawSufficient overrides', () => {
     expect(result).toEqual({
       ok: true,
       withdrawn: 0,
-      results: [{ suggestionId: SUG, status: 'sender_changed' }],
+      results: [{ suggestionId: SUG, status: 'sender_changed', reason: 'no_longer_needed' }],
     });
     expect(updateLifecycle).not.toHaveBeenCalled();
     expect(createAndSendEmail).not.toHaveBeenCalled();

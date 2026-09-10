@@ -16,6 +16,13 @@ export const RESPONSE_TYPE_MAP = {
   held: 100000004,
 };
 
+export const RELEASE_REASONS = Object.freeze({
+  no_longer_needed: 'no_longer_needed',
+  no_response: 'no_response',
+});
+
+export const RELEASE_REASON_VALUES = Object.freeze(Object.values(RELEASE_REASONS));
+
 export const REVIEW_STATUS_MAP = {
   accepted: 100000000,
   materials_sent: 100000001,

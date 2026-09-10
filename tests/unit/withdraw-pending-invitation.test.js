@@ -43,6 +43,31 @@ describe('withdrawPendingInvitation', () => {
     );
   });
 
+  it('writes the no-response stamps and revokes the token in one guarded patch', async () => {
+    mockUpdateLifecycle.mockResolvedValueOnce(undefined);
+
+    await withdrawPendingInvitation({
+      id: 'suggestion-no-response',
+      nowIso: '2026-09-06T00:00:00.000Z',
+      ifMatch: 'W/"etag-no-response"',
+      actingUserSystemId: 'user-2',
+      reason: 'no_response',
+    });
+
+    expect(mockUpdateLifecycle).toHaveBeenCalledWith(
+      'suggestion-no-response',
+      {
+        responseType: 'no_response',
+        responseReceivedAt: '2026-09-06T00:00:00.000Z',
+        respondReminderSentAt: null,
+        externalTokenRevoked: true,
+      },
+      { actingUserSystemId: 'user-2', ifMatch: 'W/"etag-no-response"' },
+    );
+    const patch = mockUpdateLifecycle.mock.calls[0][1];
+    expect(patch).not.toHaveProperty('withdrawnSufficientAt');
+  });
+
   it('propagates a 412 error unchanged (no mapping in this module)', async () => {
     const err = new Error('Precondition Failed: 412');
     err.status = 412;

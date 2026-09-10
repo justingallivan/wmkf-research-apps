@@ -642,11 +642,14 @@ registry's `FIELD_SELECT` already fetched [VERIFIED via
 **Standing hazard — the engagement-scope invariant.** The drawer tells staff its
 history covers the CURRENT engagement only. That is true *only* because every field it
 reads is a member of `ENGAGEMENT_STAMP_RESET_ENTRIES`
-(`lib/dataverse/adapters/reviewer-suggestion.js:793-813`), which clears stamps on
-remove/re-add. Three tempting fields are deliberately EXCLUDED and must not be added
-back without resolving the reason: `wmkf_coiackedat` and `wmkf_aiuseackedat` have real
-writers but are **not** reset members, so a value may belong to a prior engagement;
-`wmkf_heldat` has **no writer anywhere** in the repository (only ever nulled at
+(`lib/dataverse/adapters/reviewer-suggestion.js:887-908`), which clears reset-member
+stamps on remove/re-add. The request's `meetingDate` is a deliberate request-scoped
+exception used only for no-response attribution; it is not a reset member. The
+`wmkf_externaltokenrevoked` → `tokenRevoked` marker is a reset member and is preserved
+in the DTO as tri-state evidence. Three tempting fields are deliberately EXCLUDED and
+must not be added back without resolving the reason: `wmkf_coiackedat` and
+`wmkf_aiuseackedat` have real writers but are **not** reset members, so a value may
+belong to a prior engagement; `wmkf_heldat` has **no writer anywhere** in the repository (only ever nulled at
 `reviewer-suggestion.js:1957`). Deadline extensions now use the paired
 `wmkf_reviewduedateextensiongrantedat` current-engagement timestamp alongside the
 DateOnly `wmkf_reviewduedateoverride`, so the history can place the extension on the
@@ -659,9 +662,13 @@ the reset set from the adapter source rather than trusting a copied list.
 external reviewer accept/decline, staff-recorded withdrawal, and the stale-invite cron
 that writes `responseType=no_response` at cycle close. The activity history therefore
 classifies the response event from `responseType` plus `reviewStatus`: accepted and
-ordinary declined rows read as reviewer responses, `no_response` reads as automated
-cycle close, and `declined` + `withdrew` reads as staff-recorded withdrawal. The bare
-timestamp must not be treated as proof that a reviewer responded.
+ordinary declined rows read as reviewer responses, and `declined` + `withdrew` reads as
+staff-recorded withdrawal. No-response attribution uses direct evidence: token
+revocation, a missing meeting date, or a pre-meeting stamp is staff-recorded; only a
+dated post-meeting stamp on a non-revoked row is an automated cycle close; otherwise
+the drawer stays neutral. The bare timestamp must not be treated as proof that a
+reviewer responded. On Track, no-response rows appear in a dedicated history-only
+group outside ordinary status buckets, counts, selection, and actions.
 
 `wmkf_reviewreceivedat` alone still does not prove a portal submission. The
 current source-built closeout contract requires an existing received-review
@@ -682,10 +689,10 @@ strengthen an event's provenance** [VERIFIED via
 earlier version treated a filename or answer rows as independent proof of a genuine
 submission, and had a separate staff-attestation path keyed on
 `reviewUploadedByStaff=true`. Both were removed in `19bd000a`: none of those three
-fields is a member of `ENGAGEMENT_STAMP_RESET_ENTRIES` — the list is 18 entries and
+fields is a member of `ENGAGEMENT_STAMP_RESET_ENTRIES` — the list is 20 entries and
 carries no `wmkf_reviewfilename`, `wmkf_reviewuploadedbystaff`, or
 `wmkf_reviewsharepointfolder`, and clears no answer child rows [VERIFIED by enumerating
-the full list, `lib/dataverse/adapters/reviewer-suggestion.js:793-812`, 2026-08-12]. So
+the full list, `lib/dataverse/adapters/reviewer-suggestion.js:887-908`, 2026-08-12]. So
 a remove/re-add carries them forward and a stale file from a prior engagement would
 defeat the guard. The consequence
 is deliberate and accepted under the convenience scope above — there is now **no
@@ -1397,10 +1404,11 @@ a currently revoked or expired token resolve without content. Every other
 participant without a receipt blocks, including live-token invitees who have
 not accepted, unresolved duplicates, and malformed/unknown lifecycle or token
 state. Unselected, applicant-excluded, and explicitly merged/removed duplicates
-do not participate. `mintAndStore` clears revocation and writes a future expiry,
-but regeneration reopens readiness only when token state was the
-otherwise-participating, nonterminal row's sole resolution; it does not reselect
-a removed row or undo decline/withdraw/release. An existing synthesis remains
+do not participate. `mintAndStore` clears revocation and writes a future expiry, but
+token regeneration is independently fail-closed to response type unset/accepted/held,
+an unset or known nonterminal review status, and a concrete ETag; it does not reselect a removed row or undo
+decline/no-response/withdraw/release, and a concurrent lifecycle change cannot be
+overwritten. An existing synthesis remains
 visible but is not current until synthesis runs again after genuine reactivation
 and resolution. The exact answer digest plus lifecycle classification is hashed;
 a matching completed ledger row establishes Current state. The feature-gated
