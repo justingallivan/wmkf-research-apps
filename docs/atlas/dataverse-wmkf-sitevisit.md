@@ -4,13 +4,14 @@ domain: dataverse
 kind: source-of-truth
 status: canonical
 owner: product-engineering
-last_verified: 2026-08-29
+last_verified: 2026-09-10
 related:
   - docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md
   - docs/API_ROUTE_SECURITY_MATRIX.md
   - lib/dataverse/adapters/site-visit.js
   - lib/services/site-visit/logistics-service.js
   - lib/services/site-visit/curated-recipient-service.js
+  - lib/services/meeting-tracker/dashboard-service.js
   - lib/dataverse/schema/wave21-site-visit-logistics/wmkf_sitevisit_logistics.json
 ---
 
@@ -60,6 +61,12 @@ fallback.
 
 ## Consumers
 
+- **[VERIFIED IN SOURCE 2026-09-10 on `codex/meeting-tracker`.]** The Meeting
+  Tracker cycle list is a read-only consumer. Its dashboard service calls
+  `site-visit.js::findActiveByRequests(requestIds)` for the bounded cycle join,
+  rejects duplicate active visits, and reads each selected activity through the
+  existing adapter to display date, time, format, and location. Slice 2 does not
+  add a Site Visit writer; that editor remains the separately scoped slice 2b.
 - `listPreSiteVisitDrafts` (`lib/services/pre-site-visit/cycle-list-service.js`,
   PC Meeting Tracker slice 3, 2026-09-09) is a READ-ONLY multi-request
   consumer for the Staff Deliberations cycle view: `site-visit.js::

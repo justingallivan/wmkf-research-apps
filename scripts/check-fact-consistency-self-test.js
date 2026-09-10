@@ -313,9 +313,11 @@ function buildProseFixtures() {
     {
       name: 'known miss: web-based tools phrasing is flagged',
       file: 'pos_known_tools.md',
-      body: 'This remains a suite of 13 web-based tools.',
+      // Sentinel derived from the live count so it can never collide with it
+      // (the literal 13 became live when the Meeting Tracker app registered).
+      body: `This remains a suite of ${wrongAppsA} web-based tools.`,
       expectFlagged: true,
-      token: '13',
+      token: String(wrongAppsA),
     },
     {
       name: 'known miss: applications phrasing is flagged',

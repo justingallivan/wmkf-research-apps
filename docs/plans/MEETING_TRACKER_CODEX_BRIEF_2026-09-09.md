@@ -5,7 +5,7 @@ kind: plan
 status: active
 summary: "Codex build brief: the Meeting Tracker app (deliberation sessions with ordered slots, Zoom link, attendees) as the schedule of record, plus the fixed reader contract the Staff Deliberations tab consumes. First session is the week of 2026-09-14."
 cataloged: 2026-09-09
-last_verified: 2026-09-09
+last_verified: 2026-09-10
 owner: product-engineering
 related:
   - docs/PC_MEETING_TRACKER_PLAN.md
@@ -228,8 +228,183 @@ Add, with the discriminating fixture in each:
 
 ## Handoff (fill in at the end)
 
-- Commits on `codex/meeting-tracker`:
-- Files changed:
-- Verification run and results:
-- Ready-for-apply statement for slice 1 (target, preflight command, expected exact count):
-- Open questions / recommendations for the owner:
+- **Commits on `codex/meeting-tracker`.** [VERIFIED via
+  `git log --oneline origin/main..HEAD` on 2026-09-10]
+  - `052c304b` — Add Meeting Tracker Wave 28 schema.
+  - `0ebc8d19` — Record Meeting Tracker slice 1 handoff.
+  - `1ba57eb3` — Use registered host for Meeting Tracker preflight.
+  - `393ef4bc` — Record Meeting Tracker sandbox baseline.
+  - `9a5caae6` — Correct Meeting Tracker sandbox apply command.
+  - `1ad7ffee` — Record exact Meeting Tracker sandbox schema.
+  - `a7716ecc` — Build Meeting Tracker data services.
+  - `249eda35` — Add Meeting Tracker dashboard aggregation.
+  - `4643418c` — Add Meeting Tracker API routes.
+  - `7f98954b` — Build Meeting Tracker scheduling interface.
+  - `28e9437f` — Document Meeting Tracker slice 2 handoff.
+- **Files changed.** [VERIFIED via
+  `git diff --name-only origin/main...28e9437f`, 51 files]
+  - Schema/config: `lib/dataverse/schema/wave28-meeting-tracker/*`,
+    `scripts/preflight-meeting-tracker-schema.mjs`,
+    `shared/config/meetingTracker.js`, `shared/config/appRegistry.js`, plus the
+    required entity-set registrations in `lib/dataverse/core/entity-registry.js`
+    and `lib/services/dynamics/constants.js` and the canonical `neRaw` helper in
+    `lib/dataverse/core/odata.js`.
+  - Persistence/services: `lib/dataverse/adapters/deliberation-session.js`,
+    `lib/dataverse/adapters/deliberation-slot.js`, and all five files under
+    `lib/services/meeting-tracker/`.
+  - Routes/security: seven files under `pages/api/meeting-tracker/` and their
+    seven rows in `docs/API_ROUTE_SECURITY_MATRIX.md`.
+  - UI: `pages/meeting-tracker/index.js`,
+    `pages/meeting-tracker/sessions/[id].js`, all three files under
+    `shared/components/meeting-tracker/`, and the readiness-aware tile in
+    `pages/index.js`.
+  - Tests: the ten `tests/unit/meeting-tracker-*.test.js` files named below.
+  - Durable docs: the session, slot, and Site Visit Atlas pages; the main
+    application-state Atlas; credentials runbook; product plan; this brief;
+    generated canonical counts; current strategy count; and dated annotations
+    on three historical count statements.
+- **Verification run and results.** Every result in this list was run in this
+  Codex session.
+  - [VERIFIED via `node scripts/preflight-meeting-tracker-schema.mjs --self-test`]
+    PASS: Wave 28 specs and metadata classifiers are valid. Node also emitted
+    the existing module-type warning for `target-registry.js`.
+  - [VERIFIED via `npx jest --runInBand --silent` with the following ten paths]
+    PASS: 10/10 suites, 40/40 tests, 0 snapshots:
+    `meeting-tracker-adapters.test.js`, `meeting-tracker-attendees.test.js`,
+    `meeting-tracker-config.test.js`, `meeting-tracker-dashboard-service.test.js`,
+    `meeting-tracker-pages.test.js`, `meeting-tracker-read-routes.test.js`,
+    `meeting-tracker-schedule-reader.test.js`,
+    `meeting-tracker-session-routes.test.js`,
+    `meeting-tracker-session-service.test.js`, and
+    `meeting-tracker-slot-service.test.js`, all under `tests/unit/`.
+  - [VERIFIED via `npx jest --runInBand`] PASS: 838/838 suites, 12,195/12,195
+    tests, 0 snapshots. The first sandboxed attempt failed only because
+    `selftest-fixture.test.js` could not create its fixture directory; the
+    required host rerun passed with those totals.
+  - [VERIFIED via `npm run lint -- --quiet`] PASS with 0 errors emitted.
+    [VERIFIED via `npm run check:types`] PASS.
+  - [VERIFIED via sequential gate/self-test commands] PASS:
+    `check:api-routes` (197 route files on the branch before merge) + self-test; <!-- fact-consistency:ignore fact=api-route-file-count as-of=2026-09-10 -->
+    `check:atlas` (42 Postgres tables, 36 Dataverse entity sets) + self-test
+    (12/12 patterns); `check:trust-boundary-guid` (197 routes, two client-ID
+    selector routes both guarded, zero ignores) + self-test (28 cases);
+    `check:dataverse-access-layer` + self-test; `check:route-service-boundary`
+    + self-test; `check:route-lifecycle-auth` (four namespace entries) +
+    self-test; `check:odata-escape` (884 files, zero hand-rolled escapes) +
+    self-test; `check:status-enum-parity` (eight invariants) + self-test
+    (17/17); `check:doc-symbol-refs` (1,630 references resolved) + self-test;
+    and `check:secret-scan` (3,446 tracked text files, no real secret-shaped
+    values) + self-test.
+  - [VERIFIED via direct commands] PASS: `check:docs-catalog` (297 top-level
+    docs), `check:build-claim-freshness` + self-test,
+    `check:fact-consistency`, `check:doc-currency` + self-test (13/13), and
+    `git diff --check`.
+  - [VERIFIED via `npm run build` host rerun] PASS: Next production build
+    compiled in 3.1 seconds and generated 28/28 static pages. It emitted one
+    Turbopack whole-project-tracing warning and Node localStorage experimental
+    warnings. The first sandboxed attempt was blocked when prebuild could not
+    rewrite the unchanged migration manifest.
+  - [VERIFIED via `npm run check:fact-consistency:self-test`] **FAIL**: its
+    “known miss: web-based tools” fixture uses 13 as the intentionally stale app
+    count, but 13 is now the live count. The live `check:fact-consistency` gate
+    passes; the fixture needs a non-live sentinel in a separate code/test commit.
+  - [VERIFIED via the command inventory above] No check required by this brief
+    was skipped. [VERIFIED via session action log] No production preflight,
+    schema apply, environment change, authenticated Preview/Production smoke,
+    or Claude Opus review was run. `check:docs-catalog` has no self-test script.
+- **Slice 1 apply/readback handoff.** [VERIFIED via owner-provided command output
+  on 2026-09-10] The target is **sandbox** and the owner-run post-apply readback
+  is already 22 exact / 0 absent / 0 divergent, so no further sandbox apply is
+  required. The read-only command is
+  `node scripts/preflight-meeting-tracker-schema.mjs --target=sandbox`; the
+  required post-apply result is **22 exact / 0 absent / 0 divergent**.
+  [VERIFIED via session action log] Codex ran no apply and set no
+  `*_SCHEMA_READY` value. [ASSUMED] Production remains unapplied because no
+  production metadata probe was run in this session.
+- **Open questions and recommendations.** [VERIFIED via
+  `docs/PC_MEETING_TRACKER_PLAN.md:223-235`] Promotion still requires the Tier 2
+  owner decision, production Wave 28 apply/readback, security-role verification,
+  and the readiness flip. [ASSUMED] The application/impersonated staff role has
+  the needed Read/Create/Write/Append/Append To privileges; verify it against
+  both new entities and lookup targets before enabling the flag. [VERIFIED via
+  `npm run check:fact-consistency:self-test`] Repair that fixture collision
+  before treating the entire repository self-test battery as green. [VERIFIED
+  via `docs/CURRENT_WORK_QUEUE.md:45`] Reconcile its stale “slices 1–3 not built”
+  row when these branches are promoted. [VERIFIED via the attempted review
+  command] Claude Opus has not reviewed this branch; automatic approval review
+  blocked the run because explicit authorization after the credit-use notice
+  was not received.
+
+### State for the next session
+
+- **Slice 0.** [VERIFIED via `docs/PC_MEETING_TRACKER_PLAN.md:222`] Built on the
+  separate `claude/site-visit-schedulable-gate` branch; it is not part of this
+  branch's diff.
+- **Slice 1.** [VERIFIED via the two Wave 28 JSON specs and owner-provided
+  sandbox readback] Built on this branch: two organization-owned entities,
+  required session/request/Updated By lookups, optional lead-PD lookup, no
+  alternate keys, read-only preflight, and literal-on readiness contract.
+  [VERIFIED via owner-provided output] Sandbox is 22 exact / 0 absent / 0
+  divergent. [ASSUMED] Production is unapplied/unverified.
+- **Slice 2.** [VERIFIED via `git diff --name-only origin/main...28e9437f` and
+  the focused 40-test run] Source-built on this branch: registry/grant surface,
+  advancing-request dashboard with current share and active Site Visit joins,
+  session editor, staff-plus-Board attendee references, HTTPS meeting links,
+  ETag-fenced slot add/edit/move/delete, complete atomic reorder, capacity
+  warnings, seven routes, and the fixed schedule reader. [VERIFIED via
+  `shared/config/meetingTracker.js:8-11`, `pages/api/meeting-tracker/sessions/index.js:21-38`,
+  and `pages/index.js:10-20`] Runtime fails closed and the tile remains disabled
+  unless the readiness value is literal `on`.
+- **Slice 2b.** [VERIFIED via `docs/PC_MEETING_TRACKER_PLAN.md:225` and absence
+  from `git diff --name-only origin/main...28e9437f`] Not built: no Site Visit
+  editor and no briefing-room link. Slots render “Briefing not yet available”
+  at `shared/components/meeting-tracker/SessionEditor.js:83-87`.
+- **Slice 3.** [VERIFIED via `docs/PC_MEETING_TRACKER_PLAN.md:226`] Built on the
+  separate `claude/deliberations-stage-rail` branch, but this branch has not
+  integrated its deliberation-session seam.
+- **Slice 4.** [VERIFIED via `docs/PC_MEETING_TRACKER_PLAN.md:227`] Retired by
+  the owner; no work remains under that slice number.
+- **Reader contract.** [VERIFIED via
+  `lib/services/meeting-tracker/schedule-reader.js:37-109`] The exact source
+  export is
+  `export async function getDeliberationScheduleByRequests(requestIds, dependencies = DEFAULT_DEPENDENCIES)`.
+  The second optional argument is test injection; a production caller uses
+  `getDeliberationScheduleByRequests(requestIds)` and receives
+  `Promise<Map<inputRequestId, { sessionId, scheduledStartIso, scheduledEndIso, ianaTimeZone, meetingLink, location, order, minutes, attendees: [{ name, email }] } | null>>`.
+  [VERIFIED via `schedule-reader.js:25-27,42-47,87-108` and
+  `tests/unit/meeting-tracker-schedule-reader.test.js`] This matches §5.4 for
+  one-argument callers: every input key is present, cancelled sessions are
+  excluded, the latest session wins, reads batch at 25, and readiness/adapter/
+  attendee failures return the complete all-null map rather than throwing.
+- **Readiness flag.** [VERIFIED via
+  `shared/config/meetingTracker.js:8-11`] The exact name is
+  `MEETING_TRACKER_SCHEMA_READY`; only literal `on` enables runtime access.
+- **Departures from the brief.** [VERIFIED via source] The reader exposes the
+  optional dependency-injection argument described above, while preserving the
+  required one-argument contract. [VERIFIED via `lib/utils/tracked-secrets.js:1-31`
+  and `shared/config/meetingTracker.js:8-11`] The brief allowed a
+  `tracked-secrets.js` edit, but none was made because that registry governs
+  secret rotation and this readiness value is explicitly non-sensitive; the
+  flag instead lives in shared config and `docs/CREDENTIALS_RUNBOOK.md`.
+  [VERIFIED via `SessionEditor.js:73-80`] Reorder uses accessible up/down
+  controls rather than drag, which the brief expressly allowed.
+- **Files outside the stated owned surface.** [VERIFIED via
+  `git diff --name-only origin/main...28e9437f`] Runtime necessities were
+  `lib/dataverse/core/entity-registry.js`, `lib/dataverse/core/odata.js`,
+  `lib/services/dynamics/constants.js`, and `pages/index.js`. Gate-driven
+  durable reconciliation also changed `docs/APPLICATION_STATE_ATLAS.md`,
+  `docs/CANONICAL_COUNTS.md`, `docs/SECURITY_ARCHITECTURE.md`,
+  `docs/STRATEGY.md`, `docs/audits/memory-triage-2026-07-08.md`, and
+  `.claude-memory/project-vercel-cli-deploy-preview-auth.md`. [VERIFIED via
+  session action log] No file in the main checkout was edited; all changes are
+  confined to this worktree/branch.
+- **Main-branch seam.** [VERIFIED via
+  `git show origin/main:lib/services/deliberation-briefing/session-reader.js`]
+  `lib/services/deliberation-briefing/session-reader.js:4-12` on `origin/main`
+  is the all-null placeholder that says to wire this reader after it lands.
+  [VERIFIED via file absence plus repository `rg`] That file is absent from this
+  older branch base, and the real reader is currently consumed only by the
+  Meeting Tracker dashboard and its tests. It was **not wired** here because it
+  belonged to Claude's concurrent Slice 3 surface; the next integration owner
+  must replace the null seam with the real reader while preserving fail-open
+  behavior.

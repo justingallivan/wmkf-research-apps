@@ -108,7 +108,7 @@ plus the status corrections above.
    un-downgradeable protection designed for human attestations. See
    `docs/REVIEWER_ORCID_BACKPROPAGATION_DESIGN.md` §14.
 2. **`docs/STRATEGY.md` said "17 purpose-built tools"** while `appRegistry.js` /
-   `CANONICAL_COUNTS.md` = 12 app definitions (reviewer-finder + review-manager consolidated;
+   `CANONICAL_COUNTS.md` = 12 app definitions (reviewer-finder + review-manager consolidated; <!-- fact-consistency:ignore fact=app-definition-count as-of=2026-07-08 -->
    4 PDF apps sunset S344). **ADDRESSED S348:** changed to "a dozen purpose-built tools"
    (drift-proof narrative phrasing).
 3. **Intake memberships-admin surface / institution-search typeahead** described as
