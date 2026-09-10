@@ -683,7 +683,7 @@ const v38Statements = [
 const v39Statements = [
   `CREATE TABLE IF NOT EXISTS portal_upload_staging (
     id UUID PRIMARY KEY,
-    scope TEXT NOT NULL CHECK (scope IN ('grantee_image', 'staff_grantee_image')),
+    scope TEXT NOT NULL CONSTRAINT portal_upload_staging_scope_check CHECK (scope IN ('grantee_image', 'staff_grantee_image', 'site_visit_material')),
     resource_id UUID NOT NULL,
     actor_binding TEXT NOT NULL,
     pathname TEXT NOT NULL UNIQUE,
@@ -1056,6 +1056,14 @@ const v44Statements = [
   WHERE status <> 'closed'`,
   `CREATE INDEX IF NOT EXISTS site_visit_material_collections_request_created
   ON site_visit_material_collections (request_id, created_at DESC)`,
+];
+
+// V45: per-slot applicant-material finalize leases. Mirrors migration 044.
+const v45Statements = [
+  `ALTER TABLE site_visit_material_collections
+     ADD COLUMN IF NOT EXISTS slot_leases JSONB NOT NULL DEFAULT '{}'::jsonb`,
+  `COMMENT ON COLUMN site_visit_material_collections.slot_leases IS
+     'Per-canonical-slot finalize leases: {slot:{token,expiresAt}}; five-minute expiry, conditionally acquired and released.'`,
 ];
 
 // V32: model pricing audit history (S181).
@@ -1853,6 +1861,7 @@ async function runMigration() {
           throw error;
         }
       }
+    }
 
     // Run V44 table creation (applicant materials collections)
     console.log(`\nApplying v44 schema updates - Applicant materials collections (${v44Statements.length} statements)...`);
@@ -1871,6 +1880,23 @@ async function runMigration() {
         }
       }
     }
+
+    // Run V45 column addition (per-slot applicant-material finalize leases)
+    console.log(`\nApplying v45 schema updates - Applicant material slot leases (${v45Statements.length} statements)...`);
+    for (let i = 0; i < v45Statements.length; i++) {
+      const statement = v45Statements[i];
+      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
+      try {
+        await sql.query(statement);
+        console.log(`[v45-${i + 1}/${v45Statements.length}] ✓ ${preview}...`);
+      } catch (error) {
+        if (error.message.includes('already exists')) {
+          console.log(`[v45-${i + 1}/${v45Statements.length}] ○ Already exists: ${preview}...`);
+        } else {
+          console.error(`[v45-${i + 1}/${v45Statements.length}] ✗ Error: ${error.message}`);
+          throw error;
+        }
+      }
     }
 
     console.log('\n✓ Database migration completed successfully!');
