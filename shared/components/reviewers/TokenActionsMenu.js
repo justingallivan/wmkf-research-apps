@@ -56,7 +56,9 @@ export function TokenStateBadge({ state, expiresAt, firstAccessedAt, onClick, ar
 
 const MENU_WIDTH = 288; // w-72
 const TERMINAL_RESPONSE_TYPES = new Set(
-  Object.keys(RESPONSE_TYPE_MAP).filter(responseType => responseType !== 'accepted'),
+  Object.keys(RESPONSE_TYPE_MAP).filter(responseType => (
+    responseType !== 'accepted' && responseType !== 'held'
+  )),
 );
 
 export function TokenActionsMenu({

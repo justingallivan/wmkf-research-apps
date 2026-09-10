@@ -245,6 +245,7 @@ describe('/api/review-manager/regenerate-token', () => {
     DynamicsService.getRecord.mockResolvedValue({
       wmkf_appreviewersuggestionid: SUGGESTION_ID,
       _wmkf_request_value: REQUEST_ID,
+      _etag: 'W/"route-terminal-no-response"',
       wmkf_accepted: false,
       wmkf_responsetype: 100000002,
       wmkf_externaltokenrevoked: true,

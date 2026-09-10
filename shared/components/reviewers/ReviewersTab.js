@@ -558,6 +558,7 @@ export default function ReviewersTab({
           <ReviewerManagePanel
             proposal={panelProposal}
             reviewers={reviewers}
+            noResponseHistory={proposal?.noResponseHistory || []}
             loading={loading}
             onRefresh={refreshAll}
             settings={settings}

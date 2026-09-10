@@ -367,19 +367,23 @@ describe('getReviewers', () => {
 
     const out = await getReviewers({ proposalId: REQ, azureEmail: 'pd@wmkeck.org' });
     const rows = out.proposals[0].reviewers;
+    const history = out.proposals[0].noResponseHistory;
 
-    expect(rows).toHaveLength(3);
-    expect(rows.map((row) => row.suggestionId)).toEqual(IDS);
+    expect(rows).toHaveLength(2);
+    expect(rows.map((row) => row.suggestionId)).toEqual([IDS[0], IDS[2]]);
+    expect(history).toHaveLength(1);
+    expect(history[0].suggestionId).toBe(IDS[1]);
     expect(rows[0]).toMatchObject({ reviewStatus: 'materials_sent', responseType: null });
-    expect(rows[1]).toMatchObject({
-      reviewStatus: 'released',
+    expect(history[0]).toMatchObject({
+      reviewStatus: null,
       responseType: 'no_response',
       responseReceivedAt: '2026-09-05T12:00:00Z',
       meetingDate: '2026-09-10T00:00:00Z',
       submitted: false,
     });
-    expect(rows[2]).toMatchObject({ reviewStatus: 'review_received', submitted: true });
-    expect(out.proposals[0].statusSummary).toEqual({ materials_sent: 1, released: 1, review_received: 1 });
+    expect(rows[1]).toMatchObject({ reviewStatus: 'review_received', submitted: true });
+    expect(out.proposals[0].statusSummary).toEqual({ materials_sent: 1, review_received: 1 });
+    expect(out.totalReviewers).toBe(2);
   });
 
   test('preserves an invalid lifecycle signal for unknown response and review-status options', async () => {

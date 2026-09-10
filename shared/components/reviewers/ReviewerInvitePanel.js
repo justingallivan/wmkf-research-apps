@@ -795,7 +795,7 @@ function ReviewerInvitePanelForRequest({ requestId, candidates = [], removedCand
                 mixedSelection
                   ? 'Selection mixes reviewers to invite and to release — uncheck one kind to continue'
                   : selectedPending.length === 0
-                    ? 'Select an invited reviewer who has not yet responded to release them with a polite "no longer needed" note'
+                    ? 'Select an invited reviewer who has not yet responded to release them'
                     : 'Choose the release reason, review the optional courtesy note, then close these pending invitations'
               }
             >

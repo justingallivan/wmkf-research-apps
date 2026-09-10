@@ -6,7 +6,7 @@
  *           reason?: 'no_longer_needed'|'no_response',
  *           overrides?: { <suggestionId>:
  *             { subject, bodyText, to, from, senderId } } }
- *   → { ok: true, withdrawn: N, results: [{ suggestionId, status, reason? }] }
+ *   → { ok: true, withdrawn: N, results: [{ suggestionId, status, reason }] }
  *
  * `overrides` carries complete staff-reviewed copy plus the previewed recipient
  * and sender. Identity values are expected-value guards only and can never

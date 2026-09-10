@@ -133,6 +133,25 @@ describe('reviewer management actions menu', () => {
 
     expect(screen.queryByRole('button', { name: 'Regenerate link & copy' })).not.toBeInTheDocument();
   });
+
+  test('keeps held rows eligible for regeneration', () => {
+    const onRegenerate = jest.fn();
+    render(
+      <TokenActionsMenu
+        reviewer={{
+          ...reviewer,
+          responseType: 'held',
+          tokenState: 'revoked',
+          lifecycleValid: true,
+        }}
+        onRegenerate={onRegenerate}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Manage Dr. Test Reviewer' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Regenerate link & copy' }));
+    expect(onRegenerate).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('reviewer table geometry', () => {
@@ -248,13 +267,13 @@ describe('reviewer table geometry', () => {
     expect(screen.queryAllByRole('button', { name: 'Mark complete' })).toHaveLength(1);
   });
 
-  test('keeps a released no-response row history-reachable without accepted actions', async () => {
+  test('keeps a no-response row in the dedicated history group without accepted actions', async () => {
     const noResponse = {
       suggestionId: 'S-no-response',
       name: 'No Response Reviewer',
       affiliation: 'Research Institute',
       email: 'no-response@example.org',
-      reviewStatus: 'released',
+      reviewStatus: null,
       responseType: 'no_response',
       responseReceivedAt: '2026-09-05T12:00:00Z',
       meetingDate: '2026-09-10T00:00:00Z',
@@ -269,7 +288,8 @@ describe('reviewer table geometry', () => {
       render(
         <ReviewerManagePanel
           proposal={proposal}
-          reviewers={[noResponse]}
+          reviewers={[reviewer]}
+          noResponseHistory={[noResponse]}
           canManage
           mode="track"
         />,
@@ -277,7 +297,9 @@ describe('reviewer table geometry', () => {
       await Promise.resolve();
     });
 
-    expect(screen.getByText('Released')).toBeInTheDocument();
+    expect(screen.getByTestId('no-response-history')).toBeInTheDocument();
+    expect(screen.getByText('No-response history (1)')).toBeInTheDocument();
+    expect(screen.queryByText('Released')).not.toBeInTheDocument();
     expect(screen.queryByRole('checkbox', { name: /Select No Response Reviewer/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /release proposal/i })).not.toBeInTheDocument();
 
@@ -286,11 +308,7 @@ describe('reviewer table geometry', () => {
     expect(screen.getByText('No response to invitation')).toBeInTheDocument();
     expect(screen.getByText('Recorded by staff')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Manage No Response Reviewer' }));
-    expect(screen.queryByText('Correct recorded status')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Record reviewer withdrawal' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Release from assignment' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Regenerate link & copy' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Manage No Response Reviewer' })).not.toBeInTheDocument();
   });
 });
 

@@ -121,7 +121,6 @@ test.each([
   ['declined', 100000001],
   ['no_response', 100000002],
   ['withdrawn_sufficient', 100000003],
-  ['held', 100000004],
 ])('terminal response %s fails closed before request lookup or mint', async (_label, responseType) => {
   getForTokenRegeneration.mockResolvedValueOnce({
     _wmkf_request_value: REQ,
@@ -139,6 +138,21 @@ test.each([
   expect(err.body).toEqual({ ok: false, reason: 'not_eligible' });
   expect(getRequestById).not.toHaveBeenCalled();
   expect(mintAndStore).not.toHaveBeenCalled();
+});
+
+test('held response remains eligible and forwards its lifecycle ETag', async () => {
+  getForTokenRegeneration.mockResolvedValueOnce({
+    _wmkf_request_value: REQ,
+    _etag: 'W/"held-1"',
+    wmkf_applicantdisposition: null,
+    wmkf_accepted: false,
+    wmkf_responsetype: 100000004,
+  });
+  getRequestById.mockResolvedValueOnce({ wmkf_reviewduedate: '2026-09-09' });
+  mintAndStore.mockResolvedValueOnce({ url: 'https://app.example/held', expiresAt: new Date('2026-10-01T00:00:00Z'), jti: 'held-jti' });
+
+  await expect(regenerateToken({ suggestionId: SUG, actingUserSystemId: ACTOR })).resolves.toMatchObject({ ok: true });
+  expect(mintAndStore).toHaveBeenCalledWith(expect.objectContaining({ ifMatch: 'W/"held-1"' }));
 });
 
 test('unknown response type fails closed before any mint', async () => {

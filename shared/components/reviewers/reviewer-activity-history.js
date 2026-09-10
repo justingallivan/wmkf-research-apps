@@ -45,10 +45,10 @@
  * Every event timestamp used below IS in `ENGAGEMENT_STAMP_RESET_ENTRIES`. Auxiliary
  * fields that survive reset must never be used to strengthen an event's provenance.
  *
- * Actor identity is absent by construction — the reviewer DTO carries no acting-user
- * field. A future DTO may provide `releaseActorName`; until then the pre-meeting
- * timestamp is the narrowest available distinction between a staff release and the
- * post-meeting automated cycle close.
+ * Attribution is evidence-based rather than actor-name based. The reviewer DTO
+ * carries the token-revocation marker and the trusted request meeting date: a
+ * revoked row, missing meeting date, or pre-meeting stamp is staff-recorded;
+ * only a dated post-meeting stamp on a non-revoked row is an automated close.
  */
 
 /**
@@ -258,15 +258,16 @@ export function responseEventEvidence(reviewer) {
 }
 
 function noResponseAttribution(reviewer) {
-  const actor = reviewer?.releaseActorName || reviewer?.actingUserName || reviewer?.recordedByName;
-  if (typeof actor === 'string' && actor.trim()) return `Recorded by ${actor.trim()}`;
-
   const responseAt = parseTime(reviewer?.responseReceivedAt);
   const meetingAt = parseTime(reviewer?.meetingDate || reviewer?.requestMeetingDate);
-  if (!reviewer?.withdrawnSufficientAt && responseAt !== null && meetingAt !== null && responseAt < meetingAt) {
+  if (reviewer?.tokenRevoked === true || meetingAt === null) {
     return 'Recorded by staff';
   }
-  return 'Recorded by automated cycle close';
+  if (responseAt !== null && responseAt < meetingAt) return 'Recorded by staff';
+  if (responseAt !== null && responseAt >= meetingAt && reviewer?.tokenRevoked === false) {
+    return 'Recorded by automated cycle close';
+  }
+  return 'Recorded by staff or automated cycle close';
 }
 
 export function reviewReceiptEvidence(reviewer) {
