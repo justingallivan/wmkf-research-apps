@@ -352,7 +352,7 @@ expected columns, 0 rows — empty until the branch merges.]**
 
 ## Portal upload staging
 
-### `portal_upload_staging` (migration 031)
+### `portal_upload_staging` (migrations 031, 043)
 **Source of truth:** Postgres coordination ledger; published abstract/caption/image
 authority remains Dataverse + SharePoint.
 
@@ -366,7 +366,10 @@ committed response drop or delete only the exact unreferenced candidate.
 `result_payload` makes consumed retries idempotent.
 
 Write/read paths: `lib/services/portal-upload-staging.js`; external grantee mint
-and submit routes; staff replacement mint and finalize routes. Raw external
+and submit routes; staff replacement mint and finalize routes; external
+applicant materials mint and finalize routes (scope `site_visit_material`,
+migration 043, S503; document content types, cap from the admin setting
+`site_visit_materials.upload_max_mb`). Raw external
 tokens are never stored (SHA-256 binding only), and clients never choose or echo
 an authoritative pathname. Daily maintenance deletes exact table-selected Blob
 pathnames after expiry and prunes terminal ledger rows after seven days.

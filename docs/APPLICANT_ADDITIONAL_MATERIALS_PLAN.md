@@ -532,15 +532,25 @@ NOT NULL`, `closes_at TIMESTAMPTZ NOT NULL`, `checklist JSONB NOT NULL` (ordered
 unique index). Received files are not duplicated here: the collection reads the registry rows of the
 material types whose filename carries the request's canonical name for each checklist slot.
 
-### 16.3 Slices [PLANNED]
+### 16.3 Slices
+
+PR 1 and PR 2 were built on `claude/applicant-materials-collection` on 2026-09-10 (S503); owner
+migration + flag + merge pending. PR 3 is planned.
 
 - **PR 1 — staff side:** migration 042; business-day helper; admin cap setting; collection service
   (create from the active visit, contacts snapshot, checklist, link mint, invitation email; reminder
   email; waive; state read joining the registry); tracker route
   `/api/meeting-tracker/visits/[requestId]/materials`; visit-page card; list-row cue.
-- **PR 2 — applicant side:** external page `/external/materials/[token]` (institution, visit date,
-  due date, checklist with current files, upload per slot, Other), upload-token + finalize routes,
-  staging document scope, SharePoint upload with canonical names, registry rows, replacement keeps
-  SharePoint version history, soft out-of-sync note when only one presentation format changes.
+- **PR 2 — applicant side [BUILT 2026-09-10]:** external page `pages/external/materials/[token].js`
+  (institution, title, due and close dates, checklist with current files, upload per slot, Other);
+  routes `/api/external/materials/[token]/{context,upload-token,finalize}`; verifier
+  `lib/external/verify-materials-token.js` (`aud:'materials'`, digest lookup, refuses closed/expired);
+  migration 043 adds staging scope `site_visit_material`; byte validation
+  `lib/utils/site-visit-material-file.js` (extension per slot, signature per extension);
+  `GraphService.uploadFileLarge` (upload session, 10 MiB chunks above the 60 MB simple cap);
+  `lib/services/site-visit-materials/contributor-service.js` files under the canonical name with
+  `replace` (SharePoint version history), registers a READY/DRAFT `wmkf_requestdocument` row
+  (producer `site-visit-materials-portal`, unattributed actor policy), supersedes the slot's prior
+  row, and flags PDF/source receipts more than an hour apart as out of sync.
 - **PR 3 — visibility and closeout:** "Materials: 2 of 3 received" line on the Staff Deliberations
   tab and cycle view; auto-close by `closes_at`; reminder cron (owner follow-up).

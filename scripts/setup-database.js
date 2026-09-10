@@ -683,7 +683,7 @@ const v38Statements = [
 const v39Statements = [
   `CREATE TABLE IF NOT EXISTS portal_upload_staging (
     id UUID PRIMARY KEY,
-    scope TEXT NOT NULL CHECK (scope IN ('grantee_image', 'staff_grantee_image')),
+    scope TEXT NOT NULL CONSTRAINT portal_upload_staging_scope_check CHECK (scope IN ('grantee_image', 'staff_grantee_image', 'site_visit_material')),
     resource_id UUID NOT NULL,
     actor_binding TEXT NOT NULL,
     pathname TEXT NOT NULL UNIQUE,
