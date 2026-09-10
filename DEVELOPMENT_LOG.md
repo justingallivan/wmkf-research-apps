@@ -10,6 +10,14 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## September 2026 — Deliberation briefing page live for Board members and consultants; Meeting Tracker merged (Session 502)
+
+**Milestone:** Board members and external consultants can now open a proposal's deliberation materials without a Dataverse login: Share mints one expiring, revocable link per request (stored as digest + sealed token, never raw), the email carries it, and the page serves the exact writeup Dynamics accepted for transport (byte-hash verified), every received review with its author, and the proposal narrative. Migration 038 applied to the shared Neon database and `DELIBERATION_BRIEFING_SCHEMA_READY=on` set in Production by the owner 2026-09-10; the external route fails closed from outside. Codex's Meeting Tracker slices 1–2 (Wave 28 session/slot entities, app, session editor, fixed schedule reader) merged inert behind `MEETING_TRACKER_SCHEMA_READY`, after Claude's adversarial review fixed eleven findings.
+**Sessions:** 502 (Fable built and reviewed; Codex ran seven adversarial passes on the briefing page and built the tracker on its own brief).
+**Ship state:** PRs #219–#222 merged (`8e595e29`, `cd954a40`, `0eafce4c`, `02b754eb`); production deployed with the briefing flag on; first real Share rehearsal pending a proxy request; tracker production apply and flag pending (sandbox 22/0/0).
+**Why it matters:** The first deliberation session (week of 2026-09-14) can send Board members a single link instead of login-required SharePoint links and attachments; the schedule of record exists in source and needs only the owner's production apply.
+**Pointers:** `docs/DELIBERATION_BRIEFING_PAGE_PLAN.md`, `outputs/deliberation-briefing-codex-adversarial-review-2026-09-09.md`, `outputs/meeting-tracker-claude-adversarial-review-2026-09-10.md`, `docs/plans/MEETING_TRACKER_CODEX_BRIEF_2026-09-09.md` § Handoff, `docs/plans/STAFF_DELIBERATIONS_TAB_SHAPE_BRIEF_2026-09-09.md`.
+
 ## September 2026 — Every D26 proposal starts at "AI draft ready"; the Staff Deliberations rail is keyed and admin-labeled; PC Meeting Tracker planned (Session 501)
 
 **Milestone:** All 23 advancing D26 requests hold an AI-generated Pre-Site Visit draft (owner-run batch through the Workbench's own producer, unattributed, idempotent; 21 generated, 2 reused, 0 errors). The Staff Deliberations rail is four stable stops — `draft | shared | visit | final` — with display labels admin-editable behind the keys, shared by the per-request tab and a new cycle-wide Staff deliberations view that reads site-visit dates and sent state. The registry's SharePoint version defect (content tag stored as version) is fixed at upload and repaired in data. The PC Meeting Tracker is planned as the schedule of record for deliberation sessions and site visits (decisions D1–D9), and its first slice re-gated site-visit writes on an advancing request rather than a shared draft.
