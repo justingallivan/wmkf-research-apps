@@ -25,3 +25,12 @@ Verdict: needs-attention, six findings. All verified against source; all address
 | 4 | Unreadable sealed token hid the only recovery action | Yes | `getLiveBriefingLink` reports `unreadable: true`; the tab shows a recovery card with "Issue new link"; Share's `ensure` replaces such a row. |
 | 5 | Writeup downloads served retained bytes after the request disappeared | Yes | Every `document` member resolves the request first; a 404 there is a 404 before any Graph read. |
 | 6 | `records[0]` from up to three active visits was nondeterministic | Yes | `selectActiveSiteVisit`: earliest scheduled end wins, ties on activity id; used by expiry and the page. Owner judgment call: deterministic narrowest window rather than fail-closed on duplicates. |
+
+## Third pass (after the second fixes)
+
+Verdict: needs-attention, two findings. Both verified; both addressed in the next commit.
+
+| # | Finding (Codex) | Verified? | Fix |
+|---|---|---|---|
+| 1 | Reissue guard only blocked on an unexpired lease; an ambiguous SendEmail clears the lease with the state unresolved | Yes | Guard also blocks on any unsent attempt bound to the link with `send_requested_at` within the last 24 hours [ASSUMED window]; error text tells staff to retry the send first. |
+| 2 | Unreadable/expired-row recovery replaced whichever row was live, so concurrent recoveries could revoke each other's fresh link | Yes | `replaceLiveLink` takes `expectedLiveId` (compare-and-swap under `FOR UPDATE`) and refuses 409 `briefing_link_superseded`; `ensure` adopts the current readable row on refusal; staff reissue passes the inspected id and the tab refreshes on refusal. |

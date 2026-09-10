@@ -4,7 +4,8 @@
  * Staff read and lifecycle for the deliberation briefing link
  * (docs/DELIBERATION_BRIEFING_PAGE_PLAN.md §2.3, D15/D16).
  *   GET  ?requestId=   → { success, link: {id,url,expiresAt,createdAt}|null }
- *   POST { requestId, action: 'ensure' | 'reissue' } → { success, link, reused }
+ *   POST { requestId, action: 'ensure' | 'reissue', expectedLinkId? } → { success, link, reused }
+ *   (`expectedLinkId` makes reissue a compare-and-swap on the link the tab showed)
  * The actor comes only from the authenticated session; the raw token leaves
  * the server only inside `link.url` for the signed-in staff caller.
  */
@@ -19,7 +20,7 @@ import {
 
 export const config = { api: { bodyParser: { sizeLimit: '4kb' } } };
 
-const ALLOWED = new Set(['requestId', 'action']);
+const ALLOWED = new Set(['requestId', 'action', 'expectedLinkId']);
 const ACTIONS = new Set(['ensure', 'reissue']);
 
 function sendError(res, error) {
@@ -59,7 +60,10 @@ export default async function handler(req, res) {
   return withDalContext('workbench-briefing-link-write', async () => {
     try {
       const result = req.body.action === 'reissue'
-        ? await reissueBriefingLink(input)
+        ? await reissueBriefingLink({
+          ...input,
+          expectedLinkId: typeof req.body.expectedLinkId === 'string' ? req.body.expectedLinkId.trim() : undefined,
+        })
         : await ensureLiveBriefingLink(input);
       return res.status(200).json({ success: true, ...result });
     } catch (error) {

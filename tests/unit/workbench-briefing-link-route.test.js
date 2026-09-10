@@ -63,9 +63,9 @@ test('POST ensure and reissue pass the actor from the session, never the body', 
 
   reissueBriefingLink.mockResolvedValueOnce({ link: { id: 'b' }, reused: false });
   res = mockRes();
-  await handler({ method: 'POST', body: { requestId: REQUEST_ID, action: 'reissue' } }, res);
+  await handler({ method: 'POST', body: { requestId: REQUEST_ID, action: 'reissue', expectedLinkId: ' a ' } }, res);
   expect(res.body.link.id).toBe('b');
-  expect(reissueBriefingLink).toHaveBeenCalledWith({ requestId: REQUEST_ID, actorId: ACTOR_ID });
+  expect(reissueBriefingLink).toHaveBeenCalledWith({ requestId: REQUEST_ID, actorId: ACTOR_ID, expectedLinkId: 'a' });
 });
 
 test('POST rejects unknown actions and extra fields', async () => {

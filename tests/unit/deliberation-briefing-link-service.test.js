@@ -96,7 +96,7 @@ test('ensure replaces an expired live row instead of reusing it', async () => {
   const result = await ensureLiveBriefingLink({ requestId: REQUEST_ID, actorId: ACTOR_ID }, deps);
   expect(result.reused).toBe(false);
   expect(result.link.id).not.toBe(stale.id);
-  expect(deps.replaceLiveLink).toHaveBeenCalledWith(REQUEST_ID, expect.objectContaining({ createdBy: ACTOR_ID }), { revokedBy: ACTOR_ID });
+  expect(deps.replaceLiveLink).toHaveBeenCalledWith(REQUEST_ID, expect.objectContaining({ createdBy: ACTOR_ID }), { revokedBy: ACTOR_ID, expectedLiveId: stale.id });
 });
 
 test('reissue always revokes and replaces, and the old id is no longer live', async () => {
@@ -139,6 +139,37 @@ test('an unreadable sealed token is reported to staff and replaced by Share, nev
   const rotated = harness({ live: { ...row, token_ciphertext: 'sealed:x' } });
   rotated.unseal = () => { throw new Error('bad key'); };
   expect(await getLiveBriefingLink({ requestId: REQUEST_ID }, rotated)).toMatchObject({ unreadable: true, url: null });
+});
+
+test('recovery of an expired row is a compare-and-swap: a concurrent replacement is adopted, not revoked', async () => {
+  const stale = { id: '55555555-5555-4555-8555-555555555555', request_id: REQUEST_ID, token_digest: 'x', token_ciphertext: 'sealed:old', expires_at: new Date(NOW.getTime() - DAY), revoked_at: null };
+  const winnerJwt = 'jwt-from-the-other-caller';
+  const winner = { id: '66666666-6666-4666-8666-666666666666', request_id: REQUEST_ID, token_digest: hashToken(winnerJwt), token_ciphertext: `sealed:${winnerJwt}`, expires_at: new Date(NOW.getTime() + DAY), revoked_at: null, created_at: NOW, created_by: ACTOR_ID };
+  const deps = harness({ live: stale });
+  const { linkSupersededError } = await import('../../lib/services/deliberation-briefing/briefing-link-store');
+  deps.getLiveLink = jest.fn().mockResolvedValueOnce(stale).mockResolvedValueOnce(winner);
+  deps.replaceLiveLink = jest.fn(async (_requestId, _replacement, options) => {
+    expect(options.expectedLiveId).toBe(stale.id);
+    throw linkSupersededError();
+  });
+  const result = await ensureLiveBriefingLink({ requestId: REQUEST_ID, actorId: ACTOR_ID }, deps);
+  expect(result.reused).toBe(true);
+  expect(result.link.id).toBe(winner.id);
+  expect(result.link.url).toBe(`https://apps.test/external/briefing/${winnerJwt}`);
+});
+
+test('staff reissue passes the inspected link id and surfaces a superseded refusal', async () => {
+  const deps = harness();
+  const first = await ensureLiveBriefingLink({ requestId: REQUEST_ID, actorId: ACTOR_ID }, deps);
+  const { linkSupersededError } = await import('../../lib/services/deliberation-briefing/briefing-link-store');
+  deps.replaceLiveLink = jest.fn(async (_r, _rep, options) => {
+    expect(options.expectedLiveId).toBe(first.link.id);
+    throw linkSupersededError();
+  });
+  await expect(reissueBriefingLink({ requestId: REQUEST_ID, actorId: ACTOR_ID, expectedLinkId: first.link.id }, deps))
+    .rejects.toMatchObject({ code: 'briefing_link_superseded', httpStatus: 409 });
+  await expect(reissueBriefingLink({ requestId: REQUEST_ID, actorId: ACTOR_ID, expectedLinkId: 'nope' }, deps))
+    .rejects.toMatchObject({ code: 'briefing_request_invalid' });
 });
 
 test('reissue surfaces the store refusal while a send bound to the live link holds a lease', async () => {

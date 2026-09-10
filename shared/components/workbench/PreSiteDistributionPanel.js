@@ -367,10 +367,16 @@ export default function PreSiteDistributionPanel({
       const response = await fetch('/api/workbench/pre-site-visit/briefing-link', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requestId: id, action: 'reissue' }),
+        body: JSON.stringify({ requestId: id, action: 'reissue', expectedLinkId: briefingLink?.id || undefined }),
         signal: controller.signal,
       });
       const body = await response.json().catch(() => ({}));
+      if (!response.ok && (body.code === 'briefing_link_superseded' || body.code === 'briefing_send_in_progress')) {
+        // The link changed under us or a send still carries it: refresh the
+        // header from history instead of retrying blindly.
+        await loadHistory(id, controller.signal, currentSequence);
+        throw new Error(body.error);
+      }
       if (!response.ok) throw new Error(body.error || `The new link could not be issued (${response.status})`);
       if (sequence.current !== currentSequence || id !== requestId) return;
       setBriefingLink(body.link || null);
