@@ -7,6 +7,7 @@ import {
   MEETING_TRACKER_SCHEMA_READY_FLAG,
   isMeetingTrackerSchemaReady,
 } from '../../shared/config/meetingTracker';
+import { APP_REGISTRY } from '../../shared/config/appRegistry';
 
 test('Meeting Tracker readiness requires literal on', () => {
   for (const value of [undefined, '', 'off', 'ON', 'true', 'on\n']) {
@@ -17,6 +18,14 @@ test('Meeting Tracker readiness requires literal on', () => {
   expect(isMeetingTrackerSchemaReady({
     [MEETING_TRACKER_SCHEMA_READY_FLAG]: 'on',
   })).toBe(true);
+});
+
+test('Meeting Tracker is a grantable Phase II app', () => {
+  expect(APP_REGISTRY.find((app) => app.key === 'meeting-tracker')).toMatchObject({
+    name: 'Meeting Tracker',
+    href: '/meeting-tracker',
+    categories: ['phase-ii'],
+  });
 });
 
 test('session status labels and scheduling defaults match the Wave 28 contract', () => {
