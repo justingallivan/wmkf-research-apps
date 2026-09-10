@@ -48,7 +48,7 @@ Everything else moves down or into an overflow.
 |---|---|---|---|---|
 | AI draft ready | Review and edit the AI draft in Word, then share it for the deliberation session. The draft leaves the recommendation, referee comments, and presentation for you to complete. | Edit in Word | Share… | Download, Regenerate (More menu) |
 | Shared, email sent | Shared on date. Session line. Visit line. | Open working document | Resend (only if the last send failed) | Download (More) |
-| Visit | Visited on date. Add site-visit observations in Word, then continue in Final Writeup. | Open working document | Continue in Final Writeup | Download (More) |
+| Visit | Visited on date. Add your site-visit edits to the working document in Word, then continue in Final Writeup to start group review. | Add site-visit edits in Word | Continue in Final Writeup | Download (More) |
 | Final | This proposal moved to Final Writeup. | Open Final Writeup | none | none |
 | Generating / failed / no draft | existing copy, unchanged | Generate Word Draft | none | none |
 
