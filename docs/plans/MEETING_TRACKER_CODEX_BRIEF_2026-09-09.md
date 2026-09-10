@@ -407,4 +407,6 @@ Add, with the discriminating fixture in each:
   Meeting Tracker dashboard and its tests. It was **not wired** here because it
   belonged to Claude's concurrent Slice 3 surface; the next integration owner
   must replace the null seam with the real reader while preserving fail-open
-  behavior.
+  behavior. **Done 2026-09-10 (S503) on `main`:** the seam now calls
+  `getDeliberationScheduleByRequests([requestId])` and returns that entry or
+  null; `tests/unit/deliberation-briefing-session-reader.test.js` pins it.
