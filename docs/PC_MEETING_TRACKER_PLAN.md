@@ -296,5 +296,15 @@ readiness flag is enabled for that target.
      de-duplicates as the deliberation email does; an empty To refuses.
    - **D25 One agenda for everyone.** No per-recipient filtering; Board members find their
      proposals by the times.
-   Built by Codex on `codex/session-agenda` from
+   **[SOURCE-BUILT 2026-09-10 by Codex on `codex/session-agenda`; migration 041
+   not applied by Codex.]** The session-page card/composer is
+   `shared/components/meeting-tracker/SessionAgendaPanel.js`, mounted below the
+   proposal order in `SessionEditor.js`. The guarded GET/prepare/send endpoint
+   is `pages/api/meeting-tracker/sessions/[id]/agenda.js`; exact rendering,
+   drift detection, correlation recovery, and lease-fenced transport live in
+   `lib/services/meeting-tracker/agenda-service.js` and `agenda-store.js`.
+   Migration `041_deliberation_agenda_sends.sql` plus fresh-install v44 provide
+   the ledger. **[VERIFIED via the focused agenda schema/service/route/panel
+   suites; external schema state remains ASSUMED until the owner applies and
+   reads back migration 041.]** Build brief:
    `docs/plans/SESSION_AGENDA_EMAIL_CODEX_BRIEF_2026-09-10.md`.
