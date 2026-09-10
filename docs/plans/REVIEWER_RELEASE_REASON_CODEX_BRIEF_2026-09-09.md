@@ -277,13 +277,14 @@ is decorative and does not count):
   snapshot); and `ee085e2c`
   (predicate-partitioned no-response history, explicit answers, exact
   regeneration/reset documentation, overlap, and unknown-status regressions).
-  Verification snapshot (2026-09-09, before this final docs-only update): the
+  `ea182b4b` (finalized the preceding handoff snapshot); and `f69f2070`
+  (corrected regeneration references and completed the prior inventory update).
+  Historical verification snapshot (2026-09-09, recorded by `ea182b4b`): the
   verified feature/documentation predecessor is
   `ee085e2ce4e1e6adeeb1b50d32912152215a5664`, remote branch matches that SHA,
   `origin/main` is `14b2ba2e5bef20b9db3cd3dde8507ea53c383b0b`, and divergence is
-  10 behind / 31 ahead. The final docs-only commit containing this snapshot
-  cannot list its own hash; its delivered SHA is reported in the orchestrator
-  handoff and is not represented as part of this snapshot. All listed commits are pushed to
+  10 behind / 31 ahead. The current closure commit is intentionally self-omitted
+  from this inventory and is delivered externally. All listed commits are pushed to
   `origin/codex/reviewer-release-reason`.
 - Files changed (summarized surface list; includes this brief and focused release,
   history, UI, service, route, adapter, and regeneration test categories):
