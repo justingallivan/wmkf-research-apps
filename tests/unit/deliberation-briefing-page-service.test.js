@@ -99,7 +99,7 @@ function sentAttempt(overrides = {}) {
   };
 }
 
-test('writeup descriptors come from the latest send-requested attempt and downloads verify the pinned bytes', async () => {
+test('writeup descriptors come from the latest sent attempt and downloads verify the pinned bytes', async () => {
   const d = deps({ getLatestAttempt: jest.fn(async () => sentAttempt()) });
   const context = await buildBriefingContext({ requestId: REQUEST_ID, link: LINK }, d);
   expect(context.writeup).toEqual({
@@ -131,6 +131,18 @@ test('unknown members and reviews outside the request set are 404 before any Gra
   }
   expect(d.downloadFile).not.toHaveBeenCalled();
   expect(d.downloadReview).not.toHaveBeenCalled();
+});
+
+test('every member branch 404s before any Graph read when the request no longer resolves', async () => {
+  for (const member of ['writeup-pdf', 'proposal', `review:${RECEIVED_ID}`]) {
+    const gone = deps({
+      getRequest: jest.fn(async () => { const e = new Error('Get record failed (404)'); e.status = 404; throw e; }),
+      getLatestAttempt: jest.fn(async () => sentAttempt()),
+    });
+    await expect(resolveBriefingMember({ requestId: REQUEST_ID, member }, gone)).rejects.toMatchObject({ httpStatus: 404 });
+    expect(gone.downloadFile).not.toHaveBeenCalled();
+    expect(gone.downloadReview).not.toHaveBeenCalled();
+  }
 });
 
 test('a review member in the received set streams through the existing review reader', async () => {

@@ -12,3 +12,16 @@ Model `gpt-5.6-sol`, `--base origin/main`, run by Claude with owner authorizatio
 | 6 | "https-only" guard accepted http | Yes | `new URL()` with `protocol === 'https:'`. Tests reject http, protocol-relative, javascript:, ftp, and non-URLs. |
 
 Codex's "next steps" tests: mid-send revocation, failed schedule read, expired event dates, mutated snapshot bytes, flag-off hash compatibility, HTTP meeting links — all added. Full unit suite green after the fixes (801 suites, 11,492 tests).
+
+## Second pass (same model, `--base origin/main`, after the first fixes)
+
+Verdict: needs-attention, six findings. All verified against source; all addressed in the next commit.
+
+| # | Finding (Codex) | Verified? | Fix |
+|---|---|---|---|
+| 1 | Reader treated `send_requested_at` as published; pre-transport rechecks can fail after it is stamped | Yes | Reader now returns the latest `state = 'sent'` attempt only (`getLatestSentAttempt`). |
+| 2 | Reissue could commit between the final check and `SendEmail` | Yes | `replaceLiveLink` locks the live row and every unsent attempt bound to it `FOR UPDATE`; refuses 409 `briefing_send_in_progress` while one holds an unexpired send lease; a `claimDistributionSend` racing it waits for the commit and then fails `distribution_briefing_stale`. Owner judgment call: lease-based guard instead of a new reservation table. |
+| 3 | One-hour floor discarded near cutoffs and widened expiry | Yes | Any cutoff strictly later than now is used as is. |
+| 4 | Unreadable sealed token hid the only recovery action | Yes | `getLiveBriefingLink` reports `unreadable: true`; the tab shows a recovery card with "Issue new link"; Share's `ensure` replaces such a row. |
+| 5 | Writeup downloads served retained bytes after the request disappeared | Yes | Every `document` member resolves the request first; a 404 there is a 404 before any Graph read. |
+| 6 | `records[0]` from up to three active visits was nondeterministic | Yes | `selectActiveSiteVisit`: earliest scheduled end wins, ties on activity id; used by expiry and the page. Owner judgment call: deterministic narrowest window rather than fail-closed on duplicates. |

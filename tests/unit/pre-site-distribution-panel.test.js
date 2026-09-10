@@ -557,3 +557,24 @@ test('keeps non-stale send failures as errors', async () => {
   expect(await screen.findByRole('alert')).toHaveTextContent(/could not be found/i);
   expect(screen.queryByRole('status')).not.toBeInTheDocument();
 });
+
+test('an unreadable briefing link still offers Issue new link but never Copy', async () => {
+  global.fetch = jest.fn()
+    .mockResolvedValueOnce(response({ success: true, attempts: [], briefingLink: { id: 'l', url: null, unreadable: true, expiresAt: null } }))
+    .mockResolvedValueOnce(response({ success: true, link: { id: 'm', url: 'https://apps.test/external/briefing/new', unreadable: false, expiresAt: '2026-10-08T00:00:00Z' } }));
+  render(
+    <PreSiteDistributionPanel
+      requestId={REQUEST_ID}
+      requestNumber="1002379"
+      sourceArtifact={{ artifactId: ARTIFACT_ID }}
+    />,
+  );
+  await screen.findByText(/can no longer be read on the server/);
+  expect(screen.queryByText('Copy link')).toBeNull();
+  fireEvent.click(screen.getByText('Issue new link'));
+  await screen.findByText(/stops the current one immediately/);
+  fireEvent.click(screen.getByText('Issue new link'));
+  await waitFor(() => expect(screen.getByText('https://apps.test/external/briefing/new')).toBeInTheDocument());
+  expect(global.fetch.mock.calls[1][0]).toBe('/api/workbench/pre-site-visit/briefing-link');
+  expect(JSON.parse(global.fetch.mock.calls[1][1].body)).toEqual({ requestId: REQUEST_ID, action: 'reissue' });
+});

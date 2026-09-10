@@ -464,7 +464,7 @@ and `/api/workbench/pre-site-visit/briefing-link`; `reissueBriefingLink`
 revokes-and-replaces in one transaction). Read by
 `lib/external/verify-briefing-token.js` for `/api/external/briefing/[token]/*`.
 The row holds identity, expiry, and revocation only: the writeup the page serves
-is pinned by the latest send-requested `pre_site_distribution_attempts` row,
+is pinned by the latest `sent` `pre_site_distribution_attempts` row,
 reviews resolve live from `wmkf_appreviewersuggestion`, and the proposal
 narrative resolves by governed path. Cleanup: none scheduled; revoked and expired
 rows stay as audit history (bounded by one live row per request).

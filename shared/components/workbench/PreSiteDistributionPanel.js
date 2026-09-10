@@ -76,7 +76,8 @@ function briefingExpiryLabel(iso) {
 function BriefingLinkCard({ link, onReissue, busy, error }) {
   const [confirming, setConfirming] = useState(false);
   const [copied, setCopied] = useState(false);
-  if (!link?.url) return null;
+  if (!link || (!link.url && !link.unreadable)) return null;
+  const unreadable = !link.url;
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(link.url);
@@ -92,20 +93,28 @@ function BriefingLinkCard({ link, onReissue, busy, error }) {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="text-base font-semibold text-gray-900">Briefing page link</h3>
-          <p className="mt-1 text-sm text-gray-600">
-            Board members and consultants open the writeup, every completed review, and the proposal narrative here without a login.
-            {expires ? ` Live until ${expires}.` : ''}
-          </p>
-          <p className="mt-2 truncate font-mono text-xs text-gray-500" title={link.url}>{link.url}</p>
+          {unreadable ? (
+            <p className="mt-1 text-sm text-amber-800">
+              The current link can no longer be read on the server, so it cannot be copied or sent again. Issue a new link, then send the materials again.
+            </p>
+          ) : (
+            <p className="mt-1 text-sm text-gray-600">
+              Board members and consultants open the writeup, every completed review, and the proposal narrative here without a login.
+              {expires ? ` Live until ${expires}.` : ''}
+            </p>
+          )}
+          {!unreadable && <p className="mt-2 truncate font-mono text-xs text-gray-500" title={link.url}>{link.url}</p>}
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <button
-            type="button"
-            onClick={copy}
-            className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-800 hover:bg-gray-50"
-          >
-            {copied ? 'Copied' : 'Copy link'}
-          </button>
+          {!unreadable && (
+            <button
+              type="button"
+              onClick={copy}
+              className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-800 hover:bg-gray-50"
+            >
+              {copied ? 'Copied' : 'Copy link'}
+            </button>
+          )}
           {!confirming && (
             <button
               type="button"

@@ -59,6 +59,11 @@ describe('computeBriefingExpiry', () => {
     const expiry = computeBriefingExpiry({ siteVisitEnd: null, meetingDate: '2026-12-01T00:00:00Z', now: NOW });
     expect(expiry.toISOString()).toBe(new Date(Date.parse('2026-12-01T00:00:00Z') + 7 * DAY).toISOString());
   });
+  test('a cutoff minutes away is still honored, never widened', () => {
+    const soon = new Date(NOW.getTime() - 7 * DAY + 30 * 60 * 1000); // visit ended 7d ago minus 30 min → cutoff in 30 min
+    expect(computeBriefingExpiry({ siteVisitEnd: soon.toISOString(), meetingDate: '2026-12-01T00:00:00Z', now: NOW }).toISOString())
+      .toBe(new Date(NOW.getTime() + 30 * 60 * 1000).toISOString());
+  });
   test('a past visit falls through to a future meeting date before the 60-day default', () => {
     expect(computeBriefingExpiry({ siteVisitEnd: '2026-01-01T00:00:00Z', meetingDate: '2026-12-01T00:00:00Z', now: NOW }).toISOString())
       .toBe(new Date(Date.parse('2026-12-01T00:00:00Z') + 7 * DAY).toISOString());
@@ -120,15 +125,34 @@ test('flag off refuses mint and reads as null', async () => {
   expect(await getLiveBriefingLink({ requestId: REQUEST_ID }, deps)).toBeNull();
 });
 
-test('a sealed token whose digest no longer matches the row is refused rather than served', async () => {
+test('an unreadable sealed token is reported to staff and replaced by Share, never served', async () => {
   const row = { id: '55555555-5555-4555-8555-555555555555', request_id: REQUEST_ID, token_digest: hashToken('other'), token_ciphertext: 'sealed:jwt-tampered', expires_at: new Date(NOW.getTime() + DAY), revoked_at: null, created_at: NOW, created_by: ACTOR_ID };
   const deps = harness({ live: row });
-  await expect(getLiveBriefingLink({ requestId: REQUEST_ID }, deps)).rejects.toMatchObject({ code: 'briefing_link_unreadable' });
+  const read = await getLiveBriefingLink({ requestId: REQUEST_ID }, deps);
+  expect(read).toMatchObject({ id: row.id, url: null, unreadable: true });
+  const ensured = await ensureLiveBriefingLink({ requestId: REQUEST_ID, actorId: ACTOR_ID }, deps);
+  expect(ensured.reused).toBe(false);
+  expect(ensured.link.id).not.toBe(row.id);
+  expect(ensured.link.url).toMatch(/^https:\/\/apps\.test\/external\/briefing\//);
+  expect(deps.replaceLiveLink).toHaveBeenCalledTimes(1);
+  // A throwing unseal (key rotation) is the same case.
+  const rotated = harness({ live: { ...row, token_ciphertext: 'sealed:x' } });
+  rotated.unseal = () => { throw new Error('bad key'); };
+  expect(await getLiveBriefingLink({ requestId: REQUEST_ID }, rotated)).toMatchObject({ unreadable: true, url: null });
+});
+
+test('reissue surfaces the store refusal while a send bound to the live link holds a lease', async () => {
+  const deps = harness();
+  await ensureLiveBriefingLink({ requestId: REQUEST_ID, actorId: ACTOR_ID }, deps);
+  const { sendInProgressError } = await import('../../lib/services/deliberation-briefing/briefing-link-store');
+  deps.replaceLiveLink = jest.fn(async () => { throw sendInProgressError(); });
+  await expect(reissueBriefingLink({ requestId: REQUEST_ID, actorId: ACTOR_ID }, deps))
+    .rejects.toMatchObject({ code: 'briefing_send_in_progress', httpStatus: 409 });
 });
 
 test('projection never exposes the digest or ciphertext', () => {
   const projected = projectBriefingLink({ id: 'a', request_id: REQUEST_ID, token_digest: 'd', token_ciphertext: 'c', expires_at: NOW, created_at: NOW, created_by: ACTOR_ID }, { url: 'u' });
-  expect(Object.keys(projected).sort()).toEqual(['createdAt', 'createdBy', 'expiresAt', 'id', 'requestId', 'url']);
+  expect(Object.keys(projected).sort()).toEqual(['createdAt', 'createdBy', 'expiresAt', 'id', 'requestId', 'unreadable', 'url']);
 });
 
 test('actor and request identity are required before any store read', async () => {
