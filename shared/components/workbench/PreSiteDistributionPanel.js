@@ -422,7 +422,7 @@ export default function PreSiteDistributionPanel({
           setPreview(null);
           setConfirmed(false);
           setNotice(body.code === 'distribution_briefing_stale'
-            ? 'This preview carried a briefing link that has since been replaced. Create a new preview, review it, and then send.'
+            ? 'The briefing page link for this preview is out of date. Create a new preview, review it, and then send.'
             : 'This preview is out of date because the visit details or materials changed. Create a new preview, review it, and then send.');
         }
         return;

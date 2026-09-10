@@ -1328,6 +1328,32 @@ test('send refuses a prepared attempt whose briefing link was replaced', async (
   expect(dependencies.createEmailActivity).not.toHaveBeenCalled();
 });
 
+test('flag cutover: an unbound preview prepared before the flag is refused once the flag is on, unless its send was already requested', async () => {
+  const refuse = (row) => ({
+    ...currentSourceDependencies(row),
+    briefingReady: () => true,
+    getLiveBriefingLink: jest.fn(),
+    getAttempt: jest.fn(async () => row),
+    claimSend: jest.fn(async () => ({ ...row, lease_token: '77777777-7777-4777-8777-777777777777' })),
+    findEmailByCorrelation: jest.fn(async () => []),
+    createEmailActivity: jest.fn(),
+    recordFailure: jest.fn(async () => row),
+  });
+  const input = { requestId: REQUEST_ID, operationId: OPERATION_ID, previewHash: 'a'.repeat(64), fromEmail: 'sender@example.org', actingUserSystemId: ACTOR_ID };
+  const unbound = refuse(attemptFixture({ briefing_link_id: null }));
+  await expect(sendPreSiteDistribution(input, unbound)).rejects.toMatchObject({ code: 'distribution_briefing_stale' });
+  expect(unbound.createEmailActivity).not.toHaveBeenCalled();
+  expect(unbound.getLiveBriefingLink).not.toHaveBeenCalled();
+
+  // Already send-requested: the retry reconciles status and is not refused here.
+  const requested = refuse(attemptFixture({ briefing_link_id: null, state: 'send_requested', send_requested_at: new Date(), dynamics_email_id: null }));
+  await expect(sendPreSiteDistribution(input, requested)).rejects.not.toMatchObject({ code: 'distribution_briefing_stale' });
+
+  // Flag off: unbound previews send exactly as before.
+  const off = { ...refuse(attemptFixture({ briefing_link_id: null })), briefingReady: () => false };
+  await expect(sendPreSiteDistribution(input, off)).rejects.not.toMatchObject({ code: 'distribution_briefing_stale' });
+});
+
 test('send renders the live link into the activity body only at creation, and a reissue after attachments stops transport', async () => {
   const linkId = '99999999-9999-4999-8999-999999999999';
   const bodyWithPlaceholder = distributionBodyHtml('Attached.', OPERATION_ID, [], { id: linkId, expiresAt: '2026-10-08T20:00:00Z' });
