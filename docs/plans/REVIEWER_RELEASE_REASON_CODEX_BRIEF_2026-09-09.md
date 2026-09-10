@@ -273,10 +273,16 @@ is decorative and does not count):
   commit in this inventory); `df13f0d4` (completes the prior final commit
   inventory); and `6bee8d5c` (preserves token-revocation tri-state evidence and
   adds the unknown-review-status regeneration regression). The verified feature
-  predecessor is `6bee8d5c`; the handoff-finalizing documentation commit follows
-  it and is explicitly identified by its delivery SHA. All listed commits are pushed to
+  predecessor is `6bee8d5c`. Verification snapshot (2026-09-09, before this
+  final docs-only update): remote branch `95d26aeafcc5e5b9364d97392069e1623d6556fd`,
+  `origin/main` `7e06e4a1f65a864244279b521168059f672066c0`, divergence 7 behind /
+  29 ahead. The final docs-only commit containing this snapshot cannot list its
+  own hash; its delivered SHA is reported in the orchestrator handoff and is not
+  represented as part of this snapshot. All listed commits are pushed to
   `origin/codex/reviewer-release-reason`.
-- Files changed: `lib/services/review-manager/withdraw-sufficient-service.js`,
+- Files changed (summarized surface list; includes this brief and focused release,
+  history, UI, service, route, adapter, and regeneration test categories):
+  `lib/services/review-manager/withdraw-sufficient-service.js`,
   `lib/services/reviewer-engagement/withdraw-pending-invitation.js`,
   `lib/services/review-manager/regenerate-token-service.js`,
   `lib/dataverse/adapters/reviewer-suggestion.js`,
