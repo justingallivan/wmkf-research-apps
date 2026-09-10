@@ -14,3 +14,12 @@ paths = [
   '''^tests/unit/executor-budget-service\.test\.js$''',
   '''^tests/unit/prompt-templates-executor-budgets\.test\.js$''',
 ]
+
+[[allowlists]]
+description = "Fixture EXTERNAL_LINK_SECRET values in focused external-token verifier unit tests (never real; set on process.env inside the test)."
+targetRules = ["generic-api-key"]
+condition = "AND"
+regexes = ['''^(briefing-verifier-)?test-secret-''']
+paths = [
+  '''^tests/unit/verify-briefing-token\.test\.js$''',
+]

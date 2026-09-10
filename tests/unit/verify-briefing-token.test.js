@@ -7,7 +7,7 @@
 import { mintScopedToken, hashToken } from '../../lib/services/external-token';
 import { verifyBriefingToken } from '../../lib/external/verify-briefing-token';
 
-const SECRET = 'briefing-verifier-test-secret-at-least-32-chars';
+const SECRET = 'test-secret-32-chars-min-briefing-aaaaaaaa';
 const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
 const OTHER_REQUEST = '22222222-2222-4222-8222-222222222222';
 const FUTURE = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
