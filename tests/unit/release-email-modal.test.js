@@ -39,6 +39,47 @@ afterEach(() => {
   jest.restoreAllMocks();
 });
 
+test('opens with no reason chosen: nothing rendered, nothing fetched, release disabled', () => {
+  render(
+    <ReleaseEmailModal
+      requestId={REQUEST_ID}
+      suggestionIds={[FIRST_ID, SECOND_ID]}
+      onClose={jest.fn()}
+      onReleased={jest.fn()}
+    />,
+  );
+
+  expect(screen.getByRole('radio', { name: /^No longer needed/ })).not.toBeChecked();
+  expect(screen.getByRole('radio', { name: /^No response/ })).not.toBeChecked();
+  expect(screen.queryByRole('checkbox', { name: 'Also send a courtesy note' })).not.toBeInTheDocument();
+  expect(screen.queryByText('Rendering emails…')).not.toBeInTheDocument();
+  expect(global.fetch).not.toHaveBeenCalled();
+  expect(screen.getByRole('button', { name: 'Release (2)' })).toBeDisabled();
+});
+
+test('choosing No longer needed renders the previews once and keeps them when switching reasons', async () => {
+  global.fetch.mockResolvedValueOnce(response({
+    ok: true,
+    drafts: [draft(FIRST_ID, 'Dr. First Reviewer', 'first@example.org')],
+  }));
+  render(
+    <ReleaseEmailModal
+      requestId={REQUEST_ID}
+      suggestionIds={[FIRST_ID]}
+      onClose={jest.fn()}
+      onReleased={jest.fn()}
+    />,
+  );
+
+  fireEvent.click(screen.getByRole('radio', { name: /^No longer needed/ }));
+  await screen.findByDisplayValue('Subject for Dr. First Reviewer');
+  fireEvent.click(screen.getByRole('radio', { name: /^No response/ }));
+  expect(screen.queryByDisplayValue('Subject for Dr. First Reviewer')).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Also send a courtesy note' }));
+  expect(screen.getByDisplayValue('Subject for Dr. First Reviewer')).toBeInTheDocument();
+  expect(global.fetch).toHaveBeenCalledTimes(1);
+});
+
 test('an unmounted in-flight send cannot close or clear a later parent state', async () => {
   let resolveSend;
   const sendResponse = new Promise((resolve) => {
@@ -61,6 +102,7 @@ test('an unmounted in-flight send cannot close or clear a later parent state', a
     />,
   );
 
+  fireEvent.click(screen.getByRole('radio', { name: /^No longer needed/ }));
   await screen.findByDisplayValue('Subject for Dr. First Reviewer');
   fireEvent.click(screen.getByRole('button', { name: 'Release (1)' }));
   await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2));
@@ -108,6 +150,7 @@ test('sends complete reviewed rows and names every non-allowlisted result', asyn
     />,
   );
 
+  fireEvent.click(screen.getByRole('radio', { name: /^No longer needed/ }));
   await screen.findByDisplayValue(first.subject);
   fireEvent.change(screen.getAllByLabelText('Message')[0], {
     target: { value: 'Edited complete body' },
@@ -158,6 +201,7 @@ test('no response hides previews and releases without an email by default', asyn
     />,
   );
 
+  fireEvent.click(screen.getByRole('radio', { name: /^No longer needed/ }));
   await screen.findByDisplayValue('Subject for Dr. First Reviewer');
   fireEvent.click(screen.getByRole('radio', { name: /^No response/ }));
   expect(screen.queryByDisplayValue('Subject for Dr. First Reviewer')).not.toBeInTheDocument();
@@ -193,10 +237,9 @@ test('no response with courtesy note restores previews and posts reviewed overri
     />,
   );
 
-  await screen.findByDisplayValue(first.subject);
   fireEvent.click(screen.getByRole('radio', { name: /^No response/ }));
   fireEvent.click(screen.getByRole('checkbox', { name: 'Also send a courtesy note' }));
-  expect(screen.getByDisplayValue(first.subject)).toBeInTheDocument();
+  expect(await screen.findByDisplayValue(first.subject)).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Release (1)' }));
   await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2));
   const body = JSON.parse(global.fetch.mock.calls[1][1].body);
@@ -210,16 +253,12 @@ test('no response with courtesy note restores previews and posts reviewed overri
   });
 });
 
-test('no response without a courtesy note does not wait for the preview request', async () => {
-  let resolvePreview;
-  const previewPending = new Promise((resolve) => { resolvePreview = resolve; });
-  global.fetch
-    .mockImplementationOnce(() => previewPending)
-    .mockResolvedValueOnce(response({
-      ok: true,
-      withdrawn: 1,
-      results: [{ suggestionId: FIRST_ID, status: 'withdrawn_no_email_by_reason', reason: 'no_response' }],
-    }));
+test('no response without a courtesy note never requests a preview', async () => {
+  global.fetch.mockResolvedValueOnce(response({
+    ok: true,
+    withdrawn: 1,
+    results: [{ suggestionId: FIRST_ID, status: 'withdrawn_no_email_by_reason', reason: 'no_response' }],
+  }));
   const onClose = jest.fn();
   render(
     <ReleaseEmailModal
@@ -235,15 +274,12 @@ test('no response without a courtesy note does not wait for the preview request'
   expect(screen.getByRole('button', { name: 'Release (1)' })).toBeEnabled();
   fireEvent.click(screen.getByRole('button', { name: 'Release (1)' }));
 
-  await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2));
-  expect(JSON.parse(global.fetch.mock.calls[1][1].body)).toEqual({
+  await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
+  expect(global.fetch.mock.calls[0][0]).toBe('/api/review-manager/withdraw-sufficient');
+  expect(JSON.parse(global.fetch.mock.calls[0][1].body)).toEqual({
     requestId: REQUEST_ID,
     suggestionIds: [FIRST_ID],
     reason: 'no_response',
   });
   expect(onClose).toHaveBeenCalled();
-  await act(async () => {
-    resolvePreview(response({ ok: true, drafts: [] }));
-    await previewPending;
-  });
 });

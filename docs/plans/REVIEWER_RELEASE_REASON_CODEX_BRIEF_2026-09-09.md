@@ -238,7 +238,9 @@ is decorative and does not count):
   `wmkf_responsetype = no_response` and `wmkf_externaltokenrevoked = true` returns
   `{ ok: false, reason: 'revoked' }` — the discriminating fixture is the same row with the flag
   false, which today still verifies; assert that too, so the guard is proven load-bearing.
-- Modal: default radio is No longer needed with previews shown; choosing No response hides
+- Modal (as briefed; superseded 2026-09-09 after merge — the owner removed the UI default, so the
+  modal now opens with no reason chosen and renders previews only once a choice calls for an
+  email; the server default is unchanged): default radio is No longer needed with previews shown; choosing No response hides
   previews and unchecks the note; the posted body carries `reason` and, for No response with
   the note on, the `overrides`.
 - History drawer: a PD-recorded `no_response` renders the new label and the staff attribution;
