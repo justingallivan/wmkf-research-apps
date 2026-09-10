@@ -643,6 +643,8 @@ test('dialog mode: Add from directory opens the picker above the composer, and E
   );
   const composer = await screen.findByRole('dialog', { name: 'Share for the deliberation session' });
   expect(within(composer).getByTestId('composer-lock-note')).toBeInTheDocument();
+  // Close is reachable at both ends of a long dialog (owner 2026-09-10).
+  expect(within(composer).getAllByRole('button', { name: 'Close' })).toHaveLength(2);
   expect(within(composer).getByRole('button', { name: 'Lock and preview' })).toBeInTheDocument();
 
   fireEvent.click(within(composer).getAllByRole('button', { name: 'Add from directory' })[0]);

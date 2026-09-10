@@ -246,6 +246,16 @@ function ComposerDialog({ onClose, busy, escapeDisabled = false, children }) {
           </button>
         </div>
         {children}
+        <div className="mt-6 flex justify-end border-t border-gray-200 pt-4">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={busy}
+            className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50"
+          >
+            Close
+          </button>
+        </div>
       </div>
     </div>
   );
