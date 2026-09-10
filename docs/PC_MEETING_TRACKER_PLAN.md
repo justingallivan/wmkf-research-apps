@@ -304,7 +304,11 @@ readiness flag is enabled for that target.
    drift detection, correlation recovery, and lease-fenced transport live in
    `lib/services/meeting-tracker/agenda-service.js` and `agenda-store.js`.
    Migration `041_deliberation_agenda_sends.sql` plus fresh-install v44 provide
-   the ledger. **[VERIFIED via the focused agenda schema/service/route/panel
+   the ledger. GET keeps the last sent receipt separate from any unresolved
+   send; the composer pins that unresolved operation for retry and prepare
+   blocks a competing operation. Retry records an accepted status, resumes a
+   confirmed Draft on the same Dynamics activity, and never sends when status
+   is unknown or unreadable. **[VERIFIED via the focused agenda schema/service/route/panel
    suites; external schema state remains ASSUMED until the owner applies and
    reads back migration 041.]** Build brief:
    `docs/plans/SESSION_AGENDA_EMAIL_CODEX_BRIEF_2026-09-10.md`.

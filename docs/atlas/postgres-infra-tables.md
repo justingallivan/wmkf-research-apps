@@ -251,10 +251,14 @@ location, ordered proposal identities/details/minutes/computed windows/HTTPS
 briefing links, normalized To/Cc, subject, exact text/HTML, sender, and
 session-derived Dynamics actor. States are `prepared`, `activity_created`,
 `send_requested`, and `sent`. A lease fence, correlation-key recovery, durable
-activity ID, and durable send intent prevent a retry from creating or sending
-a second activity; only Dynamics status 3/6/7 records transport acceptance.
-GET reads the newest row per session and compares the live start plus ordered
-request/minutes tuples with the frozen snapshot for the drift note. Read/write
+activity ID, and durable send intent prevent a retry from creating a second
+activity. A retry reconciles Dynamics first: status 3/6/7 records transport
+acceptance, confirmed Draft resumes SendEmail on the same activity, and an
+unknown or unreadable status does not send. GET reads the latest sent row for
+the receipt/drift note and separately returns the latest unresolved
+`send_requested` row; prepare refuses a different operation until that pending
+send is resolved. Drift compares the live start as an instant plus ordered
+request/minutes tuples with the frozen sent snapshot. Read/write
 paths are `lib/services/meeting-tracker/agenda-store.js` and
 `lib/services/meeting-tracker/agenda-service.js`; the guarded API is
 `/api/meeting-tracker/sessions/[id]/agenda`. No cleanup is scheduled; rows

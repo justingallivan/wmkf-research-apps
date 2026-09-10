@@ -143,22 +143,27 @@ briefing services, or any migration below 041.
 - **Prepare then send, with a fixed preview.** POST prepare computes the snapshot from the live
   session and slots, normalizes recipients, renders body text and HTML, inserts the row
   (`ON CONFLICT (operation_id) DO NOTHING`, then read back; a different session or subject under
-  the same operation id is a 409), and returns the projection. Send takes `{ sessionId,
+  the same operation id is a 409; JSONB object-key order does not affect exactness), refuses a
+  different operation while a durable send is unresolved, and returns the projection. Send takes `{ sessionId,
   operationId }`, claims the lease, creates the activity with correlation key
   `wmkf-deliberation-agenda:<operation_id>` (recover an existing activity by that key before
   creating another), records the activity id, records send intent, renews the lease, calls
   SendEmail, reads the status, records sent when the status is in 3/6/7. A retry on a row with
   a durable activity id reconciles the Dynamics status first and never creates a second
-  activity. Failures record `last_error_*` and release the lease.
+  activity. Accepted status closes the receipt; confirmed Draft resumes SendEmail on the same
+  activity; unknown or unreadable status never sends. Failures record `last_error_*` and
+  release the lease.
 - **Body HTML escapes every value** (`escapeHtml` pattern in `distribution-service.js`) and
   carries only https links (the Zoom link and briefing URLs are already https-validated
   upstream; re-check with `new URL(...).protocol === 'https:'` and drop anything else).
 - **Briefing URLs in the body are the unsealed live links** exactly as the deliberation email
   carries one; do not persist them anywhere except the ledger's `body_html`/snapshot (owner D18
   in the briefing plan accepts that the token appears in transport artifacts).
-- **Drift note (D22):** GET returns the last row for the session (by `created_at`), its
-  recipients count, `sent_at`, and `scheduleChanged: boolean` computed by comparing the current
-  session start plus the current ordered `(requestId, minutes)` list against the snapshot.
+- **Drift note and pending recovery (D22):** GET returns the latest sent row for the receipt and
+  separately the latest unresolved `send_requested` row. `scheduleChanged: boolean` compares
+  the current session start as an instant plus the current ordered `(requestId, minutes)` list
+  against the sent snapshot. The panel pins an unresolved operation for exact retry rather than
+  allowing a new preview.
 - **Never read identity from the body.** Session id from the path, actor from the session, from
   address from the session user.
 - **Fail closed** on: flag off (503 after auth), session not found (404), no slots (409 with a
@@ -230,7 +235,8 @@ confirmation gate, receipt, stale notice, drift note).
 
 ### Codex handoff — 2026-09-10
 
-- **[VERIFIED via commit `2c08222c` and 23 focused tests]** The complete
+- **[VERIFIED via source commit `2c08222c`, Claude Opus adversarial review,
+  remediation commit `81f417c9`, and 24 focused tests]** The complete
   source feature is built: migration/fresh-install schema, exact-email ledger,
   session agenda calculation and HTML/text rendering, drift read, lease-fenced
   Dynamics create/recovery/send, guarded GET/prepare/send route, fixed-preview
@@ -241,10 +247,13 @@ confirmation gate, receipt, stale notice, drift note).
   built source and its runtime boundary. Canonical counts are 125 guarded API
   endpoints and 203 API route files.
 - **[VERIFIED via local execution]** The 17 Meeting Tracker/parity suites passed
-  (87 tests); every gate named in this brief passed, with each available
-  self-test run sequentially. Type checking, status-enum parity, and secret scan
-  also passed. The existing `MeetingTrackerList` missing-key React warning still
-  appears in its pre-existing page test and is outside this brief's owned files.
+  after remediation (92 tests); every gate named in this brief passed after
+  remediation, with each available self-test run sequentially. Type checking,
+  status-enum parity, secret scan, targeted lint, and the production build also
+  passed. The build retains the pre-existing Turbopack dynamic-filesystem-access
+  warning for `pre-site-visit/docx-renderer.js`; the existing
+  `MeetingTrackerList` missing-key React warning still appears in its
+  pre-existing page test. Both are outside this brief's owned files.
 - **[VERIFIED by this Codex session]** No migration was applied, no readiness or
   production-acknowledgement environment variable was set, and no deployment or
   merge was performed. **[ASSUMED externally]** Migration 041 remains unapplied
@@ -255,8 +264,9 @@ confirmation gate, receipt, stale notice, drift note).
   explicit approval after that risk is stated.
 
 Open questions: none within D21–D25. An unresolved durable `send_requested`
-receipt deliberately does not call SendEmail again; it remains retryable for
-status reconciliation so an ambiguous response cannot become a duplicate send.
+row remains visible and blocks a competing operation. A retry closes an accepted
+receipt, resumes SendEmail only when Dynamics confirms the same activity is
+still Draft, and does not send when status is unknown or unreadable.
 
 After reviewing the branch, the owner should apply through the existing-database
 runner and read back the tracker row, all 24 columns, four constraints (primary
