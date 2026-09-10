@@ -59,6 +59,12 @@ it('defaults an unrecognized scope value to all', async () => {
   expect(listPreSiteVisitDrafts).toHaveBeenCalledWith(expect.objectContaining({ scope: 'all' }));
 });
 
+it('pins the default: a missing scope query param yields all, not accidentally', async () => {
+  const res = responseHarness();
+  await handler({ method: 'GET', query: { cycleCode: 'D26' } }, res);
+  expect(listPreSiteVisitDrafts).toHaveBeenCalledWith(expect.objectContaining({ scope: 'all' }));
+});
+
 it('resolves callerSystemId to null when the session has no linked systemuser', async () => {
   requireAppAccess.mockResolvedValue({ session: { user: {} } });
   const res = responseHarness();

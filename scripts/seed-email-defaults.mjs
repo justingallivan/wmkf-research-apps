@@ -41,7 +41,6 @@ import {
   REVIEWER_THANKYOU_SEED_SUBJECT,
   REVIEWER_THANKYOU_SEED_BODY,
 } from '../lib/seed/email-defaults/reviewer-templates.js';
-import { DELIBERATION_STAGE_DEFAULT_LABELS } from '../shared/utils/deliberation-stage.js';
 
 export const EMAIL_DEFAULT_SEED_TEXT = Object.freeze({
   'email.grantee_invite.subject': GRANTEE_INVITE_SEED_SUBJECT,
@@ -68,15 +67,6 @@ export const EMAIL_DEFAULT_SEED_TEXT = Object.freeze({
   'email.reviewer_thankyou.body': REVIEWER_THANKYOU_SEED_BODY,
   'email.grantee_reminder.subject': GRANTEE_REMINDER_SEED_SUBJECT,
   'email.grantee_reminder.body': GRANTEE_REMINDER_SEED_BODY,
-  // Staff Deliberations stage labels (D6, docs/PC_MEETING_TRACKER_PLAN.md):
-  // unlike the email defaults above, these already have a code-owned fallback
-  // (DELIBERATION_STAGE_DEFAULT_LABELS) read at request time when unset, so
-  // seeding is a convenience for admin-panel discoverability, not a
-  // functional requirement.
-  'stage.deliberations.draft': DELIBERATION_STAGE_DEFAULT_LABELS.draft,
-  'stage.deliberations.shared': DELIBERATION_STAGE_DEFAULT_LABELS.shared,
-  'stage.deliberations.visit': DELIBERATION_STAGE_DEFAULT_LABELS.visit,
-  'stage.deliberations.final': DELIBERATION_STAGE_DEFAULT_LABELS.final,
 });
 
 export function loadEnvLocal() {
@@ -104,6 +94,17 @@ export async function seedEmailDefaults({
 
   const results = [];
   for (const entry of EDITABLE_TEXT_DEFAULTS) {
+    // Display labels (stage.*, e.g. the Staff Deliberations rail stops) have
+    // a code-owned default read at request time when unset — they are not
+    // email copy with no other fallback. The admin panel already enumerates
+    // EDITABLE_TEXT_DEFAULTS (not stored rows), so the key is editable there
+    // regardless; seeding one would pin wording into Dataverse and defeat
+    // the code default. Skip rather than requiring a seed string.
+    if (entry.key.startsWith('stage.')) {
+      results.push({ key: entry.key, action: 'skip-no-seed' });
+      continue;
+    }
+
     const seedText = EMAIL_DEFAULT_SEED_TEXT[entry.key];
     if (typeof seedText !== 'string') {
       throw new Error(`No seed text registered for ${entry.key}`);

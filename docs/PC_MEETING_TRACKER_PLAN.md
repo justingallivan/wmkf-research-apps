@@ -94,7 +94,7 @@ Two earlier decisions are **superseded in part** and must be read with this plan
 - **The rail today.** `StaffDeliberationsTab.js` derives Draft → Share → Wrap Up; Wrap Up is
   derived from the first transport-accepted materials send (`currentSourceEverSent`), and the
   tab renders **no visit date at all**. The 2026-09-09 cycle view (`StaffDeliberationsPanel.js`)
-  shows registry lifecycle/operation only.
+  shows registry lifecycle/operation only. (Superseded by slice 3, 2026-09-09; see §7.)
 - **Deliberation sessions** exist nowhere in the system.
 - **Recording / transcript / transcript-summary** artifact types exist in the registry but have no
   producer; only distribution and logistics reference them as material categories.

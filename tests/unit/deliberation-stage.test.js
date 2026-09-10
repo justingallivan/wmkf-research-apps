@@ -46,6 +46,9 @@ describe('deriveDeliberationStage: lifecycle x visit x everSent', () => {
     ['REVIEW, past visit, sent -> visit/awaiting-observations', REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW, PAST, true, 'visit', 'awaiting-observations', 'visited'],
     ['FINAL, no visit -> final/moved', REQUEST_DOCUMENT_LIFECYCLE_STATE.FINAL, null, false, 'final', 'moved', 'not-scheduled'],
     ['FINAL, past visit -> final/moved (visit line is independent)', REQUEST_DOCUMENT_LIFECYCLE_STATE.FINAL, PAST, true, 'final', 'moved', 'visited'],
+    ['BOARD_READY -> beyond/unknown-lifecycle, not silently "draft"', REQUEST_DOCUMENT_LIFECYCLE_STATE.BOARD_READY, null, false, 'beyond', 'unknown-lifecycle', 'not-scheduled'],
+    ['SUPERSEDED -> beyond/unknown-lifecycle', REQUEST_DOCUMENT_LIFECYCLE_STATE.SUPERSEDED, PAST, false, 'beyond', 'unknown-lifecycle', 'visited'],
+    ['unknown numeric lifecycle -> beyond/unknown-lifecycle (fails closed, not "draft")', 999999999, null, false, 'beyond', 'unknown-lifecycle', 'not-scheduled'],
   ];
 
   it.each(cases)('%s', (_label, lifecycle, visitIso, everSent, expectedStage, expectedSubstate, expectedVisitStatus) => {
@@ -86,6 +89,25 @@ describe('draft substates', () => {
     });
     expect(result).toMatchObject({ stage: 'draft', substate: 'none' });
   });
+});
+
+it('D7 "in the past" is strict: a visit scheduled for exactly now is scheduled, not visited', () => {
+  const result = deriveDeliberationStage({
+    currentArtifact: artifact(REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW),
+    siteVisitStartIso: NOW.toISOString(),
+    now: NOW,
+  });
+  expect(result.visit.status).toBe('scheduled');
+  expect(result.stage).toBe('shared');
+
+  const oneMsLater = new Date(NOW.getTime() + 1);
+  const pastByOneMs = deriveDeliberationStage({
+    currentArtifact: artifact(REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW),
+    siteVisitStartIso: NOW.toISOString(),
+    now: oneMsLater,
+  });
+  expect(pastByOneMs.visit.status).toBe('visited');
+  expect(pastByOneMs.stage).toBe('visit');
 });
 
 it('malformed siteVisitStartIso is treated as not-scheduled', () => {

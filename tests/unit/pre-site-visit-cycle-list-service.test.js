@@ -157,15 +157,26 @@ describe('site visit join', () => {
 
   it('a past visit moves the request to the visit stage; a future visit keeps it shared', async () => {
     siteVisitAdapter.findActiveByRequests.mockResolvedValue([
-      { _regardingobjectid_value: R1, scheduledstart: '2020-01-01T00:00:00Z', scheduledend: null, wmkf_visitformat: 1, wmkf_locationorlink: 'Lab A' },
-      { _regardingobjectid_value: R2, scheduledstart: '2099-01-01T00:00:00Z', scheduledend: null, wmkf_visitformat: 1, wmkf_locationorlink: 'Lab B' },
+      { _regardingobjectid_value: R1, scheduledstart: '2020-01-01T00:00:00Z', scheduledend: null },
+      { _regardingobjectid_value: R2, scheduledstart: '2099-01-01T00:00:00Z', scheduledend: null },
     ]);
     const result = await listPreSiteVisitDrafts({ cycleCode: 'D26' });
     const byRequest = Object.fromEntries(result.artifacts.map((a) => [a.requestId, a]));
     expect(byRequest[R1]).toMatchObject({ stage: 'visit', substate: 'awaiting-observations' });
-    expect(byRequest[R1].siteVisit).toMatchObject({ startIso: '2020-01-01T00:00:00Z', locationOrLink: 'Lab A' });
+    // Only startIso/endIso — the Wave-21-gated logistics fields (format,
+    // locationOrLink) are never selected on this multi-request read.
+    expect(byRequest[R1].siteVisit).toEqual({ startIso: '2020-01-01T00:00:00Z', endIso: null });
     expect(byRequest[R2]).toMatchObject({ stage: 'shared', substate: 'not-sent' });
     expect(byRequest[R2].visit).toMatchObject({ status: 'scheduled' });
+  });
+
+  it('does not select or project the Wave-21-gated logistics fields', async () => {
+    siteVisitAdapter.findActiveByRequests.mockResolvedValue([
+      { _regardingobjectid_value: R1, scheduledstart: '2020-01-01T00:00:00Z', scheduledend: '2020-01-01T02:00:00Z' },
+    ]);
+    const result = await listPreSiteVisitDrafts({ cycleCode: 'D26' });
+    expect(result.artifacts[0].siteVisit).not.toHaveProperty('format');
+    expect(result.artifacts[0].siteVisit).not.toHaveProperty('locationOrLink');
   });
 });
 
@@ -178,6 +189,26 @@ describe('everSent join', () => {
     sentSourceDocumentIds.mockResolvedValue(new Set(['r1-doc']));
     const result = await listPreSiteVisitDrafts({ cycleCode: 'D26' });
     expect(result.artifacts[0]).toMatchObject({ everSent: true, stage: 'shared', substate: 'sent' });
+  });
+
+  it('matches the sent-document GUID case-insensitively', async () => {
+    requestDocumentAdapter.findByCycle.mockResolvedValue({ records: [
+      row({ wmkf_requestdocumentid: 'R1-DOC', _wmkf_request_value: R1, wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW }),
+    ] });
+    grantRequestAdapter.findByIds.mockResolvedValue({ records: [request(R1, { _wmkf_currentpresitevisit_value: null })] });
+    // The Postgres-side helper lowercases what it stores; simulate that here
+    // rather than assuming the caller already matches case.
+    sentSourceDocumentIds.mockResolvedValue(new Set(['r1-doc']));
+    const result = await listPreSiteVisitDrafts({ cycleCode: 'D26' });
+    expect(result.artifacts[0]).toMatchObject({ everSent: true, substate: 'sent' });
+  });
+});
+
+describe('projected row shape', () => {
+  it('does not include programDirectorId (nothing consumes it)', async () => {
+    requestDocumentAdapter.findByCycle.mockResolvedValue({ records: [row()] });
+    const result = await listPreSiteVisitDrafts({ cycleCode: 'D26' });
+    expect(result.artifacts[0]).not.toHaveProperty('programDirectorId');
   });
 });
 

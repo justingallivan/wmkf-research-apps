@@ -27,6 +27,7 @@ import DeliberationStageRail from './DeliberationStageRail';
 import {
   DELIBERATION_STAGE_DEFAULT_LABELS,
   deriveDeliberationStage,
+  visitExpected,
 } from '../../utils/deliberation-stage';
 import {
   PRE_SITE_REOPEN_CONTRACT,
@@ -370,13 +371,6 @@ export default function StaffDeliberationsTab({
     && pendingArtifact.retryable === false;
   const shared = artifact?.lifecycleState === REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW;
   const draftReady = artifact?.lifecycleState === REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT;
-  const movedToFinal = artifact?.lifecycleState === REQUEST_DOCUMENT_LIFECYCLE_STATE.FINAL;
-  const beyondDeliberations = Boolean(artifact) && !draftReady && !shared;
-  // A lifecycle outside the four keyed stops (Board Ready/Superseded/unknown —
-  // never produced for the *current* artifact in practice; distribution
-  // snapshots that use Board Ready are separate rows, not this one). The rail
-  // has nothing meaningful to show for it, so it stays hidden (fail closed).
-  const unknownLifecycle = beyondDeliberations && !movedToFinal;
   // Server-derived (uncapped EXISTS, scoped to the current source document) so
   // a superseded document's sends never promote its reopen successor and the
   // display cap cannot regress the stage (Codex S466).
@@ -396,14 +390,26 @@ export default function StaffDeliberationsTab({
 
   // PC Meeting Tracker slice 3 (docs/PC_MEETING_TRACKER_PLAN.md D5-D9): the
   // four-stop rail derivation. `stage`/`substate`/`visit` drive display only —
-  // every existing gate above (`shared`, `draftReady`, `movedToFinal`) stays
-  // lifecycle-derived so the working controls and distribution panel are
-  // unaffected by the visit having happened.
+  // every existing gate above (`shared`, `draftReady`) stays lifecycle-derived
+  // so the working controls and distribution panel are unaffected by the
+  // visit having happened.
   const { stage, substate, visit } = deriveDeliberationStage({
     currentArtifact: artifact,
     siteVisitStartIso,
     everSent,
   });
+  const movedToFinal = stage === 'final';
+  // A lifecycle outside the four keyed stops (Board Ready/Superseded/unknown —
+  // never produced for the *current* artifact in practice; distribution
+  // snapshots that use Board Ready are separate rows, not this one). The rail
+  // has nothing meaningful to show for it, so it stays hidden (fail closed).
+  const unknownLifecycle = stage === 'beyond';
+  const beyondDeliberations = movedToFinal || unknownLifecycle;
+  // D8/J27 (docs/PC_MEETING_TRACKER_PLAN.md): whether a visit is even expected
+  // this cycle. No production caller varies it today (D26 is always true), but
+  // the visit line at draft/shared is anticipatory ("not scheduled" as a PC
+  // to-do) and has nothing honest to say once J27 makes a visit optional.
+  const visitLineVisible = visitExpected() || stage === 'visit' || stage === 'final';
 
   const startShare = async () => {
     if (!requestId || !readyFile || !draftReady || startingShare) return;
@@ -620,13 +626,15 @@ export default function StaffDeliberationsTab({
                   labels={stageLabels}
                   reopened={draftReady && reopenHistory.length > 0}
                 />
-                <p className="mt-1 text-xs text-gray-500" data-testid="deliberations-visit-line">
-                  {visit.status === 'not-scheduled' && 'Visit not scheduled.'}
-                  {visit.status === 'scheduled' && `Visit ${new Date(visit.startIso).toLocaleDateString()}.`}
-                  {visit.status === 'visited' && `Visited ${new Date(visit.startIso).toLocaleDateString()}.`}
-                  {stage === 'visit' && ' Add observations in Word.'}
-                  {stage === 'shared' && substate === 'not-sent' && ' Not yet sent.'}
-                </p>
+                {visitLineVisible && (
+                  <p className="mt-1 text-xs text-gray-500" data-testid="deliberations-visit-line">
+                    {visit.status === 'not-scheduled' && 'Visit not scheduled.'}
+                    {visit.status === 'scheduled' && `Visit ${new Date(visit.startIso).toLocaleDateString()}.`}
+                    {visit.status === 'visited' && `Visited ${new Date(visit.startIso).toLocaleDateString()}.`}
+                    {stage === 'visit' && ' Add observations in Word.'}
+                    {stage === 'shared' && substate === 'not-sent' && ' Not yet sent.'}
+                  </p>
+                )}
                 {stage === 'visit' && (
                   onSelectTab ? (
                     <button

@@ -50,8 +50,10 @@ function deriveVisit(siteVisitStartIso, now) {
   if (!siteVisitStartIso) return { status: 'not-scheduled', startIso: null };
   const startMs = Date.parse(siteVisitStartIso);
   if (!Number.isFinite(startMs)) return { status: 'not-scheduled', startIso: null };
+  // D7: "visited" means the scheduled start is in the past — strict `<`, so a
+  // visit scheduled for exactly `now` reads as still upcoming, not visited.
   return {
-    status: startMs <= now.getTime() ? 'visited' : 'scheduled',
+    status: startMs < now.getTime() ? 'visited' : 'scheduled',
     startIso: siteVisitStartIso,
   };
 }
@@ -63,7 +65,7 @@ function deriveVisit(siteVisitStartIso, now) {
  * @param {string|null} [args.siteVisitStartIso] - the wmkf_sitevisit Activity's scheduledstart.
  * @param {boolean} [args.everSent] - whether the shared document has ever been sent (substate only).
  * @param {Date} [args.now]
- * @returns {{ stage: 'draft'|'shared'|'visit'|'final', substate: string, visit: { status: string, startIso: string|null } }}
+ * @returns {{ stage: 'draft'|'shared'|'visit'|'final'|'beyond', substate: string, visit: { status: string, startIso: string|null } }}
  */
 export function deriveDeliberationStage({
   currentArtifact = null,
@@ -85,5 +87,15 @@ export function deriveDeliberationStage({
     return { stage: 'shared', substate: everSent ? 'sent' : 'not-sent', visit };
   }
 
-  return { stage: 'draft', substate: draftSubstate(currentArtifact), visit };
+  if (lifecycleState === null || lifecycleState === REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT) {
+    return { stage: 'draft', substate: draftSubstate(currentArtifact), visit };
+  }
+
+  // Board Ready / Superseded / any other numeric value not among the four
+  // keyed stops. Never produced for the *current* artifact in practice (Board
+  // Ready is only used on separate frozen distribution-snapshot rows), but
+  // fails closed to an explicit out-of-band stage rather than silently
+  // relabeling it "draft". Not in DELIBERATION_STAGE_KEYS — callers that
+  // group/count by stage key must treat this as its own bucket.
+  return { stage: 'beyond', substate: 'unknown-lifecycle', visit };
 }

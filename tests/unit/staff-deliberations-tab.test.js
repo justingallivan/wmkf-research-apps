@@ -26,9 +26,16 @@ jest.mock('../../shared/components/workbench/PreSiteDistributionPanel', () => {
   return { __esModule: true, default: MockDistributionPanel };
 });
 let siteVisitContextFeed = null;
+const siteVisitContextMock = jest.fn(() => siteVisitContextFeed);
 jest.mock('../../shared/components/workbench/useSiteVisitContext', () => ({
   __esModule: true,
-  default: () => siteVisitContextFeed,
+  default: (...args) => siteVisitContextMock(...args),
+}));
+
+let visitExpectedFeed = true;
+jest.mock('../../shared/utils/deliberation-stage', () => ({
+  ...jest.requireActual('../../shared/utils/deliberation-stage'),
+  visitExpected: () => visitExpectedFeed,
 }));
 
 const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
@@ -91,6 +98,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   distributionHistoryFeed = null;
   siteVisitContextFeed = null;
+  visitExpectedFeed = true;
   global.fetch = jest.fn(async (_url, options = {}) => (
     options.method === 'POST' ? successResponse() : statusResponse()
   ));
@@ -707,14 +715,30 @@ test('a draft-stage request with no scheduled visit shows "Visit not scheduled"'
   expect(await screen.findByText('Visit not scheduled.')).toBeInTheDocument();
 });
 
-test('the site-visit hook is consulted even at the draft stage (fail-open, unconditional per §5.4)', async () => {
+test('when visitExpected() is false, the visit line is not rendered at the draft stage (discriminating fixture)', async () => {
+  visitExpectedFeed = false;
+  siteVisitContextFeed = null;
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+
+  await screen.findByTestId('stage-rail');
+  expect(screen.queryByTestId('deliberations-visit-line')).not.toBeInTheDocument();
+  expect(screen.queryByText('Visit not scheduled.')).not.toBeInTheDocument();
+});
+
+test('the site-visit hook is consulted with the requestId even at the draft stage (fail-open, unconditional per §5.4)', async () => {
   siteVisitContextFeed = { siteVisit: { startIso: '2099-01-01T00:00:00Z' } };
   render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
 
   // A future visit line shows up before the document is ever shared, proving
-  // the hook was called (and its result used) for a plain draft-stage render.
+  // the hook's result was used for a plain draft-stage render.
   expect(await screen.findByText(`Visit ${new Date('2099-01-01T00:00:00Z').toLocaleDateString()}.`)).toBeInTheDocument();
   expect(screen.getByTestId('stage-rail')).toHaveTextContent('● AI draft ready');
+  // Not decorative: the mock actually receives the real requestId, not a
+  // stage-gated null (restoring the old `shared && readyFile ? requestId :
+  // null` gate would make this assertion fail even though every other
+  // assertion above stays green).
+  expect(siteVisitContextMock).toHaveBeenCalledWith(REQUEST_ID);
+  expect(siteVisitContextMock).not.toHaveBeenCalledWith(null);
 });
 
 test('a shared document with a future scheduled visit shows the visit date, not yet visited', async () => {
