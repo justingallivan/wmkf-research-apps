@@ -46,9 +46,10 @@ and ETag `W/"95328121"`.
 `pages/api/workbench/site-visit/logistics.js` establishes app access and the
 Dataverse restriction context, then delegates to
 `lib/services/site-visit/logistics-service.js`. The service independently
-requires the Request's current Pre-Site artifact to be Ready/Review, permits at
-most one active Site Visit, resolves every organizer/attendee server-side, and
-binds the Activity to the Request.
+requires the request to be an advancing request in a cycle with a meeting date
+(`isVisibleRequestRow`, the Request-list predicate; owner 2026-09-09, PC
+scheduling precedes sharing), permits at most one active Site Visit, resolves
+every organizer/attendee server-side, and binds the Activity to the Request.
 
 First save creates the Activity with nested ActivityParty rows. Field-only edits
 use `If-Match` parent PATCH. Dataverse rejects direct ActivityParty create/update/
@@ -59,6 +60,15 @@ fallback.
 
 ## Consumers
 
+- `listPreSiteVisitDrafts` (`lib/services/pre-site-visit/cycle-list-service.js`,
+  PC Meeting Tracker slice 3, 2026-09-09) is a READ-ONLY multi-request
+  consumer for the Staff Deliberations cycle view: `site-visit.js::
+  findActiveByRequests(requestIds)` chunks the OR filter at 25 ids and reads
+  `activityid, _regardingobjectid_value, scheduledstart, scheduledend,
+  wmkf_visitformat, wmkf_locationorlink` for every advancing request in the
+  cycle at once — no ActivityParty expand, since the cycle view only needs the
+  scheduled date to derive the rail's `visit` stop (D7: date-derived), not
+  attendees.
 - `useSiteVisitContext` (`shared/components/workbench/useSiteVisitContext.js`)
   is the Workbench's READ-ONLY consumer since S466: the logistics editor
   (`SiteVisitLogisticsPanel`) was removed 2026-08-28 by owner decision —

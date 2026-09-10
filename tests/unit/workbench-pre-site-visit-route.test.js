@@ -13,6 +13,9 @@ jest.mock('../../lib/services/pre-site-visit/artifact-service', () => ({
   generatePreSiteVisitArtifact: jest.fn(),
   getPreSiteVisitArtifactStatus: jest.fn(),
 }));
+jest.mock('../../lib/services/deliberation-stage-labels', () => ({
+  readDeliberationStageLabels: jest.fn(),
+}));
 
 import { getUserRole, requireAppAccess } from '../../lib/utils/auth';
 import { withDalContext } from '../../lib/dataverse/core/context';
@@ -21,8 +24,11 @@ import {
   generatePreSiteVisitArtifact,
   getPreSiteVisitArtifactStatus,
 } from '../../lib/services/pre-site-visit/artifact-service';
+import { readDeliberationStageLabels } from '../../lib/services/deliberation-stage-labels';
 import handler from '../../pages/api/workbench/pre-site-visit';
 import { REQUEST_DOCUMENT_OPERATION_STATUS } from '../../shared/config/requestDocument';
+
+const STAGE_LABELS = { draft: 'AI draft ready', shared: 'Shared', visit: 'Visit', final: 'Final' };
 
 const REQUEST_ID = '11111111-1111-1111-1111-111111111111';
 const PROFILE_ID = '44444444-4444-4444-8444-444444444444';
@@ -68,6 +74,7 @@ beforeEach(() => {
     pendingArtifact: null,
     reopenHistory: [],
   });
+  readDeliberationStageLabels.mockResolvedValue(STAGE_LABELS);
 });
 test('rejects methods other than GET/POST before authentication', async () => {
   const res = mockRes();
@@ -101,7 +108,16 @@ test('reads current/pending status without invoking generation', async () => {
     currentArtifact,
     pendingArtifact: null,
     reopenHistory: [],
+    stageLabels: STAGE_LABELS,
   });
+});
+
+test('adds stageLabels to the GET success payload from the shared admin-editable catalog', async () => {
+  readDeliberationStageLabels.mockResolvedValueOnce({ draft: 'Custom draft label', shared: 'Shared', visit: 'Visit', final: 'Final' });
+  const res = mockRes();
+  await handler(get(), res);
+  expect(readDeliberationStageLabels).toHaveBeenCalledTimes(1);
+  expect(res.body.stageLabels).toEqual({ draft: 'Custom draft label', shared: 'Shared', visit: 'Visit', final: 'Final' });
 });
 
 test('omits guarded-reopen audit history for non-superusers', async () => {
@@ -129,6 +145,7 @@ test('omits guarded-reopen audit history for non-superusers', async () => {
     success: true,
     currentArtifact: { artifactId: 'current-artifact' },
     pendingArtifact: null,
+    stageLabels: STAGE_LABELS,
   });
 });
 
@@ -151,6 +168,7 @@ test('keeps a regular pending generation visible to non-superusers without corre
     success: true,
     currentArtifact: null,
     pendingArtifact: { artifactId: 'pending-generation' },
+    stageLabels: STAGE_LABELS,
   });
 });
 

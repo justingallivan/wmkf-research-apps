@@ -23,7 +23,7 @@
  *   ... --execute            (all remaining)
  * Options: --only=<num,num>  --limit=N  --include-test  --ledger=<path.json>
  *
- * J27: the source contract (AI Materials/ProposalNarrative_{Request#}.pdf)
+ * J27-082: the source contract (AI Materials/ProposalNarrative_{Request#}.pdf)
  * and the trigger mechanism both change — register J27-082. Do not reuse
  * this script for J27 without that decision.
  */

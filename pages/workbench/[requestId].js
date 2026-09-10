@@ -210,6 +210,7 @@ export function WorkbenchRequest({ previewReadOnly = false }) {
           requestId={typeof requestId === 'string' ? requestId : ''}
           requestNumber={ctx?.requestNumber || requestNumber || ''}
           isSuperuser={isSuperuser}
+          onSelectTab={selectTab}
         />
       ) : activeTab === 'final-writeup' ? (
         <FinalWriteupTab

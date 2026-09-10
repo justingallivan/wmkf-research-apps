@@ -9,10 +9,13 @@
  * tag; the distribution flow later self-heals a row it touches, but untouched
  * drafts keep the tag.
  *
- * Rule: a row is repaired only when the item's CURRENT eTag equals the eTag
- * the row recorded at creation — proof the file has not changed since, so
- * the current publication version IS the version at creation. A row whose
- * file has changed since is reported, never guessed.
+ * Rule: a row is repaired only when the item's CURRENT publication version
+ * is `1.0` — SharePoint assigns 1.0 on upload and every later save publishes
+ * a higher version, so a file still at 1.0 has never been re-saved and its
+ * creation version IS 1.0. The stored eTag is NOT used as the witness: Graph
+ * bumps it for metadata touches that publish no version (observed 2026-09-09
+ * on untouched drafts), so it under-reports "unchanged". A file past 1.0 is
+ * reported, never guessed.
  *
  * Read-only by default. --execute PATCHes only wmkf_sharepointversionid.
  *
@@ -73,7 +76,7 @@ async function main() {
       entry.currentVersion = current.versionId || null;
       entry.eTagMatches = Boolean(row.wmkf_sharepointetag) && current.eTag === row.wmkf_sharepointetag;
       if (!current.versionId) entry.outcome = 'no-publication-version';
-      else if (!entry.eTagMatches) entry.outcome = 'changed-since-creation (report only)';
+      else if (String(current.versionId) !== '1.0') entry.outcome = 'edited-since-creation (report only)';
       else if (!EXECUTE) entry.outcome = `would-set ${current.versionId}`;
       else {
         await requestDocumentAdapter.update(row.wmkf_requestdocumentid, { wmkf_sharepointversionid: current.versionId });

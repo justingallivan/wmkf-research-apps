@@ -174,6 +174,34 @@ export const EDITABLE_TEXT_DEFAULTS = [
     multiline: true,
     placeholders: ['{{granteeName}}', '{{proposalTitle}}', 'COB {{dueDate}}', '{{signature}}'],
   },
+  {
+    key: 'stage.deliberations.draft',
+    label: 'Deliberations stage label: draft',
+    description: 'Display label for the Staff Deliberations rail\'s first stop (default "AI draft ready"). Read by both the Staff Deliberations tab and the cycle view (docs/PC_MEETING_TRACKER_PLAN.md D6).',
+    multiline: false,
+    placeholders: [],
+  },
+  {
+    key: 'stage.deliberations.shared',
+    label: 'Deliberations stage label: shared',
+    description: 'Display label for the Staff Deliberations rail\'s second stop (default "Shared"). Read by both the Staff Deliberations tab and the cycle view (docs/PC_MEETING_TRACKER_PLAN.md D6).',
+    multiline: false,
+    placeholders: [],
+  },
+  {
+    key: 'stage.deliberations.visit',
+    label: 'Deliberations stage label: visit',
+    description: 'Display label for the Staff Deliberations rail\'s third stop (default "Visit"). Read by both the Staff Deliberations tab and the cycle view (docs/PC_MEETING_TRACKER_PLAN.md D6).',
+    multiline: false,
+    placeholders: [],
+  },
+  {
+    key: 'stage.deliberations.final',
+    label: 'Deliberations stage label: final',
+    description: 'Display label for the Staff Deliberations rail\'s fourth stop (default "Final"). Read by both the Staff Deliberations tab and the cycle view (docs/PC_MEETING_TRACKER_PLAN.md D6).',
+    multiline: false,
+    placeholders: [],
+  },
 ];
 
 export const EDITABLE_TEXT_DEFAULTS_BY_KEY = Object.freeze(

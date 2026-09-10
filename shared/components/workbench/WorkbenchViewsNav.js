@@ -42,9 +42,9 @@ export const VIEWS = {
 
 const VIEW_LIST = Object.entries(VIEWS).map(([key, meta]) => ({ key, ...meta }));
 
-// The three views that share the `scope` (my/all) URL key. Every other
+// The four views that share the `scope` (my/all) URL key. Every other
 // per-view key resets on a switch; scope is carried only among these.
-const SCOPE_VIEWS = new Set(['requests', 'reviewer-follow-up', 'awardees']);
+const SCOPE_VIEWS = new Set(['requests', 'reviewer-follow-up', 'staff-deliberations', 'awardees']);
 
 // Every view lives inside the shell page: links carry the shell's program and
 // cycle and switch the view shallowly (per-view filters reset on a switch,

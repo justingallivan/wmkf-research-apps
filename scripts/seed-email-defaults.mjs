@@ -94,6 +94,17 @@ export async function seedEmailDefaults({
 
   const results = [];
   for (const entry of EDITABLE_TEXT_DEFAULTS) {
+    // Display labels (stage.*, e.g. the Staff Deliberations rail stops) have
+    // a code-owned default read at request time when unset — they are not
+    // email copy with no other fallback. The admin panel already enumerates
+    // EDITABLE_TEXT_DEFAULTS (not stored rows), so the key is editable there
+    // regardless; seeding one would pin wording into Dataverse and defeat
+    // the code default. Skip rather than requiring a seed string.
+    if (entry.key.startsWith('stage.')) {
+      results.push({ key: entry.key, action: 'skip-no-seed' });
+      continue;
+    }
+
     const seedText = EMAIL_DEFAULT_SEED_TEXT[entry.key];
     if (typeof seedText !== 'string') {
       throw new Error(`No seed text registered for ${entry.key}`);

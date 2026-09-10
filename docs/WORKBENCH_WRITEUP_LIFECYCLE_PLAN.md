@@ -31,6 +31,12 @@ presentation-layer merge only — every document-lifecycle contract, route, and
 guarantee below is unchanged, and references to the two separate tabs in this
 plan describe the pre-merge UI accurately as history.
 
+**[2026-09-09]** The Draft → Share → Wrap Up rail above is superseded: PC
+Meeting Tracker slice 3 (`docs/PC_MEETING_TRACKER_PLAN.md`) replaced it with
+four code-owned, admin-label stage keys — `draft` | `shared` | `visit` |
+`final` — shared by this tab and the Staff deliberations cycle view
+(`shared/utils/deliberation-stage.js`).
+
 **[OWNER DECISION 2026-08-17; PRE-SITE WRITER PRODUCTION-PROVED; SITE VISIT
 HANDOFF PRODUCTION-PROVED 2026-08-21; GUARDED REOPEN PRODUCTION-PROVED
 2026-08-23; SITE VISIT LOGISTICS/CALENDAR PRODUCTION-PROVED 2026-08-25; FINAL

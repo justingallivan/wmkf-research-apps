@@ -10,6 +10,14 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## September 2026 — Every D26 proposal starts at "AI draft ready"; the Staff Deliberations rail is keyed and admin-labeled; PC Meeting Tracker planned (Session 501)
+
+**Milestone:** All 23 advancing D26 requests hold an AI-generated Pre-Site Visit draft (owner-run batch through the Workbench's own producer, unattributed, idempotent; 21 generated, 2 reused, 0 errors). The Staff Deliberations rail is four stable stops — `draft | shared | visit | final` — with display labels admin-editable behind the keys, shared by the per-request tab and a new cycle-wide Staff deliberations view that reads site-visit dates and sent state. The registry's SharePoint version defect (content tag stored as version) is fixed at upload and repaired in data. The PC Meeting Tracker is planned as the schedule of record for deliberation sessions and site visits (decisions D1–D9), and its first slice re-gated site-visit writes on an advancing request rather than a shared draft.
+**Sessions:** 501 (Fable orchestrating; Sonnet built, Opus reviewed; Codex built the release-reason brief on its own branch, review pending).
+**Ship state:** PRs #214–#218 merged (`2ebc7a71`, `a3bda092`, `1ddc870c`, `7e06e4a1`, `14b2ba2e`); post-merge `main` green; owner production check of #218 pending; `codex/reviewer-release-reason` pushed, unreviewed.
+**Why it matters:** The PD's starting point is now a draft, not a blank; the rail names true states instead of a transport side effect; renaming a stage is an Admin edit, not a deploy; and scheduling has a home the rail can read.
+**Pointers:** `docs/PC_MEETING_TRACKER_PLAN.md`, `shared/utils/deliberation-stage.js`, `lib/services/deliberation-stage-labels.js`, `scripts/generate-pre-site-drafts-cycle.mjs`, `docs/plans/REVIEWER_RELEASE_REASON_CODEX_BRIEF_2026-09-09.md`, `outputs/pre-site-drafts-D26.json`.
+
 ## September 2026 — Grant cycle derives from the meeting date everywhere; the Request Workbench becomes one shell (Session 499)
 
 **Milestone:** Every cycle-scoped surface now derives the grant cycle from `wmkf_meetingdate` through `lib/utils/cycle-code.js`: the dashboard default cycle, Expertise Finder, request search (no fiscal-year fallback), and reviewer-suggestion writes (the client-supplied `grantCycleCode` is gone; the service stamps rows from the request's meeting date, and an off-month meeting shows no cycle). The Request Workbench is one shell page owning program and cycle in the URL, with Request list, Initial assessments, Reviewer follow-up, Final writeups, and Awardees as panels and the old per-view pages redirecting.
