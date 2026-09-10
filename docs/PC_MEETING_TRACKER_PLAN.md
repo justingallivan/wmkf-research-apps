@@ -303,7 +303,7 @@ readiness flag is enabled for that target.
    is `pages/api/meeting-tracker/sessions/[id]/agenda.js`; exact rendering,
    drift detection, correlation recovery, and lease-fenced transport live in
    `lib/services/meeting-tracker/agenda-service.js` and `agenda-store.js`.
-   Migration `041_deliberation_agenda_sends.sql` plus fresh-install v44 provide
+   Migration `041_deliberation_agenda_sends.sql` plus fresh-install v46 provide
    the ledger. GET keeps the last sent receipt separate from any unresolved
    send; the composer pins that unresolved operation for retry and prepare
    and send block a competing operation, with a partial unique index as the

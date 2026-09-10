@@ -3,6 +3,8 @@
 import {
   createDeliberationSession,
   getDeliberationSession,
+  listDeliberationSessions,
+  updateDeliberationSession,
   validateMeetingLink,
 } from '../../lib/services/meeting-tracker/session-service';
 
@@ -83,11 +85,6 @@ test('meeting links reject non-HTTPS schemes and preserve valid input exactly', 
 
 // Review finding 1 (S503): a stale or unreadable attendee reference never
 // makes a session unreadable or unsaveable.
-import {
-  getDeliberationSession,
-  listDeliberationSessions,
-  updateDeliberationSession,
-} from '../../lib/services/meeting-tracker/session-service';
 
 function storedRow(overrides = {}) {
   return {
