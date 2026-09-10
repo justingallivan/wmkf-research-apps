@@ -26,6 +26,9 @@ jest.mock('../../shared/components/workbench/PreSiteDistributionPanel', () => {
     return (
       <div>
         <span>{`Distribution panel: ${props.composer}${props.record ? ' (record)' : ''}${props.needsLock ? ' (lock required)' : ''}`}</span>
+        <span data-testid="mock-suggested-to">{(props.suggestedTo || []).join(',')}</span>
+        <span data-testid="mock-suggested-cc">{(props.suggestedCc || []).join(',')}</span>
+        <span data-testid="mock-session">{props.session?.scheduledStartIso || 'none'}</span>
         {props.composer === 'dialog' && (
           <>
             <button type="button" onClick={() => props.onCloseComposer?.()}>mock-close</button>
@@ -907,4 +910,33 @@ test('a ready draft keeps "AI draft ready" even while a regeneration is pending'
   render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
 
   await waitFor(() => expect(screen.getByTestId('stage-rail')).toHaveTextContent('● AI draft ready'));
+});
+
+test('the session\'s attendees become the composer\'s default To (tracker §5.6); without a session the site-visit party stays the default', async () => {
+  siteVisitContextFeed = { siteVisit: { startIso: null }, suggestedTo: ['visit-organizer@example.org'], suggestedCc: ['visit-optional@example.org'] };
+  global.fetch.mockResolvedValueOnce({
+    ok: true,
+    status: 200,
+    json: async () => ({
+      success: true,
+      currentArtifact: readyArtifact(100000001),
+      pendingArtifact: null,
+      reopenHistory: [],
+      session: { scheduledStartIso: '2026-12-01T18:00:00Z', scheduledEndIso: null, ianaTimeZone: 'America/Los_Angeles', meetingLink: null, location: null },
+      sessionAttendees: [{ name: 'A', email: 'a@example.org' }, { name: 'B', email: 'b@example.org' }],
+    }),
+  });
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+  await waitFor(() => expect(screen.getByTestId('mock-suggested-to')).toHaveTextContent('a@example.org,b@example.org'));
+  expect(screen.getByTestId('mock-suggested-cc')).toHaveTextContent('');
+  expect(screen.getByTestId('mock-session')).toHaveTextContent('2026-12-01T18:00:00Z');
+});
+
+test('without session attendees the site-visit party remains the default recipients', async () => {
+  siteVisitContextFeed = { siteVisit: { startIso: null }, suggestedTo: ['visit-organizer@example.org'], suggestedCc: ['visit-optional@example.org'] };
+  global.fetch.mockResolvedValueOnce(statusResponse({ currentArtifact: readyArtifact(100000001) }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+  await waitFor(() => expect(screen.getByTestId('mock-suggested-to')).toHaveTextContent('visit-organizer@example.org'));
+  expect(screen.getByTestId('mock-suggested-cc')).toHaveTextContent('visit-optional@example.org');
+  expect(screen.getByTestId('mock-session')).toHaveTextContent('none');
 });

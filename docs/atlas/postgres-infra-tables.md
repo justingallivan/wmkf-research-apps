@@ -188,7 +188,9 @@ identity/version/governed hash/raw byte hash, attachment mode (`none` for every
 attempt prepared since 2026-09-10, migration 039, the email carrying the
 briefing page link instead; `docx`, `pdf`, or `both` remain on earlier rows),
 exact retained Word/PDF identities and byte hashes (pinned on every prepared row
-regardless of mode because the briefing page serves them), normalized To/Cc,
+regardless of mode because the briefing page serves them), the deliberation-session
+snapshot the email states (`session_snapshot`, migration 040; null = not yet scheduled;
+rechecked live at send), normalized To/Cc,
 subject/body/template/sender/actor, preview hash, Dynamics activity/status, and
 bounded error evidence. Attachment bytes are never stored. States are
 `preparing`, `prepared`, `activity_created`, `attachments_added`,

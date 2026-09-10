@@ -15,6 +15,10 @@ const noAttachmentMigration = fs.readFileSync(
   path.join(ROOT, 'lib/db/migrations/039_pre_site_distribution_no_attachment.sql'),
   'utf8',
 );
+const sessionMigration = fs.readFileSync(
+  path.join(ROOT, 'lib/db/migrations/040_pre_site_distribution_session_snapshot.sql'),
+  'utf8',
+);
 
 const CONSTRAINT_NAMES = [
   'pre_site_distribution_mode_check',
@@ -79,4 +83,11 @@ test("migration 039 and fresh install both admit attachment_mode 'none' under th
   // The prepared-shape constraint requires the PDF snapshot whenever the mode is
   // not 'docx', so a 'none' row must carry both snapshots (the briefing page serves them).
   expect(setup).toContain("attachment_mode = 'docx' OR (");
+});
+
+test('migration 040 and fresh install declare the session snapshot column and its shape constraint', () => {
+  expect(sessionMigration).toContain('ADD COLUMN IF NOT EXISTS session_snapshot JSONB');
+  expect(sessionMigration).toContain('CONSTRAINT pre_site_distribution_session_shape');
+  expect(setup).toContain('session_snapshot JSONB');
+  expect(setup).toContain('CONSTRAINT pre_site_distribution_session_shape');
 });

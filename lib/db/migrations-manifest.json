@@ -37,6 +37,7 @@
     "036_scheduled_email_messages.sql",
     "037_reviewer_vip_flags.sql",
     "038_deliberation_briefing_links.sql",
-    "039_pre_site_distribution_no_attachment.sql"
+    "039_pre_site_distribution_no_attachment.sql",
+    "040_pre_site_distribution_session_snapshot.sql"
   ]
 }

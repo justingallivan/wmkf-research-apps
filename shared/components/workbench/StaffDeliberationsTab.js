@@ -148,6 +148,7 @@ export default function StaffDeliberationsTab({
   const [recoveryMessage, setRecoveryMessage] = useState(null);
   const [composerOpen, setComposerOpen] = useState(false);
   const [session, setSession] = useState(null);
+  const [sessionAttendees, setSessionAttendees] = useState(EMPTY_LIST);
   const [latestSendFailure, setLatestSendFailure] = useState(null);
   const [confirmDialog, setConfirmDialog] = useState(null); // null | 'regenerate'
   const [startingShare, setStartingShare] = useState(false);
@@ -172,6 +173,7 @@ export default function StaffDeliberationsTab({
     setRecoveryMessage(null);
     setComposerOpen(false);
     setSession(null);
+    setSessionAttendees(EMPTY_LIST);
     setLatestSendFailure(null);
     setConfirmDialog(null);
     setStartingShare(false);
@@ -193,6 +195,7 @@ export default function StaffDeliberationsTab({
           setReopenHistory(status.reopenHistory || EMPTY_LIST);
           if (status.stageLabels) setStageLabels(status.stageLabels);
           setSession(status.session || null);
+          setSessionAttendees(Array.isArray(status.sessionAttendees) ? status.sessionAttendees : EMPTY_LIST);
           if (status.pendingArtifact?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.FAILED) {
             setError(failureMessage(
               status.pendingArtifact,
@@ -262,6 +265,7 @@ export default function StaffDeliberationsTab({
       setPendingArtifact(pending);
       if (status.stageLabels) setStageLabels(status.stageLabels);
       if (status.session !== undefined) setSession(status.session || null);
+      if (status.sessionAttendees !== undefined) setSessionAttendees(Array.isArray(status.sessionAttendees) ? status.sessionAttendees : EMPTY_LIST);
 
       if (pending?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.FAILED) {
         throw new Error(failureMessage(pending, 'The latest Word-draft attempt failed.'));
@@ -788,8 +792,11 @@ export default function StaffDeliberationsTab({
           requestNumber={requestNumber}
           sourceArtifact={artifact}
           siteVisit={siteVisitContext?.siteVisit || null}
-          suggestedTo={siteVisitContext?.suggestedTo || EMPTY_LIST}
-          suggestedCc={siteVisitContext?.suggestedCc || EMPTY_LIST}
+          session={session}
+          // Tracker §5.6: the session's attendees are the default recipients
+          // once a slot exists; before that, the site-visit party.
+          suggestedTo={sessionAttendees.length ? sessionAttendees.map((person) => person.email) : (siteVisitContext?.suggestedTo || EMPTY_LIST)}
+          suggestedCc={sessionAttendees.length ? EMPTY_LIST : (siteVisitContext?.suggestedCc || EMPTY_LIST)}
           onHistory={onDistributionHistory}
           composer={composerOpen ? 'dialog' : 'hidden'}
           onCloseComposer={() => setComposerOpen(false)}

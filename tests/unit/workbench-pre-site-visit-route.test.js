@@ -114,6 +114,7 @@ test('reads current/pending status without invoking generation', async () => {
     reopenHistory: [],
     stageLabels: STAGE_LABELS,
     session: null,
+    sessionAttendees: [],
   });
 });
 
@@ -141,6 +142,8 @@ test('the GET payload carries the tracker session line through the briefing seam
     location: null,
   });
   expect(res.body.session).not.toHaveProperty('attendees');
+  // Tracker §5.6: attendees ride alongside as the Share email's default recipients, lowercased and email-only.
+  expect(res.body.sessionAttendees).toEqual([{ name: 'A', email: 'a@example.org' }]);
 
   getDeliberationSessionForRequest.mockRejectedValueOnce(new Error('tracker down'));
   getPreSiteVisitArtifactStatus.mockResolvedValueOnce({ currentArtifact: null, pendingArtifact: null, reopenHistory: [] });
@@ -185,6 +188,7 @@ test('omits guarded-reopen audit history for non-superusers', async () => {
     pendingArtifact: null,
     stageLabels: STAGE_LABELS,
     session: null,
+    sessionAttendees: [],
   });
 });
 
@@ -209,6 +213,7 @@ test('keeps a regular pending generation visible to non-superusers without corre
     pendingArtifact: { artifactId: 'pending-generation' },
     stageLabels: STAGE_LABELS,
     session: null,
+    sessionAttendees: [],
   });
 });
 

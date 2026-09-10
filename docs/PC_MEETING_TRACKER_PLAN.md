@@ -208,9 +208,15 @@ deliberation email (brief: `docs/plans/STAFF_DELIBERATIONS_TAB_SHAPE_BRIEF_2026-
 That email already carries the draft, the request's material links, and the site-visit
 calendar entry. From this tracker it additionally reads, for the request's latest slot:
 the session date and time (`scheduledstart`, `wmkf_ianatimezone`), the Zoom link
-(`wmkf_meetinglink`), and the attendee list as the default recipients. Until slice 1 ships,
-each of those renders as "not yet scheduled" in the email and on the card; the slot in the
-UI is designed now so the tracker fills it without a second design. The email also carries the
+(`wmkf_meetinglink`), and the attendee list as the default recipients. **[BUILT 2026-09-10,
+S503]** Prepare snapshots the request's latest slot (`sessionSnapshotOf` in
+`lib/services/pre-site-visit/distribution-service.js`, persisted as `session_snapshot`,
+migration 040) into the email body ("Deliberation session: …" with an https-only Join link, or
+"not yet scheduled"), the draft hash, and the preview hash; send rechecks the live slot and
+refuses with `distribution_session_stale` if it moved, appeared, or was removed. The status
+payload carries `sessionAttendees`, which the tab hands the composer as the default To once a
+slot exists (the site-visit party remains the default before that). The composer shows the
+slot read-only. The email also carries the
 request's deliberation briefing link (`docs/DELIBERATION_BRIEFING_PAGE_PLAN.md`, built S502):
 that link is the carrier for reviews and the proposal narrative, which are never attached.
 

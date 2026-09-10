@@ -756,6 +756,9 @@ const v40Statements = [
     site_visit_id UUID,
     site_visit_etag TEXT,
     site_visit_snapshot JSONB,
+    session_snapshot JSONB
+      CONSTRAINT pre_site_distribution_session_shape
+      CHECK (session_snapshot IS NULL OR jsonb_typeof(session_snapshot) = 'object'),
     material_links JSONB NOT NULL DEFAULT '[]'::jsonb,
     calendar_filename TEXT,
     calendar_content_type TEXT,

@@ -484,6 +484,9 @@ narrative. The retained Word and PDF snapshots are still created and pinned on
 every prepared row because the briefing page serves them, and a preview that
 cannot carry a live briefing link refuses to prepare rather than send a bare
 email. Rows sent before this date keep their legacy mode and remain readable.
+The same email states the request's deliberation session from the Meeting Tracker
+(`session_snapshot`, migration `040_pre_site_distribution_session_snapshot.sql`; tracker plan
+§5.6) and a moved session invalidates the preview at send.
 
 Migration `034_pre_site_distribution_attempts.sql` added the live, schema-read-
 back Postgres coordination ledger. Production Request `1002379`, operation
