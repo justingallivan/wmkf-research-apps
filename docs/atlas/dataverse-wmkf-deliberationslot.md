@@ -20,11 +20,11 @@ related:
 **[VERIFIED IN SOURCE 2026-09-09.]** Wave 28 declares the organization-owned
 `wmkf_deliberationslot` entity and the read-only preflight validates its
 complete metadata contract. The preflight self-test passes. **[VERIFIED IN
-SANDBOX 2026-09-09 via the read-only Wave 28 preflight.]** The entity and its
-fields and relationships are absent; the no-alternate-key check is exact. No
-schema apply has run. Keep `MEETING_TRACKER_SCHEMA_READY` unset until an
-owner-run sandbox apply is followed by 22 exact Wave 28 checks with zero absent
-or divergent.
+SANDBOX 2026-09-09 via owner-run apply and read-only Wave 28 readback.]** The
+entity, its fields and relationships, and its no-alternate-key contract are
+exact. The combined readback reported 22 exact, 0 absent, and 0 divergent.
+Keep `MEETING_TRACKER_SCHEMA_READY` unset until the runtime implementation is
+ready to use this schema.
 
 Expected entity set after apply: `wmkf_deliberationslots`.
 
@@ -81,7 +81,5 @@ readback:
 node scripts/preflight-meeting-tracker-schema.mjs --target=sandbox
 ```
 
-Before apply, the verified sandbox result was 20 absent, 2 exact
-no-alternate-key checks, and 0 divergent. The combined Wave 28 success result
-after apply is 22 exact, 0 absent, and 0 divergent. Production remains
-unverified.
+The verified post-apply sandbox result is 22 exact, 0 absent, and 0 divergent.
+Production remains unverified.

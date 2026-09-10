@@ -232,15 +232,16 @@ Add, with the discriminating fixture in each:
 - Verification run and results: `/start` all green; Wave 28 preflight self-test
   PASS; live read-only sandbox preflight PASS with 20 absent / 2 exact
   no-alternate-key checks / 0 divergent; the sandbox apply command with the
-  process-scoped registered URL completed in dry-run mode; focused Jest 3/3
+  process-scoped registered URL completed in dry-run mode; owner-run apply and
+  readback then reported 22 exact / 0 absent / 0 divergent; focused Jest 3/3
   PASS; lint 0 errors (86 pre-existing warnings);
   `check:types`, `check:atlas` + self-test, `check:docs-catalog`,
   `check:doc-symbol-refs` + self-test, `check:build-claim-freshness` +
   self-test, `check:fact-consistency` + self-test, `check:doc-currency` +
   self-test, `check:status-enum-parity` + self-test, `check:secret-scan` +
   self-test, and `git diff --check` all PASS.
-- Ready-for-apply statement for slice 1: **ready for an owner-run sandbox
-  preflight and apply; no apply was run by Codex.** Run
+- Slice 1 sandbox statement: **the owner applied Wave 28 and reported an exact
+  readback; no apply was run by Codex.** Run
   `node scripts/preflight-meeting-tracker-schema.mjs --target=sandbox`; on an
   untouched sandbox expect 20 absent / 2 exact no-alternate-key checks / 0
   divergent. After an explicitly approved
@@ -249,8 +250,7 @@ Add, with the discriminating fixture in each:
   setting `MEETING_TRACKER_SCHEMA_READY=on`. The preflight falls back to the
   tracked sandbox hostname when `DYNAMICS_SANDBOX_URL` is absent; credentials
   remain sourced from the environment.
-- Open questions / recommendations for the owner: confirm the sandbox apply
-  and exact readback before asking Codex to start slice 2. Before runtime
-  promotion, verify the application/impersonated staff security role has the
+- Open questions / recommendations for the owner: before runtime promotion,
+  verify the application/impersonated staff security role has the
   required Read/Create/Write/Append/Append To privileges on both new entities
   and their lookup targets; the brief did not authorize a role manifest.
