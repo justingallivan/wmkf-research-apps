@@ -1,13 +1,13 @@
 ---
 name: project-site-visit-materials-planning-handoff
-description: Site Visit Materials / applicant additional materials plan lives on branch codex/applicant-additional-materials (b6005273); the briefing-room subset for deliberation sessions was authorized and source-built on feature/deliberation-briefing-page (S502, 2026-09-09, D13–D16); applicant materials collection remains unbuilt
+description: Applicant materials collection SHIPPED to production 2026-09-10 (S503, plan §16 M1–M5, PRs #229/#230, migrations 042–044, flag on); briefing page live since S502 (D13–D20); PR 3 (PD visibility, auto-close, reminder cron) remains
 metadata:
   node_type: memory
   type: project
   originSessionId: 4645a5a6-2b0a-4200-94ed-4ddc0e8c0b83
   status: active
   scope: site-visit-materials
-  last_verified: 2026-09-09 via docs/DELIBERATION_BRIEFING_PAGE_PLAN.md on feature/deliberation-briefing-page and the owner's D13–D16 answers (S502)
+  last_verified: 2026-09-10 via docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md §16 on main and the owner's production rollout (S503)
 ---
 
 ## Recall Rule
@@ -16,12 +16,17 @@ Read this when: any work touches Site Visit materials, applicant additional mate
 external briefing room, or `docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md`. <!-- doc-symbol-refs:ignore reason=on-codex-branch-not-main -->
 
 Do:
-- Start from the plan on `origin/codex/applicant-additional-materials` (commits `3f0d497c` plan, `b6005273` Site Visit alignment); read it with `git show origin/codex/applicant-additional-materials:docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md`, and the brief with `git show origin/codex/applicant-additional-materials:docs/plans/CODEX_BRIEF_APPLICANT_ADDITIONAL_MATERIALS_2026-09-08.md`. <!-- doc-symbol-refs:ignore reason=on-codex-branch-not-main -->
-- Treat §2 of that plan as decided owner contract and §12 as the open items; re-confirm §12 with Justin before building.
-- Leave the Codex worktree `../WMKF_Apps-codex` and its branch alone unless Justin asks (no checkout, merge, wind-down).
+- Start from `docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md` §16 on main (decisions M1–M5, reuse map, data model, slices); PR 1 (staff) and PR 2 (applicant) are built and live; PR 3 is the open slice.
+- Treat the two Codex adversarial reviews' outcomes as the upload path's contract: clean-only scan, strict cap read (503 on outage), per-slot lease in `site_visit_material_collections.slot_leases`, Graph candidate recorded in staging before the Dataverse create, generation key from the staging id, client Retry with the same staging id, real ZIP central-directory parse for PPTX/DOCX. A candidate with no registry row is redone from the top; only a superseded or mismatched generation row is held as `replay_ambiguous`.
+- Owner runs migrations and flags; hand over `! <command>` lines.
 
 Do not:
-- Begin implementation of the applicant-materials collection, open a PR, or merge the Codex branch on your own; that plan is Tier 0 docs, the feature is Tier 2.
+- Rebuild the collection or the briefing page; reopen M1–M5 or D13–D20 without a new owner decision.
+- Read the July Site Visit upload language in `docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md` as current for this path; §16 supersedes it (flat `Site Visit - <bucket>` folders, canonical filenames, admin cap).
+
+## Applicant materials shipped (2026-09-10, S503)
+
+Owner answered §12: checklist confirmed (PDF presentation, PPTX/Keynote source, participant bios), due two business days before the visit (`lib/utils/business-days.js`), admin-editable cap default 100 MB, flat `Site Visit - Slides|Participant Bios|Other` folders, go. Built: `lib/services/site-visit-materials/*`, `/api/meeting-tracker/visits/[requestId]/materials`, `SiteVisitMaterialsCard` on the visit page, `/external/materials/[token]` + `/api/external/materials/[token]/{context,upload-token,finalize}`, `lib/external/verify-materials-token.js`, `GraphService.uploadFileLarge`. Owner applied 041–044, set `SITE_VISIT_MATERIALS_SCHEMA_READY=on`, redeployed; junk-token probe answers 401 `malformed`. Reminder cron and auto-close are PR 3.
 
 ## Briefing-room subset built (2026-09-09, S502)
 
