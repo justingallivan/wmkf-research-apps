@@ -68,7 +68,7 @@ test('offers no attachment choice; the default message names the briefing page a
   expect(screen.queryByRole('group', { name: 'Document attachment' })).not.toBeInTheDocument();
   expect(screen.queryByRole('radio')).not.toBeInTheDocument();
   expect(screen.getByLabelText('Message')).toHaveValue(
-    'The deliberation briefing page linked below has the Site Visit writeup, every completed review, the proposal, and the site visit materials.',
+    'The deliberation briefing page linked below has the Site Visit writeup, every completed review, the proposal, and the research presentation materials.',
   );
 });
 
@@ -87,7 +87,7 @@ test('offers no material checkboxes and no calendar controls; the briefing page 
   // Material links retired (owner 2026-09-10): no "Include links to materials" group.
   expect(screen.queryByRole('group', { name: 'Include links to materials' })).not.toBeInTheDocument();
   expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
-  expect(screen.getByLabelText('Message').value).toContain('the site visit materials');
+  expect(screen.getByLabelText('Message').value).toContain('the research presentation materials');
 });
 
 test('prepare carries no attachment mode, the preview shows the briefing link and no attachments, and send needs exact-preview confirmation', async () => {
@@ -681,7 +681,7 @@ test('the composer shows the deliberation session slot read-only, and the previe
   fireEvent.change(screen.getByLabelText('To'), { target: { value: 'staff@example.org' } });
   fireEvent.click(screen.getByRole('button', { name: 'Create preview' }));
   expect(await screen.findByText('Email preview')).toBeInTheDocument();
-  expect(screen.getByText('Deliberation session:').parentElement).toHaveTextContent(/Sep 11, 2026.*Join link included/);
+  expect(screen.getByText('Pre-discussion:').parentElement).toHaveTextContent(/Sep 11, 2026.*Join link included/);
 });
 
 test('with no session the slot says not yet scheduled and names the PC', async () => {

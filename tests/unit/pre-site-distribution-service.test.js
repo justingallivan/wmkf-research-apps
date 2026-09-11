@@ -120,7 +120,7 @@ test('the email carries the request\'s deliberation session (tracker §5.6): bod
   const result = await preparePreSiteDistribution(prepareInput(), withSession.dependencies);
   expect(withSession.dependencies.getSession).toHaveBeenCalledWith(REQUEST_ID);
   const created = withSession.dependencies.createOrGetAttempt.mock.calls[0][0];
-  expect(created.bodyHtml).toContain('<strong>Deliberation session:</strong>');
+  expect(created.bodyHtml).toContain('<strong>Pre-discussion:</strong>');
   expect(created.bodyHtml).toContain('September 11, 2026');
   expect(created.bodyHtml).toContain('11:45');
   expect(created.bodyHtml).toContain('<a href="https://zoom.example/j/123">Join meeting</a>');
@@ -138,7 +138,7 @@ test('the email carries the request\'s deliberation session (tracker §5.6): bod
   without.dependencies.getSession = jest.fn(async () => null);
   const plain = await preparePreSiteDistribution(prepareInput(), without.dependencies);
   const plainCreated = without.dependencies.createOrGetAttempt.mock.calls[0][0];
-  expect(plainCreated.bodyHtml).toContain('<strong>Deliberation session:</strong> not yet scheduled.');
+  expect(plainCreated.bodyHtml).toContain('<strong>Pre-discussion:</strong> not yet scheduled.');
   expect(plainCreated.bodyHtml).not.toContain('Join meeting');
   expect(plainCreated.sessionSnapshot).toBeNull();
   // Discriminating: only the session differs between the two harnesses.
@@ -532,7 +532,7 @@ test('prepare refuses a material selection (retired) and binds one informational
   expect(persisted.toRecipients).toEqual(['staff@example.org', 'organizer@wmkeck.org']);
   expect(persisted.ccRecipients).toEqual(['consultant@example.org']);
   expect(persisted.bodyHtml).not.toContain('Applicant');
-  expect(persisted.bodyHtml).toContain('the site visit materials, no login required');
+  expect(persisted.bodyHtml).toContain('the research presentation materials, no login required');
   expect(persisted.calendar.content.toString('utf8')).toContain('METHOD:PUBLISH');
   expect(persisted.calendar.content.toString('utf8'))
     .toContain('ORGANIZER:mailto:organizer@wmkeck.org');

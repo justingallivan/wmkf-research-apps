@@ -3,7 +3,7 @@ import { Card } from '../Layout';
 import CuratedRecipientPicker from './CuratedRecipientPicker';
 import { deliberationSessionLine } from '../../utils/deliberation-stage';
 
-const DEFAULT_BODY = 'The deliberation briefing page linked below has the Site Visit writeup, every completed review, the proposal, and the site visit materials.';
+const DEFAULT_BODY = 'The deliberation briefing page linked below has the Site Visit writeup, every completed review, the proposal, and the research presentation materials.';
 const EMPTY_LIST = Object.freeze([]);
 const STALE_PREVIEW_CODES = new Set([
   'distribution_stale_source',
@@ -649,7 +649,7 @@ export default function PreSiteDistributionPanel({
               {preview.cc.length > 0 && <div><dt className="inline font-medium">Cc:</dt> <dd className="inline">{preview.cc.join(', ')}</dd></div>}
               <div><dt className="inline font-medium">Subject:</dt> <dd className="inline">{preview.subject}</dd></div>
               <div><dt className="inline font-medium">Snapshot source:</dt> <dd className="inline">Word version {preview.sourceVersionId}; later edits are not included</dd></div>
-              <div><dt className="inline font-medium">Deliberation session:</dt> <dd className="inline">{deliberationSessionLine(preview.session).replace('Deliberation session: ', '')}{preview.session?.meetingLink ? ' · Join link included' : ''}</dd></div>
+              <div><dt className="inline font-medium">Pre-discussion:</dt> <dd className="inline">{deliberationSessionLine(preview.session).replace('Deliberation session: ', '')}{preview.session?.meetingLink ? ' · Join link included' : ''}</dd></div>
               <div>
                 <dt className="inline font-medium">Briefing page:</dt>{' '}
                 <dd className="inline">
