@@ -87,5 +87,117 @@ npx eslint shared/components/meeting-tracker/SessionEditor.js tests/unit/meeting
 
 ## Handoff (builder fills in)
 
-State claims labeled [VERIFIED via …] or [ASSUMED]. List commits, tests run with counts,
-gates run, which RTL approach was used, and anything left open.
+**Provenance note**: this brief file did not exist in this builder's worktree
+(`.claude/worktrees/agent-afac79c4c68b46558`, branch `claude/slot-drag-reorder`, base
+`57bf6d07`) or on `main`. It was found only as an uncommitted file in a sibling, locked
+worktree (`.claude/worktrees/agent-aa0e877754623c694`) apparently used by a parallel
+"Build A" agent [VERIFIED via `find`/`git worktree list`/`git log` across worktrees — the
+file has no commit history under `docs/plans/` in either worktree]. Per the ground rules
+("fill in the brief's Handoff section... committed on your branch"), the content was copied
+verbatim into this worktree at the same path and is committed here.
+
+**Source vs. brief discrepancies checked**:
+- `shiftSlot`, `runSlotChange`, `notice`, `busy` all matched the brief's description
+  [VERIFIED via reading `shared/components/meeting-tracker/SessionEditor.js` in full].
+  `notice` is a plain `useState(null)` string, so the assistive-tech announcement was
+  implemented as specified.
+- The brief's RTL test description ("asserts the reorder fetch payload lists the slots...")
+  assumes rendering triggers `reorderSessionSlots`/fetch directly. Because the extraction
+  path was used (see below), the new RTL test asserts the `onReorder(nextSlots, movedSlot,
+  targetIndex)` callback contract instead of a fetch payload; the fetch-payload contract for
+  `reorderSessionSlots` (order 1..n, per-slot ETag) is already covered by the pre-existing
+  test "session reorder posts every slot with its current ETag and complete new order" at
+  `tests/unit/meeting-tracker-pages.test.js:79`, which is unchanged and still exercises the
+  exact same `reorderSlots` → `runSlotChange` → `reorderSessionSlots` call used by drag drop.
+
+**Implementation choices**:
+- Extracted `ProposalOrderList` (exported) from the inline `<ol>{slots.map(...)}` block in
+  `SessionEditor`, per the brief's sanctioned fallback, to avoid mocking the full
+  `SessionEditor` fetch surface in tests. `ProposalOrderList` owns `draggingIndex`,
+  `overIndex`, `overEdge` as local React state (not `dataTransfer`) and calls
+  `onReorder(nextSlots, movedSlot, targetIndex)` on a real drop. `SessionEditor` supplies
+  `onReorder={reorderSlots}`, which sets the `notice` string and then calls
+  `runSlotChange(() => reorderSessionSlots({ sessionId, slots: next }))` — the same path
+  `shiftSlot` uses, so ETag conflicts and the post-change refetch behave identically
+  [VERIFIED by reading the edited file].
+- `moveSlot(slots, from, to)` is a pure helper: returns the same array reference (no copy)
+  when `from === to` or either index is out of range, otherwise returns a new spliced array.
+- Drag handle is the number-column `div` (grip SVG + index + arrows), `draggable={!busy}`,
+  with `onDragStart`/`onDragEnd`. `onDragOver`/`onDrop` are on the `<li>` so a drop anywhere
+  on the row works. `event.preventDefault()` is called in `onDragOver`. `dataTransfer` calls
+  are wrapped in `try/catch` and optional-chained since jsdom's `DragEvent.dataTransfer` is
+  `null`.
+- **Notice timing (corrected after a second pass)**: the notice is set only after the
+  reorder PATCH succeeds, inside the `runSlotChange` operation passed to `reorderSlots`, not
+  before it. [VERIFIED via reading `shiftSlot`/`runSlotChange` in `SessionEditor.js`:
+  `shiftSlot` never calls `setSlots` itself — the row only reorders once `runSlotChange`'s
+  `loadDetail` refetches — so there is no optimistic UI anywhere in this component today.]
+  An earlier draft set `notice` synchronously before the network call; that was wrong because
+  `runSlotChange` sets `error` on a failed PATCH but never clears `notice`, so a failed save
+  would have left a stale "Moved #X…" announcement next to the error while the list (refetched
+  unchanged from the server) didn't actually move — exactly the "optimistic state that
+  survives a failed save" the brief forbids. Fixed by moving the `setNotice` call inside the
+  `runSlotChange(async () => { ... })` operation, after `await reorderSessionSlots(...)`
+  resolves.
+- Visual feedback: dragged row gets `opacity-40`; the row under the pointer gets a 2px
+  top/bottom border (`border-t-blue-500` / `border-b-blue-500`) depending on
+  `event.clientY` vs. the row's `getBoundingClientRect()` midpoint. Both clear on drop and on
+  `onDragEnd`.
+- **`busy` guard fan-out fix**: `handleDragStart` and `handleDragOver` both bail on
+  `busy`; `handleDrop` originally did not. Fixed to `if (busy || draggingIndex === null) {
+  resetDrag(); return; }` so a `busy` transition mid-drag (e.g. a Minutes-input blur firing
+  `onChange` → `runSlotChange` while a drag is in flight) cannot apply a stale drop.
+
+**Commits**: `52b57271` (implementation: `moveSlot`, `ProposalOrderList`, drag handlers, D28
+originally, this brief), `030355f8` (follow-up: notice-timing fix so the assistive
+announcement only fires after the reorder PATCH succeeds, a `busy` guard added to
+`handleDrop` to match `handleDragStart`/`handleDragOver`, an ETag assertion added to the RTL
+reorder test, Handoff corrections), and `bad8d071` addressing an orchestrator-relayed Opus
+review: added five RTL tests covering downward and
+upward moves onto the last row's lower/upper half, a self-adjacent no-op, the `busy` state
+(no draggable handles, inert drag sequence), and that only the number-column handle is
+draggable (never the `<li>`, arrows, or form controls); added `setNotice(null)` in
+`runSlotChange` so a stale "Moved…"/"Session saved." notice can't survive a later slot
+change or a failed save; restructured the number column so `draggable` wraps only the grip
+icon and index (the up/down arrow buttons are now siblings outside the draggable wrapper, so
+a mousedown-drag on an arrow can't be misread as starting a row drag); and skip-if-unchanged
+guards in `handleDragOver` plus hiding the insertion-edge indicator on the row being dragged.
+Renumbered the `docs/PC_MEETING_TRACKER_PLAN.md` decision from D28 to D27 per the
+orchestrator (Build A took D26).
+
+**Test-teeth check** [VERIFIED empirically]: reproduced the review's exact mutation —
+replacing `rawTarget > draggingIndex ? rawTarget - 1 : rawTarget` with bare `rawTarget` in
+`handleDrop` — and reran `npx jest tests/unit/meeting-tracker-pages.test.js`: 2 of the 5 new
+tests failed (the last-row lower-half and upper-half move assertions), confirming the new
+tests catch the mutation the review flagged as previously undetected. Reverted before
+committing.
+
+**Tests / gates** [VERIFIED by running each command in this worktree, sequentially, after
+all three commits' changes]:
+- `npx jest tests/unit/meeting-tracker` — 17 suites passed, 17 total; 117 tests passed, 117
+  total (12 new overall: 5 `moveSlot` unit tests + 7 `ProposalOrderList` drag tests — the
+  original 2 plus 5 added for this review pass). One pre-existing unrelated React key-prop
+  console warning in `MeetingTrackerList` (not touched by this change).
+- `npm run check:types` — clean, no output (0 errors).
+- `npm run check:status-enum-parity` — "status-enum-parity OK — 8 producer↔consumer
+  invariant(s) in sync."
+- `npm run check:status-enum-parity:self-test` — "status-enum-parity self-test OK — 17/17".
+- `npx eslint shared/components/meeting-tracker/SessionEditor.js
+  tests/unit/meeting-tracker-pages.test.js` — clean, no output (0 errors/warnings).
+
+**RTL approach used**: extraction (`ProposalOrderList`), per the brief's fallback — see
+"Implementation choices" above.
+
+**Debugging note left for the record**: `@testing-library/react`'s `fireEvent.dragOver` /
+`fireEvent.drop` helpers did not reliably apply a passed `clientY` in this jsdom version
+(the drop-edge math silently saw the wrong edge). Dispatching a real `new MouseEvent('dragover'
+| 'drop', { clientY })` via `fireEvent(target, event)` instead was reliable and is what the
+committed tests use; React's synthetic drag handlers only need the native event type to fire,
+so a plain `MouseEvent` (not a jsdom `DragEvent`, which has the same `dataTransfer`-only issue
+the brief anticipated) works for `onDragOver`/`onDrop`, but not for anything relying on
+`dataTransfer`, which this implementation deliberately avoids.
+
+**Anything left open**: none within scope. The decision was written as D28 at first (D27 was
+not present in `docs/PC_MEETING_TRACKER_PLAN.md` at write time, per the brief's own
+contingency note) and renumbered to D27 in the final commit per the orchestrator, since Build
+A took D26.
