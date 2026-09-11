@@ -122,6 +122,11 @@ test('groups are collapsed by default and open independently', async () => {
   fireEvent.click(reviewers.querySelector('summary'));
   expect(reviewers.open).toBe(true);
   expect(screen.getByText('Grantee emails').closest('details').open).toBe(false);
+  // The chevron must track this group's own open state, not an open ancestor's
+  // (the panel wrapper is also a details/group).
+  const chevron = reviewers.querySelector('summary svg');
+  expect(chevron.getAttribute('class')).toContain('group-open/audience:rotate-180');
+  expect(chevron.getAttribute('class')).not.toMatch(/(^|\s)group-open:rotate-180/);
 });
 
 test('pairs subject and body of one email inside the same card, and does not mix cards within a group', async () => {

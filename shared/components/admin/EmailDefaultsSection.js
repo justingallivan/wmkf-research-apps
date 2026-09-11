@@ -180,8 +180,11 @@ export default function EmailDefaultsSection() {
       {error && <p className="pb-3 text-sm text-red-700">{error}</p>}
       {groups.map((group) => (
         // Collapsed by default: an admin editing one reviewer email should not have to
-        // scroll past every grantee and internal template (owner, 2026-09-10).
-        <details key={group.id} className="group">
+        // scroll past every grantee and internal template (owner, 2026-09-10). The
+        // chevron rotation is scoped to this element's own named group; a bare
+        // `group-open:` would also match the open panel above it and pin every
+        // chevron upright (seen live 2026-09-10).
+        <details key={group.id} className="group/audience">
           <summary className="flex cursor-pointer list-none items-center justify-between gap-3 py-3 [&::-webkit-details-marker]:hidden">
             <span>
               <h3 className="text-base font-semibold text-gray-900">{group.title}</h3>
@@ -189,7 +192,7 @@ export default function EmailDefaultsSection() {
             </span>
             <span className="flex shrink-0 items-center gap-2 text-xs text-gray-500">
               {group.cards.length} {group.cards.length === 1 ? 'card' : 'cards'}
-              <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4 transition-transform group-open:rotate-180"><path strokeLinecap="round" strokeLinejoin="round" d="m5 7.5 5 5 5-5" /></svg>
+              <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4 transition-transform group-open/audience:rotate-180"><path strokeLinecap="round" strokeLinejoin="round" d="m5 7.5 5 5 5-5" /></svg>
             </span>
           </summary>
           <div className="space-y-8 pb-6 pt-1">

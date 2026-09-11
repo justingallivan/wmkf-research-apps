@@ -197,13 +197,13 @@ export function AdminEditorPanel({
     return (
       <div id={id} className="scroll-mt-6">
         <Card hover={false} padding="p-0">
-          <details className="group" open={defaultOpen || undefined}>
+          <details className="group/panel" open={defaultOpen || undefined}>
             <summary
               aria-labelledby={`${id}-title`}
               className="flex cursor-pointer list-none flex-col gap-3 px-5 py-5 [&::-webkit-details-marker]:hidden sm:flex-row sm:items-start sm:justify-between sm:px-6"
             >
               {heading}
-              <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" className="mt-1 h-5 w-5 shrink-0 text-gray-400 transition-transform group-open:rotate-180">
+              <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" className="mt-1 h-5 w-5 shrink-0 text-gray-400 transition-transform group-open/panel:rotate-180">
                 <path strokeLinecap="round" strokeLinejoin="round" d="m5 7.5 5 5 5-5" />
               </svg>
             </summary>
