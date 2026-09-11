@@ -1,13 +1,13 @@
 ---
 name: project-site-visit-materials-planning-handoff
-description: Applicant materials collection SHIPPED to production 2026-09-10 (S503, plan §16 M1–M5, PRs #229/#230, migrations 042–044, flag on); briefing page live since S502 (D13–D20); PR 3 (PD visibility, auto-close, reminder cron) remains
+description: Applicant materials collection SHIPPED to production 2026-09-10 (S503, plan §16 M1–M5, PRs #229/#230, migrations 042–044, flag on); briefing page live since S502 (D13–D20); PR 3 (staff visibility lines, auto-close, unscheduled reminder cron, replay_ambiguous event) BUILT S506 as PR #252, open and unmerged
 metadata:
   node_type: memory
   type: project
   originSessionId: 4645a5a6-2b0a-4200-94ed-4ddc0e8c0b83
   status: active
   scope: site-visit-materials
-  last_verified: 2026-09-10 via docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md §16 on main and the owner's production rollout (S503)
+  last_verified: 2026-09-11 via docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md §16.3 on claude/applicant-materials-pr3 (PR #252) and the S503 production rollout
 ---
 
 ## Recall Rule
@@ -16,7 +16,7 @@ Read this when: any work touches Site Visit materials, applicant additional mate
 external briefing room, or `docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md`. <!-- doc-symbol-refs:ignore reason=on-codex-branch-not-main -->
 
 Do:
-- Start from `docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md` §16 on main (decisions M1–M5, reuse map, data model, slices); PR 1 (staff) and PR 2 (applicant) are built and live; PR 3 is the open slice.
+- Start from `docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md` §16 on main (decisions M1–M5, reuse map, data model, slices); PR 1 (staff) and PR 2 (applicant) are built and live; PR 3 is built on `claude/applicant-materials-pr3` (PR #252, open): counts-only summary reader → three staff lines, maintenance auto-close step, `/api/cron/site-visit-materials-reminders` built but deliberately absent from `vercel.json` (owner decides the schedule; `?dryRun=1` is the safe probe), durable `site_visit_material_replay_ambiguous` operational event.
 - Treat the two Codex adversarial reviews' outcomes as the upload path's contract: clean-only scan, strict cap read (503 on outage), per-slot lease in `site_visit_material_collections.slot_leases`, Graph candidate recorded in staging before the Dataverse create, generation key from the staging id, client Retry with the same staging id, real ZIP central-directory parse for PPTX/DOCX. A candidate with no registry row is redone from the top; only a superseded or mismatched generation row is held as `replay_ambiguous`.
 - Owner runs migrations and flags; hand over `! <command>` lines.
 
@@ -26,7 +26,7 @@ Do not:
 
 ## Applicant materials shipped (2026-09-10, S503)
 
-Owner answered §12: checklist confirmed (PDF presentation, PPTX/Keynote source, participant bios), due two business days before the visit (`lib/utils/business-days.js`), admin-editable cap default 100 MB, flat `Site Visit - Slides|Participant Bios|Other` folders, go. Built: `lib/services/site-visit-materials/*`, `/api/meeting-tracker/visits/[requestId]/materials`, `SiteVisitMaterialsCard` on the visit page, `/external/materials/[token]` + `/api/external/materials/[token]/{context,upload-token,finalize}`, `lib/external/verify-materials-token.js`, `GraphService.uploadFileLarge`. Owner applied 041–044, set `SITE_VISIT_MATERIALS_SCHEMA_READY=on`, redeployed; junk-token probe answers 401 `malformed`. Reminder cron and auto-close are PR 3.
+Owner answered §12: checklist confirmed (PDF presentation, PPTX/Keynote source, participant bios), due two business days before the visit (`lib/utils/business-days.js`), admin-editable cap default 100 MB, flat `Site Visit - Slides|Participant Bios|Other` folders, go. Built: `lib/services/site-visit-materials/*`, `/api/meeting-tracker/visits/[requestId]/materials`, `SiteVisitMaterialsCard` on the visit page, `/external/materials/[token]` + `/api/external/materials/[token]/{context,upload-token,finalize}`, `lib/external/verify-materials-token.js`, `GraphService.uploadFileLarge`. Owner applied 041–044, set `SITE_VISIT_MATERIALS_SCHEMA_READY=on`, redeployed; junk-token probe answers 401 `malformed`. Reminder cron and auto-close landed in PR 3 (S506, PR #252): the cron claims before sending with the same predicate as its candidate read and resolves every precondition (missing items, recipients, enabled sender, readable link, the optional visit read) before the claim; a delivered email whose receipt fails to attach counts as `receiptFailed`, not a transport failure. Known residual: the PC's manual reminder has no claim.
 
 ## Briefing-room subset built (2026-09-09, S502)
 
