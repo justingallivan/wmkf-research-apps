@@ -197,6 +197,15 @@ test('computeAgenda drops non-HTTPS links and rendered HTML escapes every propos
   expect(rendered.bodyText).toContain('briefing link to follow by email');
 });
 
+test('rendered agenda separates items with a blank line (text) and spacing (HTML)', () => {
+  const agenda = computeAgenda(session(), slots());
+  const rendered = renderAgendaEmail('Hello', agenda);
+  const agendaText = rendered.bodyText.split('\n\nAgenda\n\n')[1];
+  expect(agendaText.split('\n\n')).toHaveLength(2);
+  expect(agendaText).not.toMatch(/[^\n]\n[^\n]/);
+  expect(rendered.bodyHtml.match(/<li style="margin-bottom:12px">/g)).toHaveLength(2);
+});
+
 test('drift compares session start and ordered request/minutes tuples only', () => {
   const snapshot = computeAgenda(session(), slots());
   expect(agendaScheduleChanged(session({ location: 'Changed room' }), slots(), snapshot)).toBe(false);
