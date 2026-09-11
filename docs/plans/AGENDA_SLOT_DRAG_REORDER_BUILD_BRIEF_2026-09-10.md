@@ -149,10 +149,10 @@ verbatim into this worktree at the same path and is committed here.
   `onChange` → `runSlotChange` while a drag is in flight) cannot apply a stale drop.
 
 **Commits**: `52b57271` (implementation: `moveSlot`, `ProposalOrderList`, drag handlers, D28,
-this brief) plus one follow-up commit on the same branch (notice-timing fix so the assistive
-announcement only fires after the reorder PATCH succeeds, a `busy` guard added to `handleDrop`
-to match `handleDragStart`/`handleDragOver`, an ETag assertion added to the RTL reorder test,
-and Handoff corrections) — see the branch log for its SHA.
+this brief) and `030355f8` (follow-up: notice-timing fix so the assistive announcement only
+fires after the reorder PATCH succeeds, a `busy` guard added to `handleDrop` to match
+`handleDragStart`/`handleDragOver`, an ETag assertion added to the RTL reorder test, and
+Handoff corrections).
 
 **Tests / gates** [VERIFIED by running each command in this worktree, sequentially, after the
 follow-up commit's changes]:
