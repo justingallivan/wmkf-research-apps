@@ -112,31 +112,31 @@ function SlotRow({ slot, proposal, sessions, sessionId, busy, savingSlotId, onCh
         </svg>
       </div>
       <div className="min-w-0 flex-1 p-4">
-      <div className="flex flex-wrap items-start gap-4">
-        <div className="min-w-[13rem] flex-1">
-          <p className="font-semibold text-gray-900"><span className="sr-only">Position </span><span className="tabular-nums text-gray-500">{index + 1}</span><span aria-hidden="true" className="text-gray-400"> · </span>#{requestNumber}</p>
-          <p className="mt-1 text-sm text-gray-700">{proposal?.title || slot.wmkf_Request?.akoya_title || 'Request details are not available.'}</p>
-          <p className="mt-1 text-xs text-gray-500">Lead PD: {slot.wmkf_LeadPd?.fullname || 'Not assigned'}</p>
-          {slot.briefing?.url ? (
-            <a href={slot.briefing.url} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-xs font-semibold text-blue-800 underline">Open briefing</a>
-          ) : (
-            <p className="mt-2 text-xs font-medium text-gray-500">{slotBriefingText(slot)}</p>
-          )}
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+          <p className="min-w-0 font-semibold leading-9 text-gray-900"><span className="sr-only">Position </span><span className="tabular-nums text-gray-500">{index + 1}</span><span aria-hidden="true" className="text-gray-400"> · </span>#{requestNumber}</p>
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+              Minutes
+              <input type="number" min="1" max="1440" disabled={busy} value={minutes} onChange={(event) => setMinutes(event.target.value)} onBlur={() => Number(minutes) !== Number(slot.wmkf_minutes) && onChange(slot, { minutes: Number(minutes) })} className="h-9 w-20 rounded-lg border border-gray-300 bg-white px-2 text-sm tabular-nums text-gray-900 focus:border-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-300 disabled:opacity-50" />
+            </label>
+            <OverflowMenu
+              label={`More actions for #${requestNumber}`}
+              disabled={busy}
+              items={[
+                { key: 'position', label: 'Change position…', onSelect: () => setPanel('position') },
+                { key: 'move', label: 'Move to another session…', onSelect: () => setPanel('move') },
+                { key: 'remove', label: 'Remove…', onSelect: () => setPanel('remove') },
+              ]}
+            />
+          </div>
         </div>
-        <label className="shrink-0 text-sm font-medium text-gray-700">
-          Minutes
-          <input type="number" min="1" max="1440" disabled={busy} value={minutes} onChange={(event) => setMinutes(event.target.value)} onBlur={() => Number(minutes) !== Number(slot.wmkf_minutes) && onChange(slot, { minutes: Number(minutes) })} className={`${FIELD_CLASS} block w-24`} />
-        </label>
-        <OverflowMenu
-          label={`More actions for #${requestNumber}`}
-          disabled={busy}
-          items={[
-            { key: 'position', label: 'Change position…', onSelect: () => setPanel('position') },
-            { key: 'move', label: 'Move to another session…', onSelect: () => setPanel('move') },
-            { key: 'remove', label: 'Remove…', onSelect: () => setPanel('remove') },
-          ]}
-        />
-      </div>
+        <p className="mt-1 text-sm text-gray-700">{proposal?.title || slot.wmkf_Request?.akoya_title || 'Request details are not available.'}</p>
+        <p className="mt-1 text-xs text-gray-500">Lead PD: {slot.wmkf_LeadPd?.fullname || 'Not assigned'}</p>
+        {slot.briefing?.url ? (
+          <a href={slot.briefing.url} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-xs font-semibold text-blue-800 underline">Open briefing</a>
+        ) : (
+          <p className="mt-2 text-xs font-medium text-gray-500">{slotBriefingText(slot)}</p>
+        )}
       {panel === 'position' && (
         <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-3">
           <label className="text-sm font-medium text-gray-700">
