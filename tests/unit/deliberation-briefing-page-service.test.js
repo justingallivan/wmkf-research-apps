@@ -10,6 +10,7 @@ const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
 const RECEIVED_ID = '22222222-2222-4222-8222-222222222222';
 const PENDING_ID = '33333333-3333-4333-8333-333333333333';
 const FOREIGN_ID = '44444444-4444-4444-8444-444444444444';
+const DOCX_REVIEW_ID = '99999999-9999-4999-8999-999999999999';
 const SLIDES_ID = '55555555-5555-4555-8555-555555555555';
 const RECORDING_ID = '66666666-6666-4666-8666-666666666666';
 const WRITEUP_ROW_ID = '77777777-7777-4777-8777-777777777777';
@@ -58,6 +59,10 @@ function deps(overrides = {}) {
       wmkf_meetingdate: '2026-12-01',
       _akoya_applicantid_value: 'acct-1',
       _akoya_applicantid_value_formatted: 'Annotation University',
+      _wmkf_projectleader_value: 'pi-1',
+      _wmkf_projectleader_value_formatted: 'Anthony Leung',
+      _wmkf_programdirector_value: 'pd-1',
+      _wmkf_programdirector_value_formatted: 'Justin Gallivan',
     })),
     getAccount: jest.fn(async () => ({ name: 'Example University' })),
     findSuggestions: jest.fn(async () => suggestions()),
@@ -83,7 +88,7 @@ function deps(overrides = {}) {
         : null
     )),
     downloadFile: jest.fn(async () => ({ buffer: Buffer.from('%PDF-'), mimeType: 'application/pdf', filename: 'x.pdf', size: 5 })),
-    downloadReview: jest.fn(async () => ({ buffer: Buffer.from('r'), mimeType: 'application/pdf', filename: 'review.pdf', size: 1 })),
+    downloadReview: jest.fn(async () => ({ buffer: Buffer.from('%PDF-review'), mimeType: 'application/pdf', filename: 'review.pdf', size: 11 })),
     ...overrides,
   };
 }
@@ -94,6 +99,8 @@ test('context carries only received reviews with authors, no URL-shaped fields, 
   const d = deps();
   const context = await buildBriefingContext({ requestId: REQUEST_ID, link: LINK }, d);
   expect(context.title).toBe('Example University');
+  expect(context.projectLeader).toBe('Anthony Leung');
+  expect(context.programDirector).toBe('Justin Gallivan');
   expect(context.proposalTitle).toBe('Quantum Widgets');
   expect(context.writeup).toBeNull();
   expect(context.session).toBeNull();
@@ -113,41 +120,51 @@ test('context carries only received reviews with authors, no URL-shaped fields, 
   expect(d.fetchAnswers).toHaveBeenCalledWith([RECEIVED_ID]);
 });
 
-const PDF_BYTES = Buffer.from('%PDF-');
-const PDF_HASH = require('node:crypto').createHash('sha256').update(PDF_BYTES).digest('hex');
+const DOCX_BYTES = Buffer.from('docx');
+const DOCX_HASH = require('node:crypto').createHash('sha256').update(DOCX_BYTES).digest('hex');
 
 function sentAttempt(overrides = {}) {
   return {
-    docx_drive_id: 'd', docx_item_id: 'i', docx_filename: 'PreSite_1002379.docx', docx_size: '2048', docx_content_type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', docx_byte_hash: 'f'.repeat(64),
-    pdf_drive_id: 'd', pdf_item_id: 'p', pdf_filename: 'PreSite_1002379.pdf', pdf_size: '4096', pdf_content_type: 'application/pdf', pdf_byte_hash: PDF_HASH,
+    docx_drive_id: 'd', docx_item_id: 'i', docx_filename: 'PreSite_1002379.docx', docx_size: '2048', docx_content_type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', docx_byte_hash: DOCX_HASH,
+    pdf_drive_id: 'd', pdf_item_id: 'p', pdf_filename: 'PreSite_1002379.pdf', pdf_size: '4096', pdf_content_type: 'application/pdf', pdf_byte_hash: 'f'.repeat(64),
     sent_at: '2026-09-09T01:00:00Z', send_requested_at: '2026-09-09T00:59:00Z',
     ...overrides,
   };
 }
 
-test('writeup descriptors come from the latest sent attempt and downloads verify the pinned bytes', async () => {
-  const d = deps({ getLatestAttempt: jest.fn(async () => sentAttempt()) });
+test('the staff brief exposes only a friendly DOCX descriptor and downloads verify the pinned bytes', async () => {
+  const d = deps({
+    getLatestAttempt: jest.fn(async () => sentAttempt()),
+    downloadFile: jest.fn(async () => ({ buffer: DOCX_BYTES, mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', filename: 'PreSite_1002379.docx', size: DOCX_BYTES.length })),
+  });
   const context = await buildBriefingContext({ requestId: REQUEST_ID, link: LINK }, d);
   expect(context.writeup).toEqual({
-    docx: { member: 'writeup-docx', filename: 'PreSite_1002379.docx', size: 2048 },
-    pdf: { member: 'writeup-pdf', filename: 'PreSite_1002379.pdf', size: 4096 },
+    docx: { member: 'writeup-docx', displayName: 'Staff Brief 1002379.docx', size: 2048 },
     sharedAt: '2026-09-09T01:00:00.000Z',
   });
-  const pdf = await resolveBriefingMember({ requestId: REQUEST_ID, member: 'writeup-pdf' }, d);
-  expect(d.downloadFile).toHaveBeenCalledWith('d', 'p');
-  expect(pdf).toMatchObject({ filename: 'PreSite_1002379.pdf', mimeType: 'application/pdf', inline: true });
+  expect(JSON.stringify(context.writeup)).not.toContain('PreSite_1002379');
+  const docx = await resolveBriefingMember({ requestId: REQUEST_ID, member: 'writeup-docx' }, d);
+  expect(d.downloadFile).toHaveBeenCalledWith('d', 'i');
+  expect(docx).toMatchObject({ filename: 'PreSite_1002379.docx', inline: false });
 });
 
 test('a snapshot whose bytes no longer match the pinned hash is refused', async () => {
   const mutated = deps({
     getLatestAttempt: jest.fn(async () => sentAttempt()),
-    downloadFile: jest.fn(async () => ({ buffer: Buffer.from('%PDF-edited'), mimeType: 'application/pdf', filename: 'x.pdf', size: 11 })),
+    downloadFile: jest.fn(async () => ({ buffer: Buffer.from('docx-edited'), mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', filename: 'x.docx', size: 11 })),
   });
-  await expect(resolveBriefingMember({ requestId: REQUEST_ID, member: 'writeup-pdf' }, mutated))
+  await expect(resolveBriefingMember({ requestId: REQUEST_ID, member: 'writeup-docx' }, mutated))
     .rejects.toMatchObject({ httpStatus: 409, body: { ok: false, reason: 'snapshot_mismatch' } });
-  const noHash = deps({ getLatestAttempt: jest.fn(async () => sentAttempt({ pdf_byte_hash: null })) });
-  await expect(resolveBriefingMember({ requestId: REQUEST_ID, member: 'writeup-pdf' }, noHash))
+  const noHash = deps({ getLatestAttempt: jest.fn(async () => sentAttempt({ docx_byte_hash: null })) });
+  await expect(resolveBriefingMember({ requestId: REQUEST_ID, member: 'writeup-docx' }, noHash))
     .rejects.toMatchObject({ httpStatus: 409 });
+});
+
+test('the retired PDF member is refused even when the sent attempt has a PDF pointer', async () => {
+  const d = deps({ getLatestAttempt: jest.fn(async () => sentAttempt()) });
+  await expect(resolveBriefingMember({ requestId: REQUEST_ID, member: 'writeup-pdf' }, d))
+    .rejects.toMatchObject({ httpStatus: 404 });
+  expect(d.downloadFile).not.toHaveBeenCalled();
 });
 
 test('unknown members and reviews outside the request set are 404 before any Graph call', async () => {
@@ -160,7 +177,7 @@ test('unknown members and reviews outside the request set are 404 before any Gra
 });
 
 test('every member branch 404s before any Graph read when the request no longer resolves', async () => {
-  for (const member of ['writeup-pdf', 'proposal', `review:${RECEIVED_ID}`]) {
+  for (const member of ['writeup-docx', 'proposal', `review:${RECEIVED_ID}`]) {
     const gone = deps({
       getRequest: jest.fn(async () => { const e = new Error('Get record failed (404)'); e.status = 404; throw e; }),
       getLatestAttempt: jest.fn(async () => sentAttempt()),
@@ -176,6 +193,37 @@ test('a review member in the received set streams through the existing review re
   const file = await resolveBriefingMember({ requestId: REQUEST_ID, member: `review:${RECEIVED_ID}` }, d);
   expect(d.downloadReview).toHaveBeenCalledWith({ suggestionId: RECEIVED_ID });
   expect(file.filename).toBe('review.pdf');
+  expect(file).toMatchObject({ mimeType: 'application/pdf', inline: true });
+});
+
+test('DOCX review files stay out of the context and are refused before download', async () => {
+  const docxReview = {
+    ...suggestions()[0],
+    wmkf_appreviewersuggestionid: DOCX_REVIEW_ID,
+    wmkf_reviewfilename: 'Review-1002379-Ada-Lovelace.docx',
+  };
+  const d = deps({
+    findSuggestions: jest.fn(async () => [docxReview]),
+    fetchAnswers: jest.fn(async () => ({
+      [DOCX_REVIEW_ID]: [{ questionText: 'Strengths?', questionType: 'text', answerText: 'Strong', answerHtml: null }],
+    })),
+  });
+  const context = await buildBriefingContext({ requestId: REQUEST_ID, link: LINK }, d);
+  expect(context.reviews).toHaveLength(1);
+  expect(context.reviews[0]).toMatchObject({ id: DOCX_REVIEW_ID, file: null });
+  expect(context.reviews[0].answers).toHaveLength(1);
+  await expect(resolveBriefingMember({ requestId: REQUEST_ID, member: `review:${DOCX_REVIEW_ID}` }, d))
+    .rejects.toMatchObject({ httpStatus: 404 });
+  expect(d.downloadReview).not.toHaveBeenCalled();
+});
+
+test('a PDF-named review with non-PDF bytes is refused after download', async () => {
+  const d = deps({
+    downloadReview: jest.fn(async () => ({ buffer: Buffer.from('not a pdf'), mimeType: 'application/pdf', filename: 'review.pdf', size: 9 })),
+  });
+  await expect(resolveBriefingMember({ requestId: REQUEST_ID, member: `review:${RECEIVED_ID}` }, d))
+    .rejects.toMatchObject({ httpStatus: 404 });
+  expect(d.downloadReview).toHaveBeenCalledWith({ suggestionId: RECEIVED_ID });
 });
 
 test('the proposal member resolves Reviewer Materials/Proposal_<num>.pdf by governed path (D20) and 404s when it is absent', async () => {
