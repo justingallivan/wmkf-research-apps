@@ -172,3 +172,34 @@ test('each slot carries its request\'s live briefing link (D11), read once per r
   expect(slots[1].briefing).toEqual(slots[0].briefing);
   expect(slots[2].briefing).toBeNull();
 });
+
+test('each slot carries its applicant institution from one bounded request read; a failed read leaves null', async () => {
+  const R1 = 'aaaaaaaa-0000-4000-8000-000000000001';
+  const R2 = 'aaaaaaaa-0000-4000-8000-000000000002';
+  const findRequestsByIds = jest.fn(async () => ({ records: [
+    { akoya_requestid: R1.toUpperCase(), _akoya_applicantid_value: 'org-1', _akoya_applicantid_value_formatted: 'California Institute of Technology' },
+    { akoya_requestid: R2, _akoya_applicantid_value: null },
+  ] }));
+  const base = {
+    getSession: jest.fn(async () => storedRow()),
+    getRecipientDirectory: jest.fn(async () => ({ staff: [], external: [] })),
+    resolveAttendeesLenient: jest.fn(async () => ({ attendees: [], issues: [] })),
+    findSlotsBySession: jest.fn(async () => ({ records: [
+      { wmkf_deliberationslotid: 's1', _wmkf_request_value: R1, wmkf_order: 1 },
+      { wmkf_deliberationslotid: 's2', _wmkf_request_value: R2, wmkf_order: 2 },
+    ] })),
+    getBriefingLink: jest.fn(async () => null),
+  };
+  const { slots } = await getDeliberationSession({ sessionId: SESSION_ID }, dependencies({ ...base, findRequestsByIds }));
+  expect(findRequestsByIds).toHaveBeenCalledTimes(1);
+  expect(findRequestsByIds).toHaveBeenCalledWith([R1.toLowerCase(), R2], expect.objectContaining({ select: 'akoya_requestid,_akoya_applicantid_value', top: 2 }));
+  expect(slots[0].institution).toBe('California Institute of Technology');
+  expect(slots[1].institution).toBeNull();
+
+  const failing = dependencies({ ...base, findRequestsByIds: jest.fn(async () => { throw new Error('request read down'); }) });
+  const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+  const result = await getDeliberationSession({ sessionId: SESSION_ID }, failing);
+  consoleError.mockRestore();
+  expect(result.slots.map((slot) => slot.institution)).toEqual([null, null]);
+  expect(result.slots).toHaveLength(2);
+});

@@ -46,6 +46,7 @@ function slots() {
       wmkf_minutes: 15,
       _wmkf_request_value: REQUEST_ONE,
       wmkf_Request: { akoya_requestnum: '1001', akoya_title: 'First proposal' },
+      institution: 'California Institute of Technology',
       wmkf_LeadPd: { fullname: 'Alex Staff' },
       briefing: { url: 'https://reviews.example.org/external/briefing/token' },
     },
@@ -195,6 +196,16 @@ test('computeAgenda drops non-HTTPS links and rendered HTML escapes every propos
   expect(rendered.bodyHtml).toContain('&lt;img src=x onerror=alert(1)&gt;');
   expect(rendered.bodyHtml).not.toContain('javascript:');
   expect(rendered.bodyText).toContain('briefing link to follow by email');
+});
+
+test('agenda items carry the applicant institution after the title when known and omit it otherwise', () => {
+  const agenda = computeAgenda(session(), slots());
+  expect(agenda.slots.map((slot) => slot.institution)).toEqual(['California Institute of Technology', null]);
+  const rendered = renderAgendaEmail('Hello', agenda);
+  expect(rendered.bodyText).toContain('#1001 · First proposal · California Institute of Technology · Lead PD:');
+  expect(rendered.bodyText).toContain('#1002 · Second proposal · Lead PD:');
+  expect(rendered.bodyHtml).toContain('First proposal · California Institute of Technology · Lead PD:');
+  expect(rendered.bodyHtml).toContain('Second proposal · Lead PD:');
 });
 
 test('rendered agenda separates items with a blank line (text) and spacing (HTML)', () => {
