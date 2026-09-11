@@ -104,16 +104,16 @@ export default function BriefingPage() {
 
   return (
     <Shell title={data.title}>
+      {data.proposalTitle && (
+        <p className="mt-1 text-lg text-gray-700">
+          {data.proposalTitle}
+        </p>
+      )}
       {(data.projectLeader || data.programDirector) && (
-        <div className="mt-2 space-y-0.5 text-sm text-gray-500">
+        <div className={`${data.proposalTitle ? 'mt-3' : 'mt-2'} space-y-0.5 text-sm text-gray-500`}>
           {data.projectLeader && <p><span className="font-medium">PI:</span> {data.projectLeader}</p>}
           {data.programDirector && <p><span className="font-medium">PD:</span> {data.programDirector}</p>}
         </div>
-      )}
-      {data.proposalTitle && (
-        <p className={`${data.projectLeader || data.programDirector ? 'mt-3' : 'mt-1'} text-lg text-gray-700`}>
-          {data.proposalTitle}
-        </p>
       )}
 
       <section className="mt-6 rounded-xl border border-gray-200 bg-white p-5">
@@ -177,7 +177,7 @@ export default function BriefingPage() {
               <li key={material.member}>
                 <span className="font-medium text-gray-800">{material.label}:</span>{' '}
                 {material.available ? (
-                  <a className="text-blue-800 underline" href={documentHref(material.member)} target="_blank" rel="noreferrer noopener">
+                  <a className="text-blue-800 underline" href={documentHref(material.member)} {...(material.inline ? { target: '_blank', rel: 'noreferrer noopener' } : {})}>
                     {material.filename}
                   </a>
                 ) : (
