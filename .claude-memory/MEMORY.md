@@ -58,7 +58,8 @@
 - BILL / honoraria / payment semantics: ../docs/agent-wiki/topics/finance-honoraria.md
 - Auth / admin / access / security / private Blob: ../docs/agent-wiki/topics/security-auth.md; ../docs/Q9_PREFS_APPACCESS_DAL_MIGRATION_PLAN.md; project-reviewer-org-open-access-by-design.md
 - Intake portal / attachments / institution match / virus scan: ../docs/agent-wiki/topics/intake-portal.md
-- Site Visit materials / applicant additional materials / briefing room (collection SHIPPED S503; PR 3 built S506 as PR #252, unmerged, cron unscheduled; briefing page live S502): project-site-visit-materials-planning-handoff.md; ../docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md
+- Site Visit materials / applicant additional materials / briefing room (collection SHIPPED S503; PR 3 merged S507 as PR #252, cron unscheduled; briefing page live S502): project-site-visit-materials-planning-handoff.md; ../docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md
+- Ops meeting 2026-09-14 (reminder cron setup + effects; running agenda): project-ops-meeting-2026-09-14-agenda.md
 - PC Meeting Tracker / sessions / visits / agenda email / Staff Deliberations rail (D1–D25 decided; live in prod S503): ../docs/PC_MEETING_TRACKER_PLAN.md; ../docs/plans/SESSION_AGENDA_EMAIL_CODEX_BRIEF_2026-09-10.md; ../docs/plans/REVIEWER_RELEASE_REASON_CODEX_BRIEF_2026-09-09.md
 - Integrity screener / Retraction Watch / PubPeer / News: ../docs/agent-wiki/topics/integrity-screener.md
 - Grantee / email templates: ../docs/GRANTEE_PORTAL_SPEC.md; project-grantee-deliverable-email-voice.md; project-email-template-token-syntax.md
