@@ -7,6 +7,7 @@
 import { useEffect, useState } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
+import { SITE_VISIT_MATERIALS_OTHER_UPLOADS_ENABLED } from '../../../shared/config/siteVisitMaterials';
 
 const REASON_MESSAGE = {
   no_token: 'This link is missing its access token.',
@@ -255,7 +256,9 @@ export default function MaterialsContributorPage() {
         {data.checklist.map((item) => (
           <SlotUploader key={item.key} token={token} slot={item.key} label={item.label} required={item.required} received={item.received} maxMb={data.maxMb} disabled={data.closed} onDone={load} />
         ))}
-        <SlotUploader key="other" token={token} slot="other" label="Anything else you would like the Foundation to have" required={false} received={null} maxMb={data.maxMb} disabled={data.closed} onDone={load} />
+        {SITE_VISIT_MATERIALS_OTHER_UPLOADS_ENABLED && (
+          <SlotUploader key="other" token={token} slot="other" label="Anything else you would like the Foundation to have" required={false} received={null} maxMb={data.maxMb} disabled={data.closed} onDone={load} />
+        )}
       </ul>
       {data.other?.length > 0 && (
         <section className="mt-6 text-sm text-gray-700">

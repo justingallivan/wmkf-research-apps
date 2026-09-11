@@ -68,11 +68,12 @@ test('upload-token: server derives scope, resource, binding, and cap; waived or 
   const unknown = res(); await uploadTokenHandler(req('POST', { slot: 'nope', filename: 'b.pdf', size: 10 }), unknown); expect(unknown.statusCode).toBe(400);
   const ext = res(); await uploadTokenHandler(req('POST', { slot: 'presentation_pdf', filename: 'deck.pptx', size: 10 }), ext); expect(ext.statusCode).toBe(422); expect(ext.body.reason).toBe('extension_not_allowed');
   const big = res(); await uploadTokenHandler(req('POST', { slot: 'presentation_pdf', filename: 'deck.pdf', size: 101 * 1024 * 1024 }), big); expect(big.statusCode).toBe(400); expect(big.body).toEqual({ ok: false, reason: 'file_too_large', maxMb: 100 });
-  const other = res(); await uploadTokenHandler(req('POST', { slot: 'other', filename: 'map.docx', size: 10 }), other); expect(other.statusCode).toBe(200);
-  expect(staging.createPortalUpload).toHaveBeenCalledTimes(2);
+  // The optional "other" slot is hidden from applicants (SITE_VISIT_MATERIALS_OTHER_UPLOADS_ENABLED=false): mint refuses it before any staging row exists.
+  const other = res(); await uploadTokenHandler(req('POST', { slot: 'other', filename: 'map.docx', size: 10 }), other); expect(other.statusCode).toBe(400);
+  expect(staging.createPortalUpload).toHaveBeenCalledTimes(1);
   getUploadMaxMb.mockRejectedValueOnce(new ServiceHttpError('cap', { httpStatus: 503, code: 'site_visit_materials_cap_unavailable', body: { ok: false, reason: 'cap_unavailable' } }));
   const capDown = res(); await uploadTokenHandler(req('POST', { slot: 'presentation_pdf', filename: 'deck.pdf', size: 10 }), capDown);
-  expect(capDown.statusCode).toBe(503); expect(capDown.body.reason).toBe('cap_unavailable'); expect(staging.createPortalUpload).toHaveBeenCalledTimes(2);
+  expect(capDown.statusCode).toBe(503); expect(capDown.body.reason).toBe('cap_unavailable'); expect(staging.createPortalUpload).toHaveBeenCalledTimes(1);
   verifyMaterialsToken.mockResolvedValueOnce({ ok: false, reason: 'closed' });
   const closed = res(); await uploadTokenHandler(req('POST', { slot: 'presentation_pdf', filename: 'deck.pdf', size: 10 }), closed); expect(closed.statusCode).toBe(401);
 });

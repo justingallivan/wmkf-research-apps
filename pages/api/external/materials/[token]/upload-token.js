@@ -11,6 +11,7 @@ import { withDalContext } from '../../../../../lib/dataverse/core/context';
 import { ServiceHttpError } from '../../../../../lib/services/service-http-error';
 import { getUploadMaxMb, uploadMaxBytes } from '../../../../../lib/services/site-visit-materials/upload-cap';
 import { slotExtensions } from '../../../../../lib/utils/site-visit-material-file';
+import { SITE_VISIT_MATERIALS_OTHER_UPLOADS_ENABLED } from '../../../../../shared/config/siteVisitMaterials';
 import {
   PORTAL_DOCUMENT_CONTENT_TYPES,
   PORTAL_UPLOAD_SCOPES,
@@ -38,7 +39,7 @@ export default async function handler(req, res) {
   const filename = typeof req.body?.filename === 'string' ? req.body.filename : '';
   const contentType = typeof req.body?.contentType === 'string' && req.body.contentType ? req.body.contentType : 'application/octet-stream';
   const size = Number(req.body?.size);
-  const slotOpen = slot === 'other' || (verified.collection.checklist || []).some((item) => item.key === slot && !item.waived);
+  const slotOpen = (slot === 'other' && SITE_VISIT_MATERIALS_OTHER_UPLOADS_ENABLED) || (verified.collection.checklist || []).some((item) => item.key === slot && !item.waived);
   if (!slotOpen || !slotExtensions(slot) || !filename || !Number.isSafeInteger(size) || size <= 0) {
     return res.status(400).json({ ok: false, reason: 'bad_request' });
   }

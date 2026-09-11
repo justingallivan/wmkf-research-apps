@@ -609,3 +609,13 @@ Owner feedback after the first production smoke (ZZTEST-03). Four items, built o
 4. The upload page shows a "Need help?" mailto footer using the `support` alert-recipients
    category's first configured address (`getSupportEmail()` in `contributor-service.js`; no
    fallback to `default`), surfaced as `supportEmail` on the context response.
+
+### 16.5 2026-09-11 (S507): optional "other" upload hidden from applicants
+
+Owner decision: the "Anything else you would like the Foundation to have" uploader is hidden, not
+retired. `SITE_VISIT_MATERIALS_OTHER_UPLOADS_ENABLED = false` in `shared/config/siteVisitMaterials.js`
+gates all three seams together: the contributor page does not render the slot, the upload-token
+mint refuses `slot=other` (400, no staging row), and `finalizeMaterialUpload` refuses it
+(`slot_not_open`). Storage path, folder, artifact type, and the "Other files received" list stay
+built; §6.2 item 7 describes the re-enabled behaviour. The reminder cron is unaffected in either
+state: `missingRequiredItems` reads only checklist items, and `other` is never a checklist key.
