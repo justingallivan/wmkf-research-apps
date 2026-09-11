@@ -16,7 +16,7 @@ function dependencies(overrides = {}) {
       programs: [],
       proposals: [
         { requestId: REQUEST_B, requestNumber: '1002', projectLeader: 'Pat Two', programDirector: 'PD Two' },
-        { requestId: REQUEST_A, requestNumber: '1001', projectLeader: 'Pat One', programDirector: 'PD One' },
+        { requestId: REQUEST_A, requestNumber: '1001', projectLeader: 'Pat One', programDirector: 'PD One', institution: 'Caltech' },
       ],
     })),
     findRequestsByIds: jest.fn(async () => ({ records: [
@@ -66,6 +66,7 @@ test('joins share, deliberation, and visit state and sorts by the next meeting',
   expect(result.proposals.map((row) => row.requestId)).toEqual([REQUEST_A, REQUEST_B]);
   expect(result.proposals[0]).toMatchObject({
     title: 'Proposal A',
+    institution: 'Caltech',
     shareState: { lifecycleState: 100000002 },
     needsScheduling: false,
     nextMeetingIso: '2026-09-18T16:00:00.000Z',
@@ -73,6 +74,7 @@ test('joins share, deliberation, and visit state and sorts by the next meeting',
   });
   expect(result.proposals[1]).toMatchObject({
     title: 'Proposal B',
+    institution: null,
     shareState: null,
     deliberation: null,
     siteVisit: null,

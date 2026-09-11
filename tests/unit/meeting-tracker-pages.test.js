@@ -396,6 +396,18 @@ describe('ProposalOrderList drag-and-drop', () => {
     menuButtons.forEach((button) => expect(button).toBeDisabled());
   });
 
+  test('the institution renders under the title when the cycle dashboard supplies it, and is omitted otherwise', () => {
+    const slots = [orderSlot('slot-a', 'W/"1"'), orderSlot('slot-b', 'W/"2"')];
+    const proposalById = new Map([['slot-a', { requestNumber: '1001', title: 'Proposal A', institution: 'Caltech' }], ['slot-b', { requestNumber: '1002', title: 'Proposal B', institution: null }]]);
+    render(
+      <ProposalOrderList slots={slots} proposalById={proposalById} sessions={[]} sessionId={SESSION_ID} busy={false} savingSlotId={null} onChange={jest.fn()} onMove={jest.fn()} onRemove={jest.fn()} onReorder={jest.fn()} />,
+    );
+    const institution = screen.getByText('Caltech');
+    expect(institution.previousElementSibling).toHaveTextContent('Proposal A');
+    expect(institution.nextElementSibling).toHaveTextContent('Lead PD: Not assigned');
+    expect(screen.getAllByText(/^Lead PD:/)).toHaveLength(2);
+  });
+
   test('the lead PD is display-only on the row: no select, one "Lead PD:" line from the slot lookup', () => {
     const slots = [
       { ...orderSlot('slot-a', 'W/"1"'), wmkf_LeadPd: { systemuserid: 'u1', fullname: 'Alex Staff' } },
