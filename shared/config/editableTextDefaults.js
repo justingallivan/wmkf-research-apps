@@ -1,15 +1,13 @@
 /**
  * Catalog of admin-editable text defaults, rendered by
- * `shared/components/admin/EmailDefaultsSection.js` (one entry → one panel card).
+ * `shared/components/admin/EmailDefaultsSection.js` (grouped by audience; one
+ * card per `emailKey`, pairing that email's subject/body/button fields).
  *
- * FUTURE (readability): the panel currently shows ONE FLAT CARD per entry, so each
- * subject and each body is its own card (12+ and growing). Group them for scanning:
- *   - top-level GROUP by audience — "Reviewer emails" vs "Grantee emails"
- *   - within a group, ONE card per email pairing its subject + body together
- * The grouping is derivable from the key (`email.<audience>_<name>.<subject|body>`),
- * or add explicit `group` + `emailLabel` fields here and have the section render
- * grouped sections + paired subject/body inputs. Catalog-driven, so the change is
- * localized to this file + EmailDefaultsSection.
+ * Every entry carries `group` (`reviewers` | `grantees` | `internal` | `labels`,
+ * ordered via `EDITABLE_TEXT_GROUPS`), `emailKey` (the key with its last
+ * `.segment` removed — the pairing key for a card), and `emailLabel` (the
+ * human name shown on that card). The section groups client-side by
+ * `EDITABLE_TEXT_GROUPS` order, then by `emailKey` in catalog order.
  */
 export const EDITABLE_TEXT_DEFAULTS = [
   {
@@ -18,6 +16,9 @@ export const EDITABLE_TEXT_DEFAULTS = [
     description: 'Default subject line for grantee deliverables invitation emails. Mustache {{tokens}}, not [brackets].',
     multiline: false,
     placeholders: ['{{proposalTitle}}'],
+    group: 'grantees',
+    emailKey: 'email.grantee_invite',
+    emailLabel: 'Grantee invite',
   },
   {
     key: 'email.grantee_invite.body',
@@ -25,6 +26,9 @@ export const EDITABLE_TEXT_DEFAULTS = [
     description: 'Default body copy for grantee deliverables invitation emails. Mustache {{tokens}}, not [brackets].',
     multiline: true,
     placeholders: ['{{granteeName}}', '{{proposalTitle}}', 'COB {{dueDate}}'],
+    group: 'grantees',
+    emailKey: 'email.grantee_invite',
+    emailLabel: 'Grantee invite',
   },
   {
     key: 'email.reviewer_reminder_respond_by.subject',
@@ -32,6 +36,9 @@ export const EDITABLE_TEXT_DEFAULTS = [
     description: 'Default subject line for reviewer respond-by reminder emails. Mustache {{tokens}}, not [brackets].',
     multiline: false,
     placeholders: [],
+    group: 'reviewers',
+    emailKey: 'email.reviewer_reminder_respond_by',
+    emailLabel: 'Reviewer respond-by reminder',
   },
   {
     key: 'email.reviewer_reminder_respond_by.body',
@@ -39,6 +46,9 @@ export const EDITABLE_TEXT_DEFAULTS = [
     description: 'Default body copy for reviewer respond-by reminder emails. {{proposalClause}} renders as a proposal phrase in context, e.g. the proposal “X” (or a neutral phrase if untitled).',
     multiline: true,
     placeholders: ['{{greeting}}', '{{reviewerName}}', '{{proposalClause}}', '{{signature}}'],
+    group: 'reviewers',
+    emailKey: 'email.reviewer_reminder_respond_by',
+    emailLabel: 'Reviewer respond-by reminder',
   },
   {
     key: 'email.reviewer_reminder_review_due.subject',
@@ -46,6 +56,9 @@ export const EDITABLE_TEXT_DEFAULTS = [
     description: 'Default subject line for reviewer review-due reminder emails. Mustache {{tokens}}, not [brackets].',
     multiline: false,
     placeholders: [],
+    group: 'reviewers',
+    emailKey: 'email.reviewer_reminder_review_due',
+    emailLabel: 'Reviewer review-due reminder',
   },
   {
     key: 'email.reviewer_reminder_review_due.body',
@@ -53,6 +66,9 @@ export const EDITABLE_TEXT_DEFAULTS = [
     description: 'Default body copy for reviewer review-due reminder emails. These reminders preserve the original review link and do not include a new one. {{proposalClause}} renders as a proposal phrase in context, e.g. the proposal “X” (or a neutral phrase if untitled).',
     multiline: true,
     placeholders: ['{{greeting}}', '{{reviewerName}}', '{{proposalClause}}', '{{reviewDueDate}}', '{{signature}}'],
+    group: 'reviewers',
+    emailKey: 'email.reviewer_reminder_review_due',
+    emailLabel: 'Reviewer review-due reminder',
   },
   {
     key: 'email.reviewer_acceptance.subject',
@@ -60,6 +76,9 @@ export const EDITABLE_TEXT_DEFAULTS = [
     description: 'Default subject line for reviewer acceptance confirmation emails. Mustache {{tokens}}, not [brackets].',
     multiline: false,
     placeholders: [],
+    group: 'reviewers',
+    emailKey: 'email.reviewer_acceptance',
+    emailLabel: 'Reviewer acceptance confirmation',
   },
   {
     key: 'email.reviewer_acceptance.body',
@@ -67,6 +86,9 @@ export const EDITABLE_TEXT_DEFAULTS = [
     description: 'Default body copy for reviewer acceptance confirmation emails. Mustache {{tokens}}, not [brackets].',
     multiline: true,
     placeholders: ['{{greeting}}', '{{reviewerName}}', '{{proposalTitle}}', '{{reviewDueDate}}', '{{signature}}'],
+    group: 'reviewers',
+    emailKey: 'email.reviewer_acceptance',
+    emailLabel: 'Reviewer acceptance confirmation',
   },
   {
     key: 'email.reviewer_extension.body',
@@ -75,6 +97,9 @@ export const EDITABLE_TEXT_DEFAULTS = [
     multiline: true,
     placeholders: ['{{greeting}}', '{{reviewerName}}', '{{proposalTitle}}', '{{reviewDueDate}}', '{{signature}}'],
     requiredPlaceholders: ['{{greeting}}', '{{reviewDueDate}}', '{{signature}}'],
+    group: 'reviewers',
+    emailKey: 'email.reviewer_extension',
+    emailLabel: 'Reviewer deadline update',
   },
   {
     key: 'email.reviewer_withdraw.subject',
@@ -82,6 +107,9 @@ export const EDITABLE_TEXT_DEFAULTS = [
     description: 'Default subject line for reviewer no-longer-needed withdrawal emails. Mustache {{tokens}}, not [brackets].',
     multiline: false,
     placeholders: [],
+    group: 'reviewers',
+    emailKey: 'email.reviewer_withdraw',
+    emailLabel: 'Reviewer withdraw-sufficient',
   },
   {
     key: 'email.reviewer_withdraw.body',
@@ -89,6 +117,9 @@ export const EDITABLE_TEXT_DEFAULTS = [
     description: 'Default body copy for reviewer no-longer-needed withdrawal emails. {{proposalClause}} renders as a proposal phrase in context, e.g. the proposal “X” (or a neutral phrase if untitled).',
     multiline: true,
     placeholders: ['{{greeting}}', '{{reviewerName}}', '{{proposalClause}}', '{{signature}}'],
+    group: 'reviewers',
+    emailKey: 'email.reviewer_withdraw',
+    emailLabel: 'Reviewer withdraw-sufficient',
   },
   {
     key: 'email.reviewer_invitation.subject',
@@ -96,6 +127,9 @@ export const EDITABLE_TEXT_DEFAULTS = [
     description: 'Default subject line for the reviewer invitation email (per-PD editable; this is the org default). Mustache {{tokens}}, not [brackets].',
     multiline: false,
     placeholders: ['{{respondBy}}', '{{proposalTitle}}'],
+    group: 'reviewers',
+    emailKey: 'email.reviewer_invitation',
+    emailLabel: 'Reviewer invitation',
   },
   {
     key: 'email.reviewer_invitation.body',
@@ -103,6 +137,9 @@ export const EDITABLE_TEXT_DEFAULTS = [
     description: 'Default body for the reviewer invitation email. The honorarium amount is injected server-side from the admin honorarium setting via {{customField:honorarium}}; the timeline tokens are filled in when the PD sends.',
     multiline: true,
     placeholders: ['{{greeting}}', '{{proposalTitle}}', '{{piName}}', '{{piInstitution}}', '{{proposalDetails}}', '{{proposalAbstract}}', '{{externalLink}}', '{{respondBy}}', '{{proposalDelivery}}', '{{reviewDue}}', '{{customField:honorarium}}', '{{signature}}'],
+    group: 'reviewers',
+    emailKey: 'email.reviewer_invitation',
+    emailLabel: 'Reviewer invitation',
   },
   {
     key: 'email.reviewer_materials.subject',
@@ -110,6 +147,9 @@ export const EDITABLE_TEXT_DEFAULTS = [
     description: 'Default subject line for the post-accept review-materials email. Mustache {{tokens}}.',
     multiline: false,
     placeholders: ['{{proposalTitle}}'],
+    group: 'reviewers',
+    emailKey: 'email.reviewer_materials',
+    emailLabel: 'Reviewer materials',
   },
   {
     key: 'email.reviewer_materials.body',
@@ -117,6 +157,9 @@ export const EDITABLE_TEXT_DEFAULTS = [
     description: 'Default body for the post-accept review-materials email.',
     multiline: true,
     placeholders: ['{{greeting}}', '{{proposalTitle}}', '{{piInstitution}}', '{{externalLink}}', '{{reviewDueDate}}', '{{signature}}'],
+    group: 'reviewers',
+    emailKey: 'email.reviewer_materials',
+    emailLabel: 'Reviewer materials',
   },
   {
     key: 'email.reviewer_materials.button_label',
@@ -124,6 +167,9 @@ export const EDITABLE_TEXT_DEFAULTS = [
     description: 'Text on the secure-link button in the post-accept materials email (the reviewer starts the review here). Blank falls back to a stage default.',
     multiline: false,
     placeholders: [],
+    group: 'reviewers',
+    emailKey: 'email.reviewer_materials',
+    emailLabel: 'Reviewer materials',
   },
   {
     key: 'email.reviewer_followup.subject',
@@ -131,6 +177,9 @@ export const EDITABLE_TEXT_DEFAULTS = [
     description: 'Default subject line for the reviewer follow-up reminder email. Mustache {{tokens}}.',
     multiline: false,
     placeholders: ['{{proposalTitle}}'],
+    group: 'reviewers',
+    emailKey: 'email.reviewer_followup',
+    emailLabel: 'Reviewer follow-up',
   },
   {
     key: 'email.reviewer_followup.body',
@@ -138,6 +187,9 @@ export const EDITABLE_TEXT_DEFAULTS = [
     description: 'Default body for the reviewer follow-up reminder email.',
     multiline: true,
     placeholders: ['{{greeting}}', '{{proposalTitle}}', '{{externalLink}}', '{{reviewDueDate}}', '{{signature}}'],
+    group: 'reviewers',
+    emailKey: 'email.reviewer_followup',
+    emailLabel: 'Reviewer follow-up',
   },
   {
     key: 'email.reviewer_followup.button_label',
@@ -145,6 +197,9 @@ export const EDITABLE_TEXT_DEFAULTS = [
     description: 'Text on the secure-link button in the follow-up reminder email (reviewer has accepted and received materials). Blank falls back to a stage default.',
     multiline: false,
     placeholders: [],
+    group: 'reviewers',
+    emailKey: 'email.reviewer_followup',
+    emailLabel: 'Reviewer follow-up',
   },
   {
     key: 'email.reviewer_thankyou.subject',
@@ -152,6 +207,9 @@ export const EDITABLE_TEXT_DEFAULTS = [
     description: 'Default subject line for the reviewer thank-you email. Mustache {{tokens}}.',
     multiline: false,
     placeholders: ['{{proposalTitle}}'],
+    group: 'reviewers',
+    emailKey: 'email.reviewer_thankyou',
+    emailLabel: 'Reviewer thank-you',
   },
   {
     key: 'email.reviewer_thankyou.body',
@@ -159,6 +217,9 @@ export const EDITABLE_TEXT_DEFAULTS = [
     description: 'Default body for the reviewer thank-you email. It acknowledges receipt only and must not imply closeout or payment eligibility.',
     multiline: true,
     placeholders: ['{{greeting}}', '{{proposalTitle}}', '{{signature}}'],
+    group: 'reviewers',
+    emailKey: 'email.reviewer_thankyou',
+    emailLabel: 'Reviewer thank-you',
   },
   {
     key: 'email.grantee_reminder.subject',
@@ -166,6 +227,9 @@ export const EDITABLE_TEXT_DEFAULTS = [
     description: 'Default subject line for grantee deliverables reminder emails. Mustache {{tokens}}, not [brackets].',
     multiline: false,
     placeholders: [],
+    group: 'grantees',
+    emailKey: 'email.grantee_reminder',
+    emailLabel: 'Grantee reminder',
   },
   {
     key: 'email.grantee_reminder.body',
@@ -173,6 +237,9 @@ export const EDITABLE_TEXT_DEFAULTS = [
     description: 'Default body copy for grantee deliverables reminder emails. Mustache {{tokens}}, not [brackets].',
     multiline: true,
     placeholders: ['{{granteeName}}', '{{proposalTitle}}', 'COB {{dueDate}}', '{{signature}}'],
+    group: 'grantees',
+    emailKey: 'email.grantee_reminder',
+    emailLabel: 'Grantee reminder',
   },
   {
     key: 'email.deliberation_agenda.subject',
@@ -180,6 +247,9 @@ export const EDITABLE_TEXT_DEFAULTS = [
     description: 'Default subject line for the deliberation session agenda email (Meeting Tracker session page, "Agenda email" card). Mustache {{tokens}}, not [brackets]. {{sessionDate}} renders as e.g. "Friday, September 11" in the session\'s time zone.',
     multiline: false,
     placeholders: ['{{sessionDate}}'],
+    group: 'internal',
+    emailKey: 'email.deliberation_agenda',
+    emailLabel: 'Deliberation agenda',
   },
   {
     key: 'email.deliberation_agenda.body',
@@ -187,6 +257,9 @@ export const EDITABLE_TEXT_DEFAULTS = [
     description: 'Default opening message for the deliberation session agenda email (Meeting Tracker session page, "Agenda email" card). This is the opening paragraph only; the agenda block (session details plus per-proposal lines) is rendered separately by the service and is not editable. Mustache {{tokens}}, not [brackets]. {{sessionDate}} renders as e.g. "Friday, September 11" in the session\'s time zone.',
     multiline: true,
     placeholders: ['{{sessionDate}}'],
+    group: 'internal',
+    emailKey: 'email.deliberation_agenda',
+    emailLabel: 'Deliberation agenda',
   },
   {
     key: 'stage.deliberations.draft',
@@ -194,6 +267,9 @@ export const EDITABLE_TEXT_DEFAULTS = [
     description: 'Display label for the Staff Deliberations rail\'s first stop once a draft exists (default "AI draft ready"; before that the stop reads "No draft yet" / "Generating draft" / "Draft failed"). Read by both the Staff Deliberations tab and the cycle view (docs/PC_MEETING_TRACKER_PLAN.md D6).',
     multiline: false,
     placeholders: [],
+    group: 'labels',
+    emailKey: 'stage.deliberations',
+    emailLabel: 'Staff Deliberations stage labels',
   },
   {
     key: 'stage.deliberations.shared',
@@ -201,6 +277,9 @@ export const EDITABLE_TEXT_DEFAULTS = [
     description: 'Display label for the Staff Deliberations rail\'s second stop (default "Shared"). Read by both the Staff Deliberations tab and the cycle view (docs/PC_MEETING_TRACKER_PLAN.md D6).',
     multiline: false,
     placeholders: [],
+    group: 'labels',
+    emailKey: 'stage.deliberations',
+    emailLabel: 'Staff Deliberations stage labels',
   },
   {
     key: 'stage.deliberations.visit',
@@ -208,6 +287,9 @@ export const EDITABLE_TEXT_DEFAULTS = [
     description: 'Display label for the Staff Deliberations rail\'s third stop (default "Visit"). Read by both the Staff Deliberations tab and the cycle view (docs/PC_MEETING_TRACKER_PLAN.md D6).',
     multiline: false,
     placeholders: [],
+    group: 'labels',
+    emailKey: 'stage.deliberations',
+    emailLabel: 'Staff Deliberations stage labels',
   },
   {
     key: 'stage.deliberations.final',
@@ -215,9 +297,19 @@ export const EDITABLE_TEXT_DEFAULTS = [
     description: 'Display label for the Staff Deliberations rail\'s fourth stop (default "Final"). Read by both the Staff Deliberations tab and the cycle view (docs/PC_MEETING_TRACKER_PLAN.md D6).',
     multiline: false,
     placeholders: [],
+    group: 'labels',
+    emailKey: 'stage.deliberations',
+    emailLabel: 'Staff Deliberations stage labels',
   },
 ];
 
 export const EDITABLE_TEXT_DEFAULTS_BY_KEY = Object.freeze(
   Object.fromEntries(EDITABLE_TEXT_DEFAULTS.map((entry) => [entry.key, entry])),
 );
+
+export const EDITABLE_TEXT_GROUPS = [
+  { id: 'reviewers', title: 'Reviewer emails', description: 'Default copy for reviewer email workflows (org defaults; some are per-PD editable).' },
+  { id: 'grantees', title: 'Grantee emails', description: 'Default copy for grantee deliverables email workflows.' },
+  { id: 'internal', title: 'Internal emails', description: 'Default copy for internal staff-facing email workflows.' },
+  { id: 'labels', title: 'Staff labels', description: 'Display labels shown in staff-facing UI, not email copy.' },
+];
