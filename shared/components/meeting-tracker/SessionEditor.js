@@ -105,7 +105,7 @@ function SlotRow({ slot, proposal, leadOptions, sessions, sessionId, busy, savin
         draggable={!busy}
         onDragStart={onDragStart}
         onDragEnd={onDragEnd}
-        className={`flex w-7 shrink-0 self-stretch items-center justify-center border-r border-gray-200 bg-gray-50 text-gray-400 transition-colors ${!busy ? 'cursor-grab hover:bg-gray-100 hover:text-gray-600 active:cursor-grabbing' : ''}`}
+        className={`flex w-7 shrink-0 self-stretch items-center justify-center border-r border-gray-200 bg-gray-50 text-gray-500 transition-colors ${!busy ? 'cursor-grab hover:bg-gray-100 hover:text-gray-700 active:cursor-grabbing' : ''}`}
       >
         <svg aria-hidden="true" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
           <circle cx="6" cy="4" r="1.3" /><circle cx="6" cy="10" r="1.3" /><circle cx="6" cy="16" r="1.3" />
