@@ -314,6 +314,10 @@ readiness flag is enabled for that target.
    suites; external schema state remains ASSUMED until the owner applies and
    reads back migration 041.]** Build brief:
    `docs/plans/SESSION_AGENDA_EMAIL_CODEX_BRIEF_2026-09-10.md`.
+   - **D26 Agenda subject and opening message are admin-editable defaults**
+     (`email.deliberation_agenda.*`), seeded from the previous hard-coded
+     text; blank renders blank per the email-defaults convention. Build brief:
+     `docs/plans/AGENDA_EMAIL_DEFAULTS_BUILD_BRIEF_2026-09-10.md`.
 6. **D27 Proposal order supports drag-and-drop** (native HTML5, handle on the number column)
    in addition to the arrow buttons; both persist through the same full-order reorder route
    (`reorderSessionSlots` → `PATCH /api/meeting-tracker/slots/reorder`). Built 2026-09-10 in

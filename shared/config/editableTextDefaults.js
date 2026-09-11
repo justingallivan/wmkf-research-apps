@@ -175,6 +175,20 @@ export const EDITABLE_TEXT_DEFAULTS = [
     placeholders: ['{{granteeName}}', '{{proposalTitle}}', 'COB {{dueDate}}', '{{signature}}'],
   },
   {
+    key: 'email.deliberation_agenda.subject',
+    label: 'Deliberation agenda subject',
+    description: 'Default subject line for the deliberation session agenda email (Meeting Tracker session page, "Agenda email" card). Mustache {{tokens}}, not [brackets]. {{sessionDate}} renders as e.g. "Friday, September 11" in the session\'s time zone.',
+    multiline: false,
+    placeholders: ['{{sessionDate}}'],
+  },
+  {
+    key: 'email.deliberation_agenda.body',
+    label: 'Deliberation agenda message',
+    description: 'Default opening message for the deliberation session agenda email (Meeting Tracker session page, "Agenda email" card). This is the opening paragraph only; the agenda block (session details plus per-proposal lines) is rendered separately by the service and is not editable. Mustache {{tokens}}, not [brackets]. {{sessionDate}} renders as e.g. "Friday, September 11" in the session\'s time zone.',
+    multiline: true,
+    placeholders: ['{{sessionDate}}'],
+  },
+  {
     key: 'stage.deliberations.draft',
     label: 'Deliberations stage label: draft',
     description: 'Display label for the Staff Deliberations rail\'s first stop once a draft exists (default "AI draft ready"; before that the stop reads "No draft yet" / "Generating draft" / "Draft failed"). Read by both the Staff Deliberations tab and the cycle view (docs/PC_MEETING_TRACKER_PLAN.md D6).',

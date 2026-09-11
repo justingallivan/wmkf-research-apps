@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-const DEFAULT_MESSAGE = "Here is the agenda for our deliberation session. Each proposal's briefing page opens without a login.";
+const EMPTY_DEFAULTS = { subject: '', message: '', unavailable: false };
 
 function newOperationId() {
   if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
@@ -17,19 +17,6 @@ function newOperationId() {
   const hex = Array.from(bytes, (value) => value.toString(16).padStart(2, '0')).join('');
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}`
     + `-${hex.slice(16, 20)}-${hex.slice(20)}`;
-}
-
-function defaultSubject(session) {
-  const start = new Date(session?.scheduledStartIso || '');
-  if (!Number.isFinite(start.getTime())) return 'Deliberation session agenda';
-  try {
-    const date = new Intl.DateTimeFormat('en-US', {
-      weekday: 'long', month: 'long', day: 'numeric', timeZone: session.ianaTimeZone,
-    }).format(start);
-    return `Deliberation session agenda — ${date}`;
-  } catch {
-    return 'Deliberation session agenda';
-  }
 }
 
 function attendeeEmails(session) {
@@ -159,9 +146,11 @@ export default function SessionAgendaPanel({ sessionId, session, slots, recipien
   const [pendingSend, setPendingSend] = useState(null);
   const [changed, setChanged] = useState(false);
   const [loadError, setLoadError] = useState(null);
+  const [defaults, setDefaults] = useState(EMPTY_DEFAULTS);
+  const [statusLoaded, setStatusLoaded] = useState(false);
   const [composerOpen, setComposerOpen] = useState(false);
   const [directoryTarget, setDirectoryTarget] = useState(null);
-  const [form, setForm] = useState({ to: '', cc: '', subject: '', bodyText: DEFAULT_MESSAGE });
+  const [form, setForm] = useState({ to: '', cc: '', subject: '', bodyText: '' });
   const [preview, setPreview] = useState(null);
   const [confirmed, setConfirmed] = useState(false);
   const [busy, setBusy] = useState(null);
@@ -179,6 +168,8 @@ export default function SessionAgendaPanel({ sessionId, session, slots, recipien
     setLastAgenda(body.lastAgenda || null);
     setPendingSend(body.pendingSend || null);
     setChanged(body.scheduleChanged === true);
+    setDefaults(body.defaults || EMPTY_DEFAULTS);
+    setStatusLoaded(true);
     setLoadError(null);
   }, [sessionId]);
 
@@ -213,8 +204,8 @@ export default function SessionAgendaPanel({ sessionId, session, slots, recipien
     setForm({
       to: attendeeEmails(session),
       cc: '',
-      subject: defaultSubject(session),
-      bodyText: DEFAULT_MESSAGE,
+      subject: defaults.subject,
+      bodyText: defaults.message,
     });
     setPreview(null);
     setConfirmed(false);
@@ -319,8 +310,8 @@ export default function SessionAgendaPanel({ sessionId, session, slots, recipien
             setForm({
               to: attendeeEmails(session),
               cc: '',
-              subject: defaultSubject(session),
-              bodyText: DEFAULT_MESSAGE,
+              subject: defaults.subject,
+              bodyText: defaults.message,
             });
           }
           setPreview(null);
@@ -336,8 +327,8 @@ export default function SessionAgendaPanel({ sessionId, session, slots, recipien
             setForm({
               to: attendeeEmails(session),
               cc: '',
-              subject: defaultSubject(session),
-              bodyText: DEFAULT_MESSAGE,
+              subject: defaults.subject,
+              bodyText: defaults.message,
             });
           }
           setPreview(null);
@@ -399,7 +390,8 @@ export default function SessionAgendaPanel({ sessionId, session, slots, recipien
         <button
           type="button"
           onClick={openComposer}
-          className={`mt-4 rounded-lg px-4 py-2 text-sm font-semibold ${lastAgenda?.sentAt ? 'border border-gray-300 bg-white text-gray-900' : 'bg-gray-900 text-white'}`}
+          disabled={!statusLoaded && !loadError}
+          className={`mt-4 rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50 ${lastAgenda?.sentAt ? 'border border-gray-300 bg-white text-gray-900' : 'bg-gray-900 text-white'}`}
         >
           {pendingSend?.operationId ? 'Review unresolved send…' : lastAgenda?.sentAt ? 'Send agenda again…' : 'Send agenda…'}
         </button>
@@ -408,6 +400,11 @@ export default function SessionAgendaPanel({ sessionId, session, slots, recipien
       {composerOpen && (
         <ComposerDialog busy={Boolean(busy)} directoryOpen={directoryTarget !== null} onClose={closeComposer}>
           {error && <div role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</div>}
+          {showEditableFields && (defaults.unavailable || !defaults.subject || !defaults.message) && (
+            <p role="status" className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+              Default subject or message is not configured. Enter them below, or set them in Admin → Workflow email defaults.
+            </p>
+          )}
           {showEditableFields && <div className="mt-5 grid gap-4 md:grid-cols-2">
             {[['to', 'To'], ['cc', 'Cc']].map(([field, label]) => (
               <div key={field}>
@@ -472,4 +469,4 @@ export default function SessionAgendaPanel({ sessionId, session, slots, recipien
   );
 }
 
-export const _internal = { appendEmail, attendeeEmails, defaultSubject, scheduleKey };
+export const _internal = { appendEmail, attendeeEmails, scheduleKey };

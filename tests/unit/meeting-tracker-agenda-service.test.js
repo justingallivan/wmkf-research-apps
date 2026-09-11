@@ -6,6 +6,7 @@ import {
   getAgendaStatus,
   prepareAgendaEmail,
   renderAgendaEmail,
+  resolveAgendaDefault,
   sendAgendaEmail,
 } from '../../lib/services/meeting-tracker/agenda-service';
 
@@ -361,12 +362,56 @@ test('status reports the last sent receipt separately from a newer unresolved se
     })),
     getLatestSentAgenda: jest.fn(async () => sent),
     getLatestUnresolvedAgenda: jest.fn(async () => pending),
+    getSettingStrict: jest.fn(async () => ({ found: false, value: null })),
   });
   expect(result).toMatchObject({
     lastAgenda: { state: 'sent', sentAt: sent.sent_at },
     pendingSend: { state: 'send_requested', operationId: pending.operation_id },
     scheduleChanged: false,
+    defaults: { subject: '', message: '', unavailable: false },
   });
+});
+
+test('status resolves the sessionDate token in admin-configured agenda defaults', async () => {
+  const getSettingStrict = jest.fn(async (key) => (
+    key === 'email.deliberation_agenda.subject'
+      ? { found: true, value: 'Agenda for {{sessionDate}}' }
+      : { found: true, value: 'Here is the agenda for {{sessionDate}}, opening message.' }
+  ));
+  const result = await getAgendaStatus({ sessionId: SESSION_ID }, {
+    getSession: jest.fn(async () => ({
+      session: session({ scheduledStartIso: '2026-09-14T16:00:00Z' }),
+      slots: slots(),
+    })),
+    getLatestSentAgenda: jest.fn(async () => null),
+    getLatestUnresolvedAgenda: jest.fn(async () => null),
+    getSettingStrict,
+  });
+  expect(result.defaults).toEqual({
+    subject: 'Agenda for Monday, September 14',
+    message: 'Here is the agenda for Monday, September 14, opening message.',
+    unavailable: false,
+  });
+});
+
+test('status blanks a default that is unset or blank, and flags unavailable on a strict read failure', async () => {
+  const getSettingStrict = jest.fn(async (key) => {
+    if (key === 'email.deliberation_agenda.subject') return { found: true, value: '   ' };
+    throw new Error('Dataverse read failed');
+  });
+  const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+  const result = await getAgendaStatus({ sessionId: SESSION_ID }, {
+    getSession: jest.fn(async () => ({
+      session: session({ scheduledStartIso: '2026-09-14T16:00:00Z' }),
+      slots: slots(),
+    })),
+    getLatestSentAgenda: jest.fn(async () => null),
+    getLatestUnresolvedAgenda: jest.fn(async () => null),
+    getSettingStrict,
+  });
+  expect(result.defaults).toEqual({ subject: '', message: '', unavailable: true });
+  expect(consoleError).toHaveBeenCalled();
+  consoleError.mockRestore();
 });
 
 test('send persists each fence before transport and returns the accepted receipt', async () => {
@@ -615,4 +660,38 @@ test('an unaccepted status leaves the durable send_requested state retryable', a
     expect.anything(),
     'agenda_send_unconfirmed',
   );
+});
+
+describe('resolveAgendaDefault', () => {
+  test('resolves the sessionDate token against the session start and time zone', () => {
+    const result = resolveAgendaDefault(
+      'Deliberation session agenda — {{sessionDate}}',
+      session({ scheduledStartIso: '2026-09-14T16:00:00Z' }),
+    );
+    expect(result).toBe('Deliberation session agenda — Monday, September 14');
+  });
+
+  test('returns the template unchanged when it has no sessionDate token', () => {
+    const result = resolveAgendaDefault(
+      'A fixed opening message with no tokens.',
+      session({ scheduledStartIso: '2026-09-14T16:00:00Z' }),
+    );
+    expect(result).toBe('A fixed opening message with no tokens.');
+  });
+
+  test('falls back to the raw template when the session time cannot be resolved', () => {
+    const result = resolveAgendaDefault(
+      'Deliberation session agenda — {{sessionDate}}',
+      session({ scheduledStartIso: '', scheduledEndIso: '', ianaTimeZone: '' }),
+    );
+    expect(result).toBe('Deliberation session agenda — {{sessionDate}}');
+  });
+
+  test('resolves the date from a valid start even when the end time is missing/invalid', () => {
+    const result = resolveAgendaDefault(
+      'Deliberation session agenda — {{sessionDate}}',
+      session({ scheduledStartIso: '2026-09-14T16:00:00Z', scheduledEndIso: '' }),
+    );
+    expect(result).toBe('Deliberation session agenda — Monday, September 14');
+  });
 });
