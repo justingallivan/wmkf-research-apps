@@ -145,7 +145,9 @@ export default function StaffDeliberationsTab({
   const [pendingArtifact, setPendingArtifact] = useState(null);
   const [reopenHistory, setReopenHistory] = useState(EMPTY_LIST);
   const [stageLabels, setStageLabels] = useState(EMPTY_STAGE_LABELS);
-  const [checkingStatus, setCheckingStatus] = useState(false);
+  // The workbench keys this tab by requestId, so a mounted instance never
+  // changes request: the status read starts on mount, never on a switch.
+  const [checkingStatus, setCheckingStatus] = useState(Boolean(requestId));
   const [recoveryMessage, setRecoveryMessage] = useState(null);
   const [composerOpen, setComposerOpen] = useState(false);
   const [session, setSession] = useState(null);
@@ -167,29 +169,11 @@ export default function StaffDeliberationsTab({
     generationSequence.current += 1;
     activeController.current?.abort();
     activeController.current = null;
-    setGenerating(false);
-    setError(null);
-    setArtifact(null);
-    setPendingArtifact(null);
-    setReopenHistory(EMPTY_LIST);
-    setRecoveryMessage(null);
-    setComposerOpen(false);
-    setSession(null);
-    setSessionAttendees(EMPTY_LIST);
-    setMaterials(null);
-    setLatestSendFailure(null);
-    setConfirmDialog(null);
-    setStartingShare(false);
-    setReopenForm(null);
-    setReopenError(null);
-    setCurrentSourceEverSent(false);
-    setStageLabels(EMPTY_STAGE_LABELS);
     const id = requestId;
     if (id) {
       const sequence = generationSequence.current;
       const controller = new AbortController();
       activeController.current = controller;
-      setCheckingStatus(true);
       readStatus(id, controller.signal)
         .then((status) => {
           if (generationSequence.current !== sequence || id !== requestId) return;
@@ -887,6 +871,9 @@ export default function StaffDeliberationsTab({
         </Card>
       )}
 
+      {/* react-hooks/refs infers ref aliasing through the dialog's ref={} props below;
+          confirmDialogContent itself reads no ref (state + callbacks only). */}
+      {/* eslint-disable-next-line react-hooks/refs */}
       {confirmDialogContent && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div

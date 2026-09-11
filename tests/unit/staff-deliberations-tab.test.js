@@ -324,11 +324,12 @@ test('a late response for a prior request cannot publish a stale Word link', asy
     if (options.method !== 'POST') return Promise.resolve(statusResponse());
     return new Promise((resolve) => { resolveFirst = resolve; });
   });
-  const { rerender } = render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+  const { rerender } = render(<StaffDeliberationsTab key={REQUEST_ID} requestId={REQUEST_ID} />);
 
   await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
   fireEvent.click(screen.getByRole('button', { name: 'Generate Word Draft' }));
-  rerender(<StaffDeliberationsTab requestId={OTHER_REQUEST_ID} />);
+  // The workbench keys the tab by requestId; mirror that so the switch remounts.
+  rerender(<StaffDeliberationsTab key={OTHER_REQUEST_ID} requestId={OTHER_REQUEST_ID} />);
   await act(async () => { resolveFirst(successResponse()); });
 
   await waitFor(() => expect(screen.getByRole('button', { name: 'Generate Word Draft' })).toBeEnabled());
@@ -409,11 +410,12 @@ test('a late lock response cannot publish workspace state after the request chan
     }
     return new Promise((resolve) => { resolvePromotion = resolve; });
   });
-  const { rerender } = render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+  const { rerender } = render(<StaffDeliberationsTab key={REQUEST_ID} requestId={REQUEST_ID} />);
 
   fireEvent.click(await screen.findByRole('button', { name: 'Share…' }));
   fireEvent.click(screen.getByRole('button', { name: 'mock-prepare' }));
-  rerender(<StaffDeliberationsTab requestId={OTHER_REQUEST_ID} />);
+  // The workbench keys the tab by requestId; mirror that so the switch remounts.
+  rerender(<StaffDeliberationsTab key={OTHER_REQUEST_ID} requestId={OTHER_REQUEST_ID} />);
   await act(async () => {
     resolvePromotion(response({
       success: true,

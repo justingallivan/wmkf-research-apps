@@ -300,9 +300,26 @@ export default function PreSiteDistributionPanel({
     cc: '',
     subject: `Site Visit materials${requestNumber ? ` — ${requestNumber}` : ''}`,
     bodyText: DEFAULT_BODY,
+    // Calendar attachments have no UI since S466 (owner: unused); the form
+    // pins the calendar off while the server contract stays intact.
     includeCalendar: false,
-    siteVisitId: null,
   });
+  // Suggested recipients fill a blank To/Cc whenever the suggestions change
+  // (attendees load after mount on the same request). Seeded during render
+  // against the last seed seen, compared by value: the parent rebuilds the
+  // suggestion arrays every render, so identity would re-seed endlessly.
+  const seedTo = suggestedTo.join(', ');
+  const seedCc = suggestedCc.join(', ');
+  const seed = `${seedTo}|${seedCc}`;
+  const [seenSeed, setSeenSeed] = useState(null);
+  if (seenSeed !== seed) {
+    setSeenSeed(seed);
+    setForm((current) => ({
+      ...current,
+      to: current.to.trim() ? current.to : seedTo,
+      cc: current.cc.trim() ? current.cc : seedCc,
+    }));
+  }
   const [preview, setPreview] = useState(null);
   const [confirmed, setConfirmed] = useState(false);
   const [history, setHistory] = useState([]);
@@ -362,18 +379,6 @@ export default function PreSiteDistributionPanel({
     };
   }, [requestId, loadHistory]);
 
-  useEffect(() => {
-    setForm((current) => ({
-      ...current,
-      to: current.to.trim() ? current.to : suggestedTo.join(', '),
-      cc: current.cc.trim() ? current.cc : suggestedCc.join(', '),
-      // Calendar attachments have no UI since S466 (owner: unused); the form
-      // pins the calendar off while the server contract stays intact.
-      siteVisitId: siteVisit?.activityId || null,
-      includeCalendar: false,
-    }));
-  }, [siteVisit?.activityId, suggestedCc, suggestedTo]);
-
   const edit = (patch) => {
     setForm((current) => ({ ...current, ...patch }));
     setPreview(null);
@@ -424,6 +429,7 @@ export default function PreSiteDistributionPanel({
           expectedArtifactId: sourceArtifact.artifactId,
           operationId: newOperationId(),
           ...form,
+          siteVisitId: siteVisit?.activityId || null,
         }),
         signal: controller.signal,
       });
