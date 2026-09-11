@@ -136,9 +136,10 @@ calls the same service.
   point is rare and a second editable copy invites drift). The slot field and the agenda email's
   "Lead PD:" line are unchanged; correcting a wrong lead PD means remove and re-add. Since
   2026-09-11 each row also shows the applicant institution under the title (owner request),
-  read from the cycle dashboard's `institution` (the Workbench dashboard's formatted Applicant
-  lookup passed through `loadMeetingTrackerDashboard`); it is omitted when the page is opened
-  without a cycle in the URL, the same degraded mode the title already falls back through.
+  read from the session detail (`getDeliberationSession` attaches `institution` to every slot
+  from one bounded `akoya_request` read of the formatted Applicant lookup, fail-open null; the
+  cycle dashboard's `institution` is the fallback). The agenda email carries the same name
+  after each proposal's title (owner request, 2026-09-11).
 - One visit editor per request: the fields the Activity already has, written through the existing
   logistics service.
 
@@ -287,7 +288,8 @@ readiness flag is enabled for that target.
    - **D21 One agenda email per session**, sent by the PC from the session page. Body: the
      session date and time in its zone, the Zoom "Join meeting" link, location if any, then the
      proposals in slot order, each with a computed start–end window (session start plus the
-     cumulative minutes of earlier slots), request number, title, lead PD, and "Open briefing"
+     cumulative minutes of earlier slots), request number, title, applicant institution (since
+     2026-09-11, when known), lead PD, and "Open briefing"
      when the request's briefing link is live, else "briefing link to follow by email".
    - **D22 The email is a snapshot.** Times are computed at send from the slots as they are then.
      The session page shows "Agenda sent <when> to <n> recipients" and, when the start, order,

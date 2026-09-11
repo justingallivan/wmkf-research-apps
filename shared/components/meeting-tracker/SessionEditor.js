@@ -131,7 +131,7 @@ function SlotRow({ slot, proposal, sessions, sessionId, busy, savingSlotId, onCh
           </div>
         </div>
         <p className="mt-1 text-sm text-gray-700">{proposal?.title || slot.wmkf_Request?.akoya_title || 'Request details are not available.'}</p>
-        {proposal?.institution && <p className="mt-0.5 text-sm text-gray-600">{proposal.institution}</p>}
+        {(slot.institution || proposal?.institution) && <p className="mt-0.5 text-sm text-gray-600">{slot.institution || proposal.institution}</p>}
         <p className="mt-1 text-xs text-gray-500">Lead PD: {slot.wmkf_LeadPd?.fullname || 'Not assigned'}</p>
         {slot.briefing?.url ? (
           <a href={slot.briefing.url} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-xs font-semibold text-blue-800 underline">Open briefing</a>
