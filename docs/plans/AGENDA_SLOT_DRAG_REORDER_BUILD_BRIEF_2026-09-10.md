@@ -148,19 +148,36 @@ verbatim into this worktree at the same path and is committed here.
   resetDrag(); return; }` so a `busy` transition mid-drag (e.g. a Minutes-input blur firing
   `onChange` → `runSlotChange` while a drag is in flight) cannot apply a stale drop.
 
-**Commits**: `52b57271` (implementation: `moveSlot`, `ProposalOrderList`, drag handlers, D28,
-this brief) and `030355f8` (follow-up: notice-timing fix so the assistive announcement only
-fires after the reorder PATCH succeeds, a `busy` guard added to `handleDrop` to match
-`handleDragStart`/`handleDragOver`, an ETag assertion added to the RTL reorder test, and
-Handoff corrections).
+**Commits**: `52b57271` (implementation: `moveSlot`, `ProposalOrderList`, drag handlers, D28
+originally, this brief), `030355f8` (follow-up: notice-timing fix so the assistive
+announcement only fires after the reorder PATCH succeeds, a `busy` guard added to
+`handleDrop` to match `handleDragStart`/`handleDragOver`, an ETag assertion added to the RTL
+reorder test, Handoff corrections), and a third commit (see the branch log for its SHA)
+addressing an orchestrator-relayed Opus review: added five RTL tests covering downward and
+upward moves onto the last row's lower/upper half, a self-adjacent no-op, the `busy` state
+(no draggable handles, inert drag sequence), and that only the number-column handle is
+draggable (never the `<li>`, arrows, or form controls); added `setNotice(null)` in
+`runSlotChange` so a stale "Moved…"/"Session saved." notice can't survive a later slot
+change or a failed save; restructured the number column so `draggable` wraps only the grip
+icon and index (the up/down arrow buttons are now siblings outside the draggable wrapper, so
+a mousedown-drag on an arrow can't be misread as starting a row drag); and skip-if-unchanged
+guards in `handleDragOver` plus hiding the insertion-edge indicator on the row being dragged.
+Renumbered the `docs/PC_MEETING_TRACKER_PLAN.md` decision from D28 to D27 per the
+orchestrator (Build A took D26).
 
-**Tests / gates** [VERIFIED by running each command in this worktree, sequentially, after the
-follow-up commit's changes]:
-- `npx jest tests/unit/meeting-tracker` — 17 suites passed, 17 total; 112 tests passed, 112
-  total (7 new: 5 `moveSlot` unit tests + 2 `ProposalOrderList` drag tests, replacing the
-  brief's single combined RTL test with two — one for a real reorder including the ETag
-  order, one for the no-op-drop guard). One pre-existing unrelated React key-prop console
-  warning in `MeetingTrackerList` (not touched by this change).
+**Test-teeth check** [VERIFIED empirically]: reproduced the review's exact mutation —
+replacing `rawTarget > draggingIndex ? rawTarget - 1 : rawTarget` with bare `rawTarget` in
+`handleDrop` — and reran `npx jest tests/unit/meeting-tracker-pages.test.js`: 2 of the 5 new
+tests failed (the last-row lower-half and upper-half move assertions), confirming the new
+tests catch the mutation the review flagged as previously undetected. Reverted before
+committing.
+
+**Tests / gates** [VERIFIED by running each command in this worktree, sequentially, after
+all three commits' changes]:
+- `npx jest tests/unit/meeting-tracker` — 17 suites passed, 17 total; 117 tests passed, 117
+  total (12 new overall: 5 `moveSlot` unit tests + 7 `ProposalOrderList` drag tests — the
+  original 2 plus 5 added for this review pass). One pre-existing unrelated React key-prop
+  console warning in `MeetingTrackerList` (not touched by this change).
 - `npm run check:types` — clean, no output (0 errors).
 - `npm run check:status-enum-parity` — "status-enum-parity OK — 8 producer↔consumer
   invariant(s) in sync."
@@ -180,5 +197,7 @@ so a plain `MouseEvent` (not a jsdom `DragEvent`, which has the same `dataTransf
 the brief anticipated) works for `onDragOver`/`onDrop`, but not for anything relying on
 `dataTransfer`, which this implementation deliberately avoids.
 
-**Anything left open**: none within scope. `D27` was not present in `docs/PC_MEETING_TRACKER_PLAN.md`
-at write time, so `D28` was used per the brief's own contingency note.
+**Anything left open**: none within scope. The decision was written as D28 at first (D27 was
+not present in `docs/PC_MEETING_TRACKER_PLAN.md` at write time, per the brief's own
+contingency note) and renumbered to D27 in the final commit per the orchestrator, since Build
+A took D26.

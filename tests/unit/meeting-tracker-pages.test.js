@@ -179,7 +179,7 @@ describe('ProposalOrderList drag-and-drop', () => {
     return { wmkf_deliberationslotid: id, _etag: etag, _wmkf_request_value: id, wmkf_minutes: 15 };
   }
 
-  function renderList(onReorder) {
+  function renderList(onReorder, { busy = false } = {}) {
     const slots = [orderSlot('slot-a', 'W/"1"'), orderSlot('slot-b', 'W/"2"'), orderSlot('slot-c', 'W/"3"')];
     const { container } = render(
       <ProposalOrderList
@@ -188,7 +188,7 @@ describe('ProposalOrderList drag-and-drop', () => {
         leadOptions={[]}
         sessions={[]}
         sessionId={SESSION_ID}
-        busy={false}
+        busy={busy}
         onShift={jest.fn()}
         onChange={jest.fn()}
         onMove={jest.fn()}
@@ -230,5 +230,89 @@ describe('ProposalOrderList drag-and-drop', () => {
     const rows = container.querySelectorAll('li');
     fireEvent(rows[0], new MouseEvent('drop', { bubbles: true, cancelable: true, clientY: 5 }));
     expect(onReorder).not.toHaveBeenCalled();
+  });
+
+  test('dragging row 1 onto the lower half of the last row moves it to the end', () => {
+    const onReorder = jest.fn();
+    const { container, slots } = renderList(onReorder);
+    const rows = container.querySelectorAll('li');
+    const handles = container.querySelectorAll('[draggable="true"]');
+
+    jest.spyOn(rows[2], 'getBoundingClientRect').mockReturnValue({ top: 80, height: 40, bottom: 120, left: 0, right: 100, width: 100 });
+
+    fireEvent(handles[0], new MouseEvent('dragstart', { bubbles: true, cancelable: true }));
+    fireEvent(rows[2], new MouseEvent('dragover', { bubbles: true, cancelable: true, clientY: 115 }));
+    fireEvent(rows[2], new MouseEvent('drop', { bubbles: true, cancelable: true, clientY: 115 }));
+
+    expect(onReorder).toHaveBeenCalledTimes(1);
+    const [nextSlots, movedSlot, targetIndex] = onReorder.mock.calls[0];
+    expect(nextSlots.map((slot) => slot.wmkf_deliberationslotid)).toEqual(['slot-b', 'slot-c', 'slot-a']);
+    expect(nextSlots.map((slot) => slot._etag)).toEqual(['W/"2"', 'W/"3"', 'W/"1"']);
+    expect(movedSlot).toBe(slots[0]);
+    expect(targetIndex).toBe(2);
+  });
+
+  test('dragging row 1 onto the upper half of the last row moves it just before it', () => {
+    const onReorder = jest.fn();
+    const { container, slots } = renderList(onReorder);
+    const rows = container.querySelectorAll('li');
+    const handles = container.querySelectorAll('[draggable="true"]');
+
+    jest.spyOn(rows[2], 'getBoundingClientRect').mockReturnValue({ top: 80, height: 40, bottom: 120, left: 0, right: 100, width: 100 });
+
+    fireEvent(handles[0], new MouseEvent('dragstart', { bubbles: true, cancelable: true }));
+    fireEvent(rows[2], new MouseEvent('dragover', { bubbles: true, cancelable: true, clientY: 90 }));
+    fireEvent(rows[2], new MouseEvent('drop', { bubbles: true, cancelable: true, clientY: 90 }));
+
+    expect(onReorder).toHaveBeenCalledTimes(1);
+    const [nextSlots, movedSlot, targetIndex] = onReorder.mock.calls[0];
+    expect(nextSlots.map((slot) => slot.wmkf_deliberationslotid)).toEqual(['slot-b', 'slot-a', 'slot-c']);
+    expect(movedSlot).toBe(slots[0]);
+    expect(targetIndex).toBe(1);
+  });
+
+  test('dropping a row onto its own lower half is a no-op', () => {
+    const onReorder = jest.fn();
+    const { container } = renderList(onReorder);
+    const rows = container.querySelectorAll('li');
+    const handles = container.querySelectorAll('[draggable="true"]');
+
+    jest.spyOn(rows[0], 'getBoundingClientRect').mockReturnValue({ top: 0, height: 40, bottom: 40, left: 0, right: 100, width: 100 });
+
+    fireEvent(handles[1], new MouseEvent('dragstart', { bubbles: true, cancelable: true }));
+    fireEvent(rows[0], new MouseEvent('dragover', { bubbles: true, cancelable: true, clientY: 30 }));
+    fireEvent(rows[0], new MouseEvent('drop', { bubbles: true, cancelable: true, clientY: 30 }));
+
+    expect(onReorder).not.toHaveBeenCalled();
+  });
+
+  test('while busy, no handle is draggable and the drag sequence is inert', () => {
+    const onReorder = jest.fn();
+    const { container } = renderList(onReorder, { busy: true });
+    const rows = container.querySelectorAll('li');
+    const draggableHandles = container.querySelectorAll('[draggable="true"]');
+    const handles = container.querySelectorAll('.cursor-grab');
+    expect(draggableHandles).toHaveLength(0);
+
+    jest.spyOn(rows[0], 'getBoundingClientRect').mockReturnValue({ top: 0, height: 40, bottom: 40, left: 0, right: 100, width: 100 });
+    fireEvent(handles[2], new MouseEvent('dragstart', { bubbles: true, cancelable: true }));
+    fireEvent(rows[0], new MouseEvent('dragover', { bubbles: true, cancelable: true, clientY: 5 }));
+    fireEvent(rows[0], new MouseEvent('drop', { bubbles: true, cancelable: true, clientY: 5 }));
+
+    expect(onReorder).not.toHaveBeenCalled();
+  });
+
+  test('the drag handle covers only the grip and index, not the row, arrows, or form controls', () => {
+    const { container } = renderList(jest.fn());
+    const draggableElements = container.querySelectorAll('[draggable="true"]');
+    expect(draggableElements).toHaveLength(3);
+    draggableElements.forEach((handle) => {
+      expect(handle.tagName).not.toBe('LI');
+      expect(handle.querySelector('button')).toBeNull();
+      expect(handle.querySelector('input')).toBeNull();
+      expect(handle.querySelector('select')).toBeNull();
+    });
+    expect(container.querySelectorAll('li[draggable="true"]')).toHaveLength(0);
+    expect(container.querySelectorAll('input[draggable="true"], select[draggable="true"], button[draggable="true"]')).toHaveLength(0);
   });
 });

@@ -314,10 +314,9 @@ readiness flag is enabled for that target.
    suites; external schema state remains ASSUMED until the owner applies and
    reads back migration 041.]** Build brief:
    `docs/plans/SESSION_AGENDA_EMAIL_CODEX_BRIEF_2026-09-10.md`.
-6. **D28 Proposal order supports drag-and-drop** (native HTML5, handle on the number column)
+6. **D27 Proposal order supports drag-and-drop** (native HTML5, handle on the number column)
    in addition to the arrow buttons; both persist through the same full-order reorder route
    (`reorderSessionSlots` → `PATCH /api/meeting-tracker/slots/reorder`). Built 2026-09-10 in
    `shared/components/meeting-tracker/SessionEditor.js` (`moveSlot`, `ProposalOrderList`).
-   Build brief: `docs/plans/AGENDA_SLOT_DRAG_REORDER_BUILD_BRIEF_2026-09-10.md`. **D27 was not
-   present in this branch's base at write time**, so D28 is used per the brief's own
-   contingency note; a parallel "Build A" agent may add D27 separately.
+   Build brief: `docs/plans/AGENDA_SLOT_DRAG_REORDER_BUILD_BRIEF_2026-09-10.md`. Renumbered
+   from D28 to D27 (per orchestrator review): Build A took D26.

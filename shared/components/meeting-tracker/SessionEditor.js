@@ -91,17 +91,19 @@ function SlotRow({ slot, proposal, leadOptions, sessions, sessionId, busy, onCha
       onDrop={onDrop}
     >
       <div className="flex flex-wrap items-start gap-4">
-        <div
-          className="flex w-12 shrink-0 flex-col items-center gap-1 cursor-grab"
-          draggable={!busy}
-          onDragStart={onDragStart}
-          onDragEnd={onDragEnd}
-        >
-          <svg aria-hidden="true" viewBox="0 0 20 20" fill="currentColor" className="h-3 w-3 text-gray-400">
-            <circle cx="6" cy="4" r="1.3" /><circle cx="6" cy="10" r="1.3" /><circle cx="6" cy="16" r="1.3" />
-            <circle cx="14" cy="4" r="1.3" /><circle cx="14" cy="10" r="1.3" /><circle cx="14" cy="16" r="1.3" />
-          </svg>
-          <span className="text-sm font-semibold tabular-nums text-gray-900">{index + 1}</span>
+        <div className="flex w-12 shrink-0 flex-col items-center gap-1">
+          <div
+            className="flex flex-col items-center gap-1 cursor-grab"
+            draggable={!busy}
+            onDragStart={onDragStart}
+            onDragEnd={onDragEnd}
+          >
+            <svg aria-hidden="true" viewBox="0 0 20 20" fill="currentColor" className="h-3 w-3 text-gray-400">
+              <circle cx="6" cy="4" r="1.3" /><circle cx="6" cy="10" r="1.3" /><circle cx="6" cy="16" r="1.3" />
+              <circle cx="14" cy="4" r="1.3" /><circle cx="14" cy="10" r="1.3" /><circle cx="14" cy="16" r="1.3" />
+            </svg>
+            <span className="text-sm font-semibold tabular-nums text-gray-900">{index + 1}</span>
+          </div>
           <div className="flex gap-1">
             <button type="button" aria-label={`Move ${proposal?.requestNumber || 'proposal'} up`} disabled={busy || index === 0} onClick={() => onShift(index, -1)} className="rounded border border-gray-300 p-1.5 disabled:opacity-30">
               <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-3.5 w-3.5"><path strokeLinecap="round" strokeLinejoin="round" d="m5 12.5 5-5 5 5" /></svg>
@@ -172,6 +174,7 @@ export function ProposalOrderList({ slots, proposalById, leadOptions, sessions, 
     if (busy || draggingIndex === null) return;
     const rect = event.currentTarget.getBoundingClientRect();
     const edge = event.clientY - rect.top < rect.height / 2 ? 'top' : 'bottom';
+    if (overIndex === index && overEdge === edge) return;
     setOverIndex(index);
     setOverEdge(edge);
   };
@@ -208,7 +211,7 @@ export function ProposalOrderList({ slots, proposalById, leadOptions, sessions, 
           onMove={onMove}
           onRemove={onRemove}
           isDragging={draggingIndex === index}
-          dropEdge={overIndex === index ? overEdge : null}
+          dropEdge={overIndex === index && draggingIndex !== index ? overEdge : null}
           onDragStart={handleDragStart(index)}
           onDragOver={handleDragOver(index)}
           onDrop={handleDrop(index)}
@@ -357,6 +360,7 @@ export default function SessionEditor() {
   const runSlotChange = async (operation) => {
     setBusy(true);
     setError(null);
+    setNotice(null);
     try {
       const result = await operation();
       setWarning(result?.warning || null);
