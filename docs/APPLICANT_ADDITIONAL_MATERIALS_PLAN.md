@@ -247,8 +247,8 @@ Default first-release sections:
 
 The manifest may reference heterogeneous existing owners: Request Document rows for governed and
 applicant artifacts, and current review-suggestion file identities for peer reviews. The build
-must define and gate that closed source-type union; an unknown type fails closed. It must not solve
-the problem with folder enumeration. **[PLANNED]**
+must define and gate that closed source-type set; an unrecognized type fails closed. It must not
+solve the problem with folder enumeration. **[PLANNED]**
 
 The external page does not automatically include the presentation source. The PC normally
 publishes the applicant-supplied PDF for viewing/printing and may deliberately include the source
@@ -566,3 +566,24 @@ migration + flag + merge pending. PR 3 is planned.
   central-directory entries rather than marker substrings.
 - **PR 3 — visibility and closeout:** "Materials: 2 of 3 received" line on the Staff Deliberations
   tab and cycle view; auto-close by `closes_at`; reminder cron (owner follow-up).
+
+### 16.4 2026-09-10 UX pass (Build D)
+
+Owner feedback after the first production smoke (ZZTEST-03). Four items, built on
+`claude/materials-ux-pass`:
+
+1. Invitation and reminder emails now render through a new site-visit-materials email helper
+   (`renderMaterialsEmailHtml`), mirroring the grantee/reviewer button-plus-fallback-link pattern
+   instead of the raw-URL paragraph from `renderPlainTextEmailHtml`. The invitation button reads
+   "Upload site visit materials"; the reminder button reads "Upload the missing items".
+2. Copy only: the upload page and the invitation email no longer tell the applicant the link
+   stays open past the meeting (`closes_at`, the token expiry, and the auto-close sweep are
+   unchanged).
+3. A failed finalize now offers "Choose a different file" alongside "Retry" in `SlotUploader`,
+   clearing the abandoned pending staging key client-side and minting a fresh staging id. The
+   abandoned staging row itself is left alone: it is swept by the existing portal-upload-staging
+   TTL sweep (60-minute row expiry, then pruned after the retention window) via the daily
+   maintenance cron's "Private portal-upload staging cleanup" step — no new cleanup was added.
+4. The upload page shows a "Need help?" mailto footer using the `support` alert-recipients
+   category's first configured address (`getSupportEmail()` in `contributor-service.js`; no
+   fallback to `default`), surfaced as `supportEmail` on the context response.
