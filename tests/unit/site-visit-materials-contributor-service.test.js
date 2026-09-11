@@ -2,6 +2,7 @@
 import { buildContributorContext, finalizeMaterialUpload, outOfSync } from '../../lib/services/site-visit-materials/contributor-service';
 import { REQUEST_DOCUMENT_ARTIFACT_TYPE, REQUEST_DOCUMENT_LIFECYCLE_STATE, REQUEST_DOCUMENT_OPERATION_STATUS } from '../../shared/config/requestDocument';
 import { SITE_VISIT_MATERIALS_CHECKLIST } from '../../shared/config/siteVisitMaterials';
+import AlertRecipients from '../../lib/services/alert-recipients';
 
 const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
 const COLLECTION_ID = '22222222-2222-4222-8222-222222222222';
@@ -33,6 +34,7 @@ function deps(overrides = {}) {
     scanEnabled: () => true,
     scanBytes: jest.fn(async () => ({ scan_result: 'clean' })),
     getUploadMaxMb: jest.fn(async () => ({ maxMb: 100 })),
+    getSupportEmail: jest.fn(async () => null),
     acquireSlotLease: jest.fn(async () => ({ leaseToken: 'slot-lease', expiresAt: new Date('2026-11-21T09:05:00Z') })),
     releaseSlotLease: jest.fn(async () => true),
     recordPortalUploadCandidate: jest.fn(async () => undefined),
@@ -57,6 +59,46 @@ test('context shows institution, title, dates, cap, and per-slot receipt; waived
   expect(JSON.stringify(ctx)).not.toContain('drive');
   const closed = await buildContributorContext({ collection: collection({ closes_at: '2026-11-01T00:00:00Z' }) }, d);
   expect(closed.closed).toBe(true);
+});
+
+describe('supportEmail', () => {
+  test('surfaces the configured support address', async () => {
+    const d = deps({ getSupportEmail: jest.fn(async () => 'portalhelp@wmkeck.org') });
+    const ctx = await buildContributorContext({ collection: collection() }, d);
+    expect(ctx.supportEmail).toBe('portalhelp@wmkeck.org');
+  });
+
+  test('is null when unconfigured', async () => {
+    const d = deps({ getSupportEmail: jest.fn(async () => null) });
+    const ctx = await buildContributorContext({ collection: collection() }, d);
+    expect(ctx.supportEmail).toBeNull();
+  });
+
+});
+
+describe('DEFAULT_DEPENDENCIES.getSupportEmail', () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  test('resolves the first configured "support" category address, never falling back to "default"', async () => {
+    jest.spyOn(AlertRecipients, 'readConfig').mockResolvedValue({ support: ['portalhelp@wmkeck.org', 'other@wmkeck.org'], default: ['ops@wmkeck.org'] });
+    const { DEFAULT_DEPENDENCIES } = await import('../../lib/services/site-visit-materials/contributor-service');
+    await expect(DEFAULT_DEPENDENCIES.getSupportEmail()).resolves.toBe('portalhelp@wmkeck.org');
+  });
+
+  test('resolves null (not the "default" category) when "support" is unconfigured', async () => {
+    jest.spyOn(AlertRecipients, 'readConfig').mockResolvedValue({ default: ['ops@wmkeck.org'] });
+    const { DEFAULT_DEPENDENCIES } = await import('../../lib/services/site-visit-materials/contributor-service');
+    await expect(DEFAULT_DEPENDENCIES.getSupportEmail()).resolves.toBeNull();
+  });
+
+  test('resolves null and logs on a read failure; never throws', async () => {
+    const log = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    jest.spyOn(AlertRecipients, 'readConfig').mockRejectedValue(new Error('dataverse down'));
+    const { DEFAULT_DEPENDENCIES } = await import('../../lib/services/site-visit-materials/contributor-service');
+    await expect(DEFAULT_DEPENDENCIES.getSupportEmail()).resolves.toBeNull();
+    expect(log).toHaveBeenCalled();
+    log.mockRestore();
+  });
 });
 
 test('outOfSync flags PDF and source received more than an hour apart', () => {

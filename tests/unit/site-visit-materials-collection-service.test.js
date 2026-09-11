@@ -103,7 +103,11 @@ test('create: advancing request + active visit → due two business days before 
   expect(email.from).toBe('pc@wmkeck.org');
   expect(email.actingUserSystemId).toBe(ACTOR);
   expect(email.correlationKey).toBe('wmkf-site-visit-materials-invite:44444444-4444-4444-8444-444444444444');
-  expect(email.bodyText).toContain('https://apps.test/external/materials/jwt-');
+  expect(email.url).toContain('https://apps.test/external/materials/jwt-');
+  expect(email.buttonLabel).toBe('Upload site visit materials');
+  expect(email.bodyText).not.toContain('https://apps.test/external/materials/jwt-');
+  expect(email.bodyText).toContain('You may forward this link to a colleague who is helping.');
+  expect(email.bodyText).not.toContain('The link stays open until');
   expect(email.bodyText).toContain('Presentation (PDF)');
   expect(email.bodyText).toContain('Monday, October 5, 2026');
   expect(result.invitationSent).toBe(true);
@@ -147,6 +151,9 @@ test('read joins the registry: state moves missing → received → ready; waive
   const reminder = d.sendEmail.mock.calls[1][0];
   expect(reminder.bodyText).toContain('Presentation source (PowerPoint or Keynote)');
   expect(reminder.bodyText).not.toContain('Presentation (PDF)');
+  expect(reminder.bodyText).not.toContain('https://apps.test/external/materials/');
+  expect(reminder.url).toContain('https://apps.test/external/materials/');
+  expect(reminder.buttonLabel).toBe('Upload the missing items');
   expect(reminder.correlationKey).toBe('wmkf-site-visit-materials-reminder:44444444-4444-4444-8444-444444444444:1');
   expect(collection.reminderCount).toBe(1);
 
@@ -168,5 +175,7 @@ test('a collection past its close instant reads as closed even before the sweep 
   const { collection } = await getMaterialsCollection({ requestId: REQUEST_ID }, d);
   expect(collection.state).toBe('closed');
   await expect(getMaterialsCollection({ requestId: REQUEST_ID }, deps({ schemaReady: () => false }))).rejects.toMatchObject({ httpStatus: 503 });
-  expect(invitationBodyText({ institution: 'U', title: 'T', visitStartIso: '2026-10-07T16:00:00Z', timeZone: 'America/Los_Angeles', dueAt: '2026-10-05T16:00:00Z', closesAt: '2026-10-14T19:00:00Z', checklist: [{ key: 'a', label: 'A', required: true, waived: false }, { key: 'b', label: 'B', required: true, waived: true }], url: 'https://x' })).not.toContain('- B');
+  const body = invitationBodyText({ institution: 'U', title: 'T', visitStartIso: '2026-10-07T16:00:00Z', timeZone: 'America/Los_Angeles', dueAt: '2026-10-05T16:00:00Z', checklist: [{ key: 'a', label: 'A', required: true, waived: false }, { key: 'b', label: 'B', required: true, waived: true }] });
+  expect(body).not.toContain('- B');
+  expect(body).not.toContain('The link stays open');
 });
