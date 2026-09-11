@@ -127,6 +127,14 @@ function SlotUploader({ token, slot, label, required, received, maxMb, disabled,
     }
   };
 
+  const chooseDifferentFile = async (file) => {
+    if (!file) return;
+    removePendingUpload(token, slot);
+    setPending(null);
+    setError(null);
+    await upload(file);
+  };
+
   const upload = async (file) => {
     if (!file) return;
     setBusy(true);
@@ -167,14 +175,20 @@ function SlotUploader({ token, slot, label, required, received, maxMb, disabled,
           {error && <p className="mt-1 text-sm text-red-700" role="alert">{error}</p>}
         </div>
         {!disabled && pending && (
-          <button
-            type="button"
-            disabled={busy}
-            className={`rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800 ${busy ? 'opacity-50' : ''}`}
-            onClick={() => { void finalize(pending); }}
-          >
-            {busy ? 'Working…' : 'Retry'}
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              disabled={busy}
+              className={`rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800 ${busy ? 'opacity-50' : ''}`}
+              onClick={() => { void finalize(pending); }}
+            >
+              {busy ? 'Working…' : 'Retry'}
+            </button>
+            <label className={`cursor-pointer rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50 ${busy ? 'opacity-50' : ''}`}>
+              Choose a different file
+              <input type="file" className="sr-only" disabled={busy} aria-label={`${label} different file`} onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ''; void chooseDifferentFile(file); }} />
+            </label>
+          </div>
         )}
         {!disabled && !pending && (
           <label className={`cursor-pointer rounded-lg px-4 py-2 text-sm font-semibold ${received ? 'border border-gray-300 bg-white text-gray-800 hover:bg-gray-50' : 'bg-gray-900 text-white hover:bg-gray-800'} ${busy ? 'opacity-50' : ''}`}>
@@ -231,7 +245,7 @@ export default function MaterialsContributorPage() {
           <p>This collection has closed. Thank you for the materials you sent.</p>
         ) : (
           <>
-            <p>Please upload the items below by <span className="font-medium">{formatDate(data.dueAt)}</span>. You can replace a file at any time until {formatDate(data.closesAt)}.</p>
+            <p>Please upload the items below by <span className="font-medium">{formatDate(data.dueAt)}</span>.</p>
             {allRequiredIn && <p className="mt-2 font-medium text-green-800" role="status">Every required item has been received. Thank you.</p>}
             {data.outOfSync && <p className="mt-2 text-amber-800" role="status">The PDF and the source presentation were updated at different times. If you changed one, please replace the other too so they match.</p>}
           </>
@@ -248,6 +262,11 @@ export default function MaterialsContributorPage() {
           <h2 className="font-semibold text-gray-900">Other files received</h2>
           <ul className="mt-2 list-disc pl-5">{data.other.map((file) => <li key={`${file.filename}-${file.receivedAt}`}>{file.filename} · {formatDate(file.receivedAt)}</li>)}</ul>
         </section>
+      )}
+      {data.supportEmail && (
+        <p className="mt-6 text-sm text-gray-600">
+          Need help? Email <a className="text-blue-800 underline" href={`mailto:${data.supportEmail}?subject=${encodeURIComponent(`Site visit materials — ${data.proposalTitle || data.institution || ''}`)}`}>{data.supportEmail}</a>.
+        </p>
       )}
     </Shell>
   );
