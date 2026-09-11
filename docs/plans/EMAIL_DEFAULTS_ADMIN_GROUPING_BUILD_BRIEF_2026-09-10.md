@@ -216,4 +216,4 @@ guard, not a currently-exercised path).
 
 **Commits:**
 - `4cc383fd` — original Build B implementation (grouping, catalog metadata, tests, docs).
-- `<fill in below>` — post-review fixes (fixture hardening + Other-group fallback).
+- `5f8aa74d` — post-review fixes (fixture hardening + Other-group fallback).
