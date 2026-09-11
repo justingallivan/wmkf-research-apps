@@ -127,6 +127,15 @@ branched from `main` instead of the stale `HEAD` so the brief file existed to re
 - `620e2ca7` — Admin-editable defaults for the deliberation agenda email (catalog entries,
   seed file + script registration, service `getAgendaStatus`/`resolveAgendaDefault`, client
   `SessionAgendaPanel.js`, all four named tests, both docs).
+- `515eb4be` — filled in this Handoff section (first pass).
+- `5d466d41` — Opus review fixes (PASS WITH FIXES): panel-test fixture discrimination
+  (`DEFAULTS` changed to values unrelated to the deleted hard-coded text so a regression to
+  the old constants can no longer pass; terminal-retry test now asserts Subject and Message,
+  not just To), service-test body-side `{{sessionDate}}` proof, a `statusLoaded` load gate on
+  the "Send agenda…" button (new disabled-before/enabled-after test), `resolveAgendaDefault`
+  no longer requiring a valid end time (new missing-end unit case), the two `getSettingStrict`
+  reads hoisted into `getAgendaStatus`'s first `Promise.all`, and the API matrix wording for
+  the three read outcomes.
 
 **Discrepancies between brief and source:**
 - Item 3's claim "`defaultAgendaSubject`... if it is only used by the client" is imprecise:
@@ -146,16 +155,24 @@ branched from `main` instead of the stale `HEAD` so the brief file existed to re
   number in this doc's `**Dn**` sequence. Followed the source: added the new decision as
   **D26** (not D27), immediately after D25 in the agenda section.
 
-**Tests run** (`npx jest tests/unit/meeting-tracker-agenda tests/unit/seed-email-defaults
-tests/unit/email-defaults-routes tests/unit/meeting-tracker`): 19 suites, **125/125 passed**.
-Includes 3 new agenda-service tests (defaults resolution with token substitution, blank/unset
-default, strict-read failure → `unavailable:true`), 3 new `resolveAgendaDefault` unit tests
-(token present, token absent, invalid session time falls back to raw template), 1 new
-seed-email-defaults test (both new keys registered), and 1 new panel test (unavailable note +
-blank fields), plus fixture updates to 7 existing panel tests to carry the new `defaults` GET
-field. `[VERIFIED via test run output]`.
+**Tests run — first pass (before Opus review)** (`npx jest tests/unit/meeting-tracker-agenda
+tests/unit/seed-email-defaults tests/unit/email-defaults-routes tests/unit/meeting-tracker`):
+19 suites, **125/125 passed**.
 
-**Gates run, all clean:**
+**Tests run — after Opus review fixes, same command:** 19 suites, **127/127 passed**
+`[VERIFIED via test run output]`. The +2 over the first pass are the new
+`statusLoaded` disabled/enabled panel test and the `resolveAgendaDefault` missing-end unit
+case. Also includes: 3 agenda-service tests (defaults resolution — now with `{{sessionDate}}`
+in both the subject and body fixtures — blank/unset default, strict-read failure →
+`unavailable:true`), 4 `resolveAgendaDefault` unit tests (token present, token absent, invalid
+start/zone falls back to raw template, valid start with missing end still resolves), 1
+seed-email-defaults test (both new keys registered), and 2 panel tests (unavailable note +
+blank fields; load-gate disabled/enabled), plus fixture updates across the panel suite:
+`DEFAULTS` is now `{subject: 'Admin subject ZZZ', message: 'Admin opening message ZZZ'}`
+(unrelated to the deleted hard-coded text, so a regression to the old constants cannot pass),
+and the terminal-retry test now asserts Subject and Message, not just To.
+
+**Gates run, all clean (re-run after the Opus review fixes):**
 - `npm run check:types` — clean (no tsc errors).
 - `npm run check:api-routes` && `:self-test` — 208 route files covered, only the
   pre-existing 3 unrelated `/api/external/materials/[token]/*` warnings; self-test OK.
@@ -164,7 +181,7 @@ field. `[VERIFIED via test run output]`.
 - `npm run check:fact-consistency` && `:self-test` — 734 docs scanned, canonical facts
   current; self-test OK.
 - `npm run check:status-enum-parity` && `:self-test` — 8 invariants in sync; self-test 17/17.
-- `npm run check:secret-scan` && `:self-test` — 3533 files scanned, clean; self-test OK.
+- `npm run check:secret-scan` && `:self-test` — 3534 files scanned, clean; self-test OK.
 
 **Left open / not run:**
 - `npm run check:agent-invariants` fails in this worktree
