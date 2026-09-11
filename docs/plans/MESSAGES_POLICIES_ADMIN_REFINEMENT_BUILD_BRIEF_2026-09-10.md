@@ -170,6 +170,101 @@ node /Users/gallivan/.claude/skills/impeccable/scripts/detect.mjs --json shared/
 
 ## Handoff (builder fills in)
 
-State claims labeled [VERIFIED via …] or [ASSUMED]. Commits, test counts, gates, detector
-result, and any brief-vs-source discrepancy. Note explicitly whether the "N cards" count was
-kept and why.
+**Branch / commits**: `claude/messages-policies-refinement` off `ee7de9eb`. One commit,
+`6223fb1d` ("Build E: one disclosure system, safe publish flow, dirty state (Items 1-3)"),
+plus this handoff commit. Item 4 landed inside the same files as Items 1-3 (StatusChip,
+`text-[…]` removal, OutcomeBanner extraction, Button/field-class unification, and the
+one catalog-adjacent description edit were all done in the same pass as the components
+they touch) rather than as a separate commit — [VERIFIED via git log] there is no
+meaningful way to split "make every button in this file go through `Button`" from the
+component rewrite that already replaced every `<button>`.
+
+**Files changed**: `shared/components/admin/DisclosureRow.js` (new),
+`shared/components/admin/OutcomeBanner.js` (new),
+`shared/components/admin/AdminWorkspaceNavigation.js`,
+`shared/components/admin/PoliciesSection.js`, `shared/components/admin/EmailDefaultsSection.js`,
+`tests/unit/policies-section-label-guidance.test.js`, `tests/unit/email-defaults-section.test.js`,
+`tests/unit/admin-workspace-navigation.test.js`. `pages/admin.js` was read in full
+[VERIFIED] and needed no change — the `case 'governance':` block already passes
+`collapsible`/`defaultOpen={false}` into `AdminEditorPanel`, which now internally renders
+`DisclosureRow`.
+
+**Brief-vs-source discrepancies** (followed source per Universal Operating Rule 1):
+- The "Other" group description brief calls out as living in
+  `shared/config/editableTextDefaults.js` actually lives in
+  `shared/components/admin/EmailDefaultsSection.js:173` (formerly ~173, the runtime-built
+  fallback group object) [VERIFIED via grep — no `unrecognized group` string anywhere in
+  `editableTextDefaults.js`]. Edited it there instead; `editableTextDefaults.js` itself was
+  not touched, which is stricter than the Forbidden list required, not looser.
+- Item 1's ordering ("body, then version history, then actions") and Item 2's ordering
+  ("form directly under the actions, above the rendered body") cannot both hold for the
+  same slot row. Resolved as: actions (Edit policy / Cancel editing) always render first,
+  then — while editing — the form followed by a closed "Current version" `DisclosureRow`;
+  while not editing, the rendered body directly; version history is always last. This
+  satisfies Item 2 literally and is the only reading of Item 1 consistent with it.
+- `DisclosureRow`'s prop surface extends the brief's literal
+  `{ id, title, meta, description, defaultOpen, groupName, children, headingLevel }` with
+  two additions no caller could do without: `titleAdornment` (renders next to the heading,
+  never inside it, so `SettingScopeBadge` doesn't pollute the heading's accessible name —
+  the existing `admin-workspace-navigation` test queries
+  `getByRole('heading', { name: 'Workflow policies' })` exactly) and `actions` (right-aligned
+  interactive content, e.g. the field-mapping button, that the caller must guard itself).
+- The guard for "click the field-mapping button without toggling the panel" needed
+  `onClickCapture={(e) => e.preventDefault()}`, not the brief's literal
+  `onClick={(e) => e.preventDefault()}` on the wrapper. [VERIFIED via a jsdom spike, kept
+  as `tests/unit/admin-workspace-navigation.test.js`'s new "never toggles" test]: a
+  bubble-phase guard on a wrapper never runs once `DataverseFieldInfoButton`'s own popover
+  content calls `stopPropagation()` first (it sits below the wrapper in the tree, so the
+  bubble is cut off before reaching it) — yet `<summary>`'s native toggle is a UA default
+  action that fires regardless of where propagation stopped, unless `preventDefault()` was
+  called at any point during dispatch. Capture phase runs before any of that.
+
+**"N cards" decision**: kept. Even with real card chrome, the count is the only size
+signal visible while a group is collapsed (the default state) — you cannot see the cards
+to count them until you open the group. Dropping it would remove information, not
+redundancy.
+
+**Tests**: `tests/unit/policies-section-label-guidance.test.js` — 8 tests (was 4), all
+passing [VERIFIED]. `tests/unit/email-defaults-section.test.js` — 10 tests (was 6), all
+passing [VERIFIED]. `tests/unit/admin-workspace-navigation.test.js` — 7 tests (was 6), all
+passing [VERIFIED]. Full named suite:
+`npx jest tests/unit/policies-section-label-guidance tests/unit/email-defaults-section tests/unit/admin-workspace-navigation tests/unit/editable-text-defaults-catalog tests/unit/seed-email-defaults tests/unit/email-defaults-routes`
+→ 6 suites, 69 tests, 0 failures [VERIFIED, run 2026-09-10].
+
+**Mutation checks** (applied locally, ran, watched fail, reverted — diffs not left in the
+tree):
+- Confirm-skip: changed the Publish button in `PoliciesSection.js` from
+  `onClick={() => setConfirming(true)}` to `onClick={() => submit()}`. The new
+  "Publish opens a confirm panel … and does not call fetch until confirmed" test failed
+  (`getByText(/published versions cannot be edited later/i)` not found). Reverted;
+  suite green again.
+- Save-all-PUTs-clean-keys: changed `saveAllForCard`'s `dirtyKeys` to drop the
+  `.filter(...)` (PUT every key in the card, not just dirty ones). The rewritten
+  "Save all changes PUTs only dirty keys…" test failed (expected 1 PUT, got 2). Reverted;
+  suite green again.
+- Forget-to-clear-dirty-on-save: commented out `setSavedValues(...)` in `saveKey`. The
+  "dirty chip … clears after save" test failed (`Unsaved changes` still present after
+  save). Reverted; suite green again.
+
+**Gates** (run sequentially, each gate then its self-test):
+- `npm run check:types` → clean, no errors [VERIFIED].
+- `npm run check:status-enum-parity` → "OK — 8 producer↔consumer invariant(s) in sync."
+  [VERIFIED]. `check:status-enum-parity:self-test` → "OK — 17/17" [VERIFIED].
+- `npm run check:fact-consistency` → OK, 736 files scanned, no drift [VERIFIED].
+  `check:fact-consistency:self-test` → OK [VERIFIED].
+- `npx eslint shared/components/admin/DisclosureRow.js shared/components/admin/OutcomeBanner.js shared/components/admin/AdminWorkspaceNavigation.js shared/components/admin/PoliciesSection.js shared/components/admin/EmailDefaultsSection.js pages/admin.js`
+  → 0 errors. Warnings present are all pre-existing `react-hooks/set-state-in-effect`
+  advisories on `useEffect(() => { load(); }, [])`-shaped effects already common
+  throughout `pages/admin.js` (same pattern predates this build in every other admin
+  section); none are new to the files this build authored.
+- `node .../impeccable/scripts/detect.mjs --json <the four files>` → `[]`, **exit 0**
+  [VERIFIED]. Baseline (pre-edit) run on `PoliciesSection.js` alone found the seven
+  `text-[10px]`/`text-[11px]` font-size findings at exactly the lines the brief named
+  (316, 360, 374, 450, 460, 488, 495); all seven are gone post-rewrite (replaced with
+  `text-xs`, per Item 4).
+
+**Left open**: nothing known. `pages/api/admin/email-defaults.js` and
+`pages/api/admin/policies.js` were not touched (Forbidden); no new dependencies added;
+`docs/API_ROUTE_SECURITY_MATRIX.md` untouched (no route change); grepped
+`docs/agent-wiki/topics/security-auth.md` for existing admin email-defaults/policies UI
+coverage — none found, so no wiki edit made.

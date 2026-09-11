@@ -133,7 +133,6 @@ export default function EmailDefaultsSection() {
     setSavingAllCard(card.emailKey);
     // Sequential, one PUT per dirty key, catalog order — no batching route.
     for (const key of dirtyKeys) {
-      // eslint-disable-next-line no-await-in-loop
       await saveKey(key);
     }
     setSavingAllCard(null);
