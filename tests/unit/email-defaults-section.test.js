@@ -54,6 +54,20 @@ const defaults = [
     unavailable: false,
   },
   {
+    key: 'email.grantee_reminder.body',
+    label: 'Grantee reminder body',
+    description: 'Reminder body copy',
+    multiline: true,
+    placeholders: [],
+    group: 'grantees',
+    emailKey: 'email.grantee_reminder',
+    emailLabel: 'Grantee reminder',
+    // Blank here is NOT one of the blocking keys — the reminder falls back
+    // to a code default, so this should get the milder amber "Blank" chip.
+    value: '',
+    unavailable: false,
+  },
+  {
     key: 'email.deliberation_agenda.subject',
     label: 'Deliberation agenda subject',
     description: 'Agenda subject copy',
@@ -150,13 +164,15 @@ test('shows blank and unavailable states distinctly and saves edited values', as
   render(<EmailDefaultsSection />);
 
   await waitFor(() => expect(screen.getByLabelText('Grantee invite subject')).toBeInTheDocument());
-  expect(screen.getByText(/blank — not configured/i)).toBeInTheDocument();
-  expect(screen.getByText(/unavailable — settings read failed/i)).toBeInTheDocument();
+  const card = screen.getByText('Grantee invite').closest('section');
+  // Grantee invite subject/body are blocking keys (block a real send) -> red "Blank".
+  expect(within(card).getByText('Blank')).toHaveClass('bg-red-50');
+  expect(within(card).getByText('Unavailable')).toBeInTheDocument();
   expect(screen.getByLabelText('Grantee invite body')).toBeDisabled();
 
   fireEvent.change(screen.getByLabelText('Grantee invite subject'), { target: { value: 'Updated subject' } });
-  const card = screen.getByText('Grantee invite').closest('section');
-  fireEvent.click(within(card).getAllByRole('button', { name: /save/i })[0]);
+  const subjectField = screen.getByLabelText('Grantee invite subject').closest('.space-y-2');
+  fireEvent.click(within(subjectField).getByRole('button', { name: 'Save' }));
 
   await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/admin/email-defaults', expect.objectContaining({
     method: 'PUT',
@@ -167,7 +183,14 @@ test('shows blank and unavailable states distinctly and saves edited values', as
     value: 'Updated subject',
   });
   expect(global.fetch.mock.calls.filter(([, opts]) => opts?.method === 'PUT')).toHaveLength(1);
-  await waitFor(() => expect(screen.getByText(/^Saved$/)).toBeInTheDocument());
+  await waitFor(() => expect(within(subjectField).getByText(/^Saved · /)).toBeInTheDocument());
+});
+
+test('a blank non-blocking key gets the milder amber Blank chip', async () => {
+  render(<EmailDefaultsSection />);
+  await waitFor(() => expect(screen.getByLabelText('Grantee reminder body')).toBeInTheDocument());
+  const card = screen.getByText('Grantee reminder').closest('section');
+  expect(within(card).getByText('Blank')).toHaveClass('bg-amber-50');
 });
 
 test('saves only the edited field when its sibling field in the same card is available', async () => {
@@ -176,9 +199,8 @@ test('saves only the edited field when its sibling field in the same card is ava
   await waitFor(() => expect(screen.getByLabelText('Deliberation agenda subject')).toBeInTheDocument());
 
   fireEvent.change(screen.getByLabelText('Deliberation agenda subject'), { target: { value: 'New agenda subject' } });
-  const card = screen.getByText('Deliberation agenda').closest('section');
-  // The agenda card has two available fields (subject, body); click the first (subject's) Save.
-  fireEvent.click(within(card).getAllByRole('button', { name: /save/i })[0]);
+  const field = screen.getByLabelText('Deliberation agenda subject').closest('.space-y-2');
+  fireEvent.click(within(field).getByRole('button', { name: 'Save' }));
 
   await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/admin/email-defaults', expect.objectContaining({
     method: 'PUT',
@@ -189,4 +211,117 @@ test('saves only the edited field when its sibling field in the same card is ava
     key: 'email.deliberation_agenda.subject',
     value: 'New agenda subject',
   });
+});
+
+test('dirty chip appears on edit, clears after save, and Save is disabled while clean', async () => {
+  render(<EmailDefaultsSection />);
+  await waitFor(() => expect(screen.getByLabelText('Deliberation agenda subject')).toBeInTheDocument());
+  const card = screen.getByText('Deliberation agenda').closest('section');
+  const field = screen.getByLabelText('Deliberation agenda subject').closest('.space-y-2');
+
+  expect(within(card).queryByText('Unsaved changes')).toBeNull();
+  const fieldSave = within(field).getByRole('button', { name: 'Save' });
+  expect(fieldSave).toBeDisabled();
+
+  fireEvent.change(screen.getByLabelText('Deliberation agenda subject'), { target: { value: 'Edited' } });
+  expect(within(card).getByText('Unsaved changes')).toBeInTheDocument();
+  expect(within(field).getByRole('button', { name: 'Save' })).toBeEnabled();
+
+  fireEvent.click(within(field).getByRole('button', { name: 'Save' }));
+  await waitFor(() => expect(within(card).queryByText('Unsaved changes')).toBeNull());
+  expect(within(field).getByRole('button', { name: 'Save' })).toBeDisabled();
+});
+
+test('a failed PUT keeps the field dirty, shows the error, and does not advance savedValues', async () => {
+  render(<EmailDefaultsSection />);
+  await waitFor(() => expect(screen.getByLabelText('Deliberation agenda subject')).toBeInTheDocument());
+  const field = screen.getByLabelText('Deliberation agenda subject').closest('.space-y-2');
+  const card = screen.getByText('Deliberation agenda').closest('section');
+
+  fireEvent.change(screen.getByLabelText('Deliberation agenda subject'), { target: { value: 'Edited' } });
+
+  global.fetch.mockImplementationOnce(async () => ({ ok: false, json: async () => ({ error: 'Save failed.' }) }));
+  fireEvent.click(within(field).getByRole('button', { name: 'Save' }));
+
+  await waitFor(() => expect(within(field).getByText('Save failed.')).toBeInTheDocument());
+  // savedValues did not advance: the field is still dirty, so the card chip stays and Save stays enabled.
+  expect(within(card).getByText('Unsaved changes')).toBeInTheDocument();
+  expect(within(field).getByRole('button', { name: 'Save' })).toBeEnabled();
+  expect(screen.getByLabelText('Deliberation agenda subject')).toHaveValue('Edited');
+});
+
+test('the Saved timestamp persists across a re-render and clears on the next edit', async () => {
+  const { rerender } = render(<EmailDefaultsSection />);
+  await waitFor(() => expect(screen.getByLabelText('Deliberation agenda subject')).toBeInTheDocument());
+
+  fireEvent.change(screen.getByLabelText('Deliberation agenda subject'), { target: { value: 'Edited' } });
+  const field = screen.getByLabelText('Deliberation agenda subject').closest('.space-y-2');
+  fireEvent.click(within(field).getByRole('button', { name: 'Save' }));
+  await waitFor(() => expect(within(field).getByText(/^Saved · /)).toBeInTheDocument());
+
+  rerender(<EmailDefaultsSection />);
+  expect(within(field).getByText(/^Saved · /)).toBeInTheDocument();
+
+  fireEvent.change(screen.getByLabelText('Deliberation agenda subject'), { target: { value: 'Edited again' } });
+  expect(within(field).queryByText(/^Saved · /)).toBeNull();
+});
+
+test('Save all changes PUTs only dirty keys, in catalog order, and reports per-field status', async () => {
+  render(<EmailDefaultsSection />);
+  await waitFor(() => expect(screen.getByLabelText('Deliberation agenda subject')).toBeInTheDocument());
+  const card = screen.getByText('Deliberation agenda').closest('section');
+
+  const saveAll = within(card).getByRole('button', { name: 'Save all changes' });
+  expect(saveAll).toBeDisabled();
+
+  // Only the subject is edited — the body stays clean, so Save all must PUT
+  // exactly the subject key and leave the clean body key alone.
+  fireEvent.change(screen.getByLabelText('Deliberation agenda subject'), { target: { value: 'New subject' } });
+  expect(saveAll).toBeEnabled();
+
+  fireEvent.click(saveAll);
+
+  await waitFor(() => {
+    const putCalls = global.fetch.mock.calls.filter(([, opts]) => opts?.method === 'PUT');
+    expect(putCalls).toHaveLength(1);
+  });
+  const putCalls = global.fetch.mock.calls.filter(([, opts]) => opts?.method === 'PUT');
+  expect(putCalls.map(([, opts]) => JSON.parse(opts.body).key)).toEqual([
+    'email.deliberation_agenda.subject',
+  ]);
+  await waitFor(() => expect(within(card).queryByText('Unsaved changes')).toBeNull());
+
+  // Now dirty both fields, in reverse edit order, and confirm Save all still
+  // PUTs them in catalog order (subject before body), not edit order.
+  fireEvent.change(screen.getByLabelText('Deliberation agenda message'), { target: { value: 'New message' } });
+  fireEvent.change(screen.getByLabelText('Deliberation agenda subject'), { target: { value: 'Newer subject' } });
+  fireEvent.click(within(card).getByRole('button', { name: 'Save all changes' }));
+  await waitFor(() => {
+    const putCalls2 = global.fetch.mock.calls.filter(([, opts]) => opts?.method === 'PUT');
+    expect(putCalls2).toHaveLength(3);
+  });
+  const putCalls2 = global.fetch.mock.calls.filter(([, opts]) => opts?.method === 'PUT');
+  expect(putCalls2.slice(1).map(([, opts]) => JSON.parse(opts.body).key)).toEqual([
+    'email.deliberation_agenda.subject',
+    'email.deliberation_agenda.body',
+  ]);
+});
+
+test('registers a beforeunload guard while dirty and removes it when clean', async () => {
+  const addSpy = jest.spyOn(window, 'addEventListener');
+  const removeSpy = jest.spyOn(window, 'removeEventListener');
+  render(<EmailDefaultsSection />);
+  await waitFor(() => expect(screen.getByLabelText('Deliberation agenda subject')).toBeInTheDocument());
+
+  expect(addSpy).not.toHaveBeenCalledWith('beforeunload', expect.any(Function));
+
+  fireEvent.change(screen.getByLabelText('Deliberation agenda subject'), { target: { value: 'Edited' } });
+  await waitFor(() => expect(addSpy).toHaveBeenCalledWith('beforeunload', expect.any(Function)));
+
+  const field = screen.getByLabelText('Deliberation agenda subject').closest('.space-y-2');
+  fireEvent.click(within(field).getByRole('button', { name: 'Save' }));
+  await waitFor(() => expect(removeSpy).toHaveBeenCalledWith('beforeunload', expect.any(Function)));
+
+  addSpy.mockRestore();
+  removeSpy.mockRestore();
 });

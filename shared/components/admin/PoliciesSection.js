@@ -14,9 +14,16 @@
  * This component focuses on presenting outcomes intelligibly to the user.
  */
 
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { renderPolicyMarkdown } from '../../utils/policy-markdown-client';
+import { Button } from '../Layout';
 import DataverseFieldInfoButton from './DataverseFieldInfoButton';
+import DisclosureRow from './DisclosureRow';
+import OutcomeBanner from './OutcomeBanner';
+import { StatusChip } from './AdminWorkspaceNavigation';
+
+const INPUT_CLASS = 'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300 focus:border-gray-500';
+const TEXTAREA_CLASS = `${INPUT_CLASS} font-mono`;
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
@@ -51,17 +58,10 @@ const STATUS_COPY = {
   concurrency_conflict:  { tone: 'amber',  text: 'Another admin published while you were editing. Reload and re-apply your changes.' },
   label_conflict:        { tone: 'amber',  text: 'That label is already used by a published version with different content. Published versions are immutable — pick a new label (see the suggestion under the label field) and publish again.' },
   invalid_body:          { tone: 'red',    text: 'Policy body contains disallowed content.' },
-  slot_not_provisioned:  { tone: 'red',    text: 'Slot row missing in Dataverse. Run the seed script.' },
-  duplicate_slot_rows:   { tone: 'red',    text: 'Multiple Dataverse rows for this slot. Manual cleanup required.' },
-  audit_unavailable:     { tone: 'red',    text: 'Audit table unavailable; refused to publish.' },
-  failed:                { tone: 'red',    text: 'Publish failed. Check server logs.' },
-};
-
-const TONE_CLASSES = {
-  green: 'bg-green-50 text-green-800 border-green-200',
-  amber: 'bg-amber-50 text-amber-800 border-amber-200',
-  red:   'bg-red-50   text-red-800   border-red-200',
-  gray:  'bg-gray-50  text-gray-800  border-gray-200',
+  slot_not_provisioned:  { tone: 'red',    text: 'This policy has not been set up in Dataverse yet. Contact an administrator.' },
+  duplicate_slot_rows:   { tone: 'red',    text: 'This policy has more than one Dataverse record. Contact an administrator before publishing.' },
+  audit_unavailable:     { tone: 'red',    text: 'The audit log is unavailable, so publishing was refused. Try again later.' },
+  failed:                { tone: 'red',    text: 'Publishing failed. Try again; if it keeps failing, contact an administrator.' },
 };
 
 export default function PoliciesSection() {
@@ -93,7 +93,7 @@ export default function PoliciesSection() {
   }
 
   if (error && !state) {
-    return <div className="text-red-600 text-sm">{error}</div>;
+    return <div className="text-red-700 text-sm">{error}</div>;
   }
 
   if (!state || !state.slots || state.slots.length === 0) {
@@ -101,86 +101,10 @@ export default function PoliciesSection() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       {state.slots.map(slot => (
         <SlotPanel key={slot.code} slot={slot} onPublishedReload={fetchState} />
       ))}
-    </div>
-  );
-}
-
-function SlotPanel({ slot, onPublishedReload }) {
-  const [expanded, setExpanded] = useState(false);
-  const [outcome, setOutcome] = useState(null);
-  const dataverseFields = buildSlotDataverseFields(slot);
-
-  if (slot.invariantError) {
-    const tone = STATUS_COPY[slot.invariantError]?.tone || 'red';
-    return (
-      <div className="border rounded-lg p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="font-medium text-gray-900">{slot.code}</div>
-          <DataverseFieldInfoButton items={dataverseFields} />
-        </div>
-        <div className={`mt-2 text-sm px-3 py-2 rounded border ${TONE_CLASSES[tone]}`}>
-          {STATUS_COPY[slot.invariantError]?.text || slot.invariantError}
-          {slot.duplicateIds && (
-            <div className="mt-1 text-xs">Duplicate IDs: {slot.duplicateIds.join(', ')}</div>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="border rounded-lg overflow-hidden">
-      <div className="p-4 bg-gray-50 border-b">
-        <div className="flex items-baseline justify-between">
-          <div>
-            <div className="font-medium text-gray-900">{slot.displayName || slot.code}</div>
-            <div className="text-xs text-gray-500">slot: <code>{slot.code}</code></div>
-          </div>
-          <div className="flex items-center gap-2">
-            <DataverseFieldInfoButton items={dataverseFields} />
-            <button
-              onClick={() => setExpanded(e => !e)}
-              className="px-3 py-1.5 text-sm bg-gray-900 text-white rounded hover:bg-gray-800"
-            >
-              {expanded ? 'Cancel' : 'Publish new version'}
-            </button>
-          </div>
-        </div>
-
-        {slot.activeVersion ? (
-          <div className="mt-3">
-            <div className="text-xs text-gray-500 mb-1">
-              Active version: <strong>{slot.activeVersion.versionLabel}</strong>
-              {slot.activeVersion.effectiveDate && <> · effective {slot.activeVersion.effectiveDate}</>}
-            </div>
-            <div className="text-sm font-medium text-gray-800">{slot.activeVersion.title}</div>
-            <div
-              className="prose prose-sm max-w-none mt-2 text-gray-700"
-              dangerouslySetInnerHTML={/* nosemgrep: typescript.react.security.audit.react-dangerouslysetinnerhtml.react-dangerouslysetinnerhtml -- renderPolicyMarkdown sanitizes via DOMPurify strict allowlist; server validator rejects raw HTML */ { __html: renderPolicyMarkdown(slot.activeVersion.body || '') }}
-            />
-          </div>
-        ) : (
-          <div className="mt-3 text-sm text-amber-700">No active version yet.</div>
-        )}
-      </div>
-
-      {expanded && (
-        <PublishForm
-          slot={slot}
-          onSuccess={(o) => { setOutcome(o); onPublishedReload(); setExpanded(false); }}
-          onOutcome={setOutcome}
-        />
-      )}
-
-      {outcome && <OutcomeBanner outcome={outcome} onDismiss={() => setOutcome(null)} />}
-
-      {slot.versions && slot.versions.length > 1 && (
-        <VersionHistory versions={slot.versions} />
-      )}
     </div>
   );
 }
@@ -252,21 +176,185 @@ function buildSlotDataverseFields(slot) {
   ];
 }
 
+function SlotPanel({ slot, onPublishedReload }) {
+  const [editing, setEditing] = useState(false);
+  const [outcome, setOutcome] = useState(null);
+  const dataverseFields = buildSlotDataverseFields(slot);
+
+  const dataverseFieldsGuard = (
+    // Capture phase: see DisclosureRow's doc comment — stopPropagation inside
+    // the popover doesn't cancel <summary>'s native toggle, only preventDefault does.
+    <span onClickCapture={(e) => e.preventDefault()}>
+      <DataverseFieldInfoButton items={dataverseFields} />
+    </span>
+  );
+
+  if (slot.invariantError) {
+    const meta = STATUS_COPY[slot.invariantError] || { tone: 'red', text: slot.invariantError };
+    return (
+      <div className="rounded-lg border border-gray-200 p-4">
+        <div className="flex items-start justify-between gap-3">
+          <h3 className="text-sm font-semibold text-gray-900">{slot.displayName || slot.code}</h3>
+          <DataverseFieldInfoButton items={dataverseFields} />
+        </div>
+        <div className="mt-2">
+          <OutcomeBanner tone={meta.tone} text={meta.text}>
+            {slot.duplicateIds && (
+              <div className="mt-1 text-xs">Duplicate IDs: {slot.duplicateIds.join(', ')}</div>
+            )}
+          </OutcomeBanner>
+        </div>
+      </div>
+    );
+  }
+
+  const inactiveVersions = (slot.versions || []).filter(v => !v.isActive);
+
+  return (
+    <div className="rounded-lg border border-gray-200">
+      <DisclosureRow
+        id={`policy-slot-${slot.code}`}
+        groupName="slot"
+        headingLevel={3}
+        title={slot.displayName || slot.code}
+        meta={
+          slot.activeVersion ? (
+            <span className="inline-flex items-center gap-2">
+              <StatusChip tone="green">Active version</StatusChip>
+              <span>{slot.activeVersion.versionLabel}{slot.activeVersion.effectiveDate && <> · effective {slot.activeVersion.effectiveDate}</>}</span>
+            </span>
+          ) : (
+            <StatusChip tone="amber">No active version</StatusChip>
+          )
+        }
+        actions={dataverseFieldsGuard}
+      >
+        <div className="space-y-4">
+          <div>
+            {editing ? (
+              <Button type="button" variant="outline" size="sm" onClick={() => setEditing(false)}>
+                Cancel editing
+              </Button>
+            ) : (
+              <Button type="button" variant="primary" size="sm" onClick={() => setEditing(true)}>
+                Edit policy
+              </Button>
+            )}
+          </div>
+
+          {editing && (
+            <PublishForm
+              slot={slot}
+              onSuccess={(o) => { setOutcome(o); onPublishedReload(); setEditing(false); }}
+              onOutcome={setOutcome}
+            />
+          )}
+
+          {outcome && <OutcomeBanner tone={(STATUS_COPY[outcome.status] || {}).tone || 'gray'} text={(STATUS_COPY[outcome.status] || {}).text || outcome.status} onDismiss={() => setOutcome(null)}>
+            <OutcomeExtras outcome={outcome} />
+          </OutcomeBanner>}
+
+          {editing ? (
+            slot.activeVersion && (
+              <DisclosureRow
+                id={`policy-slot-${slot.code}-current`}
+                groupName="current"
+                headingLevel={4}
+                title="Current version"
+              >
+                <ActiveVersionBody activeVersion={slot.activeVersion} />
+              </DisclosureRow>
+            )
+          ) : (
+            slot.activeVersion ? (
+              <ActiveVersionBody activeVersion={slot.activeVersion} />
+            ) : (
+              <div className="text-sm text-amber-700">No active version yet.</div>
+            )
+          )}
+
+          {inactiveVersions.length > 0 && (
+            <DisclosureRow
+              id={`policy-slot-${slot.code}-history`}
+              groupName="history"
+              headingLevel={4}
+              title={`Version history (${inactiveVersions.length})`}
+            >
+              <VersionHistory versions={inactiveVersions} />
+            </DisclosureRow>
+          )}
+        </div>
+      </DisclosureRow>
+    </div>
+  );
+}
+
+function OutcomeExtras({ outcome }) {
+  return (
+    <>
+      {outcome.warnings && outcome.warnings.length > 0 && (
+        <ul className="mt-1 text-xs list-disc ml-5">
+          {outcome.warnings.map((w, i) => (<li key={i}>{w}</li>))}
+        </ul>
+      )}
+      {outcome.details?.dropped && outcome.details.dropped.length > 0 && (
+        <div className="mt-1 text-xs">
+          Dropped: <code>{outcome.details.dropped.join(', ')}</code>
+        </div>
+      )}
+      {outcome.details?.existing && outcome.details?.submitted && (
+        <DiffBlock
+          existing={outcome.details.existing}
+          submitted={outcome.details.submitted}
+          fieldsMatch={outcome.details.fieldsMatch}
+        />
+      )}
+      {outcome.orphan && (
+        <div className="mt-1 text-xs">
+          Orphan version: <code>{outcome.orphan.id}</code> ({outcome.orphan.reason})
+        </div>
+      )}
+    </>
+  );
+}
+
+function ActiveVersionBody({ activeVersion }) {
+  return (
+    <div>
+      <div className="text-sm font-medium text-gray-800">{activeVersion.title}</div>
+      <div
+        className="prose prose-sm max-w-none mt-2 text-gray-700"
+        dangerouslySetInnerHTML={/* nosemgrep: typescript.react.security.audit.react-dangerouslysetinnerhtml.react-dangerouslysetinnerhtml -- renderPolicyMarkdown sanitizes via DOMPurify strict allowlist; server validator rejects raw HTML */ { __html: renderPolicyMarkdown(activeVersion.body || '') }}
+      />
+    </div>
+  );
+}
+
+function buildDiffSide(versionLabel, title, effectiveDate, body) {
+  return {
+    versionLabel,
+    title,
+    effectiveDate,
+    bodyLength: (body || '').length,
+    bodyExcerpt: (body || '').slice(0, 200),
+  };
+}
+
 function PublishForm({ slot, onSuccess, onOutcome }) {
   const taken = takenLabelSet(slot.versions);
   const [versionLabel, setVersionLabel] = useState(() => suggestUniqueLabel(todayISO(), taken));
   const [title, setTitle] = useState(slot.activeVersion?.title || '');
-  const [body, setBody] = useState('');
+  const [body, setBody] = useState(slot.activeVersion?.body || '');
   const [effectiveDate, setEffectiveDate] = useState(todayISO());
   const [submitting, setSubmitting] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [confirming, setConfirming] = useState(false);
 
-  const prefillFromActive = () => {
-    if (!slot.activeVersion) return;
-    setVersionLabel(slot.activeVersion.versionLabel || '');
-    setTitle(slot.activeVersion.title || '');
-    setBody(slot.activeVersion.body || '');
-    setEffectiveDate(slot.activeVersion.effectiveDate || todayISO());
+  const resetToActive = () => {
+    setTitle(slot.activeVersion?.title || '');
+    setBody(slot.activeVersion?.body || '');
+    setEffectiveDate(todayISO());
+    setVersionLabel(suggestUniqueLabel(todayISO(), taken));
   };
 
   const submit = async () => {
@@ -294,84 +382,117 @@ function PublishForm({ slot, onSuccess, onOutcome }) {
       onOutcome({ status: 'failed', warnings: [err.message] });
     } finally {
       setSubmitting(false);
+      setConfirming(false);
     }
   };
 
   const bodyTooShort = body.length < 50;
   const labelTaken = isLabelTaken(versionLabel, taken);
   const suggestedLabel = suggestUniqueLabel(versionLabel, taken);
+  const canPublish = !submitting && title.trim() && !bodyTooShort && versionLabel.trim();
+
+  if (confirming) {
+    const existing = slot.activeVersion
+      ? buildDiffSide(slot.activeVersion.versionLabel, slot.activeVersion.title, slot.activeVersion.effectiveDate, slot.activeVersion.body)
+      : null;
+    const submitted = buildDiffSide(versionLabel, title, effectiveDate, body);
+    const fieldsMatch = existing ? {
+      title: existing.title === submitted.title,
+      effectiveDate: existing.effectiveDate === submitted.effectiveDate,
+      body: (slot.activeVersion.body || '') === body,
+    } : undefined;
+
+    return (
+      <div className="space-y-3 rounded-lg border border-gray-200 p-4">
+        <p className="text-sm text-gray-800">
+          Publish version <strong>{versionLabel}</strong>, effective {effectiveDate}? Published versions cannot be edited later.
+        </p>
+        {existing ? (
+          <DiffBlock existing={existing} submitted={submitted} fieldsMatch={fieldsMatch} />
+        ) : (
+          <p className="text-xs text-gray-500">This will be the first version.</p>
+        )}
+        <div className="flex items-center gap-2">
+          <Button type="button" variant="primary" size="sm" onClick={submit} disabled={submitting}>
+            {submitting ? 'Publishing…' : 'Publish'}
+          </Button>
+          <Button type="button" variant="outline" size="sm" onClick={() => setConfirming(false)} disabled={submitting}>
+            Back
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="p-4 space-y-3">
+    <div className="space-y-3 p-4">
       <div className="grid grid-cols-2 gap-3">
-        <label className="block text-xs text-gray-700">
+        <label className="block text-sm font-medium text-gray-700">
           Version label
           <input
             value={versionLabel}
             onChange={e => setVersionLabel(e.target.value)}
             maxLength={50}
-            className="mt-1 w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
+            className={`mt-1 ${INPUT_CLASS}`}
           />
           {labelTaken && (
-            <span className="mt-1 block text-[11px] text-amber-700">
+            <span className="mt-1 block text-xs text-amber-700">
               Already used by a published version. Identical content is a no-op; changed
               content will be rejected — versions are immutable.{' '}
-              <button
+              <Button
                 type="button"
+                variant="outline"
+                size="sm"
                 onClick={() => setVersionLabel(suggestedLabel)}
-                className="underline hover:text-amber-900"
+                className="mt-1"
               >
                 Use “{suggestedLabel}”
-              </button>
+              </Button>
             </span>
           )}
         </label>
-        <label className="block text-xs text-gray-700">
+        <label className="block text-sm font-medium text-gray-700">
           Effective date
           <input
             type="date"
             value={effectiveDate}
             onChange={e => setEffectiveDate(e.target.value)}
-            className="mt-1 w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
+            className={`mt-1 ${INPUT_CLASS}`}
           />
         </label>
       </div>
 
-      <label className="block text-xs text-gray-700">
+      <label className="block text-sm font-medium text-gray-700">
         Title
         <input
           value={title}
           onChange={e => setTitle(e.target.value)}
           maxLength={300}
-          className="mt-1 w-full px-2 py-1.5 border border-gray-300 rounded text-sm"
+          className={`mt-1 ${INPUT_CLASS}`}
         />
       </label>
 
-      <label className="block text-xs text-gray-700">
+      <label className="block text-sm font-medium text-gray-700">
         Body (markdown)
         <textarea
           value={body}
           onChange={e => setBody(e.target.value)}
-          rows={10}
+          rows={12}
           maxLength={64 * 1024}
-          className="mt-1 w-full px-2 py-1.5 border border-gray-300 rounded text-sm font-mono text-xs"
+          className={`mt-1 ${TEXTAREA_CLASS}`}
           placeholder="Paste or write the policy text. Markdown is supported (headings, lists, bold/italic, links). Raw HTML is rejected by the server."
         />
-        <div className="mt-1 flex items-center justify-between text-[10px] text-gray-400">
+        <div className="mt-1 flex items-center justify-between text-xs text-gray-500">
           <span>{body.length} chars (min 50)</span>
-          <button
-            type="button"
-            onClick={() => setPreviewOpen(p => !p)}
-            className="text-gray-600 hover:text-gray-900"
-          >
+          <Button type="button" variant="outline" size="sm" onClick={() => setPreviewOpen(p => !p)}>
             {previewOpen ? 'Hide preview' : 'Show preview'}
-          </button>
+          </Button>
         </div>
       </label>
 
       {previewOpen && (
-        <div className="border rounded p-3 bg-white">
-          <div className="text-[10px] uppercase text-gray-500 mb-2">Preview</div>
+        <div className="rounded-lg border border-gray-200 p-3 bg-white">
+          <div className="text-xs uppercase text-gray-500 mb-2">Preview</div>
           <div
             className="prose prose-sm max-w-none text-gray-800"
             dangerouslySetInnerHTML={/* nosemgrep: typescript.react.security.audit.react-dangerouslysetinnerhtml.react-dangerouslysetinnerhtml -- renderPolicyMarkdown sanitizes via DOMPurify strict allowlist; server validator rejects raw HTML */ { __html: renderPolicyMarkdown(body) }}
@@ -380,58 +501,24 @@ function PublishForm({ slot, onSuccess, onOutcome }) {
       )}
 
       <div className="flex items-center justify-between">
-        <button
+        <Button
           type="button"
-          onClick={prefillFromActive}
+          variant="outline"
+          size="sm"
+          onClick={resetToActive}
           disabled={!slot.activeVersion}
-          className="text-xs text-gray-600 hover:text-gray-900 disabled:opacity-40"
-          title="Copy the currently active version's fields into this form. Useful for testing already_published or for tweaking a single field."
         >
-          Prefill from active version
-        </button>
-        <button
-          onClick={submit}
-          disabled={submitting || !title.trim() || bodyTooShort || !versionLabel.trim()}
-          className="px-4 py-1.5 bg-gray-900 text-white text-sm font-medium rounded hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed"
+          Reset to active version
+        </Button>
+        <Button
+          type="button"
+          variant="primary"
+          size="sm"
+          onClick={() => setConfirming(true)}
+          disabled={!canPublish}
         >
-          {submitting ? 'Publishing…' : 'Publish'}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function OutcomeBanner({ outcome, onDismiss }) {
-  const meta = STATUS_COPY[outcome.status] || { tone: 'gray', text: outcome.status };
-  return (
-    <div className={`p-3 border-t text-sm ${TONE_CLASSES[meta.tone]}`}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex-1">
-          <div className="font-medium">{meta.text}</div>
-          {outcome.warnings && outcome.warnings.length > 0 && (
-            <ul className="mt-1 text-xs list-disc ml-5">
-              {outcome.warnings.map((w, i) => (<li key={i}>{w}</li>))}
-            </ul>
-          )}
-          {outcome.details?.dropped && outcome.details.dropped.length > 0 && (
-            <div className="mt-1 text-xs">
-              Dropped: <code>{outcome.details.dropped.join(', ')}</code>
-            </div>
-          )}
-          {outcome.details?.existing && outcome.details?.submitted && (
-            <DiffBlock
-              existing={outcome.details.existing}
-              submitted={outcome.details.submitted}
-              fieldsMatch={outcome.details.fieldsMatch}
-            />
-          )}
-          {outcome.orphan && (
-            <div className="mt-1 text-xs">
-              Orphan version: <code>{outcome.orphan.id}</code> ({outcome.orphan.reason})
-            </div>
-          )}
-        </div>
-        <button onClick={onDismiss} className="text-xs underline">dismiss</button>
+          Publish
+        </Button>
       </div>
     </div>
   );
@@ -447,7 +534,7 @@ function DiffBlock({ existing, submitted, fieldsMatch }) {
         <div>Title{mark(fieldsMatch?.title)}: {existing.title}</div>
         <div>Effective{mark(fieldsMatch?.effectiveDate)}: {existing.effectiveDate}</div>
         <div>Body{mark(fieldsMatch?.body)} ({existing.bodyLength ?? '?'} chars):</div>
-        <div className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap font-mono text-[10px]">
+        <div className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap font-mono text-xs">
           {existing.bodyExcerpt}
         </div>
       </div>
@@ -457,7 +544,7 @@ function DiffBlock({ existing, submitted, fieldsMatch }) {
         <div>Title{mark(fieldsMatch?.title)}: {submitted.title}</div>
         <div>Effective{mark(fieldsMatch?.effectiveDate)}: {submitted.effectiveDate}</div>
         <div>Body{mark(fieldsMatch?.body)} ({submitted.bodyLength ?? '?'} chars):</div>
-        <div className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap font-mono text-[10px]">
+        <div className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap font-mono text-xs">
           {submitted.bodyExcerpt}
         </div>
       </div>
@@ -466,38 +553,21 @@ function DiffBlock({ existing, submitted, fieldsMatch }) {
 }
 
 function VersionHistory({ versions }) {
-  const [open, setOpen] = useState(false);
-  const inactive = versions.filter(v => !v.isActive);
-  if (inactive.length === 0) return null;
   return (
-    <div className="p-3 border-t bg-white">
-      <button
-        onClick={() => setOpen(o => !o)}
-        className="text-xs text-gray-600 hover:text-gray-900"
-      >
-        {open ? '▼' : '▶'} Version history ({inactive.length})
-      </button>
-      {open && (
-        <ul className="mt-2 space-y-1 text-xs">
-          {inactive.map(v => (
-            <li key={v.id} className="flex items-center gap-2 text-gray-700">
-              <span className="font-mono">{v.versionLabel}</span>
-              <span className="text-gray-500">{v.title}</span>
-              {v.isResidue && (
-                <span
-                  className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px]"
-                  title="This version was created but never activated — likely a partial publish failure. Safe to leave; consider manual cleanup if frequent."
-                >
-                  Repair needed
-                </span>
-              )}
-              {!v.isResidue && !v.isActive && (
-                <span className="text-[10px] text-gray-400">retired</span>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
+    <ul className="space-y-1 text-xs">
+      {versions.map(v => (
+        <li key={v.id} className="flex items-center gap-2 text-gray-700">
+          <span className="font-mono">{v.versionLabel}</span>
+          <span className="text-gray-500">{v.title}</span>
+          {v.isResidue ? (
+            <span title="This version was created but never activated — likely a partial publish failure. Safe to leave; consider manual cleanup if frequent.">
+              <StatusChip tone="red">Repair needed</StatusChip>
+            </span>
+          ) : (
+            <StatusChip tone="gray">Retired</StatusChip>
+          )}
+        </li>
+      ))}
+    </ul>
   );
 }
