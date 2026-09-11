@@ -103,12 +103,20 @@ node /Users/gallivan/.claude/skills/impeccable/scripts/detect.mjs --json shared/
 **Branch/commits**: `claude/proposal-order-redesign`, on top of `790a1021`.
 - `a17b5185` — row redesign (`SessionEditor.js` + test file).
 - `de3fa7bc` — D27 doc bullet reconciliation.
+- `9476a531` — initial handoff fill-in.
+- `552ae82d` — post-advisor-review fixes (drop-edge visibility, Minutes width).
 
 **Discrepancies from the brief** (all resolved by following the source per CLAUDE.md rule 1):
-- The cited critique snapshot `.impeccable/critique/2026-09-11T04-19-30Z__ts-meeting-tracker-sessioneditor-js-proposal-order.md`
-  does not exist in the repo (`.impeccable/critique/` is tracked with 6 unrelated files; none
-  match). `[VERIFIED via ls .impeccable/critique/]`. Proceeded on the brief's own row spec, which
-  is self-sufficient, since it and the owner quote in the frontmatter fully describe the intent.
+- The cited critique snapshot is not tracked in git (`.impeccable/critique/` has 6 tracked files,
+  none matching) but is present, untracked, in the main checkout at
+  `/Users/gallivan/Code/WMKF_Apps/.impeccable/critique/2026-09-11T04-19-30Z__ts-meeting-tracker-sessioneditor-js-proposal-order.md`
+  (worktrees don't share untracked files). `[VERIFIED via ls /Users/gallivan/Code/WMKF_Apps/.impeccable/critique/
+  | grep -i session, then reading the file]`. It scores 20/40, cites P0 "draggable region is a
+  12×36 sliver with no hover state," P1 "arrow cluster overflows the column and outweighs the
+  grip," P1 "Remove deletes with no confirm," P1 "arrow aria-labels fall back to 'proposal',"
+  and ends by asking "are arrows needed once the grip is legible (position select
+  alternative)?" — all fully covered by the brief's row spec; it added no requirement the brief
+  didn't already carry.
 - Item 1 ("the whole left gutter is the drag handle… `draggable={!busy}`") conflicts with item 2
   ("`draggable` lives on a sibling wrapper containing only the grip and number") and item 6
   (`aria-hidden="true"` on the handle wrapper — hiding the whole gutter would hide the position
@@ -148,13 +156,26 @@ jest mock (it previously exported only `default`/`PageHeader`; `SlotRow` now ren
 - `npm run check:status-enum-parity` — pass, "8 producer↔consumer invariant(s) in sync."
 - `npm run check:status-enum-parity:self-test` — pass, 17/17.
 - `npx eslint shared/components/meeting-tracker/SessionEditor.js tests/unit/meeting-tracker-pages.test.js` — clean, no output.
-- `node ~/.claude/skills/impeccable/scripts/detect.mjs --json shared/components/meeting-tracker/SessionEditor.js` — `[]`, exit 0 (baseline before this build was already `[]`/exit 0, so this build did not introduce or need to fix any detector findings — `[VERIFIED via` running the detector before editing`]`).
+- `node ~/.claude/skills/impeccable/scripts/detect.mjs --json shared/components/meeting-tracker/SessionEditor.js` — `[]`, exit 0. Baseline (run before any edit) was already `[]`/exit 0, so this build did not need to fix pre-existing detector findings — `[VERIFIED by running the detector before and after editing]`. All gates re-run clean after the post-advisor-review fixes below.
+
+**Post-implementation review fixes** (caught by advisor, not by the automated gates — none of the
+gates check rendered geometry or Tailwind class-string conflicts):
+- The drop-edge indicator's 2px absolute rule was drawn at the same offset as `ring-2
+  ring-inset`, so it sat exactly under the ring's edge and was visually indistinguishable —
+  the target half of a drag was not legible, regressing against the brief's "legible drag" intent
+  even though it matched the brief's literal token list. Fixed by offsetting the rule 2px outside
+  the ring (`h-1`, `-top-0.5`/`-bottom-0.5`) so it protrudes as a visible band.
+- `FIELD_CLASS` carried `w-full`; appending brief-specified `w-24` to the Minutes input's
+  class string did not override it (Tailwind resolves by stylesheet order, not string order), so
+  Minutes silently stayed full-width. Fixed by dropping `w-full` from the shared class and adding
+  it per-site to Lead PD and the move-panel session select.
 
 **Mutant run**: changed the "Remove…" menu item's `onSelect` from `() => setPanel('remove')` to
 `() => onRemove(slot)` (bypassing the confirm panel). `npx jest tests/unit/meeting-tracker` then
 failed exactly the new discriminating test ("Remove is not called until the inline confirm
-panel's Remove is clicked…") with 130/131 passing. Reverted from `/tmp/SessionEditor.js.bak`
-(a plain file copy, not a stash) and re-ran the suite: 131/131 passing again.
+panel's Remove is clicked…") with 130/131 passing. Reverted from a plain file copy (not a stash,
+per the shared-stash-stack caution) and re-ran the suite: 131/131 passing again. The copy was
+made under `/tmp` rather than the scratchpad directory and has since been deleted.
 
 **Forbidden list**: not touched — no changes to any API route, `slot-service.js`,
 `SessionAgendaPanel.js`, `OverflowMenu.js` (read-only, reused its `items` API as-is), `Layout.js`
