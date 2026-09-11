@@ -127,27 +127,40 @@ verbatim into this worktree at the same path and is committed here.
   on the row works. `event.preventDefault()` is called in `onDragOver`. `dataTransfer` calls
   are wrapped in `try/catch` and optional-chained since jsdom's `DragEvent.dataTransfer` is
   `null`.
-- **[ASSUMED]** "successful drop" for the notice announcement means the drop produced a
-  different order (`moveSlot` returned a new array), evaluated synchronously before the
-  network call resolves — not gated on the PATCH succeeding. The brief did not disambiguate
-  UI-drop success from server-save success; this mirrors typical sortable-list a11y UX
-  (announce the reorder immediately) and matches that `shiftSlot` similarly doesn't wait for
-  the network before the row visibly reorders (it always calls `runSlotChange`, which
-  refetches from the server regardless).
+- **Notice timing (corrected after a second pass)**: the notice is set only after the
+  reorder PATCH succeeds, inside the `runSlotChange` operation passed to `reorderSlots`, not
+  before it. [VERIFIED via reading `shiftSlot`/`runSlotChange` in `SessionEditor.js`:
+  `shiftSlot` never calls `setSlots` itself — the row only reorders once `runSlotChange`'s
+  `loadDetail` refetches — so there is no optimistic UI anywhere in this component today.]
+  An earlier draft set `notice` synchronously before the network call; that was wrong because
+  `runSlotChange` sets `error` on a failed PATCH but never clears `notice`, so a failed save
+  would have left a stale "Moved #X…" announcement next to the error while the list (refetched
+  unchanged from the server) didn't actually move — exactly the "optimistic state that
+  survives a failed save" the brief forbids. Fixed by moving the `setNotice` call inside the
+  `runSlotChange(async () => { ... })` operation, after `await reorderSessionSlots(...)`
+  resolves.
 - Visual feedback: dragged row gets `opacity-40`; the row under the pointer gets a 2px
   top/bottom border (`border-t-blue-500` / `border-b-blue-500`) depending on
   `event.clientY` vs. the row's `getBoundingClientRect()` midpoint. Both clear on drop and on
   `onDragEnd`.
+- **`busy` guard fan-out fix**: `handleDragStart` and `handleDragOver` both bail on
+  `busy`; `handleDrop` originally did not. Fixed to `if (busy || draggingIndex === null) {
+  resetDrag(); return; }` so a `busy` transition mid-drag (e.g. a Minutes-input blur firing
+  `onChange` → `runSlotChange` while a drag is in flight) cannot apply a stale drop.
 
-**Commits**: on branch `claude/slot-drag-reorder` (see the branch log for exact SHAs; not
-recorded here to avoid a self-referential edit before the commit exists).
+**Commits**: `52b57271` (implementation: `moveSlot`, `ProposalOrderList`, drag handlers, D28,
+this brief) plus one follow-up commit on the same branch (notice-timing fix so the assistive
+announcement only fires after the reorder PATCH succeeds, a `busy` guard added to `handleDrop`
+to match `handleDragStart`/`handleDragOver`, an ETag assertion added to the RTL reorder test,
+and Handoff corrections) — see the branch log for its SHA.
 
-**Tests / gates** [VERIFIED by running each command in this worktree, sequentially]:
+**Tests / gates** [VERIFIED by running each command in this worktree, sequentially, after the
+follow-up commit's changes]:
 - `npx jest tests/unit/meeting-tracker` — 17 suites passed, 17 total; 112 tests passed, 112
-  total (6 new: 5 `moveSlot` unit tests + 2 `ProposalOrderList` drag tests, replacing the
-  brief's single combined RTL test with two — one for a real reorder, one for the no-op-drop
-  guard). One pre-existing unrelated React key-prop console warning in `MeetingTrackerList`
-  (not touched by this change).
+  total (7 new: 5 `moveSlot` unit tests + 2 `ProposalOrderList` drag tests, replacing the
+  brief's single combined RTL test with two — one for a real reorder including the ETag
+  order, one for the no-op-drop guard). One pre-existing unrelated React key-prop console
+  warning in `MeetingTrackerList` (not touched by this change).
 - `npm run check:types` — clean, no output (0 errors).
 - `npm run check:status-enum-parity` — "status-enum-parity OK — 8 producer↔consumer
   invariant(s) in sync."

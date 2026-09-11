@@ -178,7 +178,7 @@ export function ProposalOrderList({ slots, proposalById, leadOptions, sessions, 
 
   const handleDrop = (index) => (event) => {
     event.preventDefault();
-    if (draggingIndex === null) {
+    if (busy || draggingIndex === null) {
       resetDrag();
       return;
     }
@@ -388,8 +388,11 @@ export default function SessionEditor() {
   const reorderSlots = (next, movedSlot, targetIndex) => {
     const movedProposal = proposalById.get(String(movedSlot._wmkf_request_value).toLowerCase());
     const requestNumber = movedProposal?.requestNumber || movedSlot.wmkf_Request?.akoya_requestnum || movedSlot._wmkf_request_value;
-    setNotice(`Moved #${requestNumber} to position ${targetIndex + 1}.`);
-    return runSlotChange(() => reorderSessionSlots({ sessionId, slots: next }));
+    return runSlotChange(async () => {
+      const result = await reorderSessionSlots({ sessionId, slots: next });
+      setNotice(`Moved #${requestNumber} to position ${targetIndex + 1}.`);
+      return result;
+    });
   };
 
   if (loading) {

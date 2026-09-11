@@ -219,6 +219,7 @@ describe('ProposalOrderList drag-and-drop', () => {
     expect(onReorder).toHaveBeenCalledTimes(1);
     const [nextSlots, movedSlot, targetIndex] = onReorder.mock.calls[0];
     expect(nextSlots.map((slot) => slot.wmkf_deliberationslotid)).toEqual(['slot-c', 'slot-a', 'slot-b']);
+    expect(nextSlots.map((slot) => slot._etag)).toEqual(['W/"3"', 'W/"1"', 'W/"2"']);
     expect(movedSlot).toBe(slots[2]);
     expect(targetIndex).toBe(0);
   });
