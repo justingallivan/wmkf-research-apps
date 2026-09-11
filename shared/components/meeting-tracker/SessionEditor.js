@@ -4,6 +4,9 @@ import { useRouter } from 'next/router';
 import Layout, { Button } from '../Layout';
 import { formatZonedLocalInput, resolveZonedDateTime } from '../../../lib/utils/zoned-date-time';
 import SessionAgendaPanel from './SessionAgendaPanel';
+import OverflowMenu from '../workbench/OverflowMenu';
+
+const FIELD_CLASS = 'mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 focus:border-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-300';
 
 const EMPTY_FORM = {
   startLocal: '',
@@ -79,42 +82,53 @@ function sessionForm(session) {
   };
 }
 
-function SlotRow({ slot, proposal, leadOptions, sessions, sessionId, busy, onChange, onMove, onRemove, onShift, index, count, isDragging, dropEdge, onDragStart, onDragOver, onDrop, onDragEnd }) {
+function SlotRow({ slot, proposal, leadOptions, sessions, sessionId, busy, savingSlotId, onChange, onMove, onRemove, onPositionChange, index, count, isDragging, dropEdge, onDragStart, onDragOver, onDrop, onDragEnd }) {
   const [minutes, setMinutes] = useState(slot.wmkf_minutes || 15);
   const [leadPdId, setLeadPdId] = useState(slot._wmkf_leadpd_value || '');
   const [targetSessionId, setTargetSessionId] = useState('');
-  const edgeClass = dropEdge === 'top' ? 'border-t-2 border-t-blue-500' : dropEdge === 'bottom' ? 'border-b-2 border-b-blue-500' : '';
+  const [panel, setPanel] = useState(null); // 'move' | 'remove' | null
+  const requestNumber = proposal?.requestNumber || slot.wmkf_Request?.akoya_requestnum || slot._wmkf_request_value;
+  const isSaving = savingSlotId === slot.wmkf_deliberationslotid;
+
   return (
     <li
-      className={`rounded-xl border border-gray-200 bg-white p-4 shadow-sm ${isDragging ? 'opacity-40' : ''} ${edgeClass}`}
+      className={`relative rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition-transform duration-150 ${isDragging ? 'opacity-40' : ''} ${isSaving ? 'opacity-70' : ''} ${dropEdge ? 'ring-2 ring-inset ring-blue-600' : ''}`}
       onDragOver={onDragOver}
       onDrop={onDrop}
     >
+      {dropEdge && (
+        <span aria-hidden="true" className={`pointer-events-none absolute inset-x-0 h-0.5 bg-blue-600 ${dropEdge === 'top' ? 'top-0' : 'bottom-0'}`} />
+      )}
       <div className="flex flex-wrap items-start gap-4">
         <div className="flex w-12 shrink-0 flex-col items-center gap-1">
           <div
-            className="flex flex-col items-center gap-1 cursor-grab"
+            aria-hidden="true"
+            title="Drag to reorder"
             draggable={!busy}
             onDragStart={onDragStart}
             onDragEnd={onDragEnd}
+            className={`flex min-h-[44px] flex-col items-center justify-center gap-1 rounded-lg hover:bg-gray-100 ${!busy ? 'cursor-grab active:cursor-grabbing' : ''}`}
           >
-            <svg aria-hidden="true" viewBox="0 0 20 20" fill="currentColor" className="h-3 w-3 text-gray-400">
+            <svg aria-hidden="true" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4 text-gray-500">
               <circle cx="6" cy="4" r="1.3" /><circle cx="6" cy="10" r="1.3" /><circle cx="6" cy="16" r="1.3" />
               <circle cx="14" cy="4" r="1.3" /><circle cx="14" cy="10" r="1.3" /><circle cx="14" cy="16" r="1.3" />
             </svg>
             <span className="text-sm font-semibold tabular-nums text-gray-900">{index + 1}</span>
           </div>
-          <div className="flex gap-1">
-            <button type="button" aria-label={`Move ${proposal?.requestNumber || 'proposal'} up`} disabled={busy || index === 0} onClick={() => onShift(index, -1)} className="rounded border border-gray-300 p-1.5 disabled:opacity-30">
-              <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-3.5 w-3.5"><path strokeLinecap="round" strokeLinejoin="round" d="m5 12.5 5-5 5 5" /></svg>
-            </button>
-            <button type="button" aria-label={`Move ${proposal?.requestNumber || 'proposal'} down`} disabled={busy || index === count - 1} onClick={() => onShift(index, 1)} className="rounded border border-gray-300 p-1.5 disabled:opacity-30">
-              <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-3.5 w-3.5"><path strokeLinecap="round" strokeLinejoin="round" d="m5 7.5 5 5 5-5" /></svg>
-            </button>
-          </div>
+          <select
+            aria-label={`Position of #${requestNumber}`}
+            value={index + 1}
+            disabled={busy}
+            onChange={(event) => onPositionChange(index, Number(event.target.value))}
+            className="w-full rounded-lg border border-gray-300 bg-white px-1 py-1 text-center text-sm focus:border-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-300"
+          >
+            {Array.from({ length: count }, (_, position) => position + 1).map((position) => (
+              <option key={position} value={position}>{position}</option>
+            ))}
+          </select>
         </div>
         <div className="min-w-[13rem] flex-1">
-          <p className="font-semibold text-gray-900">#{proposal?.requestNumber || slot.wmkf_Request?.akoya_requestnum || slot._wmkf_request_value}</p>
+          <p className="font-semibold text-gray-900">#{requestNumber}</p>
           <p className="mt-1 text-sm text-gray-700">{proposal?.title || slot.wmkf_Request?.akoya_title || 'Request details are not available.'}</p>
           {slot.briefing?.url ? (
             <a href={slot.briefing.url} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-xs font-semibold text-blue-800 underline">Open briefing</a>
@@ -125,33 +139,54 @@ function SlotRow({ slot, proposal, leadOptions, sessions, sessionId, busy, onCha
         <div className="grid min-w-[17rem] flex-1 gap-3 sm:grid-cols-2">
           <label className="text-sm font-medium text-gray-700">
             Minutes
-            <input type="number" min="1" max="1440" value={minutes} onChange={(event) => setMinutes(event.target.value)} onBlur={() => Number(minutes) !== Number(slot.wmkf_minutes) && onChange(slot, { minutes: Number(minutes) })} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-300" />
+            <input type="number" min="1" max="1440" disabled={busy} value={minutes} onChange={(event) => setMinutes(event.target.value)} onBlur={() => Number(minutes) !== Number(slot.wmkf_minutes) && onChange(slot, { minutes: Number(minutes) })} className={FIELD_CLASS} />
           </label>
           <label className="text-sm font-medium text-gray-700">
             Lead Program Director
-            <select value={leadPdId} onChange={(event) => { setLeadPdId(event.target.value); onChange(slot, { leadPdId: event.target.value || null }); }} className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 focus:border-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-300">
+            <select value={leadPdId} disabled={busy} onChange={(event) => { setLeadPdId(event.target.value); onChange(slot, { leadPdId: event.target.value || null }); }} className={FIELD_CLASS}>
               <option value="">Not assigned</option>
               {leadOptions.map((lead) => <option key={lead.id} value={lead.id}>{lead.name}</option>)}
             </select>
           </label>
-          <label className="text-sm font-medium text-gray-700 sm:col-span-2">
-            Move to another session
-            <div className="mt-1 flex gap-2">
-              <select value={targetSessionId} onChange={(event) => setTargetSessionId(event.target.value)} className="min-w-0 flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 focus:border-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-300">
-                <option value="">Choose a session</option>
-                {sessions.filter((session) => session.sessionId !== sessionId).map((session) => <option key={session.sessionId} value={session.sessionId}>{new Date(session.scheduledStartIso).toLocaleString()}</option>)}
-              </select>
-              <button type="button" disabled={!targetSessionId || busy} onClick={() => onMove(slot, targetSessionId)} className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-40">Move</button>
-            </div>
-          </label>
         </div>
-        <button type="button" disabled={busy} onClick={() => onRemove(slot)} className="rounded-lg px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-40">Remove</button>
+        <OverflowMenu
+          label={`More actions for #${requestNumber}`}
+          disabled={busy}
+          items={[
+            { key: 'move', label: 'Move to another session…', onSelect: () => setPanel('move') },
+            { key: 'remove', label: 'Remove…', onSelect: () => setPanel('remove') },
+          ]}
+        />
       </div>
+      {panel === 'move' && (
+        <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-3">
+          <label className="text-sm font-medium text-gray-700">
+            Move to another session
+            <select value={targetSessionId} onChange={(event) => setTargetSessionId(event.target.value)} className={FIELD_CLASS}>
+              <option value="">Choose a session</option>
+              {sessions.filter((session) => session.sessionId !== sessionId).map((session) => <option key={session.sessionId} value={session.sessionId}>{new Date(session.scheduledStartIso).toLocaleString()}</option>)}
+            </select>
+          </label>
+          <div className="mt-3 flex gap-2">
+            <Button type="button" size="sm" disabled={!targetSessionId || busy} onClick={() => { onMove(slot, targetSessionId); setPanel(null); }}>Move</Button>
+            <Button type="button" variant="outline" size="sm" onClick={() => setPanel(null)}>Cancel</Button>
+          </div>
+        </div>
+      )}
+      {panel === 'remove' && (
+        <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-3">
+          <p className="text-sm text-gray-800">{`Remove #${requestNumber} from this session? Its minutes and lead assignment will be lost.`}</p>
+          <div className="mt-3 flex gap-2">
+            <Button type="button" variant="danger" size="sm" disabled={busy} onClick={() => { onRemove(slot); setPanel(null); }}>Remove</Button>
+            <Button type="button" variant="outline" size="sm" onClick={() => setPanel(null)}>Cancel</Button>
+          </div>
+        </div>
+      )}
     </li>
   );
 }
 
-export function ProposalOrderList({ slots, proposalById, leadOptions, sessions, sessionId, busy, onShift, onChange, onMove, onRemove, onReorder }) {
+export function ProposalOrderList({ slots, proposalById, leadOptions, sessions, sessionId, busy, savingSlotId, onChange, onMove, onRemove, onReorder }) {
   const [draggingIndex, setDraggingIndex] = useState(null);
   const [overIndex, setOverIndex] = useState(null);
   const [overEdge, setOverEdge] = useState(null);
@@ -193,32 +228,47 @@ export function ProposalOrderList({ slots, proposalById, leadOptions, sessions, 
     if (next !== slots) onReorder(next, movedSlot, targetIndex);
   };
 
+  const handlePositionChange = (index, position) => {
+    const targetIndex = position - 1;
+    const movedSlot = slots[index];
+    const next = moveSlot(slots, index, targetIndex);
+    if (next !== slots) onReorder(next, movedSlot, targetIndex);
+  };
+
+  const handleKeyDown = (event) => {
+    if (event.key === 'Escape' && draggingIndex !== null) resetDrag();
+  };
+
   return (
-    <ol className="mt-4 space-y-3">
-      {slots.map((slot, index) => (
-        <SlotRow
-          key={slot.wmkf_deliberationslotid}
-          slot={slot}
-          proposal={proposalById.get(String(slot._wmkf_request_value).toLowerCase())}
-          leadOptions={leadOptions}
-          sessions={sessions}
-          sessionId={sessionId}
-          busy={busy}
-          index={index}
-          count={slots.length}
-          onShift={onShift}
-          onChange={onChange}
-          onMove={onMove}
-          onRemove={onRemove}
-          isDragging={draggingIndex === index}
-          dropEdge={overIndex === index && draggingIndex !== index ? overEdge : null}
-          onDragStart={handleDragStart(index)}
-          onDragOver={handleDragOver(index)}
-          onDrop={handleDrop(index)}
-          onDragEnd={resetDrag}
-        />
-      ))}
-    </ol>
+    <>
+      <p className="sr-only">Drag a proposal by its handle to change the order.</p>
+      <ol aria-label="Proposal order" className="mt-4 space-y-3" onKeyDown={handleKeyDown}>
+        {slots.map((slot, index) => (
+          <SlotRow
+            key={slot.wmkf_deliberationslotid}
+            slot={slot}
+            proposal={proposalById.get(String(slot._wmkf_request_value).toLowerCase())}
+            leadOptions={leadOptions}
+            sessions={sessions}
+            sessionId={sessionId}
+            busy={busy}
+            savingSlotId={savingSlotId}
+            index={index}
+            count={slots.length}
+            onChange={onChange}
+            onMove={onMove}
+            onRemove={onRemove}
+            onPositionChange={handlePositionChange}
+            isDragging={draggingIndex === index}
+            dropEdge={overIndex === index && draggingIndex !== index ? overEdge : null}
+            onDragStart={handleDragStart(index)}
+            onDragOver={handleDragOver(index)}
+            onDrop={handleDrop(index)}
+            onDragEnd={resetDrag}
+          />
+        ))}
+      </ol>
+    </>
   );
 }
 
@@ -238,6 +288,7 @@ export default function SessionEditor() {
   const [selectedRequestId, setSelectedRequestId] = useState(initialRequestId);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [savingSlotId, setSavingSlotId] = useState(null);
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
   const [warning, setWarning] = useState(null);
@@ -357,7 +408,8 @@ export default function SessionEditor() {
     }
   };
 
-  const runSlotChange = async (operation) => {
+  const runSlotChange = async (operation, slotId = null) => {
+    setSavingSlotId(slotId);
     setBusy(true);
     setError(null);
     setNotice(null);
@@ -369,6 +421,7 @@ export default function SessionEditor() {
       setError(`${slotError.message} Please try again. If the problem continues, contact an administrator.`);
     } finally {
       setBusy(false);
+      setSavingSlotId(null);
     }
   };
 
@@ -383,12 +436,6 @@ export default function SessionEditor() {
     }));
   };
 
-  const shiftSlot = (index, direction) => {
-    const next = [...slots];
-    [next[index], next[index + direction]] = [next[index + direction], next[index]];
-    return runSlotChange(() => reorderSessionSlots({ sessionId, slots: next }));
-  };
-
   const reorderSlots = (next, movedSlot, targetIndex) => {
     const movedProposal = proposalById.get(String(movedSlot._wmkf_request_value).toLowerCase());
     const requestNumber = movedProposal?.requestNumber || movedSlot.wmkf_Request?.akoya_requestnum || movedSlot._wmkf_request_value;
@@ -396,7 +443,7 @@ export default function SessionEditor() {
       const result = await reorderSessionSlots({ sessionId, slots: next });
       setNotice(`Moved #${requestNumber} to position ${targetIndex + 1}.`);
       return result;
-    });
+    }, movedSlot.wmkf_deliberationslotid);
   };
 
   if (loading) {
@@ -459,10 +506,10 @@ export default function SessionEditor() {
               sessions={sessions}
               sessionId={sessionId}
               busy={busy}
-              onShift={shiftSlot}
-              onChange={(row, patch) => runSlotChange(() => sendJson(`/api/meeting-tracker/slots/${row.wmkf_deliberationslotid}`, 'PATCH', { etag: row._etag, ...patch }))}
-              onMove={(row, targetSessionId) => runSlotChange(() => sendJson(`/api/meeting-tracker/slots/${row.wmkf_deliberationslotid}`, 'PATCH', { etag: row._etag, targetSessionId }))}
-              onRemove={(row) => runSlotChange(() => sendJson(`/api/meeting-tracker/slots/${row.wmkf_deliberationslotid}`, 'DELETE', { etag: row._etag }))}
+              savingSlotId={savingSlotId}
+              onChange={(row, patch) => runSlotChange(() => sendJson(`/api/meeting-tracker/slots/${row.wmkf_deliberationslotid}`, 'PATCH', { etag: row._etag, ...patch }), row.wmkf_deliberationslotid)}
+              onMove={(row, targetSessionId) => runSlotChange(() => sendJson(`/api/meeting-tracker/slots/${row.wmkf_deliberationslotid}`, 'PATCH', { etag: row._etag, targetSessionId }), row.wmkf_deliberationslotid)}
+              onRemove={(row) => runSlotChange(() => sendJson(`/api/meeting-tracker/slots/${row.wmkf_deliberationslotid}`, 'DELETE', { etag: row._etag }), row.wmkf_deliberationslotid)}
               onReorder={reorderSlots}
             />
           ) : <div className="mt-4 rounded-xl border border-dashed border-gray-300 bg-white p-8 text-center text-sm text-gray-600">No proposals are in this session yet.</div>}
