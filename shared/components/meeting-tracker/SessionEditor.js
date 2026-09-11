@@ -48,6 +48,16 @@ export function slotBriefingText(slot) {
   return slot?.briefing?.url ? 'Open briefing' : 'Briefing not yet shared — the lead PD shares the writeup from Staff Deliberations.';
 }
 
+// Returns a new array with the item at `from` moved to `to`; returns the same
+// array unchanged when the move is a no-op or either index is out of range.
+export function moveSlot(slots, from, to) {
+  if (from === to || from < 0 || to < 0 || from >= slots.length || to >= slots.length) return slots;
+  const next = [...slots];
+  const [item] = next.splice(from, 1);
+  next.splice(to, 0, item);
+  return next;
+}
+
 function sameRef(left, right) {
   return left.kind === right.kind
     && (left.kind === 'staff' ? left.profileId === right.profileId : left.rosterId === right.rosterId);
@@ -69,14 +79,28 @@ function sessionForm(session) {
   };
 }
 
-function SlotRow({ slot, proposal, leadOptions, sessions, sessionId, busy, onChange, onMove, onRemove, onShift, index, count }) {
+function SlotRow({ slot, proposal, leadOptions, sessions, sessionId, busy, onChange, onMove, onRemove, onShift, index, count, isDragging, dropEdge, onDragStart, onDragOver, onDrop, onDragEnd }) {
   const [minutes, setMinutes] = useState(slot.wmkf_minutes || 15);
   const [leadPdId, setLeadPdId] = useState(slot._wmkf_leadpd_value || '');
   const [targetSessionId, setTargetSessionId] = useState('');
+  const edgeClass = dropEdge === 'top' ? 'border-t-2 border-t-blue-500' : dropEdge === 'bottom' ? 'border-b-2 border-b-blue-500' : '';
   return (
-    <li className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+    <li
+      className={`rounded-xl border border-gray-200 bg-white p-4 shadow-sm ${isDragging ? 'opacity-40' : ''} ${edgeClass}`}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+    >
       <div className="flex flex-wrap items-start gap-4">
-        <div className="flex w-12 shrink-0 flex-col items-center gap-1">
+        <div
+          className="flex w-12 shrink-0 flex-col items-center gap-1 cursor-grab"
+          draggable={!busy}
+          onDragStart={onDragStart}
+          onDragEnd={onDragEnd}
+        >
+          <svg aria-hidden="true" viewBox="0 0 20 20" fill="currentColor" className="h-3 w-3 text-gray-400">
+            <circle cx="6" cy="4" r="1.3" /><circle cx="6" cy="10" r="1.3" /><circle cx="6" cy="16" r="1.3" />
+            <circle cx="14" cy="4" r="1.3" /><circle cx="14" cy="10" r="1.3" /><circle cx="14" cy="16" r="1.3" />
+          </svg>
           <span className="text-sm font-semibold tabular-nums text-gray-900">{index + 1}</span>
           <div className="flex gap-1">
             <button type="button" aria-label={`Move ${proposal?.requestNumber || 'proposal'} up`} disabled={busy || index === 0} onClick={() => onShift(index, -1)} className="rounded border border-gray-300 p-1.5 disabled:opacity-30">
@@ -122,6 +146,76 @@ function SlotRow({ slot, proposal, leadOptions, sessions, sessionId, busy, onCha
         <button type="button" disabled={busy} onClick={() => onRemove(slot)} className="rounded-lg px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-40">Remove</button>
       </div>
     </li>
+  );
+}
+
+export function ProposalOrderList({ slots, proposalById, leadOptions, sessions, sessionId, busy, onShift, onChange, onMove, onRemove, onReorder }) {
+  const [draggingIndex, setDraggingIndex] = useState(null);
+  const [overIndex, setOverIndex] = useState(null);
+  const [overEdge, setOverEdge] = useState(null);
+
+  const resetDrag = () => {
+    setDraggingIndex(null);
+    setOverIndex(null);
+    setOverEdge(null);
+  };
+
+  const handleDragStart = (index) => (event) => {
+    if (busy) return;
+    setDraggingIndex(index);
+    try { event.dataTransfer?.setData('text/plain', String(index)); } catch { /* dataTransfer unavailable */ }
+    try { if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move'; } catch { /* dataTransfer unavailable */ }
+  };
+
+  const handleDragOver = (index) => (event) => {
+    event.preventDefault();
+    if (busy || draggingIndex === null) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    const edge = event.clientY - rect.top < rect.height / 2 ? 'top' : 'bottom';
+    setOverIndex(index);
+    setOverEdge(edge);
+  };
+
+  const handleDrop = (index) => (event) => {
+    event.preventDefault();
+    if (draggingIndex === null) {
+      resetDrag();
+      return;
+    }
+    const rawTarget = overEdge === 'bottom' ? index + 1 : index;
+    const targetIndex = rawTarget > draggingIndex ? rawTarget - 1 : rawTarget;
+    const movedSlot = slots[draggingIndex];
+    const next = moveSlot(slots, draggingIndex, targetIndex);
+    resetDrag();
+    if (next !== slots) onReorder(next, movedSlot, targetIndex);
+  };
+
+  return (
+    <ol className="mt-4 space-y-3">
+      {slots.map((slot, index) => (
+        <SlotRow
+          key={slot.wmkf_deliberationslotid}
+          slot={slot}
+          proposal={proposalById.get(String(slot._wmkf_request_value).toLowerCase())}
+          leadOptions={leadOptions}
+          sessions={sessions}
+          sessionId={sessionId}
+          busy={busy}
+          index={index}
+          count={slots.length}
+          onShift={onShift}
+          onChange={onChange}
+          onMove={onMove}
+          onRemove={onRemove}
+          isDragging={draggingIndex === index}
+          dropEdge={overIndex === index ? overEdge : null}
+          onDragStart={handleDragStart(index)}
+          onDragOver={handleDragOver(index)}
+          onDrop={handleDrop(index)}
+          onDragEnd={resetDrag}
+        />
+      ))}
+    </ol>
   );
 }
 
@@ -291,6 +385,13 @@ export default function SessionEditor() {
     return runSlotChange(() => reorderSessionSlots({ sessionId, slots: next }));
   };
 
+  const reorderSlots = (next, movedSlot, targetIndex) => {
+    const movedProposal = proposalById.get(String(movedSlot._wmkf_request_value).toLowerCase());
+    const requestNumber = movedProposal?.requestNumber || movedSlot.wmkf_Request?.akoya_requestnum || movedSlot._wmkf_request_value;
+    setNotice(`Moved #${requestNumber} to position ${targetIndex + 1}.`);
+    return runSlotChange(() => reorderSessionSlots({ sessionId, slots: next }));
+  };
+
   if (loading) {
     return <Layout title="Meeting Tracker"><div className="py-24 text-center text-gray-500">Loading the session workspace…</div></Layout>;
   }
@@ -343,7 +444,21 @@ export default function SessionEditor() {
             <div><h2 className="text-xl font-semibold text-gray-900">Proposal order</h2><p className="mt-1 text-sm text-gray-600">{slotMinutes} discussion minutes across {slots.length} proposal{slots.length === 1 ? '' : 's'}.</p></div>
             <div className="flex min-w-[18rem] gap-2"><select aria-label="Proposal to add" value={selectedRequestId} onChange={(event) => setSelectedRequestId(event.target.value)} className="min-w-0 flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2"><option value="">Choose a proposal</option>{proposals.filter((proposal) => !slots.some((slot) => String(slot._wmkf_request_value).toLowerCase() === String(proposal.requestId).toLowerCase())).map((proposal) => <option key={proposal.requestId} value={proposal.requestId}>#{proposal.requestNumber} · {proposal.title}</option>)}</select><Button type="button" size="sm" disabled={!selectedRequestId || busy} onClick={addSlot}>Add</Button></div>
           </div>
-          {slots.length ? <ol className="mt-4 space-y-3">{slots.map((slot, index) => <SlotRow key={slot.wmkf_deliberationslotid} slot={slot} proposal={proposalById.get(String(slot._wmkf_request_value).toLowerCase())} leadOptions={leadOptions} sessions={sessions} sessionId={sessionId} busy={busy} index={index} count={slots.length} onShift={shiftSlot} onChange={(row, patch) => runSlotChange(() => sendJson(`/api/meeting-tracker/slots/${row.wmkf_deliberationslotid}`, 'PATCH', { etag: row._etag, ...patch }))} onMove={(row, targetSessionId) => runSlotChange(() => sendJson(`/api/meeting-tracker/slots/${row.wmkf_deliberationslotid}`, 'PATCH', { etag: row._etag, targetSessionId }))} onRemove={(row) => runSlotChange(() => sendJson(`/api/meeting-tracker/slots/${row.wmkf_deliberationslotid}`, 'DELETE', { etag: row._etag }))} />)}</ol> : <div className="mt-4 rounded-xl border border-dashed border-gray-300 bg-white p-8 text-center text-sm text-gray-600">No proposals are in this session yet.</div>}
+          {slots.length ? (
+            <ProposalOrderList
+              slots={slots}
+              proposalById={proposalById}
+              leadOptions={leadOptions}
+              sessions={sessions}
+              sessionId={sessionId}
+              busy={busy}
+              onShift={shiftSlot}
+              onChange={(row, patch) => runSlotChange(() => sendJson(`/api/meeting-tracker/slots/${row.wmkf_deliberationslotid}`, 'PATCH', { etag: row._etag, ...patch }))}
+              onMove={(row, targetSessionId) => runSlotChange(() => sendJson(`/api/meeting-tracker/slots/${row.wmkf_deliberationslotid}`, 'PATCH', { etag: row._etag, targetSessionId }))}
+              onRemove={(row) => runSlotChange(() => sendJson(`/api/meeting-tracker/slots/${row.wmkf_deliberationslotid}`, 'DELETE', { etag: row._etag }))}
+              onReorder={reorderSlots}
+            />
+          ) : <div className="mt-4 rounded-xl border border-dashed border-gray-300 bg-white p-8 text-center text-sm text-gray-600">No proposals are in this session yet.</div>}
         </section>
       )}
 

@@ -1,6 +1,6 @@
 /** @jest-environment jsdom */
 
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { AppCard, getServerSideProps as getLandingProps } from '../../pages/index';
 import MeetingTrackerList, { MeetingTrackerRequestRow } from '../../shared/components/meeting-tracker/MeetingTrackerList';
 
@@ -17,7 +17,7 @@ jest.mock('../../shared/components/Layout', () => ({
 jest.mock('next/link', () => function MockLink({ children, href }) {
   return <a href={typeof href === 'string' ? href : href.pathname}>{children}</a>;
 });
-import { reorderSessionSlots, slotBriefingText } from '../../shared/components/meeting-tracker/SessionEditor';
+import { moveSlot, ProposalOrderList, reorderSessionSlots, slotBriefingText } from '../../shared/components/meeting-tracker/SessionEditor';
 
 const SESSION_ID = '11111111-1111-4111-8111-111111111111';
 const FIRST_SLOT_ID = '22222222-2222-4222-8222-222222222222';
@@ -145,4 +145,89 @@ test('arriving with a cycle in the URL still loads the cycle picker (the session
 test('a slot without a live briefing link says who shares it; with one it offers Open briefing', () => {
   expect(slotBriefingText({ briefing: null })).toMatch(/not yet shared.*lead PD shares the writeup/);
   expect(slotBriefingText({ briefing: { url: 'https://apps.test/external/briefing/t' } })).toBe('Open briefing');
+});
+
+describe('moveSlot', () => {
+  test('moves an item forward', () => {
+    expect(moveSlot(['a', 'b', 'c', 'd'], 0, 2)).toEqual(['b', 'c', 'a', 'd']);
+  });
+
+  test('moves an item backward', () => {
+    expect(moveSlot(['a', 'b', 'c', 'd'], 3, 1)).toEqual(['a', 'd', 'b', 'c']);
+  });
+
+  test('returns the same array reference when from equals to', () => {
+    const input = ['a', 'b', 'c'];
+    expect(moveSlot(input, 1, 1)).toBe(input);
+  });
+
+  test('returns the same array reference for an out-of-range index', () => {
+    const input = ['a', 'b', 'c'];
+    expect(moveSlot(input, 0, 5)).toBe(input);
+    expect(moveSlot(input, -1, 1)).toBe(input);
+  });
+
+  test('does not mutate the input array', () => {
+    const input = ['a', 'b', 'c'];
+    moveSlot(input, 0, 2);
+    expect(input).toEqual(['a', 'b', 'c']);
+  });
+});
+
+describe('ProposalOrderList drag-and-drop', () => {
+  function orderSlot(id, etag) {
+    return { wmkf_deliberationslotid: id, _etag: etag, _wmkf_request_value: id, wmkf_minutes: 15 };
+  }
+
+  function renderList(onReorder) {
+    const slots = [orderSlot('slot-a', 'W/"1"'), orderSlot('slot-b', 'W/"2"'), orderSlot('slot-c', 'W/"3"')];
+    const { container } = render(
+      <ProposalOrderList
+        slots={slots}
+        proposalById={new Map()}
+        leadOptions={[]}
+        sessions={[]}
+        sessionId={SESSION_ID}
+        busy={false}
+        onShift={jest.fn()}
+        onChange={jest.fn()}
+        onMove={jest.fn()}
+        onRemove={jest.fn()}
+        onReorder={onReorder}
+      />,
+    );
+    return { container, slots };
+  }
+
+  test('dragging row 3\'s handle onto row 1 reorders the list and calls onReorder', () => {
+    const onReorder = jest.fn();
+    const { container, slots } = renderList(onReorder);
+    const rows = container.querySelectorAll('li');
+    const handles = container.querySelectorAll('[draggable="true"]');
+    expect(rows).toHaveLength(3);
+    expect(handles).toHaveLength(3);
+
+    jest.spyOn(rows[0], 'getBoundingClientRect').mockReturnValue({ top: 0, height: 40, bottom: 40, left: 0, right: 100, width: 100 });
+
+    // React's synthetic drag events only need the native event type to fire; the
+    // MouseEvent constructor (unlike jsdom's DragEvent init dict) reliably applies
+    // `clientY`, which the drop-edge calculation depends on.
+    fireEvent(handles[2], new MouseEvent('dragstart', { bubbles: true, cancelable: true }));
+    fireEvent(rows[0], new MouseEvent('dragover', { bubbles: true, cancelable: true, clientY: 5 }));
+    fireEvent(rows[0], new MouseEvent('drop', { bubbles: true, cancelable: true, clientY: 5 }));
+
+    expect(onReorder).toHaveBeenCalledTimes(1);
+    const [nextSlots, movedSlot, targetIndex] = onReorder.mock.calls[0];
+    expect(nextSlots.map((slot) => slot.wmkf_deliberationslotid)).toEqual(['slot-c', 'slot-a', 'slot-b']);
+    expect(movedSlot).toBe(slots[2]);
+    expect(targetIndex).toBe(0);
+  });
+
+  test('drop is a no-op when nothing is being dragged', () => {
+    const onReorder = jest.fn();
+    const { container } = renderList(onReorder);
+    const rows = container.querySelectorAll('li');
+    fireEvent(rows[0], new MouseEvent('drop', { bubbles: true, cancelable: true, clientY: 5 }));
+    expect(onReorder).not.toHaveBeenCalled();
+  });
 });
