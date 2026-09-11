@@ -107,7 +107,7 @@ function SlotRow({ slot, proposal, leadOptions, sessions, sessionId, busy, savin
             draggable={!busy}
             onDragStart={onDragStart}
             onDragEnd={onDragEnd}
-            className={`flex min-h-[44px] flex-col items-center justify-center gap-1 rounded-lg hover:bg-gray-100 ${!busy ? 'cursor-grab active:cursor-grabbing' : ''}`}
+            className={`flex min-h-[44px] w-full flex-col items-center justify-center gap-1 rounded-lg hover:bg-gray-100 ${!busy ? 'cursor-grab active:cursor-grabbing' : ''}`}
           >
             <svg aria-hidden="true" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4 text-gray-500">
               <circle cx="6" cy="4" r="1.3" /><circle cx="6" cy="10" r="1.3" /><circle cx="6" cy="16" r="1.3" />
@@ -241,7 +241,7 @@ export function ProposalOrderList({ slots, proposalById, leadOptions, sessions, 
 
   return (
     <>
-      <p className="sr-only">Drag a proposal by its handle to change the order.</p>
+      <p className="sr-only">Drag a proposal by its handle, or change its position number, to reorder. Changing the position saves immediately.</p>
       <ol aria-label="Proposal order" className="mt-4 space-y-3" onKeyDown={handleKeyDown}>
         {slots.map((slot, index) => (
           <SlotRow

@@ -379,6 +379,20 @@ describe('ProposalOrderList drag-and-drop', () => {
     expect(rows[1]).toHaveClass('opacity-70');
     expect(rows[0]).not.toHaveClass('opacity-70');
     container.querySelectorAll('input[type="number"]').forEach((input) => expect(input).toBeDisabled());
+    // The position and Lead PD selects are load-bearing guards: an enabled position
+    // select would fire a second reorder PATCH against ETags the pending refetch
+    // is about to invalidate.
+    const comboboxes = container.querySelectorAll('select');
+    expect(comboboxes.length).toBeGreaterThan(0);
+    comboboxes.forEach((select) => expect(select).toBeDisabled());
+  });
+
+  test('the drag handle spans the full number column and the Move button stays disabled while busy', () => {
+    const { container } = renderList(jest.fn(), { busy: true, savingSlotId: 'slot-b' });
+    const handle = container.querySelector('[draggable]');
+    expect(handle.getAttribute('class')).toContain('w-full');
+    expect(handle.getAttribute('draggable')).toBe('false');
+    expect(handle.getAttribute('class')).not.toContain('cursor-grab');
   });
 
   test('the position select carries the request number even when proposal is undefined, falling back to the expanded request', () => {
