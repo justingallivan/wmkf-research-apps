@@ -92,43 +92,30 @@ function SlotRow({ slot, proposal, leadOptions, sessions, sessionId, busy, savin
 
   return (
     <li
-      className={`relative rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition-transform duration-150 ${isDragging ? 'opacity-40' : ''} ${isSaving ? 'opacity-70' : ''} ${dropEdge ? 'ring-2 ring-inset ring-blue-600' : ''}`}
+      className={`relative flex overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition-transform duration-150 ${isDragging ? 'opacity-40' : ''} ${isSaving ? 'opacity-70' : ''} ${dropEdge ? 'ring-2 ring-inset ring-blue-600' : ''}`}
       onDragOver={onDragOver}
       onDrop={onDrop}
     >
       {dropEdge && (
-        <span aria-hidden="true" className={`pointer-events-none absolute inset-x-0 h-1 bg-blue-600 ${dropEdge === 'top' ? '-top-0.5' : '-bottom-0.5'}`} />
+        <span aria-hidden="true" className={`pointer-events-none absolute inset-x-0 z-10 h-1 bg-blue-600 ${dropEdge === 'top' ? 'top-0' : 'bottom-0'}`} />
       )}
+      <div
+        aria-hidden="true"
+        title="Drag to reorder"
+        draggable={!busy}
+        onDragStart={onDragStart}
+        onDragEnd={onDragEnd}
+        className={`flex w-7 shrink-0 self-stretch items-center justify-center border-r border-gray-200 bg-gray-50 text-gray-500 transition-colors ${!busy ? 'cursor-grab hover:bg-gray-100 hover:text-gray-700 active:cursor-grabbing' : ''}`}
+      >
+        <svg aria-hidden="true" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+          <circle cx="6" cy="4" r="1.3" /><circle cx="6" cy="10" r="1.3" /><circle cx="6" cy="16" r="1.3" />
+          <circle cx="14" cy="4" r="1.3" /><circle cx="14" cy="10" r="1.3" /><circle cx="14" cy="16" r="1.3" />
+        </svg>
+      </div>
+      <div className="min-w-0 flex-1 p-4">
       <div className="flex flex-wrap items-start gap-4">
-        <div className="flex w-12 shrink-0 flex-col items-center gap-1">
-          <div
-            aria-hidden="true"
-            title="Drag to reorder"
-            draggable={!busy}
-            onDragStart={onDragStart}
-            onDragEnd={onDragEnd}
-            className={`flex min-h-[44px] w-full flex-col items-center justify-center gap-1 rounded-lg hover:bg-gray-100 ${!busy ? 'cursor-grab active:cursor-grabbing' : ''}`}
-          >
-            <svg aria-hidden="true" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4 text-gray-500">
-              <circle cx="6" cy="4" r="1.3" /><circle cx="6" cy="10" r="1.3" /><circle cx="6" cy="16" r="1.3" />
-              <circle cx="14" cy="4" r="1.3" /><circle cx="14" cy="10" r="1.3" /><circle cx="14" cy="16" r="1.3" />
-            </svg>
-            <span className="text-sm font-semibold tabular-nums text-gray-900">{index + 1}</span>
-          </div>
-          <select
-            aria-label={`Position of #${requestNumber}`}
-            value={index + 1}
-            disabled={busy}
-            onChange={(event) => onPositionChange(index, Number(event.target.value))}
-            className="w-full rounded-lg border border-gray-300 bg-white px-1 py-1 text-center text-sm focus:border-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-300"
-          >
-            {Array.from({ length: count }, (_, position) => position + 1).map((position) => (
-              <option key={position} value={position}>{position}</option>
-            ))}
-          </select>
-        </div>
         <div className="min-w-[13rem] flex-1">
-          <p className="font-semibold text-gray-900">#{requestNumber}</p>
+          <p className="font-semibold text-gray-900"><span className="sr-only">Position </span><span className="tabular-nums text-gray-500">{index + 1}</span><span aria-hidden="true" className="text-gray-400"> · </span>#{requestNumber}</p>
           <p className="mt-1 text-sm text-gray-700">{proposal?.title || slot.wmkf_Request?.akoya_title || 'Request details are not available.'}</p>
           {slot.briefing?.url ? (
             <a href={slot.briefing.url} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-xs font-semibold text-blue-800 underline">Open briefing</a>
@@ -153,11 +140,35 @@ function SlotRow({ slot, proposal, leadOptions, sessions, sessionId, busy, savin
           label={`More actions for #${requestNumber}`}
           disabled={busy}
           items={[
+            { key: 'position', label: 'Change position…', onSelect: () => setPanel('position') },
             { key: 'move', label: 'Move to another session…', onSelect: () => setPanel('move') },
             { key: 'remove', label: 'Remove…', onSelect: () => setPanel('remove') },
           ]}
         />
       </div>
+      {panel === 'position' && (
+        <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-3">
+          <label className="text-sm font-medium text-gray-700">
+            Position in this session
+            <select
+              aria-label={`Position of #${requestNumber}`}
+              value={index + 1}
+              disabled={busy}
+              autoFocus
+              onChange={(event) => { onPositionChange(index, Number(event.target.value)); setPanel(null); }}
+              className={`${FIELD_CLASS} w-24`}
+            >
+              {Array.from({ length: count }, (_, position) => position + 1).map((position) => (
+                <option key={position} value={position}>{position}</option>
+              ))}
+            </select>
+          </label>
+          <p className="mt-1 text-xs text-gray-500">Choosing a position saves the new order immediately.</p>
+          <div className="mt-3 flex gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={() => setPanel(null)}>Cancel</Button>
+          </div>
+        </div>
+      )}
       {panel === 'move' && (
         <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-3">
           <label className="text-sm font-medium text-gray-700">
@@ -182,6 +193,7 @@ function SlotRow({ slot, proposal, leadOptions, sessions, sessionId, busy, savin
           </div>
         </div>
       )}
+      </div>
     </li>
   );
 }
@@ -241,7 +253,7 @@ export function ProposalOrderList({ slots, proposalById, leadOptions, sessions, 
 
   return (
     <>
-      <p className="sr-only">Drag a proposal by its handle, or change its position number, to reorder. Changing the position saves immediately.</p>
+      <p className="sr-only">Drag a proposal by the handle on its left edge, or open its More actions menu and choose Change position, to reorder. Choosing a position saves immediately.</p>
       <ol aria-label="Proposal order" className="mt-4 space-y-3" onKeyDown={handleKeyDown}>
         {slots.map((slot, index) => (
           <SlotRow
