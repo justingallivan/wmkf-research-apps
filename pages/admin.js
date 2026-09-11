@@ -3150,18 +3150,22 @@ function WorkflowsWorkspace({ view }) {
           <AdminEditorPanel
             id="workflow-policies"
             title="Workflow policies"
-            description="Publish immutable versions of reviewer and grantee policy text."
+            description="Reviewer and grantee policy text. Published versions are immutable: every edit publishes a new version and moves the active pointer."
             scope="Workflow-specific"
             dataverseFields={POLICY_SECTION_DATAVERSE_FIELDS}
+            collapsible
+            defaultOpen={false}
           >
             <PoliciesSection />
           </AdminEditorPanel>
           <AdminEditorPanel
             id="workflow-email-defaults"
             title="Workflow email defaults"
-            description="Edit shared default copy for reviewer, grantee, and internal email workflows, plus staff display labels."
+            description="Default copy for reviewer, grantee, and internal emails, plus staff display labels. A blank invitation default blocks sends until it is filled in."
             scope="Workflow-specific"
             dataverseFields={EMAIL_DEFAULTS_DATAVERSE_FIELDS}
+            collapsible
+            defaultOpen={false}
           >
             <EmailDefaultsSection />
           </AdminEditorPanel>
