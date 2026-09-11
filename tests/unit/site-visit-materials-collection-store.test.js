@@ -28,7 +28,9 @@ test('acquire uses one conditional UPDATE and records a five-minute lease for th
   expect(sql).toHaveBeenCalledTimes(1);
   expect(queryText()).toContain('UPDATE site_visit_material_collections');
   expect(queryText()).toContain('jsonb_set');
-  expect(queryText()).toContain("jsonb_build_object('token', ?, 'expiresAt', ?)");
+  // jsonb_build_object is variadic "any": bound parameters there must be cast
+  // or Postgres rejects the statement at plan time (production 2026-09-10).
+  expect(queryText()).toContain("jsonb_build_object('token', ?::text, 'expiresAt', ?::double precision)");
   expect(queryText()).toContain('IS NULL OR CASE');
   expect(queryText()).toContain('< EXTRACT(EPOCH FROM NOW()) * 1000');
   expect(sql.mock.calls[0]).toContain(now + SLOT_LEASE_TTL_MS);
