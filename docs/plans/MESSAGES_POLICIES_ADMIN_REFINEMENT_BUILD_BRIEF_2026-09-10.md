@@ -268,3 +268,65 @@ tree):
 `docs/API_ROUTE_SECURITY_MATRIX.md` untouched (no route change); grepped
 `docs/agent-wiki/topics/security-auth.md` for existing admin email-defaults/policies UI
 coverage — none found, so no wiki edit made.
+
+### Round 2 — Opus review fixes (PASS WITH FIXES, nothing above P2)
+
+**Commit**: `b95a6cac` ("Build E: apply Opus review fixes (P2 and below)"), on top of
+`34b2919b`. All seven required items applied:
+
+1. `PoliciesSection.js` slot container: dropped `overflow-hidden` [VERIFIED via diff —
+   the class list on the slot wrapper `<div>` is now `rounded-lg border border-gray-200`].
+2. Added a failed-PUT test to `email-defaults-section.test.js` (mocks one PUT response as
+   `ok:false`, asserts the field stays dirty, the error text renders, the card's "Unsaved
+   changes" chip is still present, and the field's Save button is still enabled — i.e.
+   `savedValues` did not advance). Applied the "hoist `setSavedValues` above the `ok`
+   check" mutant in `saveKey`, ran `npx jest tests/unit/email-defaults-section -t "a
+   failed PUT"`, watched it fail (`Unsaved changes` no longer found), then reverted;
+   full suite green again after revert [VERIFIED].
+3. `PoliciesSection.js`'s top-level load-error color: `text-red-600` → `text-red-700`.
+4. `OutcomeBanner.js`'s Dismiss now renders through `Button variant="outline" size="sm"`
+   instead of a raw `<button className="text-xs underline">`.
+5. `PublishForm`'s non-confirm wrapper (`PoliciesSection.js`, the form's outer `<div>`)
+   lost `rounded-lg border border-gray-200`, keeping `p-4`; the confirm-panel wrapper a
+   few lines above it (still a distinct, separately-scoped `<div>`) was left bordered —
+   the review named only the form wrapper, and the confirm panel is a one-shot summary
+   step, not a fourth nested card sitting permanently inside the slot body.
+6. `EmailDefaultsSection.js`'s Blank chip now reads `savedValues[entry.key]`, not
+   `drafts[entry.key]` (a new `savedValue` local, computed alongside the existing
+   `value`). Checked the existing blank-state tests (`shows blank and unavailable states
+   distinctly…`, `a blank non-blocking key gets the milder amber Blank chip`) — neither
+   types into a field before asserting the chip, so both still pass unmodified
+   [VERIFIED — full suite green, no test edits needed for this item beyond the new
+   failed-PUT test].
+7. (a) `AdminWorkspaceNavigation.js`'s collapsible `AdminEditorPanel` branch now wraps
+   `{children}` in `<section aria-labelledby={`${id}-title`}>`, matching the
+   non-collapsible branch. (b) `PoliciesSection.js`'s `invariantError` branch now
+   renders `slot.displayName || slot.code` as an `<h3>` (same fallback and tag healthy
+   slots use, was a plain `<div>` on `slot.code` only). (c) `EmailDefaultsSection.js`:
+   `renderField` takes a second `savingCard` argument (the boolean
+   `savingAllCard === card.emailKey`, already-tracked state — no new state variable
+   needed per Rule 8) and folds it into the per-field Save button's `disabled`
+   expression, so every Save button in a card is disabled for the full duration of that
+   card's "Save all changes" loop, not just the one currently mid-PUT.
+
+**Not required, recorded per the coordinator's note**: the field-mapping popover
+rendering inside `<summary>` is brief-directed (Item 1); the "Use “label”" button
+nested inside the wrapping `<label>` in `PublishForm`'s label-taken warning is
+pre-existing structure from before this build (a `<label>` wrapping a `<Button>` is
+valid HTML — buttons are phrasing content — so no fix was made or needed here).
+
+**Verification (sequential, re-run after Round 2)**:
+- `npx jest tests/unit/policies-section-label-guidance tests/unit/email-defaults-section tests/unit/admin-workspace-navigation tests/unit/editable-text-defaults-catalog tests/unit/seed-email-defaults tests/unit/email-defaults-routes`
+  → 6 suites, **70 tests, 0 failures** [VERIFIED, run 2026-09-10] (69 → 70: the one new
+  failed-PUT test).
+- `npm run check:types` → clean [VERIFIED].
+- `npm run check:status-enum-parity` → "OK — 8 producer↔consumer invariant(s) in sync."
+  [VERIFIED]; `check:status-enum-parity:self-test` → "OK — 17/17" [VERIFIED].
+- `npm run check:fact-consistency` → OK, 736 files scanned, no drift [VERIFIED];
+  `check:fact-consistency:self-test` → OK [VERIFIED].
+- `npx eslint` on the six named files → **0 errors**, 11 warnings, all the same
+  pre-existing `react-hooks/set-state-in-effect` advisories already present in
+  `pages/admin.js` before this build (verified the warning count and file locations are
+  unchanged from the Round 1 run) [VERIFIED].
+- `node .../impeccable/scripts/detect.mjs --json <the four files>` → `[]`, **exit 0**
+  [VERIFIED].
