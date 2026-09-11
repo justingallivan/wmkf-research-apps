@@ -304,11 +304,14 @@ describe('ProposalOrderList drag-and-drop', () => {
     expect(onReorder).not.toHaveBeenCalled();
   });
 
-  test('no arrow buttons remain; the position select lets keyboard users move any distance in one save', () => {
+  test('no arrow buttons remain; the position select lets keyboard users move any distance in one save', async () => {
     const onReorder = jest.fn();
     const { container } = renderList(onReorder);
     expect(screen.queryByRole('button', { name: /move.*(up|down)/i })).not.toBeInTheDocument();
 
+    expect(screen.queryByRole('combobox', { name: 'Position of #slot-a' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole('button', { name: /More actions for #/ })[0]);
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Change position…' }));
     const select = screen.getByRole('combobox', { name: 'Position of #slot-a' });
     expect(select.querySelectorAll('option')).toHaveLength(3);
     fireEvent.change(select, { target: { value: '3' } });
@@ -318,13 +321,21 @@ describe('ProposalOrderList drag-and-drop', () => {
     expect(nextSlots.map((slot) => slot.wmkf_deliberationslotid)).toEqual(['slot-b', 'slot-c', 'slot-a']);
     expect(movedSlot.wmkf_deliberationslotid).toBe('slot-a');
     expect(targetIndex).toBe(2);
+    expect(screen.queryByRole('combobox', { name: 'Position of #slot-a' })).not.toBeInTheDocument();
   });
 
-  test('the overflow menu exposes exactly Move to another session and Remove', async () => {
+  test('the overflow menu exposes exactly Change position, Move to another session, and Remove', async () => {
     renderList(jest.fn());
     fireEvent.click(screen.getAllByRole('button', { name: /More actions for #/ })[0]);
     const menuItems = await screen.findAllByRole('menuitem');
-    expect(menuItems.map((item) => item.textContent)).toEqual(['Move to another session…', 'Remove…']);
+    expect(menuItems.map((item) => item.textContent)).toEqual(['Change position…', 'Move to another session…', 'Remove…']);
+  });
+
+  test('each row shows its position once, in the header beside the request number', () => {
+    const { container } = renderList(jest.fn());
+    const headers = [...container.querySelectorAll('li p.font-semibold')].map((node) => node.textContent);
+    expect(headers).toEqual(['Position 1 · #slot-a', 'Position 2 · #slot-b', 'Position 3 · #slot-c']);
+    expect(container.querySelectorAll('select')).toHaveLength(3); // Lead PD only; no position select in the gutter
   });
 
   test('Remove is not called until the inline confirm panel\'s Remove is clicked (menu select alone must not remove)', async () => {
@@ -387,15 +398,17 @@ describe('ProposalOrderList drag-and-drop', () => {
     comboboxes.forEach((select) => expect(select).toBeDisabled());
   });
 
-  test('the drag handle spans the full number column and the Move button stays disabled while busy', () => {
+  test('the drag handle is a full-height rail on the row\'s left edge and is inert while busy', () => {
     const { container } = renderList(jest.fn(), { busy: true, savingSlotId: 'slot-b' });
     const handle = container.querySelector('[draggable]');
-    expect(handle.getAttribute('class')).toContain('w-full');
+    expect(handle.getAttribute('class')).toContain('self-stretch');
+    expect(handle.parentElement.tagName).toBe('LI');
+    expect(handle.parentElement.getAttribute('class')).toContain('flex');
     expect(handle.getAttribute('draggable')).toBe('false');
     expect(handle.getAttribute('class')).not.toContain('cursor-grab');
   });
 
-  test('the position select carries the request number even when proposal is undefined, falling back to the expanded request', () => {
+  test('the position select carries the request number even when proposal is undefined, falling back to the expanded request', async () => {
     const slots = [{
       wmkf_deliberationslotid: 'slot-x',
       _etag: 'W/"1"',
@@ -418,6 +431,8 @@ describe('ProposalOrderList drag-and-drop', () => {
         onReorder={jest.fn()}
       />,
     );
+    fireEvent.click(screen.getByRole('button', { name: 'More actions for #1009001' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Change position…' }));
     expect(screen.getByRole('combobox', { name: 'Position of #1009001' })).toBeInTheDocument();
   });
 
