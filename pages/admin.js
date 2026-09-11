@@ -3159,7 +3159,7 @@ function WorkflowsWorkspace({ view }) {
           <AdminEditorPanel
             id="workflow-email-defaults"
             title="Workflow email defaults"
-            description="Edit shared default copy for reviewer and grantee email workflows."
+            description="Edit shared default copy for reviewer, grantee, and internal email workflows, plus staff display labels."
             scope="Workflow-specific"
             dataverseFields={EMAIL_DEFAULTS_DATAVERSE_FIELDS}
           >

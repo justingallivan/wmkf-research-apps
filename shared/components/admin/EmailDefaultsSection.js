@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import DataverseFieldInfoButton, { appSystemSettingField } from './DataverseFieldInfoButton';
+import { EDITABLE_TEXT_GROUPS } from '../../config/editableTextDefaults';
 
 const TONE = {
   saved: 'text-green-700',
@@ -70,85 +71,139 @@ export default function EmailDefaultsSection() {
   if (error && !defaults) return <p className="text-sm text-red-700">{error}</p>;
   if (!defaults || defaults.length === 0) return <p className="text-sm text-gray-500">No editable email defaults found.</p>;
 
+  const renderField = (entry) => {
+    const value = drafts[entry.key] ?? '';
+    const status = statusByKey[entry.key];
+    const Input = entry.multiline ? 'textarea' : 'input';
+    const dataverseFields = [
+      appSystemSettingField(entry.label, entry.key, 'The admin editor reads and writes this setting value.'),
+    ];
+    return (
+      <div key={entry.key} className="space-y-3">
+        <div>
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <h5 className="text-sm font-semibold text-gray-900">{entry.label}</h5>
+              {entry.unavailable ? (
+                <span className="text-xs px-2 py-0.5 rounded bg-red-50 text-red-700 border border-red-200">
+                  unavailable — settings read failed
+                </span>
+              ) : value === '' ? (
+                <span className="text-xs px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">
+                  blank — not configured
+                </span>
+              ) : null}
+            </div>
+            <DataverseFieldInfoButton items={dataverseFields} />
+          </div>
+          <p className="text-xs text-gray-500 mt-1">{entry.description}</p>
+          {entry.placeholders?.length ? (
+            <p className="text-xs text-gray-500 mt-1">
+              Placeholders: {entry.placeholders.map((token) => <code key={token}>{token}</code>).reduce((acc, node, i) => (
+                i === 0 ? [node] : [...acc, ', ', node]
+              ), [])}
+            </p>
+          ) : null}
+        </div>
+
+        <Input
+          type={entry.multiline ? undefined : 'text'}
+          value={value}
+          onChange={(e) => updateDraft(entry.key, e.target.value)}
+          rows={entry.multiline ? 12 : undefined}
+          disabled={entry.unavailable}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono disabled:bg-gray-50 disabled:text-gray-500"
+          aria-label={entry.label}
+        />
+
+        <div className="flex items-center justify-between gap-3">
+          <span className={`text-xs ${status ? TONE[status.tone] : TONE.muted}`}>
+            {status?.text || (entry.unavailable ? 'Reload before editing this setting.' : `${value.length} chars`)}
+          </span>
+          <div className="flex items-center gap-2">
+            {entry.unavailable && (
+              <button
+                type="button"
+                onClick={load}
+                className="px-3 py-1.5 text-sm rounded border border-gray-300 text-gray-700 hover:bg-gray-50"
+              >
+                Reload
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => save(entry)}
+              disabled={savingKey === entry.key || entry.unavailable}
+              className="px-3 py-1.5 text-sm rounded bg-blue-700 text-white disabled:opacity-50"
+            >
+              {savingKey === entry.key ? 'Saving...' : 'Save'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Group by EDITABLE_TEXT_GROUPS order, then by emailKey (one card per emailKey) in catalog order.
+  const buildCards = (groupEntries) => {
+    const cards = [];
+    const cardIndexByEmailKey = {};
+    groupEntries.forEach((entry) => {
+      if (!(entry.emailKey in cardIndexByEmailKey)) {
+        cardIndexByEmailKey[entry.emailKey] = cards.length;
+        cards.push({ emailKey: entry.emailKey, emailLabel: entry.emailLabel, entries: [] });
+      }
+      cards[cardIndexByEmailKey[entry.emailKey]].entries.push(entry);
+    });
+    return cards;
+  };
+
+  const knownGroupIds = new Set(EDITABLE_TEXT_GROUPS.map((group) => group.id));
+  const groups = EDITABLE_TEXT_GROUPS
+    .map((group) => ({ ...group, cards: buildCards(defaults.filter((entry) => entry.group === group.id)) }))
+    .filter((group) => group.cards.length > 0);
+
+  // Entries whose `group` doesn't match a known EDITABLE_TEXT_GROUPS id (e.g. a typo in the
+  // catalog) still render, in a trailing "Other" group, instead of silently disappearing.
+  const otherEntries = defaults.filter((entry) => !knownGroupIds.has(entry.group));
+  if (otherEntries.length > 0) {
+    groups.push({
+      id: 'other',
+      title: 'Other',
+      description: 'Entries with an unrecognized group — check EDITABLE_TEXT_DEFAULTS for a missing or misspelled `group`.',
+      cards: buildCards(otherEntries),
+    });
+  }
+
   return (
-    <div className="space-y-5">
+    <div className="space-y-8">
       <p className="text-sm text-gray-600">
         Edit default copy used by email workflows. Blank values are allowed, but blank
         invitation defaults block sends until an admin configures them.
       </p>
       {error && <p className="text-sm text-red-700">{error}</p>}
-      {defaults.map((entry) => {
-        const value = drafts[entry.key] ?? '';
-        const status = statusByKey[entry.key];
-        const Input = entry.multiline ? 'textarea' : 'input';
-        const dataverseFields = [
-          appSystemSettingField(entry.label, entry.key, 'The admin editor reads and writes this setting value.'),
-        ];
-        return (
-          <section key={entry.key} className="border border-gray-200 rounded-lg p-4 space-y-3">
-            <div>
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="text-sm font-semibold text-gray-900">{entry.label}</h3>
-                  {entry.unavailable ? (
-                    <span className="text-xs px-2 py-0.5 rounded bg-red-50 text-red-700 border border-red-200">
-                      unavailable — settings read failed
-                    </span>
-                  ) : value === '' ? (
-                    <span className="text-xs px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">
-                      blank — not configured
-                    </span>
-                  ) : null}
+      {groups.map((group) => (
+        <div key={group.id} className="space-y-4">
+          <div>
+            <h3 className="text-base font-semibold text-gray-900">{group.title}</h3>
+            <p className="text-xs text-gray-500 mt-0.5">{group.description}</p>
+          </div>
+          <div className="space-y-4">
+            {group.cards.map((card) => (
+              <section key={card.emailKey} className="border border-gray-200 rounded-lg p-4 space-y-4">
+                <h4 className="text-sm font-bold text-gray-900">{card.emailLabel}</h4>
+                <div className="space-y-4 divide-y divide-gray-100">
+                  {card.entries.map((entry) => (
+                    <div key={entry.key} className="pt-4 first:pt-0">
+                      {renderField(entry)}
+                    </div>
+                  ))}
                 </div>
-                <DataverseFieldInfoButton items={dataverseFields} />
-              </div>
-              <p className="text-xs text-gray-500 mt-1">{entry.description}</p>
-              {entry.placeholders?.length ? (
-                <p className="text-xs text-gray-500 mt-1">
-                  Placeholders: {entry.placeholders.map((token) => <code key={token}>{token}</code>).reduce((acc, node, i) => (
-                    i === 0 ? [node] : [...acc, ', ', node]
-                  ), [])}
-                </p>
-              ) : null}
-            </div>
-
-            <Input
-              type={entry.multiline ? undefined : 'text'}
-              value={value}
-              onChange={(e) => updateDraft(entry.key, e.target.value)}
-              rows={entry.multiline ? 12 : undefined}
-              disabled={entry.unavailable}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono disabled:bg-gray-50 disabled:text-gray-500"
-              aria-label={entry.label}
-            />
-
-            <div className="flex items-center justify-between gap-3">
-              <span className={`text-xs ${status ? TONE[status.tone] : TONE.muted}`}>
-                {status?.text || (entry.unavailable ? 'Reload before editing this setting.' : `${value.length} chars`)}
-              </span>
-              <div className="flex items-center gap-2">
-                {entry.unavailable && (
-                  <button
-                    type="button"
-                    onClick={load}
-                    className="px-3 py-1.5 text-sm rounded border border-gray-300 text-gray-700 hover:bg-gray-50"
-                  >
-                    Reload
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => save(entry)}
-                  disabled={savingKey === entry.key || entry.unavailable}
-                  className="px-3 py-1.5 text-sm rounded bg-blue-700 text-white disabled:opacity-50"
-                >
-                  {savingKey === entry.key ? 'Saving...' : 'Save'}
-                </button>
-              </div>
-            </div>
-          </section>
-        );
-      })}
+              </section>
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
