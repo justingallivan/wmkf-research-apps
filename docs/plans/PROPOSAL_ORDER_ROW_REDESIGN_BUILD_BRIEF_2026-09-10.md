@@ -100,5 +100,64 @@ node /Users/gallivan/.claude/skills/impeccable/scripts/detect.mjs --json shared/
 
 ## Handoff (builder fills in)
 
-[VERIFIED via …]/[ASSUMED] labels, commits, test counts, gates, detector exit, the mutant you
-ran, discrepancies, anything open.
+**Branch/commits**: `claude/proposal-order-redesign`, on top of `790a1021`.
+- `a17b5185` — row redesign (`SessionEditor.js` + test file).
+- `de3fa7bc` — D27 doc bullet reconciliation.
+
+**Discrepancies from the brief** (all resolved by following the source per CLAUDE.md rule 1):
+- The cited critique snapshot `.impeccable/critique/2026-09-11T04-19-30Z__ts-meeting-tracker-sessioneditor-js-proposal-order.md`
+  does not exist in the repo (`.impeccable/critique/` is tracked with 6 unrelated files; none
+  match). `[VERIFIED via ls .impeccable/critique/]`. Proceeded on the brief's own row spec, which
+  is self-sufficient, since it and the owner quote in the frontmatter fully describe the intent.
+- Item 1 ("the whole left gutter is the drag handle… `draggable={!busy}`") conflicts with item 2
+  ("`draggable` lives on a sibling wrapper containing only the grip and number") and item 6
+  (`aria-hidden="true"` on the handle wrapper — hiding the whole gutter would hide the position
+  select from assistive tech) and with the existing test "the drag handle covers only the grip
+  and index, not the row, arrows, or form controls" (asserts no `select` inside the draggable
+  node). Followed items 2/6 and the existing test: `draggable`/`aria-hidden`/`title`/`min-h-[44px]`/
+  `rounded-lg hover:bg-gray-100`/conditional `cursor-grab active:cursor-grabbing` are on the inner
+  grip+number wrapper; the position `<select>` is its sibling in the `w-12` column, not a child, so
+  no `onMouseDown` stopPropagation guard was needed ("if needed" in item 2 — it wasn't).
+- The "visually hidden hint… the first time the list renders" (item 1) is contradictory (hidden +
+  first-render-only don't compose observably). Implemented as an always-rendered `sr-only` `<p>`
+  above the `<ol>`; noted here rather than guessing at session/localStorage state to fake
+  "first time," which the brief doesn't ask for and would widen scope.
+- `shiftSlot`/`onShift` were grepped repo-wide before removal: only referenced inside
+  `SessionEditor.js` itself and passed as an unused `jest.fn()` in the old test file. `[VERIFIED
+  via grep -rn "shiftSlot|onShift" shared tests pages]`. Removed both, per brief item 2 and rule 2
+  (verify destructive carryover).
+- `docs/plans/AGENDA_SLOT_DRAG_REORDER_BUILD_BRIEF_2026-09-10.md` (the original drag-and-drop
+  brief, referenced by the D27 bullet) still describes arrow buttons; left as a historical build
+  record per the brief's "No other docs" instruction and durable-docs' allowance for classified
+  historical records, rather than edited.
+
+**Tests**: `npx jest tests/unit/meeting-tracker` — 17 suites / 131 tests passed. Added: position
+select renders 1..n options and calls `onReorder` with the full reordered array + moved slot;
+no arrow buttons remain; overflow menu exposes exactly "Move to another session…" and "Remove…";
+Remove is not called until the inline confirm's Remove is clicked; Escape during a drag clears
+dragging state and a subsequent drop no-ops; busy disables the handle (`[title="Drag to
+reorder"]` selector, since `.cursor-grab` is conditional now); savingSlotId drives per-row
+opacity-70 vs. plain-disabled on other rows; position-select `aria-label` falls back to
+`slot.wmkf_Request?.akoya_requestnum` when `proposal` is undefined. Kept `moveSlot` unit tests
+and the reorder fetch payload test unchanged. Added a `Button` mock to the existing `Layout`
+jest mock (it previously exported only `default`/`PageHeader`; `SlotRow` now renders `Button`).
+
+**Gates** (run sequentially, per rule 4):
+- `npx jest tests/unit/meeting-tracker` — pass, 131/131.
+- `npm run check:types` — pass, no tsc errors.
+- `npm run check:status-enum-parity` — pass, "8 producer↔consumer invariant(s) in sync."
+- `npm run check:status-enum-parity:self-test` — pass, 17/17.
+- `npx eslint shared/components/meeting-tracker/SessionEditor.js tests/unit/meeting-tracker-pages.test.js` — clean, no output.
+- `node ~/.claude/skills/impeccable/scripts/detect.mjs --json shared/components/meeting-tracker/SessionEditor.js` — `[]`, exit 0 (baseline before this build was already `[]`/exit 0, so this build did not introduce or need to fix any detector findings — `[VERIFIED via` running the detector before editing`]`).
+
+**Mutant run**: changed the "Remove…" menu item's `onSelect` from `() => setPanel('remove')` to
+`() => onRemove(slot)` (bypassing the confirm panel). `npx jest tests/unit/meeting-tracker` then
+failed exactly the new discriminating test ("Remove is not called until the inline confirm
+panel's Remove is clicked…") with 130/131 passing. Reverted from `/tmp/SessionEditor.js.bak`
+(a plain file copy, not a stash) and re-ran the suite: 131/131 passing again.
+
+**Forbidden list**: not touched — no changes to any API route, `slot-service.js`,
+`SessionAgendaPanel.js`, `OverflowMenu.js` (read-only, reused its `items` API as-is), `Layout.js`
+(read-only), or `package.json`; no new dependencies.
+
+**Open items**: none from the brief's scope. Not pushed, no PR opened, per instructions.
