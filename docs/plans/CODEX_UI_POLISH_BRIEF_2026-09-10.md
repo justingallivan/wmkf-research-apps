@@ -22,7 +22,9 @@ confirm the file is not in the "surfaces reserved for Claude" list below. If it 
 and say so instead of editing.
 
 1. Change the deliberation briefing schedule label from “Site visit” to “Research Presentation.”
-2. _(owner fills in)_
+2. Polish the deliberation briefing content: use the Research Presentation naming throughout,
+   show the lead PI and lead PD, expose only the DOCX staff brief under a friendly label, expose
+   only PDF review files in a new tab, and rename “Deliberation session” to “Pre-discussion.”
 3. _(owner fills in)_
 
 ## Surfaces reserved for Claude today — do not edit
@@ -86,3 +88,29 @@ anything left open. Label state claims `[VERIFIED via …]` or `[ASSUMED]`.
   self-test, `check:fact-consistency` plus its self-test, and `check:docs-catalog` passed;
   ESLint passed for both changed JavaScript files.
 - **Open:** None.
+
+### Task 2 — Deliberation briefing content polish
+
+- **Files changed:** `lib/services/deliberation-briefing/briefing-page-service.js`,
+  `pages/api/external/briefing/[token]/document.js`, `pages/external/briefing/[token].js`,
+  `tests/unit/deliberation-briefing-page-service.test.js`,
+  `tests/unit/external-briefing-page.test.js`, and
+  `tests/unit/external-briefing-routes.test.js`.
+- **What changed:** [VERIFIED via source and regression tests] The page now shows lead PI and
+  lead PD beneath the applicant; labels the schedule “Pre-discussion” and “Research
+  Presentation”; labels the materials section “Research presentation materials”; labels the
+  former Writeup section “Staff brief and notes”; exposes only its pinned DOCX under the link
+  text `Staff Brief {Request#}.docx`; and exposes only PDF review files, inline in a new tab.
+  The retired staff-brief PDF member returns 404 before a file read. DOCX review files retain
+  their structured answers but have no file link; a PDF-named review must also carry a PDF byte
+  signature.
+- **Commit:** `b8fa01ac` — `Polish deliberation briefing content`.
+- **Tests:** [VERIFIED via Jest] Three focused suites — 31 passed, 3 suites passed.
+- **Gates:** [VERIFIED via commands] `npm run check:types`; ESLint across all six implementation
+  and test files; `check:api-routes` plus its self-test; and `check:route-service-boundary` plus
+  its self-test passed. The API-route gate retained three pre-existing external-materials guard
+  warnings and covered 208 routes.
+- **Open:** [VERIFIED via owner browser report] Visual review is incomplete. The localhost
+  attempt ended at “This link is malformed,” so it did not verify the rendered changes. Claude
+  must review this branch in a working preview with a valid briefing link, or review it in
+  production after deliberate integration and deployment.
