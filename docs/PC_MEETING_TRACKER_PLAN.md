@@ -219,7 +219,7 @@ the session date and time (`scheduledstart`, `wmkf_ianatimezone`), the Zoom link
 (`wmkf_meetinglink`), and the attendee list as the default recipients. **[BUILT 2026-09-10,
 S503]** Prepare snapshots the request's latest slot (`sessionSnapshotOf` in
 `lib/services/pre-site-visit/distribution-service.js`, persisted as `session_snapshot`,
-migration 040) into the email body ("Deliberation session: …" with an https-only Join link, or
+migration 040) into the email body ("Pre-discussion: …" since 2026-09-11, owner decision to match the briefing page; was "Deliberation session: …"; with an https-only Join link, or
 "not yet scheduled"), the draft hash, and the preview hash; send rechecks the live slot and
 refuses with `distribution_session_stale` if it moved, appeared, or was removed. The status
 payload carries `sessionAttendees`, which the tab hands the composer as the default To once a

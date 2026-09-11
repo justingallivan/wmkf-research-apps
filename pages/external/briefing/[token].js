@@ -104,13 +104,23 @@ export default function BriefingPage() {
 
   return (
     <Shell title={data.title}>
-      {data.proposalTitle && <p className="mt-1 text-lg text-gray-700">{data.proposalTitle}</p>}
+      {(data.projectLeader || data.programDirector) && (
+        <div className="mt-2 space-y-0.5 text-sm text-gray-500">
+          {data.projectLeader && <p><span className="font-medium">PI:</span> {data.projectLeader}</p>}
+          {data.programDirector && <p><span className="font-medium">PD:</span> {data.programDirector}</p>}
+        </div>
+      )}
+      {data.proposalTitle && (
+        <p className={`${data.projectLeader || data.programDirector ? 'mt-3' : 'mt-1'} text-lg text-gray-700`}>
+          {data.proposalTitle}
+        </p>
+      )}
 
       <section className="mt-6 rounded-xl border border-gray-200 bg-white p-5">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">Schedule</h2>
         <dl className="mt-2 space-y-1 text-sm text-gray-800">
           <div>
-            <dt className="inline font-medium">Deliberation session:</dt>{' '}
+            <dt className="inline font-medium">Pre-discussion:</dt>{' '}
             <dd className="inline">
               {sessionLine || 'Not yet scheduled'}
               {meetingLink && (
@@ -122,36 +132,26 @@ export default function BriefingPage() {
             </dd>
           </div>
           <div>
-            <dt className="inline font-medium">Site visit:</dt>{' '}
+            <dt className="inline font-medium">Research Presentation:</dt>{' '}
             <dd className="inline">{visitLine || 'Not yet scheduled'}</dd>
           </div>
         </dl>
       </section>
 
       <section className="mt-6 rounded-xl border border-gray-200 bg-white p-5">
-        <h2 className="text-base font-semibold text-gray-900">Writeup</h2>
-        {data.writeup?.docx || data.writeup?.pdf ? (
+        <h2 className="text-base font-semibold text-gray-900">Staff brief and notes</h2>
+        {data.writeup?.docx ? (
           <ul className="mt-2 space-y-1 text-sm">
-            {data.writeup.pdf && (
-              <li>
-                <a className="text-blue-800 underline" href={documentHref(data.writeup.pdf.member)} target="_blank" rel="noreferrer noopener">
-                  {data.writeup.pdf.filename}
-                </a>
-                {formatSize(data.writeup.pdf.size) && <span className="text-gray-500"> · {formatSize(data.writeup.pdf.size)}</span>}
-              </li>
-            )}
-            {data.writeup.docx && (
-              <li>
-                <a className="text-blue-800 underline" href={documentHref(data.writeup.docx.member)}>
-                  {data.writeup.docx.filename}
-                </a>
-                {formatSize(data.writeup.docx.size) && <span className="text-gray-500"> · {formatSize(data.writeup.docx.size)}</span>}
-              </li>
-            )}
+            <li>
+              <a className="text-blue-800 underline" href={documentHref(data.writeup.docx.member)}>
+                {data.writeup.docx.displayName}
+              </a>
+              {formatSize(data.writeup.docx.size) && <span className="text-gray-500"> · {formatSize(data.writeup.docx.size)}</span>}
+            </li>
             {data.writeup.sharedAt && <li className="text-xs text-gray-500">Shared {formatDate(data.writeup.sharedAt)}. Later staff edits are not reflected here.</li>}
           </ul>
         ) : (
-          <p className="mt-2 text-sm text-gray-600">The writeup will appear here once staff share it.</p>
+          <p className="mt-2 text-sm text-gray-600">The staff brief will appear here once staff share it.</p>
         )}
       </section>
 
@@ -170,7 +170,7 @@ export default function BriefingPage() {
       </section>
 
       <section className="mt-6 rounded-xl border border-gray-200 bg-white p-5">
-        <h2 className="text-base font-semibold text-gray-900">Site visit materials</h2>
+        <h2 className="text-base font-semibold text-gray-900">Research presentation materials</h2>
         {data.materials?.length ? (
           <ul className="mt-2 space-y-1 text-sm">
             {data.materials.map((material) => (
@@ -188,7 +188,7 @@ export default function BriefingPage() {
             ))}
           </ul>
         ) : (
-          <p className="mt-2 text-sm text-gray-600">No site visit materials yet. Slides, recordings, and transcripts appear here as staff add them.</p>
+          <p className="mt-2 text-sm text-gray-600">No research presentation materials yet. Slides, recordings, and transcripts appear here as staff add them.</p>
         )}
       </section>
 

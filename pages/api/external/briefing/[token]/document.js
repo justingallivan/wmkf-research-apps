@@ -3,10 +3,11 @@
  *
  * Streams one briefing member to a verified link holder
  * (docs/DELIBERATION_BRIEFING_PAGE_PLAN.md §2.3, §3). `member` is one of
- * `writeup-docx`, `writeup-pdf`, `proposal`, or `review:<suggestionId>`; the
- * server resolves it against the request's own model and 404s anything else
- * before any Graph call. The client never supplies a path, drive, item, or
- * filename. Ordering: method → rate-limit → verify → record outcome → resolve.
+ * `writeup-docx`, `proposal`, `review:<suggestionId>`, or
+ * `material:<requestdocumentId>`; the server resolves it against the request's
+ * own model and 404s anything else before any Graph call. The client never
+ * supplies a path, drive, item, or filename. Ordering: method → rate-limit →
+ * verify → record outcome → resolve.
  */
 import { verifyBriefingToken } from '../../../../../lib/external/verify-briefing-token';
 import { checkRateLimit, recordTokenOutcome } from '../../../../../lib/external/rate-limit';

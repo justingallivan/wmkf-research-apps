@@ -3,10 +3,10 @@ title: Deliberation Briefing Page — Read-Only Materials for Board Members and 
 domain: workbench
 kind: plan
 status: active
-summary: "Share mints one expiring, revocable link per proposal serving the shared writeup, completed reviews with authors, the proposal, and site visit materials."
+summary: "An expiring link serves the staff brief, completed reviews, proposal, and research presentation materials."
 canonical: false
 cataloged: 2026-09-09
-last_verified: 2026-09-09
+last_verified: 2026-09-10
 owner: product-engineering
 related:
   - docs/PC_MEETING_TRACKER_PLAN.md
@@ -17,7 +17,7 @@ related:
 
 # Deliberation Briefing Page
 
-Board members and external consultants attend deliberation sessions and site visits but have no Dataverse login. Today the Share email carries the writeup as an attachment plus SharePoint links that require login [VERIFIED via lib/services/pre-site-visit/distribution-service.js:198-210, `distributionBodyHtml`]. This plan adds one read-only page per proposal, reached by a link the Share email carries, that serves the materials the session needs.
+Board members and external consultants attend pre-discussions and research presentations but have no Dataverse login. The Share email carries one read-only page link per proposal so recipients can reach the materials the session needs without a Dataverse login. Internal services and Dataverse records retain their existing pre-site/site-visit names; the external page uses the owner-selected labels in D21–D23.
 
 The first deliberation session is the week of 2026-09-14. This is the deliberation-session subset of the Site Visit Materials briefing room planned on `origin/codex/applicant-additional-materials` [PLANNED there, not built]; applicant additional materials are out of scope here and get a slot later.
 
@@ -33,6 +33,9 @@ The first deliberation session is the week of 2026-09-14. This is the deliberati
 | D18 (2026-09-10, S503) | The raw token appearing in Vercel request-log paths (§3) is accepted as-is; no path redaction. Log access is already privileged and every link is revocable by reissue. |
 | D19 (2026-09-10, S503) | The page is the single carrier: it also serves the request's site visit materials (applicant slides, other applicant materials, recording, transcript, transcript summary), and the deliberation email carries only the briefing link. The composer's "Include links to materials" checkboxes are gone and prepare refuses a selection (`distribution_material_links_retired`); rows already sent keep their links. Files over 50 MB are listed but not served until streaming exists. |
 | D20 (2026-09-10, S503) | The page's proposal is `Reviewer Materials/Proposal_{Request#}.pdf` (what reviewers received), titled "Proposal", not the AI Materials narrative. |
+| D21 (2026-09-10) | The schedule labels are “Pre-discussion” and “Research Presentation”; the materials section is “Research presentation materials.” These are presentation labels only; internal site-visit service and field names are unchanged. |
+| D22 (2026-09-10) | Under the applicant name, show the lead PI and lead PD when present. The “Staff brief and notes” section exposes only the pinned DOCX, with link text `Staff Brief {Request#}.docx`; do not display the raw stored filename or the companion PDF. |
+| D23 (2026-09-10) | Reviews continue to show their structured answers. Expose an uploaded review file only when it is a PDF, and open that PDF inline in a new tab; do not expose a DOCX review file. |
 
 Carried from the Codex Site Visit Materials plan §2 and §9, unchanged: one shared link per proposal, read-only, no copies of files, exact pinned writeup version, external labels are institution-led and carry no request number, unknown members fail closed, no folder listing.
 
@@ -42,16 +45,16 @@ Carried from the Codex Site Visit Materials plan §2 and §9, unchanged: one sha
 
 | Section | Source | Pinned or live |
 |---|---|---|
-| Session line | Meeting Tracker reader `getDeliberationScheduleByRequests` (PC_MEETING_TRACKER_PLAN §5.4) via the seam `lib/services/deliberation-briefing/session-reader.js` [VERIFIED wired 2026-09-10, S503; fail-open in both layers]; while `MEETING_TRACKER_SCHEMA_READY` is not `on` or nothing is scheduled the page reads "Session not yet scheduled" | live |
-| Site visit line | active `wmkf_sitevisit` for the request via `findActiveByRequest` [VERIFIED via lib/dataverse/adapters/site-visit.js:46-58], reduced to one row by `selectActiveSiteVisit` (earliest scheduled end wins, ties on activity id) [ASSUMED rule, owner may adjust] so expiry and display never depend on Dataverse's ordering | live |
-| Writeup (Word and PDF) | the frozen snapshot request documents pinned on the most recent distribution attempt for this request that Dynamics accepted for transport (`state = 'sent'`; send intent alone is not publication, since a pre-transport recheck can still fail after it is stamped): `pre_site_distribution_attempts.docx_drive_id/docx_item_id` and `pdf_*` [VERIFIED via lib/db/migrations/034_pre_site_distribution_attempts.sql:29-48]. Snapshot rows are separate retained request documents created by `ensureSnapshot` and re-validated for stability by `validateReadySnapshot` [VERIFIED via lib/services/pre-site-visit/distribution-service.js:612, 702-760], so the item id is the exact version and `GraphService.downloadFile(driveId, itemId)` serves it without a version-content endpoint. | pinned to the last Share |
-| Reviews | `wmkf_appreviewersuggestion` rows for the request read through `findByRequest(requestId, { selectedOnly: true, requireComplete: true })` and kept when `wmkf_reviewreceivedat` is set, the same signal the Reviews tab uses [VERIFIED via lib/services/review-manager/reviewers-service.js:200-206, 386-391]; answers via `fetchAnswersBySuggestion` [VERIFIED via lib/services/review-answers.js:18-21]; the file via the existing `downloadReview` reader [VERIFIED via lib/services/review-manager/download-review-service.js:1-60] after the server proves the suggestion is in this request's set | live (a late review appears without re-sharing) |
+| Pre-discussion line | Meeting Tracker reader `getDeliberationScheduleByRequests` (PC_MEETING_TRACKER_PLAN §5.4) via the seam `lib/services/deliberation-briefing/session-reader.js` [VERIFIED wired 2026-09-10, S503; fail-open in both layers]; while `MEETING_TRACKER_SCHEMA_READY` is not `on` or nothing is scheduled the page reads “Not yet scheduled” | live |
+| Research Presentation line | active `wmkf_sitevisit` for the request via `findActiveByRequest` [VERIFIED via lib/dataverse/adapters/site-visit.js:46-58], reduced to one row by `selectActiveSiteVisit` (earliest scheduled end wins, ties on activity id) [ASSUMED rule, owner may adjust] so expiry and display never depend on Dataverse's ordering | live |
+| Staff brief and notes (DOCX only) | the frozen DOCX snapshot pinned on the most recent distribution attempt for this request that Dynamics accepted for transport (`state = 'sent'`; send intent alone is not publication): `pre_site_distribution_attempts.docx_drive_id/docx_item_id`. The companion PDF remains in the distribution ledger but is not a briefing-page member [VERIFIED via `briefing-page-service.js` `writeupFromAttempt` and `resolveBriefingMember`]. The link text is `Staff Brief {Request#}.docx`; the download preserves the stored filename. Snapshot rows are separate retained request documents created by `ensureSnapshot` and re-validated for stability by `validateReadySnapshot`, so the item id is the exact version and `GraphService.downloadFile(driveId, itemId)` serves it without a version-content endpoint. | pinned to the last Share |
+| Reviews | `wmkf_appreviewersuggestion` rows for the request read through `findByRequest(requestId, { selectedOnly: true, requireComplete: true })` and kept when `wmkf_reviewreceivedat` is set, the same signal the Reviews tab uses [VERIFIED via lib/services/review-manager/reviewers-service.js:200-206, 386-391]; answers via `fetchAnswersBySuggestion` [VERIFIED via lib/services/review-answers.js:18-21]. A file member is emitted only when the stored filename ends in `.pdf`; download re-proves membership, the `.pdf` filename, and a `%PDF-` byte signature before returning it inline [VERIFIED via `briefing-page-service.js` `loadReviews` and `resolveBriefingMember`]. | live (a late review appears without re-sharing) |
 | Proposal | `Reviewer Materials/Proposal_{Request#}.pdf`, the exact file external reviewers received, located through `getRequestSharePointBuckets` + `getFileMetadataByPath` across the request's active and archive buckets with the reviewer portal's filename rule (`expectedReviewerProposalFilename`) [VERIFIED via lib/services/deliberation-briefing/briefing-page-service.js `locateProposal`]. **Owner 2026-09-10 (D20):** replaced the AI Materials `ProposalNarrative_{Request#}.pdf`; the section is titled "Proposal". | live |
-| Site visit materials | `wmkf_requestdocument` rows for the request of artifact type Applicant Slides, Other Applicant Materials, Recording, Transcript, or Transcript Summary that are Ready, not Superseded, carry SharePoint drive/item ids, and are not distribution snapshots (`loadMaterialRows` in `briefing-page-service.js`; the writeup row is excluded on purpose, it is served from the ledger above). Member `material:<requestdocumentid>`, membership re-proved on every download. Files over `MAX_MATERIAL_BYTES` (50 MB) list with size and no link. [BUILT 2026-09-10, D19] | live |
+| Research presentation materials | `wmkf_requestdocument` rows for the request of artifact type Applicant Slides, Other Applicant Materials, Recording, Transcript, or Transcript Summary that are Ready, not Superseded, carry SharePoint drive/item ids, and are not distribution snapshots (`loadMaterialRows` in `briefing-page-service.js`; the staff brief row is excluded on purpose, it is served from the ledger above). Member `material:<requestdocumentid>`, membership re-proved on every download. Files over `MAX_MATERIAL_BYTES` (50 MB) list with size and no link. [BUILT 2026-09-10, D19] | live |
 
-Before any Share has been sent, the writeup section reads "The writeup will appear here once staff share it." Everything else still renders.
+Before any Share has been sent, the staff-brief section reads “The staff brief will appear here once staff share it.” Everything else still renders.
 
-Departure from the Codex plan §8 (stored manifest): no manifest row. The link row holds identity, expiry, and revocation only. Writeup identity comes from the distribution ledger, which already pins exact snapshots per send. Reviews are resolved live because D14 replaced staff selection with "all completed."
+Departure from the Codex plan §8 (stored manifest): no manifest row. The link row holds identity, expiry, and revocation only. Staff-brief identity comes from the distribution ledger, which already pins exact snapshots per send. Reviews are resolved live because D14 replaced staff selection with “all completed.”
 
 ### 2.2 Link lifecycle
 
@@ -66,8 +69,8 @@ Departure from the Codex plan §8 (stored manifest): no manifest row. The link r
 
 | Route | Method | Auth | Behavior |
 |---|---|---|---|
-| `/api/external/briefing/[token]/context` | GET | External token (`verifyBriefingToken`) | method → rate limit → verify → record outcome → shape, the order the grantee context route documents [VERIFIED via pages/api/external/grantee/[token]/context.js:14-15]. Returns the page model: title, session, site visit, expiry, writeup descriptors, reviews with answers, proposal descriptor. No SharePoint or Dataverse URLs. |
-| `/api/external/briefing/[token]/document` | GET | External token | `?member=` one of `writeup-docx`, `writeup-pdf`, `proposal`, `review:<suggestionId>`, `material:<requestdocumentid>` (D19). The server resolves the member against the same model; anything else is 404 before any Graph call. Streams bytes with `nosniff`, `private, no-store`, and a bounded `Content-Disposition`, as the reviewer proposal route does [VERIFIED via pages/api/external/review/[token]/proposal.js:81-91, 128-133]. PDF inline, everything else attachment. |
+| `/api/external/briefing/[token]/context` | GET | External token (`verifyBriefingToken`) | method → rate limit → verify → record outcome → shape, the order the grantee context route documents [VERIFIED via pages/api/external/grantee/[token]/context.js:14-15]. Returns the page model: applicant, lead PI, lead PD, proposal title, schedule, expiry, DOCX staff-brief descriptor, reviews with answers and optional PDF descriptor, proposal descriptor, and materials. No SharePoint or Dataverse URLs. |
+| `/api/external/briefing/[token]/document` | GET | External token | `?member=` one of `writeup-docx`, `proposal`, `review:<suggestionId>`, or `material:<requestdocumentid>` (D19, D22, D23). The retired `writeup-pdf` member returns 404 before any Graph call. The server resolves every member against the request's model; anything else is 404. Streams bytes with `nosniff`, `private, no-store`, and a bounded `Content-Disposition`. PDFs are inline; the DOCX staff brief is an attachment. |
 | `/api/workbench/pre-site-visit/briefing-link` | GET, POST | `requireAppAccess('reviewers')`, the guard the sibling distribution routes use [VERIFIED via pages/api/workbench/pre-site-visit/distribution/prepare.js:33] | GET returns the live link summary for a request or null. POST `{ requestId, action: 'ensure' \| 'reissue' }` mints or reissues; actor from session. |
 
 Page: `pages/external/briefing/[token].js`, modeled on the grantee shell [VERIFIED via pages/external/grantee/[token].js:28-65, 126-132].
@@ -83,20 +86,20 @@ Inside `PreSiteDistributionPanel` (rendered by the tab once the writeup is share
 - The external routes never accept a request id, file path, drive id, or filename from the client. `member` is an enum plus a GUID that must appear in the server-resolved review set.
 - Response headers on `document`: `X-Content-Type-Options: nosniff`, `Cache-Control: private, no-store`, `Content-Disposition` with a sanitized filename.
 - Raw token never logged by application code or persisted outside `token_ciphertext`: the attempt row stores a body placeholder, and the URL is unsealed only inside the staff route and the distribution send path when the Dynamics activity is built. Because the token is a URL path segment, Vercel's request logs do record it for every page, `context`, and `document` call [VERIFIED via production logs 2026-09-10]; accepted as-is under D18.
-- Writeup downloads hash the bytes and refuse (`snapshot_mismatch`) when they differ from the byte hash the distribution ledger pinned.
+- Staff-brief downloads hash the bytes and refuse (`snapshot_mismatch`) when they differ from the byte hash the distribution ledger pinned. Review downloads require both a `.pdf` filename and a `%PDF-` byte signature.
 - The page renders a session meeting link only when it parses as an absolute `https:` URL.
 - Every `document` member re-resolves the request in Dataverse before any retained pointer or Graph read; a request that no longer resolves is 404 for downloads as well as for `context`.
 - Codex adversarial reviews (2026-09-09, gpt-5.6-sol): two passes, twelve findings, all addressed on the same branch; record in `outputs/deliberation-briefing-codex-adversarial-review-2026-09-09.md`.
-- Reviewer names and affiliations are shown (D13). The page carries no request number in its title (Codex plan §9 external-label rule); the writeup filenames may include it because staff already send them by email.
+- Reviewer names and affiliations are shown (D13). The page carries no request number in its title (Codex plan §9 external-label rule); the friendly staff-brief link includes the request number, while its raw stored filename is not rendered.
 
 ## 4. Tests
 
 - Verifier: valid → ok; after revoke → `revoked`; digest mismatch with valid signature → `invalid_claim`; grantee-audience token → `invalid_claim`; expired row → `expired`; `sub` ≠ row request → `invalid_claim`.
 - Mint: ensure twice → same row id; reissue → old row revoked with `superseded_by`, new row live.
 - Distribution: preview hash changes when the link id changes; send after reissue fails with `distribution_briefing_stale`; flag off → prepare refuses with `distribution_briefing_required`; an unbound preview (prepared before the link was mandatory) is refused at send unless its send intent is already durable.
-- `document`: unknown member → 404 with no Graph call; `review:<guid>` outside the request's set → 404; headers asserted.
-- `context`: flag off → 404; reviews limited to received rows; no URL-shaped fields in the response.
-- Page: fail-closed states render; writeup placeholder before any send.
+- `document`: unknown or retired `writeup-pdf` member → 404 with no Graph call; `review:<guid>` outside the request's set or naming a DOCX → 404; a PDF-named review with non-PDF bytes → 404; headers asserted.
+- `context`: flag off → 404; reviews limited to received rows; review file descriptors limited to PDFs; lead PI/PD annotations returned; no URL-shaped fields in the response.
+- Page: fail-closed states render; staff-brief placeholder before any send; PI/PD omit independently when missing; schedule and materials use the D21 labels.
 
 ## 5. Durable surfaces touched
 

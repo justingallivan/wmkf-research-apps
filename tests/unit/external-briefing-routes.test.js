@@ -92,16 +92,16 @@ describe('document', () => {
   test('streams a resolved member with nosniff, no-store, and a bounded filename', async () => {
     verifyBriefingToken.mockResolvedValueOnce({ ok: true, requestId: 'req', link: {} });
     resolveBriefingMember.mockResolvedValueOnce({
-      buffer: Buffer.from('%PDF-'), mimeType: 'application/pdf', filename: 'Pre"Site\r\n.pdf', size: 5, inline: true,
+      buffer: Buffer.from('docx'), mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', filename: 'Pre"Site\r\n.docx', size: 4, inline: false,
     });
     const res = mockRes();
-    await documentHandler({ method: 'GET', query: { token: 't', member: 'writeup-pdf' } }, res);
+    await documentHandler({ method: 'GET', query: { token: 't', member: 'writeup-docx' } }, res);
     expect(res.statusCode).toBe(200);
     expect(res.headers['X-Content-Type-Options']).toBe('nosniff');
     expect(res.headers['Cache-Control']).toBe('private, no-store');
-    expect(res.headers['Content-Disposition']).toBe('inline; filename="PreSite.pdf"');
-    expect(res.headers['Content-Length']).toBe(5);
-    expect(resolveBriefingMember).toHaveBeenCalledWith({ requestId: 'req', member: 'writeup-pdf' });
+    expect(res.headers['Content-Disposition']).toBe('attachment; filename="PreSite.docx"');
+    expect(res.headers['Content-Length']).toBe(4);
+    expect(resolveBriefingMember).toHaveBeenCalledWith({ requestId: 'req', member: 'writeup-docx' });
   });
 
   test('a 404 from member resolution passes through as the service body', async () => {
