@@ -227,6 +227,24 @@ test('dirty chip appears on edit, clears after save, and Save is disabled while 
   expect(within(field).getByRole('button', { name: 'Save' })).toBeDisabled();
 });
 
+test('a failed PUT keeps the field dirty, shows the error, and does not advance savedValues', async () => {
+  render(<EmailDefaultsSection />);
+  await waitFor(() => expect(screen.getByLabelText('Deliberation agenda subject')).toBeInTheDocument());
+  const field = screen.getByLabelText('Deliberation agenda subject').closest('.space-y-2');
+  const card = screen.getByText('Deliberation agenda').closest('section');
+
+  fireEvent.change(screen.getByLabelText('Deliberation agenda subject'), { target: { value: 'Edited' } });
+
+  global.fetch.mockImplementationOnce(async () => ({ ok: false, json: async () => ({ error: 'Save failed.' }) }));
+  fireEvent.click(within(field).getByRole('button', { name: 'Save' }));
+
+  await waitFor(() => expect(within(field).getByText('Save failed.')).toBeInTheDocument());
+  // savedValues did not advance: the field is still dirty, so the card chip stays and Save stays enabled.
+  expect(within(card).getByText('Unsaved changes')).toBeInTheDocument();
+  expect(within(field).getByRole('button', { name: 'Save' })).toBeEnabled();
+  expect(screen.getByLabelText('Deliberation agenda subject')).toHaveValue('Edited');
+});
+
 test('the Saved timestamp persists across a re-render and clears on the next edit', async () => {
   const { rerender } = render(<EmailDefaultsSection />);
   await waitFor(() => expect(screen.getByLabelText('Deliberation agenda subject')).toBeInTheDocument());

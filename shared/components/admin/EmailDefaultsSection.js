@@ -142,8 +142,9 @@ export default function EmailDefaultsSection() {
   if (error && !defaults) return <p className="text-sm text-red-700">{error}</p>;
   if (!defaults || defaults.length === 0) return <p className="text-sm text-gray-500">No editable email defaults found.</p>;
 
-  const renderField = (entry) => {
+  const renderField = (entry, savingCard) => {
     const value = drafts[entry.key] ?? '';
+    const savedValue = savedValues[entry.key] ?? '';
     const status = statusByKey[entry.key];
     const dirty = drafts[entry.key] !== savedValues[entry.key];
     const Input = entry.multiline ? 'textarea' : 'input';
@@ -180,7 +181,7 @@ export default function EmailDefaultsSection() {
         <div className="flex flex-wrap items-center gap-2">
           {entry.unavailable ? (
             <StatusChip tone="red">Unavailable</StatusChip>
-          ) : value === '' ? (
+          ) : savedValue === '' ? (
             <StatusChip tone={BLOCKING_BLANK_KEYS.has(entry.key) ? 'red' : 'amber'}>Blank</StatusChip>
           ) : null}
         </div>
@@ -200,7 +201,7 @@ export default function EmailDefaultsSection() {
               variant="primary"
               size="sm"
               onClick={() => saveKey(entry.key)}
-              disabled={savingKey === entry.key || entry.unavailable || !dirty}
+              disabled={savingKey === entry.key || entry.unavailable || !dirty || Boolean(savingCard)}
             >
               {savingKey === entry.key ? 'Saving…' : 'Save'}
             </Button>
@@ -283,7 +284,7 @@ export default function EmailDefaultsSection() {
                   <div className="space-y-4 divide-y divide-gray-100">
                     {card.entries.map((entry) => (
                       <div key={entry.key} className="pt-4 first:pt-0">
-                        {renderField(entry)}
+                        {renderField(entry, savingAllCard === card.emailKey)}
                       </div>
                     ))}
                   </div>

@@ -240,7 +240,7 @@ export function AdminEditorPanel({
               )
             }
           >
-            {children}
+            <section aria-labelledby={`${id}-title`}>{children}</section>
           </DisclosureRow>
         </Card>
       </div>

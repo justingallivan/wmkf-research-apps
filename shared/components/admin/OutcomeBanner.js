@@ -4,6 +4,8 @@
  * PoliciesSection's original inline banner (Build E, Item 4) so both
  * sections read the same way.
  */
+import { Button } from '../Layout';
+
 const TONE_CLASSES = {
   green: 'bg-green-50 text-green-800 border-green-200',
   amber: 'bg-amber-50 text-amber-800 border-amber-200',
@@ -20,9 +22,9 @@ export default function OutcomeBanner({ tone = 'gray', text, children, onDismiss
           {children}
         </div>
         {onDismiss && (
-          <button type="button" onClick={onDismiss} className="text-xs underline">
+          <Button type="button" variant="outline" size="sm" onClick={onDismiss}>
             Dismiss
-          </button>
+          </Button>
         )}
       </div>
     </div>

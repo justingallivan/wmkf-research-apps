@@ -93,7 +93,7 @@ export default function PoliciesSection() {
   }
 
   if (error && !state) {
-    return <div className="text-red-600 text-sm">{error}</div>;
+    return <div className="text-red-700 text-sm">{error}</div>;
   }
 
   if (!state || !state.slots || state.slots.length === 0) {
@@ -194,7 +194,7 @@ function SlotPanel({ slot, onPublishedReload }) {
     return (
       <div className="rounded-lg border border-gray-200 p-4">
         <div className="flex items-start justify-between gap-3">
-          <div className="text-sm font-semibold text-gray-900">{slot.code}</div>
+          <h3 className="text-sm font-semibold text-gray-900">{slot.displayName || slot.code}</h3>
           <DataverseFieldInfoButton items={dataverseFields} />
         </div>
         <div className="mt-2">
@@ -211,7 +211,7 @@ function SlotPanel({ slot, onPublishedReload }) {
   const inactiveVersions = (slot.versions || []).filter(v => !v.isActive);
 
   return (
-    <div className="rounded-lg border border-gray-200 overflow-hidden">
+    <div className="rounded-lg border border-gray-200">
       <DisclosureRow
         id={`policy-slot-${slot.code}`}
         groupName="slot"
@@ -425,7 +425,7 @@ function PublishForm({ slot, onSuccess, onOutcome }) {
   }
 
   return (
-    <div className="space-y-3 rounded-lg border border-gray-200 p-4">
+    <div className="space-y-3 p-4">
       <div className="grid grid-cols-2 gap-3">
         <label className="block text-sm font-medium text-gray-700">
           Version label
