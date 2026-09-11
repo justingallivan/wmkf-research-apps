@@ -233,8 +233,8 @@ test('thrown scanner failures are sanitized into unavailable or misconfigured er
   const misconfigured = deps({ scanBytes: async () => { throw Object.assign(new Error('bad key secret'), { serviceName: 'cloudmersive', status: 401, isTransient: false }); } });
   await expect(finalizeMaterialUpload(finalizeArgs(), misconfigured)).rejects.toMatchObject({ code: 'scan_misconfigured', httpStatus: 500 });
   expect(log.mock.calls).toEqual([
-    ['[site-visit-materials] malware scan failed', { serviceName: 'cloudmersive', status: 503, isTransient: true }],
-    ['[site-visit-materials] malware scan failed', { serviceName: 'cloudmersive', status: 401, isTransient: false }],
+    ['[site-visit-materials] malware scan failed', { serviceName: 'cloudmersive', status: 503, isTransient: true, causeKind: null }],
+    ['[site-visit-materials] malware scan failed', { serviceName: 'cloudmersive', status: 401, isTransient: false, causeKind: null }],
   ]);
   log.mockRestore();
 });
