@@ -176,20 +176,57 @@ export function AdminEditorPanel({
   description,
   scope,
   dataverseFields = [],
+  collapsible = false,
+  defaultOpen = true,
   children,
 }) {
+  const heading = (
+    <div className="min-w-0">
+      <div className="flex flex-wrap items-center gap-2">
+        <h2 id={`${id}-title`} className="text-lg font-semibold text-gray-950">{title}</h2>
+        <SettingScopeBadge>{scope}</SettingScopeBadge>
+      </div>
+      {description && <p className="mt-1 max-w-3xl text-sm leading-6 text-gray-600">{description}</p>}
+    </div>
+  );
+
+  if (collapsible) {
+    // Progressive disclosure for editor pages that stack several long panels: the
+    // header row is the toggle, the field-mapping button moves into the body so a
+    // click on it never toggles the panel.
+    return (
+      <div id={id} className="scroll-mt-6">
+        <Card hover={false} padding="p-0">
+          <details className="group" open={defaultOpen || undefined}>
+            <summary
+              aria-labelledby={`${id}-title`}
+              className="flex cursor-pointer list-none flex-col gap-3 px-5 py-5 [&::-webkit-details-marker]:hidden sm:flex-row sm:items-start sm:justify-between sm:px-6"
+            >
+              {heading}
+              <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" className="mt-1 h-5 w-5 shrink-0 text-gray-400 transition-transform group-open:rotate-180">
+                <path strokeLinecap="round" strokeLinejoin="round" d="m5 7.5 5 5 5-5" />
+              </svg>
+            </summary>
+            <section aria-labelledby={`${id}-title`} className="border-t border-gray-200 px-5 py-5 sm:px-6">
+              {dataverseFields.length > 0 && (
+                <div className="mb-4 flex justify-end">
+                  <DataverseFieldInfoButton items={dataverseFields} />
+                </div>
+              )}
+              {children}
+            </section>
+          </details>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div id={id} className="scroll-mt-6">
       <Card hover={false} padding="p-0">
         <section aria-labelledby={`${id}-title`}>
           <div className="flex flex-col gap-3 border-b border-gray-200 px-5 py-5 sm:flex-row sm:items-start sm:justify-between sm:px-6">
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <h2 id={`${id}-title`} className="text-lg font-semibold text-gray-950">{title}</h2>
-                <SettingScopeBadge>{scope}</SettingScopeBadge>
-              </div>
-              {description && <p className="mt-1 max-w-3xl text-sm leading-6 text-gray-600">{description}</p>}
-            </div>
+            {heading}
             <DataverseFieldInfoButton items={dataverseFields} />
           </div>
           <div className="px-5 py-5 sm:px-6">{children}</div>

@@ -101,16 +101,11 @@ export default function PoliciesSection() {
   }
 
   return (
-    <>
-      <p className="text-xs text-gray-500 mb-4">
-        Publish a new version of a policy. Version rows are immutable once referenced — edits always create a new version and flip the active pointer.
-      </p>
-      <div className="space-y-6">
-        {state.slots.map(slot => (
-          <SlotPanel key={slot.code} slot={slot} onPublishedReload={fetchState} />
-        ))}
-      </div>
-    </>
+    <div className="space-y-6">
+      {state.slots.map(slot => (
+        <SlotPanel key={slot.code} slot={slot} onPublishedReload={fetchState} />
+      ))}
+    </div>
   );
 }
 
