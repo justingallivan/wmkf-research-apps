@@ -18,6 +18,15 @@ export const SITE_VISIT_MATERIALS_CHECKLIST = Object.freeze([
   Object.freeze({ key: 'participant_bios', label: 'Participant bios (PDF or Word)', required: true }),
 ]);
 
+/**
+ * Owner decision (2026-09-11, S507): the optional "Anything else" upload is
+ * hidden from applicants for now. The slot's storage path, folder, and
+ * artifact type stay built; flipping this to `true` restores the uploader on
+ * the contributor page and reopens the mint/finalize gates. Never a checklist
+ * item, so the reminder cron's required-item check is unaffected either way.
+ */
+export const SITE_VISIT_MATERIALS_OTHER_UPLOADS_ENABLED = false;
+
 export const SITE_VISIT_MATERIALS_STATUS = Object.freeze({ OPEN: 'open', READY: 'ready', CLOSED: 'closed' });
 
 /** M4: flat request-relative SharePoint folders. */

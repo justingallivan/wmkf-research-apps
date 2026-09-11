@@ -168,8 +168,16 @@ test('finalize refuses: waived slot, oversize, wrong bytes, infected scan, no ac
   for (const x of [d, tiny, infected, unknown, errored, noBucket]) { expect(x.uploadFile).not.toHaveBeenCalled(); expect(x.createDocument).not.toHaveBeenCalled(); }
 });
 
-test('other slot keeps a sanitized original name under Site Visit - Other and never supersedes', async () => {
+test('other slot is refused while hidden from applicants (default), before any lease, upload, or registry write', async () => {
   const d = deps({ findDocumentsByRequest: async () => ({ records: [ROW_PDF] }) });
+  await expect(finalizeMaterialUpload(finalizeArgs('other', { filename: 'map.pdf', buffer: PDF }), d)).rejects.toMatchObject({ code: 'slot_not_open', httpStatus: 400 });
+  expect(d.acquireSlotLease).not.toHaveBeenCalled();
+  expect(d.uploadFile).not.toHaveBeenCalled();
+  expect(d.createDocument).not.toHaveBeenCalled();
+});
+
+test('other slot (when re-enabled) keeps a sanitized original name under Site Visit - Other and never supersedes', async () => {
+  const d = deps({ findDocumentsByRequest: async () => ({ records: [ROW_PDF] }), otherUploadsEnabled: () => true });
   const result = await finalizeMaterialUpload(finalizeArgs('other', { filename: 'Lab  Tour <Map>.pdf', buffer: PDF }), d);
   expect(d.uploadFile.mock.calls[0][1]).toBe('Neural dust_ABC123/Site Visit - Other');
   expect(result.filename.startsWith('1003222 Site Visit - ')).toBe(true);
