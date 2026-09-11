@@ -176,19 +176,27 @@ export default function EmailDefaultsSection() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-3">
       <p className="text-sm text-gray-600">
         Edit default copy used by email workflows. Blank values are allowed, but blank
         invitation defaults block sends until an admin configures them.
       </p>
       {error && <p className="text-sm text-red-700">{error}</p>}
       {groups.map((group) => (
-        <div key={group.id} className="space-y-4">
-          <div>
-            <h3 className="text-base font-semibold text-gray-900">{group.title}</h3>
-            <p className="text-xs text-gray-500 mt-0.5">{group.description}</p>
-          </div>
-          <div className="space-y-4">
+        // Collapsed by default: an admin editing one reviewer email should not have to
+        // scroll past every grantee and internal template (owner, 2026-09-10).
+        <details key={group.id} className="group rounded-lg border border-gray-200 bg-white">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden">
+            <span>
+              <h3 className="text-base font-semibold text-gray-900">{group.title}</h3>
+              <p className="text-xs text-gray-500 mt-0.5">{group.description}</p>
+            </span>
+            <span className="flex shrink-0 items-center gap-2 text-xs text-gray-500">
+              {group.cards.length} {group.cards.length === 1 ? 'card' : 'cards'}
+              <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4 transition-transform group-open:rotate-180"><path strokeLinecap="round" strokeLinejoin="round" d="m5 7.5 5 5 5-5" /></svg>
+            </span>
+          </summary>
+          <div className="space-y-4 border-t border-gray-100 p-4">
             {group.cards.map((card) => (
               <section key={card.emailKey} className="border border-gray-200 rounded-lg p-4 space-y-4">
                 <h4 className="text-sm font-bold text-gray-900">{card.emailLabel}</h4>
@@ -202,7 +210,7 @@ export default function EmailDefaultsSection() {
               </section>
             ))}
           </div>
-        </div>
+        </details>
       ))}
     </div>
   );
