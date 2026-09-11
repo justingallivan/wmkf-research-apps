@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { Card } from '../Layout';
 import DataverseFieldInfoButton from './DataverseFieldInfoButton';
+import DisclosureRow from './DisclosureRow';
 
 export const ADMIN_WORKSPACES = Object.freeze([
   {
@@ -170,6 +171,28 @@ export function SettingScopeBadge({ children }) {
   );
 }
 
+// One status chip for the whole Messages & policies page (Build E, Item 4):
+// rounded-full, pale semantic background, Title-case text supplied by the
+// caller. Tone is a caller decision — this component only carries the paint.
+const STATUS_CHIP_TONE_CLASSES = {
+  green: 'bg-green-50 text-green-700 border-green-200',
+  amber: 'bg-amber-50 text-amber-800 border-amber-200',
+  red: 'bg-red-50 text-red-700 border-red-200',
+  gray: 'bg-gray-100 text-gray-600 border-gray-200',
+};
+
+export function StatusChip({ tone = 'gray', children }) {
+  return (
+    <span
+      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${
+        STATUS_CHIP_TONE_CLASSES[tone] || STATUS_CHIP_TONE_CLASSES.gray
+      }`}
+    >
+      {children}
+    </span>
+  );
+}
+
 export function AdminEditorPanel({
   id,
   title,
@@ -192,30 +215,33 @@ export function AdminEditorPanel({
 
   if (collapsible) {
     // Progressive disclosure for editor pages that stack several long panels: the
-    // header row is the toggle, the field-mapping button moves into the body so a
-    // click on it never toggles the panel.
+    // header row is the toggle, and the field-mapping button sits inline at the
+    // right of the summary row behind a click guard so it never toggles the panel.
     return (
       <div id={id} className="scroll-mt-6">
         <Card hover={false} padding="p-0">
-          <details className="group" open={defaultOpen || undefined}>
-            <summary
-              aria-labelledby={`${id}-title`}
-              className="flex cursor-pointer list-none flex-col gap-3 px-5 py-5 [&::-webkit-details-marker]:hidden sm:flex-row sm:items-start sm:justify-between sm:px-6"
-            >
-              {heading}
-              <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" className="mt-1 h-5 w-5 shrink-0 text-gray-400 transition-transform group-open:rotate-180">
-                <path strokeLinecap="round" strokeLinejoin="round" d="m5 7.5 5 5 5-5" />
-              </svg>
-            </summary>
-            <section aria-labelledby={`${id}-title`} className="border-t border-gray-200 px-5 py-5 sm:px-6">
-              {dataverseFields.length > 0 && (
-                <div className="mb-4 flex justify-end">
+          <DisclosureRow
+            id={id}
+            groupName="panel"
+            headingLevel={2}
+            defaultOpen={defaultOpen}
+            title={title}
+            titleAdornment={<SettingScopeBadge>{scope}</SettingScopeBadge>}
+            description={description}
+            actions={
+              dataverseFields.length > 0 && (
+                // Capture phase: the popover's own content only calls
+                // stopPropagation, which doesn't cancel <summary>'s native
+                // toggle default action — only preventDefault() does, and it
+                // must run before that content can stop the event reaching us.
+                <span onClickCapture={(e) => e.preventDefault()}>
                   <DataverseFieldInfoButton items={dataverseFields} />
-                </div>
-              )}
-              {children}
-            </section>
-          </details>
+                </span>
+              )
+            }
+          >
+            {children}
+          </DisclosureRow>
         </Card>
       </div>
     );
