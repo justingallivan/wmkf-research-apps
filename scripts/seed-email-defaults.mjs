@@ -29,6 +29,10 @@ import {
   REVIEWER_EXTENSION_SEED_BODY,
 } from '../lib/seed/email-defaults/reviewer-actions.js';
 import {
+  DELIBERATION_AGENDA_SEED_SUBJECT,
+  DELIBERATION_AGENDA_SEED_BODY,
+} from '../lib/seed/email-defaults/deliberation-agenda.js';
+import {
   REVIEWER_INVITATION_SEED_SUBJECT,
   REVIEWER_INVITATION_SEED_BODY,
   REVIEWER_INVITATION_SEED_BUTTON_LABEL,
@@ -67,6 +71,8 @@ export const EMAIL_DEFAULT_SEED_TEXT = Object.freeze({
   'email.reviewer_thankyou.body': REVIEWER_THANKYOU_SEED_BODY,
   'email.grantee_reminder.subject': GRANTEE_REMINDER_SEED_SUBJECT,
   'email.grantee_reminder.body': GRANTEE_REMINDER_SEED_BODY,
+  'email.deliberation_agenda.subject': DELIBERATION_AGENDA_SEED_SUBJECT,
+  'email.deliberation_agenda.body': DELIBERATION_AGENDA_SEED_BODY,
 });
 
 export function loadEnvLocal() {

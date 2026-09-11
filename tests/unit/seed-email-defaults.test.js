@@ -71,6 +71,28 @@ describe('seed-email-defaults script core', () => {
       EMAIL_DEFAULT_SEED_TEXT['email.grantee_invite.body'],
       null,
     );
+    expect(setSetting).toHaveBeenCalledWith(
+      'email.deliberation_agenda.subject',
+      EMAIL_DEFAULT_SEED_TEXT['email.deliberation_agenda.subject'],
+      null,
+    );
+    expect(setSetting).toHaveBeenCalledWith(
+      'email.deliberation_agenda.body',
+      EMAIL_DEFAULT_SEED_TEXT['email.deliberation_agenda.body'],
+      null,
+    );
+  });
+
+  test('registers seed text for both deliberation agenda keys', async () => {
+    const { EMAIL_DEFAULT_SEED_TEXT } = await import('../../scripts/seed-email-defaults.mjs');
+    const {
+      DELIBERATION_AGENDA_SEED_SUBJECT,
+      DELIBERATION_AGENDA_SEED_BODY,
+    } = await import('../../lib/seed/email-defaults/deliberation-agenda.js');
+
+    expect(EMAIL_DEFAULT_SEED_TEXT['email.deliberation_agenda.subject']).toBe(DELIBERATION_AGENDA_SEED_SUBJECT);
+    expect(EMAIL_DEFAULT_SEED_TEXT['email.deliberation_agenda.body']).toBe(DELIBERATION_AGENDA_SEED_BODY);
+    expect(DELIBERATION_AGENDA_SEED_SUBJECT).toContain('{{sessionDate}}');
   });
 
   test('does not overwrite existing non-empty settings', async () => {
