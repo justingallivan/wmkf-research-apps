@@ -31,6 +31,8 @@ test('renders the placeholder states before any share, review, or schedule exist
   render(<BriefingPage />);
   await screen.findByText('Example University');
   expect(screen.getByText('Quantum Widgets')).toBeInTheDocument();
+  expect(screen.getByText('Research Presentation:')).toBeInTheDocument();
+  expect(screen.queryByText('Site visit:')).not.toBeInTheDocument();
   expect(screen.getAllByText('Not yet scheduled')).toHaveLength(2);
   expect(screen.getByText(/The writeup will appear here once staff share it/)).toBeInTheDocument();
   expect(screen.getByText(/No completed reviews yet/)).toBeInTheDocument();

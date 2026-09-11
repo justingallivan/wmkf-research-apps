@@ -21,7 +21,7 @@ The owner will paste the UI issues here or in the chat. For each one, before edi
 confirm the file is not in the "surfaces reserved for Claude" list below. If it is, stop
 and say so instead of editing.
 
-1. _(owner fills in)_
+1. Change the deliberation briefing schedule label from “Site visit” to “Research Presentation.”
 2. _(owner fills in)_
 3. _(owner fills in)_
 
@@ -72,3 +72,17 @@ If a task requires one of these, report it and wait; do not work around it.
 
 For each task: files changed, what changed, tests run with counts, gates run, and
 anything left open. Label state claims `[VERIFIED via …]` or `[ASSUMED]`.
+
+### Task 1 — Research Presentation label
+
+- **Files changed:** `pages/external/briefing/[token].js`,
+  `tests/unit/external-briefing-page.test.js`.
+- **What changed:** [VERIFIED via source and regression test] The schedule label now reads
+  “Research Presentation” instead of “Site visit”; the scheduled date and empty-state
+  behavior are unchanged.
+- **Tests:** [VERIFIED via Jest] `tests/unit/external-briefing-page.test.js` — 10 passed,
+  1 suite passed.
+- **Gates:** [VERIFIED via commands] `npm run check:types`, `check:doc-currency` plus its
+  self-test, `check:fact-consistency` plus its self-test, and `check:docs-catalog` passed;
+  ESLint passed for both changed JavaScript files.
+- **Open:** None.

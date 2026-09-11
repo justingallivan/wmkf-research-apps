@@ -122,7 +122,7 @@ export default function BriefingPage() {
             </dd>
           </div>
           <div>
-            <dt className="inline font-medium">Site visit:</dt>{' '}
+            <dt className="inline font-medium">Research Presentation:</dt>{' '}
             <dd className="inline">{visitLine || 'Not yet scheduled'}</dd>
           </div>
         </dl>
