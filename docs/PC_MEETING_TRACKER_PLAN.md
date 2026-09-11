@@ -319,8 +319,12 @@ readiness flag is enabled for that target.
      text; blank renders blank per the email-defaults convention. Build brief:
      `docs/plans/AGENDA_EMAIL_DEFAULTS_BUILD_BRIEF_2026-09-10.md`.
 6. **D27 Proposal order supports drag-and-drop** (native HTML5, handle on the number column)
-   in addition to the arrow buttons; both persist through the same full-order reorder route
-   (`reorderSessionSlots` → `PATCH /api/meeting-tracker/slots/reorder`). Built 2026-09-10 in
-   `shared/components/meeting-tracker/SessionEditor.js` (`moveSlot`, `ProposalOrderList`).
-   Build brief: `docs/plans/AGENDA_SLOT_DRAG_REORDER_BUILD_BRIEF_2026-09-10.md`. Renumbered
+   and, since the 2026-09-10 row redesign, a keyboard-accessible position select in place of
+   the arrow buttons (removed); both persist through the same full-order reorder route
+   (`reorderSessionSlots` → `PATCH /api/meeting-tracker/slots/reorder`). Move-to-another-session
+   and Remove moved behind an `OverflowMenu` with an inline confirm panel (no browser dialog).
+   Built 2026-09-10 in `shared/components/meeting-tracker/SessionEditor.js` (`moveSlot`,
+   `ProposalOrderList`). Build briefs: `docs/plans/AGENDA_SLOT_DRAG_REORDER_BUILD_BRIEF_2026-09-10.md`
+   (original drag-and-drop, historical) and
+   `docs/plans/PROPOSAL_ORDER_ROW_REDESIGN_BUILD_BRIEF_2026-09-10.md` (row redesign). Renumbered
    from D28 to D27 (per orchestrator review): Build A took D26.
