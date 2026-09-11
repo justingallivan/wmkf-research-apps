@@ -112,6 +112,18 @@ test('renders group headings in order', async () => {
   expect(headings).toEqual(['Reviewer emails', 'Grantee emails', 'Internal emails', 'Staff labels']);
 });
 
+test('groups are collapsed by default and open independently', async () => {
+  render(<EmailDefaultsSection />);
+  await screen.findByText('Reviewer emails');
+  const groups = Array.from(document.querySelectorAll('details'));
+  expect(groups).toHaveLength(4);
+  expect(groups.every((group) => !group.open)).toBe(true);
+  const reviewers = screen.getByText('Reviewer emails').closest('details');
+  fireEvent.click(reviewers.querySelector('summary'));
+  expect(reviewers.open).toBe(true);
+  expect(screen.getByText('Grantee emails').closest('details').open).toBe(false);
+});
+
 test('pairs subject and body of one email inside the same card, and does not mix cards within a group', async () => {
   render(<EmailDefaultsSection />);
 
