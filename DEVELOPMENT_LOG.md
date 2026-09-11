@@ -10,6 +10,14 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## September 2026 — First real agenda send and first applicant uploads in production; slot-lease SQL incident fixed same night (Session 504)
+
+**Milestone:** The two capabilities shipped in Session 503 were exercised for real: the PC sent a session agenda (ledger `sent`, Dynamics accepted) and an applicant uploaded a PDF and a 37 MB PPTX through the sealed link into `Site Visit -` folders. The first PDF finalize failed in production because the per-slot lease statement passed untyped parameters into `jsonb_build_object` and every test mocked the SQL client; the fix (casts, verified with EXPLAIN against the live schema) shipped within the hour. The same night the owner drove a UX pass on both surfaces: admin-editable agenda email text, grouped and collapsible email defaults, action-button emails and a support link for applicants, drag-and-drop reordering, and two Impeccable critiques that produced the held redesign PRs.
+**Sessions:** 504 (Fable orchestrating; Sonnet built, Opus reviewed each build adversarially; Codex polished the briefing page in parallel).
+**Ship state:** PRs #233–#241 merged (`c990f378` … `50fb442b`); PRs #242 (Messages & policies), #243 (briefing polish, two copy decisions open), #245 (Proposal order row) open with green CI, held for the morning walkthrough in `docs/plans/MORNING_BRIEF_2026-09-11.md`; agenda defaults still to be pasted into Admin.
+**Why it matters:** The week-of-2026-09-14 deliberation runs on a path that has now carried a real agenda and real applicant files, and the incident closed a whole class of "mocked SQL passes, planner fails" bugs with a recorded habit.
+**Pointers:** `docs/plans/MORNING_BRIEF_2026-09-11.md`, `.claude-memory/feedback-mocked-sql-hides-parameter-typing.md`, `docs/plans/*_BUILD_BRIEF_2026-09-10.md`, `.impeccable/critique/2026-09-11T03-39-34Z__pages-admin-js-governance.md`.
+
 ## September 2026 — Applicants upload site-visit materials without a login; the PC sends one agenda per session; Meeting Tracker on in production (Session 503)
 
 **Milestone:** The applicant materials collection is live: the PC starts it from a scheduled visit, the PI and liaison get one sealed link, and each checklist file goes browser-to-private-Blob then server-to-SharePoint under a canonical name with the registry as the only owner (plan §16, M1–M5). The Meeting Tracker is enabled in production and the PC can send one agenda email per deliberation session with per-proposal time windows and briefing links (D21–D25, Codex-built). The Staff Deliberations tab is the decided shape: stage sentence, one primary action, Share locks then sends, and the deliberation email carries no attachment because the briefing page is the only carrier. The briefing page was rehearsed on a real Share in production.

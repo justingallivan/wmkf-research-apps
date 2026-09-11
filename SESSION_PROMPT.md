@@ -1,158 +1,133 @@
-# Session 504 Prompt: Smoke the agenda email and the applicant upload on real requests; PR 3 (PD visibility, auto-close, reminder cron)
+# Session 505 Prompt: Walk the morning brief; merge #245, #242, #243 after smoke; then PR 3 for applicant materials
 
-> Session 503 ran on 2026-09-10 (one long conversation, owner present throughout). Everything
-> below is on `main` at `cba1c4a9` or later and deployed to production with migrations 041–044
-> applied and `SITE_VISIT_MATERIALS_SCHEMA_READY=on`. Start with `/start`.
+> Session 504 ran on 2026-09-10 into the night (owner present for the smoke tests and design
+> critiques, then handed the remaining builds to Claude). Start with `/start`, then read
+> `docs/plans/MORNING_BRIEF_2026-09-11.md` — it is the walkthrough and smoke checklist for
+> everything below and is the first thing to discuss with the owner.
 
-## Session 503 Summary (Claude Fable building, reviewing, and merging; Codex on the agenda email and one rescue pass)
+## Session 504 Summary (Claude Fable orchestrating; Sonnet builders; Opus reviewers; Codex in parallel)
 
 ### What Was Completed
 
-1. **Briefing page rehearsed in production on request 1003222** (PR #223 `adcc5f0a` fixed the
-   rail's false "AI draft ready"; `2578463d`). Owner sent a real Share, opened the link in a
-   private window, reached every material, reissued, and saw the old link revoked. D17 expiry
-   rule confirmed; D18 token-in-request-logs accepted. Tracker schedule reader wired into the
-   page's session seam (`22626e9b`).
-2. **Staff Deliberations tab redesigned and shipped** (PRs #224 `a16615ab`, #225 `6781ae49`,
-   #226 `adf11766`; follow-ups `727ab13a`, `e2327ffb`). Stage sentence + one primary action;
-   Share opens a dialog that locks at preview then sends; Download and Regenerate under More;
-   **writeup attachments dropped entirely** (migration 039 `attachment_mode='none'`); material
-   links retired from the composer and served on the briefing page instead; proposal now comes
-   from `Reviewer Materials/Proposal_<num>.pdf` titled "Proposal" (D20, `49e1ea74`).
-3. **Meeting Tracker enabled in production** (owner applied Wave 28, readback 22/0/0, flag on).
-   Bugs fixed on main: `queryAllRecords` dropped `$expand` so slots never saw their session
-   (`118fc754` + regression test); cycle picker inert when arriving with a cycle in the URL
-   (`aec3458e`); scope label alignment (`5ed5df9e`); exit link and saved notice at the bottom
-   (`dde4973f`); Virtual is the default visit format (`eff5ecd7`). Share email session slot
-   (PR #227 `15f17268`, migration 040 `session_snapshot`); site-visit editor slice 2b
-   (PR #228 `17c5f0c7`); each slot links to its request's briefing page (D11, `6fabefd1`).
-4. **Session agenda email designed, delegated, reviewed, merged** (D21–D25 `83266903`; Codex
-   built on `codex/session-agenda` from `docs/plans/SESSION_AGENDA_EMAIL_CODEX_BRIEF_2026-09-10.md`;
-   PR #232 `cba1c4a9`). One agenda per session with per-proposal time windows and briefing
-   links, exact-email ledger `deliberation_agenda_sends` (migration 041, fresh-install v46),
-   lease-fenced send with correlation recovery. Claude re-ran the sixteen tracker suites and
-   ten gates before merging and resolved the fresh-install block collision with #229.
-5. **Applicant materials collection built and LIVE** (plan §16 M1–M5 from the owner's answers;
-   PR #229 `eb6cb0e3` staff side, PR #230 `7b3aef91` applicant side). Staff: the visit page's
-   materials card creates the collection from the active visit, invites the PI and liaison
-   with one sealed contributor link, reminds, waives, confirms ready; admin cap
-   `site_visit_materials.upload_max_mb` default 100; due date = two business days before the
-   visit in its zone (`lib/utils/business-days.js`). Applicant: `/external/materials/[token]`
-   uploads one file per checklist slot straight to the private staging store (migration 043
-   scope), finalize validates extension-vs-signature (real ZIP central-directory parse for
-   PPTX/DOCX), scans (clean-only), uploads under the canonical name with `replace`, registers
-   a READY/DRAFT `wmkf_requestdocument` row (producer `site-visit-materials-portal`), and
-   supersedes the slot's prior row. Two Codex adversarial reviews; Codex rescue implemented
-   six findings (`12ea32a4`: strict cap read, per-slot lease `slot_leases` migration 044,
-   candidate recorded in staging before the Dataverse create, client Retry with the same
-   staging id, scanner throw classification); Claude corrected one dead end (`c12f179a`: a
-   candidate with no registry row is redone, not held). `GraphService.uploadFileLarge`
-   (upload session above 60 MB).
-6. **Rollout done by the owner in-session:** migrations 041–044 applied and read back (24
-   agenda columns, 4 constraints, 3 indexes, `slot_leases`, staging scope check), flag set,
-   production redeployed; `/api/external/materials/<bogus>/context` answers 401 `malformed`.
-7. **Housekeeping:** main's Tests workflow had been red since `dc269bf1` (duplicate import in
-   a tracker test); fixed in PR #231 `b2717058`. 161 merged remote branches deleted; 38
-   remain, all unmerged or with open PRs. Codex worktree parked on `codex/parked`.
+1. **Agenda email smoke passed on a real session** (`c67dbfbe-…`): ledger row `sent`, Dynamics
+   statuscode 6, one attempt, lease released; drift line appeared after a reorder. Drag
+   reordering never existed at that point (only arrows); the owner asked for it.
+2. **Applicant materials smoke found and fixed a production bug.** First PDF finalize on
+   ZZTEST-03 failed 503: `acquireSlotLease` passed untyped params into `jsonb_build_object`
+   ("could not determine data type of parameter $2"); every unit test mocked `sql`. Fixed by
+   casting (PR #234 `c990f378`), verified with EXPLAIN against the live schema; the 37 MB PPTX
+   scan failure was transient and succeeded on retry. Both files landed under `Site Visit -`
+   folders; staging rows consumed; leases released. Memory
+   `feedback-mocked-sql-hides-parameter-typing` records the lesson.
+3. **Four owner-requested builds shipped through Sonnet-build → Opus-review → fix → PR:**
+   drag-and-drop proposal reordering (#233), admin-editable agenda email subject/message
+   (#235, keys `email.deliberation_agenda.*`), Workflow email defaults grouped by audience
+   (#237) and collapsed by default (#239), applicant materials UX pass (#238: email action
+   button + fallback link, close-date copy removed, "Choose a different file" after a failed
+   finalize, `portalhelp@` footer from the admin `support` category).
+4. **Messages & policies page**: both panels collapsible (#240), chevron scoping fix (#241),
+   then a full Impeccable critique (12/40) and Build E answering it → **PR #242 open, green,
+   held** (one disclosure system, safe publish with prefill + confirm + diff, dirty state, polish).
+5. **Proposal order list**: Impeccable critique (20/40) → owner: "arrows don't earn their keep" →
+   Build F → **PR #245 open, CI running at handoff, held** (gutter drag handle, position select,
+   overflow menu with inline confirms, inset-ring drop indicator).
+6. **Codex parallel work reviewed**: `codex/ui-polish-2026-09-10` (briefing content polish)
+   passed an Opus adversarial review; Claude reconciled the API matrix row and restored main's
+   SESSION_PROMPT on the branch → **PR #243 open, HOLD** for two owner copy decisions; visual
+   check must happen in production (preview cannot render a briefing link).
+7. **Tooling**: browser tools allow-listed in `.claude/settings.local.json` (git-ignored);
+   Codex worktree repointed to `codex/ui-polish-2026-09-10` with a brief.
 
 ### Commits (first-parent on main, this session)
-- `cba1c4a9` #232 session agenda email (Codex) · `7b3aef91` #230 applicant upload path ·
-  `eb6cb0e3` #229 materials collection staff side · `b2717058` #231 lint fix
-- `83266903` agenda decisions + brief · `6fabefd1` D11 slot links · `49e1ea74` D20 proposal
-- `eff5ecd7`, `17c5f0c7` #228, `15f17268` #227, `5ed5df9e`, `aec3458e`, `118fc754`,
-  `dde4973f`, `e2327ffb`, `adf11766` #226, `727ab13a`, `6781ae49` #225, `a16615ab` #224,
-  `3b8a9b59`, `22626e9b`, `2578463d`, `adcc5f0a` #223
+- `c990f378` #234 finalize hotfix · `31af8fe1` #233 · `7e54540b` #235 · `e1346bfb` #237 ·
+  `978638f1` #238 · `19bcea26` #239 · `e1433dc8` #240 · `50fb442b` #241
+- Briefs: `af50dd97`, `5bd57a47`, `ee7de9eb`, `790a1021`; critique addendum `62c4d42f`;
+  memory `82f738de`; morning brief `aed21f36`
 
 ## Next Items
 
 ### Verified Open
 
-1. **Smoke the agenda email on a real session.** Evidence: PR #232 merged and deployed;
-   no production send yet. Owner opens a session in the tracker, "Send agenda…", sends to
-   self; check time windows, zone, Zoom link, briefing links; then reorder a slot and confirm
-   "Schedule changed since the last agenda." Claude may read `deliberation_agenda_sends`
-   (Postgres, read-only) to confirm the row reached `sent`.
-2. **Smoke the applicant materials path on a real visit.** Evidence: flag on, routes answer;
-   no collection created yet. Pick a request whose PI/liaison may receive the invitation (or
-   add the owner as a contact first); create the collection from the visit page; open the
-   link in a private window; upload a PDF; confirm it lands under `Site Visit - Slides` and
-   appears on the briefing page; replace it and confirm SharePoint keeps the version.
-3. **PR 3 — visibility and closeout** (plan §16.3): "Materials: 2 of 3 received" line on the
-   Staff Deliberations tab and cycle view; auto-close by `closes_at`
-   (`closeExpiredCollections`); reminder cron (owner flagged "we just have to remember to
-   write it"); a staff-facing signal for `replay_ambiguous` finalizes (today only the
-   applicant sees it). Evidence: `docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md` §16.3.
-4. **Post-merge production check of PR #218** (rail) — still not done. Evidence: PR body.
-5. Carried unchanged: closeout route generic 500 (`close-review.js:64-71`); Codex
-   `codex/UI-audit` reviewer UI commits; Cycle Dossier reconciliation (PR #179).
+1. **Walk `docs/plans/MORNING_BRIEF_2026-09-11.md` with the owner.** Evidence: the file; PRs
+   #242, #243, #245 open on GitHub. Merge #245 and #242 after the owner's walkthrough (both
+   green; #245 CI may still be finishing at handoff — check `gh pr checks 245`), smoke per the
+   brief, then #243 once the two copy decisions land.
+2. **Paste the two agenda defaults** in Admin → Workflows → Messages & policies (Internal
+   emails → Deliberation agenda). Evidence: `getAgendaStatus` returns blank defaults until the
+   settings exist; composer shows the "not configured" note. Text is in the morning brief.
+3. **Production smoke of #238**: "Send invitation again" on ZZTEST-03; open the contributor
+   page (header sentence, footer link). Evidence: deployed 20:11 PDT; not yet eyeballed.
+4. **PR 3 for applicant materials** (plan §16.3): "Materials: 2 of 3 received" on the Staff
+   Deliberations tab and cycle view; auto-close by `closes_at`; reminder cron; staff signal
+   for `replay_ambiguous`. Evidence: `docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md` §16.3.
+5. **Post-merge production check of PR #218** (rail). Evidence: PR body; still not done.
+6. Carried: closeout route generic 500 (`close-review.js:64-71`); Cycle Dossier
+   reconciliation (PR #179).
 
 ### Owner Decision Needed
 
-1. **Reissue during Dynamics Pending Send**: accept as designed (current) or add a short
-   post-send hold. Evidence: `outputs/deliberation-briefing-codex-adversarial-review-2026-09-09.md`.
-2. **Release reason:** whether a PD-recorded `no_response` lowers standing anywhere.
-   Evidence: `docs/plans/REVIEWER_RELEASE_REASON_CODEX_BRIEF_2026-09-09.md`.
-3. Carried: Program select on Final writeups/Awardees; historic suggestion rows with stale
-   cycle codes; dossier roster scope; unmerged Codex branches to abandon (`codex/UI-audit`,
-   `codex/reviewer-ui-surfacing`, `codex/c0-4-action-policy-foundation`,
-   `codex/ror-api-production-shadow`, plus the other 30 unmerged remotes); combined dossier
-   retention; PD front-end flip; distribution email copy edits.
+1. **Share email copy rename** (`lib/services/pre-site-visit/distribution-service.js:277-307`):
+   adopt "Pre-discussion" / "Research presentation materials"? The agenda email
+   (`agenda-service.js:147,158`) has the same drift. Evidence: PR #243 review.
+2. **DOCX-uploaded reviews on the briefing page**: add "A file review is on record; ask staff
+   for a copy"? Evidence: PR #243 review F3.
+3. Carried: reissue during Dynamics Pending Send; release-reason `no_response` standing;
+   Program select on Final writeups/Awardees; unmerged Codex branches to abandon; combined
+   dossier retention; PD front-end flip.
 
 ### Parked
 
 1. Connor items (J27 Q5, back-end status changes, slice G). 2. Request Quick Find metadata
-repair. 3. Legacy Complete row with null eligibility. 4. `NEXTAUTH_SECRET` rotation;
-multipart direct-upload conversion; Stage III institution identity authority.
-5. Playwright coverage for the external briefing and materials pages (need flags and
-Postgres in the e2e environment). 6. Legacy labels/affordances the decided target removes
-(see `feedback-skip-legacy-fixes-that-the-target-state-removes`).
+repair. 3. Legacy Complete row with null eligibility. 4. `NEXTAUTH_SECRET` rotation; multipart
+direct-upload conversion; Stage III institution identity authority. 5. Playwright coverage for
+the external briefing and materials pages. 6. Proposal order P3s from the critique: focus
+restore after a keyboard reorder; `OverflowMenu` trigger is 36px (file was forbidden).
+7. Messages & policies P3s: popover inside `<summary>`; "Use label" button inside the wrapping
+label (pre-existing).
 
 ### Verify Before Acting
 
 1. **Never set `DATAVERSE_ALLOW_PROD_READS`, `DATAVERSE_PROD_WRITE_ACK`, or any
-   `*_SCHEMA_READY` yourself.** Owner ran every migration and flag today; hand over
-   `! <command>` lines. `psql` is not installed; a Node readback through
-   `@vercel/postgres` must live inside the repo to resolve the package (delete it after).
-2. **`vercel redeploy` takes a deployment URL and `--target production`**, not `--prod`;
-   the CLI may print "fetch failed" while waiting even though the build succeeds — confirm
-   with `vercel inspect <url>`.
-3. **Codex worktree `../WMKF_Apps-codex`** is parked on `codex/parked` at main; reuse it
-   with `git -C ../WMKF_Apps-codex checkout -B codex/<slug> origin/main`.
-4. **Fresh-install blocks in `scripts/setup-database.js`** are now v44 (042), v45 (044),
-   v46 (041); the next migration is 045 → block v47. Check before adding.
-5. **`visitExpected()`** remains the single D26 assumption; J27 register row when it changes.
+   `*_SCHEMA_READY` yourself.** Postgres read-only probes: a repo-local Node script with
+   `node --env-file=.env.local` (no dotenv in the repo); delete it after.
+2. **Codex worktree `../WMKF_Apps-codex`** is on `codex/ui-polish-2026-09-10` (fully pushed,
+   PR #243). Park it (`checkout -B codex/parked origin/main`) only after #243 merges or is
+   abandoned. `../WMKF_Apps-codex-tracker` remains on `codex/meeting-tracker` (merged long ago).
+3. **Agent worktrees under `.claude/worktrees/agent-*`** hold the `claude/*` build branches
+   (all merged into the `integrate/*` PR branches); remove with `git worktree remove --force`
+   once the PRs merge. `claude/cycle-dossier-reconcile` is older and unrelated.
+4. **`/meeting-tracker/sessions` is a 404**; only `/meeting-tracker/sessions/<id>` exists.
+5. **Fresh-install blocks** unchanged this session: next migration is 045 → block v47.
+6. **`visitExpected()`** remains the single D26 assumption in the briefing plan (the tracker
+   plan's D26/D27 now name the agenda defaults and drag reorder; the two documents number
+   independently).
 
 ### Do Not Reopen Without New Decision
 
-1. **Deliberation email carries no attachment; the briefing page is the only carrier**
-   (owner 2026-09-10). Evidence: `docs/plans/STAFF_DELIBERATIONS_TAB_SHAPE_BRIEF_2026-09-09.md`.
-2. **Applicant materials M1–M5** (checklist, two business days, admin cap 100 MB, flat
-   `Site Visit - <bucket>` folders, go). Evidence: plan §16.
-3. **Agenda D21–D25**; **tracker D1–D12**; **briefing D13–D20**. Evidence: the plans.
-4. **Ledger `sent` = transport accepted (statuses 3/6/7)**; unchanged since 2026-08-24.
-5. Initial assessments hidden for D26; copy-the-bytes Board snapshot; `wmkf_meetingdate` as
-   the single temporal axis.
+1. **Seed text is init data, not a runtime fallback; blank renders blank** (agenda defaults
+   follow it). Evidence: `lib/seed/email-defaults/reviewer-templates.js` header; Build A brief.
+2. **Materials close date is not shown to applicants** (page or email). Evidence: Build D brief.
+3. **Arrows removed from Proposal order; position select is the accessible path** (owner,
+   2026-09-10). Evidence: Build F brief.
+4. Deliberation email carries no attachment; applicant materials M1–M5; agenda D21–D25;
+   tracker D1–D12, D26, D27; briefing D13–D23; ledger `sent` = transport accepted.
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md` §16 | Materials decisions, data model, slices (PR 1–2 built, PR 3 planned) |
-| `lib/services/site-visit-materials/{collection-service,collection-store,contributor-service,upload-cap}.js` | Staff collection, per-slot leases, applicant finalize, admin cap |
-| `pages/api/meeting-tracker/visits/[requestId]/materials.js`; `shared/components/meeting-tracker/SiteVisitMaterialsCard.js` | Staff route and card |
-| `pages/api/external/materials/[token]/{context,upload-token,finalize}.js`; `pages/external/materials/[token].js`; `lib/external/verify-materials-token.js` | Applicant surface |
-| `lib/utils/site-visit-material-file.js`; `lib/utils/business-days.js` | Byte validation (ZIP directory parse); due-date helper |
-| `lib/services/graph-service.js` `uploadFileLarge` | Upload session above 60 MB |
-| `lib/services/meeting-tracker/{agenda-service,agenda-store}.js`; `pages/api/meeting-tracker/sessions/[id]/agenda.js`; `shared/components/meeting-tracker/SessionAgendaPanel.js` | Agenda email (Codex) |
-| `docs/plans/SESSION_AGENDA_EMAIL_CODEX_BRIEF_2026-09-10.md` § Handoff | Agenda readback queries and expected names |
-| `shared/components/workbench/{StaffDeliberationsTab,PreSiteDistributionPanel,OverflowMenu}.js`; `shared/utils/deliberation-stage.js` | Redesigned tab |
-| `lib/db/migrations/039–044` | no-attachment mode, session snapshot, agenda ledger, collections, staging scope, slot leases |
+| `docs/plans/MORNING_BRIEF_2026-09-11.md` | Walkthrough + smoke checklist for #242, #243, #245 and the live changes |
+| `docs/plans/*_BUILD_BRIEF_2026-09-10.md` (A, B, D, E, F, drag) | Build briefs with handoffs (Builds A–F) |
+| `shared/components/admin/{DisclosureRow,OutcomeBanner,AdminWorkspaceNavigation,PoliciesSection,EmailDefaultsSection}.js` | Messages & policies (PR #242) |
+| `shared/components/meeting-tracker/SessionEditor.js` | Proposal order row (PR #245) |
+| `lib/services/site-visit-materials/collection-store.js` | Slot-lease SQL with the casts (hotfix) |
+| `lib/external/site-visit-materials-email.js` | Materials email button + fallback renderer |
+| `.impeccable/critique/2026-09-11T*` | Critique snapshots (governance; proposal order rides in #245) |
 
 ## Testing
 
 ```bash
-npx jest tests/unit/site-visit-materials tests/unit/site-visit-material-file tests/unit/external-materials tests/unit/portal-upload tests/unit/graph-service-upload-large tests/unit/meeting-tracker tests/unit/pre-site-distribution-* tests/unit/deliberation-*
-npm run check:types && npm run check:api-routes && npm run check:atlas && npm run check:request-document-writers && npm run check:fact-consistency
-# Live, flag on:
-curl -s https://wmkfresearch.vercel.app/api/external/materials/not-a-token/context   # → {"ok":false,"reason":"malformed"}
+npx jest tests/unit/meeting-tracker tests/unit/site-visit-materials tests/unit/external-materials tests/unit/email-defaults tests/unit/policies-section-label-guidance tests/unit/admin-workspace-navigation
+npm run check:types && npm run check:api-routes && npm run check:atlas && npm run check:fact-consistency
+gh pr checks 245; gh pr checks 242; gh pr checks 243
 ```
