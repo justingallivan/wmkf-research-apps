@@ -157,3 +157,63 @@ meeting-tracker files were not modified. No new dependencies added.
 
 **Left open:** nothing from Scope. Rebase onto `main` is deferred to whoever merges Build A
 first, per the launching instruction's explicit branch setup (not this builder's call).
+
+---
+
+### Post-review fixes (Opus review: PASS WITH FIXES)
+
+Review found the original `email-defaults-section.test.js` fixture (one email per group, its
+only sibling field `unavailable`) let three mutants pass: (1) grouping by `group` only and
+ignoring `emailKey`, (2) batch-saving every available field in a card, (3) swapping the
+`reviewers`/`labels` group order. No production-code change was required by the review; fixed
+by extending the fixture per the review's spec (a-d) plus one optional hardening change.
+
+**Test changes** (`tests/unit/email-defaults-section.test.js`):
+- Fixture extended to 7 entries: `email.reviewer_invitation.subject` (reviewers),
+  `email.grantee_invite.subject`/`.body` (grantees, body still `unavailable: true`),
+  `email.grantee_reminder.subject` (grantees, added after both invite entries),
+  `email.deliberation_agenda.subject`/`.body` (internal, both available), and
+  `stage.deliberations.draft` (labels).
+- Heading-order assertion now checks all four group titles:
+  `['Reviewer emails', 'Grantee emails', 'Internal emails', 'Staff labels']`.
+- Pairing test asserts `within(inviteCard).queryByLabelText('Grantee reminder subject')` is
+  `null` (kills the "group-only" mutant) and pins grantees card order to
+  `['Grantee invite', 'Grantee reminder']` via the level-4 heading sequence.
+- New test saves `email.deliberation_agenda.subject` inside a card whose sibling
+  (`.body`) is available, and asserts exactly one PUT with
+  `{ key: 'email.deliberation_agenda.subject', value: … }` (kills the "batch-save" mutant).
+- Existing blank/unavailable assertions kept passing unchanged.
+
+**Mutation-kill verification** [VERIFIED via manual mutation]: applied each of the three
+named mutants directly to `EmailDefaultsSection.js` in a scratch copy, ran
+`npx jest tests/unit/email-defaults-section` against each, confirmed a failing assertion for
+all three, then restored the file (`diff` against a pre-mutation copy showed no residual
+change) before committing:
+- Mutant 1 (group-by-`group`-only, all entries in one card): failed on the
+  `queryByLabelText('Grantee reminder subject')` assertion.
+- Mutant 2 (batch-save every available sibling field): failed on the single-PUT
+  `toHaveBeenCalledWith`/count assertion (the mutation as applied also threw a `ReferenceError`
+  inside the click handler since `card` isn't in `renderField`'s scope — either way, the test
+  suite would catch a batch-save regression here; it did not pass silently).
+- Mutant 3 (reversed `EDITABLE_TEXT_GROUPS` order): failed on the four-group heading-order
+  `toEqual` assertion.
+
+**Optional hardening applied** (`shared/components/admin/EmailDefaultsSection.js`): the
+per-group/per-card grouping logic was factored into a `buildCards` helper; entries whose
+`group` does not match any `EDITABLE_TEXT_GROUPS` id now render in a trailing "Other" group
+(`id: 'other'`, title "Other") instead of silently disappearing if a catalog entry's `group`
+is misspelled. No existing behavior changed (all defaults have valid known groups today, so
+this path is currently inert; `tests/unit/editable-text-defaults-catalog.test.js` already
+asserts every entry's `group` is one of the four valid ids, so this is a defense-in-depth
+guard, not a currently-exercised path).
+
+**Re-run verification (sequential, as requested):**
+- `npx jest tests/unit/email-defaults tests/unit/editable-text-defaults-catalog` →
+  **3 suites / 42 tests passed** (`email-defaults-section`, `email-defaults-routes`,
+  `editable-text-defaults-catalog`; two expected `console.error` lines from the routes test's
+  strict-read-failure path, not failures).
+- `npm run check:types` → clean.
+
+**Commits:**
+- `4cc383fd` — original Build B implementation (grouping, catalog metadata, tests, docs).
+- `<fill in below>` — post-review fixes (fixture hardening + Other-group fallback).

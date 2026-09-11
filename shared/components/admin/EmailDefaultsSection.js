@@ -145,8 +145,7 @@ export default function EmailDefaultsSection() {
   };
 
   // Group by EDITABLE_TEXT_GROUPS order, then by emailKey (one card per emailKey) in catalog order.
-  const groups = EDITABLE_TEXT_GROUPS.map((group) => {
-    const groupEntries = defaults.filter((entry) => entry.group === group.id);
+  const buildCards = (groupEntries) => {
     const cards = [];
     const cardIndexByEmailKey = {};
     groupEntries.forEach((entry) => {
@@ -156,8 +155,25 @@ export default function EmailDefaultsSection() {
       }
       cards[cardIndexByEmailKey[entry.emailKey]].entries.push(entry);
     });
-    return { ...group, cards };
-  }).filter((group) => group.cards.length > 0);
+    return cards;
+  };
+
+  const knownGroupIds = new Set(EDITABLE_TEXT_GROUPS.map((group) => group.id));
+  const groups = EDITABLE_TEXT_GROUPS
+    .map((group) => ({ ...group, cards: buildCards(defaults.filter((entry) => entry.group === group.id)) }))
+    .filter((group) => group.cards.length > 0);
+
+  // Entries whose `group` doesn't match a known EDITABLE_TEXT_GROUPS id (e.g. a typo in the
+  // catalog) still render, in a trailing "Other" group, instead of silently disappearing.
+  const otherEntries = defaults.filter((entry) => !knownGroupIds.has(entry.group));
+  if (otherEntries.length > 0) {
+    groups.push({
+      id: 'other',
+      title: 'Other',
+      description: 'Entries with an unrecognized group — check EDITABLE_TEXT_DEFAULTS for a missing or misspelled `group`.',
+      cards: buildCards(otherEntries),
+    });
+  }
 
   return (
     <div className="space-y-8">
