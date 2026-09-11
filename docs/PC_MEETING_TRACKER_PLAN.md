@@ -131,7 +131,10 @@ calls the same service.
   in; validated as an https URL, shown as a "Join" link on the page and carried into the Share
   email per §5.6; owner 2026-09-09), attendees (staff and Board, using the existing recipient
   directory), and the ordered slot list with per-slot minutes and lead PD. Add, remove, reorder,
-  and move a slot to another session in place.
+  and move a slot to another session in place. Since 2026-09-11 the lead PD is display-only on
+  the row (seeded from the request's PD when the proposal is added; owner: reassignment at this
+  point is rare and a second editable copy invites drift). The slot field and the agenda email's
+  "Lead PD:" line are unchanged; correcting a wrong lead PD means remove and re-add.
 - One visit editor per request: the fields the Activity already has, written through the existing
   logistics service.
 
@@ -323,7 +326,9 @@ readiness flag is enabled for that target.
    header) and, since the 2026-09-10 row redesign, a keyboard-accessible position select in
    place of the arrow buttons (removed). The select moved behind the row's `OverflowMenu` as
    "Change position…" on 2026-09-11 (owner: the gutter's number + select read as a doubled
-   number); both paths persist through the same full-order reorder route
+   number). Reorder is optimistic since 2026-09-11: the row moves on drop, the save and the
+   ETag-refreshing detail reload run behind the busy guard, and a failed save restores the
+   previous order. Both paths persist through the same full-order reorder route
    (`reorderSessionSlots` → `PATCH /api/meeting-tracker/slots/reorder`). Move-to-another-session
    and Remove sit in the same menu with inline confirm panels (no browser dialog).
    Built 2026-09-10 in `shared/components/meeting-tracker/SessionEditor.js` (`moveSlot`,

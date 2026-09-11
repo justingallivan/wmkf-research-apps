@@ -82,9 +82,8 @@ function sessionForm(session) {
   };
 }
 
-function SlotRow({ slot, proposal, leadOptions, sessions, sessionId, busy, savingSlotId, onChange, onMove, onRemove, onPositionChange, index, count, isDragging, dropEdge, onDragStart, onDragOver, onDrop, onDragEnd }) {
+function SlotRow({ slot, proposal, sessions, sessionId, busy, savingSlotId, onChange, onMove, onRemove, onPositionChange, index, count, isDragging, dropEdge, onDragStart, onDragOver, onDrop, onDragEnd }) {
   const [minutes, setMinutes] = useState(slot.wmkf_minutes || 15);
-  const [leadPdId, setLeadPdId] = useState(slot._wmkf_leadpd_value || '');
   const [targetSessionId, setTargetSessionId] = useState('');
   const [panel, setPanel] = useState(null); // 'move' | 'remove' | null
   const requestNumber = proposal?.requestNumber || slot.wmkf_Request?.akoya_requestnum || slot._wmkf_request_value;
@@ -117,25 +116,17 @@ function SlotRow({ slot, proposal, leadOptions, sessions, sessionId, busy, savin
         <div className="min-w-[13rem] flex-1">
           <p className="font-semibold text-gray-900"><span className="sr-only">Position </span><span className="tabular-nums text-gray-500">{index + 1}</span><span aria-hidden="true" className="text-gray-400"> · </span>#{requestNumber}</p>
           <p className="mt-1 text-sm text-gray-700">{proposal?.title || slot.wmkf_Request?.akoya_title || 'Request details are not available.'}</p>
+          <p className="mt-1 text-xs text-gray-500">Lead PD: {slot.wmkf_LeadPd?.fullname || 'Not assigned'}</p>
           {slot.briefing?.url ? (
             <a href={slot.briefing.url} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-xs font-semibold text-blue-800 underline">Open briefing</a>
           ) : (
             <p className="mt-2 text-xs font-medium text-gray-500">{slotBriefingText(slot)}</p>
           )}
         </div>
-        <div className="grid min-w-[17rem] flex-1 gap-3 sm:grid-cols-2">
-          <label className="text-sm font-medium text-gray-700">
-            Minutes
-            <input type="number" min="1" max="1440" disabled={busy} value={minutes} onChange={(event) => setMinutes(event.target.value)} onBlur={() => Number(minutes) !== Number(slot.wmkf_minutes) && onChange(slot, { minutes: Number(minutes) })} className={`${FIELD_CLASS} w-24`} />
-          </label>
-          <label className="text-sm font-medium text-gray-700">
-            Lead Program Director
-            <select value={leadPdId} disabled={busy} onChange={(event) => { setLeadPdId(event.target.value); onChange(slot, { leadPdId: event.target.value || null }); }} className={`${FIELD_CLASS} w-full`}>
-              <option value="">Not assigned</option>
-              {leadOptions.map((lead) => <option key={lead.id} value={lead.id}>{lead.name}</option>)}
-            </select>
-          </label>
-        </div>
+        <label className="shrink-0 text-sm font-medium text-gray-700">
+          Minutes
+          <input type="number" min="1" max="1440" disabled={busy} value={minutes} onChange={(event) => setMinutes(event.target.value)} onBlur={() => Number(minutes) !== Number(slot.wmkf_minutes) && onChange(slot, { minutes: Number(minutes) })} className={`${FIELD_CLASS} block w-24`} />
+        </label>
         <OverflowMenu
           label={`More actions for #${requestNumber}`}
           disabled={busy}
@@ -198,7 +189,7 @@ function SlotRow({ slot, proposal, leadOptions, sessions, sessionId, busy, savin
   );
 }
 
-export function ProposalOrderList({ slots, proposalById, leadOptions, sessions, sessionId, busy, savingSlotId, onChange, onMove, onRemove, onReorder }) {
+export function ProposalOrderList({ slots, proposalById, sessions, sessionId, busy, savingSlotId, onChange, onMove, onRemove, onReorder }) {
   const [draggingIndex, setDraggingIndex] = useState(null);
   const [overIndex, setOverIndex] = useState(null);
   const [overEdge, setOverEdge] = useState(null);
@@ -260,7 +251,6 @@ export function ProposalOrderList({ slots, proposalById, leadOptions, sessions, 
             key={slot.wmkf_deliberationslotid}
             slot={slot}
             proposal={proposalById.get(String(slot._wmkf_request_value).toLowerCase())}
-            leadOptions={leadOptions}
             sessions={sessions}
             sessionId={sessionId}
             busy={busy}
@@ -350,18 +340,6 @@ export default function SessionEditor() {
     };
   }, [router.isReady, sessionId, isNew, cycleCode, programId, loadDetail]);
 
-  const leadOptions = useMemo(() => {
-    const unique = new Map();
-    proposals.forEach((proposal) => {
-      if (proposal.leadPdId && proposal.programDirector) unique.set(proposal.leadPdId, proposal.programDirector);
-    });
-    slots.forEach((slot) => {
-      if (slot.wmkf_LeadPd?.systemuserid && slot.wmkf_LeadPd?.fullname) {
-        unique.set(slot.wmkf_LeadPd.systemuserid, slot.wmkf_LeadPd.fullname);
-      }
-    });
-    return [...unique].map(([id, name]) => ({ id, name }));
-  }, [proposals, slots]);
   const proposalById = useMemo(() => new Map(proposals.map((proposal) => [String(proposal.requestId).toLowerCase(), proposal])), [proposals]);
   const sessionMinutes = session ? Math.round((new Date(session.scheduledEndIso) - new Date(session.scheduledStartIso)) / 60000) : Number(form.durationMinutes);
   const slotMinutes = slots.reduce((sum, slot) => sum + Number(slot.wmkf_minutes || 0), 0);
@@ -451,10 +429,19 @@ export default function SessionEditor() {
   const reorderSlots = (next, movedSlot, targetIndex) => {
     const movedProposal = proposalById.get(String(movedSlot._wmkf_request_value).toLowerCase());
     const requestNumber = movedProposal?.requestNumber || movedSlot.wmkf_Request?.akoya_requestnum || movedSlot._wmkf_request_value;
+    // Optimistic: the row moves now; the save and the ETag-refreshing reload
+    // run behind the busy guard. A failed save restores the previous order.
+    const previous = slots;
+    setSlots(next);
     return runSlotChange(async () => {
-      const result = await reorderSessionSlots({ sessionId, slots: next });
-      setNotice(`Moved #${requestNumber} to position ${targetIndex + 1}.`);
-      return result;
+      try {
+        const result = await reorderSessionSlots({ sessionId, slots: next });
+        setNotice(`Moved #${requestNumber} to position ${targetIndex + 1}.`);
+        return result;
+      } catch (error) {
+        setSlots(previous);
+        throw error;
+      }
     }, movedSlot.wmkf_deliberationslotid);
   };
 
@@ -514,7 +501,6 @@ export default function SessionEditor() {
             <ProposalOrderList
               slots={slots}
               proposalById={proposalById}
-              leadOptions={leadOptions}
               sessions={sessions}
               sessionId={sessionId}
               busy={busy}
