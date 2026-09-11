@@ -6,10 +6,12 @@ import SessionAgendaPanel from '../../shared/components/meeting-tracker/SessionA
 const SESSION_ID = '11111111-1111-4111-8111-111111111111';
 const OPERATION_ID = '22222222-2222-4222-8222-222222222222';
 const REQUEST_ID = '33333333-3333-4333-8333-333333333333';
-const DEFAULT_MESSAGE = "Here is the agenda for our deliberation session. Each proposal's briefing page opens without a login.";
+// Deliberately unrelated to the deleted hard-coded subject/message text, so a
+// test asserting these values cannot pass if the component regresses to the
+// old hard-coded constants instead of reading the loaded `defaults` state.
 const DEFAULTS = {
-  subject: 'Deliberation session agenda — Monday, September 14',
-  message: DEFAULT_MESSAGE,
+  subject: 'Admin subject ZZZ',
+  message: 'Admin opening message ZZZ',
   unavailable: false,
 };
 
@@ -53,7 +55,7 @@ function prepared(overrides = {}) {
     to: ['alex@example.org', 'bailey@example.org'],
     cc: [],
     recipientCount: 2,
-    subject: 'Deliberation session agenda — Monday, September 14',
+    subject: DEFAULTS.subject,
     bodyText: 'Exact body\n\nDeliberation session: Monday.\n\nAgenda\n\n9:00 AM–9:15 AM · #1001 · First proposal · Lead PD: Alex Staff · Open briefing',
     state: 'prepared',
     sendRequestedAt: null,
@@ -91,10 +93,8 @@ test('defaults attendees, subject, and message and posts the exact prepare paylo
   fireEvent.click(screen.getByRole('button', { name: 'Send agenda…' }));
 
   expect(screen.getByLabelText('To')).toHaveValue('alex@example.org, bailey@example.org');
-  expect(screen.getByLabelText('Subject')).toHaveValue('Deliberation session agenda — Monday, September 14');
-  expect(screen.getByLabelText('Message')).toHaveValue(
-    "Here is the agenda for our deliberation session. Each proposal's briefing page opens without a login.",
-  );
+  expect(screen.getByLabelText('Subject')).toHaveValue(DEFAULTS.subject);
+  expect(screen.getByLabelText('Message')).toHaveValue(DEFAULTS.message);
   fireEvent.click(screen.getByRole('button', { name: 'Create preview' }));
 
   await screen.findByText(/First proposal/);
@@ -104,7 +104,7 @@ test('defaults attendees, subject, and message and posts the exact prepare paylo
     operationId: expect.stringMatching(/^[0-9a-f-]{36}$/),
     to: 'alex@example.org, bailey@example.org',
     cc: '',
-    subject: 'Deliberation session agenda — Monday, September 14',
+    subject: DEFAULTS.subject,
   });
   expect(screen.getByText(/9:00 AM–9:15 AM/)).toBeInTheDocument();
 });
@@ -179,8 +179,8 @@ test('a stale unresolved retry restores usable composer defaults', async () => {
   fireEvent.click(screen.getByRole('button', { name: 'Send agenda' }));
 
   expect(await screen.findByLabelText('To')).toHaveValue('alex@example.org, bailey@example.org');
-  expect(screen.getByLabelText('Subject')).toHaveValue('Deliberation session agenda — Monday, September 14');
-  expect(screen.getByLabelText('Message')).toHaveValue(DEFAULT_MESSAGE);
+  expect(screen.getByLabelText('Subject')).toHaveValue(DEFAULTS.subject);
+  expect(screen.getByLabelText('Message')).toHaveValue(DEFAULTS.message);
   expect(screen.getByRole('button', { name: 'Create preview' })).toBeEnabled();
 });
 
@@ -237,6 +237,8 @@ test('a terminal retry unblocks a new preview without retaining the failed opera
 
   expect(await screen.findByText(/Dynamics closed this agenda email/)).toBeInTheDocument();
   expect(screen.getByLabelText('To')).toHaveValue('alex@example.org, bailey@example.org');
+  expect(screen.getByLabelText('Subject')).toHaveValue(DEFAULTS.subject);
+  expect(screen.getByLabelText('Message')).toHaveValue(DEFAULTS.message);
   expect(screen.getByRole('button', { name: 'Create preview' })).toBeEnabled();
   expect(screen.queryByRole('button', { name: 'Review unresolved send…' })).not.toBeInTheDocument();
 });
@@ -329,6 +331,22 @@ test('shows an unavailable note and leaves the subject and message blank when de
   expect(screen.getByLabelText('Message')).toHaveValue('');
   expect(screen.getByText(/Default subject or message is not configured/)).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Create preview' })).toBeDisabled();
+});
+
+test('disables Send agenda… until the initial GET resolves, then enables it', async () => {
+  let resolveGet;
+  global.fetch = jest.fn(() => new Promise((resolve) => { resolveGet = resolve; }));
+  render(<SessionAgendaPanel sessionId={SESSION_ID} session={session} slots={slots} recipients={recipients} />);
+
+  const sendButton = screen.getByRole('button', { name: 'Send agenda…' });
+  expect(sendButton).toBeDisabled();
+
+  await act(async () => {
+    resolveGet(response({ lastAgenda: null, scheduleChanged: false, defaults: DEFAULTS }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+
+  expect(sendButton).toBeEnabled();
 });
 
 test('adds tracker directory recipients without creating To/Cc conflicts', async () => {

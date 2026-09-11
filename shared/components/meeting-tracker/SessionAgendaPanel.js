@@ -147,6 +147,7 @@ export default function SessionAgendaPanel({ sessionId, session, slots, recipien
   const [changed, setChanged] = useState(false);
   const [loadError, setLoadError] = useState(null);
   const [defaults, setDefaults] = useState(EMPTY_DEFAULTS);
+  const [statusLoaded, setStatusLoaded] = useState(false);
   const [composerOpen, setComposerOpen] = useState(false);
   const [directoryTarget, setDirectoryTarget] = useState(null);
   const [form, setForm] = useState({ to: '', cc: '', subject: '', bodyText: '' });
@@ -168,6 +169,7 @@ export default function SessionAgendaPanel({ sessionId, session, slots, recipien
     setPendingSend(body.pendingSend || null);
     setChanged(body.scheduleChanged === true);
     setDefaults(body.defaults || EMPTY_DEFAULTS);
+    setStatusLoaded(true);
     setLoadError(null);
   }, [sessionId]);
 
@@ -388,7 +390,8 @@ export default function SessionAgendaPanel({ sessionId, session, slots, recipien
         <button
           type="button"
           onClick={openComposer}
-          className={`mt-4 rounded-lg px-4 py-2 text-sm font-semibold ${lastAgenda?.sentAt ? 'border border-gray-300 bg-white text-gray-900' : 'bg-gray-900 text-white'}`}
+          disabled={!statusLoaded && !loadError}
+          className={`mt-4 rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50 ${lastAgenda?.sentAt ? 'border border-gray-300 bg-white text-gray-900' : 'bg-gray-900 text-white'}`}
         >
           {pendingSend?.operationId ? 'Review unresolved send…' : lastAgenda?.sentAt ? 'Send agenda again…' : 'Send agenda…'}
         </button>

@@ -376,7 +376,7 @@ test('status resolves the sessionDate token in admin-configured agenda defaults'
   const getSettingStrict = jest.fn(async (key) => (
     key === 'email.deliberation_agenda.subject'
       ? { found: true, value: 'Agenda for {{sessionDate}}' }
-      : { found: true, value: 'Opening message, no token here.' }
+      : { found: true, value: 'Here is the agenda for {{sessionDate}}, opening message.' }
   ));
   const result = await getAgendaStatus({ sessionId: SESSION_ID }, {
     getSession: jest.fn(async () => ({
@@ -389,7 +389,7 @@ test('status resolves the sessionDate token in admin-configured agenda defaults'
   });
   expect(result.defaults).toEqual({
     subject: 'Agenda for Monday, September 14',
-    message: 'Opening message, no token here.',
+    message: 'Here is the agenda for Monday, September 14, opening message.',
     unavailable: false,
   });
 });
@@ -685,5 +685,13 @@ describe('resolveAgendaDefault', () => {
       session({ scheduledStartIso: '', scheduledEndIso: '', ianaTimeZone: '' }),
     );
     expect(result).toBe('Deliberation session agenda — {{sessionDate}}');
+  });
+
+  test('resolves the date from a valid start even when the end time is missing/invalid', () => {
+    const result = resolveAgendaDefault(
+      'Deliberation session agenda — {{sessionDate}}',
+      session({ scheduledStartIso: '2026-09-14T16:00:00Z', scheduledEndIso: '' }),
+    );
+    expect(result).toBe('Deliberation session agenda — Monday, September 14');
   });
 });
