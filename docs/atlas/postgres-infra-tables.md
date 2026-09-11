@@ -530,4 +530,15 @@ NOT NULL DEFAULT '{}'::jsonb`: one server-owned token/expiry object per canonica
 `collection-store.js` acquires an absent or expired entry with one conditional UPDATE before the
 finalize re-read and removes only the matching token afterward; the five-minute expiry recovers a
 crashed holder while live contention returns `slot_busy`. Readiness flag
-`SITE_VISIT_MATERIALS_SCHEMA_READY` (literal `on`).
+`SITE_VISIT_MATERIALS_SCHEMA_READY` (literal `on`). PR 3 (S506): the daily maintenance cron's
+auto-close step (`MaintenanceService.closeExpiredSiteVisitMaterialCollections` →
+`closeExpiredCollections`) sets `status = 'closed'` on every `open` or `ready` row past
+`closes_at` (reads already projected a past `closes_at` as closed; the sweep makes it durable and
+frees the partial unique index). The automatic reminder sweep (`reminder-sweep.js`, cron route
+`/api/cron/site-visit-materials-reminders`, built but unscheduled) claims by stamping
+`last_reminder_at` and incrementing `reminder_count` with `last_reminder_email_id = NULL` before the
+send, then attaches the email id; so a reminder row with a null email id after a claim is a send
+that failed after the claim, never retried. Staff list surfaces (Staff Deliberations tab and cycle
+view, tracker list row) read a counts-only summary through `summary-reader.js`
+(`listLatestCollectionsForRequests`, `DISTINCT ON (request_id)`); the contributor link and contacts
+never leave the tracker grant.

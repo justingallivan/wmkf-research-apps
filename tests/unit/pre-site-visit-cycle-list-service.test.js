@@ -7,6 +7,7 @@ jest.mock('../../lib/dataverse/adapters/site-visit.js', () => ({ findActiveByReq
 jest.mock('../../lib/services/pre-site-visit/distribution-store.js', () => ({ sentSourceDocumentIds: jest.fn() }));
 jest.mock('../../lib/services/deliberation-stage-labels.js', () => ({ readDeliberationStageLabels: jest.fn() }));
 jest.mock('../../lib/services/meeting-tracker/schedule-reader.js', () => ({ getDeliberationScheduleByRequests: jest.fn(async (ids) => new Map(ids.map((id) => [id, null]))) }));
+jest.mock('../../lib/services/site-visit-materials/summary-reader.js', () => ({ getMaterialsSummaryByRequests: jest.fn(async ({ requestIds }) => new Map(requestIds.map((id) => [id, null]))) }));
 
 import * as requestDocumentAdapter from '../../lib/dataverse/adapters/request-document.js';
 import * as grantRequestAdapter from '../../lib/dataverse/adapters/grant-request.js';
@@ -14,6 +15,7 @@ import * as siteVisitAdapter from '../../lib/dataverse/adapters/site-visit.js';
 import { sentSourceDocumentIds } from '../../lib/services/pre-site-visit/distribution-store.js';
 import { readDeliberationStageLabels } from '../../lib/services/deliberation-stage-labels.js';
 import { getDeliberationScheduleByRequests } from '../../lib/services/meeting-tracker/schedule-reader.js';
+import { getMaterialsSummaryByRequests } from '../../lib/services/site-visit-materials/summary-reader.js';
 import { listPreSiteVisitDrafts } from '../../lib/services/pre-site-visit/cycle-list-service';
 import {
   PRE_SITE_VISIT_CONTRACT,
@@ -259,4 +261,25 @@ it('a schedule-reader failure leaves every session null instead of failing the l
   const result = await listPreSiteVisitDrafts({ cycleCode: 'D26' });
   expect(result.artifacts).toHaveLength(1);
   expect(result.artifacts[0].session).toBeNull();
+});
+
+it('joins the applicant-materials summary per request through the cycle read (request numbers supplied); null when absent or when the reader fails', async () => {
+  const summary = { state: 'missing', receivedCount: 2, requiredCount: 3, otherCount: 0, dueAt: '2026-10-05T19:00:00.000Z', closesAt: '2026-10-14T19:00:00.000Z', overdue: true, invited: true };
+  getMaterialsSummaryByRequests.mockImplementationOnce(async ({ requestIds }) => new Map(requestIds.map((id) => [id, id === R1 ? summary : null])));
+  requestDocumentAdapter.findByCycle.mockResolvedValue({ records: [
+    row({ wmkf_requestdocumentid: 'current', wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW }),
+    row({ wmkf_requestdocumentid: 'r2', _wmkf_request_value: R2 }),
+  ] });
+  const result = await listPreSiteVisitDrafts({ cycleCode: 'D26' });
+  expect(getMaterialsSummaryByRequests).toHaveBeenCalledWith({
+    requestIds: expect.arrayContaining([R1, R2]),
+    requestNumbers: new Map([[R1, '1002959'], [R2, '1003001']]),
+    cycleCode: 'D26',
+  });
+  expect(result.artifacts.find((a) => a.requestId === R1).materials).toEqual(summary);
+  expect(result.artifacts.find((a) => a.requestId === R2).materials).toBeNull();
+
+  getMaterialsSummaryByRequests.mockRejectedValueOnce(new Error('pg down'));
+  const degraded = await listPreSiteVisitDrafts({ cycleCode: 'D26' });
+  expect(degraded.artifacts.map((a) => a.materials)).toEqual([null, null]);
 });

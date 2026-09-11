@@ -88,6 +88,7 @@ function statusResponse({
   pendingArtifact = null,
   reopenHistory = [],
   stageLabels = null,
+  materials = null,
 } = {}) {
   return {
     ok: true,
@@ -98,6 +99,7 @@ function statusResponse({
       pendingArtifact,
       reopenHistory,
       ...(stageLabels ? { stageLabels } : {}),
+      ...(materials ? { materials } : {}),
     }),
   };
 }
@@ -939,4 +941,18 @@ test('without session attendees the site-visit party remains the default recipie
   await waitFor(() => expect(screen.getByTestId('mock-suggested-to')).toHaveTextContent('visit-organizer@example.org'));
   expect(screen.getByTestId('mock-suggested-cc')).toHaveTextContent('visit-optional@example.org');
   expect(screen.getByTestId('mock-session')).toHaveTextContent('none');
+});
+
+test('the applicant-materials line renders from the status payload at draft and shared stages, and not without a collection (plan §16.3, PR 3)', async () => {
+  const materials = { state: 'missing', receivedCount: 1, requiredCount: 3, otherCount: 0, dueAt: '2026-10-05T19:00:00Z', closesAt: '2026-10-14T19:00:00Z', overdue: false, invited: true };
+  global.fetch.mockResolvedValueOnce(statusResponse({ currentArtifact: readyArtifact(100000001), materials }));
+  const { unmount } = render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+  await screen.findByText('Working document:');
+  expect(screen.getByTestId('deliberations-materials-line')).toHaveTextContent(/^Materials: 1 of 3 received · due /);
+  unmount();
+
+  global.fetch.mockResolvedValueOnce(statusResponse({ currentArtifact: readyArtifact(100000001) }));
+  render(<StaffDeliberationsTab requestId={REQUEST_ID} />);
+  await screen.findByText('Working document:');
+  expect(screen.queryByTestId('deliberations-materials-line')).not.toBeInTheDocument();
 });

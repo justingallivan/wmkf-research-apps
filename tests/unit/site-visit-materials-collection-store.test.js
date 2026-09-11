@@ -5,6 +5,11 @@ import { sql } from '@vercel/postgres';
 import {
   SLOT_LEASE_TTL_MS,
   acquireSlotLease,
+  attachReminderEmailId,
+  claimAutomaticReminder,
+  closeExpiredCollections,
+  listCollectionsDueForAutomaticReminder,
+  listLatestCollectionsForRequests,
   releaseSlotLease,
 } from '../../lib/services/site-visit-materials/collection-store';
 
@@ -57,4 +62,44 @@ test('release removes only the matching slot token and reports contention/lost o
 
   sql.mockResolvedValueOnce({ rows: [] });
   await expect(releaseSlotLease({ collectionId: COLLECTION_ID, slotKey: 'other', leaseToken: 'stale' })).resolves.toBe(false);
+});
+
+test('batch read is one DISTINCT ON query with an explicit uuid[] cast on the bound array; empty input never queries', async () => {
+  expect(await listLatestCollectionsForRequests([])).toEqual([]);
+  expect(sql).not.toHaveBeenCalled();
+  sql.mockResolvedValueOnce({ rows: [{ id: 'c1' }] });
+  const rows = await listLatestCollectionsForRequests(['AAAAAAAA-0000-4000-8000-000000000001', 'aaaaaaaa-0000-4000-8000-000000000001', 'aaaaaaaa-0000-4000-8000-000000000002']);
+  expect(rows).toEqual([{ id: 'c1' }]);
+  expect(queryText()).toContain('SELECT DISTINCT ON (request_id) *');
+  expect(queryText()).toContain('WHERE request_id = ANY(?::uuid[])');
+  expect(queryText()).toContain('ORDER BY request_id, created_at DESC');
+  expect(sql.mock.calls[0][1]).toEqual(['aaaaaaaa-0000-4000-8000-000000000001', 'aaaaaaaa-0000-4000-8000-000000000002']);
+});
+
+test('automatic reminder: the candidate read and the claim share one predicate (open, invited, past due, inside the window, no reminder since due); claim increments and clears the email id', async () => {
+  const now = new Date('2026-10-06T15:00:00Z');
+  sql.mockResolvedValueOnce({ rows: [] });
+  await listCollectionsDueForAutomaticReminder(now);
+  const predicate = "status = 'open' AND invited_at IS NOT NULL AND due_at <= ? AND closes_at > ? AND (last_reminder_at IS NULL OR last_reminder_at < due_at)";
+  expect(queryText(0)).toContain(predicate);
+  expect(sql.mock.calls[0].slice(1)).toEqual([now.toISOString(), now.toISOString()]);
+
+  sql.mockResolvedValueOnce({ rows: [{ id: 'c1', reminder_count: 1 }] });
+  expect(await claimAutomaticReminder('c1', now)).toEqual({ id: 'c1', reminder_count: 1 });
+  expect(queryText(1)).toContain('UPDATE site_visit_material_collections SET last_reminder_at = NOW(), last_reminder_email_id = NULL, reminder_count = reminder_count + 1');
+  expect(queryText(1)).toContain(`WHERE id = ? AND ${predicate}`);
+  sql.mockResolvedValueOnce({ rows: [] });
+  expect(await claimAutomaticReminder('c1', now)).toBeNull();
+
+  sql.mockResolvedValueOnce({ rows: [{ id: 'c1' }] });
+  await attachReminderEmailId('c1', 'email-1');
+  expect(queryText(3)).toContain('SET last_reminder_email_id = ?, updated_at = NOW() WHERE id = ?');
+  expect(sql.mock.calls[3].slice(1)).toEqual(['email-1', 'c1']);
+});
+
+test('auto-close sweeps every non-closed row past closes_at (ready included) and returns the count', async () => {
+  sql.mockResolvedValueOnce({ rowCount: 2, rows: [{ id: 'a' }, { id: 'b' }] });
+  expect(await closeExpiredCollections(new Date('2026-10-20T00:00:00Z'))).toBe(2);
+  expect(queryText()).toContain("SET status = 'closed'");
+  expect(queryText()).toContain("WHERE status <> 'closed' AND closes_at <= ?");
 });

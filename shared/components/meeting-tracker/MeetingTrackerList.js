@@ -4,6 +4,7 @@ import { useRouter } from 'next/router';
 import Layout, { PageHeader } from '../Layout';
 import ToolbarSelect from '../ToolbarSelect';
 import ScopeSegment from '../workbench/ScopeSegment';
+import { siteVisitMaterialsLine } from '../../utils/site-visit-materials-line';
 
 const DATE_FORMAT = new Intl.DateTimeFormat('en-US', {
   weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
@@ -86,6 +87,9 @@ export function MeetingTrackerRequestRow({ proposal, cycleCode, programId }) {
               <p>{formatDate(proposal.siteVisit.scheduledStartIso)}</p>
               <p className="mt-1 text-gray-500">{[proposal.siteVisit.formatLabel, proposal.siteVisit.location].filter(Boolean).join(' · ') || 'Details not set'}</p>
               {proposal.siteVisitNeedsReconciliation && <p className="mt-1 font-medium text-amber-800">More than one active Site Visit; showing the earliest. Reconcile in the Workbench.</p>}
+              <p className={`mt-1 ${proposal.materials?.overdue ? 'font-medium text-amber-800' : 'text-gray-700'}`} data-testid="tracker-materials-line">
+                {siteVisitMaterialsLine(proposal.materials) || 'Materials not requested.'}
+              </p>
             </div>
           ) : <p className="mt-1 text-sm font-medium text-amber-700">No site visit</p>}
         </section>

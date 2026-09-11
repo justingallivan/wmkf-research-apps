@@ -17,6 +17,7 @@ import {
 import { readDeliberationStageLabels } from '../../../lib/services/deliberation-stage-labels';
 import { getDeliberationSessionForRequest } from '../../../lib/services/deliberation-briefing/session-reader';
 import { projectDeliberationSession } from '../../../shared/utils/deliberation-stage';
+import { getMaterialsSummaryForRequest } from '../../../lib/services/site-visit-materials/summary-reader';
 import { REQUEST_DOCUMENT_OPERATION_STATUS } from '../../../shared/config/requestDocument';
 
 export const config = {
@@ -82,16 +83,19 @@ export default async function handler(req, res) {
         const payload = includeCorrectionAudit ? status : staffSafePayload(status);
         // Session line (tracker §5.4 via the briefing seam): fail-open null
         // until the tracker is enabled or a slot exists.
-        const [stageLabels, session] = await Promise.all([
+        // Applicant materials summary (plan §16.3, PR 3): counts and window
+        // only, never the contributor link or contacts; null when off/failed.
+        const [stageLabels, session, materials] = await Promise.all([
           readDeliberationStageLabels(),
           getDeliberationSessionForRequest(requestId).catch(() => null),
+          getMaterialsSummaryForRequest({ requestId }),
         ]);
         // Tracker §5.6: the session's attendees are the Share email's default
         // recipients, so the tab gets their addresses alongside the card shape.
         const sessionAttendees = Array.isArray(session?.attendees)
           ? session.attendees.map((person) => ({ name: person?.name || '', email: String(person?.email || '').trim().toLowerCase() })).filter((person) => person.email)
           : [];
-        return res.status(200).json({ success: true, ...payload, stageLabels, session: projectDeliberationSession(session), sessionAttendees });
+        return res.status(200).json({ success: true, ...payload, stageLabels, session: projectDeliberationSession(session), sessionAttendees, materials });
       }
 
       if (!req.body

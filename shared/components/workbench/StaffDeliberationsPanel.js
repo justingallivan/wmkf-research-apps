@@ -22,6 +22,7 @@ import {
   deliberationVisitLine,
   visitExpected,
 } from '../../utils/deliberation-stage';
+import { siteVisitMaterialsLine } from '../../utils/site-visit-materials-line';
 
 const NOT_SCHEDULED_VISIT = Object.freeze({ status: 'not-scheduled', startIso: null });
 
@@ -103,6 +104,11 @@ function DeliberationCard({ artifact, stageLabels }) {
           {showLines && artifact.stage !== 'visit' && visitLineVisible(artifact.stage) && (
             <p className="mt-1 text-xs text-gray-500" data-testid="deliberations-visit-line">
               {deliberationVisitLine(artifact.visit || NOT_SCHEDULED_VISIT)}
+            </p>
+          )}
+          {showLines && artifact.materials && (
+            <p className="mt-1 text-xs text-gray-500" data-testid="deliberations-materials-line">
+              {siteVisitMaterialsLine(artifact.materials)}
             </p>
           )}
           {!artifact.isCurrent && (
