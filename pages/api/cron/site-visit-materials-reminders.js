@@ -44,7 +44,7 @@ export default async function handler(req, res) {
       sweepMaterialsReminders({ maxBatch, dryRun }));
     const errs = result.errors?.length || 0;
     if (result.sent || errs) {
-      console.log(`[cron:site-visit-materials-reminders] scanned=${result.scanned} eligible=${result.eligible} sent=${result.sent} nothingMissing=${result.skippedNothingMissing} noSender=${result.skippedNoSender} claimLost=${result.claimLost} sendFail=${result.sendFailed} dryRun=${dryRun}`);
+      console.log(`[cron:site-visit-materials-reminders] scanned=${result.scanned} eligible=${result.eligible} sent=${result.sent} nothingMissing=${result.skippedNothingMissing} noSender=${result.skippedNoSender} claimLost=${result.claimLost} sendFail=${result.sendFailed} receiptFail=${result.receiptFailed} dryRun=${dryRun}`);
     }
     await MaintenanceService.completeRun(runId, {
       status: errs > 0 ? 'failed' : 'completed',

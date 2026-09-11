@@ -41,12 +41,13 @@ test('claims before sending, names only the missing items, sends from the creati
   expect(d.listDue).toHaveBeenCalledWith(NOW);
   expect(d.claim).toHaveBeenCalledWith('c1', NOW);
   expect(d.claim.mock.invocationCallOrder[0]).toBeLessThan(d.sendReminder.mock.invocationCallOrder[0]);
+  expect(d.findActiveSiteVisit.mock.invocationCallOrder[0]).toBeLessThan(d.claim.mock.invocationCallOrder[0]);
   const args = d.sendReminder.mock.calls[0][0];
   expect(args.missing.map((item) => item.key)).toEqual(['presentation_source', 'participant_bios']);
   expect(args).toMatchObject({ fromEmail: 'pc@wmkeck.org', actorId: PC, sequence: 1, request: REQUEST });
   expect(args.row.reminder_count).toBe(1);
   expect(d.attachEmailId).toHaveBeenCalledWith('c1', 'email-1');
-  expect(result).toMatchObject({ scanned: 1, eligible: 1, sent: 1, sendFailed: 0, claimLost: 0, errors: [] });
+  expect(result).toMatchObject({ scanned: 1, eligible: 1, sent: 1, sendFailed: 0, receiptFailed: 0, claimLost: 0, errors: [] });
 });
 
 test('nothing missing, no sender mailbox, and a lost claim each skip without sending', async () => {
@@ -92,6 +93,25 @@ test('the default sender lookup refuses a disabled or mailbox-less creator', asy
   expect(await DEFAULT_DEPENDENCIES.getSender('ok')).toEqual({ email: 'pc@wmkeck.org', systemUserId: 'ok' });
   expect(DEFAULT_DEPENDENCIES.canReadLink({ token_ciphertext: 'not-sealed' })).toBe(false);
   jest.dontMock('../../lib/dataverse/adapters/system-user.js');
+});
+
+test('a failed site-visit read does not consume the claim: the reminder still sends, without a visit (Codex adversarial finding)', async () => {
+  const log = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+  const d = deps({ findActiveSiteVisit: jest.fn(async () => { throw new Error('dataverse 503'); }) });
+  const result = await sweepMaterialsReminders({}, d);
+  expect(result).toMatchObject({ eligible: 1, sent: 1, sendFailed: 0, errors: [] });
+  expect(d.claim).toHaveBeenCalledTimes(1);
+  expect(d.sendReminder.mock.calls[0][0].visit).toBeNull();
+  log.mockRestore();
+});
+
+test('a receipt-attach failure after a delivered email counts as sent + receiptFailed with the email id in the error, never as a transport failure (Codex adversarial finding)', async () => {
+  const log = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+  const d = deps({ attachEmailId: jest.fn(async () => { throw new Error('pg down'); }) });
+  const result = await sweepMaterialsReminders({}, d);
+  expect(result).toMatchObject({ sent: 1, sendFailed: 0, receiptFailed: 1, errors: [{ id: 'c1', error: 'sent as email-1; receipt not attached: pg down' }] });
+  expect(d.sendReminder).toHaveBeenCalledTimes(1);
+  log.mockRestore();
 });
 
 test('a send failure after the claim is counted and logged, not retried, and other rows still run', async () => {

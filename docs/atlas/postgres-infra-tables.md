@@ -537,8 +537,11 @@ auto-close step (`MaintenanceService.closeExpiredSiteVisitMaterialCollections` â
 frees the partial unique index). The automatic reminder sweep (`reminder-sweep.js`, cron route
 `/api/cron/site-visit-materials-reminders`, built but unscheduled) claims by stamping
 `last_reminder_at` and incrementing `reminder_count` with `last_reminder_email_id = NULL` before the
-send, then attaches the email id; so a reminder row with a null email id after a claim is a send
-that failed after the claim, never retried. Staff list surfaces (Staff Deliberations tab and cycle
+send, then attaches the email id; every other precondition (missing items, recipients, sender,
+readable link, the optional site-visit read) resolves before the claim. A reminder row with a null
+email id after a claim is therefore either a send that failed after the claim (`sendFailed`) or a
+delivered email whose id could not be attached (`receiptFailed`; the run log and `maintenance_runs`
+details carry the id for repair); neither is retried automatically. Staff list surfaces (Staff Deliberations tab and cycle
 view, tracker list row) read a counts-only summary through `summary-reader.js`
 (`listLatestCollectionsForRequests`, `DISTINCT ON (request_id)`); the contributor link and contacts
 never leave the tracker grant.

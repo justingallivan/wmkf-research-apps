@@ -581,8 +581,10 @@ merged and production-smoked (ZZTEST-03, 2026-09-10). PR 3 was built 2026-09-11 
   `lib/services/site-visit-materials/reminder-sweep.js`, policy: one automatic reminder per
   collection, on the first run after `due_at` with a required item still missing and no reminder
   (PC or automatic) recorded on or after `due_at`; claim-before-send (conditional UPDATE stamps the
-  reminder before the email goes out, at-most-once), sent from the creating PC's mailbox to the
-  collection's contacts, `?dryRun=1` supported. **Built but not scheduled**: the `vercel.json` entry
+  reminder before the email goes out, at-most-once; recipients, sender, link, and the optional
+  site-visit read all resolve before the claim, and a delivered email whose receipt fails to attach
+  is counted as `receiptFailed`, not as a transport failure), sent from the creating PC's mailbox to
+  the collection's contacts, `?dryRun=1` supported. **Built but not scheduled**: the `vercel.json` entry
   is the owner's decision (M5). **Staff signal for `replay_ambiguous`:** the contributor finalize
   records one durable operational event (`site_visit_material_replay_ambiguous`, error, keyed on the
   staging id) when it holds a staged upload, so staff see the hold in Admin operational events.
