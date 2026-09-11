@@ -6,7 +6,7 @@ import { formatZonedLocalInput, resolveZonedDateTime } from '../../../lib/utils/
 import SessionAgendaPanel from './SessionAgendaPanel';
 import OverflowMenu from '../workbench/OverflowMenu';
 
-const FIELD_CLASS = 'mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 focus:border-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-300';
+const FIELD_CLASS = 'mt-1 rounded-lg border border-gray-300 bg-white px-3 py-2 focus:border-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-300';
 
 const EMPTY_FORM = {
   startLocal: '',
@@ -97,7 +97,7 @@ function SlotRow({ slot, proposal, leadOptions, sessions, sessionId, busy, savin
       onDrop={onDrop}
     >
       {dropEdge && (
-        <span aria-hidden="true" className={`pointer-events-none absolute inset-x-0 h-0.5 bg-blue-600 ${dropEdge === 'top' ? 'top-0' : 'bottom-0'}`} />
+        <span aria-hidden="true" className={`pointer-events-none absolute inset-x-0 h-1 bg-blue-600 ${dropEdge === 'top' ? '-top-0.5' : '-bottom-0.5'}`} />
       )}
       <div className="flex flex-wrap items-start gap-4">
         <div className="flex w-12 shrink-0 flex-col items-center gap-1">
@@ -139,11 +139,11 @@ function SlotRow({ slot, proposal, leadOptions, sessions, sessionId, busy, savin
         <div className="grid min-w-[17rem] flex-1 gap-3 sm:grid-cols-2">
           <label className="text-sm font-medium text-gray-700">
             Minutes
-            <input type="number" min="1" max="1440" disabled={busy} value={minutes} onChange={(event) => setMinutes(event.target.value)} onBlur={() => Number(minutes) !== Number(slot.wmkf_minutes) && onChange(slot, { minutes: Number(minutes) })} className={FIELD_CLASS} />
+            <input type="number" min="1" max="1440" disabled={busy} value={minutes} onChange={(event) => setMinutes(event.target.value)} onBlur={() => Number(minutes) !== Number(slot.wmkf_minutes) && onChange(slot, { minutes: Number(minutes) })} className={`${FIELD_CLASS} w-24`} />
           </label>
           <label className="text-sm font-medium text-gray-700">
             Lead Program Director
-            <select value={leadPdId} disabled={busy} onChange={(event) => { setLeadPdId(event.target.value); onChange(slot, { leadPdId: event.target.value || null }); }} className={FIELD_CLASS}>
+            <select value={leadPdId} disabled={busy} onChange={(event) => { setLeadPdId(event.target.value); onChange(slot, { leadPdId: event.target.value || null }); }} className={`${FIELD_CLASS} w-full`}>
               <option value="">Not assigned</option>
               {leadOptions.map((lead) => <option key={lead.id} value={lead.id}>{lead.name}</option>)}
             </select>
@@ -162,7 +162,7 @@ function SlotRow({ slot, proposal, leadOptions, sessions, sessionId, busy, savin
         <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-3">
           <label className="text-sm font-medium text-gray-700">
             Move to another session
-            <select value={targetSessionId} onChange={(event) => setTargetSessionId(event.target.value)} className={FIELD_CLASS}>
+            <select value={targetSessionId} onChange={(event) => setTargetSessionId(event.target.value)} className={`${FIELD_CLASS} w-full`}>
               <option value="">Choose a session</option>
               {sessions.filter((session) => session.sessionId !== sessionId).map((session) => <option key={session.sessionId} value={session.sessionId}>{new Date(session.scheduledStartIso).toLocaleString()}</option>)}
             </select>
