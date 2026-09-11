@@ -18,7 +18,7 @@ jest.mock('../../shared/components/Layout', () => ({
 jest.mock('next/link', () => function MockLink({ children, href }) {
   return <a href={typeof href === 'string' ? href : href.pathname}>{children}</a>;
 });
-import { moveSlot, ProposalOrderList, reorderSessionSlots, slotBriefingText } from '../../shared/components/meeting-tracker/SessionEditor';
+import SessionEditor, { moveSlot, ProposalOrderList, reorderSessionSlots, slotBriefingText } from '../../shared/components/meeting-tracker/SessionEditor';
 
 const SESSION_ID = '11111111-1111-4111-8111-111111111111';
 const FIRST_SLOT_ID = '22222222-2222-4222-8222-222222222222';
@@ -186,7 +186,6 @@ describe('ProposalOrderList drag-and-drop', () => {
       <ProposalOrderList
         slots={slots}
         proposalById={new Map()}
-        leadOptions={[]}
         sessions={[]}
         sessionId={SESSION_ID}
         busy={busy}
@@ -335,7 +334,7 @@ describe('ProposalOrderList drag-and-drop', () => {
     const { container } = renderList(jest.fn());
     const headers = [...container.querySelectorAll('li p.font-semibold')].map((node) => node.textContent);
     expect(headers).toEqual(['Position 1 · #slot-a', 'Position 2 · #slot-b', 'Position 3 · #slot-c']);
-    expect(container.querySelectorAll('select')).toHaveLength(3); // Lead PD only; no position select in the gutter
+    expect(container.querySelectorAll('select')).toHaveLength(0); // no position select in the gutter, no Lead PD select
   });
 
   test('Remove is not called until the inline confirm panel\'s Remove is clicked (menu select alone must not remove)', async () => {
@@ -345,7 +344,6 @@ describe('ProposalOrderList drag-and-drop', () => {
       <ProposalOrderList
         slots={slots}
         proposalById={new Map()}
-        leadOptions={[]}
         sessions={[]}
         sessionId={SESSION_ID}
         busy={false}
@@ -390,12 +388,26 @@ describe('ProposalOrderList drag-and-drop', () => {
     expect(rows[1]).toHaveClass('opacity-70');
     expect(rows[0]).not.toHaveClass('opacity-70');
     container.querySelectorAll('input[type="number"]').forEach((input) => expect(input).toBeDisabled());
-    // The position and Lead PD selects are load-bearing guards: an enabled position
+    // The More actions trigger is a load-bearing guard: an enabled Change position…
     // select would fire a second reorder PATCH against ETags the pending refetch
     // is about to invalidate.
-    const comboboxes = container.querySelectorAll('select');
-    expect(comboboxes.length).toBeGreaterThan(0);
-    comboboxes.forEach((select) => expect(select).toBeDisabled());
+    const menuButtons = screen.getAllByRole('button', { name: /More actions for #/ });
+    expect(menuButtons).toHaveLength(3);
+    menuButtons.forEach((button) => expect(button).toBeDisabled());
+  });
+
+  test('the lead PD is display-only on the row: no select, one "Lead PD:" line from the slot lookup', () => {
+    const slots = [
+      { ...orderSlot('slot-a', 'W/"1"'), wmkf_LeadPd: { systemuserid: 'u1', fullname: 'Alex Staff' } },
+      orderSlot('slot-b', 'W/"2"'),
+    ];
+    const { container } = render(
+      <ProposalOrderList slots={slots} proposalById={new Map()} sessions={[]} sessionId={SESSION_ID} busy={false} savingSlotId={null} onChange={jest.fn()} onMove={jest.fn()} onRemove={jest.fn()} onReorder={jest.fn()} />,
+    );
+    expect(screen.queryByLabelText(/Lead Program Director/)).not.toBeInTheDocument();
+    expect(container.querySelectorAll('select')).toHaveLength(0);
+    expect(screen.getByText('Lead PD: Alex Staff')).toBeInTheDocument();
+    expect(screen.getByText('Lead PD: Not assigned')).toBeInTheDocument();
   });
 
   test('the drag handle is a full-height rail on the row\'s left edge and is inert while busy', () => {
@@ -420,7 +432,6 @@ describe('ProposalOrderList drag-and-drop', () => {
       <ProposalOrderList
         slots={slots}
         proposalById={new Map()}
-        leadOptions={[]}
         sessions={[]}
         sessionId={SESSION_ID}
         busy={false}
@@ -448,5 +459,81 @@ describe('ProposalOrderList drag-and-drop', () => {
     });
     expect(container.querySelectorAll('li[draggable="true"]')).toHaveLength(0);
     expect(container.querySelectorAll('input[draggable="true"], select[draggable="true"], button[draggable="true"]')).toHaveLength(0);
+  });
+});
+
+describe('SessionEditor optimistic reorder', () => {
+  const SESSION = {
+    sessionId: SESSION_ID,
+    scheduledStartIso: '2026-09-14T16:00:00.000Z',
+    scheduledEndIso: '2026-09-14T17:00:00.000Z',
+    ianaTimeZone: 'America/Los_Angeles',
+    location: '',
+    meetingLink: '',
+    notes: '',
+    status: 'planned',
+    attendeeRefs: [],
+  };
+  function detailSlots(order) {
+    return order.map((id, index) => ({
+      wmkf_deliberationslotid: id, _etag: `W/"${id}"`, _wmkf_request_value: id, wmkf_minutes: 15, wmkf_order: index + 1,
+      wmkf_Request: { akoya_requestnum: id.toUpperCase(), akoya_title: `Title ${id}` },
+    }));
+  }
+  function mockFetch({ reorder }) {
+    let detailOrder = ['a', 'b', 'c'];
+    global.fetch = jest.fn(async (url, init = {}) => {
+      const target = String(url);
+      if (target.endsWith('/slots/reorder')) return reorder(init);
+      if (target.endsWith('/recipients')) return { ok: true, status: 200, json: async () => ({ staff: [], board: [] }) };
+      if (target.endsWith(`/sessions/${SESSION_ID}`)) return { ok: true, status: 200, json: async () => ({ session: SESSION, slots: detailSlots(detailOrder) }) };
+      if (target.endsWith('/sessions')) return { ok: true, status: 200, json: async () => ({ sessions: [] }) };
+      throw new Error(`unexpected fetch ${target}`);
+    });
+    return { setDetailOrder: (order) => { detailOrder = order; } };
+  }
+  function headers(container) {
+    return [...container.querySelectorAll('ol[aria-label="Proposal order"] li p.font-semibold')].map((node) => node.textContent);
+  }
+  function drag(container, fromIndex, toIndex, clientY) {
+    const rows = container.querySelectorAll('ol[aria-label="Proposal order"] li');
+    const handles = container.querySelectorAll('[title="Drag to reorder"]');
+    jest.spyOn(rows[toIndex], 'getBoundingClientRect').mockReturnValue({ top: 0, height: 40, bottom: 40, left: 0, right: 100, width: 100 });
+    fireEvent(handles[fromIndex], new MouseEvent('dragstart', { bubbles: true, cancelable: true }));
+    fireEvent(rows[toIndex], new MouseEvent('dragover', { bubbles: true, cancelable: true, clientY }));
+    fireEvent(rows[toIndex], new MouseEvent('drop', { bubbles: true, cancelable: true, clientY }));
+  }
+
+  beforeEach(() => { routerQuery = { id: SESSION_ID }; });
+
+  test('the row moves before the reorder PATCH resolves; the reload then confirms the order', async () => {
+    let resolveReorder;
+    const mocks = mockFetch({ reorder: () => new Promise((resolve) => { resolveReorder = resolve; }) });
+    const { container } = render(<SessionEditor />);
+    await waitFor(() => expect(headers(container)).toEqual(['Position 1 · #A', 'Position 2 · #B', 'Position 3 · #C']));
+
+    drag(container, 2, 0, 5);
+    // Discriminating: the PATCH is still pending, and the DOM already shows the new order.
+    expect(resolveReorder).toBeDefined();
+    expect(headers(container)).toEqual(['Position 1 · #C', 'Position 2 · #A', 'Position 3 · #B']);
+    expect(container.querySelectorAll('ol[aria-label="Proposal order"] li')[0]).toHaveClass('opacity-70');
+
+    mocks.setDetailOrder(['c', 'a', 'b']);
+    resolveReorder({ ok: true, status: 200, json: async () => ({ slots: [] }) });
+    await waitFor(() => expect(container.querySelectorAll('ol[aria-label="Proposal order"] li')[0]).not.toHaveClass('opacity-70'));
+    expect(headers(container)).toEqual(['Position 1 · #C', 'Position 2 · #A', 'Position 3 · #B']);
+    expect(screen.getAllByText('Moved #C to position 1.').length).toBeGreaterThan(0);
+  });
+
+  test('a failed reorder restores the previous order and shows the error', async () => {
+    mockFetch({ reorder: async () => ({ ok: false, status: 409, json: async () => ({ error: 'The session order changed.' }) }) });
+    const { container } = render(<SessionEditor />);
+    await waitFor(() => expect(headers(container)).toEqual(['Position 1 · #A', 'Position 2 · #B', 'Position 3 · #C']));
+
+    drag(container, 2, 0, 5);
+    expect(headers(container)).toEqual(['Position 1 · #C', 'Position 2 · #A', 'Position 3 · #B']);
+
+    await screen.findByText(/The session order changed\. Please try again\./);
+    expect(headers(container)).toEqual(['Position 1 · #A', 'Position 2 · #B', 'Position 3 · #C']);
   });
 });
