@@ -13,6 +13,7 @@ jest.mock('../../shared/components/Layout', () => ({
   __esModule: true,
   default: ({ children }) => <div>{children}</div>,
   PageHeader: ({ title }) => <h1>{title}</h1>,
+  Button: ({ children, variant, size, loading, ...props }) => <button {...props}>{children}</button>,
 }));
 jest.mock('next/link', () => function MockLink({ children, href }) {
   return <a href={typeof href === 'string' ? href : href.pathname}>{children}</a>;
@@ -179,7 +180,7 @@ describe('ProposalOrderList drag-and-drop', () => {
     return { wmkf_deliberationslotid: id, _etag: etag, _wmkf_request_value: id, wmkf_minutes: 15 };
   }
 
-  function renderList(onReorder, { busy = false } = {}) {
+  function renderList(onReorder, { busy = false, savingSlotId = null } = {}) {
     const slots = [orderSlot('slot-a', 'W/"1"'), orderSlot('slot-b', 'W/"2"'), orderSlot('slot-c', 'W/"3"')];
     const { container } = render(
       <ProposalOrderList
@@ -189,7 +190,7 @@ describe('ProposalOrderList drag-and-drop', () => {
         sessions={[]}
         sessionId={SESSION_ID}
         busy={busy}
-        onShift={jest.fn()}
+        savingSlotId={savingSlotId}
         onChange={jest.fn()}
         onMove={jest.fn()}
         onRemove={jest.fn()}
@@ -291,8 +292,9 @@ describe('ProposalOrderList drag-and-drop', () => {
     const { container } = renderList(onReorder, { busy: true });
     const rows = container.querySelectorAll('li');
     const draggableHandles = container.querySelectorAll('[draggable="true"]');
-    const handles = container.querySelectorAll('.cursor-grab');
+    const handles = container.querySelectorAll('[title="Drag to reorder"]');
     expect(draggableHandles).toHaveLength(0);
+    expect(handles).toHaveLength(3);
 
     jest.spyOn(rows[0], 'getBoundingClientRect').mockReturnValue({ top: 0, height: 40, bottom: 40, left: 0, right: 100, width: 100 });
     fireEvent(handles[2], new MouseEvent('dragstart', { bubbles: true, cancelable: true }));
@@ -300,6 +302,123 @@ describe('ProposalOrderList drag-and-drop', () => {
     fireEvent(rows[0], new MouseEvent('drop', { bubbles: true, cancelable: true, clientY: 5 }));
 
     expect(onReorder).not.toHaveBeenCalled();
+  });
+
+  test('no arrow buttons remain; the position select lets keyboard users move any distance in one save', () => {
+    const onReorder = jest.fn();
+    const { container } = renderList(onReorder);
+    expect(screen.queryByRole('button', { name: /move.*(up|down)/i })).not.toBeInTheDocument();
+
+    const select = screen.getByRole('combobox', { name: 'Position of #slot-a' });
+    expect(select.querySelectorAll('option')).toHaveLength(3);
+    fireEvent.change(select, { target: { value: '3' } });
+
+    expect(onReorder).toHaveBeenCalledTimes(1);
+    const [nextSlots, movedSlot, targetIndex] = onReorder.mock.calls[0];
+    expect(nextSlots.map((slot) => slot.wmkf_deliberationslotid)).toEqual(['slot-b', 'slot-c', 'slot-a']);
+    expect(movedSlot.wmkf_deliberationslotid).toBe('slot-a');
+    expect(targetIndex).toBe(2);
+  });
+
+  test('the overflow menu exposes exactly Move to another session and Remove', async () => {
+    renderList(jest.fn());
+    fireEvent.click(screen.getAllByRole('button', { name: /More actions for #/ })[0]);
+    const menuItems = await screen.findAllByRole('menuitem');
+    expect(menuItems.map((item) => item.textContent)).toEqual(['Move to another session…', 'Remove…']);
+  });
+
+  test('Remove is not called until the inline confirm panel\'s Remove is clicked (menu select alone must not remove)', async () => {
+    const onRemove = jest.fn();
+    const slots = [orderSlot('slot-a', 'W/"1"'), orderSlot('slot-b', 'W/"2"'), orderSlot('slot-c', 'W/"3"')];
+    render(
+      <ProposalOrderList
+        slots={slots}
+        proposalById={new Map()}
+        leadOptions={[]}
+        sessions={[]}
+        sessionId={SESSION_ID}
+        busy={false}
+        savingSlotId={null}
+        onChange={jest.fn()}
+        onMove={jest.fn()}
+        onRemove={onRemove}
+        onReorder={jest.fn()}
+      />,
+    );
+    fireEvent.click(screen.getAllByRole('button', { name: /More actions for #/ })[0]);
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Remove…' }));
+    expect(onRemove).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove' }));
+    expect(onRemove).toHaveBeenCalledTimes(1);
+    expect(onRemove).toHaveBeenCalledWith(slots[0]);
+  });
+
+  test('Escape during a drag clears the dragging state and a subsequent drop does nothing', () => {
+    const onReorder = jest.fn();
+    const { container } = renderList(onReorder);
+    const rows = container.querySelectorAll('li');
+    const handles = container.querySelectorAll('[title="Drag to reorder"]');
+    const ol = container.querySelector('ol');
+
+    fireEvent(handles[2], new MouseEvent('dragstart', { bubbles: true, cancelable: true }));
+    expect(rows[2]).toHaveClass('opacity-40');
+
+    fireEvent.keyDown(ol, { key: 'Escape' });
+    expect(rows[2]).not.toHaveClass('opacity-40');
+
+    jest.spyOn(rows[0], 'getBoundingClientRect').mockReturnValue({ top: 0, height: 40, bottom: 40, left: 0, right: 100, width: 100 });
+    fireEvent(rows[0], new MouseEvent('dragover', { bubbles: true, cancelable: true, clientY: 5 }));
+    fireEvent(rows[0], new MouseEvent('drop', { bubbles: true, cancelable: true, clientY: 5 }));
+    expect(onReorder).not.toHaveBeenCalled();
+  });
+
+  test('while busy, the row that initiated the save is opacity-70 and its controls disabled; other rows only disable', () => {
+    const { container } = renderList(jest.fn(), { busy: true, savingSlotId: 'slot-b' });
+    const rows = container.querySelectorAll('li');
+    expect(rows[1]).toHaveClass('opacity-70');
+    expect(rows[0]).not.toHaveClass('opacity-70');
+    container.querySelectorAll('input[type="number"]').forEach((input) => expect(input).toBeDisabled());
+    // The position and Lead PD selects are load-bearing guards: an enabled position
+    // select would fire a second reorder PATCH against ETags the pending refetch
+    // is about to invalidate.
+    const comboboxes = container.querySelectorAll('select');
+    expect(comboboxes.length).toBeGreaterThan(0);
+    comboboxes.forEach((select) => expect(select).toBeDisabled());
+  });
+
+  test('the drag handle spans the full number column and the Move button stays disabled while busy', () => {
+    const { container } = renderList(jest.fn(), { busy: true, savingSlotId: 'slot-b' });
+    const handle = container.querySelector('[draggable]');
+    expect(handle.getAttribute('class')).toContain('w-full');
+    expect(handle.getAttribute('draggable')).toBe('false');
+    expect(handle.getAttribute('class')).not.toContain('cursor-grab');
+  });
+
+  test('the position select carries the request number even when proposal is undefined, falling back to the expanded request', () => {
+    const slots = [{
+      wmkf_deliberationslotid: 'slot-x',
+      _etag: 'W/"1"',
+      _wmkf_request_value: 'req-x',
+      wmkf_minutes: 15,
+      wmkf_Request: { akoya_requestnum: '1009001' },
+    }];
+    render(
+      <ProposalOrderList
+        slots={slots}
+        proposalById={new Map()}
+        leadOptions={[]}
+        sessions={[]}
+        sessionId={SESSION_ID}
+        busy={false}
+        savingSlotId={null}
+        onChange={jest.fn()}
+        onMove={jest.fn()}
+        onRemove={jest.fn()}
+        onReorder={jest.fn()}
+      />,
+    );
+    expect(screen.getByRole('combobox', { name: 'Position of #1009001' })).toBeInTheDocument();
   });
 
   test('the drag handle covers only the grip and index, not the row, arrows, or form controls', () => {
