@@ -253,8 +253,8 @@ test('materials: the context lists this request\'s Ready applicant/visit files b
   const d = deps();
   const context = await buildBriefingContext({ requestId: REQUEST_ID, link: LINK }, d);
   expect(context.materials).toEqual([
-    { member: `material:${SLIDES_ID}`, label: 'Applicant Slides', filename: 'Applicant Slides.pdf', size: 2048, available: true },
-    { member: `material:${RECORDING_ID}`, label: 'Recording', filename: 'Visit.mp4', size: 900 * 1024 * 1024, available: false },
+    { member: `material:${SLIDES_ID}`, label: 'Applicant Slides', filename: 'Applicant Slides.pdf', size: 2048, available: true, inline: true },
+    { member: `material:${RECORDING_ID}`, label: 'Recording', filename: 'Visit.mp4', size: 900 * 1024 * 1024, available: false, inline: false },
   ]);
   expect(JSON.stringify(context.materials)).not.toMatch(/drive|item|sharepoint|Writeup\.docx|Other\.pdf/i);
   // A registry failure leaves the section empty rather than failing the page.

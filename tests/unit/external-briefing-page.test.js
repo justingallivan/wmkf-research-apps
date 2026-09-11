@@ -34,6 +34,12 @@ test('renders the placeholder states before any share, review, or schedule exist
   expect(screen.getByText('PI:').closest('p')).toHaveTextContent('PI: Anthony Leung');
   expect(screen.getByText('PD:').closest('p')).toHaveTextContent('PD: Justin Gallivan');
   expect(screen.getByText('Quantum Widgets')).toBeInTheDocument();
+  // Header order: institution, proposal title, then PI/PD.
+  const institution = screen.getByText('Example University');
+  const proposalTitle = screen.getByText('Quantum Widgets');
+  const pi = screen.getByText('PI:').closest('p');
+  expect(institution.compareDocumentPosition(proposalTitle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(proposalTitle.compareDocumentPosition(pi) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   expect(screen.getByText('Pre-discussion:')).toBeInTheDocument();
   expect(screen.queryByText('Deliberation session:')).not.toBeInTheDocument();
   expect(screen.getByText('Research Presentation:')).toBeInTheDocument();
@@ -98,15 +104,21 @@ test('research presentation materials list by label; oversize files show without
     ok: true, title: 'Example University', proposalTitle: null, expiresAt: null,
     session: null, siteVisit: null, writeup: null, reviews: [], proposal: null,
     materials: [
-      { member: 'material:55555555-5555-4555-8555-555555555555', label: 'Applicant Slides', filename: 'Applicant Slides.pdf', size: 2048, available: true },
-      { member: 'material:66666666-6666-4666-8666-666666666666', label: 'Recording', filename: 'Visit.mp4', size: 900 * 1024 * 1024, available: false },
+      { member: 'material:55555555-5555-4555-8555-555555555555', label: 'Applicant Slides', filename: 'Applicant Slides.pdf', size: 2048, available: true, inline: true },
+      { member: 'material:77777777-7777-4777-8777-777777777777', label: 'Applicant Slides', filename: 'Applicant Slides.pptx', size: 4096, available: true, inline: false },
+      { member: 'material:66666666-6666-4666-8666-666666666666', label: 'Recording', filename: 'Visit.mp4', size: 900 * 1024 * 1024, available: false, inline: false },
     ],
   }));
   render(<BriefingPage />);
   expect(await screen.findByText('Research presentation materials')).toBeInTheDocument();
   const slides = await screen.findByRole('link', { name: 'Applicant Slides.pdf' });
   expect(slides).toHaveAttribute('href', '/api/external/briefing/tok/document?member=material%3A55555555-5555-4555-8555-555555555555');
-  expect(screen.getByText('Applicant Slides:')).toBeInTheDocument();
+  expect(slides).toHaveAttribute('target', '_blank');
+  // Non-PDF materials are served as attachments: a direct download, no blank tab.
+  const pptx = screen.getByRole('link', { name: 'Applicant Slides.pptx' });
+  expect(pptx).toHaveAttribute('href', '/api/external/briefing/tok/document?member=material%3A77777777-7777-4777-8777-777777777777');
+  expect(pptx).not.toHaveAttribute('target');
+  expect(screen.getAllByText('Applicant Slides:')).toHaveLength(2);
   expect(screen.queryByRole('link', { name: 'Visit.mp4' })).not.toBeInTheDocument();
   expect(screen.getByText(/Visit\.mp4/)).toBeInTheDocument();
   expect(screen.getByText(/too large to open here/)).toBeInTheDocument();

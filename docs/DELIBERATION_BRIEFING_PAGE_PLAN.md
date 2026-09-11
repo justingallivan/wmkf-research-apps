@@ -36,6 +36,7 @@ The first deliberation session is the week of 2026-09-14. This is the deliberati
 | D21 (2026-09-10) | The schedule labels are “Pre-discussion” and “Research Presentation”; the materials section is “Research presentation materials.” These are presentation labels only; internal site-visit service and field names are unchanged. |
 | D22 (2026-09-10) | Under the applicant name, show the lead PI and lead PD when present. The “Staff brief and notes” section exposes only the pinned DOCX, with link text `Staff Brief {Request#}.docx`; do not display the raw stored filename or the companion PDF. |
 | D23 (2026-09-10) | Reviews continue to show their structured answers. Expose an uploaded review file only when it is a PDF, and open that PDF inline in a new tab; do not expose a DOCX review file. |
+| D28 (2026-09-11) | Header order is institution, proposal title, then PI/PD. Research presentation materials open a new tab only when the file is a PDF (served inline); every other type (PPTX, recordings) is a direct download with no interstitial window, matching the staff brief. |
 
 Carried from the Codex Site Visit Materials plan §2 and §9, unchanged: one shared link per proposal, read-only, no copies of files, exact pinned writeup version, external labels are institution-led and carry no request number, unknown members fail closed, no folder listing.
 
