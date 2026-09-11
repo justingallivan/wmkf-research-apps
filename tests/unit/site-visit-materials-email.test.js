@@ -11,13 +11,17 @@ const URL = 'https://apps.example.org/external/materials/JWT.123_abc?x=1&y=2';
 
 test('includes the action button and a fallback copy-paste link to the url, both escaped', () => {
   const html = renderMaterialsEmailHtml({ bodyText: 'Hello.', url: URL, buttonLabel: 'Upload site visit materials' });
-  expect(html).toContain(`href="${URL.replace(/&/g, '&amp;')}"`);
+  const escapedUrl = URL.replace(/&/g, '&amp;');
+  expect(html).toContain(`href="${escapedUrl}"`);
   expect(html).toContain('Upload site visit materials');
   expect(html).toContain('If the button does not work, copy and paste this secure link into your browser');
-  // The url appears as both the button href and the visible fallback text.
-  const escapedUrl = URL.replace(/&/g, '&amp;');
+  // The visible fallback text itself must be escaped, not just the href
+  // attributes — this fails if `visibleUrl` were left unescaped.
+  expect(html).toContain(`>${escapedUrl}</a>`);
+  // Exactly three occurrences: the button href, the fallback href, and the
+  // fallback's visible text.
   const occurrences = html.split(escapedUrl).length - 1;
-  expect(occurrences).toBeGreaterThanOrEqual(2);
+  expect(occurrences).toBe(3);
 });
 
 test('falls back to a default button label when none is given', () => {
@@ -31,9 +35,11 @@ test('renders blank-line-separated body as paragraphs and newlines as <br>, with
   expect((html.match(/<p /g) || []).length).toBeGreaterThanOrEqual(2);
   expect(html).toContain('with a break.');
   expect(html).toContain('<br>');
-  // The body-text paragraphs never carry the URL as a standalone line — it
-  // only appears via the server-injected button and fallback link.
-  expect(bodyText).not.toContain(URL);
+  // The rendered body paragraphs (not the fixture) never carry the URL as a
+  // standalone line — it only appears via the server-injected button and
+  // fallback link, i.e. after the two `<p>` blocks close.
+  const bodyHtml = html.slice(0, html.indexOf('<p style="margin:18px'));
+  expect(bodyHtml).not.toContain(URL);
   expect((html.match(/<a href=/g) || []).length).toBe(2);
 });
 

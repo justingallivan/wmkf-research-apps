@@ -94,24 +94,21 @@ test('the upload page no longer says the link stays open past the meeting', asyn
   expect(screen.queryByText(/stays open until/i)).toBeNull();
 });
 
-test('a pending upload shows both Retry and Choose a different file; choosing a different file clears the pending key, mints a new upload, and Retry still uses the original staging id', async () => {
-  const stagingIds = [STAGING_ID, '99999999-9999-4999-8999-999999999999'];
+test('a pending upload shows both Retry and Choose a different file; choosing a different file clears the pending key synchronously and never resurrects it if the new upload fails to start', async () => {
   let tokenCalls = 0;
-  let finalizeCalls = 0;
   global.fetch = jest.fn(async (url, options) => {
     if (url.endsWith('/context')) return response(200, context);
     if (url.endsWith('/upload-token')) {
-      const id = stagingIds[tokenCalls];
       tokenCalls += 1;
-      return response(200, { ok: true, stagingId: id, pathname: 'private/path', clientToken: 'client', contentType: 'application/pdf' });
+      // The first upload-token mints normally; the second (for the different
+      // file) fails to start, so nothing should ever write a new pending key.
+      if (tokenCalls === 1) return response(200, { ok: true, stagingId: STAGING_ID, pathname: 'private/path', clientToken: 'client', contentType: 'application/pdf' });
+      return response(500, { ok: false, reason: 'server_error' });
     }
     if (url.endsWith('/finalize')) {
-      finalizeCalls += 1;
-      const body = JSON.parse(options.body);
-      // The first upload always fails so the slot stays pending; a retry of
-      // the second (different) file succeeds.
-      if (body.stagingId === stagingIds[0]) return response(409, { ok: false, reason: 'slot_busy' });
-      return response(200, { ok: true, slot: 'presentation_pdf', filename: 'other.pdf' });
+      // The only file that ever reaches finalize is the first one, and it
+      // always fails so the slot stays pending.
+      return response(409, { ok: false, reason: 'slot_busy' });
     }
     throw new Error(`unexpected fetch ${url}`);
   });
@@ -122,19 +119,26 @@ test('a pending upload shows both Retry and Choose a different file; choosing a 
 
   await screen.findByRole('button', { name: 'Retry' });
   const differentFileInput = await screen.findByLabelText('Presentation different file');
-  expect(JSON.parse(window.sessionStorage.getItem(STORAGE_KEY))).toEqual({ stagingId: stagingIds[0], slot: 'presentation_pdf' });
+  expect(JSON.parse(window.sessionStorage.getItem(STORAGE_KEY))).toEqual({ stagingId: STAGING_ID, slot: 'presentation_pdf' });
 
   fireEvent.change(differentFileInput, { target: { files: [new File(['%PDF'], 'other.pdf', { type: 'application/pdf' })] } });
+  // chooseDifferentFile clears the pending key synchronously (before any
+  // await), independent of whether the subsequent upload-token call
+  // succeeds. A mutant that drops the removePendingUpload call would leave
+  // the first staging id here.
+  expect(window.sessionStorage.getItem(STORAGE_KEY)).toBeNull();
 
   await waitFor(() => expect(tokenCalls).toBe(2));
-  await waitFor(() => expect(window.sessionStorage.getItem(STORAGE_KEY)).toBeNull());
-  expect(put).toHaveBeenCalledTimes(2);
+  // The failed upload-token call must not resurrect the pending key, and the
+  // slot falls back to the plain "Choose file" picker rather than staying on
+  // Retry / "Choose a different file" with stale pending state.
+  expect(window.sessionStorage.getItem(STORAGE_KEY)).toBeNull();
+  await screen.findByLabelText('Presentation file');
+  expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull();
+  expect(screen.queryByLabelText('Presentation different file')).toBeNull();
 
   const finalizeBodies = global.fetch.mock.calls.filter(([url]) => url.endsWith('/finalize')).map(([, options]) => JSON.parse(options.body));
-  expect(finalizeBodies).toEqual([
-    { stagingId: stagingIds[0], slot: 'presentation_pdf' },
-    { stagingId: stagingIds[1], slot: 'presentation_pdf' },
-  ]);
+  expect(finalizeBodies).toEqual([{ stagingId: STAGING_ID, slot: 'presentation_pdf' }]);
 });
 
 test('the support-email footer renders only when the context includes supportEmail', async () => {

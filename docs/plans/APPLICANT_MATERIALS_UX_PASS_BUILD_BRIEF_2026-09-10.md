@@ -205,8 +205,9 @@ button-label escaping). Updated `tests/unit/site-visit-materials-collection-serv
 since the failure-swallowing lives in the default dependency, not in `buildContributorContext`
 itself). Updated `tests/unit/external-materials-routes-client.test.js` (no "replace a file"/"stays
 open" text; both Retry and "Choose a different file" render together and the latter clears
-storage, POSTs a new `/upload-token`, and Retry still posts the original staging id; support-email
-footer renders only when present, with the expected `mailto:` href).
+storage; support-email footer renders only when present, with the expected `mailto:` href). See
+the 2026-09-10 Opus-review follow-up below for a since-corrected discrimination gap in that
+client test's "different file" case.
 
 **Verification run sequentially, all green:**
 - `npx jest tests/unit/site-visit-materials tests/unit/external-materials tests/unit/alert-recipients tests/unit/grantee-invite-email` → 12 suites, 90 tests passed.
@@ -229,3 +230,59 @@ new dependencies, no new routes.
 **Left open / not done:** nothing from the four items. Not pushed, no PR opened, no env vars
 touched, per instructions. `pages/admin.js` and `docs/agent-wiki/topics/intake-portal.md` were
 read but not edited (no matching content to reconcile).
+
+## 2026-09-10 Opus-review follow-up (PASS WITH FIXES, no security findings)
+
+Four required fixes applied as new commits on the same branch:
+
+1. **Client test discrimination.** The "different file" case in
+   `tests/unit/external-materials-routes-client.test.js` previously could not fail: even with
+   `removePendingUpload` dropped from `chooseDifferentFile`, `upload()`'s own
+   `writePendingUpload` overwrote the same sessionStorage key and the second finalize's success
+   removed it, so the `waitFor(...).toBeNull()` never observed a stale value. Rewrote the test so
+   the **second** `/upload-token` response returns 500: the correct implementation calls
+   `removePendingUpload` synchronously (before any `await`) inside `chooseDifferentFile`, so the
+   pending key is asserted `null` immediately after `fireEvent.change` (no `await` in between) and
+   stays `null` through the failed mint — no second `/finalize` call happens, and the slot falls
+   back to the plain "Choose file" picker. **[VERIFIED by mutation]**: dropped the
+   `removePendingUpload(token, slot)` line from `chooseDifferentFile` locally, re-ran
+   `npx jest tests/unit/external-materials-routes-client.test.js`, confirmed the rewritten test
+   failed exactly at the synchronous assertion (`Received: "{\"stagingId\":...}"` instead of
+   `null`), then restored the line and re-ran to confirm all 6 tests in that file pass again.
+2. **Test rename.** Renamed to "...choosing a different file clears the pending key synchronously
+   and never resurrects it if the new upload fails to start" — dropped the "Retry still uses the
+   original staging id" clause, which the test never exercised (a `Retry` click); that claim is
+   already covered by the "reload restores a pending finalize..." test earlier in the same file.
+3. **Email copy.** `invitationBodyText` in `collection-service.js`: "You may forward this link to
+   a colleague who is helping." → "No login is needed. You may forward the link below to a
+   colleague who is helping." Restores the "no login needed" reassurance the pre-Item-1 text
+   carried in its "Upload here (no login needed; ...)" line, and fixes the antecedent for "this
+   link" now that the button/fallback link render after the body text, not inline with it.
+   Updated the matching assertion in
+   `tests/unit/site-visit-materials-collection-service.test.js`.
+4. **Email-render test discrimination.** `tests/unit/site-visit-materials-email.test.js`: the
+   `occurrences >= 2` check on the escaped URL was satisfiable by the two `href` attributes alone,
+   so an unescaped `visibleUrl` (`const visibleUrl = url` instead of `escapeHtml(url)`) would
+   still pass. Added an explicit `>${escapedUrl}</a>` containment check on the visible fallback
+   text and tightened the count to exactly 3 (button href + fallback href + fallback visible
+   text). Also removed the vacuous `expect(bodyText).not.toContain(URL)` (it asserted a property
+   of the test fixture, not of the renderer's output) and replaced it with a check on the
+   rendered body-paragraph HTML slice (before the button block) instead.
+
+Not required, left as-is per the review (noted for the record, no action taken): the extra
+uncached Dataverse read on the context route, the aria-label vs. visible-text mismatch on
+"Choose a different file" (mirrors the existing picker's pattern), and the sign-off-before-button
+paragraph order (matches the house email pattern).
+
+**Verification re-run sequentially after the fixes, all green:**
+- `npx jest tests/unit/site-visit-materials tests/unit/external-materials tests/unit/alert-recipients tests/unit/grantee-invite-email` → 12 suites, 90 tests passed.
+- `npm run check:types` → passed.
+- `npm run check:api-routes` → passed (same pre-existing, unrelated "no recognized guard token" warnings for the three untouched `/api/external/materials/[token]/*` routes; 208 routes covered).
+- `npm run check:api-routes:self-test` → OK.
+- `npm run check:request-document-writers` → OK, 7 actor-aware create seams.
+- `npm run check:request-document-writers:self-test` → OK.
+- `npm run check:fact-consistency` → OK, 735 docs scanned.
+- `npm run check:fact-consistency:self-test` → OK.
+- `npm run check:prompt-injection-tagging` → OK, 28 surfaces, 0 pending.
+- `npm run check:prompt-injection-tagging:self-test` → OK, 18/18.
+- `npx eslint "pages/external/materials/[token].js" lib/external/site-visit-materials-email.js lib/services/site-visit-materials/collection-service.js lib/services/site-visit-materials/contributor-service.js` → no output, no errors.

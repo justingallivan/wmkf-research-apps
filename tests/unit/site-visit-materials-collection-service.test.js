@@ -106,7 +106,7 @@ test('create: advancing request + active visit → due two business days before 
   expect(email.url).toContain('https://apps.test/external/materials/jwt-');
   expect(email.buttonLabel).toBe('Upload site visit materials');
   expect(email.bodyText).not.toContain('https://apps.test/external/materials/jwt-');
-  expect(email.bodyText).toContain('You may forward this link to a colleague who is helping.');
+  expect(email.bodyText).toContain('No login is needed. You may forward the link below to a colleague who is helping.');
   expect(email.bodyText).not.toContain('The link stays open until');
   expect(email.bodyText).toContain('Presentation (PDF)');
   expect(email.bodyText).toContain('Monday, October 5, 2026');
