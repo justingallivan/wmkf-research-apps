@@ -19,6 +19,10 @@ jest.mock('../../lib/services/deliberation-stage-labels', () => ({
 jest.mock('../../lib/services/deliberation-briefing/session-reader', () => ({
   getDeliberationSessionForRequest: jest.fn(async () => null),
 }));
+jest.mock('../../lib/services/site-visit-materials/summary-reader', () => ({
+  getMaterialsSummaryForRequest: jest.fn(async () => null),
+}));
+import { getMaterialsSummaryForRequest } from '../../lib/services/site-visit-materials/summary-reader';
 import { getDeliberationSessionForRequest } from '../../lib/services/deliberation-briefing/session-reader';
 
 import { getUserRole, requireAppAccess } from '../../lib/utils/auth';
@@ -115,7 +119,19 @@ test('reads current/pending status without invoking generation', async () => {
     stageLabels: STAGE_LABELS,
     session: null,
     sessionAttendees: [],
+    materials: null,
   });
+});
+
+test('the GET payload carries the applicant-materials summary (counts and window only; the reader owns the fail-open null)', async () => {
+  const summary = { state: 'missing', receivedCount: 1, requiredCount: 3, otherCount: 0, dueAt: '2026-10-05T19:00:00.000Z', closesAt: '2026-10-14T19:00:00.000Z', overdue: false, invited: true };
+  getMaterialsSummaryForRequest.mockResolvedValueOnce(summary);
+  getPreSiteVisitArtifactStatus.mockResolvedValueOnce({ currentArtifact: null, pendingArtifact: null, reopenHistory: [] });
+  const res = mockRes();
+  await handler(get(), res);
+  expect(getMaterialsSummaryForRequest).toHaveBeenCalledWith({ requestId: REQUEST_ID });
+  expect(res.body.materials).toEqual(summary);
+  expect(JSON.stringify(res.body)).not.toMatch(/contributorUrl|contacts/);
 });
 
 test('the GET payload carries the tracker session line through the briefing seam, reduced to the card shape (fail-open null on error)', async () => {
@@ -189,6 +205,7 @@ test('omits guarded-reopen audit history for non-superusers', async () => {
     stageLabels: STAGE_LABELS,
     session: null,
     sessionAttendees: [],
+    materials: null,
   });
 });
 
@@ -214,6 +231,7 @@ test('keeps a regular pending generation visible to non-superusers without corre
     stageLabels: STAGE_LABELS,
     session: null,
     sessionAttendees: [],
+    materials: null,
   });
 });
 

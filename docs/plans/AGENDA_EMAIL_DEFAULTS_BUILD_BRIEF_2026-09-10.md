@@ -174,7 +174,7 @@ and the terminal-retry test now asserts Subject and Message, not just To.
 
 **Gates run, all clean (re-run after the Opus review fixes):**
 - `npm run check:types` — clean (no tsc errors).
-- `npm run check:api-routes` && `:self-test` — 208 route files covered, only the
+- `npm run check:api-routes` && `:self-test` — 208 route files covered, only the <!-- fact-consistency:ignore fact=api-route-file-count as-of=2026-09-10 -->
   pre-existing 3 unrelated `/api/external/materials/[token]/*` warnings; self-test OK.
 - `npm run check:atlas` && `:self-test` — 45 Postgres tables / 36 Dataverse entity sets
   covered; self-test 12/12.

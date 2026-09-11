@@ -6,7 +6,10 @@ import {
   getMaterialsCollection,
   invitationBodyText,
   matchReceivedFiles,
+  missingRequiredItems,
+  projectCollection,
   remindMaterialsContributors,
+  summarizeCollection,
   waiveMaterialsItem,
 } from '../../lib/services/site-visit-materials/collection-service';
 
@@ -178,4 +181,27 @@ test('a collection past its close instant reads as closed even before the sweep 
   const body = invitationBodyText({ institution: 'U', title: 'T', visitStartIso: '2026-10-07T16:00:00Z', timeZone: 'America/Los_Angeles', dueAt: '2026-10-05T16:00:00Z', checklist: [{ key: 'a', label: 'A', required: true, waived: false }, { key: 'b', label: 'B', required: true, waived: true }] });
   expect(body).not.toContain('- B');
   expect(body).not.toContain('The link stays open');
+});
+
+test('summarizeCollection keeps state, counts, and the window; drops the link, contacts, and per-item detail; waived items leave the denominator', async () => {
+  const d = deps();
+  await createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org' }, d);
+  d.findDocumentsByRequest.mockResolvedValue({ records: [registryRow({ id: 'p', filename: '1003222 Site Visit Presentation.pdf' })] });
+  await waiveMaterialsItem({ requestId: REQUEST_ID, key: 'participant_bios', waived: true }, d);
+  const { collection } = await getMaterialsCollection({ requestId: REQUEST_ID }, d);
+  expect(collection.contributorUrl).toMatch(/^https?:\/\/|^\/external\/materials\//);
+  const summary = summarizeCollection(collection);
+  expect(summary).toEqual({
+    state: 'missing', receivedCount: 1, requiredCount: 2, otherCount: 0,
+    dueAt: collection.dueAt, closesAt: collection.closesAt, overdue: false, invited: true,
+  });
+  expect(Object.keys(summary)).not.toEqual(expect.arrayContaining(['contributorUrl', 'contacts', 'checklist', 'id']));
+  expect(summarizeCollection(null)).toBeNull();
+  expect(missingRequiredItems({ checklist: collection.checklist }, { presentation_pdf: { artifactId: 'p' } }).map((item) => item.key)).toEqual(['presentation_source']);
+});
+
+test('projectCollection reports a past closes_at as closed even while the row still says open (the sweep only makes that durable)', () => {
+  const row = { id: 'c', request_id: REQUEST_ID, site_visit_activity_id: VISIT_ID, status: 'open', due_at: '2026-10-05T19:00:00Z', closes_at: '2026-10-14T19:00:00Z', checklist: [], contacts: {}, created_at: NOW };
+  expect(projectCollection(row, { now: new Date('2026-10-15T00:00:00Z') }).state).toBe('closed');
+  expect(projectCollection(row, { now: new Date('2026-10-10T00:00:00Z') }).state).toBe('received');
 });

@@ -38,6 +38,7 @@ import {
   deriveDeliberationStage,
   visitExpected,
 } from '../../utils/deliberation-stage';
+import { siteVisitMaterialsLine } from '../../utils/site-visit-materials-line';
 import {
   PRE_SITE_REOPEN_CONTRACT,
   PRE_SITE_REOPEN_REASON_LABEL,
@@ -149,6 +150,7 @@ export default function StaffDeliberationsTab({
   const [composerOpen, setComposerOpen] = useState(false);
   const [session, setSession] = useState(null);
   const [sessionAttendees, setSessionAttendees] = useState(EMPTY_LIST);
+  const [materials, setMaterials] = useState(null);
   const [latestSendFailure, setLatestSendFailure] = useState(null);
   const [confirmDialog, setConfirmDialog] = useState(null); // null | 'regenerate'
   const [startingShare, setStartingShare] = useState(false);
@@ -174,6 +176,7 @@ export default function StaffDeliberationsTab({
     setComposerOpen(false);
     setSession(null);
     setSessionAttendees(EMPTY_LIST);
+    setMaterials(null);
     setLatestSendFailure(null);
     setConfirmDialog(null);
     setStartingShare(false);
@@ -196,6 +199,7 @@ export default function StaffDeliberationsTab({
           if (status.stageLabels) setStageLabels(status.stageLabels);
           setSession(status.session || null);
           setSessionAttendees(Array.isArray(status.sessionAttendees) ? status.sessionAttendees : EMPTY_LIST);
+          setMaterials(status.materials || null);
           if (status.pendingArtifact?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.FAILED) {
             setError(failureMessage(
               status.pendingArtifact,
@@ -266,6 +270,7 @@ export default function StaffDeliberationsTab({
       if (status.stageLabels) setStageLabels(status.stageLabels);
       if (status.session !== undefined) setSession(status.session || null);
       if (status.sessionAttendees !== undefined) setSessionAttendees(Array.isArray(status.sessionAttendees) ? status.sessionAttendees : EMPTY_LIST);
+      if (status.materials !== undefined) setMaterials(status.materials || null);
 
       if (pending?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.FAILED) {
         throw new Error(failureMessage(pending, 'The latest Word-draft attempt failed.'));
@@ -582,6 +587,9 @@ export default function StaffDeliberationsTab({
   // visit date, and at Final nothing is pending.
   const showSessionLine = !beyondDeliberations && stage !== 'visit';
   const showVisitLine = showSessionLine && visitLineVisible;
+  // Applicant materials (plan §16.3, PR 3): shown at every stage before Final
+  // once a collection exists, since the files matter through the visit.
+  const materialsLine = !beyondDeliberations && stage !== 'final' ? siteVisitMaterialsLine(materials) : null;
   const moreItems = [
     readyFile && !beyondDeliberations && {
       key: 'download', label: 'Download', href: downloadUrl, download: readyFile.name || true, title: readyFile.name || undefined,
@@ -629,6 +637,11 @@ export default function StaffDeliberationsTab({
                 {showVisitLine && (
                   <p className="mt-1 text-xs text-gray-500" data-testid="deliberations-visit-line">
                     {deliberationVisitLine(visit)}
+                  </p>
+                )}
+                {materialsLine && (
+                  <p className="mt-1 text-xs text-gray-500" data-testid="deliberations-materials-line">
+                    {materialsLine}
                   </p>
                 )}
                 {shared && latestSendFailure && (

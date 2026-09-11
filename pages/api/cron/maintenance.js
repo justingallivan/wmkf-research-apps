@@ -229,6 +229,15 @@ export default async function handler(req, res) {
       results.scheduledEmailMessages = { error: error.message };
     }
 
+    // 7.8. Applicant materials collections past their window close (plan
+    //      §16.3, PR 3). Not a deletion: the closed row stays for the record
+    //      and the request becomes free to start another collection.
+    try {
+      results.siteVisitMaterialCollectionsClosed = await MaintenanceService.closeExpiredSiteVisitMaterialCollections();
+    } catch (error) {
+      results.siteVisitMaterialCollectionsClosed = { error: error.message };
+    }
+
     // 8. Dynamics feedback cleanup (20 days after first admin ACK).
     // Owner decision 2026-08-08: reviewed_at is the retention clock; rows
     // without an ACK remain ineligible regardless of status or creation age.
@@ -276,6 +285,7 @@ export default async function handler(req, res) {
     // Summary line is computed the same way regardless of outcome
     const summary = Object.entries(results)
       .map(([key, val]) => {
+        if (key === 'siteVisitMaterialCollectionsClosed' && typeof val === 'number') return `${key}: ${val} closed`;
         if (typeof val === 'number') return `${key}: ${val} deleted`;
         if (val?.deleted !== undefined) return `${key}: ${val.deleted} deleted, ${val.errors || 0} errors`;
         if (val?.error) return `${key}: ERROR - ${val.error}`;

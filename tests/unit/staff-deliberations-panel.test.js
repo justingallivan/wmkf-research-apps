@@ -173,3 +173,19 @@ test('cycle-view rails read the draft substate on the first stop (S503)', async 
     expect.stringContaining('● AI draft ready'),
   ]);
 });
+
+it('renders the applicant-materials line when the row carries a summary and omits it otherwise (plan §16.3, PR 3)', async () => {
+  const materials = { state: 'missing', receivedCount: 2, requiredCount: 3, otherCount: 0, dueAt: '2026-10-05T19:00:00Z', closesAt: '2026-10-14T19:00:00Z', overdue: true, invited: true };
+  global.fetch.mockResolvedValue(mockResponse({
+    success: true, cycleCode: 'D26', scope: 'all', stageLabels: STAGE_LABELS,
+    counts: { draft: 1, shared: 1, visit: 0, final: 0 },
+    artifacts: [
+      artifact({ artifactId: 'with', requestNumber: '1002959', materials }),
+      artifact({ artifactId: 'without', requestId: 'r2', requestNumber: '1003001', stage: 'shared', substate: 'sent', materials: null }),
+    ],
+  }));
+  render(<StaffDeliberationsPanel cycleCode="D26" loadingCycles={false} scope="all" />);
+  const lines = await screen.findAllByTestId('deliberations-materials-line');
+  expect(lines).toHaveLength(1);
+  expect(lines[0]).toHaveTextContent('Materials: 2 of 3 received · overdue');
+});

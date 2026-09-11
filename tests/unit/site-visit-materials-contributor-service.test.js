@@ -299,3 +299,28 @@ test('a recorded candidate with no registry row is redone from the top, not held
   expect(d.createDocument).toHaveBeenCalledTimes(1);
   expect(d.supersedeDocument).toHaveBeenCalledWith(ROW_PDF.wmkf_requestdocumentid);
 });
+
+test('replay_ambiguous records one durable staff event keyed on the staging id; the redo-from-top path records none; a logging failure changes nothing (plan §16.3, PR 3)', async () => {
+  const unbound = { ...ROW_PDF, wmkf_requestdocumentid: 'eeeeeeee-0000-4000-8000-000000000005', wmkf_sharepointitemid: 'someone-else' };
+  const held = deps({ findDocumentByGenerationKey: async () => ({ records: [unbound] }), recordEvent: jest.fn(async () => ({ id: 1 })) });
+  await expect(finalizeMaterialUpload(finalizeArgs('presentation_pdf', undefined, {
+    candidateResult: { requestId: REQUEST_ID, slot: 'presentation_pdf', generationKey: 'stale' },
+  }), held)).rejects.toMatchObject({ code: 'replay_ambiguous' });
+  expect(held.recordEvent).toHaveBeenCalledTimes(1);
+  expect(held.recordEvent).toHaveBeenCalledWith(expect.objectContaining({
+    eventType: 'site_visit_material_replay_ambiguous', severity: 'error', transient: false, subsystem: 'site-visit-materials',
+    requestNumber: '1003222', dedupeKey: `site_visit_material_replay_ambiguous:${STAGING_ID}`,
+    entityRefs: { requestId: REQUEST_ID, collectionId: COLLECTION_ID, stagingId: STAGING_ID, slot: 'presentation_pdf', registryRowId: unbound.wmkf_requestdocumentid },
+  }));
+
+  const redo = deps({ findDocumentsByRequest: async () => ({ records: [ROW_PDF] }), findDocumentByGenerationKey: async () => ({ records: [] }), recordEvent: jest.fn() });
+  await finalizeMaterialUpload(finalizeArgs('presentation_pdf', undefined, { candidateResult: { requestId: REQUEST_ID, slot: 'presentation_pdf', generationKey: 'stale', predecessorArtifactId: ROW_PDF.wmkf_requestdocumentid, driveId: 'drive', itemId: 'item-1', versionId: '2.0', filename: '1003222 Site Visit Presentation.pdf' } }), redo);
+  expect(redo.recordEvent).not.toHaveBeenCalled();
+
+  const log = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+  const broken = deps({ findDocumentByGenerationKey: async () => ({ records: [unbound] }), recordEvent: async () => { throw new Error('events table gone'); } });
+  await expect(finalizeMaterialUpload(finalizeArgs('presentation_pdf', undefined, {
+    candidateResult: { requestId: REQUEST_ID, slot: 'presentation_pdf', generationKey: 'stale' },
+  }), broken)).rejects.toMatchObject({ code: 'replay_ambiguous', httpStatus: 409 });
+  log.mockRestore();
+});

@@ -536,13 +536,15 @@ each checklist slot.
 
 ### 16.3 Slices
 
-PR 1 and PR 2 were built on `claude/applicant-materials-collection` on 2026-09-10 (S503); owner
-migration + flag + merge pending. PR 3 is planned.
+PR 1 and PR 2 were built on `claude/applicant-materials-collection` on 2026-09-10 (S503) and are
+merged and production-smoked (ZZTEST-03, 2026-09-10). PR 3 was built 2026-09-11 (S506) on
+`claude/applicant-materials-pr3`.
 
 - **PR 1 — staff side:** migration 042; business-day helper; admin cap setting; collection service
   (create from the active visit, contacts snapshot, checklist, link mint, invitation email; reminder
   email; waive; state read joining the registry); tracker route
-  `/api/meeting-tracker/visits/[requestId]/materials`; visit-page card; list-row cue.
+  `/api/meeting-tracker/visits/[requestId]/materials`; visit-page card. (The list-row cue named
+  here was not built in PR 1; it landed in PR 3.)
 - **PR 2 — applicant side [BUILT 2026-09-10]:** external page `pages/external/materials/[token].js`
   (institution, title, due and close dates, checklist with current files, upload per slot, Other);
   routes `/api/external/materials/[token]/{context,upload-token,finalize}`; verifier
@@ -564,8 +566,28 @@ migration + flag + merge pending. PR 3 is planned.
   to confirm success, classifies thrown scanner failures, retains the same staging id in browser
   session storage for transient finalize retry, and validates PPTX/DOCX through bounded exact ZIP
   central-directory entries rather than marker substrings.
-- **PR 3 — visibility and closeout:** "Materials: 2 of 3 received" line on the Staff Deliberations
-  tab and cycle view; auto-close by `closes_at`; reminder cron (owner follow-up).
+- **PR 3 — visibility and closeout [BUILT 2026-09-11, S506]:** a counts-only summary
+  (`lib/services/site-visit-materials/summary-reader.js`, fail-open all-null like the tracker's
+  schedule reader; state, received/required counts, window, overdue, invited; never the contributor
+  link or contacts) rides the `/api/workbench/pre-site-visit` GET, `/api/workbench/staff-deliberations`,
+  and `/api/meeting-tracker/dashboard` payloads and renders as one line
+  (`shared/utils/site-visit-materials-line.js`: "Materials: 2 of 3 received · due Oct 5.", overdue,
+  ready, closed, and invitation-not-sent variants) on the Staff Deliberations tab, the cycle view
+  card, and the tracker list row's Site visit section ("Materials not requested." when a visit
+  exists without a collection). **Auto-close:** the daily maintenance cron's step 7.8 calls the
+  store's `closeExpiredCollections` (open or ready → closed past `closes_at`; readiness-gated),
+  which frees the one-open-collection index; reads already treated a past `closes_at` as closed.
+  **Reminder cron:** `/api/cron/site-visit-materials-reminders` +
+  `lib/services/site-visit-materials/reminder-sweep.js`, policy: one automatic reminder per
+  collection, on the first run after `due_at` with a required item still missing and no reminder
+  (PC or automatic) recorded on or after `due_at`; claim-before-send (conditional UPDATE stamps the
+  reminder before the email goes out, at-most-once; recipients, sender, link, and the optional
+  site-visit read all resolve before the claim, and a delivered email whose receipt fails to attach
+  is counted as `receiptFailed`, not as a transport failure), sent from the creating PC's mailbox to
+  the collection's contacts, `?dryRun=1` supported. **Built but not scheduled**: the `vercel.json` entry
+  is the owner's decision (M5). **Staff signal for `replay_ambiguous`:** the contributor finalize
+  records one durable operational event (`site_visit_material_replay_ambiguous`, error, keyed on the
+  staging id) when it holds a staged upload, so staff see the hold in Admin operational events.
 
 ### 16.4 2026-09-10 UX pass (Build D)
 
