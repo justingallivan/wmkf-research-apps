@@ -118,5 +118,65 @@ composer shows the "not configured" note and blank fields.
 
 ## Handoff (builder fills in)
 
-State claims labeled [VERIFIED via …] or [ASSUMED]. List commits, tests run with counts,
-gates run, and anything left open.
+**Branch/worktree:** `claude/agenda-email-defaults`, created from `main` at `af50dd97`
+(this repo's `HEAD` at task start, `57bf6d07`, predated the commit that added this brief
+file — `[VERIFIED via git log HEAD..main]` showed exactly one commit, `af50dd97`, ahead;
+branched from `main` instead of the stale `HEAD` so the brief file existed to read).
+
+**Commits:**
+- `620e2ca7` — Admin-editable defaults for the deliberation agenda email (catalog entries,
+  seed file + script registration, service `getAgendaStatus`/`resolveAgendaDefault`, client
+  `SessionAgendaPanel.js`, all four named tests, both docs).
+
+**Discrepancies between brief and source:**
+- Item 3's claim "`defaultAgendaSubject`... if it is only used by the client" is imprecise:
+  `[VERIFIED via grep for defaultAgendaSubject across the repo]` — nothing imported the
+  service's `defaultAgendaSubject` at all, including the client (the client had its own
+  separate, duplicate synchronous implementation named `defaultSubject`, not an import of
+  the service function). Followed the brief's fallback instruction anyway: deleted the
+  unused service export; its date-formatting behavior is now covered by
+  `resolveAgendaDefault`'s tests. The client's own local `defaultSubject` function was also
+  removed (superseded by the `defaults` state from GET).
+- **D27 vs D26**: the brief says "D26 is `visitExpected()`; check numbering before writing"
+  and asks for **D27**. `[VERIFIED via grep '\*\*D[0-9]' docs/PC_MEETING_TRACKER_PLAN.md]`:
+  the bolded decision sequence for this plan is D21–D25 (the session agenda email section);
+  there is no bolded `**D26**` decision anywhere in the file. The "D26" the brief's author
+  saw is an unrelated grant-cycle label (e.g. "23 advancing D26 requests", a table cell
+  referencing `visitExpected()`) that coincidentally strings-matches "D26" — not a decision
+  number in this doc's `**Dn**` sequence. Followed the source: added the new decision as
+  **D26** (not D27), immediately after D25 in the agenda section.
+
+**Tests run** (`npx jest tests/unit/meeting-tracker-agenda tests/unit/seed-email-defaults
+tests/unit/email-defaults-routes tests/unit/meeting-tracker`): 19 suites, **125/125 passed**.
+Includes 3 new agenda-service tests (defaults resolution with token substitution, blank/unset
+default, strict-read failure → `unavailable:true`), 3 new `resolveAgendaDefault` unit tests
+(token present, token absent, invalid session time falls back to raw template), 1 new
+seed-email-defaults test (both new keys registered), and 1 new panel test (unavailable note +
+blank fields), plus fixture updates to 7 existing panel tests to carry the new `defaults` GET
+field. `[VERIFIED via test run output]`.
+
+**Gates run, all clean:**
+- `npm run check:types` — clean (no tsc errors).
+- `npm run check:api-routes` && `:self-test` — 208 route files covered, only the
+  pre-existing 3 unrelated `/api/external/materials/[token]/*` warnings; self-test OK.
+- `npm run check:atlas` && `:self-test` — 45 Postgres tables / 36 Dataverse entity sets
+  covered; self-test 12/12.
+- `npm run check:fact-consistency` && `:self-test` — 734 docs scanned, canonical facts
+  current; self-test OK.
+- `npm run check:status-enum-parity` && `:self-test` — 8 invariants in sync; self-test 17/17.
+- `npm run check:secret-scan` && `:self-test` — 3533 files scanned, clean; self-test OK.
+
+**Left open / not run:**
+- `npm run check:agent-invariants` fails in this worktree
+  (`.agents/skills` and `.claude-memory` report "not a symlink / missing") but
+  `[VERIFIED via git stash]` this failure is pre-existing and unrelated to this build: it
+  reproduces identically with every change from this branch stashed out, i.e. against the
+  same `main`-derived tree this branch started from. Not in the brief's Verification block
+  and not caused by this diff; left for the owner/environment to address, not attempted here
+  (outside Owned files and outside the stated Verification list).
+- Rollout (seeding the two new keys against production Dataverse) is explicitly the owner's
+  step per the brief; not run here, no credentials used.
+- `check:agent-wiki` was flagged as advisory (non-blocking) by the pre-edit hooks on
+  `scripts/seed-email-defaults.mjs` and `docs/API_ROUTE_SECURITY_MATRIX.md` changes; not run,
+  since neither edit changes a durable-behavior fact the wiki topic pages state (mechanical
+  new-key registration and a matrix-row description of code written in this same session).
