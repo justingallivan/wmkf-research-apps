@@ -134,7 +134,11 @@ calls the same service.
   and move a slot to another session in place. Since 2026-09-11 the lead PD is display-only on
   the row (seeded from the request's PD when the proposal is added; owner: reassignment at this
   point is rare and a second editable copy invites drift). The slot field and the agenda email's
-  "Lead PD:" line are unchanged; correcting a wrong lead PD means remove and re-add.
+  "Lead PD:" line are unchanged; correcting a wrong lead PD means remove and re-add. Since
+  2026-09-11 each row also shows the applicant institution under the title (owner request),
+  read from the cycle dashboard's `institution` (the Workbench dashboard's formatted Applicant
+  lookup passed through `loadMeetingTrackerDashboard`); it is omitted when the page is opened
+  without a cycle in the URL, the same degraded mode the title already falls back through.
 - One visit editor per request: the fields the Activity already has, written through the existing
   logistics service.
 
