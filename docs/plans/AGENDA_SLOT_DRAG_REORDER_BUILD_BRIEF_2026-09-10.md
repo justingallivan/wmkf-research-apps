@@ -152,8 +152,8 @@ verbatim into this worktree at the same path and is committed here.
 originally, this brief), `030355f8` (follow-up: notice-timing fix so the assistive
 announcement only fires after the reorder PATCH succeeds, a `busy` guard added to
 `handleDrop` to match `handleDragStart`/`handleDragOver`, an ETag assertion added to the RTL
-reorder test, Handoff corrections), and a third commit (see the branch log for its SHA)
-addressing an orchestrator-relayed Opus review: added five RTL tests covering downward and
+reorder test, Handoff corrections), and `bad8d071` addressing an orchestrator-relayed Opus
+review: added five RTL tests covering downward and
 upward moves onto the last row's lower/upper half, a self-adjacent no-op, the `busy` state
 (no draggable handles, inert drag sequence), and that only the number-column handle is
 draggable (never the `<li>`, arrows, or form controls); added `setNotice(null)` in
