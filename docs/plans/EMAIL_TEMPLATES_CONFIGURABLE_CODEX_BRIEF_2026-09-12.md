@@ -19,7 +19,7 @@ related:
 ## Where you are
 
 You are in `/Users/gallivan/Code/WMKF_Apps-codex` on branch `codex/email-templates-configurable`
-(created from `origin/main` at `b8e1499b`). Run `/start` there. Claude works in the main checkout
+(created from `origin/main` at `9fbc2243` or later; the branch is pushed). Run `/start` there. Claude works in the main checkout
 on the Cycle Dossier at the same time; your file surfaces are disjoint (§3). Do not check out
 other branches, touch the main checkout, or push to `main`. Commit after each meaningful step and
 push the branch (`git push -u origin codex/email-templates-configurable`); pushing a feature
@@ -48,9 +48,13 @@ their subject and body as code literals, so the copy can only change by commit a
   tokens. Look at how `withdraw-sufficient-service.js` and the grantee reminder path interpolate
   and escape before reusing a helper.
 - **Admin surface:** `pages/api/admin/email-defaults.js` + the Admin "Email defaults" panel read
-  the catalog; a new catalog entry appears there with no UI change. Seeding: a catalog default is
-  the fallback the Admin panel shows and saves; confirm whether any script seeds Dataverse rows
-  before assuming one does (grep `EDITABLE_TEXT_DEFAULTS` consumers; only the admin route today).
+  the catalog; a new catalog entry appears there with no UI change.
+- **Seeding (corrected 2026-09-12 after Codex's read-only survey):** `scripts/seed-email-defaults.mjs`
+  is also a catalog consumer. It walks `EDITABLE_TEXT_DEFAULTS` and **throws
+  `No seed text registered for <key>`** for any catalog key without a seed map entry, and the seed
+  texts live in `lib/seed/email-defaults/*.js` (one module per family, e.g. `grantee-reminder.js`).
+  A new family therefore needs a new `lib/seed/email-defaults/site-visit-materials.js` exporting
+  the subject/body seeds, and the seed script's import/map extended. Both are in your surface (§3).
 
 ## 2. Inventory — what is hard-coded (convert these)
 
@@ -73,6 +77,8 @@ You may edit only:
 - `shared/config/editableTextDefaults.js` (append entries; keep existing keys and order)
 - `lib/services/site-visit-materials/collection-service.js` (the two senders and their body builders)
 - any *new* helper under `lib/services/site-visit-materials/` you need
+- `lib/seed/email-defaults/site-visit-materials.js` (new) and the import/map lines in
+  `scripts/seed-email-defaults.mjs` (plus its test if one exists: `grep -rl seed-email-defaults tests`)
 - `tests/unit/site-visit-materials-collection-service.test.js`, `tests/unit/editable-text-defaults-catalog.test.js`
 - `docs/agent-wiki/topics/intake-portal.md` or the site-visit materials plan
   (`docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md`) — one paragraph naming the new keys
