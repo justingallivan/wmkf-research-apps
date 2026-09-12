@@ -22,7 +22,7 @@ import {loadDossierRoster} from '../../lib/services/cycle-dossier-service';
 import {generateResearch,generateEntry} from '../../lib/services/cycle-dossier-generation';
 import {renderDossierDocuments} from '../../lib/services/cycle-dossier-documents';
 import * as storage from '../../lib/services/cycle-dossier-storage';
-import {drainCycleDossiers} from '../../lib/services/cycle-dossier-worker';
+import {drainCycleDossiers, describeEntryFailure} from '../../lib/services/cycle-dossier-worker';
 
 let run; const clone=x=>JSON.parse(JSON.stringify(x));
 const queued=(id='a')=>({requestId:id,requestNumber:id,revisionId:`rev-${id}`,status:'queued',inputRef:{pathname:'input'},estimate:{highUsd:2},programDirector:'Justin'});
@@ -148,8 +148,35 @@ test('ambiguous provider failure is terminal for that attempt and preserves its 
   generateResearch.mockImplementation(async(input,config,options)=>{await options.beforePaidCall({stage:'research-plan'});throw new Error('connection lost');});
   await drainCycleDossiers();
   expect(run.data.items[0]).toMatchObject({status:'failed',paidInFlight:true,reservationUsd:2});
+  // Unknown provider text never reaches the page; the stage and the charge do.
+  expect(run.data.items[0].error).toBe('The literature research stage hit an unexpected problem. A possible charge remains reserved; retry reruns only this stage.');
+  expect(run.data.items[0].error).not.toContain('connection lost');
   expect(run.data.reservedUsd).toBe(2);expect(run.status).toBe('failed');
   expect(store.publishDossierEdition).not.toHaveBeenCalled();
+});
+test('a transport timeout on the entry stage is named with its duration and the retained charge',async()=>{
+  run.data.items[0].researchRef={pathname:'saved-research'};
+  generateEntry.mockImplementation(async(input,research,config,options)=>{await options.beforePaidCall({stage:'entry'});throw new Error('Claude API timeout after 85000ms');});
+  await drainCycleDossiers();
+  expect(run.data.items[0]).toMatchObject({status:'failed',paidInFlight:true});
+  expect(run.data.items[0].error).toBe("The briefing stage's AI call timed out after 85 seconds. A possible charge remains reserved; retry reruns only this stage.");
+});
+test('describeEntryFailure names each cause class in plain words',()=>{
+  const unpaid={researchRef:{},payloadRef:{},files:null,paidInFlight:false};
+  expect(describeEntryFailure(Object.assign(new Error('x'),{code:'executor_deadline_exhausted'}),{paidInFlight:true}))
+    .toBe("The literature research stage ran out of time before the worker's turn ended. A possible charge remains reserved; retry reruns only this stage.");
+  expect(describeEntryFailure(Object.assign(new Error('x'),{code:'claude_output_refused'}),{researchRef:{},paidInFlight:true}))
+    .toMatch(/^The AI declined to write the briefing output\./);
+  expect(describeEntryFailure(Object.assign(new Error('x'),{code:'claude_output_truncated'}),{researchRef:{},paidInFlight:true}))
+    .toMatch(/^The briefing output ran past its length limit and was not saved\./);
+  expect(describeEntryFailure(Object.assign(new Error('x'),{status:529}),{researchRef:{},paidInFlight:true}))
+    .toMatch(/^The AI service was busy \(HTTP 529\) during the briefing stage\./);
+  expect(describeEntryFailure(Object.assign(new Error('Entry cited unknown source oa-9'),{code:'cycle_dossier_entry_reference_invalid'}),{researchRef:{},paidInFlight:false}))
+    .toBe('The briefing stage stopped: Entry cited unknown source oa-9. Saved work is kept; retry resumes from the last checkpoint. If it keeps failing, contact an administrator.');
+  expect(describeEntryFailure(Object.assign(new Error('The published file differs from the frozen entry.'),{httpStatus:409}),{...unpaid,files:{}}))
+    .toBe('The published file differs from the frozen entry. Saved work is kept; retry resumes from the last checkpoint. If it keeps failing, contact an administrator.');
+  expect(describeEntryFailure(new Error('ECONNRESET at internal/stream'),unpaid))
+    .toBe('The document rendering stage hit an unexpected problem. Saved work is kept; retry resumes from the last checkpoint. If it keeps failing, contact an administrator.');
 });
 test('operator stop after claim prevents the next paid stage and leaves the item queued', async()=>{
   store.readDossierControl.mockReset()
