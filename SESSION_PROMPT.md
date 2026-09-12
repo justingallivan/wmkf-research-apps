@@ -1,114 +1,89 @@
-# Session 508 Prompt: Run the Cycle Dossier smoke on 1002852, then the Monday ops meeting
+# Session 509 Prompt: Monday ops meeting, then Cycle Dossier pilot-mode hardening
 
-> Session 507 ran 2026-09-11 with the owner present. Start with `/start`. Eight PRs merged to
-> production (#252–#259). The Cycle Dossier pilot is LIVE AND ENABLED in production in smoke
-> mode, preflight fully green, no run launched yet. The owner ran out of time before launching;
-> the smoke is the first task next session.
+> Session 508 ran 2026-09-12 with the owner present. Start with `/start`. **The Cycle Dossier
+> smoke on 1002852 SUCCEEDED end to end** after four production fixes; the pilot remains in smoke
+> mode (profile 2, allowlist 1002852). Next: Monday 2026-09-14 ops meeting, then the hardening
+> slice in work queue item 11.
 
-## Session 507 Summary (Claude Fable, owner-directed; Sonnet subagents for builds and sweeps; Codex reviews)
+## Session 508 Summary (Claude Fable, owner-directed; no subagents)
 
 ### What Was Completed
 
-1. **Applicant materials PR 3 promoted** (PR #252, `3b41f879`). With `SITE_VISIT_MATERIALS_SCHEMA_READY`
-   on, the three staff lines and the tracker cue render (owner saw "Materials: 2 of 3 received · due
-   Sep 16" on ZZTEST-03). Reminder cron dry run verified in production: HTTP 200, 0 scanned. Cron
-   remains unscheduled (owner M5; ops decides Monday).
-2. **Optional "other" applicant upload hidden** (PR #253, `e71f617d`). One constant
-   `SITE_VISIT_MATERIALS_OTHER_UPLOADS_ENABLED=false` gates the page, the upload-token mint (400), and
-   finalize (`slot_not_open`). Storage path stays built; cron unaffected (`missingRequiredItems` reads
-   checklist items only; `other` is never a key). Plan §16.5.
-3. **Briefing page** (PR #254, `18a5bd70`): proposal title between institution and PI/PD; Research
-   presentation materials open a new tab only for PDFs (`inline` flag in the context mirrors the
-   document route's disposition rule), so a PPTX downloads directly. D28.
-4. **Closeout route structured errors** (PR #255, `18073bfb`): `mapWriteError` now maps interlock
-   denials (503 `write_interlocked`), Dataverse 401/403 (502 `dataverse_forbidden`), other 4xx (502
-   `dataverse_rejected`), 404 on write; fixed copy only. Sibling engagement routes untouched.
-5. **Meeting tracker bare paths** (PR #256, `50436d49`): `/meeting-tracker/sessions` and `/visits`
-   redirect (307) to the dashboard keeping `cycleCode`/`programId`.
-6. **react-hooks lint warnings cleared** (PR #257, `c707f84c`): dead reset block removed from the
-   keyed Staff Deliberations tab (`checkingStatus` seeded from the prop; tests mirror the parent's
-   key); refs false positive suppressed with reason; distribution panel To/Cc seeding moved to a
-   render-time seed check compared by value; `siteVisitId` derived into the prepare payload.
-7. **PC manual reminder claims before sending** (PR #258, `dac9f239`; Sonnet build in a worktree):
-   `claimManualReminder` conditional UPDATE (open, no reminder in the last 60 s) → send → attach;
-   lost claim = 409 `site_visit_materials_reminder_just_sent`; `recordReminder` removed. Plan §16.6.
-8. **Cycle Dossier pilot landed and activated** (PR #259, `9c5943ae`; PR #179 auto-marked merged):
-   `claude/cycle-dossier-reconcile` merged onto main by a Sonnet agent (seven registry conflicts as
-   unions, migration `038`→`045_cycle_dossiers.sql`, fresh-install block V47, preflight
-   `MIGRATION_FILE`, counts regenerated: `requireappaccess-endpoint-count` 128,
-   `api-route-file-count` 212). Seam-drift sweep: only `graph-service.js` overlapped (non-conflicting
-   functions). `/contract-reconcile` Mode B: READY FOR SMOKE. Codex adversarial review: 3 high /
-   3 medium / 1 low → fixed in `fb285cd1` (selection resolved against the server-owned roster so a
-   request-number allowlist works in smoke mode; resume cannot lower the cap below spent+reserved;
-   institution from the Applicant lookup not `wmkf_organizationname`; provider deadline leaves 60 s
-   under the 280 s lease; preflight messages say 045; catalog says six tables; matrix wording).
-   Codex re-review of the fix commit: no actionable defects.
-   **Owner production steps done tonight:** env set in Production (`CYCLE_DOSSIER_ROLLOUT_MODE=smoke`,
-   `CYCLE_DOSSIER_OPERATOR_STOP=false`, `CYCLE_DOSSIER_OPERATOR_PROFILE_ID=2`,
-   `CYCLE_DOSSIER_REQUEST_ALLOWLIST=1002852`, `CYCLE_DOSSIER_ENABLED=true`; Blob token/store id were
-   already connected in all envs); migration 045 applied (`1 applied, 43 skipped`); prompt seed dry
-   run refused both rows (already published v1, exact match); preflight `--live-read --smoke-request
-   1002852` all 13 checks ready (roster 24, narrative 37,839 chars, destination folder
-   `1002852_E5DF0B46…`); redeploy `wmkfresearchapps-kzwmk1npl` Ready; drain probe returns
-   `{"claimed":0}`. **No preview, launch, paid call, or SharePoint write has happened.**
-9. **Durable tracking.** Ops meeting 2026-09-14 agenda memory (6 items); work queue items 10 (email
-   send feedback/consistency audit) and 11 (Cycle Dossier smoke → pilot hardening); agent-wiki index
-   re-verified (90-day window expired mid-session, `5321109d`).
-10. **Diagnosed, record-only:** the 2026-09-10 deliberation send 403 on ZZTEST-03 was a per-user
-    Dataverse role gap (a not-yet-onboarded colleague, one role / 15 privileges; Customer Voice
-    plugin on email create needs `prvCreateActivity` on `msfp_alert` under the impersonated
-    sender). Owner's sends succeed. Resolution owned via onboarding.
+1. **Startup gates all green** (38 gates + 29 self-tests). Memory and Codex-skills symlinks
+   consolidated. Gate list in `.claude/skills/start/SKILL.md` matches `package.json`.
+2. **Missing production env found and fixed (owner).** `CYCLE_DOSSIER_REQUEST_ALLOWLIST` had never
+   been saved in Vercel in any environment; the S507 handoff claim was wrong because the preflight
+   reads the shell's env, not Vercel's. Owner added it as a readable `--type config` var and
+   redeployed. Page then loaded the one-request roster.
+3. **Launch bug: JSONB key order** (PR #260, `56538f94`). Launch re-digested the persisted
+   `item.destination` object; Postgres JSONB reorders keys so `JSON.stringify` never matched and
+   every launch returned 409 "SharePoint destination changed". Preview now stores
+   `destinationHash` (string) beside `destination`; launch and the worker's pre-publish check
+   compare against it. Old previews fail closed with "Preview again".
+4. **First paid run** at 09:38: research-plan call + 3 PubMed searches, entry call, render,
+   DOCX uploaded; then the post-upload integrity check failed. Total spend $0.135; every later
+   retry was free (research/entry checkpointed).
+5. **SharePoint rewrites Office packages on upload** (three PRs as each layer surfaced):
+   #261 `2fed91b3` structural DOCX comparison (decompressed `word/` parts; PDF exact);
+   #262 `06d0ecc3` relationship parts compared as attribute sets ignoring customXml links
+   (SharePoint appends rId13–rId15 to `word/_rels/document.xml.rels`) + the worker now logs the
+   differing part names; #264 `bde60a8a` ignore `[trash]/NNNN.dat` packaging slots. Evidence came
+   from the owner's Word Online copy and then from the new log line. Facts recorded in
+   `docs/CYCLE_DOSSIER_PILOT_DESIGN.md` and `docs/agent-wiki/topics/dataverse-dynamics.md`.
+6. **Owner-side hazard discovered:** opening the SharePoint DOCX in Word Online autosaved a
+   re-serialised package, so verification failed legitimately (every `word/` part differed,
+   `[trash]` parts present). Recovered by restoring version 1.0 in the SharePoint folder view
+   (file-row ⋯ menu → Version history). Recorded as a hardening item.
+7. **Usage logging** (PR #263, `4cabe501`). The Executor's LLMClient has no `appName` by design;
+   the dossier stages never logged. `loggedExecute` in `cycle-dossier-generation.js` writes one
+   `api_usage_log` row per paid call (`cycle-dossier`, run owner profile, tokens, model, latency;
+   error rows on failure). Not retroactive. Admin dollars (`MODEL_PRICING`) may differ slightly
+   from the run ledger (snapshot rates).
+8. **Smoke result:** run completed, item ready, edition `7b656b74…` assembled 11:14 PDT, owner
+   reviewed the PDF ("makes sense"). DOCX and PDF in the request's
+   `AI Artifacts/Cycle Dossier/D26/<revision>/` folder. Work queue item 11 updated
+   (`cfc7e60d`) with the result and the hardening findings.
 
 ### Commits (main, this session)
-`3b41f879` #252 · `554e92ce`/`e71f617d` #253 · `7b7b0649` ops memory · `27794363`/`18a5bd70` #254 ·
-`28343800`/`18073bfb` #255 · `d1ce7ad4`/`50436d49` #256 · `457a7af6`/`c707f84c` #257 · `e1d66641`,
-`5bb04f83` ops memory · `e5870ba7` queue item 10 · `5321109d` agent-wiki · `fb285cd1` dossier fixes ·
-`5fac0254` queue item 11 · `dac9f239` #258 · `9c5943ae` #259.
+`0a37dfee`/`56538f94` #260 · `f224ed7a`/`2fed91b3` #261 · `fc7ff7fb`/`06d0ecc3` #262 ·
+`297d73b7`/`bde60a8a` #264 · `157c2785`/`4cabe501` #263 · `cfc7e60d` queue item 11.
 
 ## Next Items
 
 ### Verified Open
 
-1. **Run the Cycle Dossier smoke on 1002852** (owner, in the page). Evidence: preflight JSON above;
-   drain probe `{"claimed":0}`; PR #259 body "Owner smoke sequence" steps 5. Sequence: open
-   `/cycle-dossier` as profile 2 → select 1002852 (server-checked against the roster) → preview
-   (freezes the narrative; returns low/high USD) → launch with a cap ≥ the high bound → the
-   per-minute cron claims the run; research stage, entry stage, then DOCX/PDF into the request's AI
-   Artifacts folder → verify both private downloads and the exact SharePoint files. Operator stop is
-   on the page. A failed item needs an explicit retry (a `paidInFlight` failure may re-bill; by design).
-   The agent may poll the drain probe and read `cycle_dossier_runs` (owner authorized ledger reads
-   this session) while the owner watches.
-2. **Monday 2026-09-14 ops meeting** — agenda in `project-ops-meeting-2026-09-14-agenda.md`:
-   materials reminder cron schedule; its effects; PC-reminder race (now DONE via #258 — mark as
-   informational); hidden "other" upload; per-user role gap (record-only); dossier drain-cron cadence.
-   After the meeting: record decisions in `docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md` §16 and
+1. **Monday 2026-09-14 ops meeting** — agenda in `project-ops-meeting-2026-09-14-agenda.md`
+   (6 items): materials reminder cron schedule + effects; PC-reminder race (DONE via #258,
+   informational); hidden "other" upload; per-user role gap (record-only); dossier drain-cron
+   cadence (per-minute today; the smoke needed a tick per stage, ~5 ticks per entry). After the
+   meeting: record decisions in `docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md` §16 and
    `docs/CYCLE_DOSSIER_PILOT_DESIGN.md`, add cron entries to `vercel.json` if decided, close the memory.
-3. **Cycle Dossier pilot-mode hardening** (after a clean smoke; work queue item 11): stop re-read
-   inside `LLMClient` retries and between `ensureFolderPath` POSTs; preview/Blob retention job
-   (owner decision open since S494); UI retry affordance + dead `pausing`/`cancelling` strings;
-   `Content-Disposition` filename escaping in `pages/api/cycle-dossier/download.js`; design-doc
-   `last_verified` refresh now that prompts/preflight/activation are real.
-4. **Email send feedback and consistency audit** (work queue item 10): subagent sweep of every
-   send path and every surface that reports a send; propose one contract before any copy edit.
-   Triggers: the quiet 2026-09-10 send failure; the "does not assert inbox delivery" disclaimers.
-5. Owner production checks still not eyeballed: Share composer preview and agenda "Exact email"
-   preview on 1003222; PR #218 cycle view (the per-request rail was verified today).
+2. **Cycle Dossier pilot-mode hardening** (work queue item 11, evidence: today's smoke): round
+   the USD estimate to two decimals; rename "Retry failed" → "Retry failed entries"; show the
+   error banner beside the launch control (owner missed the 409 above the fold); default to the
+   Progress tab while the latest run is unsettled; warn against opening the SharePoint copy in
+   Word Online before ready; plus the S507 list (stop re-read inside LLMClient retries and between
+   `ensureFolderPath` POSTs; preview/Blob retention; dead `pausing`/`cancelling` strings;
+   `Content-Disposition` filename escaping; design-doc `last_verified` refresh).
+3. **Email send feedback and consistency audit** (work queue item 10): unchanged from S507.
+4. Owner production checks still not eyeballed: Share composer preview and agenda "Exact email"
+   preview on 1003222; PR #218 cycle view.
+5. **Verify the two SharePoint files exist** in the request folder (owner saw the DOCX; the PDF
+   upload succeeded per logs but was not eyeballed in SharePoint).
 
 ### Owner Decision Needed
 
-1. Materials reminder cron: `vercel.json` entry or manual (ops Monday). Dry run verified.
-2. Dossier drain cron cadence: per-minute (current, invokes ~43k×/month even when disabled) vs
-   `*/5` vs windowed (ops Monday).
-3. Combined dossier / preview retention policy (open since S494; Codex medium).
-4. Agenda email subject vs "Pre-discussion" body — owner said DONE 2026-09-11 (admin setting).
-5. PR #116 (ROR resolver shadow mode, open since 2026-08-07, no activity): keep or close.
-6. 45 unmerged local branches (older Codex/Claude work): prune or keep. Grep live refs first.
-7. Carried: reissue during Dynamics Pending Send; release-reason `no_response` standing; Program
-   select on Final writeups/Awardees; PD front-end flip.
+1. Pilot mode: when to widen from smoke (one request, profile 2) to the full D26 roster and other
+   superusers. Suggested gate: the hardening slice above.
+2. Materials reminder cron: `vercel.json` entry or manual (ops Monday).
+3. Dossier drain cron cadence (ops Monday).
+4. Combined dossier / preview retention policy (open since S494).
+5. PR #116 (ROR resolver shadow mode): keep or close. 6. 45 unmerged local branches: prune or keep
+   (grep live refs first). 7. Carried: reissue during Dynamics Pending Send; release-reason
+   `no_response`; Program select on Final writeups/Awardees; PD front-end flip.
 8. Sibling engagement routes may share the closeout route's old generic-500 gap (not audited).
-9. The hidden "other" upload toggle is a code constant; an admin setting is an optional follow-up.
-10. The four `CYCLE_DOSSIER_*` flags were stored as hidden secrets by the CLI default; re-add with
-    `--type config` if auditability matters (functionally fine).
+9. The other four `CYCLE_DOSSIER_*` flags are still hidden secrets; re-add with `--type config`
+   if auditability matters (the allowlist is already readable).
 
 ### Parked
 
@@ -116,61 +91,52 @@
 3. Legacy Complete row with null eligibility. 4. `NEXTAUTH_SECRET` rotation; multipart direct-upload
 conversion; Stage III institution identity authority. 5. Playwright coverage for external briefing
 and materials pages. 6. Proposal order P3s. 7. Messages & policies P3s. 8. Slots-only reload after
-reorder. 9. Card-vs-line materials count paths (agree for contributor uploads).
+reorder. 9. Card-vs-line materials count paths. 10. Consolidating Executor usage accounting (the
+Executor comment's follow-up) — the dossier logs its own rows; do not generalise without a decision.
 
 ### Verify Before Acting
 
-1. **Never set `DATAVERSE_ALLOW_PROD_READS`, `DATAVERSE_PROD_WRITE_ACK`, `*_SCHEMA_READY`, or
-   Vercel env vars yourself**; the auto-mode classifier refuses Vercel env writes and (sometimes)
-   Node scripts reading production Postgres even with owner authorization — hand the owner a
-   `! <command>` line. Owner authorized read-only ledger probes this session (repo-local script,
-   `NODE_PATH=node_modules node --env-file=.env.local`, delete after).
-2. The dossier preflight reads only `process.env`: run it with `VERCEL_ENV=production`, the three
-   smoke vars, `DATAVERSE_ALLOW_PROD_READS=yes`, `--env-file=.env.local`, and the two
-   `DOSSIER_BLOB_*` values from a temporary `vercel env pull --environment=development` (deleted
-   after). Exact command in the S507 transcript / PR #259 body.
+1. **Never set Vercel env vars yourself**; hand the owner a `! <command>` line. The auto-mode
+   classifier also refused a `curl` drain probe with the cron secret this session; the owner runs
+   probes. `vercel env ls` and `vercel logs --query` are fine.
+2. **Handoff env claims are not Vercel state.** Verify with `vercel env ls <environment>`; the
+   dossier preflight reads `process.env` only (see `feedback-verify-vercel-env-with-env-ls`).
 3. Worktrees: `../WMKF_Apps-codex` (`codex/parked`), `../WMKF_Apps-codex-tracker`
-   (`codex/meeting-tracker`, merged long ago). The dossier reconcile worktree was removed after #259.
-4. Production hostname for cron probes: `https://wmkfresearch.vercel.app` (aliases
-   `reviews.wmkeck.org` etc.); `CRON_SECRET` in `.env.local` matches production.
+   (`codex/meeting-tracker`, merged long ago).
+4. Production hostname for probes: `https://wmkfresearch.vercel.app`; SharePoint site
+   `https://appriver3651007194.sharepoint.com/sites/akoyaGO`, library `akoya_request`.
 5. Fresh-install blocks: migration 045 = block V47; next migration is 046 → block v48.
-6. `visitExpected()` remains the single D26 assumption in the briefing plan.
-7. Materials manual reminders are now rate-limited to one per 60 s per collection (#258).
+6. Retry resumes from the last checkpoint on a NEW run row (spent resets to 0 on the card; the
+   source run keeps its charges). "Spent $0" on a retry is expected, not a logging gap.
 
 ### Do Not Reopen Without New Decision
 
-1. Cycle Dossier: roster scope is server-side Research (2026-09-08); institution from the Applicant
-   lookup (PR #201 mirror, 2026-09-11); smoke mode = profile 2 + request 1002852 (2026-09-11);
-   entry downloads shared across superusers, combined editions owner-private (design).
-2. Materials reminder cron stays out of `vercel.json` until ops/owner decide (M5, 2026-09-11).
-3. Optional "other" applicant upload hidden, not retired (2026-09-11). Summary payloads on
-   reviewer-gated routes carry counts and window only.
-4. Briefing header order institution → title → PI/PD; non-PDF materials download directly (D28).
-5. Role-gap send failure is record-only; resolution via onboarding (owner, 2026-09-11).
-6. Prior decisions unchanged: arrows removed / position select behind ⋯ / rail drag handle;
-   "Pre-discussion" labels; seed text is init data; ledger `sent` = transport accepted.
+1. Cycle Dossier: roster scope server-side Research; institution from the Applicant lookup;
+   smoke mode = profile 2 + 1002852; entry downloads shared across superusers, combined editions
+   owner-private; **DOCX verification is structural, PDF exact (2026-09-12)**; frozen bytes in the
+   private Blob store remain the artifact of record, the SharePoint copy is a derived publication.
+2. Materials reminder cron stays out of `vercel.json` until ops/owner decide (M5).
+3. Optional "other" applicant upload hidden, not retired. 4. Briefing header order and non-PDF
+download behaviour (D28). 5. Role-gap send failure is record-only. 6. Prior decisions unchanged.
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `docs/CYCLE_DOSSIER_PILOT_DESIGN.md` | Dossier design, env contract, rollout modes, smoke plan |
-| `lib/services/cycle-dossier-{service,store,worker,generation,rollout,storage,sharepoint,documents}.js` | Pilot services (worker: fenced 280 s lease, budget reservation, stop checks) |
-| `pages/cycle-dossier.js`, `pages/api/cycle-dossier/{index,download}.js`, `pages/api/cron/drain-cycle-dossiers.js` | Pilot UI, actions, private downloads, per-minute drain |
-| `scripts/check-cycle-dossier-rollout.js` | Read-only production preflight (all 13 checks ready 2026-09-11) |
-| `lib/db/migrations/045_cycle_dossiers.sql` | Six `cycle_dossier_*` tables + control row (applied in production) |
-| `lib/services/site-visit-materials/collection-store.js` | `claimManualReminder`, `claimAutomaticReminder`, `attachReminderEmailId` |
-| `shared/config/siteVisitMaterials.js` | `SITE_VISIT_MATERIALS_OTHER_UPLOADS_ENABLED` toggle |
-| `lib/services/reviewer-engagement/close-review.js` | `mapWriteError` structured errors |
-| `.claude-memory/project-ops-meeting-2026-09-14-agenda.md` | Monday ops agenda (6 items) |
-| `docs/CURRENT_WORK_QUEUE.md` items 10–11 | Email feedback audit; dossier smoke → pilot hardening |
+| `lib/services/cycle-dossier-worker.js` | `assertPublishedMatchesFrozen`, `ooxmlDifferingParts`, `SHAREPOINT_OWNED_PART`; logs differing parts |
+| `lib/services/cycle-dossier-service.js` | preview stores `destinationHash`; launch compares against it |
+| `lib/services/cycle-dossier-generation.js` | `loggedExecute` → `api_usage_log` per paid stage |
+| `lib/services/cycle-dossier-rollout.js` | smoke/pilot gates; allowlist parser (rejects quoted values) |
+| `docs/CYCLE_DOSSIER_PILOT_DESIGN.md` | design + SharePoint rewrite facts + usage-logging note |
+| `docs/agent-wiki/topics/dataverse-dynamics.md` | Operating note: SharePoint rewrites Office packages |
+| `docs/CURRENT_WORK_QUEUE.md` item 11 | smoke record + hardening findings |
+| `.claude-memory/project-ops-meeting-2026-09-14-agenda.md` | Monday ops agenda |
 
 ## Testing
 
 ```bash
-npx jest tests/unit/cycle-dossier tests/unit/site-visit-materials tests/unit/external-briefing-page.test.js tests/unit/reviewer-closeout-service.test.js tests/unit/meeting-tracker-index-redirects.test.js tests/unit/staff-deliberations-tab.test.js tests/unit/pre-site-distribution-panel.test.js
-npm run check:types && npm run check:api-routes && npm run check:atlas && npm run check:fact-consistency
-# production probes (owner shell): drain tick + materials reminder dry run
-curl -H "Authorization: Bearer $CRON_SECRET" https://wmkfresearch.vercel.app/api/cron/drain-cycle-dossiers
-curl -H "Authorization: Bearer $CRON_SECRET" "https://wmkfresearch.vercel.app/api/cron/site-visit-materials-reminders?dryRun=1"
+npx jest tests/unit/cycle-dossier
+npm run check:types && npm run check:status-enum-parity
+vercel logs --environment production --since 30m --query "drain-cycle-dossiers" --limit 100 --json
+vercel env ls production | grep CYCLE_DOSSIER
 ```

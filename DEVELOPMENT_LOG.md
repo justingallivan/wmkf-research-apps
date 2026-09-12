@@ -10,6 +10,14 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## September 2026 — First Cycle Dossier generated in production; SharePoint Office-package rewrite handled (Session 508)
+
+**Milestone:** The D26 Cycle Dossier pilot produced its first real scientific briefing for request 1002852 end to end: frozen narrative → paid research-plan and entry calls → DOCX/PDF → SharePoint publication → private downloads, with the owner reviewing the PDF.
+**Sessions:** 508 (Fable, owner-directed, no subagents; five PRs in one morning).
+**Ship state:** PRs #260–#264 merged (`56538f94` … `4cabe501`): destination digest stored as a string (JSONB key order), structural DOCX verification tolerant of SharePoint property promotion (customXml items, relationship entries, `[trash]` slots) with differing-part logging, per-stage `api_usage_log` rows. `CYCLE_DOSSIER_REQUEST_ALLOWLIST` added to Vercel (it had never been saved). Spend $0.135.
+**Why it matters:** The pilot's fenced paid path, checkpointed retries, and SharePoint publication are proven on production data; the remaining work is UI hardening and the owner's decision to widen from one request to the cycle.
+**Pointers:** `docs/CYCLE_DOSSIER_PILOT_DESIGN.md`, `docs/agent-wiki/topics/dataverse-dynamics.md` (SharePoint rewrite note), `docs/CURRENT_WORK_QUEUE.md` item 11, `.claude-memory/feedback-verify-vercel-env-with-env-ls.md`.
+
 ## September 2026 — Cycle Dossier superuser pilot live and enabled in production; eight PRs promoted in one owner session (Session 507)
 
 **Milestone:** The D26 Cycle Dossier pilot (Codex build, Session 499 reconcile, parked 292 commits behind main) was merged onto current main, reviewed twice, activated in production smoke mode, and passed a fully green 13-check preflight against request 1002852 — no run launched yet. Same session: applicant materials PR 3 shipped, the optional "other" upload was hidden, and the PC manual reminder gained a claim-before-send.
