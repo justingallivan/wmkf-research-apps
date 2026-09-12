@@ -29,4 +29,12 @@ describe('security headers', () => {
 
     expect(headers['Cache-Control']).toBe('no-store, max-age=0');
   });
+
+  it('allows only same-origin framing of the Cycle Dossier PDF preview', async () => {
+    const rules = await nextConfig.headers();
+    const rule = rules.find(r => r.source === '/api/cycle-dossier/download');
+    expect(toHeaderMap(rule.headers)['X-Frame-Options']).toBe('SAMEORIGIN');
+    // Ordering matters: the override must come after the global DENY rule.
+    expect(rules.indexOf(rule)).toBeGreaterThan(rules.findIndex(r => r.source === '/:path*'));
+  });
 });
