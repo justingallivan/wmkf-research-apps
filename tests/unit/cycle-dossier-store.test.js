@@ -1,7 +1,7 @@
 /** @jest-environment node */
 jest.mock('@vercel/postgres', () => ({ db: { connect: jest.fn() }, sql: { query: jest.fn() } }));
 import { db, sql } from '@vercel/postgres';
-import { assertDossierActor, mutateDossierRun, publishDossierEdition, claimDossierRun, releaseDossierRun, setDossierOperatorStop } from '../../lib/services/cycle-dossier-store';
+import { assertDossierActor, mutateDossierRun, publishDossierEdition, claimDossierRun, releaseDossierRun, setDossierOperatorStop, reserveDossierEntry } from '../../lib/services/cycle-dossier-store';
 
 let client;
 beforeEach(() => {
@@ -90,4 +90,17 @@ test('unexpected in-flight exits keep the lease marker for expiry recovery', asy
   sql.query.mockResolvedValue({rows:[]});
   await releaseDossierRun('run','token');
   expect(sql.query.mock.calls[0][0]).toContain("i->>'status'='running'");
+});
+
+test('reserving an entry assigns the next per-request revision and turns a unique-index race into a 409', async () => {
+  const q = jest.fn().mockResolvedValue({ rows: [{ id: 'e1', request_revision: 3 }] });
+  const row = await reserveDossierEntry({ id: 'e1', requestId: 'req-1', owner: 7, data: {} }, { query: q });
+  expect(row.request_revision).toBe(3);
+  const [text, params] = q.mock.calls[0];
+  expect(text).toMatch(/COALESCE\(MAX\(request_revision\),0\)\+1 FROM cycle_dossier_entries WHERE request_id=\$2/);
+  expect(params).toEqual(['e1', 'req-1', 7, '{}']);
+
+  const dup = Object.assign(new Error('duplicate key value violates unique constraint'), { code: '23505' });
+  await expect(reserveDossierEntry({ id: 'e2', requestId: 'req-1', owner: 7, data: {} }, { query: jest.fn().mockRejectedValue(dup) }))
+    .rejects.toMatchObject({ httpStatus: 409, message: /Another launch just reserved a revision/ });
 });
