@@ -19,6 +19,7 @@ jest.mock('../../lib/services/cycle-dossier-generation.js', () => ({
   prepareRequestInput: jest.fn(),
   snapshotConfiguration: jest.fn(),
   estimateGenerationCost: jest.fn(),
+  resolveEntryTimeoutMs: jest.fn(async () => 200000),
 }));
 jest.mock('../../lib/services/cycle-dossier-sharepoint.js', () => ({
   resolveDossierDestination: jest.fn(async () => ({ library: 'akoya_request', folder: '1001_GUID', siteId: 'site', driveId: 'drive' })),
@@ -233,6 +234,22 @@ test('retry starts a new run with a fresh budget and no carried charges', async 
   expect(result.run.id).toBe('run-new');
   expect(store.createDossierRun).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ spentUsd: 0, reservedUsd: 0, budgetUsd: 6 }) }), client);
   expect(store.createDossierRun.mock.calls[0][0].data.items).toEqual(expect.arrayContaining([expect.objectContaining({ requestId: ID, status: 'ready' }), expect.objectContaining({ requestId: ID2, status: 'queued', error: null })]));
+});
+
+test('retry refreshes the entry-stage timeout from the current admin budget while keeping the pinned prompts', async () => {
+  const generation = require('../../lib/services/cycle-dossier-generation.js');
+  generation.resolveEntryTimeoutMs.mockResolvedValueOnce(200000);
+  const config = { prompts: { entry: { wmkf_promptversion: 1 } }, budget: { entryTimeoutMs: 85000 } };
+  const source = runRow({ id: 'run-old', status: 'failed', dossier_id: 'dossier-1', owner_profile_id: 7, data: { spentUsd: 0.08, reservedUsd: 23, budgetUsd: null, config, items: [{ requestId: ID2, status: 'failed', inputRef: 'input-ref', researchRef: 'research-ref', error: 'timed out' }] } });
+  const client = { query: jest.fn().mockResolvedValue({ rows: [source] }) };
+  store.withDossierTransaction.mockImplementation(async (fn) => fn(client));
+  store.createDossierRun.mockImplementation(async ({ data }) => runRow({ id: 'run-new', data }));
+  await controlCycleDossier(7, { action: 'retry', runId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee' });
+  const data = store.createDossierRun.mock.calls[0][0].data;
+  expect(data.config.budget.entryTimeoutMs).toBe(200000);
+  expect(data.config.prompts).toEqual(config.prompts);
+  // The research checkpoint survives the retry so only the entry call reruns.
+  expect(data.items[0]).toMatchObject({ status: 'queued', researchRef: 'research-ref' });
 });
 
 test('entry revisions are shared across superusers while editions remain owner-private', async () => {
