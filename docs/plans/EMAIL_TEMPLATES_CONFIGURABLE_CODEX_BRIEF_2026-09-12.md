@@ -63,13 +63,13 @@ their subject and body as code literals, so the copy can only change by commit a
 | Site-visit materials invitation | `lib/services/site-visit-materials/collection-service.js` `sendInvitation` (~L339–360) + `invitationBodyText` (~L224) | subject `Site visit materials requested — <title>`; multi-paragraph body with checklist | `email.site_visit_materials_invite.subject/.body` |
 | Site-visit materials reminder | same file, `sendReminderEmail` (~L412) + `reminderBodyText` (~L237) | subject `Reminder: site visit materials — <title>`; body with missing items | `email.site_visit_materials_reminder.subject/.body` |
 
-Also **survey and list** (do not convert without listing first in your handoff, and skip if the
-owner's rule below excludes them): `lib/services/scheduled-email-service.js` (daily summary
-subject, internal ops mail), `lib/services/notification-service.js` (`[SEVERITY] title`, ops
-alerting), `lib/utils/email-generator.js` (`Invitation to Review: {{proposalTitle}}` — check
-whether this is a live default or a dead legacy path), and any other `subject:` literal you find
-with `grep -rn "subject: [\`'\"]" lib pages/api`. **Rule:** convert applicant-, reviewer-, and
-grantee-facing mail; leave internal ops/alert mail hard-coded and say so.
+The survey of other `subject:` literals is already done (Codex, read-only, 2026-09-12) and
+needs no further conversion: `lib/services/scheduled-email-service.js:431` (internal daily summary)
+and `lib/services/notification-service.js:122` (internal ops alert) stay hard-coded by the owner's
+rule; `lib/utils/email-generator.js:489` is a legacy `DEFAULT_TEMPLATE` with no live importer,
+flagged for a separate cleanup; `lib/services/review-manager/render-emails-service.js:231` holds
+`subject: ''` sentinels, not copy; nothing under `pages/api`. **Rule:** convert applicant-,
+reviewer-, and grantee-facing mail; leave internal ops/alert mail hard-coded.
 
 ## 3. Owned file surface (the safety boundary)
 
