@@ -63,6 +63,7 @@ import {
   downloadCycleDossier,
   getCycleDossierPage,
   launchCycleDossier,
+  loadDossierRoster,
   previewCycleDossier,
 } from '../../lib/services/cycle-dossier-service.js';
 
@@ -201,7 +202,7 @@ test('launch accepts a captured-at change with the same content hash and rejects
     if (value?.folder) return value.folder;
     return JSON.stringify(value);
   });
-  store.readDossierPreview.mockResolvedValue({ id: PREVIEW, dossier_id: 'dossier-1', data: { rosterHash: 'roster-hash', items: [{ requestId: ID, requestNumber: 'D26-001', inputRef: 'input-ref', inputHash: 'hash-a', destination: { library: 'akoya_request', folder: '1001_GUID', siteId: 'site', driveId: 'drive' } }] } });
+  store.readDossierPreview.mockResolvedValue({ id: PREVIEW, dossier_id: 'dossier-1', data: { rosterHash: 'roster-hash', items: [{ requestId: ID, requestNumber: 'D26-001', inputRef: 'input-ref', inputHash: 'hash-a', destination: { library: 'akoya_request', folder: '1001_GUID', siteId: 'site', driveId: 'drive' }, destinationHash: '1001_GUID' }] } });
   store.findDossierLaunch.mockResolvedValue(null);
   store.withDossierTransaction.mockImplementation(async (fn) => fn({ query: jest.fn(async () => ({ rows: [] })) }));
   store.createDossierRun.mockResolvedValue(runRow());
@@ -253,4 +254,32 @@ test('operator stop persists a global stop without requiring a run id', async ()
   await expect(controlCycleDossier(7, { action: 'operator-stop', stop: true, reason: 'controlled rehearsal complete' }))
     .resolves.toEqual({ control: { stopRequested: true, reason: 'controlled stop', updatedAt: '2026-09-07T00:00:00Z' } });
   expect(store.setDossierOperatorStop).toHaveBeenCalledWith(7, true, 'controlled rehearsal complete');
+});
+
+test('launch accepts a preview destination whose keys came back from JSONB in a different order', async () => {
+  // Postgres JSONB stores object keys sorted by length then bytewise, so the
+  // persisted destination never stringifies the way the live resolver's does.
+  // The digest under test is the REAL one; a mocked digest hid this in production.
+  const { dossierDigest: realDigest } = jest.requireActual('../../lib/services/cycle-dossier-storage.js');
+  storage.dossierDigest.mockImplementation(realDigest);
+  const live = { library: 'akoya_request', folder: '1001_GUID', siteId: 'site', driveId: 'drive', requestFolderId: 'folder-id' };
+  const persisted = { driveId: 'drive', folder: '1001_GUID', siteId: 'site', library: 'akoya_request', requestFolderId: 'folder-id' };
+  expect(JSON.stringify(persisted)).not.toBe(JSON.stringify(live));
+  resolveDossierDestination.mockResolvedValue(live);
+  const input = { requestId: ID, requestNumber: 'D26-001', narrative: { text: 'Frozen narrative', contentHash: 'hash-a', capturedAt: 'T1' } };
+  generation.prepareRequestInput.mockResolvedValue(input);
+  const { capturedAt: _c, ...narrative } = input.narrative;
+  const inputHash = realDigest({ requestId: ID, requestNumber: 'D26-001', narrative, priorAiContext: undefined });
+  const item = { requestId: ID, requestNumber: 'D26-001', inputRef: 'input-ref', inputHash, destination: persisted, destinationHash: realDigest(live) };
+  const rosterHash = realDigest(await loadDossierRoster());
+  store.readDossierPreview.mockResolvedValue({ id: PREVIEW, dossier_id: 'dossier-1', data: { rosterHash, items: [item] } });
+  store.findDossierLaunch.mockResolvedValue(null);
+  store.withDossierTransaction.mockImplementation(async (fn) => fn({ query: jest.fn(async () => ({ rows: [] })) }));
+  store.createDossierRun.mockResolvedValue(runRow());
+  await expect(launchCycleDossier(7, { previewId: PREVIEW, idempotencyKey: KEY, budgetUsd: 15 })).resolves.toMatchObject({ run: { id: 'run-1' } });
+
+  // A preview persisted before destinationHash existed cannot be launched; it must be redone.
+  store.readDossierPreview.mockResolvedValue({ id: PREVIEW, dossier_id: 'dossier-1', data: { rosterHash, items: [{ ...item, destinationHash: undefined }] } });
+  store.findDossierLaunch.mockResolvedValue(null);
+  await expect(launchCycleDossier(7, { previewId: PREVIEW, idempotencyKey: '11111111-1111-4111-8111-111111111111', budgetUsd: 15 })).rejects.toThrow(/destination changed/i);
 });
