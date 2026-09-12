@@ -7,7 +7,7 @@ summary: "D26 private Cycle Dossier pilot design and branch-local implementation
 canonical: true
 cataloged: 2026-09-07
 owner: product-engineering
-last_verified: 2026-09-08
+last_verified: 2026-09-12
 related:
   - docs/atlas/postgres-cycle-dossiers.md
   - docs/EXECUTOR_CONTRACT.md
@@ -54,14 +54,20 @@ The six Postgres tables are documented in docs/atlas/postgres-cycle-dossiers.md.
 
 **[VERIFIED 2026-09-07 via local validation]** Sol approved the generation and UI contracts. The focused Dossier/Executor suite passes 140 tests in 16 suites; production build, scoped ESLint, types, migration, Atlas, route/security, prompt-boundary, and documentation gates pass. The browser rehearsal exercises 44 synthetic candidates, two retained exclusions, selective rewrites, partial editions, retry, and mobile layout without unknown API calls or console errors. The document rehearsal renders 1,270-word synthetic entries to three pages per individual document and six pages per combined document in both formats, with visible citations, PD boundaries, and no clipping. These fixtures do not establish live service integration.
 
-**[VERIFIED 2026-09-07 via controlled rollout state]** The feature remains disabled. No Cycle Dossier generation, SharePoint artifact publication, deployment, or promotion is claimed. Production and Preview token runtime authentication remains pending the rollout preflight.
+**[VERIFIED 2026-09-12 via production smoke, S508]** The feature is enabled in production in smoke mode (operator profile 2, allowlist request 1002852). One controlled run completed end to end: research plan, three PubMed searches, entry, render, DOCX and PDF published to the request's `AI Artifacts/Cycle Dossier/D26/<revision>/` folder, edition assembled, PDF reviewed by the owner. Total provider spend $0.135. Migration 045, the dedicated store, and governed prompt publication/readback were complete beforehand. Existing populated databases must use the governed migration process; do not run fresh-install setup against them.
 
-**[VERIFIED 2026-09-07]** Migration 045, dedicated store setup, and governed prompt publication/readback are complete. `CYCLE_DOSSIER_ENABLED` remains disabled; no generation, SharePoint artifact publication, unattended cron processing, deployment, or promotion has occurred. Existing populated databases must use the governed migration process; do not run fresh-install setup against them.
+**[VERIFIED 2026-09-12 via source and focused tests, S509]** Pilot-mode hardening landed on branch `claude/dossier-pilot-hardening`: the download route escapes its `Content-Disposition` filename (`lib/utils/content-disposition.js`); the page shows USD to two decimals, repeats the page error beside the Launch button and the run controls, defaults to the Progress tab while the latest run is queued/running/paused, labels the retry control "Retry failed entries", and warns against opening the SharePoint copies in Word Online before the entry is Ready; and the worker re-reads the operator stop inside in-flight paid calls and Graph folder creation (see the stop section below).
 
 ## Controlled rollout remaining
 
-1. Run the read-only rollout preflight to prove each environment's dedicated Blob token/store identity, schema/control row, prompt readback, roster, source, and destination; keep CYCLE_DOSSIER_ENABLED disabled during review.
-2. Review the preflight evidence and authorize exactly one controlled request through generation, SharePoint publication, private downloads, and unattended recovery before cycle-wide use; the preflight's roster, source, destination, material-listing, and access checks must cover that request.
-3. Promote through the Tier 2 release process and enable the worker with literal CYCLE_DOSSIER_ENABLED=true only in the approved environment. A user still launches each dossier after reviewing their inclusion list and budget.
+The preflight, the single controlled request (1002852, 2026-09-12), and the enable in production are done; the worker runs in smoke mode with literal `CYCLE_DOSSIER_ENABLED=true`. Remaining, all owner decisions: when to widen from smoke mode (one request, operator profile 2) to the full D26 roster and other superusers, with the S509 hardening slice as the suggested gate; the drain-cron cadence (ops meeting 2026-09-14); and the preview/Blob retention policy (open since S494). A user still launches each dossier after reviewing their inclusion list and budget.
+
+## Operator stop inside in-flight work
+
+The operator stop (`CYCLE_DOSSIER_ENABLED` not `true`, `CYCLE_DOSSIER_OPERATOR_STOP=true`, or `cycle_dossier_control.stop_requested`) is checked between every worker step. Since S509 it is also polled every 10 seconds per in-flight entry (`operatorStopSignal` in `lib/services/cycle-dossier-worker.js`): the poll aborts the in-flight LLM call or multi-segment Graph folder creation through the Executor's server-owned `signal` argument (combined with `deadlineMs` via `AbortSignal.any`, see `docs/EXECUTOR_CONTRACT.md`) and the item returns to queued with no error, so a stop no longer waits out 429/529 retry backoff. Only a real stop aborts; a transient control-row read failure is ignored until the next between-step check. A run's own Pause or Cancel is unchanged: an in-flight paid call is allowed to finish and its result is retained.
+
+## Word Online hazard
+
+SharePoint copies appear in the request folder before the entry is Ready. Opening the DOCX in Word Online autosaves a re-serialised package, so the worker's structural verification fails legitimately (every `word/` part differs). Observed on the 2026-09-12 smoke; recovered by restoring version 1.0 from the file's Version history in the SharePoint folder view. The page now says so on the Progress tab while a run is active or an entry has a saved file without being Ready.
 
 The LLM estimate excludes storage/hosting costs and is a dispatch control rather than an exact provider-invoice promise. The pilot retains entries and editions; cleanup of expired previews and unreferenced temporary objects remains deferred. PD groups and their requests currently sort by name and request number; custom group ordering and native SharePoint-edit ingestion are outside this build.
