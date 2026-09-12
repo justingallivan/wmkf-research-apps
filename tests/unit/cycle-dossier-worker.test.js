@@ -52,11 +52,76 @@ afterEach(() => {
   delete process.env.CYCLE_DOSSIER_OPERATOR_STOP;
 });
 test('one research stage checkpoints and leaves entry generation for a later invocation',async()=>{
-  await drainCycleDossiers();
+  jest.useFakeTimers();
+  try {
+    await drainCycleDossiers();
+    // The per-entry operator-stop poll interval must be cleared in processEntry's
+    // finally, not left dangling past the happy path (S509 hardening).
+    expect(jest.getTimerCount()).toBe(0);
+  } finally {
+    jest.useRealTimers();
+  }
   expect(generateResearch).toHaveBeenCalledTimes(1);expect(generateEntry).not.toHaveBeenCalled();
   expect(run.data.items[0]).toMatchObject({status:'queued',stage:'research',paidInFlight:false});
   expect(run.data.items[0].researchRef.pathname).toContain('/research-');
   expect(run.data.spentUsd).toBe(0.25);expect(run.data.reservedUsd).toBe(1.75);
+});
+test('operator stop firing during an in-flight paid call aborts the poll signal and leaves the item queued',async()=>{
+  jest.useFakeTimers();
+  try {
+    let started;
+    const startedPromise = new Promise(resolve => { started = resolve; });
+    generateResearch.mockImplementation(async (input, config, options) => {
+      await options.beforePaidCall({ stage: 'research-plan' });
+      started(options.signal);
+      return new Promise((_, reject) => {
+        options.signal.addEventListener('abort', () => reject(options.signal.reason), { once: true });
+      });
+    });
+    const pending = drainCycleDossiers();
+    const signal = await startedPromise;
+    expect(signal.aborted).toBe(false);
+    const readsBefore = store.readDossierControl.mock.calls.length;
+    store.readDossierControl.mockResolvedValue({ stop_requested: true });
+    await jest.advanceTimersByTimeAsync(10000);
+    await pending;
+
+    expect(store.readDossierControl.mock.calls.length).toBe(readsBefore + 1);
+    expect(signal.aborted).toBe(true);
+    expect(signal.reason).toMatchObject({ interrupted: true });
+    expect(run.data.items[0]).toMatchObject({ status: 'queued', error: null, paidInFlight: true, unknownCost: true, reservationUsd: 2 });
+    expect(run.data.reservedUsd).toBe(2);
+    expect(storage.storeDossierJSON).not.toHaveBeenCalled();
+    expect(jest.getTimerCount()).toBe(0);
+  } finally {
+    jest.useRealTimers();
+  }
+});
+test('a transient control-row read failure during an in-flight paid call does not abort it',async()=>{
+  jest.useFakeTimers();
+  try {
+    let started; let finish;
+    const startedPromise = new Promise(resolve => { started = resolve; });
+    generateResearch.mockImplementation(async (input, config, options) => {
+      await options.beforePaidCall({ stage: 'research-plan' });
+      started(options.signal);
+      return new Promise((resolve, reject) => {
+        finish = () => resolve({ research: { evidence: ['p'] }, costUsd: 0.25 });
+        options.signal.addEventListener('abort', () => reject(options.signal.reason), { once: true });
+      });
+    });
+    const pending = drainCycleDossiers();
+    const signal = await startedPromise;
+    store.readDossierControl.mockRejectedValueOnce(new Error('connection reset'));
+    await jest.advanceTimersByTimeAsync(10000);
+    expect(signal.aborted).toBe(false);
+    finish();
+    await pending;
+    expect(run.data.items[0]).toMatchObject({ status: 'queued', stage: 'research', paidInFlight: false });
+    expect(jest.getTimerCount()).toBe(0);
+  } finally {
+    jest.useRealTimers();
+  }
 });
 test('saved research is reused for a later entry stage',async()=>{
   run.data.items[0].researchRef={pathname:'saved-research'};

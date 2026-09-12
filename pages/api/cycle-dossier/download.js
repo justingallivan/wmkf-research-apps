@@ -1,6 +1,7 @@
 import { requireAppAccess } from '../../../lib/utils/auth';
 import { withDalContext } from '../../../lib/dataverse/core/context';
 import { downloadCycleDossier } from '../../../lib/services/cycle-dossier-service';
+import { contentDisposition } from '../../../lib/utils/content-disposition';
 export const config = { api: { responseLimit: false } };
 export default async function handler(req, res) {
   if (req.method !== 'GET') { res.setHeader('Allow','GET'); return res.status(405).json({ error: 'Method not allowed' }); }
@@ -12,7 +13,7 @@ export default async function handler(req, res) {
       const file = await downloadCycleDossier(access.profileId, req.query);
       res.setHeader('Content-Type', file.contentType);
       res.setHeader('X-Content-Type-Options', 'nosniff');
-      res.setHeader('Content-Disposition', `${req.query.format === 'pdf' ? 'inline' : 'attachment'}; filename="${file.filename}"`);
+      res.setHeader('Content-Disposition', contentDisposition(req.query.format === 'pdf' ? 'inline' : 'attachment', file.filename));
       return res.send(file.bytes);
     } catch (error) {
       return res.status(error.httpStatus || 503).json({ error: error.httpStatus ? error.message : 'Unable to retrieve the saved document.' });

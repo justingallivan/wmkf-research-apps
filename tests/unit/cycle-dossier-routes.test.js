@@ -73,8 +73,18 @@ test('download route authenticates first, derives owner from auth, and supports 
   await downloadHandler({ method: 'GET', query: { editionId: 'edition-1', format: 'pdf' } }, res);
   expect(downloadCycleDossier).toHaveBeenCalledWith(7, { editionId: 'edition-1', format: 'pdf' });
   expect(res.headers['Content-Type']).toBe('application/pdf');
-  expect(res.headers['Content-Disposition']).toBe('inline; filename="D26.pdf"');
+  expect(res.headers['Content-Disposition']).toBe(`inline; filename="D26.pdf"; filename*=UTF-8''D26.pdf`);
   expect(res.body).toEqual(Buffer.from('pdf'));
+});
+
+test('download route escapes a filename carrying quotes and a CRLF header-injection attempt', async () => {
+  const maliciousName = '1002852-Scientific "Briefing"\r\nX-Evil: 1.docx';
+  downloadCycleDossier.mockResolvedValue({ bytes: Buffer.from('docx'), contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', filename: maliciousName });
+  const res = response();
+  await downloadHandler({ method: 'GET', query: { editionId: 'edition-1', format: 'docx' } }, res);
+  const header = res.headers['Content-Disposition'];
+  expect(header).not.toMatch(/[\r\n]/);
+  expect(header).toBe(`attachment; filename="1002852-Scientific BriefingX-Evil: 1.docx"; filename*=UTF-8''${encodeURIComponent(maliciousName.replace(/[\r\n]/g, ''))}`);
 });
 
 test('download rejects unsupported methods and preserves API errors', async () => {
