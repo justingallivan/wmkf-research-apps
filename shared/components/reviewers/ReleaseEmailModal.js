@@ -79,15 +79,22 @@ export default function ReleaseEmailModal({ requestId, suggestionIds, onClose, o
   // email editor before staff had said why they were releasing. Nothing loads
   // and nothing can be released until a reason is chosen.
   const [reason, setReason] = useState(null);
+  // Courtesy email is a choice for either reason. Picking a reason resets the
+  // checkbox to that reason's default: on for "no longer needed", off for
+  // "no response" (owner, 2026-09-12: a reviewer invited only to share the
+  // abstract and suggest names should be releasable without an odd email).
   const [sendCourtesyEmail, setSendCourtesyEmail] = useState(false);
+  const chooseReason = (value) => {
+    setReason(value);
+    setSendCourtesyEmail(value === RELEASE_REASONS.no_longer_needed);
+  };
   const mountedRef = useRef(true);
   const sendGenerationRef = useRef(0);
   const sendingRef = useRef(false);
   const previewsRequestedRef = useRef(false);
 
-  const showPreviews = reason === RELEASE_REASONS.no_longer_needed
-    || (reason === RELEASE_REASONS.no_response && sendCourtesyEmail);
-  const releaseWithoutEmail = reason === RELEASE_REASONS.no_response && !sendCourtesyEmail;
+  const showPreviews = Boolean(reason) && sendCourtesyEmail;
+  const releaseWithoutEmail = Boolean(reason) && !sendCourtesyEmail;
 
   useEffect(() => {
     // Previews render lazily, the first time a choice calls for an email, and
@@ -184,6 +191,7 @@ export default function ReleaseEmailModal({ requestId, suggestionIds, onClose, o
           requestId,
           suggestionIds: releaseableIds,
           reason,
+          sendEmail: sendCourtesyEmail,
           ...(Object.keys(overrides).length > 0 ? { overrides } : {}),
         }),
       });
@@ -262,7 +270,7 @@ export default function ReleaseEmailModal({ requestId, suggestionIds, onClose, o
                     name="release-reason"
                     value={option.value}
                     checked={selected}
-                    onChange={() => { setReason(option.value); setSendCourtesyEmail(false); }}
+                    onChange={() => chooseReason(option.value)}
                     aria-describedby={`release-reason-${option.value}-description`}
                     className="mt-0.5 h-4 w-4 shrink-0 accent-blue-600"
                   />
@@ -275,7 +283,7 @@ export default function ReleaseEmailModal({ requestId, suggestionIds, onClose, o
                 </label>
               );
             })}
-            {reason === RELEASE_REASONS.no_response && (
+            {reason && (
               <label className="ml-[2.625rem] flex cursor-pointer items-center gap-2 text-sm text-gray-700">
                 <input
                   type="checkbox"
@@ -283,7 +291,7 @@ export default function ReleaseEmailModal({ requestId, suggestionIds, onClose, o
                   onChange={(e) => setSendCourtesyEmail(e.target.checked)}
                   className="h-4 w-4 accent-blue-600"
                 />
-                Also send a courtesy note
+                {reason === RELEASE_REASONS.no_longer_needed ? 'Send a courtesy note' : 'Also send a courtesy note'}
               </label>
             )}
           </fieldset>
@@ -292,7 +300,11 @@ export default function ReleaseEmailModal({ requestId, suggestionIds, onClose, o
           {showPreviews && loadError && <p className="text-sm text-red-600">{loadError}</p>}
 
           {releaseWithoutEmail && (
-            <p className="text-sm text-gray-600">No email will be sent. The link is disabled and the invitation is recorded as unanswered.</p>
+            <p className="text-sm text-gray-600">
+              {reason === RELEASE_REASONS.no_response
+                ? 'No email will be sent. The link is disabled and the invitation is recorded as unanswered.'
+                : 'No email will be sent. The invitation is recorded as released by the Foundation.'}
+            </p>
           )}
 
           {showPreviews && excluded.length > 0 && (

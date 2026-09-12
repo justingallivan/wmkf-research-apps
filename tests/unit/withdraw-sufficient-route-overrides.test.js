@@ -33,7 +33,7 @@ beforeEach(() => {
   withdrawSufficient.mockClear();
 });
 
-async function run(overrides, reason) {
+async function run(overrides, reason, sendEmail) {
   const req = createMockReq({
     method: 'POST',
     body: {
@@ -41,6 +41,7 @@ async function run(overrides, reason) {
       suggestionIds: [SUGGESTION_ID],
       overrides,
       ...(reason === undefined ? {} : { reason }),
+      ...(sendEmail === undefined ? {} : { sendEmail }),
     },
   });
   const res = createMockRes();
@@ -121,5 +122,20 @@ test('rejects an unknown reason before calling the service', async () => {
 
   expect(res.statusCode).toBe(400);
   expect(res._data.error).toMatch(/reason must be no_longer_needed or no_response/);
+  expect(withdrawSufficient).not.toHaveBeenCalled();
+});
+
+test('passes an explicit sendEmail=false through to the service', async () => {
+  const res = await run(null, 'no_longer_needed', false);
+
+  expect(res.statusCode).toBe(200);
+  expect(withdrawSufficient).toHaveBeenCalledWith(expect.objectContaining({ reason: 'no_longer_needed', sendEmail: false }));
+});
+
+test('rejects a non-boolean sendEmail before calling the service', async () => {
+  const res = await run(null, 'no_longer_needed', 'no');
+
+  expect(res.statusCode).toBe(400);
+  expect(res._data.error).toMatch(/sendEmail must be a boolean/);
   expect(withdrawSufficient).not.toHaveBeenCalled();
 });
