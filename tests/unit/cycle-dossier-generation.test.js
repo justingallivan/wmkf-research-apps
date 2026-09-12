@@ -1,4 +1,5 @@
 jest.mock('../../lib/services/execute-prompt.js', () => ({ executePrompt: jest.fn() }));
+jest.mock('../../lib/utils/usage-logger.js', () => ({ logUsage: jest.fn() }));
 jest.mock('../../lib/services/workbench-proposal-documents.js', () => ({ getAiProposalNarrativeText: jest.fn() }));
 jest.mock('../../lib/dataverse/adapters/grant-request.js', () => ({ getById: jest.fn() }));
 jest.mock('../../lib/services/prompt-store.js', () => ({ fetchCurrentPrompt: jest.fn() }));
@@ -136,4 +137,25 @@ test('generateEntry validates references and returns provenance plus stable sour
 test('estimateGenerationCost is conservative and unknown when no model pricing is pinned', () => {
   expect(estimateGenerationCost({ narrative: { text: 'x'.repeat(100) } }, config)).toMatchObject({ lowUsd: null, highUsd: null, calls: 2 });
   expect(estimateGenerationCost({ narrative: { text: 'x'.repeat(100) } }, { ...config, pricing: { inputUsdPer1k: 1, outputUsdPer1k: 2 } }).highUsd).toBeGreaterThan(0);
+});
+
+test('each paid stage logs one api_usage_log row for the run owner, on success and on failure', async () => {
+  const { logUsage } = require('../../lib/utils/usage-logger.js');
+  logUsage.mockClear();
+  const input = await prepareRequestInput(ID);
+  executePrompt.mockResolvedValue({ parsed: { queries: [{ query: 'topic', reason: 'field' }] }, runId: 'plan',
+    usage: { input_tokens: 1200, output_tokens: 80, cache_creation_input_tokens: 900, cache_read_input_tokens: 0 }, meta: { modelUsed: 'claude-model-x' } });
+  await generateResearch(input, config, { beforePaidCall: jest.fn(), userProfileId: 2 });
+  expect(logUsage).toHaveBeenCalledTimes(1);
+  expect(logUsage).toHaveBeenCalledWith(expect.objectContaining({ appName: 'cycle-dossier', userProfileId: 2, model: 'claude-model-x',
+    inputTokens: 1200, outputTokens: 80, cacheCreationTokens: 900, cacheReadTokens: 0, status: 'success' }));
+  expect(logUsage.mock.calls[0][0].latencyMs).toBeGreaterThanOrEqual(0);
+
+  logUsage.mockClear();
+  const research = { schema: 'cycle-dossier-research/v1', evidence: [{ sourceId: 'oa-1', title: 'Study', url: 'https://example.test/study', abstract: 'context', retrievedAt: '2026-09-07T00:00:00.000Z' }], coverage: 'c', queries: [], failures: [], partial: false };
+  executePrompt.mockRejectedValue(new Error('provider 529'));
+  await expect(generateEntry(input, research, config, { beforePaidCall: jest.fn(), userProfileId: 2 })).rejects.toThrow('provider 529');
+  expect(logUsage).toHaveBeenCalledTimes(1);
+  expect(logUsage).toHaveBeenCalledWith(expect.objectContaining({ appName: 'cycle-dossier', userProfileId: 2, status: 'error', errorMessage: 'provider 529', inputTokens: 0, outputTokens: 0 }));
+  expect(typeof logUsage.mock.calls[0][0].model).toBe('string');
 });

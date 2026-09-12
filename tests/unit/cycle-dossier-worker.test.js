@@ -62,6 +62,7 @@ test('saved research is reused for a later entry stage',async()=>{
   run.data.items[0].researchRef={pathname:'saved-research'};
   await drainCycleDossiers();
   expect(generateResearch).not.toHaveBeenCalled();expect(generateEntry).toHaveBeenCalledTimes(1);
+  expect(generateEntry.mock.calls[0][3]).toMatchObject({userProfileId:7});
   expect(run.data.items[0]).toMatchObject({status:'queued',stage:'entry'});
 });
 test('three concurrent jobs share one budget; only the affordable first call starts',async()=>{
