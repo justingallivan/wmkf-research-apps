@@ -117,5 +117,34 @@ already configurable; the Cycle Dossier; anything that needs a migration or a ne
 
 ## Handoff (Codex writes this)
 
-_(commits, what was converted, what was surveyed-and-left with reasons, tests/gates run, anything
-outside the owned surface that needs Claude.)_
+### 2026-09-12 — blocked before conversion
+
+No template keys or sender code were changed. The checkout was clean and current with
+`origin/codex/email-templates-configurable`; all 67 `/start` gate and self-test commands passed.
+
+**Owned-surface conflict:** Contract 4.1 requires a missing or blank reminder default to block
+the send **without changing the collection row**. The PC path can read defaults before
+`claimManualReminder` (`collection-service.js:400`), but the automatic path calls
+`claimAutomaticReminder` in `reminder-sweep.js:99` before `sendReminderEmail` at lines 103–107.
+The shared sender therefore runs too late to validate defaults for the automatic path
+without editing the sweep. The claim stamps `last_reminder_at` and increments `reminder_count`
+before a failed send, per `reminder-sweep.js:1-16` and `collection-store.js:123-145`.
+`reminder-sweep.js` is outside §3's permitted files, so conversion stopped under §3 rather
+than weakening the row-unchanged contract. To proceed, authorize a narrow §3 addition for
+`lib/services/site-visit-materials/reminder-sweep.js` and its unit test so the automatic sweep
+can validate the required defaults before claiming and pass the resolved values to the sender.
+
+**Token interpretation to settle with that change:** The existing HTML renderer appends the
+server-owned upload button and fallback link (`lib/external/site-visit-materials-email.js:33-53`),
+while the existing body tests require no raw URL in `bodyText`
+(`tests/unit/site-visit-materials-collection-service.test.js:110-112,155-159`). §4.2 also asks
+for an editable `{{uploadLink}}` token. The current sender is the PC, whereas
+`resolveSignatureForRequest` resolves the request's PD (`lib/services/email-signature.js:57-80`);
+the brief does not identify which signature `{{signature}}` should insert. Decide whether
+these tokens should refer to the renderer-owned link and PC signature, respectively, before
+adding catalog hints that would promise working substitutions.
+
+The survey's internal daily summary and ops alert remain intentionally hard-coded per §2;
+the legacy `DEFAULT_TEMPLATE` is a separate cleanup item. No conversion-specific tests were
+run because no runtime or catalog change was made. The brief itself is the only durable
+restatement found for the proposed new keys (`rg` over docs, memory, source, scripts, and tests).
