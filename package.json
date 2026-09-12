@@ -169,7 +169,7 @@
   },
   "overrides": {
     "brace-expansion": "$brace-expansion",
-    "sharp": "0.35.0",
+    "sharp": "0.35.4",
     "uuid": "11.1.1"
   }
 }
