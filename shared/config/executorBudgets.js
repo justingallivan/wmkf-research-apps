@@ -25,6 +25,10 @@ export const EXECUTOR_BUDGET_DEFAULTS = Object.freeze({
     kind: 'timeout',
     timeoutMsOverride: 240_000,
   }),
+  'cycle-dossier.entry': Object.freeze({
+    kind: 'timeout',
+    timeoutMsOverride: 200_000,
+  }),
 });
 
 // Safety bounds remain code-owned. Admin publications may tune values only
@@ -42,6 +46,11 @@ export const EXECUTOR_BUDGET_LIMITS = Object.freeze({
   'field-primer.generate': Object.freeze({
     timeoutMsOverride: Object.freeze({ min: 60_000, max: 240_000 }),
   }),
+  // Ceiling = the worker's 280 s lease minus its 60 s checkpoint reserve; the
+  // Executor deadline (lease − 60 s) still aborts the call independently.
+  'cycle-dossier.entry': Object.freeze({
+    timeoutMsOverride: Object.freeze({ min: 60_000, max: 220_000 }),
+  }),
 });
 
 export const EXECUTOR_BUDGET_DESCRIPTIONS = Object.freeze({
@@ -56,6 +65,10 @@ export const EXECUTOR_BUDGET_DESCRIPTIONS = Object.freeze({
   'field-primer.generate': Object.freeze({
     since: 'S493 (2026-09-07)',
     reason: 'One structured primer over a full proposal narrative; the shared 120s transport timeout expired in production on Request 1002852. Output tokens stay on the prompt row.',
+  }),
+  'cycle-dossier.entry': Object.freeze({
+    since: 'S509 (2026-09-12)',
+    reason: 'One five-section briefing over the frozen narrative plus retrieved evidence; the 85s code default expired in production on Request 1002874 (first pilot-mode run). Output tokens stay on the prompt row; the research-plan stage keeps the short default.',
   }),
 });
 

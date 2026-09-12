@@ -5,6 +5,7 @@ jest.mock('../../lib/dataverse/adapters/grant-request.js', () => ({ getById: jes
 jest.mock('../../lib/services/prompt-store.js', () => ({ fetchCurrentPrompt: jest.fn() }));
 jest.mock('../../lib/services/openalex-service.js', () => ({ OpenAlexService: { searchWorks: jest.fn() } }));
 jest.mock('../../lib/services/pubmed-service.js', () => ({ PubMedService: { search: jest.fn() } }));
+jest.mock('../../lib/services/executor-budget-service.js', () => ({ getExecutorBudget: jest.fn() }));
 
 import { executePrompt } from '../../lib/services/execute-prompt.js';
 import { getAiProposalNarrativeText } from '../../lib/services/workbench-proposal-documents.js';
@@ -12,6 +13,7 @@ import * as requests from '../../lib/dataverse/adapters/grant-request.js';
 import { fetchCurrentPrompt } from '../../lib/services/prompt-store.js';
 import { OpenAlexService } from '../../lib/services/openalex-service.js';
 import { PubMedService } from '../../lib/services/pubmed-service.js';
+import { getExecutorBudget } from '../../lib/services/executor-budget-service.js';
 import * as researchDefinition from '../../shared/config/prompts/cycle-dossier-research-plan.js';
 import * as entryDefinition from '../../shared/config/prompts/cycle-dossier-entry.js';
 import {
@@ -34,6 +36,7 @@ beforeEach(() => {
   requests.getById.mockResolvedValue(ROW);
   getAiProposalNarrativeText.mockResolvedValue(narrative);
   fetchCurrentPrompt.mockImplementation(async (name) => rowFor(name, name === RESEARCH_PROMPT_NAME ? ID2 : ID));
+  getExecutorBudget.mockResolvedValue({ kind: 'timeout', timeoutMsOverride: 200000 });
   OpenAlexService.searchWorks.mockResolvedValue({ records: [{ openAlexId: 'oa-1', title: 'OpenAlex study', url: 'https://openalex.org/W1', abstract: 'An adequate abstract '.repeat(10), year: 2026 }] });
   PubMedService.search.mockResolvedValue([{ pmid: '123', title: 'PubMed study', doi: '10.1/x', abstract: 'A second adequate abstract '.repeat(10), year: 2025 }]);
 });
@@ -158,6 +161,43 @@ test('generateEntry validates references and returns provenance plus stable sour
   expect(result.payload.source.narrativeHash).toBe('abc123');
   expect(result.payload.provenance.promptVersion).toBe(4);
   expect(Object.isFrozen(result.payload)).toBe(true);
+});
+
+test('snapshotConfiguration pins the admin-tunable entry timeout and falls back to the registry default on a settings outage', async () => {
+  getExecutorBudget.mockResolvedValueOnce({ kind: 'timeout', timeoutMsOverride: 150000 });
+  const pinned = await snapshotConfiguration();
+  expect(getExecutorBudget).toHaveBeenCalledWith(ENTRY_PROMPT_NAME);
+  expect(pinned.budget.entryTimeoutMs).toBe(150000);
+
+  getExecutorBudget.mockRejectedValueOnce(new Error('settings store unavailable'));
+  const fallback = await snapshotConfiguration();
+  expect(fallback.budget.entryTimeoutMs).toBe(200000);
+
+  const explicit = await snapshotConfiguration({ budget: { entryTimeoutMs: 120000 } });
+  expect(explicit.budget.entryTimeoutMs).toBe(120000);
+});
+
+test('generateEntry sends the pinned entry timeout, clamped to the reviewed envelope; research keeps the short default', async () => {
+  const input = await prepareRequestInput(ID);
+  const research = { schema: 'cycle-dossier-research/v1', evidence: [{ sourceId: 'oa-1', title: 'Study', url: 'https://example.test/study', abstract: 'context', retrievedAt: '2026-09-07T00:00:00.000Z' }], coverage: 'one source', partial: false };
+  const entryResult = { parsed: { projectAtAGlance: 'glance', whyItMatters: 'matters', fieldAroundIt: 'field', backgroundForOutsideField: 'background', references: [{ sourceId: 'oa-1' }] }, runId: 'entry-run', usage: { input_tokens: 1 } };
+
+  executePrompt.mockResolvedValue(entryResult);
+  await generateEntry(input, research, { ...config, budget: { entryTimeoutMs: 180000 } }, {});
+  expect(executePrompt.mock.calls[0][0].timeoutMsOverride).toBe(180000);
+
+  executePrompt.mockClear(); executePrompt.mockResolvedValue(entryResult);
+  await generateEntry(input, research, { ...config, budget: { entryTimeoutMs: 999999 } }, {});
+  expect(executePrompt.mock.calls[0][0].timeoutMsOverride).toBe(220000);
+
+  executePrompt.mockClear(); executePrompt.mockResolvedValue(entryResult);
+  await generateEntry(input, research, { ...config, budget: {} }, {});
+  expect(executePrompt.mock.calls[0][0].timeoutMsOverride).toBe(200000);
+
+  executePrompt.mockClear();
+  executePrompt.mockResolvedValue({ parsed: { queries: [{ query: 'topic', reason: 'field' }] } });
+  await generateResearch(input, { ...config, budget: { entryTimeoutMs: 180000 } }, {});
+  expect(executePrompt.mock.calls[0][0].timeoutMsOverride).toBe(85000);
 });
 
 test('generateEntry forwards a caller signal to execute', async () => {
