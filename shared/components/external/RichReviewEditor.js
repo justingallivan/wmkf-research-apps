@@ -24,14 +24,19 @@ import Subscript from '@tiptap/extension-subscript';
 import Superscript from '@tiptap/extension-superscript';
 
 // StarterKit ships marks/nodes beyond our allowlist (code, codeBlock, strike,
-// horizontalRule). Disable them so the editor can't produce formatting the
-// sanitizer would strip, and pin headings to H2/H3.
+// horizontalRule, and since tiptap 3 underline and a bundled link). Disable
+// them so the editor can't produce formatting the sanitizer would strip, and
+// pin headings to H2/H3. Link is configured separately below; trailingNode
+// is off so getHTML() keeps the tiptap 2 shape (no appended empty paragraph).
 const STARTER_KIT_CONFIG = {
   heading: { levels: [2, 3] },
   code: false,
   codeBlock: false,
   strike: false,
   horizontalRule: false,
+  underline: false,
+  link: false,
+  trailingNode: false,
 };
 
 const LINK_CONFIG = {
@@ -85,6 +90,9 @@ export default function RichReviewEditor({
     editable: !disabled,
     // Next.js SSR: defer first render to the client to avoid hydration mismatch.
     immediatelyRender: false,
+    // tiptap 3 stops re-rendering on every transaction by default; the toolbar
+    // reads editor.isActive()/can() during render, so keep the legacy behaviour.
+    shouldRerenderOnTransaction: true,
     editorProps: {
       attributes: {
         class: 'prose prose-sm max-w-none min-h-[8rem] px-3 py-2 focus:outline-none',
@@ -104,7 +112,7 @@ export default function RichReviewEditor({
     if (!editor) return;
     const current = editor.getHTML();
     if (value !== current && (value || '') !== current) {
-      editor.commands.setContent(value || '', false);
+      editor.commands.setContent(value || '', { emitUpdate: false });
     }
   }, [value, editor]);
 

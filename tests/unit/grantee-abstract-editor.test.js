@@ -137,6 +137,27 @@ test('selection-preserving toolbar click emits canonical Markdown and parent ech
   expect(editor.querySelector('em')).toHaveTextContent('Escherichia coli');
 });
 
+test('toolbar pressed state tracks the selection after a formatting transaction (tiptap 3 rerender)', async () => {
+  render(
+    <GranteeAbstractEditor
+      value="Escherichia coli"
+      htmlValue="<p>Escherichia coli</p>"
+      onChange={jest.fn()}
+      ariaLabel="Abstract"
+    />,
+  );
+  const editor = await screen.findByRole('textbox', { name: 'Abstract' });
+  const bold = screen.getByRole('button', { name: 'Bold' });
+  expect(bold).toHaveAttribute('aria-pressed', 'false');
+  fireEvent.focus(editor);
+  fireEvent.keyDown(editor, { key: 'a', code: 'KeyA', ctrlKey: true });
+  fireEvent.mouseDown(bold);
+  fireEvent.click(bold);
+  // tiptap 3 no longer re-renders on every transaction by default; without
+  // shouldRerenderOnTransaction the button would stay unpressed after the click.
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Bold' })).toHaveAttribute('aria-pressed', 'true'));
+});
+
 test('pasted unsupported structure keeps text and allowed marks while emitting only canonical Markdown', async () => {
   const onChange = jest.fn();
   render(

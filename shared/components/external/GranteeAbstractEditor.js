@@ -26,6 +26,11 @@ const STARTER_KIT_CONFIG = {
   listItem: false,
   orderedList: false,
   strike: false,
+  // tiptap 3 StarterKit additions, kept off to hold the Markdown subset.
+  underline: false,
+  link: false,
+  listKeymap: false,
+  trailingNode: false,
 };
 
 const ExclusiveSubscript = Subscript.extend({ excludes: 'superscript' });
@@ -104,6 +109,9 @@ export default function GranteeAbstractEditor({
     content: htmlValue || '<p></p>',
     editable: !disabled,
     immediatelyRender: false,
+    // tiptap 3 stops re-rendering on every transaction by default; the toolbar
+    // reads editor.isActive()/can() during render, so keep the legacy behaviour.
+    shouldRerenderOnTransaction: true,
     editorProps: {
       attributes: {
         class: `prose prose-sm max-w-none ${compact ? 'min-h-[6rem]' : 'min-h-[10rem]'} px-3 py-2 focus:outline-none`,
@@ -136,7 +144,7 @@ export default function GranteeAbstractEditor({
     }
     if (value === lastExternalValue.current) return;
     lastExternalValue.current = value;
-    editor.commands.setContent(htmlValue || '<p></p>', false);
+    editor.commands.setContent(htmlValue || '<p></p>', { emitUpdate: false });
   }, [editor, htmlValue, value]);
 
   useEffect(() => {
