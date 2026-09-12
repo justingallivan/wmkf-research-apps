@@ -84,7 +84,10 @@ reviewer-finder prompt migration.
   Request 1002852, and passes the Executor an absolute `deadlineMs` (lease
   deadline minus its grounding reserve) that `callClaude` re-checks immediately
   before the provider call and carries as an abort across every retry and
-  backoff. Older two-key revisions still parse; missing registered names fill
+  backoff. `executePrompt` also accepts a server-owned `signal` (`AbortSignal`,
+  S509) combined with the deadline via `AbortSignal.any`; the Cycle Dossier
+  worker passes an operator-stop poll so a stop during 429/529 backoff aborts
+  the call, and the caller's abort reason propagates unwrapped. Older two-key revisions still parse; missing registered names fill
   from code defaults. `executor.budgets.v000001` (owner-directed 2026-09-07) pins the reviewed
   defaults for all three prompts; the Admin editor blocks a no-op republish, so an identical
   document must go through `PUT /api/admin/executor-budgets`.

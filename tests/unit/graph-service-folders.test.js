@@ -117,6 +117,42 @@ it('uses pinned site and drive identities before creating any folder', async () 
   expect(global.fetch.mock.calls[0][0]).toContain('/drives/pinned-drive/');
 });
 
+it('ensureFolderPath throws a pre-aborted signal reason before any Graph request', async () => {
+  jest.spyOn(GraphService, 'getSiteId').mockResolvedValue('site');
+  jest.spyOn(GraphService, 'getDriveId').mockResolvedValue('drive');
+  jest.spyOn(GraphService, 'getAccessToken').mockResolvedValue('token');
+  global.fetch = jest.fn();
+  const controller = new AbortController();
+  const reason = new Error('operator stop');
+  controller.abort(reason);
+
+  await expect(GraphService.ensureFolderPath(
+    'akoya_request',
+    '1003001_REQUEST/Artifacts',
+    { signal: controller.signal },
+  )).rejects.toBe(reason);
+  expect(global.fetch).not.toHaveBeenCalled();
+});
+
+it('ensureFolderPath stops before the next request once the signal aborts after the first segment', async () => {
+  jest.spyOn(GraphService, 'getSiteId').mockResolvedValue('site');
+  jest.spyOn(GraphService, 'getDriveId').mockResolvedValue('drive');
+  jest.spyOn(GraphService, 'getAccessToken').mockResolvedValue('token');
+  const controller = new AbortController();
+  const reason = new Error('operator stop');
+  global.fetch = jest.fn().mockImplementationOnce(async () => {
+    controller.abort(reason);
+    return response(200, { id: 'request-folder', name: '1003001_REQUEST', folder: {} });
+  });
+
+  await expect(GraphService.ensureFolderPath(
+    'akoya_request',
+    '1003001_REQUEST/Artifacts',
+    { signal: controller.signal },
+  )).rejects.toBe(reason);
+  expect(global.fetch).toHaveBeenCalledTimes(1);
+});
+
 it('rejects incomplete pinned identity before any Graph request', async () => {
   global.fetch = jest.fn();
   await expect(GraphService.ensureFolderPath('akoya_request', 'request/AI Artifacts', { siteId: 'site' }))

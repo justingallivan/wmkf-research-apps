@@ -123,6 +123,32 @@ test('generateResearch discloses a source with no results when the other source 
   expect(result.research.failures).toEqual(expect.arrayContaining([expect.objectContaining({ source: 'pubmed', reason: 'no results' })]));
 });
 
+test('generateResearch forwards a caller signal to execute and combines it with the per-query timeout', async () => {
+  const input = await prepareRequestInput(ID);
+  executePrompt.mockResolvedValue({ parsed: { queries: [{ query: 'topic', reason: 'field' }] } });
+  const controller = new AbortController();
+  await generateResearch(input, config, { signal: controller.signal });
+  expect(executePrompt.mock.calls[0][0].signal).toBe(controller.signal);
+  const openAlexSignal = OpenAlexService.searchWorks.mock.calls[0][1].signal;
+  expect(openAlexSignal).toBeInstanceOf(AbortSignal);
+  expect(openAlexSignal.aborted).toBe(false);
+  controller.abort(new Error('operator stop'));
+  expect(openAlexSignal.aborted).toBe(true);
+});
+
+test('generateResearch rethrows an operator-stop abort instead of recording it as an adapter failure', async () => {
+  const input = await prepareRequestInput(ID);
+  executePrompt.mockResolvedValue({ parsed: { queries: [{ query: 'topic', reason: 'field' }] } });
+  const controller = new AbortController();
+  const reason = Object.assign(new Error('Work is paused.'), { interrupted: true });
+  OpenAlexService.searchWorks.mockImplementation((query, { signal }) => new Promise((_, reject) => {
+    signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+    controller.abort(reason);
+  }));
+  PubMedService.search.mockRejectedValue(new Error('aborted'));
+  await expect(generateResearch(input, config, { signal: controller.signal })).rejects.toBe(reason);
+});
+
 test('generateEntry validates references and returns provenance plus stable source hash', async () => {
   const input = await prepareRequestInput(ID);
   const research = { schema: 'cycle-dossier-research/v1', evidence: [{ sourceId: 'oa-1', title: 'Study', url: 'https://example.test/study', abstract: 'context', retrievedAt: '2026-09-07T00:00:00.000Z' }], coverage: 'one source', partial: false };
@@ -132,6 +158,15 @@ test('generateEntry validates references and returns provenance plus stable sour
   expect(result.payload.source.narrativeHash).toBe('abc123');
   expect(result.payload.provenance.promptVersion).toBe(4);
   expect(Object.isFrozen(result.payload)).toBe(true);
+});
+
+test('generateEntry forwards a caller signal to execute', async () => {
+  const input = await prepareRequestInput(ID);
+  const research = { schema: 'cycle-dossier-research/v1', evidence: [{ sourceId: 'oa-1', title: 'Study', url: 'https://example.test/study', abstract: 'context', retrievedAt: '2026-09-07T00:00:00.000Z' }], coverage: 'one source', partial: false };
+  executePrompt.mockResolvedValue({ parsed: { projectAtAGlance: 'glance', whyItMatters: 'matters', fieldAroundIt: 'field', backgroundForOutsideField: 'background', references: [{ sourceId: 'oa-1' }] }, runId: 'entry-run', usage: { input_tokens: 1 } });
+  const controller = new AbortController();
+  await generateEntry(input, research, config, { signal: controller.signal });
+  expect(executePrompt.mock.calls[0][0].signal).toBe(controller.signal);
 });
 
 test('estimateGenerationCost is conservative and unknown when no model pricing is pinned', () => {
