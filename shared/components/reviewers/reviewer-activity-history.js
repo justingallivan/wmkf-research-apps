@@ -4,7 +4,10 @@
  * Every event here is computed at read time from lifecycle stamps already on the
  * reviewer suggestion. Nothing is materialized and nothing is backfilled: re-added
  * reviewers have had those stamps cleared by `ENGAGEMENT_STAMP_RESET_ENTRIES`
- * (`lib/dataverse/adapters/reviewer-suggestion.js`). This is an operational summary
+ * (`lib/dataverse/adapters/reviewer-suggestion.js:887-908`). The request-scoped
+ * meetingDate used for no-response attribution is a deliberate exception, while
+ * tokenRevoked is a reset member carried through the DTO as tri-state evidence.
+ * This is an operational summary
  * of the current row, not an audit log, and it cannot reconstruct overwritten or
  * prior transitions. See
  * `outputs/reviewer-activity-history-opus-review-2026-08-11.md` findings 3 and 11.
@@ -42,11 +45,15 @@
  *   in the repository ever writes a value to it — `reviewer-suggestion.js:1957` only
  *   ever nulls it. An event derived from it could never fire.
  *
- * Every event timestamp used below IS in `ENGAGEMENT_STAMP_RESET_ENTRIES`. Auxiliary
- * fields that survive reset must never be used to strengthen an event's provenance.
+ * Every event timestamp used below IS in `ENGAGEMENT_STAMP_RESET_ENTRIES`. The
+ * request-scoped meeting date is not an event timestamp and is used only for
+ * attribution. Auxiliary fields that survive reset must never be used to strengthen
+ * an event's provenance.
  *
- * Actor identity is absent by construction — the reviewer DTO carries no acting-user
- * field. Attribution would mean reading Dataverse field audit (finding 7/10).
+ * Attribution is evidence-based rather than actor-name based. The reviewer DTO
+ * carries the token-revocation marker and the trusted request meeting date: a
+ * revoked row, missing meeting date, or pre-meeting stamp is staff-recorded;
+ * only a dated post-meeting stamp on a non-revoked row is an automated close.
  */
 
 /**
@@ -161,9 +168,8 @@ const RESPONSE_EVENT_BY_TYPE = Object.freeze({
     deliveryProven: true,
   },
   no_response: {
-    label: 'No response recorded at cycle close',
+    label: 'No response to invitation',
     deliveryProven: false,
-    unprovenNote: 'Recorded by automated cycle close; no reviewer response on record.',
   },
   withdrawn_sufficient: {
     label: 'Withdrawn — sufficient reviews received',
@@ -235,6 +241,13 @@ export function responseEventEvidence(reviewer) {
   }
 
   if (responseType && RESPONSE_EVENT_BY_TYPE[responseType]) {
+    if (responseType === 'no_response') {
+      return {
+        ...RESPONSE_EVENT_BY_TYPE[responseType],
+        detail: 'Response: no_response',
+        unprovenNote: noResponseAttribution(reviewer),
+      };
+    }
     return {
       ...RESPONSE_EVENT_BY_TYPE[responseType],
       detail: `Response: ${responseType}`,
@@ -247,6 +260,19 @@ export function responseEventEvidence(reviewer) {
     unprovenNote: 'Response type is missing; timestamp alone does not prove a reviewer response.',
     detail: null,
   };
+}
+
+function noResponseAttribution(reviewer) {
+  const responseAt = parseTime(reviewer?.responseReceivedAt);
+  const meetingAt = parseTime(reviewer?.meetingDate || reviewer?.requestMeetingDate);
+  if (reviewer?.tokenRevoked === true || meetingAt === null) {
+    return 'Recorded by staff';
+  }
+  if (responseAt !== null && responseAt < meetingAt) return 'Recorded by staff';
+  if (responseAt !== null && responseAt >= meetingAt && reviewer?.tokenRevoked === false) {
+    return 'Recorded by automated cycle close';
+  }
+  return 'Recorded by staff or automated cycle close';
 }
 
 export function reviewReceiptEvidence(reviewer) {

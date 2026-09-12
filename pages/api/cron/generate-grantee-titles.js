@@ -23,22 +23,10 @@
 import { verifyCronSecret } from '../../../lib/utils/cron-auth';
 import { withDalContext } from '../../../lib/dataverse/core/context';
 import { loadModelOverrides } from '../../../lib/services/model-override-loader';
-import { cycleCodeToOdataFilter } from '../../../lib/utils/cycle-code';
+import { cycleCodeToOdataFilter, resolveWorkingCycle, conventionalCycles } from '../../../lib/utils/cycle-code';
 import { GRANTEE_RESEARCH_PROGRAM_IDS } from '../../../shared/config/granteeResearchPrograms';
 import { ServiceHttpError } from '../../../lib/services/service-http-error';
 import { runGranteeTitleGeneration } from '../../../lib/services/cron/generate-grantee-titles-service';
-
-/**
- * Current open board cycle from today: first half of the year → the June meeting
- * (`Jyy`), second half → December (`Dyy`). The seasonal schedule only runs this
- * route in Apr–Jun / Oct–Dec, so this always resolves to the cycle in prep.
- * `?cycleCode=` overrides for a one-off backfill of a prior cycle.
- */
-function currentCycleCode(now) {
-  const month = now.getUTCMonth() + 1;
-  const yy = String(now.getUTCFullYear() % 100).padStart(2, '0');
-  return (month <= 6 ? 'J' : 'D') + yy;
-}
 
 export default async function handler(req, res) {
   if (req.method !== 'GET' && req.method !== 'POST') {
@@ -48,7 +36,11 @@ export default async function handler(req, res) {
   if (!verifyCronSecret(req, res)) return;
 
   const cycleCode = (typeof req.query?.cycleCode === 'string' && req.query.cycleCode.trim())
-    || currentCycleCode(new Date());
+    // No user and no cycle list here: EXPLICIT FALLBACK POLICY — the working
+    // cycle of the June/December convention (`conventionalCycles`), not of the
+    // cycles that exist. The window filter below returns zero rows for a cycle
+    // with no requests, which is the correct no-op; `?cycleCode=` overrides.
+    || resolveWorkingCycle(conventionalCycles(new Date()), new Date());
   const cycleFilter = cycleCodeToOdataFilter(cycleCode, 'wmkf_meetingdate');
   if (!cycleFilter) {
     return res.status(400).json({ error: `Invalid cycleCode "${cycleCode}" (expected e.g. J26 / D26).` });

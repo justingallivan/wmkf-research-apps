@@ -18,6 +18,7 @@ const KNOWN_GUARDS = [
   'verifyDossierCronSecret',
   'verifySuggestionToken',
   'verifyGranteeToken',
+  'verifyBriefingToken',
   'getServerSession',
   'NextAuth',
 ];

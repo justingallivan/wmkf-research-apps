@@ -1,0 +1,82 @@
+{
+  "name": "wmkf_deliberationslot",
+  "kind": "new-entity",
+  "schemaName": "wmkf_DeliberationSlot",
+  "displayName": "Deliberation Slot",
+  "displayCollectionName": "Deliberation Slots",
+  "description": "One ordered proposal slot in an internal deliberation session. A request may appear in more than one session by design.",
+  "ownershipType": "OrganizationOwned",
+  "primaryNameAttribute": {
+    "schemaName": "wmkf_Name",
+    "displayName": "Name",
+    "description": "Synthetic display name for the request's deliberation slot.",
+    "maxLength": 200,
+    "requiredLevel": "ApplicationRequired"
+  },
+  "attributes": [
+    {
+      "type": "Integer",
+      "schemaName": "wmkf_Order",
+      "displayName": "Order",
+      "description": "One-based display order within the deliberation session.",
+      "minValue": 1,
+      "maxValue": 1000,
+      "requiredLevel": "ApplicationRequired"
+    },
+    {
+      "type": "Integer",
+      "schemaName": "wmkf_Minutes",
+      "displayName": "Minutes",
+      "description": "Planned discussion minutes for this proposal. The application default is 15 minutes.",
+      "minValue": 1,
+      "maxValue": 1440,
+      "requiredLevel": "ApplicationRequired"
+    },
+    {
+      "type": "Memo",
+      "schemaName": "wmkf_Notes",
+      "displayName": "Notes",
+      "description": "Internal planning notes for this proposal slot.",
+      "maxLength": 10000
+    }
+  ],
+  "relationships": [
+    {
+      "kind": "N:1",
+      "schemaName": "wmkf_deliberationslot_session",
+      "referencedEntity": "wmkf_deliberationsession",
+      "lookupSchemaName": "wmkf_Session",
+      "lookupDisplayName": "Session",
+      "lookupDescription": "The deliberation session that contains this ordered slot.",
+      "required": "ApplicationRequired"
+    },
+    {
+      "kind": "N:1",
+      "schemaName": "wmkf_deliberationslot_request",
+      "referencedEntity": "akoya_request",
+      "lookupSchemaName": "wmkf_Request",
+      "lookupDisplayName": "Request",
+      "lookupDescription": "The advancing grant request discussed in this slot.",
+      "required": "ApplicationRequired"
+    },
+    {
+      "kind": "N:1",
+      "schemaName": "wmkf_deliberationslot_leadpd",
+      "referencedEntity": "systemuser",
+      "lookupSchemaName": "wmkf_LeadPd",
+      "lookupDisplayName": "Lead Program Director",
+      "lookupDescription": "Program Director leading discussion of this request.",
+      "required": "None"
+    },
+    {
+      "kind": "N:1",
+      "schemaName": "wmkf_deliberationslot_updatedby",
+      "referencedEntity": "systemuser",
+      "lookupSchemaName": "wmkf_UpdatedBy",
+      "lookupDisplayName": "Updated By",
+      "lookupDescription": "Authenticated staff systemuser who created or most recently changed this slot through the application.",
+      "required": "ApplicationRequired"
+    }
+  ],
+  "alternateKeys": []
+}

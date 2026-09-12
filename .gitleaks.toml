@@ -23,3 +23,13 @@ description = "Public Cycle Dossier activation flag in its rollout documentation
 condition = "AND"
 regexes = ['''^CYCLE_DOSSIER_ENABLED=true$''']
 paths = ['''^docs/CYCLE_DOSSIER_PILOT_DESIGN\.md$''']
+
+[[allowlists]]
+description = "Fixture EXTERNAL_LINK_SECRET values in focused external-token verifier unit tests (never real; set on process.env inside the test)."
+targetRules = ["generic-api-key"]
+condition = "AND"
+regexTarget = "line"
+regexes = ['''const SECRET = '[a-z0-9-]*test-secret-[a-z0-9-]*';''']
+paths = [
+  '''^tests/unit/verify-briefing-token\.test\.js$''',
+]

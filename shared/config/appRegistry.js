@@ -48,6 +48,15 @@ export const APP_REGISTRY = [
     features: ['Cycle Dashboard', 'Find + Invite + Track', 'Applicant Reviewers', 'Work-Remaining Cues'],
   },
   {
+    key: 'meeting-tracker',
+    name: 'Meeting Tracker',
+    href: '/meeting-tracker',
+    icon: '🗓️',
+    description: 'Plan deliberation sessions, attendees, Zoom links, and ordered proposal discussions',
+    categories: ['phase-ii'],
+    features: ['Session Planning', 'Proposal Schedule', 'Attendee Directory', 'Zoom Links'],
+  },
+  {
     key: 'peer-review-summarizer',
     name: 'Summarize Peer Reviews',
     href: '/peer-review-summarizer',

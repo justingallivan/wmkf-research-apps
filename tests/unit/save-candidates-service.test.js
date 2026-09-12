@@ -883,6 +883,28 @@ test('attested trusted-ORCID address change updates the exact stable person atom
   }), expect.anything());
 });
 
+test.each([
+  ['a request with a meeting date', { cycleCode: 'D26' }, 'D26'],
+  ['a request without a meeting date', { cycleCode: null }, null],
+])('stamps the cycle code derived from %s and ignores a client-supplied one', async (_label, contextCycle, expected) => {
+  loadCoiContext.mockResolvedValueOnce({
+    applicantInstitutionContext: { state: 'complete', names: ['Applicant University'] },
+    piResolution: { state: 'ok', reason: null },
+    institutionEntries: [{ identity: 'Applicant University', display: 'Applicant University' }],
+    ...contextCycle,
+  });
+
+  const out = await saveCandidates({
+    ...BASE,
+    grantCycleCode: 'J99', // a stale page value; must never reach the row
+    candidates: [{ name: 'Dr Cycle', email: 'cycle@example.edu' }],
+  });
+
+  expect(out.savedCount).toBe(1);
+  expect(reviewerSuggestionAdapter.upsert).toHaveBeenCalledTimes(1);
+  expect(reviewerSuggestionAdapter.upsert.mock.calls[0][0].grantCycleCode).toBe(expected);
+});
+
 test('an address receipt created before the current conflict cannot resolve it', async () => {
   verifyAutomatedIdentityAttestation.mockResolvedValueOnce({
     valid: true,

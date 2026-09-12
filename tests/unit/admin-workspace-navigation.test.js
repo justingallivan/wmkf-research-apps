@@ -1,8 +1,9 @@
 /**
  * @jest-environment jsdom
  */
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import {
+  AdminEditorPanel,
   ADMIN_WORKSPACES,
   AdminViewNavigation,
   AdminWorkspaceNavigation,
@@ -59,4 +60,57 @@ test('workspace and view navigation are URL-addressable and announce the active 
     'href',
     adminHref('workflows', 'site-visits'),
   );
+});
+
+test('a collapsible editor panel starts closed when asked, keeps its heading visible, and opens on the header', () => {
+  const { container } = render(
+    <AdminEditorPanel id="p1" title="Workflow policies" description="Policy text." scope="Workflow-specific" collapsible defaultOpen={false}>
+      <p>Panel body</p>
+    </AdminEditorPanel>,
+  );
+  const details = container.querySelector('details');
+  expect(details).not.toBeNull();
+  expect(details.open).toBe(false);
+  expect(screen.getByRole('heading', { name: 'Workflow policies' })).toBeInTheDocument();
+  fireEvent.click(container.querySelector('summary'));
+  expect(details.open).toBe(true);
+  expect(screen.getByText('Panel body')).toBeInTheDocument();
+});
+
+test('clicking the panel field-mapping button never toggles the collapsible panel', () => {
+  const { container } = render(
+    <AdminEditorPanel
+      id="p3"
+      title="Workflow email defaults"
+      scope="Workflow-specific"
+      collapsible
+      defaultOpen={false}
+      dataverseFields={[{ label: 'Setting', entity: 'wmkf_appsystemsetting', field: 'wmkf_settingvalue' }]}
+    >
+      <p>Panel body</p>
+    </AdminEditorPanel>,
+  );
+  const details = container.querySelector('details');
+  expect(details.open).toBe(false);
+
+  fireEvent.click(screen.getByRole('button', { name: /dataverse field mapping/i }));
+  // The popover is now open; clicking the button toggled ONLY the popover, not the panel.
+  expect(details.open).toBe(false);
+  expect(screen.getByText('Setting')).toBeInTheDocument();
+
+  // Clicking non-interactive content inside the popover must not toggle the panel either —
+  // this is the case a bare bubble-phase preventDefault() misses once the popover's own
+  // stopPropagation() already cuts the bubble before it reaches the guard.
+  fireEvent.click(screen.getByText('Setting'));
+  expect(details.open).toBe(false);
+});
+
+test('a non-collapsible editor panel renders no disclosure and shows its body immediately', () => {
+  const { container } = render(
+    <AdminEditorPanel id="p2" title="Plain panel" scope="Global">
+      <p>Always visible</p>
+    </AdminEditorPanel>,
+  );
+  expect(container.querySelector('details')).toBeNull();
+  expect(screen.getByText('Always visible')).toBeInTheDocument();
 });

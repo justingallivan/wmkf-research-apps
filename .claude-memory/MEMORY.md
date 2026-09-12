@@ -15,7 +15,7 @@
 ## Always-Read Guardrails
 - Carryover / destructive work: feedback-verify-before-destructive-carryover.md; feedback-list-and-confirm-before-bulk-deletes.md
 - Evidence / reconciliation: ../.claude/skills/sweep/SKILL.md; ../.claude/skills/contract-reconcile/SKILL.md; ../.claude/rules/durable-docs.md
-- Red gates / test trust: ../docs/CI_GATES_REFERENCE.md; feedback-red-gates-are-p0.md
+- Red gates / test trust: ../docs/CI_GATES_REFERENCE.md; feedback-red-gates-are-p0.md; feedback-run-harness-framing-before-handoff-commit.md
 - External systems / literals: feedback-verify-external-platform-claims.md; feedback-no-fabricated-placeholder-values.md
 - Delegated work: ../docs/AGENT_COLLABORATION_PLAN.md; feedback-codex-delegation-review-vs-rescue-routing.md; reference-codex-review-needs-a-committed-diff.md; feedback-codex-model-gpt56-sol.md
 - Environment / deployment: ../docs/agent-wiki/topics/dev-environment.md; feedback-deployment-monitoring-use-inspect.md; feedback-no-vercel-cli-update-reminders.md; reference-vercel-sensitive-env-unreadable.md; reference-vercel-logs-filtering.md
@@ -31,8 +31,9 @@
 - Reviewer product decisions: feedback-prioritize-contact-recall-over-identity-precision.md; feedback-manual-affiliation-edit-no-coi-recheck.md; project-institution-identity-cost-calibration.md
 - Audits / completion: feedback-vacuous-clean-results-print-the-denominator.md; feedback-apply-measurement-artifacts-in-both-directions.md; feedback-briefs-are-snapshots-not-ship-state.md
 - Review posture: feedback-read-the-implementation-not-the-callers-docblock.md; feedback-weigh-the-risks-you-name.md; feedback-corrections-decay-unless-mechanized.md; feedback-consistency-over-preview-rationale.md
-- Test teeth / mutation checks: feedback-mutation-test-with-the-discriminating-fixture.md
+- Test teeth / mutation checks: feedback-mutation-test-with-the-discriminating-fixture.md; feedback-mocked-sql-hides-parameter-typing.md
 - Tone / user context: feedback-no-performative-contrition.md; feedback-user-facing-error-copy-voice.md
+- Legacy labels / interim trims on surfaces with a decided target: feedback-skip-legacy-fixes-that-the-target-state-removes.md
 - Search / schema language: feedback-grep-general-codebase-terms.md; feedback-human-legibility-schema-principle.md
 
 ## Task Routing
@@ -57,6 +58,9 @@
 - BILL / honoraria / payment semantics: ../docs/agent-wiki/topics/finance-honoraria.md
 - Auth / admin / access / security / private Blob: ../docs/agent-wiki/topics/security-auth.md; ../docs/Q9_PREFS_APPACCESS_DAL_MIGRATION_PLAN.md; project-reviewer-org-open-access-by-design.md
 - Intake portal / attachments / institution match / virus scan: ../docs/agent-wiki/topics/intake-portal.md
+- Site Visit materials / applicant additional materials / briefing room (collection SHIPPED S503; PR 3 merged S507 as PR #252, cron unscheduled; briefing page live S502): project-site-visit-materials-planning-handoff.md; ../docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md
+- Ops meeting 2026-09-14 (reminder cron setup + effects; running agenda): project-ops-meeting-2026-09-14-agenda.md
+- PC Meeting Tracker / sessions / visits / agenda email / Staff Deliberations rail (D1–D25 decided; live in prod S503): ../docs/PC_MEETING_TRACKER_PLAN.md; ../docs/plans/SESSION_AGENDA_EMAIL_CODEX_BRIEF_2026-09-10.md; ../docs/plans/REVIEWER_RELEASE_REASON_CODEX_BRIEF_2026-09-09.md
 - Integrity screener / Retraction Watch / PubPeer / News: ../docs/agent-wiki/topics/integrity-screener.md
 - Grantee / email templates: ../docs/GRANTEE_PORTAL_SPEC.md; project-grantee-deliverable-email-voice.md; project-email-template-token-syntax.md
 - Deferred cleanup / dead code: project-deferred-code-cleanup.md

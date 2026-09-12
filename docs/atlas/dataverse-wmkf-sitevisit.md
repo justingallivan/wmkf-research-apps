@@ -4,13 +4,14 @@ domain: dataverse
 kind: source-of-truth
 status: canonical
 owner: product-engineering
-last_verified: 2026-08-29
+last_verified: 2026-09-10
 related:
   - docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md
   - docs/API_ROUTE_SECURITY_MATRIX.md
   - lib/dataverse/adapters/site-visit.js
   - lib/services/site-visit/logistics-service.js
   - lib/services/site-visit/curated-recipient-service.js
+  - lib/services/meeting-tracker/dashboard-service.js
   - lib/dataverse/schema/wave21-site-visit-logistics/wmkf_sitevisit_logistics.json
 ---
 
@@ -46,9 +47,10 @@ and ETag `W/"95328121"`.
 `pages/api/workbench/site-visit/logistics.js` establishes app access and the
 Dataverse restriction context, then delegates to
 `lib/services/site-visit/logistics-service.js`. The service independently
-requires the Request's current Pre-Site artifact to be Ready/Review, permits at
-most one active Site Visit, resolves every organizer/attendee server-side, and
-binds the Activity to the Request.
+requires the request to be an advancing request in a cycle with a meeting date
+(`isVisibleRequestRow`, the Request-list predicate; owner 2026-09-09, PC
+scheduling precedes sharing), permits at most one active Site Visit, resolves
+every organizer/attendee server-side, and binds the Activity to the Request.
 
 First save creates the Activity with nested ActivityParty rows. Field-only edits
 use `If-Match` parent PATCH. Dataverse rejects direct ActivityParty create/update/
@@ -59,6 +61,21 @@ fallback.
 
 ## Consumers
 
+- **[VERIFIED IN SOURCE 2026-09-10 on `codex/meeting-tracker`.]** The Meeting
+  Tracker cycle list is a read-only consumer. Its dashboard service calls
+  `site-visit.js::findActiveByRequests(requestIds)` for the bounded cycle join,
+  rejects duplicate active visits, and reads each selected activity through the
+  existing adapter to display date, time, format, and location. Slice 2 does not
+  add a Site Visit writer; that editor remains the separately scoped slice 2b.
+- `listPreSiteVisitDrafts` (`lib/services/pre-site-visit/cycle-list-service.js`,
+  PC Meeting Tracker slice 3, 2026-09-09) is a READ-ONLY multi-request
+  consumer for the Staff Deliberations cycle view: `site-visit.js::
+  findActiveByRequests(requestIds)` chunks the OR filter at 25 ids and reads
+  `activityid, _regardingobjectid_value, scheduledstart, scheduledend,
+  wmkf_visitformat, wmkf_locationorlink` for every advancing request in the
+  cycle at once — no ActivityParty expand, since the cycle view only needs the
+  scheduled date to derive the rail's `visit` stop (D7: date-derived), not
+  attendees.
 - `useSiteVisitContext` (`shared/components/workbench/useSiteVisitContext.js`)
   is the Workbench's READ-ONLY consumer since S466: the logistics editor
   (`SiteVisitLogisticsPanel`) was removed 2026-08-28 by owner decision —

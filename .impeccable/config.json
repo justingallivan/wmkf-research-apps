@@ -30,6 +30,24 @@
         ],
         "createdAt": "2026-09-08T01:05:12.478Z",
         "reason": "Agent review: the regex detector pairs sibling classes across long JSX lines 473, 477, and 479. Gray text is on white Card or gray-50 surfaces; amber panels use text-amber-900, emerald rows use text-emerald-950/text-emerald-700, and red errors use text-red-800. No gray-on-colored panel exists in these findings."
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "10px",
+        "files": [
+          "shared/components/Layout.js"
+        ],
+        "createdAt": "2026-09-08T17:25:09.567Z",
+        "reason": "Intentional compact notification badge in shared navigation shell"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#6366f1",
+        "files": [
+          "shared/components/Layout.js"
+        ],
+        "createdAt": "2026-09-08T17:25:09.603Z",
+        "reason": "Intentional established default avatar fallback when no profile color exists"
       }
     ]
   }

@@ -258,7 +258,7 @@ test('happy-path response envelope is pinned exactly (full shape, not just 200)'
   expect(res._data).toEqual({
     ok: true,
     withdrawn: 1,
-    results: [{ suggestionId: SUG, status: 'withdrawn_emailed' }],
+    results: [{ suggestionId: SUG, status: 'withdrawn_emailed', reason: 'no_longer_needed' }],
   });
 });
 

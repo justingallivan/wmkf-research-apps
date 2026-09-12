@@ -35,6 +35,12 @@ related:
 | [CODEX_REVIEW_PROMPT_hook-self-review.md](CODEX_REVIEW_PROMPT_hook-self-review.md) | draft | draft |  | ✅ COMPLETED (S259, 2026-06-15). This review was run, relayed verbatim, and acted on. | 2026-07-02 |
 | [HARNESS_INSTRUCTION_AUDIT_S322.md](HARNESS_INSTRUCTION_AUDIT_S322.md) | audit | historical |  | Historical S322 harness audit; approved hook and skill changes shipped, while the remaining removal was explicitly rejected. | 2026-07-26 |
 
+## applicant-materials
+
+| File | Kind | Status | Canonical | Summary | Cataloged |
+|---|---|---|---|---|---|
+| [APPLICANT_ADDITIONAL_MATERIALS_PLAN.md](APPLICANT_ADDITIONAL_MATERIALS_PLAN.md) | plan | active | yes | Canonical Site Visit-led plan for applicant material collection, staff follow-up, and a shared external briefing room. | 2026-09-08 |
+
 ## architecture
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
@@ -467,10 +473,12 @@ related:
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
+| [DELIBERATION_BRIEFING_PAGE_PLAN.md](DELIBERATION_BRIEFING_PAGE_PLAN.md) | plan | active |  | An expiring link serves the staff brief, completed reviews, proposal, and research presentation materials. | 2026-09-09 |
 | [FINAL_WRITEUP_LEADERSHIP_TRANSITION_PLAN.md](FINAL_WRITEUP_LEADERSHIP_TRANSITION_PLAN.md) | plan | active |  | PD-triggered Ready for leadership review: the current Final row moves from lifecycle Review to Final with explicit actor/time; every reader accepts the stage. | 2026-09-07 |
 | [FINAL_WRITEUP_PERSONA_CONFIGURATION_PLAN.md](FINAL_WRITEUP_PERSONA_CONFIGURATION_PLAN.md) | plan | active |  | Version-2 staffing and explicit Final Writeup persona lenses are Production-live; live-data smoke and natural signed-in staff observation passed. | 2026-08-31 |
 | [FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md](FINAL_WRITEUP_REVIEW_IMPLEMENTATION_PLAN.md) | plan | active |  | Final runtime, staffing, lenses, and dashboard Slices 6A–6C are Production-live; the leadership-review transition (Slice 4) is Production-live since 2026-09-07. | 2026-08-28 |
 | [FINAL_WRITEUPS_DASHBOARD_CYCLE_SCOPING_PLAN.md](FINAL_WRITEUPS_DASHBOARD_CYCLE_SCOPING_PLAN.md) | plan | active |  | Scopes the Final writeups dashboard read model to one grant cycle before the global row bound fails the page; PD lens retention decided. | 2026-09-06 |
 | [FINAL_WRITEUPS_DASHBOARD_VIEWS_AND_VERSION_PLAN.md](FINAL_WRITEUPS_DASHBOARD_VIEWS_AND_VERSION_PLAN.md) | plan | active |  | Opens the Final writeups dashboard on Needs my review with two alternative views and a PD filter, URL-persisted; renders the acknowledged publication version. | 2026-09-06 |
+| [PC_MEETING_TRACKER_PLAN.md](PC_MEETING_TRACKER_PLAN.md) | plan | active |  | A PC-owned app records each proposal's deliberation slot and site visit once, so the Staff Deliberations rail and cycle view read dates from one source. | 2026-09-09 |
 | [WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md](WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md) | plan | active |  | Pre-Site/Site Visit lifecycle, Final acknowledgement, dashboard, and persona lenses are live; leadership-review transition Production-live since 2026-09-07. | 2026-08-17 |
 

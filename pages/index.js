@@ -7,7 +7,19 @@ import { APP_REGISTRY } from '../shared/config/appRegistry';
 import { useAppAccess } from '../shared/context/AppAccessContext';
 import { getAuthEnabled } from '../shared/utils/auth-enabled';
 
-export default function LandingPage() {
+export async function getServerSideProps() {
+  return {
+    props: {
+      runtimeAppStatus: {
+        'meeting-tracker': process.env.MEETING_TRACKER_SCHEMA_READY === 'on'
+          ? 'active'
+          : 'not-ready',
+      },
+    },
+  };
+}
+
+export default function LandingPage({ runtimeAppStatus = {} }) {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [authEnabled, setAuthEnabled] = useState(false);
@@ -29,12 +41,12 @@ export default function LandingPage() {
         title: app.name,
         description: app.description,
         icon: app.icon,
-        status: 'active',
+        status: runtimeAppStatus[app.key] || 'active',
         categories: app.categories,
         features: app.features,
         path: app.href,
       })),
-    [hasAccess]
+    [hasAccess, runtimeAppStatus]
   );
 
   const filteredApps = apps.filter(app => {
@@ -250,7 +262,7 @@ export default function LandingPage() {
   );
 }
 
-function AppCard({ app }) {
+export function AppCard({ app }) {
   const isActive = app.status === 'active';
   
   const CardContent = (
@@ -274,7 +286,7 @@ function AppCard({ app }) {
               : 'bg-amber-50 text-amber-700 border border-amber-200'
             }
           `}>
-            {app.status === 'active' ? '✓ Available' : '⏳ Coming Soon'}
+            {app.status === 'active' ? '✓ Available' : 'Not yet enabled'}
           </span>
         </div>
       </div>
@@ -293,7 +305,7 @@ function AppCard({ app }) {
           </div>
         ) : (
           <div className="flex items-center justify-center py-3 px-6 bg-gray-100 text-gray-500 font-semibold rounded-lg cursor-not-allowed">
-            Coming Soon
+            Not yet enabled
           </div>
         )}
       </div>

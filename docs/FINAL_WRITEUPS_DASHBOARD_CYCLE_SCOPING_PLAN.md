@@ -52,9 +52,11 @@ for the plan plus the Mode B invariant table the build must satisfy. Every state
   query is bounded to one grant cycle, the response carries the available cycle list and the
   selected cycle, and the focused read derives its cycle from the selected request.
 - **Entry points:** `GET /api/workbench/final-writeups` (`pages/api/workbench/final-writeups.js`);
-  `shared/components/final-writeups/FinalWriteupsViews.js` (`FinalWriteupsDashboardView`,
-  `FinalWriteupFocusedView`); pages `pages/workbench/final-writeups/index.js` and
-  `[requestId].js` (thin wrappers, unchanged).
+  `shared/components/final-writeups/FinalWriteupsViews.js` (`FinalWriteupsPanel` — the former
+  `FinalWriteupsDashboardView`, mounted inside the Request Workbench shell since 2026-09-08 —
+  and `FinalWriteupFocusedView`); pages `pages/workbench/final-writeups/index.js` (now a redirect
+  into `/workbench?view=final-writeups`, translating the old `view`/`pd`/`cycleCode=none` keys)
+  and `[requestId].js` (thin wrapper, unchanged).
 - **Persistence:** **none.** No Dataverse, Postgres, Blob, or settings write. Read-only against
   `akoya_requests`, `wmkf_requestdocuments`, `wmkf_finalwriteupreviewacknowledgements`, and Graph
   file metadata. The acknowledgement POST route (`pages/api/workbench/final-writeup/...`) is
@@ -179,12 +181,16 @@ grantRequestAdapter.queryAllRequests({
   bounded reads; the common case is one. `cycles.defaultResolvedBy` reports the outcome:
   `'visible'` (a visible row was found, possibly after walking back), `'exhausted'` (the window or
   the list ran out; newest cycle shown empty), or `'explicit'` (caller supplied `cycleCode`; never
-  walks back). The client uses `'visible'` plus `selected !== available[0].code` to say "Nothing
-  awaits you in <newest>; showing <selected>", and `'exhausted'` to say "Nothing awaits your review
-  in the <n> most recent cycles"; both are rendered from the response, never inferred. The `none`
-  sentinel is never a walk-back candidate: `available` holds real cycle codes only, so a viewer
-  whose only visible rows have no meeting date resolves `exhausted` and reaches them through the
-  explicit **No cycle** option.
+  walks back). **Since 2026-09-08 the UI always supplies a cycle** (the Request Workbench shell owns
+  it, `shared/components/workbench/WorkbenchShell.js`), so the walk-back is API-only behavior: the
+  Final writeups panel (`shared/components/final-writeups/FinalWriteupsViews.js`,
+  `FinalWriteupsPanel`) renders, when `counts.total` is 0, one in-place notice naming the shell's
+  cycle plus a link to the newest other `available` cycle ("newest cycle with writeups", not
+  "visible to you", because `available` is existence-only) that changes the shell's cycle, and a
+  link to the uncycled rows when `hasUncycled`. This replaces the 2026-09-06 client copy for
+  `'visible'`/`'exhausted'` (owner decision 2026-09-08). The `none` sentinel is never a walk-back
+  candidate: `available` holds real cycle codes only; the panel reaches uncycled rows through the
+  shell URL's `uncycled=1` (sent as `cycleCode=none`).
 - **Oversized cycle during default resolution fails closed (Codex third-pass finding 2).** Each
   candidate read is the same scoped loader, which throws `final_writeups_dashboard_scope_exceeded`
   when a cycle exceeds `FINAL_WRITEUPS_DASHBOARD_MAX_ROWS` (`dashboard-service.js:118-134`). The
@@ -248,13 +254,13 @@ focused row's own 200 or 404. This mirrors the existing convention that focused 
 
 ### 3.6 Client (minimal; 6B adds the other filters)
 
-- `FinalWriteupsDashboardView` reads `cycleCode` from `window.location.search` on mount (same
-  pattern as `pages/workbench/artifacts.js:32-36`), passes it as the only query parameter,
-  renders a cycle `<select>` labeled **Cycle** above the search field (mirroring the Initial
-  assessments locator), and on change writes `?cycleCode=` to the URL via `history.replaceState`
-  then reloads. The existing `requestIdRef` stale-response guard **[VERIFIED via
-  `FinalWriteupsViews.js:425-453`]** already covers the reload; the cycle select is disabled
-  while `loading`.
+- **Superseded 2026-09-08 by the Workbench shell:** the cycle `<select>` and the URL read/write
+  now belong to `shared/components/workbench/WorkbenchShell.js` (`workbench-location.js` keys
+  `cycleCode`, `writeups`, `pd`, `q`, `uncycled`); `FinalWriteupsPanel` receives the cycle as a
+  prop and passes it as the only query parameter. As originally built (6A): the view read
+  `cycleCode` from `window.location.search` on mount, rendered its own cycle select, and wrote
+  `?cycleCode=` via `history.replaceState` then reloaded. The `requestIdRef` stale-response guard
+  still covers the reload; controls are disabled while loading.
 - The header line becomes "N awaiting your review in December 2026".
 - The **No cycle** option (value `none`) renders only when `hasUncycled` is true; a bookmarked
   `?cycleCode=none` when it is false returns success with empty queues, the same as any absent

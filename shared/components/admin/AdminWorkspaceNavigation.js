@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { Card } from '../Layout';
 import DataverseFieldInfoButton from './DataverseFieldInfoButton';
+import DisclosureRow from './DisclosureRow';
 
 export const ADMIN_WORKSPACES = Object.freeze([
   {
@@ -170,26 +171,88 @@ export function SettingScopeBadge({ children }) {
   );
 }
 
+// One status chip for the whole Messages & policies page (Build E, Item 4):
+// rounded-full, pale semantic background, Title-case text supplied by the
+// caller. Tone is a caller decision — this component only carries the paint.
+const STATUS_CHIP_TONE_CLASSES = {
+  green: 'bg-green-50 text-green-700 border-green-200',
+  amber: 'bg-amber-50 text-amber-800 border-amber-200',
+  red: 'bg-red-50 text-red-700 border-red-200',
+  gray: 'bg-gray-100 text-gray-600 border-gray-200',
+};
+
+export function StatusChip({ tone = 'gray', children }) {
+  return (
+    <span
+      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${
+        STATUS_CHIP_TONE_CLASSES[tone] || STATUS_CHIP_TONE_CLASSES.gray
+      }`}
+    >
+      {children}
+    </span>
+  );
+}
+
 export function AdminEditorPanel({
   id,
   title,
   description,
   scope,
   dataverseFields = [],
+  collapsible = false,
+  defaultOpen = true,
   children,
 }) {
+  const heading = (
+    <div className="min-w-0">
+      <div className="flex flex-wrap items-center gap-2">
+        <h2 id={`${id}-title`} className="text-lg font-semibold text-gray-950">{title}</h2>
+        <SettingScopeBadge>{scope}</SettingScopeBadge>
+      </div>
+      {description && <p className="mt-1 max-w-3xl text-sm leading-6 text-gray-600">{description}</p>}
+    </div>
+  );
+
+  if (collapsible) {
+    // Progressive disclosure for editor pages that stack several long panels: the
+    // header row is the toggle, and the field-mapping button sits inline at the
+    // right of the summary row behind a click guard so it never toggles the panel.
+    return (
+      <div id={id} className="scroll-mt-6">
+        <Card hover={false} padding="p-0">
+          <DisclosureRow
+            id={id}
+            groupName="panel"
+            headingLevel={2}
+            defaultOpen={defaultOpen}
+            title={title}
+            titleAdornment={<SettingScopeBadge>{scope}</SettingScopeBadge>}
+            description={description}
+            actions={
+              dataverseFields.length > 0 && (
+                // Capture phase: the popover's own content only calls
+                // stopPropagation, which doesn't cancel <summary>'s native
+                // toggle default action — only preventDefault() does, and it
+                // must run before that content can stop the event reaching us.
+                <span onClickCapture={(e) => e.preventDefault()}>
+                  <DataverseFieldInfoButton items={dataverseFields} />
+                </span>
+              )
+            }
+          >
+            <section aria-labelledby={`${id}-title`}>{children}</section>
+          </DisclosureRow>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div id={id} className="scroll-mt-6">
       <Card hover={false} padding="p-0">
         <section aria-labelledby={`${id}-title`}>
           <div className="flex flex-col gap-3 border-b border-gray-200 px-5 py-5 sm:flex-row sm:items-start sm:justify-between sm:px-6">
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <h2 id={`${id}-title`} className="text-lg font-semibold text-gray-950">{title}</h2>
-                <SettingScopeBadge>{scope}</SettingScopeBadge>
-              </div>
-              {description && <p className="mt-1 max-w-3xl text-sm leading-6 text-gray-600">{description}</p>}
-            </div>
+            {heading}
             <DataverseFieldInfoButton items={dataverseFields} />
           </div>
           <div className="px-5 py-5 sm:px-6">{children}</div>

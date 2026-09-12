@@ -24,7 +24,7 @@ jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
   findByRequest: (...a) => findByRequest(...a),
   findAcceptedByPD: (...a) => findAcceptedByPD(...a),
   findAcceptedByCycle: (...a) => findAcceptedByCycle(...a),
-  RESPONSE_TYPE_BY_VALUE: { 100000000: 'accepted' },
+  RESPONSE_TYPE_BY_VALUE: { 100000000: 'accepted', 100000002: 'no_response' },
   HONORARIUM_ELIGIBILITY_BY_VALUE: {
     100000000: 'eligible',
     100000001: 'not_eligible',
@@ -328,6 +328,149 @@ describe('getReviewers', () => {
     expect(out.proposals[0].reviewSynthesisState).toMatchObject(synthesisNotStarted);
   });
 
+  test('single-proposal scope retains no_response rows for history without changing accepted or received rows', async () => {
+    getRequestById.mockResolvedValueOnce({
+      akoya_requestid: REQ,
+      _wmkf_grantprogram_value: '11111111-1111-4111-8111-111111111111',
+      akoya_requestnum: 'R-1001',
+      akoya_title: 'T',
+      wmkf_meetingdate: '2026-09-10T00:00:00Z',
+      wmkf_reviewduedate: '2026-09-09',
+    });
+    findByRequest.mockResolvedValueOnce([
+      {
+        wmkf_appreviewersuggestionid: IDS[0],
+        _wmkf_request_value: REQ,
+        _wmkf_potentialreviewer_value: 'person-1',
+        wmkf_accepted: true,
+        wmkf_reviewstatus: 100000001,
+        // Malformed overlap: no_response must remain ordinary because accepted
+        // is authoritative for the roster/history partition.
+        wmkf_responsetype: 100000002,
+        wmkf_externaltokenrevoked: true,
+      },
+      {
+        wmkf_appreviewersuggestionid: IDS[1],
+        _wmkf_request_value: REQ,
+        _wmkf_potentialreviewer_value: 'person-2',
+        wmkf_accepted: false,
+        wmkf_responsetype: 100000002,
+        wmkf_responsereceivedat: '2026-09-05T12:00:00Z',
+        // Source null must remain null in the history-only projection so the
+        // attribution helper can stay neutral when revocation evidence is absent.
+        wmkf_externaltokenrevoked: null,
+        // A stale pre-release status must not expose follow-up actions.
+        wmkf_reviewstatus: 100000001,
+      },
+      {
+        wmkf_appreviewersuggestionid: IDS[2],
+        _wmkf_request_value: REQ,
+        _wmkf_potentialreviewer_value: 'person-3',
+        wmkf_accepted: false,
+        wmkf_reviewreceivedat: '2026-09-06T12:00:00Z',
+        wmkf_reviewstatus: 100000003,
+        // A received review also keeps this no_response row out of history.
+        wmkf_responsetype: 100000002,
+        wmkf_externaltokenrevoked: false,
+      },
+    ]);
+
+    const out = await getReviewers({ proposalId: REQ, azureEmail: 'pd@wmkeck.org' });
+    const rows = out.proposals[0].reviewers;
+    const history = out.proposals[0].noResponseHistory;
+
+    expect(rows).toHaveLength(2);
+    expect(rows.map((row) => row.suggestionId)).toEqual([IDS[0], IDS[2]]);
+    expect(history).toHaveLength(1);
+    expect(history[0].suggestionId).toBe(IDS[1]);
+    expect(rows[0]).toMatchObject({ reviewStatus: 'materials_sent', responseType: 'no_response', tokenRevoked: true });
+    expect(history[0]).toMatchObject({
+      reviewStatus: null,
+      responseType: 'no_response',
+      responseReceivedAt: '2026-09-05T12:00:00Z',
+      meetingDate: '2026-09-10T00:00:00Z',
+      submitted: false,
+      tokenRevoked: null,
+      answers: [],
+    });
+    expect(rows[1]).toMatchObject({ reviewStatus: 'review_received', responseType: 'no_response', submitted: true });
+    expect(rows[1].tokenRevoked).toBe(false);
+    expect(out.proposals[0].statusSummary).toEqual({ materials_sent: 1, review_received: 1 });
+    expect(out.totalReviewers).toBe(2);
+  });
+
+  test('keeps malformed no_response overlaps in exactly one ordinary roster partition', async () => {
+    getRequestById.mockResolvedValueOnce({
+      akoya_requestid: REQ,
+      _wmkf_grantprogram_value: '11111111-1111-4111-8111-111111111111',
+      akoya_requestnum: 'R-1001',
+      akoya_title: 'T',
+      wmkf_meetingdate: '2026-09-10T00:00:00Z',
+    });
+    findByRequest.mockResolvedValueOnce([
+      {
+        wmkf_appreviewersuggestionid: IDS[0],
+        _wmkf_request_value: REQ,
+        wmkf_accepted: true,
+        wmkf_responsetype: 100000002,
+        wmkf_reviewstatus: 100000001,
+      },
+      {
+        wmkf_appreviewersuggestionid: IDS[1],
+        _wmkf_request_value: REQ,
+        wmkf_accepted: false,
+        wmkf_responsetype: 100000002,
+        wmkf_reviewreceivedat: '2026-09-06T12:00:00Z',
+        wmkf_reviewstatus: 100000003,
+      },
+    ]);
+
+    const out = await getReviewers({ proposalId: REQ, azureEmail: 'pd@wmkeck.org' });
+    const ordinary = out.proposals[0].reviewers;
+    const history = out.proposals[0].noResponseHistory;
+
+    expect(ordinary.map((row) => row.suggestionId)).toEqual([IDS[0], IDS[1]]);
+    expect(new Set(ordinary.map((row) => row.suggestionId)).size).toBe(ordinary.length);
+    expect(history).toEqual([]);
+    expect(out.totalReviewers).toBe(2);
+    expect(ordinary.every((row) => Array.isArray(row.answers))).toBe(true);
+  });
+
+  test('preserves an invalid lifecycle signal for unknown response and review-status options', async () => {
+    getRequestById.mockResolvedValueOnce({
+      akoya_requestid: REQ,
+      _wmkf_grantprogram_value: '11111111-1111-4111-8111-111111111111',
+      akoya_requestnum: 'R-1001',
+      akoya_title: 'T',
+      wmkf_reviewduedate: '2026-09-09',
+    });
+    findByRequest.mockResolvedValueOnce([
+      {
+        wmkf_appreviewersuggestionid: IDS[0],
+        _wmkf_request_value: REQ,
+        _wmkf_potentialreviewer_value: 'person-1',
+        wmkf_accepted: true,
+        wmkf_responsetype: 999999998,
+        wmkf_reviewstatus: REVIEW_STATUS_MAP.materials_sent,
+      },
+      {
+        wmkf_appreviewersuggestionid: IDS[1],
+        _wmkf_request_value: REQ,
+        _wmkf_potentialreviewer_value: 'person-2',
+        wmkf_accepted: true,
+        wmkf_responsetype: 100000000,
+        wmkf_reviewstatus: 999999997,
+      },
+    ]);
+
+    const out = await getReviewers({ proposalId: REQ, azureEmail: 'pd@wmkeck.org' });
+    const rows = out.proposals[0].reviewers;
+
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toMatchObject({ responseType: null, reviewStatus: 'materials_sent', lifecycleValid: false });
+    expect(rows[1]).toMatchObject({ responseType: 'accepted', reviewStatus: 'accepted', lifecycleValid: false });
+  });
+
   test('unavailable synthesis dependency preserves reviewer DTO and returns the logged fallback without SQL or network', async () => {
     getRequestById.mockResolvedValueOnce({
       akoya_requestid: REQ, _wmkf_grantprogram_value: '11111111-1111-4111-8111-111111111111', akoya_requestnum: 'R-1001', akoya_title: 'T',
@@ -354,6 +497,7 @@ describe('getReviewers', () => {
         ...synthesisNotStarted,
         ready: false, canRunManually: false, participantCount: 1,
         submittedCount: 0, resolvedCount: 0, blockingCount: 1,
+        blockers: [{ suggestionId: IDS[0], reason: 'missing_current_token', name: null, accepted: true, emailSentAt: null }],
         status: 'unavailable', lastError: 'Synthesis status is temporarily unavailable.',
       });
       expect(getReviewSynthesisJobState).toHaveBeenCalledTimes(1);

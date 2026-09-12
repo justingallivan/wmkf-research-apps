@@ -683,7 +683,7 @@ const v38Statements = [
 const v39Statements = [
   `CREATE TABLE IF NOT EXISTS portal_upload_staging (
     id UUID PRIMARY KEY,
-    scope TEXT NOT NULL CHECK (scope IN ('grantee_image', 'staff_grantee_image')),
+    scope TEXT NOT NULL CONSTRAINT portal_upload_staging_scope_check CHECK (scope IN ('grantee_image', 'staff_grantee_image', 'site_visit_material')),
     resource_id UUID NOT NULL,
     actor_binding TEXT NOT NULL,
     pathname TEXT NOT NULL UNIQUE,
@@ -741,7 +741,7 @@ const v40Statements = [
     source_filename TEXT,
     attachment_mode TEXT NOT NULL
       CONSTRAINT pre_site_distribution_mode_check
-      CHECK (attachment_mode IN ('docx', 'pdf', 'both')),
+      CHECK (attachment_mode IN ('none', 'docx', 'pdf', 'both')),
     to_recipients JSONB NOT NULL,
     cc_recipients JSONB NOT NULL DEFAULT '[]'::jsonb,
     subject TEXT NOT NULL,
@@ -756,6 +756,9 @@ const v40Statements = [
     site_visit_id UUID,
     site_visit_etag TEXT,
     site_visit_snapshot JSONB,
+    session_snapshot JSONB
+      CONSTRAINT pre_site_distribution_session_shape
+      CHECK (session_snapshot IS NULL OR jsonb_typeof(session_snapshot) = 'object'),
     material_links JSONB NOT NULL DEFAULT '[]'::jsonb,
     calendar_filename TEXT,
     calendar_content_type TEXT,
@@ -986,10 +989,10 @@ const v42Statements = [
   )`,
 ];
 
-// V43: private Cycle Dossier pilot state. JSONB stores immutable source/config
+// V47: private Cycle Dossier pilot state. JSONB stores immutable source/config
 // snapshots and independently checkpointed item/edition state; bytes remain
-// in the dedicated private Blob store (see migration 038).
-const v43Statements = [
+// in the dedicated private Blob store (see migration 045).
+const v47Statements = [
   `CREATE TABLE IF NOT EXISTS cycle_dossiers (
     id UUID PRIMARY KEY, owner_profile_id INTEGER NOT NULL REFERENCES user_profiles(id),
     cycle TEXT NOT NULL DEFAULT 'D26' CHECK (cycle = 'D26'), selection JSONB,
@@ -1032,6 +1035,130 @@ const v43Statements = [
     cut_key TEXT NOT NULL, data JSONB NOT NULL, ready BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), UNIQUE(run_id, cut_key)
   )`,
+];
+
+// V43: deliberation briefing links (docs/DELIBERATION_BRIEFING_PAGE_PLAN.md).
+// One expiring, revocable link per request for the read-only briefing page;
+// stores a token digest and sealed token, never the raw token. Also binds the
+// link an exact Pre-Site preview carried. Mirrors migration 038.
+const v43Statements = [
+  `CREATE TABLE IF NOT EXISTS deliberation_briefing_links (
+    id UUID PRIMARY KEY,
+    request_id UUID NOT NULL,
+    jti TEXT NOT NULL UNIQUE,
+    token_digest CHAR(64) NOT NULL UNIQUE,
+    token_ciphertext TEXT NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    created_by UUID NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    revoked_at TIMESTAMPTZ,
+    revoked_by UUID,
+    superseded_by UUID,
+    CONSTRAINT deliberation_briefing_digest_shape CHECK (token_digest ~ '^[0-9a-f]{64}$'),
+    CONSTRAINT deliberation_briefing_revocation_shape CHECK (
+      (revoked_at IS NULL AND revoked_by IS NULL AND superseded_by IS NULL)
+      OR revoked_at IS NOT NULL
+    )
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_deliberation_briefing_live_per_request
+     ON deliberation_briefing_links (request_id)
+     WHERE revoked_at IS NULL`,
+  `ALTER TABLE pre_site_distribution_attempts
+     ADD COLUMN IF NOT EXISTS briefing_link_id UUID`,
+];
+
+
+// V44: applicant materials collections (docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md §16, S503).
+const v44Statements = [
+  `CREATE TABLE IF NOT EXISTS site_visit_material_collections (
+  id UUID PRIMARY KEY,
+  request_id UUID NOT NULL,
+  site_visit_activity_id UUID NOT NULL,
+  status TEXT NOT NULL DEFAULT 'open',
+  due_at TIMESTAMPTZ NOT NULL,
+  closes_at TIMESTAMPTZ NOT NULL,
+  checklist JSONB NOT NULL,
+  contacts JSONB NOT NULL,
+  jti TEXT NOT NULL UNIQUE,
+  token_digest CHAR(64) NOT NULL UNIQUE,
+  token_ciphertext TEXT NOT NULL,
+  created_by UUID NOT NULL,
+  invited_at TIMESTAMPTZ,
+  invitation_email_id UUID,
+  last_reminder_at TIMESTAMPTZ,
+  last_reminder_email_id UUID,
+  reminder_count INTEGER NOT NULL DEFAULT 0,
+  ready_confirmed_at TIMESTAMPTZ,
+  ready_confirmed_by UUID,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT site_visit_material_status_check CHECK (status IN ('open', 'ready', 'closed')),
+  CONSTRAINT site_visit_material_digest_shape CHECK (token_digest ~ '^[0-9a-f]{64}$'),
+  CONSTRAINT site_visit_material_checklist_shape CHECK (jsonb_typeof(checklist) = 'array'),
+  CONSTRAINT site_visit_material_contacts_shape CHECK (jsonb_typeof(contacts) = 'object'),
+  CONSTRAINT site_visit_material_window_shape CHECK (closes_at > due_at),
+  CONSTRAINT site_visit_material_reminders_nonnegative CHECK (reminder_count >= 0)
+)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS site_visit_material_collections_open_request
+  ON site_visit_material_collections (request_id)
+  WHERE status <> 'closed'`,
+  `CREATE INDEX IF NOT EXISTS site_visit_material_collections_request_created
+  ON site_visit_material_collections (request_id, created_at DESC)`,
+];
+
+// V45: per-slot applicant-material finalize leases. Mirrors migration 044.
+const v45Statements = [
+  `ALTER TABLE site_visit_material_collections
+     ADD COLUMN IF NOT EXISTS slot_leases JSONB NOT NULL DEFAULT '{}'::jsonb`,
+  `COMMENT ON COLUMN site_visit_material_collections.slot_leases IS
+     'Per-canonical-slot finalize leases: {slot:{token,expiresAt}}; five-minute expiry, conditionally acquired and released.'`,
+];
+
+// V46: exact agenda-email and Dynamics send-recovery ledger for deliberation
+// sessions. Existing databases use migration 041_deliberation_agenda_sends.sql.
+const v46Statements = [
+  `CREATE TABLE IF NOT EXISTS deliberation_agenda_sends (
+    operation_id UUID PRIMARY KEY,
+    session_id UUID NOT NULL,
+    agenda_snapshot JSONB NOT NULL,
+    to_recipients JSONB NOT NULL,
+    cc_recipients JSONB NOT NULL DEFAULT '[]'::jsonb,
+    subject TEXT NOT NULL,
+    body_text TEXT NOT NULL,
+    body_html TEXT NOT NULL,
+    from_email TEXT NOT NULL,
+    acting_user_system_id UUID,
+    state TEXT NOT NULL DEFAULT 'prepared',
+    dynamics_email_id UUID,
+    dynamics_statecode INTEGER,
+    dynamics_statuscode INTEGER,
+    send_requested_at TIMESTAMPTZ,
+    sent_at TIMESTAMPTZ,
+    attempt_count INTEGER NOT NULL DEFAULT 0,
+    lease_token UUID,
+    locked_until TIMESTAMPTZ,
+    last_error_code TEXT,
+    last_error_message TEXT,
+    last_failed_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT deliberation_agenda_state_check
+      CHECK (state IN ('prepared', 'activity_created', 'send_requested', 'sent', 'failed')),
+    CONSTRAINT deliberation_agenda_recipient_shape CHECK (
+      jsonb_typeof(to_recipients) = 'array'
+      AND jsonb_array_length(to_recipients) > 0
+      AND jsonb_typeof(cc_recipients) = 'array'
+    ),
+    CONSTRAINT deliberation_agenda_lease_shape CHECK (
+      (lease_token IS NULL AND locked_until IS NULL)
+      OR (lease_token IS NOT NULL AND locked_until IS NOT NULL)
+    )
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_deliberation_agenda_session_history
+     ON deliberation_agenda_sends (session_id, created_at DESC)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS uq_deliberation_agenda_one_unresolved
+     ON deliberation_agenda_sends (session_id)
+     WHERE state = 'send_requested'`,
 ];
 
 // V32: model pricing audit history (S181).
@@ -1813,8 +1940,8 @@ async function runMigration() {
       }
     }
 
-    // Run V43 table creation (Cycle Dossier pilot)
-    console.log(`\nApplying v43 schema updates - Cycle Dossier pilot (${v43Statements.length} statements)...`);
+    // Run V43 table creation (deliberation briefing links)
+    console.log(`\nApplying v43 schema updates - Deliberation briefing links (${v43Statements.length} statements)...`);
     for (let i = 0; i < v43Statements.length; i++) {
       const statement = v43Statements[i];
       const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
@@ -1826,6 +1953,78 @@ async function runMigration() {
           console.log(`[v43-${i + 1}/${v43Statements.length}] ○ Already exists: ${preview}...`);
         } else {
           console.error(`[v43-${i + 1}/${v43Statements.length}] ✗ Error: ${error.message}`);
+          throw error;
+        }
+      }
+    }
+
+    // Run V44 table creation (applicant materials collections)
+    console.log(`\nApplying v44 schema updates - Applicant materials collections (${v44Statements.length} statements)...`);
+    for (let i = 0; i < v44Statements.length; i++) {
+      const statement = v44Statements[i];
+      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
+      try {
+        await sql.query(statement);
+        console.log(`[v44-${i + 1}/${v44Statements.length}] ✓ ${preview}...`);
+      } catch (error) {
+        if (error.message.includes('already exists')) {
+          console.log(`[v44-${i + 1}/${v44Statements.length}] ○ Already exists: ${preview}...`);
+        } else {
+          console.error(`[v44-${i + 1}/${v44Statements.length}] ✗ Error: ${error.message}`);
+          throw error;
+        }
+      }
+    }
+
+    // Run V45 column addition (per-slot applicant-material finalize leases)
+    console.log(`\nApplying v45 schema updates - Applicant material slot leases (${v45Statements.length} statements)...`);
+    for (let i = 0; i < v45Statements.length; i++) {
+      const statement = v45Statements[i];
+      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
+      try {
+        await sql.query(statement);
+        console.log(`[v45-${i + 1}/${v45Statements.length}] ✓ ${preview}...`);
+      } catch (error) {
+        if (error.message.includes('already exists')) {
+          console.log(`[v45-${i + 1}/${v45Statements.length}] ○ Already exists: ${preview}...`);
+        } else {
+          console.error(`[v45-${i + 1}/${v45Statements.length}] ✗ Error: ${error.message}`);
+          throw error;
+        }
+      }
+    }
+
+    // Run V46 table creation (deliberation session agenda send ledger)
+    console.log(`\nApplying v46 schema updates - Deliberation agenda sends (${v46Statements.length} statements)...`);
+    for (let i = 0; i < v46Statements.length; i++) {
+      const statement = v46Statements[i];
+      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
+      try {
+        await sql.query(statement);
+        console.log(`[v46-${i + 1}/${v46Statements.length}] ✓ ${preview}...`);
+      } catch (error) {
+        if (error.message.includes('already exists')) {
+          console.log(`[v46-${i + 1}/${v46Statements.length}] ○ Already exists: ${preview}...`);
+        } else {
+          console.error(`[v46-${i + 1}/${v46Statements.length}] ✗ Error: ${error.message}`);
+          throw error;
+        }
+      }
+    }
+
+    // Run V47 table creation (Cycle Dossier pilot)
+    console.log(`\nApplying v47 schema updates - Cycle Dossier pilot (${v47Statements.length} statements)...`);
+    for (let i = 0; i < v47Statements.length; i++) {
+      const statement = v47Statements[i];
+      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
+      try {
+        await sql.query(statement);
+        console.log(`[v47-${i + 1}/${v47Statements.length}] ✓ ${preview}...`);
+      } catch (error) {
+        if (error.message.includes('already exists')) {
+          console.log(`[v47-${i + 1}/${v47Statements.length}] ○ Already exists: ${preview}...`);
+        } else {
+          console.error(`[v47-${i + 1}/${v47Statements.length}] ✗ Error: ${error.message}`);
           throw error;
         }
       }
@@ -1893,10 +2092,13 @@ async function runMigration() {
     console.log('  • pre_site_distribution_attempts (exact preview + Dynamics send recovery ledger)');
     console.log('\nV41 new table (Scheduled personalized email review):');
     console.log('  • scheduled_email_messages (PD review windows + exact draft/send recovery ledger)');
-    console.log('\nV43 new tables (Cycle Dossier pilot):');
+    console.log('  • deliberation_briefing_links (expiring, revocable briefing-page links; sealed token, digest, revocation)');
+    console.log('\nV46 new table (Deliberation session agenda email):');
+    console.log('  • deliberation_agenda_sends (frozen session agenda + Dynamics send recovery ledger)');
+    console.log('\nV47 new tables (Cycle Dossier pilot):');
     console.log('  • cycle_dossiers, cycle_dossier_previews, cycle_dossier_entries,');
     console.log('    cycle_dossier_runs, cycle_dossier_control, cycle_dossier_editions (private state/checkpoints; bytes in private Blob)');
-    console.log('\nIndexes created: 64 (plus 7 added in V30, 6 added in V35, 4 added in V37, 3 added in V39, 3 added in V40)');
+    console.log('\nIndexes created: 64 (plus 7 added in V30, 6 added in V35, 4 added in V37, 3 added in V39, 3 added in V40, 2 added in V44, 2 added in V47)');
 
   } catch (error) {
     console.error('\n✗ Migration failed:', error.message);

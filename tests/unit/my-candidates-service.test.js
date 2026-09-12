@@ -134,6 +134,31 @@ describe('getMyCandidates', () => {
     expect(resolveByEmail).not.toHaveBeenCalled(); // explicit request skips PD scope
   });
 
+  test.each([
+    ['meeting-date-derived code wins over a disagreeing stored code', '2026-06-15', 'J99', 'J26'],
+    ['an off-month meeting date shows no cycle, never the stored code', '2026-03-01', 'J99', null],
+    ['stored code fills in only when the request has no meeting date', null, 'D25', 'D25'],
+    ['no meeting date and no stored code is null, never a guess', null, null, null],
+  ])('grantCycleCode: %s', async (_label, meetingDate, storedCode, expected) => {
+    grantRequestAdapter.getById.mockResolvedValue({
+      akoya_requestid: REQUEST_ID, akoya_requestnum: 'R-1', akoya_title: 'A Proposal',
+      ...(meetingDate ? { wmkf_meetingdate: meetingDate } : {}),
+    });
+    suggestionAdapter.findByRequest.mockResolvedValue([{
+      wmkf_appreviewersuggestionid: SUGGESTION_ID,
+      _wmkf_request_value: REQUEST_ID,
+      _wmkf_potentialreviewer_value: PERSON_ID,
+      wmkf_grantcyclecode: storedCode,
+    }]);
+    potentialReviewerAdapter.queryReviewers.mockResolvedValue({
+      records: [{ wmkf_potentialreviewersid: PERSON_ID, wmkf_name: 'Dr X' }],
+    });
+
+    const out = await getMyCandidates({ requestId: REQUEST_ID, azureEmail: EMAIL });
+
+    expect(out.proposals[0].grantCycleCode).toBe(expected);
+  });
+
   test('single-request scope with only REMOVED rows builds a proposal shell carrying removedCandidates', async () => {
     grantRequestAdapter.getById.mockResolvedValue({
       akoya_requestid: REQUEST_ID, akoya_requestnum: 'R-1', akoya_title: 'A Proposal',

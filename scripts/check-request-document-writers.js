@@ -3,7 +3,7 @@
 /**
  * Guard the Wave 24 Request Document explicit-actor write contract.
  *
- * - exactly six runtime create seams are registered;
+ * - exactly seven runtime create seams are registered;
  * - each create declares its approved actor policy beside the call;
  * - raw Request Document createRecord calls remain centralized in the adapter;
  * - immutable origin fields are not written by arbitrary services/changesets.
@@ -20,6 +20,7 @@ const WRITERS = Object.freeze([
   ['lib/services/pre-site-visit/reopen-service.js', 'dependencies.createDocument(', 'REQUIRED'],
   ['lib/services/pre-site-visit/distribution-service.js', 'dependencies.createDocument(', 'REQUIRED'],
   ['lib/services/final-writeup/transition-service.js', 'dependencies.createDocument(', 'REQUIRED'],
+  ['lib/services/site-visit-materials/contributor-service.js', 'dependencies.createDocument(', 'ALLOW_UNATTRIBUTED'],
 ]);
 
 const ALLOWED_ORIGIN_FIELD_FILES = new Set([

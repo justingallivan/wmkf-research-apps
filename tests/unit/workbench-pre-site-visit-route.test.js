@@ -13,6 +13,17 @@ jest.mock('../../lib/services/pre-site-visit/artifact-service', () => ({
   generatePreSiteVisitArtifact: jest.fn(),
   getPreSiteVisitArtifactStatus: jest.fn(),
 }));
+jest.mock('../../lib/services/deliberation-stage-labels', () => ({
+  readDeliberationStageLabels: jest.fn(),
+}));
+jest.mock('../../lib/services/deliberation-briefing/session-reader', () => ({
+  getDeliberationSessionForRequest: jest.fn(async () => null),
+}));
+jest.mock('../../lib/services/site-visit-materials/summary-reader', () => ({
+  getMaterialsSummaryForRequest: jest.fn(async () => null),
+}));
+import { getMaterialsSummaryForRequest } from '../../lib/services/site-visit-materials/summary-reader';
+import { getDeliberationSessionForRequest } from '../../lib/services/deliberation-briefing/session-reader';
 
 import { getUserRole, requireAppAccess } from '../../lib/utils/auth';
 import { withDalContext } from '../../lib/dataverse/core/context';
@@ -21,8 +32,11 @@ import {
   generatePreSiteVisitArtifact,
   getPreSiteVisitArtifactStatus,
 } from '../../lib/services/pre-site-visit/artifact-service';
+import { readDeliberationStageLabels } from '../../lib/services/deliberation-stage-labels';
 import handler from '../../pages/api/workbench/pre-site-visit';
 import { REQUEST_DOCUMENT_OPERATION_STATUS } from '../../shared/config/requestDocument';
+
+const STAGE_LABELS = { draft: 'AI draft ready', shared: 'Shared', visit: 'Visit', final: 'Final' };
 
 const REQUEST_ID = '11111111-1111-1111-1111-111111111111';
 const PROFILE_ID = '44444444-4444-4444-8444-444444444444';
@@ -68,6 +82,7 @@ beforeEach(() => {
     pendingArtifact: null,
     reopenHistory: [],
   });
+  readDeliberationStageLabels.mockResolvedValue(STAGE_LABELS);
 });
 test('rejects methods other than GET/POST before authentication', async () => {
   const res = mockRes();
@@ -101,7 +116,65 @@ test('reads current/pending status without invoking generation', async () => {
     currentArtifact,
     pendingArtifact: null,
     reopenHistory: [],
+    stageLabels: STAGE_LABELS,
+    session: null,
+    sessionAttendees: [],
+    materials: null,
   });
+});
+
+test('the GET payload carries the applicant-materials summary (counts and window only; the reader owns the fail-open null)', async () => {
+  const summary = { state: 'missing', receivedCount: 1, requiredCount: 3, otherCount: 0, dueAt: '2026-10-05T19:00:00.000Z', closesAt: '2026-10-14T19:00:00.000Z', overdue: false, invited: true };
+  getMaterialsSummaryForRequest.mockResolvedValueOnce(summary);
+  getPreSiteVisitArtifactStatus.mockResolvedValueOnce({ currentArtifact: null, pendingArtifact: null, reopenHistory: [] });
+  const res = mockRes();
+  await handler(get(), res);
+  expect(getMaterialsSummaryForRequest).toHaveBeenCalledWith({ requestId: REQUEST_ID });
+  expect(res.body.materials).toEqual(summary);
+  expect(JSON.stringify(res.body)).not.toMatch(/contributorUrl|contacts/);
+});
+
+test('the GET payload carries the tracker session line through the briefing seam, reduced to the card shape (fail-open null on error)', async () => {
+  getDeliberationSessionForRequest.mockResolvedValueOnce({
+    sessionId: 's-1',
+    scheduledStartIso: '2026-12-01T18:00:00Z',
+    scheduledEndIso: '2026-12-01T18:30:00Z',
+    ianaTimeZone: 'America/Los_Angeles',
+    meetingLink: 'https://zoom.example/j/1',
+    location: '',
+    order: 1,
+    minutes: 30,
+    attendees: [{ name: 'A', email: 'a@example.org' }],
+  });
+  getPreSiteVisitArtifactStatus.mockResolvedValueOnce({ currentArtifact: null, pendingArtifact: null, reopenHistory: [] });
+  const res = mockRes();
+  await handler(get(), res);
+  expect(getDeliberationSessionForRequest).toHaveBeenCalledWith(REQUEST_ID);
+  expect(res.body.session).toEqual({
+    scheduledStartIso: '2026-12-01T18:00:00Z',
+    scheduledEndIso: '2026-12-01T18:30:00Z',
+    ianaTimeZone: 'America/Los_Angeles',
+    meetingLink: 'https://zoom.example/j/1',
+    location: null,
+  });
+  expect(res.body.session).not.toHaveProperty('attendees');
+  // Tracker §5.6: attendees ride alongside as the Share email's default recipients, lowercased and email-only.
+  expect(res.body.sessionAttendees).toEqual([{ name: 'A', email: 'a@example.org' }]);
+
+  getDeliberationSessionForRequest.mockRejectedValueOnce(new Error('tracker down'));
+  getPreSiteVisitArtifactStatus.mockResolvedValueOnce({ currentArtifact: null, pendingArtifact: null, reopenHistory: [] });
+  const failed = mockRes();
+  await handler(get(), failed);
+  expect(failed.statusCode).toBe(200);
+  expect(failed.body.session).toBeNull();
+});
+
+test('adds stageLabels to the GET success payload from the shared admin-editable catalog', async () => {
+  readDeliberationStageLabels.mockResolvedValueOnce({ draft: 'Custom draft label', shared: 'Shared', visit: 'Visit', final: 'Final' });
+  const res = mockRes();
+  await handler(get(), res);
+  expect(readDeliberationStageLabels).toHaveBeenCalledTimes(1);
+  expect(res.body.stageLabels).toEqual({ draft: 'Custom draft label', shared: 'Shared', visit: 'Visit', final: 'Final' });
 });
 
 test('omits guarded-reopen audit history for non-superusers', async () => {
@@ -129,6 +202,10 @@ test('omits guarded-reopen audit history for non-superusers', async () => {
     success: true,
     currentArtifact: { artifactId: 'current-artifact' },
     pendingArtifact: null,
+    stageLabels: STAGE_LABELS,
+    session: null,
+    sessionAttendees: [],
+    materials: null,
   });
 });
 
@@ -151,6 +228,10 @@ test('keeps a regular pending generation visible to non-superusers without corre
     success: true,
     currentArtifact: null,
     pendingArtifact: { artifactId: 'pending-generation' },
+    stageLabels: STAGE_LABELS,
+    session: null,
+    sessionAttendees: [],
+    materials: null,
   });
 });
 

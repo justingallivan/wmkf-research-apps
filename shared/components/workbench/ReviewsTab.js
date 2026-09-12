@@ -392,6 +392,23 @@ function CompareView({ submitted, liveQuestions }) {
 // as plain text nodes (NO dangerouslySetInnerHTML) per the plan's rendering
 // contract. `synthesis` is the stored `proposal.reviewSynthesis` (fail-soft
 // parsed server-side, or null when never generated / parse failed).
+// Human wording for a synthesis blocker (mirrors lib/services/review-synthesis-readiness.js reasons).
+function describeSynthesisBlocker(blocker) {
+  const invitedOn = blocker.emailSentAt ? ` (invited ${new Date(blocker.emailSentAt).toLocaleDateString()})` : '';
+  switch (blocker.reason) {
+    case 'active_invitation':
+      return blocker.accepted
+        ? `accepted, review not yet received${invitedOn}`
+        : `invited, no response yet${invitedOn}`;
+    case 'missing_current_token':
+    case 'missing_token_issued_at':
+    case 'missing_token_expires_at':
+      return 'invited without a working link — regenerate or remove the invitation';
+    default:
+      return `record needs attention (${String(blocker.reason || 'unknown').replace(/_/g, ' ')})`;
+  }
+}
+
 function SynthesisCard({ requestId, synthesis, state, reviewers = [], onUpdated, previewReadOnly = false }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
@@ -505,6 +522,18 @@ function SynthesisCard({ requestId, synthesis, state, reviewers = [], onUpdated,
       }`}>
         {statusText}
       </p>
+      {Array.isArray(state?.blockers) && state.blockers.length > 0 && !automaticInFlight && (
+        <ul className="mt-2 space-y-0.5 text-xs text-gray-700" data-testid="synthesis-blockers">
+          {state.blockers.map((blocker) => (
+            <li key={blocker.suggestionId}>
+              Waiting on <span className="font-medium text-gray-900">{blocker.name || 'an unnamed reviewer'}</span>
+              {' — '}
+              {describeSynthesisBlocker(blocker)}
+            </li>
+          ))}
+          <li className="text-gray-500">Resolve on the Reviewers tab: remove an open invitation, or confirm early generation.</li>
+        </ul>
+      )}
       {error && <p className="text-xs text-amber-600 mt-2">{error}</p>}
       {!synthesis ? (
         <p className="text-sm text-gray-500 mt-2">No synthesis generated yet.</p>

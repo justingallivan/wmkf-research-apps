@@ -6,7 +6,7 @@ status: active
 summary: Governed request-artifact registry with Production-proved same-item Final lineage, explicit group-review attribution, and the Production-live leadership-review transition (2026-09-07).
 canonical: false
 owner: product-engineering
-last_verified: 2026-09-07
+last_verified: 2026-09-10
 related:
   - lib/dataverse/schema/wave16-request-document-registry/wmkf_requestdocument.json
   - lib/dataverse/schema/wave19-pre-site-draft/01_wmkf_requestdocument_pre_site_draft.json
@@ -16,6 +16,7 @@ related:
   - lib/services/initial-assessment/artifact-service.js
   - lib/services/initial-assessment/controls-service.js
   - lib/services/pre-site-visit/distribution-service.js
+  - lib/services/pre-site-visit/cycle-list-service.js
   - lib/services/final-writeup/transition-service.js
   - lib/db/migrations/034_pre_site_distribution_attempts.sql
   - docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md
@@ -245,6 +246,14 @@ Production Request Document row was created by this release smoke.
 ## Ownership
 
 - SharePoint owns editable Word bytes and native version history.
+- External reader (2026-09-10, briefing plan D19): the deliberation briefing
+  page (`lib/services/deliberation-briefing/briefing-page-service.js`) reads
+  this registry live for the request's Ready, non-Superseded, non-snapshot
+  Applicant Slides / Other Applicant Materials / Recording / Transcript /
+  Transcript Summary rows and serves their bytes to a verified briefing-link
+  holder by member `material:<requestdocumentid>`. Read-only; never the
+  Pre-Site Visit writeup row (served from the distribution ledger's pinned
+  snapshot instead).
 - `wmkf_requestdocument` owns the request/cycle relationship, typed artifact and
   lifecycle state, producer operation state, stable Graph site/drive/item
   identity, upload/finalization eTag/version snapshot, and

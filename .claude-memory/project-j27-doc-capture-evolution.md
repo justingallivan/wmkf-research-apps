@@ -51,6 +51,7 @@ Assessment, and Field Primer use and fingerprint only the exact narrative.
 The bibliography remains separate for the next-cycle Reviewer Finder, which
 will label and fingerprint both sources so cited authors can inform discovery.
 Its current-cycle resolver remains unchanged.
+**Owner 2026-09-09 (register J27-082):** D26 pre-site drafts are being generated for every advancing request by an owner-run script that depends on this exact path; in J27 the source file name and location *may* change, so the J27 planning must settle the source contract before designing the next-cycle auto-generation trigger (which will not be a script).
 
 **Filename-match is FRAGILE — but do NOT assert it "will break in J27."** (Corrected S265, Justin: the earlier "J27 will use new naming conventions / a different collection mechanism, so filename-match WILL break" claim was **unsubstantiated** — Connor pushed back on dropping filename-reconciliation on that premise. There is **no evidence** J27 changes naming; filename-match only breaks **if the names actually change**, which isn't established.) The real, durable case for moving OFF filename-match is **fragility + Dataverse legibility**, NOT a J27-will-break prediction: it depends on PDs naming files consistently/correctly, with **no structured fallback** when they don't. **Strongest argument:** if we **auto-generate writeups** in a future cycle, there is **nowhere structured to store them that the apps can read back** — a filename heuristic can't anchor a machine-produced doc that a PD may never (re)name correctly. Keep the D26 name→label map in one small per-cycle config; never hard-code D26 names as permanent (consistent with [[project-grant-phasing-evolution]]).
 
@@ -113,13 +114,20 @@ a pre-J27-scale checkpoint rather than manufacturing Production evidence now.
 
 ## Sequencing / urgency (user, S258)
 
-**Initial Assessments are hidden in the UI for D26 (owner decision 2026-09-05, S489).**
-`/workbench/artifacts` (now titled "Initial assessments") and its `WorkbenchViewsNav` entry
-show a "not part of the D26 dual-phase workflow / available for J27" card for `cycleCode
-=== 'D26'` (Codex PR #151, `3fc0a936`). Justin: the D26 pilot proved the plumbing; its output
-was not needed by this cycle's business processes, so hiding it is safe. In J27 Initial
-Assessment becomes a real feature (every complete single-submission proposal gets one before
-advancement) — plan it as product work then, and do not treat the D26 hide as a regression.
+**Initial Assessments are hidden in the UI for D26 (owner decision 2026-09-05, S489; reconfirmed
+2026-09-09 after a same-day unhide/re-hide).** The cycle-wide "Initial assessments" view (formerly
+`/workbench/artifacts`) and its `WorkbenchViewsNav` entry show a "not part of the D26 dual-phase
+workflow / available for J27" card for `cycleCode === 'D26'` (Codex PR #151, `3fc0a936`). Justin: the
+D26 pilot proved the plumbing; for D26 the list holds only pilot rows. **Lesson 2026-09-09:** when the
+owner asked for "the pre-site draft section" back, PR #213 unhid this view — the wrong artifact. The
+drafts staff actually use are **Pre Site Visit** artifacts (per-request tab renamed to Staff
+Deliberations in S466), which had never had a cycle-wide list. They now have one: the **Staff
+deliberations** view between Reviewer follow-up and Final writeups
+(`lib/services/pre-site-visit/cycle-list-service.js`, `/api/workbench/staff-deliberations`). Do not
+treat the D26 hide as a regression. In J27 Initial Assessment becomes a real feature (every complete
+single-submission proposal gets one before advancement) and precedes reviewer identification, so the
+view moves left of Request list then and a Find reviewers view surfaces alongside it — plan that
+reorder as J27 product work.
 
 J27 design is a **large planning effort with many moving parts** that must **start soon after the bulk of the D26 Workbench work lands** — treat it as the next major planning push, not a someday item. J27 specifics (exactly what is collected up front, timing, final table shape) are **not yet decided** — re-confirm with Justin/Connor before building.
 

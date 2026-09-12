@@ -50,6 +50,7 @@ jest.mock('../../lib/services/reviewer-rollup', () => ({
 
 import { loadDashboard } from '../../lib/services/workbench/dashboard-service';
 import { ServiceHttpError } from '../../lib/services/service-http-error';
+import { resolveWorkbenchProgramScope, buildProgramScopeFilter } from '../../lib/services/workbench/program-scope-service.js';
 
 const PD = { systemuserid: 'pd-1', fullName: 'Dr. PD One' };
 
@@ -61,8 +62,10 @@ beforeEach(() => {
   fetchReviewerRollup.mockResolvedValue({});
 });
 
+// Fixed "today" so the calendar-based default is deterministic: 2026-09-08.
+const TODAY = new Date('2026-09-08T12:00:00Z');
 const args = (over = {}) => ({
-  azureEmail: 'pd@example.org', profileId: 1, callerSystemId: 'pd-1', cycleCode: undefined, scope: 'my', includeSetAside: false, ...over,
+  azureEmail: 'pd@example.org', profileId: 1, callerSystemId: 'pd-1', cycleCode: undefined, scope: 'my', includeSetAside: false, today: TODAY, ...over,
 });
 
 test('no active systemuser → ServiceHttpError 404 with the historical message', async () => {
@@ -92,9 +95,12 @@ test('cycle-list mode: lists organization-wide eligible cycles with honest activ
   });
   const body = await loadDashboard(args());
   expect(body.success).toBe(true);
-  expect(body.cycles.map((c) => [c.code, c.count, c.setAsideCount, c.myCount, c.mySetAsideCount]))
-    .toEqual([['D26', 1, 1, 0, 1], ['J26', 1, 0, 1, 0]]);
-  expect(body.defaultCycleCode).toBe('J26');
+  expect(body.cycles.map((c) => [c.code, c.count, c.setAsideCount, c.myCount, c.mySetAsideCount, c.meetingDate]))
+    .toEqual([['D26', 1, 1, 0, 1, '2026-12-12'], ['J26', 1, 0, 1, 0, '2026-06-04']]);
+  // Calendar default: the working cycle is the upcoming December meeting, even
+  // though the caller's only active request is in June.
+  expect(body.defaultCycleCode).toBe('D26');
+  expect(body.lastDecidedCycleCode).toBe('J26');
   expect(body.programDirector).toEqual({ systemuserid: 'pd-1', fullName: 'Dr. PD One' });
   expect(queryAllRequests).toHaveBeenCalledWith({
     select: 'akoya_requestid,wmkf_meetingdate,akoya_requeststatus,_wmkf_grantprogram_value,_wmkf_programdirector_value,wmkf_triagestatus',
@@ -103,21 +109,52 @@ test('cycle-list mode: lists organization-wide eligible cycles with honest activ
   });
 });
 
-test('cycle-list mode: falls back to newest active org cycle, then set-aside-only cycle', async () => {
-  queryAllRequests.mockResolvedValue({
-    records: [
-      { wmkf_meetingdate: '2026-12-11', _wmkf_programdirector_value: 'pd-2', wmkf_triagestatus: 100000001 },
-      { wmkf_meetingdate: '2026-06-04', _wmkf_programdirector_value: 'pd-2' },
-    ],
-    capped: false,
-  });
-  await expect(loadDashboard(args({ callerSystemId: null }))).resolves.toMatchObject({ defaultCycleCode: 'J26' });
+test('cycle-list mode: the default cycle is the same for every caller regardless of assignments or visibility', async () => {
+  const records = [
+    { wmkf_meetingdate: '2026-12-11', _wmkf_programdirector_value: 'pd-2', wmkf_triagestatus: 100000001 },
+    { wmkf_meetingdate: '2026-06-04', _wmkf_programdirector_value: 'pd-1' },
+  ];
+  queryAllRequests.mockResolvedValue({ records, capped: false });
+  const pd1 = await loadDashboard(args({ callerSystemId: 'pd-1' }));
+  queryAllRequests.mockResolvedValue({ records, capped: false });
+  const pd2 = await loadDashboard(args({ callerSystemId: 'pd-2' }));
+  queryAllRequests.mockResolvedValue({ records, capped: false });
+  const anon = await loadDashboard(args({ callerSystemId: null }));
+  // D26 is set-aside-only and nobody's "active" cycle; it is still the working cycle.
+  expect([pd1.defaultCycleCode, pd2.defaultCycleCode, anon.defaultCycleCode]).toEqual(['D26', 'D26', 'D26']);
+});
 
-  queryAllRequests.mockResolvedValue({
-    records: [{ wmkf_meetingdate: '2026-12-11', wmkf_triagestatus: 100000001 }],
-    capped: false,
+test('cycle-list mode: the default is per Grant Program — a caller whose default program differs sees that program\'s cycles', async () => {
+  const otherProgram = '11111111-1111-4111-8111-111111111111';
+  resolveWorkbenchProgramScope.mockResolvedValueOnce({
+    programs: [{ programId: otherProgram, name: 'SoCal' }],
+    defaultProgramId: otherProgram,
+    programId: otherProgram,
+    programName: 'SoCal',
   });
-  await expect(loadDashboard(args({ callerSystemId: null }))).resolves.toMatchObject({ defaultCycleCode: 'D26' });
+  buildProgramScopeFilter.mockImplementationOnce((programId) => `_wmkf_grantprogram_value eq ${programId}`);
+  queryAllRequests.mockResolvedValue({ records: [{ wmkf_meetingdate: '2027-06-10', _wmkf_programdirector_value: 'pd-9' }], capped: false });
+  const body = await loadDashboard(args({ callerSystemId: 'pd-9' }));
+  expect(queryAllRequests).toHaveBeenCalledWith(expect.objectContaining({
+    filter: expect.stringContaining(`_wmkf_grantprogram_value eq ${otherProgram}`),
+  }));
+  // Same calendar rule, applied to that program's own cycle list.
+  expect(body).toMatchObject({ programId: otherProgram, defaultCycleCode: 'J27', lastDecidedCycleCode: null });
+});
+
+test('cycle-list mode: the default flips the day after the working meeting, and falls back to the newest cycle once all have passed', async () => {
+  const records = [
+    { wmkf_meetingdate: '2026-12-11', _wmkf_programdirector_value: 'pd-1' },
+    { wmkf_meetingdate: '2026-06-04', _wmkf_programdirector_value: 'pd-1' },
+  ];
+  queryAllRequests.mockResolvedValue({ records, capped: false });
+  await expect(loadDashboard(args({ today: new Date('2026-12-11T23:00:00Z') })))
+    .resolves.toMatchObject({ defaultCycleCode: 'D26', lastDecidedCycleCode: 'J26' });
+  queryAllRequests.mockResolvedValue({ records, capped: false });
+  await expect(loadDashboard(args({ today: new Date('2026-12-12T00:00:00Z') })))
+    .resolves.toMatchObject({ defaultCycleCode: 'D26', lastDecidedCycleCode: 'D26' });
+  queryAllRequests.mockResolvedValue({ records: [], capped: false });
+  await expect(loadDashboard(args())).resolves.toMatchObject({ cycles: [], defaultCycleCode: null, lastDecidedCycleCode: null });
 });
 
 test('cycle-list mode: fails closed with typed 503 when the organization scan is capped', async () => {

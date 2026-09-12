@@ -7,6 +7,8 @@ import ReviewQuestionsSection from '../shared/components/admin/ReviewQuestionsSe
 import PromptTemplatesSection from '../shared/components/admin/PromptTemplatesSection';
 import EmailDefaultsSection from '../shared/components/admin/EmailDefaultsSection';
 import SiteVisitRecipientsSection from '../shared/components/admin/SiteVisitRecipientsSection';
+import MeetingTrackerDefaultsSection from '../shared/components/admin/MeetingTrackerDefaultsSection';
+import SiteVisitMaterialsDefaultsSection from '../shared/components/admin/SiteVisitMaterialsDefaultsSection';
 import FinalWriteupMatrixAudiencesSection from '../shared/components/admin/FinalWriteupMatrixAudiencesSection';
 import ReviewerRepairAlertDetails from '../shared/components/admin/ReviewerRepairAlertDetails';
 import DynamicsExplorerRestrictionsSection from '../shared/components/admin/DynamicsExplorerRestrictionsSection';
@@ -84,6 +86,21 @@ const ALERT_RECIPIENT_DATAVERSE_FIELDS = [
     'Per-category recipient JSON',
     'alertRecipientsByCategory',
     'The active-superuser fallback roster is Postgres-backed, not Dataverse.',
+  ),
+];
+
+const MEETING_TRACKER_DEFAULTS_DATAVERSE_FIELDS = [
+  appSystemSettingField(
+    'Default deliberation attendees',
+    'meeting_tracker.default_attendees',
+    'Stores only active staff profile IDs (reference map v1); names and emails are resolved live from the recipient directory.',
+  ),
+];
+const SITE_VISIT_MATERIALS_DEFAULTS_DATAVERSE_FIELDS = [
+  appSystemSettingField(
+    'Applicant materials upload cap',
+    'site_visit_materials.upload_max_mb',
+    'Whole number of megabytes (1–500). Unset reads as the 100 MB default. The briefing page opens files up to 50 MB and lists larger ones with a note.',
   ),
 ];
 
@@ -3097,6 +3114,7 @@ function WorkflowsWorkspace({ view }) {
       );
     case 'site-visits':
       return (
+        <div className="space-y-6">
         <AdminEditorPanel
           id="site-visit-recipient-directory"
           title="Site Visit recipient directory"
@@ -3106,6 +3124,25 @@ function WorkflowsWorkspace({ view }) {
         >
           <SiteVisitRecipientsSection />
         </AdminEditorPanel>
+          <AdminEditorPanel
+            id="meeting-tracker-default-attendees"
+            title="Meeting Tracker default attendees"
+            description="Choose the staff who attend every deliberation session by default. Board members are added per session in the Meeting Tracker."
+            scope="Global setting"
+            dataverseFields={MEETING_TRACKER_DEFAULTS_DATAVERSE_FIELDS}
+          >
+            <MeetingTrackerDefaultsSection />
+          </AdminEditorPanel>
+          <AdminEditorPanel
+            id="site-visit-materials-upload-cap"
+            title="Applicant materials upload cap"
+            description="Largest file an applicant can upload for a site visit through the materials link."
+            scope="Global setting"
+            dataverseFields={SITE_VISIT_MATERIALS_DEFAULTS_DATAVERSE_FIELDS}
+          >
+            <SiteVisitMaterialsDefaultsSection />
+          </AdminEditorPanel>
+        </div>
       );
     case 'governance':
       return (
@@ -3113,18 +3150,22 @@ function WorkflowsWorkspace({ view }) {
           <AdminEditorPanel
             id="workflow-policies"
             title="Workflow policies"
-            description="Publish immutable versions of reviewer and grantee policy text."
+            description="Reviewer and grantee policy text. Published versions are immutable: every edit publishes a new version and moves the active pointer."
             scope="Workflow-specific"
             dataverseFields={POLICY_SECTION_DATAVERSE_FIELDS}
+            collapsible
+            defaultOpen={false}
           >
             <PoliciesSection />
           </AdminEditorPanel>
           <AdminEditorPanel
             id="workflow-email-defaults"
             title="Workflow email defaults"
-            description="Edit shared default copy for reviewer and grantee email workflows."
+            description="Default copy for reviewer, grantee, and internal emails, plus staff display labels. A blank invitation default blocks sends until it is filled in."
             scope="Workflow-specific"
             dataverseFields={EMAIL_DEFAULTS_DATAVERSE_FIELDS}
+            collapsible
+            defaultOpen={false}
           >
             <EmailDefaultsSection />
           </AdminEditorPanel>

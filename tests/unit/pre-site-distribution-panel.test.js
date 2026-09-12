@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import PreSiteDistributionPanel from '../../shared/components/workbench/PreSiteDistributionPanel';
 
 jest.mock('../../shared/components/Layout', () => ({
@@ -20,8 +20,12 @@ function response(body, status = 200) {
   };
 }
 
-function preparedAttempt(mode = 'both') {
-  const attachments = [
+const BRIEFING_LINK_ID = '12121212-1212-4212-8212-121212121212';
+
+// Since 2026-09-10 a prepared attempt attaches nothing and always carries the
+// briefing link; `mode` is kept only so legacy-shaped history rows can be built.
+function preparedAttempt(mode = 'none') {
+  const attachments = mode === 'none' ? [] : [
     ...(mode === 'pdf' ? [] : [{
       kind: 'docx', filename: 'PreSite_1002379.docx', webUrl: 'https://sharepoint.test/frozen.docx', size: 2048,
     }]),
@@ -34,10 +38,11 @@ function preparedAttempt(mode = 'both') {
     requestId: REQUEST_ID,
     previewHash: 'a'.repeat(64),
     attachmentMode: mode,
+    briefingLinkId: BRIEFING_LINK_ID,
     to: ['staff@example.org'],
     cc: ['consultant@example.org'],
     subject: 'Pre-Site Visit materials — 1002379',
-    bodyText: 'Please find the frozen materials attached.',
+    bodyText: 'The briefing page linked below has the materials.',
     state: 'prepared',
     transportAccepted: false,
     attachments,
@@ -51,7 +56,7 @@ beforeEach(() => {
 
 afterEach(() => jest.restoreAllMocks());
 
-test('offers Word, PDF, and both as explicit attachment choices', async () => {
+test('offers no attachment choice; the default message names the briefing page as the carrier', async () => {
   render(
     <PreSiteDistributionPanel
       requestId={REQUEST_ID}
@@ -59,48 +64,43 @@ test('offers Word, PDF, and both as explicit attachment choices', async () => {
       sourceArtifact={{ artifactId: ARTIFACT_ID }}
     />,
   );
-  expect(await screen.findByLabelText('Word document')).toBeInTheDocument();
-  expect(screen.getByRole('heading', { name: 'Send Site Visit materials' })).toBeInTheDocument();
-  expect(screen.getByLabelText('PDF')).toBeChecked();
-  expect(screen.getByLabelText('Word and PDF')).toBeInTheDocument();
+  expect(await screen.findByRole('heading', { name: 'Send Site Visit materials' })).toBeInTheDocument();
+  expect(screen.queryByRole('group', { name: 'Document attachment' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('radio')).not.toBeInTheDocument();
+  expect(screen.getByLabelText('Message')).toHaveValue(
+    'The deliberation briefing page linked below has the Site Visit writeup, every completed review, the proposal, and the research presentation materials.',
+  );
 });
 
-test('offers material links by display label with no calendar controls', async () => {
+test('offers no material checkboxes and no calendar controls; the briefing page is the carrier', async () => {
   render(
     <PreSiteDistributionPanel
       requestId={REQUEST_ID}
       requestNumber="1002379"
       sourceArtifact={{ artifactId: ARTIFACT_ID }}
-      materials={[{
-        artifactId: '44444444-4444-4444-8444-444444444444',
-        filename: 'Applicant Slides.pdf',
-        artifactTypeLabel: 'Applicant Slides',
-      }]}
     />,
   );
 
-  expect(await screen.findByRole('group', { name: 'Document attachment' })).toBeInTheDocument();
+  expect(await screen.findByRole('heading', { name: 'Send Site Visit materials' })).toBeInTheDocument();
   // Calendar attachments have no UI (owner decision S466: unused).
   expect(screen.queryByText(/add-to-calendar/i)).not.toBeInTheDocument();
-  expect(screen.queryByText(/Calendar and material links/)).not.toBeInTheDocument();
-  // Materials show the display label; the SharePoint filename stays in a tooltip.
-  expect(screen.getByRole('group', { name: 'Include links to materials' })).toBeInTheDocument();
-  const materialLabel = screen.getByText('Applicant Slides');
-  expect(materialLabel).toHaveAttribute('title', 'Applicant Slides.pdf');
-  expect(screen.queryByText(/Applicant Slides\.pdf/)).not.toBeInTheDocument();
+  // Material links retired (owner 2026-09-10): no "Include links to materials" group.
+  expect(screen.queryByRole('group', { name: 'Include links to materials' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+  expect(screen.getByLabelText('Message').value).toContain('the research presentation materials');
 });
 
-test('binds the chosen mode into prepare and requires exact-preview confirmation before send', async () => {
+test('prepare carries no attachment mode, the preview shows the briefing link and no attachments, and send needs exact-preview confirmation', async () => {
   global.fetch
     .mockResolvedValueOnce(response({ success: true, attempts: [] }))
-    .mockResolvedValueOnce(response({ success: true, attempt: preparedAttempt('both') }))
+    .mockResolvedValueOnce(response({ success: true, attempt: preparedAttempt() }))
     .mockResolvedValueOnce(response({
       success: true,
-      attempt: { ...preparedAttempt('both'), state: 'sent', transportAccepted: true },
+      attempt: { ...preparedAttempt(), state: 'sent', transportAccepted: true },
     }))
     .mockResolvedValueOnce(response({
       success: true,
-      attempts: [{ ...preparedAttempt('both'), state: 'sent', transportAccepted: true, createdAt: '2026-08-23T12:00:00Z' }],
+      attempts: [{ ...preparedAttempt(), state: 'sent', transportAccepted: true, createdAt: '2026-08-23T12:00:00Z' }],
     }));
   render(
     <PreSiteDistributionPanel
@@ -110,22 +110,23 @@ test('binds the chosen mode into prepare and requires exact-preview confirmation
     />,
   );
   await screen.findByText(/No email previews/);
-  fireEvent.click(screen.getByLabelText('Word and PDF'));
   fireEvent.change(screen.getByLabelText('To'), { target: { value: 'staff@example.org' } });
   fireEvent.change(screen.getByLabelText('Cc'), { target: { value: 'consultant@example.org' } });
   fireEvent.click(screen.getByRole('button', { name: 'Create preview' }));
 
   expect(await screen.findByText('Email preview')).toBeInTheDocument();
   const prepareCall = global.fetch.mock.calls.find(([url]) => url.endsWith('/prepare'));
-  expect(JSON.parse(prepareCall[1].body)).toMatchObject({
+  const prepareBody = JSON.parse(prepareCall[1].body);
+  expect(prepareBody).toMatchObject({
     requestId: REQUEST_ID,
     expectedArtifactId: ARTIFACT_ID,
-    attachmentMode: 'both',
     to: 'staff@example.org',
     cc: 'consultant@example.org',
   });
-  expect(screen.getByText(/PreSite_1002379.docx/)).toBeInTheDocument();
-  expect(screen.getByText(/PreSite_1002379.pdf/)).toBeInTheDocument();
+  expect(prepareBody).not.toHaveProperty('attachmentMode');
+  expect(screen.getByText(/Link included/)).toBeInTheDocument();
+  expect(screen.queryByText('Attachments:')).not.toBeInTheDocument();
+  expect(screen.queryByText(/PreSite_1002379/)).not.toBeInTheDocument();
   expect(screen.getByText(/later edits are not included/i)).toBeInTheDocument();
   const send = screen.getByRole('button', { name: 'Send email' });
   expect(send).toBeDisabled();
@@ -146,10 +147,10 @@ test('binds the chosen mode into prepare and requires exact-preview confirmation
   expect(await screen.findByText(/accepted this exact email for transport/i)).toBeInTheDocument();
 });
 
-test('changing attachment selection invalidates a prepared preview', async () => {
+test('editing the message after a preview invalidates it', async () => {
   global.fetch
     .mockResolvedValueOnce(response({ success: true, attempts: [] }))
-    .mockResolvedValueOnce(response({ success: true, attempt: preparedAttempt('pdf') }));
+    .mockResolvedValueOnce(response({ success: true, attempt: preparedAttempt() }));
   render(
     <PreSiteDistributionPanel
       requestId={REQUEST_ID}
@@ -161,8 +162,28 @@ test('changing attachment selection invalidates a prepared preview', async () =>
   fireEvent.change(screen.getByLabelText('To'), { target: { value: 'staff@example.org' } });
   fireEvent.click(screen.getByRole('button', { name: 'Create preview' }));
   expect(await screen.findByText('Email preview')).toBeInTheDocument();
-  fireEvent.click(screen.getByLabelText('Word document'));
+  fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'Edited after preview.' } });
   expect(screen.queryByText('Email preview')).not.toBeInTheDocument();
+});
+
+test('a preview without a briefing link cannot be sent (defense: the server refuses to prepare one)', async () => {
+  global.fetch
+    .mockResolvedValueOnce(response({ success: true, attempts: [] }))
+    .mockResolvedValueOnce(response({ success: true, attempt: { ...preparedAttempt(), briefingLinkId: null } }));
+  render(
+    <PreSiteDistributionPanel
+      requestId={REQUEST_ID}
+      requestNumber="1002379"
+      sourceArtifact={{ artifactId: ARTIFACT_ID }}
+    />,
+  );
+  await screen.findByText(/No email previews/);
+  fireEvent.change(screen.getByLabelText('To'), { target: { value: 'staff@example.org' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Create preview' }));
+  expect(await screen.findByText(/No link — this preview cannot be sent/)).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('checkbox', { name: /I reviewed the recipients/ }));
+  fireEvent.click(screen.getByRole('button', { name: 'Send email' }));
+  expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith('/send'))).toBe(false);
 });
 
 test('adds curated recipients without replacing manual addresses or creating To/Cc conflicts', async () => {
@@ -510,6 +531,7 @@ test('reports loaded history and the server-derived sent flag through onHistory'
   await waitFor(() => expect(onHistory).toHaveBeenCalledWith({
     attempts,
     currentSourceEverSent: true,
+    latestSendFailure: null,
   }));
 });
 
@@ -556,4 +578,121 @@ test('keeps non-stale send failures as errors', async () => {
 
   expect(await screen.findByRole('alert')).toHaveTextContent(/could not be found/i);
   expect(screen.queryByRole('status')).not.toBeInTheDocument();
+});
+
+test('an unreadable briefing link still offers Issue new link but never Copy', async () => {
+  global.fetch = jest.fn()
+    .mockResolvedValueOnce(response({ success: true, attempts: [], briefingLink: { id: 'l', url: null, unreadable: true, expiresAt: null } }))
+    .mockResolvedValueOnce(response({ success: true, link: { id: 'm', url: 'https://apps.test/external/briefing/new', unreadable: false, expiresAt: '2026-10-08T00:00:00Z' } }));
+  render(
+    <PreSiteDistributionPanel
+      requestId={REQUEST_ID}
+      requestNumber="1002379"
+      sourceArtifact={{ artifactId: ARTIFACT_ID }}
+    />,
+  );
+  await screen.findByText(/can no longer be read on the server/);
+  expect(screen.queryByText('Copy link')).toBeNull();
+  fireEvent.click(screen.getByText('Issue new link'));
+  await screen.findByText(/stops the current one immediately/);
+  fireEvent.click(screen.getByText('Issue new link'));
+  await waitFor(() => expect(screen.getByText('https://apps.test/external/briefing/new')).toBeInTheDocument());
+  expect(global.fetch.mock.calls[1][0]).toBe('/api/workbench/pre-site-visit/briefing-link');
+  expect(JSON.parse(global.fetch.mock.calls[1][1].body)).toEqual({ requestId: REQUEST_ID, action: 'reissue', expectedLinkId: 'l' });
+});
+
+test('a superseded reissue refreshes the header from history instead of revoking the newer link', async () => {
+  global.fetch = jest.fn()
+    .mockResolvedValueOnce(response({ success: true, attempts: [], briefingLink: { id: 'l', url: 'https://apps.test/external/briefing/old', expiresAt: null } }))
+    .mockResolvedValueOnce(response({ error: 'The briefing link was replaced by another action. Refresh to see the current link.', code: 'briefing_link_superseded' }, 409))
+    .mockResolvedValueOnce(response({ success: true, attempts: [], briefingLink: { id: 'm', url: 'https://apps.test/external/briefing/newer', expiresAt: null } }));
+  render(
+    <PreSiteDistributionPanel
+      requestId={REQUEST_ID}
+      requestNumber="1002379"
+      sourceArtifact={{ artifactId: ARTIFACT_ID }}
+    />,
+  );
+  await screen.findByText('https://apps.test/external/briefing/old');
+  fireEvent.click(screen.getByText('Issue new link'));
+  await screen.findByText(/stops the current one immediately/);
+  fireEvent.click(screen.getByText('Issue new link'));
+  await screen.findByText('https://apps.test/external/briefing/newer');
+  expect(screen.getByText(/replaced by another action/)).toBeInTheDocument();
+  expect(global.fetch).toHaveBeenCalledTimes(3);
+});
+
+test('dialog mode: Add from directory opens the picker above the composer, and Escape closes the picker first', async () => {
+  global.fetch = jest.fn(async (url) => {
+    if (String(url).includes('/history')) return response({ success: true, attempts: [] });
+    if (String(url).includes('/recipient-options')) {
+      return response({ success: true, recipients: [{ key: 'r0', category: 'staff', name: 'Alice Staff', email: 'alice@example.org' }] });
+    }
+    return response({ success: true });
+  });
+  const onCloseComposer = jest.fn();
+  render(
+    <PreSiteDistributionPanel
+      requestId={REQUEST_ID}
+      requestNumber="1002379"
+      sourceArtifact={{ artifactId: ARTIFACT_ID }}
+      composer="dialog"
+      onCloseComposer={onCloseComposer}
+      needsLock
+    />,
+  );
+  const composer = await screen.findByRole('dialog', { name: 'Share for the deliberation session' });
+  expect(within(composer).getByTestId('composer-lock-note')).toBeInTheDocument();
+  // Close is reachable at both ends of a long dialog (owner 2026-09-10).
+  expect(within(composer).getAllByRole('button', { name: 'Close' })).toHaveLength(2);
+  expect(within(composer).getByRole('button', { name: 'Lock and preview' })).toBeInTheDocument();
+
+  fireEvent.click(within(composer).getAllByRole('button', { name: 'Add from directory' })[0]);
+  const picker = await screen.findByRole('dialog', { name: /directory|recipients/i });
+  // Stacked above the composer (z-60 over z-50), so it is visible, not painted under.
+  expect(picker.closest('[class*="z-[60]"]')).not.toBeNull();
+
+  fireEvent.keyDown(document, { key: 'Escape' });
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: /directory|recipients/i })).not.toBeInTheDocument());
+  expect(onCloseComposer).not.toHaveBeenCalled();
+  expect(screen.getByRole('dialog', { name: 'Share for the deliberation session' })).toBeInTheDocument();
+
+  fireEvent.keyDown(document, { key: 'Escape' });
+  expect(onCloseComposer).toHaveBeenCalledTimes(1);
+});
+
+test('the composer shows the deliberation session slot read-only, and the preview reports the session the server bound', async () => {
+  const session = { scheduledStartIso: '2026-09-11T18:45:00.000Z', scheduledEndIso: null, ianaTimeZone: 'America/Los_Angeles', meetingLink: 'https://zoom.example/j/1', location: null };
+  global.fetch
+    .mockResolvedValueOnce(response({ success: true, attempts: [] }))
+    .mockResolvedValueOnce(response({ success: true, attempt: { ...preparedAttempt(), session: { ...session, sessionId: 's1' } } }));
+  render(
+    <PreSiteDistributionPanel
+      requestId={REQUEST_ID}
+      requestNumber="1002379"
+      sourceArtifact={{ artifactId: ARTIFACT_ID }}
+      session={session}
+    />,
+  );
+  const slot = await screen.findByTestId('composer-session-slot');
+  expect(slot).toHaveTextContent(/Deliberation session: .*Sep 11, 2026.*11:45.*AM\./);
+  expect(slot).toHaveTextContent('Join link included.');
+
+  fireEvent.change(screen.getByLabelText('To'), { target: { value: 'staff@example.org' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Create preview' }));
+  expect(await screen.findByText('Email preview')).toBeInTheDocument();
+  expect(screen.getByText('Pre-discussion:').parentElement).toHaveTextContent(/Sep 11, 2026.*Join link included/);
+});
+
+test('with no session the slot says not yet scheduled and names the PC', async () => {
+  render(
+    <PreSiteDistributionPanel
+      requestId={REQUEST_ID}
+      requestNumber="1002379"
+      sourceArtifact={{ artifactId: ARTIFACT_ID }}
+    />,
+  );
+  const slot = await screen.findByTestId('composer-session-slot');
+  expect(slot).toHaveTextContent('Deliberation session: not yet scheduled.');
+  expect(slot).toHaveTextContent('the PC schedules sessions in Meeting Tracker');
 });

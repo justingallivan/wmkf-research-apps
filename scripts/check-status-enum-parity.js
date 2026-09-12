@@ -106,11 +106,11 @@ function registry() {
   //    the per-request Overview rollup) — read it from there now.
   {
     const rollup = read('lib/services/reviewer-rollup.js');
-    const wb = read('pages/workbench.js');
+    const wb = read('shared/components/workbench/RequestListPanel.js');
     checks.push({
       name: 'workRemaining stages ⊆ STAGE_META chips',
       producer: 'deriveWorkRemaining() returns (reviewer-rollup.js)',
-      consumer: 'STAGE_META keys (workbench.js)',
+      consumer: 'STAGE_META keys (RequestListPanel.js)',
       produced: extractReturnedStrings(rollup, 'deriveWorkRemaining'),
       consumed: extractObjectKeys(wb, 'STAGE_META'),
       rule: 'subset',

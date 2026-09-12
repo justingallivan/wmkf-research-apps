@@ -19,6 +19,7 @@ jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
 }));
 
 const { closeReview } = require('../../lib/services/review-manager/close-review-service');
+const { ServiceHttpError } = require('../../lib/services/service-http-error');
 
 const SUGGESTION = '11111111-1111-4111-8111-111111111111';
 const HONORARIUM = '22222222-2222-4222-8222-222222222222';
@@ -59,6 +60,29 @@ test('fails closed if the suggestion is reparented after authorization', async (
     body: { code: 'request_changed' },
   });
   expect(updateLifecycle).not.toHaveBeenCalled();
+});
+
+test.each([
+  ['an interlock denial', Object.assign(new Error('[dataverse-interlock] denied: deployment=preview target=prod op=PATCH caller=x reason="policy"'), {}), 503, 'write_interlocked'],
+  ['a Dataverse 403', Object.assign(new Error('Forbidden'), { status: 403 }), 502, 'dataverse_forbidden'],
+  ['a Dataverse 401', Object.assign(new Error('Unauthorized'), { status: 401 }), 502, 'dataverse_forbidden'],
+  ['a Dataverse 400', Object.assign(new Error('Bad Request: 0x80040203'), { status: 400 }), 502, 'dataverse_rejected'],
+  ['a Dataverse 404 on write', Object.assign(new Error('gone'), { status: 404 }), 404, 'not_found'],
+  ['a nested response status', Object.assign(new Error('Bad Request'), { response: { status: 400 } }), 502, 'dataverse_rejected'],
+])('maps %s on the lifecycle write to a structured error instead of a generic 500', async (_label, writeError, httpStatus, code) => {
+  updateLifecycle.mockRejectedValueOnce(writeError);
+  const rejection = await closeReview(args()).catch((e) => e);
+  expect(rejection).toBeInstanceOf(ServiceHttpError);
+  expect(rejection).toMatchObject({ httpStatus, body: { code } });
+  // Fixed copy only: upstream detail (error codes, hostnames, policy text) never reaches the client.
+  expect(rejection.body.error).not.toMatch(/0x8004|deployment=|Forbidden|Unauthorized|Bad Request/);
+});
+
+test('an unrecognised write failure still propagates unmapped (route answers 500)', async () => {
+  updateLifecycle.mockRejectedValueOnce(Object.assign(new Error('socket hang up'), { code: 'ECONNRESET' }));
+  const rejection = await closeReview(args()).catch((e) => e);
+  expect(rejection).not.toBeInstanceOf(ServiceHttpError);
+  expect(rejection.message).toBe('socket hang up');
 });
 
 test('maps a structured Dataverse record disappearance to 404', async () => {

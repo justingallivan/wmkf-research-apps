@@ -28,9 +28,9 @@ beforeEach(() => {
 describe('queryProposals', () => {
   it('builds the historical filter/select/orderby and projects the DTO', async () => {
     grantRequestAdapter.queryAllRequests.mockResolvedValueOnce({ records: [record()] });
-    const r = await queryProposals({ fiscalYear: 'December 2025' });
+    const r = await queryProposals({ cycleCode: 'D25' });
     expect(grantRequestAdapter.queryAllRequests).toHaveBeenCalledWith(expect.objectContaining({
-      filter: "akoya_fiscalyear eq 'December 2025' and wmkf_request_type eq 100000001",
+      filter: 'wmkf_meetingdate ge 2025-12-01T00:00:00Z and wmkf_meetingdate lt 2026-01-01T00:00:00Z and wmkf_request_type eq 100000001',
       orderby: 'akoya_requestnum asc',
     }));
     expect(r).toEqual({
@@ -40,7 +40,7 @@ describe('queryProposals', () => {
         pi: 'Dr. PI', actualPd: 'Dr. PD', phaseIStatus: 'Invited', phaseIIStatus: 'Pending',
       }],
       totalCount: 1,
-      fiscalYear: 'December 2025',
+      cycleCode: 'D25',
       program: 'all',
     });
   });
@@ -52,7 +52,7 @@ describe('queryProposals', () => {
         record({ akoya_requestid: 'r2', _akoya_programid_value_formatted: 'Medical Research' }),
       ],
     });
-    const r = await queryProposals({ fiscalYear: 'December 2025', program: 'SE' });
+    const r = await queryProposals({ cycleCode: 'D25', program: 'SE' });
     expect(r.proposals.map((p) => p.requestId)).toEqual(['r1']);
     expect(r.totalCount).toBe(1);
     expect(r.program).toBe('SE');
@@ -60,7 +60,7 @@ describe('queryProposals', () => {
 
   it('unknown program code leaves the set unfiltered (historical behavior)', async () => {
     grantRequestAdapter.queryAllRequests.mockResolvedValueOnce({ records: [record()] });
-    const r = await queryProposals({ fiscalYear: 'December 2025', program: 'XX' });
+    const r = await queryProposals({ cycleCode: 'D25', program: 'XX' });
     expect(r.proposals).toHaveLength(1);
     expect(r.program).toBe('XX');
   });
@@ -69,15 +69,20 @@ describe('queryProposals', () => {
     grantRequestAdapter.queryAllRequests.mockResolvedValueOnce({
       records: [{ akoya_requestid: 'r3', akoya_requestnum: 'n', wmkf_phaseistatus: 5 }],
     });
-    const r = await queryProposals({ fiscalYear: 'FY' });
+    const r = await queryProposals({ cycleCode: 'J24' });
     expect(r.proposals[0]).toMatchObject({
       title: 'Untitled', program: '', institution: '', pi: '', actualPd: '',
       phaseIStatus: '5', phaseIIStatus: '',
     });
   });
 
+  it('an unparseable cycle code throws before any query (fail loud, never a silent empty set)', async () => {
+    await expect(queryProposals({ cycleCode: 'December 2025' })).rejects.toThrow('Invalid cycle code "December 2025"');
+    expect(grantRequestAdapter.queryAllRequests).not.toHaveBeenCalled();
+  });
+
   it('adapter errors propagate raw for the shell to map to 500', async () => {
     grantRequestAdapter.queryAllRequests.mockRejectedValueOnce(new Error('boom'));
-    await expect(queryProposals({ fiscalYear: 'FY' })).rejects.toThrow('boom');
+    await expect(queryProposals({ cycleCode: 'J24' })).rejects.toThrow('boom');
   });
 });

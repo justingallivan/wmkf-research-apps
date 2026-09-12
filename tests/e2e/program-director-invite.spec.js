@@ -643,23 +643,26 @@ test.describe('Program Director reviewer invitation flow', () => {
     await page.getByLabel('Select Dr. Pending Invitee').check();
 
     await page.getByRole('button', { name: /release invitee \(1\)/i }).click();
-    await expect(page.getByText('Review release emails')).toBeVisible();
+    await expect(page.getByText('Release invitations')).toBeVisible();
+    const modal = page.locator('.fixed').filter({ hasText: 'Release invitations' });
+    expect(withdrawRenderBodies.length).toBe(0);
+    await modal.getByRole('radio', { name: /^No longer needed/ }).check();
     await expect.poll(() => withdrawRenderBodies.length).toBe(1);
 
-    const modal = page.locator('.fixed').filter({ hasText: 'Review release emails' });
     await modal.getByLabel('Subject').fill('Reviewed release subject');
     await modal.getByLabel('Message').fill('Dear Dr. Pending Invitee,\n\nWe have completed the reviewer slate. Thank you.');
 
     page.once('dialog', async (dialog) => {
-      expect(dialog.message()).toContain('Send and release 1 reviewer?');
+      expect(dialog.message()).toContain('Release 1 reviewer?');
       await dialog.accept();
     });
-    await modal.getByRole('button', { name: /send and release 1/i }).click();
+    await modal.getByRole('button', { name: /^release \(1\)$/i }).click();
 
     await expect.poll(() => withdrawBodies.length).toBe(1);
     expect(withdrawBodies[0]).toEqual({
       requestId: REQUEST_ID,
       suggestionIds: [pending.suggestionId],
+      reason: 'no_longer_needed',
       overrides: {
         [pending.suggestionId]: {
           subject: 'Reviewed release subject',
@@ -700,15 +703,16 @@ test.describe('Program Director reviewer invitation flow', () => {
     await page.getByLabel('Select Dr. Failed Reviewer').check();
     await page.getByRole('button', { name: /release invitees \(2\)/i }).click();
 
-    const modal = page.locator('.fixed').filter({ hasText: 'Review release emails' });
+    const modal = page.locator('.fixed').filter({ hasText: 'Release invitations' });
+    await modal.getByRole('radio', { name: /^No longer needed/ }).check();
     // exact: the draft textarea also contains the name ("Dear Dr. Failed Reviewer,"),
     // so a substring match resolves to two elements and trips strict mode.
     await expect(modal.getByText('Dr. Failed Reviewer', { exact: true })).toBeVisible();
     page.once('dialog', async (dialog) => {
-      expect(dialog.message()).toContain('Send and release 2 reviewers?');
+      expect(dialog.message()).toContain('Release 2 reviewers?');
       await dialog.accept();
     });
-    await modal.getByRole('button', { name: /send and release 2/i }).click();
+    await modal.getByRole('button', { name: /^release \(2\)$/i }).click();
 
     await expect(modal.getByText(/1 emailed\. 1 issue:/i)).toBeVisible();
     await expect(modal.getByText(/Dr\. Failed Reviewer — The reviewer was released, but the email failed/i)).toBeVisible();

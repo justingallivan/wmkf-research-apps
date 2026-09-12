@@ -342,12 +342,14 @@ export default function ReviewerManagePanel({
   previewReadOnly = false,
   degraded = false,
   declineReferrals = [],
+  pendingInvites = [],
   referralActions = {},
   onAddReferral,
   onDismissDeclineReferral,
   onGoToInvite,
   onNavigate,
   onDismissReferral,
+  noResponseHistory = [],
 }) {
   const [selectedReviewers, setSelectedReviewers] = useState(new Set());
   const [releaseModalOpen, setReleaseModalOpen] = useState(false);
@@ -477,7 +479,7 @@ export default function ReviewerManagePanel({
   // "refresh" half of the Phase 1 staleness policy. The only case left is the row
   // vanishing (removed, or filtered out by a mode/status change), which closes it.
   const activityReviewer = activityDrawerId
-    ? reviewers.find(r => r.suggestionId === activityDrawerId) || null
+    ? [...reviewers, ...noResponseHistory].find(r => r.suggestionId === activityDrawerId) || null
     : null;
   const closeoutReviewer = closeoutReviewerId
     ? reviewers.find(r => r.suggestionId === closeoutReviewerId) || null
@@ -892,6 +894,45 @@ export default function ReviewerManagePanel({
           backward-readable for legacy free text. They surface only on Track
           Reviewers — the home base once invites are out. "Add as candidate"
           routes through the normal identity-resolution flow. */}
+      {mode === 'track' && pendingInvites.length > 0 && (
+        <section
+          className="rounded-lg border border-amber-200 bg-amber-50 p-4"
+          aria-labelledby="pending-invites-heading"
+          data-testid="pending-invites"
+        >
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p id="pending-invites-heading" className="text-sm font-semibold text-amber-900">
+                {pendingInvites.length} invited, awaiting response
+              </p>
+              <p className="text-xs text-amber-800 mt-1">
+                Synthesis waits on every open invitation. Send a reminder, or remove the invitation if no answer is expected.
+              </p>
+            </div>
+            {onGoToInvite && (
+              <button
+                type="button"
+                onClick={onGoToInvite}
+                className="text-xs font-medium text-amber-900 underline hover:text-amber-950"
+              >
+                Manage in Invite Reviewers
+              </button>
+            )}
+          </div>
+          <ul className="mt-3 space-y-1.5">
+            {pendingInvites.map((c) => (
+              <li key={c.suggestionId || c.id || c.email} className="rounded-md bg-white/70 border border-amber-100 px-3 py-2 text-sm">
+                <span className="font-medium text-gray-900">{c.name || 'Unnamed reviewer'}</span>
+                {c.affiliation && <span className="text-gray-600"> — {c.affiliation}</span>}
+                <span className="block text-xs text-gray-500">
+                  {c.emailSentAt ? `Invited ${new Date(c.emailSentAt).toLocaleDateString()}` : 'Invited'}
+                  {c.email ? ` · ${c.email}` : ''}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       {mode === 'track' && declineReferrals.length > 0 && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
           <p className="text-sm font-semibold text-amber-900 mb-1">
@@ -1248,6 +1289,36 @@ export default function ReviewerManagePanel({
             </tbody>
           </table>
         </div>
+      )}
+
+      {mode === 'track' && noResponseHistory.length > 0 && (
+        <section
+          className="rounded-xl border border-slate-200 bg-slate-50 p-4"
+          aria-labelledby="no-response-history-heading"
+          data-testid="no-response-history"
+        >
+          <h2 id="no-response-history-heading" className="text-sm font-semibold text-slate-800">
+            No-response history ({noResponseHistory.length})
+          </h2>
+          <p className="mt-1 text-xs text-slate-600">
+            History-only records. These engagements are not part of reviewer status counts or available actions.
+          </p>
+          <ul className="mt-3 space-y-1.5">
+            {noResponseHistory.map((r) => (
+              <li key={r.suggestionId} className="flex items-center justify-between gap-3 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm">
+                <span className="min-w-0 truncate font-medium text-gray-900">{r.name || 'Unnamed reviewer'}</span>
+                <button
+                  type="button"
+                  onClick={() => setActivityDrawerId(r.suggestionId)}
+                  className="shrink-0 text-blue-700 hover:text-blue-900 hover:underline"
+                  aria-label={`View activity history for ${r.name || 'reviewer'}`}
+                >
+                  History
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
 
       {/* Read-only, so it renders regardless of the canManage UI gate. */}

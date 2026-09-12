@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-09-08
+last_verified: 2026-09-10
 stale_after_days: 90
 owner: reviewers
 source_files:
@@ -642,11 +642,14 @@ registry's `FIELD_SELECT` already fetched [VERIFIED via
 **Standing hazard — the engagement-scope invariant.** The drawer tells staff its
 history covers the CURRENT engagement only. That is true *only* because every field it
 reads is a member of `ENGAGEMENT_STAMP_RESET_ENTRIES`
-(`lib/dataverse/adapters/reviewer-suggestion.js:793-813`), which clears stamps on
-remove/re-add. Three tempting fields are deliberately EXCLUDED and must not be added
-back without resolving the reason: `wmkf_coiackedat` and `wmkf_aiuseackedat` have real
-writers but are **not** reset members, so a value may belong to a prior engagement;
-`wmkf_heldat` has **no writer anywhere** in the repository (only ever nulled at
+(`lib/dataverse/adapters/reviewer-suggestion.js:887-908`), which clears reset-member
+stamps on remove/re-add. The request's `meetingDate` is a deliberate request-scoped
+exception used only for no-response attribution; it is not a reset member. The
+`wmkf_externaltokenrevoked` → `tokenRevoked` marker is a reset member and is preserved
+in the DTO as tri-state evidence. Three tempting fields are deliberately EXCLUDED and
+must not be added back without resolving the reason: `wmkf_coiackedat` and
+`wmkf_aiuseackedat` have real writers but are **not** reset members, so a value may
+belong to a prior engagement; `wmkf_heldat` has **no writer anywhere** in the repository (only ever nulled at
 `reviewer-suggestion.js:1957`). Deadline extensions now use the paired
 `wmkf_reviewduedateextensiongrantedat` current-engagement timestamp alongside the
 DateOnly `wmkf_reviewduedateoverride`, so the history can place the extension on the
@@ -659,9 +662,13 @@ the reset set from the adapter source rather than trusting a copied list.
 external reviewer accept/decline, staff-recorded withdrawal, and the stale-invite cron
 that writes `responseType=no_response` at cycle close. The activity history therefore
 classifies the response event from `responseType` plus `reviewStatus`: accepted and
-ordinary declined rows read as reviewer responses, `no_response` reads as automated
-cycle close, and `declined` + `withdrew` reads as staff-recorded withdrawal. The bare
-timestamp must not be treated as proof that a reviewer responded.
+ordinary declined rows read as reviewer responses, and `declined` + `withdrew` reads as
+staff-recorded withdrawal. No-response attribution uses direct evidence: token
+revocation, a missing meeting date, or a pre-meeting stamp is staff-recorded; only a
+dated post-meeting stamp on a non-revoked row is an automated cycle close; otherwise
+the drawer stays neutral. The bare timestamp must not be treated as proof that a
+reviewer responded. On Track, no-response rows appear in a dedicated history-only
+group outside ordinary status buckets, counts, selection, and actions.
 
 `wmkf_reviewreceivedat` alone still does not prove a portal submission. The
 current source-built closeout contract requires an existing received-review
@@ -682,10 +689,10 @@ strengthen an event's provenance** [VERIFIED via
 earlier version treated a filename or answer rows as independent proof of a genuine
 submission, and had a separate staff-attestation path keyed on
 `reviewUploadedByStaff=true`. Both were removed in `19bd000a`: none of those three
-fields is a member of `ENGAGEMENT_STAMP_RESET_ENTRIES` — the list is 18 entries and
+fields is a member of `ENGAGEMENT_STAMP_RESET_ENTRIES` — the list is 20 entries and
 carries no `wmkf_reviewfilename`, `wmkf_reviewuploadedbystaff`, or
 `wmkf_reviewsharepointfolder`, and clears no answer child rows [VERIFIED by enumerating
-the full list, `lib/dataverse/adapters/reviewer-suggestion.js:793-812`, 2026-08-12]. So
+the full list, `lib/dataverse/adapters/reviewer-suggestion.js:887-908`, 2026-08-12]. So
 a remove/re-add carries them forward and a stale file from a prior engagement would
 defeat the guard. The consequence
 is deliberate and accepted under the convenience scope above — there is now **no
@@ -1397,10 +1404,11 @@ a currently revoked or expired token resolve without content. Every other
 participant without a receipt blocks, including live-token invitees who have
 not accepted, unresolved duplicates, and malformed/unknown lifecycle or token
 state. Unselected, applicant-excluded, and explicitly merged/removed duplicates
-do not participate. `mintAndStore` clears revocation and writes a future expiry,
-but regeneration reopens readiness only when token state was the
-otherwise-participating, nonterminal row's sole resolution; it does not reselect
-a removed row or undo decline/withdraw/release. An existing synthesis remains
+do not participate. `mintAndStore` clears revocation and writes a future expiry, but
+token regeneration is independently fail-closed to response type unset/accepted/held,
+an unset or known nonterminal review status, and a concrete ETag; it does not reselect a removed row or undo
+decline/no-response/withdraw/release, and a concurrent lifecycle change cannot be
+overwritten. An existing synthesis remains
 visible but is not current until synthesis runs again after genuine reactivation
 and resolution. The exact answer digest plus lifecycle classification is hashed;
 a matching completed ledger row establishes Current state. The feature-gated
@@ -1594,6 +1602,79 @@ One Final Writeup row per request over the same stable SharePoint Word item; the
 
 ## Operating Notes
 
+- **Single-page Workbench shell (PR #204, `claude/workbench-shell`, 2026-09-08).** `pages/workbench.js`
+  is a guard around `shared/components/workbench/WorkbenchShell.js`. The URL owns the shell state
+  (`shared/components/workbench/workbench-location.js`: `view`, `programId`, `cycleCode`, `scope`,
+  `setAside`; defaults omitted). The shell loads the program's cycle list once from
+  `/api/workbench/dashboard`, honors a listed `?cycleCode=` deep link, otherwise falls back to the
+  list's `defaultCycleCode` (the working cycle, `lib/utils/cycle-code.js` `resolveWorkingCycle`)
+  and writes it back with `router.replace` so the address is always shareable. Cycle and program
+  changes push history entries; scope and Set Aside replace. An external navigation (back button,
+  a nav link) is adopted from `router.query` once no write of the shell's own is in flight — the
+  first cut had a same-commit race where the cycle fallback effect undid an adoption, so the
+  fallback compares against the render's `location.cycleCode`, never the ref. Panels so far:
+  Request list (`RequestListPanel.js`, PR #204) and Reviewer follow-up (`ReviewerFollowUpPanel.js`,
+  step 2: shares the shell's `scope`, owns `reviewers=attention|all` and `q=` in the URL with the
+  search box mirrored after a 300 ms pause; `previewReadOnly` now comes from the shell page's
+  `getServerSideProps` via `lib/services/workbench/preview-read-only.js`; the legacy
+  `/workbench/reviewer-follow-up` route redirects into the shell carrying cycle and program), and
+  Final writeups (`shared/components/final-writeups/FinalWriteupsViews.js` `FinalWriteupsPanel`,
+  step 3: keys `writeups=`, `pd=`, `q=`, `uncycled=1` (sent as `cycleCode=none`); the API's
+  default-cycle walk-back is no longer used by the UI — an empty cycle renders one in-place notice
+  linking the newest other cycle with writeups and the uncycled rows; the legacy
+  `/workbench/final-writeups` index redirects into the shell translating its old `view`/`pd` keys;
+  both search boxes share `useUrlMirroredInput.js`), Awardees (`AwardeesPanel.js`, step 4: shows the
+  shell's working cycle and shares its `scope` ("Show all programs" = `scope=all`); when a cycle is
+  empty it reads the awardees endpoint's cycle-list mode once and links `lastDecidedCycleCode`
+  ("N awardees in June 2026") which changes the shell cycle — owner decision 2026-09-08; the
+  standalone page's own default-cycle resolution is gone), and Initial assessments
+  (`InitialAssessmentsPanel.js`, step 4: takes the shell's cycle; renders the D26 explanatory card
+  without calling the API, which is what a `view=initial-assessments&cycleCode=D26` deep link shows
+  while the tab stays hidden for D26 — briefly unhidden and re-hidden 2026-09-09; in J27 it moves
+  left of Request list and a Find reviewers view surfaces), and **Staff deliberations**
+  (`StaffDeliberationsPanel.js`, added 2026-09-09 between Reviewer follow-up and Final writeups:
+  the cycle-wide list of Pre-Site Visit Word drafts via read-only
+  `GET /api/workbench/staff-deliberations?cycleCode=` → `lib/services/pre-site-visit/cycle-list-service.js`,
+  one row per request — the `wmkf_CurrentPreSiteVisit` pointer row, else the newest active draft —
+  linking to the per-request Staff Deliberations tab, which owns every write. PC Meeting Tracker
+  slice 3, 2026-09-09 (`docs/PC_MEETING_TRACKER_PLAN.md`): both the tab and this panel now render a
+  shared four-keyed-stop rail — `draft` (AI draft ready; since 2026-09-10 the first stop reads the
+  code-owned substate text "No draft yet" / "Generating draft" / "Draft failed" in gray until a
+  draft exists — `draftStopText` in `shared/utils/deliberation-stage.js`) → `shared` (Shared; D5, locked not
+  "first sent") → `visit` (date-derived "visited", D7) → `final` — with admin-editable labels
+  (D6, `shared/config/editableTextDefaults.js` keys `stage.deliberations.*`); the old
+  Draft/Draft ready/Share/Wrap Up hard-coded labels are gone. **Tab redesign 2026-09-10 (S503,
+  `docs/plans/STAFF_DELIBERATIONS_TAB_SHAPE_BRIEF_2026-09-09.md`):** stage → sentence → one primary
+  action. A code-owned stage sentence (`deliberationStageSentence` in
+  `shared/utils/deliberation-stage.js`) sits under the rail with a "Deliberation session: …" line
+  (tracker §5.4 via the status payload / cycle list) and the visit line; the action row is one dark
+  button plus at most one outline button (draft: Edit in Word + Share…; shared not-sent: Share… +
+  Open working document; shared sent: Open working document, Resend only after a failed send;
+  visit: Add site-visit edits in Word + Continue in Final Writeup; final: Open Final Writeup), with
+  Download / Regenerate / Send again under a portalled More menu
+  (`shared/components/workbench/OverflowMenu.js`). Share… opens `PreSiteDistributionPanel` in
+  `composer="dialog"` mode; the composer's first button is "Lock and preview" at the draft stage and
+  calls the tab's `lockForShare` (guarded `start-site-visit`) before `prepare`, so the order is lock →
+  preview → send and a lock failure lands in the composer. The help popover, "Start sharing" block,
+  Shared/Materials sent chips, and the cycle view's registry block are gone; the email carries no
+  attachment (PR #224, migration 039). **Meeting Tracker slice 2b (2026-09-10):** the site visit is
+  scheduled from the tracker (`/meeting-tracker/visits/[requestId]`, route
+  `/api/meeting-tracker/visits/[requestId]` over the existing logistics service); the Activity is
+  still the record every reader here uses. The panel gained a `scope=my|all`
+  ScopeSegment like Request list/Reviewer follow-up/Awardees, stage-grouped cards, and a lead
+  count line; a deliberation-session line is deferred to tracker slice 1.) All six views are
+  panels (`SHELL_PANEL_VIEWS` =
+  every view); `pages/workbench/{artifacts,awardees,reviewer-follow-up,final-writeups/index}.js` are
+  redirects; `WorkbenchViewsNav` no longer reads the router. **Shell rule change in
+  step 3:** a well-formed `?cycleCode=` is honored even when the program's dashboard list omits it
+  (rendered as an extra option) — Final writeups and Awardees cycles need not have pending
+  requests; only a missing cycle falls back to the working cycle. Readiness after a program change
+  is derived from which program the loaded list belongs to (`loadedProgramKey`), because the
+  fallback effect otherwise ran one render early on the previous program's default; `WorkbenchViewsNav` links
+  shell-backed views into the shell (shallow) and the rest to their own pages. Tests:
+  `tests/unit/workbench-shell.test.js`, `workbench-location.test.js`, `workbench-views-nav.test.js`,
+  and the request-locator suite (stateful router mock). Remaining panels and the Awardees
+  cycle question: `docs/CURRENT_WORK_QUEUE.md` audit follow-ups.
 - **Reviewer follow-up polish (Codex worktree branch, merged `f0494607` + `d0a5fc07`, production
   2026-09-06).** Owner requested and approved the changes, including edits to the shared reviewer
   components used by both `/workbench/reviewer-follow-up` and the request page Reviewers tab.
@@ -1635,7 +1716,8 @@ One Final Writeup row per request over the same stable SharePoint Word item; the
   changes: (a) `/workbench/reviewer-follow-up` is now a focused attention queue — request
   cards start collapsed ("Show reviewer activity"), the per-card **Campaign settings** button,
   the **Open full reviewer panel** link and the page-level `WorkbenchViewsNav` were removed,
-  and search sits in the toolbar; the panel it mounts is still `ReviewerManagePanel` in
+  and search sits in the toolbar (the views strip returned 2026-09-08 when the view moved
+  inside the single-page shell, owner decision — see the shell note above); the panel it mounts is still `ReviewerManagePanel` in
   `track` mode; its refetch-error handling was fixed in PR #152 (see the 6B3d note above).
   (b) `/workbench/artifacts` is retitled **Initial assessments** and renders a "not part of
   the D26 dual-phase workflow / available for J27" card for `cycleCode === 'D26'` without

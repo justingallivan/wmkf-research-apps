@@ -169,18 +169,80 @@ describe('buildActivityHistory', () => {
     expect(response.label).not.toBe('Reviewer declined invitation');
   });
 
-  it('labels cron no-response close-out without asserting a reviewer response', () => {
+  it('labels automated no-response close-out without asserting a reviewer response', () => {
     const events = buildActivityHistory({
       suggestionId: 's12',
       responseReceivedAt: '2026-08-03T12:00:00Z',
+      meetingDate: '2026-08-01T00:00:00Z',
+      responseType: 'no_response',
+      tokenRevoked: false,
+    });
+    const response = events.find(e => e.key === 'response_received');
+
+    expect(response.label).toBe('No response to invitation');
+    expect(response.deliveryProven).toBe(false);
+    expect(response.unprovenNote).toMatch(/automated cycle close/);
+    expect(response.label).not.toMatch(/received|accepted|declined/i);
+  });
+
+  it('uses token revocation as direct staff evidence even after the meeting', () => {
+    const events = buildActivityHistory({
+      suggestionId: 's13',
+      responseReceivedAt: '2026-09-12T12:00:00Z',
+      meetingDate: '2026-09-10T00:00:00Z',
+      responseType: 'no_response',
+      tokenRevoked: true,
+    });
+    const response = events.find(e => e.key === 'response_received');
+
+    expect(response.label).toBe('No response to invitation');
+    expect(response.unprovenNote).toBe('Recorded by staff');
+  });
+
+  it('uses pre-meeting timing to distinguish staff recording when no actor field is exposed', () => {
+    const events = buildActivityHistory({
+      suggestionId: 's14',
+      responseReceivedAt: '2026-08-03T12:00:00Z',
+      meetingDate: '2026-08-10T00:00:00Z',
       responseType: 'no_response',
     });
     const response = events.find(e => e.key === 'response_received');
 
-    expect(response.label).toBe('No response recorded at cycle close');
-    expect(response.deliveryProven).toBe(false);
-    expect(response.unprovenNote).toMatch(/automated cycle close/);
-    expect(response.label).not.toMatch(/received|accepted|declined/i);
+    expect(response.unprovenNote).toBe('Recorded by staff');
+  });
+
+  it('keeps a post-meeting no-response sweep attributed to automated cycle close', () => {
+    const events = buildActivityHistory({
+      suggestionId: 's15',
+      responseReceivedAt: '2026-09-12T12:00:00Z',
+      meetingDate: '2026-09-10T00:00:00Z',
+      responseType: 'no_response',
+      tokenRevoked: false,
+    });
+    const response = events.find(e => e.key === 'response_received');
+
+    expect(response.unprovenNote).toBe('Recorded by automated cycle close');
+  });
+
+  it('attributes a missing-meeting no-response row to staff', () => {
+    const events = buildActivityHistory({
+      suggestionId: 's16',
+      responseReceivedAt: '2026-09-12T12:00:00Z',
+      responseType: 'no_response',
+    });
+    expect(events.find(e => e.key === 'response_received').unprovenNote).toBe('Recorded by staff');
+  });
+
+  it('keeps ambiguous undated no-response evidence neutral', () => {
+    const events = buildActivityHistory({
+      suggestionId: 's17',
+      responseReceivedAt: '2026-09-12T12:00:00Z',
+      meetingDate: '2026-09-10T00:00:00Z',
+      responseType: 'no_response',
+      tokenRevoked: null,
+    });
+    expect(events.find(e => e.key === 'response_received').unprovenNote)
+      .toBe('Recorded by staff or automated cycle close');
   });
 
   it('singularizes a single reminder', () => {

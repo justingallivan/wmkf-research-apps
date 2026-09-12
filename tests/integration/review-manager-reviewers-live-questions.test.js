@@ -26,10 +26,15 @@ jest.mock('../../lib/services/dynamics-service', () => ({
     queryAllRecords: jest.fn(),
   },
 }));
-jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
-  findByRequest: jest.fn(),
-  RESPONSE_TYPE_BY_VALUE: {},
-}));
+jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => {
+  // Real inverse map so responseType and lifecycleValid reflect production, not
+  // an empty mock (an empty map would make every row read as unknown lifecycle).
+  const { RESPONSE_TYPE_MAP } = jest.requireActual('../../shared/config/reviewerLifecycle');
+  return {
+    findByRequest: jest.fn(),
+    RESPONSE_TYPE_BY_VALUE: Object.fromEntries(Object.entries(RESPONSE_TYPE_MAP).map(([k, v]) => [v, k])),
+  };
+});
 jest.mock('../../lib/external/review-question-fetcher', () => ({
   getActiveQuestionSet: jest.fn(),
 }));
@@ -216,6 +221,7 @@ test('GET success returns the full proposal + reviewer envelope', async () => {
         submittedCount: 1,
         resolvedCount: 1,
         blockingCount: 0,
+        blockers: [],
         current: false,
         status: 'not_started',
         mode: null,
@@ -230,6 +236,7 @@ test('GET success returns the full proposal + reviewer envelope', async () => {
         currentCompletedAt: null,
       },
       statusSummary: { review_received: 1 },
+      noResponseHistory: [],
       reviewers: [{
         suggestionId: SUGGESTION_ID,
         potentialReviewerId: PERSON_ID,
@@ -244,7 +251,9 @@ test('GET success returns the full proposal + reviewer envelope', async () => {
         totalCitations: 345,
         notes: 'A note',
         reviewStatus: 'review_received',
-        responseType: undefined, // RESPONSE_TYPE_BY_VALUE is mocked to {} in this suite
+        responseType: 'accepted',
+        lifecycleValid: true,
+        meetingDate: null,
         emailSentAt: null,
         respondReminderSentAt: null,
         responseReceivedAt: null,

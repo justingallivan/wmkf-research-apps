@@ -132,6 +132,13 @@ test.each([
   expect(result.results[0].cycleLabel).toBe(cycle);
 });
 
+test('a cycle label outside the offered list is a 400, never a fiscal-year string match', async () => {
+  await expect(searchWorkbenchRequests({ cycle: 'FY2017' })).rejects.toMatchObject({
+    name: 'ServiceHttpError', httpStatus: 400, message: 'Select a cycle from the list.',
+  });
+  expect(queryRequests).not.toHaveBeenCalled();
+});
+
 test('text search applies escaped server filters, hydrates rows, and preserves relevance order', async () => {
   const first = '11111111-1111-1111-1111-111111111111';
   const second = '22222222-2222-2222-2222-222222222222';

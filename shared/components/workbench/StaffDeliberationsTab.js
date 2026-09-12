@@ -1,20 +1,44 @@
 /**
  * Staff Deliberations — the merged workspace for the site-visit writeup's whole
  * life (S466; replaces PreSiteVisitTab + SiteVisitTab). One header card answers
- * what stage the document is at (Draft → Share → Wrap Up), what the current
- * document is, and what the next action is; sections appear by stage.
+ * what stage the document is at, what the current document is, and what the
+ * next action is; sections appear by stage.
  *
- * Stage backing: Draft/Share map to the document lifecycle (DRAFT / REVIEW via
- * the guarded start-site-visit lock). Wrap Up is DERIVED — the first
- * transport-accepted materials send promotes the rail (owner decision
- * 2026-08-27); no new document state exists. Final lifecycle is a receipt here;
- * the Final Writeup tab owns its separate Word launch.
+ * Stage backing (PC Meeting Tracker slice 3, docs/PC_MEETING_TRACKER_PLAN.md
+ * D5-D9): four keyed stops — draft | shared | visit | final — derived by
+ * shared/utils/deliberation-stage.js from the document lifecycle (DRAFT /
+ * REVIEW via the guarded start-site-visit lock / FINAL) and the wmkf_sitevisit
+ * Activity's scheduled start (date-derived "visited", D7). Display labels are
+ * admin-editable (D6; shared/config/editableTextDefaults.js) and arrive on the
+ * GET /api/workbench/pre-site-visit payload as `stageLabels`. "Shared" means
+ * locked (D5) — a substate ("not-sent"/"sent") tracks whether materials have
+ * actually gone out, fed by the distribution panel's onHistory callback.
+ *
+ * Tab redesign (docs/plans/STAFF_DELIBERATIONS_TAB_SHAPE_BRIEF_2026-09-09.md,
+ * owner-approved 2026-09-10): stage → sentence → one primary action. The rail
+ * is the map, one code-owned sentence says what to do next, the action row
+ * carries one dark button plus at most one outline button, and Download /
+ * Regenerate live in a More menu. Share opens the distribution composer as a
+ * dialog; the composer locks the draft (guarded start-site-visit) at preview
+ * time, then sends, so the preview is always built from the locked version.
+ * The session line reads the tracker through the status payload (§5.4 seam).
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Card } from '../Layout';
 import PreSiteDistributionPanel from './PreSiteDistributionPanel';
 import useSiteVisitContext from './useSiteVisitContext';
+import DeliberationStageRail from './DeliberationStageRail';
+import OverflowMenu from './OverflowMenu';
+import {
+  DELIBERATION_STAGE_DEFAULT_LABELS,
+  deliberationSessionLine,
+  deliberationStageSentence,
+  deliberationVisitLine,
+  deriveDeliberationStage,
+  visitExpected,
+} from '../../utils/deliberation-stage';
+import { siteVisitMaterialsLine } from '../../utils/site-visit-materials-line';
 import {
   PRE_SITE_REOPEN_CONTRACT,
   PRE_SITE_REOPEN_REASON_LABEL,
@@ -25,6 +49,7 @@ import {
 const STATUS_POLL_INTERVAL_MS = 3000;
 const STATUS_POLL_ATTEMPTS = 20;
 const EMPTY_LIST = Object.freeze([]);
+const EMPTY_STAGE_LABELS = DELIBERATION_STAGE_DEFAULT_LABELS;
 
 async function readStatus(requestId, signal) {
   const response = await fetch(
@@ -91,37 +116,6 @@ function newClientOperationId() {
     + `-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
-function StageRail({ stage, reopened }) {
-  const currentIndex = stage === 'share' ? 1 : stage === 'wrap-up' ? 2 : 0;
-  const items = [
-    { label: stage === 'draft-ready' ? 'Draft ready' : 'Draft', index: 0 },
-    { label: 'Share', index: 1 },
-    { label: 'Wrap Up', index: 2 },
-  ];
-  return (
-    <p className="mt-1 flex flex-wrap items-center gap-2 text-xs font-semibold" data-testid="stage-rail">
-      {items.map((item, position) => (
-        <span key={item.label} className="flex items-center gap-2">
-          {position > 0 && <span className="text-gray-300">──</span>}
-          <span className={item.index < currentIndex
-            ? 'text-gray-500'
-            : item.index === currentIndex
-              ? 'text-green-800'
-              : 'text-gray-300'}
-          >
-            {item.index < currentIndex ? '✓' : item.index === currentIndex ? '●' : '○'} {item.label}
-          </span>
-        </span>
-      ))}
-      {reopened && (
-        <span className="inline-flex min-h-6 items-center rounded-full bg-amber-100 px-2 py-0.5 font-medium text-amber-800">
-          reopened
-        </span>
-      )}
-    </p>
-  );
-}
-
 // The SharePoint filename carries idempotency hex staff shouldn't have to
 // read; links show a display label and the real identity lives one click
 // away here (Download still saves under the real filename).
@@ -139,18 +133,29 @@ function FileDetails({ file }) {
   );
 }
 
-export default function StaffDeliberationsTab({ requestId, requestNumber = '', isSuperuser = false }) {
+export default function StaffDeliberationsTab({
+  requestId,
+  requestNumber = '',
+  isSuperuser = false,
+  onSelectTab = null,
+}) {
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState(null);
   const [artifact, setArtifact] = useState(null);
   const [pendingArtifact, setPendingArtifact] = useState(null);
   const [reopenHistory, setReopenHistory] = useState(EMPTY_LIST);
-  const [checkingStatus, setCheckingStatus] = useState(false);
+  const [stageLabels, setStageLabels] = useState(EMPTY_STAGE_LABELS);
+  // The workbench keys this tab by requestId, so a mounted instance never
+  // changes request: the status read starts on mount, never on a switch.
+  const [checkingStatus, setCheckingStatus] = useState(Boolean(requestId));
   const [recoveryMessage, setRecoveryMessage] = useState(null);
-  const [showHelp, setShowHelp] = useState(false);
-  const [confirmDialog, setConfirmDialog] = useState(null); // null | 'start' | 'regenerate'
+  const [composerOpen, setComposerOpen] = useState(false);
+  const [session, setSession] = useState(null);
+  const [sessionAttendees, setSessionAttendees] = useState(EMPTY_LIST);
+  const [materials, setMaterials] = useState(null);
+  const [latestSendFailure, setLatestSendFailure] = useState(null);
+  const [confirmDialog, setConfirmDialog] = useState(null); // null | 'regenerate'
   const [startingShare, setStartingShare] = useState(false);
-  const [shareError, setShareError] = useState(null);
   const [reopeningRequestId, setReopeningRequestId] = useState(null);
   const [reopenForm, setReopenForm] = useState(null);
   const [reopenError, setReopenError] = useState(null);
@@ -164,31 +169,21 @@ export default function StaffDeliberationsTab({ requestId, requestNumber = '', i
     generationSequence.current += 1;
     activeController.current?.abort();
     activeController.current = null;
-    setGenerating(false);
-    setError(null);
-    setArtifact(null);
-    setPendingArtifact(null);
-    setReopenHistory(EMPTY_LIST);
-    setRecoveryMessage(null);
-    setShowHelp(false);
-    setConfirmDialog(null);
-    setStartingShare(false);
-    setShareError(null);
-    setReopenForm(null);
-    setReopenError(null);
-    setCurrentSourceEverSent(false);
     const id = requestId;
     if (id) {
       const sequence = generationSequence.current;
       const controller = new AbortController();
       activeController.current = controller;
-      setCheckingStatus(true);
       readStatus(id, controller.signal)
         .then((status) => {
           if (generationSequence.current !== sequence || id !== requestId) return;
           setArtifact(status.currentArtifact || null);
           setPendingArtifact(status.pendingArtifact || null);
           setReopenHistory(status.reopenHistory || EMPTY_LIST);
+          if (status.stageLabels) setStageLabels(status.stageLabels);
+          setSession(status.session || null);
+          setSessionAttendees(Array.isArray(status.sessionAttendees) ? status.sessionAttendees : EMPTY_LIST);
+          setMaterials(status.materials || null);
           if (status.pendingArtifact?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.FAILED) {
             setError(failureMessage(
               status.pendingArtifact,
@@ -222,9 +217,8 @@ export default function StaffDeliberationsTab({ requestId, requestNumber = '', i
     const previouslyFocused = document.activeElement;
     confirmDialogButtonRef.current?.focus();
     const handleModalKey = (event) => {
-      if (event.key === 'Escape' && !startingShare && !generating) {
+      if (event.key === 'Escape' && !generating) {
         setConfirmDialog(null);
-        setShareError(null);
       }
       if (event.key === 'Tab') {
         const first = cancelDialogButtonRef.current;
@@ -243,7 +237,7 @@ export default function StaffDeliberationsTab({ requestId, requestNumber = '', i
       document.removeEventListener('keydown', handleModalKey);
       if (previouslyFocused?.focus) previouslyFocused.focus();
     };
-  }, [confirmDialog, startingShare, generating]);
+  }, [confirmDialog, generating]);
 
   const pollForArtifact = async ({ id, sequence, controller, targetArtifactId, baselineArtifactId }) => {
     for (let attempt = 0; attempt < STATUS_POLL_ATTEMPTS; attempt += 1) {
@@ -257,6 +251,10 @@ export default function StaffDeliberationsTab({ requestId, requestNumber = '', i
       const pending = status.pendingArtifact || null;
       if (current) setArtifact(current);
       setPendingArtifact(pending);
+      if (status.stageLabels) setStageLabels(status.stageLabels);
+      if (status.session !== undefined) setSession(status.session || null);
+      if (status.sessionAttendees !== undefined) setSessionAttendees(Array.isArray(status.sessionAttendees) ? status.sessionAttendees : EMPTY_LIST);
+      if (status.materials !== undefined) setMaterials(status.materials || null);
 
       if (pending?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.FAILED) {
         throw new Error(failureMessage(pending, 'The latest Word-draft attempt failed.'));
@@ -378,30 +376,57 @@ export default function StaffDeliberationsTab({ requestId, requestNumber = '', i
     && pendingArtifact.retryable === false;
   const shared = artifact?.lifecycleState === REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW;
   const draftReady = artifact?.lifecycleState === REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT;
-  const movedToFinal = artifact?.lifecycleState === REQUEST_DOCUMENT_LIFECYCLE_STATE.FINAL;
-  const beyondDeliberations = Boolean(artifact) && !draftReady && !shared;
   // Server-derived (uncapped EXISTS, scoped to the current source document) so
   // a superseded document's sends never promote its reopen successor and the
   // display cap cannot regress the stage (Codex S466).
   const everSent = currentSourceEverSent;
-  const stage = shared
-    ? (everSent ? 'wrap-up' : 'share')
-    : readyFile && draftReady
-      ? 'draft-ready'
-      : 'draft';
   const downloadUrl = downloadUrlFor(readyFile);
-  const workingControlsAvailable = readyFile && (draftReady || shared);
 
   const onDistributionHistory = useCallback((historyInfo) => {
     setCurrentSourceEverSent(historyInfo?.currentSourceEverSent === true);
+    setLatestSendFailure(historyInfo?.latestSendFailure || null);
   }, []);
 
   // Headless read of the wmkf_sitevisit Activity (maintained outside this
-  // workspace) feeding the composer's calendar/materials/suggestions.
-  const siteVisitContext = useSiteVisitContext(shared && readyFile ? requestId : null);
+  // workspace) feeding the composer's calendar/materials/suggestions, and the
+  // rail's visit stop. Fail-open, so this is safe to call for every stage.
+  const siteVisitContext = useSiteVisitContext(requestId);
+  const siteVisitStartIso = siteVisitContext?.siteVisit?.startIso || null;
 
-  const startShare = async () => {
-    if (!requestId || !readyFile || !draftReady || startingShare) return;
+  // PC Meeting Tracker slice 3 (docs/PC_MEETING_TRACKER_PLAN.md D5-D9): the
+  // four-stop rail derivation. `stage`/`substate`/`visit` drive display only —
+  // every existing gate above (`shared`, `draftReady`) stays lifecycle-derived
+  // so the working controls and distribution panel are unaffected by the
+  // visit having happened.
+  // With no current document, an in-flight or failed generation lives in
+  // `pendingArtifact`; feed it so the first stop can say generating/failed
+  // instead of "No draft yet". Once a draft exists it wins (a regeneration in
+  // flight does not un-ready the existing draft).
+  const { stage, substate, visit } = deriveDeliberationStage({
+    currentArtifact: artifact || pendingArtifact,
+    siteVisitStartIso,
+    everSent,
+  });
+  const movedToFinal = stage === 'final';
+  // A lifecycle outside the four keyed stops (Board Ready/Superseded/unknown —
+  // never produced for the *current* artifact in practice; distribution
+  // snapshots that use Board Ready are separate rows, not this one). The rail
+  // has nothing meaningful to show for it, so it stays hidden (fail closed).
+  const unknownLifecycle = stage === 'beyond';
+  const beyondDeliberations = movedToFinal || unknownLifecycle;
+  // D8/J27 (docs/PC_MEETING_TRACKER_PLAN.md): whether a visit is even expected
+  // this cycle. No production caller varies it today (D26 is always true), but
+  // the visit line at draft/shared is anticipatory ("not scheduled" as a PC
+  // to-do) and has nothing honest to say once J27 makes a visit optional.
+  const visitLineVisible = visitExpected() || stage === 'visit' || stage === 'final';
+
+  // Lock the exact draft as the working document (guarded start-site-visit,
+  // ETag-fenced). Called by the composer before it prepares the preview, so
+  // the order is lock → preview → send and a lock failure lands in the
+  // composer as the error. Idempotent server-side once the row is REVIEW.
+  const lockForShare = async () => {
+    if (!requestId || !readyFile || !draftReady) return;
+    if (startingShare) throw new Error('The draft is already being locked. Wait a moment and try again.');
     const id = requestId;
     const expectedArtifactId = artifact.artifactId;
     const sequence = ++generationSequence.current;
@@ -409,7 +434,6 @@ export default function StaffDeliberationsTab({ requestId, requestNumber = '', i
     const controller = new AbortController();
     activeController.current = controller;
     setStartingShare(true);
-    setShareError(null);
     setError(null);
     try {
       const response = await fetch('/api/workbench/pre-site-visit/start-site-visit', {
@@ -419,18 +443,13 @@ export default function StaffDeliberationsTab({ requestId, requestNumber = '', i
         signal: controller.signal,
       });
       const body = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(body.error || `Site Visit handoff failed (${response.status})`);
-      if (generationSequence.current !== sequence || id !== requestId) return;
-      if (!body.artifact) throw new Error('Site Visit handoff returned no artifact identity.');
+      if (!response.ok) throw new Error(body.error || `The draft could not be locked for sharing (${response.status})`);
+      if (generationSequence.current !== sequence || id !== requestId) {
+        throw new Error('The request changed while the draft was being locked.');
+      }
+      if (!body.artifact) throw new Error('Locking returned no artifact identity.');
       setArtifact(body.artifact);
       setPendingArtifact(null);
-      setConfirmDialog(null);
-    } catch (startError) {
-      if (startError?.name !== 'AbortError'
-        && generationSequence.current === sequence
-        && id === requestId) {
-        setShareError(startError.message);
-      }
     } finally {
       if (generationSequence.current === sequence && id === requestId) {
         if (activeController.current === controller) activeController.current = null;
@@ -516,45 +535,56 @@ export default function StaffDeliberationsTab({ requestId, requestNumber = '', i
     }
   };
 
-  const confirmDialogContent = confirmDialog === 'start'
+  const confirmDialogContent = confirmDialog === 'regenerate'
     ? {
-      title: 'Start sharing this draft?',
-      confirmLabel: startingShare ? 'Starting…' : 'Start sharing',
-      busy: startingShare,
-      onConfirm: startShare,
+      title: 'Regenerate this draft?',
+      confirmLabel: generating ? 'Regenerating…' : 'Regenerate',
+      busy: generating,
+      onConfirm: () => {
+        setConfirmDialog(null);
+        generate();
+      },
       body: (
-        <>
-          <p>
-            You are about to use <span className="font-medium">{readyFile?.name || 'this Word draft'}</span>
-            {' '}as the working document for the site visit.
-          </p>
-          <ul className="mt-3 list-disc space-y-2 pl-5">
-            <li>This exact Word document will become the Site Visit workspace.</li>
-            <li>Its current SharePoint version will be recorded in Dataverse.</li>
-            <li>Staff can continue editing this same document in Word.</li>
-            <li>The draft can no longer be regenerated after this change.</li>
-          </ul>
-        </>
+        <p>
+          Regenerating starts a new Claude call and creates new AI-generated content from
+          the latest proposal source and Dataverse data. Edits in the current Word file
+          will not be carried into the new draft.
+        </p>
       ),
     }
-    : confirmDialog === 'regenerate'
-      ? {
-        title: 'Regenerate this draft?',
-        confirmLabel: generating ? 'Regenerating…' : 'Regenerate',
-        busy: generating,
-        onConfirm: () => {
-          setConfirmDialog(null);
-          generate();
-        },
-        body: (
-          <p>
-            Regenerating starts a new Claude call and creates new AI-generated content from
-            the latest proposal source and Dataverse data. Edits in the current Word file
-            will not be carried into the new draft.
-          </p>
-        ),
-      }
-      : null;
+    : null;
+
+  const primaryClass = 'rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50';
+  const secondaryClass = 'rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50';
+  const openComposer = () => {
+    setError(null);
+    setComposerOpen(true);
+  };
+  const sentence = deliberationStageSentence({
+    stage,
+    substate,
+    sharedAtIso: artifact?.milestone?.createdAt || null,
+    visit,
+  });
+  // Session and visit lines belong to the stages where the PC's scheduling is
+  // still ahead (draft, shared); at Visit the sentence already carries the
+  // visit date, and at Final nothing is pending.
+  const showSessionLine = !beyondDeliberations && stage !== 'visit';
+  const showVisitLine = showSessionLine && visitLineVisible;
+  // Applicant materials (plan §16.3, PR 3): shown at every stage before Final
+  // once a collection exists, since the files matter through the visit.
+  const materialsLine = !beyondDeliberations && stage !== 'final' ? siteVisitMaterialsLine(materials) : null;
+  const moreItems = [
+    readyFile && !beyondDeliberations && {
+      key: 'download', label: 'Download', href: downloadUrl, download: readyFile.name || true, title: readyFile.name || undefined,
+    },
+    readyFile && draftReady && {
+      key: 'regenerate', label: 'Regenerate Word Draft', onSelect: () => setConfirmDialog('regenerate'), disabled: generating || unchangedRetryBlocked,
+    },
+    readyFile && shared && everSent && {
+      key: 'send-again', label: 'Send the deliberation email again…', onSelect: openComposer,
+    },
+  ].filter(Boolean);
 
   return (
     <div className="space-y-4">
@@ -570,91 +600,114 @@ export default function StaffDeliberationsTab({ requestId, requestNumber = '', i
       )}
       <Card hover={false}>
         <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <div className="relative flex items-center gap-2">
-              <h2 className="text-lg font-semibold text-gray-900">Site Visit Writeup</h2>
-              <button
-                type="button"
-                aria-label="About the site visit writeup"
-                aria-expanded={showHelp}
-                aria-controls="staff-deliberations-help"
-                onClick={() => setShowHelp((visible) => !visible)}
-                className="flex h-6 w-6 items-center justify-center rounded-full border border-gray-300 text-sm font-semibold text-gray-600 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400"
-              >
-                ?
-              </button>
-              {showHelp && (
-                <div
-                  id="staff-deliberations-help"
-                  role="note"
-                  className="absolute left-0 top-full z-10 mt-2 w-[min(34rem,calc(100vw-3rem))] rounded-lg border border-gray-200 bg-white p-4 text-sm text-gray-700 shadow-lg"
-                >
-                  <p>
-                    The draft uses the exact <code>AI Materials/ProposalNarrative_&#123;Request#&#125;.pdf</code>
-                    {' '}file, authoritative Dataverse fields, and the current published Admin prompt.
+          <div className="min-w-0">
+            <h2 className="text-lg font-semibold text-gray-900">Staff Deliberations</h2>
+            {!unknownLifecycle && (
+              <>
+                <DeliberationStageRail
+                  stage={stage}
+                  substate={substate}
+                  labels={stageLabels}
+                  reopened={draftReady && reopenHistory.length > 0}
+                />
+                <p className="mt-2 max-w-2xl text-sm text-gray-700" data-testid="deliberations-stage-sentence">
+                  {sentence}
+                </p>
+                {showSessionLine && (
+                  <p className="mt-1 text-xs text-gray-500" data-testid="deliberations-session-line">
+                    {deliberationSessionLine(session)}
                   </p>
-                  <p className="mt-2">
-                    The graphical abstract, caption, recommendation, referee comments, and scientific
-                    presentation remain marked for staff completion. Institutional funding history is
-                    filled from the AkoyaGO award history; a document generated before that fill keeps
-                    an edit-check note (complete the section in Word, or regenerate).
+                )}
+                {showVisitLine && (
+                  <p className="mt-1 text-xs text-gray-500" data-testid="deliberations-visit-line">
+                    {deliberationVisitLine(visit)}
                   </p>
-                  <p className="mt-2">
-                    Generated sections and the input snapshot are registered in Dataverse. The Word file
-                    is saved in SharePoint and becomes the working document once sharing starts.
-                    Regeneration uses the latest governed inputs; unchanged inputs may reuse the
-                    current draft.
+                )}
+                {materialsLine && (
+                  <p className="mt-1 text-xs text-gray-500" data-testid="deliberations-materials-line">
+                    {materialsLine}
                   </p>
-                </div>
-              )}
-            </div>
-            {!beyondDeliberations && (
-              <StageRail stage={stage} reopened={draftReady && reopenHistory.length > 0} />
+                )}
+                {shared && latestSendFailure && (
+                  <p className="mt-1 text-xs font-medium text-red-700" role="alert" data-testid="deliberations-send-failure">
+                    The last send failed: {latestSendFailure.message}
+                  </p>
+                )}
+              </>
             )}
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {workingControlsAvailable && (
+            {stage === 'draft' && !readyFile && (
+              <button
+                type="button"
+                onClick={generate}
+                disabled={generating || !requestId || unchangedRetryBlocked}
+                className={primaryClass}
+              >
+                {generating ? 'Generating…' : 'Generate Word Draft'}
+              </button>
+            )}
+            {stage === 'draft' && readyFile && draftReady && (
               <>
-                <a
-                  href={readyFile.webUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white"
-                >
-                  Edit
+                <a href={readyFile.webUrl} target="_blank" rel="noopener noreferrer" className={primaryClass}>
+                  Edit in Word
                 </a>
-                <a
-                  href={downloadUrl}
-                  download={readyFile.name || true}
-                  className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50"
-                >
-                  Download
+                <button type="button" onClick={openComposer} disabled={generating} className={secondaryClass}>
+                  Share…
+                </button>
+              </>
+            )}
+            {stage === 'shared' && readyFile && substate === 'not-sent' && (
+              <>
+                <button type="button" onClick={openComposer} className={primaryClass}>
+                  {latestSendFailure ? 'Resend' : 'Share…'}
+                </button>
+                <a href={readyFile.webUrl} target="_blank" rel="noopener noreferrer" className={secondaryClass}>
+                  Open working document
                 </a>
               </>
             )}
-            {(!artifact || draftReady) && (
-              <button
-                type="button"
-                onClick={() => (readyFile ? setConfirmDialog('regenerate') : generate())}
-                disabled={generating || !requestId || unchangedRetryBlocked}
-                className={readyFile
-                  ? 'rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50'
-                  : 'rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50'}
-              >
-                {generating
-                  ? 'Generating…'
-                  : readyFile ? 'Regenerate Word Draft' : 'Generate Word Draft'}
+            {stage === 'shared' && readyFile && substate === 'sent' && (
+              <>
+                <a href={readyFile.webUrl} target="_blank" rel="noopener noreferrer" className={primaryClass}>
+                  Open working document
+                </a>
+                {latestSendFailure && (
+                  <button type="button" onClick={openComposer} className={secondaryClass}>
+                    Resend
+                  </button>
+                )}
+              </>
+            )}
+            {stage === 'visit' && readyFile && (
+              <>
+                <a href={readyFile.webUrl} target="_blank" rel="noopener noreferrer" className={primaryClass}>
+                  Add site-visit edits in Word
+                </a>
+                {onSelectTab ? (
+                  <button type="button" onClick={() => onSelectTab('final-writeup')} className={secondaryClass}>
+                    Continue in Final Writeup
+                  </button>
+                ) : (
+                  <span className="text-xs text-gray-400">Open the Final Writeup tab to continue →</span>
+                )}
+              </>
+            )}
+            {movedToFinal && onSelectTab && (
+              <button type="button" onClick={() => onSelectTab('final-writeup')} className={primaryClass}>
+                Open Final Writeup
               </button>
             )}
+            {!beyondDeliberations && <OverflowMenu label="More actions" items={moreItems} />}
           </div>
         </div>
         <div aria-live="polite">
           {checkingStatus && !artifact && !pendingArtifact && (
             <p className="mt-4 text-sm text-gray-600">Checking for an existing writeup draft…</p>
           )}
-          {pendingArtifact?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING && (
+          {pendingArtifact?.operationStatus === REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING && readyFile && (
             <p className="mt-4 text-sm text-amber-800">
-              This draft is being generated. The Word link will be available when generation finishes.
+              A new draft is being generated. The current Word link stays available until it finishes.
             </p>
           )}
           {unchangedRetryBlocked && (
@@ -662,10 +715,10 @@ export default function StaffDeliberationsTab({ requestId, requestNumber = '', i
               This attempt needs a prompt or application change before it can be retried.
             </p>
           )}
-          {readyFile && draftReady && (
+          {readyFile && !beyondDeliberations && (
             <div className="mt-4 text-sm text-gray-700">
               <p>
-                Latest draft:{' '}
+                {shared ? 'Working document:' : 'Latest draft:'}{' '}
                 <a
                   href={readyFile.webUrl}
                   target="_blank"
@@ -673,15 +726,19 @@ export default function StaffDeliberationsTab({ requestId, requestNumber = '', i
                   title={readyFile.name || undefined}
                   className="font-medium text-green-800 underline"
                 >
-                  {readyFile.lastModified
-                    ? `Word draft · generated ${new Date(readyFile.lastModified).toLocaleDateString()}`
-                    : 'Word draft'}
+                  {shared
+                    ? 'Word document'
+                    : readyFile.lastModified
+                      ? `Word draft · generated ${new Date(readyFile.lastModified).toLocaleDateString()}`
+                      : 'Word draft'}
                 </a>
               </p>
               <FileDetails file={readyFile} />
               {warnings.length > 0 && (
                 <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-950" role="status">
-                  <h3 className="font-semibold">Draft needs a quick edit check</h3>
+                  <h3 className="font-semibold">
+                    {shared ? 'Working document needs a quick edit check' : 'Draft needs a quick edit check'}
+                  </h3>
                   <ul className="mt-2 list-disc space-y-1 pl-5">
                     {warnings.map((warning, index) => (
                       <li key={`${warning.code || 'warning'}-${index}`}>
@@ -691,74 +748,11 @@ export default function StaffDeliberationsTab({ requestId, requestNumber = '', i
                   </ul>
                 </div>
               )}
-              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-gray-200 pt-4">
-                <p className="max-w-xl text-sm text-gray-600">
-                  Sharing locks this exact version as the working document and turns off regeneration.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShareError(null);
-                    setConfirmDialog('start');
-                  }}
-                  className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
-                >
-                  Start sharing
-                </button>
-              </div>
-            </div>
-          )}
-          {readyFile && shared && (
-            <div className="mt-4 text-sm text-gray-700">
-              <p>
-                Working document:{' '}
-                <a
-                  href={readyFile.webUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  title={readyFile.name || undefined}
-                  className="font-medium underline"
-                >
-                  Word document
-                </a>
-                {' '}
-                <span className="inline-flex min-h-6 items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">
-                  Shared
-                </span>
-              </p>
-              {artifact.milestone?.createdAt && (
-                <p className="mt-1 text-xs text-gray-500">
-                  Sharing began {new Date(artifact.milestone.createdAt).toLocaleString()}; this exact
-                  version is recorded and regeneration is off.
-                </p>
-              )}
-              <FileDetails file={readyFile} />
-              {warnings.length > 0 && (
-                <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-950" role="status">
-                  <h4 className="font-semibold">Working document needs a quick edit check</h4>
-                  <ul className="mt-2 list-disc space-y-1 pl-5">
-                    {warnings.map((warning, index) => (
-                      <li key={`${warning.code || 'warning'}-${index}`}>
-                        {warning.message || 'The document completed with a review warning.'}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              {everSent && (
-                <p className="mt-3 text-sm text-gray-700">
-                  <span className="mr-1 inline-flex min-h-6 items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">
-                    Materials sent
-                  </span>
-                  Fill in the site-visit sections (recommendation, referee comments, presentation)
-                  in the working document — it is the starting draft for the final writeup.
-                </p>
-              )}
             </div>
           )}
           {shared && !readyFile && (
             <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
-              <h3 className="font-semibold">Site visit writeup is read-only</h3>
+              <h3 className="font-semibold">Staff Deliberations is read-only</h3>
               <p className="mt-1">
                 No current Word link was returned for this record, so working controls are not
                 available. Reload to retry, or contact an administrator if this persists.
@@ -771,7 +765,7 @@ export default function StaffDeliberationsTab({ requestId, requestNumber = '', i
               : 'mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950'}
             >
               <h3 className="font-semibold">
-                {movedToFinal ? 'Moved to Final Writeup' : 'Site visit writeup is read-only'}
+                {movedToFinal ? 'Moved to Final Writeup' : 'Staff Deliberations is read-only'}
               </h3>
               <p className="mt-1">
                 {movedToFinal
@@ -788,18 +782,24 @@ export default function StaffDeliberationsTab({ requestId, requestNumber = '', i
         </div>
       </Card>
 
-      {shared && readyFile && (
+      {readyFile && (draftReady || shared) && (
         <PreSiteDistributionPanel
           key={`distribution-${requestId}`}
           requestId={requestId}
           requestNumber={requestNumber}
           sourceArtifact={artifact}
           siteVisit={siteVisitContext?.siteVisit || null}
-          materials={siteVisitContext?.materials || EMPTY_LIST}
-          suggestedTo={siteVisitContext?.suggestedTo || EMPTY_LIST}
-          suggestedCc={siteVisitContext?.suggestedCc || EMPTY_LIST}
+          session={session}
+          // Tracker §5.6: the session's attendees are the default recipients
+          // once a slot exists; before that, the site-visit party.
+          suggestedTo={sessionAttendees.length ? sessionAttendees.map((person) => person.email) : (siteVisitContext?.suggestedTo || EMPTY_LIST)}
+          suggestedCc={sessionAttendees.length ? EMPTY_LIST : (siteVisitContext?.suggestedCc || EMPTY_LIST)}
           onHistory={onDistributionHistory}
-          collapsed={everSent}
+          composer={composerOpen ? 'dialog' : 'hidden'}
+          onCloseComposer={() => setComposerOpen(false)}
+          beforePrepare={draftReady ? lockForShare : null}
+          needsLock={draftReady}
+          record={shared}
         />
       )}
 
@@ -871,6 +871,9 @@ export default function StaffDeliberationsTab({ requestId, requestNumber = '', i
         </Card>
       )}
 
+      {/* react-hooks/refs infers ref aliasing through the dialog's ref={} props below;
+          confirmDialogContent itself reads no ref (state + callbacks only). */}
+      {/* eslint-disable-next-line react-hooks/refs */}
       {confirmDialogContent && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div
@@ -886,20 +889,12 @@ export default function StaffDeliberationsTab({ requestId, requestNumber = '', i
             <div id="deliberations-confirm-description" className="mt-3 text-sm text-gray-700">
               {confirmDialogContent.body}
             </div>
-            {shareError && confirmDialog === 'start' && (
-              <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800" role="alert">
-                {shareError}
-              </div>
-            )}
             <div className="mt-6 flex justify-end gap-3">
               <button
                 ref={cancelDialogButtonRef}
                 type="button"
                 disabled={confirmDialogContent.busy}
-                onClick={() => {
-                  setConfirmDialog(null);
-                  setShareError(null);
-                }}
+                onClick={() => setConfirmDialog(null)}
                 className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50"
               >
                 Cancel

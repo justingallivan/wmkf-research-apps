@@ -54,6 +54,7 @@ jest.mock('../../lib/services/maintenance-service', () => ({
     cleanupIntakePrivateBlobs: jest.fn(async () => ({ deleted: 0 })),
     cleanupPortalUploadStaging: jest.fn(async () => ({ deleted: 0, errors: 0, pruned: 0 })),
     cleanupScheduledEmailMessages: jest.fn(async () => 0),
+    closeExpiredSiteVisitMaterialCollections: jest.fn(async () => 0),
   },
 }));
 
@@ -218,5 +219,27 @@ describe('maintenance cron — maintenance_runs retention step wiring', () => {
       1,
       expect.objectContaining({ status: 'failed' }),
     );
+  });
+});
+
+describe('maintenance cron — applicant materials auto-close step wiring (plan §16.3, PR 3)', () => {
+  it('runs the close sweep and reports the count as closed, not deleted', async () => {
+    MaintenanceService.closeExpiredSiteVisitMaterialCollections.mockResolvedValueOnce(3);
+    const res = makeRes();
+    await handler({ method: 'POST', headers: {} }, res);
+    expect(MaintenanceService.closeExpiredSiteVisitMaterialCollections).toHaveBeenCalledTimes(1);
+    expect(res.body.results.siteVisitMaterialCollectionsClosed).toBe(3);
+    expect(res.body.totalDeleted).toBe(0);
+    expect(res.body.ok).toBe(true);
+  });
+
+  it('a failing close sweep marks the run failed without skipping later steps', async () => {
+    MaintenanceService.closeExpiredSiteVisitMaterialCollections.mockRejectedValueOnce(new Error('pg down'));
+    const res = makeRes();
+    await handler({ method: 'POST', headers: {} }, res);
+    expect(res.body.ok).toBe(false);
+    expect(res.body.results.siteVisitMaterialCollectionsClosed).toEqual({ error: 'pg down' });
+    expect(res.body.failedSubtasks).toContain('siteVisitMaterialCollectionsClosed');
+    expect(FeedbackService.cleanupOldFeedback).toHaveBeenCalled();
   });
 });

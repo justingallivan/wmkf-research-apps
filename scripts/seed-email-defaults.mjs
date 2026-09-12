@@ -29,6 +29,10 @@ import {
   REVIEWER_EXTENSION_SEED_BODY,
 } from '../lib/seed/email-defaults/reviewer-actions.js';
 import {
+  DELIBERATION_AGENDA_SEED_SUBJECT,
+  DELIBERATION_AGENDA_SEED_BODY,
+} from '../lib/seed/email-defaults/deliberation-agenda.js';
+import {
   REVIEWER_INVITATION_SEED_SUBJECT,
   REVIEWER_INVITATION_SEED_BODY,
   REVIEWER_INVITATION_SEED_BUTTON_LABEL,
@@ -67,6 +71,8 @@ export const EMAIL_DEFAULT_SEED_TEXT = Object.freeze({
   'email.reviewer_thankyou.body': REVIEWER_THANKYOU_SEED_BODY,
   'email.grantee_reminder.subject': GRANTEE_REMINDER_SEED_SUBJECT,
   'email.grantee_reminder.body': GRANTEE_REMINDER_SEED_BODY,
+  'email.deliberation_agenda.subject': DELIBERATION_AGENDA_SEED_SUBJECT,
+  'email.deliberation_agenda.body': DELIBERATION_AGENDA_SEED_BODY,
 });
 
 export function loadEnvLocal() {
@@ -94,6 +100,17 @@ export async function seedEmailDefaults({
 
   const results = [];
   for (const entry of EDITABLE_TEXT_DEFAULTS) {
+    // Display labels (stage.*, e.g. the Staff Deliberations rail stops) have
+    // a code-owned default read at request time when unset — they are not
+    // email copy with no other fallback. The admin panel already enumerates
+    // EDITABLE_TEXT_DEFAULTS (not stored rows), so the key is editable there
+    // regardless; seeding one would pin wording into Dataverse and defeat
+    // the code default. Skip rather than requiring a seed string.
+    if (entry.key.startsWith('stage.')) {
+      results.push({ key: entry.key, action: 'skip-no-seed' });
+      continue;
+    }
+
     const seedText = EMAIL_DEFAULT_SEED_TEXT[entry.key];
     if (typeof seedText !== 'string') {
       throw new Error(`No seed text registered for ${entry.key}`);

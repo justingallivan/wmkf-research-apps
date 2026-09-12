@@ -310,8 +310,10 @@ document inventory, and individual implementation plans do not establish priorit
   removed by owner decision (headless `useSiteVisitContext` +
   ActivityParty fallback keep the composer fed). The production-proof
   entries below describe the pre-merge two-tab UI; their document-lifecycle
-  guarantees are unchanged. Design record: the Site Visit Workspace
-  proposal artifact (link in `SESSION_PROMPT.md`).
+  guarantees are unchanged. (Rail superseded by PC Meeting Tracker slice 3,
+  2026-09-09 — four keyed stops with admin-editable labels; see
+  `docs/PC_MEETING_TRACKER_PLAN.md` §7.) Design record: the Site Visit
+  Workspace proposal artifact (link in `SESSION_PROMPT.md`).
 - **Curated Site Visit recipient directory (S468, 2026-08-29, production):**
   superusers curate at most 50 active app-staff/existing-Contact references for
   the materials composer's Consultant/Board menu. The Dataverse setting stores

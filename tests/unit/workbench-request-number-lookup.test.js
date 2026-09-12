@@ -3,13 +3,23 @@
  */
 
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { WorkbenchDashboard } from '../../pages/workbench';
+import { WorkbenchShell as WorkbenchDashboard } from '../../shared/components/workbench/WorkbenchShell';
 import { TRIAGE_STATUS } from '../../shared/config/triageStatus';
 
-const push = jest.fn();
+// A stateful router: the shell mirrors its view/program/cycle/filters into the
+// URL, so replace/push update the query the next render reads back.
+const routerState = { pathname: '/workbench', asPath: '/workbench', query: {}, isReady: true };
+const applyHref = (href) => {
+  const url = new URL(href, 'http://localhost');
+  routerState.asPath = href;
+  routerState.query = Object.fromEntries(url.searchParams.entries());
+  return Promise.resolve(true);
+};
+const push = jest.fn((href) => (typeof href === 'string' && href.startsWith('/workbench?') ? applyHref(href) : Promise.resolve(true)));
+const replace = jest.fn(applyHref);
 
 jest.mock('next/router', () => ({
-  useRouter: () => ({ push, pathname: '/workbench' }),
+  useRouter: () => ({ ...routerState, push, replace }),
 }));
 
 jest.mock('../../shared/components/Layout', () => ({
@@ -30,7 +40,7 @@ jest.mock('../../shared/components/workbench/ReviewerStatusIndicator', () => ({
 }));
 
 const REQUEST_ID = '11111111-1111-1111-1111-111111111111';
-const SEARCH_LABEL = 'Request number, institution, PI, or proposal title';
+const SEARCH_LABEL = 'Request number, institution, PI, or title';
 
 function response({ ok = true, status = 200, body = {} } = {}) {
   return { ok, status, json: async () => body };
@@ -44,7 +54,7 @@ function deferred() {
 
 function baseResponse(url) {
   if (url === '/api/workbench/dashboard') {
-    return response({ body: { success: true, cycles: [], defaultCycleCode: null } });
+    return response({ body: { success: true, programId: 'program-1', cycles: [], defaultCycleCode: null } });
   }
   if (url === '/api/workbench/search-requests?mode=options'
     || String(url).startsWith('/api/workbench/search-requests?mode=options&')) {
@@ -64,6 +74,8 @@ function baseResponse(url) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  routerState.asPath = '/workbench';
+  routerState.query = {};
   window.sessionStorage.clear();
   global.fetch = jest.fn(async (url) => baseResponse(url));
 });
@@ -74,7 +86,14 @@ afterEach(() => {
 
 async function renderReady() {
   render(<WorkbenchDashboard />);
-  await waitFor(() => expect(screen.getAllByLabelText('Cycle')[0]).not.toBeDisabled());
+  fireEvent.click(screen.getByRole('button', { name: 'Find and open a request' }));
+  await screen.findByLabelText(SEARCH_LABEL);
+  await waitFor(() => expect(screen.queryByText('Loading cycle and status filters…')).not.toBeInTheDocument());
+}
+
+function openSearchOptions() {
+  const toggle = screen.getByRole('button', { name: 'Search options' });
+  if (toggle.getAttribute('aria-expanded') === 'false') fireEvent.click(toggle);
 }
 
 test('shows the signed-in PD request count for the selected cycle and set-aside state', async () => {
@@ -100,13 +119,13 @@ test('shows the signed-in PD request count for the selected cycle and set-aside 
   });
 
   render(<WorkbenchDashboard />);
-  await waitFor(() => expect(screen.getByRole('button', { name: 'My requests (2)' })).toBeInTheDocument());
-  expect(screen.getByRole('button', { name: 'My requests (2)' })).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'All' })).toBeInTheDocument();
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Assigned to me (2)' })).toBeInTheDocument());
+  expect(screen.getByRole('button', { name: 'Assigned to me (2)' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'All in program' })).toBeInTheDocument();
 
-  fireEvent.click(screen.getByLabelText('Show set aside'));
-  expect(screen.getByRole('button', { name: 'My requests (3)' })).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'All' })).toBeInTheDocument();
+  fireEvent.click(screen.getByLabelText('Include set-aside requests'));
+  expect(screen.getByRole('button', { name: 'Assigned to me (3)' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'All in program' })).toBeInTheDocument();
 });
 
 test('updates the personal count when a personal request moves into and out of Set Aside', async () => {
@@ -140,18 +159,18 @@ test('updates the personal count when a personal request moves into and out of S
   });
 
   render(<WorkbenchDashboard />);
-  await waitFor(() => expect(screen.getByRole('button', { name: 'My requests (1)' })).toBeInTheDocument());
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Assigned to me (1)' })).toBeInTheDocument());
   await waitFor(() => expect(screen.getByTitle('Set triage status')).toBeInTheDocument());
   fireEvent.change(screen.getByTitle('Set triage status'), { target: { value: 'setAside' } });
-  await waitFor(() => expect(screen.getByRole('button', { name: 'My requests (0)' })).toBeInTheDocument());
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Assigned to me (0)' })).toBeInTheDocument());
 
-  fireEvent.click(screen.getByLabelText('Show set aside'));
-  await waitFor(() => expect(screen.getByRole('button', { name: 'My requests (1)' })).toBeInTheDocument());
+  fireEvent.click(screen.getByLabelText('Include set-aside requests'));
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Assigned to me (1)' })).toBeInTheDocument());
   await waitFor(() => expect(screen.getByTitle('Set triage status')).toBeInTheDocument());
   fireEvent.change(screen.getByTitle('Set triage status'), { target: { value: 'advancing' } });
-  await waitFor(() => expect(screen.getByRole('button', { name: 'My requests (1)' })).toBeInTheDocument());
-  fireEvent.click(screen.getByLabelText('Show set aside'));
-  expect(screen.getByRole('button', { name: 'My requests (1)' })).toBeInTheDocument();
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Assigned to me (1)' })).toBeInTheDocument());
+  fireEvent.click(screen.getByLabelText('Include set-aside requests'));
+  expect(screen.getByRole('button', { name: 'Assigned to me (1)' })).toBeInTheDocument();
 });
 
 test('keeps the personal count transition when set-aside visibility changes during triage', async () => {
@@ -189,19 +208,19 @@ test('keeps the personal count transition when set-aside visibility changes duri
   });
 
   render(<WorkbenchDashboard />);
-  await waitFor(() => expect(screen.getByRole('button', { name: 'My requests (2)' })).toBeInTheDocument());
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Assigned to me (2)' })).toBeInTheDocument());
   await waitFor(() => expect(screen.getByTitle('Set triage status')).toBeInTheDocument());
   fireEvent.change(screen.getByTitle('Set triage status'), { target: { value: 'setAside' } });
   await waitFor(() => expect(triageStarted).toBe(true));
-  fireEvent.click(screen.getByLabelText('Show set aside'));
+  fireEvent.click(screen.getByLabelText('Include set-aside requests'));
 
   await act(async () => {
     triage.resolve(response({ body: { success: true } }));
     await triage.promise;
   });
-  await waitFor(() => expect(screen.getByRole('button', { name: 'My requests (2)' })).toBeInTheDocument());
-  fireEvent.click(screen.getByLabelText('Show set aside'));
-  await waitFor(() => expect(screen.getByRole('button', { name: 'My requests (1)' })).toBeInTheDocument());
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Assigned to me (2)' })).toBeInTheDocument());
+  fireEvent.click(screen.getByLabelText('Include set-aside requests'));
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Assigned to me (1)' })).toBeInTheDocument());
 });
 
 test('does not apply a delayed triage count patch after returning to the original program', async () => {
@@ -257,25 +276,34 @@ test('does not apply a delayed triage count patch after returning to the origina
   });
 
   render(<WorkbenchDashboard />);
-  await waitFor(() => expect(screen.getByRole('button', { name: 'My requests (0)' })).toBeInTheDocument());
-  fireEvent.click(screen.getByLabelText('Show set aside'));
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Assigned to me (0)' })).toBeInTheDocument());
+  fireEvent.click(screen.getByLabelText('Include set-aside requests'));
   await waitFor(() => expect(screen.getByTitle('Set triage status')).toBeInTheDocument());
   fireEvent.change(screen.getByTitle('Set triage status'), { target: { value: 'advancing' } });
   await waitFor(() => expect(triageStarted).toBe(true));
 
-  const mainProgram = () => screen.getAllByLabelText('Grant Program').at(-1);
+  const mainProgram = () => screen.getByLabelText('Grant program');
   fireEvent.change(mainProgram(), { target: { value: 'p2' } });
   await waitFor(() => expect(mainProgram()).toHaveValue('p2'));
   fireEvent.change(mainProgram(), { target: { value: 'p1' } });
   await waitFor(() => expect(mainProgram()).toHaveValue('p1'));
-  await waitFor(() => expect(screen.getByRole('button', { name: 'My requests (1)' })).toBeInTheDocument());
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Assigned to me (1)' })).toBeInTheDocument());
 
   await act(async () => {
     triage.resolve(response({ body: { success: true } }));
     await triage.promise;
   });
-  await waitFor(() => expect(screen.getByRole('button', { name: 'My requests (1)' })).toBeInTheDocument());
-  expect(screen.queryByRole('button', { name: 'My requests (2)' })).not.toBeInTheDocument();
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Assigned to me (1)' })).toBeInTheDocument());
+  expect(screen.queryByRole('button', { name: 'Assigned to me (2)' })).not.toBeInTheDocument();
+});
+
+test('the locator search-options fetch does not fire until the disclosure is opened', async () => {
+  render(<WorkbenchDashboard />);
+  await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/workbench/dashboard'));
+  expect(global.fetch.mock.calls.some(([url]) => String(url).includes('search-requests'))).toBe(false);
+
+  fireEvent.click(screen.getByRole('button', { name: 'Find and open a request' }));
+  await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/workbench/search-requests?mode=options&programId=program-1'));
 });
 
 test('opens an exact historical Research request through the scoped search', async () => {
@@ -288,7 +316,7 @@ test('opens an exact historical Research request through the scoped search', asy
   await renderReady();
 
   fireEvent.change(screen.getByLabelText(SEARCH_LABEL), { target: { value: '1002379' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Search' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Search requests' }));
 
   await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
     '/api/workbench/search-requests?q=1002379&programId=program-1',
@@ -296,7 +324,7 @@ test('opens an exact historical Research request through the scoped search', asy
   await waitFor(() => expect(push).toHaveBeenCalledWith(
     `/workbench/${REQUEST_ID}?n=1002379`,
   ));
-  expect(screen.getByText(/without changing their status/i)).toBeInTheDocument();
+  expect(screen.getByText(/Search options do not change the Workbench context/i)).toBeInTheDocument();
 });
 
 test('keeps an unknown or excluded exact request on the dashboard', async () => {
@@ -311,7 +339,7 @@ test('keeps an unknown or excluded exact request on the dashboard', async () => 
   await renderReady();
 
   fireEvent.change(screen.getByLabelText(SEARCH_LABEL), { target: { value: '9999999' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Search' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Search requests' }));
 
   expect(await screen.findByText('No requests matched.')).toBeInTheDocument();
   expect(push).not.toHaveBeenCalled();
@@ -334,7 +362,7 @@ test('shows a minimal AkoyaGO handoff for an exact request outside Research', as
   await renderReady();
 
   fireEvent.change(screen.getByLabelText(SEARCH_LABEL), { target: { value: '1009999' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Search' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Search requests' }));
 
   expect(await screen.findByRole('heading', {
     name: 'Request #1009999 is valid, but it is outside Research.',
@@ -355,7 +383,7 @@ test('requires a term or filter without issuing a search request', async () => {
   await renderReady();
   global.fetch.mockClear();
 
-  fireEvent.click(screen.getByRole('button', { name: 'Search' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Search requests' }));
 
   expect(await screen.findByRole('alert')).toHaveTextContent(/enter a request number/i);
   expect(global.fetch).not.toHaveBeenCalled();
@@ -389,9 +417,10 @@ test('renders broad results with live cycle/status filters and semantic open lin
   fireEvent.change(screen.getByLabelText(SEARCH_LABEL), {
     target: { value: 'University of Washington' },
   });
-  fireEvent.change(screen.getAllByLabelText('Cycle')[0], { target: { value: 'December 2026' } });
+  openSearchOptions();
+  fireEvent.change(screen.getAllByLabelText('Grant cycle').at(-1), { target: { value: 'December 2026' } });
   fireEvent.change(screen.getByLabelText('Request status'), { target: { value: 'Active' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Search' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Search requests' }));
 
   expect(await screen.findByText('Regenerative medicine study')).toBeInTheDocument();
   expect(screen.getByText('PI: Manuel Müller')).toBeInTheDocument();
@@ -421,7 +450,7 @@ test('shows the generalized limit warning when a bounded source is incomplete', 
   await renderReady();
 
   fireEvent.change(screen.getByLabelText(SEARCH_LABEL), { target: { value: 'Smith' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Search' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Search requests' }));
 
   expect(await screen.findByText(
     'Results are limited; narrow the search to see more precise matches',
@@ -464,7 +493,7 @@ test('loads the next bounded page and appends it to the restored search state', 
   await renderReady();
 
   fireEvent.change(screen.getByLabelText(SEARCH_LABEL), { target: { value: 'university' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Search' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Search requests' }));
   expect(await screen.findByText('Matching request 24')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Load 25 more' }));
 
@@ -493,8 +522,10 @@ test('keeps restored filters visible when live options are missing', async () =>
   });
 
   render(<WorkbenchDashboard />);
+  fireEvent.click(screen.getByRole('button', { name: 'Find and open a request' }));
 
-  await waitFor(() => expect(screen.getAllByLabelText('Cycle')[0]).toHaveValue('June 2024'));
+  // A restored cycle/status criterion opens Search options automatically.
+  await waitFor(() => expect(screen.getAllByLabelText('Grant cycle').at(-1)).toHaveValue('June 2024'));
   expect(screen.getByRole('option', { name: 'June 2024 (saved)' })).toBeInTheDocument();
   expect(screen.getByLabelText('Request status')).toHaveValue('Archived');
   expect(screen.getByRole('option', { name: 'Archived (saved)' })).toBeInTheDocument();
@@ -534,9 +565,9 @@ test('a slower superseded exact lookup cannot navigate after a newer request ope
 
   const input = screen.getByLabelText(SEARCH_LABEL);
   fireEvent.change(input, { target: { value: '1002000' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Search' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Search requests' }));
   fireEvent.change(input, { target: { value: '1002379' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Search' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Search requests' }));
 
   await waitFor(() => expect(push).toHaveBeenCalledTimes(1));
   expect(push).toHaveBeenLastCalledWith(`/workbench/${REQUEST_ID}?n=1002379`);
@@ -571,9 +602,9 @@ test('a slower superseded broad search cannot replace newer results or saved cri
 
   const input = screen.getByLabelText(SEARCH_LABEL);
   fireEvent.change(input, { target: { value: 'older' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Search' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Search requests' }));
   fireEvent.change(input, { target: { value: 'newer' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Search' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Search requests' }));
 
   expect(await screen.findByText('Newer result')).toBeInTheDocument();
   await act(async () => {
@@ -630,11 +661,11 @@ test('a superseded load-more response cannot append into a fresh search', async 
 
   const input = screen.getByLabelText(SEARCH_LABEL);
   fireEvent.change(input, { target: { value: 'initial' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Search' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Search requests' }));
   expect(await screen.findByText('Initial result 24')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Load 25 more' }));
   fireEvent.change(input, { target: { value: 'fresh' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Search' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Search requests' }));
   expect(await screen.findByText('Fresh result')).toBeInTheDocument();
 
   await act(async () => {
@@ -664,7 +695,7 @@ test('clearing during a broad search prevents the late response from restoring r
   await renderReady();
 
   fireEvent.change(screen.getByLabelText(SEARCH_LABEL), { target: { value: 'delayed' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Search' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Search requests' }));
   fireEvent.click(screen.getByRole('button', { name: 'Clear' }));
 
   await act(async () => {

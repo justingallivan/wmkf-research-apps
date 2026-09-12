@@ -434,8 +434,12 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   filters selected/non-revoked rows; Materials delivery refuses revoked,
   non-accepted, terminal/unknown, and already-delivered rows before mint; manual
   reminders freshly reauthorize; and review-due reminders are link-free and never mint.
-  `regenerate-token` remains the deliberate staff replacement-link action and can
-  restore access, so it is not a routine follow-up substitute. The automatic
+  `regenerate-token` remains the deliberate staff replacement-link action when
+  response type is unset, `accepted`, or `held`, review status is unset or a
+  known nonterminal value, and a concrete ETag is present; it can restore access only after
+  those server-side lifecycle checks and is not a routine follow-up substitute.
+  `complete` and a received/submitted timestamp are not separate regeneration
+  guards. The automatic
   reminder route is safe from execution because it is absent from the Vercel cron
   registry under the hold gate—not because configuration is null. A 2026-09-01
   read-only probe instead found 92 current-cycle active requests with both reminder
@@ -487,6 +491,21 @@ Playwright E2E harness, and the live prod automation that an accept triggers.
   to `send-emails.js` at all. The panel GETs the setting fresh every time the
   modal opens (no build-time constant); the admin panel's "Reviewer Release
   Attachments" section (superuser-gated) is the only write path.
+
+## Deliberation briefing page (third external surface, S502)
+
+`pages/external/briefing/[token].js` + `/api/external/briefing/[token]/{context,document}`
+serve a read-only per-request page (shared writeup snapshot, every received review with
+author and re-sanitized answers, the proposal as `Reviewer Materials/Proposal_<num>.pdf` since 2026-09-10 D20) to Board members and consultants
+who have no Dataverse login. Plan and owner decisions D13–D16:
+`docs/DELIBERATION_BRIEFING_PAGE_PLAN.md`. Verifier
+`lib/external/verify-briefing-token.js` is the stored-digest pattern keyed on Postgres
+`deliberation_briefing_links` (`aud:'briefing'`, digest, revocation, row expiry, request
+binding, re-run on every request). Links are minted by Share
+(`lib/services/deliberation-briefing/briefing-link-service.js`, one live row per request,
+reissue = revoke-and-replace) and everything is inert until the owner sets
+`DELIBERATION_BRIEFING_SCHEMA_READY=on` after applying migration 038. Same route order as
+the other external routes: method → rate-limit → verify → record outcome → shape.
 
 ## Durable Memory
 

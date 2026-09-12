@@ -1,6 +1,14 @@
+/**
+ * @jest-environment node
+ *
+ * Node environment: the service now imports the deliberation briefing link
+ * service, whose token primitive resolves `jose` to its Node build.
+ */
 import {
+  BRIEFING_LINK_PLACEHOLDER,
   distributionBodyHtml,
   getPreSiteDistributionHistory,
+  renderBriefingBody,
   normalizeDistributionRecipients,
   preparePreSiteDistribution,
   projectDistributionAttempt,
@@ -47,23 +55,164 @@ test('plain-text body rendering escapes markup and carries a recovery marker', (
   expect(html).toContain(`wmkf-pre-site-distribution:${OPERATION_ID}`);
 });
 
-test('prepare rejects a missing attachment selection before any persistence or file work', async () => {
+test('prepare rejects an unrecognized attachment mode before any persistence or file work', async () => {
   await expect(preparePreSiteDistribution({
     requestId: REQUEST_ID,
     expectedArtifactId: '44444444-4444-4444-8444-444444444444',
     operationId: OPERATION_ID,
-    attachmentMode: '',
+    attachmentMode: 'zip',
     to: 'staff@example.org',
     subject: 'Frozen materials',
     bodyText: 'Attached.',
     fromEmail: 'sender@example.org',
     actingUserSystemId: ACTOR_ID,
-  }, {})).rejects.toMatchObject({ code: 'distribution_attachment_mode_required' });
+  }, {})).rejects.toMatchObject({ code: 'distribution_attachment_mode_invalid' });
+});
+
+test('an absent or empty attachment mode means none: both snapshots are pinned, nothing is selected for attachment', async () => {
+  for (const attachmentMode of [undefined, '']) {
+    const harness = createPrepareHarness();
+    const input = prepareInput();
+    if (attachmentMode === undefined) delete input.attachmentMode; else input.attachmentMode = attachmentMode;
+    const result = await preparePreSiteDistribution(input, harness.dependencies);
+    expect(harness.dependencies.createOrGetAttempt.mock.calls[0][0].attachmentMode).toBe('none');
+    expect(result.attempt.attachmentMode).toBe('none');
+    expect(result.attempt.attachments).toEqual([]);
+    expect(result.attempt.briefingLinkId).toBe('12121212-1212-4212-8212-121212121212');
+    // Snapshots are still pinned because the briefing page serves them.
+    const prepared = harness.dependencies.recordPrepared.mock.calls[0][1];
+    expect(prepared.docx?.documentId).toBeTruthy();
+    expect(prepared.pdf?.documentId).toBeTruthy();
+  }
+});
+
+test('the preview hash pins both snapshot identities even when nothing is attached (a snapshot swap invalidates the preview)', async () => {
+  const a = createPrepareHarness();
+  const b = createPrepareHarness();
+  const [first, second] = await Promise.all([
+    preparePreSiteDistribution(prepareInput({ attachmentMode: 'none' }), a.dependencies),
+    preparePreSiteDistribution(prepareInput({ attachmentMode: 'none' }), b.dependencies),
+  ]);
+  expect(first.attempt.previewHash).toBe(second.attempt.previewHash);
+  const c = createPrepareHarness({ settledWordVersionId: '1.1' });
+  const third = await preparePreSiteDistribution(prepareInput({ attachmentMode: 'none' }), c.dependencies);
+  // Discriminating: the harness option changes only the DOCX snapshot's
+  // settled version (the source version stays '2.0' and nothing is attached),
+  // so an equal hash here would mean the snapshots were not pinned.
+  expect(third.attempt.previewHash).not.toBe(first.attempt.previewHash);
+});
+
+const SESSION = {
+  sessionId: 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa',
+  scheduledStartIso: '2026-09-11T18:45:00.000Z',
+  scheduledEndIso: '2026-09-11T20:00:00.000Z',
+  ianaTimeZone: 'America/Los_Angeles',
+  meetingLink: 'https://zoom.example/j/123',
+  location: '',
+  order: 1,
+  minutes: 15,
+  attendees: [{ name: 'A', email: 'a@example.org' }],
+};
+
+test('the email carries the request\'s deliberation session (tracker §5.6): body line with Join link, snapshot persisted, both hashes bound', async () => {
+  const withSession = createPrepareHarness();
+  withSession.dependencies.getSession = jest.fn(async () => SESSION);
+  const result = await preparePreSiteDistribution(prepareInput(), withSession.dependencies);
+  expect(withSession.dependencies.getSession).toHaveBeenCalledWith(REQUEST_ID);
+  const created = withSession.dependencies.createOrGetAttempt.mock.calls[0][0];
+  expect(created.bodyHtml).toContain('<strong>Pre-discussion:</strong>');
+  expect(created.bodyHtml).toContain('September 11, 2026');
+  expect(created.bodyHtml).toContain('11:45');
+  expect(created.bodyHtml).toContain('<a href="https://zoom.example/j/123">Join meeting</a>');
+  expect(created.sessionSnapshot).toEqual({
+    sessionId: SESSION.sessionId,
+    scheduledStartIso: SESSION.scheduledStartIso,
+    scheduledEndIso: SESSION.scheduledEndIso,
+    ianaTimeZone: 'America/Los_Angeles',
+    meetingLink: 'https://zoom.example/j/123',
+    location: '',
+  });
+  expect(created.sessionSnapshot).not.toHaveProperty('attendees');
+
+  const without = createPrepareHarness();
+  without.dependencies.getSession = jest.fn(async () => null);
+  const plain = await preparePreSiteDistribution(prepareInput(), without.dependencies);
+  const plainCreated = without.dependencies.createOrGetAttempt.mock.calls[0][0];
+  expect(plainCreated.bodyHtml).toContain('<strong>Pre-discussion:</strong> not yet scheduled.');
+  expect(plainCreated.bodyHtml).not.toContain('Join meeting');
+  expect(plainCreated.sessionSnapshot).toBeNull();
+  // Discriminating: only the session differs between the two harnesses.
+  expect(created.draftHash).not.toBe(plainCreated.draftHash);
+  expect(result.attempt.previewHash).not.toBe(plain.attempt.previewHash);
+});
+
+test('a non-https meeting link is dropped from the email and the snapshot; a session-reader failure reads as not scheduled', async () => {
+  const harness = createPrepareHarness();
+  harness.dependencies.getSession = jest.fn(async () => ({ ...SESSION, meetingLink: 'javascript:alert(1)' }));
+  await preparePreSiteDistribution(prepareInput(), harness.dependencies);
+  const created = harness.dependencies.createOrGetAttempt.mock.calls[0][0];
+  expect(created.bodyHtml).not.toContain('Join meeting');
+  expect(created.sessionSnapshot.meetingLink).toBe('');
+
+  const failing = createPrepareHarness();
+  failing.dependencies.getSession = jest.fn(async () => { throw new Error('tracker down'); });
+  await preparePreSiteDistribution(prepareInput(), failing.dependencies);
+  expect(failing.dependencies.createOrGetAttempt.mock.calls[0][0].sessionSnapshot).toBeNull();
+});
+
+test('send refuses when the deliberation session moved, appeared, or was removed since preview; unchanged passes the check', async () => {
+  const snapshot = {
+    sessionId: SESSION.sessionId, scheduledStartIso: SESSION.scheduledStartIso, scheduledEndIso: SESSION.scheduledEndIso,
+    ianaTimeZone: 'America/Los_Angeles', meetingLink: 'https://zoom.example/j/123', location: '',
+  };
+  const input = { requestId: REQUEST_ID, operationId: OPERATION_ID, previewHash: 'a'.repeat(64), fromEmail: 'sender@example.org', actingUserSystemId: ACTOR_ID };
+  const attempt = (session_snapshot) => attemptFixture({ session_snapshot });
+  const deps = (row, live) => ({
+    ...currentSourceDependencies(row),
+    getSession: jest.fn(async () => live),
+    getAttempt: jest.fn(async () => row),
+    claimSend: jest.fn(async () => ({ ...row, lease_token: '77777777-7777-4777-8777-777777777777' })),
+    findEmailByCorrelation: jest.fn(async () => []),
+    createEmailActivity: jest.fn(),
+    recordFailure: jest.fn(async () => row),
+  });
+
+  for (const [stored, live] of [
+    [snapshot, { ...SESSION, scheduledStartIso: '2026-09-12T18:45:00.000Z' }],
+    [snapshot, null],
+    [null, SESSION],
+    [snapshot, { ...SESSION, meetingLink: 'https://zoom.example/j/999' }],
+  ]) {
+    const d = deps(attempt(stored), live);
+    await expect(sendPreSiteDistribution(input, d)).rejects.toMatchObject({ code: 'distribution_session_stale' });
+    expect(d.createEmailActivity).not.toHaveBeenCalled();
+  }
+
+  for (const [stored, live] of [[snapshot, SESSION], [null, null], [JSON.stringify(snapshot), SESSION]]) {
+    const d = deps(attempt(stored), live);
+    await expect(sendPreSiteDistribution(input, d)).rejects.not.toMatchObject({ code: 'distribution_session_stale' });
+  }
+});
+
+test('prepare refuses when the briefing page is not enabled, before any persistence or file work', async () => {
+  const off = createPrepareHarness();
+  off.dependencies.briefingReady = () => false;
+  off.dependencies.ensureBriefingLink = jest.fn();
+  await expect(preparePreSiteDistribution(prepareInput(), off.dependencies))
+    .rejects.toMatchObject({ code: 'distribution_briefing_required', httpStatus: 503 });
+  expect(off.dependencies.createOrGetAttempt).not.toHaveBeenCalled();
+  expect(off.dependencies.ensureBriefingLink).not.toHaveBeenCalled();
+  const unwired = createPrepareHarness();
+  delete unwired.dependencies.ensureBriefingLink;
+  await expect(preparePreSiteDistribution(prepareInput(), unwired.dependencies))
+    .rejects.toMatchObject({ code: 'distribution_briefing_required' });
+  expect(unwired.dependencies.createOrGetAttempt).not.toHaveBeenCalled();
 });
 
 function createPrepareHarness({
   mutateWordDuringPdf = false,
   provisionalWordETag = 'word-etag',
+  settledWordVersionId = '1.0',
 } = {}) {
   const sourceDocumentId = '44444444-4444-4444-8444-444444444444';
   const sourceBytes = Buffer.from('governed-word-bytes');
@@ -86,7 +235,8 @@ function createPrepareHarness({
   const snapshots = [];
   let snapshotSequence = 0;
   let wordMetadataReads = 0;
-  let settledWordVersion = '1.0';
+  let uuidSequence = 6;
+  let settledWordVersion = settledWordVersionId;
   let settledWordETag = 'word-etag';
 
   const metadata = (itemId, versionId, eTag, size, name) => ({
@@ -102,6 +252,17 @@ function createPrepareHarness({
   });
 
   const dependencies = {
+    // The link is mandatory since 2026-09-10; individual tests override these
+    // to exercise the refusal paths.
+    briefingReady: () => true,
+    ensureBriefingLink: jest.fn(async () => ({
+      link: { id: '12121212-1212-4212-8212-121212121212', url: 'https://apps.test/external/briefing/default-token', expiresAt: '2026-12-18T00:00:00.000Z' },
+      reused: false,
+    })),
+    recordBriefingLink: jest.fn(async (_operationId, briefingLinkId) => {
+      attempt = { ...attempt, briefing_link_id: briefingLinkId };
+      return attempt;
+    }),
     getRequest: jest.fn(async () => ({
       akoya_requestid: REQUEST_ID,
       akoya_requestnum: '1002379',
@@ -157,9 +318,9 @@ function createPrepareHarness({
       snapshotSequence += 1;
       const row = {
         ...payload,
-        wmkf_requestdocumentid: snapshotSequence === 1
-          ? '55555555-5555-4555-8555-555555555555'
-          : '66666666-6666-4666-8666-666666666666',
+        // Sequential ids: a re-prepare builds a second DOCX and a second PDF
+        // snapshot, and updateDocument finds rows by id.
+        wmkf_requestdocumentid: `${String(4 + snapshotSequence).repeat(8)}-${String(4 + snapshotSequence).repeat(4)}-4${String(4 + snapshotSequence).repeat(3)}-8${String(4 + snapshotSequence).repeat(3)}-${String(4 + snapshotSequence).repeat(12)}`,
         _wmkf_request_value: REQUEST_ID,
         _wmkf_sourcedocument_value: payload['wmkf_SourceDocument@odata.bind']
           .match(/\(([^)]+)\)/)?.[1],
@@ -238,9 +399,12 @@ function createPrepareHarness({
       };
       return attempt;
     }),
-    randomUUID: jest.fn()
-      .mockReturnValueOnce('77777777-7777-4777-8777-777777777777')
-      .mockReturnValueOnce('88888888-8888-4888-8888-888888888888'),
+    // Every prepare now builds both snapshots, so a re-prepare needs more than
+    // two ids: hand them out sequentially and deterministically.
+    randomUUID: jest.fn(() => {
+      uuidSequence += 1;
+      return `${String(uuidSequence).repeat(8)}-${String(uuidSequence).repeat(4)}-4${String(uuidSequence).repeat(3)}-8${String(uuidSequence).repeat(3)}-${String(uuidSequence).repeat(12)}`.slice(0, 36);
+    }),
     now: jest.fn(() => new Date('2026-08-23T12:00:00Z')),
   };
 
@@ -259,7 +423,7 @@ function prepareInput(overrides = {}) {
     requestId: REQUEST_ID,
     expectedArtifactId: '44444444-4444-4444-8444-444444444444',
     operationId: OPERATION_ID,
-    attachmentMode: 'both',
+    attachmentMode: 'none',
     to: 'staff@example.org',
     cc: 'consultant@example.org',
     subject: 'Frozen materials',
@@ -276,8 +440,9 @@ test('prepare persists native Graph publication versions instead of provisional 
   const result = await preparePreSiteDistribution(prepareInput(), harness.dependencies);
 
   expect(result.attempt.state).toBe('prepared');
-  expect(result.attempt.attachments.map((attachment) => attachment.versionId))
-    .toEqual(['1.0', '1.0']);
+  expect(result.attempt.attachments).toEqual([]);
+  const pinned = harness.dependencies.recordPrepared.mock.calls[0][1];
+  expect([pinned.docx.versionId, pinned.pdf.versionId]).toEqual(['1.0', '1.0']);
   expect(harness.snapshots.map((row) => row.wmkf_sharepointversionid))
     .toEqual(['1.0', '1.0']);
 });
@@ -286,15 +451,16 @@ test('prepare accepts the settled stable-ID eTag when the upload response eTag i
   const harness = createPrepareHarness({ provisionalWordETag: 'upload-response-etag' });
 
   const result = await preparePreSiteDistribution(
-    prepareInput({ attachmentMode: 'docx' }),
+    prepareInput({ attachmentMode: 'none' }),
     harness.dependencies,
   );
 
-  expect(result.attempt.attachments[0].versionId).toBe('1.0');
+  expect(result.attempt.attachments).toEqual([]);
+  expect(harness.dependencies.recordPrepared.mock.calls[0][1].docx.versionId).toBe('1.0');
   expect(harness.snapshots[0].wmkf_sharepointetag).toBe('word-etag');
 });
 
-test('prepare binds server-resolved material links and one informational calendar to the preview', async () => {
+test('prepare refuses a material selection (retired) and binds one informational calendar to the preview', async () => {
   const harness = createPrepareHarness();
   const materialId = '99999999-9999-4999-8999-999999999999';
   const sourceResult = await harness.dependencies.findDocumentsByRequest();
@@ -339,23 +505,34 @@ test('prepare binds server-resolved material links and one informational calenda
     }],
   }));
 
-  const result = await preparePreSiteDistribution(prepareInput({
-    attachmentMode: 'docx',
+  // Material links are retired (owner 2026-09-10): a selection is refused
+  // before any persistence, even for an eligible Ready material.
+  await expect(preparePreSiteDistribution(prepareInput({
+    attachmentMode: 'none',
     includeCalendar: true,
     siteVisitId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
     selectedMaterialIds: [materialId],
+  }), harness.dependencies)).rejects.toMatchObject({ code: 'distribution_material_links_retired', httpStatus: 400 });
+  expect(harness.dependencies.createOrGetAttempt).not.toHaveBeenCalled();
+
+  const result = await preparePreSiteDistribution(prepareInput({
+    attachmentMode: 'none',
+    includeCalendar: true,
+    siteVisitId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
   }), harness.dependencies);
 
+  // Nothing but the informational calendar is attached; the writeup and the
+  // materials ride the briefing page.
   expect(result.attempt.attachments.map((attachment) => attachment.kind))
-    .toEqual(['docx', 'calendar']);
-  expect(result.attempt.materialLinks).toEqual([expect.objectContaining({ artifactId: materialId })]);
+    .toEqual(['calendar']);
+  expect(result.attempt.materialLinks).toEqual([]);
   expect(result.attempt.calendarEnabled).toBe(true);
   expect(result.attempt.bodyText).toBe('Attached.');
   const persisted = harness.dependencies.createOrGetAttempt.mock.calls[0][0];
   expect(persisted.toRecipients).toEqual(['staff@example.org', 'organizer@wmkeck.org']);
   expect(persisted.ccRecipients).toEqual(['consultant@example.org']);
-  expect(persisted.bodyHtml).toContain('Applicant &lt;Slides&gt;.pdf');
-  expect(persisted.bodyHtml).toContain('a=1&amp;b=2');
+  expect(persisted.bodyHtml).not.toContain('Applicant');
+  expect(persisted.bodyHtml).toContain('the research presentation materials, no login required');
   expect(persisted.calendar.content.toString('utf8')).toContain('METHOD:PUBLISH');
   expect(persisted.calendar.content.toString('utf8'))
     .toContain('ORGANIZER:mailto:organizer@wmkeck.org');
@@ -387,7 +564,7 @@ test('calendar organizer is moved from Cc to To before preview persistence', asy
   }));
 
   await preparePreSiteDistribution(prepareInput({
-    attachmentMode: 'docx',
+    attachmentMode: 'none',
     cc: 'organizer@wmkeck.org, consultant@example.org',
     includeCalendar: true,
     siteVisitId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
@@ -398,9 +575,9 @@ test('calendar organizer is moved from Cc to To before preview persistence', asy
   expect(persisted.ccRecipients).toEqual(['consultant@example.org']);
 });
 
-test('calendar and material selections participate in the draft identity', async () => {
+test('the calendar selection participates in the draft identity; a material selection is refused', async () => {
   const base = createPrepareHarness();
-  await preparePreSiteDistribution(prepareInput({ attachmentMode: 'docx' }), base.dependencies);
+  await preparePreSiteDistribution(prepareInput({ attachmentMode: 'none' }), base.dependencies);
   const baseHash = base.dependencies.createOrGetAttempt.mock.calls[0][0].draftHash;
 
   const materialId = '99999999-9999-4999-8999-999999999999';
@@ -423,12 +600,13 @@ test('calendar and material selections participate in the draft identity', async
       },
     ],
   });
-  await preparePreSiteDistribution(prepareInput({
-    attachmentMode: 'docx',
+  // Material links are retired: a selection is refused before the draft
+  // identity is ever computed (the calendar still participates below).
+  await expect(preparePreSiteDistribution(prepareInput({
+    attachmentMode: 'none',
     selectedMaterialIds: [materialId],
-  }), material.dependencies);
-  const materialHash = material.dependencies.createOrGetAttempt.mock.calls[0][0].draftHash;
-  expect(materialHash).not.toBe(baseHash);
+  }), material.dependencies)).rejects.toMatchObject({ code: 'distribution_material_links_retired' });
+  expect(material.dependencies.createOrGetAttempt).not.toHaveBeenCalled();
 
   const extended = createPrepareHarness();
   extended.dependencies.schemaReady = jest.fn(() => true);
@@ -453,7 +631,7 @@ test('calendar and material selections participate in the draft identity', async
     }],
   }));
   await preparePreSiteDistribution(prepareInput({
-    attachmentMode: 'docx',
+    attachmentMode: 'none',
     includeCalendar: true,
     siteVisitId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
   }), extended.dependencies);
@@ -464,17 +642,18 @@ test('calendar and material selections participate in the draft identity', async
 test('byte-identical Ready snapshot metadata drift refreshes the registry and remains reusable', async () => {
   const harness = createPrepareHarness();
   await preparePreSiteDistribution(
-    prepareInput({ attachmentMode: 'docx' }),
+    prepareInput({ attachmentMode: 'none' }),
     harness.dependencies,
   );
   harness.setWordPublication('2.0', 'word-etag-2');
 
   const result = await preparePreSiteDistribution(prepareInput({
     operationId: '99999999-9999-4999-8999-999999999999',
-    attachmentMode: 'docx',
+    attachmentMode: 'none',
   }), harness.dependencies);
 
-  expect(result.attempt.attachments[0].versionId).toBe('2.0');
+  expect(result.attempt.attachments).toEqual([]);
+  expect(harness.dependencies.recordPrepared.mock.calls[1][1].docx.versionId).toBe('2.0');
   expect(harness.snapshots[0]).toMatchObject({
     wmkf_sharepointversionid: '2.0',
     wmkf_sharepointetag: 'word-etag-2',
@@ -493,8 +672,12 @@ test('prepare rejects PDF conversion when the frozen Word publication changes mi
   expect(harness.dependencies.recordPrepared).not.toHaveBeenCalled();
 });
 
+const FIXTURE_BRIEFING_LINK_ID = '13131313-1313-4313-8313-131313131313';
+
 function attemptFixture(overrides = {}) {
   return {
+    // Bound link by default: since 2026-09-10 every sendable preview carries one.
+    briefing_link_id: FIXTURE_BRIEFING_LINK_ID,
     operation_id: OPERATION_ID,
     request_id: REQUEST_ID,
     source_document_id: '44444444-4444-4444-8444-444444444444',
@@ -537,6 +720,7 @@ function attemptFixture(overrides = {}) {
 
 function currentSourceDependencies(row) {
   return {
+    getLiveBriefingLink: jest.fn(async () => ({ id: FIXTURE_BRIEFING_LINK_ID, url: 'https://apps.test/external/briefing/fixture-token' })),
     getRequest: jest.fn(async () => ({
       akoya_requestid: row.request_id,
       _wmkf_currentpresitevisit_value: row.source_document_id,
@@ -638,6 +822,67 @@ test('history reports currentSourceEverSent=false when no current document resol
   });
   expect(hasSentAttemptForSource).not.toHaveBeenCalled();
   expect(result.currentSourceEverSent).toBe(false);
+});
+
+test('a no-attachment send creates the activity, attaches nothing, and reaches sent without touching the attachment ledger', async () => {
+  let row = attemptFixture({ attachment_mode: 'none', body_html: `<p>Hi</p><p><a href="${BRIEFING_LINK_PLACEHOLDER}">Open</a></p>` });
+  const calls = [];
+  const dependencies = {
+    ...currentSourceDependencies(row),
+    getAttempt: jest.fn(async () => row),
+    claimSend: jest.fn(async () => {
+      row = { ...row, lease_token: '77777777-7777-4777-8777-777777777777', attempt_count: 1 };
+      return row;
+    }),
+    findEmailByCorrelation: jest.fn(async () => []),
+    createEmailActivity: jest.fn(async () => '88888888-8888-4888-8888-888888888888'),
+    recordEmailActivity: jest.fn(async (attempt, emailId) => {
+      row = { ...attempt, dynamics_email_id: emailId, state: 'activity_created' };
+      calls.push('activity');
+      return row;
+    }),
+    findEmailAttachments: jest.fn(),
+    downloadFile: jest.fn(),
+    addEmailAttachment: jest.fn(),
+    recordAttachment: jest.fn(),
+    getEmailActivity: jest.fn()
+      .mockImplementationOnce(async () => emailFixture(row, {
+        description: row.body_html.replace(BRIEFING_LINK_PLACEHOLDER, 'https://apps.test/external/briefing/fixture-token'),
+      }))
+      .mockResolvedValueOnce({ statuscode: 1 })
+      .mockResolvedValueOnce({ statuscode: 6, statecode: 0 }),
+    recordSendRequested: jest.fn(async (attempt) => {
+      row = { ...attempt, state: 'send_requested', send_requested_at: new Date() };
+      calls.push('send_requested');
+      return row;
+    }),
+    renewSendLease: jest.fn(async (attempt) => attempt),
+    sendEmail: jest.fn(async () => { calls.push('send'); }),
+    recordSent: jest.fn(async (attempt, status) => {
+      row = { ...attempt, ...status, state: 'sent', sent_at: new Date(), send_requested_at: new Date(), lease_token: null };
+      calls.push('sent');
+      return row;
+    }),
+    recordFailure: jest.fn(async () => row),
+  };
+
+  const result = await sendPreSiteDistribution({
+    requestId: REQUEST_ID,
+    operationId: OPERATION_ID,
+    previewHash: 'a'.repeat(64),
+    fromEmail: 'sender@example.org',
+    actingUserSystemId: ACTOR_ID,
+  }, dependencies);
+
+  expect(result.attempt.transportAccepted).toBe(true);
+  expect(result.attempt.attachments).toEqual([]);
+  expect(calls).toEqual(['activity', 'send_requested', 'send', 'sent']);
+  // The activity body carries the live link where the placeholder was.
+  expect(dependencies.createEmailActivity.mock.calls[0][0].body).toContain('https://apps.test/external/briefing/fixture-token');
+  expect(dependencies.addEmailAttachment).not.toHaveBeenCalled();
+  expect(dependencies.recordAttachment).not.toHaveBeenCalled();
+  expect(dependencies.downloadFile).not.toHaveBeenCalled();
+  expect(dependencies.sendEmail).toHaveBeenCalledTimes(1);
 });
 
 test('send accepts an unchanged linked material after PostgreSQL JSONB reorders its object keys', async () => {
@@ -1113,7 +1358,10 @@ test('transport is not called when the source changes after activity recovery bu
     fromEmail: 'sender@example.org',
     actingUserSystemId: ACTOR_ID,
   }, dependencies)).rejects.toMatchObject({ code: 'distribution_stale_source' });
-  expect(dependencies.renewSendLease).toHaveBeenCalledTimes(1);
+  // The final rechecks now run before send intent is stamped or the lease is
+  // renewed, so a pre-transport failure leaves the attempt provably unsent.
+  expect(dependencies.recordSendRequested).not.toHaveBeenCalled();
+  expect(dependencies.renewSendLease).not.toHaveBeenCalled();
   expect(dependencies.sendEmail).not.toHaveBeenCalled();
 });
 
@@ -1210,4 +1458,207 @@ test('a missing persisted Dynamics activity fails closed without creating a repl
     actingUserSystemId: ACTOR_ID,
   }, dependencies)).rejects.toMatchObject({ code: 'distribution_email_missing' });
   expect(dependencies.createEmailActivity).not.toHaveBeenCalled();
+});
+
+// ---------------------------------------------------------------------------
+// Deliberation briefing link integration (docs/DELIBERATION_BRIEFING_PAGE_PLAN.md
+// §2.2, §4): the link appears in the body only when minted, joins the exact
+// preview hash, and a replaced link fails the send.
+// ---------------------------------------------------------------------------
+
+test('body html carries the briefing section only when a link was minted', () => {
+  const without = distributionBodyHtml('Hello', OPERATION_ID, []);
+  expect(without).not.toContain('Briefing page');
+  const link = { id: 'l', url: 'https://apps.test/external/briefing/abc<>', expiresAt: '2026-10-08T20:00:00Z' };
+  const withLink = distributionBodyHtml('Hello', OPERATION_ID, [], link);
+  expect(withLink).toContain('<strong>Briefing page:</strong>');
+  // The stored body never carries the token: only the placeholder.
+  expect(withLink).not.toContain('apps.test');
+  expect(withLink).toContain(`href="${BRIEFING_LINK_PLACEHOLDER}"`);
+  expect(withLink).toContain('expires on October 8, 2026');
+  const rendered = renderBriefingBody(withLink, link.url);
+  expect(rendered).toContain('href="https://apps.test/external/briefing/abc&lt;&gt;"');
+  expect(rendered).not.toContain(BRIEFING_LINK_PLACEHOLDER);
+  expect(renderBriefingBody(withLink, null)).toBe(withLink);
+  expect(withLink.indexOf('Briefing page')).toBeLessThan(withLink.indexOf('wmkf-pre-site-distribution'));
+});
+
+test('prepare mints the briefing link, binds it to the attempt, and folds it into the preview hash', async () => {
+  // Every prepare now links (the harness default is link 1212…); a different
+  // link must yield a different preview hash and a different bound id.
+  const plain = createPrepareHarness();
+  const plainResult = await preparePreSiteDistribution({
+    requestId: REQUEST_ID,
+    expectedArtifactId: '44444444-4444-4444-8444-444444444444',
+    operationId: OPERATION_ID,
+    attachmentMode: 'none',
+    to: 'staff@example.org',
+    subject: 'Frozen materials',
+    bodyText: 'Attached.',
+    fromEmail: 'sender@example.org',
+    actingUserSystemId: ACTOR_ID,
+  }, plain.dependencies);
+  expect(plainResult.briefingLink?.id).toBe('12121212-1212-4212-8212-121212121212');
+
+  const linked = createPrepareHarness();
+  const briefing = { id: '99999999-9999-4999-8999-999999999999', url: 'https://apps.test/external/briefing/tok', expiresAt: '2026-10-08T20:00:00.000Z' };
+  linked.dependencies.briefingReady = () => true;
+  linked.dependencies.ensureBriefingLink = jest.fn(async () => ({ link: briefing, reused: false }));
+  let bound = null;
+  linked.dependencies.recordBriefingLink = jest.fn(async (operationId, briefingLinkId) => {
+    bound = briefingLinkId;
+    const current = await linked.dependencies.createOrGetAttempt({ operationId });
+    return { ...current, briefing_link_id: briefingLinkId };
+  });
+  const linkedResult = await preparePreSiteDistribution({
+    requestId: REQUEST_ID,
+    expectedArtifactId: '44444444-4444-4444-8444-444444444444',
+    operationId: OPERATION_ID,
+    attachmentMode: 'none',
+    to: 'staff@example.org',
+    subject: 'Frozen materials',
+    bodyText: 'Attached.',
+    fromEmail: 'sender@example.org',
+    actingUserSystemId: ACTOR_ID,
+  }, linked.dependencies);
+  expect(linked.dependencies.ensureBriefingLink).toHaveBeenCalledWith(REQUEST_ID, ACTOR_ID);
+  expect(bound).toBe(briefing.id);
+  expect(linkedResult.briefingLink).toEqual(briefing);
+  expect(linkedResult.attempt.previewHash).not.toBe(plainResult.attempt.previewHash);
+  const created = linked.dependencies.createOrGetAttempt.mock.calls[0][0];
+  expect(created.bodyHtml).toContain(`href="${BRIEFING_LINK_PLACEHOLDER}"`);
+  expect(JSON.stringify(created)).not.toContain('external/briefing/tok');
+});
+
+test('send refuses a prepared attempt whose briefing link was replaced', async () => {
+  let row = attemptFixture({ briefing_link_id: '99999999-9999-4999-8999-999999999999' });
+  const dependencies = {
+    ...currentSourceDependencies(row),
+    getLiveBriefingLink: jest.fn(async () => ({ id: '10101010-1010-4010-8010-101010101010', url: 'https://apps.test/external/briefing/new' })),
+    getAttempt: jest.fn(async () => row),
+    claimSend: jest.fn(async () => {
+      row = { ...row, lease_token: '77777777-7777-4777-8777-777777777777' };
+      return row;
+    }),
+    findEmailByCorrelation: jest.fn(),
+    createEmailActivity: jest.fn(),
+    recordFailure: jest.fn(async () => row),
+  };
+  await expect(sendPreSiteDistribution({
+    requestId: REQUEST_ID,
+    operationId: OPERATION_ID,
+    previewHash: 'a'.repeat(64),
+    fromEmail: 'sender@example.org',
+    actingUserSystemId: ACTOR_ID,
+  }, dependencies)).rejects.toMatchObject({ code: 'distribution_briefing_stale' });
+  expect(dependencies.getLiveBriefingLink).toHaveBeenCalledWith(REQUEST_ID);
+  expect(dependencies.createEmailActivity).not.toHaveBeenCalled();
+});
+
+test('an unbound preview (prepared before the link was mandatory) is refused at send regardless of the flag, unless its send was already requested', async () => {
+  const refuse = (row) => ({
+    ...currentSourceDependencies(row),
+    briefingReady: () => true,
+    getLiveBriefingLink: jest.fn(),
+    getAttempt: jest.fn(async () => row),
+    claimSend: jest.fn(async () => ({ ...row, lease_token: '77777777-7777-4777-8777-777777777777' })),
+    findEmailByCorrelation: jest.fn(async () => []),
+    createEmailActivity: jest.fn(),
+    recordFailure: jest.fn(async () => row),
+  });
+  const input = { requestId: REQUEST_ID, operationId: OPERATION_ID, previewHash: 'a'.repeat(64), fromEmail: 'sender@example.org', actingUserSystemId: ACTOR_ID };
+  const unbound = refuse(attemptFixture({ briefing_link_id: null }));
+  await expect(sendPreSiteDistribution(input, unbound)).rejects.toMatchObject({ code: 'distribution_briefing_stale' });
+  expect(unbound.createEmailActivity).not.toHaveBeenCalled();
+  expect(unbound.getLiveBriefingLink).not.toHaveBeenCalled();
+
+  // Already send-requested: the retry reconciles status and is not refused here.
+  const requested = refuse(attemptFixture({ briefing_link_id: null, state: 'send_requested', send_requested_at: new Date(), dynamics_email_id: null }));
+  await expect(sendPreSiteDistribution(input, requested)).rejects.not.toMatchObject({ code: 'distribution_briefing_stale' });
+
+  // Flag off no longer exempts it: the email carries no attachment, so a
+  // linkless send would be a bare email.
+  const off = { ...refuse(attemptFixture({ briefing_link_id: null })), briefingReady: () => false };
+  await expect(sendPreSiteDistribution(input, off)).rejects.toMatchObject({ code: 'distribution_briefing_stale' });
+  expect(off.createEmailActivity).not.toHaveBeenCalled();
+});
+
+test('send renders the live link into the activity body only at creation, and a reissue after attachments stops transport', async () => {
+  const linkId = '99999999-9999-4999-8999-999999999999';
+  const bodyWithPlaceholder = distributionBodyHtml('Attached.', OPERATION_ID, [], { id: linkId, expiresAt: '2026-10-08T20:00:00Z' });
+  let row = attemptFixture({ briefing_link_id: linkId, body_html: bodyWithPlaceholder, attachment_mode: 'docx' });
+  const url = 'https://apps.test/external/briefing/live-token';
+  let liveId = linkId;
+  const calls = [];
+  const dependencies = {
+    ...currentSourceDependencies(row),
+    getLiveBriefingLink: jest.fn(async () => ({ id: liveId, url })),
+    getAttempt: jest.fn(async () => row),
+    claimSend: jest.fn(async () => {
+      row = { ...row, lease_token: '77777777-7777-4777-8777-777777777777', attempt_count: 1 };
+      return row;
+    }),
+    findEmailByCorrelation: jest.fn(async () => []),
+    createEmailActivity: jest.fn(async (activity) => { calls.push(activity.body); return '88888888-8888-4888-8888-888888888888'; }),
+    recordEmailActivity: jest.fn(async (attempt, emailId) => {
+      row = { ...attempt, dynamics_email_id: emailId, state: 'activity_created' };
+      return row;
+    }),
+    getEmailActivity: jest.fn(async () => emailFixture(row, { description: renderBriefingBody(row.body_html, url) })),
+    findEmailAttachments: jest.fn(async () => []),
+    downloadFile: jest.fn(async () => ({ buffer: Buffer.from('word-bytes') })),
+    addEmailAttachment: jest.fn(async () => {}),
+    recordAttachment: jest.fn(async (attempt) => { liveId = 'replaced'; row = { ...attempt, docx_attached_at: new Date() }; return row; }),
+    recordSendRequested: jest.fn(async (attempt) => { row = { ...attempt, state: 'send_requested', send_requested_at: new Date() }; return row; }),
+    renewSendLease: jest.fn(async (attempt) => attempt),
+    sendEmail: jest.fn(),
+    recordSent: jest.fn(),
+    recordFailure: jest.fn(async () => row),
+  };
+  const crypto = await import('node:crypto');
+  row.docx_byte_hash = crypto.createHash('sha256').update('word-bytes').digest('hex');
+
+  await expect(sendPreSiteDistribution({
+    requestId: REQUEST_ID,
+    operationId: OPERATION_ID,
+    previewHash: 'a'.repeat(64),
+    fromEmail: 'sender@example.org',
+    actingUserSystemId: ACTOR_ID,
+  }, dependencies)).rejects.toMatchObject({ code: 'distribution_briefing_stale' });
+  expect(calls).toHaveLength(1);
+  expect(calls[0]).toContain(`href="${url}"`);
+  expect(calls[0]).not.toContain(BRIEFING_LINK_PLACEHOLDER);
+  expect(dependencies.sendEmail).not.toHaveBeenCalled();
+  expect(dependencies.getLiveBriefingLink).toHaveBeenCalledTimes(2);
+  // The failure happened before send intent, so the attempt is provably unsent
+  // and cannot block a reissue as an "unresolved" send.
+  expect(dependencies.recordSendRequested).not.toHaveBeenCalled();
+});
+
+test('a retry of a send-requested attempt reconciles an accepted Dynamics send before requiring link liveness', async () => {
+  const linkId = '99999999-9999-4999-8999-999999999999';
+  let row = attemptFixture({
+    briefing_link_id: linkId, state: 'send_requested', send_requested_at: new Date(),
+    dynamics_email_id: '88888888-8888-4888-8888-888888888888', docx_attached_at: new Date(), pdf_attached_at: new Date(),
+  });
+  const dependencies = {
+    ...currentSourceDependencies(row),
+    // The link expired after the send went out: liveness would now fail.
+    getLiveBriefingLink: jest.fn(async () => null),
+    getAttempt: jest.fn(async () => row),
+    claimSend: jest.fn(async () => { row = { ...row, lease_token: '77777777-7777-4777-8777-777777777777' }; return row; }),
+    getEmailActivity: jest.fn(async () => ({ statuscode: 6, statecode: 0 })),
+    recordSent: jest.fn(async (attempt, status) => { row = { ...attempt, ...status, state: 'sent', sent_at: new Date(), lease_token: null }; return row; }),
+    findEmailByCorrelation: jest.fn(),
+    createEmailActivity: jest.fn(),
+    sendEmail: jest.fn(),
+    recordFailure: jest.fn(async () => row),
+  };
+  const result = await sendPreSiteDistribution({
+    requestId: REQUEST_ID, operationId: OPERATION_ID, previewHash: 'a'.repeat(64), fromEmail: 'sender@example.org', actingUserSystemId: ACTOR_ID,
+  }, dependencies);
+  expect(result.attempt.transportAccepted).toBe(true);
+  expect(result.reused).toBe(true);
+  expect(dependencies.getLiveBriefingLink).not.toHaveBeenCalled();
+  expect(dependencies.sendEmail).not.toHaveBeenCalled();
 });

@@ -184,12 +184,18 @@ SharePoint plus `wmkf_requestdocument` remain retained-file authority, and
 Dynamics remains email-activity/transport authority.
 
 One client operation UUID binds one Request, exact editable source Word
-identity/version/governed hash/raw byte hash, attachment mode (`docx`, `pdf`, or
-`both`), exact retained Word/PDF identities and byte hashes, normalized To/Cc,
+identity/version/governed hash/raw byte hash, attachment mode (`none` for every
+attempt prepared since 2026-09-10, migration 039, the email carrying the
+briefing page link instead; `docx`, `pdf`, or `both` remain on earlier rows),
+exact retained Word/PDF identities and byte hashes (pinned on every prepared row
+regardless of mode because the briefing page serves them), the deliberation-session
+snapshot the email states (`session_snapshot`, migration 040; null = not yet scheduled;
+rechecked live at send), normalized To/Cc,
 subject/body/template/sender/actor, preview hash, Dynamics activity/status, and
 bounded error evidence. Attachment bytes are never stored. States are
 `preparing`, `prepared`, `activity_created`, `attachments_added`,
-`send_requested`, and `sent`; per-kind attachment timestamps plus a lease fence
+`send_requested`, and `sent` (a `none` row skips `attachments_added`); per-kind
+attachment timestamps plus a lease fence
 allow recovery between Word and PDF or after an ambiguous SendEmail response.
 The Dynamics activity ID becomes durable before exact activity assertions, and
 the same fenced lease is renewed immediately before transport; a lost renewal
@@ -206,6 +212,11 @@ selected links and the live Site Visit ETag are re-resolved under the lease.
 request, not inbox delivery. Read/write paths:
 `lib/services/pre-site-visit/distribution-store.js` and
 `lib/services/pre-site-visit/distribution-service.js`.
+Migration 038 **[PLANNED, not applied]** adds nullable `briefing_link_id`
+(the `deliberation_briefing_links.id` an exact preview carried; send refuses
+when that link is no longer live). The column is only named by a separate
+UPDATE that runs when `DELIBERATION_BRIEFING_SCHEMA_READY=on`, so an
+environment without the migration behaves exactly as before.
 
 **[PRODUCTION-PROVED 2026-08-24.]** Request `1002379`, PDF-only operation
 `85f52fc5-fb48-4ceb-84d6-0f246af0b6fb`, moved through `prepared` to `sent` in
@@ -228,6 +239,38 @@ inbox delivery is not independently verified.
 object-key-order defect fixed in commit `f5b7efc2`; they are not additional
 sends. This receipt proves Dynamics transport acceptance, not independent
 inbox/calendar-client delivery.
+
+### `deliberation_agenda_sends` — SOURCE-BUILT; MIGRATION 041 NOT APPLIED BY CODEX
+
+**Source of truth:** Postgres exact-email and cross-system recovery ledger for
+Meeting Tracker session agendas; Dynamics remains email-activity/transport
+authority and Dataverse remains session/slot authority. Migration
+`041_deliberation_agenda_sends.sql` is mirrored in fresh-install v46.
+One operation UUID freezes the session start/end/zone/HTTPS meeting link,
+location, ordered proposal identities/details/minutes/computed windows/HTTPS
+briefing links, normalized To/Cc, subject, exact text/HTML, sender, and
+session-derived Dynamics actor. States are `prepared`, `activity_created`,
+`send_requested`, `sent`, and terminal `failed`. A lease fence,
+correlation-key recovery, durable
+activity ID, and durable send intent prevent a retry from creating a second
+activity. A retry reconciles Dynamics first: status 3/6/7 records transport
+acceptance, confirmed Draft resumes SendEmail on the same activity, and an
+unknown or unreadable status remains unresolved and does not send. Known closed
+status 2/4/5/8 records `failed` and permits a new preview without reusing that
+activity. GET reads the latest sent row for
+the receipt/drift note and separately returns the latest unresolved
+`send_requested` row; prepare refuses a different operation until that pending
+send is resolved. Send has the same guard, and unique partial index
+`uq_deliberation_agenda_one_unresolved` enforces at most one `send_requested`
+row per session under concurrency. Drift compares the live start as an instant plus ordered
+request/minutes tuples with the frozen sent snapshot. Read/write
+paths are `lib/services/meeting-tracker/agenda-store.js` and
+`lib/services/meeting-tracker/agenda-service.js`; the guarded API is
+`/api/meeting-tracker/sessions/[id]/agenda`. No cleanup is scheduled; rows
+remain audit history until a retention policy is explicitly approved.
+**[VERIFIED 2026-09-10 via migration/fresh-install parity, focused service,
+route, and panel tests. ASSUMED externally: migration 041 remains unapplied;
+this Codex build did not apply it or change any readiness flag.]**
 
 ### `scheduled_email_messages` — MIGRATION 036 APPLIED 2026-08-26; CODE NOT DEPLOYED
 
@@ -341,7 +384,7 @@ expected columns, 0 rows — empty until the branch merges.]**
 
 ## Portal upload staging
 
-### `portal_upload_staging` (migration 031)
+### `portal_upload_staging` (migrations 031, 043)
 **Source of truth:** Postgres coordination ledger; published abstract/caption/image
 authority remains Dataverse + SharePoint.
 
@@ -349,13 +392,19 @@ One row authorizes one private Blob pathname for one server-derived actor,
 scope, and request. Statuses are `pending`, `finalizing`, `consumed`, `rejected`,
 and `expired`; a five-minute lease serializes finalization. Verified Blob ETag,
 SHA-256, and actual bytes are recorded before domain processing. If SharePoint
-upload succeeds, `candidate_result` records the exact drive/item/image reference
-before the Dataverse write, allowing an expired-lease retry to recognize a
-committed response drop or delete only the exact unreferenced candidate.
+upload succeeds, `candidate_result` records the scope-specific exact candidate
+before the Dataverse write: image flows store the drive/item/image reference;
+applicant materials store the intended predecessor artifact id plus the Graph
+drive/item/version/filename. This lets an expired-lease retry recognize a
+committed response drop, retire only the recorded predecessor, or delete only
+an exact unreferenced candidate where that scope supports candidate cleanup.
 `result_payload` makes consumed retries idempotent.
 
 Write/read paths: `lib/services/portal-upload-staging.js`; external grantee mint
-and submit routes; staff replacement mint and finalize routes. Raw external
+and submit routes; staff replacement mint and finalize routes; external
+applicant materials mint and finalize routes (scope `site_visit_material`,
+migration 043, S503; document content types, cap from the admin setting
+`site_visit_materials.upload_max_mb`). Raw external
 tokens are never stored (SHA-256 binding only), and clients never choose or echo
 an authoritative pathname. Daily maintenance deletes exact table-selected Blob
 pathnames after expiry and prunes terminal ledger rows after seven days.
@@ -435,3 +484,64 @@ Dedup gate for BILL.com webhook deliveries at `/api/webhooks/bill`. Compound `UN
 ### `bill_onboarding_state` (0 rows — pre-launch)
 **Source of truth:** Postgres-only. `017_bill_onboarding_state.sql` (S199, 2026-05-29). Design: `docs/BILL_CHUNK_4_DESIGN.md` Thread 3.
 Durable state for the BILL honorarium onboarding flow (`lib/bill/onboard-reviewer-service.js`), one row per honorarium `akoya_request` (PK `honorarium_request_id`). Closes the three S198 P1s (`docs/REVIEWER_BILL_HARDENING_FINDINGS.md`): the row is RESERVED (`INSERT ... ON CONFLICT DO NOTHING RETURNING`) **before** `createBillVendor` so a concurrent second caller loses the PK race and never reaches BILL; `vendor_id` is written the instant the vendor is created, **before** the contact `wmkf_billcomid` PATCH, so a failed contact PATCH can't lose it (→ no duplicate vendor on retry); `dynamics_pending` is the torn-state marker (BILL side done, `akoya_request` writeback still owed) that the daily `MaintenanceService.sweepBillOnboarding` resumes idempotently (`pending_match` true → write PNI + "Yes"; false → "No"; **NULL → sweep fails closed, never defaults to "No"**). Written/read by `lib/bill/onboarding-state.js`. TTL: completed (`dynamics_pending = false`) rows pruned after 30 days by `MaintenanceService.cleanupBillOnboardingState`.
+
+### `deliberation_briefing_links` — SOURCE-BUILT (branch `feature/deliberation-briefing-page`); MIGRATION 038 NOT YET APPLIED
+
+**Source of truth:** Postgres. One expiring, revocable link per request to the
+read-only deliberation briefing page (`docs/DELIBERATION_BRIEFING_PAGE_PLAN.md`,
+owner decisions D13–D16, 2026-09-09), added by migration
+`038_deliberation_briefing_links.sql` (mirrored in fresh-install v43), which also
+adds `pre_site_distribution_attempts.briefing_link_id`. **[PLANNED — the
+migration exists in source; the owner applies it and sets
+`DELIBERATION_BRIEFING_SCHEMA_READY=on`; nothing reads or writes the table until
+that flag is literal `on`.]**
+
+Columns: `id`, `request_id`, `jti`, `token_digest` (SHA-256 of the JWT, unique;
+verified on every external request), `token_ciphertext` (the JWT sealed with
+`lib/utils/encryption.js` so Share can carry the same link again and staff can
+copy it — the raw token is never stored), `expires_at`, `created_by`,
+`created_at`, `revoked_at`, `revoked_by`, `superseded_by`. Partial unique index
+on `request_id WHERE revoked_at IS NULL` holds at most one live row per request.
+Written by `lib/services/deliberation-briefing/briefing-link-store.js` through
+`briefing-link-service.js` (`ensureLiveBriefingLink` from the Share prepare path
+and `/api/workbench/pre-site-visit/briefing-link`; `reissueBriefingLink`
+revokes-and-replaces in one transaction). Read by
+`lib/external/verify-briefing-token.js` for `/api/external/briefing/[token]/*`.
+The row holds identity, expiry, and revocation only: the writeup the page serves
+is pinned by the latest `sent` `pre_site_distribution_attempts` row,
+reviews resolve live from `wmkf_appreviewersuggestion`, and the proposal
+narrative resolves by governed path. Cleanup: none scheduled; revoked and expired
+rows stay as audit history (bounded by one live row per request).
+
+
+### `site_visit_material_collections` (migrations 042, 044; S503)
+
+Owner: applicant materials collection (`lib/services/site-visit-materials/collection-service.js`
++ `collection-store.js`; docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md §16). One row per collection
+the PC starts from a request's active `wmkf_sitevisit`: request and Activity ids, `status`
+(`open | ready | closed`), `due_at` (two business days before the visit in its zone) and
+`closes_at` (visit end + 7 days), the checklist template with per-item waivers, the PI/liaison
+contacts snapshot, the sealed contributor link (`jti`, `token_digest`, `token_ciphertext`; raw
+token never stored), invitation and reminder receipts (Dynamics email ids, counts, timestamps),
+and the PC's ready confirmation. One non-closed row per request (partial unique index). Files are
+never here: accepted uploads are SharePoint items registered in `wmkf_requestdocument`, which the
+service reads back by artifact type and canonical filename. Migration 044 adds `slot_leases JSONB
+NOT NULL DEFAULT '{}'::jsonb`: one server-owned token/expiry object per canonical checklist slot.
+`collection-store.js` acquires an absent or expired entry with one conditional UPDATE before the
+finalize re-read and removes only the matching token afterward; the five-minute expiry recovers a
+crashed holder while live contention returns `slot_busy`. Readiness flag
+`SITE_VISIT_MATERIALS_SCHEMA_READY` (literal `on`). PR 3 (S506): the daily maintenance cron's
+auto-close step (`MaintenanceService.closeExpiredSiteVisitMaterialCollections` →
+`closeExpiredCollections`) sets `status = 'closed'` on every `open` or `ready` row past
+`closes_at` (reads already projected a past `closes_at` as closed; the sweep makes it durable and
+frees the partial unique index). The automatic reminder sweep (`reminder-sweep.js`, cron route
+`/api/cron/site-visit-materials-reminders`, built but unscheduled) claims by stamping
+`last_reminder_at` and incrementing `reminder_count` with `last_reminder_email_id = NULL` before the
+send, then attaches the email id; every other precondition (missing items, recipients, sender,
+readable link, the optional site-visit read) resolves before the claim. A reminder row with a null
+email id after a claim is therefore either a send that failed after the claim (`sendFailed`) or a
+delivered email whose id could not be attached (`receiptFailed`; the run log and `maintenance_runs`
+details carry the id for repair); neither is retried automatically. Staff list surfaces (Staff Deliberations tab and cycle
+view, tracker list row) read a counts-only summary through `summary-reader.js`
+(`listLatestCollectionsForRequests`, `DISTINCT ON (request_id)`); the contributor link and contacts
+never leave the tracker grant.

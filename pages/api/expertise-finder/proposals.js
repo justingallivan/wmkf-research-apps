@@ -4,7 +4,7 @@
  * GET: Query Dynamics for historical proposals, filtered by grant cycle and program.
  *
  * Query parameters:
- *   fiscalYear: string  - e.g. "December 2025" (required)
+ *   cycleCode: string   - grant cycle code, Jyy/Dyy (required)
  *   program: string     - "SE" or "MR" (optional, filters by internal program)
  *
  * Returns: { proposals: [...], totalCount: number }
@@ -18,6 +18,7 @@
 import { requireAppAccess } from '../../../lib/utils/auth';
 import { withDalContext } from '../../../lib/dataverse/core/context';
 import { queryProposals } from '../../../lib/services/expertise-finder/proposals-service';
+import { parseCycleCode } from '../../../lib/utils/cycle-code';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -27,15 +28,18 @@ export default async function handler(req, res) {
   const access = await requireAppAccess(req, res, 'expertise-finder');
   if (!access) return;
 
-  const { fiscalYear, program } = req.query;
+  const { cycleCode, program } = req.query;
 
-  if (!fiscalYear) {
-    return res.status(400).json({ error: 'fiscalYear is required' });
+  if (!cycleCode) {
+    return res.status(400).json({ error: 'cycleCode is required' });
+  }
+  if (typeof cycleCode !== 'string' || !parseCycleCode(cycleCode)) {
+    return res.status(400).json({ error: 'cycleCode must be a grant cycle code such as D26' });
   }
 
   return withDalContext('expertise-finder-proposals', async () => {
     try {
-      const result = await queryProposals({ fiscalYear, program });
+      const result = await queryProposals({ cycleCode: cycleCode.trim().toUpperCase(), program });
       return res.status(200).json(result);
     } catch (error) {
       console.error('[ExpertiseFinder] Proposals query error:', error);

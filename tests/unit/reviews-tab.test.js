@@ -304,6 +304,36 @@ test('keeps a stored synthesis visible even when there are no accepted reviewer 
   expect(screen.getByText(/stale or predates lifecycle tracking/i)).toBeInTheDocument();
 });
 
+test('names who is blocking synthesis instead of reporting a bare count', async () => {
+  fetch.mockResolvedValue({
+    ok: true,
+    json: async () => ({
+      success: true,
+      proposals: [{
+        proposalId: 'req1',
+        reviewers: [],
+        reviewSynthesis: null,
+        reviewSynthesisState: {
+          current: false,
+          status: 'not_started',
+          ready: false,
+          canRunManually: true,
+          submittedCount: 4,
+          blockingCount: 1,
+          blockers: [{ suggestionId: 'S9', reason: 'active_invitation', name: 'Benjamin Garcia', accepted: false, emailSentAt: '2026-08-20T00:00:00Z' }],
+        },
+      }],
+    }),
+  });
+
+  render(<ReviewsTab requestId="req1" />);
+  const list = await screen.findByTestId('synthesis-blockers');
+  expect(list).toHaveTextContent('Waiting on Benjamin Garcia');
+  expect(list).toHaveTextContent('invited, no response yet');
+  expect(list).toHaveTextContent('Resolve on the Reviewers tab');
+  expect(screen.getByText(/1 participating reviewer\(s\) remain unresolved/)).toBeInTheDocument();
+});
+
 test('lists submitted reviewer names and accepted affiliations beside the anonymous synthesis', async () => {
   fetch.mockResolvedValue({
     ok: true,
