@@ -4,19 +4,34 @@ import {
   confirmMaterialsReady,
   createMaterialsCollection,
   getMaterialsCollection,
+  inviteMaterialsContributors,
   invitationBodyText,
   matchReceivedFiles,
   missingRequiredItems,
   projectCollection,
   remindMaterialsContributors,
+  reminderBodyText,
   summarizeCollection,
   waiveMaterialsItem,
 } from '../../lib/services/site-visit-materials/collection-service';
+import { renderMaterialsEmailHtml } from '../../lib/external/site-visit-materials-email';
+import {
+  SITE_VISIT_MATERIALS_INVITE_SEED_BODY,
+  SITE_VISIT_MATERIALS_INVITE_SEED_SUBJECT,
+  SITE_VISIT_MATERIALS_REMINDER_SEED_BODY,
+  SITE_VISIT_MATERIALS_REMINDER_SEED_SUBJECT,
+} from '../../lib/seed/email-defaults/site-visit-materials';
 
 const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
 const ACTOR = '22222222-2222-4222-8222-222222222222';
 const VISIT_ID = '33333333-3333-4333-8333-333333333333';
 const NOW = new Date('2026-09-15T17:00:00Z');
+const DEFAULT_TEXT = {
+  'email.site_visit_materials_invite.subject': SITE_VISIT_MATERIALS_INVITE_SEED_SUBJECT,
+  'email.site_visit_materials_invite.body': SITE_VISIT_MATERIALS_INVITE_SEED_BODY,
+  'email.site_visit_materials_reminder.subject': SITE_VISIT_MATERIALS_REMINDER_SEED_SUBJECT,
+  'email.site_visit_materials_reminder.body': SITE_VISIT_MATERIALS_REMINDER_SEED_BODY,
+};
 
 const request = () => ({
   akoya_requestid: REQUEST_ID, akoya_requestnum: '1003222', akoya_title: 'The Secret History of Our Sun',
@@ -57,6 +72,8 @@ function deps(overrides = {}) {
     unseal: jest.fn((sealed) => sealed.replace(/^sealed:/, '')),
     randomUUID: jest.fn(() => '44444444-4444-4444-8444-444444444444'),
     now: () => NOW,
+    readEmailDefaults: jest.fn(async (keys) => ({ ok: true, values: Object.fromEntries(keys.map((key) => [key, DEFAULT_TEXT[key]])) })),
+    resolvePcSignature: jest.fn(async () => 'Casey Coordinator\nW. M. Keck Foundation'),
     sendEmail: jest.fn(async () => '55555555-5555-4555-8555-555555555555'),
     buildContributorUrl: jest.fn((jwt) => `https://apps.test/external/materials/${jwt}`),
     ...overrides,
@@ -109,6 +126,7 @@ test('create: advancing request + active visit → due two business days before 
   expect(email.correlationKey).toBe('wmkf-site-visit-materials-invite:44444444-4444-4444-8444-444444444444');
   expect(email.url).toContain('https://apps.test/external/materials/jwt-');
   expect(email.buttonLabel).toBe('Upload site visit materials');
+  expect(email.subject).toBe('Site visit materials requested — The Secret History of Our Sun');
   expect(email.bodyText).not.toContain('https://apps.test/external/materials/jwt-');
   expect(email.bodyText).toContain('No login is needed. You may forward the link below to a colleague who is helping.');
   expect(email.bodyText).not.toContain('The link stays open until');
@@ -158,6 +176,7 @@ test('read joins the registry: state moves missing → received → ready; waive
   expect(reminder.bodyText).not.toContain('https://apps.test/external/materials/');
   expect(reminder.url).toContain('https://apps.test/external/materials/');
   expect(reminder.buttonLabel).toBe('Upload the missing items');
+  expect(reminder.subject).toBe('Reminder: site visit materials — The Secret History of Our Sun');
   expect(reminder.correlationKey).toBe('wmkf-site-visit-materials-reminder:44444444-4444-4444-8444-444444444444:1');
   expect(collection.reminderCount).toBe(1);
 
@@ -211,9 +230,84 @@ test('a collection past its close instant reads as closed even before the sweep 
   const { collection } = await getMaterialsCollection({ requestId: REQUEST_ID }, d);
   expect(collection.state).toBe('closed');
   await expect(getMaterialsCollection({ requestId: REQUEST_ID }, deps({ schemaReady: () => false }))).rejects.toMatchObject({ httpStatus: 503 });
-  const body = invitationBodyText({ institution: 'U', title: 'T', visitStartIso: '2026-10-07T16:00:00Z', timeZone: 'America/Los_Angeles', dueAt: '2026-10-05T16:00:00Z', checklist: [{ key: 'a', label: 'A', required: true, waived: false }, { key: 'b', label: 'B', required: true, waived: true }] });
-  expect(body).not.toContain('- B');
-  expect(body).not.toContain('The link stays open');
+  const body = invitationBodyText({ bodyTemplate: SITE_VISIT_MATERIALS_INVITE_SEED_BODY, institution: 'U', title: 'T', visitStartIso: '2026-10-07T16:00:00Z', timeZone: 'America/Los_Angeles', dueAt: '2026-10-05T16:00:00Z', checklist: [{ key: 'a', label: 'A', required: true, waived: false }, { key: 'b', label: 'B', required: true, waived: true }] });
+  expect(body).toBe('Ahead of the W. M. Keck Foundation site visit for "T" (U) on Wednesday, October 7, 2026, please upload the following by Monday, October 5, 2026:\n\n  - A\n\nNo login is needed. You may forward the link below to a colleague who is helping.\n\nThank you.');
+});
+
+test('edited invitation and reminder settings supply distinct subjects and bodies with resolved tokens', async () => {
+  const custom = {
+    ...DEFAULT_TEXT,
+    'email.site_visit_materials_invite.subject': 'INVITE {{proposalTitle}}',
+    'email.site_visit_materials_invite.body': 'Invite {{proposalTitle}} / {{institution}} / {{visitDate}} / {{dueDate}}\n{{checklist}}\n{{uploadLink}}\n{{signature}}',
+    'email.site_visit_materials_reminder.subject': 'REMIND {{proposalTitle}}',
+    'email.site_visit_materials_reminder.body': 'Remind {{missingItemsGrammar}}: {{missingItems}}\n{{uploadLink}}\n{{signature}}',
+  };
+  const d = deps({
+    readEmailDefaults: jest.fn(async (keys) => ({ ok: true, values: Object.fromEntries(keys.map((key) => [key, custom[key]])) })),
+    buildContributorUrl: jest.fn((jwt) => `https://apps.test/external/materials/${jwt}?a=1&b=2`),
+  });
+  await createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org' }, d);
+  const invite = d.sendEmail.mock.calls[0][0];
+  expect(invite.subject).toBe('INVITE The Secret History of Our Sun');
+  expect(invite.bodyText).toContain('Invite The Secret History of Our Sun / Franklin Cat University / Wednesday, October 7, 2026 / Monday, October 5, 2026');
+  expect(invite.bodyText).toContain('  - Presentation (PDF)');
+  expect(invite.bodyText).toContain('?a=1&b=2');
+  expect(invite.bodyText).toContain('Casey Coordinator\nW. M. Keck Foundation');
+  expect(invite.bodyText).not.toContain('{{');
+  const html = renderMaterialsEmailHtml(invite);
+  expect(html).toContain('a=1&amp;b=2');
+  expect(html).not.toContain('a=1&b=2');
+
+  await remindMaterialsContributors({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org' }, d);
+  const reminder = d.sendEmail.mock.calls[1][0];
+  expect(reminder.subject).toBe('REMIND The Secret History of Our Sun');
+  expect(reminder.bodyText).toContain('Remind items are:');
+  expect(reminder.bodyText).toContain('  - Presentation (PDF)');
+  expect(reminder.bodyText).toContain('?a=1&b=2');
+  expect(reminder.bodyText).toContain('Casey Coordinator\nW. M. Keck Foundation');
+  expect(reminder.bodyText).not.toContain('{{');
+  expect(d.resolvePcSignature).toHaveBeenCalledTimes(2);
+});
+
+test('blank required settings block both sends before invitation receipt or reminder claim changes', async () => {
+  const log = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+  const blank = { ok: false, values: {}, failures: [{ key: 'email.site_visit_materials_invite.body', reason: 'blank' }] };
+  const failedInvite = deps({ readEmailDefaults: jest.fn(async () => blank) });
+  const result = await createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org' }, failedInvite);
+  expect(result.invitationSent).toBe(false);
+  expect(failedInvite.sendEmail).not.toHaveBeenCalled();
+  expect(failedInvite.recordInvitation).not.toHaveBeenCalled();
+  expect(failedInvite.__stored().invited_at).toBeUndefined();
+
+  const existingInvite = deps();
+  await createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org' }, existingInvite);
+  const invitedBefore = existingInvite.__stored();
+  existingInvite.readEmailDefaults.mockResolvedValue(blank);
+  await expect(inviteMaterialsContributors({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org' }, existingInvite))
+    .rejects.toMatchObject({ code: 'site_visit_materials_send_failed', httpStatus: 502 });
+  expect(existingInvite.sendEmail).toHaveBeenCalledTimes(1);
+  expect(existingInvite.__stored()).toEqual(invitedBefore);
+
+  const d = deps();
+  await createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org' }, d);
+  const before = d.__stored();
+  d.readEmailDefaults.mockResolvedValue({ ok: false, values: {}, failures: [{ key: 'email.site_visit_materials_reminder.body', reason: 'blank' }] });
+  await expect(remindMaterialsContributors({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org' }, d))
+    .rejects.toMatchObject({ code: 'site_visit_materials_email_defaults_unavailable', httpStatus: 503 });
+  expect(d.claimManualReminder).not.toHaveBeenCalled();
+  expect(d.sendEmail).toHaveBeenCalledTimes(1);
+  expect(d.__stored()).toEqual(before);
+  log.mockRestore();
+});
+
+test('seed reminder retains singular grammar and excludes received items', () => {
+  const text = reminderBodyText({
+    bodyTemplate: SITE_VISIT_MATERIALS_REMINDER_SEED_BODY,
+    institution: 'U', title: 'T', visitStartIso: '2026-10-07T16:00:00Z',
+    timeZone: 'America/Los_Angeles', dueAt: '2026-10-05T16:00:00Z',
+    missing: [{ label: 'Presentation source (PowerPoint or Keynote)' }],
+  });
+  expect(text).toBe('A reminder for the W. M. Keck Foundation site visit for "T" (U) on Wednesday, October 7, 2026. The following item is still needed (due Monday, October 5, 2026):\n\n  - Presentation source (PowerPoint or Keynote)\n\nThank you.');
 });
 
 test('summarizeCollection keeps state, counts, and the window; drops the link, contacts, and per-item detail; waived items leave the denominator', async () => {
@@ -237,4 +331,27 @@ test('projectCollection reports a past closes_at as closed even while the row st
   const row = { id: 'c', request_id: REQUEST_ID, site_visit_activity_id: VISIT_ID, status: 'open', due_at: '2026-10-05T19:00:00Z', closes_at: '2026-10-14T19:00:00Z', checklist: [], contacts: {}, created_at: NOW };
   expect(projectCollection(row, { now: new Date('2026-10-15T00:00:00Z') }).state).toBe('closed');
   expect(projectCollection(row, { now: new Date('2026-10-10T00:00:00Z') }).state).toBe('received');
+});
+
+test('the signature token uses the sending PC preference, with the PC name as fallback', async () => {
+  jest.resetModules();
+  const getByIdWithSelect = jest.fn(async () => ({ systemuserid: ACTOR, fullname: 'Casey Coordinator', internalemailaddress: 'pc@wmkeck.org', isdisabled: false }));
+  const resolveSystemUserToProfile = jest.fn(async () => 17);
+  const getUserPreferences = jest.fn(async () => ({ email_signature: JSON.stringify({ signature: 'Best,\nCasey Coordinator' }) }));
+  jest.doMock('../../lib/dataverse/adapters/system-user.js', () => ({ getByIdWithSelect }));
+  jest.doMock('../../lib/services/dataverse-identity-map.js', () => ({ resolveSystemUserToProfile }));
+  jest.doMock('../../lib/services/database-service.js', () => ({ DatabaseService: { getUserPreferences } }));
+  try {
+    const { DEFAULT_DEPENDENCIES } = require('../../lib/services/site-visit-materials/collection-service');
+    expect(await DEFAULT_DEPENDENCIES.resolvePcSignature(ACTOR)).toBe('Best,\nCasey Coordinator\nW. M. Keck Foundation');
+    expect(getByIdWithSelect).toHaveBeenCalledWith(ACTOR, 'systemuserid,fullname,internalemailaddress,isdisabled');
+    expect(resolveSystemUserToProfile).toHaveBeenCalledWith(ACTOR);
+    expect(getUserPreferences).toHaveBeenCalledWith(17, false);
+    getUserPreferences.mockResolvedValue({});
+    expect(await DEFAULT_DEPENDENCIES.resolvePcSignature(ACTOR)).toBe('Casey Coordinator\nW. M. Keck Foundation');
+  } finally {
+    jest.dontMock('../../lib/dataverse/adapters/system-user.js');
+    jest.dontMock('../../lib/services/dataverse-identity-map.js');
+    jest.dontMock('../../lib/services/database-service.js');
+  }
 });

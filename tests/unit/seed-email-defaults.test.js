@@ -95,6 +95,22 @@ describe('seed-email-defaults script core', () => {
     expect(DELIBERATION_AGENDA_SEED_SUBJECT).toContain('{{sessionDate}}');
   });
 
+  test('registers both site-visit email families with the previous default wording', async () => {
+    const { EMAIL_DEFAULT_SEED_TEXT } = await import('../../scripts/seed-email-defaults.mjs');
+    const {
+      SITE_VISIT_MATERIALS_INVITE_SEED_BODY,
+      SITE_VISIT_MATERIALS_INVITE_SEED_SUBJECT,
+      SITE_VISIT_MATERIALS_REMINDER_SEED_BODY,
+      SITE_VISIT_MATERIALS_REMINDER_SEED_SUBJECT,
+    } = await import('../../lib/seed/email-defaults/site-visit-materials.js');
+    expect(EMAIL_DEFAULT_SEED_TEXT['email.site_visit_materials_invite.subject']).toBe(SITE_VISIT_MATERIALS_INVITE_SEED_SUBJECT);
+    expect(EMAIL_DEFAULT_SEED_TEXT['email.site_visit_materials_invite.body']).toBe(SITE_VISIT_MATERIALS_INVITE_SEED_BODY);
+    expect(EMAIL_DEFAULT_SEED_TEXT['email.site_visit_materials_reminder.subject']).toBe(SITE_VISIT_MATERIALS_REMINDER_SEED_SUBJECT);
+    expect(EMAIL_DEFAULT_SEED_TEXT['email.site_visit_materials_reminder.body']).toBe(SITE_VISIT_MATERIALS_REMINDER_SEED_BODY);
+    expect(SITE_VISIT_MATERIALS_INVITE_SEED_BODY).toContain('No login is needed. You may forward the link below');
+    expect(SITE_VISIT_MATERIALS_REMINDER_SEED_BODY).toContain('The following {{missingItemsGrammar}} still needed');
+  });
+
   test('does not overwrite existing non-empty settings', async () => {
     const { EDITABLE_TEXT_DEFAULTS } = await import('../../shared/config/editableTextDefaults.js');
     const { seedEmailDefaults } = await import('../../scripts/seed-email-defaults.mjs');

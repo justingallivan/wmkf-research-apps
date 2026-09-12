@@ -27,4 +27,30 @@ describe('editableTextDefaults catalog grouping metadata', () => {
       expect(entry.key.startsWith(`${entry.emailKey}.`)).toBe(true);
     },
   );
+
+  test('site-visit invitation and reminder keys are grouped with applicant-facing mail and advertise mustache tokens only', () => {
+    const keys = [
+      'email.site_visit_materials_invite.subject',
+      'email.site_visit_materials_invite.body',
+      'email.site_visit_materials_reminder.subject',
+      'email.site_visit_materials_reminder.body',
+    ];
+    const entries = keys.map((key) => EDITABLE_TEXT_DEFAULTS.find((entry) => entry.key === key));
+    expect(entries.every(Boolean)).toBe(true);
+    expect(entries.map((entry) => entry.group)).toEqual(['grantees', 'grantees', 'grantees', 'grantees']);
+    expect(entries.map((entry) => entry.emailKey)).toEqual([
+      'email.site_visit_materials_invite', 'email.site_visit_materials_invite',
+      'email.site_visit_materials_reminder', 'email.site_visit_materials_reminder',
+    ]);
+    expect(entries[1].placeholders).toEqual(expect.arrayContaining([
+      '{{proposalTitle}}', '{{institution}}', '{{visitDate}}', '{{dueDate}}',
+      '{{checklist}}', '{{uploadLink}}', '{{signature}}',
+    ]));
+    expect(entries[3].placeholders).toEqual(expect.arrayContaining([
+      '{{missingItemsGrammar}}', '{{missingItems}}', '{{uploadLink}}', '{{signature}}',
+    ]));
+    for (const entry of entries) {
+      expect(entry.placeholders.every((placeholder) => /^\{\{[A-Za-z]+\}\}$/.test(placeholder))).toBe(true);
+    }
+  });
 });

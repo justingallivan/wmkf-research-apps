@@ -1,5 +1,6 @@
 /** @jest-environment node */
 import { sweepMaterialsReminders } from '../../lib/services/site-visit-materials/reminder-sweep';
+import { prepareMaterialsReminderEmail } from '../../lib/services/site-visit-materials/collection-service';
 import { SITE_VISIT_MATERIALS_CHECKLIST } from '../../shared/config/siteVisitMaterials';
 import { REQUEST_DOCUMENT_ARTIFACT_TYPE, REQUEST_DOCUMENT_LIFECYCLE_STATE, REQUEST_DOCUMENT_OPERATION_STATUS } from '../../shared/config/requestDocument';
 
@@ -29,6 +30,7 @@ function deps(overrides = {}) {
     findActiveSiteVisit: jest.fn(async () => ({ scheduledstart: '2026-10-07T16:00:00Z', wmkf_ianatimezone: 'America/Los_Angeles' })),
     getSender: jest.fn(async () => ({ email: 'pc@wmkeck.org', systemUserId: PC })),
     canReadLink: jest.fn(() => true),
+    prepareReminder: jest.fn(async () => ({ subject: 'Configured reminder', bodyText: 'Configured body', url: 'https://apps.test/materials' })),
     sendReminder: jest.fn(async () => 'email-1'),
     now: () => NOW,
     ...overrides,
@@ -40,11 +42,14 @@ test('claims before sending, names only the missing items, sends from the creati
   const result = await sweepMaterialsReminders({}, d);
   expect(d.listDue).toHaveBeenCalledWith(NOW);
   expect(d.claim).toHaveBeenCalledWith('c1', NOW);
+  expect(d.prepareReminder.mock.invocationCallOrder[0]).toBeLessThan(d.claim.mock.invocationCallOrder[0]);
   expect(d.claim.mock.invocationCallOrder[0]).toBeLessThan(d.sendReminder.mock.invocationCallOrder[0]);
   expect(d.findActiveSiteVisit.mock.invocationCallOrder[0]).toBeLessThan(d.claim.mock.invocationCallOrder[0]);
+  const prep = d.prepareReminder.mock.calls[0][0];
+  expect(prep.missing.map((item) => item.key)).toEqual(['presentation_source', 'participant_bios']);
+  expect(prep).toMatchObject({ actorId: PC, request: REQUEST });
   const args = d.sendReminder.mock.calls[0][0];
-  expect(args.missing.map((item) => item.key)).toEqual(['presentation_source', 'participant_bios']);
-  expect(args).toMatchObject({ fromEmail: 'pc@wmkeck.org', actorId: PC, sequence: 1, request: REQUEST });
+  expect(args).toMatchObject({ fromEmail: 'pc@wmkeck.org', actorId: PC, sequence: 1, prepared: { subject: 'Configured reminder', bodyText: 'Configured body' } });
   expect(args.row.reminder_count).toBe(1);
   expect(d.attachEmailId).toHaveBeenCalledWith('c1', 'email-1');
   expect(result).toMatchObject({ scanned: 1, eligible: 1, sent: 1, sendFailed: 0, receiptFailed: 0, claimLost: 0, errors: [] });
@@ -77,11 +82,32 @@ test('dryRun reports eligibility and never claims or sends; readiness off skips 
   expect(await sweepMaterialsReminders({ dryRun: true }, d)).toMatchObject({ dryRun: true, eligible: 1, sent: 0 });
   expect(d.claim).not.toHaveBeenCalled();
   expect(d.sendReminder).not.toHaveBeenCalled();
+  expect(d.prepareReminder).not.toHaveBeenCalled();
   const off = deps({ schemaReady: () => false });
   expect(await sweepMaterialsReminders({}, off)).toMatchObject({ skipped: 'schema_not_ready', scanned: 0 });
   expect(off.listDue).not.toHaveBeenCalled();
   const many = deps({ listDue: async () => [row({ id: 'c1' }), row({ id: 'c2' }), row({ id: 'c3' })] });
   expect(await sweepMaterialsReminders({ maxBatch: 2 }, many)).toMatchObject({ scanned: 2, sent: 2 });
+});
+
+test('blank required default leaves the automatic reminder unclaimed and unsent', async () => {
+  const log = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+  const readEmailDefaults = jest.fn(async () => ({ ok: false, values: {}, failures: [{ key: 'email.site_visit_materials_reminder.body', reason: 'blank' }] }));
+  const d = deps({ prepareReminder: jest.fn((args) => prepareMaterialsReminderEmail(args, {
+    unseal: () => 'jwt',
+    buildContributorUrl: () => 'https://apps.test/materials/jwt',
+    readEmailDefaults,
+  })) });
+  const result = await sweepMaterialsReminders({}, d);
+  expect(result).toMatchObject({ scanned: 1, eligible: 0, sent: 0, sendFailed: 0, errors: [{ id: 'c1', error: 'Required email defaults are unavailable. Ask an admin to check Email defaults.' }] });
+  expect(readEmailDefaults).toHaveBeenCalledWith(
+    ['email.site_visit_materials_reminder.subject', 'email.site_visit_materials_reminder.body'],
+    { source: 'site-visit-materials:reminder' },
+  );
+  expect(d.claim).not.toHaveBeenCalled();
+  expect(d.sendReminder).not.toHaveBeenCalled();
+  expect(d.attachEmailId).not.toHaveBeenCalled();
+  log.mockRestore();
 });
 
 test('the default sender lookup refuses a disabled or mailbox-less creator', async () => {
@@ -101,7 +127,7 @@ test('a failed site-visit read does not consume the claim: the reminder still se
   const result = await sweepMaterialsReminders({}, d);
   expect(result).toMatchObject({ eligible: 1, sent: 1, sendFailed: 0, errors: [] });
   expect(d.claim).toHaveBeenCalledTimes(1);
-  expect(d.sendReminder.mock.calls[0][0].visit).toBeNull();
+  expect(d.prepareReminder.mock.calls[0][0].visit).toBeNull();
   log.mockRestore();
 });
 

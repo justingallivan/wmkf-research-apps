@@ -16,6 +16,12 @@ import {
   GRANTEE_REMINDER_SEED_SUBJECT,
 } from '../lib/seed/email-defaults/grantee-reminder.js';
 import {
+  SITE_VISIT_MATERIALS_INVITE_SEED_BODY,
+  SITE_VISIT_MATERIALS_INVITE_SEED_SUBJECT,
+  SITE_VISIT_MATERIALS_REMINDER_SEED_BODY,
+  SITE_VISIT_MATERIALS_REMINDER_SEED_SUBJECT,
+} from '../lib/seed/email-defaults/site-visit-materials.js';
+import {
   REVIEWER_REMINDER_RESPOND_BY_SEED_BODY,
   REVIEWER_REMINDER_RESPOND_BY_SEED_SUBJECT,
   REVIEWER_REMINDER_REVIEW_DUE_SEED_BODY,
@@ -71,6 +77,10 @@ export const EMAIL_DEFAULT_SEED_TEXT = Object.freeze({
   'email.reviewer_thankyou.body': REVIEWER_THANKYOU_SEED_BODY,
   'email.grantee_reminder.subject': GRANTEE_REMINDER_SEED_SUBJECT,
   'email.grantee_reminder.body': GRANTEE_REMINDER_SEED_BODY,
+  'email.site_visit_materials_invite.subject': SITE_VISIT_MATERIALS_INVITE_SEED_SUBJECT,
+  'email.site_visit_materials_invite.body': SITE_VISIT_MATERIALS_INVITE_SEED_BODY,
+  'email.site_visit_materials_reminder.subject': SITE_VISIT_MATERIALS_REMINDER_SEED_SUBJECT,
+  'email.site_visit_materials_reminder.body': SITE_VISIT_MATERIALS_REMINDER_SEED_BODY,
   'email.deliberation_agenda.subject': DELIBERATION_AGENDA_SEED_SUBJECT,
   'email.deliberation_agenda.body': DELIBERATION_AGENDA_SEED_BODY,
 });
