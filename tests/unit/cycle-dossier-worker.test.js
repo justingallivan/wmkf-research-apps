@@ -89,7 +89,8 @@ test('operator stop firing during an in-flight paid call aborts the poll signal 
     expect(store.readDossierControl.mock.calls.length).toBe(readsBefore + 1);
     expect(signal.aborted).toBe(true);
     expect(signal.reason).toMatchObject({ interrupted: true });
-    expect(run.data.items[0]).toMatchObject({ status: 'queued', error: null });
+    expect(run.data.items[0]).toMatchObject({ status: 'queued', error: null, paidInFlight: true, unknownCost: true, reservationUsd: 2 });
+    expect(run.data.reservedUsd).toBe(2);
     expect(storage.storeDossierJSON).not.toHaveBeenCalled();
     expect(jest.getTimerCount()).toBe(0);
   } finally {
