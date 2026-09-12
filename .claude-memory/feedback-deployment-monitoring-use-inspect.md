@@ -1,12 +1,12 @@
 ---
 name: feedback-deployment-monitoring-use-inspect
-description: "When checking a Vercel deploy after a push, inspect the deployment directly rather than polling a fragile grep over the deployment listing; re-check current CLI output before parsing it."
+description: "Waiting on a deploy or on PR checks: use the tool's own blocking wait (vercel inspect --wait, gh pr checks --watch) in a background command and act on the completion notification; never a home-rolled foreground poll loop that parses listings and merges in the same call."
 metadata: 
   node_type: memory
   type: feedback
   status: active
   scope: global
-  last_verified: 2026-06-18 via session-feedback
+  last_verified: 2026-09-12 (S509) — owner: "Your tracking of deploys keeps failing. They finish and you don't notice them."
   originSessionId: a647b42e-0a37-4ef2-8e1d-ee1f87fb8990
 ---
 
@@ -27,6 +27,20 @@ window, or `vercel ls` emits no parseable line for that hash at that moment), so
 printed "pending" and the loop ran to its full multi-minute cap — even though the deploy was
 Ready in ~30s. Justin flagged it: "you're waiting on a signal that never comes." Even
 `vercel ls | grep Production` returned empty intermittently.
+
+**Recurrence (S509, 2026-09-12):** the same failure class on `gh pr checks`. I wrapped
+`gh pr checks <n>` in a `for … sleep 10` loop with tab-field parsing, ran it as one
+foreground Bash call (up to 15 min) and chained `gh pr merge` onto it. The owner:
+"Your tracking of deploys keeps failing. They finish and you don't notice them. I
+think you need a new strategy." The strategy that replaces it, for every wait on
+external state:
+1. Use the tool's own wait primitive: `gh pr checks <n> --watch --fail-fast` (exits
+   when checks finish), `vercel inspect <url> --wait` (blocks until the deploy
+   completes), `gh run watch <id>`.
+2. Run it with `run_in_background: true` so the session gets a completion
+   notification and the owner is never blocked behind the wait.
+3. Merge / redeploy / verify in a SEPARATE step after the notification, never in
+   the same command as the wait.
 
 **How to apply:**
 - Prefer a direct deployment inspection for a one-shot status check; obtain the URL

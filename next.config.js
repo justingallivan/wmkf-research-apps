@@ -128,6 +128,18 @@ const nextConfig = {
           },
         ],
       },
+      {
+        // The Cycle Dossier page previews an edition PDF in a same-origin
+        // iframe; the global DENY would blank it. Later rules override
+        // earlier ones for the same header key. Still no cross-site framing.
+        source: '/api/cycle-dossier/download',
+        headers: [
+          {
+            key: 'X-Frame-Options',
+            value: 'SAMEORIGIN',
+          },
+        ],
+      },
     ]
   },
 }

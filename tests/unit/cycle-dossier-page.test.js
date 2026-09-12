@@ -278,6 +278,30 @@ describe('cycle dossier page', () => {
     expect(screen.queryByRole('heading', { name: 'Choose requests' })).not.toBeInTheDocument();
   });
 
+  it('Include all persists the whole roster as the selection and Exclude all empties it', async () => {
+    const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue(response(dossierResponse(['b'])));
+    render(<CycleDossierWorkspace />);
+    await waitFor(() => expect(screen.getByText('1 of 2 included')).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: 'Include all' }));
+    await waitFor(() => expect(screen.getByText('2 of 2 included')).toBeInTheDocument());
+    const saveCall = fetchMock.mock.calls.find(([, init]) => init?.body && JSON.parse(init.body).action === 'selection');
+    expect(JSON.parse(saveCall[1].body).selectedRequestIds.sort()).toEqual(['a', 'b']);
+    expect(screen.getByRole('button', { name: 'Include all' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Exclude all' }));
+    await waitFor(() => expect(screen.getByText('0 of 2 included')).toBeInTheDocument());
+    const last = JSON.parse(fetchMock.mock.calls.at(-1)[1].body);
+    expect(last).toMatchObject({ action: 'selection', selectedRequestIds: [] });
+  });
+
+  it('edition cards name the requests they contain and the section says editions span all runs', async () => {
+    const edition = { id: 'ed-1', createdAt: '2026-09-12T18:14:01Z', status: 'complete', missing: [], fallback: [], requestNumbers: ['1002852'] };
+    jest.spyOn(global, 'fetch').mockResolvedValue(response(dossierResponse(['b'], { editions: [edition] })));
+    render(<CycleDossierWorkspace />);
+    await waitFor(() => expect(screen.getByTestId('cycle-dossier-edition-contents')).toHaveTextContent('1 entry: #1002852'));
+    expect(screen.getByRole('heading', { name: 'Dossier editions' })).toBeInTheDocument();
+    expect(screen.getByText(/combined document for the requests selected at that launch, across all your runs/)).toBeInTheDocument();
+  });
+
   it('stays on the Choose requests tab on first load when the latest run is completed', async () => {
     const completedRun = { id: 'run-2', status: 'completed', items: [] };
     jest.spyOn(global, 'fetch').mockResolvedValue(response(dossierResponse(['b'], { runs: [completedRun] })));
