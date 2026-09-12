@@ -1320,7 +1320,7 @@ function ModelConfigSection() {
     <>
       <div className="flex items-center justify-between mb-4">
         <p className="text-xs text-gray-500">
-          Tier picks (Opus / Sonnet / Haiku) auto-track the latest model in that family. Pin a specific version only if you need to reproduce historical behavior. Changes take effect within 5 minutes.
+          Tier picks (Fable / Opus / Sonnet / Haiku) auto-track the latest model in that family. Pin a specific version only if you need to reproduce historical behavior. Changes take effect within 5 minutes.
         </p>
         <div className="flex items-center gap-2 ml-3 shrink-0">
           <button
