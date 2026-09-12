@@ -51,8 +51,13 @@ sequence.
   sharp 0.35.4, qs 6.16.0, js-yaml 3.15.2/4.3.2) and csv-parse 7.0.2 (a mistaken major
   with no breaking changes; the IRS BMF importer's option set was smoke-tested but the
   importer has no unit test and was not re-run against a live IRS file) shipped in S509.
-  The `@tiptap/core` prototype-pollution alert (GHSA-cp6q-959q-f8rh) requires the tiptap 3
-  editor migration, tracked in its own PR.
+  The `@tiptap/core` prototype-pollution alert (GHSA-cp6q-959q-f8rh) was closed by the
+  tiptap 2 → 3.31 editor migration (same day): StarterKit's new bundled link/underline/
+  trailingNode/listKeymap are disabled to hold each editor's allowlist, `setContent` uses
+  `{ emitUpdate: false }`, `shouldRerenderOnTransaction: true` keeps toolbar state live,
+  and the Markdown serializer imports `prosemirror-markdown` directly (the `@tiptap/pm/
+  markdown` subpath is gone). Owner eyeball of the reviewer and grantee editors in
+  production is still pending; the Playwright authoring spec was not run locally.
 - **Unescaped `Content-Disposition` filenames on five download/export routes (found 2026-09-12, S509).**
   `pages/api/cycle-dossier/download.js` now uses `lib/utils/content-disposition.js`
   (ASCII quoted fallback plus RFC 5987 `filename*`). The same raw interpolation or a
