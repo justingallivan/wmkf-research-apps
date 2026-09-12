@@ -141,3 +141,36 @@ test('revoked owner stops even when a real queued request exists',async()=>{
   await drainCycleDossiers();
   expect(generateResearch).not.toHaveBeenCalled();expect(store.stopRevokedDossierRun).toHaveBeenCalledWith('run','token');
 });
+
+const publishFixture=()=>{
+  const {resolveDossierDestination}=require('../../lib/services/cycle-dossier-sharepoint');
+  const {GraphService}=require('../../lib/services/graph-service');
+  // Postgres JSONB returns object keys sorted by length then bytewise, so the
+  // persisted destination never stringifies the way the live resolver's does.
+  const live={library:'akoya_request',folder:'1001_GUID',siteId:'site',driveId:'drive',requestFolderId:'f'};
+  const persisted={driveId:'drive',folder:'1001_GUID',siteId:'site',library:'akoya_request',requestFolderId:'f'};
+  resolveDossierDestination.mockResolvedValue(live);
+  const bytes=Buffer.from('word');
+  storage.readDossierFile.mockResolvedValue(bytes);
+  GraphService.ensureFolderPath.mockResolvedValue({siteId:'site',driveId:'drive'});
+  GraphService.uploadFile.mockResolvedValue({id:'file',driveId:'drive'});
+  GraphService.downloadFile.mockResolvedValue({buffer:bytes});
+  const ref={pathname:'p',sha256:storage.dossierDigest(bytes),size:4};
+  Object.assign(run.data.items[0],{stage:'rendered',revision:1,researchRef:{pathname:'research'},payloadRef:{pathname:'payload'},files:{docx:ref,pdf:ref},
+    destination:persisted,destinationHash:storage.dossierDigest(live)});
+  return {GraphService};
+};
+test('publish accepts a JSONB-reordered destination through its stored hash',async()=>{
+  const {GraphService}=publishFixture();
+  await drainCycleDossiers();
+  expect(GraphService.uploadFile).toHaveBeenCalled();
+  expect(run.data.items[0].sharepoint.docx).toBeTruthy();
+});
+test('publish refuses an item persisted without a destination hash before any SharePoint write',async()=>{
+  const {GraphService}=publishFixture();
+  delete run.data.items[0].destinationHash;
+  await drainCycleDossiers();
+  expect(GraphService.uploadFile).not.toHaveBeenCalled();
+  expect(run.data.items[0]).toMatchObject({status:'failed'});
+  expect(run.data.items[0].error).toMatch(/destination changed/i);
+});
