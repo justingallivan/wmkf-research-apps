@@ -143,10 +143,11 @@ test('revoked owner stops even when a real queued request exists',async()=>{
 });
 
 const JSZip=require('jszip');
-async function docxZip({body='<w:document>frozen</w:document>',core='<cp:coreProperties/>',extra={}}={}){
+const DOC_RELS='<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml" Id="rId1"/><Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://doi.org/10.1/x" TargetMode="External" Id="rId2"/></Relationships>';
+async function docxZip({body='<w:document>frozen</w:document>',core='<cp:coreProperties/>',rels=DOC_RELS,extra={}}={}){
   const zip=new JSZip();
   zip.file('[Content_Types].xml','<Types/>'); zip.file('_rels/.rels','<Relationships/>');
-  zip.file('word/document.xml',body); zip.file('word/styles.xml','<w:styles/>'); zip.file('docProps/core.xml',core);
+  zip.file('word/document.xml',body); zip.file('word/styles.xml','<w:styles/>'); zip.file('word/_rels/document.xml.rels',rels); zip.file('docProps/core.xml',core);
   for(const [k,v] of Object.entries(extra)) zip.file(k,v);
   return zip.generateAsync({type:'nodebuffer'});
 }
@@ -187,7 +188,10 @@ test('publish refuses an item persisted without a destination hash before any Sh
 test('publish accepts a DOCX that SharePoint rewrote in its property-promotion parts and records both hashes',async()=>{
   // Mirrors what SharePoint Online does on upload: core properties change and a
   // customXml item is added; the word/ parts are untouched.
-  const observedDocx=await docxZip({core:'<cp:coreProperties><cp:contentType>Document</cp:contentType></cp:coreProperties>',extra:{'customXml/item1.xml':'<p:properties/>','customXml/_rels/item1.xml.rels':'<Relationships/>'}});
+  // SharePoint also appends customXml relationships to word/_rels/document.xml.rels
+  // and may reorder/reformat the surviving entries (observed 2026-09-12).
+  const rewrittenRels='<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml" Target="../customXml/item1.xml" Id="rId13" /><Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://doi.org/10.1/x" TargetMode="External" Id="rId2" /><Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml" Id="rId1" /></Relationships>';
+  const observedDocx=await docxZip({core:'<cp:coreProperties><cp:contentType>Document</cp:contentType></cp:coreProperties>',rels:rewrittenRels,extra:{'customXml/item1.xml':'<p:properties/>','customXml/_rels/item1.xml.rels':'<Relationships/>'}});
   const {frozen}=await publishFixture({observedDocx});
   expect(storage.dossierDigest(observedDocx)).not.toBe(storage.dossierDigest(frozen.docx));
   await drainCycleDossiers();
@@ -209,4 +213,15 @@ test('publish refuses a PDF with any byte change',async()=>{
   expect(run.data.items[0].sharepoint.docx).toBeTruthy();
   expect(run.data.items[0].sharepoint?.pdf).toBeUndefined();
   expect(run.data.items[0].error).toMatch(/differs from the frozen entry/i);
+});
+
+test('publish refuses a DOCX whose non-customXml relationships changed and names the part',async()=>{
+  const warn=jest.spyOn(console,'warn').mockImplementation(()=>{});
+  const observedDocx=await docxZip({rels:DOC_RELS.replace('https://doi.org/10.1/x','https://evil.example/x')});
+  await publishFixture({observedDocx});
+  await drainCycleDossiers();
+  expect(run.data.items[0]).toMatchObject({status:'failed'});
+  expect(run.data.items[0].error).toMatch(/differs from the frozen entry/i);
+  expect(warn.mock.calls.map(c=>c.join(' ')).join('\n')).toMatch(/word\/_rels\/document\.xml\.rels/);
+  warn.mockRestore();
 });
