@@ -142,7 +142,15 @@ test('revoked owner stops even when a real queued request exists',async()=>{
   expect(generateResearch).not.toHaveBeenCalled();expect(store.stopRevokedDossierRun).toHaveBeenCalledWith('run','token');
 });
 
-const publishFixture=()=>{
+const JSZip=require('jszip');
+async function docxZip({body='<w:document>frozen</w:document>',core='<cp:coreProperties/>',extra={}}={}){
+  const zip=new JSZip();
+  zip.file('[Content_Types].xml','<Types/>'); zip.file('_rels/.rels','<Relationships/>');
+  zip.file('word/document.xml',body); zip.file('word/styles.xml','<w:styles/>'); zip.file('docProps/core.xml',core);
+  for(const [k,v] of Object.entries(extra)) zip.file(k,v);
+  return zip.generateAsync({type:'nodebuffer'});
+}
+async function publishFixture({observedDocx,observedPdf}={}){
   const {resolveDossierDestination}=require('../../lib/services/cycle-dossier-sharepoint');
   const {GraphService}=require('../../lib/services/graph-service');
   // Postgres JSONB returns object keys sorted by length then bytewise, so the
@@ -150,27 +158,55 @@ const publishFixture=()=>{
   const live={library:'akoya_request',folder:'1001_GUID',siteId:'site',driveId:'drive',requestFolderId:'f'};
   const persisted={driveId:'drive',folder:'1001_GUID',siteId:'site',library:'akoya_request',requestFolderId:'f'};
   resolveDossierDestination.mockResolvedValue(live);
-  const bytes=Buffer.from('word');
-  storage.readDossierFile.mockResolvedValue(bytes);
+  const frozen={docx:await docxZip(),pdf:Buffer.from('%PDF-frozen')};
+  const observed={docx:observedDocx||frozen.docx,pdf:observedPdf||frozen.pdf};
+  const refs={docx:{pathname:'p.docx',sha256:storage.dossierDigest(frozen.docx),size:frozen.docx.length},pdf:{pathname:'p.pdf',sha256:storage.dossierDigest(frozen.pdf),size:frozen.pdf.length}};
+  storage.readDossierFile.mockImplementation(async ref=>frozen[ref.pathname.endsWith('docx')?'docx':'pdf']);
   GraphService.ensureFolderPath.mockResolvedValue({siteId:'site',driveId:'drive'});
-  GraphService.uploadFile.mockResolvedValue({id:'file',driveId:'drive'});
-  GraphService.downloadFile.mockResolvedValue({buffer:bytes});
-  const ref={pathname:'p',sha256:storage.dossierDigest(bytes),size:4};
-  Object.assign(run.data.items[0],{stage:'rendered',revision:1,researchRef:{pathname:'research'},payloadRef:{pathname:'payload'},files:{docx:ref,pdf:ref},
+  GraphService.uploadFile.mockImplementation(async(lib,folder,name)=>({id:`file-${name.split('.').pop()}`,driveId:'drive'}));
+  GraphService.downloadFile.mockImplementation(async(driveId,id)=>({buffer:observed[id.endsWith('docx')?'docx':'pdf']}));
+  Object.assign(run.data.items[0],{stage:'rendered',revision:1,researchRef:{pathname:'research'},payloadRef:{pathname:'payload'},files:refs,
     destination:persisted,destinationHash:storage.dossierDigest(live)});
-  return {GraphService};
-};
+  return {GraphService,frozen};
+}
 test('publish accepts a JSONB-reordered destination through its stored hash',async()=>{
-  const {GraphService}=publishFixture();
+  const {GraphService}=await publishFixture();
   await drainCycleDossiers();
-  expect(GraphService.uploadFile).toHaveBeenCalled();
+  expect(GraphService.uploadFile).toHaveBeenCalledTimes(2);
   expect(run.data.items[0].sharepoint.docx).toBeTruthy();
+  expect(run.data.items[0].sharepoint.pdf).toBeTruthy();
 });
 test('publish refuses an item persisted without a destination hash before any SharePoint write',async()=>{
-  const {GraphService}=publishFixture();
+  const {GraphService}=await publishFixture();
   delete run.data.items[0].destinationHash;
   await drainCycleDossiers();
   expect(GraphService.uploadFile).not.toHaveBeenCalled();
   expect(run.data.items[0]).toMatchObject({status:'failed'});
   expect(run.data.items[0].error).toMatch(/destination changed/i);
+});
+test('publish accepts a DOCX that SharePoint rewrote in its property-promotion parts and records both hashes',async()=>{
+  // Mirrors what SharePoint Online does on upload: core properties change and a
+  // customXml item is added; the word/ parts are untouched.
+  const observedDocx=await docxZip({core:'<cp:coreProperties><cp:contentType>Document</cp:contentType></cp:coreProperties>',extra:{'customXml/item1.xml':'<p:properties/>','customXml/_rels/item1.xml.rels':'<Relationships/>'}});
+  const {frozen}=await publishFixture({observedDocx});
+  expect(storage.dossierDigest(observedDocx)).not.toBe(storage.dossierDigest(frozen.docx));
+  await drainCycleDossiers();
+  const saved=run.data.items[0].sharepoint.docx;
+  expect(run.data.items[0].error).toBeNull();
+  expect(saved).toMatchObject({sha256:storage.dossierDigest(frozen.docx),publishedSha256:storage.dossierDigest(observedDocx),publishedSize:observedDocx.length});
+});
+test('publish still refuses a DOCX whose document body differs from the frozen entry',async()=>{
+  const observedDocx=await docxZip({body:'<w:document>tampered</w:document>'});
+  await publishFixture({observedDocx});
+  await drainCycleDossiers();
+  expect(run.data.items[0]).toMatchObject({status:'failed'});
+  expect(run.data.items[0].error).toMatch(/differs from the frozen entry/i);
+  expect(run.data.items[0].sharepoint?.docx).toBeUndefined();
+});
+test('publish refuses a PDF with any byte change',async()=>{
+  await publishFixture({observedPdf:Buffer.from('%PDF-changed')});
+  await drainCycleDossiers();
+  expect(run.data.items[0].sharepoint.docx).toBeTruthy();
+  expect(run.data.items[0].sharepoint?.pdf).toBeUndefined();
+  expect(run.data.items[0].error).toMatch(/differs from the frozen entry/i);
 });

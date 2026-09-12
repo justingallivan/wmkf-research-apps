@@ -125,6 +125,8 @@ fields, and sandbox/prod assumptions. The Atlas adjudicates live data state.
 
 ## Operating Notes
 
+- **SharePoint Online rewrites Office packages on upload.** Document property promotion edits `docProps/`, `customXml/`, `_rels/.rels`, and `[Content_Types].xml` inside a DOCX/XLSX/PPTX, so the bytes Graph serves back never hash-match what was uploaded; PDFs and other non-Office files are stored verbatim. Verify Office uploads structurally (the Cycle Dossier worker compares decompressed `word/` parts, `lib/services/cycle-dossier-worker.js`), never by package SHA-256. Observed on the first Cycle Dossier production smoke, 2026-09-12.
+
 - **Dynamics Explorer restriction management lives in Admin, not on the Explorer page
   (Codex PR #151, `3fc0a936`, production 2026-09-05).** The Explorer page's inline "Admin
   Panel" toggle was removed; `pages/admin.js` gained a **Dynamics safeguards** section
