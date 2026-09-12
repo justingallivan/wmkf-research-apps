@@ -10,6 +10,14 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## September 2026 — Cycle Dossier superuser pilot live and enabled in production; eight PRs promoted in one owner session (Session 507)
+
+**Milestone:** The D26 Cycle Dossier pilot (Codex build, Session 499 reconcile, parked 292 commits behind main) was merged onto current main, reviewed twice, activated in production smoke mode, and passed a fully green 13-check preflight against request 1002852 — no run launched yet. Same session: applicant materials PR 3 shipped, the optional "other" upload was hidden, and the PC manual reminder gained a claim-before-send.
+**Sessions:** 507 (Fable orchestrating; Sonnet agents did the trial merge, seam-drift and docs sweeps, the reminder build, and the contract reconcile; Codex adversarial review + fix re-review).
+**Ship state:** PRs #252–#259 merged (`3b41f879` … `9c5943ae`); migration 045 applied in production; `CYCLE_DOSSIER_ENABLED=true`, smoke mode, operator profile 2, allowlist 1002852; prompts `cycle-dossier.*` v1 verified exact; drain cron live (idle `{"claimed":0}`); PR #179 superseded. Accepted-for-smoke residuals (stop inside LLM retries, retention, cron cadence) tracked as work queue item 11.
+**Why it matters:** The first scientific-briefing dossier can be generated on demand this weekend from the frozen Proposal Narrative with fenced paid calls and a spend cap, and the applicant-materials path now has staff visibility, auto-close, and a double-send-proof reminder ahead of the 2026-09-14 deliberation week.
+**Pointers:** `docs/CYCLE_DOSSIER_PILOT_DESIGN.md`, PR #259 body (owner smoke sequence), `docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md` §16.3–16.6, `.claude-memory/project-ops-meeting-2026-09-14-agenda.md`, `docs/CURRENT_WORK_QUEUE.md` items 10–11.
+
 ## September 2026 — First real agenda send and first applicant uploads in production; slot-lease SQL incident fixed same night (Session 504)
 
 **Milestone:** The two capabilities shipped in Session 503 were exercised for real: the PC sent a session agenda (ledger `sent`, Dynamics accepted) and an applicant uploaded a PDF and a 37 MB PPTX through the sealed link into `Site Visit -` folders. The first PDF finalize failed in production because the per-slot lease statement passed untyped parameters into `jsonb_build_object` and every test mocked the SQL client; the fix (casts, verified with EXPLAIN against the live schema) shipped within the hour. The same night the owner drove a UX pass on both surfaces: admin-editable agenda email text, grouped and collapsible email defaults, action-button emails and a support link for applicants, drag-and-drop reordering, and two Impeccable critiques that produced the held redesign PRs.
