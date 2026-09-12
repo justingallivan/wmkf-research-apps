@@ -215,6 +215,7 @@ test('no response hides previews and releases without an email by default', asyn
     requestId: REQUEST_ID,
     suggestionIds: [FIRST_ID],
     reason: 'no_response',
+    sendEmail: false,
   });
   expect(onReleased).toHaveBeenCalledWith([{ suggestionId: FIRST_ID, status: 'withdrawn_no_email_by_reason' }]);
   expect(onClose).toHaveBeenCalled();
@@ -280,6 +281,58 @@ test('no response without a courtesy note never requests a preview', async () =>
     requestId: REQUEST_ID,
     suggestionIds: [FIRST_ID],
     reason: 'no_response',
+    sendEmail: false,
   });
   expect(onClose).toHaveBeenCalled();
+});
+
+test('no longer needed defaults to sending the note, and unticking it releases without an email or a preview', async () => {
+  global.fetch.mockResolvedValueOnce(response({
+    ok: true,
+    drafts: [draft(FIRST_ID, 'Dr. First Reviewer', 'first@example.org')],
+  })).mockResolvedValueOnce(response({
+    ok: true,
+    withdrawn: 1,
+    results: [{ suggestionId: FIRST_ID, status: 'withdrawn_no_email_by_reason' }],
+  }));
+  const onClose = jest.fn();
+  const onReleased = jest.fn();
+  render(
+    <ReleaseEmailModal
+      requestId={REQUEST_ID}
+      suggestionIds={[FIRST_ID]}
+      onClose={onClose}
+      onReleased={onReleased}
+    />,
+  );
+
+  fireEvent.click(screen.getByRole('radio', { name: /^No longer needed/ }));
+  const note = screen.getByRole('checkbox', { name: 'Send a courtesy note' });
+  expect(note).toBeChecked();
+  await screen.findByDisplayValue('Subject for Dr. First Reviewer');
+
+  fireEvent.click(note);
+  expect(note).not.toBeChecked();
+  expect(screen.queryByDisplayValue('Subject for Dr. First Reviewer')).not.toBeInTheDocument();
+  expect(screen.getByText('No email will be sent. The invitation is recorded as released by the Foundation.')).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Release (1)' }));
+  await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(2));
+  expect(JSON.parse(global.fetch.mock.calls[1][1].body)).toEqual({
+    requestId: REQUEST_ID,
+    suggestionIds: [FIRST_ID],
+    reason: 'no_longer_needed',
+    sendEmail: false,
+  });
+  expect(onReleased).toHaveBeenCalledWith([{ suggestionId: FIRST_ID, status: 'withdrawn_no_email_by_reason' }]);
+  expect(onClose).toHaveBeenCalled();
+});
+
+test('switching back to No longer needed re-arms the courtesy note default', () => {
+  global.fetch.mockResolvedValue(response({ ok: true, drafts: [] }));
+  render(<ReleaseEmailModal requestId={REQUEST_ID} suggestionIds={[FIRST_ID]} onClose={jest.fn()} onReleased={jest.fn()} />);
+  fireEvent.click(screen.getByRole('radio', { name: /^No response/ }));
+  expect(screen.getByRole('checkbox', { name: 'Also send a courtesy note' })).not.toBeChecked();
+  fireEvent.click(screen.getByRole('radio', { name: /^No longer needed/ }));
+  expect(screen.getByRole('checkbox', { name: 'Send a courtesy note' })).toBeChecked();
 });

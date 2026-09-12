@@ -4,6 +4,7 @@
  * POST /api/review-manager/withdraw-sufficient
  *   body: { requestId: <GUID>, suggestionIds: <GUID[]>,
  *           reason?: 'no_longer_needed'|'no_response',
+ *           sendEmail?: boolean,   // false releases without the courtesy email for either reason
  *           overrides?: { <suggestionId>:
  *             { subject, bodyText, to, from, senderId } } }
  *   → { ok: true, withdrawn: N, results: [{ suggestionId, status, reason }] }
@@ -64,6 +65,10 @@ export default async function handler(req, res) {
   if (!RELEASE_REASON_VALUES.includes(reason)) {
     return res.status(400).json({ error: 'reason must be no_longer_needed or no_response' });
   }
+  const sendEmail = req.body?.sendEmail;
+  if (sendEmail !== undefined && typeof sendEmail !== 'boolean') {
+    return res.status(400).json({ error: 'sendEmail must be a boolean when provided' });
+  }
 
   // Staff edits, keyed by suggestion. Keys are GUID-validated and narrowed to the
   // selected suggestionIds, so a key for an unrelated row is dropped rather than
@@ -120,7 +125,7 @@ export default async function handler(req, res) {
 
   return withDalContext('review-manager-withdraw-sufficient', async () => {
     try {
-      const result = await withdrawSufficient({ requestId, suggestionIds, actingUserSystemId, overrides, reason });
+      const result = await withdrawSufficient({ requestId, suggestionIds, actingUserSystemId, overrides, reason, sendEmail });
       return res.status(200).json(result);
     } catch (error) {
       if (error instanceof ServiceHttpError) {

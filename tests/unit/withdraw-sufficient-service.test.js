@@ -118,6 +118,38 @@ test('happy path: withdrawn_emailed, lifecycle write with ifMatch BEFORE the ema
   }));
 });
 
+test('no-longer-needed release with sendEmail=false writes withdrawn_sufficient and skips the email by choice', async () => {
+  findById.mockResolvedValue(pendingRow());
+
+  const out = await withdrawSufficient({ ...ARGS, sendEmail: false });
+
+  expect(out).toEqual({
+    ok: true,
+    withdrawn: 1,
+    results: [{ suggestionId: SUG, status: 'withdrawn_no_email_by_reason', reason: 'no_longer_needed' }],
+  });
+  expect(updateLifecycle).toHaveBeenCalledWith(
+    SUG,
+    expect.objectContaining({ responseType: 'withdrawn_sufficient', withdrawnSufficientAt: expect.any(String) }),
+    expect.objectContaining({ ifMatch: 'W/"1"', actingUserSystemId: 'u-1' }),
+  );
+  expect(readRequiredEmailDefaults).not.toHaveBeenCalled();
+  expect(renderWithdrawSufficient).not.toHaveBeenCalled();
+  expect(createAndSendEmail).not.toHaveBeenCalled();
+});
+
+test('sendEmail=true on a no-response release without reviewed copy still does not send', async () => {
+  findById.mockResolvedValue(pendingRow());
+
+  const out = await withdrawSufficient({ ...ARGS, reason: 'no_response', sendEmail: true });
+
+  // Email was requested but no reviewed copy was supplied: the release stands,
+  // and the result is the no-PD/no-copy outcome rather than a silent send.
+  expect(out.withdrawn).toBe(1);
+  expect(out.results[0].status).not.toBe('withdrawn_emailed');
+  expect(createAndSendEmail).not.toHaveBeenCalled();
+});
+
 test('no-response release records a deliberate email skip without rendering or sending', async () => {
   findById.mockResolvedValue(pendingRow());
 
