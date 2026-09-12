@@ -147,6 +147,33 @@ test('disabled pilot rejects selection persistence before Postgres write', async
   expect(store.saveDossierSelection).not.toHaveBeenCalled();
 });
 
+test('smoke mode with a request-number allowlist accepts the matching GUID selection', async () => {
+  process.env.CYCLE_DOSSIER_ROLLOUT_MODE = 'smoke';
+  process.env.CYCLE_DOSSIER_OPERATOR_PROFILE_ID = '7';
+  process.env.CYCLE_DOSSIER_REQUEST_ALLOWLIST = 'D26-001';
+  store.saveDossierSelection.mockResolvedValue({ id: 'dossier-1', cycle: 'D26', selection: [ID], latest_edition_id: null });
+  await expect(cycleDossierAction(7, { action: 'selection', selectedRequestIds: [ID] })).resolves.toBeTruthy();
+  expect(store.saveDossierSelection).toHaveBeenCalledWith(7, [ID]);
+});
+
+test('a selection outside the roster cohort is rejected before persistence', async () => {
+  process.env.CYCLE_DOSSIER_REQUEST_ALLOWLIST = 'D26-001';
+  await expect(cycleDossierAction(7, { action: 'selection', selectedRequestIds: [ID2] }))
+    .rejects.toMatchObject({ httpStatus: 400 });
+  expect(store.saveDossierSelection).not.toHaveBeenCalled();
+});
+
+test('resume rejects a cap below what the run has already spent or reserved', async () => {
+  const RUN_ID = '33333333-3333-4333-8333-333333333333';
+  const run = runRow({ id: RUN_ID, status: 'paused', lease_token: null, data: { items: [], spentUsd: 3, reservedUsd: 2, cutPending: false, cutCounter: 0, budgetUsd: 10 } });
+  store.mutateDossierRun.mockImplementation(async (_id, fn) => { await fn(run); return run; });
+  await expect(cycleDossierAction(7, { action: 'resume', runId: RUN_ID, budgetUsd: 4 })).rejects.toMatchObject({ httpStatus: 400 });
+  expect(run.status).toBe('paused');
+  await expect(cycleDossierAction(7, { action: 'resume', runId: RUN_ID, budgetUsd: 5 })).resolves.toBeTruthy();
+  expect(run.status).toBe('queued');
+  expect(run.data.budgetUsd).toBe(5);
+});
+
 test('smoke mode rejects multi-request selection before persistence', async () => {
   process.env.CYCLE_DOSSIER_ROLLOUT_MODE = 'smoke';
   process.env.CYCLE_DOSSIER_OPERATOR_PROFILE_ID = '7';

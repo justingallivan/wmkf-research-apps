@@ -20,7 +20,7 @@ import {
 
 const ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const ID2 = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
-const ROW = { akoya_requestid: ID, akoya_requestnum: 'D26-001', akoya_title: 'A proposal', wmkf_organizationname: 'Example U', _wmkf_projectleader_value_formatted: 'Dr PI', _wmkf_programdirector_value_formatted: 'PD', wmkf_ai_summary: 'summary' };
+const ROW = { akoya_requestid: ID, akoya_requestnum: 'D26-001', akoya_title: 'A proposal', _akoya_applicantid_value_formatted: 'Example U', wmkf_organizationname: 'Bill.com Vendor Name', _wmkf_projectleader_value_formatted: 'Dr PI', _wmkf_programdirector_value_formatted: 'PD', wmkf_ai_summary: 'summary' };
 const narrative = { filename: 'ProposalNarrative_D26-001.pdf', siteId: 'site', driveId: 'drive', itemId: 'item', versionId: 'v1', contentHash: 'abc123', text: 'A'.repeat(200) };
 const rowFor = (name, id) => {
   const definition = name === RESEARCH_PROMPT_NAME ? researchDefinition : entryDefinition;
@@ -39,6 +39,8 @@ beforeEach(() => {
 
 test('prepareRequestInput freezes exact source identity and preserves allowlisted context', async () => {
   const input = await prepareRequestInput(ID);
+  // Institution comes from the Applicant lookup, never the Bill.com organization field.
+  expect(input.institution).toBe('Example U');
   expect(input.narrative).toMatchObject({ filename: narrative.filename, contentHash: 'abc123', text: narrative.text });
   expect(Object.isFrozen(input)).toBe(true);
   expect(Object.isFrozen(input.narrative)).toBe(true);

@@ -174,7 +174,7 @@ export async function runPreflight({
   const config = dossierRolloutConfig(env);
   const allowlist = parseDossierRequestAllowlist(env.CYCLE_DOSSIER_REQUEST_ALLOWLIST || '');
   const checks = {
-    migration: readinessCheck(migration.ok, 'Migration 038 is missing, unlisted, unsorted, or incomplete.'),
+    migration: readinessCheck(migration.ok, 'Migration 045 is missing, unlisted, unsorted, or incomplete.'),
     environment: readinessCheck(environment.ok, environment.reason),
     cohort: readinessCheck(allowlist.length > 0 && (config.mode !== 'smoke' || allowlist.length === 1), config.mode === 'smoke' ? 'Smoke mode requires exactly one allowlisted request.' : 'CYCLE_DOSSIER_REQUEST_ALLOWLIST is empty or malformed.'),
     promptContract: readinessCheck(promptContract.ok, 'The configured dossier model is not an approved structured-output Claude model.'),
@@ -201,7 +201,7 @@ export async function runPreflight({
       try {
         const state = await (dependencies.readSchemaState || defaultReadSchemaState)();
         const schemaReady = REQUIRED_TABLES.every(table => state.tables?.includes(table)) && state.migrationApplied && state.control && state.control.stop_requested === false;
-        checks.schema = readinessCheck(schemaReady, schemaReady ? null : 'Migration 038, all dossier tables, and an un-stopped control row are required.');
+        checks.schema = readinessCheck(schemaReady, schemaReady ? null : 'Migration 045, all dossier tables, and an un-stopped control row are required.');
       } catch (error) { checks.schema = readinessCheck(false, `Schema/control check unavailable: ${error.message}`); }
       try {
         const fetchCurrentPrompt = dependencies.fetchCurrentPrompt || fetchPublishedPromptForPreflight;
