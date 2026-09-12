@@ -663,6 +663,7 @@ test.describe('Program Director reviewer invitation flow', () => {
       requestId: REQUEST_ID,
       suggestionIds: [pending.suggestionId],
       reason: 'no_longer_needed',
+      sendEmail: true,
       overrides: {
         [pending.suggestionId]: {
           subject: 'Reviewed release subject',
