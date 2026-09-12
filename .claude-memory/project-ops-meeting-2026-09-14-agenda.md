@@ -40,3 +40,11 @@ evidence pointer. After the meeting, record the decisions in
    `claimAutomaticReminder`'s shape) or accept. Evidence: PR #252 residuals.
 4. **Optional "other" upload hidden** (PR #253, 2026-09-11): confirm ops agrees
    it stays hidden for this cycle; the cron never reads that slot either way.
+5. **Per-user Dataverse role gap on email create** (found 2026-09-11 on ZZTEST-03). The
+   2026-09-10 21:19 UTC deliberation send by systemuser `73d32260-aa8b-f111-ab0f-70a8a59cded0`
+   (mailbox jsader@wmkeck.org; one role, 15 privileges) failed 403 `0x80040220`: the Customer
+   Voice plugin on email create needs `prvCreateActivity` on `msfp_alert`, evaluated under the
+   impersonated sender (`DYNAMICS_IMPERSONATION_ENABLED` is on in prod). The owner's sends and
+   resend succeed. Ask IT to add that privilege to the thin role or move the user to the standard
+   staff role; anyone else on that role will hit it on their first send. Evidence: read-only
+   ledger probe of `pre_site_distribution_attempts`, S507.
