@@ -68,8 +68,8 @@
 3. **Email send feedback and consistency audit** (work queue item 10): unchanged from S507.
 4. Owner production checks still not eyeballed: Share composer preview and agenda "Exact email"
    preview on 1003222; PR #218 cycle view.
-5. **Verify the two SharePoint files exist** in the request folder (owner saw the DOCX; the PDF
-   upload succeeded per logs but was not eyeballed in SharePoint).
+5. ~~Verify the two SharePoint files exist~~ — DONE: owner confirmed both the DOCX and the PDF in
+   the request's SharePoint folder (2026-09-12, S509).
 
 ### Owner Decision Needed
 

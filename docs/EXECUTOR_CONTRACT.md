@@ -136,6 +136,12 @@ even if a later valid revision has already overtaken it. The closed schema conta
 - `field-primer.generate` (S493, 2026-09-07): timeout-only `timeoutMsOverride`
   (default 240 000 ms). Output tokens stay on the prompt row, so no model
   ceiling applies and publication does not read that prompt.
+- `cycle-dossier.entry` (S509, 2026-09-12): timeout-only `timeoutMsOverride`
+  (default 200 000 ms; envelope 60 000–220 000 ms, the worker's 280 s lease
+  minus its 60 s checkpoint reserve). Read once at preview and pinned into the
+  run's captured config as `budget.entryTimeoutMs`; the research-plan stage
+  keeps its 85 s code default. Added after the 85 s default expired on the
+  first pilot-mode entry call (Request 1002874).
 
 Registry growth is additive: a stored revision published before a prompt name
 was registered stays authoritative for the names it carries, and the reader

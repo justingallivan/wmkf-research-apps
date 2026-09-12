@@ -38,6 +38,7 @@ const EXECUTOR_BUDGET_EDITABLE_FIELDS = {
   'pre-site-visit.proposal-core.generate': ['maxTokensOverride', 'timeoutMsOverride'],
   'review-synthesis.generate': ['floor', 'ceiling'],
   'field-primer.generate': ['timeoutMsOverride'],
+  'cycle-dossier.entry': ['timeoutMsOverride'],
 };
 
 function newRequestId() {
@@ -403,7 +404,10 @@ export function OutputBudgetLine({ prompt, modelCatalog, executorBudgetConfig })
 export function ExecutorBudgetEditor({ config, onPublished }) {
   const standingName = 'pre-site-visit.proposal-core.generate';
   const retryName = 'review-synthesis.generate';
-  const timeoutName = 'field-primer.generate';
+  const timeoutNames = [
+    ['field-primer.generate', 'Field primer timeout (milliseconds)'],
+    ['cycle-dossier.entry', 'Cycle Dossier entry timeout (milliseconds)'],
+  ];
   const [values, setValues] = useState(() => config?.budgets || {});
   const [baseBudgets, setBaseBudgets] = useState(() => config?.budgets || {});
   const [baseRevision, setBaseRevision] = useState(() => configRevision(config));
@@ -418,14 +422,13 @@ export function ExecutorBudgetEditor({ config, onPublished }) {
     : conflictConfig;
   const standing = values[standingName] || {};
   const retry = values[retryName] || {};
-  const timeoutOnly = values[timeoutName] || {};
   const limits = config.limits || {};
   const integers = [
     standing.maxTokensOverride,
     standing.timeoutMsOverride,
     retry.floor,
     retry.ceiling,
-    timeoutOnly.timeoutMsOverride,
+    ...timeoutNames.map(([name]) => values[name]?.timeoutMsOverride),
   ].every(Number.isInteger);
   const within = (value, range) => Number.isInteger(value)
     && value >= range?.min && value <= range?.max;
@@ -434,7 +437,7 @@ export function ExecutorBudgetEditor({ config, onPublished }) {
     && within(standing.timeoutMsOverride, limits[standingName]?.timeoutMsOverride)
     && within(retry.floor, limits[retryName]?.floor)
     && within(retry.ceiling, limits[retryName]?.ceiling)
-    && within(timeoutOnly.timeoutMsOverride, limits[timeoutName]?.timeoutMsOverride)
+    && timeoutNames.every(([name]) => within(values[name]?.timeoutMsOverride, limits[name]?.timeoutMsOverride))
     && retry.floor <= retry.ceiling;
   const unchanged = JSON.stringify(values) === JSON.stringify(baseBudgets);
   const unsupportedSchema = (currentConfig.storageWarnings || []).some(
@@ -580,17 +583,19 @@ export function ExecutorBudgetEditor({ config, onPublished }) {
             />
           </div>
         </div>
-        <div>
-          <div className="text-sm font-medium text-gray-800"><code>{timeoutName}</code></div>
-          <div className="grid sm:grid-cols-2 gap-3 mt-2">
-            <BudgetNumberField
-              label="Field primer timeout (milliseconds)"
-              value={timeoutOnly.timeoutMsOverride}
-              limits={limits[timeoutName]?.timeoutMsOverride}
-              onChange={(value) => setBudgetValue(timeoutName, 'timeoutMsOverride', value)}
-            />
+        {timeoutNames.map(([name, label]) => (
+          <div key={name}>
+            <div className="text-sm font-medium text-gray-800"><code>{name}</code></div>
+            <div className="grid sm:grid-cols-2 gap-3 mt-2">
+              <BudgetNumberField
+                label={label}
+                value={values[name]?.timeoutMsOverride}
+                limits={limits[name]?.timeoutMsOverride}
+                onChange={(value) => setBudgetValue(name, 'timeoutMsOverride', value)}
+              />
+            </div>
           </div>
-        </div>
+        ))}
         {!valid && (
           <div className={`text-xs px-3 py-2 rounded border ${TONE.red}`}>
             Use whole numbers inside each displayed safety range; the retry floor cannot exceed its ceiling.

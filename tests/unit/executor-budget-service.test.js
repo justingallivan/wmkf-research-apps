@@ -21,6 +21,11 @@ function budgets(overrides = {}) {
       timeoutMsOverride: 240000,
       ...(overrides.timeout || {}),
     },
+    'cycle-dossier.entry': {
+      kind: 'timeout',
+      timeoutMsOverride: 200000,
+      ...(overrides.entryTimeout || {}),
+    },
   };
 }
 
@@ -359,6 +364,7 @@ test('a revision published before a prompt name was registered still governs and
     budgets: {
       'pre-site-visit.proposal-core.generate': { timeoutMsOverride: 180000 },
       'field-primer.generate': EXECUTOR_BUDGET_DEFAULTS['field-primer.generate'],
+      'cycle-dossier.entry': EXECUTOR_BUDGET_DEFAULTS['cycle-dossier.entry'],
     },
   });
   await expect(getExecutorBudget('field-primer.generate', {}, deps)).resolves.toEqual({

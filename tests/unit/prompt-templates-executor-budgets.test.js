@@ -36,6 +36,7 @@ function budgetConfig(version = 0, maxTokensOverride = 32768) {
       },
       'review-synthesis.generate': { kind: 'retry', floor: 16000, ceiling: 32000 },
       'field-primer.generate': { kind: 'timeout', timeoutMsOverride: 240000 },
+      'cycle-dossier.entry': { kind: 'timeout', timeoutMsOverride: 200000 },
     },
     limits: {
       'pre-site-visit.proposal-core.generate': {
@@ -48,6 +49,9 @@ function budgetConfig(version = 0, maxTokensOverride = 32768) {
       },
       'field-primer.generate': {
         timeoutMsOverride: { min: 60000, max: 240000 },
+      },
+      'cycle-dossier.entry': {
+        timeoutMsOverride: { min: 60000, max: 220000 },
       },
     },
     descriptions: {
@@ -106,6 +110,7 @@ test('Admin edits and atomically publishes the complete Executor budget revision
       'pre-site-visit.proposal-core.generate': { maxTokensOverride: 40000 },
       'review-synthesis.generate': { floor: 16000, ceiling: 32000 },
       'field-primer.generate': { kind: 'timeout', timeoutMsOverride: 240000 },
+      'cycle-dossier.entry': { kind: 'timeout', timeoutMsOverride: 200000 },
     },
   });
   expect(JSON.parse(put[1].body).requestId).toMatch(/^[0-9a-f-]{36}$/);
