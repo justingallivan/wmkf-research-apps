@@ -302,6 +302,20 @@ describe('cycle dossier page', () => {
     expect(screen.getByText(/combined document for the requests selected at that launch, across all your runs/)).toBeInTheDocument();
   });
 
+  it('ready run items link to their own Word and PDF briefing by revision', async () => {
+    const run = { id: 'run-3', status: 'completed', spentUsd: 1.87, items: [
+      { requestId: 'a', requestNumber: '102', status: 'ready', stage: 'ready', revisionId: 'rev-a' },
+      { requestId: 'b', requestNumber: '101', status: 'failed', stage: 'research', revisionId: 'rev-b', error: 'x' },
+    ] };
+    jest.spyOn(global, 'fetch').mockResolvedValue(response(dossierResponse(['a', 'b'], { runs: [run] })));
+    render(<CycleDossierWorkspace />);
+    fireEvent.click(await screen.findByRole('button', { name: /Progress & editions/ }));
+    const links = await screen.findByTestId('cycle-dossier-run-item-links');
+    expect(links.querySelector('a[href="/api/cycle-dossier/download?entryId=rev-a&format=docx"]')).not.toBeNull();
+    expect(links.querySelector('a[href="/api/cycle-dossier/download?entryId=rev-a&format=pdf"]')).not.toBeNull();
+    expect(screen.getAllByTestId('cycle-dossier-run-item-links')).toHaveLength(1);
+  });
+
   it('stays on the Choose requests tab on first load when the latest run is completed', async () => {
     const completedRun = { id: 'run-2', status: 'completed', items: [] };
     jest.spyOn(global, 'fetch').mockResolvedValue(response(dossierResponse(['b'], { runs: [completedRun] })));
