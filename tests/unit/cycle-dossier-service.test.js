@@ -115,11 +115,13 @@ test('roster is scoped server-side to the Workbench default program with no call
 });
 
 test('preview returns the selected and generated DTOs and saves the selection', async () => {
-  store.listDossierEntries.mockResolvedValue([{ request_id: ID, id: 'entry-existing', revision: 1, created_at: '2026-09-07T00:00:00Z', created_by: 9 }]);
+  store.listDossierEntries.mockResolvedValue([{ request_id: ID, id: 'entry-existing', revision: 6, request_revision: 1, created_at: '2026-09-07T00:00:00Z', created_by: 9 }]);
   store.createDossierPreview.mockResolvedValue({ id: PREVIEW, expires_at: '2026-09-07T01:00:00Z', dossier_id: 'dossier-1' });
   const result = await previewCycleDossier(7, { selectedRequestIds: [ID, ID2], generateRequestIds: [ID2] });
   expect(generation.prepareRequestInput).toHaveBeenCalledWith(ID2);
   expect(result.preview).toMatchObject({ id: PREVIEW, estimate: { newCount: 1, reuseCount: 1 } });
+  // The pinned reuse item carries the per-request revision (1), never the table-wide identity (6).
+  expect(store.createDossierPreview.mock.calls[0][2].items).toEqual(expect.arrayContaining([expect.objectContaining({ requestId: ID, reuseId: 'entry-existing', revision: 1 })]));
   expect(result.preview.items).toEqual(expect.arrayContaining([
     expect.objectContaining({ requestId: ID, reuseId: expect.anything(), status: 'ready' }),
     expect.objectContaining({ requestId: ID2, status: 'queued', fallback: false }),
@@ -189,7 +191,7 @@ test('launch without a cap accepts a complete preview and returns a queued run',
   store.readDossierPreview.mockResolvedValue({ id: PREVIEW, dossier_id: 'dossier-1', data: { rosterHash: 'same-roster', items: [{ requestId: ID, reuseId: 'entry-1' }] } });
   store.findDossierLaunch.mockResolvedValue(null);
   store.withDossierTransaction.mockImplementation(async (fn) => fn({ query: jest.fn(async (sql) => sql.startsWith('SELECT * FROM cycle_dossier_runs') ? { rows: [] } : { rows: [] }) }));
-  store.reserveDossierEntry.mockResolvedValue({ id: 'entry-1', revision: 1 });
+  store.reserveDossierEntry.mockResolvedValue({ id: 'entry-1', revision: 9, request_revision: 1 });
   store.createDossierRun.mockResolvedValue(runRow());
   const result = await launchCycleDossier(7, { previewId: PREVIEW, idempotencyKey: KEY, budgetUsd: null });
   expect(result.run).toMatchObject({ id: 'run-1', status: 'queued' });
@@ -253,9 +255,9 @@ test('retry refreshes the entry-stage timeout from the current admin budget whil
 });
 
 test('entry revisions are shared across superusers while editions remain owner-private', async () => {
-  store.getDossierEntry.mockResolvedValue({ id: ENTRY, ready: true, cycle: 'D26', revision: 2, data: { files: { docx: { path: 'docx-ref', contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }, pdf: { path: 'pdf-ref', contentType: 'application/pdf' } }, request: { requestNumber: 'D26-001' } } });
+  store.getDossierEntry.mockResolvedValue({ id: ENTRY, ready: true, cycle: 'D26', revision: 7, request_revision: 2, data: { files: { docx: { path: 'docx-ref', contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }, pdf: { path: 'pdf-ref', contentType: 'application/pdf' } }, request: { requestNumber: 'D26-001' } } });
   storage.readDossierFile.mockResolvedValue(Buffer.from('file'));
-  await expect(downloadCycleDossier(7, { entryId: ENTRY, format: 'pdf' })).resolves.toMatchObject({ contentType: expect.stringContaining('pdf') });
+  await expect(downloadCycleDossier(7, { entryId: ENTRY, format: 'pdf' })).resolves.toMatchObject({ contentType: expect.stringContaining('pdf'), filename: 'D26-D26-001-v2.pdf' });
   store.readDossierEdition.mockRejectedValue(Object.assign(new Error('Edition not found.'), { httpStatus: 404 }));
   await expect(downloadCycleDossier(7, { editionId: EDITION, format: 'pdf' })).rejects.toMatchObject({ httpStatus: 404 });
   expect(store.readDossierEdition).toHaveBeenCalledWith(7, EDITION);

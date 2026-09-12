@@ -7,10 +7,11 @@ summary: "Source-built D26 Cycle Dossier pilot state: six Postgres tables hold p
 canonical: true
 cataloged: 2026-09-07
 owner: product-engineering
-last_verified: 2026-09-07
+last_verified: 2026-09-12
 related:
   - docs/CYCLE_DOSSIER_PILOT_DESIGN.md
   - lib/db/migrations/045_cycle_dossiers.sql
+  - lib/db/migrations/046_cycle_dossier_entry_request_revision.sql
   - lib/services/cycle-dossier-store.js
   - lib/services/cycle-dossier-storage.js
 ---
@@ -23,7 +24,7 @@ related:
 |---|---|---|---|
 | `cycle_dossiers` | `owner_profile_id`, one D26 dossier per owner | Current private selection and latest edition pointer | Upserted for the owner; private app state |
 | `cycle_dossier_previews` | `owner_profile_id`, linked dossier | Expiring preview JSON: selected roster, frozen input/config refs and cost estimate | 30-minute expiry; preview payload is bounded and references retained inputs |
-| `cycle_dossier_entries` | Shared request entry, `created_by` attribution | Immutable revision JSON, including frozen source/config/provenance and artifact refs | Ready revisions are reusable by superusers; new generations append revisions |
+| `cycle_dossier_entries` | Shared request entry, `created_by` attribution | Immutable revision JSON, including frozen source/config/provenance and artifact refs; `request_revision` (migration 046, S509) numbers revisions within a request and is what cards, filenames, and document metadata show, while the table-wide `revision` identity keeps append order | Ready revisions are reusable by superusers; new generations append revisions; a concurrent launch for one request hits the unique `(request_id, request_revision)` index and returns 409 |
 | `cycle_dossier_runs` | `owner_profile_id`, linked dossier | One global run lease plus independently checkpointed item state, reservations, pauses, retries, and assembly refs | Queue/drain state; retries create a new run and preserve prior charge history |
 | `cycle_dossier_control` | Singleton operator control row | Durable global stop signal, reason, operator, and update time | Created with `stop_requested=false`; the superuser operator action sets the stop and pauses queued/running runs |
 | `cycle_dossier_editions` | `owner_profile_id`, linked run/dossier | Private edition cut JSON and immutable combined document refs | One row per `(run_id, cut_key)`; ready editions are owner-private |

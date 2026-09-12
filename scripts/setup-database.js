@@ -1037,6 +1037,19 @@ const v47Statements = [
   )`,
 ];
 
+// V48: per-request revision number on Cycle Dossier entries. Mirrors migration 046.
+const v48Statements = [
+  `ALTER TABLE cycle_dossier_entries ADD COLUMN IF NOT EXISTS request_revision INTEGER`,
+  `UPDATE cycle_dossier_entries e SET request_revision = r.rn
+     FROM (SELECT id, ROW_NUMBER() OVER (PARTITION BY request_id ORDER BY revision) AS rn FROM cycle_dossier_entries) r
+     WHERE e.id = r.id AND e.request_revision IS NULL`,
+  `ALTER TABLE cycle_dossier_entries ALTER COLUMN request_revision SET NOT NULL`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS cycle_dossier_entries_request_revision
+     ON cycle_dossier_entries (request_id, request_revision)`,
+  `COMMENT ON COLUMN cycle_dossier_entries.request_revision IS
+     'Revision number within the request (1, 2, …); revision is the table-wide append order.'`,
+];
+
 // V43: deliberation briefing links (docs/DELIBERATION_BRIEFING_PAGE_PLAN.md).
 // One expiring, revocable link per request for the read-only briefing page;
 // stores a token digest and sealed token, never the raw token. Also binds the
@@ -2025,6 +2038,24 @@ async function runMigration() {
           console.log(`[v47-${i + 1}/${v47Statements.length}] ○ Already exists: ${preview}...`);
         } else {
           console.error(`[v47-${i + 1}/${v47Statements.length}] ✗ Error: ${error.message}`);
+          throw error;
+        }
+      }
+    }
+
+    // Run V48 column addition (Cycle Dossier per-request revision; mirrors migration 046)
+    console.log(`\nApplying v48 schema updates - Cycle Dossier request revision (${v48Statements.length} statements)...`);
+    for (let i = 0; i < v48Statements.length; i++) {
+      const statement = v48Statements[i];
+      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
+      try {
+        await sql.query(statement);
+        console.log(`[v48-${i + 1}/${v48Statements.length}] ✓ ${preview}...`);
+      } catch (error) {
+        if (error.message.includes('already exists')) {
+          console.log(`[v48-${i + 1}/${v48Statements.length}] ○ Already exists: ${preview}...`);
+        } else {
+          console.error(`[v48-${i + 1}/${v48Statements.length}] ✗ Error: ${error.message}`);
           throw error;
         }
       }
