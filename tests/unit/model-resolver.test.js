@@ -4,6 +4,7 @@
 
 const {
   clearAvailableModelsCache,
+  getTierCatalog,
   resolveModelWithCapabilities,
 } = require('../../lib/services/model-resolver.js');
 
@@ -26,6 +27,32 @@ describe('resolveModelWithCapabilities', () => {
       supportsTemperature: false,
     });
     expect(resolved.capabilities).not.toHaveProperty('unknown');
+  });
+
+  it('resolves the fable tier to the reviewed Fable 5.1 fallback with the always-on thinking contract', () => {
+    const resolved = resolveModelWithCapabilities('fable');
+
+    expect(resolved).toMatchObject({
+      rawModel: 'fable',
+      model: 'claude-fable-5-1',
+      resolvedId: 'claude-fable-5-1',
+      isTier: true,
+      capabilities: {
+        family: 'fable',
+        supportsTemperature: false,
+        supportsEffort: true,
+        thinkingMode: 'adaptive_always_on',
+        requiresRefusalHandling: true,
+      },
+    });
+  });
+
+  it('lists the fable tier first in the admin catalog as "extra high" above Opus', () => {
+    const catalog = getTierCatalog();
+
+    expect(catalog.map((t) => t.key)).toEqual(['fable', 'opus', 'sonnet', 'haiku']);
+    expect(catalog[0]).toMatchObject({ anthropic: 'Fable', tier: 'extra high', resolvedId: 'claude-fable-5-1' });
+    expect(catalog[1]).toMatchObject({ anthropic: 'Opus', tier: 'high' });
   });
 
   it('uses the reviewed Opus 5 fallback when the live model list is unavailable', () => {

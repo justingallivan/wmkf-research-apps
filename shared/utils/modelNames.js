@@ -5,6 +5,9 @@
 
 // Map of model IDs to friendly names
 const MODEL_DISPLAY_NAMES = {
+  // Fable models (the generic parser below would drop the point release)
+  'claude-fable-5-1': 'Fable 5.1',
+
   // Opus models
   'claude-opus-4-20250514': 'Opus 4',
   'claude-opus-4-0-20250514': 'Opus 4',
@@ -38,6 +41,7 @@ const MODEL_TIERS = {
  */
 // Tier-key short names (matches lib/services/model-resolver.js TIERS).
 const TIER_DISPLAY_NAMES = {
+  fable: 'Fable (latest)',
   opus: 'Opus (latest)',
   sonnet: 'Sonnet (latest)',
   haiku: 'Haiku (latest)',

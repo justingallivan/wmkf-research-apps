@@ -5,7 +5,7 @@
 
 export const BASE_CONFIG = {
   // Claude API Configuration
-  // Tier-keyed (opus/sonnet/haiku) — resolved to a concrete id at call time
+  // Tier-keyed (fable/opus/sonnet/haiku) — resolved to a concrete id at call time
   // via lib/services/model-resolver.js. Concrete ids are still accepted as
   // an escape hatch (env vars, Dataverse wmkf_appsystemsettings overrides,
   // prompt rows).
@@ -257,7 +257,7 @@ export function _setModelResolver(fn) {
 // Local tier-key set used only for the drift warning below. Kept inline
 // (not imported from model-resolver) so client bundles that import
 // BASE_CONFIG don't transitively pull /v1/models machinery.
-const _TIER_KEYS_FOR_DRIFT_WARN = new Set(['opus', 'sonnet', 'haiku']);
+const _TIER_KEYS_FOR_DRIFT_WARN = new Set(['fable', 'opus', 'sonnet', 'haiku']);
 const _warnedAppKeys = new Set();
 function _warnUnresolvedTier(appKey, type, value) {
   // Server-only: window check avoids noisy logs in any code path that
@@ -283,7 +283,7 @@ function _warnUnresolvedTier(appKey, type, value) {
  *   3. APP_MODELS[appKey][type]
  *   4. BASE_CONFIG.CLAUDE.DEFAULT_MODEL
  *
- * Each source may hold a tier key (opus/sonnet/haiku) or a concrete id;
+ * Each source may hold a tier key (fable/opus/sonnet/haiku) or a concrete id;
  * the resolver returns the latest concrete id for the tier, and passes
  * concrete ids through unchanged (escape hatch).
  *

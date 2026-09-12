@@ -16,7 +16,7 @@ const fs = require('fs');
 const path = require('path');
 const babel = require('@babel/parser');
 
-const TIER_KEYS = new Set(['opus', 'sonnet', 'haiku']);
+const TIER_KEYS = new Set(['fable', 'opus', 'sonnet', 'haiku']);
 const REQUIRED_CAPABILITY_FIELDS = [
   'provider',
   'family',
