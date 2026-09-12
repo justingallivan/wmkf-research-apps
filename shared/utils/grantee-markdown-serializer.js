@@ -7,7 +7,9 @@
  * breaks, bold, italic, subscript, and superscript.
  */
 
-import { MarkdownSerializerState } from '@tiptap/pm/markdown';
+// tiptap 3 dropped the `@tiptap/pm/markdown` subpath; prosemirror-markdown is
+// a direct dependency and shares the single prosemirror-model instance.
+import { MarkdownSerializerState } from 'prosemirror-markdown';
 
 const MARK_SERIALIZERS = {
   bold: { open: '**', close: '**', mixable: true, expelEnclosingWhitespace: true },
