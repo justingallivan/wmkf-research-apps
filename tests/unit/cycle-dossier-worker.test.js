@@ -191,7 +191,8 @@ test('publish accepts a DOCX that SharePoint rewrote in its property-promotion p
   // SharePoint also appends customXml relationships to word/_rels/document.xml.rels
   // and may reorder/reformat the surviving entries (observed 2026-09-12).
   const rewrittenRels='<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml" Target="../customXml/item1.xml" Id="rId13" /><Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://doi.org/10.1/x" TargetMode="External" Id="rId2" /><Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml" Id="rId1" /></Relationships>';
-  const observedDocx=await docxZip({core:'<cp:coreProperties><cp:contentType>Document</cp:contentType></cp:coreProperties>',rels:rewrittenRels,extra:{'customXml/item1.xml':'<p:properties/>','customXml/_rels/item1.xml.rels':'<Relationships/>'}});
+  // The in-place rewrite also leaves packaging garbage slots ([trash]/NNNN.dat).
+  const observedDocx=await docxZip({core:'<cp:coreProperties><cp:contentType>Document</cp:contentType></cp:coreProperties>',rels:rewrittenRels,extra:{'customXml/item1.xml':'<p:properties/>','customXml/_rels/item1.xml.rels':'<Relationships/>','[trash]/0000.dat':Buffer.alloc(512),'[trash]/0001.dat':Buffer.alloc(64)}});
   const {frozen}=await publishFixture({observedDocx});
   expect(storage.dossierDigest(observedDocx)).not.toBe(storage.dossierDigest(frozen.docx));
   await drainCycleDossiers();
