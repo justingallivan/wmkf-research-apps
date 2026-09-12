@@ -209,7 +209,7 @@ async function handlePut(req, res, profileId) {
       // Delete the override — revert to env/hardcoded default
       await deleteSetting(settingKey);
     } else {
-      // Stored value may be a tier key (opus/sonnet/haiku) or a reviewed
+      // Stored value may be a tier key (fable/opus/sonnet/haiku) or a reviewed
       // concrete Anthropic id. Future model ids must first be added to the
       // capability + pricing registries so request shaping and cost logging
       // cannot drift silently.
