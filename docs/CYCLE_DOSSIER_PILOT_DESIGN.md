@@ -48,7 +48,7 @@ The six Postgres tables are documented in docs/atlas/postgres-cycle-dossiers.md.
 
 ## Branch-local implementation status
 
-**[VERIFIED 2026-09-07 via source, focused tests, and controlled setup]** The generation/document modules, guarded historical prompt support, prompt seed definitions, prompt seeder, six-table migration, setup-database fresh-install shape, API routes, worker/service/store, and UI are source-built on branch codex/cycle-dossier-pilot-build. Migration 038 is applied and verified; the private store `wmkf-cycle-dossier-private` (`store_W9WC1TLR7kpl9hty`) is connected under the custom `DOSSIER_BLOB` prefix in all environments, with the managed token authenticated in Development. Focused generation/document/Executor tests and targeted lint pass in the local checkout.
+**[VERIFIED 2026-09-07 via source, focused tests, and controlled setup]** The generation/document modules, guarded historical prompt support, prompt seed definitions, prompt seeder, six-table migration, setup-database fresh-install shape, API routes, worker/service/store, and UI are source-built on branch codex/cycle-dossier-pilot-build. Migration 045 is applied and verified; the private store `wmkf-cycle-dossier-private` (`store_W9WC1TLR7kpl9hty`) is connected under the custom `DOSSIER_BLOB` prefix in all environments, with the managed token authenticated in Development. Focused generation/document/Executor tests and targeted lint pass in the local checkout.
 
 **[VERIFIED 2026-09-07 via governed publication and readback]** Both prompt families are published at version 1 and read back successfully. No paid generation call was made.
 
@@ -56,7 +56,7 @@ The six Postgres tables are documented in docs/atlas/postgres-cycle-dossiers.md.
 
 **[VERIFIED 2026-09-07 via controlled rollout state]** The feature remains disabled. No Cycle Dossier generation, SharePoint artifact publication, deployment, or promotion is claimed. Production and Preview token runtime authentication remains pending the rollout preflight.
 
-**[VERIFIED 2026-09-07]** Migration 038, dedicated store setup, and governed prompt publication/readback are complete. `CYCLE_DOSSIER_ENABLED` remains disabled; no generation, SharePoint artifact publication, unattended cron processing, deployment, or promotion has occurred. Existing populated databases must use the governed migration process; do not run fresh-install setup against them.
+**[VERIFIED 2026-09-07]** Migration 045, dedicated store setup, and governed prompt publication/readback are complete. `CYCLE_DOSSIER_ENABLED` remains disabled; no generation, SharePoint artifact publication, unattended cron processing, deployment, or promotion has occurred. Existing populated databases must use the governed migration process; do not run fresh-install setup against them.
 
 ## Controlled rollout remaining
 

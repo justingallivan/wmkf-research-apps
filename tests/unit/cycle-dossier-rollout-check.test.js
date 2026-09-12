@@ -50,10 +50,10 @@ afterEach(() => {
 });
 
 test('migration contract requires manifest inclusion, sorted files, and the control table', () => {
-  expect(verifyMigrationContract({ migrationText, manifest: { files: ['001.sql', '038_cycle_dossiers.sql'] } }).ok).toBe(true);
-  expect(verifyMigrationContract({ migrationText, manifest: { files: ['038_cycle_dossiers.sql', '001.sql'] } }).ok).toBe(false);
-  expect(verifyMigrationContract({ migrationText: migrationText.replace('cycle_dossier_editions', 'wrong'), manifest: { files: ['038_cycle_dossiers.sql'] } }).missingTables).toContain('cycle_dossier_editions');
-  expect(verifyMigrationContract({ migrationText: migrationText.replace('cycle_dossier_control', 'wrong'), manifest: { files: ['038_cycle_dossiers.sql'] } }).missingTables).toContain('cycle_dossier_control');
+  expect(verifyMigrationContract({ migrationText, manifest: { files: ['001.sql', '045_cycle_dossiers.sql'] } }).ok).toBe(true);
+  expect(verifyMigrationContract({ migrationText, manifest: { files: ['045_cycle_dossiers.sql', '001.sql'] } }).ok).toBe(false);
+  expect(verifyMigrationContract({ migrationText: migrationText.replace('cycle_dossier_editions', 'wrong'), manifest: { files: ['045_cycle_dossiers.sql'] } }).missingTables).toContain('cycle_dossier_editions');
+  expect(verifyMigrationContract({ migrationText: migrationText.replace('cycle_dossier_control', 'wrong'), manifest: { files: ['045_cycle_dossiers.sql'] } }).missingTables).toContain('cycle_dossier_control');
 });
 
 test('prompt verification pins every seeded field and current identity', () => {

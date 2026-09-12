@@ -18,7 +18,7 @@ import * as research from '../shared/config/prompts/cycle-dossier-research-plan.
 import * as entry from '../shared/config/prompts/cycle-dossier-entry.js';
 import { parseDossierRequestAllowlist, validateDossierEnvironment, dossierRolloutConfig, buildDossierRosterFilter } from '../lib/services/cycle-dossier-rollout.js';
 
-export const MIGRATION_FILE = '038_cycle_dossiers.sql';
+export const MIGRATION_FILE = '045_cycle_dossiers.sql';
 export const PROMPTS = [
   { definition: research, maxTokens: 3000 },
   { definition: entry, maxTokens: 12000 },
