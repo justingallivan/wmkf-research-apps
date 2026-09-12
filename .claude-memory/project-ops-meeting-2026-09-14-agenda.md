@@ -50,3 +50,8 @@ evidence pointer. After the meeting, record the decisions in
    later: at send time the failure was quiet (no email in the Dynamics chain, no loud
    error); the red "last send failed" line appears on the next tab load. Evidence:
    read-only ledger probe of `pre_site_distribution_attempts`, S507.
+6. **Drain cron cadence for the Cycle Dossier worker** (`/api/cron/drain-cycle-dossiers`, every
+   minute in `vercel.json` on PR #259). Idle tick is Postgres-only and returns before any I/O
+   while `CYCLE_DOSSIER_ENABLED` is not `true`, but the function is still invoked ~43,200×/month
+   while disabled (Codex low finding, 2026-09-11). Options: keep per-minute, lower to every 5
+   minutes, or schedule only during active pilot windows. Same M5 shape as item 1.
