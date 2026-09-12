@@ -619,3 +619,16 @@ mint refuses `slot=other` (400, no staging row), and `finalizeMaterialUpload` re
 (`slot_not_open`). Storage path, folder, artifact type, and the "Other files received" list stay
 built; §6.2 item 7 describes the re-enabled behaviour. The reminder cron is unaffected in either
 state: `missingRequiredItems` reads only checklist items, and `other` is never a checklist key.
+
+### 16.6 2026-09-11 (S507): PC manual reminder claims before sending
+
+Owner decision: the PC's "Send reminder" (`remindMaterialsContributors`) now claims before sending,
+the same shape as the automatic sweep — resolve everything the send needs, claim, send, attach the
+email id. Unlike the sweep's claim (`claimAutomaticReminder`, gated on being past due), the manual
+path is allowed at any time on an open collection, any number of times: `claimManualReminder`
+(`lib/services/site-visit-materials/collection-store.js`) is a single conditional UPDATE that stamps
+`last_reminder_at = NOW()` and increments `reminder_count` only when the collection is `open` and no
+reminder (manual or automatic) was stamped in the last 60 seconds; a lost claim throws
+`site_visit_materials_reminder_just_sent` (409). This serializes the PC click against a concurrent
+cron run so a click during the daily sweep can never produce two reminder emails. `recordReminder`
+is removed; nothing else referenced it.

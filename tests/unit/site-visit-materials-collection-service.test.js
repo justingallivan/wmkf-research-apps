@@ -47,7 +47,8 @@ function deps(overrides = {}) {
     getLatestCollection: jest.fn(async () => stored),
     insertCollection: jest.fn(async (row) => { stored = { id: row.id, request_id: row.requestId, site_visit_activity_id: row.siteVisitActivityId, status: 'open', due_at: row.dueAt, closes_at: row.closesAt, checklist: row.checklist, contacts: row.contacts, jti: row.jti, token_digest: row.tokenDigest, token_ciphertext: row.tokenCiphertext, created_by: row.createdBy, reminder_count: 0, created_at: NOW }; return stored; }),
     recordInvitation: jest.fn(async (id, emailId) => { stored = { ...stored, invited_at: NOW, invitation_email_id: emailId }; return stored; }),
-    recordReminder: jest.fn(async (id, emailId) => { stored = { ...stored, last_reminder_at: NOW, last_reminder_email_id: emailId, reminder_count: stored.reminder_count + 1 }; return stored; }),
+    claimManualReminder: jest.fn(async (id) => { if (stored.status && stored.status !== 'open') return null; stored = { ...stored, last_reminder_at: NOW, reminder_count: stored.reminder_count + 1 }; return stored; }),
+    attachReminderEmailId: jest.fn(async (id, emailId) => { stored = { ...stored, last_reminder_email_id: emailId }; return stored; }),
     updateChecklist: jest.fn(async (id, checklist) => { stored = { ...stored, checklist }; return stored; }),
     markReady: jest.fn(async (id, actor) => { if (stored.status !== 'open') return null; stored = { ...stored, status: 'ready', ready_confirmed_at: NOW, ready_confirmed_by: actor }; return stored; }),
     reopenFromReady: jest.fn(),
@@ -169,6 +170,38 @@ test('read joins the registry: state moves missing → received → ready; waive
   expect(collection.state).toBe('ready');
   expect(d.markReady).toHaveBeenCalledWith('44444444-4444-4444-8444-444444444444', ACTOR);
   await expect(waiveMaterialsItem({ requestId: REQUEST_ID, key: 'nope', waived: true }, d)).rejects.toMatchObject({ code: 'site_visit_materials_item_unknown' });
+});
+
+test('manual reminder claims before sending (S507): claim order, 409 on a lost claim, and an email id attached only after a successful send', async () => {
+  const d = deps();
+  await createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org' }, d);
+
+  const order = [];
+  d.claimManualReminder.mockImplementation(async (id) => { order.push('claim'); const stored = d.__stored(); const next = { ...stored, last_reminder_at: NOW, reminder_count: stored.reminder_count + 1 }; d.__setStored(next); return next; });
+  d.sendEmail.mockImplementation(async (...args) => { order.push('send'); return '55555555-5555-4555-8555-555555555555'; });
+  d.attachReminderEmailId.mockImplementation(async (id, emailId) => { order.push('attach'); const stored = d.__stored(); const next = { ...stored, last_reminder_email_id: emailId }; d.__setStored(next); return next; });
+
+  await remindMaterialsContributors({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org' }, d);
+  expect(order).toEqual(['claim', 'send', 'attach']);
+  expect(d.claimManualReminder).toHaveBeenCalledWith(d.__stored().id, NOW);
+
+  // Claim lost (e.g. the cron claimed moments earlier): 409, never sends, never attaches.
+  d.claimManualReminder.mockImplementation(async () => null);
+  const sendCallsBefore = d.sendEmail.mock.calls.length;
+  await expect(remindMaterialsContributors({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org' }, d))
+    .rejects.toMatchObject({ code: 'site_visit_materials_reminder_just_sent', httpStatus: 409 });
+  expect(d.sendEmail.mock.calls.length).toBe(sendCallsBefore);
+  expect(d.attachReminderEmailId).not.toHaveBeenCalledWith(expect.anything(), undefined);
+
+  // Send failure after a successful claim: at-most-once — the error propagates, the claim stands, nothing is attached.
+  d.claimManualReminder.mockImplementation(async (id) => { const stored = d.__stored(); const next = { ...stored, last_reminder_at: NOW, reminder_count: stored.reminder_count + 1 }; d.__setStored(next); return next; });
+  const attachCallsBefore = d.attachReminderEmailId.mock.calls.length;
+  const reminderCountBefore = d.__stored().reminder_count;
+  d.sendEmail.mockImplementation(async () => { throw new Error('transport down'); });
+  await expect(remindMaterialsContributors({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org' }, d))
+    .rejects.toThrow('transport down');
+  expect(d.attachReminderEmailId.mock.calls.length).toBe(attachCallsBefore);
+  expect(d.__stored().reminder_count).toBe(reminderCountBefore + 1);
 });
 
 test('a collection past its close instant reads as closed even before the sweep marks it; the schema flag off is 503', async () => {
