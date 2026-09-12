@@ -117,34 +117,39 @@ already configurable; the Cycle Dossier; anything that needs a migration or a ne
 
 ## Handoff (Codex writes this)
 
-### 2026-09-12 — blocked before conversion
+### 2026-09-12 — implementation on feature branch
 
-No template keys or sender code were changed. The checkout was clean and current with
-`origin/codex/email-templates-configurable`; all 67 `/start` gate and self-test commands passed.
+The first pass stopped at the automatic claim-before-send conflict and recorded it in commit
+`0d73bf2a`. The owner then approved §3's narrow sweep/test extension and specified that
+`{{uploadLink}}` means the server-minted contributor URL and `{{signature}}` means the sending
+PC's signature. No other file-surface expansion was authorized.
 
-**Owned-surface conflict:** Contract 4.1 requires a missing or blank reminder default to block
-the send **without changing the collection row**. The PC path can read defaults before
-`claimManualReminder` (`collection-service.js:400`), but the automatic path calls
-`claimAutomaticReminder` in `reminder-sweep.js:99` before `sendReminderEmail` at lines 103–107.
-The shared sender therefore runs too late to validate defaults for the automatic path
-without editing the sweep. The claim stamps `last_reminder_at` and increments `reminder_count`
-before a failed send, per `reminder-sweep.js:1-16` and `collection-store.js:123-145`.
-`reminder-sweep.js` is outside §3's permitted files, so conversion stopped under §3 rather
-than weakening the row-unchanged contract. To proceed, authorize a narrow §3 addition for
-`lib/services/site-visit-materials/reminder-sweep.js` and its unit test so the automatic sweep
-can validate the required defaults before claiming and pass the resolved values to the sender.
+Commit `e578d6f2` adds four catalog/seed keys, reads them through
+`readRequiredEmailDefaults`, and renders the invitation and reminder subjects/bodies from
+the stored text. The seed bodies reproduce the prior wording; the list tokens remain
+server-built. The HTML renderer still owns the button and fallback link, and escapes an
+optional `{{uploadLink}}` in edited body copy. The PC signature uses the sending systemuser's
+saved email-signature preference, falling back to the PC's name and Foundation line.
+Both manual and automatic reminders prepare defaults/link/signature before the unchanged
+conditional claim, so a configuration error leaves the row retryable. An invitation failure
+leaves the existing collection without a new email receipt, as before.
 
-**Token interpretation to settle with that change:** The existing HTML renderer appends the
-server-owned upload button and fallback link (`lib/external/site-visit-materials-email.js:33-53`),
-while the existing body tests require no raw URL in `bodyText`
-(`tests/unit/site-visit-materials-collection-service.test.js:110-112,155-159`). §4.2 also asks
-for an editable `{{uploadLink}}` token. The current sender is the PC, whereas
-`resolveSignatureForRequest` resolves the request's PD (`lib/services/email-signature.js:57-80`);
-the brief does not identify which signature `{{signature}}` should insert. Decide whether
-these tokens should refer to the renderer-owned link and PC signature, respectively, before
-adding catalog hints that would promise working substitutions.
+The internal daily summary (`scheduled-email-service.js`) and ops alert
+(`notification-service.js`) remain hard-coded by the owner's §2 rule. The unimported legacy
+`DEFAULT_TEMPLATE` in `email-generator.js` remains a separate cleanup item.
 
-The survey's internal daily summary and ops alert remain intentionally hard-coded per §2;
-the legacy `DEFAULT_TEMPLATE` is a separate cleanup item. No conversion-specific tests were
-run because no runtime or catalog change was made. The brief itself is the only durable
-restatement found for the proposed new keys (`rg` over docs, memory, source, scripts, and tests).
+Validation: 14 site-visit/catalog/seed suites (112 tests), two Admin email-defaults suites
+(19 tests), `check:types`, changed-file ESLint, and `git diff --check` passed. The production
+`npm run build` passed with one path-tracing warning in the untouched Pre-Site DOCX renderer. Post-edit
+`check:doc-currency`, `check:prompt-injection-tagging`, `check:fact-consistency`,
+`check:build-claim-freshness`, `check:dataverse-access-layer`, `check:dynamics-context-boundary`,
+`check:route-service-boundary`, and `check:atlas` passed with their self-tests; `check:docs-catalog`
+passed. The full 67-command `/start` gate set passed before implementation. The new settings
+have **not** been written to Dataverse and the branch has not been merged or deployed; seed the
+four keys before promotion.
+
+Outside the owned surface, `docs/API_ROUTE_SECURITY_MATRIX.md`'s materials route descriptions
+do not yet name the settings reads, and
+`.claude-memory/project-site-visit-materials-planning-handoff.md` retains an older claim that
+the PC manual reminder has no claim (already stale before this work). Claude should reconcile
+those durable restatements with the branch on promotion.

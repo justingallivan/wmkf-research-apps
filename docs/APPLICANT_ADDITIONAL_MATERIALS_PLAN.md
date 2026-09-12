@@ -6,7 +6,7 @@ status: active
 summary: "Canonical Site Visit-led plan for applicant material collection, staff follow-up, and a shared external briefing room."
 canonical: true
 cataloged: 2026-09-08
-last_verified: 2026-09-10
+last_verified: 2026-09-12
 owner: product-engineering
 related:
   - docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md
@@ -632,3 +632,16 @@ reminder (manual or automatic) was stamped in the last 60 seconds; a lost claim 
 `site_visit_materials_reminder_just_sent` (409). This serializes the PC click against a concurrent
 cron run so a click during the daily sweep can never produce two reminder emails. `recordReminder`
 is removed; nothing else referenced it.
+
+### 16.7 2026-09-12: configurable applicant email copy [SOURCE-BUILT ON FEATURE BRANCH]
+
+Branch `codex/email-templates-configurable` moves the invitation and reminder subjects/bodies to
+Admin → Email defaults under `email.site_visit_materials_invite.subject` / `.body` and
+`email.site_visit_materials_reminder.subject` / `.body`. The seed script registers the existing
+wording for all four keys; production must seed them before the branch is deployed, because
+an absent or blank required value blocks the send without a code-literal fallback. Both manual
+and automatic reminders resolve defaults, the contributor link, and any sending-PC signature
+before claiming the collection row. The default body still uses the fixed server-injected upload
+button and fallback link; an edited template may also place the server-minted URL with
+`{{uploadLink}}` and the sending PC’s signature with `{{signature}}`. This branch is not a
+production-live claim.
