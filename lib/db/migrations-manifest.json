@@ -42,6 +42,7 @@
     "041_deliberation_agenda_sends.sql",
     "042_site_visit_material_collections.sql",
     "043_portal_upload_staging_document_scope.sql",
-    "044_site_visit_material_slot_leases.sql"
+    "044_site_visit_material_slot_leases.sql",
+    "045_cycle_dossiers.sql"
   ]
 }

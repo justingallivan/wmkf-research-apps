@@ -6,7 +6,7 @@ status: canonical
 summary: "The Executor is the function invoker. The prompt row is the function definition. Chains and triggers are the Flow's job, not the Executor's."
 canonical: true
 cataloged: 2026-07-02
-last_verified: 2026-08-30
+last_verified: 2026-09-07
 owner: product-engineering
 related:
   - lib/services/execute-prompt.js
@@ -22,7 +22,7 @@ related:
 and multiple live grantee, field-primer, and review services). A Power Automate implementation is a deferred target, not a
 second current implementation. The original "May 1 2026 cycle target" framing is historical.
 **Created:** 2026-04-24 (Session 109, reconciliation pass)
-**Last status update:** 2026-08-30 (durable budget recovery, provenance, and concurrent-draft handling)
+**Last status update:** 2026-09-07 (guarded historical prompt snapshots for Cycle Dossier generation)
 **Owners:** Justin (Vercel implementation — shipped); Connor would own any future Power Automate implementation
 **Related docs:** `docs/PROMPT_STORAGE_DESIGN.md`, `docs/BACKEND_AUTOMATION_PLAN.md`, `docs/WORKFLOW_CHAINING_DESIGN.md`, `docs/GRANT_CYCLE_LIFECYCLE.md`
 
@@ -76,12 +76,36 @@ The contract covers **Pattern A + dual-caller prompts and Pattern B/C Vercel-onl
 | `actingUserSystemId` | GUID | no | Dataverse system-user identity used to attribute supported writes. Callers must derive it from authenticated/server context, never request input. |
 | `assertSystemIncludes` | string \| string[] | no | Fail-closed assertion that each required substring survived composition in the actual system prompt. Used when a mutable prompt row must retain a security-critical block. |
 | `requireNoPersistence` | bool | no | Default `false`. When `true`, the Executor rejects any current prompt row whose output schema declares a target other than `kind: none`, before the model call or target write. Use for producers that need request-linked audit lineage but must remain pass-through-only even if the mutable prompt row drifts. |
+| `promptSnapshot` | object | no | Server-owned frozen prompt row for a historical generation. When supplied, the Executor skips current-row lookup and validates exact `wmkf_ai_promptname`, GUID `wmkf_ai_promptid`, positive `wmkf_promptversion`, system/body text, and a concrete model id (tier aliases are refused). The snapshot must include the Executor's variable/output-schema/model fields; `requireNoPersistence:true` is required for Cycle Dossier pass-through stages. Existing callers omit this field and continue resolving the sole current row. |
 | `maxTokensOverride` | positive integer | no | Server-owned, per-invocation output-budget override, capped at the final resolved model's reviewed `maxOutputTokens`. The Pre-Site standing value and review-synthesis retry floor/ceiling resolve through `lib/services/executor-budget-service.js` from the latest append-only `executor.budgets.vNNNNNN` Dataverse setting; `shared/config/executorBudgets.js` owns only the closed schema, safety bounds, and outage fallback. The superuser Admin panel reads the same resolved revision. Never accept this value from client input. |
 | `timeoutMsOverride` | positive integer | no | Server-owned, per-invocation LLM transport timeout override (milliseconds), passed to `LLMClient` in place of its 120s default. The Pre-Site standing value and the field-primer timeout-only value resolve through the same durable budget revision and remain bounded to the reviewed 60 000–240 000 ms range; never accept it from client input. Non-integer/non-positive values are ignored. |
 | `deadlineMs` | positive number (epoch ms) | no | Server-owned absolute bound for the provider call, for callers holding a time-limited lease (field primer, S493). Checked immediately before the model call: the transport timeout becomes the smaller of the caller's budget (or the client default) and the time remaining, and a deadline with under one second left throws `executor_deadline_exhausted` before any tokens are spent. Never accept it from client input. |
 | `minimumEffectiveMaxTokensExclusive` | non-negative integer | no | Server-owned retry guard. After applying the resolved model ceiling, the final token budget must exceed this value or the Executor aborts before the provider call. Review synthesis uses the first attempt's budget here so a concurrent model change cannot trigger a retry with no larger effective budget. |
 | `semanticAttempt` | positive integer | no | Default `1`. Server-owned audit metadata for caller-level semantic retries. |
 | `retryOfRunId` | GUID | no | Prior failed `wmkf_ai_run` id when the caller re-invokes. Included in notes for deterministic audit pairing; null is allowed when the prior audit write failed. |
+
+### Historical prompt snapshots and frozen inputs
+
+`promptSnapshot` is an opt-in server boundary for workflows that have already
+captured a published prompt row. `cycle-dossier-generation.js` stores the full
+prompt row (including model, temperature, token budget, variable declarations,
+and output schema) in its configuration snapshot and passes that exact object to
+both no-persistence Executor stages. The Executor validates the identity and
+version before model resolution and rejects `opus`, `sonnet`, and `haiku` tier
+aliases so a later model-registry change cannot silently alter a replay. The
+historical row is never fetched from the mutable current pointer during that
+call; `prompt-store.fetchPromptVersion(name, {promptId, version})` is available
+for a caller that needs to resolve the exact row before capturing it.
+
+Cycle Dossier variables are all declared `source.kind: override` and the worker
+supplies the retained narrative/evidence strings. Passing `requestId` still
+causes the Executor to perform its normal request-row read for request identity,
+ETag/output-guard compatibility, and audit lineage. That read does not replace
+any override variable and no dossier output schema permits a request write;
+source freezing and change detection remain the generation service/worker's
+responsibility. A caller using a historical snapshot must keep the snapshot and
+its source payload immutable, use `requireNoPersistence:true`, and reauthorize
+immediately before each provider stage.
 
 ### Durable Executor-budget publication
 

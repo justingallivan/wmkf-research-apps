@@ -176,6 +176,13 @@ export const DEFAULT_APP_GRANTS = ['dynamics-explorer'];
  *   'direct-url-test'   — live direct-URL / test surface, intentionally not in nav
  */
 export const APP_LIFECYCLE_REGISTRY = {
+  'cycle-dossier': {
+    name: 'Cycle Dossier',
+    status: 'direct-url-test',
+    pagePath: '/cycle-dossier',
+    notes: 'D26 superuser pilot. Explicit superuser-only navigation and page/API authorization; not grantable through the active app registry.',
+    lastVerified: '2026-09-07',
+  },
   'reviewer-finder': {
     name: 'Reviewer Finder',
     status: 'consolidated-into',

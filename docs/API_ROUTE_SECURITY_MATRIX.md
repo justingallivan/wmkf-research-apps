@@ -344,6 +344,14 @@ separate server-owned promotion contract. No branch writes Dataverse or accepts 
 - `/api/workbench/grantee-deliverables/abstract` GET keeps exact Markdown in `effective` and `caption`, and adds response-only sanitized `effectiveHtml` / `captionHtml` for the staff editor seeds and caption display. PUT still accepts and persists only abstract Markdown, with the existing ETag and effective-field guards; caption writes remain on the separate ETag-conditional `replace-submission` route.
 - The abstract PUT reconciles an ambiguous non-412 Dataverse write by re-reading both abstract fields. An exact value on the same effective field returns 200 with the fresh ETag; a field flip remains a 409 stale conflict; a mismatched or unavailable confirmation returns a typed 503. The Awardee tab preserves the working copy and renders that save-specific failure beside the Save button.
 
+### Cycle Dossier pilot routes
+
+| Route | Methods | Access class / guard | Inputs and persistence |
+|---|---|---|---|
+| `/api/cycle-dossier` | GET, POST | App / `requireAppAccess(req, res, 'cycle-dossier')` | Superuser-only service contract after app access. Reads or changes the caller's private D26 selection/preview/run controls; previews retain bounded source/config references and estimates; no client identity is accepted. Preview writes frozen input bytes to the dedicated private Blob store and metadata to Postgres; generation and document publication occur in the worker. |
+| `/api/cycle-dossier/download` | GET | App / `requireAppAccess(req, res, 'cycle-dossier')` | `entryId` or owner-scoped `editionId` plus `docx`/`pdf`; service reauthorizes private ownership and validates persisted SHA-256/size/path refs before streaming. Private Blob bytes only; `Cache-Control: private, no-store`, `nosniff`. |
+| `/api/cron/drain-cycle-dossiers` | GET, POST | Cron / strict platform `CRON_SECRET` bearer (no development bypass) | No client body authority. Feature flag `CYCLE_DOSSIER_ENABLED=true`, durable `cycle_dossier_control.stop_requested=false`, are required after secret verification (the server-owned `CYCLE_DOSSIER_REQUEST_ALLOWLIST` is enforced downstream when the worker loads the roster for a running run); worker claims one global run lease and re-reads the durable stop before every paid call and SharePoint mutation. Postgres checkpoints plus dedicated private Blob artifacts; no public response data. |
+
 ## Regular Maintenance Process
 
 ### On every PR that touches `pages/api`

@@ -989,6 +989,54 @@ const v42Statements = [
   )`,
 ];
 
+// V47: private Cycle Dossier pilot state. JSONB stores immutable source/config
+// snapshots and independently checkpointed item/edition state; bytes remain
+// in the dedicated private Blob store (see migration 045).
+const v47Statements = [
+  `CREATE TABLE IF NOT EXISTS cycle_dossiers (
+    id UUID PRIMARY KEY, owner_profile_id INTEGER NOT NULL REFERENCES user_profiles(id),
+    cycle TEXT NOT NULL DEFAULT 'D26' CHECK (cycle = 'D26'), selection JSONB,
+    latest_edition_id UUID, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), UNIQUE (owner_profile_id, cycle)
+  )`,
+  `CREATE TABLE IF NOT EXISTS cycle_dossier_previews (
+    id UUID PRIMARY KEY, owner_profile_id INTEGER NOT NULL REFERENCES user_profiles(id),
+    dossier_id UUID NOT NULL REFERENCES cycle_dossiers(id), data JSONB NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL DEFAULT NOW() + INTERVAL '30 minutes',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`,
+  `CREATE TABLE IF NOT EXISTS cycle_dossier_entries (
+    id UUID PRIMARY KEY, request_id UUID NOT NULL, cycle TEXT NOT NULL DEFAULT 'D26' CHECK (cycle = 'D26'),
+    revision BIGINT GENERATED ALWAYS AS IDENTITY, created_by INTEGER NOT NULL REFERENCES user_profiles(id),
+    data JSONB NOT NULL, ready BOOLEAN NOT NULL DEFAULT FALSE, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`,
+  `CREATE INDEX IF NOT EXISTS cycle_dossier_entries_latest ON cycle_dossier_entries(request_id, revision DESC) WHERE ready`,
+  `CREATE TABLE IF NOT EXISTS cycle_dossier_runs (
+    id UUID PRIMARY KEY, owner_profile_id INTEGER NOT NULL REFERENCES user_profiles(id),
+    dossier_id UUID NOT NULL REFERENCES cycle_dossiers(id), idempotency_key UUID NOT NULL,
+    launch_hash TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'queued'
+      CHECK (status IN ('queued','running','paused','cancelled','completed','partial','failed')),
+    data JSONB NOT NULL, lease_token UUID, locked_until TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(owner_profile_id, idempotency_key)
+  )`,
+  `CREATE INDEX IF NOT EXISTS cycle_dossier_runs_queue ON cycle_dossier_runs(status, created_at)`,
+  `CREATE TABLE IF NOT EXISTS cycle_dossier_control (
+    id BOOLEAN PRIMARY KEY DEFAULT TRUE CHECK (id=TRUE),
+    stop_requested BOOLEAN NOT NULL DEFAULT FALSE,
+    reason TEXT,
+    updated_by INTEGER REFERENCES user_profiles(id),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`,
+  `INSERT INTO cycle_dossier_control(id) VALUES(TRUE) ON CONFLICT(id) DO NOTHING`,
+  `CREATE TABLE IF NOT EXISTS cycle_dossier_editions (
+    id UUID PRIMARY KEY, owner_profile_id INTEGER NOT NULL REFERENCES user_profiles(id),
+    dossier_id UUID NOT NULL REFERENCES cycle_dossiers(id), run_id UUID NOT NULL REFERENCES cycle_dossier_runs(id),
+    cut_key TEXT NOT NULL, data JSONB NOT NULL, ready BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), UNIQUE(run_id, cut_key)
+  )`,
+];
+
 // V43: deliberation briefing links (docs/DELIBERATION_BRIEFING_PAGE_PLAN.md).
 // One expiring, revocable link per request for the read-only briefing page;
 // stores a token digest and sealed token, never the raw token. Also binds the
@@ -1112,7 +1160,6 @@ const v46Statements = [
      ON deliberation_agenda_sends (session_id)
      WHERE state = 'send_requested'`,
 ];
-
 
 // V32: model pricing audit history (S181).
 // Monthly drift cron (/api/cron/pricing-refresh) writes one row per
@@ -1965,6 +2012,24 @@ async function runMigration() {
       }
     }
 
+    // Run V47 table creation (Cycle Dossier pilot)
+    console.log(`\nApplying v47 schema updates - Cycle Dossier pilot (${v47Statements.length} statements)...`);
+    for (let i = 0; i < v47Statements.length; i++) {
+      const statement = v47Statements[i];
+      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
+      try {
+        await sql.query(statement);
+        console.log(`[v47-${i + 1}/${v47Statements.length}] ✓ ${preview}...`);
+      } catch (error) {
+        if (error.message.includes('already exists')) {
+          console.log(`[v47-${i + 1}/${v47Statements.length}] ○ Already exists: ${preview}...`);
+        } else {
+          console.error(`[v47-${i + 1}/${v47Statements.length}] ✗ Error: ${error.message}`);
+          throw error;
+        }
+      }
+    }
+
     console.log('\n✓ Database migration completed successfully!');
     console.log('\nTables created/updated:');
     console.log('  • search_cache (API search result caching)');
@@ -2030,7 +2095,10 @@ async function runMigration() {
     console.log('  • deliberation_briefing_links (expiring, revocable briefing-page links; sealed token, digest, revocation)');
     console.log('\nV46 new table (Deliberation session agenda email):');
     console.log('  • deliberation_agenda_sends (frozen session agenda + Dynamics send recovery ledger)');
-    console.log('\nIndexes created: 64 (plus 7 added in V30, 6 added in V35, 4 added in V37, 3 added in V39, 3 added in V40, 2 added in V44)');
+    console.log('\nV47 new tables (Cycle Dossier pilot):');
+    console.log('  • cycle_dossiers, cycle_dossier_previews, cycle_dossier_entries,');
+    console.log('    cycle_dossier_runs, cycle_dossier_control, cycle_dossier_editions (private state/checkpoints; bytes in private Blob)');
+    console.log('\nIndexes created: 64 (plus 7 added in V30, 6 added in V35, 4 added in V37, 3 added in V39, 3 added in V40, 2 added in V44, 2 added in V47)');
 
   } catch (error) {
     console.error('\n✗ Migration failed:', error.message);

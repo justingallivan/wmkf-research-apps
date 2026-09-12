@@ -15,6 +15,15 @@ paths = [
   '''^tests/unit/prompt-templates-executor-budgets\.test\.js$''',
 ]
 
+[[rules]]
+id = "generic-api-key"
+
+[[rules.allowlists]]
+description = "Public Cycle Dossier activation flag in its rollout documentation; this literal is not a credential."
+condition = "AND"
+regexes = ['''^CYCLE_DOSSIER_ENABLED=true$''']
+paths = ['''^docs/CYCLE_DOSSIER_PILOT_DESIGN\.md$''']
+
 [[allowlists]]
 description = "Fixture EXTERNAL_LINK_SECRET values in focused external-token verifier unit tests (never real; set on process.env inside the test)."
 targetRules = ["generic-api-key"]

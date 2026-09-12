@@ -437,6 +437,16 @@ const SURFACES = [
       "target: { kind: 'none' }",
     ],
   },
+  {
+    // Dossier snapshots enforce these exact seeded source declarations;
+    // the shared Executor wraps all inputs and injects the A7 preamble.
+    id: 'cycle-dossier-generation',
+    inv: 31,
+    status: 'migrated',
+    promptFiles: ['shared/config/prompts/cycle-dossier-research-plan.js', 'shared/config/prompts/cycle-dossier-entry.js'],
+    callSiteFiles: ['lib/services/execute-prompt.js'],
+    requiredMarkers: ['untrusted: true', "source: { kind: 'override' }", 'maxChars: 100000', "target: { kind: 'none' }"],
+  },
 ];
 
 // Prompt-builder files known NOT to be untrusted-content surfaces (so the
