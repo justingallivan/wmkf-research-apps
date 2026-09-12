@@ -10,6 +10,14 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## September 2026 — Cycle Dossier widened to the full D26 roster; seven entries generated at ~$0.37 each; Dependabot cleared; editors on tiptap 3 (Session 509)
+
+**Milestone:** The Cycle Dossier moved from a one-request smoke to pilot mode over the 23-request D26 roster, and the owner generated seven briefings the same afternoon while the app was hardened live around the failures each run surfaced.
+**Sessions:** 509 (Opus 5, owner-present; Sonnet agents built the hardening slice, Fable/Opus reviewed; fourteen PRs).
+**Ship state:** hardening slice #265 (operator-stop abort inside in-flight calls via a new Executor `signal`, Content-Disposition escaping, page fixes); pilot widened by env (`pilot`, 23-request allowlist); entry timeout became the admin-tunable `cycle-dossier.entry` budget after an 85 s timeout on the first pilot run (#274, retry refresh #276); plain-language failure copy; editions clarity, Include all, working PDF preview, per-row downloads (#275, #277); per-request revision numbers, migration 046 (#278). Also: Fable model tier (#266), all 18 Dependabot alerts closed incl. tiptap 2→3 (#267, #270, #271), reviewer release without courtesy email (#273). Actuals: $0.47 for 1002874 across two runs, $1.87 for five entries, vs. reservation bounds ~40× higher.
+**Why it matters:** The pilot is now usable by every superuser on real requests, with real cost data in hand for the estimate redesign; the tiptap and Next security debt is gone.
+**Pointers:** `docs/CYCLE_DOSSIER_PILOT_DESIGN.md`, `docs/CURRENT_WORK_QUEUE.md` item 11, `docs/plans/VIRTUAL_REVIEW_PANEL_REVIVAL_SURVEY_2026-09-12.md`, `.claude-memory/feedback-deployment-monitoring-use-inspect.md`, `.claude-memory/feedback-codex-worktree-owner-runs-it.md`.
+
 ## September 2026 — First Cycle Dossier generated in production; SharePoint Office-package rewrite handled (Session 508)
 
 **Milestone:** The D26 Cycle Dossier pilot produced its first real scientific briefing for request 1002852 end to end: frozen narrative → paid research-plan and entry calls → DOCX/PDF → SharePoint publication → private downloads, with the owner reviewing the PDF.
