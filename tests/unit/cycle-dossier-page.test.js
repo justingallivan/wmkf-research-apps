@@ -8,6 +8,7 @@ import {
   buildLaunchPayload,
   default as CycleDossierPage,
   CycleDossierWorkspace,
+  formatCostRange,
   groupedCandidates,
   isCurrentGeneration,
   parseBudgetUsd,
@@ -83,6 +84,11 @@ describe('cycle dossier page', () => {
       idempotencyKey: '00000000-0000-4000-8000-000000000001',
       budgetUsd: 12.5,
     });
+  });
+
+  it('rounds the cost-range display to two decimals', () => {
+    expect(formatCostRange({ lowUsd: 2.87775, highUsd: 14.38875 })).toBe('$2.88–$14.39');
+    expect(formatCostRange({})).toBe('Unknown');
   });
 
   it('starts all returned candidates included and persists an exclusion', async () => {
@@ -207,7 +213,7 @@ describe('cycle dossier page', () => {
     fireEvent.click(screen.getByRole('button', { name: /review cost & sources/i }));
     await waitFor(() => expect(screen.getByText('Preview ready')).toBeInTheDocument());
     fireEvent.click(screen.getByRole('button', { name: /launch dossier run/i }));
-    await waitFor(() => expect(screen.getByText('network lost')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getAllByText('network lost').length).toBeGreaterThan(0));
     fireEvent.click(screen.getByRole('button', { name: /launch dossier run/i }));
     await waitFor(() => expect(fetchMock.mock.calls.filter(([, init]) => init?.method === 'POST' && JSON.parse(init.body).action === 'launch').length).toBe(2));
     const launchBodies = fetchMock.mock.calls.filter(([, init]) => init?.method === 'POST' && JSON.parse(init.body).action === 'launch').map(([, init]) => JSON.parse(init.body));
@@ -231,8 +237,52 @@ describe('cycle dossier page', () => {
     expect(fetchMock.mock.calls.some(([, init]) => init?.method === 'POST' && JSON.parse(init.body).action === 'launch')).toBe(false);
 
     fireEvent.click(screen.getByRole('button', { name: /progress & editions/i }));
-    fireEvent.click(screen.getByRole('button', { name: /retry failed/i }));
+    expect(screen.getByRole('button', { name: 'Retry failed entries' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry failed entries' }));
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/between \$0\.01 and \$10,000/));
+    expect(screen.getAllByTestId('cycle-dossier-inline-error')).toHaveLength(1);
+    expect(screen.getByTestId('cycle-dossier-inline-error')).toHaveTextContent(/between \$0\.01 and \$10,000/);
     expect(fetchMock.mock.calls.some(([, init]) => init?.method === 'POST' && JSON.parse(init.body).action === 'retry')).toBe(false);
+  });
+
+  it('shows the error inline under the Launch button in addition to the top banner', async () => {
+    const preview = { id: 'preview-inline', expiresAt: '2026-09-07T12:00:00Z', items: [{ requestId: 'b', status: 'queued' }], estimate: { lowUsd: 1, highUsd: 2, newCount: 1, reuseCount: 0 }, errors: [] };
+    jest.spyOn(global, 'fetch')
+      .mockResolvedValueOnce(response(dossierResponse(['b'])))
+      .mockResolvedValueOnce(response({ preview }))
+      .mockRejectedValueOnce(new Error('launch rejected: 409'))
+      .mockResolvedValue(response(dossierResponse(['b'])));
+    render(<CycleDossierWorkspace />);
+    await waitFor(() => expect(screen.getByText('Beta')).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: /review cost & sources/i }));
+    await waitFor(() => expect(screen.getByText('Preview ready')).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: /launch dossier run/i }));
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('launch rejected: 409'));
+    expect(screen.getByTestId('cycle-dossier-inline-error')).toHaveTextContent('launch rejected: 409');
+  });
+
+  it('formats the Spent amount to two decimals and warns about editing files in Word Online', async () => {
+    const runningRun = { id: 'run-1', status: 'running', spentUsd: 0.135, reservedUsd: 0, budgetUsd: null, items: [{ requestId: 'b', status: 'processing', stage: 'docx-saved' }] };
+    jest.spyOn(global, 'fetch').mockResolvedValue(response(dossierResponse(['b'], { runs: [runningRun] })));
+    render(<CycleDossierWorkspace />);
+    await waitFor(() => expect(screen.getByText('Run progress')).toBeInTheDocument());
+    expect(screen.getByText(/Spent \$0\.14/)).toBeInTheDocument();
+    expect(screen.getByTestId('cycle-dossier-word-online-note')).toBeInTheDocument();
+  });
+
+  it('defaults to the Progress tab on first load when the latest run is unsettled, but not when completed', async () => {
+    const runningRun = { id: 'run-1', status: 'running', items: [] };
+    jest.spyOn(global, 'fetch').mockResolvedValue(response(dossierResponse(['b'], { runs: [runningRun] })));
+    render(<CycleDossierWorkspace />);
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Run progress' })).toBeInTheDocument());
+    expect(screen.queryByRole('heading', { name: 'Choose requests' })).not.toBeInTheDocument();
+  });
+
+  it('stays on the Choose requests tab on first load when the latest run is completed', async () => {
+    const completedRun = { id: 'run-2', status: 'completed', items: [] };
+    jest.spyOn(global, 'fetch').mockResolvedValue(response(dossierResponse(['b'], { runs: [completedRun] })));
+    render(<CycleDossierWorkspace />);
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Choose requests' })).toBeInTheDocument());
+    expect(screen.queryByRole('heading', { name: 'Run progress' })).not.toBeInTheDocument();
   });
 });
