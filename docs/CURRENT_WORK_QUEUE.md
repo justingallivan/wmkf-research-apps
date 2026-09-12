@@ -56,8 +56,12 @@ sequence.
   trailingNode/listKeymap are disabled to hold each editor's allowlist, `setContent` uses
   `{ emitUpdate: false }`, `shouldRerenderOnTransaction: true` keeps toolbar state live,
   and the Markdown serializer imports `prosemirror-markdown` directly (the `@tiptap/pm/
-  markdown` subpath is gone). Owner eyeball of the reviewer and grantee editors in
-  production is still pending; the Playwright authoring spec was not run locally.
+  markdown` subpath is gone). Production smoke 2026-09-12 (Chrome, signed-in staff): the
+  grantee abstract editor on an awarded J26 request and the manual-review rescue form on
+  a D26 request both rendered on tiptap 3.31; bold, italic (Cmd+I), subscript, and
+  superscript applied and the toolbar pressed-state tracked each; Undo restored the
+  original; no console errors; nothing was saved. The external reviewer portal itself and
+  the Playwright authoring spec were not exercised.
 - **Unescaped `Content-Disposition` filenames on five download/export routes (found 2026-09-12, S509).**
   `pages/api/cycle-dossier/download.js` now uses `lib/utils/content-disposition.js`
   (ASCII quoted fallback plus RFC 5987 `filename*`). The same raw interpolation or a
