@@ -1,7 +1,7 @@
 ---
 agent_wiki: index
 status: active
-last_verified: 2026-06-13
+last_verified: 2026-09-11
 stale_after_days: 90
 owner: agent-operations
 source_files:
