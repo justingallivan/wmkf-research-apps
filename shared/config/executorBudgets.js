@@ -10,6 +10,15 @@
 export const EXECUTOR_BUDGET_SCHEMA_VERSION = 1;
 export const EXECUTOR_BUDGET_SETTING_PREFIX = 'executor.budgets.v';
 
+// `lib/services/review-panel-generation.js`'s `snapshotPrompt` refuses any
+// review-panel.seat/chair prompt ROW whose wmkf_ai_maxtokens exceeds this
+// value (a fixed, reviewed ceiling on the seeded row itself, independent of
+// the Executor budget below). Mirrored here — not re-derived — so the two
+// standing budgets' LIMITS.maxTokensOverride.max below can reference the same
+// number instead of drifting from it. Raising it requires relaxing that
+// row-level check first.
+export const REVIEW_PANEL_PROMPT_ROW_MAX_TOKENS_CAP = 16_000;
+
 export const EXECUTOR_BUDGET_DEFAULTS = Object.freeze({
   'pre-site-visit.proposal-core.generate': Object.freeze({
     kind: 'standing',
@@ -29,24 +38,28 @@ export const EXECUTOR_BUDGET_DEFAULTS = Object.freeze({
     kind: 'timeout',
     timeoutMsOverride: 200_000,
   }),
-  // review-panel.seat and review-panel.chair use 'timeout' (output tokens stay
-  // on the prompt row, like cycle-dossier.entry), not 'standing': the panel's
-  // prompt rows (A.3) are not seeded in Phase A slice 1, and assertModelCeilings
-  // would call fetchCurrentPrompt for any non-'timeout' kind, blocking budget
-  // publication for every registered prompt (not just the panel's) before then.
-  // For the OpenAI seat (gpt-5.6-sol, MODEL_CAPABILITIES `instructionRole:
-  // 'developer'`), OpenAI's max_completion_tokens counts reasoning tokens
-  // toward the same ceiling as the visible answer, so the eventual
-  // review-panel.seat prompt row's wmkf_ai_maxtokens must be sized with
-  // headroom beyond a Claude-only synthesis budget (see review-synthesis.generate
-  // above) to leave room for reasoning before the final structured review; both
-  // seat vendors share this one timeout envelope.
+  // review-panel.seat and review-panel.chair are 'standing' (owner decision,
+  // 2026-09-13): the seat/chair output ceiling must not be hard-coded in the
+  // prompt row or seed, because it will need changing as models evolve and
+  // adaptive thinking is counted inside this same output budget. The panel's
+  // prompt rows (A.3/A.7) are seeded, so assertModelCeilings' fetchCurrentPrompt
+  // read (which any non-'timeout' kind now takes) is safe.
+  // Both seat vendors — the Claude seat and the OpenAI seat (gpt-5.6-sol,
+  // MODEL_CAPABILITIES `instructionRole: 'developer'`) — share this ONE
+  // standing override: OpenAI's max_completion_tokens counts reasoning tokens
+  // toward the same ceiling as the visible answer, so this budget must leave
+  // headroom for reasoning before the final structured review, same as
+  // Claude's adaptive thinking does. The runtime resolver
+  // (execute-prompt.js's resolveMaxTokensForCall) still caps the effective
+  // call to whichever model is actually resolved for a given seat/run.
   'review-panel.seat': Object.freeze({
-    kind: 'timeout',
+    kind: 'standing',
+    maxTokensOverride: 16_000,
     timeoutMsOverride: 200_000,
   }),
   'review-panel.chair': Object.freeze({
-    kind: 'timeout',
+    kind: 'standing',
+    maxTokensOverride: 12_000,
     timeoutMsOverride: 200_000,
   }),
 });
@@ -75,10 +88,15 @@ export const EXECUTOR_BUDGET_LIMITS = Object.freeze({
   // lease length (A.6) is not yet built in this slice, so the 280s-lease-minus-
   // checkpoint-reserve rationale behind cycle-dossier.entry's ceiling has not
   // been independently re-derived for the panel's own worker.
+  // maxTokensOverride's max is the lower of REVIEW_PANEL_PROMPT_ROW_MAX_TOKENS_CAP
+  // (snapshotPrompt's row-level ceiling) and each resolved model's own
+  // maxOutputTokens (checked separately, per publication, by assertModelCeilings).
   'review-panel.seat': Object.freeze({
+    maxTokensOverride: Object.freeze({ min: 4_000, max: REVIEW_PANEL_PROMPT_ROW_MAX_TOKENS_CAP }),
     timeoutMsOverride: Object.freeze({ min: 60_000, max: 220_000 }),
   }),
   'review-panel.chair': Object.freeze({
+    maxTokensOverride: Object.freeze({ min: 4_000, max: REVIEW_PANEL_PROMPT_ROW_MAX_TOKENS_CAP }),
     timeoutMsOverride: Object.freeze({ min: 60_000, max: 220_000 }),
   }),
 });
@@ -101,12 +119,12 @@ export const EXECUTOR_BUDGET_DESCRIPTIONS = Object.freeze({
     reason: 'One five-section briefing over the frozen narrative plus retrieved evidence; the 85s code default expired in production on Request 1002874 (first pilot-mode run). Output tokens stay on the prompt row; the research-plan stage keeps the short default.',
   }),
   'review-panel.seat': Object.freeze({
-    since: 'Phase A slice 1 (2026-09-12)',
-    reason: 'Registered ahead of the seat prompt (A.3) so the envelope exists before the first governed run; cloned from cycle-dossier.entry\'s timeout-only shape. [ASSUMED] envelope, not yet exercised by a real run.',
+    since: '2026-09-13 (owner decision: admin-tunable ceiling, not hard-coded in the prompt row/seed)',
+    reason: 'One structured review per seat, shared by both seat vendors. Adaptive thinking (Claude) and reasoning tokens (the OpenAI seat\'s max_completion_tokens) are both counted inside this same output budget, so it must be raisable as models evolve without a code change.',
   }),
   'review-panel.chair': Object.freeze({
-    since: 'Phase A slice 1 (2026-09-12)',
-    reason: 'Registered ahead of the chair prompt (A.3); cloned from cycle-dossier.entry\'s timeout-only shape. [ASSUMED] envelope, not yet exercised by a real run.',
+    since: '2026-09-13 (owner decision: admin-tunable ceiling, not hard-coded in the prompt row/seed)',
+    reason: 'One synthesis over every seat\'s structured review. Adaptive thinking is counted inside this same output budget, so it must be raisable as models evolve without a code change.',
   }),
 });
 

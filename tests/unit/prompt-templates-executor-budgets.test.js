@@ -37,6 +37,8 @@ function budgetConfig(version = 0, maxTokensOverride = 32768) {
       'review-synthesis.generate': { kind: 'retry', floor: 16000, ceiling: 32000 },
       'field-primer.generate': { kind: 'timeout', timeoutMsOverride: 240000 },
       'cycle-dossier.entry': { kind: 'timeout', timeoutMsOverride: 200000 },
+      'review-panel.seat': { kind: 'standing', maxTokensOverride: 16000, timeoutMsOverride: 200000 },
+      'review-panel.chair': { kind: 'standing', maxTokensOverride: 12000, timeoutMsOverride: 200000 },
     },
     limits: {
       'pre-site-visit.proposal-core.generate': {
@@ -51,6 +53,14 @@ function budgetConfig(version = 0, maxTokensOverride = 32768) {
         timeoutMsOverride: { min: 60000, max: 240000 },
       },
       'cycle-dossier.entry': {
+        timeoutMsOverride: { min: 60000, max: 220000 },
+      },
+      'review-panel.seat': {
+        maxTokensOverride: { min: 4000, max: 16000 },
+        timeoutMsOverride: { min: 60000, max: 220000 },
+      },
+      'review-panel.chair': {
+        maxTokensOverride: { min: 4000, max: 16000 },
         timeoutMsOverride: { min: 60000, max: 220000 },
       },
     },
@@ -116,6 +126,33 @@ test('Admin edits and atomically publishes the complete Executor budget revision
   expect(JSON.parse(put[1].body).requestId).toMatch(/^[0-9a-f-]{36}$/);
   expect(await screen.findByText('Published Executor budget revision 1.')).toBeInTheDocument();
   expect(screen.getByTestId('output-budget')).toHaveTextContent('published revision 1');
+});
+
+test('the review panel seat and chair output budgets are editable, range-checked, and published with the complete revision', async () => {
+  render(<PromptTemplatesSection />);
+  const seatTokens = await screen.findByLabelText(/Seat output tokens/);
+  const chairTokens = await screen.findByLabelText(/Chair output tokens/);
+  expect(seatTokens).toHaveValue(16000);
+  expect(chairTokens).toHaveValue(12000);
+
+  fireEvent.change(seatTokens, { target: { value: '20000' } });
+  expect(screen.getByText(/Use whole numbers inside each displayed safety range/)).toBeInTheDocument();
+
+  fireEvent.change(seatTokens, { target: { value: '16000' } });
+  fireEvent.change(chairTokens, { target: { value: '10000' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Publish v1' }));
+
+  await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
+    '/api/admin/executor-budgets',
+    expect.objectContaining({ method: 'PUT' }),
+  ));
+  const put = global.fetch.mock.calls.find(([, options]) => options?.method === 'PUT');
+  expect(JSON.parse(put[1].body).budgets['review-panel.seat']).toEqual({
+    kind: 'standing', maxTokensOverride: 16000, timeoutMsOverride: 200000,
+  });
+  expect(JSON.parse(put[1].body).budgets['review-panel.chair']).toEqual({
+    kind: 'standing', maxTokensOverride: 10000, timeoutMsOverride: 200000,
+  });
 });
 
 test('a budget-load failure leaves unrelated prompt editing available', async () => {

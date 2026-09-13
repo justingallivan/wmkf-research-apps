@@ -27,14 +27,16 @@ function budgets(overrides = {}) {
       ...(overrides.entryTimeout || {}),
     },
     'review-panel.seat': {
-      kind: 'timeout',
+      kind: 'standing',
+      maxTokensOverride: 16000,
       timeoutMsOverride: 200000,
-      ...(overrides.seatTimeout || {}),
+      ...(overrides.seat || {}),
     },
     'review-panel.chair': {
-      kind: 'timeout',
+      kind: 'standing',
+      maxTokensOverride: 12000,
       timeoutMsOverride: 200000,
-      ...(overrides.chairTimeout || {}),
+      ...(overrides.chair || {}),
     },
   };
 }
@@ -209,7 +211,11 @@ test('publishes and verifies the next immutable revision after model-ceiling che
   }, deps);
 
   expect(result).toMatchObject({ status: 'completed', config: { version: 1, source: 'dataverse' } });
-  expect(deps.fetchCurrentPrompt).toHaveBeenCalledTimes(2);
+  // pre-site-visit.proposal-core.generate + review-synthesis.generate (retry)
+  // + review-panel.seat + review-panel.chair: every 'standing'/'retry' kind
+  // reads its current prompt row for a model-ceiling check; 'timeout' kinds
+  // (field-primer, cycle-dossier) do not.
+  expect(deps.fetchCurrentPrompt).toHaveBeenCalledTimes(4);
   expect(deps.createSettingStrict).toHaveBeenCalledWith(
     'executor.budgets.v000001',
     expect.any(String),

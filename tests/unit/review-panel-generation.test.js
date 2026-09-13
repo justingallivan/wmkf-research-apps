@@ -13,7 +13,13 @@ jest.mock('../../lib/external/review-question-fetcher', () => ({
   getAuthoritativeQuestionSet: jest.fn(),
   questionSetVersion: jest.fn(() => 'v-fixture'),
 }));
-jest.mock('../../lib/services/executor-budget-service', () => ({ getExecutorBudget: jest.fn().mockResolvedValue({ timeoutMsOverride: 150000 }) }));
+jest.mock('../../lib/services/executor-budget-service', () => ({
+  getExecutorBudget: jest.fn((promptName) => Promise.resolve(
+    promptName === 'review-panel.chair'
+      ? { timeoutMsOverride: 150000, maxTokensOverride: 12000 }
+      : { timeoutMsOverride: 150000, maxTokensOverride: 16000 },
+  )),
+}));
 jest.mock('../../lib/utils/model-pricing', () => {
   const actual = jest.requireActual('../../lib/utils/model-pricing');
   return { ...actual, lookupPricing: jest.fn(actual.lookupPricing) };
@@ -147,6 +153,15 @@ describe('snapshotConfiguration', () => {
     await expect(snapshotConfiguration()).rejects.toThrow(/declared input names/);
   });
 
+  test('pins the standing Executor budget (max tokens + timeout) per seat and for the chair, frozen at launch', async () => {
+    const config = await snapshotConfiguration();
+    expect(config.seats['seat.claude'].budget).toEqual({ timeoutMsOverride: 150000, maxTokensOverride: 16000 });
+    expect(config.seats['seat.openai'].budget).toEqual({ timeoutMsOverride: 150000, maxTokensOverride: 16000 });
+    expect(config.chair.budget).toEqual({ timeoutMsOverride: 150000, maxTokensOverride: 12000 });
+    expect(Object.isFrozen(config.chair.budget)).toBe(true);
+    expect(Object.isFrozen(config.seats['seat.claude'].budget)).toBe(true);
+  });
+
   test('projects the question set and excludes teamCapacity as a real question (marks it not-assessable)', async () => {
     const config = await snapshotConfiguration();
     expect(config.projectedQuestionSet.some((f) => f.key === 'affiliation')).toBe(false);
@@ -206,6 +221,21 @@ describe('runSeat', () => {
     expect(finalizeAttempt.mock.calls[0][2].costCents).toEqual(expect.any(Number));
   });
 
+  test('a standing maxTokensOverride of 16000 reaches executePrompt as the seat call\'s max tokens, pinned from the snapshot', async () => {
+    const cfg = await config();
+    const execute = jest.fn().mockResolvedValue({ parsed: {}, usage: {}, usageComplete: true });
+    await runSeat(INPUT, cfg.seats['seat.claude'], { attemptId: 'att-1', dispatchToken: 'tok-1', execute });
+    expect(execute.mock.calls[0][0].maxTokensOverride).toBe(16000);
+  });
+
+  test('a budget missing maxTokensOverride falls back to the prompt row value (executePrompt receives null, not a fabricated number)', async () => {
+    const cfg = await config();
+    const seatConfigWithoutOverride = { ...cfg.seats['seat.claude'], budget: { timeoutMsOverride: 150000 } };
+    const execute = jest.fn().mockResolvedValue({ parsed: {}, usage: {}, usageComplete: true });
+    await runSeat(INPUT, seatConfigWithoutOverride, { attemptId: 'att-1', dispatchToken: 'tok-1', execute });
+    expect(execute.mock.calls[0][0].maxTokensOverride).toBeNull();
+  });
+
   test('allowedProviders passed to executePrompt equals exactly [seat.provider]', async () => {
     const cfg = await config();
     const execute = jest.fn().mockResolvedValue({ parsed: {}, usage: {}, usageComplete: true });
@@ -244,6 +274,23 @@ describe('runChair', () => {
     expect(Object.values(sentReviews).some((r) => 'teamCapacity' in r)).toBe(false);
     expect(execute.mock.calls[0][0].allowedProviders).toEqual(['anthropic']);
     expect(finalizeAttempt).toHaveBeenCalledWith('att-chair', 'tok-c', expect.objectContaining({ state: 'completed' }));
+  });
+
+  test('a standing maxTokensOverride of 12000 reaches executePrompt as the chair call\'s max tokens, pinned from the snapshot', async () => {
+    const cfg = await snapshotConfiguration();
+    const execute = jest.fn().mockResolvedValue({ parsed: { consensus: [] }, usage: { input_tokens: 10, output_tokens: 10 }, usageComplete: true });
+    const seatWinners = { 'seat.claude': { priorWork: 'a' }, 'seat.openai': { priorWork: 'b' } };
+    await runChair(INPUT, seatWinners, cfg.chair, { attemptId: 'att-chair', dispatchToken: 'tok-c', execute });
+    expect(execute.mock.calls[0][0].maxTokensOverride).toBe(12000);
+  });
+
+  test('a budget missing maxTokensOverride falls back to the prompt row value (executePrompt receives null)', async () => {
+    const cfg = await snapshotConfiguration();
+    const chairConfigWithoutOverride = { ...cfg.chair, budget: { timeoutMsOverride: 150000 } };
+    const execute = jest.fn().mockResolvedValue({ parsed: { consensus: [] }, usage: { input_tokens: 10, output_tokens: 10 }, usageComplete: true });
+    const seatWinners = { 'seat.claude': { priorWork: 'a' }, 'seat.openai': { priorWork: 'b' } };
+    await runChair(INPUT, seatWinners, chairConfigWithoutOverride, { attemptId: 'att-chair', dispatchToken: 'tok-c', execute });
+    expect(execute.mock.calls[0][0].maxTokensOverride).toBeNull();
   });
 
   test('refuses to synthesize over a seat_reviews payload that would exceed the declared size cap — executePrompt is never called, so wrapUntrustedContent can never silently truncate it', async () => {

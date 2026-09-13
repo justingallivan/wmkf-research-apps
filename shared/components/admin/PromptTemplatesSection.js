@@ -39,6 +39,8 @@ const EXECUTOR_BUDGET_EDITABLE_FIELDS = {
   'review-synthesis.generate': ['floor', 'ceiling'],
   'field-primer.generate': ['timeoutMsOverride'],
   'cycle-dossier.entry': ['timeoutMsOverride'],
+  'review-panel.seat': ['maxTokensOverride', 'timeoutMsOverride'],
+  'review-panel.chair': ['maxTokensOverride', 'timeoutMsOverride'],
 };
 
 function newRequestId() {
@@ -402,7 +404,12 @@ export function OutputBudgetLine({ prompt, modelCatalog, executorBudgetConfig })
 }
 
 export function ExecutorBudgetEditor({ config, onPublished }) {
-  const standingName = 'pre-site-visit.proposal-core.generate';
+  // Each entry is [promptName, output-tokens field label, timeout field label].
+  const standingNames = [
+    ['pre-site-visit.proposal-core.generate', 'Maximum output tokens', 'Timeout (milliseconds)'],
+    ['review-panel.seat', 'Seat output tokens (counts adaptive thinking/reasoning)', 'Seat timeout (milliseconds)'],
+    ['review-panel.chair', 'Chair output tokens (counts adaptive thinking)', 'Chair timeout (milliseconds)'],
+  ];
   const retryName = 'review-synthesis.generate';
   const timeoutNames = [
     ['field-primer.generate', 'Field primer timeout (milliseconds)'],
@@ -420,12 +427,10 @@ export function ExecutorBudgetEditor({ config, onPublished }) {
   const currentConfig = configRevision(config) >= configRevision(conflictConfig)
     ? config
     : conflictConfig;
-  const standing = values[standingName] || {};
   const retry = values[retryName] || {};
   const limits = config.limits || {};
   const integers = [
-    standing.maxTokensOverride,
-    standing.timeoutMsOverride,
+    ...standingNames.flatMap(([name]) => [values[name]?.maxTokensOverride, values[name]?.timeoutMsOverride]),
     retry.floor,
     retry.ceiling,
     ...timeoutNames.map(([name]) => values[name]?.timeoutMsOverride),
@@ -433,8 +438,8 @@ export function ExecutorBudgetEditor({ config, onPublished }) {
   const within = (value, range) => Number.isInteger(value)
     && value >= range?.min && value <= range?.max;
   const valid = integers
-    && within(standing.maxTokensOverride, limits[standingName]?.maxTokensOverride)
-    && within(standing.timeoutMsOverride, limits[standingName]?.timeoutMsOverride)
+    && standingNames.every(([name]) => within(values[name]?.maxTokensOverride, limits[name]?.maxTokensOverride)
+      && within(values[name]?.timeoutMsOverride, limits[name]?.timeoutMsOverride))
     && within(retry.floor, limits[retryName]?.floor)
     && within(retry.ceiling, limits[retryName]?.ceiling)
     && timeoutNames.every(([name]) => within(values[name]?.timeoutMsOverride, limits[name]?.timeoutMsOverride))
@@ -549,23 +554,25 @@ export function ExecutorBudgetEditor({ config, onPublished }) {
         }]} />
       </div>
       <div className="p-4 space-y-4">
-        <div>
-          <div className="text-sm font-medium text-gray-800"><code>{standingName}</code></div>
-          <div className="grid sm:grid-cols-2 gap-3 mt-2">
-            <BudgetNumberField
-              label="Maximum output tokens"
-              value={standing.maxTokensOverride}
-              limits={limits[standingName]?.maxTokensOverride}
-              onChange={(value) => setBudgetValue(standingName, 'maxTokensOverride', value)}
-            />
-            <BudgetNumberField
-              label="Timeout (milliseconds)"
-              value={standing.timeoutMsOverride}
-              limits={limits[standingName]?.timeoutMsOverride}
-              onChange={(value) => setBudgetValue(standingName, 'timeoutMsOverride', value)}
-            />
+        {standingNames.map(([name, tokensLabel, timeoutLabel]) => (
+          <div key={name}>
+            <div className="text-sm font-medium text-gray-800"><code>{name}</code></div>
+            <div className="grid sm:grid-cols-2 gap-3 mt-2">
+              <BudgetNumberField
+                label={tokensLabel}
+                value={values[name]?.maxTokensOverride}
+                limits={limits[name]?.maxTokensOverride}
+                onChange={(value) => setBudgetValue(name, 'maxTokensOverride', value)}
+              />
+              <BudgetNumberField
+                label={timeoutLabel}
+                value={values[name]?.timeoutMsOverride}
+                limits={limits[name]?.timeoutMsOverride}
+                onChange={(value) => setBudgetValue(name, 'timeoutMsOverride', value)}
+              />
+            </div>
           </div>
-        </div>
+        ))}
         <div>
           <div className="text-sm font-medium text-gray-800"><code>{retryName}</code></div>
           <div className="grid sm:grid-cols-2 gap-3 mt-2">
