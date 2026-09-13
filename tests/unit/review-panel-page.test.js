@@ -9,6 +9,7 @@ import {
   formatRunningElapsed,
   isRunUnsettled,
   launchSelectionSignature,
+  runPillLabel,
   default as ReviewPanelPage,
   ReviewPanelWorkspace,
 } from '../../pages/review-panel';
@@ -155,6 +156,66 @@ describe('ReviewPanelWorkspace', () => {
     await waitFor(() => expect(screen.getByText(/#101/)).toBeInTheDocument());
     expect(screen.getAllByTestId('review-panel-entry-links')).toHaveLength(1);
     expect(screen.getByText('boom')).toBeInTheDocument();
+  });
+
+  test('a retry-requested entry hides the stale error and the failed pill, showing the waiting line instead', async () => {
+    global.fetch = jest.fn().mockResolvedValue(response(pageResponse({
+      runs: [{ id: 'run-1', status: 'queued', entries: [
+        { id: 'entry-1', requestNumber: '101', status: 'failed', hasReport: false, retryRequested: true, error: 'The panel completed, but its report could not be saved …', seats: [] },
+      ] }],
+    })));
+    render(<ReviewPanelWorkspace />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Progress' }));
+    await waitFor(() => expect(screen.getByText(/#101/)).toBeInTheDocument());
+    expect(screen.queryByText(/could not be saved/)).not.toBeInTheDocument();
+    expect(screen.getByText('Retry requested — waiting for the worker (runs every minute).')).toBeInTheDocument();
+    expect(screen.queryByText('failed', { selector: 'span' })).not.toBeInTheDocument();
+    expect(screen.getByText('Retry queued')).toBeInTheDocument();
+  });
+
+  test('a running entry whose retry was cleared but has no report yet, with every seat/chair completed, shows the re-rendering line ALONGSIDE the still-visible failed pill/error (the state is only an inference — it can also be a fresh, unrelated failure, so nothing about the failed status is hidden here)', async () => {
+    global.fetch = jest.fn().mockResolvedValue(response(pageResponse({
+      runs: [{ id: 'run-1', status: 'running', entries: [
+        {
+          id: 'entry-1', requestNumber: '101', status: 'failed', hasReport: false, retryRequested: false,
+          error: 'stale', seats: [{ seatKey: 'seat.claude', label: 'Claude reviewer', state: 'completed' }, { seatKey: 'chair', label: 'Chair', state: 'completed' }],
+        },
+      ] }],
+    })));
+    render(<ReviewPanelWorkspace />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Progress' }));
+    await waitFor(() => expect(screen.getByText(/#101/)).toBeInTheDocument());
+    expect(screen.getByText('Retrying: rendering and saving the report…')).toBeInTheDocument();
+    expect(screen.getByText('stale')).toBeInTheDocument();
+    expect(screen.getByText('failed')).toBeInTheDocument();
+  });
+
+  test('a plain failed entry (no retry pending) still shows its failed pill and error text', async () => {
+    global.fetch = jest.fn().mockResolvedValue(response(pageResponse({
+      runs: [{ id: 'run-1', status: 'running', entries: [
+        { id: 'entry-1', requestNumber: '101', status: 'failed', hasReport: false, retryRequested: false, error: 'boom', seats: [] },
+      ] }],
+    })));
+    render(<ReviewPanelWorkspace />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Progress' }));
+    await waitFor(() => expect(screen.getByText(/#101/)).toBeInTheDocument());
+    expect(screen.getByText('boom')).toBeInTheDocument();
+    expect(screen.getByText('failed')).toBeInTheDocument();
+  });
+
+  test('runPillLabel shows "retry queued" for a queued run with a pending retry entry, and plain status otherwise', () => {
+    expect(runPillLabel(null)).toBe('no run yet');
+    expect(runPillLabel({ status: 'queued', entries: [{ retryRequested: true }] })).toBe('retry queued');
+    expect(runPillLabel({ status: 'queued', entries: [{ retryRequested: false }] })).toBe('queued');
+    expect(runPillLabel({ status: 'running', entries: [{ retryRequested: true }] })).toBe('running');
+  });
+
+  test('the run pill reads "retry queued" when the queued run has a pending retry', async () => {
+    global.fetch = jest.fn().mockResolvedValue(response(pageResponse({
+      runs: [{ id: 'run-1', status: 'queued', entries: [{ id: 'entry-1', requestNumber: '101', status: 'failed', hasReport: false, retryRequested: true, seats: [] }] }],
+    })));
+    render(<ReviewPanelWorkspace />);
+    await waitFor(() => expect(screen.getByText('retry queued')).toBeInTheDocument());
   });
 
   test('a second click with an IDENTICAL selection after a failed first response sends the SAME idempotencyKey (mirrors cycle-dossier.js launchKeyRef) — a changed selection then sends a new one', async () => {
