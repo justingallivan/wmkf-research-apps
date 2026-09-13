@@ -49,8 +49,14 @@ All eight owner steps in §5 are done: 047 applied, PR #281 merged (bbef47ac), s
 | 1002874 | Fable: API refusal, 4 s, 14.5k in / 0 out, $0.15 | completed, 94 s, 8.8k/3.2k, $0.10 | entry failed |
 | 1002852 (Opus intended) | Fable again: admin override cache (5-min TTL per instance) had not expired at launch | completed, 58 s, $0.10 | entry failed |
 | 1002852 (Opus pinned) | Opus: hit the 8,000-token seat ceiling after 126 s, 15.1k in / 8.0k out, $0.28; output not persisted | completed, 64 s, $0.11 | entry failed |
+| **1002852 (all fixes)** | **Opus: completed, 83 s, 15.2k in / 5.2k out, $0.21** | **completed, 35 s, 10.2k / 1.6k, $0.07** | **chair Opus completed, 115 s, 20.7k / 8.8k, $0.33; first save failed on "→" in the PDF renderer; retry after PR #286 saved DOCX + PDF with no new paid call. Entry and run completed. Panel cost $0.61.** |
 
-Findings:
+Findings (2026-09-13, in order fixed):
+- **First complete panel: 1002852, $0.61** (seats $0.21 + $0.07, chair $0.33), ~4 minutes wall clock including a one-minute cron wait. D6 posture: this is one data point, not a typical figure.
+- **Prompt editor tier keys**: picking "opus tier" stores the tier key on the row and the panel's D8 check rejected it (chair row v2); fixed in PR #285 (resolve tier → concrete id, structural parity compare, readiness reason shown on the page and logged).
+- **PDF renderer could not encode "→"** from the chair text (pdf-lib standard font, WinAnsi); the panel's PDF builder skipped the shared sanitizer the other exports use; fixed in PR #286 (sanitizer + bounded `data.reportError` detail on the entry).
+- **Output budgets are admin-tunable standing budgets** since PR #284 (Admin → Prompt Templates → Executor output budgets: seat 16,000 default, chair 12,000; thinking counts inside).
+- **Retry-state UX**: while a retry is queued the row showed both `failed` and `Retry queued` with stale copy and no timeline events; fix in flight (branch `fix/review-panel-retry-state`).
 - **Fable refuses the seat prompt** (Anthropic `stop_reason: refusal`, zero output) on two different molecular-biology proposals. Fable's dual-use safety layer, not a parse issue. Seat switched to `claude-opus-5` in the admin panel. Whether Fable passes on non-biology proposals is untested.
 - **Opus overflows the seat ceiling** because the seat prompt carried the human form's "up to 50,000 characters" per answer. Fix in flight: per-answer cap of 2,000 chars in the seat schema and guidance, seed default max tokens 12,000, timeline on the Progress tab (branch `fix/review-panel-seat-cap-timeline`). The live seat prompt row must be re-seeded (`--force`, with the prod-write ack) after that merges.
 - **Admin model changes take up to five minutes to reach launches** (override cache TTL per serverless instance; a save clears only the saving instance). Worth a sentence on the page.
