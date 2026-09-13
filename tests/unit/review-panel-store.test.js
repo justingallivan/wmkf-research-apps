@@ -3,7 +3,8 @@ jest.mock('@vercel/postgres', () => ({ db: { connect: jest.fn() }, sql: { query:
 import { db, sql } from '@vercel/postgres';
 import {
   createAttempt, markAttemptDispatched, finalizeAttempt, reapExpiredAttempts,
-  selectWinners, sumAttemptCosts,
+  selectWinners, sumAttemptCosts, createReviewPanelEntry, mutateReviewPanelEntry,
+  claimReviewPanelRun,
 } from '../../lib/services/review-panel-store';
 
 let client;
@@ -247,4 +248,83 @@ test('sumAttemptCosts reports zero unknowns when every attempt has a known cost'
   const { totalCents, unknownCount } = await sumAttemptCosts('run-1');
   expect(totalCents).toBe(15);
   expect(unknownCount).toBe(0);
+});
+
+describe('createReviewPanelEntry', () => {
+  test('requires the current run lease and computes request_revision per request', async () => {
+    client.query.mockImplementation(async (q) => {
+      if (q.startsWith('SELECT lease_token, locked_until FROM review_panel_runs')) return { rows: [LIVE_RUN] };
+      if (q.startsWith('INSERT INTO review_panel_entries')) return { rows: [{ id: 'entry-1', request_revision: 1 }] };
+      return { rows: [] };
+    });
+    const row = await createReviewPanelEntry({ runId: 'run-1', requestId: 'req-1', leaseToken: 'lease-1', createdBy: 7 });
+    expect(row.id).toBe('entry-1');
+    expect(client.query).toHaveBeenCalledWith('COMMIT');
+  });
+
+  test('rejects a stale lease token before any insert', async () => {
+    client.query.mockImplementation(async (q) => {
+      if (q.startsWith('SELECT lease_token, locked_until FROM review_panel_runs')) return { rows: [LIVE_RUN] };
+      return { rows: [] };
+    });
+    await expect(createReviewPanelEntry({ runId: 'run-1', requestId: 'req-1', leaseToken: 'wrong', createdBy: 7 }))
+      .rejects.toMatchObject({ httpStatus: 409 });
+    expect(client.query).not.toHaveBeenCalledWith(expect.stringContaining('INSERT INTO review_panel_entries'), expect.anything());
+  });
+});
+
+describe('mutateReviewPanelEntry', () => {
+  test('locks the RUN row (FOR UPDATE OF r), not the entry row — same fence as createAttempt/selectWinners', async () => {
+    client.query.mockImplementation(async (q) => {
+      if (q.includes('FOR UPDATE OF r') && q.startsWith('SELECT e.*')) {
+        return { rows: [{ id: 'entry-1', run_id: 'run-1', request_id: 'req-1', request_revision: 1, status: 'pending', data: {}, winners_json: {}, created_by: 7, run_lease_token: 'lease-1', run_locked_until: LIVE_RUN.locked_until }] };
+      }
+      return { rows: [{ id: 'entry-1', status: 'running' }] };
+    });
+    await mutateReviewPanelEntry('entry-1', (e) => { e.status = 'running'; }, 'lease-1');
+    const selectCall = client.query.mock.calls.find(([q]) => q.startsWith('SELECT e.*'));
+    expect(selectCall[0]).toContain('FOR UPDATE OF r');
+    expect(selectCall[0]).not.toContain('FOR UPDATE OF e');
+  });
+
+  test('never writes winners_json back — selectWinners is its only writer', async () => {
+    client.query.mockImplementation(async (q) => {
+      if (q.startsWith('SELECT e.*')) {
+        return { rows: [{ id: 'entry-1', run_id: 'run-1', request_id: 'req-1', request_revision: 1, status: 'pending', data: {}, winners_json: { 'seat.claude': 'att-1' }, created_by: 7, run_lease_token: 'lease-1', run_locked_until: LIVE_RUN.locked_until }] };
+      }
+      return { rows: [{ id: 'entry-1' }] };
+    });
+    await mutateReviewPanelEntry('entry-1', (e) => { e.status = 'failed'; }, 'lease-1');
+    const updateCall = client.query.mock.calls.find(([q]) => q.startsWith('UPDATE review_panel_entries'));
+    expect(updateCall[0]).not.toContain('winners_json');
+  });
+
+  test('rejects a stale lease token', async () => {
+    client.query.mockImplementation(async (q) => {
+      if (q.startsWith('SELECT e.*')) {
+        return { rows: [{ id: 'entry-1', run_id: 'run-1', status: 'pending', data: {}, winners_json: {}, run_lease_token: 'lease-1', run_locked_until: EXPIRED_RUN.locked_until }] };
+      }
+      return { rows: [] };
+    });
+    await expect(mutateReviewPanelEntry('entry-1', () => {}, 'lease-1')).rejects.toMatchObject({ httpStatus: 409 });
+  });
+});
+
+describe('claimReviewPanelRun', () => {
+  test('returns null when the operator stop is set', async () => {
+    client.query.mockImplementation(async (q) => {
+      if (q.includes('stop_requested')) return { rows: [{ stop_requested: true }] };
+      return { rows: [] };
+    });
+    expect(await claimReviewPanelRun()).toBeNull();
+  });
+
+  test('returns null when another run already holds a live lease', async () => {
+    client.query.mockImplementation(async (q) => {
+      if (q.includes('stop_requested')) return { rows: [{ stop_requested: false }] };
+      if (q.includes('locked_until>NOW()')) return { rows: [{ id: 'other-run' }] };
+      return { rows: [] };
+    });
+    expect(await claimReviewPanelRun()).toBeNull();
+  });
 });

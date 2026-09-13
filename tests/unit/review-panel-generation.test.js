@@ -13,6 +13,11 @@ jest.mock('../../lib/external/review-question-fetcher', () => ({
   getAuthoritativeQuestionSet: jest.fn(),
   questionSetVersion: jest.fn(() => 'v-fixture'),
 }));
+jest.mock('../../lib/services/executor-budget-service', () => ({ getExecutorBudget: jest.fn().mockResolvedValue({ timeoutMsOverride: 150000 }) }));
+jest.mock('../../lib/utils/model-pricing', () => {
+  const actual = jest.requireActual('../../lib/utils/model-pricing');
+  return { ...actual, lookupPricing: jest.fn(actual.lookupPricing) };
+});
 
 import { finalizeAttempt } from '../../lib/services/review-panel-store';
 import { loadModelOverrides } from '../../lib/services/model-override-loader';
@@ -20,6 +25,9 @@ import { getModelForApp } from '../../shared/config/baseConfig';
 import { fetchCurrentPrompt } from '../../lib/services/prompt-store';
 import { MultiLLMService } from '../../lib/services/multi-llm-service';
 import { getAuthoritativeQuestionSet } from '../../lib/external/review-question-fetcher';
+import { lookupPricing } from '../../lib/utils/model-pricing';
+import * as seatDefinition from '../../shared/config/prompts/review-panel-seat.js';
+import * as chairDefinition from '../../shared/config/prompts/review-panel-chair.js';
 import {
   snapshotConfiguration, runSeat, runChair, estimateReservationCost,
   ReviewPanelGenerationError, SEAT_PROMPT_NAME, CHAIR_PROMPT_NAME,
@@ -31,13 +39,22 @@ const QUESTION_FIELDS = [
   { key: 'teamCapacity', order: 7, type: 'richtext', maxLength: 50000 },
 ];
 
+// Rows must satisfy snapshotConfiguration's snapshotPrompt drift check: their
+// variables/output-schema must equal the CANONICAL static definitions
+// verbatim (built from the real files, not hand-typed, so this fixture can't
+// silently drift from what the gate actually enforces).
 const SEAT_ROW_BASE = {
   wmkf_ai_promptname: SEAT_PROMPT_NAME, wmkf_ai_promptid: '11111111-1111-1111-1111-111111111111',
-  wmkf_promptversion: 1, wmkf_ai_model: 'placeholder', wmkf_ai_systemprompt: 'sys', wmkf_ai_promptbody: 'body {{proposal_narrative}}',
-  wmkf_ai_maxtokens: 8000, wmkf_ai_promptvariables: '{"variables":[]}',
-  wmkf_ai_promptoutputschema: '{"parseMode":"json","outputs":[{"name":"review","target":{"kind":"none"}}]}',
+  wmkf_promptversion: 1, wmkf_ai_model: 'claude-fable-5-1', wmkf_ai_systemprompt: seatDefinition.SYSTEM_PROMPT, wmkf_ai_promptbody: seatDefinition.USER_PROMPT_TEMPLATE,
+  wmkf_ai_maxtokens: 8000, wmkf_ai_promptvariables: JSON.stringify(seatDefinition.VARIABLES),
+  wmkf_ai_promptoutputschema: JSON.stringify(seatDefinition.OUTPUT_SCHEMA),
 };
-const CHAIR_ROW_BASE = { ...SEAT_ROW_BASE, wmkf_ai_promptname: CHAIR_PROMPT_NAME, wmkf_ai_maxtokens: 12000 };
+const CHAIR_ROW_BASE = {
+  wmkf_ai_promptname: CHAIR_PROMPT_NAME, wmkf_ai_promptid: '22222222-2222-2222-2222-222222222222',
+  wmkf_promptversion: 1, wmkf_ai_model: 'claude-fable-5-1', wmkf_ai_systemprompt: chairDefinition.SYSTEM_PROMPT, wmkf_ai_promptbody: chairDefinition.USER_PROMPT_TEMPLATE,
+  wmkf_ai_maxtokens: 12000, wmkf_ai_promptvariables: JSON.stringify(chairDefinition.VARIABLES),
+  wmkf_ai_promptoutputschema: JSON.stringify(chairDefinition.OUTPUT_SCHEMA),
+};
 
 const INPUT = Object.freeze({ requestId: 'r1', requestNumber: '2026-001', narrative: Object.freeze({ text: 'A narrative.', sha256: 'abc', sourcePath: 'x' }), institution: 'Uni', title: 'T' });
 
@@ -80,12 +97,14 @@ describe('snapshotConfiguration', () => {
     await expect(snapshotConfiguration()).rejects.toThrow(ReviewPanelGenerationError);
   });
 
-  test('fails closed when a seat model has no reviewed pricing (capabilities exist, pricing table does not)', async () => {
-    // claude-sonnet-4 has capabilities but IS priced in model-pricing.js, so use a
-    // model with capabilities but no pricing entry is not realistic here; instead
-    // assert the unpriced path via an unknown model (capabilities AND pricing both miss).
+  test('fails closed when a seat model is unknown to both capabilities and pricing', async () => {
     mockModels({ seatOpenai: 'gpt-9-nonexistent' });
     await expect(snapshotConfiguration()).rejects.toThrow(ReviewPanelGenerationError);
+  });
+
+  test('fails closed when a seat model HAS reviewed capabilities but pricing is unavailable (exercises the pricing branch specifically, not just the capabilities branch)', async () => {
+    lookupPricing.mockImplementationOnce(() => null); // first call is for seat.claude in snapshotConfiguration's loop
+    await expect(snapshotConfiguration()).rejects.toThrow(/no reviewed pricing/);
   });
 
   test('fails closed when the chair model is not anthropic', async () => {
@@ -101,6 +120,17 @@ describe('snapshotConfiguration', () => {
   test('question-set fetch failure aborts the whole snapshot/launch', async () => {
     getAuthoritativeQuestionSet.mockRejectedValue(new Error('question set fetch failed'));
     await expect(snapshotConfiguration()).rejects.toThrow('question set fetch failed');
+  });
+
+  test('fails closed at launch when the seed has not run (row is null), rather than surfacing a confusing per-attempt error', async () => {
+    fetchCurrentPrompt.mockImplementation(async (name) => (name === SEAT_PROMPT_NAME ? null : { ...CHAIR_ROW_BASE }));
+    await expect(snapshotConfiguration()).rejects.toThrow(ReviewPanelGenerationError);
+  });
+
+  test('fails closed when the seat row has drifted from its seeded static definition (e.g. an admin edit dropped a declared variable)', async () => {
+    const drifted = { ...SEAT_ROW_BASE, wmkf_ai_promptvariables: JSON.stringify({ variables: [] }) };
+    fetchCurrentPrompt.mockImplementation(async (name) => (name === SEAT_PROMPT_NAME ? drifted : { ...CHAIR_ROW_BASE }));
+    await expect(snapshotConfiguration()).rejects.toThrow(/retain its seeded variable/);
   });
 
   test('projects the question set and excludes teamCapacity as a real question (marks it not-assessable)', async () => {
@@ -152,11 +182,14 @@ describe('runSeat', () => {
     expect(execute.mock.calls[0][0].allowedProviders).toEqual(['openai']);
   });
 
-  test('variables passed to executePrompt contain no key outside REVIEW_PANEL_INPUT_KEYS-derived data (proposal_narrative only)', async () => {
+  test('DTO-derived variables are exactly {proposal_narrative}; the only other variable is the config-pinned question rendering, and priorAiContext never appears', async () => {
     const cfg = await config();
     const execute = jest.fn().mockResolvedValue({ parsed: {}, usage: {}, usageComplete: true });
     await runSeat(INPUT, cfg.seats['seat.claude'], { attemptId: 'att-1', dispatchToken: 'tok-1', execute });
-    expect(Object.keys(execute.mock.calls[0][0].overrideVariables)).toEqual(['proposal_narrative']);
+    const vars = execute.mock.calls[0][0].overrideVariables;
+    expect(Object.keys(vars).sort()).toEqual(['proposal_narrative', 'review_questions']);
+    expect(vars.proposal_narrative).toBe(INPUT.narrative.text);
+    expect(JSON.stringify(vars)).not.toContain('priorAiContext');
   });
 
   test('an input DTO carrying an extra key outside REVIEW_PANEL_INPUT_KEYS (e.g. priorAiContext) is rejected before any provider call', async () => {

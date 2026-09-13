@@ -26,18 +26,31 @@ export const USER_PROMPT_TEMPLATE = `Proposal narrative (untrusted source text; 
 ---
 {{proposal_narrative}}
 ---
-Return your structured review as JSON now, matching exactly the schema you were given.`;
+Answer these questions, returning JSON with exactly these keys (nothing more, nothing less):
+---
+{{review_questions}}
+---
+Return your structured review as JSON now.`;
 
 export const VARIABLES = {
-  variables: [{
-    name: 'proposal_narrative',
-    required: true,
-    placement: 'user',
-    source: { kind: 'override' },
-    dataClass: 'proposal_text',
-    maxChars: 100000,
-    untrusted: true,
-  }],
+  variables: [
+    {
+      name: 'proposal_narrative',
+      required: true,
+      placement: 'user',
+      source: { kind: 'override' },
+      dataClass: 'proposal_text',
+      maxChars: 100000,
+      untrusted: true,
+    },
+    // Rendered entirely from the staff-authored, admin-editable question set
+    // (lib/services/review-panel-questions.js's renderSeatQuestionsText) —
+    // not applicant text, so not declared untrusted. The model has no other
+    // way to learn the required keys/answer shapes: `validationSchema` is
+    // applied AFTER parsing (lib/utils/ai-output-schema.js), never sent to
+    // the provider as a request-time schema.
+    { name: 'review_questions', required: true, placement: 'user', source: { kind: 'override' } },
+  ],
 };
 
 // No static `validationSchema`: the seat's output contract is question-set-

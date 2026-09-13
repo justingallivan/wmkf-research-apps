@@ -1,7 +1,7 @@
 /** @jest-environment node */
 import { validateAiJson } from '../../lib/utils/ai-output-schema';
 import {
-  projectSeatQuestionSet, buildSeatValidationSchema, chairInput,
+  projectSeatQuestionSet, buildSeatValidationSchema, chairInput, renderSeatQuestionsText,
   REVIEW_PANEL_NOT_ASSESSABLE_REPORT_LINE,
 } from '../../lib/services/review-panel-questions';
 
@@ -25,6 +25,31 @@ describe('projectSeatQuestionSet', () => {
     const projected = projectSeatQuestionSet(FIXTURE_FIELDS);
     const teamCapacity = projected.find((f) => f.key === 'teamCapacity');
     expect(teamCapacity).toEqual({ key: 'teamCapacity', notAssessable: true });
+  });
+
+  test('retains per-option {value, label} pairs, not bare values, so the model can be told what each choice means', () => {
+    const projected = projectSeatQuestionSet(FIXTURE_FIELDS);
+    const riskLevel = projected.find((f) => f.key === 'riskLevel');
+    expect(riskLevel.options).toEqual([{ value: 1, label: 'Low' }, { value: 2, label: 'High' }]);
+  });
+});
+
+describe('renderSeatQuestionsText', () => {
+  const projected = projectSeatQuestionSet(FIXTURE_FIELDS);
+  const text = renderSeatQuestionsText(projected);
+
+  test('names every projected key and, for picklist/multiselect, every option value AND label', () => {
+    for (const key of ['priorWork', 'impactAreas', 'riskLevel', 'teamCapacity', 'questionsForPi']) {
+      expect(text).toContain(key);
+    }
+    expect(text).toContain('"1" = Low');
+    expect(text).toContain('"2" = High');
+  });
+
+  test('instructs the not-assessable literal for teamCapacity instead of asking for an answer', () => {
+    const line = text.split('\n').find((l) => l.startsWith('- teamCapacity'));
+    expect(line).toContain('not_assessable');
+    expect(line).not.toMatch(/answer in prose/);
   });
 });
 
