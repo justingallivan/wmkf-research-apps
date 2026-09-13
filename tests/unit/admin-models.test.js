@@ -86,6 +86,26 @@ describe('GET /api/admin/models', () => {
       },
     });
   });
+
+  it('returns provider-bound review-panel slots with reviewed provider-filtered lists', async () => {
+    const res = mockRes();
+    await handler({ method: 'GET', query: {} }, res);
+
+    const panel = res.body.apps.find(app => app.appKey === 'review-panel');
+    expect(panel).toMatchObject({ providerBound: true });
+    expect(Object.keys(panel.models)).toEqual(['seat.claude', 'seat.openai', 'chair']);
+    expect(panel.models['seat.openai']).toMatchObject({
+      vendor: 'openai',
+      hardcoded: 'gpt-5.6-sol',
+      effective: 'gpt-5.6-sol',
+    });
+    expect(panel.models['seat.openai'].availableModels.map(model => model.id))
+      .toEqual(['gpt-5.6-sol']);
+    for (const model of panel.models['seat.claude'].availableModels) {
+      expect(res.body.modelStatuses[model.id]?.capability?.provider).toBe('anthropic');
+      expect(res.body.modelStatuses[model.id]?.ok).toBe(true);
+    }
+  });
 });
 
 describe('PUT /api/admin/models', () => {
@@ -152,5 +172,63 @@ describe('PUT /api/admin/models', () => {
     expect(res.statusCode).toBe(200);
     expect(deleteSetting).toHaveBeenCalledWith('model_override:reviewer-finder:model');
     expect(res.body.modelId).toBeNull();
+  });
+
+  it('saves a reviewed OpenAI model only in the OpenAI seat', async () => {
+    const res = mockRes();
+    await handler({
+      method: 'PUT',
+      body: { appKey: 'review-panel', modelType: 'seat.openai', modelId: 'gpt-5.6-sol' },
+    }, res);
+
+    expect(res.statusCode).toBe(200);
+    expect(setSetting).toHaveBeenCalledWith(
+      'model_override:review-panel:seat.openai',
+      'gpt-5.6-sol',
+      9,
+    );
+  });
+
+  it('rejects an OpenAI model for the Anthropic chair before persistence', async () => {
+    const res = mockRes();
+    await handler({
+      method: 'PUT',
+      body: { appKey: 'review-panel', modelType: 'chair', modelId: 'gpt-5.6-sol' },
+    }, res);
+
+    expect(res.statusCode).toBe(400);
+    expect(res.body.code).toBe('provider_model_mismatch');
+    expect(setSetting).not.toHaveBeenCalled();
+  });
+
+  it('rejects an unreviewed same-provider slot value before persistence', async () => {
+    const res = mockRes();
+    await handler({
+      method: 'PUT',
+      body: { appKey: 'review-panel', modelType: 'seat.openai', modelId: 'gpt-future' },
+    }, res);
+
+    expect(res.statusCode).toBe(400);
+    expect(res.body.code).toBe('unreviewed_provider_model');
+    expect(setSetting).not.toHaveBeenCalled();
+  });
+});
+
+describe('admin provider-bound review-panel UI contract', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const adminSource = fs.readFileSync(path.join(__dirname, '../../pages/admin.js'), 'utf8');
+
+  it('renders the review panel separately from legacy Claude app rows', () => {
+    expect(adminSource).toContain("apps.find(app => app.appKey === 'review-panel')");
+    expect(adminSource).toContain('apps.filter(app => !app.providerBound)');
+    expect(adminSource).toContain('Each slot has a fixed provider.');
+  });
+
+  it('shows vendor as read-only text and models from each slot list', () => {
+    expect(adminSource).toContain('{info.vendor}</td>');
+    expect(adminSource).toContain('(info.availableModels || []).map(model =>');
+    expect(adminSource).toContain('handleChange(reviewPanel.appKey, slotKey, e.target.value)');
+    expect(adminSource).not.toMatch(/handleChange\(reviewPanel\.appKey,\s*['"]provider/);
   });
 });
