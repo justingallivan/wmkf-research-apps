@@ -56,11 +56,14 @@ related:
   a retention class, `reviewedAt` and `source` (`lib/services/model-capabilities.js:17-40`). Pricing
   in `MODEL_PRICING` is **cents per million tokens** (`lib/utils/model-pricing.js:33-35`).
   `check:model-registry` requires a capability and pricing row for every concrete id reachable from
-  config (`scripts/check-model-registry.js` header); its wording is Anthropic-named but its scan is
-  structurally vendor-agnostic.
+  the static config files it scans (`scripts/check-model-registry.js` header). **It is Anthropic-only
+  in code, not just in wording:** every `MODEL_CAPABILITIES` key must start with `claude-` (`:154`),
+  configured values without that prefix are skipped rather than checked (`:196`), and tier fallbacks
+  must be Claude ids (`:204`). An OpenAI capability row turns the gate red as written, and an OpenAI
+  id chosen only through the admin panel (stored in Postgres) is outside its scan entirely.
 - **Admin model panel.** `pages/admin.js` (Models section around `:1118-1271`) → `/api/admin/models`
   stores `model_override:<appKey>:<modelType>` via `settings-service` (`pages/api/admin/models.js:202`);
-  `VALID_MODEL_TYPES = ['model','visionModel','fallback']` (`:26`); the dropdown lists the live
+  `VALID_MODEL_TYPES = ['model','visionModel','fallback']` (`:28`); the dropdown lists the live
   Anthropic `/v1/models` list validated by `validateReviewedClaudeModelValue`. `getModelForApp`
   reads override → `APP_MODELS` → default (`shared/config/baseConfig.js:283-286`). Routes that
   resolve a model must call `loadModelOverrides()` first (`check:model-override-warming`).
@@ -133,9 +136,12 @@ the call fails). Without this option per-seat admin selection is impossible.
 `supportsStructuredOutput: false` for Phase A per D1b, `supportsTemperature` per model, retention
 class) and `MODEL_PRICING`. **Every value is verified from OpenAI's published documentation with a
 `source:` URL and `reviewedAt` at implementation time; none is guessed.** The default OpenAI seat
-model is `[OWNER-SUPPLIED at seed time]`. `check:model-registry` and
-`validateReviewedClaudeModelValue` are generalised to vendor-aware equivalents; the gate must cover
-OpenAI ids reachable from seat config.
+model is `[OWNER-SUPPLIED at seed time]`. `check:model-registry` must be
+generalised **before** the first OpenAI row lands: key validation keyed on the row's `provider` instead
+of the `claude-` prefix, non-Claude configured values checked rather than skipped, and the seat
+registry's `defaultModel` values added to its scanned sources so every seat default is gate-covered.
+Admin-panel overrides live in Postgres and are validated at write time by a vendor-aware successor to
+`validateReviewedClaudeModelValue`, not by the static gate.
 
 **A0.5 Admin model panel.** Let an app declare **named model slots** in a tracked registry
 (`shared/config/reviewPanelSeats.js`: `{ key, vendor, label, enabled, defaultModel }` for
@@ -223,6 +229,11 @@ are shown read-only on the page and changed in the admin model panel.
 
 ## 7. Sequencing and release tier
 
+Tier 2 per `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md` §4: A0 is a cross-layer refactor of
+shared runtime; Phase A adds migrations, background work, and paid provider calls. Requirements:
+isolated branch, characterization coverage before change, preview deployment, staff rehearsal,
+recorded rollback, explicit owner merge decision.
+
 | Slice | Branch | Tier | Gate before merge |
 |---|---|---|---|
 | A0 Executor seam + registries + admin slots | `feature/executor-provider-seam` | Tier 2 (shared runtime) | `/contract-reconcile`, full Executor tests, model-registry, override-warming, A7 gate |
@@ -242,3 +253,7 @@ and Phase C (panel-vs-human comparison, history views, third seat) follow the su
   budget envelope must reflect that.
 - Whether `getModelForApp` slot semantics or a separate settings prefix is cleaner for named slots.
 - Old-page parity definition for D5 (not before Phase B).
+- **Key-collision check before A.1:** `review-panel` is a substring of the live `virtual-review-panel`.
+  Confirm `check:api-routes`, `check:route-lifecycle-auth`, and the A7 registry match app keys and
+  route paths exactly (not by prefix or `includes`) before the new key lands. Verified 2026-09-12 that
+  no `pages/api/review-panel*` file and no `'review-panel'` registry, matrix, or A7 entry exists yet.

@@ -3,7 +3,7 @@ title: Virtual Review Panel Revival — Survey and Build Direction (2026-09-12)
 domain: virtual-review-panel
 kind: plan
 status: proposal
-summary: "What the original VRP did, which of its uploads the platform now supplies internally, and a proposed admin-only rebuild on the Cycle Dossier scaffolding with the decisions the owner must make first."
+summary: "What the original VRP did, which of its uploads the platform now supplies internally, and a proposed admin-only rebuild on the Cycle Dossier scaffolding. Decisions D1–D6 were made 2026-09-12; see the Phase A build plan, which supersedes §3, §5 and §6 here."
 cataloged: 2026-09-12
 owner: product-engineering
 last_verified: 2026-09-12
@@ -114,7 +114,8 @@ biosketches/budget if D2 includes them.
 
 > **Decided 2026-09-12 (Session 510).** Outcomes are recorded in
 > `docs/plans/VIRTUAL_REVIEW_PANEL_PHASE_A_BUILD_PLAN_2026-09-12.md` §1, which supersedes the
-> persona-based composition in §3 above. In brief: D1 hybrid (vendor seats Claude + OpenAI on a
+> persona-based composition in §3, the persona phasing in §5, and the "Executor is Anthropic-only by
+> design" constraint in §6 (A0 adds a provider seam). Those sections stay as the historical survey. In brief: D1 hybrid (vendor seats Claude + OpenAI on a
 > governed Executor provider seam, Claude chair starting on Opus, all models selectable in the admin
 > model panel, seat list extensible); D2 narrative only; D3 and D4 deferred; D5 unchanged; D6 no
 > typical-cost figure until a small-subset smoke yields actuals.
