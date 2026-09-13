@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-09-12
+last_verified: 2026-09-13
 stale_after_days: 60
 owner: product-engineering
 source_files:
@@ -54,6 +54,6 @@ update_triggers:
 - **Two lease fences, not one.** Run-state changes (creating an entry/attempt, dispatch, reap, winner selection, entry materialization, run-status finalization) require the run's CURRENT worker lease. Attempt finalization is a separate CAS on the attempt's own `dispatch_token` + `dispatch_expires_at`, decided on `clock_timestamp()` — see `docs/atlas/postgres-review-panel.md`.
 - **A route never holds a lease.** `launchReviewPanel` cannot create `review_panel_entries` rows directly (`createReviewPanelEntry` requires the lease) — it parks resolved input DTOs in `run.data.pendingEntries` for the worker's `materializePendingEntries` to consume. Likewise, an operator retry request only sets `retry_requested_at`; the worker's `drainReviewPanels` does the actual `retryFailedEntries` call and clears the marker.
 - **Cost suppression is load-bearing.** Any surface reading `review_panel_seat_attempts` (reports, spend-check cron, admin stats) must withhold the total (never show a number) when any attempt in scope is `unknown`-state — never silently treat it as $0.
-- **D11 store not yet provisioned.** `review-panel-storage.js` 503s with plain copy when `REVIEW_PANEL_BLOB_READ_WRITE_TOKEN` is unset; the worker fails the entry (preserving the chair result) rather than completing silently with no saved report.
+- **D11 store provisioned 2026-09-13** (`wmkf-review-panel-private`, `store_cwVLLxRMR3A8NFA2`, `REVIEW_PANEL_BLOB` prefix, Production + Preview). `review-panel-storage.js` 503s with plain copy when `REVIEW_PANEL_BLOB_READ_WRITE_TOKEN` is unset; the worker fails the entry (preserving the chair result) rather than completing silently with no saved report.
 - **The panel never writes `api_usage_log`.** Its own `review_panel_seat_attempts` ledger is the only source for both `pages/api/cron/spend-check.js`'s daily sum and `pages/api/admin/stats.js`'s `reviewPanel` block.
 - **D7 teamCapacity.** Seats must never emit free text for `teamCapacity`; the report always prints the fixed line from `REVIEW_PANEL_NOT_ASSESSABLE_REPORT_LINE` (`review-panel-questions.js`) — never retype it elsewhere.

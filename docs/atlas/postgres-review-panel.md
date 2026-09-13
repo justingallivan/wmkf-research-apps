@@ -2,12 +2,12 @@
 title: Postgres Review Panel
 domain: review-panel
 kind: source-of-truth
-status: source-built
+status: live
 summary: "Source-built Virtual Review Panel Phase A foundation state: five Postgres tables hold the run/entry/attempt ledger and a durable operator stop; per-entry DOCX/PDF editions use a dedicated private Blob store not yet provisioned."
 canonical: true
 cataloged: 2026-09-12
 owner: product-engineering
-last_verified: 2026-09-12
+last_verified: 2026-09-13
 related:
   - docs/plans/VIRTUAL_REVIEW_PANEL_PHASE_A_BUILD_PLAN_2026-09-12.md
   - docs/VIRTUAL_REVIEW_PANEL.md
@@ -18,7 +18,7 @@ related:
 
 # Postgres Review Panel
 
-**[VERIFIED 2026-09-12 via migration 047, `scripts/setup-database.js`'s v49 block, and the branch-local service/worker/route source]** These five tables are source-built on branch `feature/review-panel-foundation`; migration 047 is not yet applied to any live database (`node scripts/apply-migrations.js` is explicitly out of scope for agent sessions against this repo's `.env.local`, which points at production). The feature remains disabled (`REVIEW_PANEL_ENABLED` unset); no launch, generation, or edition publication is claimed against a real database.
+**[VERIFIED 2026-09-13 via `scripts/apply-migrations.js` output (owner-run: `047_review_panel.sql` apply ok, 45 skipped) and `vercel env ls`]** These five tables exist in the production database since 2026-09-13; the code landed on `main` via PR #281 (merge bbef47ac). The feature is enabled in Production in smoke mode with a four-request allowlist; the drain cron runs per minute (fb6a911a). No launch, generation, or edition had run against live data as of the cron deploy.
 
 | Table | Owner / scope | Stored state | Retention and write contract |
 |---|---|---|---|
@@ -52,5 +52,5 @@ The entry's narrative input DTO (requestId/requestNumber/narrative text+hash+sou
 ## Current lifecycle truth
 
 - **Source-built:** migration 047, the fresh-install v49 block (schema-parity tested), and full service/worker/route/page contracts exist on the current branch.
-- **Not provisioned:** the dedicated private Blob store (D11) has no store id yet; `REVIEW_PANEL_ENABLED`/`REVIEW_PANEL_ROLLOUT_MODE`/`REVIEW_PANEL_REQUEST_ALLOWLIST` are unconfigured.
-- **Not activated, not applied:** migration 047 has not been applied to any database; no launch, generation, or edition has ever run against live data.
+- **Provisioned 2026-09-13:** the dedicated private Blob store `wmkf-review-panel-private` (`store_cwVLLxRMR3A8NFA2`) is connected under the `REVIEW_PANEL_BLOB` prefix in Production and Preview; `REVIEW_PANEL_ENABLED=true`, `REVIEW_PANEL_ROLLOUT_MODE=smoke`, and a four-request `REVIEW_PANEL_REQUEST_ALLOWLIST` are set in Production.
+- **Applied 2026-09-13:** migration 047 is applied to the production database; prompts `review-panel.seat` v1 and `review-panel.chair` v1 are published in Dataverse. First smoke launch pending at the time of writing.
