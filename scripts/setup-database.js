@@ -1093,7 +1093,9 @@ const v49Statements = [
     cost_cents NUMERIC, cost_state TEXT CHECK (cost_state IN ('known','unknown')),
     error_text TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE (entry_id, seat_key, attempt_no)
+    UNIQUE (entry_id, seat_key, attempt_no),
+    CONSTRAINT review_panel_seat_attempts_cost_known_has_cents CHECK (cost_state <> 'known' OR cost_cents IS NOT NULL),
+    CONSTRAINT review_panel_seat_attempts_dispatched_has_token CHECK (state <> 'dispatched' OR (dispatch_token IS NOT NULL AND dispatch_expires_at IS NOT NULL))
   )`,
   `CREATE INDEX IF NOT EXISTS review_panel_seat_attempts_entry ON review_panel_seat_attempts(entry_id)`,
   `CREATE INDEX IF NOT EXISTS review_panel_seat_attempts_reap

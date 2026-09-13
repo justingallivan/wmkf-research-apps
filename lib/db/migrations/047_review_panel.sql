@@ -16,11 +16,17 @@
 -- review_panel_seat_attempts is the per-seat paid-call ledger. dispatch_token
 -- is immutable once set: the only writer that sets it is
 -- markAttemptDispatched (lib/services/review-panel-store.js), gated on
--- state='pending'; no other function ever assigns it. state has exactly four
--- writers: markAttemptDispatched (pending->dispatched), the two CAS UPDATEs
--- inside finalizeAttempt (the in-lease completion and the late/unknown-outcome
--- path), and reapExpiredAttempts (dispatched->unknown_outcome on lease
--- expiry). No other code may write this column.
+-- state='pending' AND dispatch_token IS NULL; no other function ever assigns
+-- it. state has exactly five writers: createAttempt's INSERT (the initial
+-- 'pending' row), markAttemptDispatched (pending->dispatched), the two CAS
+-- UPDATEs inside finalizeAttempt (the in-lease completion and the
+-- late/unknown-outcome path), and reapExpiredAttempts
+-- (dispatched->unknown_outcome on lease expiry). No other code may write this
+-- column. review_panel_seat_attempts_cost_known_has_cents prevents a 'known'
+-- cost_state with a NULL cost_cents from ever being persisted (the app layer
+-- also validates this before the write; the constraint is defense in depth).
+-- review_panel_seat_attempts_dispatched_has_token guards the converse: a
+-- 'dispatched' row must always carry a token and an expiry.
 CREATE TABLE IF NOT EXISTS review_panels (
   id UUID PRIMARY KEY, owner_profile_id INTEGER NOT NULL REFERENCES user_profiles(id),
   selection JSONB, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -62,7 +68,9 @@ CREATE TABLE IF NOT EXISTS review_panel_seat_attempts (
   cost_cents NUMERIC, cost_state TEXT CHECK (cost_state IN ('known','unknown')),
   error_text TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  UNIQUE (entry_id, seat_key, attempt_no)
+  UNIQUE (entry_id, seat_key, attempt_no),
+  CONSTRAINT review_panel_seat_attempts_cost_known_has_cents CHECK (cost_state <> 'known' OR cost_cents IS NOT NULL),
+  CONSTRAINT review_panel_seat_attempts_dispatched_has_token CHECK (state <> 'dispatched' OR (dispatch_token IS NOT NULL AND dispatch_expires_at IS NOT NULL))
 );
 CREATE INDEX IF NOT EXISTS review_panel_seat_attempts_entry ON review_panel_seat_attempts(entry_id);
 CREATE INDEX IF NOT EXISTS review_panel_seat_attempts_reap

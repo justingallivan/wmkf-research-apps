@@ -70,3 +70,7 @@ test('reviewPanelRolloutConfig reads the three readable rollout vars verbatim', 
   const config = reviewPanelRolloutConfig({ REVIEW_PANEL_ENABLED: 'true', REVIEW_PANEL_ROLLOUT_MODE: 'smoke', REVIEW_PANEL_REQUEST_ALLOWLIST: 'a,b' });
   expect(config).toEqual({ enabled: true, mode: 'smoke', requestAllowlist: ['a', 'b'] });
 });
+
+test('reviewPanelRolloutConfig fails closed on an unrecognised mode instead of returning it verbatim', () => {
+  expect(() => reviewPanelRolloutConfig({ REVIEW_PANEL_ENABLED: 'true', REVIEW_PANEL_ROLLOUT_MODE: 'yolo' })).toThrow(/invalid/);
+});

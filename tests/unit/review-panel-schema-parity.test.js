@@ -5,23 +5,42 @@ const ROOT = process.cwd();
 const migration = fs.readFileSync(path.join(ROOT, 'lib/db/migrations/047_review_panel.sql'), 'utf8');
 const setup = fs.readFileSync(path.join(ROOT, 'scripts/setup-database.js'), 'utf8');
 
-const TABLE_NAMES = [
-  'review_panels', 'review_panel_runs', 'review_panel_entries',
-  'review_panel_seat_attempts', 'review_panel_control',
-];
+function normalize(statement) {
+  return statement.replace(/--.*$/gm, '').replace(/\s+/g, ' ').trim().toLowerCase();
+}
 
-const STATE_CHECKS = [
-  "CHECK (state IN ('pending','dispatched','completed','failed','unknown_outcome'))",
-  "CHECK (cost_state IN ('known','unknown'))",
-];
-
-test('migration 047 and fresh install (v49) declare the same review-panel tables and state checks', () => {
-  for (const source of [migration, setup]) {
-    for (const name of TABLE_NAMES) expect(source).toContain(`CREATE TABLE IF NOT EXISTS ${name}`);
-    for (const check of STATE_CHECKS) expect(source).toContain(check);
-    expect(source).toContain('UNIQUE (entry_id, seat_key, attempt_no)');
-    expect(source).toContain('review_panel_entries_request_revision');
+/** Every top-level `;`-terminated statement in the .sql migration file, comments stripped, respecting `;` inside single-quoted string literals (e.g. the COMMENT ON COLUMN text). */
+function migrationStatements(sql) {
+  const stripped = sql.split('\n').filter((line) => !line.trim().startsWith('--')).join('\n');
+  const statements = [];
+  let current = '';
+  let inString = false;
+  for (const ch of stripped) {
+    if (ch === "'") inString = !inString;
+    if (ch === ';' && !inString) {
+      statements.push(current);
+      current = '';
+      continue;
+    }
+    current += ch;
   }
+  if (current.trim()) statements.push(current);
+  return statements.map((s) => s.trim()).filter(Boolean);
+}
+
+/** Every backtick-delimited template string inside the `const v49Statements = [ ... ];` array in setup-database.js. */
+function v49Statements(source) {
+  const start = source.indexOf('const v49Statements = [');
+  if (start === -1) throw new Error('v49Statements block not found in setup-database.js');
+  const end = source.indexOf('\n];', start);
+  const block = source.slice(start, end);
+  return [...block.matchAll(/`([^`]*)`/gs)].map((m) => m[1]);
+}
+
+test('every statement in migration 047 has a normalised match in the v49 block, and vice versa (a dropped column or constraint fails this)', () => {
+  const migrationNormalized = migrationStatements(migration).map(normalize).sort();
+  const v49Normalized = v49Statements(setup).map(normalize).sort();
+  expect(v49Normalized).toEqual(migrationNormalized);
 });
 
 test('the migrations manifest tracks 047', () => {

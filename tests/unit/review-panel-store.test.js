@@ -38,25 +38,42 @@ test('createAttempt rejects a stale lease token before any insert', async () => 
   expect(client.query).toHaveBeenCalledWith('ROLLBACK');
 });
 
-test('markAttemptDispatched sets the dispatch token only from pending, under the current lease', async () => {
-  client.query.mockImplementation(async (q) => {
-    if (q.startsWith('SELECT r.lease_token')) return { rows: [LIVE_RUN] };
-    if (q.startsWith('UPDATE review_panel_seat_attempts SET state=\'dispatched\'')) return { rows: [{ id: 'att-1', state: 'dispatched' }] };
-    return { rows: [] };
+describe('markAttemptDispatched', () => {
+  test('sets the dispatch token only from pending with no existing token, under the current lease', async () => {
+    client.query.mockImplementation(async (q) => {
+      if (q.startsWith('SELECT r.lease_token')) return { rows: [LIVE_RUN] };
+      if (q.startsWith('UPDATE review_panel_seat_attempts SET state=\'dispatched\'')) return { rows: [{ id: 'att-1', state: 'dispatched' }] };
+      return { rows: [] };
+    });
+    const row = await markAttemptDispatched('att-1', { dispatchToken: 'tok-1', leaseToken: 'lease-1', dispatchExpiresAt: new Date() });
+    expect(row.state).toBe('dispatched');
+    const call = client.query.mock.calls.find(([q]) => q.includes("state='pending'"));
+    expect(call[0]).toContain("state='pending'");
+    expect(call[0]).toContain('dispatch_token IS NULL');
   });
-  const row = await markAttemptDispatched('att-1', { dispatchToken: 'tok-1', leaseToken: 'lease-1', dispatchExpiresAt: new Date() });
-  expect(row.state).toBe('dispatched');
-  const call = client.query.mock.calls.find(([q]) => q.includes("state='pending'"));
-  expect(call[0]).toContain("state='pending'");
-});
 
-test('markAttemptDispatched rejects an expired run lease', async () => {
-  client.query.mockImplementation(async (q) => {
-    if (q.startsWith('SELECT r.lease_token')) return { rows: [EXPIRED_RUN] };
-    return { rows: [] };
+  test('rejects an expired run lease', async () => {
+    client.query.mockImplementation(async (q) => {
+      if (q.startsWith('SELECT r.lease_token')) return { rows: [EXPIRED_RUN] };
+      return { rows: [] };
+    });
+    await expect(markAttemptDispatched('att-1', { dispatchToken: 'tok-1', leaseToken: 'lease-1', dispatchExpiresAt: new Date() }))
+      .rejects.toMatchObject({ httpStatus: 409 });
   });
-  await expect(markAttemptDispatched('att-1', { dispatchToken: 'tok-1', leaseToken: 'lease-1', dispatchExpiresAt: new Date() }))
-    .rejects.toMatchObject({ httpStatus: 409 });
+
+  test('rejects an empty/non-string dispatchToken before opening a transaction', async () => {
+    await expect(markAttemptDispatched('att-1', { dispatchToken: '', leaseToken: 'lease-1', dispatchExpiresAt: new Date() }))
+      .rejects.toMatchObject({ httpStatus: 400 });
+    await expect(markAttemptDispatched('att-1', { dispatchToken: '   ', leaseToken: 'lease-1', dispatchExpiresAt: new Date() }))
+      .rejects.toMatchObject({ httpStatus: 400 });
+    expect(db.connect).not.toHaveBeenCalled();
+  });
+
+  test('rejects an invalid dispatchExpiresAt before opening a transaction', async () => {
+    await expect(markAttemptDispatched('att-1', { dispatchToken: 'tok-1', leaseToken: 'lease-1', dispatchExpiresAt: 'not-a-date' }))
+      .rejects.toMatchObject({ httpStatus: 400 });
+    expect(db.connect).not.toHaveBeenCalled();
+  });
 });
 
 describe('finalizeAttempt fences', () => {
@@ -70,12 +87,32 @@ describe('finalizeAttempt fences', () => {
     expect(result.outcome).toBe('finalized');
   });
 
+  test('rejects a non-terminal state (e.g. "pending") before touching the database, so a caller can never re-open a dispatched row this way', async () => {
+    await expect(finalizeAttempt('att-1', 'tok-1', { state: 'pending', costState: 'unknown' })).rejects.toMatchObject({ httpStatus: 400 });
+    await expect(finalizeAttempt('att-1', 'tok-1', { state: 'dispatched', costState: 'unknown' })).rejects.toMatchObject({ httpStatus: 400 });
+    await expect(finalizeAttempt('att-1', 'tok-1', { state: 'unknown_outcome', costState: 'unknown' })).rejects.toMatchObject({ httpStatus: 400 });
+    expect(db.connect).not.toHaveBeenCalled();
+  });
+
+  test('rejects costState "known" with a missing costCents before touching the database', async () => {
+    await expect(finalizeAttempt('att-1', 'tok-1', { state: 'completed', costState: 'known' })).rejects.toMatchObject({ httpStatus: 400 });
+    await expect(finalizeAttempt('att-1', 'tok-1', { state: 'completed', costState: 'known', costCents: null })).rejects.toMatchObject({ httpStatus: 400 });
+    await expect(finalizeAttempt('att-1', 'tok-1', { state: 'completed', costState: 'known', costCents: -1 })).rejects.toMatchObject({ httpStatus: 400 });
+    await expect(finalizeAttempt('att-1', 'tok-1', { state: 'completed', costState: 'known', costCents: NaN })).rejects.toMatchObject({ httpStatus: 400 });
+    expect(db.connect).not.toHaveBeenCalled();
+  });
+
+  test('rejects a costState outside {known, unknown}', async () => {
+    await expect(finalizeAttempt('att-1', 'tok-1', { state: 'completed', costState: undefined })).rejects.toMatchObject({ httpStatus: 400 });
+    await expect(finalizeAttempt('att-1', 'tok-1', { state: 'completed', costState: 'free' })).rejects.toMatchObject({ httpStatus: 400 });
+  });
+
   test('CAS SQL uses clock_timestamp() and never now() in the fence predicate', async () => {
     client.query.mockImplementation(async (q) => {
       if (q.startsWith('SELECT id FROM review_panel_seat_attempts')) return { rows: [{ id: 'att-1' }] };
       return { rows: [] };
     });
-    await finalizeAttempt('att-1', 'tok-1', { state: 'completed', costState: 'known' });
+    await finalizeAttempt('att-1', 'tok-1', { state: 'completed', costState: 'unknown' });
     const casCall = client.query.mock.calls.find(([q]) => q.includes("state='dispatched'") && q.includes('dispatch_token=$2'));
     expect(casCall[0]).toContain('clock_timestamp()');
     // Isolate the fence predicate itself (the WHERE clause), not incidental
@@ -91,7 +128,7 @@ describe('finalizeAttempt fences', () => {
       if (q.includes('late_result_json')) return { rows: [{ id: 'att-1', state: 'unknown_outcome', late_usage_json: { input_tokens: 3 } }] };
       return { rows: [] };
     });
-    const result = await finalizeAttempt('att-1', 'tok-1', { state: 'completed', usage: { input_tokens: 3 }, costState: 'known' });
+    const result = await finalizeAttempt('att-1', 'tok-1', { state: 'completed', usage: { input_tokens: 3 }, costState: 'unknown' });
     expect(result.outcome).toBe('late');
     expect(result.attempt.state).toBe('unknown_outcome');
   });
@@ -103,20 +140,24 @@ describe('finalizeAttempt fences', () => {
       if (q.includes('late_result_json')) return { rows: [{ id: 'att-1', state: 'unknown_outcome', late_usage_json: { input_tokens: 3 } }] };
       return { rows: [] };
     });
-    const result = await finalizeAttempt('att-1', 'tok-1', { state: 'completed', usage: { input_tokens: 3 }, costState: 'known' });
+    const result = await finalizeAttempt('att-1', 'tok-1', { state: 'completed', usage: { input_tokens: 3 }, costState: 'unknown' });
     expect(result.outcome).toBe('late');
     const lateCall = client.query.mock.calls.find(([q]) => q.includes('late_result_json'));
     expect(lateCall[0]).toContain("CASE WHEN state='dispatched' THEN 'unknown_outcome' ELSE state END");
   });
 
-  test('wrong dispatch_token: no_match, no state change', async () => {
+  test('wrong dispatch_token: no_match, and the late-path UPDATE genuinely filters on the attempt id and the (wrong) token', async () => {
     client.query.mockImplementation(async (q) => {
       if (q.startsWith('SELECT id FROM review_panel_seat_attempts')) return { rows: [{ id: 'att-1' }] };
       return { rows: [] }; // both CAS and late path match nothing for a foreign token
     });
-    const result = await finalizeAttempt('att-1', 'wrong-token', { state: 'completed', costState: 'known' });
+    const result = await finalizeAttempt('att-1', 'wrong-token', { state: 'completed', costState: 'unknown' });
     expect(result.outcome).toBe('no_match');
     expect(result.attempt).toBeNull();
+    const lateCall = client.query.mock.calls.find(([q]) => q.includes('late_result_json'));
+    expect(lateCall[0]).toContain('WHERE id=$1 AND dispatch_token=$2');
+    expect(lateCall[1][0]).toBe('att-1');
+    expect(lateCall[1][1]).toBe('wrong-token');
   });
 
   test('attempt row missing entirely: no_match without attempting either UPDATE', async () => {
@@ -124,7 +165,7 @@ describe('finalizeAttempt fences', () => {
       if (q.startsWith('SELECT id FROM review_panel_seat_attempts')) return { rows: [] };
       return { rows: [] };
     });
-    const result = await finalizeAttempt('missing', 'tok-1', { state: 'completed', costState: 'known' });
+    const result = await finalizeAttempt('missing', 'tok-1', { state: 'completed', costState: 'unknown' });
     expect(result.outcome).toBe('no_match');
     expect(client.query).not.toHaveBeenCalledWith(expect.stringContaining('clock_timestamp()'), expect.anything());
   });
@@ -151,22 +192,33 @@ test('reapExpiredAttempts rejects a stale lease token', async () => {
   await expect(reapExpiredAttempts('run-1', 'wrong')).rejects.toMatchObject({ httpStatus: 409 });
 });
 
-test('selectWinners picks the highest attempt_no among completed attempts per seat and ignores a later failed/unknown_outcome', async () => {
-  client.query.mockImplementation(async (q) => {
-    if (q.startsWith('SELECT e.id, r.lease_token')) return { rows: [{ id: 'entry-1', ...LIVE_RUN }] };
-    if (q.includes('DISTINCT ON (seat_key)')) {
-      // Simulate: seat.claude attempt 1 completed, attempt 2 failed (ignored because state != 'completed');
-      // seat.openai attempt 1 completed, attempt 2 completed (attempt 2 wins as the highest attempt_no).
-      return { rows: [{ id: 'att-claude-1', seat_key: 'seat.claude' }, { id: 'att-openai-2', seat_key: 'seat.openai' }] };
-    }
-    if (q.startsWith('UPDATE review_panel_entries')) return { rows: [{ id: 'entry-1', winners_json: { 'seat.claude': 'att-claude-1', 'seat.openai': 'att-openai-2' } }] };
-    return { rows: [] };
+describe('selectWinners', () => {
+  test('picks the highest attempt_no among completed attempts per seat and ignores a later failed/unknown_outcome', async () => {
+    client.query.mockImplementation(async (q) => {
+      if (q.startsWith('SELECT e.id, r.lease_token')) return { rows: [{ id: 'entry-1', ...LIVE_RUN }] };
+      if (q.includes('DISTINCT ON (seat_key)')) {
+        // Simulate: seat.claude attempt 1 completed, attempt 2 failed (ignored because state != 'completed');
+        // seat.openai attempt 1 completed, attempt 2 completed (attempt 2 wins as the highest attempt_no).
+        return { rows: [{ id: 'att-claude-1', seat_key: 'seat.claude' }, { id: 'att-openai-2', seat_key: 'seat.openai' }] };
+      }
+      if (q.startsWith('UPDATE review_panel_entries')) return { rows: [{ id: 'entry-1', winners_json: { 'seat.claude': 'att-claude-1', 'seat.openai': 'att-openai-2' } }] };
+      return { rows: [] };
+    });
+    const row = await selectWinners('entry-1', 'lease-1');
+    expect(row.winners_json).toEqual({ 'seat.claude': 'att-claude-1', 'seat.openai': 'att-openai-2' });
+    const selectCall = client.query.mock.calls.find(([q]) => q.includes('DISTINCT ON (seat_key)'));
+    expect(selectCall[0]).toContain("state='completed'");
+    expect(selectCall[0]).toContain('ORDER BY seat_key, attempt_no DESC');
   });
-  const row = await selectWinners('entry-1', 'lease-1');
-  expect(row.winners_json).toEqual({ 'seat.claude': 'att-claude-1', 'seat.openai': 'att-openai-2' });
-  const selectCall = client.query.mock.calls.find(([q]) => q.includes('DISTINCT ON (seat_key)'));
-  expect(selectCall[0]).toContain("state='completed'");
-  expect(selectCall[0]).toContain('ORDER BY seat_key, attempt_no DESC');
+
+  test('rejects a stale lease token before reading any attempts', async () => {
+    client.query.mockImplementation(async (q) => {
+      if (q.startsWith('SELECT e.id, r.lease_token')) return { rows: [{ id: 'entry-1', ...LIVE_RUN }] };
+      return { rows: [] };
+    });
+    await expect(selectWinners('entry-1', 'wrong-lease')).rejects.toMatchObject({ httpStatus: 409 });
+    expect(client.query).not.toHaveBeenCalledWith(expect.stringContaining('DISTINCT ON (seat_key)'), expect.anything());
+  });
 });
 
 test('sumAttemptCosts withholds the total (unknownCount > 0) when any attempt has cost_state unknown or an unknown_outcome state', async () => {
@@ -178,6 +230,16 @@ test('sumAttemptCosts withholds the total (unknownCount > 0) when any attempt ha
   const { totalCents, unknownCount } = await sumAttemptCosts('run-1');
   expect(totalCents).toBe(10);
   expect(unknownCount).toBe(2);
+});
+
+test('sumAttemptCosts treats a "known" row with a NULL cost_cents as unknown, never as $0 (defense in depth behind the DB CHECK)', async () => {
+  sql.query.mockResolvedValue({ rows: [
+    { cost_cents: '10', cost_state: 'known' },
+    { cost_cents: null, cost_state: 'known' },
+  ] });
+  const { totalCents, unknownCount } = await sumAttemptCosts('run-1');
+  expect(totalCents).toBe(10);
+  expect(unknownCount).toBe(1);
 });
 
 test('sumAttemptCosts reports zero unknowns when every attempt has a known cost', async () => {
