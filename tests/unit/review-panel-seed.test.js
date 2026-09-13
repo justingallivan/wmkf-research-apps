@@ -14,6 +14,11 @@ test('DEFINITIONS carries exactly the seat and chair prompts', () => {
   expect(DEFINITIONS.map((d) => d.definition.PROMPT_NAME).sort()).toEqual(['review-panel.chair', 'review-panel.seat']);
 });
 
+test('the seat row seeds a 12000 default maxTokens (headroom only; SEAT_ANSWER_MAX_CHARS is the real output-size control)', () => {
+  const seat = DEFINITIONS.find((d) => d.definition.PROMPT_NAME === 'review-panel.seat');
+  expect(seat.maxTokens).toBe(12000);
+});
+
 describe('validateDefinition', () => {
   test('accepts both definitions with the reviewed seat.claude default model', () => {
     for (const item of DEFINITIONS) {

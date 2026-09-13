@@ -2,10 +2,11 @@
  * @jest-environment jsdom
  */
 import React from 'react';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import {
   deriveLaunchState,
   formatReservationBound,
+  formatRunningElapsed,
   isRunUnsettled,
   launchSelectionSignature,
   default as ReviewPanelPage,
@@ -322,6 +323,67 @@ describe('per-seat pills in the Progress tab', () => {
     expect(screen.getByText('OpenAI reviewer · gpt-5.6-sol · failed · cost unknown')).toBeInTheDocument();
     expect(screen.getByText('Chair · pending')).toBeInTheDocument();
     expect(screen.getByText(/declined to review this proposal/)).toBeInTheDocument();
+  });
+});
+
+describe('formatRunningElapsed', () => {
+  test('returns null for a missing/invalid start time', () => {
+    expect(formatRunningElapsed(undefined, Date.now())).toBeNull();
+    expect(formatRunningElapsed('not-a-date', Date.now())).toBeNull();
+  });
+
+  test('computes whole seconds since createdAt, floored, never negative', () => {
+    const start = new Date('2026-09-13T10:00:00.000Z').getTime();
+    expect(formatRunningElapsed('2026-09-13T10:00:00.000Z', start + 4500)).toBe('Running for 4s');
+    expect(formatRunningElapsed('2026-09-13T10:00:00.000Z', start - 1000)).toBe('Running for 0s');
+  });
+});
+
+describe('Progress tab run timeline', () => {
+  afterEach(() => { jest.useRealTimers(); jest.restoreAllMocks(); });
+
+  test('renders the run timeline as a small list, oldest first / newest last', async () => {
+    global.fetch = jest.fn().mockResolvedValue(response(pageResponse({
+      runs: [{
+        id: 'run-1',
+        status: 'completed',
+        createdAt: '2026-09-13T10:00:00.000Z',
+        entries: [],
+        timeline: [
+          { at: '2026-09-13T10:00:00.000Z', label: 'Launched' },
+          { at: '2026-09-13T10:02:00.000Z', label: 'Claude reviewer completed' },
+        ],
+      }],
+    })));
+    render(<ReviewPanelWorkspace />);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Progress' })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: 'Progress' }));
+    const list = await screen.findByTestId('review-panel-timeline');
+    const items = within(list).getAllByRole('listitem');
+    expect(items).toHaveLength(2);
+    expect(items[0]).toHaveTextContent('Launched');
+    expect(items[1]).toHaveTextContent('Claude reviewer completed');
+  });
+
+  test('a running run shows "Running for Xs", elapsed since the run\'s created time, refreshed by the existing poll', async () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2026-09-13T10:00:00.000Z'));
+    global.fetch = jest.fn(() => Promise.resolve(response(pageResponse({
+      runs: [{
+        id: 'run-1', status: 'running', createdAt: '2026-09-13T10:00:00.000Z',
+        entries: [{ id: 'e1', requestNumber: '101', status: 'running', seats: [] }], timeline: [],
+      }],
+    }))));
+    render(<ReviewPanelWorkspace />);
+    await act(async () => { await Promise.resolve(); });
+    expect(screen.getByRole('button', { name: 'Progress' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Progress' }));
+    expect(screen.getByText('Running for 0s')).toBeInTheDocument();
+
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(4000);
+    });
+    expect(screen.getByText('Running for 4s')).toBeInTheDocument();
   });
 });
 
