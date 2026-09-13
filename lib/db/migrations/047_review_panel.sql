@@ -17,10 +17,11 @@
 -- is immutable once set: the only writer that sets it is
 -- markAttemptDispatched (lib/services/review-panel-store.js), gated on
 -- state='pending' AND dispatch_token IS NULL; no other function ever assigns
--- it. state has exactly five writers: createAttempt's INSERT (the initial
+-- it. state has exactly six writers: createAttempt's INSERT (the initial
 -- 'pending' row), markAttemptDispatched (pending->dispatched), the two CAS
 -- UPDATEs inside finalizeAttempt (the in-lease completion and the
--- late/unknown-outcome path), and reapExpiredAttempts
+-- late/unknown-outcome path), reapExpiredAttempts, and the lease-fenced
+-- reapAllDispatchedAttempts used only when the run owner's access is revoked
 -- (dispatched->unknown_outcome on lease expiry). No other code may write this
 -- column. review_panel_seat_attempts_cost_known_has_cents prevents a 'known'
 -- cost_state with a NULL cost_cents from ever being persisted (the app layer

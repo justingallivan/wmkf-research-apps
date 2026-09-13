@@ -465,6 +465,7 @@ describe('the run owner is re-asserted at claim time and again immediately befor
     expect(allAttempts.some((a) => a.state === 'dispatched')).toBe(false);
     expect(entries.some((e) => e.status === 'running')).toBe(false);
     expect(entries.every((e) => e.status === 'failed')).toBe(true);
+    expect(store.reapAllDispatchedAttempts).toHaveBeenCalledWith('run-1', 'lease-1');
     expect(store.stopRevokedReviewPanelRun).toHaveBeenCalledWith('run-1', 'lease-1', expect.stringMatching(/no longer has superuser access/i));
     expect(store.releaseReviewPanelRun).toHaveBeenCalledWith('run-1', 'lease-1');
   });
