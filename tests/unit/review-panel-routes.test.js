@@ -57,7 +57,7 @@ describe('/api/review-panel auth fail-closed', () => {
     expect(getReviewPanelPage).not.toHaveBeenCalled();
   });
 
-  test('an app-granted but non-superuser profile is rejected by the service-level actor assertion, not silently allowed through', async () => {
+  test('a 403 thrown by the service (e.g. its own actor assertion — see review-panel-service.test.js) is propagated verbatim, not swallowed or remapped', async () => {
     getReviewPanelPage.mockRejectedValue(Object.assign(new Error('An active superuser profile is required.'), { httpStatus: 403 }));
     const res = response();
     await pageHandler({ method: 'GET', query: {}, body: {} }, res);
