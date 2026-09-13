@@ -2,7 +2,7 @@
 title: Review Panel Phase A — Overnight Build Brief (2026-09-13)
 domain: virtual-review-panel
 kind: brief
-status: in-progress
+status: complete
 summary: "Running log of the autonomous overnight Phase A build (Sonnet builds, Opus reviews, Codex adversarial review, Fable orchestrates). Per-slice status, unresolved findings, decisions made on the owner's behalf, and the owner-side commands needed before a smoke run."
 cataloged: 2026-09-13
 owner: product-engineering
@@ -14,7 +14,7 @@ related:
 
 # Review Panel Phase A — Overnight Build Brief
 
-> Snapshot log, not ship state. Branch: `feature/review-panel-foundation` (worktree
+> **Morning status (2026-09-13): PR #281 is open, reviewed, and ready for the owner's merge decision; nothing is deployed or configured.** Snapshot log, not ship state. Branch: `feature/review-panel-foundation` (worktree
 > `../WMKF_Apps-codex`), cut from `main` at 262f3322 after A0 (PR #280) merged. Nothing here is
 > merged to `main`; no Vercel env var, cron entry, migration, or Dataverse seed has been applied.
 
@@ -37,9 +37,16 @@ related:
 | 2 | A.3 prompt seeds + question-set projection (D7), generation service + snapshot builder, A.6 worker + drain route | built; Opus round 1 = FIX (1 blocking: chair `seat_reviews` cap 40k chars below two seats' output, payload boundary truncates silently); fixed: cap derived from 5 seats × 16k tokens × 4 chars × 1.25 = 400k chars and `runChair` refuses before dispatch when exceeded | a0a4a750, 3f6433c4, 78943885, fb5646d4 |
 | 3 | A.1 registry/routes/matrix + service layer, A.7 editions in the D11 store + download route, A.8 page, operator retry hand-off, spend-check/admin-stats ledger queries, A.9 docs | built (8 commits, 34 files; all 18 gates green, full unit suite 12,235 green); Opus round 1 = FIX (6 blocking: unknown-cost predicate inconsistent across spend-check/admin-stats/ledger, per-entry report used run-wide cost, two decorative cost tests, no service-level actor-assertion test, retry stuck after partial Blob write); all fixed; Opus recheck round 2 = PASS, no new blocking | 03f96d25 … d46f252e |
 | Gates + PR | full gate set sequentially, PR opened, CI watched | all gates green in the worktree; PR #281 open, every CI check green (Jest, Semgrep, Trivy, Vercel preview, claude-review) | — |
-| Codex adversarial review | after Opus is satisfied with the whole | round 1 = needs-attention: 4 blocking (per-click idempotency key can double-launch; worker never re-asserts run owner before paid calls; Blob store readiness checked only after paid work and store id never enforced; spend alert ignores unknown attempts) + 1 decorative SUM test. All fixed in 5353a314 (CI green). Opus recheck: fixes confirmed, but the fix introduced two regressions (owner-revocation 403 mid-pool strands sibling entries in a failed run; unknown-cost alert shares the dedupe key with the threshold alert) plus one decorative test. Final bounded Sonnet round in progress; loop stops after it | 5353a314 |
+| Codex adversarial review | after Opus is satisfied with the whole | round 1 = needs-attention: 4 blocking (per-click idempotency key can double-launch; worker never re-asserts run owner before paid calls; Blob store readiness checked only after paid work and store id never enforced; spend alert ignores unknown attempts) + 1 decorative SUM test. All fixed in 5353a314 (CI green). Opus recheck: fixes confirmed, but the fix introduced two regressions (owner-revocation 403 mid-pool strands sibling entries in a failed run; unknown-cost alert shares the dedupe key with the threshold alert) plus one decorative test. Final Sonnet round 05e14957 fixed all three; Opus recheck PASS on substance, sole leftover (stale six-writers comment + one test assertion) fixed by Fable directly in 72dd40dd. **Loop closed.** | 5353a314, 05e14957, 72dd40dd |
 
 ## 3. Unresolved findings for the owner
+
+Review chain: 3 Opus slice reviews (FIX → fixed → rechecked), 1 Codex adversarial round (4 blocking, all fixed), 2 Opus rechecks of the fix commits (one regression pair found and fixed). No finding was rejected as relitigating a decision. Items below are logged, not fixed:
+
+- **D11 store identity is presence-checked, not proven.** Launch and every paid dispatch now require both `REVIEW_PANEL_BLOB_READ_WRITE_TOKEN` and `REVIEW_PANEL_BLOB_STORE_ID` and refuse a token shared with any other store, but no code derives the store id from the token. The dossier proves identity with an authenticated read-only probe in `scripts/check-cycle-dossier-rollout.js`; a `check-review-panel-rollout.js` clone is the natural follow-up before the smoke run.
+- **Rollout mode default is `pilot` when unset** (dossier precedent). Set `REVIEW_PANEL_ROLLOUT_MODE=smoke` explicitly.
+- **Cost `known` on the success path relies on `usageComplete` only**; `paidCall` is not on the Executor's success return. Error path requires both. Safe by construction today; noted as a coupling to the Executor.
+- **A worker-side D11 misconfiguration pauses the drain with an error log rather than a cron 503**, so it is visible in logs, not in the cron response.
 
 Accepted as designed, not fixed (Opus slice 2 review):
 - The finaliser's late path stores `late_usage_json` but no `cost_cents`/`cost_state`, so a run with an `unknown_outcome` attempt keeps its total withheld permanently. Conservative; the real spend for those calls is only recoverable from the vendor console.
