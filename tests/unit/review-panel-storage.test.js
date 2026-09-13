@@ -62,8 +62,8 @@ describe('Review Panel private storage configuration', () => {
   });
 
   it('uses the dedicated REVIEW_PANEL_BLOB_READ_WRITE_TOKEN, never BLOB_READ_WRITE_TOKEN or DOSSIER_BLOB_READ_WRITE_TOKEN', async () => {
-    process.env.BLOB_READ_WRITE_TOKEN = 'shared-token-should-never-be-used';
-    process.env.DOSSIER_BLOB_READ_WRITE_TOKEN = 'dossier-token-should-never-be-used';
+    process.env.BLOB_READ_WRITE_TOKEN = 'shared-token-fixture-must-not-be-used';
+    process.env.DOSSIER_BLOB_READ_WRITE_TOKEN = 'dossier-token-fixture-must-not-be-used';
     const bytes = Buffer.from('panel bytes');
     put.mockResolvedValue({ pathname: PATHNAME });
     await storeReviewPanelFile(PATHNAME, bytes, 'application/octet-stream');

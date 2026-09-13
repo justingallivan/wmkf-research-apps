@@ -4,7 +4,7 @@ import { db, sql } from '@vercel/postgres';
 import {
   createAttempt, markAttemptDispatched, finalizeAttempt, reapExpiredAttempts,
   selectWinners, sumAttemptCosts, createReviewPanelEntry, mutateReviewPanelEntry,
-  claimReviewPanelRun, requestReviewPanelRetry, listRetryRequestedEntries,
+  claimReviewPanelRun, requestReviewPanelRetry, listRetryRequestedEntries, requestReviewPanelCancel,
 } from '../../lib/services/review-panel-store';
 
 let client;
@@ -384,5 +384,46 @@ describe('listRetryRequestedEntries', () => {
     sql.query.mockResolvedValue({ rows: [{ id: 'entry-1' }, { id: 'entry-2' }] });
     expect(await listRetryRequestedEntries('run-1')).toEqual(['entry-1', 'entry-2']);
     expect(sql.query).toHaveBeenCalledWith(expect.stringContaining('retry_requested_at IS NOT NULL'), ['run-1']);
+  });
+});
+
+describe('requestReviewPanelCancel', () => {
+  const ACTOR_ROW = { rows: [{ id: 7, dynamics_systemuser_id: 'sysid-1' }] };
+
+  test('rejects while an active worker lease is held', async () => {
+    client.query.mockImplementation(async (q) => {
+      if (q.startsWith('SELECT * FROM review_panel_runs')) {
+        return { rows: [{ id: 'run-1', owner_profile_id: 7, status: 'running', lease_token: 'lease-1', locked_until: new Date(Date.now() + 60000) }] };
+      }
+      if (q.startsWith('SELECT p.id, p.dynamics_systemuser_id')) return ACTOR_ROW;
+      return { rows: [] };
+    });
+    await expect(requestReviewPanelCancel('run-1', 7)).rejects.toMatchObject({ httpStatus: 409 });
+    expect(client.query).not.toHaveBeenCalledWith(expect.stringContaining('UPDATE review_panel_runs'), expect.anything());
+  });
+
+  test('cancels a queued run with no live lease', async () => {
+    client.query.mockImplementation(async (q) => {
+      if (q.startsWith('SELECT * FROM review_panel_runs')) {
+        return { rows: [{ id: 'run-1', owner_profile_id: 7, status: 'queued', lease_token: null, locked_until: null, data: {} }] };
+      }
+      if (q.startsWith('SELECT p.id, p.dynamics_systemuser_id')) return ACTOR_ROW;
+      if (q.startsWith('UPDATE review_panel_runs')) return { rows: [{ id: 'run-1', status: 'cancelled' }] };
+      return { rows: [] };
+    });
+    const run = await requestReviewPanelCancel('run-1', 7);
+    expect(run.status).toBe('cancelled');
+    expect(client.query).toHaveBeenCalledWith('COMMIT');
+  });
+
+  test('rejects a run that already settled', async () => {
+    client.query.mockImplementation(async (q) => {
+      if (q.startsWith('SELECT * FROM review_panel_runs')) {
+        return { rows: [{ id: 'run-1', owner_profile_id: 7, status: 'completed', lease_token: null, locked_until: null, data: {} }] };
+      }
+      if (q.startsWith('SELECT p.id, p.dynamics_systemuser_id')) return ACTOR_ROW;
+      return { rows: [] };
+    });
+    await expect(requestReviewPanelCancel('run-1', 7)).rejects.toMatchObject({ httpStatus: 409 });
   });
 });

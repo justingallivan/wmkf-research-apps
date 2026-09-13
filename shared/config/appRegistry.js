@@ -39,6 +39,15 @@ export const APP_REGISTRY = [
     features: ['NSF Awards API', 'NIH RePORTER', 'USAspending.gov', 'Funding Gap Analysis'],
   },
   {
+    key: 'review-panel',
+    name: 'Review Panel',
+    href: '/review-panel',
+    icon: '⚖️',
+    description: 'Virtual Review Panel Phase A — narrative-only AI seat reviews (Claude + OpenAI) synthesized by a Claude chair, blind and separate from the D26 Cycle Dossier',
+    categories: ['phase-ii'],
+    features: ['Server-Scoped Roster', 'Blind Seat Reviews', 'Chair Synthesis', 'Private DOCX/PDF Editions'],
+  },
+  {
     key: 'reviewers',
     name: 'Reviewers',
     href: '/workbench',
