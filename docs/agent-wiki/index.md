@@ -48,6 +48,7 @@ reviewing. It is subordinate to source, Atlas, and live probes.
 | Dev environment, secrets, Vercel deploys, local Jest/build quirks, Claude config sync | [Dev Environment](topics/dev-environment.md) | `docs/CREDENTIALS_RUNBOOK.md`, deployment docs, local scripts |
 | Strategy, system model, roadmap, phasing, planned automation | [Strategy & Roadmap](topics/strategy-roadmap.md) | `docs/SYSTEM_MODEL.md`, `DEVELOPMENT_LOG.md`, current handoff |
 | Nomenclature, overloaded/legacy names, app lifecycle (consolidated/deprecated/direct-URL), borrowed route namespaces | `docs/NOMENCLATURE_GLOSSARY.md` | `docs/NOMENCLATURE_AND_APP_LIFECYCLE_STRATEGY.md`, `shared/config/appRegistry.js` (`APP_LIFECYCLE_REGISTRY`, `ROUTE_NAMESPACE_LIFECYCLE`) |
+| Review Panel (Phase A foundation, governed Executor, seats/chair/attempt ledger) — distinct from the legacy `virtual-review-panel` app | [Review Panel](topics/review-panel.md) | `docs/plans/VIRTUAL_REVIEW_PANEL_PHASE_A_BUILD_PLAN_2026-09-12.md`, `docs/atlas/postgres-review-panel.md` |
 
 ## Maintenance
 
