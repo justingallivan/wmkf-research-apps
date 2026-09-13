@@ -47,6 +47,13 @@ export function isRunUnsettled(status) {
   return ['queued', 'running', 'paused'].includes(String(status || '').toLowerCase());
 }
 
+/** "retry queued" instead of "queued" when the run is queued because an entry retry is pending — the plain "queued" pill otherwise reads as the original launch queue, not a retry. */
+export function runPillLabel(run) {
+  if (!run) return 'no run yet';
+  if (run.status === 'queued' && (run.entries || []).some((e) => e.retryRequested)) return 'retry queued';
+  return run.status;
+}
+
 async function readResponse(response) {
   const body = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(body.error || `Request failed (${response.status})`);
@@ -118,13 +125,41 @@ function RunTimeline({ timeline }) {
   );
 }
 
-function EntryRow({ entry }) {
+/** True once every enabled seat AND the chair have a terminal `completed` attempt for this entry. */
+function seatsAndChairCompleted(seats) {
+  return seats.length > 0 && seats.every((seat) => seat.state === 'completed');
+}
+
+/**
+ * True while the worker is between "retry_requested_at cleared" and "entry
+ * marked completed" — retryFailedEntries clears retry_requested_at under
+ * its lease BEFORE completeEntryWithReport re-renders/uploads, so during
+ * that window the entry still reads `failed`/no report with retryRequested
+ * already false, and every seat/chair attempt already completed (nothing
+ * left to re-run — only the report render/upload is retrying).
+ */
+function isReRenderingReport({ runStatus, entry, seats }) {
+  return runStatus === 'running' && entry.status === 'failed' && !entry.retryRequested && !entry.hasReport && seatsAndChairCompleted(seats);
+}
+
+function EntryRow({ entry, runStatus }) {
   const seats = entry.seats || EMPTY_ARRAY;
   const failedSeats = seats.filter((seat) => seat.error);
+  const reRendering = isReRenderingReport({ runStatus, entry, seats });
+  // Suppression of the stale `failed` pill/error is gated on entry.retryRequested
+  // ONLY — the one DB-backed fact. `reRendering` is an inference (running +
+  // failed + no report + every seat/chair already won + retryRequested
+  // already cleared) that can ALSO be true for a first-time report-save
+  // failure sitting alongside still-running sibling entries (panelPool runs
+  // up to 3 entries concurrently), or a retry that itself re-fails. Hiding a
+  // fresh failure/error there would recreate the exact confusion this fix is
+  // for. The "Retrying…" line below is shown on the inference regardless,
+  // additively — it does not hide the failed pill or error.
+  const showFailedPill = entry.status !== 'failed' || !entry.retryRequested;
   return (
     <div className="flex flex-wrap items-center gap-3 border-b border-gray-100 py-3 last:border-0">
       <span className="min-w-36 flex-1 text-sm font-medium text-gray-800">#{entry.requestNumber || entry.requestId}</span>
-      <StatusPill tone={toneForStatus(entry.status)}>{entry.status}</StatusPill>
+      {showFailedPill && <StatusPill tone={toneForStatus(entry.status)}>{entry.status}</StatusPill>}
       {entry.retryRequested && <StatusPill tone="warning">Retry queued</StatusPill>}
       {entry.hasReport && (
         <span className="inline-flex items-center gap-1.5" data-testid="review-panel-entry-links">
@@ -140,7 +175,13 @@ function EntryRow({ entry }) {
       {failedSeats.map((seat) => (
         <p key={seat.seatKey} className="basis-full pl-1 text-xs text-red-700">{seat.error}</p>
       ))}
-      {entry.error && <p className="basis-full pl-1 text-xs text-red-700">{entry.error}</p>}
+      {entry.retryRequested && (
+        <p className="basis-full pl-1 text-xs text-gray-500">Retry requested — waiting for the worker (runs every minute).</p>
+      )}
+      {!entry.retryRequested && reRendering && (
+        <p className="basis-full pl-1 text-xs text-gray-500">Retrying: rendering and saving the report…</p>
+      )}
+      {!entry.retryRequested && entry.error && <p className="basis-full pl-1 text-xs text-red-700">{entry.error}</p>}
     </div>
   );
 }
@@ -355,7 +396,7 @@ export function ReviewPanelWorkspace() {
           {view === 'progress' && (
             <div>
               <div className="mb-3 flex items-center justify-between">
-                <StatusPill tone={toneForStatus(latestRun?.status)}>{latestRun?.status || 'no run yet'}</StatusPill>
+                <StatusPill tone={toneForStatus(latestRun?.status)}>{runPillLabel(latestRun)}</StatusPill>
                 <div className="flex items-center gap-2">
                   {failedEntries.length > 0 && (
                     <Button onClick={retryFailed} disabled={!retrySelection.size || actionLoading === 'retry'} loading={actionLoading === 'retry'}>Retry failed entries</Button>
@@ -385,7 +426,7 @@ export function ReviewPanelWorkspace() {
                         className="h-4 w-4"
                       />
                     )}
-                    <div className="flex-1"><EntryRow entry={entry} /></div>
+                    <div className="flex-1"><EntryRow entry={entry} runStatus={latestRun?.status} /></div>
                   </li>
                 ))}
                 {!latestRun && !loading && <p className="text-sm text-gray-500">No runs yet.</p>}

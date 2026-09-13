@@ -309,6 +309,7 @@ describe('projectReviewPanelRun — timeline for the Progress tab', () => {
       { at: '2026-09-13T10:03:00.000Z', label: 'Chair dispatched' },
       { at: '2026-09-13T10:04:00.000Z', label: 'Chair completed' },
       { at: '2026-09-13T10:05:00.000Z', label: 'Edition completed' },
+      { at: '2026-09-13T10:05:00.000Z', label: 'Report saved' },
     ]);
   });
 
@@ -326,12 +327,40 @@ describe('projectReviewPanelRun — timeline for the Progress tab', () => {
     const bareEntry = { ...timelineEntry, data: {} };
     const result = projectReviewPanelRun(timelineRun, [bareEntry], []);
     expect(result.timeline.some((e) => e.label === 'Edition completed')).toBe(false);
+    expect(result.timeline.some((e) => e.label === 'Report saved')).toBe(false);
   });
 
   test('omits edition completion for a failed entry, even with files present — the label would otherwise lie', () => {
     const failedEntry = { ...timelineEntry, status: 'failed' };
     const result = projectReviewPanelRun(timelineRun, [failedEntry], []);
     expect(result.timeline.some((e) => e.label === 'Edition completed')).toBe(false);
+    expect(result.timeline.some((e) => e.label === 'Report saved')).toBe(false);
+  });
+
+  test('"Retry requested" appears while retry_requested_at is set, timestamped from it', () => {
+    const retryingEntry = { ...timelineEntry, status: 'failed', data: {}, retry_requested_at: '2026-09-13T10:06:00.000Z' };
+    const result = projectReviewPanelRun(timelineRun, [retryingEntry], []);
+    expect(result.timeline).toContainEqual({ at: '2026-09-13T10:06:00.000Z', label: 'Retry requested' });
+  });
+
+  test('omits "Retry requested" once the worker has cleared retry_requested_at (nothing to derive it from)', () => {
+    const clearedEntry = { ...timelineEntry, retry_requested_at: null };
+    const result = projectReviewPanelRun(timelineRun, [clearedEntry], []);
+    expect(result.timeline.some((e) => e.label === 'Retry requested')).toBe(false);
+  });
+
+  test('"Report saved" falls back to the run\'s own updated_at when the entry has no updated_at', () => {
+    const noTimestampEntry = { ...timelineEntry, updated_at: null };
+    const runWithUpdatedAt = { ...timelineRun, updated_at: '2026-09-13T10:07:00.000Z' };
+    const result = projectReviewPanelRun(runWithUpdatedAt, [noTimestampEntry], []);
+    expect(result.timeline).toContainEqual({ at: '2026-09-13T10:07:00.000Z', label: 'Report saved' });
+  });
+
+  test('omits "Report saved" rather than inventing a timestamp when neither the entry nor the run has one', () => {
+    const noTimestampEntry = { ...timelineEntry, updated_at: null };
+    const runWithoutUpdatedAt = { ...timelineRun, updated_at: null };
+    const result = projectReviewPanelRun(runWithoutUpdatedAt, [noTimestampEntry], []);
+    expect(result.timeline.some((e) => e.label === 'Report saved')).toBe(false);
   });
 
   test('a chair attempt dispatched but not yet terminal still surfaces "Chair dispatched"', () => {
