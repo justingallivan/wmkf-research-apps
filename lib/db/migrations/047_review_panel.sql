@@ -48,6 +48,7 @@ CREATE TABLE IF NOT EXISTS review_panel_entries (
   request_revision INTEGER NOT NULL,
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','running','completed','failed')),
   data JSONB NOT NULL DEFAULT '{}'::jsonb, winners_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+  retry_requested_at TIMESTAMPTZ,
   created_by INTEGER NOT NULL REFERENCES user_profiles(id),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

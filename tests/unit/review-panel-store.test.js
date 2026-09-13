@@ -4,7 +4,7 @@ import { db, sql } from '@vercel/postgres';
 import {
   createAttempt, markAttemptDispatched, finalizeAttempt, reapExpiredAttempts,
   selectWinners, sumAttemptCosts, createReviewPanelEntry, mutateReviewPanelEntry,
-  claimReviewPanelRun,
+  claimReviewPanelRun, requestReviewPanelRetry, listRetryRequestedEntries,
 } from '../../lib/services/review-panel-store';
 
 let client;
@@ -326,5 +326,63 @@ describe('claimReviewPanelRun', () => {
       return { rows: [] };
     });
     expect(await claimReviewPanelRun()).toBeNull();
+  });
+});
+
+describe('requestReviewPanelRetry', () => {
+  const ACTOR_ROW = { rows: [{ id: 7, dynamics_systemuser_id: 'sysid-1' }] };
+
+  test('rejects while the run holds a live lease', async () => {
+    client.query.mockImplementation(async (q) => {
+      if (q.startsWith('SELECT * FROM review_panel_runs')) return { rows: [{ id: 'run-1', owner_profile_id: 7, lease_token: 'lease-1', status: 'running' }] };
+      if (q.startsWith('SELECT p.id, p.dynamics_systemuser_id')) return ACTOR_ROW;
+      return { rows: [] };
+    });
+    await expect(requestReviewPanelRetry('run-1', 7, ['entry-1'])).rejects.toMatchObject({ httpStatus: 409 });
+    expect(client.query).not.toHaveBeenCalledWith(expect.stringContaining('UPDATE review_panel_entries'), expect.anything());
+    expect(client.query).toHaveBeenCalledWith('ROLLBACK');
+  });
+
+  test('rejects while the run is queued even with no lease token', async () => {
+    client.query.mockImplementation(async (q) => {
+      if (q.startsWith('SELECT * FROM review_panel_runs')) return { rows: [{ id: 'run-1', owner_profile_id: 7, lease_token: null, status: 'queued' }] };
+      if (q.startsWith('SELECT p.id, p.dynamics_systemuser_id')) return ACTOR_ROW;
+      return { rows: [] };
+    });
+    await expect(requestReviewPanelRetry('run-1', 7, ['entry-1'])).rejects.toMatchObject({ httpStatus: 409 });
+  });
+
+  test('marks only failed entries with retry_requested_at and requeues the run when settled', async () => {
+    client.query.mockImplementation(async (q) => {
+      if (q.startsWith('SELECT * FROM review_panel_runs')) return { rows: [{ id: 'run-1', owner_profile_id: 7, lease_token: null, status: 'failed' }] };
+      if (q.startsWith('SELECT p.id, p.dynamics_systemuser_id')) return ACTOR_ROW;
+      if (q.startsWith('SELECT id FROM review_panel_entries')) return { rows: [{ id: 'entry-1' }] };
+      if (q.startsWith('UPDATE review_panel_runs')) return { rows: [{ id: 'run-1', status: 'queued' }] };
+      return { rows: [] };
+    });
+    const run = await requestReviewPanelRetry('run-1', 7, ['entry-1', 'entry-not-failed']);
+    expect(run.status).toBe('queued');
+    const markCall = client.query.mock.calls.find(([q]) => q.startsWith('UPDATE review_panel_entries'));
+    expect(markCall[0]).toContain('retry_requested_at=NOW()');
+    expect(markCall[1]).toEqual([['entry-1']]);
+    expect(client.query).toHaveBeenCalledWith('COMMIT');
+  });
+
+  test('rejects when none of the chosen entries are eligible (not failed)', async () => {
+    client.query.mockImplementation(async (q) => {
+      if (q.startsWith('SELECT * FROM review_panel_runs')) return { rows: [{ id: 'run-1', owner_profile_id: 7, lease_token: null, status: 'failed' }] };
+      if (q.startsWith('SELECT p.id, p.dynamics_systemuser_id')) return ACTOR_ROW;
+      if (q.startsWith('SELECT id FROM review_panel_entries')) return { rows: [] };
+      return { rows: [] };
+    });
+    await expect(requestReviewPanelRetry('run-1', 7, ['entry-1'])).rejects.toMatchObject({ httpStatus: 400 });
+  });
+});
+
+describe('listRetryRequestedEntries', () => {
+  test('returns entry ids with a pending retry marker', async () => {
+    sql.query.mockResolvedValue({ rows: [{ id: 'entry-1' }, { id: 'entry-2' }] });
+    expect(await listRetryRequestedEntries('run-1')).toEqual(['entry-1', 'entry-2']);
+    expect(sql.query).toHaveBeenCalledWith(expect.stringContaining('retry_requested_at IS NOT NULL'), ['run-1']);
   });
 });

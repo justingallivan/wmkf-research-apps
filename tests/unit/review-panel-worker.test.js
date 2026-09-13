@@ -75,6 +75,7 @@ beforeEach(() => {
   assertReviewPanelWorkerOpen.mockResolvedValue(undefined);
   store.claimReviewPanelRun.mockResolvedValue(RUN);
   store.releaseReviewPanelRun.mockResolvedValue(undefined);
+  store.listRetryRequestedEntries.mockResolvedValue([]);
   seatSetup();
 });
 
@@ -152,6 +153,35 @@ test('the chair is never dispatched twice for one entry: a second drain pass wit
   await drainReviewPanels();
   expect(runChair).toHaveBeenCalledTimes(1); // still 1 — guarded
   expect(attempts.filter((a) => a.seat_key === 'chair').length).toBe(1);
+});
+
+test('drainReviewPanels consumes retry_requested_at entries under its lease: retryFailedEntries runs and the marker clears via mutateReviewPanelEntry, so a second drain before completion never mints duplicate attempts', async () => {
+  seatSetup({ openaiFails: true });
+  store.listReviewPanelEntries.mockResolvedValue([entryState]);
+  await drainReviewPanels();
+  expect(entryState.status).toBe('failed');
+  expect(entryState.winners_json['seat.openai']).toBeUndefined();
+
+  // The route (requestReviewPanelRetry) would have set this on the entry row;
+  // the worker mock surfaces it via listRetryRequestedEntries.
+  store.listRetryRequestedEntries.mockResolvedValue(['entry-1']);
+  runSeat.mockImplementation(async (input, seatConfig, { attemptId }) => {
+    const a = attempts.find((x) => x.id === attemptId);
+    a.state = 'completed';
+    a.result_json = { priorWork: `retry ${seatConfig.seatKey}` };
+  });
+  store.listReviewPanelEntries.mockResolvedValue([entryState]);
+  await drainReviewPanels();
+  expect(entryState.status).toBe('completed');
+  expect(attempts.filter((a) => a.seat_key === 'seat.openai').length).toBe(2); // exactly one fresh attempt from the retry
+
+  // A second POST worth of drain (marker already cleared by mutateReviewPanelEntry
+  // inside retryFailedEntries) must not mint another attempt for either seat.
+  store.listRetryRequestedEntries.mockResolvedValue([]);
+  store.listReviewPanelEntries.mockResolvedValue([entryState]);
+  await drainReviewPanels();
+  expect(attempts.filter((a) => a.seat_key === 'seat.claude').length).toBe(1);
+  expect(attempts.filter((a) => a.seat_key === 'seat.openai').length).toBe(2);
 });
 
 test('retryFailedEntries only re-arms entries whose seats/chair still lack a winner; a subsequent drain re-attempts only the seat that lacked a winner', async () => {
