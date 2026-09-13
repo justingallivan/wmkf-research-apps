@@ -352,6 +352,12 @@ separate server-owned promotion contract. No branch writes Dataverse or accepts 
 | `/api/cycle-dossier/download` | GET | App / `requireAppAccess(req, res, 'cycle-dossier')` | `entryId` or owner-scoped `editionId` plus `docx`/`pdf`; service reauthorizes private ownership and validates persisted SHA-256/size/path refs before streaming. Private Blob bytes only; `Cache-Control: private, no-store`, `nosniff`. |
 | `/api/cron/drain-cycle-dossiers` | GET, POST | Cron / strict platform `CRON_SECRET` bearer (no development bypass) | No client body authority. Feature flag `CYCLE_DOSSIER_ENABLED=true`, durable `cycle_dossier_control.stop_requested=false`, are required after secret verification (the server-owned `CYCLE_DOSSIER_REQUEST_ALLOWLIST` is enforced downstream when the worker loads the roster for a running run); worker claims one global run lease and re-reads the durable stop before every paid call and SharePoint mutation. Postgres checkpoints plus dedicated private Blob artifacts; no public response data. |
 
+### Virtual Review Panel Phase A foundation routes
+
+| Route | Methods | Access class / guard | Inputs and persistence |
+|---|---|---|---|
+| `/api/cron/drain-review-panels` | GET, POST | Cron / strict platform `CRON_SECRET` bearer (no development bypass, `verifyReviewPanelCronSecret`) | No client body authority. Feature flag `REVIEW_PANEL_ENABLED=true` is required after secret verification; the durable `review_panel_control.stop_requested` stop is enforced inside the worker (claim-time and before every paid call via `assertReviewPanelWorkerOpen`). Worker claims one global run lease; per-seat/chair Postgres attempt-ledger checkpoints only — never `api_usage_log`. No public response data. |
+
 ## Regular Maintenance Process
 
 ### On every PR that touches `pages/api`
