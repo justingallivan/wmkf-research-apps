@@ -346,6 +346,9 @@ export function ReviewPanelWorkspace() {
                 <Button onClick={launch} disabled={launchState.disabled} loading={actionLoading === 'launch'}>Launch</Button>
                 {(launchState.reason || launchError) && <span className="text-xs text-red-700" role="alert">{launchError || launchState.reason}</span>}
               </div>
+              {!configuration?.ready && configuration?.reason && (
+                <p className="mt-1 text-xs text-gray-400">{configuration.reason}</p>
+              )}
             </div>
           )}
 

@@ -99,6 +99,27 @@ describe('ReviewPanelWorkspace', () => {
     expect(screen.getByRole('button', { name: /Launch/i })).toBeDisabled();
   });
 
+  test('a specific configuration.reason renders as a muted line under the generic not-ready sentence', async () => {
+    global.fetch = jest.fn().mockResolvedValue(response(pageResponse({
+      configuration: {
+        ready: false,
+        error: 'Published review panel prompts are not ready. Check Admin configuration.',
+        reason: 'Prompt review-panel.chair must pin a concrete Claude model id at seed time (D8) — got "opus"',
+        code: 'review_panel_prompt_invalid',
+      },
+    })));
+    render(<ReviewPanelWorkspace />);
+    await waitFor(() => expect(screen.getByText(/Published review panel prompts are not ready\./)).toBeInTheDocument());
+    expect(screen.getByText(/must pin a concrete Claude model id at seed time \(D8\) — got "opus"/)).toBeInTheDocument();
+  });
+
+  test('no reason line renders when configuration.reason is absent', async () => {
+    global.fetch = jest.fn().mockResolvedValue(response(pageResponse({ configuration: { ready: false, error: 'The review panel is awaiting activation.', reason: null } })));
+    render(<ReviewPanelWorkspace />);
+    await waitFor(() => expect(screen.getByText(/The review panel is awaiting activation\./)).toBeInTheDocument());
+    expect(screen.queryByText(/D8/)).not.toBeInTheDocument();
+  });
+
   test('Launch is enabled once the roster loads with ready configuration and a default selection', async () => {
     global.fetch = jest.fn().mockResolvedValue(response(pageResponse()));
     render(<ReviewPanelWorkspace />);

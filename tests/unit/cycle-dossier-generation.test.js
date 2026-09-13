@@ -58,6 +58,35 @@ test('snapshotConfiguration pins both published rows', async () => {
   expect(Object.isFrozen(configSnapshot.prompts.entry)).toBe(true);
 });
 
+function reverseKeysDeep(value) {
+  if (Array.isArray(value)) return value.map(reverseKeysDeep);
+  if (value && typeof value === 'object') {
+    return Object.keys(value).reverse().reduce((out, key) => {
+      out[key] = reverseKeysDeep(value[key]);
+      return out;
+    }, {});
+  }
+  return value;
+}
+
+test('accepts a variables/output-schema contract that is structurally identical but key-reordered and pretty-printed (canonical parity, not stringified)', async () => {
+  const reorderedVariables = reverseKeysDeep(entryDefinition.VARIABLES);
+  const reorderedSchema = reverseKeysDeep(entryDefinition.OUTPUT_SCHEMA);
+  // Prove the fixture is a genuine discriminator: naive JSON.stringify
+  // comparison (the old check) WOULD have rejected this.
+  expect(JSON.stringify(reorderedVariables)).not.toBe(JSON.stringify(entryDefinition.VARIABLES));
+  expect(JSON.stringify(reorderedSchema)).not.toBe(JSON.stringify(entryDefinition.OUTPUT_SCHEMA));
+  fetchCurrentPrompt.mockImplementation(async (name) => {
+    const row = rowFor(name, name === RESEARCH_PROMPT_NAME ? ID2 : ID);
+    if (name === ENTRY_PROMPT_NAME) {
+      row.wmkf_ai_promptvariables = JSON.stringify(reorderedVariables, null, 2);
+      row.wmkf_ai_promptoutputschema = JSON.stringify(reorderedSchema, null, 2);
+    }
+    return row;
+  });
+  await expect(snapshotConfiguration()).resolves.toBeDefined();
+});
+
 test.each(['missing-model', 'live-source', 'unwrapped', 'missing-placeholder', 'persistent-output'])('snapshot fails closed for edited %s contract', async (change) => {
   fetchCurrentPrompt.mockImplementation(async name => {
     const row = rowFor(name, ID);

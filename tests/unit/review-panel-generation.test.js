@@ -46,9 +46,10 @@ const QUESTION_FIELDS = [
 ];
 
 // Rows must satisfy snapshotConfiguration's snapshotPrompt drift check: their
-// variables/output-schema must equal the CANONICAL static definitions
-// verbatim (built from the real files, not hand-typed, so this fixture can't
-// silently drift from what the gate actually enforces).
+// variables/output-schema must be STRUCTURALLY equal (key order/whitespace
+// independent) to the CANONICAL static definitions (built from the real
+// files, not hand-typed, so this fixture can't silently drift from what the
+// gate actually enforces).
 const SEAT_ROW_BASE = {
   wmkf_ai_promptname: SEAT_PROMPT_NAME, wmkf_ai_promptid: '11111111-1111-1111-1111-111111111111',
   wmkf_promptversion: 1, wmkf_ai_model: 'claude-fable-5-1', wmkf_ai_systemprompt: seatDefinition.SYSTEM_PROMPT, wmkf_ai_promptbody: seatDefinition.USER_PROMPT_TEMPLATE,
@@ -167,6 +168,76 @@ describe('snapshotConfiguration', () => {
     expect(config.projectedQuestionSet.some((f) => f.key === 'affiliation')).toBe(false);
     const teamCapacity = config.projectedQuestionSet.find((f) => f.key === 'teamCapacity');
     expect(teamCapacity).toEqual({ key: 'teamCapacity', notAssessable: true });
+  });
+
+  // Deep key-reversal: proves the fixture actually has different key order
+  // than the canonical definition (JSON.stringify would differ), so a pass
+  // here demonstrates the structural comparison, not a fixture that happens
+  // to preserve order under both old and new code.
+  function reverseKeysDeep(value) {
+    if (Array.isArray(value)) return value.map(reverseKeysDeep);
+    if (value && typeof value === 'object') {
+      return Object.keys(value).reverse().reduce((out, key) => {
+        out[key] = reverseKeysDeep(value[key]);
+        return out;
+      }, {});
+    }
+    return value;
+  }
+
+  test('accepts a variables/output-schema contract that is structurally identical but key-reordered and pretty-printed (canonical parity, not stringified)', async () => {
+    const reorderedVariables = reverseKeysDeep(seatDefinition.VARIABLES);
+    const reorderedSchema = reverseKeysDeep(seatDefinition.OUTPUT_SCHEMA);
+    // Prove the fixture is a genuine discriminator: naive JSON.stringify
+    // comparison (the old check) WOULD have rejected this.
+    expect(JSON.stringify(reorderedVariables)).not.toBe(JSON.stringify(seatDefinition.VARIABLES));
+    expect(JSON.stringify(reorderedSchema)).not.toBe(JSON.stringify(seatDefinition.OUTPUT_SCHEMA));
+    const reorderedRow = {
+      ...SEAT_ROW_BASE,
+      wmkf_ai_promptvariables: JSON.stringify(reorderedVariables, null, 2), // pretty-printed too
+      wmkf_ai_promptoutputschema: JSON.stringify(reorderedSchema, null, 2),
+    };
+    fetchCurrentPrompt.mockImplementation(async (name) => (name === SEAT_PROMPT_NAME ? reorderedRow : { ...CHAIR_ROW_BASE }));
+    await expect(snapshotConfiguration()).resolves.toBeDefined();
+  });
+
+  test('still fails closed when a variable is missing untrusted:true (a real security-relevant drift, not just key order)', async () => {
+    // Drop the `untrusted` key entirely (not just set to false/undefined) —
+    // the real-world shape of an admin edit that strips the field.
+    const withoutUntrusted = {
+      variables: seatDefinition.VARIABLES.variables.map((v) => {
+        if (v.name !== 'proposal_narrative') return v;
+        const { untrusted, ...rest } = v;
+        return rest;
+      }),
+    };
+    const driftedRow = { ...SEAT_ROW_BASE, wmkf_ai_promptvariables: JSON.stringify(withoutUntrusted) };
+    fetchCurrentPrompt.mockImplementation(async (name) => (name === SEAT_PROMPT_NAME ? driftedRow : { ...CHAIR_ROW_BASE }));
+    await expect(snapshotConfiguration()).rejects.toThrow(/retain its seeded variable/);
+  });
+
+  test('D8 rejects a published prompt row pinning a non-Claude concrete model id', async () => {
+    const nonClaudeRow = { ...SEAT_ROW_BASE, wmkf_ai_model: 'gpt-5.6-sol' };
+    fetchCurrentPrompt.mockImplementation(async (name) => (name === SEAT_PROMPT_NAME ? nonClaudeRow : { ...CHAIR_ROW_BASE }));
+    await expect(snapshotConfiguration()).rejects.toThrow(/must pin a concrete Claude model id/);
+  });
+
+  test('D8 resolves a tier key (e.g. the editor\'s "opus tier" option) through the same resolver getModelForApp uses, then accepts the resolved concrete id', async () => {
+    // Without resolution, the raw "opus" tier key fails D8's concrete-id
+    // regex outright and snapshotConfiguration() would reject — so a
+    // resolved result here is direct proof the row-level D8 check resolved
+    // it (this is independent of the chair's SEPARATE getModelForApp-driven
+    // execution model, which mockModels() controls and always overwrites
+    // config.chair.model/promptSnapshot.wmkf_ai_model regardless).
+    const tierRow = { ...CHAIR_ROW_BASE, wmkf_ai_model: 'opus' };
+    fetchCurrentPrompt.mockImplementation(async (name) => (name === CHAIR_PROMPT_NAME ? tierRow : { ...SEAT_ROW_BASE }));
+    await expect(snapshotConfiguration()).resolves.toBeDefined();
+  });
+
+  test('D8 still fails closed for an unresolvable tier-shaped string that is not a real tier key', async () => {
+    const badRow = { ...CHAIR_ROW_BASE, wmkf_ai_model: 'not-a-real-tier' };
+    fetchCurrentPrompt.mockImplementation(async (name) => (name === CHAIR_PROMPT_NAME ? badRow : { ...SEAT_ROW_BASE }));
+    await expect(snapshotConfiguration()).rejects.toThrow(/must pin a concrete Claude model id/);
   });
 });
 
