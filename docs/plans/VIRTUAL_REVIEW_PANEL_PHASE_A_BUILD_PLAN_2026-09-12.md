@@ -118,19 +118,33 @@ prompt row (all Anthropic) must be unchanged.
 the existing unreviewed-model error (already fail-closed). No prompt-row schema change: vendor is a
 property of the model id, not a new Dataverse column.
 
-**A0.2 OpenAI client.** Same public contract as `LLMClient.complete()`: normalized
-`{ text, inputTokens, outputTokens, model, stopReason }`, external `AbortSignal` honoured across
-attempts and backoff, per-attempt `timeoutMs`, 429/5xx retry with the same backoff policy, bearer
-`OPENAI_API_KEY` read server-side, `safeFetch`, `max_completion_tokens`, **temperature sent only when
-`supportsTemperature` is true**. Refusal/finish-reason mapping documented in the capability row.
-Usage logged through the Executor's existing `api_usage_log` path (the client itself does not log).
+**A0.2 OpenAI client.** Same public contract as `LLMClient.complete()` (`llm-client.js:127-160`,
+`normalizeUnaryResponse` `:436-451`): returns `{ text, content, model, stopReason, stopDetails, refused,
+usage: { inputTokens, outputTokens, cacheCreationTokens: 0, cacheReadTokens: 0 } }`; accepts the
+Executor's `system` array-of-text-blocks (flattened to one system message, `cache_control` ignored)
+and `messages`; external `AbortSignal` honoured across attempts and backoff; per-attempt `timeoutMs`;
+429/5xx retry with the same backoff policy; bearer `OPENAI_API_KEY` read server-side; `safeFetch`;
+`max_completion_tokens`; **temperature sent only when `supportsTemperature` is true** (mirrors
+`LLMClient._buildBody` `:225`). **Stop reasons are normalised in the client**, because
+`parseClaudeOutput` (`execute-prompt.js:760-790`) accepts only `end_turn` and fails closed on
+`refusal`, `max_tokens`, `model_context_window_exceeded`, and anything else: `stop → end_turn`,
+`length → max_tokens`, `content_filter → refusal` with `refused: true`; any other finish reason passes
+through unchanged so the Executor rejects it. **The Executor does not write `api_usage_log`** by
+design (`execute-prompt.js:567-573`: the driver owns usage accounting); the panel worker logs each
+paid call with a `loggedExecute`-style wrapper like the dossier's (`cycle-dossier-generation.js`),
+reading `result.usage.input_tokens` / `output_tokens` from the Executor's snake_case result shape.
 `MultiLLMService` is not modified; the old panel keeps its own path until D5.
 
-**A0.3 Caller-supplied model.** New `executePrompt` option `modelOverride` (concrete id or tier).
-It goes through the same `resolveModelWithCapabilities` unknown-model gate as the prompt row's model,
-is recorded on the `wmkf_ai_run` row and in the caller's config snapshot, and its precedence against
-a `promptSnapshot` that pins a different model is decided in contract-reconcile (snapshot wins, or
-the call fails). Without this option per-seat admin selection is impossible.
+**A0.3 Caller-supplied model.** New `executePrompt` option `modelOverride` (concrete id only; tiers
+rejected so a pinned run cannot drift). **Precedence decided 2026-09-12: the override wins over the
+row or snapshot model.** Both are caller-supplied at the same call, and the panel worker pins the
+override model in its own config snapshot, so the snapshot's `wmkf_ai_model` is only the fallback
+when no override is given. The override goes through the same `resolveModelWithCapabilities`
+unknown-model gate as the row model (`execute-prompt.js:495-513`), drives `buildStructuredOutputConfig`
+and vendor dispatch, and is recorded on the `wmkf_ai_run` row automatically because `modelUsed`
+is `claudeResp.model || modelInfo.model` (`:282`, `:976`); the run notes additionally name the
+override so an audit can tell it from the row model. Without this option per-seat admin selection
+is impossible.
 
 **A0.4 Registries.** Add OpenAI rows to `MODEL_CAPABILITIES` (`provider: 'openai'`,
 `supportsStructuredOutput: false` for Phase A per D1b, `supportsTemperature` per model, retention
@@ -141,7 +155,14 @@ generalised **before** the first OpenAI row lands: key validation keyed on the r
 of the `claude-` prefix, non-Claude configured values checked rather than skipped, and the seat
 registry's `defaultModel` values added to its scanned sources so every seat default is gate-covered.
 Admin-panel overrides live in Postgres and are validated at write time by a vendor-aware successor to
-`validateReviewedClaudeModelValue`, not by the static gate.
+`validateReviewedClaudeModelValue`. That successor must **not** reuse the existing `allowNonClaude`
+escape (`model-review-validation.js`, returns `kind: 'non_claude'` with no capability or pricing
+check): an OpenAI id is valid only when its capability row and pricing row both exist. Callers to
+update: `/api/admin/models` PUT (`:216`), `prompts-publish-service.js:411`, and the two seed scripts.
+`MODEL_PRICING` already carries stale OpenAI rows (`gpt-4o`, `gpt-4o-mini`, `o3-mini`,
+`model-pricing.js:65-68`) used only by the old panel's usage logging; leave them, add the chosen
+seat model with a `source:` URL. `OPENAI_API_KEY` is in the credentials runbook but **not** in
+`lib/utils/tracked-secrets.js` (0 hits, 2026-09-12); A0 adds it.
 
 **A0.5 Admin model panel.** Let an app declare **named model slots** in a tracked registry
 (`shared/config/reviewPanelSeats.js`: `{ key, vendor, label, enabled, defaultModel }` for
@@ -253,6 +274,13 @@ and Phase C (panel-vs-human comparison, history views, third seat) follow the su
   budget envelope must reflect that.
 - Whether `getModelForApp` slot semantics or a separate settings prefix is cleaner for named slots.
 - Old-page parity definition for D5 (not before Phase B).
+- The dossier's `snapshotPrompt` rejects any model not matching `^claude-…` (`cycle-dossier-generation.js`);
+  the panel's cloned snapshot must key on the capability row's `provider` instead, or GPT seats fail
+  at snapshot time.
+- `getModelForApp` keys overrides by `${appKey}:${type}` with no type allowlist
+  (`shared/config/baseConfig.js:309`), so named slots work at read time; the allowlist to extend is
+  `VALID_MODEL_TYPES` in `/api/admin/models` and the GET's `APP_MODELS`-driven app list, which today
+  never lists an app absent from `APP_MODELS`.
 - **Key-collision check before A.1:** `review-panel` is a substring of the live `virtual-review-panel`.
   Confirm `check:api-routes`, `check:route-lifecycle-auth`, and the A7 registry match app keys and
   route paths exactly (not by prefix or `includes`) before the new key lands. Verified 2026-09-12 that
