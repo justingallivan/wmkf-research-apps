@@ -2,7 +2,7 @@
 import { validateAiJson } from '../../lib/utils/ai-output-schema';
 import {
   projectSeatQuestionSet, buildSeatValidationSchema, chairInput, renderSeatQuestionsText,
-  REVIEW_PANEL_NOT_ASSESSABLE_REPORT_LINE, SEAT_ANSWER_MAX_CHARS,
+  REVIEW_PANEL_NOT_ASSESSABLE_REPORT_LINE, SEAT_ANSWER_MAX_CHARS, SEAT_ANSWER_SCHEMA_MAX_CHARS,
 } from '../../lib/services/review-panel-questions';
 
 const FIXTURE_FIELDS = [
@@ -102,9 +102,10 @@ describe('buildSeatValidationSchema', () => {
     expect(bad.ok).toBe(false);
   });
 
-  test('richtext maxLength is capped at SEAT_ANSWER_MAX_CHARS regardless of the human form maxLength', () => {
-    expect(schema.fields.priorWork.maxLength).toBe(SEAT_ANSWER_MAX_CHARS);
+  test('richtext maxLength is capped at SEAT_ANSWER_SCHEMA_MAX_CHARS (2x the guidance figure) regardless of the human form maxLength', () => {
+    expect(schema.fields.priorWork.maxLength).toBe(SEAT_ANSWER_SCHEMA_MAX_CHARS);
     expect(SEAT_ANSWER_MAX_CHARS).toBe(2000);
+    expect(SEAT_ANSWER_SCHEMA_MAX_CHARS).toBe(4000);
   });
 
   test('a richtext field with a maxLength already below the seat cap keeps its own, smaller value', () => {
