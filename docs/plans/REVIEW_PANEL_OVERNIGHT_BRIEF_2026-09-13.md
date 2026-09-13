@@ -48,6 +48,9 @@ Review chain: 3 Opus slice reviews (FIX → fixed → rechecked), 1 Codex advers
 - **Cost `known` on the success path relies on `usageComplete` only**; `paidCall` is not on the Executor's success return. Error path requires both. Safe by construction today; noted as a coupling to the Executor.
 - **A worker-side D11 misconfiguration pauses the drain with an error log rather than a cron 503**, so it is visible in logs, not in the cron response.
 
+- **Post-loop advisor finding:** the ledger reads in `spend-check.js` and `admin/stats.js` were unguarded against the table not existing yet (merge-before-migrate window). A final narrow Sonnet task makes both tolerate `42P01` (undefined table) with a "not migrated" state; see §2 for its status. §5 also now orders the migration before the merge.
+- **Process slip:** one Codex companion invocation with `--help` was parsed as review text and ran an empty adversarial review against `main` without `--model gpt-5.6-sol`. Harmless (no diff), one wasted Codex turn.
+
 Accepted as designed, not fixed (Opus slice 2 review):
 - The finaliser's late path stores `late_usage_json` but no `cost_cents`/`cost_state`, so a run with an `unknown_outcome` attempt keeps its total withheld permanently. Conservative; the real spend for those calls is only recoverable from the vendor console.
 - The ledger fence tests assert the SQL text the mock receives (`clock_timestamp()`, `dispatch_token=$2`), not database behaviour. A live rehearsal against a scratch database would be the behavioural proof.
@@ -75,11 +78,12 @@ Accepted as designed, not fixed (Opus slice 2 review):
 
 Nothing below has been done. Order matters; each step is the owner's call. PR: https://github.com/justingallivan/wmkf-research-apps/pull/281
 
-1. **Merge PR #281** once CI is green and the Codex findings in §3 are acceptable. `main` auto-deploys; the panel stays dark until `REVIEW_PANEL_ENABLED=true`, and the drain cron is not scheduled, so merging alone changes nothing at runtime.
-2. **Apply migration 047** to the production database (existing-DB path, never `setup-database.js`):
+1. **Apply migration 047 to the production database FIRST** (existing-DB path, never `setup-database.js`). It is additive (five new tables), so it is safe ahead of the code, exactly as 046 was:
    ```bash
    node scripts/apply-migrations.js
    ```
+   Reason for the order: the spend-check cron and the admin stats endpoint on the branch read `review_panel_seat_attempts`. A late fix on the branch makes both tolerate a missing table (see §2), but applying 047 first removes the question entirely.
+2. **Merge PR #281** once CI is green and the findings in §3 are acceptable. `main` auto-deploys; the panel stays dark until `REVIEW_PANEL_ENABLED=true`, and the drain cron is not scheduled.
 3. **Provision the dedicated private Blob store (D11)**, following the runbook's dedicated-store procedure (decline the auto-link prompt, which would overwrite `BLOB_READ_WRITE_TOKEN`):
    ```bash
    vercel blob create-store wmkf-review-panel-private --access private
