@@ -154,13 +154,13 @@ describe('Executor provider authorization and dispatch', () => {
     expect(OpenAIClient).not.toHaveBeenCalled();
   });
 
-  it('uses the existing unreviewed-model failure for an unknown provider', async () => {
+  it('fails closed on a declared but unwired provider', async () => {
     mockResolveModelWithCapabilities.mockReturnValueOnce({
       model: 'vendor-model-1',
       capabilities: { provider: 'vendor', unknown: false, maxOutputTokens: 1000 },
     });
     await expect(run(prompt('vendor-model-1'), { allowedProviders: ['vendor'] }))
-      .rejects.toThrow(/unreviewed Claude model/);
+      .rejects.toThrow(/unsupported provider "vendor"/);
     expect(mockClaudeComplete).not.toHaveBeenCalled();
     expect(mockOpenAIComplete).not.toHaveBeenCalled();
   });
