@@ -144,9 +144,9 @@ Validation: 14 site-visit/catalog/seed suites (112 tests), two Admin email-defau
 `check:doc-currency`, `check:prompt-injection-tagging`, `check:fact-consistency`,
 `check:build-claim-freshness`, `check:dataverse-access-layer`, `check:dynamics-context-boundary`,
 `check:route-service-boundary`, and `check:atlas` passed with their self-tests; `check:docs-catalog`
-passed. The full 67-command `/start` gate set passed before implementation. The new settings
-have **not** been written to Dataverse and the branch has not been merged or deployed; seed the
-four keys before promotion.
+passed. The full 67-command `/start` gate set passed before implementation. At this
+implementation handoff, the new settings had not yet been written to Dataverse; the
+production seed receipt below supersedes that state. The branch was not merged or deployed.
 
 Outside the owned surface, `docs/API_ROUTE_SECURITY_MATRIX.md`'s materials route descriptions
 do not yet name the settings reads, and
@@ -168,5 +168,20 @@ each eligible row. Its dry-run eligibility count is explicitly provisional:
 dry runs skip settings resolution because that read can notify operations.
 
 The focused site-visit, catalog, seed, and Admin suites now pass (16 suites,
-135 tests); types, changed-file lint, and diff check pass. The four settings
-are still unseeded in Dataverse and this branch is still unmerged and undeployed.
+135 tests); types, changed-file lint, and diff check pass. At this review-fix
+handoff, the four settings were still unseeded; see the later receipt below.
+The branch remains unmerged and undeployed.
+
+### 2026-09-12 PT / 2026-09-13 UTC — production Dataverse seed receipt
+
+The local checkout targeted `wmkf.crm.dynamics.com` with
+`DATAVERSE_TARGET_INTERLOCK=on` and no sandbox URL. A read-only dry run of
+`node scripts/seed-email-defaults.mjs` found exactly four missing keys and
+25 existing non-empty email defaults. The owner-authorized `--execute` run
+used a single-invocation, UTC-dated `DATAVERSE_PROD_WRITE_ACK`; it created
+`email.site_visit_materials_invite.subject`, `.body`,
+`email.site_visit_materials_reminder.subject`, and `.body`, while skipping
+the 25 existing values. A separate `getSettingStrict` readback found all
+four rows and compared each value byte-for-byte with the tracked seed text;
+all four matched. No email was sent. The feature branch remains unmerged and
+undeployed, so this receipt establishes stored copy, not production runtime.

@@ -638,8 +638,10 @@ is removed; nothing else referenced it.
 Branch `codex/email-templates-configurable` moves the invitation and reminder subjects/bodies to
 Admin → Email defaults under `email.site_visit_materials_invite.subject` / `.body` and
 `email.site_visit_materials_reminder.subject` / `.body`. The seed script registers the existing
-wording for all four keys; production must seed them before the branch is deployed, because
-an absent or blank required value blocks the send without a code-literal fallback. Both manual
+wording for all four keys. **[PRODUCTION-SEEDED 2026-09-13 UTC]** A dry run found only these
+four keys missing; the execute run created them, skipped 25 existing non-empty email defaults,
+and a separate strict readback matched each stored value exactly to the tracked seed text.
+An absent or blank required value still blocks the send without a code-literal fallback. Both manual
 and automatic reminders resolve defaults, the contributor link, and any sending-PC signature
 before claiming the collection row. The default body still uses the fixed server-injected upload
 button and fallback link; an edited template may also place the server-minted URL with
