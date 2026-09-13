@@ -8,7 +8,7 @@ import {
   planReviewPanelSeed, executeReviewPanelSeed,
 } from '../../scripts/seed-review-panel-prompts.js';
 
-const SEAT_CLAUDE_DEFAULT_MODEL = 'claude-fable-5-1';
+const SEAT_CLAUDE_DEFAULT_MODEL = 'claude-opus-5';
 
 test('DEFINITIONS carries exactly the seat and chair prompts', () => {
   expect(DEFINITIONS.map((d) => d.definition.PROMPT_NAME).sort()).toEqual(['review-panel.chair', 'review-panel.seat']);

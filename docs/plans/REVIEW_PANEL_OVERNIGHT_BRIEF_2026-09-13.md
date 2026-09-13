@@ -130,7 +130,7 @@ Nothing below has been done. Order matters; each step is the owner's call. PR: h
    node --import ./scripts/lib/use-extensionless.mjs scripts/seed-review-panel-prompts.js --dry-run
    node --import ./scripts/lib/use-extensionless.mjs scripts/seed-review-panel-prompts.js --execute
    ```
-   Then confirm the seat and chair model slots in the admin model panel (defaults `claude-fable-5-1`, `gpt-5.6-sol`, chair `claude-opus-5`; D10 said the OpenAI id will probably change).
+   Then confirm the seat and chair model slots in the admin model panel (defaults `claude-opus-5` for the Claude seat since 2026-09-13 after Fable refused two biology proposals, `gpt-5.6-sol`, chair `claude-opus-5`; D10 said the OpenAI id will probably change).
 7. **Schedule the drain cron** (a tracked commit to `vercel.json`, Tier 2, mirroring the dossier entries):
    ```json
    "pages/api/cron/drain-review-panels.js": { "maxDuration": 300 },

@@ -10,7 +10,7 @@ export const REVIEW_PANEL_SEATS = Object.freeze([
     label: 'Claude reviewer',
     vendor: 'anthropic',
     enabled: true,
-    defaultModel: 'claude-fable-5-1',
+    defaultModel: 'claude-opus-5',
   }),
   Object.freeze({
     key: 'seat.openai',
