@@ -227,6 +227,72 @@ test('operator stop set between seats: subsequent paid calls are skipped and the
   expect(signalPassedToTheOneSeatThatRan.aborted).toBe(true);
 });
 
+describe('materializePendingEntries (via drainReviewPanels)', () => {
+  test('creates a real entry for each request parked in run.data.pendingEntries by the launch route, then clears the list', async () => {
+    const runWithPending = { ...RUN, data: { ...RUN.data, pendingEntries: [{ requestId: 'req-1', input: { requestId: 'req-1', narrative: { text: 'n' } }, requestNumber: 'R-1' }] }, owner_profile_id: 42 };
+    store.claimReviewPanelRun.mockResolvedValue(runWithPending);
+    store.listReviewPanelEntries.mockResolvedValueOnce([]); // materialization check: nothing exists yet
+    store.createReviewPanelEntry.mockResolvedValue({ id: 'entry-1', run_id: 'run-1', request_id: 'req-1', status: 'pending', data: {}, winners_json: {} });
+    store.mutateReviewPanelRun.mockResolvedValue(runWithPending);
+    store.listReviewPanelEntries.mockResolvedValueOnce([]); // the drain's own pending/running scan after materialization: nothing to process this pass in this test
+    store.listReviewPanelEntries.mockResolvedValueOnce([]); // finalizeRunStatusIfSettled's read
+
+    await drainReviewPanels();
+
+    expect(store.createReviewPanelEntry).toHaveBeenCalledWith(expect.objectContaining({
+      runId: 'run-1', requestId: 'req-1', leaseToken: 'lease-1', createdBy: 42,
+      data: { input: { requestId: 'req-1', narrative: { text: 'n' } }, requestNumber: 'R-1' },
+    }));
+    const clearCall = store.mutateReviewPanelRun.mock.calls.find(([id]) => id === 'run-1');
+    expect(clearCall).toBeTruthy();
+    const row = { data: { pendingEntries: [{ requestId: 'req-1' }] } };
+    clearCall[1](row);
+    expect(row.data.pendingEntries).toEqual([]);
+  });
+
+  test('never re-creates an entry for a requestId that already has one — a crash between create and clear is safe on the next pass', async () => {
+    const runWithPending = { ...RUN, data: { ...RUN.data, pendingEntries: [{ requestId: 'req-1', input: {}, requestNumber: 'R-1' }] }, owner_profile_id: 42 };
+    store.claimReviewPanelRun.mockResolvedValue(runWithPending);
+    store.listReviewPanelEntries.mockResolvedValue([{ id: 'entry-1', run_id: 'run-1', request_id: 'req-1', status: 'completed' }]);
+
+    await drainReviewPanels();
+
+    expect(store.createReviewPanelEntry).not.toHaveBeenCalled();
+  });
+});
+
+describe('finalizeRunStatusIfSettled (via drainReviewPanels)', () => {
+  test('writes the run status to completed once every entry has completed', async () => {
+    store.listReviewPanelEntries.mockResolvedValue([entryState]); // entryState.status is 'completed' after seatSetup's happy path
+    await drainReviewPanels();
+    const statusCall = store.mutateReviewPanelRun.mock.calls.find(([id]) => id === 'run-1');
+    expect(statusCall).toBeTruthy();
+    const row = { status: 'running' };
+    statusCall[1](row);
+    expect(row.status).toBe('completed');
+  });
+
+  test('never writes a run status while any entry is still in flight (both seats already dispatched, neither settled)', async () => {
+    attempts = [
+      { id: 'seat.claude-1', entry_id: 'entry-1', seat_key: 'seat.claude', attempt_no: 1, state: 'dispatched' },
+      { id: 'seat.openai-1', entry_id: 'entry-1', seat_key: 'seat.openai', attempt_no: 1, state: 'dispatched' },
+    ];
+    entryState.status = 'running';
+    entryState.winners_json = {};
+    store.listAttemptsForEntry.mockImplementation(async () => attempts.slice());
+    store.reapExpiredAttempts.mockResolvedValue([]);
+    store.selectWinners.mockImplementation(async () => entryState); // no completed attempts yet, so no winners recorded
+    store.readReviewPanelEntry.mockImplementation(async () => entryState);
+    store.listReviewPanelEntries.mockResolvedValue([entryState]);
+    store.mutateReviewPanelRun.mockClear();
+
+    await drainReviewPanels();
+
+    expect(entryState.status).toBe('running'); // processEntry returned early: not every seat has a winner yet
+    expect(store.mutateReviewPanelRun).not.toHaveBeenCalled();
+  });
+});
+
 describe('describeEntryFailure', () => {
   test('names the failing seat/chair in plain language', () => {
     expect(describeEntryFailure({ message: 'x' }, 'seat.openai')).toContain('seat.openai');
