@@ -13,10 +13,14 @@ jest.mock('../../lib/services/workbench/program-scope-service', () => ({
   resolveWorkbenchProgramScope: jest.fn(async () => ({ programId: 'program-1' })),
 }));
 jest.mock('../../lib/services/review-panel-input', () => ({ prepareReviewPanelInput: jest.fn() }));
-jest.mock('../../lib/services/review-panel-generation', () => ({
-  snapshotConfiguration: jest.fn(),
-  estimateReservationCost: jest.fn(() => ({ lowUsd: 1, highUsd: 2 })),
-}));
+jest.mock('../../lib/services/review-panel-generation', () => {
+  const actual = jest.requireActual('../../lib/services/review-panel-generation');
+  return {
+    snapshotConfiguration: jest.fn(),
+    estimateReservationCost: jest.fn(() => ({ lowUsd: 1, highUsd: 2 })),
+    ReviewPanelGenerationError: actual.ReviewPanelGenerationError,
+  };
+});
 jest.mock('../../lib/services/review-panel-storage', () => ({
   assertReviewPanelStorageConfigured: jest.fn(),
   reviewPanelDigest: jest.fn((value) => JSON.stringify(value)),
@@ -48,7 +52,7 @@ jest.mock('../../lib/services/review-panel-store', () => ({
 
 const requests = require('../../lib/dataverse/adapters/grant-request');
 const { prepareReviewPanelInput } = require('../../lib/services/review-panel-input');
-const { snapshotConfiguration } = require('../../lib/services/review-panel-generation');
+const { snapshotConfiguration, ReviewPanelGenerationError } = require('../../lib/services/review-panel-generation');
 const { readReviewPanelFile, assertReviewPanelStorageConfigured } = require('../../lib/services/review-panel-storage');
 const rollout = require('../../lib/services/review-panel-rollout');
 const store = require('../../lib/services/review-panel-store');
@@ -103,6 +107,35 @@ describe('getReviewPanelPage surfaces the rollout mode so the page can mirror th
     rollout.assertReviewPanelModeValid.mockImplementation(() => { throw Object.assign(new Error('invalid mode'), { httpStatus: 503 }); });
     const result = await getReviewPanelPage(OWNER);
     expect(result.configuration.mode).toBeNull();
+  });
+});
+
+describe('getReviewPanelPage surfaces WHY snapshotConfiguration failed, instead of collapsing every failure into one generic sentence', () => {
+  let warnSpy;
+  beforeEach(() => { warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {}); });
+  afterEach(() => { warnSpy.mockRestore(); });
+
+  test('a ReviewPanelGenerationError surfaces its message as reason + its code, and is logged', async () => {
+    snapshotConfiguration.mockRejectedValue(new ReviewPanelGenerationError('Prompt review-panel.chair must pin a concrete Claude model id at seed time (D8) — got "opus"', 'review_panel_prompt_invalid'));
+    const result = await getReviewPanelPage(OWNER);
+    expect(result.configuration.ready).toBe(false);
+    expect(result.configuration.error).toBe('Published review panel prompts are not ready. Check Admin configuration.');
+    expect(result.configuration.reason).toBe('Prompt review-panel.chair must pin a concrete Claude model id at seed time (D8) — got "opus"');
+    expect(result.configuration.code).toBe('review_panel_prompt_invalid');
+    expect(warnSpy).toHaveBeenCalledWith('[review-panel] configuration not ready', {
+      code: 'review_panel_prompt_invalid',
+      message: 'Prompt review-panel.chair must pin a concrete Claude model id at seed time (D8) — got "opus"',
+    });
+  });
+
+  test('a non-ReviewPanelGenerationError failure still surfaces the generic sentence with no reason', async () => {
+    snapshotConfiguration.mockRejectedValue(new Error('boom'));
+    const result = await getReviewPanelPage(OWNER);
+    expect(result.configuration.ready).toBe(false);
+    expect(result.configuration.error).toBe('Published review panel prompts are not ready. Check Admin configuration.');
+    expect(result.configuration.reason).toBeNull();
+    expect(result.configuration.code).toBeNull();
+    expect(warnSpy).toHaveBeenCalled();
   });
 });
 
