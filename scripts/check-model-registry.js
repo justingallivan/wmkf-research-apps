@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 /**
- * CI gate: configured Anthropic model ids must be reviewed before they can ship.
+ * CI gate: configured provider model ids must be reviewed before they can ship.
  *
  * Scans the static source-of-truth files without importing app modules:
  * - shared/config/baseConfig.js APP_MODELS + global Claude defaults
+ * - shared/config/reviewPanelSeats.js REVIEW_PANEL_SEATS
  * - lib/services/model-resolver.js TIER_FALLBACK_IDS
  * - lib/services/model-capabilities.js MODEL_CAPABILITIES
  * - lib/utils/model-pricing.js MODEL_PRICING
@@ -32,6 +33,10 @@ const REQUIRED_CAPABILITY_FIELDS = [
   'reviewedAt',
   'source',
 ];
+const PROVIDER_ID_PREFIXES = {
+  anthropic: ['claude-'],
+  openai: ['gpt-', 'o'],
+};
 
 function parseArgs(argv) {
   let root = path.resolve(__dirname, '..');
@@ -117,6 +122,41 @@ function findConstObject(root, rel, name) {
   return found;
 }
 
+function findConstArray(root, rel, name) {
+  const ast = parse(read(root, rel), rel);
+  let found = null;
+  (function walk(node) {
+    if (!node || found) return;
+    if (Array.isArray(node)) {
+      for (const child of node) walk(child);
+      return;
+    }
+    if (typeof node !== 'object') return;
+    if (node.type === 'VariableDeclarator'
+        && node.id?.type === 'Identifier'
+        && node.id.name === name) {
+      const init = unwrapFreeze(node.init);
+      if (init?.type === 'ArrayExpression') found = init.elements.map((element) => literal(unwrapFreeze(element)));
+      return;
+    }
+    for (const value of Object.values(node)) {
+      if (value && typeof value === 'object') walk(value);
+    }
+  })(ast.program);
+  if (!found) throw new Error(`could not find array ${name} in ${rel}`);
+  return found;
+}
+
+function unwrapFreeze(node) {
+  if (node?.type === 'CallExpression'
+      && node.callee?.type === 'MemberExpression'
+      && node.callee.object?.name === 'Object'
+      && node.callee.property?.name === 'freeze') {
+    return node.arguments[0];
+  }
+  return node;
+}
+
 function matchesKnownPrefix(modelId, table) {
   if (Object.prototype.hasOwnProperty.call(table, modelId)) return true;
   const keys = Object.keys(table).sort((a, b) => b.length - a.length);
@@ -151,8 +191,11 @@ function collectConfiguredModelValues(baseConfig) {
 function validateCapabilityEntries(capabilities) {
   const errors = [];
   for (const [key, caps] of Object.entries(capabilities)) {
-    if (!key.startsWith('claude-')) {
-      errors.push(`MODEL_CAPABILITIES key "${key}" is not an Anthropic model id/prefix`);
+    const prefixes = PROVIDER_ID_PREFIXES[caps.provider];
+    if (!prefixes) {
+      errors.push(`MODEL_CAPABILITIES["${key}"] has unsupported provider "${caps.provider}"`);
+    } else if (!prefixes.some((prefix) => key.startsWith(prefix))) {
+      errors.push(`MODEL_CAPABILITIES key "${key}" does not match provider "${caps.provider}"`);
     }
     for (const field of REQUIRED_CAPABILITY_FIELDS) {
       if (!Object.prototype.hasOwnProperty.call(caps, field) || caps[field] === undefined) {
@@ -175,6 +218,20 @@ function validateCapabilityEntries(capabilities) {
     if (typeof caps.source !== 'string' || !/^https?:\/\//.test(caps.source)) {
       errors.push(`MODEL_CAPABILITIES["${key}"].source must be an http(s) URL`);
     }
+    if (caps.provider === 'openai') {
+      if (!['system', 'developer'].includes(caps.instructionRole)) {
+        errors.push(`MODEL_CAPABILITIES["${key}"].instructionRole must be system or developer`);
+      }
+      if (caps.refusalField !== 'message.refusal') {
+        errors.push(`MODEL_CAPABILITIES["${key}"].refusalField must be "message.refusal"`);
+      }
+      if (caps.supportsStructuredOutput !== false) {
+        errors.push(`MODEL_CAPABILITIES["${key}"].supportsStructuredOutput must be false for Phase A`);
+      }
+      if (typeof caps.zeroDataRetentionEligible !== 'boolean') {
+        errors.push(`MODEL_CAPABILITIES["${key}"].zeroDataRetentionEligible must be boolean`);
+      }
+    }
   }
   return errors;
 }
@@ -185,6 +242,10 @@ function main() {
   const tierFallbacks = findConstObject(root, 'lib/services/model-resolver.js', 'TIER_FALLBACK_IDS');
   const capabilities = findConstObject(root, 'lib/services/model-capabilities.js', 'MODEL_CAPABILITIES');
   const pricing = findConstObject(root, 'lib/utils/model-pricing.js', 'MODEL_PRICING');
+  const seatRegistryPath = path.join(root, 'shared/config/reviewPanelSeats.js');
+  const seats = fs.existsSync(seatRegistryPath)
+    ? findConstArray(root, 'shared/config/reviewPanelSeats.js', 'REVIEW_PANEL_SEATS')
+    : [];
 
   const errors = validateCapabilityEntries(capabilities);
   const configured = collectConfiguredModelValues(baseConfig);
@@ -193,8 +254,23 @@ function main() {
   for (const item of configured) {
     const value = item.value;
     if (TIER_KEYS.has(value)) continue;
-    if (!value.startsWith('claude-')) continue;
     concreteToCheck.push(item);
+  }
+
+  for (const seat of seats) {
+    if (!seat || typeof seat !== 'object') {
+      errors.push('REVIEW_PANEL_SEATS entries must be objects');
+      continue;
+    }
+    if (!seat.key || !seat.vendor || !seat.label || typeof seat.enabled !== 'boolean' || !seat.defaultModel) {
+      errors.push('REVIEW_PANEL_SEATS entries require key, vendor, label, enabled, and defaultModel');
+      continue;
+    }
+    concreteToCheck.push({
+      source: `REVIEW_PANEL_SEATS.${seat.key}.defaultModel`,
+      value: seat.defaultModel,
+      provider: seat.vendor,
+    });
   }
 
   for (const [tier, concrete] of Object.entries(tierFallbacks)) {
@@ -208,12 +284,20 @@ function main() {
     concreteToCheck.push({ source: `TIER_FALLBACK_IDS.${tier}`, value: concrete });
   }
 
-  for (const { source, value } of concreteToCheck) {
+  for (const { source, value, provider: expectedProvider } of concreteToCheck) {
     if (!matchesKnownPrefix(value, capabilities)) {
       errors.push(`${source} -> ${value} is missing from MODEL_CAPABILITIES`);
     }
     if (!matchesKnownPrefix(value, pricing)) {
       errors.push(`${source} -> ${value} is missing from MODEL_PRICING`);
+    }
+    const capabilityKey = Object.keys(capabilities)
+      .sort((a, b) => b.length - a.length)
+      .find((key) => value === key || (value.startsWith(key) && value[key.length] === '-'));
+    if (expectedProvider && capabilityKey && capabilities[capabilityKey]?.provider !== expectedProvider) {
+      errors.push(
+        `${source} -> ${value} belongs to provider "${capabilities[capabilityKey]?.provider}", expected "${expectedProvider}"`,
+      );
     }
   }
 
@@ -246,3 +330,5 @@ if (require.main === module) {
     process.exit(2);
   }
 }
+
+module.exports = { validateCapabilityEntries };

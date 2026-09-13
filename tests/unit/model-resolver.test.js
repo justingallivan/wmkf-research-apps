@@ -7,6 +7,8 @@ const {
   getTierCatalog,
   resolveModelWithCapabilities,
 } = require('../../lib/services/model-resolver.js');
+const { MODEL_CAPABILITIES } = require('../../lib/services/model-capabilities.js');
+const { validateCapabilityEntries } = require('../../scripts/check-model-registry.js');
 
 describe('resolveModelWithCapabilities', () => {
   afterEach(() => {
@@ -84,6 +86,31 @@ describe('resolveModelWithCapabilities', () => {
       family: 'opus',
       supportsTemperature: false,
     });
+  });
+
+  it('passes the reviewed OpenAI id through with its provider request contract', () => {
+    const resolved = resolveModelWithCapabilities('gpt-5.6-sol');
+    expect(resolved).toMatchObject({
+      model: 'gpt-5.6-sol',
+      isTier: false,
+      capabilities: {
+        provider: 'openai',
+        instructionRole: 'developer',
+        refusalField: 'message.refusal',
+        supportsTemperature: false,
+        supportsStructuredOutput: false,
+        maxOutputTokens: 128_000,
+      },
+    });
+  });
+
+  it('makes the registry gate red when a capability row omits provider', () => {
+    const providerless = { ...MODEL_CAPABILITIES['gpt-5.6-sol'] };
+    delete providerless.provider;
+    expect(validateCapabilityEntries({ 'gpt-5.6-sol': providerless }))
+      .toEqual(expect.arrayContaining([
+        expect.stringMatching(/unsupported provider|missing required field "provider"/),
+      ]));
   });
 
   it('returns the reviewed Opus 5 request and refusal contract', () => {
