@@ -109,6 +109,33 @@ test('the per-entry report cost is scoped to THIS entry (sumEntryAttemptCosts), 
   expect(store.sumAttemptCosts).not.toHaveBeenCalled();
 });
 
+test('a format already saved on the entry (e.g. a prior pass\'s docx succeeded, pdf then failed) is never re-rendered or re-uploaded — only the missing format is', async () => {
+  const existingDocxRef = { pathname: 'review-panel/entry-1/report.docx', sha256: 'b'.repeat(64), size: 9 };
+  entryState.data = { ...entryState.data, files: { docx: existingDocxRef } };
+  store.listReviewPanelEntries.mockResolvedValue([entryState]);
+  await drainReviewPanels();
+  expect(renderReviewPanelEntryDocuments).toHaveBeenCalledWith(expect.anything(), { formats: ['pdf'] });
+  expect(storeReviewPanelFile).toHaveBeenCalledTimes(1);
+  expect(storeReviewPanelFile).toHaveBeenCalledWith('review-panel/entry-1/report.pdf', expect.anything(), 'application/pdf');
+  expect(storeReviewPanelFile).not.toHaveBeenCalledWith(expect.stringContaining('.docx'), expect.anything(), expect.anything());
+  expect(entryState.data.files.docx).toBe(existingDocxRef); // untouched
+  expect(entryState.status).toBe('completed');
+});
+
+test('when both editions are already saved (a stale re-entry), the entry is settled to completed without touching storage at all', async () => {
+  const files = {
+    docx: { pathname: 'review-panel/entry-1/report.docx', sha256: 'b'.repeat(64), size: 9 },
+    pdf: { pathname: 'review-panel/entry-1/report.pdf', sha256: 'c'.repeat(64), size: 7 },
+  };
+  entryState.data = { ...entryState.data, files };
+  store.listReviewPanelEntries.mockResolvedValue([entryState]);
+  await drainReviewPanels();
+  expect(renderReviewPanelEntryDocuments).not.toHaveBeenCalled();
+  expect(storeReviewPanelFile).not.toHaveBeenCalled();
+  expect(entryState.status).toBe('completed');
+  expect(entryState.data.files).toEqual(files);
+});
+
 test('when the report cannot be saved (e.g. the D11 Blob store is not yet provisioned), the entry is FAILED rather than silently completed with no report; the chair result is preserved for visibility', async () => {
   storeReviewPanelFile.mockRejectedValueOnce(Object.assign(new Error('The private review panel document store has not been configured.'), { httpStatus: 503 }));
   store.listReviewPanelEntries.mockResolvedValue([entryState]);

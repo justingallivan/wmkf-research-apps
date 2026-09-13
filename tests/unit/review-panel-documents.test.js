@@ -66,3 +66,21 @@ test('cost section withholds the total (and prints no dollar figure) when unknow
   expect(text).toContain('Cost for this request withheld: 2 attempt(s) with unknown outcome.');
   expect(text).not.toContain('$123.45');
 });
+
+describe('formats option — selective rendering (review-panel-worker.js skips a format already saved on the entry)', () => {
+  test('formats: ["pdf"] renders only the PDF, leaving docx/docxSha256 null', async () => {
+    const result = await renderReviewPanelEntryDocuments(BASE_REPORT, { formats: ['pdf'] });
+    expect(result.docx).toBeNull();
+    expect(result.docxSha256).toBeNull();
+    expect(Buffer.isBuffer(result.pdf)).toBe(true);
+    expect(result.pdfSha256).toMatch(/^[a-f0-9]{64}$/);
+  });
+
+  test('formats: ["docx"] renders only the DOCX, leaving pdf/pdfSha256 null', async () => {
+    const result = await renderReviewPanelEntryDocuments(BASE_REPORT, { formats: ['docx'] });
+    expect(result.pdf).toBeNull();
+    expect(result.pdfSha256).toBeNull();
+    expect(Buffer.isBuffer(result.docx)).toBe(true);
+    expect(result.docxSha256).toMatch(/^[a-f0-9]{64}$/);
+  });
+});
