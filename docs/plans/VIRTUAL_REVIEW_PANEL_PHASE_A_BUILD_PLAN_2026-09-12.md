@@ -37,7 +37,7 @@ related:
 | D3 | Human reviews | Deferred (Phase C). Blind panel; the seat output schema stays in lockstep with the human review form so a later comparison lines up. |
 | D4 | Publication | Deferred (Phase B). Private Blob editions only. |
 | D5 | Old app | Unchanged. The upload-based page stays live until parity; no retirement work in Phase A. |
-| D6 | Cost posture | **No "typical cost" figure yet.** Run the panel on a small owner-chosen subset first and collect real actuals from `api_usage_log`, then decide. Same posture as the dossier's open figure. |
+| D6 | Cost posture | **No "typical cost" figure yet.** Run the panel on a small owner-chosen subset first and collect real actuals from the `review_panel_seat_attempts` ledger (A0.4; `api_usage_log` is a cross-check only), then decide. Same posture as the dossier's open figure. |
 | D7 | Team-capacity question `[DECIDED 2026-09-12: option 1]` | The required human-form question `teamCapacity` asks about personnel, infrastructure, and budget, but D2 excludes budget and biosketches. **Decision: narrative only, enforced.** Seats emit `teamCapacity` as `{ status: 'not_assessable' }` with no answer text; the seat `validationSchema` rejects any answer text for that key; the chair prompt receives no `teamCapacity` content and the report prints the question as "Not assessed in Phase A (budget and team materials not provided)". Widening D2 remains a Phase B/C option. Raised by the Codex adversarial review 2026-09-12. |
 | D8 | Provider scope `[DECIDED 2026-09-12 by revision]` | Prompt publishing stays Claude-only. Non-Anthropic dispatch happens only when the calling service explicitly allows that provider on the call, intersected with `VRP_ALLOWED_PROVIDERS`. No existing Executor prompt can be repointed at OpenAI by an admin edit. |
 
@@ -166,10 +166,21 @@ fire-and-forget with a swallowed catch (`lib/utils/usage-logger.js:60-92`), and 
 cost-known or attempt-correlation column (`scripts/setup-database.js:265-282`). The panel therefore
 records usage **on its own `review_panel_seat_attempts` row, in an awaited write, before the attempt
 is marked terminal** (A.5): `input_tokens`, `output_tokens`, `model`, `provider`, `cost_usd`, and
-`cost_state ∈ {known, unknown}` (`unknown` when `paidCall` is null or the usage object is missing).
-`logUsage` is still called for cross-app reporting, best-effort, after the ledger write. D6 actuals
-are computed from the ledger; the page and the report **refuse to print a run total while any attempt
-in the run has `cost_state = 'unknown'`** and show the unknown count instead. The dossier wrapper
+`cost_state ∈ {known, unknown}`. **`known` requires all of:** `paidCall === true`; the provider
+response carried explicit usage (both clients expose `usageComplete: boolean`, true only when the
+provider's input and output token fields were **present, finite, and non-negative** in the raw
+response, because `normalizeUnaryResponse` otherwise substitutes zero, `llm-client.js:436-448`); and
+`lookupPricing(model)` resolves. Anything else is `unknown`, including a well-formed response with
+absent usage fields. Test fixtures: missing `usage`, malformed token fields, unpriced model.
+**Central monitoring sees unknowns.** The daily spend alert (`pages/api/cron/spend-check.js:65-88`)
+and admin stats (`pages/api/admin/stats.js:45-159`) sum `api_usage_log`, which cannot represent an
+unknown; so (a) `logUsage` is still called best-effort after the ledger write for every `known`
+attempt, and (b) `spend-check` gains a second query counting `review_panel_seat_attempts` rows with
+`cost_state = 'unknown'` in the window and raises the same `spend_threshold`-class alert with an
+explicit "N panel calls with unknown cost" message whenever the count is non-zero; admin stats show
+the unknown count beside the panel's total. D6 actuals are computed from the ledger; the page and the
+report **refuse to print a run total while any attempt in the run has `cost_state = 'unknown'`** and
+show the unknown count instead. The dossier wrapper
 (`cycle-dossier-generation.js` loggedExecute) can adopt `err.usage` later. Tests: invalid JSON, schema
 failure, refusal, truncation, abort-after-dispatch, and a failing ledger write each leave the attempt
 non-terminal or `unknown`, never a zero-cost `completed`.
@@ -239,7 +250,7 @@ assertion on every entry (dossier pattern); rows for `/api/review-panel`, `/api/
   The run config stores the projected set and `questionSetVersion` of the full set; launch fails if
   the set cannot be fetched. **`teamCapacity` (D7):** the projection marks it `not_assessable`; the
   schema for that key accepts only `{ status: 'not_assessable' }` and rejects answer text; the chair
-  input and the report omit it. Seat identity is not in the prompt; the model differs per seat via
+  input omits it; the **report prints the fixed line** from D7 (one contract, tested in A.7). Seat identity is not in the prompt; the model differs per seat via
   the per-seat snapshot (A0.3).
 - `review-panel.chair`: synthesis over N seat reviews, reusing the existing synthesis shape
   (`ratingMatrix`, `consensus`, `disagreements`, `keyStrengths`, `keyConcerns`, `questionsForPI`,
@@ -266,18 +277,22 @@ change mid-run cannot shift anything. **Per seat, not per entry:** each paid cal
 `paidInFlight` flag per entry (`cycle-dossier-worker.js:121-147`) is insufficient for parallel seats.
 **Two separate fences.** (1) Run-state changes (entry status, winner selection, chair dispatch,
 retry creation) require the **current run lease**, exactly as the dossier worker fences its mutations
-(`cycle-dossier-worker.js:94-100`). (2) Attempt finalisation is a **compare-and-set on the attempt's
-own `dispatch_token`** from `dispatched` to `completed | failed`, storing result and usage; it does not
-require the run lease, so a worker that lost the lease can still land the usage and result of a call
-it paid for. An attempt already moved to `unknown_outcome` by the reaper keeps that state: a late
-CAS may append `late_result_json` and usage metadata but **cannot change the state or become a
-winner**. The reaper (current-lease holder) moves `dispatched` attempts whose lease expired to
-`unknown_outcome`; they are **never retried automatically**. Winner selection is explicit: under the
+(`cycle-dossier-worker.js:94-100`). (2) Attempt finalisation is a single **compare-and-set on the attempt's
+own `dispatch_token` that also requires `dispatch_expires_at > now()`** (the attempt records the
+run-lease expiry in force when it was dispatched): `UPDATE … SET state = completed|failed, result,
+usage WHERE id = $1 AND dispatch_token = $2 AND state = 'dispatched' AND dispatch_expires_at > now()`.
+If that CAS matches zero rows the finaliser runs the **late path**: `UPDATE … SET state =
+CASE WHEN state = 'dispatched' THEN 'unknown_outcome' ELSE state END, late_result_json, late_usage
+WHERE id = $1 AND dispatch_token = $2`, so a finaliser that arrives after its lease expired, whether
+before or after the reaper, can only land metadata and never `completed`. The reaper (current-lease
+holder) moves `dispatched` attempts with `dispatch_expires_at <= now()` to `unknown_outcome`; they
+are **never retried automatically**. The two updates are the only writers of attempt state. Winner selection is explicit: under the
 current lease, the entry picks the single `completed` attempt per seat with the highest `attempt_no`
 and records `winner_attempt_id` on the entry; only winners feed the chair. Seats run with
 `Promise.allSettled`; the entry completes only when every configured seat has a winner, then the chair
-runs as its own attempt row. Tests: old worker CAS after lease expiry lands usage without changing
-`unknown_outcome`; old worker CAS after a manual replacement attempt does not displace the winner;
+runs as its own attempt row. Tests, both orderings: finaliser-after-expiry-before-reaper lands `unknown_outcome` + late usage,
+never `completed`; reaper-then-finaliser leaves `unknown_outcome` and appends usage; finaliser
+within lease completes; old worker after a manual replacement attempt does not displace the winner;
 chair never dispatches twice for one entry. **Partial-seat policy:** any failed
 seat fails the entry; "Retry failed entries" creates new attempts only for seats without a `completed`
 attempt and re-runs the chair. Each call uses `promptSnapshot`, `requireNoPersistence`, `deadlineMs`,
@@ -292,7 +307,9 @@ copy. Cron entry in `vercel.json` only when the owner enables it (dossier preced
 **A.7 Editions.** Private Blob DOCX + PDF per entry with SHA-256/size/path refs, structural DOCX
 verification, download route with `Cache-Control: private, no-store` and `X-Frame-Options: SAMEORIGIN`
 for the PDF preview. Report sections: rating matrix, panel summary, per-seat reviews (labelled by
-vendor and pinned model), cost breakdown from actuals. No SharePoint (D4).
+vendor and pinned model) with `teamCapacity` rendered as the fixed D7 line "Not assessed in Phase A
+(budget and team materials not provided)", cost breakdown from the attempt ledger (withheld while any
+attempt is `unknown`, A0.4). No SharePoint (D4).
 
 **A.8 Page.** `/review-panel` on the dossier page skeleton with its hardened affordances: inline error
 beside Launch, Progress tab default while unsettled, per-row Word/PDF links, Include all / Exclude
@@ -360,3 +377,10 @@ and Phase C (panel-vs-human comparison, history views, third seat) follow the su
   test; A0.4 ledger-authoritative cost with `cost_state` and awaited writes, totals withheld while any
   attempt is unknown; D7 decided option 1 (owner) and enforced in A.3; A.5 two-fence contract with
   `dispatch_token` CAS and explicit winners.
+- 2026-09-12 Codex adversarial review round 3 against `ee692aa8`: **no-ship** on four findings (late
+  CAS could still win before the reaper; unknown spend invisible to spend-check/admin stats; usage
+  object presence is not a safe known-cost predicate; D7 report contract contradicted A.3).
+  Addressed: A.5 CAS requires an unexpired dispatch lease with a metadata-only late path, both
+  orderings tested; A0.4 `usageComplete` predicate plus spend-check unknown-count alert and admin
+  stats unknown count; D6 row and §6 name the ledger; D7/A.3/A.7 agree the report prints the fixed
+  "Not assessed" line while the chair omits the key.
