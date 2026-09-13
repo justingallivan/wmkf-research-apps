@@ -142,7 +142,7 @@ function isReRenderingReport({ runStatus, entry, seats }) {
   return runStatus === 'running' && entry.status === 'failed' && !entry.retryRequested && !entry.hasReport && seatsAndChairCompleted(seats);
 }
 
-function EntryRow({ entry, runStatus }) {
+function EntryRow({ entry, runStatus, onRerender, rerenderLoading, rerenderError }) {
   const seats = entry.seats || EMPTY_ARRAY;
   const failedSeats = seats.filter((seat) => seat.error);
   const reRendering = isReRenderingReport({ runStatus, entry, seats });
@@ -156,16 +156,36 @@ function EntryRow({ entry, runStatus }) {
   // for. The "Retrying…" line below is shown on the inference regardless,
   // additively — it does not hide the failed pill or error.
   const showFailedPill = entry.status !== 'failed' || !entry.retryRequested;
+  // A re-render request reuses entry.retryRequested (same DB marker as an
+  // ordinary failed-entry retry) — entry.rerender (only present while the
+  // marker is outstanding) is what distinguishes it, so the completed-entry
+  // waiting copy is only ever shown for THIS entry's own outstanding request.
+  // Mirrors requestReviewPanelRerender's own settle fence (review-panel-
+  // store.js): the run must not be unsettled (queued/running/paused) or
+  // cancelled, or the server 409s — the button must never render enabled
+  // when the request would only be rejected.
+  const canRerender = entry.status === 'completed' && entry.hasReport && !entry.retryRequested
+    && !isRunUnsettled(runStatus) && runStatus !== 'cancelled';
   return (
     <div className="flex flex-wrap items-center gap-3 border-b border-gray-100 py-3 last:border-0">
       <span className="min-w-36 flex-1 text-sm font-medium text-gray-800">#{entry.requestNumber || entry.requestId}</span>
       {showFailedPill && <StatusPill tone={toneForStatus(entry.status)}>{entry.status}</StatusPill>}
-      {entry.retryRequested && <StatusPill tone="warning">Retry queued</StatusPill>}
+      {entry.retryRequested && <StatusPill tone="warning">{entry.rerender ? 'Re-render queued' : 'Retry queued'}</StatusPill>}
       {entry.hasReport && (
         <span className="inline-flex items-center gap-1.5" data-testid="review-panel-entry-links">
           <a className="text-xs font-semibold text-gray-600 underline underline-offset-2 hover:text-gray-900" href={`/api/review-panel/download?entryId=${encodeURIComponent(entry.id)}&format=docx`} download>Word</a>
           <a className="text-xs font-semibold text-gray-600 underline underline-offset-2 hover:text-gray-900" href={`/api/review-panel/download?entryId=${encodeURIComponent(entry.id)}&format=pdf`}>PDF</a>
         </span>
+      )}
+      {canRerender && (
+        <button
+          type="button"
+          onClick={() => onRerender(entry.id)}
+          disabled={rerenderLoading}
+          className="text-xs font-semibold text-gray-600 underline underline-offset-2 hover:text-gray-900 disabled:opacity-50"
+        >
+          Re-render report
+        </button>
       )}
       {seats.length > 0 && (
         <span className="flex basis-full flex-wrap items-center gap-1.5 pl-1">
@@ -176,12 +196,17 @@ function EntryRow({ entry, runStatus }) {
         <p key={seat.seatKey} className="basis-full pl-1 text-xs text-red-700">{seat.error}</p>
       ))}
       {entry.retryRequested && (
-        <p className="basis-full pl-1 text-xs text-gray-500">Retry requested — waiting for the worker (runs every minute).</p>
+        <p className="basis-full pl-1 text-xs text-gray-500">
+          {entry.rerender ? 'Re-render requested — waiting for the worker (runs every minute).' : 'Retry requested — waiting for the worker (runs every minute).'}
+        </p>
       )}
       {!entry.retryRequested && reRendering && (
         <p className="basis-full pl-1 text-xs text-gray-500">Retrying: rendering and saving the report…</p>
       )}
       {!entry.retryRequested && entry.error && <p className="basis-full pl-1 text-xs text-red-700">{entry.error}</p>}
+      {/* A rejected rerender request (e.g. a 409 because the run isn't settled) shows HERE, beside this
+          entry's own row, never in the shared launch-error slot (which only renders on the Requests tab). */}
+      {rerenderError && <p className="basis-full pl-1 text-xs text-red-700">{rerenderError}</p>}
     </div>
   );
 }
@@ -198,6 +223,10 @@ export function ReviewPanelWorkspace() {
   const [actionLoading, setActionLoading] = useState('');
   const [view, setView] = useState('requests');
   const [retrySelection, setRetrySelection] = useState(() => new Set());
+  // Per-entry rerender request errors (e.g. a 409 because the run isn't
+  // settled) — shown beside THAT entry's own row, never in the shared
+  // launchError slot (which only ever renders on the Requests tab).
+  const [rerenderErrors, setRerenderErrors] = useState(() => new Map());
   const mounted = useRef(true);
   const initialViewSet = useRef(false);
   const launchKeyRef = useRef({ signature: '', key: '' });
@@ -321,6 +350,34 @@ export function ReviewPanelWorkspace() {
     }
   };
 
+  // Re-render makes no model calls (review-panel-worker.js's
+  // rerenderCompletedEntries re-derives the DOCX/PDF editions from the
+  // entry's already-saved seat/chair reviews) — the confirm copy says so
+  // explicitly, since the button otherwise reads exactly like a paid retry.
+  const rerenderEntry = async (entryId) => {
+    if (!latestRun) return;
+    if (typeof window !== 'undefined' && !window.confirm('Re-render the Word and PDF editions from the saved reviews? No model calls are made.')) return;
+    setActionLoading(`rerender:${entryId}`);
+    setRerenderErrors((current) => {
+      if (!current.has(entryId)) return current;
+      const next = new Map(current);
+      next.delete(entryId);
+      return next;
+    });
+    try {
+      await runAction({ action: 'rerender', runId: latestRun.id, entryIds: [entryId] });
+      await load();
+    } catch (rerenderErr) {
+      // Shown beside THIS entry's own row (EntryRow's rerenderError prop),
+      // never in the shared launchError slot — that slot only renders on
+      // the Requests tab, so a rejection here (e.g. the run isn't settled)
+      // would otherwise be silently invisible on the Progress tab.
+      setRerenderErrors((current) => new Map(current).set(entryId, rerenderErr.message));
+    } finally {
+      setActionLoading('');
+    }
+  };
+
   const toggleOperatorStop = async () => {
     setActionLoading('operator-stop');
     try {
@@ -426,7 +483,15 @@ export function ReviewPanelWorkspace() {
                         className="h-4 w-4"
                       />
                     )}
-                    <div className="flex-1"><EntryRow entry={entry} runStatus={latestRun?.status} /></div>
+                    <div className="flex-1">
+                      <EntryRow
+                        entry={entry}
+                        runStatus={latestRun?.status}
+                        onRerender={rerenderEntry}
+                        rerenderLoading={actionLoading === `rerender:${entry.id}`}
+                        rerenderError={rerenderErrors.get(entry.id)}
+                      />
+                    </div>
                   </li>
                 ))}
                 {!latestRun && !loading && <p className="text-sm text-gray-500">No runs yet.</p>}

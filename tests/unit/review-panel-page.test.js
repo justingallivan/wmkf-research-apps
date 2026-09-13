@@ -469,6 +469,101 @@ describe('Progress tab run timeline', () => {
   });
 });
 
+describe('Re-render report action', () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  test('a completed entry with a saved report shows the "Re-render report" button; confirming posts action:"rerender" for that entry', async () => {
+    jest.spyOn(window, 'confirm').mockReturnValue(true);
+    const postBodies = [];
+    global.fetch = jest.fn((url, options) => {
+      if (options?.method === 'POST') { postBodies.push(JSON.parse(options.body)); return Promise.resolve(response({ run: { id: 'run-1', status: 'queued', entries: [] } })); }
+      return Promise.resolve(response(pageResponse({
+        runs: [{ id: 'run-1', status: 'completed', entries: [{ id: 'entry-1', requestNumber: '101', status: 'completed', hasReport: true, retryRequested: false, seats: [] }] }],
+      })));
+    });
+    render(<ReviewPanelWorkspace />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Progress' }));
+    const rerenderButton = await screen.findByRole('button', { name: 'Re-render report' });
+    fireEvent.click(rerenderButton);
+    expect(window.confirm).toHaveBeenCalledWith('Re-render the Word and PDF editions from the saved reviews? No model calls are made.');
+    await waitFor(() => expect(postBodies).toEqual([{ action: 'rerender', runId: 'run-1', entryIds: ['entry-1'] }]));
+  });
+
+  test('declining the confirm dialog sends no request', async () => {
+    jest.spyOn(window, 'confirm').mockReturnValue(false);
+    const postBodies = [];
+    global.fetch = jest.fn((url, options) => {
+      if (options?.method === 'POST') { postBodies.push(JSON.parse(options.body)); return Promise.resolve(response({ run: {} })); }
+      return Promise.resolve(response(pageResponse({
+        runs: [{ id: 'run-1', status: 'completed', entries: [{ id: 'entry-1', requestNumber: '101', status: 'completed', hasReport: true, retryRequested: false, seats: [] }] }],
+      })));
+    });
+    render(<ReviewPanelWorkspace />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Progress' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Re-render report' }));
+    expect(window.confirm).toHaveBeenCalled();
+    expect(postBodies).toEqual([]);
+  });
+
+  test('a rejected re-render request (e.g. server 409 because the run is not settled) shows beside THAT entry row, never in the shared launch-error slot', async () => {
+    jest.spyOn(window, 'confirm').mockReturnValue(true);
+    global.fetch = jest.fn((url, options) => {
+      if (options?.method === 'POST') return Promise.resolve({ ok: false, status: 409, json: async () => ({ error: 'Wait for this run to settle before re-rendering.' }) });
+      return Promise.resolve(response(pageResponse({
+        runs: [{ id: 'run-1', status: 'completed', entries: [{ id: 'entry-1', requestNumber: '101', status: 'completed', hasReport: true, retryRequested: false, seats: [] }] }],
+      })));
+    });
+    render(<ReviewPanelWorkspace />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Progress' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Re-render report' }));
+    await waitFor(() => expect(screen.getByText('Wait for this run to settle before re-rendering.')).toBeInTheDocument());
+    // Never in the launch-error slot: that slot only renders on the Requests tab, so switching there must show nothing stale.
+    fireEvent.click(screen.getByRole('button', { name: 'Requests' }));
+    expect(screen.queryByText('Wait for this run to settle before re-rendering.')).not.toBeInTheDocument();
+  });
+
+  test('no "Re-render report" button for an entry with no saved report, or one already mid-retry', async () => {
+    global.fetch = jest.fn().mockResolvedValue(response(pageResponse({
+      runs: [{ id: 'run-1', status: 'running', entries: [
+        { id: 'entry-1', requestNumber: '101', status: 'failed', hasReport: false, retryRequested: false, seats: [] },
+        { id: 'entry-2', requestNumber: '102', status: 'completed', hasReport: true, retryRequested: true, rerender: { requestedAt: '2026-09-13T10:06:00.000Z' }, seats: [] },
+      ] }],
+    })));
+    render(<ReviewPanelWorkspace />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Progress' }));
+    await waitFor(() => expect(screen.getByText(/#102/)).toBeInTheDocument());
+    expect(screen.queryByRole('button', { name: 'Re-render report' })).not.toBeInTheDocument();
+  });
+
+  test('no "Re-render report" button while the run itself is unsettled — mirrors the server\'s own settle fence even for an otherwise-eligible entry', async () => {
+    global.fetch = jest.fn().mockResolvedValue(response(pageResponse({
+      runs: [{ id: 'run-1', status: 'running', entries: [
+        { id: 'entry-1', requestNumber: '101', status: 'completed', hasReport: true, retryRequested: false, seats: [] },
+      ] }],
+    })));
+    render(<ReviewPanelWorkspace />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Progress' }));
+    await waitFor(() => expect(screen.getByText(/#101/)).toBeInTheDocument());
+    expect(screen.queryByRole('button', { name: 'Re-render report' })).not.toBeInTheDocument();
+  });
+
+  test('a completed entry with an outstanding re-render request shows the re-render waiting copy and "Re-render queued" pill', async () => {
+    global.fetch = jest.fn().mockResolvedValue(response(pageResponse({
+      runs: [{ id: 'run-1', status: 'queued', entries: [
+        {
+          id: 'entry-1', requestNumber: '101', status: 'completed', hasReport: true, retryRequested: true,
+          rerender: { requestedAt: '2026-09-13T10:06:00.000Z' }, seats: [],
+        },
+      ] }],
+    })));
+    render(<ReviewPanelWorkspace />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Progress' }));
+    await waitFor(() => expect(screen.getByText(/#101/)).toBeInTheDocument());
+    expect(screen.getByText('Re-render requested — waiting for the worker (runs every minute).')).toBeInTheDocument();
+    expect(screen.getByText('Re-render queued')).toBeInTheDocument();
+  });
+});
+
 test('the default export wraps the workspace in RequireAuth without crashing', async () => {
   global.fetch = jest.fn().mockResolvedValue(response(pageResponse()));
   render(<ReviewPanelPage />);
