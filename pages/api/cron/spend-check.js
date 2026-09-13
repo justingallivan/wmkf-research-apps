@@ -79,28 +79,15 @@ async function checkDailyThreshold() {
   // The Virtual Review Panel Phase A foundation never writes api_usage_log
   // (docs/plans/VIRTUAL_REVIEW_PANEL_PHASE_A_BUILD_PLAN_2026-09-12.md §5 A.5)
   // — its own per-seat/chair ledger (review_panel_seat_attempts) is added
-  // here so the daily sum still reflects panel spend. Same day window as
-  // api_usage_log above (created_at::date = CURRENT_DATE). Uses the SAME
-  // ATTEMPT_COST_UNKNOWN_SQL predicate as review-panel-store.js's
-  // sumAttemptCosts/sumEntryAttemptCosts and pages/api/admin/stats.js — a
-  // single definition so "unknown cost" can never drift between call sites.
-  // A reaped/late attempt is state='unknown_outcome' with cost_state left
-  // NULL (never set by the late path); a finalized completed/failed attempt
-  // can ALSO carry cost_state='unknown' when its paid-call confirmation was
-  // itself ambiguous — both must count, and neither is ever folded into the
-  // known total. Built with sql.query (not the tagged template) so the
-  // predicate lands as literal SQL text, not a bound parameter.
-  const panelResult = await sql.query(
-    `SELECT COALESCE(SUM(a.cost_cents) FILTER (WHERE NOT ${ATTEMPT_COST_UNKNOWN_SQL}), 0)::numeric AS panel_known_cost_cents,
-            COUNT(*) FILTER (WHERE ${ATTEMPT_COST_UNKNOWN_SQL})::int AS panel_unknown_count
-     FROM review_panel_seat_attempts a
-     WHERE a.created_at::date = CURRENT_DATE`);
-  const panelKnownCents = Number(panelResult.rows[0].panel_known_cost_cents);
-  const panelUnknownCount = Number(panelResult.rows[0].panel_unknown_count);
+  // here so the daily sum still reflects panel spend. See
+  // getReviewPanelDailyCost below for the migration-not-applied guard.
+  const panel = await getReviewPanelDailyCost();
+  const panelKnownCents = panel.knownCents;
+  const panelUnknownCount = panel.unknownCount;
   const spentCents = Number(total_cost_cents) + panelKnownCents;
 
   const overThreshold = spentCents > thresholdCents;
-  const metadata = { spentCents, thresholdCents, requestCount: request_count, panelKnownCents, panelUnknownCount, overThreshold };
+  const metadata = { spentCents, thresholdCents, requestCount: request_count, panelKnownCents, panelUnknownCount, overThreshold, panelAvailable: panel.available };
 
   // Two INDEPENDENT alerts, each with its own dedupe key and its own
   // create/autoResolve pair, so one condition can never suppress or
@@ -127,7 +114,10 @@ async function checkDailyThreshold() {
     await AlertService.autoResolve(DAILY_ALERT_KEY);
   }
 
-  if (panelUnknownCount > 0) {
+  // The unknown-cost alert must never fire while the ledger itself is
+  // unavailable (migration 047 not yet applied) — an unmigrated table isn't
+  // an "unknown cost" condition, it's simply not there yet.
+  if (panel.available && panelUnknownCount > 0) {
     await AlertService.createAlert({
       type: 'spend_threshold',
       severity: 'warning',
@@ -141,5 +131,43 @@ async function checkDailyThreshold() {
     await AlertService.autoResolve(PANEL_UNKNOWN_ALERT_KEY);
   }
 
-  return { status: (overThreshold || panelUnknownCount > 0) ? 'alerting' : 'ok', spentCents, thresholdCents, requestCount: request_count, panelKnownCents, panelUnknownCount };
+  return { status: (overThreshold || (panel.available && panelUnknownCount > 0)) ? 'alerting' : 'ok', spentCents, thresholdCents, requestCount: request_count, panelKnownCents, panelUnknownCount, panelAvailable: panel.available };
+}
+
+// Same day window as api_usage_log above (created_at::date = CURRENT_DATE).
+// Uses the SAME ATTEMPT_COST_UNKNOWN_SQL predicate as review-panel-store.js's
+// sumAttemptCosts/sumEntryAttemptCosts and pages/api/admin/stats.js — a
+// single definition so "unknown cost" can never drift between call sites.
+// A reaped/late attempt is state='unknown_outcome' with cost_state left
+// NULL (never set by the late path); a finalized completed/failed attempt
+// can ALSO carry cost_state='unknown' when its paid-call confirmation was
+// itself ambiguous — both must count, and neither is ever folded into the
+// known total. Built with sql.query (not the tagged template) so the
+// predicate lands as literal SQL text, not a bound parameter.
+//
+// PR #281 merges review_panel_seat_attempts callers before migration 047
+// runs on main's auto-deploy, so this table can legitimately not exist yet.
+// Isolate that one failure mode (Postgres 42P01 undefined_table) from the
+// rest of the handler: return the "not yet migrated" shape instead of
+// throwing, so the daily spend-check cron keeps running on api_usage_log
+// alone. Any other error still propagates — this is not a blanket swallow.
+async function getReviewPanelDailyCost() {
+  try {
+    const panelResult = await sql.query(
+      `SELECT COALESCE(SUM(a.cost_cents) FILTER (WHERE NOT ${ATTEMPT_COST_UNKNOWN_SQL}), 0)::numeric AS panel_known_cost_cents,
+              COUNT(*) FILTER (WHERE ${ATTEMPT_COST_UNKNOWN_SQL})::int AS panel_unknown_count
+       FROM review_panel_seat_attempts a
+       WHERE a.created_at::date = CURRENT_DATE`);
+    return {
+      knownCents: Number(panelResult.rows[0].panel_known_cost_cents),
+      unknownCount: Number(panelResult.rows[0].panel_unknown_count),
+      available: true,
+    };
+  } catch (error) {
+    if (error && error.code === '42P01') {
+      console.warn('review_panel_seat_attempts not present; migration 047 not applied');
+      return { knownCents: 0, unknownCount: 0, available: false };
+    }
+    throw error;
+  }
 }

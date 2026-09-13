@@ -145,3 +145,37 @@ test('never folds an unknown-outcome attempt cost into the total (fixture has a 
   expect(res.body.dailyThreshold.spentCents).toBe(200); // only the KNOWN 200 cents, the 5 unknown attempts contribute nothing
   expect(res.body.dailyThreshold.panelUnknownCount).toBe(5);
 });
+
+test('migration 047 not yet applied (42P01 undefined_table on review_panel_seat_attempts): cron still returns 200 and the daily threshold logic runs on api_usage_log alone, no unknown-cost alert', async () => {
+  sql.mockResolvedValueOnce({ rows: [{ total_cost_cents: '100', request_count: 2 }] });
+  sql.query.mockRejectedValueOnce(Object.assign(new Error('relation "review_panel_seat_attempts" does not exist'), { code: '42P01' }));
+  const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  const res = response();
+  await handler({ method: 'GET' }, res);
+  expect(res.statusCode).toBe(200);
+  expect(res.body.dailyThreshold).toMatchObject({
+    status: 'ok',
+    spentCents: 100,
+    panelKnownCents: 0,
+    panelUnknownCount: 0,
+    panelAvailable: false,
+  });
+  // No unknown-cost alert raised for an unmigrated table — it isn't an
+  // "unknown cost" condition, just an absent one — and the threshold
+  // logic still ran to completion on api_usage_log alone.
+  expect(AlertService.createAlert).not.toHaveBeenCalled();
+  expect(AlertService.autoResolve).toHaveBeenCalledWith('spend:review-panel-unknown-cost');
+  expect(warnSpy).toHaveBeenCalledWith(expect.stringMatching(/review_panel_seat_attempts not present; migration 047 not applied/));
+  warnSpy.mockRestore();
+});
+
+test('a non-42P01 error from the panel query still propagates as a failed cron run (the guard is not a blanket swallow)', async () => {
+  sql.mockResolvedValueOnce({ rows: [{ total_cost_cents: '100', request_count: 2 }] });
+  sql.query.mockRejectedValueOnce(Object.assign(new Error('connection terminated unexpectedly'), { code: '57P03' }));
+  const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+  const res = response();
+  await handler({ method: 'GET' }, res);
+  expect(res.statusCode).toBe(500);
+  expect(AlertService.createAlert).not.toHaveBeenCalled();
+  errorSpy.mockRestore();
+});

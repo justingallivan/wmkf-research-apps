@@ -61,6 +61,7 @@ test('reviewPanel.knownCostCents sums only known-cost rows across state buckets,
       { state: 'completed', attemptCount: 3, knownCostCents: 150, unknownCount: 0 },
       { state: 'failed', attemptCount: 1, knownCostCents: 0, unknownCount: 0 },
     ],
+    available: true,
   });
 });
 
@@ -74,4 +75,25 @@ test('unknownCount is populated from unknown-cost attempts (including a "failed"
   await handler({ method: 'GET', query: {} }, res);
   expect(res.body.reviewPanel.knownCostCents).toBe(200);
   expect(res.body.reviewPanel.unknownCount).toBe(5); // 4 (unknown_outcome) + 1 (ambiguous failed)
+});
+
+test('migration 047 not yet applied (42P01 undefined_table on review_panel_seat_attempts): the endpoint still returns 200 with the rest of the response intact, and reviewPanel signals unavailable rather than a fabricated zero', async () => {
+  sql.query.mockRejectedValueOnce(Object.assign(new Error('relation "review_panel_seat_attempts" does not exist'), { code: '42P01' }));
+  const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  const res = response();
+  await handler({ method: 'GET', query: {} }, res);
+  expect(res.statusCode).toBe(200);
+  expect(res.body.reviewPanel).toEqual({ knownCostCents: 0, unknownCount: 0, byState: [], available: false });
+  expect(res.body.byApp).toEqual([]); // the rest of the response is unaffected by the missing table
+  expect(warnSpy).toHaveBeenCalledWith(expect.stringMatching(/review_panel_seat_attempts not present; migration 047 not applied/));
+  warnSpy.mockRestore();
+});
+
+test('a non-42P01 error from the panel query still propagates as a failed request (the guard is not a blanket swallow)', async () => {
+  sql.query.mockRejectedValueOnce(Object.assign(new Error('connection terminated unexpectedly'), { code: '57P03' }));
+  const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+  const res = response();
+  await handler({ method: 'GET', query: {} }, res);
+  expect(res.statusCode).toBe(500);
+  errorSpy.mockRestore();
 });
