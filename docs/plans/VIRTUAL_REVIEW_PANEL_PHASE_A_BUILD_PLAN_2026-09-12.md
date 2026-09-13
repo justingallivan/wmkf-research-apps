@@ -3,7 +3,7 @@ title: Virtual Review Panel Phase A Build Plan (2026-09-12)
 domain: virtual-review-panel
 kind: plan
 status: proposal
-summary: "Phase A build plan for the request-scoped, admin-only Virtual Review Panel: an Executor provider seam (A0) so GPT seats run governed beside Claude seats, then the panel foundation on the Cycle Dossier scaffolding. Records the owner's 2026-09-12 decisions D1–D6."
+summary: "Phase A build plan for the request-scoped, admin-only Virtual Review Panel: an opt-in Executor provider seam (A0) so GPT seats run governed beside Claude seats, then the panel foundation with a per-seat attempt ledger. Records the owner's 2026-09-12 decisions D1–D8 and the Codex adversarial review revision."
 cataloged: 2026-09-12
 owner: product-engineering
 last_verified: 2026-09-12
@@ -38,6 +38,8 @@ related:
 | D4 | Publication | Deferred (Phase B). Private Blob editions only. |
 | D5 | Old app | Unchanged. The upload-based page stays live until parity; no retirement work in Phase A. |
 | D6 | Cost posture | **No "typical cost" figure yet.** Run the panel on a small owner-chosen subset first and collect real actuals from `api_usage_log`, then decide. Same posture as the dossier's open figure. |
+| D7 | Team-capacity question `[OPEN — owner]` | The required human-form question `teamCapacity` asks about personnel, infrastructure, and budget, but D2 excludes budget and biosketches. Options: (a) seats answer it from the narrative and mark it `not assessable from provided sources` in a structured coverage field; (b) widen D2 to include the budget lines and biosketch text resolvers in Phase A. Codex adversarial review 2026-09-12 raised this. |
+| D8 | Provider scope `[DECIDED 2026-09-12 by revision]` | Prompt publishing stays Claude-only. Non-Anthropic dispatch happens only when the calling service explicitly allows that provider on the call, intersected with `VRP_ALLOWED_PROVIDERS`. No existing Executor prompt can be repointed at OpenAI by an admin edit. |
 
 ## 2. What exists today `[VERIFIED 2026-09-12 via source]`
 
@@ -50,7 +52,7 @@ related:
   allowlist change is needed.
 - **No caller-supplied model.** The `executePrompt` option list (`execute-prompt.js:88-105`) has no
   `model`/`modelOverride`; the model comes only from the prompt row, falling back to
-  `BASE_CONFIG.CLAUDE.DEFAULT_MODEL`. Admin per-seat selection therefore needs a new option (A0.3).
+  `BASE_CONFIG.CLAUDE.DEFAULT_MODEL`. Per-seat models are therefore supplied through per-seat `promptSnapshot`s (A0.3), not a new option.
 - **Capability registry already carries a vendor field.** Every `MODEL_CAPABILITIES` row has
   `provider: 'anthropic'` plus `supportsTemperature`, `supportsStructuredOutput`, `maxOutputTokens`,
   a retention class, `reviewedAt` and `source` (`lib/services/model-capabilities.js:17-40`). Pricing
@@ -110,78 +112,98 @@ related:
 
 A0 is a shared-contract change touching every Executor consumer. It lands as its own PR, passes
 `/contract-reconcile`, and is gated before any panel code depends on it. Behaviour for every existing
-prompt row (all Anthropic) must be unchanged.
+prompt row (all Anthropic) must be unchanged. Revised 2026-09-12 after the Codex adversarial review:
+the caller-supplied `modelOverride` option is **dropped**; provider access is **opt-in per call**;
+usage survives failures.
 
-**A0.1 Vendor dispatch.** `executePrompt` derives the vendor from the resolved model's capability row
-(`capabilities.provider`). `provider === 'anthropic'` → existing `LLMClient` path, unchanged.
-`provider === 'openai'` → new `lib/services/openai-client.js`. Unknown model or unknown provider →
-the existing unreviewed-model error (already fail-closed). No prompt-row schema change: vendor is a
-property of the model id, not a new Dataverse column.
+**A0.1 Vendor dispatch, opt-in per call.** `executePrompt` gains an `allowedProviders` option,
+default `['anthropic']`. After `resolvePromptClaudeModel` (`execute-prompt.js:495-513`) the Executor
+reads `capabilities.provider`; if it is not in `allowedProviders` the call fails before any variable
+resolution or paid call (`provider_not_allowed`). `anthropic` → existing `LLMClient` path, unchanged.
+`openai` → new `lib/services/openai-client.js`. Unknown model or unknown provider → the existing
+unreviewed-model error (already fail-closed). The panel service computes its allowed set as
+`resolveAllowedProviders` (`lib/utils/vrp-providers.js`) mapped `claude → anthropic`, so
+`VRP_ALLOWED_PROVIDERS` governs the panel exactly as it governs the old app. **Prompt publishing is
+not changed** (`prompts-publish-service.js:411` keeps `validateReviewedClaudeModelValue`), so a
+row-fetched prompt can never carry an OpenAI model; OpenAI models reach the Executor only through a
+caller-built `promptSnapshot` (A0.3).
 
 **A0.2 OpenAI client.** Same public contract as `LLMClient.complete()` (`llm-client.js:127-160`,
 `normalizeUnaryResponse` `:436-451`): returns `{ text, content, model, stopReason, stopDetails, refused,
-usage: { inputTokens, outputTokens, cacheCreationTokens: 0, cacheReadTokens: 0 } }`; accepts the
-Executor's `system` array-of-text-blocks (flattened to one system message, `cache_control` ignored)
-and `messages`; external `AbortSignal` honoured across attempts and backoff; per-attempt `timeoutMs`;
-429/5xx retry with the same backoff policy; bearer `OPENAI_API_KEY` read server-side; `safeFetch`;
-`max_completion_tokens`; **temperature sent only when `supportsTemperature` is true** (mirrors
-`LLMClient._buildBody` `:225`). **Stop reasons are normalised in the client**, because
-`parseClaudeOutput` (`execute-prompt.js:760-790`) accepts only `end_turn` and fails closed on
-`refusal`, `max_tokens`, `model_context_window_exceeded`, and anything else: `stop → end_turn`,
-`length → max_tokens`, `content_filter → refusal` with `refused: true`; any other finish reason passes
-through unchanged so the Executor rejects it. **The Executor does not write `api_usage_log`** by
-design (`execute-prompt.js:567-573`: the driver owns usage accounting); the panel worker logs each
-paid call with a `loggedExecute`-style wrapper like the dossier's (`cycle-dossier-generation.js`),
-reading `result.usage.input_tokens` / `output_tokens` from the Executor's snake_case result shape.
-`MultiLLMService` is not modified; the old panel keeps its own path until D5.
+usage: { inputTokens, outputTokens, cacheCreationTokens: 0, cacheReadTokens: 0 }, provider: 'openai',
+providerFinishReason }`; accepts the Executor's `system` array-of-text-blocks and `messages`; external
+`AbortSignal` honoured across attempts and backoff; per-attempt `timeoutMs`; 429/5xx retry with the
+same backoff policy; bearer `OPENAI_API_KEY` read server-side; `safeFetch`; `max_completion_tokens`;
+**temperature sent only when `supportsTemperature` is true** (mirrors `LLMClient._buildBody` `:225`).
+**Instruction role is a reviewed capability**: each OpenAI capability row declares
+`instructionRole: 'system' | 'developer'` and the client emits the Executor's system text under that
+role, so the A7 preamble keeps top instruction priority on reasoning models `[VERIFY against OpenAI
+docs at implementation; source URL recorded on the row]`. **Stop reasons are normalised in the
+client**, because `parseClaudeOutput` (`execute-prompt.js:760-790`) accepts only `end_turn` and fails
+closed on everything else: `stop → end_turn`, `length → max_tokens`, `content_filter → refusal`;
+**a non-empty `message.refusal` field sets `refused: true` regardless of finish reason** so a refusal
+delivered with `finish_reason=stop` cannot pass as a clean answer; any other finish reason passes
+through unchanged and the Executor rejects it. The original finish reason is kept on the response for
+audit. `MultiLLMService` is not modified; the old panel keeps its own path until D5.
 
-**A0.3 Caller-supplied model.** New `executePrompt` option `modelOverride` (concrete id only; tiers
-rejected so a pinned run cannot drift). **Precedence decided 2026-09-12: the override wins over the
-row or snapshot model.** Both are caller-supplied at the same call, and the panel worker pins the
-override model in its own config snapshot, so the snapshot's `wmkf_ai_model` is only the fallback
-when no override is given. The override goes through the same `resolveModelWithCapabilities`
-unknown-model gate as the row model (`execute-prompt.js:495-513`), drives `buildStructuredOutputConfig`
-and vendor dispatch, and is recorded on the `wmkf_ai_run` row automatically because `modelUsed`
-is `claudeResp.model || modelInfo.model` (`:282`, `:976`); the run notes additionally name the
-override so an audit can tell it from the row model. Without this option per-seat admin selection
-is impossible.
+**A0.3 Per-seat prompt snapshots replace a model override.** The Executor already lets a caller pass
+a `promptSnapshot` that must pin a concrete model (`validatePromptSnapshot`, `execute-prompt.js:1187-1205`)
+and records the model that ran on the `wmkf_ai_run` row (`:282`, `:976`). The panel therefore builds
+**one snapshot per seat** from the single published `review-panel.seat` row, with `wmkf_ai_model`
+set to that seat's resolved model, and stores every seat snapshot in its run config. One immutable
+record per seat of prompt text, version, model, and provider; no second value to remember, no
+precedence rule. **No Executor option is added for this.** The seat model must satisfy
+`validatePromptSnapshot` (concrete, non-tier) and resolve to a reviewed capability row.
 
-**A0.4 Registries.** Add OpenAI rows to `MODEL_CAPABILITIES` (`provider: 'openai'`,
-`supportsStructuredOutput: false` for Phase A per D1b, `supportsTemperature` per model, retention
-class) and `MODEL_PRICING`. **Every value is verified from OpenAI's published documentation with a
-`source:` URL and `reviewedAt` at implementation time; none is guessed.** The default OpenAI seat
-model is `[OWNER-SUPPLIED at seed time]`. `check:model-registry` must be
-generalised **before** the first OpenAI row lands: key validation keyed on the row's `provider` instead
-of the `claude-` prefix, non-Claude configured values checked rather than skipped, and the seat
-registry's `defaultModel` values added to its scanned sources so every seat default is gate-covered.
-Admin-panel overrides live in Postgres and are validated at write time by a vendor-aware successor to
-`validateReviewedClaudeModelValue`. That successor must **not** reuse the existing `allowNonClaude`
-escape (`model-review-validation.js`, returns `kind: 'non_claude'` with no capability or pricing
-check): an OpenAI id is valid only when its capability row and pricing row both exist. Callers to
-update: `/api/admin/models` PUT (`:216`), `prompts-publish-service.js:411`, and the two seed scripts.
-`MODEL_PRICING` already carries stale OpenAI rows (`gpt-4o`, `gpt-4o-mini`, `o3-mini`,
-`model-pricing.js:65-68`) used only by the old panel's usage logging; leave them, add the chosen
-seat model with a `source:` URL. `OPENAI_API_KEY` is in the credentials runbook but **not** in
+**A0.4 Usage survives failure.** Today a parse or schema failure after a paid response throws with
+only `runId` attached (`execute-prompt.js:295-313`), so a wrapper logs zero tokens for a paid call.
+A0 attaches `err.usage` (the same snake_case shape as the success result), `err.modelUsed`, and
+`err.provider` to every error thrown after a provider response was received, and `err.paidCall =
+true|false|null` (null = ambiguous: aborted after dispatch with no response). The Executor still does
+not write `api_usage_log` (`:567-573`, driver-owned); the panel's `loggedExecute` wrapper logs from
+the result on success and from `err.usage` on failure, and records `unknownCost` when `paidCall` is
+null. The dossier wrapper (`cycle-dossier-generation.js` loggedExecute) can adopt the same fields
+later. Tests: invalid JSON, schema failure, refusal, truncation, abort-after-dispatch each produce a
+logged row with the right tokens or an explicit unknown-cost marker.
+
+**A0.5 Registries.** Add OpenAI rows to `MODEL_CAPABILITIES` (`provider: 'openai'`,
+`instructionRole`, `refusalField: 'message.refusal'`, `supportsStructuredOutput: false` for Phase A
+per D1b, `supportsTemperature` per model, retention class) and `MODEL_PRICING`. **Every value is
+verified from OpenAI's published documentation with a `source:` URL and `reviewedAt` at
+implementation time; none is guessed.** The default OpenAI seat model is `[OWNER-SUPPLIED at seed
+time]`. `check:model-registry` must be generalised **before** the first OpenAI row lands: key
+validation keyed on the row's `provider` instead of the `claude-` prefix (`:154`), non-Claude
+configured values checked rather than skipped (`:196`), and the seat registry's `defaultModel`
+values added to its scanned sources. `MODEL_PRICING` already carries stale OpenAI rows (`gpt-4o`,
+`gpt-4o-mini`, `o3-mini`, `model-pricing.js:65-68`) used only by the old panel; leave them, add the
+chosen seat model. `OPENAI_API_KEY` is in the credentials runbook but **not** in
 `lib/utils/tracked-secrets.js` (0 hits, 2026-09-12); A0 adds it.
 
-**A0.5 Admin model panel.** Let an app declare **named model slots** in a tracked registry
-(`shared/config/reviewPanelSeats.js`: `{ key, vendor, label, enabled, defaultModel }` for
-`seat.claude`, `seat.openai`, and `chair`) alongside the existing `model`/`visionModel`/`fallback`
-types. `/api/admin/models` lists, for each slot, the reviewed models of that slot's vendor (Anthropic
-from the live `/v1/models` list as today; OpenAI from the reviewed capability rows, optionally
-cross-checked against OpenAI's `/v1/models`). Override key shape stays
-`model_override:review-panel:<slotKey>`. Adding a third seat is a registry edit plus
-capability/pricing rows, not a schema change.
+**A0.6 Admin model slots, vendor-bound.** A tracked seat registry (`shared/config/reviewPanelSeats.js`:
+`{ key, vendor, label, enabled, defaultModel }` for `seat.claude`, `seat.openai`, `chair` with
+`vendor: 'anthropic'`) is consulted by `/api/admin/models`. GET lists, per slot, only reviewed models
+whose capability row `provider` equals the slot vendor (Anthropic from the live `/v1/models` list as
+today; OpenAI from capability rows). **PUT validates server-side that the submitted model's provider
+equals the slot's vendor** and that capability and pricing rows exist; the existing `allowNonClaude`
+escape in `model-review-validation.js` (returns `kind: 'non_claude'` with no registry check) is not
+used. A direct request binding an OpenAI model to the chair is rejected with 400. Override key shape
+stays `model_override:review-panel:<slotKey>`; `getModelForApp` already keys overrides by
+`${appKey}:${type}` with no type allowlist (`shared/config/baseConfig.js:309`). The GET app list is
+driven by `APP_MODELS` today, so `review-panel` gets an `APP_MODELS` entry or the GET consults the
+slot registry. Adding a third seat is a registry edit plus capability/pricing rows.
 
-**A0.6 Prompt-injection.** The Executor's `wrapUntrustedContent` + `buildUntrustedContentPreamble`
-apply identically on the OpenAI path because wrapping happens before dispatch. The A7 registry row
-`execute-prompt-executor` continues to cover it; A0 adds a unit test that the OpenAI path receives
-the wrapped body and the preamble.
+**A0.7 Prompt-injection.** `wrapUntrustedContent` + `buildUntrustedContentPreamble` run before dispatch
+(`execute-prompt.js:184-200`, then `callClaude` at `:236`) so both vendors receive identical wrapped
+payloads. A0 tests, for the OpenAI path: the preamble is emitted under the capability row's
+`instructionRole`; the wrapped body reaches the user message; an injected "ignore previous
+instructions" fixture inside the wrapped block does not change the output-schema shape.
 
-**A0 exit criteria:** all existing Executor unit tests unchanged and green; new tests for dispatch,
-override precedence, temperature gating, abort propagation, and unknown-vendor fail-closed;
-`check:model-registry`, `check:model-override-warming`, `check:prompt-injection-tagging`, `check:types`
-green; `docs/EXECUTOR_CONTRACT.md` updated with `modelOverride` and the vendor rule.
+**A0 exit criteria:** all existing Executor unit tests unchanged and green; new tests for
+`allowedProviders` default-deny, dispatch, temperature gating, instruction role, refusal-field
+detection, stop-reason mapping, abort propagation, error-attached usage, unknown-vendor fail-closed;
+slot PUT vendor mismatch rejected; `check:model-registry`, `check:model-override-warming`,
+`check:prompt-injection-tagging`, `check:secret-scan`, `check:types` green; `docs/EXECUTOR_CONTRACT.md`
+updated with `allowedProviders`, the vendor rule, and error-attached usage.
 
 ## 5. Phase A: panel foundation `[PLANNED]`
 
@@ -196,9 +218,15 @@ assertion on every entry (dossier pattern); rows for `/api/review-panel`, `/api/
 `review_panel_control`.
 
 **A.3 Governed prompts.** `scripts/seed-review-panel-prompts.js` seeds two prompt rows:
-- `review-panel.seat`: one reviewer prompt shared by every seat, run blind. Output
-  `validationSchema` derived from `lib/external/review-form-schema.js` rather than duplicated, so
-  D3 cannot drift. Seat identity is not in the prompt; the model differs per seat via `modelOverride`.
+- `review-panel.seat`: one reviewer prompt shared by every seat, run blind. Its output
+  `validationSchema` is **derived at configuration-snapshot time from the live question set**:
+  `getAuthoritativeQuestionSet()` (`lib/external/review-question-fetcher.js:220`, the write-boundary
+  resolver) plus `questionSetVersion(fields)` (`:255`). The static `review-form-schema.js` is only the
+  seed for `wmkf_reviewquestion`, which is the staff-editable system of record (Atlas
+  `docs/atlas/dataverse-wmkf-reviewquestion.md`). The run config stores the normalised question set
+  and its version; launch fails if the set cannot be fetched. Seat identity is not in the prompt; the
+  model differs per seat via the per-seat snapshot (A0.3). Each seat answer carries a structured
+  `sourceCoverage` field naming questions it could not assess from the provided sources (D7).
 - `review-panel.chair`: synthesis over N seat reviews, reusing the existing synthesis shape
   (`ratingMatrix`, `consensus`, `disagreements`, `keyStrengths`, `keyConcerns`, `questionsForPI`,
   `resolvableVsFundamental`, `panelRecommendation`, `confidenceNote`). Claim verification and
@@ -206,17 +234,30 @@ assertion on every entry (dossier pattern); rows for `/api/review-panel`, `/api/
 The old `createStructuredReviewPrompt` / `createPanelSynthesisPrompt` text
 (`shared/config/prompts/virtual-review-panel.js:382,515`) is the starting draft.
 
-**A.4 Input.** `prepareRequestInput` narrative only (D2). Proposal text is declared as an untrusted
-variable; the A7 registry gains row `review-panel-generation`.
+**A.4 Input.** A **dedicated** `prepareReviewPanelInput` in the panel's own service, not the dossier's
+`prepareRequestInput`, which bundles the four `priorAiContext` memos (`cycle-dossier-generation.js:108-113`)
+that D2 excludes. The panel DTO has an exact key allowlist (`requestId`, `requestNumber`, `narrative`
+text + hash + source path, `institution`, `title`), reuses only `getAiProposalNarrativeText`, and has a
+test proving memo fields cannot reach the snapshot, the prompt variables, or Blob storage. Proposal
+text is declared as an untrusted variable; the A7 registry gains row `review-panel-generation`.
 
-**A.5 Run contract.** Tables `review_panels`, `review_panel_runs`, `review_panel_entries`,
-`review_panel_seat_reviews`, `review_panel_control` in migration 047 (block v49), with per-request
-revision numbers from day one. Per entry: seats run in parallel, each a separate `executePrompt` with
-`promptSnapshot`, `requireNoPersistence`, `deadlineMs`, `signal` (operator stop), `modelOverride`
-from the pinned snapshot; then the chair. **The snapshot pins resolved seat models and vendors per
-run** so an admin change mid-run cannot shift models. **Partial-seat policy:** a failed seat fails the
-entry; each seat is its own checkpoint so "Retry failed entries" re-pays only the failed seat and
-the chair. The chair never runs on fewer seats than configured. Executor budgets `review-panel.seat`
+**A.5 Run contract and seat-attempt ledger.** Tables `review_panels`, `review_panel_runs`,
+`review_panel_entries`, `review_panel_seat_attempts`, `review_panel_control` in migration 047
+(block v49), with per-request revision numbers from day one. The run config snapshot pins, per seat,
+the prompt snapshot (A0.3), provider, model, pricing, and the question-set version (A.3), so an admin
+change mid-run cannot shift anything. **Per seat, not per entry:** each paid call is a row in
+`review_panel_seat_attempts` with `(entry_id, seat_key, attempt_no)` unique, states
+`pending → dispatched → completed | failed | unknown_outcome`, the lease token that dispatched it,
+`dispatched_at`, and logged usage. The dossier's single `paidInFlight` flag per entry
+(`cycle-dossier-worker.js:121-147`) is insufficient for parallel seats. Dispatch is fenced on the
+current lease token; a `dispatched` attempt whose lease expired becomes `unknown_outcome` and is
+**never retried automatically**; a late completion for a superseded attempt is recorded but ignored.
+Seats run with `Promise.allSettled`; the entry completes only when every configured seat has a
+`completed` attempt, then the chair runs as its own attempt row. **Partial-seat policy:** any failed
+seat fails the entry; "Retry failed entries" creates new attempts only for seats without a `completed`
+attempt and re-runs the chair. Each call uses `promptSnapshot`, `requireNoPersistence`, `deadlineMs`,
+`signal` (operator stop), and `allowedProviders`. Usage is logged per attempt from the result or from
+`err.usage` (A0.4) **before** the attempt row is marked terminal. Executor budgets `review-panel.seat`
 and `review-panel.chair` registered in `executorBudgets.js` with admin-tunable envelopes.
 
 **A.6 Worker and cron.** Clone `cycle-dossier-worker.js`: single global lease, per-minute drain cron
@@ -257,7 +298,7 @@ recorded rollback, explicit owner merge decision.
 
 | Slice | Branch | Tier | Gate before merge |
 |---|---|---|---|
-| A0 Executor seam + registries + admin slots | `feature/executor-provider-seam` | Tier 2 (shared runtime) | `/contract-reconcile`, full Executor tests, model-registry, override-warming, A7 gate |
+| A0 Executor seam (opt-in providers, OpenAI client, error-attached usage) + registries + vendor-bound slots | `feature/executor-provider-seam` | Tier 2 (shared runtime) | `/contract-reconcile`, full Executor tests, model-registry, override-warming, A7 gate |
 | A.1–A.5 tables, prompts, service | `feature/review-panel-foundation` | Tier 2 | atlas, api-routes, route-lifecycle-auth, unit tests, migration applied to preview |
 | A.6–A.8 worker, editions, page | same branch | Tier 2 | rehearsal scripts cloned from `scripts/rehearse-cycle-dossier-*.mjs`; Playwright smoke |
 | §6 smoke | production, `smoke` mode | operator | owner-run env commands; actuals reviewed |
@@ -267,21 +308,25 @@ and Phase C (panel-vs-human comparison, history views, third seat) follow the su
 
 ## 8. Open items carried into implementation
 
-- Snapshot-vs-override precedence when both are set (A0.3): resolve in contract-reconcile.
+- **D7 team-capacity handling** is the owner's; until decided, A.3's `sourceCoverage` field is the
+  default so the comparison stage can exclude unassessable answers.
 - Chair input size: N full seat reviews plus narrative may be large for the chair; decide whether
   the chair receives the narrative or only the reviews.
 - OpenAI reasoning models: `max_completion_tokens` includes reasoning tokens; the capability row and
-  budget envelope must reflect that.
-- Whether `getModelForApp` slot semantics or a separate settings prefix is cleaner for named slots.
+  budget envelope must reflect that. Verify `instructionRole` per model family from OpenAI's docs.
 - Old-page parity definition for D5 (not before Phase B).
 - The dossier's `snapshotPrompt` rejects any model not matching `^claude-…` (`cycle-dossier-generation.js`);
-  the panel's cloned snapshot must key on the capability row's `provider` instead, or GPT seats fail
-  at snapshot time.
-- `getModelForApp` keys overrides by `${appKey}:${type}` with no type allowlist
-  (`shared/config/baseConfig.js:309`), so named slots work at read time; the allowlist to extend is
-  `VALID_MODEL_TYPES` in `/api/admin/models` and the GET's `APP_MODELS`-driven app list, which today
-  never lists an app absent from `APP_MODELS`.
+  the panel's snapshot builder keys on the capability row's `provider` instead.
 - **Key-collision check before A.1:** `review-panel` is a substring of the live `virtual-review-panel`.
   Confirm `check:api-routes`, `check:route-lifecycle-auth`, and the A7 registry match app keys and
   route paths exactly (not by prefix or `includes`) before the new key lands. Verified 2026-09-12 that
   no `pages/api/review-panel*` file and no `'review-panel'` registry, matrix, or A7 entry exists yet.
+- Whether the dossier adopts `err.usage` logging (A0.4) in the same PR or a follow-up.
+
+## 9. Review history
+
+- 2026-09-12 Claude `/contract-reconcile` (Mode A): READY WITH NAMED CHANGES; folded in (`d7480241`).
+- 2026-09-12 Codex adversarial review against `8d168ed4`: **no-ship** on seven findings (provider scope,
+  usage lost on failure, stale schema authority, per-seat ambiguity, input DTO leak, OpenAI instruction
+  and refusal semantics, override-vs-snapshot). All seven addressed in this revision: D8, A0.1, A0.2,
+  A0.3 (override dropped), A0.4, A0.6, A.3, A.4, A.5, D7 raised to the owner.
