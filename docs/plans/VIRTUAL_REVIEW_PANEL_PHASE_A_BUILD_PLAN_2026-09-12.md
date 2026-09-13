@@ -42,6 +42,7 @@ related:
 | D8 | Provider scope `[DECIDED 2026-09-12 by revision]` | Prompt publishing stays Claude-only. Non-Anthropic dispatch happens only when the calling service explicitly allows that provider on the call, intersected with `VRP_ALLOWED_PROVIDERS`. No existing Executor prompt can be repointed at OpenAI by an admin edit. |
 | D9 | Chair input `[DECIDED 2026-09-12: option b]` | The chair receives the N seat reviews **and** the proposal narrative, so it can arbitrate factual disagreements against the source. Consequences pinned for A.3/A.5: the chair prompt declares `proposal_narrative` as an untrusted A7 variable with the same 100k-char bound as the seats plus one `seat_reviews` JSON variable; the chair's context cap and `review-panel.chair` budget envelope are sized for narrative + N reviews (roughly 2× the reviews-only input); the chair's cost is a separate attempt row. |
 | D10 | Default OpenAI seat model `[DECIDED 2026-09-12, provisional]` | Owner: **"GPT Sol"** (the owner expects to change this). The Codex CLI catalog names it `gpt-5.6-sol`; the **concrete OpenAI API model id is verified at seed time against OpenAI's published model list and docs**, never assumed from the CLI name. Its capability row (`instructionRole`, `supportsTemperature`, `maxOutputTokens`, retention class, `source`) and pricing row are written from those docs with `reviewedAt`; if the id cannot be verified, seeding stops and reports. |
+| D11 | Blob store `[DECIDED 2026-09-12: dedicated]` | The panel gets its **own private Blob store** and token, following the one-store-per-app pattern (intake, uploads, export, dossier), not a prefix inside the dossier store. Variables: `REVIEW_PANEL_BLOB_READ_WRITE_TOKEN` and `REVIEW_PANEL_BLOB_STORE_ID`, provisioned by the owner the same way as `DOSSIER_BLOB_READ_WRITE_TOKEN` / `DOSSIER_BLOB_STORE_ID` (`docs/CREDENTIALS_RUNBOOK.md` § Private Blob store provisioning); both added to `lib/utils/tracked-secrets.js`. The storage helper is a parameterised copy of `cycle-dossier-storage.js`, and rollout preflight authenticates against the panel store. Retention policy is decided per store. |
 
 ## 2. What exists today `[VERIFIED 2026-09-12 via source]`
 
@@ -328,7 +329,7 @@ and `review-panel.chair` registered in `executorBudgets.js` with admin-tunable e
 under strict `CRON_SECRET`, stop re-read before every paid call, `describeEntryFailure`-style plain
 copy. Cron entry in `vercel.json` only when the owner enables it (dossier precedent).
 
-**A.7 Editions.** Private Blob DOCX + PDF per entry with SHA-256/size/path refs, structural DOCX
+**A.7 Editions.** Private Blob DOCX + PDF per entry in the **dedicated panel store (D11)** with SHA-256/size/path refs, structural DOCX
 verification, download route with `Cache-Control: private, no-store` and `X-Frame-Options: SAMEORIGIN`
 for the PDF preview. Report sections: rating matrix, panel summary, per-seat reviews (labelled by
 vendor and pinned model) with `teamCapacity` rendered as the fixed D7 line "Not assessed in Phase A
@@ -417,3 +418,4 @@ and Phase C (panel-vs-human comparison, history views, third seat) follow the su
 - 2026-09-12 owner decided D9 (b: chair sees reviews + narrative) and D10 (GPT Sol, provisional).
   No owner decision remains open. A0 handed to Codex via
   `docs/plans/EXECUTOR_PROVIDER_SEAM_CODEX_BRIEF_2026-09-12.md`; Claude reviews.
+- 2026-09-12 owner decided D11: dedicated private Blob store for the panel.
