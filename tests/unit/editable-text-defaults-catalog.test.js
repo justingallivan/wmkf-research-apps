@@ -7,7 +7,7 @@ describe('editableTextDefaults catalog grouping metadata', () => {
   const validGroupIds = new Set(EDITABLE_TEXT_GROUPS.map((g) => g.id));
 
   test('EDITABLE_TEXT_GROUPS has the expected ordered ids', () => {
-    expect(EDITABLE_TEXT_GROUPS.map((g) => g.id)).toEqual(['reviewers', 'grantees', 'internal', 'labels']);
+    expect(EDITABLE_TEXT_GROUPS.map((g) => g.id)).toEqual(['reviewers', 'grantees', 'applicants', 'internal', 'labels']);
     EDITABLE_TEXT_GROUPS.forEach((g) => {
       expect(typeof g.title).toBe('string');
       expect(g.title.length).toBeGreaterThan(0);
@@ -37,7 +37,7 @@ describe('editableTextDefaults catalog grouping metadata', () => {
     ];
     const entries = keys.map((key) => EDITABLE_TEXT_DEFAULTS.find((entry) => entry.key === key));
     expect(entries.every(Boolean)).toBe(true);
-    expect(entries.map((entry) => entry.group)).toEqual(['grantees', 'grantees', 'grantees', 'grantees']);
+    expect(entries.map((entry) => entry.group)).toEqual(['applicants', 'applicants', 'applicants', 'applicants']);
     expect(entries.map((entry) => entry.emailKey)).toEqual([
       'email.site_visit_materials_invite', 'email.site_visit_materials_invite',
       'email.site_visit_materials_reminder', 'email.site_visit_materials_reminder',
