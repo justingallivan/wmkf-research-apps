@@ -37,6 +37,7 @@ jest.mock('../../lib/services/review-panel-store', () => ({
   listReviewPanelRuns: jest.fn(),
   readReviewPanelControl: jest.fn(),
   listReviewPanelEntries: jest.fn(async () => []),
+  listEntryAttempts: jest.fn(async () => []),
   findReviewPanelLaunch: jest.fn(async () => null),
   createReviewPanelRun: jest.fn(),
   setReviewPanelOperatorStop: jest.fn(),
@@ -52,7 +53,7 @@ const { readReviewPanelFile, assertReviewPanelStorageConfigured } = require('../
 const rollout = require('../../lib/services/review-panel-rollout');
 const store = require('../../lib/services/review-panel-store');
 const {
-  getReviewPanelPage, launchReviewPanel, controlReviewPanel, downloadReviewPanel,
+  getReviewPanelPage, launchReviewPanel, controlReviewPanel, downloadReviewPanel, projectReviewPanelRun,
 } = require('../../lib/services/review-panel-service');
 
 const OWNER = 7;
@@ -76,6 +77,7 @@ beforeEach(() => {
   store.listReviewPanelRuns.mockResolvedValue([]);
   store.readReviewPanelControl.mockResolvedValue(null);
   store.listReviewPanelEntries.mockResolvedValue([]);
+  store.listEntryAttempts.mockResolvedValue([]);
   store.findReviewPanelLaunch.mockResolvedValue(null);
   requests.queryAllRequests.mockResolvedValue({ capped: false, records: [rosterRecord(REQ_A, 'R-1'), rosterRecord(REQ_B, 'R-2')] });
   rollout.assertReviewPanelModeValid.mockReturnValue('pilot');
@@ -192,6 +194,63 @@ describe('launchReviewPanel', () => {
       data: expect.objectContaining({ pendingEntries: [expect.objectContaining({ requestId: REQ_A })] }),
     }));
     expect(result.run.id).toBe(RUN_ID);
+  });
+});
+
+describe('projectReviewPanelRun — per-seat detail for the Progress tab', () => {
+  const run = { id: RUN_ID, status: 'running', created_at: '2026-09-13T00:00:00.000Z', data: {} };
+  const entry = { id: ENTRY_ID, request_id: REQ_A, request_revision: 1, status: 'running', data: {}, retry_requested_at: null };
+
+  test('a seat with no attempt at all projects as pending, with every other field null', () => {
+    const result = projectReviewPanelRun(run, [entry], []);
+    expect(result.entries[0].seats).toEqual([
+      { seatKey: 'seat.claude', label: 'Claude reviewer', provider: null, model: null, state: 'pending', costCents: null, costState: null, error: null },
+      { seatKey: 'seat.openai', label: 'OpenAI reviewer', provider: null, model: null, state: 'pending', costCents: null, costState: null, error: null },
+      { seatKey: 'chair', label: 'Chair', provider: null, model: null, state: 'pending', costCents: null, costState: null, error: null },
+    ]);
+  });
+
+  test('the LATEST attempt_no wins per seat — an earlier failed attempt is superseded by a later completed one', () => {
+    const attempts = [
+      { entry_id: ENTRY_ID, seat_key: 'seat.claude', attempt_no: 1, state: 'failed', provider: 'anthropic', model: 'claude-fable-5-1', cost_cents: null, cost_state: null, error_text: 'first try failed' },
+      { entry_id: ENTRY_ID, seat_key: 'seat.claude', attempt_no: 2, state: 'completed', provider: 'anthropic', model: 'claude-fable-5-1', cost_cents: 16, cost_state: 'known', error_text: null },
+      { entry_id: ENTRY_ID, seat_key: 'seat.openai', attempt_no: 1, state: 'dispatched', provider: 'openai', model: 'gpt-5.6-sol', cost_cents: null, cost_state: null, error_text: null },
+    ];
+    const result = projectReviewPanelRun(run, [entry], attempts);
+    const [claudeSeat, openaiSeat, chairSeat] = result.entries[0].seats;
+    expect(claudeSeat).toEqual({ seatKey: 'seat.claude', label: 'Claude reviewer', provider: 'anthropic', model: 'claude-fable-5-1', state: 'completed', costCents: 16, costState: 'known', error: null });
+    expect(openaiSeat).toMatchObject({ state: 'dispatched', costCents: null, costState: null });
+    expect(chairSeat).toMatchObject({ state: 'pending' });
+  });
+
+  test('a failed seat carries its attempt error text', () => {
+    const attempts = [
+      { entry_id: ENTRY_ID, seat_key: 'seat.openai', attempt_no: 1, state: 'failed', provider: 'openai', model: 'gpt-5.6-sol', cost_cents: null, cost_state: null, error_text: 'The AI service was busy (HTTP 529) for the OpenAI reviewer.' },
+    ];
+    const result = projectReviewPanelRun(run, [entry], attempts);
+    const openaiSeat = result.entries[0].seats.find((s) => s.seatKey === 'seat.openai');
+    expect(openaiSeat.error).toBe('The AI service was busy (HTTP 529) for the OpenAI reviewer.');
+  });
+
+  test('never carries usage tokens or prompt snapshots — only the explicit projection fields per seat', () => {
+    const attempts = [
+      { entry_id: ENTRY_ID, seat_key: 'seat.claude', attempt_no: 1, state: 'completed', provider: 'anthropic', model: 'claude-fable-5-1', cost_cents: 16, cost_state: 'known', error_text: null,
+        // A store row could carry these (SELECT * elsewhere in the store) — the projection must never pass them through even if present on the input row.
+        usage_json: { input_tokens: 999 }, prompt_snapshot_json: { text: 'secret narrative' }, result_json: { review: 'text' } },
+    ];
+    const result = projectReviewPanelRun(run, [entry], attempts);
+    const claudeSeat = result.entries[0].seats.find((s) => s.seatKey === 'seat.claude');
+    expect(Object.keys(claudeSeat).sort()).toEqual(['costCents', 'costState', 'error', 'label', 'model', 'provider', 'seatKey', 'state'].sort());
+    expect(JSON.stringify(result)).not.toMatch(/999|secret narrative|prompt_snapshot|usage_json/);
+  });
+
+  test('runs entries through getReviewPanelPage call listEntryAttempts once per run, batched (never per-entry)', async () => {
+    store.listReviewPanelRuns.mockResolvedValue([{ id: RUN_ID, status: 'completed', created_at: '2026-09-13T00:00:00.000Z', data: {} }]);
+    store.listReviewPanelEntries.mockResolvedValue([entry, { ...entry, id: 'entry-2' }]);
+    store.listEntryAttempts.mockResolvedValue([]);
+    await getReviewPanelPage(OWNER);
+    expect(store.listEntryAttempts).toHaveBeenCalledTimes(1);
+    expect(store.listEntryAttempts).toHaveBeenCalledWith([ENTRY_ID, 'entry-2']);
   });
 });
 

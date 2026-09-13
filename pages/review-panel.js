@@ -3,6 +3,7 @@ import Layout, { Button, Card, PageHeader } from '../shared/components/Layout';
 import RequireAuth from '../shared/components/RequireAuth';
 
 const EMPTY_ARRAY = [];
+const POLL_MS = 4000;
 
 function toId(value) { return value == null ? '' : String(value); }
 function asSet(values) { return new Set((Array.isArray(values) ? values : []).map(toId).filter(Boolean)); }
@@ -43,7 +44,7 @@ export function formatReservationBound(reservation) {
 }
 
 export function isRunUnsettled(status) {
-  return ['queued', 'running'].includes(String(status || '').toLowerCase());
+  return ['queued', 'running', 'paused'].includes(String(status || '').toLowerCase());
 }
 
 async function readResponse(response) {
@@ -70,7 +71,29 @@ function toneForStatus(status) {
   return 'info';
 }
 
+/** "$0.16" when the seat's cost is known, "cost unknown" when it isn't, or null (no cost segment) for a seat with no completed cost yet. */
+function formatSeatCost(costState, costCents) {
+  if (costState === 'known') return `$${(Number(costCents) / 100).toFixed(2)}`;
+  if (costState === 'unknown') return 'cost unknown';
+  return null;
+}
+
+function SeatPill({ seat }) {
+  const parts = [seat.label];
+  if (seat.model) parts.push(seat.model);
+  parts.push(seat.state);
+  const cost = formatSeatCost(seat.costState, seat.costCents);
+  if (cost) parts.push(cost);
+  return (
+    <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-700">
+      {parts.join(' · ')}
+    </span>
+  );
+}
+
 function EntryRow({ entry }) {
+  const seats = entry.seats || EMPTY_ARRAY;
+  const failedSeats = seats.filter((seat) => seat.error);
   return (
     <div className="flex flex-wrap items-center gap-3 border-b border-gray-100 py-3 last:border-0">
       <span className="min-w-36 flex-1 text-sm font-medium text-gray-800">#{entry.requestNumber || entry.requestId}</span>
@@ -82,6 +105,14 @@ function EntryRow({ entry }) {
           <a className="text-xs font-semibold text-gray-600 underline underline-offset-2 hover:text-gray-900" href={`/api/review-panel/download?entryId=${encodeURIComponent(entry.id)}&format=pdf`}>PDF</a>
         </span>
       )}
+      {seats.length > 0 && (
+        <span className="flex basis-full flex-wrap items-center gap-1.5 pl-1">
+          {seats.map((seat) => <SeatPill key={seat.seatKey} seat={seat} />)}
+        </span>
+      )}
+      {failedSeats.map((seat) => (
+        <p key={seat.seatKey} className="basis-full pl-1 text-xs text-red-700">{seat.error}</p>
+      ))}
       {entry.error && <p className="basis-full pl-1 text-xs text-red-700">{entry.error}</p>}
     </div>
   );
@@ -99,15 +130,17 @@ export function ReviewPanelWorkspace() {
   const mounted = useRef(true);
   const initialViewSet = useRef(false);
   const launchKeyRef = useRef({ signature: '', key: '' });
+  const requestSeq = useRef(0);
 
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
 
   const load = useCallback(async () => {
+    const seq = ++requestSeq.current;
     setLoading(true);
     setError('');
     try {
       const body = await readResponse(await fetch('/api/review-panel'));
-      if (!mounted.current) return;
+      if (!mounted.current || requestSeq.current !== seq) return;
       setData(body);
       if (!initialViewSet.current) {
         initialViewSet.current = true;
@@ -118,9 +151,9 @@ export function ReviewPanelWorkspace() {
         : asSet(body.panel.selection);
       setSelectedIds(incoming);
     } catch (loadError) {
-      if (mounted.current) setError(loadError.message);
+      if (mounted.current && requestSeq.current === seq) setError(loadError.message);
     } finally {
-      if (mounted.current) setLoading(false);
+      if (mounted.current && requestSeq.current === seq) setLoading(false);
     }
   }, []);
 
@@ -135,6 +168,30 @@ export function ReviewPanelWorkspace() {
     return { ...reservationPerEntry, highUsd: reservationPerEntry.highUsd * Math.max(1, selectedIds.size) };
   }, [reservationPerEntry, selectedIds.size]);
   const launchState = deriveLaunchState({ configuration, selectedCount: selectedIds.size, launching: actionLoading === 'launch' });
+  const runActive = isRunUnsettled(latestRun?.status);
+
+  // Mirrors pages/cycle-dossier.js's runActive effect exactly: poll every
+  // POLL_MS while the latest run is queued/running/paused, stop once it
+  // settles. `actionGeneration` is snapshotted at poll-start and compared
+  // against requestSeq.current before the response is applied — a stale
+  // generation guard so a poll response arriving after a user action (an
+  // action bumps requestSeq via load()) can never clobber that action's
+  // fresher state.
+  useEffect(() => {
+    if (!runActive) return undefined;
+    let cancelled = false;
+    const poll = async () => {
+      const actionGeneration = requestSeq.current;
+      try {
+        const body = await readResponse(await fetch('/api/review-panel'));
+        if (!cancelled && mounted.current && requestSeq.current === actionGeneration) setData(body);
+      } catch (pollError) {
+        if (!cancelled && mounted.current && requestSeq.current === actionGeneration) setError(pollError.message);
+      }
+    };
+    const timer = window.setInterval(poll, POLL_MS);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, [runActive]);
 
   const toggleIncluded = (requestId) => {
     setSelectedIds((current) => {
@@ -203,6 +260,17 @@ export function ReviewPanelWorkspace() {
   };
 
   const failedEntries = (latestRun?.entries || []).filter((e) => e.status === 'failed');
+  // The worker materializes entries on claim (drain-review-panels cron runs
+  // every minute) — a queued run has no entry rows yet, and a running run
+  // may briefly have none while the worker prepares requests. Without this,
+  // the Progress tab shows nothing at all during that window.
+  const latestRunStatus = String(latestRun?.status || '').toLowerCase();
+  const hasEntries = Boolean(latestRun?.entries?.length);
+  const waitingCopy = !hasEntries && latestRunStatus === 'queued'
+    ? 'Waiting for the worker to pick up the run (runs every minute).'
+    : !hasEntries && latestRunStatus === 'running'
+      ? 'Preparing requests…'
+      : null;
 
   return (
     <Layout>
@@ -262,6 +330,7 @@ export function ReviewPanelWorkspace() {
                 </div>
               </div>
               {latestRun?.error && <p className="mb-3 text-sm text-red-700">{latestRun.error}</p>}
+              {waitingCopy && <p className="mb-3 text-sm text-gray-500">{waitingCopy}</p>}
               <ul>
                 {(latestRun?.entries || []).map((entry) => (
                   <li key={entry.id} className="flex items-center gap-2">

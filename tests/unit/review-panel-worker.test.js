@@ -364,9 +364,50 @@ describe('finalizeRunStatusIfSettled (via drainReviewPanels)', () => {
 });
 
 describe('describeEntryFailure', () => {
-  test('names the failing seat/chair in plain language', () => {
-    expect(describeEntryFailure({ message: 'x' }, 'seat.openai')).toContain('seat.openai');
-    expect(describeEntryFailure({}, 'chair')).toContain('chair synthesis');
+  test('names the failing seat/chair by its display label, never the raw seat key', () => {
+    expect(describeEntryFailure({ message: 'x' }, 'seat.openai')).toContain('OpenAI reviewer');
+    expect(describeEntryFailure({ message: 'x' }, 'seat.openai')).not.toContain('seat.openai');
+    expect(describeEntryFailure({ message: 'x' }, 'seat.claude')).toContain('Claude reviewer');
+    expect(describeEntryFailure({}, 'chair')).toContain('Chair');
+  });
+
+  test('starts with a capital letter', () => {
+    expect(describeEntryFailure({ message: 'x' }, 'seat.openai')[0]).toBe(describeEntryFailure({ message: 'x' }, 'seat.openai')[0].toUpperCase());
+  });
+
+  test('an Executor refusal is mapped to plain "declined to review" copy, naming the seat that refused', () => {
+    const message = describeEntryFailure({ message: 'Claude refused the request; no output was persisted' }, 'seat.claude');
+    expect(message).toBe('The Claude reviewer declined to review this proposal (the model returned a refusal); no review was produced.');
+  });
+
+  test('a refusal is recognized from the persisted error_text alone (no error.code available), matching failEntryForProblem\'s call shape', () => {
+    // failEntryForProblem only ever passes { message: attempt.error_text } — never a `code` — so the
+    // refusal mapping must key off the message text, not error.code, or a refusal falls through to the
+    // generic fallback (the bug this fix addresses).
+    expect(describeEntryFailure({ message: 'Claude refused the request; no output was persisted' }, 'seat.openai')).toContain('declined to review this proposal');
+  });
+
+  test('an executor deadline/timeout error is mapped to plain "time budget" copy', () => {
+    expect(describeEntryFailure({ code: 'executor_deadline_exhausted' }, 'chair')).toBe("The Chair did not finish within the time budget.");
+    expect(describeEntryFailure({ message: 'timeout after 30000ms' }, 'seat.openai')).toBe('The OpenAI reviewer did not finish within the time budget.');
+  });
+
+  test('an abort is mapped to plain "time budget" copy', () => {
+    expect(describeEntryFailure({ name: 'AbortError', message: 'aborted' }, 'seat.claude')).toBe('The Claude reviewer did not finish within the time budget.');
+  });
+
+  test('anything else falls back to a generic message carrying an excerpt of the underlying error, plus the retry sentence', () => {
+    const message = describeEntryFailure({ message: 'some odd provider-specific failure' }, 'seat.claude');
+    expect(message).toBe('The Claude reviewer hit an unexpected problem: some odd provider-specific failure. Saved work is kept; Retry failed entries re-runs only the seats and chair that did not complete.');
+  });
+
+  test('a message with no text (e.g. failEntryForProblem\'s chair-with-no-attempt fallback) never produces an empty ": ." excerpt', () => {
+    expect(describeEntryFailure({}, 'chair')).toBe('The Chair hit an unexpected problem. Saved work is kept; Retry failed entries re-runs only the seats and chair that did not complete.');
+  });
+
+  test('a message that already ends in a period never doubles up the punctuation', () => {
+    const message = describeEntryFailure({ message: 'The AI service was busy (HTTP 529) for the OpenAI reviewer.' }, 'seat.openai');
+    expect(message).toBe('The OpenAI reviewer hit an unexpected problem: The AI service was busy (HTTP 529) for the OpenAI reviewer. Saved work is kept; Retry failed entries re-runs only the seats and chair that did not complete.');
   });
 });
 
