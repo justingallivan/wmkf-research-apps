@@ -35,7 +35,7 @@ related:
 |---|---|---|---|
 | 1 | A.5 migration 047 / block v49, store + seat-attempt ledger with both fences, A.4 input DTO, A.2 rollout gates, executor budgets | built (2b714ebf); Opus round 1 = FIX (3 blocking: `known` cost with NULL cents counted as $0, finaliser state unallowlisted, decorative token test); all fixed and spot-checked in source | 2b714ebf, c7c48238 |
 | 2 | A.3 prompt seeds + question-set projection (D7), generation service + snapshot builder, A.6 worker + drain route | built; Opus round 1 = FIX (1 blocking: chair `seat_reviews` cap 40k chars below two seats' output, payload boundary truncates silently); fixed: cap derived from 5 seats × 16k tokens × 4 chars × 1.25 = 400k chars and `runChair` refuses before dispatch when exceeded | a0a4a750, 3f6433c4, 78943885, fb5646d4 |
-| 3 | A.1 registry/routes/matrix + service layer, A.7 editions in the D11 store + download route, A.8 page, operator retry hand-off, spend-check/admin-stats ledger queries, A.9 docs | started | — |
+| 3 | A.1 registry/routes/matrix + service layer, A.7 editions in the D11 store + download route, A.8 page, operator retry hand-off, spend-check/admin-stats ledger queries, A.9 docs | built (8 commits, 34 files; all 18 gates green, full unit suite 12,235 green); Opus reviewing | 03f96d25 … ada0365f |
 | Gates + PR | full gate set sequentially, PR opened, CI watched | pending | — |
 | Codex adversarial review | after Opus is satisfied with the whole | pending | — |
 
@@ -56,6 +56,9 @@ Accepted as designed, not fixed (Opus slice 2 review):
 - **Operator retry is a durable hand-off**: the route marks failed entries `retry_requested_at` and re-queues the run; the worker performs the retry under its lease. The route never touches the ledger.
 - **Seat answers to picklist/multiselect questions are validated as string enums** because the Executor's output-schema validator only supports enums on string types.
 - **Chair input cap = 400,000 chars** (5-seat ceiling × 16,000 output tokens × 4 chars/token × 1.25 headroom), with a hard refusal in `runChair` rather than the payload boundary's silent truncation. Larger than needed today; the guard is what matters.
+- **Report editions are rendered by the worker at entry completion** (not lazily on download), because entry mutations need the run lease that a route request never holds.
+- **Two stop affordances**: `action: 'stop'` cancels one run; the global operator stop pauses the worker. Names were not specified in the plan.
+- **Run status is finalised once every entry settles** (`completed`/`failed`/`partial`) so the retry fence can open.
 - **Ledger cost columns are `cost_cents` + `usage_json`**, not the plan's `input_tokens`/`output_tokens`/`cost_usd`; spend-check and admin-stats queries are written against the real shape.
 
 ## 5. Owner-side steps before a smoke run
