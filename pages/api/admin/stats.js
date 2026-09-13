@@ -10,6 +10,7 @@
 
 import { requireSuperuser } from '../../../lib/utils/auth';
 import { sql } from '@vercel/postgres';
+import { ATTEMPT_COST_UNKNOWN_SQL } from '../../../lib/services/review-panel-store';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -27,15 +28,16 @@ export default async function handler(req, res) {
     30;
 
   try {
-    const [summary, byUser, byApp, byDay, today] = await Promise.all([
+    const [summary, byUser, byApp, byDay, today, reviewPanel] = await Promise.all([
       getSummary(days),
       getByUser(days),
       getByApp(days),
       getByDay(days),
       getToday(),
+      getReviewPanel(days),
     ]);
 
-    return res.json({ period, days, summary, byUser, byApp, byDay, today });
+    return res.json({ period, days, summary, byUser, byApp, byDay, today, reviewPanel });
   } catch (error) {
     console.error('Admin stats error:', error);
     return res.status(500).json({ error: 'Failed to fetch usage stats' });
@@ -157,5 +159,55 @@ async function getByDay(days) {
     ORDER BY day ASC
   `;
   return result.rows;
+}
+
+// The Virtual Review Panel Phase A foundation never writes api_usage_log
+// (docs/plans/VIRTUAL_REVIEW_PANEL_PHASE_A_BUILD_PLAN_2026-09-12.md §5 A.5) —
+// its own per-seat/chair ledger (review_panel_seat_attempts) is surfaced here
+// as an additive block. Uses the SAME ATTEMPT_COST_UNKNOWN_SQL predicate as
+// review-panel-store.js's sumAttemptCosts/sumEntryAttemptCosts and
+// pages/api/cron/spend-check.js — a single definition so "unknown cost" can
+// never drift between call sites. Per-state unknownCount is computed WITHIN
+// each state's group (a 'failed' or 'completed' bucket can itself contain
+// attempts with cost_state='unknown' — an ambiguous paid-call confirmation —
+// alongside attempts with a known cost), not just assumed for the
+// 'unknown_outcome' bucket. The admin UI must render "Withheld" rather than
+// a number for ANY state bucket whose own unknownCount > 0 — see
+// pages/admin.js's rendering of this block.
+//
+// PR #281 merges review_panel_seat_attempts callers before migration 047
+// runs on main's auto-deploy, so this table can legitimately not exist yet.
+// Isolate that one failure mode (Postgres 42P01 undefined_table) so a
+// missing table cannot fail this whole admin/stats response: return an
+// `available: false` shape instead of throwing. Any other error still
+// propagates — this is not a blanket swallow. pages/admin.js must render
+// "Not migrated" (never a dollar figure or "Withheld") when available is
+// false.
+async function getReviewPanel(days) {
+  try {
+    const result = await sql.query(
+      `SELECT
+         a.state AS state,
+         COUNT(*)::int AS attempt_count,
+         COALESCE(SUM(a.cost_cents) FILTER (WHERE NOT ${ATTEMPT_COST_UNKNOWN_SQL}), 0)::numeric AS known_cost_cents,
+         COUNT(*) FILTER (WHERE ${ATTEMPT_COST_UNKNOWN_SQL})::int AS unknown_count
+       FROM review_panel_seat_attempts a
+       WHERE a.created_at >= NOW() - MAKE_INTERVAL(days => $1)
+       GROUP BY a.state`,
+      [days]);
+    const byState = result.rows.map((row) => ({
+      state: row.state, attemptCount: row.attempt_count,
+      knownCostCents: Number(row.known_cost_cents), unknownCount: row.unknown_count,
+    }));
+    const knownCostCents = byState.reduce((sum, row) => sum + row.knownCostCents, 0);
+    const unknownCount = byState.reduce((sum, row) => sum + row.unknownCount, 0);
+    return { knownCostCents, unknownCount, byState, available: true };
+  } catch (error) {
+    if (error && error.code === '42P01') {
+      console.warn('review_panel_seat_attempts not present; migration 047 not applied');
+      return { knownCostCents: 0, unknownCount: 0, byState: [], available: false };
+    }
+    throw error;
+  }
 }
 

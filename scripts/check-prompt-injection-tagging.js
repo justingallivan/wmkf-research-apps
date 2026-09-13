@@ -447,6 +447,17 @@ const SURFACES = [
     callSiteFiles: ['lib/services/execute-prompt.js'],
     requiredMarkers: ['untrusted: true', "source: { kind: 'override' }", 'maxChars: 100000', "target: { kind: 'none' }"],
   },
+  {
+    // Virtual Review Panel Phase A (seat + chair). Both are seeded, provider-
+    // agnostic prompts (review-panel-generation.js snapshots the row per seat
+    // with only the model swapped); the shared Executor wraps every declared
+    // variable and injects the A7 preamble the same way it does for the dossier.
+    id: 'review-panel-generation',
+    status: 'migrated',
+    promptFiles: ['shared/config/prompts/review-panel-seat.js', 'shared/config/prompts/review-panel-chair.js'],
+    callSiteFiles: ['lib/services/execute-prompt.js'],
+    requiredMarkers: ['untrusted: true', "source: { kind: 'override' }", "target: { kind: 'none' }"],
+  },
 ];
 
 // Prompt-builder files known NOT to be untrusted-content surfaces (so the

@@ -1099,6 +1099,54 @@ function UsageSection() {
           </div>
         </Card>
       )}
+
+      {/* Review Panel ledger (never in api_usage_log — its own attempt ledger) */}
+      {detailsOpen && stats?.reviewPanel && (
+        <Card>
+          <h3 className="text-md font-semibold text-gray-900 mb-3">Review Panel</h3>
+          {stats.reviewPanel.available === false ? (
+            <p className="text-sm text-gray-600">Not migrated — the review panel ledger table does not exist yet.</p>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-3">
+                <SummaryCard
+                  label="Known Cost"
+                  value={stats.reviewPanel.unknownCount > 0 ? 'Withheld' : formatCost(stats.reviewPanel.knownCostCents)}
+                  alert={stats.reviewPanel.unknownCount > 0}
+                />
+                <SummaryCard label="Unknown-Outcome Attempts" value={stats.reviewPanel.unknownCount} alert={stats.reviewPanel.unknownCount > 0} />
+              </div>
+              {stats.reviewPanel.unknownCount > 0 && (
+                <div className="text-xs text-red-700 mb-3">
+                  Cost total withheld: {stats.reviewPanel.unknownCount} attempt(s) with unknown outcome are not counted toward the figure above.
+                </div>
+              )}
+              {stats.reviewPanel.byState?.length > 0 && (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-200">
+                        <th className="text-left py-2 px-2 font-medium text-gray-600">State</th>
+                        <th className="text-right py-2 px-2 font-medium text-gray-600">Attempts</th>
+                        <th className="text-right py-2 px-2 font-medium text-gray-600">Known Cost</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {stats.reviewPanel.byState.map((row, i) => (
+                        <tr key={i} className="border-b border-gray-100">
+                          <td className="py-2 px-2 text-gray-900">{row.state}</td>
+                          <td className="py-2 px-2 text-right text-gray-700">{row.attemptCount}</td>
+                          <td className="py-2 px-2 text-right text-gray-700">{row.unknownCount > 0 ? 'Withheld' : formatCost(row.knownCostCents)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
+          )}
+        </Card>
+      )}
     </div>
   );
 }

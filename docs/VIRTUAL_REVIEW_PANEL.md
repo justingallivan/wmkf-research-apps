@@ -18,6 +18,10 @@ related:
 
 Thin design / operations reference for the Virtual Review Panel app. Created S191 to receive content extracted from CLAUDE.md so the table-row trim wouldn't drop load-bearing facts (notably the access posture).
 
+## Successor
+
+The **Virtual Review Panel Phase A foundation** (app key `review-panel`, distinct from this app's `virtual-review-panel` key) is a source-built successor per `docs/plans/VIRTUAL_REVIEW_PANEL_PHASE_A_BUILD_PLAN_2026-09-12.md` (D5): narrative-only, blind seat reviews on the governed Executor (Claude + OpenAI seats, a Claude chair), replacing this app's ungoverned `MultiLLMService` fan-out. **D5 is explicit: this app stays unchanged and stays live until parity — no retirement work is in scope for Phase A.** See `docs/agent-wiki/topics/review-panel.md` and `docs/atlas/postgres-review-panel.md` for the successor's state.
+
 ## Status and access
 
 - **App key:** `virtual-review-panel` (`shared/config/appRegistry.js` — find by app key).

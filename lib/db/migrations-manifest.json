@@ -44,6 +44,7 @@
     "043_portal_upload_staging_document_scope.sql",
     "044_site_visit_material_slot_leases.sql",
     "045_cycle_dossiers.sql",
-    "046_cycle_dossier_entry_request_revision.sql"
+    "046_cycle_dossier_entry_request_revision.sql",
+    "047_review_panel.sql"
   ]
 }

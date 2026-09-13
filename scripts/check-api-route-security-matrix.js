@@ -16,6 +16,7 @@ const KNOWN_GUARDS = [
   'requireSuperuser',
   'verifyCronSecret',
   'verifyDossierCronSecret',
+  'verifyReviewPanelCronSecret',
   'verifySuggestionToken',
   'verifyGranteeToken',
   'verifyBriefingToken',
