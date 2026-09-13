@@ -29,6 +29,11 @@ import { ATTEMPT_COST_UNKNOWN_SQL } from '../../../lib/services/review-panel-sto
 const DAILY_THRESHOLD_DEFAULT_CENTS = 7500;    // $75
 
 const DAILY_ALERT_KEY = 'spend:daily-threshold';
+// Distinct key (Opus recheck of 5353a314, item 2): the panel's own
+// unknown-cost condition must never share a dedupe key with the daily
+// threshold breach, or an early unknown-only alert would suppress a later
+// genuine breach (and vice versa).
+const PANEL_UNKNOWN_ALERT_KEY = 'spend:review-panel-unknown-cost';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET' && req.method !== 'POST') {
@@ -95,35 +100,46 @@ async function checkDailyThreshold() {
   const spentCents = Number(total_cost_cents) + panelKnownCents;
 
   const overThreshold = spentCents > thresholdCents;
-  // Alert on EITHER condition: an unresolved-cost review panel attempt is
-  // itself alert-worthy even when the (necessarily incomplete) known total
-  // stays under threshold — a silent gap in spend visibility is exactly what
-  // this cron exists to surface, not something to wait out until it happens
-  // to coincide with a threshold breach. Same DAILY_ALERT_KEY/autoResolveKey
-  // either way, so the existing dedupe/autoResolve semantics are unchanged:
-  // one alert row, auto-resolved only once BOTH conditions clear.
-  if (overThreshold || panelUnknownCount > 0) {
-    const incompleteNote = panelUnknownCount > 0
-      ? `${panelUnknownCount} review panel attempt(s) have unknown cost; the daily total is incomplete. Known review panel cost today: $${(panelKnownCents / 100).toFixed(2)}.`
-      : '';
-    const title = overThreshold
-      ? `Today's AI spend exceeded $${(thresholdCents / 100).toFixed(2)}`
-      : 'Review panel attempts have unknown cost today';
-    const message = overThreshold
-      ? `Current spend: $${(spentCents / 100).toFixed(2)} across ${request_count} requests (includes $${(panelKnownCents / 100).toFixed(2)} of known review panel cost). Threshold: $${(thresholdCents / 100).toFixed(2)} (DAILY_SPEND_ALERT_CENTS).${incompleteNote ? ` ${incompleteNote}` : ''}`
-      : incompleteNote;
+  const metadata = { spentCents, thresholdCents, requestCount: request_count, panelKnownCents, panelUnknownCount, overThreshold };
+
+  // Two INDEPENDENT alerts, each with its own dedupe key and its own
+  // create/autoResolve pair, so one condition can never suppress or
+  // prematurely clear the other. Previously both conditions shared
+  // DAILY_ALERT_KEY: an unknown-only alert raised early in the day (e.g.
+  // 9am, threshold not yet breached) would auto-resolve-key-collide with a
+  // genuine threshold breach later that same day (e.g. 2pm) — the breach
+  // never got its own row because AlertService.createAlert's dedupe treats
+  // an existing active row under the same key as already-alerted. Splitting
+  // the keys means the breach alert always fires on its own, and each
+  // condition auto-resolves independently the moment IT clears, regardless
+  // of the other's state.
+  if (overThreshold) {
     await AlertService.createAlert({
       type: 'spend_threshold',
       severity: 'warning',
-      title,
-      message,
-      metadata: { spentCents, thresholdCents, requestCount: request_count, panelKnownCents, panelUnknownCount, overThreshold },
+      title: `Today's AI spend exceeded $${(thresholdCents / 100).toFixed(2)}`,
+      message: `Current spend: $${(spentCents / 100).toFixed(2)} across ${request_count} requests (includes $${(panelKnownCents / 100).toFixed(2)} of known review panel cost). Threshold: $${(thresholdCents / 100).toFixed(2)} (DAILY_SPEND_ALERT_CENTS).`,
+      metadata,
       source: 'cron/spend-check',
       autoResolveKey: DAILY_ALERT_KEY,
     });
-    return { status: 'alerting', spentCents, thresholdCents, requestCount: request_count, panelKnownCents, panelUnknownCount };
+  } else {
+    await AlertService.autoResolve(DAILY_ALERT_KEY);
   }
 
-  await AlertService.autoResolve(DAILY_ALERT_KEY);
-  return { status: 'ok', spentCents, thresholdCents, requestCount: request_count, panelKnownCents, panelUnknownCount };
+  if (panelUnknownCount > 0) {
+    await AlertService.createAlert({
+      type: 'spend_threshold',
+      severity: 'warning',
+      title: 'Review panel attempts have unknown cost today',
+      message: `${panelUnknownCount} review panel attempt(s) have unknown cost; the daily total is incomplete. Known review panel cost today: $${(panelKnownCents / 100).toFixed(2)}.`,
+      metadata,
+      source: 'cron/spend-check',
+      autoResolveKey: PANEL_UNKNOWN_ALERT_KEY,
+    });
+  } else {
+    await AlertService.autoResolve(PANEL_UNKNOWN_ALERT_KEY);
+  }
+
+  return { status: (overThreshold || panelUnknownCount > 0) ? 'alerting' : 'ok', spentCents, thresholdCents, requestCount: request_count, panelKnownCents, panelUnknownCount };
 }

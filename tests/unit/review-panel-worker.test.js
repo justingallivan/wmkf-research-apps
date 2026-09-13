@@ -396,6 +396,78 @@ describe('the run owner is re-asserted at claim time and again immediately befor
     expect(store.createAttempt).not.toHaveBeenCalled(); // no attempt minted once the owner check fails
     expect(store.stopRevokedReviewPanelRun).toHaveBeenCalled();
   });
+
+  test('three entries in flight, 403 on the first: no dispatched attempt remains, no running entry remains, run fails, lease released', async () => {
+    // A single-seat config keeps each entry's runOneSeat call count to exactly
+    // one, so the three entries' assertReviewPanelActor calls land in a
+    // predictable order after the claim-time call: A (rejects), then B, C
+    // (both still succeed — the owner check is per-call, not sticky).
+    const SINGLE_SEAT_CONFIG = { seats: { 'seat.claude': CONFIG.seats['seat.claude'] }, chair: CONFIG.chair };
+    const run3 = { ...RUN, data: { config: SINGLE_SEAT_CONFIG } };
+    store.claimReviewPanelRun.mockResolvedValue(run3);
+
+    const attemptsByEntry = { 'entry-A': [], 'entry-B': [], 'entry-C': [] };
+    const entries = ['A', 'B', 'C'].map((k) => ({
+      id: `entry-${k}`, run_id: 'run-1', status: 'running',
+      data: { input: { requestId: `r-${k}`, narrative: { text: 'n' } } }, winners_json: {},
+    }));
+    store.listReviewPanelEntries.mockResolvedValue(entries);
+    store.listAttemptsForEntry.mockImplementation(async (entryId) => attemptsByEntry[entryId].slice());
+    store.reapExpiredAttempts.mockResolvedValue([]);
+    store.selectWinners.mockImplementation(async (entryId) => entries.find((e) => e.id === entryId));
+    store.createAttempt.mockImplementation(async ({ entryId, seatKey }) => {
+      const attempt = { id: `${entryId}-${seatKey}-1`, entry_id: entryId, seat_key: seatKey, attempt_no: 1, state: 'pending' };
+      attemptsByEntry[entryId].push(attempt);
+      return attempt;
+    });
+    store.markAttemptDispatched.mockImplementation(async (id) => {
+      for (const list of Object.values(attemptsByEntry)) {
+        const a = list.find((x) => x.id === id);
+        if (a) { a.state = 'dispatched'; return a; }
+      }
+      return null;
+    });
+    store.reapAllDispatchedAttempts.mockImplementation(async () => {
+      const reaped = [];
+      for (const list of Object.values(attemptsByEntry)) {
+        for (const a of list) if (a.state === 'dispatched') { a.state = 'unknown_outcome'; reaped.push(a); }
+      }
+      return reaped;
+    });
+    store.mutateReviewPanelEntry.mockImplementation(async (entryId, fn) => {
+      const entry = entries.find((e) => e.id === entryId);
+      await fn(entry);
+      return entry;
+    });
+
+    let actorCalls = 0;
+    store.assertReviewPanelActor.mockImplementation(async () => {
+      actorCalls += 1;
+      if (actorCalls === 1) return { profileId: run3.owner_profile_id }; // claim-time
+      if (actorCalls === 2) throw Object.assign(new Error('An active superuser profile is required.'), { httpStatus: 403 }); // first entry into the pool
+      return { profileId: run3.owner_profile_id }; // the other two entries' checks still succeed — the race is the point
+    });
+
+    // Simulates a genuinely in-flight paid call: never resolves on its own,
+    // only reacts to the shared operatorStop abort (fired by the first 403)
+    // — exactly what the fix relies on to stop siblings from hanging while
+    // the pool is drained to settlement.
+    runSeat.mockImplementation((input, seatConfig, { signal }) => new Promise((resolve, reject) => {
+      const onAbort = () => reject(Object.assign(new Error('aborted mid-call'), {}));
+      if (signal.aborted) { onAbort(); return; }
+      signal.addEventListener('abort', onAbort);
+    }));
+
+    const result = await drainReviewPanels();
+    expect(result).toEqual({ claimed: 1, ownerRevoked: true });
+
+    const allAttempts = Object.values(attemptsByEntry).flat();
+    expect(allAttempts.some((a) => a.state === 'dispatched')).toBe(false);
+    expect(entries.some((e) => e.status === 'running')).toBe(false);
+    expect(entries.every((e) => e.status === 'failed')).toBe(true);
+    expect(store.stopRevokedReviewPanelRun).toHaveBeenCalledWith('run-1', 'lease-1', expect.stringMatching(/no longer has superuser access/i));
+    expect(store.releaseReviewPanelRun).toHaveBeenCalledWith('run-1', 'lease-1');
+  });
 });
 
 describe('D11 storage readiness is re-checked immediately before every paid dispatch', () => {

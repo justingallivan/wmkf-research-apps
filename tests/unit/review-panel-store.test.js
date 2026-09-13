@@ -2,7 +2,7 @@
 jest.mock('@vercel/postgres', () => ({ db: { connect: jest.fn() }, sql: { query: jest.fn() } }));
 import { db, sql } from '@vercel/postgres';
 import {
-  createAttempt, markAttemptDispatched, finalizeAttempt, reapExpiredAttempts,
+  createAttempt, markAttemptDispatched, finalizeAttempt, reapExpiredAttempts, reapAllDispatchedAttempts,
   selectWinners, sumAttemptCosts, sumEntryAttemptCosts, createReviewPanelEntry, mutateReviewPanelEntry,
   claimReviewPanelRun, requestReviewPanelRetry, listRetryRequestedEntries, requestReviewPanelCancel,
   ATTEMPT_COST_UNKNOWN_SQL, isAttemptCostUnknown, stopRevokedReviewPanelRun,
@@ -192,6 +192,27 @@ test('reapExpiredAttempts rejects a stale lease token', async () => {
     return { rows: [] };
   });
   await expect(reapExpiredAttempts('run-1', 'wrong')).rejects.toMatchObject({ httpStatus: 409 });
+});
+
+test('reapAllDispatchedAttempts requires the current run lease and moves every dispatched row regardless of expiry', async () => {
+  client.query.mockImplementation(async (q) => {
+    if (q.startsWith('SELECT lease_token, locked_until FROM review_panel_runs')) return { rows: [LIVE_RUN] };
+    if (q.includes("state='unknown_outcome'")) return { rows: [{ id: 'att-1', state: 'unknown_outcome' }, { id: 'att-2', state: 'unknown_outcome' }] };
+    return { rows: [] };
+  });
+  const rows = await reapAllDispatchedAttempts('run-1', 'lease-1');
+  expect(rows).toEqual([{ id: 'att-1', state: 'unknown_outcome' }, { id: 'att-2', state: 'unknown_outcome' }]);
+  const reapCall = client.query.mock.calls.find(([q]) => q.includes("state='unknown_outcome'"));
+  expect(reapCall[0]).toContain("state='dispatched'");
+  expect(reapCall[0]).not.toContain('dispatch_expires_at'); // unconditional — not gated on expiry, unlike reapExpiredAttempts
+});
+
+test('reapAllDispatchedAttempts rejects a stale lease token', async () => {
+  client.query.mockImplementation(async (q) => {
+    if (q.startsWith('SELECT lease_token, locked_until FROM review_panel_runs')) return { rows: [LIVE_RUN] };
+    return { rows: [] };
+  });
+  await expect(reapAllDispatchedAttempts('run-1', 'wrong')).rejects.toMatchObject({ httpStatus: 409 });
 });
 
 describe('selectWinners', () => {

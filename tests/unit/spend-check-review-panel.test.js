@@ -68,31 +68,74 @@ test('folds known review panel cost into the daily total; no unknown attempts an
   expect(AlertService.autoResolve).toHaveBeenCalled();
 });
 
-test('threshold NOT exceeded but a review panel attempt has unknown cost: an alert is still raised (not autoResolved) naming the count and the known total', async () => {
+test('threshold NOT exceeded but a review panel attempt has unknown cost: an alert is still raised (not autoResolved) naming the count and the known total, under its OWN dedupe key', async () => {
   mockQueries({ usageRow: { total_cost_cents: '100', request_count: 2 }, panelRow: { panel_known_cost_cents: '50', panel_unknown_count: 1 } });
   const res = response();
   await handler({ method: 'GET' }, res);
   expect(res.body.dailyThreshold).toMatchObject({ status: 'alerting', spentCents: 150, panelKnownCents: 50, panelUnknownCount: 1 });
-  expect(AlertService.createAlert).toHaveBeenCalledTimes(1);
-  expect(AlertService.autoResolve).not.toHaveBeenCalled();
+  expect(AlertService.createAlert).toHaveBeenCalledTimes(1); // only the panel-unknown alert — threshold not breached
+  expect(AlertService.autoResolve).toHaveBeenCalledWith('spend:daily-threshold'); // the threshold condition itself is clear
   const alertCall = AlertService.createAlert.mock.calls[0][0];
   expect(alertCall.message).toMatch(/1 review panel attempt\(s\) have unknown cost; the daily total is incomplete/i);
   expect(alertCall.message).toMatch(/\$0\.50/); // the known total is still named
-  expect(alertCall.autoResolveKey).toBe('spend:daily-threshold'); // same dedupe key as the threshold-exceeded path
+  expect(alertCall.autoResolveKey).toBe('spend:review-panel-unknown-cost'); // its OWN key — never the threshold key
   expect(alertCall.metadata).toMatchObject({ overThreshold: false, panelKnownCents: 50, panelUnknownCount: 1 });
 });
 
-test('an alert triggered by the combined total names the unknown attempt count in its message — proving the note is present, not just the count', async () => {
+test('threshold exceeded AND a review panel attempt has unknown cost: two INDEPENDENT alerts, one per condition, each under its own key', async () => {
   process.env.DAILY_SPEND_ALERT_CENTS = '100';
   mockQueries({ usageRow: { total_cost_cents: '60', request_count: 3 }, panelRow: { panel_known_cost_cents: '50', panel_unknown_count: 2 } });
   const res = response();
   await handler({ method: 'GET' }, res);
   expect(res.body.dailyThreshold.status).toBe('alerting');
   expect(res.body.dailyThreshold.spentCents).toBe(110);
-  const alertCall = AlertService.createAlert.mock.calls[0][0];
-  expect(alertCall.message).toMatch(/incomplete/i);
-  expect(alertCall.message).toMatch(/2 review panel attempt\(s\)/);
-  expect(alertCall.metadata).toMatchObject({ panelKnownCents: 50, panelUnknownCount: 2, overThreshold: true });
+  expect(AlertService.createAlert).toHaveBeenCalledTimes(2);
+  expect(AlertService.autoResolve).not.toHaveBeenCalled();
+  const keys = AlertService.createAlert.mock.calls.map((call) => call[0].autoResolveKey).sort();
+  expect(keys).toEqual(['spend:daily-threshold', 'spend:review-panel-unknown-cost'].sort());
+  const thresholdCall = AlertService.createAlert.mock.calls.find((call) => call[0].autoResolveKey === 'spend:daily-threshold')[0];
+  expect(thresholdCall.message).not.toMatch(/incomplete/i); // the threshold alert's own copy is unchanged by the panel condition
+  const panelCall = AlertService.createAlert.mock.calls.find((call) => call[0].autoResolveKey === 'spend:review-panel-unknown-cost')[0];
+  expect(panelCall.message).toMatch(/incomplete/i);
+  expect(panelCall.message).toMatch(/2 review panel attempt\(s\)/);
+  expect(panelCall.metadata).toMatchObject({ panelKnownCents: 50, panelUnknownCount: 2, overThreshold: true });
+});
+
+test('dedupe collision regression: an unknown-only alert earlier in the day does not suppress a genuine threshold breach later — two separate cron passes each raise their own alert', async () => {
+  // Pass 1 (e.g. 9am): unknown-only, under threshold.
+  mockQueries({ usageRow: { total_cost_cents: '0', request_count: 0 }, panelRow: { panel_known_cost_cents: '0', panel_unknown_count: 1 } });
+  await handler({ method: 'GET' }, response());
+  expect(AlertService.createAlert).toHaveBeenCalledTimes(1);
+  expect(AlertService.createAlert.mock.calls[0][0].autoResolveKey).toBe('spend:review-panel-unknown-cost');
+
+  // Pass 2 (e.g. 2pm): a genuine threshold breach, unknown condition persists.
+  process.env.DAILY_SPEND_ALERT_CENTS = '100';
+  mockQueries({ usageRow: { total_cost_cents: '200', request_count: 5 }, panelRow: { panel_known_cost_cents: '0', panel_unknown_count: 1 } });
+  await handler({ method: 'GET' }, response());
+  // Across both passes, BOTH keys have now raised an alert — the earlier
+  // unknown-only alert never suppressed the later breach (pass 2 alerts
+  // twice: once for the new breach, once because the unknown condition
+  // still persists — that persistence is independent, expected behavior).
+  expect(AlertService.createAlert).toHaveBeenCalledTimes(3);
+  const pass2Keys = AlertService.createAlert.mock.calls.slice(1).map((call) => call[0].autoResolveKey).sort();
+  expect(pass2Keys).toEqual(['spend:daily-threshold', 'spend:review-panel-unknown-cost'].sort());
+});
+
+test('breach clears while the unknown condition persists: only the threshold key is autoResolved, the panel-unknown alert keeps firing', async () => {
+  // Pass 1: both conditions active.
+  process.env.DAILY_SPEND_ALERT_CENTS = '100';
+  mockQueries({ usageRow: { total_cost_cents: '200', request_count: 5 }, panelRow: { panel_known_cost_cents: '0', panel_unknown_count: 1 } });
+  await handler({ method: 'GET' }, response());
+  expect(AlertService.createAlert).toHaveBeenCalledTimes(2);
+
+  // Pass 2: the breach clears, but the unknown-cost condition persists.
+  jest.clearAllMocks();
+  mockQueries({ usageRow: { total_cost_cents: '10', request_count: 1 }, panelRow: { panel_known_cost_cents: '0', panel_unknown_count: 1 } });
+  await handler({ method: 'GET' }, response());
+  expect(AlertService.autoResolve).toHaveBeenCalledTimes(1);
+  expect(AlertService.autoResolve).toHaveBeenCalledWith('spend:daily-threshold');
+  expect(AlertService.createAlert).toHaveBeenCalledTimes(1);
+  expect(AlertService.createAlert.mock.calls[0][0].autoResolveKey).toBe('spend:review-panel-unknown-cost');
 });
 
 test('never folds an unknown-outcome attempt cost into the total (fixture has a nonzero known total to prove suppression, not absence)', async () => {

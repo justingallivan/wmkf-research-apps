@@ -166,6 +166,37 @@ describe('ReviewPanelWorkspace', () => {
     await waitFor(() => expect(postBodies.length).toBe(3));
     expect(postBodies[2].idempotencyKey).not.toBe(postBodies[1].idempotencyKey);
   });
+
+  test('launch fails on selection S1; changing to S2 with NO intervening success still mints a new idempotencyKey (retrying S1 unchanged still reuses it)', async () => {
+    const postBodies = [];
+    global.fetch = jest.fn((url, options) => {
+      if (options?.method === 'POST') {
+        postBodies.push(JSON.parse(options.body));
+        return Promise.reject(new Error('network error')); // every launch in this test fails — no success ever occurs
+      }
+      return Promise.resolve(response(pageResponse()));
+    });
+    render(<ReviewPanelWorkspace />);
+    await waitFor(() => expect(screen.getByRole('button', { name: /Launch/i })).not.toBeDisabled());
+
+    // First click on selection S1 (the default: both candidates included) — fails.
+    fireEvent.click(screen.getByRole('button', { name: /Launch/i }));
+    await waitFor(() => expect(postBodies.length).toBe(1));
+    await waitFor(() => expect(screen.getByRole('button', { name: /Launch/i })).not.toBeDisabled());
+
+    // Retry with the SAME selection S1 (no intervening success) — must reuse the same key.
+    fireEvent.click(screen.getByRole('button', { name: /Launch/i }));
+    await waitFor(() => expect(postBodies.length).toBe(2));
+    expect(postBodies[1].idempotencyKey).toBe(postBodies[0].idempotencyKey);
+
+    // Change the selection to S2 — still no launch has ever succeeded. A
+    // failed launch must not pin the idempotency key to the old selection
+    // forever: the changed selection must mint a NEW key.
+    fireEvent.click(screen.getAllByRole('checkbox')[1]);
+    fireEvent.click(screen.getByRole('button', { name: /Launch/i }));
+    await waitFor(() => expect(postBodies.length).toBe(3));
+    expect(postBodies[2].idempotencyKey).not.toBe(postBodies[1].idempotencyKey);
+  });
 });
 
 test('the default export wraps the workspace in RequireAuth without crashing', async () => {
