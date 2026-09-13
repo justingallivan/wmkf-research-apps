@@ -83,6 +83,26 @@ beforeEach(() => {
   prepareReviewPanelInput.mockResolvedValue({ requestId: REQ_A, requestNumber: 'R-1', narrative: { text: 'n' } });
 });
 
+describe('getReviewPanelPage surfaces the rollout mode so the page can mirror the server\'s smoke-mode launch rule', () => {
+  test('surfaces mode: "smoke"', async () => {
+    rollout.assertReviewPanelModeValid.mockReturnValue('smoke');
+    const result = await getReviewPanelPage(OWNER);
+    expect(result.configuration.mode).toBe('smoke');
+  });
+
+  test('surfaces mode: "pilot"', async () => {
+    rollout.assertReviewPanelModeValid.mockReturnValue('pilot');
+    const result = await getReviewPanelPage(OWNER);
+    expect(result.configuration.mode).toBe('pilot');
+  });
+
+  test('an invalid mode never breaks the read-only status page — mode comes back null instead of throwing', async () => {
+    rollout.assertReviewPanelModeValid.mockImplementation(() => { throw Object.assign(new Error('invalid mode'), { httpStatus: 503 }); });
+    const result = await getReviewPanelPage(OWNER);
+    expect(result.configuration.mode).toBeNull();
+  });
+});
+
 describe('actor assertion runs BEFORE any store/roster/Blob call', () => {
   function rejectActor() {
     store.assertReviewPanelActor.mockRejectedValue(Object.assign(new Error('An active superuser profile is required.'), { httpStatus: 403 }));

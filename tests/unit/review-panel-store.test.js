@@ -391,6 +391,16 @@ describe('requestReviewPanelRetry', () => {
     await expect(requestReviewPanelRetry('run-1', 7, ['entry-1'])).rejects.toMatchObject({ httpStatus: 409 });
   });
 
+  test('rejects a cancelled run — an operator stop must never be resurrected by a retry', async () => {
+    client.query.mockImplementation(async (q) => {
+      if (q.startsWith('SELECT * FROM review_panel_runs')) return { rows: [{ id: 'run-1', owner_profile_id: 7, lease_token: null, status: 'cancelled' }] };
+      if (q.startsWith('SELECT p.id, p.dynamics_systemuser_id')) return ACTOR_ROW;
+      return { rows: [] };
+    });
+    await expect(requestReviewPanelRetry('run-1', 7, ['entry-1'])).rejects.toMatchObject({ httpStatus: 409, message: expect.stringMatching(/cancelled by the operator/i) });
+    expect(client.query).not.toHaveBeenCalledWith(expect.stringContaining('UPDATE review_panel_entries'), expect.anything());
+  });
+
   test('marks only failed entries with retry_requested_at and requeues the run when settled', async () => {
     client.query.mockImplementation(async (q) => {
       if (q.startsWith('SELECT * FROM review_panel_runs')) return { rows: [{ id: 'run-1', owner_profile_id: 7, lease_token: null, status: 'failed' }] };

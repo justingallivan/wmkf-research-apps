@@ -55,6 +55,16 @@ describe('deriveLaunchState — mirrors the server own launch preconditions', ()
   test('disabled (no reason) while a launch is already in flight', () => {
     expect(deriveLaunchState({ configuration: { ready: true }, selectedCount: 1, launching: true })).toEqual({ disabled: true, reason: null });
   });
+  test('smoke mode with more than one selection is disabled with inline copy, mirroring the server\'s own rejection', () => {
+    const state = deriveLaunchState({ configuration: { ready: true, mode: 'smoke' }, selectedCount: 2, launching: false });
+    expect(state).toEqual({ disabled: true, reason: 'Smoke mode requires exactly one selected request.' });
+  });
+  test('smoke mode with exactly one selection is enabled', () => {
+    expect(deriveLaunchState({ configuration: { ready: true, mode: 'smoke' }, selectedCount: 1, launching: false })).toEqual({ disabled: false, reason: null });
+  });
+  test('pilot mode (or mode absent) never applies the one-selection rule', () => {
+    expect(deriveLaunchState({ configuration: { ready: true, mode: 'pilot' }, selectedCount: 3, launching: false })).toEqual({ disabled: false, reason: null });
+  });
 });
 
 describe('formatReservationBound — D6: a bound only, never a "typical cost" figure', () => {

@@ -266,6 +266,15 @@ test('retryFailedEntries only re-arms entries whose seats/chair still lack a win
   expect(entryState.status).toBe('completed');
 });
 
+test('retryFailedEntries clears retry_requested_at (via mutateReviewPanelEntry) for an entry that is no longer failed, instead of leaving a stale marker forever', async () => {
+  entryState.status = 'completed'; // moved on since the route queued the retry request
+  store.mutateReviewPanelEntry.mockClear();
+  await retryFailedEntries(RUN, ['entry-1']);
+  expect(store.mutateReviewPanelEntry).toHaveBeenCalledWith('entry-1', expect.any(Function), 'lease-1');
+  expect(store.createAttempt).not.toHaveBeenCalled();
+  expect(entryState.status).toBe('completed'); // untouched by the no-op mutation
+});
+
 test('operator stop set between seats: subsequent paid calls are skipped and the signal is aborted', async () => {
   let call = 0;
   assertReviewPanelWorkerOpen.mockImplementation(async () => {

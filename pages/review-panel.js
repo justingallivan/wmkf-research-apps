@@ -10,14 +10,19 @@ function asSet(values) { return new Set((Array.isArray(values) ? values : []).ma
 /**
  * Pure derivation of the Launch button's disabled state and the reason shown
  * beside it. Mirrors the SAME conditions the server enforces (rollout
- * enabled/configured, at least one selected candidate, configuration ready)
- * so the UI never shows Launch enabled when the server would reject it.
+ * enabled/configured, at least one selected candidate, configuration ready,
+ * smoke mode's exactly-one-selection rule — review-panel-service.js's
+ * launchReviewPanel) so the UI never shows Launch enabled when the server
+ * would reject it.
  */
 export function deriveLaunchState({ configuration, selectedCount, launching }) {
   if (launching) return { disabled: true, reason: null };
   if (!configuration) return { disabled: true, reason: 'Loading configuration…' };
   if (!configuration.ready) return { disabled: true, reason: configuration.error || 'The review panel is not ready.' };
   if (!selectedCount) return { disabled: true, reason: 'Select at least one request.' };
+  if (configuration.mode === 'smoke' && selectedCount !== 1) {
+    return { disabled: true, reason: 'Smoke mode requires exactly one selected request.' };
+  }
   return { disabled: false, reason: null };
 }
 
