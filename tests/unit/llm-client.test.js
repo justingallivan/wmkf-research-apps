@@ -103,7 +103,18 @@ describe('LLMClient.complete', () => {
     expect(result.usage.inputTokens).toBe(10);
     expect(result.usage.outputTokens).toBe(5);
     expect(result.stopReason).toBe('end_turn');
+    expect(result.usageComplete).toBe(true);
     expect(result.textStreamed).toBe(false);
+  });
+
+  test.each([
+    [undefined],
+    [{ input_tokens: 1 }],
+    [{ input_tokens: -1, output_tokens: 2 }],
+    [{ input_tokens: 1, output_tokens: Number.NaN }],
+  ])('marks missing or malformed raw usage incomplete (%p)', (usage) => {
+    const result = normalizeUnaryResponse({ content: [], usage }, 'claude-sonnet-5');
+    expect(result.usageComplete).toBe(false);
   });
 
   describe('_buildBody temperature handling (S286)', () => {

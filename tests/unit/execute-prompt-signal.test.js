@@ -10,7 +10,7 @@ jest.mock('../../lib/dataverse/adapters/ai-run.js', () => ({ create: jest.fn(asy
 jest.mock('../../lib/services/model-resolver.js', () => ({
   resolveModel: value => value,
   loadAvailableModels: jest.fn(async () => []),
-  resolveModelWithCapabilities: value => ({ model: value, capabilities: { maxOutputTokens: 16000, supportsStructuredOutput: true } }),
+  resolveModelWithCapabilities: value => ({ model: value, capabilities: { provider: 'anthropic', maxOutputTokens: 16000, supportsStructuredOutput: true } }),
 }));
 const mockComplete = jest.fn();
 jest.mock('../../lib/services/llm-client.js', () => ({
