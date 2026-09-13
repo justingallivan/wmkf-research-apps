@@ -185,3 +185,16 @@ the 25 existing values. A separate `getSettingStrict` readback found all
 four rows and compared each value byte-for-byte with the tracked seed text;
 all four matched. No email was sent. The feature branch remains unmerged and
 undeployed, so this receipt establishes stored copy, not production runtime.
+
+### 2026-09-12 — Claude promotion preparation (read-only review, no runtime change)
+
+Independent verification on the worktree at `ed1b4e51`: clean tree, branch pushed, five commits
+ahead of `origin/main`, zero merge conflicts against `origin/main`; 16 suites / 135 tests, `check:types`,
+changed-file ESLint, and `git diff --check` pass. Reviewed the runtime diff: settings, link, and
+signature resolve before either reminder claim; a sweep prepare failure lands in the row's `errors`
+entry with the row unclaimed; `requiredPlaceholders` is enforced by the existing Admin save route
+on `main`; every new dependency export exists. Reconciled the two restatements named above on this
+branch: the security-matrix rows for the cron sweep and the meeting-tracker materials route now name
+the settings reads, and the memory handoff no longer claims the manual reminder has no claim (it has
+claimed since S507, `90641978`). Vercel preview deployments for the branch are Ready. No PR exists
+yet. Still unmerged and undeployed.
