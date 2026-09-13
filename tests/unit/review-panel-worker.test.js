@@ -119,6 +119,25 @@ test('crash recovery: a stale dispatched attempt (worker died mid-call) is reape
   expect(entryState.data.error).toEqual(expect.stringContaining('reserved'));
 });
 
+test('a lost chair attempt (unknown_outcome) fails the entry outright and is never auto-retried', async () => {
+  // Both seats already won; the chair's own prior attempt was reaped to
+  // unknown_outcome (worker crashed mid-call) before this pass began.
+  store.selectWinners.mockImplementation(async () => {
+    for (const a of attempts) if (a.state === 'completed') entryState.winners_json[a.seat_key] = a.id;
+    return entryState;
+  });
+  attempts.push({ id: 'seat.claude-1', seat_key: 'seat.claude', attempt_no: 1, state: 'completed', result_json: {} });
+  attempts.push({ id: 'seat.openai-1', seat_key: 'seat.openai', attempt_no: 1, state: 'completed', result_json: {} });
+  entryState.winners_json = { 'seat.claude': 'seat.claude-1', 'seat.openai': 'seat.openai-1' };
+  attempts.push({ id: 'chair-1', seat_key: 'chair', attempt_no: 1, state: 'unknown_outcome' });
+  store.listReviewPanelEntries.mockResolvedValue([entryState]);
+  await drainReviewPanels();
+  expect(runChair).not.toHaveBeenCalled();
+  expect(entryState.status).toBe('failed');
+  expect(entryState.data.error).toEqual(expect.stringContaining('reserved'));
+  expect(attempts.filter((a) => a.seat_key === 'chair').length).toBe(1); // no fresh chair attempt was minted
+});
+
 test('the chair is never dispatched twice for one entry: a second drain pass with a completed chair attempt already present is a no-op', async () => {
   // First pass: seats run + winners selected + chair runs.
   store.listReviewPanelEntries.mockResolvedValue([entryState]);

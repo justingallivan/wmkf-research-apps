@@ -133,6 +133,12 @@ describe('snapshotConfiguration', () => {
     await expect(snapshotConfiguration()).rejects.toThrow(/retain its seeded variable/);
   });
 
+  test('fails closed when an admin deletes a template placeholder while its variable stays declared (the model would then silently receive no review_questions text)', async () => {
+    const strippedTemplate = { ...SEAT_ROW_BASE, wmkf_ai_promptbody: SEAT_ROW_BASE.wmkf_ai_promptbody.replace('{{review_questions}}', '') };
+    fetchCurrentPrompt.mockImplementation(async (name) => (name === SEAT_PROMPT_NAME ? strippedTemplate : { ...CHAIR_ROW_BASE }));
+    await expect(snapshotConfiguration()).rejects.toThrow(/declared input names/);
+  });
+
   test('projects the question set and excludes teamCapacity as a real question (marks it not-assessable)', async () => {
     const config = await snapshotConfiguration();
     expect(config.projectedQuestionSet.some((f) => f.key === 'affiliation')).toBe(false);
