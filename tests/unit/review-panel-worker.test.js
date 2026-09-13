@@ -97,12 +97,12 @@ test('an entry with one failed seat fails the entry and never reaches the chair'
   expect(entryState.data.error).toEqual(expect.stringContaining('seat.openai'));
 });
 
-test('crash recovery: a stale dispatched attempt (worker died mid-call) is reaped and its seat re-attempted, not left stuck forever', async () => {
+test('crash recovery: a stale dispatched attempt (worker died mid-call) is reaped to unknown_outcome and the entry fails visibly — it is NEVER auto-retried with a fresh paid call', async () => {
   // Simulate a prior crash: seat.claude already has a stale 'dispatched'
   // attempt from a worker that died mid-call — no 'completed'/'failed' ever
-  // landed for it. Without reaping BEFORE computing seatsNeedingRun, this
-  // seat would look "already in flight" forever and the entry would never
-  // progress (store.reapExpiredAttempts is what actually converts it).
+  // landed for it. reapExpiredAttempts converts it to 'unknown_outcome'
+  // (an ambiguous paid call); the worker must fail the entry outright
+  // rather than silently spending another paid call on the same seat.
   attempts.push({ id: 'seat.claude-1', seat_key: 'seat.claude', attempt_no: 1, state: 'dispatched' });
   store.reapExpiredAttempts.mockImplementation(async () => {
     const stale = attempts.filter((a) => a.state === 'dispatched');
@@ -112,10 +112,11 @@ test('crash recovery: a stale dispatched attempt (worker died mid-call) is reape
   store.listReviewPanelEntries.mockResolvedValue([entryState]);
   await drainReviewPanels();
   expect(store.reapExpiredAttempts).toHaveBeenCalled();
-  // seat.claude got a FRESH attempt (attempt_no 2) after its stale one was reaped.
-  const claudeAttempts = attempts.filter((a) => a.seat_key === 'seat.claude');
-  expect(claudeAttempts.some((a) => a.attempt_no === 2 && a.state === 'completed')).toBe(true);
-  expect(entryState.status).toBe('completed');
+  // No fresh attempt was ever created for seat.claude, and no seat ran at all.
+  expect(attempts.filter((a) => a.seat_key === 'seat.claude').length).toBe(1);
+  expect(runSeat).not.toHaveBeenCalled();
+  expect(entryState.status).toBe('failed');
+  expect(entryState.data.error).toEqual(expect.stringContaining('reserved'));
 });
 
 test('the chair is never dispatched twice for one entry: a second drain pass with a completed chair attempt already present is a no-op', async () => {
