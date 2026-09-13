@@ -1,12 +1,13 @@
-# Session 511 Prompt: merge/configure Review Panel Phase A (PR #281); Monday ops meeting; dossier cost figure
+# Session 511 Prompt: Review Panel is live in smoke mode; decide typical-cost figure, Fable seat, pilot widening; Monday ops meeting
 
-> Session 510 ran 2026-09-12 into the night of 2026-09-13 (owner present, then an autonomous
-> overnight build). Start with `/start`. **First thing to read:**
-> `docs/plans/REVIEW_PANEL_OVERNIGHT_BRIEF_2026-09-13.md` — the Review Panel Phase A foundation is
-> built, reviewed, and waiting as **PR #281** (branch `feature/review-panel-foundation`, worktree
-> `../WMKF_Apps-codex`). Nothing is merged, deployed, migrated, seeded, or configured.
+> Session 510 ran 2026-09-12 through the afternoon of 2026-09-13: overnight autonomous build, then
+> the owner merged, configured, and smoke-tested the Virtual Review Panel in production with Fable
+> orchestrating fixes live. Start with `/start`. **Read first:**
+> `docs/plans/REVIEW_PANEL_OVERNIGHT_BRIEF_2026-09-13.md` §2b (smoke results), §3 (logged
+> findings), §4 (delegated decisions). The panel is **enabled in production in smoke mode** on a
+> four-request allowlist; all four requests completed at ~$0.60 each.
 
-## Session 510 Summary (Fable orchestrating; Sonnet built, Opus reviewed, Codex adversarial round)
+## Session 510 Summary (Fable orchestrating; Sonnet built, Opus reviewed, one Codex adversarial round; owner drove production rollout 2026-09-13)
 
 ### What Was Completed
 
@@ -32,6 +33,18 @@
    (one regression pair found and fixed). Brief §3 lists what was logged rather than fixed; §4 the
    decisions made on the owner's behalf; §5 the exact owner-side commands.
 
+5. **Production rollout and smoke (2026-09-13, owner-run):** migration 047 applied; PR #281 merged;
+   store `wmkf-review-panel-private` (`store_cwVLLxRMR3A8NFA2`) connected under the `REVIEW_PANEL_BLOB`
+   prefix; `OPENAI_API_KEY`, `VRP_ALLOWED_PROVIDERS=claude,openai`, `REVIEW_PANEL_ENABLED=true`,
+   `REVIEW_PANEL_ROLLOUT_MODE=smoke`, four-request allowlist; prompts seeded (seat v2 Opus, chair v3);
+   drain cron per minute. Four complete panels: 1002852 $0.61, 1002874 $0.59, 1002903 $0.65,
+   1002912 $0.59 (~4 min each). Fixes merged during the smoke: PR #282 progress polling + seat
+   pills, #283 answer cap + timeline, #284 admin-tunable output budgets (seat 16k, chair 12k),
+   #285 tier-key resolution + readiness reason, #286 PDF WinAnsi sanitizer + stored error detail,
+   #287 retry-state UX, #288 report rendering (labelled matrix, disagreements), #289 "Re-render report"
+   action (no model calls). Fable refused the seat prompt on two biology proposals (API `refusal`);
+   Claude seat default is now Opus (a88ea0b2).
+
 ### Commits (main, this session; merges omitted)
 
 VRP plan revisions (4399fcbb … 262f3322), email-templates group move, brief commits
@@ -45,13 +58,15 @@ VRP plan revisions (4399fcbb … 262f3322), email-templates group move, brief co
    incl. materials reminder cron and dossier drain-cron cadence). Afterward: record decisions in
    `docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md` §16 and `docs/CYCLE_DOSSIER_PILOT_DESIGN.md`, add
    `vercel.json` entries if decided, close the memory.
-2. **Review Panel Phase A: owner's merge and configuration decision** on PR #281. Read brief §3
-   (logged findings) first, then §5 in order: merge → `apply-migrations.js` → provision the D11
-   store and set both Blob vars → `OPENAI_API_KEY` + `VRP_ALLOWED_PROVIDERS=claude,openai` →
-   rollout flags (`smoke`, allowlist) → seed the two prompts (`--execute`) → cron entry in
-   `vercel.json` (tracked commit) → smoke run on one request. Natural follow-up before the smoke:
-   a `scripts/check-review-panel-rollout.js` clone of the dossier preflight to prove the store
-   identity. Evidence: brief §2 table, PR #281 checks.
+2. **Review Panel next steps** (all owner decisions; the app is live in smoke mode):
+   (a) whether the page shows a typical-cost figure (~$0.60/request from four runs, D6);
+   (b) whether to widen to pilot mode / the full D26 roster (`REVIEW_PANEL_ROLLOUT_MODE=pilot`,
+   allowlist); (c) Fable seat: test on a non-biology proposal or leave Opus; (d) the OpenAI seat id
+   (D10, still `gpt-5.6-sol`); (e) re-render 1002852 and 1002874 with the "Re-render report" button
+   once PR #289's deploy is confirmed (was pending at handoff). Follow-ups logged in brief §3:
+   worker-stamped retry marker, `check-review-panel-rollout.js` preflight clone, prompt editor
+   should show the slot model for the two panel rows, admin model changes take up to 5 minutes to
+   reach launches (override cache TTL). Evidence: brief §2b/§3.
 3. **Dossier "typical cost from real runs" figure** beside the reservation bound. Evidence: seven
    logged entries in `api_usage_log` (`app_name='cycle-dossier'`); owner asked to decide after seeing
    actuals (now in hand, ~40× below the bound).
@@ -67,8 +82,8 @@ VRP plan revisions (4399fcbb … 262f3322), email-templates group move, brief co
 
 ### Owner Decision Needed
 
-1. Review Panel: merge PR #281 and the §5 configuration order; whether to change the provisional
-OpenAI seat model `gpt-5.6-sol` (D10) before the smoke; whether the panel needs a `cycle` scope.
+1. Review Panel: typical-cost figure (D6), pilot widening, Fable seat, OpenAI seat id (D10), `cycle`
+scope. Old upload-based VRP page retirement stays deferred (D5).
 2. Dossier preview/Blob retention policy (open since S494).
 3. Drain-cron cadence and materials reminder cron (ops Monday). 4. PR #116 (ROR resolver shadow
 mode): keep or close. 5. 45 unmerged local branches: prune or keep (grep live refs first).
@@ -99,18 +114,27 @@ reorder. 9. Card-vs-line materials count paths. 10. Executor usage-accounting co
    worktree, Claude commits for it. Adversarial review needs `--base <commit>`. Confirm delegation
    scope in one line before dispatching a build (S510: "have codex make the fixes" was over-read as
    "build everything").
-4. Worktrees: `../WMKF_Apps-codex` (`feature/review-panel-foundation`, PR #281, keep until merged),
+4. Worktrees: `../WMKF_Apps-codex` (parked on the last merged panel branch; all panel PRs #281–#289 merged),
    `../WMKF_Apps-codex-tracker` (`codex/meeting-tracker`, merged long ago).
 5. Production hostname for probes: `https://wmkfresearch.vercel.app` (redirects to
    `applications.wmkeck.org`); SharePoint site `https://appriver3651007194.sharepoint.com/sites/akoyaGO`.
-6. Fresh-install blocks: migration 047 = block v49 (on the PR #281 branch, never applied anywhere);
-   next migration is 048 → block v50.
+6. Fresh-install blocks: migration 047 = block v49 (applied to production 2026-09-13); next migration
+   is 048 → block v50.
 7. Retry resumes from the last checkpoint on a NEW run row (spent resets to 0 on the card; the
    source run keeps its charges) and now re-reads the entry timeout budget.
 8. Production Postgres reads for diagnosis (usage log, run ledger) were done from `.env.local`,
    which points at the production Neon database; read-only, under an explicit owner ask.
 9. A dossier's persisted selection is an explicit include list; a smoke-era selection showed the
    widened roster as excluded until "Include all" (now a button).
+
+### Verify Before Acting (added 2026-09-13)
+
+10. **Deploy readiness:** `vercel inspect <alias>` reporting Ready can be the PREVIOUS deployment.
+    Before telling the owner a merge is live, confirm the newest production deployment's `created`
+    time is after the merge commit and its status is Ready (S510: 1002874 rendered with the old
+    report template because of this).
+11. **Production reads for diagnosis** were done read-only from `.env.local` under explicit owner
+    permission ("read"); temp scripts under `scripts/_*.mjs` were deleted after each use.
 
 ### Do Not Reopen Without New Decision
 
