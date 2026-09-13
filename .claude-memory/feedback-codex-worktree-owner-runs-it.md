@@ -35,7 +35,7 @@ the main checkout, not for parallel branch builds. See [[feedback-codex-delegati
 **Update (S510, 2026-09-12):** the owner reversed the default: "You can use codex rescue for
 this task. I usually request prompts when I'm working on parallel work." The S509 failure was
 not the tool but the root: the companion resolves its workspace with `git rev-parse
---show-toplevel` on its cwd (`scripts/lib/workspace.mjs`, `lib/git.mjs:79`) and starts the
+--show-toplevel` on its cwd (the plugin's own workspace and git helper modules under `~/.claude/plugins/cache/openai-codex/codex/`, not repo files) and starts the
 Codex thread there, so `codex-companion.mjs task -C /path/to/WMKF_Apps-codex --write
 --background --model gpt-5.6-sol …` roots the sandbox in the worktree (job state dir became
 `WMKF_Apps-codex-…`, S510). Rule: always pass `-C <worktree>`; still pass `--model
