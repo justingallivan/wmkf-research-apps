@@ -79,7 +79,7 @@ test('nothing missing, no sender mailbox, and a lost claim each skip without sen
 
 test('dryRun reports eligibility and never claims or sends; readiness off skips everything; maxBatch bounds the scan', async () => {
   const d = deps();
-  expect(await sweepMaterialsReminders({ dryRun: true }, d)).toMatchObject({ dryRun: true, eligible: 1, sent: 0 });
+  expect(await sweepMaterialsReminders({ dryRun: true }, d)).toMatchObject({ dryRun: true, eligibilityIsProvisional: true, eligible: 1, sent: 0 });
   expect(d.claim).not.toHaveBeenCalled();
   expect(d.sendReminder).not.toHaveBeenCalled();
   expect(d.prepareReminder).not.toHaveBeenCalled();
@@ -90,20 +90,48 @@ test('dryRun reports eligibility and never claims or sends; readiness off skips 
   expect(await sweepMaterialsReminders({ maxBatch: 2 }, many)).toMatchObject({ scanned: 2, sent: 2 });
 });
 
+test('two eligible rows share one settings read per sweep before either claim', async () => {
+  const readEmailDefaults = jest.fn(async (keys) => ({ ok: true, values: Object.fromEntries(keys.map((key) => [key,
+    key.endsWith('.subject') ? 'Reminder {{proposalTitle}}' : 'Missing: {{missingItems}}',
+  ])) }));
+  const d = deps({
+    listDue: async () => [row({ id: 'c1' }), row({ id: 'c2' })],
+    readEmailDefaults,
+    prepareReminder: jest.fn((args, readDefaults) => prepareMaterialsReminderEmail(args, {
+      unseal: () => 'jwt',
+      buildContributorUrl: () => 'https://apps.test/materials/jwt',
+      readEmailDefaults: readDefaults,
+    })),
+  });
+  const result = await sweepMaterialsReminders({}, d);
+  expect(result).toMatchObject({ eligible: 2, sent: 2, eligibilityIsProvisional: false });
+  expect(readEmailDefaults).toHaveBeenCalledTimes(1);
+  expect(readEmailDefaults.mock.invocationCallOrder[0]).toBeLessThan(d.claim.mock.invocationCallOrder[0]);
+  expect(d.claim).toHaveBeenCalledTimes(2);
+});
+
 test('blank required default leaves the automatic reminder unclaimed and unsent', async () => {
   const log = jest.spyOn(console, 'error').mockImplementation(() => undefined);
   const readEmailDefaults = jest.fn(async () => ({ ok: false, values: {}, failures: [{ key: 'email.site_visit_materials_reminder.body', reason: 'blank' }] }));
-  const d = deps({ prepareReminder: jest.fn((args) => prepareMaterialsReminderEmail(args, {
-    unseal: () => 'jwt',
-    buildContributorUrl: () => 'https://apps.test/materials/jwt',
+  const d = deps({
+    listDue: async () => [row({ id: 'c1' }), row({ id: 'c2' })],
     readEmailDefaults,
-  })) });
+    prepareReminder: jest.fn((args, readDefaults) => prepareMaterialsReminderEmail(args, {
+      unseal: () => 'jwt',
+      buildContributorUrl: () => 'https://apps.test/materials/jwt',
+      readEmailDefaults: readDefaults,
+    })),
+  });
   const result = await sweepMaterialsReminders({}, d);
-  expect(result).toMatchObject({ scanned: 1, eligible: 0, sent: 0, sendFailed: 0, errors: [{ id: 'c1', error: 'Required email defaults are unavailable. Ask an admin to check Email defaults.' }] });
+  expect(result).toMatchObject({ scanned: 2, eligible: 0, sent: 0, sendFailed: 0, errors: [
+    { id: 'c1', error: 'Required email defaults are unavailable. Ask an admin to check Email defaults.' },
+    { id: 'c2', error: 'Required email defaults are unavailable. Ask an admin to check Email defaults.' },
+  ] });
   expect(readEmailDefaults).toHaveBeenCalledWith(
     ['email.site_visit_materials_reminder.subject', 'email.site_visit_materials_reminder.body'],
     { source: 'site-visit-materials:reminder' },
   );
+  expect(readEmailDefaults).toHaveBeenCalledTimes(1);
   expect(d.claim).not.toHaveBeenCalled();
   expect(d.sendReminder).not.toHaveBeenCalled();
   expect(d.attachEmailId).not.toHaveBeenCalled();

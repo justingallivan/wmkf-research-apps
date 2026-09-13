@@ -132,6 +132,7 @@ test('create: advancing request + active visit → due two business days before 
   expect(email.bodyText).not.toContain('The link stays open until');
   expect(email.bodyText).toContain('Presentation (PDF)');
   expect(email.bodyText).toContain('Monday, October 5, 2026');
+  expect(d.resolvePcSignature).not.toHaveBeenCalled();
   expect(result.invitationSent).toBe(true);
   expect(result.collection).toMatchObject({ state: 'missing', missing: ['presentation_pdf', 'presentation_source', 'participant_bios'], contributorUrl: expect.stringContaining('/external/materials/') });
 });
@@ -154,6 +155,21 @@ test('create refusals: no visit, already open, no recipient email, not schedulab
   expect(failing.recordInvitation).not.toHaveBeenCalled();
   expect(result.invitationSent).toBe(false);
   expect(result.collection.invitedAt).toBeNull();
+});
+
+test('invite and remind reject an unlinked actor before reading or claiming a collection', async () => {
+  const d = deps();
+  await createMaterialsCollection({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org' }, d);
+  d.getRequest.mockClear();
+  d.readEmailDefaults.mockClear();
+  for (const action of [inviteMaterialsContributors, remindMaterialsContributors]) {
+    await expect(action({ requestId: REQUEST_ID, actorId: null, fromEmail: 'pc@wmkeck.org' }, d))
+      .rejects.toMatchObject({ code: 'site_visit_materials_actor_required', httpStatus: 403 });
+  }
+  expect(d.getRequest).not.toHaveBeenCalled();
+  expect(d.readEmailDefaults).not.toHaveBeenCalled();
+  expect(d.claimManualReminder).not.toHaveBeenCalled();
+  expect(d.sendEmail).toHaveBeenCalledTimes(1);
 });
 
 test('read joins the registry: state moves missing → received → ready; waive removes an item from the requirement; reminder names only the missing items', async () => {
@@ -284,8 +300,17 @@ test('blank required settings block both sends before invitation receipt or remi
   const invitedBefore = existingInvite.__stored();
   existingInvite.readEmailDefaults.mockResolvedValue(blank);
   await expect(inviteMaterialsContributors({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org' }, existingInvite))
-    .rejects.toMatchObject({ code: 'site_visit_materials_send_failed', httpStatus: 502 });
+    .rejects.toMatchObject({ code: 'site_visit_materials_email_defaults_unavailable', httpStatus: 503 });
   expect(existingInvite.sendEmail).toHaveBeenCalledTimes(1);
+  expect(existingInvite.__stored()).toEqual(invitedBefore);
+
+  existingInvite.readEmailDefaults.mockResolvedValue({ ok: true, values: {
+    'email.site_visit_materials_invite.subject': SITE_VISIT_MATERIALS_INVITE_SEED_SUBJECT,
+    'email.site_visit_materials_invite.body': SITE_VISIT_MATERIALS_INVITE_SEED_BODY,
+  } });
+  existingInvite.sendEmail.mockRejectedValue(new Error('transport down'));
+  await expect(inviteMaterialsContributors({ requestId: REQUEST_ID, actorId: ACTOR, fromEmail: 'pc@wmkeck.org' }, existingInvite))
+    .rejects.toMatchObject({ code: 'site_visit_materials_send_failed', httpStatus: 502 });
   expect(existingInvite.__stored()).toEqual(invitedBefore);
 
   const d = deps();

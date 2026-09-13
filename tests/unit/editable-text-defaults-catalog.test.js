@@ -49,6 +49,8 @@ describe('editableTextDefaults catalog grouping metadata', () => {
     expect(entries[3].placeholders).toEqual(expect.arrayContaining([
       '{{missingItemsGrammar}}', '{{missingItems}}', '{{uploadLink}}', '{{signature}}',
     ]));
+    expect(entries[1].requiredPlaceholders).toEqual(['{{checklist}}']);
+    expect(entries[3].requiredPlaceholders).toEqual(['{{missingItems}}']);
     for (const entry of entries) {
       expect(entry.placeholders.every((placeholder) => /^\{\{[A-Za-z]+\}\}$/.test(placeholder))).toBe(true);
     }

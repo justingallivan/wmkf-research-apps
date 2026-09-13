@@ -153,3 +153,20 @@ do not yet name the settings reads, and
 `.claude-memory/project-site-visit-materials-planning-handoff.md` retains an older claim that
 the PC manual reminder has no claim (already stale before this work). Claude should reconcile
 those durable restatements with the branch on promotion.
+
+### 2026-09-12 — Opus review fixes on the same branch
+
+The invitation body now requires `{{checklist}}` and the reminder body requires
+`{{missingItems}}` on Admin saves, so an edited template cannot silently omit the
+server-built item list. A retry of an invitation with missing/blank settings
+returns the actionable 503 instead of a generic transport 502; a transport
+failure still leaves the collection retryable and reports 502. Invite and
+manual reminder reject an unlinked staff actor with the same 403 as create,
+before any context read or reminder claim. The automatic sweep reads the two
+reminder defaults at most once per run, before any claim, while handling failures for
+each eligible row. Its dry-run eligibility count is explicitly provisional:
+dry runs skip settings resolution because that read can notify operations.
+
+The focused site-visit, catalog, seed, and Admin suites now pass (16 suites,
+135 tests); types, changed-file lint, and diff check pass. The four settings
+are still unseeded in Dataverse and this branch is still unmerged and undeployed.

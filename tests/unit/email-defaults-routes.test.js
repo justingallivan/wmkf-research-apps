@@ -130,6 +130,23 @@ describe('/api/admin/email-defaults', () => {
     expect(setSetting).toHaveBeenCalledWith(key, value, 42);
   });
 
+  test.each([
+    ['email.site_visit_materials_invite.body', '{{checklist}}'],
+    ['email.site_visit_materials_reminder.body', '{{missingItems}}'],
+  ])('%s keeps the server-built item list in an admin edit', async (key, requiredToken) => {
+    const rejected = res();
+    await adminHandler({ method: 'PUT', body: { key, value: 'Please upload the items below.' } }, rejected);
+    expect(rejected.statusCode).toBe(400);
+    expect(rejected.body.error).toContain(requiredToken);
+    expect(setSetting).not.toHaveBeenCalled();
+
+    const accepted = res();
+    const value = `Please upload:\n${requiredToken}`;
+    await adminHandler({ method: 'PUT', body: { key, value } }, accepted);
+    expect(accepted.statusCode).toBe(200);
+    expect(setSetting).toHaveBeenCalledWith(key, value, 42);
+  });
+
   test('requires the superuser gate', async () => {
     requireSuperuser.mockResolvedValueOnce(null);
 
