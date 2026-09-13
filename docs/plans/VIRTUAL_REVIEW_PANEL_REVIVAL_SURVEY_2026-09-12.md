@@ -10,6 +10,7 @@ last_verified: 2026-09-12
 related:
   - docs/VIRTUAL_REVIEW_PANEL.md
   - docs/CYCLE_DOSSIER_PILOT_DESIGN.md
+  - docs/plans/VIRTUAL_REVIEW_PANEL_PHASE_A_BUILD_PLAN_2026-09-12.md
   - docs/EXECUTOR_CONTRACT.md
   - lib/services/panel-review-service.js
   - lib/services/cycle-dossier-generation.js
@@ -110,6 +111,14 @@ matrix with the review-synthesis ratings and naming divergences (D3); (c) text r
 biosketches/budget if D2 includes them.
 
 ## 4. Decisions for the owner
+
+> **Decided 2026-09-12 (Session 510).** Outcomes are recorded in
+> `docs/plans/VIRTUAL_REVIEW_PANEL_PHASE_A_BUILD_PLAN_2026-09-12.md` §1, which supersedes the
+> persona-based composition in §3 above. In brief: D1 hybrid (vendor seats Claude + OpenAI on a
+> governed Executor provider seam, Claude chair starting on Opus, all models selectable in the admin
+> model panel, seat list extensible); D2 narrative only; D3 and D4 deferred; D5 unchanged; D6 no
+> typical-cost figure until a small-subset smoke yields actuals.
+
 
 - **D1 Vendors.** Claude-only personas under the Executor (governed, audited, cheaper to build) vs
   keeping multi-vendor via the ungoverned `MultiLLMService` (the old app's differentiator). Recommendation:
