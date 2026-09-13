@@ -150,6 +150,20 @@ test('when the report cannot be saved (e.g. the D11 Blob store is not yet provis
   expect(entryState.data.files).toBeUndefined();
 });
 
+test('a report render throw stores a bounded reportError detail and the user-facing copy includes the message', async () => {
+  renderReviewPanelEntryDocuments.mockRejectedValueOnce(new Error('WinAnsi cannot encode "→" (0x2192)'));
+  store.listReviewPanelEntries.mockResolvedValue([entryState]);
+  await drainReviewPanels();
+  expect(entryState.status).toBe('failed');
+  expect(entryState.data.reportError).toEqual({
+    name: 'Error',
+    message: 'WinAnsi cannot encode "→" (0x2192)',
+    at: expect.any(String),
+  });
+  expect(entryState.data.error).toContain('WinAnsi cannot encode "→" (0x2192)');
+  expect(entryState.data.error).toMatch(/report could not be saved/i);
+});
+
 test('an entry with one failed seat fails the entry and never reaches the chair', async () => {
   seatSetup({ openaiFails: true });
   store.listReviewPanelEntries.mockResolvedValue([entryState]);

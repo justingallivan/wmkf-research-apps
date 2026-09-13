@@ -71,7 +71,7 @@ const COLORS = {
  * Sanitize text for WinAnsi encoding (Helvetica only supports WinAnsi).
  * Replaces Unicode characters that pdf-lib cannot encode.
  */
-function sanitizeForPdf(text) {
+export function sanitizeForPdf(text) {
   if (!text) return text;
   return text
     // Subscript digits
@@ -96,6 +96,13 @@ function sanitizeForPdf(text) {
     .replace(/\u00A0/g, ' ')   // non-breaking space
     .replace(/\u2032/g, "'")   // prime
     .replace(/\u2033/g, '"')   // double prime
+    // Arrows and comparison/math operators common in model output
+    .replace(/\u2192/g, '->')  // rightwards arrow
+    .replace(/\u2190/g, '<-')  // leftwards arrow
+    .replace(/\u2265/g, '>=')  // greater-than or equal to
+    .replace(/\u2264/g, '<=')  // less-than or equal to
+    .replace(/\u2248/g, '~')   // almost equal to
+    .replace(/\u2212/g, '-')   // minus sign
     // Fallback: replace any remaining non-WinAnsi chars with '?'
     // WinAnsi covers 0x20-0x7E (ASCII printable) + 0xA0-0xFF (Latin-1 Supplement)
     .replace(/[^\x09\x0A\x0D\x20-\x7E\xA0-\xFF]/g, '?');
