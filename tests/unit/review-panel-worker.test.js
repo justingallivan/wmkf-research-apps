@@ -7,10 +7,18 @@ jest.mock('../../lib/services/review-panel-generation', () => ({
 jest.mock('../../lib/services/review-panel-rollout', () => ({
   assertReviewPanelWorkerOpen: jest.fn().mockResolvedValue(undefined),
 }));
+jest.mock('../../lib/services/review-panel-documents', () => ({
+  renderReviewPanelEntryDocuments: jest.fn().mockResolvedValue({ docx: Buffer.from('docx'), pdf: Buffer.from('pdf'), docxSha256: 'docx-sha', pdfSha256: 'pdf-sha' }),
+}));
+jest.mock('../../lib/services/review-panel-storage', () => ({
+  storeReviewPanelFile: jest.fn().mockResolvedValue({ pathname: 'review-panel/fixture', sha256: 'a'.repeat(64), size: 4 }),
+}));
 
 import * as store from '../../lib/services/review-panel-store';
 import { runSeat, runChair } from '../../lib/services/review-panel-generation';
 import { assertReviewPanelWorkerOpen } from '../../lib/services/review-panel-rollout';
+import { renderReviewPanelEntryDocuments } from '../../lib/services/review-panel-documents';
+import { storeReviewPanelFile } from '../../lib/services/review-panel-storage';
 import { drainReviewPanels, retryFailedEntries, describeEntryFailure } from '../../lib/services/review-panel-worker';
 
 store.reviewPanelError = jest.fn((message, httpStatus = 409) => Object.assign(new Error(message), { httpStatus }));
@@ -87,6 +95,21 @@ test('happy path: both seats run, winners selected, chair runs once, entry compl
   expect(runChair).toHaveBeenCalledTimes(1);
   expect(entryState.status).toBe('completed');
   expect(entryState.data.chairResult).toEqual({ consensus: [] });
+  expect(entryState.data.files).toEqual({
+    docx: { pathname: 'review-panel/fixture', sha256: 'a'.repeat(64), size: 4 },
+    pdf: { pathname: 'review-panel/fixture', sha256: 'a'.repeat(64), size: 4 },
+  });
+  expect(storeReviewPanelFile).toHaveBeenCalledTimes(2);
+});
+
+test('when the report cannot be saved (e.g. the D11 Blob store is not yet provisioned), the entry is FAILED rather than silently completed with no report; the chair result is preserved for visibility', async () => {
+  storeReviewPanelFile.mockRejectedValueOnce(Object.assign(new Error('The private review panel document store has not been configured.'), { httpStatus: 503 }));
+  store.listReviewPanelEntries.mockResolvedValue([entryState]);
+  await drainReviewPanels();
+  expect(entryState.status).toBe('failed');
+  expect(entryState.data.chairResult).toEqual({ consensus: [] });
+  expect(entryState.data.error).toMatch(/report could not be saved/i);
+  expect(entryState.data.files).toBeUndefined();
 });
 
 test('an entry with one failed seat fails the entry and never reaches the chair', async () => {
