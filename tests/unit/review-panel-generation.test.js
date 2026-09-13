@@ -112,6 +112,14 @@ describe('snapshotConfiguration', () => {
     await expect(snapshotConfiguration()).rejects.toThrow(/Anthropic/);
   });
 
+  test('fails closed when a model override points a seat at a model from a DIFFERENT vendor than its fixed seat identity (shared/config/reviewPanelSeats.js) — a seat may only be overridden to another reviewed model WITHIN its own vendor', async () => {
+    // 'gpt-5.6-sol' is a genuinely reviewed+priced model (the seat.openai
+    // default), so this exercises the vendor-identity check specifically,
+    // not the capabilities/pricing branches.
+    mockModels({ seatClaude: 'gpt-5.6-sol' });
+    await expect(snapshotConfiguration()).rejects.toThrow(/fixed to vendor "anthropic"/);
+  });
+
   test('fails closed when a configured seat provider is outside VRP_ALLOWED_PROVIDERS', async () => {
     process.env.VRP_ALLOWED_PROVIDERS = 'claude';
     await expect(snapshotConfiguration()).rejects.toThrow(/allowed provider set/);
@@ -173,12 +181,29 @@ describe('runSeat', () => {
     expect(finalizeAttempt).toHaveBeenCalledWith('att-1', 'tok-1', expect.objectContaining({ state: 'failed', costState: 'unknown', costCents: null }));
   });
 
-  test('transport error with paidCall:null -> unknown cost (usageComplete gate alone decides, matching the Executor invariant that usageComplete implies a response was received)', async () => {
+  test('transport error with paidCall:null -> unknown cost even with usage present', async () => {
     const cfg = await config();
     const err = Object.assign(new Error('transport down'), { usage: null, usageComplete: false, paidCall: null });
     const execute = jest.fn().mockRejectedValue(err);
     await expect(runSeat(INPUT, cfg.seats['seat.claude'], { attemptId: 'att-1', dispatchToken: 'tok-1', execute })).rejects.toThrow();
     expect(finalizeAttempt).toHaveBeenCalledWith('att-1', 'tok-1', expect.objectContaining({ costState: 'unknown', costCents: null }));
+  });
+
+  test('error path with usageComplete:true but paidCall:null (ambiguous — no confirmed response) -> unknown cost, NOT known: paidCall must be an explicit conjunct alongside usageComplete', async () => {
+    const cfg = await config();
+    const err = Object.assign(new Error('ambiguous'), { usage: { input_tokens: 100, output_tokens: 50 }, usageComplete: true, paidCall: null });
+    const execute = jest.fn().mockRejectedValue(err);
+    await expect(runSeat(INPUT, cfg.seats['seat.claude'], { attemptId: 'att-1', dispatchToken: 'tok-1', execute })).rejects.toThrow();
+    expect(finalizeAttempt).toHaveBeenCalledWith('att-1', 'tok-1', expect.objectContaining({ costState: 'unknown', costCents: null }));
+  });
+
+  test('error path with usageComplete:true AND paidCall:true -> known cost (a confirmed provider response was received and billed)', async () => {
+    const cfg = await config();
+    const err = Object.assign(new Error('validation failed after response'), { usage: { input_tokens: 100, output_tokens: 50 }, usageComplete: true, paidCall: true });
+    const execute = jest.fn().mockRejectedValue(err);
+    await expect(runSeat(INPUT, cfg.seats['seat.claude'], { attemptId: 'att-1', dispatchToken: 'tok-1', execute })).rejects.toThrow();
+    expect(finalizeAttempt).toHaveBeenCalledWith('att-1', 'tok-1', expect.objectContaining({ costState: 'known' }));
+    expect(finalizeAttempt.mock.calls[0][2].costCents).toEqual(expect.any(Number));
   });
 
   test('allowedProviders passed to executePrompt equals exactly [seat.provider]', async () => {
@@ -219,6 +244,18 @@ describe('runChair', () => {
     expect(Object.values(sentReviews).some((r) => 'teamCapacity' in r)).toBe(false);
     expect(execute.mock.calls[0][0].allowedProviders).toEqual(['anthropic']);
     expect(finalizeAttempt).toHaveBeenCalledWith('att-chair', 'tok-c', expect.objectContaining({ state: 'completed' }));
+  });
+
+  test('refuses to synthesize over a seat_reviews payload that would exceed the declared size cap — executePrompt is never called, so wrapUntrustedContent can never silently truncate it', async () => {
+    const cfg = await snapshotConfiguration();
+    const execute = jest.fn().mockResolvedValue({ parsed: { consensus: [] }, usage: { input_tokens: 10, output_tokens: 10 }, usageComplete: true });
+    // One seat's review alone, well past the declared cap once JSON-stringified.
+    const oversizedText = 'x'.repeat(500000);
+    const seatWinners = { 'seat.claude': { priorWork: oversizedText }, 'seat.openai': { priorWork: 'b' } };
+    await expect(runChair(INPUT, seatWinners, cfg.chair, { attemptId: 'att-chair', dispatchToken: 'tok-c', execute }))
+      .rejects.toThrow(/exceeds the declared size cap/);
+    expect(execute).not.toHaveBeenCalled();
+    expect(finalizeAttempt).toHaveBeenCalledWith('att-chair', 'tok-c', expect.objectContaining({ state: 'failed', costState: 'unknown', costCents: null }));
   });
 });
 

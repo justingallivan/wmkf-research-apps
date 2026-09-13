@@ -10,7 +10,35 @@
  * Adapted from the retired interactive Virtual Review Panel's
  * createPanelSynthesisPrompt (shared/config/prompts/virtual-review-panel.js).
  */
+import { REVIEW_PANEL_SEATS } from '../reviewPanelSeats';
+
 export const PROMPT_NAME = 'review-panel.chair';
+
+// `seat_reviews`'s maxChars must be sized so buildBoundedTextPayload
+// (lib/utils/ai-payload-boundary.js) can never SILENTLY truncate a
+// legitimate seat_reviews payload before it reaches the model — truncation
+// there is invisible (no error, just a cut JSON string). review-panel-
+// generation.js's runChair additionally throws BEFORE calling executePrompt
+// if the actual serialized payload would exceed this cap, so a config that
+// somehow still overflows it fails the entry outright rather than silently
+// truncating.
+//
+// Arithmetic: chars-per-token ceiling (4, generous for JSON output) x
+// per-seat max output tokens (16000 — review-panel-generation.js's
+// snapshotPrompt hard-caps wmkf_ai_maxtokens at 16000; the seed row
+// currently sets 8000, but this must hold for any future admin edit up to
+// that hard cap) x reviewer-seat count ceiling (5 — REVIEW_PANEL_SEATS
+// currently declares 2 reviewer seats; sized to 5 so adding a 3rd/4th/5th
+// seat needs no edit here) x a 1.25 headroom multiplier for the JSON
+// envelope humanizeSeatReviews/chairInput add (keys, quotes, re-attached
+// option labels) over the raw per-seat answer text.
+const SEAT_REVIEWS_CHARS_PER_TOKEN = 4;
+const SEAT_REVIEWS_MAX_OUTPUT_TOKENS_CEILING = 16000;
+const SEAT_REVIEWS_SEAT_COUNT_CEILING = Math.max(REVIEW_PANEL_SEATS.filter((s) => s.key !== 'chair').length, 5);
+const SEAT_REVIEWS_HEADROOM_MULTIPLIER = 1.25;
+export const SEAT_REVIEWS_MAX_CHARS = Math.ceil(
+  SEAT_REVIEWS_SEAT_COUNT_CEILING * SEAT_REVIEWS_MAX_OUTPUT_TOKENS_CEILING * SEAT_REVIEWS_CHARS_PER_TOKEN * SEAT_REVIEWS_HEADROOM_MULTIPLIER,
+); // 5 * 16000 * 4 * 1.25 = 400,000
 
 export const SYSTEM_PROMPT = `You are the chair of a review panel for the W. M. Keck Foundation. Independent reviewers have each evaluated a grant proposal. Synthesize their reviews into an honest, actionable panel summary that helps the Foundation make a funding decision.
 
@@ -40,7 +68,7 @@ Return the panel synthesis as JSON now, with exactly the nine keys and shapes de
 export const VARIABLES = {
   variables: [
     { name: 'proposal_narrative', required: true, placement: 'user', source: { kind: 'override' }, dataClass: 'proposal_text', maxChars: 100000, untrusted: true },
-    { name: 'seat_reviews', required: true, placement: 'user', source: { kind: 'override' }, dataClass: 'llm_output', maxChars: 40000, untrusted: true },
+    { name: 'seat_reviews', required: true, placement: 'user', source: { kind: 'override' }, dataClass: 'llm_output', maxChars: SEAT_REVIEWS_MAX_CHARS, untrusted: true },
   ],
 };
 

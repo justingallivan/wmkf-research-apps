@@ -44,6 +44,7 @@ describe('renderSeatQuestionsText', () => {
     }
     expect(text).toContain('"1" = Low');
     expect(text).toContain('"2" = High');
+    expect(text).not.toContain('affiliation'); // excluded by the projection before this text is ever rendered
   });
 
   test('instructs the not-assessable literal for teamCapacity instead of asking for an answer', () => {
