@@ -26,7 +26,7 @@ export const PROMPT_NAME = 'review-panel.chair';
 // Arithmetic: chars-per-token ceiling (4, generous for JSON output) x
 // per-seat max output tokens (16000 — review-panel-generation.js's
 // snapshotPrompt hard-caps wmkf_ai_maxtokens at 16000; the seed row
-// currently sets 12000, but this must hold for any future admin edit up to
+// currently sets 16000, but this must hold for any future admin edit up to
 // that hard cap) x reviewer-seat count ceiling (5 — REVIEW_PANEL_SEATS
 // currently declares 2 reviewer seats; sized to 5 so adding a 3rd/4th/5th
 // seat needs no edit here) x a 1.25 headroom multiplier for the JSON

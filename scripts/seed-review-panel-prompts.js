@@ -43,7 +43,7 @@ export const PROMPTSTATUS_PUBLISHED = 682090001;
 const SEAT_CLAUDE_DEFAULT_MODEL = REVIEW_PANEL_SEATS.find((s) => s.key === 'seat.claude')?.defaultModel;
 
 export const DEFINITIONS = Object.freeze([
-  { definition: seatDefinition, maxTokens: 12000, notes: 'Virtual Review Panel Phase A seat prompt; provider-agnostic, per-seat model swapped at launch time. Headroom only: SEAT_ANSWER_MAX_CHARS (lib/services/review-panel-questions.js) is the real control keeping output within the seat ceiling.' },
+  { definition: seatDefinition, maxTokens: 16000, notes: 'Virtual Review Panel Phase A seat prompt; provider-agnostic, per-seat model swapped at launch time. Headroom only: SEAT_ANSWER_MAX_CHARS (lib/services/review-panel-questions.js) is the real control keeping output within the seat ceiling.' },
   { definition: chairDefinition, maxTokens: 12000, notes: 'Virtual Review Panel Phase A chair synthesis prompt; always Anthropic.' },
 ]);
 
