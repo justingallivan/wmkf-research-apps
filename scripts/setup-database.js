@@ -1050,6 +1050,64 @@ const v48Statements = [
      'Revision number within the request (1, 2, …); revision is the table-wide append order.'`,
 ];
 
+// V49: Virtual Review Panel Phase A foundation. Mirrors migration 047.
+const v49Statements = [
+  `CREATE TABLE IF NOT EXISTS review_panels (
+    id UUID PRIMARY KEY, owner_profile_id INTEGER NOT NULL REFERENCES user_profiles(id),
+    selection JSONB, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), UNIQUE (owner_profile_id)
+  )`,
+  `CREATE TABLE IF NOT EXISTS review_panel_runs (
+    id UUID PRIMARY KEY, owner_profile_id INTEGER NOT NULL REFERENCES user_profiles(id),
+    panel_id UUID NOT NULL REFERENCES review_panels(id), idempotency_key UUID NOT NULL,
+    launch_hash TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'queued'
+      CHECK (status IN ('queued','running','paused','cancelled','completed','partial','failed')),
+    data JSONB NOT NULL DEFAULT '{}'::jsonb, lease_token UUID, locked_until TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (owner_profile_id, idempotency_key)
+  )`,
+  `CREATE INDEX IF NOT EXISTS review_panel_runs_queue ON review_panel_runs(status, created_at)`,
+  `CREATE TABLE IF NOT EXISTS review_panel_entries (
+    id UUID PRIMARY KEY, run_id UUID NOT NULL REFERENCES review_panel_runs(id),
+    request_id UUID NOT NULL, revision BIGINT GENERATED ALWAYS AS IDENTITY,
+    request_revision INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','running','completed','failed')),
+    data JSONB NOT NULL DEFAULT '{}'::jsonb, winners_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+    created_by INTEGER NOT NULL REFERENCES user_profiles(id),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS review_panel_entries_request_revision
+     ON review_panel_entries (request_id, request_revision)`,
+  `CREATE INDEX IF NOT EXISTS review_panel_entries_run ON review_panel_entries(run_id)`,
+  `COMMENT ON COLUMN review_panel_entries.request_revision IS
+     'Revision number within the request (1, 2, …); revision is the table-wide append order (mirrors cycle_dossier_entries).'`,
+  `CREATE TABLE IF NOT EXISTS review_panel_seat_attempts (
+    id UUID PRIMARY KEY, entry_id UUID NOT NULL REFERENCES review_panel_entries(id),
+    seat_key TEXT NOT NULL, attempt_no INTEGER NOT NULL,
+    state TEXT NOT NULL DEFAULT 'pending'
+      CHECK (state IN ('pending','dispatched','completed','failed','unknown_outcome')),
+    dispatch_token TEXT, lease_token UUID, dispatched_at TIMESTAMPTZ, dispatch_expires_at TIMESTAMPTZ,
+    provider TEXT, model TEXT,
+    prompt_snapshot_json JSONB, result_json JSONB, late_result_json JSONB,
+    usage_json JSONB, late_usage_json JSONB,
+    cost_cents NUMERIC, cost_state TEXT CHECK (cost_state IN ('known','unknown')),
+    error_text TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (entry_id, seat_key, attempt_no)
+  )`,
+  `CREATE INDEX IF NOT EXISTS review_panel_seat_attempts_entry ON review_panel_seat_attempts(entry_id)`,
+  `CREATE INDEX IF NOT EXISTS review_panel_seat_attempts_reap
+     ON review_panel_seat_attempts(state, dispatch_expires_at) WHERE state = 'dispatched'`,
+  `CREATE TABLE IF NOT EXISTS review_panel_control (
+    id BOOLEAN PRIMARY KEY DEFAULT TRUE CHECK (id = TRUE),
+    stop_requested BOOLEAN NOT NULL DEFAULT FALSE,
+    reason TEXT,
+    updated_by INTEGER REFERENCES user_profiles(id),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`,
+  `INSERT INTO review_panel_control(id) VALUES (TRUE) ON CONFLICT(id) DO NOTHING`,
+];
+
 // V43: deliberation briefing links (docs/DELIBERATION_BRIEFING_PAGE_PLAN.md).
 // One expiring, revocable link per request for the read-only briefing page;
 // stores a token digest and sealed token, never the raw token. Also binds the
@@ -2056,6 +2114,24 @@ async function runMigration() {
           console.log(`[v48-${i + 1}/${v48Statements.length}] ○ Already exists: ${preview}...`);
         } else {
           console.error(`[v48-${i + 1}/${v48Statements.length}] ✗ Error: ${error.message}`);
+          throw error;
+        }
+      }
+    }
+
+    // Run V49 schema updates (Virtual Review Panel Phase A foundation; mirrors migration 047)
+    console.log(`\nApplying v49 schema updates - Review Panel foundation (${v49Statements.length} statements)...`);
+    for (let i = 0; i < v49Statements.length; i++) {
+      const statement = v49Statements[i];
+      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
+      try {
+        await sql.query(statement);
+        console.log(`[v49-${i + 1}/${v49Statements.length}] ✓ ${preview}...`);
+      } catch (error) {
+        if (error.message.includes('already exists')) {
+          console.log(`[v49-${i + 1}/${v49Statements.length}] ○ Already exists: ${preview}...`);
+        } else {
+          console.error(`[v49-${i + 1}/${v49Statements.length}] ✗ Error: ${error.message}`);
           throw error;
         }
       }

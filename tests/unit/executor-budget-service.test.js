@@ -26,6 +26,16 @@ function budgets(overrides = {}) {
       timeoutMsOverride: 200000,
       ...(overrides.entryTimeout || {}),
     },
+    'review-panel.seat': {
+      kind: 'timeout',
+      timeoutMsOverride: 200000,
+      ...(overrides.seatTimeout || {}),
+    },
+    'review-panel.chair': {
+      kind: 'timeout',
+      timeoutMsOverride: 200000,
+      ...(overrides.chairTimeout || {}),
+    },
   };
 }
 
