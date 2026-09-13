@@ -66,5 +66,45 @@ Accepted as designed, not fixed (Opus slice 2 review):
 
 ## 5. Owner-side steps before a smoke run
 
-Filled in at the end of the build: migration command, prompt seed command, Blob store provisioning,
-`! vercel env add` lines, `vercel.json` cron line, `VRP_ALLOWED_PROVIDERS` update.
+Nothing below has been done. Order matters; each step is the owner's call. PR: https://github.com/justingallivan/wmkf-research-apps/pull/281
+
+1. **Merge PR #281** once CI is green and the Codex findings in §3 are acceptable. `main` auto-deploys; the panel stays dark until `REVIEW_PANEL_ENABLED=true`, and the drain cron is not scheduled, so merging alone changes nothing at runtime.
+2. **Apply migration 047** to the production database (existing-DB path, never `setup-database.js`):
+   ```bash
+   node scripts/apply-migrations.js
+   ```
+3. **Provision the dedicated private Blob store (D11)**, following the runbook's dedicated-store procedure (decline the auto-link prompt, which would overwrite `BLOB_READ_WRITE_TOKEN`):
+   ```bash
+   vercel blob create-store wmkf-review-panel-private --access private
+   ```
+   Then copy the RW token from the dashboard and set it, plus the store id the dashboard shows, per environment:
+   ```bash
+   ! vercel env add REVIEW_PANEL_BLOB_READ_WRITE_TOKEN production
+   ! vercel env add REVIEW_PANEL_BLOB_STORE_ID production
+   ```
+   Record the store id in `docs/CREDENTIALS_RUNBOOK.md` rows 102-103 and 308 (currently "NOT yet provisioned").
+4. **Provider key and allowlist.** `OPENAI_API_KEY` must exist in production (runbook row 83 lists it as open). `VRP_ALLOWED_PROVIDERS` must contain both `claude` and `openai` (comma-separated; the panel maps `claude` to the Anthropic transport). The chair is Claude, so `claude` is mandatory.
+   ```bash
+   ! vercel env add OPENAI_API_KEY production
+   ! vercel env add VRP_ALLOWED_PROVIDERS production      # value: claude,openai
+   ```
+5. **Rollout flags** (readable config, not secrets):
+   ```bash
+   ! vercel env add REVIEW_PANEL_ENABLED production            # true
+   ! vercel env add REVIEW_PANEL_ROLLOUT_MODE production       # smoke
+   ! vercel env add REVIEW_PANEL_REQUEST_ALLOWLIST production  # comma-separated request ids or numbers for the subset
+   ```
+   Smoke mode admits at most four allowlisted requests and requires exactly one selection per launch.
+6. **Seed the two governed prompts** to Dataverse (writes; the target interlock must be enforcing):
+   ```bash
+   node --import ./scripts/lib/use-extensionless.mjs scripts/seed-review-panel-prompts.js --dry-run
+   node --import ./scripts/lib/use-extensionless.mjs scripts/seed-review-panel-prompts.js --execute
+   ```
+   Then confirm the seat and chair model slots in the admin model panel (defaults `claude-fable-5-1`, `gpt-5.6-sol`, chair `claude-opus-5`; D10 said the OpenAI id will probably change).
+7. **Schedule the drain cron** (a tracked commit to `vercel.json`, Tier 2, mirroring the dossier entries):
+   ```json
+   "pages/api/cron/drain-review-panels.js": { "maxDuration": 300 },
+   { "path": "/api/cron/drain-review-panels", "schedule": "* * * * *" }
+   ```
+   Without this the panel accepts launches but never runs them.
+8. **Smoke run** on one allowlisted request from `/review-panel`; read the per-request cost line in the report and the `review_panel_seat_attempts` rows for the D6 actuals. Old `panel_reviews` and the `virtual-review-panel` page are untouched (D5).
