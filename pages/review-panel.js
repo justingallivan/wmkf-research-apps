@@ -147,6 +147,9 @@ function EntryRow({ entry }) {
 
 export function ReviewPanelWorkspace() {
   const [data, setData] = useState(null);
+  // Clock sample for the elapsed-time line: refreshed whenever data lands (mount load and each poll),
+  // never read during render (react-hooks/purity).
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [launchError, setLaunchError] = useState('');
@@ -169,6 +172,7 @@ export function ReviewPanelWorkspace() {
       const body = await readResponse(await fetch('/api/review-panel'));
       if (!mounted.current || requestSeq.current !== seq) return;
       setData(body);
+      setNowMs(Date.now());
       if (!initialViewSet.current) {
         initialViewSet.current = true;
         if (isRunUnsettled(body.runs?.[0]?.status)) setView('progress');
@@ -211,7 +215,7 @@ export function ReviewPanelWorkspace() {
       const actionGeneration = requestSeq.current;
       try {
         const body = await readResponse(await fetch('/api/review-panel'));
-        if (!cancelled && mounted.current && requestSeq.current === actionGeneration) setData(body);
+        if (!cancelled && mounted.current && requestSeq.current === actionGeneration) { setData(body); setNowMs(Date.now()); }
       } catch (pollError) {
         if (!cancelled && mounted.current && requestSeq.current === actionGeneration) setError(pollError.message);
       }
@@ -298,9 +302,8 @@ export function ReviewPanelWorkspace() {
     : !hasEntries && latestRunStatus === 'running'
       ? 'Preparing requests…'
       : null;
-  // Recomputed on every render, including the poll's own re-render every
-  // POLL_MS while the run is unsettled — no separate timer needed.
-  const runningElapsedText = latestRunStatus === 'running' ? formatRunningElapsed(latestRun?.createdAt, Date.now()) : null;
+  // Recomputed from the clock sample taken when each poll's data landed (every POLL_MS while unsettled).
+  const runningElapsedText = latestRunStatus === 'running' ? formatRunningElapsed(latestRun?.createdAt, nowMs) : null;
 
   return (
     <Layout>
