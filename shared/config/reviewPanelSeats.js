@@ -31,3 +31,14 @@ export const REVIEW_PANEL_SEATS = Object.freeze([
 export function getReviewPanelSeat(key) {
   return REVIEW_PANEL_SEATS.find((seat) => seat.key === key) || null;
 }
+
+/**
+ * Short display label for user-facing copy (Progress tab seat pills, worker
+ * failure messages) — same seats as REVIEW_PANEL_SEATS, but the chair reads
+ * as "Chair" rather than the config's own record-keeping `label` ("Claude
+ * chair"), since the model identity is already shown alongside it.
+ */
+export function getReviewPanelSeatLabel(key) {
+  if (key === 'chair') return 'Chair';
+  return getReviewPanelSeat(key)?.label || key;
+}

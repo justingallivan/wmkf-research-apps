@@ -199,6 +199,132 @@ describe('ReviewPanelWorkspace', () => {
   });
 });
 
+describe('Progress tab polling — mirrors pages/cycle-dossier.js\'s runActive effect', () => {
+  afterEach(() => { jest.useRealTimers(); jest.restoreAllMocks(); });
+
+  test('polls every 4s while the latest run is unsettled, and stops once it settles', async () => {
+    jest.useFakeTimers();
+    let call = 0;
+    global.fetch = jest.fn(() => {
+      call += 1;
+      // First load, then two polls while queued, then the run settles.
+      const status = call <= 3 ? 'queued' : 'completed';
+      return Promise.resolve(response(pageResponse({ runs: [{ id: 'run-1', status, entries: [] }] })));
+    });
+    render(<ReviewPanelWorkspace />);
+    await act(async () => { await Promise.resolve(); }); // flush the initial load()
+    expect(call).toBe(1);
+
+    await act(async () => { await jest.advanceTimersByTimeAsync(4000); });
+    expect(call).toBe(2); // first poll while queued
+
+    await act(async () => { await jest.advanceTimersByTimeAsync(4000); });
+    expect(call).toBe(3); // second poll — still queued
+
+    await act(async () => { await jest.advanceTimersByTimeAsync(4000); });
+    expect(call).toBe(4); // poll observes the run settled to completed
+
+    const callsAtSettle = call;
+    await act(async () => { await jest.advanceTimersByTimeAsync(8000); });
+    expect(call).toBe(callsAtSettle); // no further polling once settled
+  });
+
+  test('a poll response cannot clobber state after a user action (stale-generation guard)', async () => {
+    jest.useFakeTimers();
+    let getCall = 0;
+    let resolveStalePoll;
+    const stalePollPromise = new Promise((resolve) => { resolveStalePoll = resolve; });
+    global.fetch = jest.fn((url, options) => {
+      if (options?.method === 'POST') return Promise.resolve(response({ control: { stopRequested: true, reason: null } }));
+      getCall += 1;
+      if (getCall === 1) return Promise.resolve(response(pageResponse({ runs: [{ id: 'run-1', status: 'running', entries: [] }] })));
+      if (getCall === 2) return stalePollPromise; // the poll fired by the interval — held pending until resolved below, AFTER the action's own load() below
+      // load() triggered by the user's operator-stop action: arrives after the poll started, but resolves first.
+      return Promise.resolve(response(pageResponse({
+        runs: [{ id: 'run-1', status: 'completed', entries: [{ id: 'entry-done', requestNumber: '999', status: 'completed', seats: [] }] }],
+        control: { stopRequested: true, reason: null },
+      })));
+    });
+    render(<ReviewPanelWorkspace />);
+    await act(async () => { await Promise.resolve(); }); // flush the initial load (getCall === 1)
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Progress' })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: 'Progress' }));
+
+    // Advance to fire the poll — it's held pending by stalePollPromise (getCall === 2).
+    await act(async () => { await jest.advanceTimersByTimeAsync(4000); });
+
+    // While that poll is still in flight, the user takes an action: operator-stop
+    // POSTs, then calls load() — which bumps requestSeq and resolves (getCall === 3)
+    // BEFORE the stale poll below is ever resolved.
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /Operator stop|Resume/i }));
+      await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+    });
+    await waitFor(() => expect(screen.getByText(/#999/)).toBeInTheDocument());
+
+    // NOW resolve the stale poll with OLDER data — it must be dropped, not applied on top.
+    await act(async () => {
+      resolveStalePoll(response(pageResponse({ runs: [{ id: 'run-1', status: 'running', entries: [{ id: 'stale-entry', requestNumber: '111', status: 'running', seats: [] }] }] })));
+      await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+    });
+    expect(screen.getByText(/#999/)).toBeInTheDocument();
+    expect(screen.queryByText(/#111/)).not.toBeInTheDocument();
+  });
+});
+
+describe('Progress tab waiting copy — the worker materializes entries on claim, so a fresh run has none yet', () => {
+  test('queued with no entries: waiting-for-worker copy', async () => {
+    global.fetch = jest.fn().mockResolvedValue(response(pageResponse({ runs: [{ id: 'run-1', status: 'queued', entries: [] }] })));
+    render(<ReviewPanelWorkspace />);
+    await waitFor(() => expect(screen.getByText(/Waiting for the worker to pick up the run \(runs every minute\)\./)).toBeInTheDocument());
+  });
+
+  test('running with no entries yet: preparing-requests copy', async () => {
+    global.fetch = jest.fn().mockResolvedValue(response(pageResponse({ runs: [{ id: 'run-1', status: 'running', entries: [] }] })));
+    render(<ReviewPanelWorkspace />);
+    await waitFor(() => expect(screen.getByText('Preparing requests…')).toBeInTheDocument());
+  });
+
+  test('once entries exist, the waiting copy is gone', async () => {
+    global.fetch = jest.fn().mockResolvedValue(response(pageResponse({
+      runs: [{ id: 'run-1', status: 'running', entries: [{ id: 'entry-1', requestNumber: '101', status: 'running', seats: [] }] }],
+    })));
+    render(<ReviewPanelWorkspace />);
+    await waitFor(() => expect(screen.getByText(/#101/)).toBeInTheDocument());
+    expect(screen.queryByText(/Preparing requests/)).not.toBeInTheDocument();
+  });
+});
+
+describe('per-seat pills in the Progress tab', () => {
+  test('renders label · model · state, cost as $0.16 when known, "cost unknown" when unknown, "pending" for a seat with no attempt, and the failed seat\'s error text', async () => {
+    global.fetch = jest.fn().mockResolvedValue(response(pageResponse({
+      runs: [{
+        id: 'run-1',
+        status: 'failed',
+        entries: [{
+          id: 'entry-1',
+          requestNumber: '101',
+          status: 'failed',
+          seats: [
+            { seatKey: 'seat.claude', label: 'Claude reviewer', provider: 'anthropic', model: 'claude-fable-5-1', state: 'completed', costCents: 16, costState: 'known', error: null },
+            { seatKey: 'seat.openai', label: 'OpenAI reviewer', provider: 'openai', model: 'gpt-5.6-sol', state: 'failed', costCents: null, costState: 'unknown', error: 'The OpenAI reviewer declined to review this proposal (the model returned a refusal); no review was produced.' },
+            { seatKey: 'chair', label: 'Chair', provider: null, model: null, state: 'pending', costCents: null, costState: null, error: null },
+          ],
+        }],
+      }],
+    })));
+    render(<ReviewPanelWorkspace />);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Progress' })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: 'Progress' }));
+    await waitFor(() => expect(screen.getByText(/#101/)).toBeInTheDocument());
+
+    expect(screen.getByText('Claude reviewer · claude-fable-5-1 · completed · $0.16')).toBeInTheDocument();
+    expect(screen.getByText('OpenAI reviewer · gpt-5.6-sol · failed · cost unknown')).toBeInTheDocument();
+    expect(screen.getByText('Chair · pending')).toBeInTheDocument();
+    expect(screen.getByText(/declined to review this proposal/)).toBeInTheDocument();
+  });
+});
+
 test('the default export wraps the workspace in RequireAuth without crashing', async () => {
   global.fetch = jest.fn().mockResolvedValue(response(pageResponse()));
   render(<ReviewPanelPage />);
