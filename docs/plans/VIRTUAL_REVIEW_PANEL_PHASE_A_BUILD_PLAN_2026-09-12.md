@@ -158,27 +158,39 @@ precedence rule. **No Executor option is added for this.** The seat model must s
 **A0.4 Usage survives failure; the attempt ledger is the cost authority.** Today a parse or schema
 failure after a paid response throws with only `runId` attached (`execute-prompt.js:295-313`), so a
 wrapper logs zero tokens for a paid call. A0 attaches `err.usage` (the same snake_case shape as the
-success result), `err.modelUsed`, and `err.provider` to every error thrown after a provider response
-was received, and `err.paidCall = true|false|null` (null = ambiguous: aborted after dispatch with no
-response). The Executor still does not write `api_usage_log` (`:567-573`, driver-owned).
+success result), `err.modelUsed`, `err.provider`, and `err.usageComplete` to every error thrown after
+a provider response was received, and `err.paidCall = true|false|null` (null = ambiguous: aborted
+after dispatch with no response). **`usageComplete` is propagated unchanged end to end:** set by each
+client from the raw provider fields (`normalizeUnaryResponse` gains it as an additive field beside
+the zero-substituted tokens, `llm-client.js:436-448`), carried through `callClaude`'s reshape
+(`execute-prompt.js:626-644`) into the success result's `usage`/`meta` (`:287-294`) and onto the
+error, so the panel's finaliser never infers completeness from normalised tokens. Tests at the
+Executor boundary: missing and malformed provider usage on success and on post-response failure both
+yield `usageComplete: false`. The Executor still does not write `api_usage_log` (`:567-573`, driver-owned).
 **`api_usage_log` cannot be the D6 source**: `logUsage` coerces absent tokens to zero and inserts
 fire-and-forget with a swallowed catch (`lib/utils/usage-logger.js:60-92`), and the table has no
 cost-known or attempt-correlation column (`scripts/setup-database.js:265-282`). The panel therefore
 records usage **on its own `review_panel_seat_attempts` row, in an awaited write, before the attempt
 is marked terminal** (A.5): `input_tokens`, `output_tokens`, `model`, `provider`, `cost_usd`, and
 `cost_state ∈ {known, unknown}`. **`known` requires all of:** `paidCall === true`; the provider
-response carried explicit usage (both clients expose `usageComplete: boolean`, true only when the
-provider's input and output token fields were **present, finite, and non-negative** in the raw
+response carried explicit usage (the Executor result or error carries `usageComplete: true`, which both clients set only when
+the provider's input and output token fields were **present, finite, and non-negative** in the raw
 response, because `normalizeUnaryResponse` otherwise substitutes zero, `llm-client.js:436-448`); and
 `lookupPricing(model)` resolves. Anything else is `unknown`, including a well-formed response with
 absent usage fields. Test fixtures: missing `usage`, malformed token fields, unpriced model.
-**Central monitoring sees unknowns.** The daily spend alert (`pages/api/cron/spend-check.js:65-88`)
-and admin stats (`pages/api/admin/stats.js:45-159`) sum `api_usage_log`, which cannot represent an
-unknown; so (a) `logUsage` is still called best-effort after the ledger write for every `known`
-attempt, and (b) `spend-check` gains a second query counting `review_panel_seat_attempts` rows with
-`cost_state = 'unknown'` in the window and raises the same `spend_threshold`-class alert with an
-explicit "N panel calls with unknown cost" message whenever the count is non-zero; admin stats show
-the unknown count beside the panel's total. D6 actuals are computed from the ledger; the page and the
+**Central monitoring reads the ledger for the panel.** The daily spend alert
+(`pages/api/cron/spend-check.js:65-88`) and admin stats (`pages/api/admin/stats.js:45-159`) sum
+`api_usage_log`, which is populated fire-and-forget with swallowed failures
+(`lib/utils/usage-logger.js:60-89`) and cannot represent an unknown. **The panel does not write
+`api_usage_log` at all**, so no double counting and no silent omission is possible. Both consumers
+gain a second query over `review_panel_seat_attempts` in the same window: `SUM(cost_usd) WHERE
+cost_state = 'known'` is added to the dollar total, and `COUNT(*) WHERE cost_state = 'unknown'` is
+reported beside it. `spend-check` raises its `spend_threshold`-class alert when the combined total
+crosses the threshold **or** the unknown count is non-zero, with an explicit "N panel calls with
+unknown cost" message. The admin Usage panel (`pages/admin.js:983-989`, `1039-1067`, fixed
+`total_cost_cents`/`total_requests` fields) shows the panel's known spend and unknown count as two
+additional fields. Tests: a ledger write followed by any downstream failure still yields correct
+totals; an unknown attempt trips the alert with zero dollars. D6 actuals are computed from the ledger; the page and the
 report **refuse to print a run total while any attempt in the run has `cost_state = 'unknown'`** and
 show the unknown count instead. The dossier wrapper
 (`cycle-dossier-generation.js` loggedExecute) can adopt `err.usage` later. Tests: invalid JSON, schema
@@ -279,9 +291,13 @@ change mid-run cannot shift anything. **Per seat, not per entry:** each paid cal
 retry creation) require the **current run lease**, exactly as the dossier worker fences its mutations
 (`cycle-dossier-worker.js:94-100`). (2) Attempt finalisation is a single **compare-and-set on the attempt's
 own `dispatch_token` that also requires `dispatch_expires_at > now()`** (the attempt records the
-run-lease expiry in force when it was dispatched): `UPDATE … SET state = completed|failed, result,
-usage WHERE id = $1 AND dispatch_token = $2 AND state = 'dispatched' AND dispatch_expires_at > now()`.
-If that CAS matches zero rows the finaliser runs the **late path**: `UPDATE … SET state =
+run-lease expiry in force when it was dispatched): in one transaction: `SELECT … FOR UPDATE` on
+the attempt row first, then the expiry decision on **`clock_timestamp()`**, not `now()`, because
+`now()` is frozen at transaction start and the cloned store runs awaited work inside open
+transactions (`cycle-dossier-store.js:28-38`), so a finaliser that began before expiry could
+otherwise pass the check after it. Then `UPDATE … SET state = completed|failed, result, usage WHERE
+id = $1 AND dispatch_token = $2 AND state = 'dispatched' AND dispatch_expires_at > clock_timestamp()`.
+If that CAS matches zero rows the finaliser runs the **late path** under the same row lock: `UPDATE … SET state =
 CASE WHEN state = 'dispatched' THEN 'unknown_outcome' ELSE state END, late_result_json, late_usage
 WHERE id = $1 AND dispatch_token = $2`, so a finaliser that arrives after its lease expired, whether
 before or after the reaper, can only land metadata and never `completed`. The reaper (current-lease
@@ -290,9 +306,10 @@ are **never retried automatically**. The two updates are the only writers of att
 current lease, the entry picks the single `completed` attempt per seat with the highest `attempt_no`
 and records `winner_attempt_id` on the entry; only winners feed the chair. Seats run with
 `Promise.allSettled`; the entry completes only when every configured seat has a winner, then the chair
-runs as its own attempt row. Tests, both orderings: finaliser-after-expiry-before-reaper lands `unknown_outcome` + late usage,
-never `completed`; reaper-then-finaliser leaves `unknown_outcome` and appends usage; finaliser
-within lease completes; old worker after a manual replacement attempt does not displace the winner;
+runs as its own attempt row. Tests: finaliser-after-expiry-before-reaper lands `unknown_outcome` + late usage, never
+`completed`; reaper-then-finaliser leaves `unknown_outcome` and appends usage; **a finaliser
+transaction that begins before expiry and reaches the UPDATE after expiry lands `unknown_outcome`**;
+finaliser within lease completes; old worker after a manual replacement attempt does not displace the winner;
 chair never dispatches twice for one entry. **Partial-seat policy:** any failed
 seat fails the entry; "Retry failed entries" creates new attempts only for seats without a `completed`
 attempt and re-runs the chair. Each call uses `promptSnapshot`, `requireNoPersistence`, `deadlineMs`,
@@ -351,8 +368,13 @@ and Phase C (panel-vs-human comparison, history views, third seat) follow the su
 
 ## 8. Open items carried into implementation
 
-- Chair input size: N full seat reviews plus narrative may be large for the chair; decide whether
-  the chair receives the narrative or only the reviews.
+- **D9 chair input contract `[OPEN — owner]`:** (a) reviews only, the chair synthesises the N seat
+  reviews without the narrative (smaller context, cheaper, and the chair cannot re-review the
+  proposal), or (b) reviews plus the narrative (the chair can arbitrate factual disagreements against
+  the source at roughly 2× chair input). The choice fixes the chair prompt's variables, A7
+  declarations, context cap, budget envelope, and cost profile.
+- **D10 default OpenAI seat model `[OPEN — owner]`:** the concrete model id to seed as
+  `seat.openai.defaultModel`; its capability and pricing rows are then verified from OpenAI's docs.
 - OpenAI reasoning models: `max_completion_tokens` includes reasoning tokens; the capability row and
   budget envelope must reflect that. Verify `instructionRole` per model family from OpenAI's docs.
 - Old-page parity definition for D5 (not before Phase B).
@@ -384,3 +406,10 @@ and Phase C (panel-vs-human comparison, history views, third seat) follow the su
   orderings tested; A0.4 `usageComplete` predicate plus spend-check unknown-count alert and admin
   stats unknown count; D6 row and §6 name the ledger; D7/A.3/A.7 agree the report prints the fixed
   "Not assessed" line while the chair omits the key.
+- 2026-09-12 Codex adversarial review round 4 against `4e98ce02`: **no-ship** on three technical
+  findings (known panel spend could vanish if the duplicate `logUsage` insert failed; `usageComplete`
+  not propagated through the Executor; `now()` is transaction-stable so a straddling finaliser could
+  complete) plus one owner-decision finding. Addressed: A0.4 panel spend read from the ledger by
+  spend-check and admin stats, panel never writes `api_usage_log`; `usageComplete` on the Executor
+  result and error; A.5 row lock + `clock_timestamp()` with a straddle test. Raised to the owner as
+  D9 (chair input) and D10 (default OpenAI model).
