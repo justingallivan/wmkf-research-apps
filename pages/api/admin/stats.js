@@ -27,15 +27,16 @@ export default async function handler(req, res) {
     30;
 
   try {
-    const [summary, byUser, byApp, byDay, today] = await Promise.all([
+    const [summary, byUser, byApp, byDay, today, reviewPanel] = await Promise.all([
       getSummary(days),
       getByUser(days),
       getByApp(days),
       getByDay(days),
       getToday(),
+      getReviewPanel(days),
     ]);
 
-    return res.json({ period, days, summary, byUser, byApp, byDay, today });
+    return res.json({ period, days, summary, byUser, byApp, byDay, today, reviewPanel });
   } catch (error) {
     console.error('Admin stats error:', error);
     return res.status(500).json({ error: 'Failed to fetch usage stats' });
@@ -157,5 +158,29 @@ async function getByDay(days) {
     ORDER BY day ASC
   `;
   return result.rows;
+}
+
+// The Virtual Review Panel Phase A foundation never writes api_usage_log
+// (docs/plans/VIRTUAL_REVIEW_PANEL_PHASE_A_BUILD_PLAN_2026-09-12.md §5 A.5) —
+// its own per-seat/chair ledger (review_panel_seat_attempts) is surfaced here
+// as an additive block. knownCostCents sums only cost_state='known' rows
+// (mirrors review-panel-store.js's sumAttemptCosts); byState never folds an
+// unknown-outcome attempt's cost into a total. The admin UI must render
+// "withheld" rather than a number whenever unknownCount > 0 — see the admin
+// page's rendering of this block.
+async function getReviewPanel(days) {
+  const result = await sql`
+    SELECT
+      state,
+      COUNT(*)::int AS attempt_count,
+      COALESCE(SUM(cost_cents) FILTER (WHERE cost_state = 'known'), 0)::numeric AS known_cost_cents
+    FROM review_panel_seat_attempts
+    WHERE created_at >= NOW() - MAKE_INTERVAL(days => ${days})
+    GROUP BY state
+  `;
+  const byState = result.rows.map((row) => ({ state: row.state, attemptCount: row.attempt_count, knownCostCents: Number(row.known_cost_cents) }));
+  const knownCostCents = byState.reduce((sum, row) => sum + row.knownCostCents, 0);
+  const unknownCount = byState.find((row) => row.state === 'unknown_outcome')?.attemptCount || 0;
+  return { knownCostCents, unknownCount, byState };
 }
 

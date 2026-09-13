@@ -69,21 +69,42 @@ async function checkDailyThreshold() {
     WHERE created_at::date = CURRENT_DATE
   `;
   const { total_cost_cents, request_count } = result.rows[0];
-  const spentCents = Number(total_cost_cents);
+
+  // The Virtual Review Panel Phase A foundation never writes api_usage_log
+  // (docs/plans/VIRTUAL_REVIEW_PANEL_PHASE_A_BUILD_PLAN_2026-09-12.md §5 A.5)
+  // — its own per-seat/chair ledger (review_panel_seat_attempts) is added
+  // here so the daily sum still reflects panel spend. Same day window as
+  // api_usage_log above (created_at::date = CURRENT_DATE). Only cost_state=
+  // 'known' rows are ever summed (matches review-panel-store.js's own
+  // sumAttemptCosts semantics); 'unknown'-outcome attempts are counted
+  // separately and NEVER folded into the total, since their true cost is
+  // unknowable.
+  const panelResult = await sql`
+    SELECT COALESCE(SUM(cost_cents) FILTER (WHERE cost_state = 'known'), 0)::numeric AS panel_known_cost_cents,
+           COUNT(*) FILTER (WHERE cost_state = 'unknown')::int AS panel_unknown_count
+    FROM review_panel_seat_attempts
+    WHERE created_at::date = CURRENT_DATE
+  `;
+  const panelKnownCents = Number(panelResult.rows[0].panel_known_cost_cents);
+  const panelUnknownCount = Number(panelResult.rows[0].panel_unknown_count);
+  const spentCents = Number(total_cost_cents) + panelKnownCents;
 
   if (spentCents > thresholdCents) {
+    const incompleteNote = panelUnknownCount > 0
+      ? ` Note: the review panel total is incomplete — ${panelUnknownCount} attempt(s) today have an unknown outcome and are not counted.`
+      : '';
     await AlertService.createAlert({
       type: 'spend_threshold',
       severity: 'warning',
       title: `Today's AI spend exceeded $${(thresholdCents / 100).toFixed(2)}`,
-      message: `Current spend: $${(spentCents / 100).toFixed(2)} across ${request_count} requests. Threshold: $${(thresholdCents / 100).toFixed(2)} (DAILY_SPEND_ALERT_CENTS).`,
-      metadata: { spentCents, thresholdCents, requestCount: request_count },
+      message: `Current spend: $${(spentCents / 100).toFixed(2)} across ${request_count} requests (includes $${(panelKnownCents / 100).toFixed(2)} of known review panel cost). Threshold: $${(thresholdCents / 100).toFixed(2)} (DAILY_SPEND_ALERT_CENTS).${incompleteNote}`,
+      metadata: { spentCents, thresholdCents, requestCount: request_count, panelKnownCents, panelUnknownCount },
       source: 'cron/spend-check',
       autoResolveKey: DAILY_ALERT_KEY,
     });
-    return { status: 'alerting', spentCents, thresholdCents, requestCount: request_count };
+    return { status: 'alerting', spentCents, thresholdCents, requestCount: request_count, panelKnownCents, panelUnknownCount };
   }
 
   await AlertService.autoResolve(DAILY_ALERT_KEY);
-  return { status: 'ok', spentCents, thresholdCents, requestCount: request_count };
+  return { status: 'ok', spentCents, thresholdCents, requestCount: request_count, panelKnownCents, panelUnknownCount };
 }
