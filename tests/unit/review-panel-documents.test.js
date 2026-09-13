@@ -67,6 +67,26 @@ test('cost section withholds the total (and prints no dollar figure) when unknow
   expect(text).not.toContain('$123.45');
 });
 
+test('a chair consensus/seat answer with WinAnsi-incompatible characters (arrows, comparison operators, em dash, curly quotes, Greek) renders both editions without throwing', async () => {
+  const report = {
+    ...BASE_REPORT,
+    chair: {
+      ...BASE_REPORT.chair,
+      consensus: ['Funding tier → higher band', 'Risk ≥ threshold — proceed with “conditions”'],
+    },
+    seats: [
+      { ...BASE_REPORT.seats[0], answers: { ...BASE_REPORT.seats[0].answers, significance: 'Effect size α is large; risk ≥ baseline.' } },
+      BASE_REPORT.seats[1],
+    ],
+  };
+
+  const result = await renderReviewPanelEntryDocuments(report);
+  expect(Buffer.isBuffer(result.pdf)).toBe(true);
+  expect(Buffer.isBuffer(result.docx)).toBe(true);
+  const text = await docxText(result.docx);
+  expect(text).toContain('Funding tier');
+});
+
 describe('formats option — selective rendering (review-panel-worker.js skips a format already saved on the entry)', () => {
   test('formats: ["pdf"] renders only the PDF, leaving docx/docxSha256 null', async () => {
     const result = await renderReviewPanelEntryDocuments(BASE_REPORT, { formats: ['pdf'] });
