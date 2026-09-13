@@ -117,5 +117,84 @@ already configurable; the Cycle Dossier; anything that needs a migration or a ne
 
 ## Handoff (Codex writes this)
 
-_(commits, what was converted, what was surveyed-and-left with reasons, tests/gates run, anything
-outside the owned surface that needs Claude.)_
+### 2026-09-12 — implementation on feature branch
+
+The first pass stopped at the automatic claim-before-send conflict and recorded it in commit
+`0d73bf2a`. The owner then approved §3's narrow sweep/test extension and specified that
+`{{uploadLink}}` means the server-minted contributor URL and `{{signature}}` means the sending
+PC's signature. No other file-surface expansion was authorized.
+
+Commit `e578d6f2` adds four catalog/seed keys, reads them through
+`readRequiredEmailDefaults`, and renders the invitation and reminder subjects/bodies from
+the stored text. The seed bodies reproduce the prior wording; the list tokens remain
+server-built. The HTML renderer still owns the button and fallback link, and escapes an
+optional `{{uploadLink}}` in edited body copy. The PC signature uses the sending systemuser's
+saved email-signature preference, falling back to the PC's name and Foundation line.
+Both manual and automatic reminders prepare defaults/link/signature before the unchanged
+conditional claim, so a configuration error leaves the row retryable. An invitation failure
+leaves the existing collection without a new email receipt, as before.
+
+The internal daily summary (`scheduled-email-service.js`) and ops alert
+(`notification-service.js`) remain hard-coded by the owner's §2 rule. The unimported legacy
+`DEFAULT_TEMPLATE` in `email-generator.js` remains a separate cleanup item.
+
+Validation: 14 site-visit/catalog/seed suites (112 tests), two Admin email-defaults suites
+(19 tests), `check:types`, changed-file ESLint, and `git diff --check` passed. The production
+`npm run build` passed with one path-tracing warning in the untouched Pre-Site DOCX renderer. Post-edit
+`check:doc-currency`, `check:prompt-injection-tagging`, `check:fact-consistency`,
+`check:build-claim-freshness`, `check:dataverse-access-layer`, `check:dynamics-context-boundary`,
+`check:route-service-boundary`, and `check:atlas` passed with their self-tests; `check:docs-catalog`
+passed. The full 67-command `/start` gate set passed before implementation. At this
+implementation handoff, the new settings had not yet been written to Dataverse; the
+production seed receipt below supersedes that state. The branch was not merged or deployed.
+
+Outside the owned surface, `docs/API_ROUTE_SECURITY_MATRIX.md`'s materials route descriptions
+do not yet name the settings reads, and
+`.claude-memory/project-site-visit-materials-planning-handoff.md` retains an older claim that
+the PC manual reminder has no claim (already stale before this work). Claude should reconcile
+those durable restatements with the branch on promotion.
+
+### 2026-09-12 — Opus review fixes on the same branch
+
+The invitation body now requires `{{checklist}}` and the reminder body requires
+`{{missingItems}}` on Admin saves, so an edited template cannot silently omit the
+server-built item list. A retry of an invitation with missing/blank settings
+returns the actionable 503 instead of a generic transport 502; a transport
+failure still leaves the collection retryable and reports 502. Invite and
+manual reminder reject an unlinked staff actor with the same 403 as create,
+before any context read or reminder claim. The automatic sweep reads the two
+reminder defaults at most once per run, before any claim, while handling failures for
+each eligible row. Its dry-run eligibility count is explicitly provisional:
+dry runs skip settings resolution because that read can notify operations.
+
+The focused site-visit, catalog, seed, and Admin suites now pass (16 suites,
+135 tests); types, changed-file lint, and diff check pass. At this review-fix
+handoff, the four settings were still unseeded; see the later receipt below.
+The branch remains unmerged and undeployed.
+
+### 2026-09-12 PT / 2026-09-13 UTC — production Dataverse seed receipt
+
+The local checkout targeted `wmkf.crm.dynamics.com` with
+`DATAVERSE_TARGET_INTERLOCK=on` and no sandbox URL. A read-only dry run of
+`node scripts/seed-email-defaults.mjs` found exactly four missing keys and
+25 existing non-empty email defaults. The owner-authorized `--execute` run
+used a single-invocation, UTC-dated `DATAVERSE_PROD_WRITE_ACK`; it created
+`email.site_visit_materials_invite.subject`, `.body`,
+`email.site_visit_materials_reminder.subject`, and `.body`, while skipping
+the 25 existing values. A separate `getSettingStrict` readback found all
+four rows and compared each value byte-for-byte with the tracked seed text;
+all four matched. No email was sent. The feature branch remains unmerged and
+undeployed, so this receipt establishes stored copy, not production runtime.
+
+### 2026-09-12 — Claude promotion preparation (read-only review, no runtime change)
+
+Independent verification on the worktree at `ed1b4e51`: clean tree, branch pushed, five commits
+ahead of `origin/main`, zero merge conflicts against `origin/main`; 16 suites / 135 tests, `check:types`,
+changed-file ESLint, and `git diff --check` pass. Reviewed the runtime diff: settings, link, and
+signature resolve before either reminder claim; a sweep prepare failure lands in the row's `errors`
+entry with the row unclaimed; `requiredPlaceholders` is enforced by the existing Admin save route
+on `main`; every new dependency export exists. Reconciled the two restatements named above on this
+branch: the security-matrix rows for the cron sweep and the meeting-tracker materials route now name
+the settings reads, and the memory handoff no longer claims the manual reminder has no claim (it has
+claimed since S507, `90641978`). Vercel preview deployments for the branch are Ready. No PR exists
+yet. Still unmerged and undeployed.
