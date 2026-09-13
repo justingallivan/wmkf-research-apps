@@ -30,6 +30,7 @@ const CONFIG = {
     'seat.openai': { seatKey: 'seat.openai', provider: 'openai', model: 'gpt-5.6-sol', promptSnapshot: {} },
   },
   chair: { seatKey: 'chair', provider: 'anthropic', model: 'claude-opus-5', promptSnapshot: {} },
+  projectedQuestionSet: [{ key: 'priorWork', label: 'Prior work', type: 'richtext', order: 1 }],
 };
 const RUN = { id: 'run-1', owner_profile_id: 42, lease_token: 'lease-1', locked_until: new Date(Date.now() + 280000).toISOString(), data: { config: CONFIG } };
 
@@ -104,6 +105,14 @@ test('happy path: both seats run, winners selected, chair runs once, entry compl
     pdf: { pathname: 'review-panel/fixture', sha256: 'a'.repeat(64), size: 4 },
   });
   expect(storeReviewPanelFile).toHaveBeenCalledTimes(2);
+});
+
+test('the report passed to renderReviewPanelEntryDocuments carries the pinned question set and seat display labels, so the document renderer never falls back to raw JSON keys', async () => {
+  store.listReviewPanelEntries.mockResolvedValue([entryState]);
+  await drainReviewPanels();
+  const [report] = renderReviewPanelEntryDocuments.mock.calls[0];
+  expect(report.questions).toEqual(CONFIG.projectedQuestionSet);
+  expect(report.seatLabels).toEqual({ 'seat.claude': 'Claude reviewer', 'seat.openai': 'OpenAI reviewer' });
 });
 
 test('the per-entry report cost is scoped to THIS entry (sumEntryAttemptCosts), never a run-wide sum — sibling entries in the same run must not affect this report\'s cost line', async () => {
