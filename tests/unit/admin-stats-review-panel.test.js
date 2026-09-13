@@ -37,7 +37,11 @@ test('the panel query text embeds the SAME unified unknown-cost predicate as rev
   await handler({ method: 'GET', query: {} }, res);
   expect(sql.query).toHaveBeenCalledTimes(1);
   const queryText = sql.query.mock.calls[0][0];
-  expect(queryText).toContain(ATTEMPT_COST_UNKNOWN_SQL);
+  // Assert the COMPLETE guarded SUM expression, not merely that the
+  // predicate string appears somewhere in the query (see the matching
+  // comment in spend-check-review-panel.test.js).
+  expect(queryText).toContain(`SUM(a.cost_cents) FILTER (WHERE NOT ${ATTEMPT_COST_UNKNOWN_SQL})`);
+  expect(queryText).toContain(`COUNT(*) FILTER (WHERE ${ATTEMPT_COST_UNKNOWN_SQL})`);
   expect(queryText).toMatch(/state\s*=\s*'unknown_outcome'/);
   expect(queryText).toMatch(/cost_state\s+IS\s+DISTINCT\s+FROM\s+'known'/i);
   expect(queryText).toContain('FROM review_panel_seat_attempts a');

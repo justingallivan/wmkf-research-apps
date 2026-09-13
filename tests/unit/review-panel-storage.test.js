@@ -39,16 +39,22 @@ function refFor(bytes, overrides = {}) {
   return { pathname: PATHNAME, sha256: reviewPanelDigest(bytes), size: bytes.length, contentType: 'application/octet-stream', ...overrides };
 }
 
+const STORE_ID = 'store_review-panel-fixture';
+
 beforeEach(() => {
   process.env.REVIEW_PANEL_BLOB_READ_WRITE_TOKEN = TOKEN;
+  process.env.REVIEW_PANEL_BLOB_STORE_ID = STORE_ID;
   delete process.env.BLOB_READ_WRITE_TOKEN;
   delete process.env.DOSSIER_BLOB_READ_WRITE_TOKEN;
+  delete process.env.INTAKE_BLOB_RW_TOKEN;
+  delete process.env.UPLOADS_BLOB_RW_TOKEN;
   get.mockReset();
   put.mockReset();
 });
 
 afterEach(() => {
   delete process.env.REVIEW_PANEL_BLOB_READ_WRITE_TOKEN;
+  delete process.env.REVIEW_PANEL_BLOB_STORE_ID;
 });
 
 describe('Review Panel private storage configuration', () => {
@@ -59,6 +65,26 @@ describe('Review Panel private storage configuration', () => {
     await expect(storeReviewPanelFile(PATHNAME, Buffer.from('bytes'), 'application/octet-stream')).rejects.toMatchObject({ httpStatus: 503 });
     expect(get).not.toHaveBeenCalled();
     expect(put).not.toHaveBeenCalled();
+  });
+
+  it('fails closed with a 503 when the token is set but the store id is absent or blank', () => {
+    delete process.env.REVIEW_PANEL_BLOB_STORE_ID;
+    expect(() => assertReviewPanelStorageConfigured()).toThrow(/private review panel document store has not been configured/i);
+    process.env.REVIEW_PANEL_BLOB_STORE_ID = '   '; // blank, not merely absent
+    expect(() => assertReviewPanelStorageConfigured()).toThrow(/private review panel document store has not been configured/i);
+  });
+
+  it.each(['DOSSIER_BLOB_READ_WRITE_TOKEN', 'BLOB_READ_WRITE_TOKEN', 'INTAKE_BLOB_RW_TOKEN', 'UPLOADS_BLOB_RW_TOKEN'])(
+    'refuses when the token is identical to %s (same string reused in two env vars)',
+    (otherVar) => {
+      process.env[otherVar] = TOKEN;
+      expect(() => assertReviewPanelStorageConfigured()).toThrow(/must not reuse another store's token/i);
+    },
+  );
+
+  it('does not derive or check the store id against the token bytes — an unrelated store id string is accepted', () => {
+    process.env.REVIEW_PANEL_BLOB_STORE_ID = 'store_totally-unrelated-fixture';
+    expect(() => assertReviewPanelStorageConfigured()).not.toThrow();
   });
 
   it('uses the dedicated REVIEW_PANEL_BLOB_READ_WRITE_TOKEN, never BLOB_READ_WRITE_TOKEN or DOSSIER_BLOB_READ_WRITE_TOKEN', async () => {

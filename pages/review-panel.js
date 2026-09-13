@@ -7,6 +7,16 @@ const EMPTY_ARRAY = [];
 function toId(value) { return value == null ? '' : String(value); }
 function asSet(values) { return new Set((Array.isArray(values) ? values : []).map(toId).filter(Boolean)); }
 
+/** The exact selection this idempotency key would authorize — order-independent, so re-deriving it never depends on Set iteration order. */
+export function launchSelectionSignature(selectedIds) {
+  return [...selectedIds].map(toId).sort().join(',');
+}
+
+function makeIdempotencyKey() {
+  if (typeof globalThis !== 'undefined' && globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+  return `review-panel-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
 /**
  * Pure derivation of the Launch button's disabled state and the reason shown
  * beside it. Mirrors the SAME conditions the server enforces (rollout
@@ -88,6 +98,7 @@ export function ReviewPanelWorkspace() {
   const [retrySelection, setRetrySelection] = useState(() => new Set());
   const mounted = useRef(true);
   const initialViewSet = useRef(false);
+  const launchKeyRef = useRef({ signature: '', key: '' });
 
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
 
@@ -140,16 +151,28 @@ export function ReviewPanelWorkspace() {
     return readResponse(response);
   };
 
+  // Mirrors pages/cycle-dossier.js's launchKeyRef: mint a fresh idempotency
+  // key ONLY when the selection changed since the last mint, or after a
+  // CONFIRMED success. A lost response (network error, or any thrown error —
+  // the request may have reached the server) keeps the same key, so a
+  // same-selection second click replays the SAME launch instead of starting
+  // a second paid run; the page then refreshes from GET before Launch is
+  // re-enabled, so a replay sees the run that already exists.
   const launch = async () => {
+    const signature = launchSelectionSignature(selectedIds);
+    if (launchKeyRef.current.signature !== signature) {
+      launchKeyRef.current = { signature, key: makeIdempotencyKey() };
+    }
     setActionLoading('launch');
     setLaunchError('');
     try {
-      const idempotencyKey = globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : `review-panel-${Date.now()}`;
-      await runAction({ action: 'launch', selectedRequestIds: [...selectedIds], idempotencyKey });
+      await runAction({ action: 'launch', selectedRequestIds: [...selectedIds], idempotencyKey: launchKeyRef.current.key });
+      launchKeyRef.current = { signature: '', key: '' }; // confirmed success: force a fresh key for any future launch
       setView('progress');
       await load();
     } catch (launchErr) {
       setLaunchError(launchErr.message);
+      await load(); // ambiguous/failed: refresh state from GET before Launch is re-enabled
     } finally {
       setActionLoading('');
     }

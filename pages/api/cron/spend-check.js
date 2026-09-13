@@ -94,16 +94,30 @@ async function checkDailyThreshold() {
   const panelUnknownCount = Number(panelResult.rows[0].panel_unknown_count);
   const spentCents = Number(total_cost_cents) + panelKnownCents;
 
-  if (spentCents > thresholdCents) {
+  const overThreshold = spentCents > thresholdCents;
+  // Alert on EITHER condition: an unresolved-cost review panel attempt is
+  // itself alert-worthy even when the (necessarily incomplete) known total
+  // stays under threshold — a silent gap in spend visibility is exactly what
+  // this cron exists to surface, not something to wait out until it happens
+  // to coincide with a threshold breach. Same DAILY_ALERT_KEY/autoResolveKey
+  // either way, so the existing dedupe/autoResolve semantics are unchanged:
+  // one alert row, auto-resolved only once BOTH conditions clear.
+  if (overThreshold || panelUnknownCount > 0) {
     const incompleteNote = panelUnknownCount > 0
-      ? ` Note: the review panel total is incomplete — ${panelUnknownCount} attempt(s) today have an unknown outcome and are not counted.`
+      ? `${panelUnknownCount} review panel attempt(s) have unknown cost; the daily total is incomplete. Known review panel cost today: $${(panelKnownCents / 100).toFixed(2)}.`
       : '';
+    const title = overThreshold
+      ? `Today's AI spend exceeded $${(thresholdCents / 100).toFixed(2)}`
+      : 'Review panel attempts have unknown cost today';
+    const message = overThreshold
+      ? `Current spend: $${(spentCents / 100).toFixed(2)} across ${request_count} requests (includes $${(panelKnownCents / 100).toFixed(2)} of known review panel cost). Threshold: $${(thresholdCents / 100).toFixed(2)} (DAILY_SPEND_ALERT_CENTS).${incompleteNote ? ` ${incompleteNote}` : ''}`
+      : incompleteNote;
     await AlertService.createAlert({
       type: 'spend_threshold',
       severity: 'warning',
-      title: `Today's AI spend exceeded $${(thresholdCents / 100).toFixed(2)}`,
-      message: `Current spend: $${(spentCents / 100).toFixed(2)} across ${request_count} requests (includes $${(panelKnownCents / 100).toFixed(2)} of known review panel cost). Threshold: $${(thresholdCents / 100).toFixed(2)} (DAILY_SPEND_ALERT_CENTS).${incompleteNote}`,
-      metadata: { spentCents, thresholdCents, requestCount: request_count, panelKnownCents, panelUnknownCount },
+      title,
+      message,
+      metadata: { spentCents, thresholdCents, requestCount: request_count, panelKnownCents, panelUnknownCount, overThreshold },
       source: 'cron/spend-check',
       autoResolveKey: DAILY_ALERT_KEY,
     });

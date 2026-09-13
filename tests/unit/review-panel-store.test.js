@@ -5,7 +5,7 @@ import {
   createAttempt, markAttemptDispatched, finalizeAttempt, reapExpiredAttempts,
   selectWinners, sumAttemptCosts, sumEntryAttemptCosts, createReviewPanelEntry, mutateReviewPanelEntry,
   claimReviewPanelRun, requestReviewPanelRetry, listRetryRequestedEntries, requestReviewPanelCancel,
-  ATTEMPT_COST_UNKNOWN_SQL, isAttemptCostUnknown,
+  ATTEMPT_COST_UNKNOWN_SQL, isAttemptCostUnknown, stopRevokedReviewPanelRun,
 } from '../../lib/services/review-panel-store';
 
 let client;
@@ -474,5 +474,19 @@ describe('requestReviewPanelCancel', () => {
       return { rows: [] };
     });
     await expect(requestReviewPanelCancel('run-1', 7)).rejects.toMatchObject({ httpStatus: 409 });
+  });
+});
+
+describe('stopRevokedReviewPanelRun', () => {
+  test('fails the run and clears the lease WITHOUT calling assertReviewPanelActor — that check is exactly what just failed', async () => {
+    sql.query.mockResolvedValue({ rows: [] });
+    await stopRevokedReviewPanelRun('run-1', 'lease-1', 'The run owner no longer has superuser access; no further model calls were made.');
+    expect(sql.query).toHaveBeenCalledTimes(1);
+    const [text, params] = sql.query.mock.calls[0];
+    expect(text).toContain("status='failed'");
+    expect(text).toContain('lease_token=NULL');
+    expect(text).toContain('locked_until=NULL');
+    expect(text).toContain('WHERE id=$1 AND lease_token=$2');
+    expect(params).toEqual(['run-1', 'lease-1', 'The run owner no longer has superuser access; no further model calls were made.']);
   });
 });

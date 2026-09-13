@@ -47,21 +47,42 @@ test('the panel query text embeds the SAME unified unknown-cost predicate as rev
   await handler({ method: 'GET' }, res);
   expect(sql.query).toHaveBeenCalledTimes(1);
   const queryText = sql.query.mock.calls[0][0];
-  expect(queryText).toContain(ATTEMPT_COST_UNKNOWN_SQL);
+  // Assert the COMPLETE guarded SUM expression, not merely that the
+  // predicate string appears SOMEWHERE in the query — a query that kept the
+  // predicate in COUNT but dropped `NOT ${ATTEMPT_COST_UNKNOWN_SQL}` from
+  // SUM's own FILTER (folding an unknown-cost attempt's cost into the total)
+  // would still pass a bare `toContain(ATTEMPT_COST_UNKNOWN_SQL)` check.
+  expect(queryText).toContain(`SUM(a.cost_cents) FILTER (WHERE NOT ${ATTEMPT_COST_UNKNOWN_SQL})`);
+  expect(queryText).toContain(`COUNT(*) FILTER (WHERE ${ATTEMPT_COST_UNKNOWN_SQL})`);
   expect(queryText).toMatch(/state\s*=\s*'unknown_outcome'/);
   expect(queryText).toMatch(/cost_state\s+IS\s+DISTINCT\s+FROM\s+'known'/i);
   expect(queryText).toContain('FROM review_panel_seat_attempts a');
 });
 
-test('folds known review panel cost into the daily total and counts unknown-outcome attempts separately, without alerting under threshold', async () => {
+test('folds known review panel cost into the daily total; no unknown attempts and under threshold means no alert at all', async () => {
+  mockQueries({ usageRow: { total_cost_cents: '100', request_count: 2 }, panelRow: { panel_known_cost_cents: '50', panel_unknown_count: 0 } });
+  const res = response();
+  await handler({ method: 'GET' }, res);
+  expect(res.body.dailyThreshold).toMatchObject({ status: 'ok', spentCents: 150, panelKnownCents: 50, panelUnknownCount: 0 });
+  expect(AlertService.createAlert).not.toHaveBeenCalled();
+  expect(AlertService.autoResolve).toHaveBeenCalled();
+});
+
+test('threshold NOT exceeded but a review panel attempt has unknown cost: an alert is still raised (not autoResolved) naming the count and the known total', async () => {
   mockQueries({ usageRow: { total_cost_cents: '100', request_count: 2 }, panelRow: { panel_known_cost_cents: '50', panel_unknown_count: 1 } });
   const res = response();
   await handler({ method: 'GET' }, res);
-  expect(res.body.dailyThreshold).toMatchObject({ status: 'ok', spentCents: 150, panelKnownCents: 50, panelUnknownCount: 1 });
-  expect(AlertService.createAlert).not.toHaveBeenCalled();
+  expect(res.body.dailyThreshold).toMatchObject({ status: 'alerting', spentCents: 150, panelKnownCents: 50, panelUnknownCount: 1 });
+  expect(AlertService.createAlert).toHaveBeenCalledTimes(1);
+  expect(AlertService.autoResolve).not.toHaveBeenCalled();
+  const alertCall = AlertService.createAlert.mock.calls[0][0];
+  expect(alertCall.message).toMatch(/1 review panel attempt\(s\) have unknown cost; the daily total is incomplete/i);
+  expect(alertCall.message).toMatch(/\$0\.50/); // the known total is still named
+  expect(alertCall.autoResolveKey).toBe('spend:daily-threshold'); // same dedupe key as the threshold-exceeded path
+  expect(alertCall.metadata).toMatchObject({ overThreshold: false, panelKnownCents: 50, panelUnknownCount: 1 });
 });
 
-test('an alert triggered by the combined total names the withheld/unknown attempt count in its message — proving the note is present, not just the count', async () => {
+test('an alert triggered by the combined total names the unknown attempt count in its message — proving the note is present, not just the count', async () => {
   process.env.DAILY_SPEND_ALERT_CENTS = '100';
   mockQueries({ usageRow: { total_cost_cents: '60', request_count: 3 }, panelRow: { panel_known_cost_cents: '50', panel_unknown_count: 2 } });
   const res = response();
@@ -70,8 +91,8 @@ test('an alert triggered by the combined total names the withheld/unknown attemp
   expect(res.body.dailyThreshold.spentCents).toBe(110);
   const alertCall = AlertService.createAlert.mock.calls[0][0];
   expect(alertCall.message).toMatch(/incomplete/i);
-  expect(alertCall.message).toMatch(/2 attempt\(s\)/);
-  expect(alertCall.metadata).toMatchObject({ panelKnownCents: 50, panelUnknownCount: 2 });
+  expect(alertCall.message).toMatch(/2 review panel attempt\(s\)/);
+  expect(alertCall.metadata).toMatchObject({ panelKnownCents: 50, panelUnknownCount: 2, overThreshold: true });
 });
 
 test('never folds an unknown-outcome attempt cost into the total (fixture has a nonzero known total to prove suppression, not absence)', async () => {

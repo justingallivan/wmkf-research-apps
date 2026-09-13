@@ -12,13 +12,14 @@ jest.mock('../../lib/services/review-panel-documents', () => ({
 }));
 jest.mock('../../lib/services/review-panel-storage', () => ({
   storeReviewPanelFile: jest.fn().mockResolvedValue({ pathname: 'review-panel/fixture', sha256: 'a'.repeat(64), size: 4 }),
+  assertReviewPanelStorageConfigured: jest.fn(),
 }));
 
 import * as store from '../../lib/services/review-panel-store';
 import { runSeat, runChair } from '../../lib/services/review-panel-generation';
 import { assertReviewPanelWorkerOpen } from '../../lib/services/review-panel-rollout';
 import { renderReviewPanelEntryDocuments } from '../../lib/services/review-panel-documents';
-import { storeReviewPanelFile } from '../../lib/services/review-panel-storage';
+import { storeReviewPanelFile, assertReviewPanelStorageConfigured } from '../../lib/services/review-panel-storage';
 import { drainReviewPanels, retryFailedEntries, describeEntryFailure } from '../../lib/services/review-panel-worker';
 
 store.reviewPanelError = jest.fn((message, httpStatus = 409) => Object.assign(new Error(message), { httpStatus }));
@@ -30,7 +31,7 @@ const CONFIG = {
   },
   chair: { seatKey: 'chair', provider: 'anthropic', model: 'claude-opus-5', promptSnapshot: {} },
 };
-const RUN = { id: 'run-1', lease_token: 'lease-1', locked_until: new Date(Date.now() + 280000).toISOString(), data: { config: CONFIG } };
+const RUN = { id: 'run-1', owner_profile_id: 42, lease_token: 'lease-1', locked_until: new Date(Date.now() + 280000).toISOString(), data: { config: CONFIG } };
 
 let attempts;
 let entryState;
@@ -84,6 +85,9 @@ beforeEach(() => {
   store.claimReviewPanelRun.mockResolvedValue(RUN);
   store.releaseReviewPanelRun.mockResolvedValue(undefined);
   store.listRetryRequestedEntries.mockResolvedValue([]);
+  store.assertReviewPanelActor.mockResolvedValue({ profileId: RUN.owner_profile_id });
+  store.stopRevokedReviewPanelRun.mockResolvedValue(undefined);
+  assertReviewPanelStorageConfigured.mockImplementation(() => {});
   seatSetup();
 });
 
@@ -363,5 +367,48 @@ describe('describeEntryFailure', () => {
   test('names the failing seat/chair in plain language', () => {
     expect(describeEntryFailure({ message: 'x' }, 'seat.openai')).toContain('seat.openai');
     expect(describeEntryFailure({}, 'chair')).toContain('chair synthesis');
+  });
+});
+
+describe('the run owner is re-asserted at claim time and again immediately before every paid dispatch', () => {
+  test('owner demoted between claim and dispatch: runSeat is never called, and the run is marked failed with plain copy — no dispatch happens', async () => {
+    store.assertReviewPanelActor.mockRejectedValue(Object.assign(new Error('An active superuser profile is required.'), { httpStatus: 403 }));
+    store.listReviewPanelEntries.mockResolvedValue([entryState]);
+    const result = await drainReviewPanels();
+    expect(result).toEqual({ claimed: 1, ownerRevoked: true });
+    expect(runSeat).not.toHaveBeenCalled();
+    expect(runChair).not.toHaveBeenCalled();
+    expect(store.stopRevokedReviewPanelRun).toHaveBeenCalledWith('run-1', 'lease-1', expect.stringMatching(/no longer has superuser access/i));
+    expect(store.releaseReviewPanelRun).toHaveBeenCalled(); // still released, unconditionally, in `finally`
+  });
+
+  test('owner still valid at claim but demoted before the first seat dispatch: runSeat is never called for that seat, the run fails', async () => {
+    let calls = 0;
+    store.assertReviewPanelActor.mockImplementation(async () => {
+      calls += 1;
+      if (calls === 1) return { profileId: RUN.owner_profile_id }; // the claim-time check passes
+      throw Object.assign(new Error('An active superuser profile is required.'), { httpStatus: 403 }); // dispatch-time check fails
+    });
+    store.listReviewPanelEntries.mockResolvedValue([entryState]);
+    const result = await drainReviewPanels();
+    expect(result).toEqual({ claimed: 1, ownerRevoked: true });
+    expect(runSeat).not.toHaveBeenCalled();
+    expect(store.createAttempt).not.toHaveBeenCalled(); // no attempt minted once the owner check fails
+    expect(store.stopRevokedReviewPanelRun).toHaveBeenCalled();
+  });
+});
+
+describe('D11 storage readiness is re-checked immediately before every paid dispatch', () => {
+  test('storage unconfigured before the first seat dispatch of an entry: runSeat is never called, drain returns paused (not a permanent run failure)', async () => {
+    assertReviewPanelStorageConfigured.mockImplementation(() => {
+      throw Object.assign(new Error('The private review panel document store has not been configured.'), { httpStatus: 503 });
+    });
+    store.listReviewPanelEntries.mockResolvedValue([entryState]);
+    const result = await drainReviewPanels();
+    expect(result).toEqual({ claimed: 1, paused: true });
+    expect(runSeat).not.toHaveBeenCalled();
+    expect(store.createAttempt).not.toHaveBeenCalled();
+    expect(store.stopRevokedReviewPanelRun).not.toHaveBeenCalled(); // storage readiness is not an owner-revocation
+    expect(store.releaseReviewPanelRun).toHaveBeenCalled();
   });
 });

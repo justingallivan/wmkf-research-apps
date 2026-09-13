@@ -7,6 +7,7 @@ import {
   deriveLaunchState,
   formatReservationBound,
   isRunUnsettled,
+  launchSelectionSignature,
   default as ReviewPanelPage,
   ReviewPanelWorkspace,
 } from '../../pages/review-panel';
@@ -132,6 +133,38 @@ describe('ReviewPanelWorkspace', () => {
     await waitFor(() => expect(screen.getByText(/#101/)).toBeInTheDocument());
     expect(screen.getAllByTestId('review-panel-entry-links')).toHaveLength(1);
     expect(screen.getByText('boom')).toBeInTheDocument();
+  });
+
+  test('a second click with an IDENTICAL selection after a failed first response sends the SAME idempotencyKey (mirrors cycle-dossier.js launchKeyRef) — a changed selection then sends a new one', async () => {
+    const postBodies = [];
+    global.fetch = jest.fn((url, options) => {
+      if (options?.method === 'POST') {
+        postBodies.push(JSON.parse(options.body));
+        if (postBodies.length === 1) return Promise.reject(new Error('network error'));
+        return Promise.resolve(response({ run: { id: 'run-1', status: 'queued' } }));
+      }
+      return Promise.resolve(response(pageResponse()));
+    });
+    render(<ReviewPanelWorkspace />);
+    await waitFor(() => expect(screen.getByRole('button', { name: /Launch/i })).not.toBeDisabled());
+
+    // First click: the POST rejects (lost response / network error).
+    fireEvent.click(screen.getByRole('button', { name: /Launch/i }));
+    await waitFor(() => expect(postBodies.length).toBe(1));
+    await waitFor(() => expect(screen.getByRole('button', { name: /Launch/i })).not.toBeDisabled());
+
+    // Second click, SAME selection: must reuse the same idempotencyKey.
+    fireEvent.click(screen.getByRole('button', { name: /Launch/i }));
+    await waitFor(() => expect(postBodies.length).toBe(2));
+    expect(postBodies[1].idempotencyKey).toBe(postBodies[0].idempotencyKey);
+
+    // The confirmed success switched to the Progress tab; go back to Requests
+    // to change the selection and launch again.
+    fireEvent.click(screen.getByRole('button', { name: 'Requests' }));
+    fireEvent.click(screen.getAllByRole('checkbox')[1]);
+    fireEvent.click(screen.getByRole('button', { name: /Launch/i }));
+    await waitFor(() => expect(postBodies.length).toBe(3));
+    expect(postBodies[2].idempotencyKey).not.toBe(postBodies[1].idempotencyKey);
   });
 });
 

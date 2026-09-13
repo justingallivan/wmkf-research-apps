@@ -48,7 +48,7 @@ jest.mock('../../lib/services/review-panel-store', () => ({
 const requests = require('../../lib/dataverse/adapters/grant-request');
 const { prepareReviewPanelInput } = require('../../lib/services/review-panel-input');
 const { snapshotConfiguration } = require('../../lib/services/review-panel-generation');
-const { readReviewPanelFile } = require('../../lib/services/review-panel-storage');
+const { readReviewPanelFile, assertReviewPanelStorageConfigured } = require('../../lib/services/review-panel-storage');
 const rollout = require('../../lib/services/review-panel-rollout');
 const store = require('../../lib/services/review-panel-store');
 const {
@@ -81,6 +81,7 @@ beforeEach(() => {
   rollout.assertReviewPanelModeValid.mockReturnValue('pilot');
   snapshotConfiguration.mockResolvedValue({ seats: {}, chair: { provider: 'anthropic', model: 'claude-opus-5' } });
   prepareReviewPanelInput.mockResolvedValue({ requestId: REQ_A, requestNumber: 'R-1', narrative: { text: 'n' } });
+  assertReviewPanelStorageConfigured.mockImplementation(() => {}); // configured (no-op) by default
 });
 
 describe('getReviewPanelPage surfaces the rollout mode so the page can mirror the server\'s smoke-mode launch rule', () => {
@@ -137,6 +138,17 @@ describe('actor assertion runs BEFORE any store/roster/Blob call', () => {
     await expect(downloadReviewPanel(OWNER, { entryId: ENTRY_ID, format: 'pdf' })).rejects.toMatchObject({ httpStatus: 403 });
     expect(store.readReviewPanelEntry).not.toHaveBeenCalled();
     expect(readReviewPanelFile).not.toHaveBeenCalled();
+  });
+});
+
+describe('launchReviewPanel — Blob store readiness enforced BEFORE the run is created', () => {
+  test('fails closed when the D11 store is not configured, before touching the roster or creating the run', async () => {
+    assertReviewPanelStorageConfigured.mockImplementation(() => {
+      throw Object.assign(new Error('The private review panel document store has not been configured.'), { httpStatus: 503 });
+    });
+    await expect(launchReviewPanel(OWNER, { selectedRequestIds: [REQ_A], idempotencyKey: LAUNCH_KEY })).rejects.toMatchObject({ httpStatus: 503 });
+    expect(requests.queryAllRequests).not.toHaveBeenCalled();
+    expect(store.createReviewPanelRun).not.toHaveBeenCalled();
   });
 });
 
