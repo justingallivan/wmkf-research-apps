@@ -254,6 +254,71 @@ describe('projectReviewPanelRun — per-seat detail for the Progress tab', () =>
   });
 });
 
+describe('projectReviewPanelRun — timeline for the Progress tab', () => {
+  const timelineRun = { id: RUN_ID, status: 'running', created_at: '2026-09-13T10:00:00.000Z', data: {} };
+  const timelineEntry = {
+    id: ENTRY_ID, request_id: REQ_A, request_revision: 1, status: 'completed',
+    data: { files: { docx: {}, pdf: {} } }, retry_requested_at: null, updated_at: '2026-09-13T10:05:00.000Z',
+  };
+
+  test('orders Launched, worker pickup, per-seat terminal events, and edition completion oldest-first, with correct labels', () => {
+    const attempts = [
+      { entry_id: ENTRY_ID, seat_key: 'seat.claude', attempt_no: 1, state: 'completed', dispatched_at: '2026-09-13T10:01:00.000Z', updated_at: '2026-09-13T10:02:00.000Z' },
+      { entry_id: ENTRY_ID, seat_key: 'seat.openai', attempt_no: 1, state: 'failed', dispatched_at: '2026-09-13T10:01:30.000Z', updated_at: '2026-09-13T10:02:30.000Z' },
+      { entry_id: ENTRY_ID, seat_key: 'chair', attempt_no: 1, state: 'completed', dispatched_at: '2026-09-13T10:03:00.000Z', updated_at: '2026-09-13T10:04:00.000Z' },
+    ];
+    const result = projectReviewPanelRun(timelineRun, [timelineEntry], attempts);
+    expect(result.timeline).toEqual([
+      { at: '2026-09-13T10:00:00.000Z', label: 'Launched' },
+      { at: '2026-09-13T10:01:00.000Z', label: 'Worker picked up the run' },
+      { at: '2026-09-13T10:02:00.000Z', label: 'Claude reviewer completed' },
+      { at: '2026-09-13T10:02:30.000Z', label: 'OpenAI reviewer failed' },
+      { at: '2026-09-13T10:03:00.000Z', label: 'Chair dispatched' },
+      { at: '2026-09-13T10:04:00.000Z', label: 'Chair completed' },
+      { at: '2026-09-13T10:05:00.000Z', label: 'Edition completed' },
+    ]);
+  });
+
+  test('only the LATEST attempt per seat contributes a terminal event', () => {
+    const attempts = [
+      { entry_id: ENTRY_ID, seat_key: 'seat.claude', attempt_no: 1, state: 'failed', dispatched_at: '2026-09-13T10:01:00.000Z', updated_at: '2026-09-13T10:01:30.000Z' },
+      { entry_id: ENTRY_ID, seat_key: 'seat.claude', attempt_no: 2, state: 'completed', dispatched_at: '2026-09-13T10:02:00.000Z', updated_at: '2026-09-13T10:03:00.000Z' },
+    ];
+    const result = projectReviewPanelRun(timelineRun, [timelineEntry], attempts);
+    const seatEvents = result.timeline.filter((e) => e.label.startsWith('Claude reviewer'));
+    expect(seatEvents).toEqual([{ at: '2026-09-13T10:03:00.000Z', label: 'Claude reviewer completed' }]);
+  });
+
+  test('omits edition completion when the entry has no persisted files, even if terminal', () => {
+    const bareEntry = { ...timelineEntry, data: {} };
+    const result = projectReviewPanelRun(timelineRun, [bareEntry], []);
+    expect(result.timeline.some((e) => e.label === 'Edition completed')).toBe(false);
+  });
+
+  test('omits edition completion for a failed entry, even with files present — the label would otherwise lie', () => {
+    const failedEntry = { ...timelineEntry, status: 'failed' };
+    const result = projectReviewPanelRun(timelineRun, [failedEntry], []);
+    expect(result.timeline.some((e) => e.label === 'Edition completed')).toBe(false);
+  });
+
+  test('a chair attempt dispatched but not yet terminal still surfaces "Chair dispatched"', () => {
+    const attempts = [
+      { entry_id: ENTRY_ID, seat_key: 'chair', attempt_no: 1, state: 'dispatched', dispatched_at: '2026-09-13T10:03:00.000Z', updated_at: '2026-09-13T10:03:00.000Z' },
+    ];
+    const result = projectReviewPanelRun(timelineRun, [timelineEntry], attempts);
+    expect(result.timeline).toContainEqual({ at: '2026-09-13T10:03:00.000Z', label: 'Chair dispatched' });
+    expect(result.timeline.some((e) => e.label.startsWith('Chair completed') || e.label.startsWith('Chair failed'))).toBe(false);
+  });
+
+  test('never carries usage tokens or prompt text in the timeline', () => {
+    const attempts = [
+      { entry_id: ENTRY_ID, seat_key: 'seat.claude', attempt_no: 1, state: 'completed', dispatched_at: '2026-09-13T10:01:00.000Z', updated_at: '2026-09-13T10:02:00.000Z', usage_json: { input_tokens: 999 }, prompt_snapshot_json: { text: 'secret' } },
+    ];
+    const result = projectReviewPanelRun(timelineRun, [timelineEntry], attempts);
+    expect(JSON.stringify(result.timeline)).not.toMatch(/999|secret|usage_json|prompt_snapshot/);
+  });
+});
+
 describe('downloadReviewPanel', () => {
   test('passes exactly entry.data.files[format] to readReviewPanelFile, never anything derived from the query', async () => {
     const ref = { pathname: 'review-panel/entry/report.pdf', sha256: 'a'.repeat(64), size: 10, contentType: 'application/pdf' };

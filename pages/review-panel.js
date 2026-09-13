@@ -91,6 +91,33 @@ function SeatPill({ seat }) {
   );
 }
 
+/** "HH:MM:SS" in the viewer's local time (24h) for one timeline event's ISO timestamp. */
+function formatLocalTime(iso) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleTimeString([], { hourCycle: 'h23' });
+}
+
+/** "Running for Xs" from the run's created time to `nowMs`, or null for an invalid/missing start. */
+export function formatRunningElapsed(createdAt, nowMs) {
+  const start = new Date(createdAt).getTime();
+  if (!Number.isFinite(start)) return null;
+  const seconds = Math.max(0, Math.floor((nowMs - start) / 1000));
+  return `Running for ${seconds}s`;
+}
+
+/** Compact operator timeline under the run pill — oldest first / newest last, per review-panel-service.js's projection. */
+function RunTimeline({ timeline }) {
+  if (!timeline?.length) return null;
+  return (
+    <ul className="mb-3 space-y-0.5 text-xs text-gray-500" data-testid="review-panel-timeline">
+      {timeline.map((event, i) => (
+        <li key={`${event.at}-${i}`}>{formatLocalTime(event.at)}  {event.label}</li>
+      ))}
+    </ul>
+  );
+}
+
 function EntryRow({ entry }) {
   const seats = entry.seats || EMPTY_ARRAY;
   const failedSeats = seats.filter((seat) => seat.error);
@@ -271,6 +298,9 @@ export function ReviewPanelWorkspace() {
     : !hasEntries && latestRunStatus === 'running'
       ? 'Preparing requests…'
       : null;
+  // Recomputed on every render, including the poll's own re-render every
+  // POLL_MS while the run is unsettled — no separate timer needed.
+  const runningElapsedText = latestRunStatus === 'running' ? formatRunningElapsed(latestRun?.createdAt, Date.now()) : null;
 
   return (
     <Layout>
@@ -330,6 +360,8 @@ export function ReviewPanelWorkspace() {
                 </div>
               </div>
               {latestRun?.error && <p className="mb-3 text-sm text-red-700">{latestRun.error}</p>}
+              <RunTimeline timeline={latestRun?.timeline} />
+              {runningElapsedText && <p className="mb-3 text-xs text-gray-500">{runningElapsedText}</p>}
               {waitingCopy && <p className="mb-3 text-sm text-gray-500">{waitingCopy}</p>}
               <ul>
                 {(latestRun?.entries || []).map((entry) => (

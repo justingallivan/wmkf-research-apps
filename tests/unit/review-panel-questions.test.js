@@ -2,7 +2,7 @@
 import { validateAiJson } from '../../lib/utils/ai-output-schema';
 import {
   projectSeatQuestionSet, buildSeatValidationSchema, chairInput, renderSeatQuestionsText,
-  REVIEW_PANEL_NOT_ASSESSABLE_REPORT_LINE,
+  REVIEW_PANEL_NOT_ASSESSABLE_REPORT_LINE, SEAT_ANSWER_MAX_CHARS,
 } from '../../lib/services/review-panel-questions';
 
 const FIXTURE_FIELDS = [
@@ -52,6 +52,15 @@ describe('renderSeatQuestionsText', () => {
     expect(line).toContain('not_assessable');
     expect(line).not.toMatch(/answer in prose/);
   });
+
+  test('richtext guidance caps the stated character limit at SEAT_ANSWER_MAX_CHARS, never the human form maxLength', () => {
+    expect(text).toContain(`up to ${SEAT_ANSWER_MAX_CHARS} characters`);
+    expect(text).not.toContain('50000');
+  });
+
+  test('includes a conciseness sentence guiding the model to stay within the character limit', () => {
+    expect(text).toContain('Be concise and specific; each answer must stay within its character limit.');
+  });
 });
 
 describe('buildSeatValidationSchema', () => {
@@ -91,6 +100,18 @@ describe('buildSeatValidationSchema', () => {
   test('richtext validates as a bounded string', () => {
     const bad = validateAiJson({ teamCapacity: { status: 'not_assessable' }, priorWork: 123, impactAreas: ['1'], riskLevel: '1', questionsForPi: 'y' }, schema);
     expect(bad.ok).toBe(false);
+  });
+
+  test('richtext maxLength is capped at SEAT_ANSWER_MAX_CHARS regardless of the human form maxLength', () => {
+    expect(schema.fields.priorWork.maxLength).toBe(SEAT_ANSWER_MAX_CHARS);
+    expect(SEAT_ANSWER_MAX_CHARS).toBe(2000);
+  });
+
+  test('a richtext field with a maxLength already below the seat cap keeps its own, smaller value', () => {
+    const smallField = { key: 'shortAnswer', order: 9, type: 'richtext', maxLength: 300 };
+    const projectedSmall = projectSeatQuestionSet([...FIXTURE_FIELDS, smallField]);
+    const schemaSmall = buildSeatValidationSchema(projectedSmall);
+    expect(schemaSmall.fields.shortAnswer.maxLength).toBe(300);
   });
 
   test('the deleted-guard check: without allowExtra on teamCapacity, the rejected fixture would incorrectly pass', () => {
