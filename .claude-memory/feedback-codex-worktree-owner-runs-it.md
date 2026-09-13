@@ -1,11 +1,11 @@
 ---
 name: feedback-codex-worktree-owner-runs-it
-description: For parallel Codex work, Claude prepares the worktree, branch, and committed brief; the OWNER launches Codex in another app. Never dispatch it from Claude's shell via codex:rescue — the companion's sandbox is pinned to the main checkout and cannot write into a worktree.
+description: "For a Codex worktree build, Claude prepares the worktree, branch, and committed brief. Dispatch via codex:rescue is fine WHEN the companion is pointed at the worktree with -C <worktree> (owner 2026-09-12 S510); without -C the sandbox roots at the main checkout and every worktree write is refused. The owner asks for a paste-able prompt instead when they are running parallel work themselves."
 metadata:
   type: feedback
   status: active
   scope: agent-collaboration
-  last_verified: 2026-09-12 (S509)
+  last_verified: 2026-09-12 (S510)
 ---
 ## Recall Rule
 Read before any "set Codex up on a branch" request. The deliverable is a ready
@@ -31,3 +31,13 @@ the main checkout, not for parallel branch builds. See [[feedback-codex-delegati
   Stop there.
 - Resume at Step 5 (read-only review, verify, merge on the owner's go) when the
   owner says Codex is done.
+
+**Update (S510, 2026-09-12):** the owner reversed the default: "You can use codex rescue for
+this task. I usually request prompts when I'm working on parallel work." The S509 failure was
+not the tool but the root: the companion resolves its workspace with `git rev-parse
+--show-toplevel` on its cwd (`scripts/lib/workspace.mjs`, `lib/git.mjs:79`) and starts the
+Codex thread there, so `codex-companion.mjs task -C /path/to/WMKF_Apps-codex --write
+--background --model gpt-5.6-sol …` roots the sandbox in the worktree (job state dir became
+`WMKF_Apps-codex-…`, S510). Rule: always pass `-C <worktree>`; still pass `--model
+gpt-5.6-sol` ([[feedback-codex-model-gpt56-sol]]); when the owner says they will run
+Codex themselves, hand over the prompt instead.
