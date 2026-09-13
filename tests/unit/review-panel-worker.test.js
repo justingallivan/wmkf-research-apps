@@ -303,8 +303,7 @@ test('retryFailedEntries clears retry_requested_at (via mutateReviewPanelEntry) 
 });
 
 describe('rerenderCompletedEntries (via drainReviewPanels) — re-render makes NO model calls', () => {
-  test('a completed entry with data.rerender re-renders both formats under a NEW Blob pathname, stamps savedAt, clears the marker, and never creates an attempt or calls runSeat/runChair', async () => {
-    seatSetup();
+  function setUpCompletedEntryForRerender() {
     attempts.push(
       { id: 'seat.claude-1', entry_id: 'entry-1', seat_key: 'seat.claude', attempt_no: 1, state: 'completed', result_json: { priorWork: 'a' } },
       { id: 'seat.openai-1', entry_id: 'entry-1', seat_key: 'seat.openai', attempt_no: 1, state: 'completed', result_json: { priorWork: 'b' } },
@@ -313,21 +312,37 @@ describe('rerenderCompletedEntries (via drainReviewPanels) — re-render makes N
     entryState.status = 'completed';
     entryState.winners_json = { 'seat.claude': 'seat.claude-1', 'seat.openai': 'seat.openai-1', chair: 'chair-1' };
     const previousFiles = { docx: { pathname: 'review-panel/entry-1/report.docx' }, pdf: { pathname: 'review-panel/entry-1/report.pdf' } };
-    entryState.data = {
-      ...entryState.data, files: null, rerender: { requestedAt: '2026-09-13T00:00:00.000Z', requestedBy: 7, previousFiles },
-      error: 'stale from a prior failed re-render', // must never survive a SUCCESSFUL re-render
-    };
+    entryState.data = { ...entryState.data, files: previousFiles, rerender: { requestedAt: '2026-09-13T00:00:00.000Z', requestedBy: 7 } };
     store.listRetryRequestedEntries.mockResolvedValue(['entry-1']);
     store.listReviewPanelEntries.mockResolvedValue([entryState]);
+    return previousFiles;
+  }
+
+  test('data.files (the current pair) stays completely untouched throughout render/upload — downloads keep resolving to it — and is only swapped in atomically on full success, with the superseded pair appended (never overwritten) to rerenderHistory', async () => {
+    seatSetup();
+    const previousFiles = setUpCompletedEntryForRerender();
+    entryState.data.error = 'stale from a prior failed re-render'; // must never survive a SUCCESSFUL re-render
+    entryState.data.reportError = { name: 'Error', message: 'stale', at: '2026-09-13T00:00:00.000Z' };
+
+    let filesDuringRender;
+    storeReviewPanelFile
+      .mockImplementationOnce(async (pathname) => { filesDuringRender = entryState.data.files; return { pathname, sha256: 'a'.repeat(64), size: 4 }; })
+      .mockImplementationOnce(async (pathname) => ({ pathname, sha256: 'a'.repeat(64), size: 4 }));
 
     const result = await drainReviewPanels();
     expect(result).toEqual({ claimed: 1, runId: 'run-1' });
     expect(store.createAttempt).not.toHaveBeenCalled();
     expect(runSeat).not.toHaveBeenCalled();
     expect(runChair).not.toHaveBeenCalled();
+
+    // Snapshot taken mid-render (inside the first storeReviewPanelFile call):
+    // still the OLD pair — nothing was swapped in until BOTH formats landed.
+    expect(filesDuringRender).toEqual(previousFiles);
+
     expect(entryState.status).toBe('completed');
     expect(entryState.data.rerender).toBeUndefined();
     expect(entryState.data.error).toBeNull();
+    expect(entryState.data.reportError).toBeNull();
 
     expect(storeReviewPanelFile).toHaveBeenCalledTimes(2);
     const pathnames = storeReviewPanelFile.mock.calls.map((c) => c[0]);
@@ -335,37 +350,57 @@ describe('rerenderCompletedEntries (via drainReviewPanels) — re-render makes N
     expect(pathnames).not.toContain('review-panel/entry-1/report.docx');
     expect(pathnames).not.toContain('review-panel/entry-1/report.pdf');
 
+    expect(entryState.data.files.docx.pathname).not.toBe(previousFiles.docx.pathname);
     expect(entryState.data.files.docx.savedAt).toEqual(expect.any(String));
     expect(entryState.data.files.pdf.savedAt).toEqual(expect.any(String));
+    expect(entryState.data.rerenderHistory).toEqual([{ replacedAt: expect.any(String), files: previousFiles }]);
   });
 
-  test('a re-render that fails to save restores the entry to completed with the PREVIOUS files intact — never left failed with no report and no attempt/runSeat/runChair call', async () => {
+  test('a mixed-pair upload (docx lands, pdf fails) never goes live: data.files stays the PREVIOUS pair, never left failed, and the orphaned new docx ref is recorded (never silently lost) without becoming live', async () => {
     seatSetup();
-    attempts.push(
-      { id: 'seat.claude-1', entry_id: 'entry-1', seat_key: 'seat.claude', attempt_no: 1, state: 'completed', result_json: { priorWork: 'a' } },
-      { id: 'seat.openai-1', entry_id: 'entry-1', seat_key: 'seat.openai', attempt_no: 1, state: 'completed', result_json: { priorWork: 'b' } },
-      { id: 'chair-1', entry_id: 'entry-1', seat_key: 'chair', attempt_no: 1, state: 'completed', result_json: { consensus: [] } },
-    );
-    entryState.status = 'completed';
-    entryState.winners_json = { 'seat.claude': 'seat.claude-1', 'seat.openai': 'seat.openai-1', chair: 'chair-1' };
-    const previousFiles = { docx: { pathname: 'review-panel/entry-1/report.docx' }, pdf: { pathname: 'review-panel/entry-1/report.pdf' } };
-    entryState.data = { ...entryState.data, files: null, rerender: { requestedAt: '2026-09-13T00:00:00.000Z', requestedBy: 7, previousFiles } };
-    store.listRetryRequestedEntries.mockResolvedValue(['entry-1']);
-    store.listReviewPanelEntries.mockResolvedValue([entryState]);
-    storeReviewPanelFile.mockRejectedValueOnce(Object.assign(new Error('The private review panel document store has not been configured.'), { httpStatus: 503 }));
+    const previousFiles = setUpCompletedEntryForRerender();
+
+    const newDocxRef = { pathname: 'review-panel/entry-1/report-stamp123.docx', sha256: 'b'.repeat(64), size: 5 };
+    storeReviewPanelFile
+      .mockResolvedValueOnce(newDocxRef)
+      .mockRejectedValueOnce(new Error('pdf upload boom'));
 
     await drainReviewPanels();
     expect(store.createAttempt).not.toHaveBeenCalled();
     expect(runSeat).not.toHaveBeenCalled();
     expect(runChair).not.toHaveBeenCalled();
-    expect(entryState.status).toBe('completed'); // restored, never left `failed` with no report
-    expect(entryState.data.files).toEqual(previousFiles); // the OLD edition, kept intact
+    expect(entryState.status).toBe('completed'); // never left `failed` — the old pair is still live
+    expect(entryState.data.files).toEqual(previousFiles); // untouched: no partial pair ever goes live
     expect(entryState.data.error).toMatch(/re-rendered report could not be saved/i);
+    expect(entryState.data.reportError.orphanedFiles.docx.pathname).toBe(newDocxRef.pathname);
+    expect(entryState.data.reportError.orphanedFiles.pdf).toBeUndefined();
     expect(entryState.data.rerender).toBeUndefined();
-    // The stash survives consumption: previousFiles was carried into
-    // data.lastRerender BEFORE the render attempt, not merely inferred from
-    // the restored data.files (which the restore itself also sets).
-    expect(entryState.data.lastRerender.previousFiles).toEqual(previousFiles);
+    expect(entryState.data.rerenderHistory).toBeUndefined(); // no swap ever happened
+  });
+
+  test('a lease-expiry (409) on the rollback write itself is safe: data.files was never touched by the rerender path, so the previous pair is still the persisted, live pair', async () => {
+    seatSetup();
+    const previousFiles = setUpCompletedEntryForRerender();
+    storeReviewPanelFile.mockRejectedValueOnce(Object.assign(new Error('The private review panel document store has not been configured.'), { httpStatus: 503 }));
+    // The marker-clear mutate (the first mutateReviewPanelEntry call inside
+    // rerenderCompletedEntries) must still succeed — only the ROLLBACK write
+    // after the render failure hits the expired lease.
+    let mutateCalls = 0;
+    store.mutateReviewPanelEntry.mockImplementation(async (id, fn) => {
+      mutateCalls += 1;
+      if (mutateCalls === 2) throw Object.assign(new Error('Worker lease expired.'), { httpStatus: 409 });
+      await fn(entryState);
+      return entryState;
+    });
+
+    await drainReviewPanels();
+    expect(store.createAttempt).not.toHaveBeenCalled();
+    expect(runSeat).not.toHaveBeenCalled();
+    expect(runChair).not.toHaveBeenCalled();
+    // data.files was never written by this code path at all (only ever
+    // read), so it is still the previous pair regardless of the rollback
+    // write's own failure.
+    expect(entryState.data.files).toEqual(previousFiles);
   });
 
   test('an entry whose marker no longer matches (moved on before this pass consumed it) just gets the marker cleared, without creating any attempt', async () => {

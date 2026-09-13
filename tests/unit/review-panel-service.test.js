@@ -263,14 +263,30 @@ describe('projectReviewPanelRun — rerender projection', () => {
     expect(result.entries[0].rerender).toBeNull();
   });
 
-  test('entries[].rerender surfaces requestedAt and previousFiles as a COUNT, never the superseded refs themselves', () => {
+  test('entries[].rerender surfaces requestedAt only — no file refs, since data.files is never touched by the request itself', () => {
     const entry = {
       id: ENTRY_ID, request_id: REQ_A, request_revision: 1, status: 'completed', retry_requested_at: '2026-09-13T10:06:00.000Z',
-      data: { files: null, rerender: { requestedAt: '2026-09-13T10:06:00.000Z', requestedBy: 7, previousFiles: { docx: { pathname: 'x' }, pdf: { pathname: 'y' } } } },
+      data: { files: { docx: {}, pdf: {} }, rerender: { requestedAt: '2026-09-13T10:06:00.000Z', requestedBy: 7 } },
     };
     const result = projectReviewPanelRun(run, [entry], []);
-    expect(result.entries[0].rerender).toEqual({ requestedAt: '2026-09-13T10:06:00.000Z', previousFiles: 2 });
-    expect(JSON.stringify(result.entries[0].rerender)).not.toMatch(/pathname/);
+    expect(result.entries[0].rerender).toEqual({ requestedAt: '2026-09-13T10:06:00.000Z' });
+    // The CURRENT pair stays live and the entry still reads hasReport:true throughout the wait.
+    expect(result.entries[0].hasReport).toBe(true);
+  });
+
+  test('entries[].rerenderCount reflects the appended (never overwritten) rerenderHistory length', () => {
+    const entry = {
+      id: ENTRY_ID, request_id: REQ_A, request_revision: 1, status: 'completed',
+      data: { files: { docx: {}, pdf: {} }, rerenderHistory: [{ replacedAt: '2026-09-13T09:00:00.000Z', files: {} }, { replacedAt: '2026-09-13T10:00:00.000Z', files: {} }] },
+    };
+    const result = projectReviewPanelRun(run, [entry], []);
+    expect(result.entries[0].rerenderCount).toBe(2);
+  });
+
+  test('entries[].rerenderCount is 0 when rerenderHistory is absent', () => {
+    const entry = { id: ENTRY_ID, request_id: REQ_A, request_revision: 1, status: 'completed', data: { files: { docx: {}, pdf: {} } } };
+    const result = projectReviewPanelRun(run, [entry], []);
+    expect(result.entries[0].rerenderCount).toBe(0);
   });
 });
 

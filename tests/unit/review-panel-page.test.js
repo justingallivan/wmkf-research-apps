@@ -505,11 +505,28 @@ describe('Re-render report action', () => {
     expect(postBodies).toEqual([]);
   });
 
+  test('a rejected re-render request (e.g. server 409 because the run is not settled) shows beside THAT entry row, never in the shared launch-error slot', async () => {
+    jest.spyOn(window, 'confirm').mockReturnValue(true);
+    global.fetch = jest.fn((url, options) => {
+      if (options?.method === 'POST') return Promise.resolve({ ok: false, status: 409, json: async () => ({ error: 'Wait for this run to settle before re-rendering.' }) });
+      return Promise.resolve(response(pageResponse({
+        runs: [{ id: 'run-1', status: 'completed', entries: [{ id: 'entry-1', requestNumber: '101', status: 'completed', hasReport: true, retryRequested: false, seats: [] }] }],
+      })));
+    });
+    render(<ReviewPanelWorkspace />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Progress' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Re-render report' }));
+    await waitFor(() => expect(screen.getByText('Wait for this run to settle before re-rendering.')).toBeInTheDocument());
+    // Never in the launch-error slot: that slot only renders on the Requests tab, so switching there must show nothing stale.
+    fireEvent.click(screen.getByRole('button', { name: 'Requests' }));
+    expect(screen.queryByText('Wait for this run to settle before re-rendering.')).not.toBeInTheDocument();
+  });
+
   test('no "Re-render report" button for an entry with no saved report, or one already mid-retry', async () => {
     global.fetch = jest.fn().mockResolvedValue(response(pageResponse({
       runs: [{ id: 'run-1', status: 'running', entries: [
         { id: 'entry-1', requestNumber: '101', status: 'failed', hasReport: false, retryRequested: false, seats: [] },
-        { id: 'entry-2', requestNumber: '102', status: 'completed', hasReport: false, retryRequested: true, rerender: { requestedAt: '2026-09-13T10:06:00.000Z', previousFiles: 2 }, seats: [] },
+        { id: 'entry-2', requestNumber: '102', status: 'completed', hasReport: true, retryRequested: true, rerender: { requestedAt: '2026-09-13T10:06:00.000Z' }, seats: [] },
       ] }],
     })));
     render(<ReviewPanelWorkspace />);
@@ -534,8 +551,8 @@ describe('Re-render report action', () => {
     global.fetch = jest.fn().mockResolvedValue(response(pageResponse({
       runs: [{ id: 'run-1', status: 'queued', entries: [
         {
-          id: 'entry-1', requestNumber: '101', status: 'completed', hasReport: false, retryRequested: true,
-          rerender: { requestedAt: '2026-09-13T10:06:00.000Z', previousFiles: 2 }, seats: [],
+          id: 'entry-1', requestNumber: '101', status: 'completed', hasReport: true, retryRequested: true,
+          rerender: { requestedAt: '2026-09-13T10:06:00.000Z' }, seats: [],
         },
       ] }],
     })));

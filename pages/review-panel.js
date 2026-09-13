@@ -142,7 +142,7 @@ function isReRenderingReport({ runStatus, entry, seats }) {
   return runStatus === 'running' && entry.status === 'failed' && !entry.retryRequested && !entry.hasReport && seatsAndChairCompleted(seats);
 }
 
-function EntryRow({ entry, runStatus, onRerender, rerenderLoading }) {
+function EntryRow({ entry, runStatus, onRerender, rerenderLoading, rerenderError }) {
   const seats = entry.seats || EMPTY_ARRAY;
   const failedSeats = seats.filter((seat) => seat.error);
   const reRendering = isReRenderingReport({ runStatus, entry, seats });
@@ -204,6 +204,9 @@ function EntryRow({ entry, runStatus, onRerender, rerenderLoading }) {
         <p className="basis-full pl-1 text-xs text-gray-500">Retrying: rendering and saving the report…</p>
       )}
       {!entry.retryRequested && entry.error && <p className="basis-full pl-1 text-xs text-red-700">{entry.error}</p>}
+      {/* A rejected rerender request (e.g. a 409 because the run isn't settled) shows HERE, beside this
+          entry's own row, never in the shared launch-error slot (which only renders on the Requests tab). */}
+      {rerenderError && <p className="basis-full pl-1 text-xs text-red-700">{rerenderError}</p>}
     </div>
   );
 }
@@ -220,6 +223,10 @@ export function ReviewPanelWorkspace() {
   const [actionLoading, setActionLoading] = useState('');
   const [view, setView] = useState('requests');
   const [retrySelection, setRetrySelection] = useState(() => new Set());
+  // Per-entry rerender request errors (e.g. a 409 because the run isn't
+  // settled) — shown beside THAT entry's own row, never in the shared
+  // launchError slot (which only ever renders on the Requests tab).
+  const [rerenderErrors, setRerenderErrors] = useState(() => new Map());
   const mounted = useRef(true);
   const initialViewSet = useRef(false);
   const launchKeyRef = useRef({ signature: '', key: '' });
@@ -351,11 +358,21 @@ export function ReviewPanelWorkspace() {
     if (!latestRun) return;
     if (typeof window !== 'undefined' && !window.confirm('Re-render the Word and PDF editions from the saved reviews? No model calls are made.')) return;
     setActionLoading(`rerender:${entryId}`);
+    setRerenderErrors((current) => {
+      if (!current.has(entryId)) return current;
+      const next = new Map(current);
+      next.delete(entryId);
+      return next;
+    });
     try {
       await runAction({ action: 'rerender', runId: latestRun.id, entryIds: [entryId] });
       await load();
     } catch (rerenderErr) {
-      setLaunchError(rerenderErr.message);
+      // Shown beside THIS entry's own row (EntryRow's rerenderError prop),
+      // never in the shared launchError slot — that slot only renders on
+      // the Requests tab, so a rejection here (e.g. the run isn't settled)
+      // would otherwise be silently invisible on the Progress tab.
+      setRerenderErrors((current) => new Map(current).set(entryId, rerenderErr.message));
     } finally {
       setActionLoading('');
     }
@@ -472,6 +489,7 @@ export function ReviewPanelWorkspace() {
                         runStatus={latestRun?.status}
                         onRerender={rerenderEntry}
                         rerenderLoading={actionLoading === `rerender:${entry.id}`}
+                        rerenderError={rerenderErrors.get(entry.id)}
                       />
                     </div>
                   </li>

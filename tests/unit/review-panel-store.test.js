@@ -500,13 +500,13 @@ describe('requestReviewPanelRerender', () => {
     await expect(requestReviewPanelRerender('run-1', 7, ['entry-1'])).rejects.toMatchObject({ httpStatus: 400 });
   });
 
-  test('accepts a completed entry with a chair winner: clears data.files, stamps data.rerender with previousFiles kept, requeues the run', async () => {
-    const previousFiles = { docx: { pathname: 'review-panel/entry-1/report.docx' }, pdf: { pathname: 'review-panel/entry-1/report.pdf' } };
+  test('accepts a completed entry with a chair winner: stamps data.rerender (requestedAt/requestedBy only), NEVER touches data.files, requeues the run', async () => {
+    const currentFiles = { docx: { pathname: 'review-panel/entry-1/report.docx' }, pdf: { pathname: 'review-panel/entry-1/report.pdf' } };
     client.query.mockImplementation(async (q) => {
       if (q.startsWith('SELECT * FROM review_panel_runs')) return { rows: [{ id: 'run-1', owner_profile_id: 7, lease_token: null, status: 'completed' }] };
       if (q.startsWith('SELECT p.id, p.dynamics_systemuser_id')) return ACTOR_ROW;
       if (q.startsWith('SELECT id, data, winners_json FROM review_panel_entries')) {
-        return { rows: [{ id: 'entry-1', data: { files: previousFiles, input: { requestNumber: 'R-1' } }, winners_json: { chair: 'att-chair-1' } }] };
+        return { rows: [{ id: 'entry-1', data: { files: currentFiles, input: { requestNumber: 'R-1' } }, winners_json: { chair: 'att-chair-1' } }] };
       }
       if (q.startsWith('UPDATE review_panel_runs')) return { rows: [{ id: 'run-1', status: 'queued' }] };
       return { rows: [] };
@@ -518,9 +518,10 @@ describe('requestReviewPanelRerender', () => {
     const [entryId, dataJson] = updateCall[1];
     expect(entryId).toBe('entry-1');
     const data = JSON.parse(dataJson);
-    expect(data.files).toBeNull();
-    expect(data.rerender.previousFiles).toEqual(previousFiles);
-    expect(data.rerender.requestedBy).toBe(7);
+    // data.files is untouched — the CURRENT edition stays live/downloadable
+    // for the entire wait; only the worker's own successful swap replaces it.
+    expect(data.files).toEqual(currentFiles);
+    expect(data.rerender).toEqual({ requestedAt: expect.any(String), requestedBy: 7 });
     expect(data.input).toEqual({ requestNumber: 'R-1' }); // rest of data preserved
     expect(client.query).toHaveBeenCalledWith('COMMIT');
   });
