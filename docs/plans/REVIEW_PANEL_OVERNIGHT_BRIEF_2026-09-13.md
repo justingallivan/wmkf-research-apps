@@ -35,7 +35,7 @@ related:
 |---|---|---|---|
 | 1 | A.5 migration 047 / block v49, store + seat-attempt ledger with both fences, A.4 input DTO, A.2 rollout gates, executor budgets | built (2b714ebf); Opus round 1 = FIX (3 blocking: `known` cost with NULL cents counted as $0, finaliser state unallowlisted, decorative token test); all fixed and spot-checked in source | 2b714ebf, c7c48238 |
 | 2 | A.3 prompt seeds + question-set projection (D7), generation service + snapshot builder, A.6 worker + drain route | built; Opus round 1 = FIX (1 blocking: chair `seat_reviews` cap 40k chars below two seats' output, payload boundary truncates silently); fixed: cap derived from 5 seats × 16k tokens × 4 chars × 1.25 = 400k chars and `runChair` refuses before dispatch when exceeded | a0a4a750, 3f6433c4, 78943885, fb5646d4 |
-| 3 | A.1 registry/routes/matrix + service layer, A.7 editions in the D11 store + download route, A.8 page, operator retry hand-off, spend-check/admin-stats ledger queries, A.9 docs | built (8 commits, 34 files; all 18 gates green, full unit suite 12,235 green); Opus reviewing | 03f96d25 … ada0365f |
+| 3 | A.1 registry/routes/matrix + service layer, A.7 editions in the D11 store + download route, A.8 page, operator retry hand-off, spend-check/admin-stats ledger queries, A.9 docs | built (8 commits, 34 files; all 18 gates green, full unit suite 12,235 green); Opus round 1 = FIX (6 blocking: unknown-cost predicate inconsistent across spend-check/admin-stats/ledger, per-entry report used run-wide cost, two decorative cost tests, no service-level actor-assertion test, retry stuck after partial Blob write); Sonnet fixing | 03f96d25 … ada0365f |
 | Gates + PR | full gate set sequentially, PR opened, CI watched | pending | — |
 | Codex adversarial review | after Opus is satisfied with the whole | pending | — |
 
@@ -44,6 +44,9 @@ related:
 Accepted as designed, not fixed (Opus slice 2 review):
 - The finaliser's late path stores `late_usage_json` but no `cost_cents`/`cost_state`, so a run with an `unknown_outcome` attempt keeps its total withheld permanently. Conservative; the real spend for those calls is only recoverable from the vendor console.
 - The ledger fence tests assert the SQL text the mock receives (`clock_timestamp()`, `dispatch_token=$2`), not database behaviour. A live rehearsal against a scratch database would be the behavioural proof.
+- Spend-check window: the panel ledger sums on attempt `created_at` (pre-dispatch) while `api_usage_log` stamps post-response, so a call straddling midnight can land on the prior day in one half of the daily total. Cosmetic for an hourly threshold alert.
+- `readReviewPanelEntry` is not owner-scoped while run listing is. Consistent with the dossier's "shared across active superusers" posture; flagged only for consistency.
+- Migration 047 was edited in place during the build (`retry_requested_at` added to the CREATE TABLE). Safe only because 047 has never been applied anywhere. Do not apply an older copy.
 - Ledger edge: if a seat attempt is stuck `pending` (crash between create and dispatch) while a sibling seat fails, a retry mints a second `pending` row and the first stays `pending` forever. Harmless (no token, no cost), just dead weight.
 
 ## 4. Decisions made on the owner's behalf
