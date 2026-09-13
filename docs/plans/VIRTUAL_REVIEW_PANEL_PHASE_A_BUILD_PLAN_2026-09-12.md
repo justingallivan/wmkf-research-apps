@@ -40,6 +40,8 @@ related:
 | D6 | Cost posture | **No "typical cost" figure yet.** Run the panel on a small owner-chosen subset first and collect real actuals from the `review_panel_seat_attempts` ledger (A0.4; `api_usage_log` is a cross-check only), then decide. Same posture as the dossier's open figure. |
 | D7 | Team-capacity question `[DECIDED 2026-09-12: option 1]` | The required human-form question `teamCapacity` asks about personnel, infrastructure, and budget, but D2 excludes budget and biosketches. **Decision: narrative only, enforced.** Seats emit `teamCapacity` as `{ status: 'not_assessable' }` with no answer text; the seat `validationSchema` rejects any answer text for that key; the chair prompt receives no `teamCapacity` content and the report prints the question as "Not assessed in Phase A (budget and team materials not provided)". Widening D2 remains a Phase B/C option. Raised by the Codex adversarial review 2026-09-12. |
 | D8 | Provider scope `[DECIDED 2026-09-12 by revision]` | Prompt publishing stays Claude-only. Non-Anthropic dispatch happens only when the calling service explicitly allows that provider on the call, intersected with `VRP_ALLOWED_PROVIDERS`. No existing Executor prompt can be repointed at OpenAI by an admin edit. |
+| D9 | Chair input `[DECIDED 2026-09-12: option b]` | The chair receives the N seat reviews **and** the proposal narrative, so it can arbitrate factual disagreements against the source. Consequences pinned for A.3/A.5: the chair prompt declares `proposal_narrative` as an untrusted A7 variable with the same 100k-char bound as the seats plus one `seat_reviews` JSON variable; the chair's context cap and `review-panel.chair` budget envelope are sized for narrative + N reviews (roughly 2× the reviews-only input); the chair's cost is a separate attempt row. |
+| D10 | Default OpenAI seat model `[DECIDED 2026-09-12, provisional]` | Owner: **"GPT Sol"** (the owner expects to change this). The Codex CLI catalog names it `gpt-5.6-sol`; the **concrete OpenAI API model id is verified at seed time against OpenAI's published model list and docs**, never assumed from the CLI name. Its capability row (`instructionRole`, `supportsTemperature`, `maxOutputTokens`, retention class, `source`) and pricing row are written from those docs with `reviewedAt`; if the id cannot be verified, seeding stops and reports. |
 
 ## 2. What exists today `[VERIFIED 2026-09-12 via source]`
 
@@ -368,13 +370,7 @@ and Phase C (panel-vs-human comparison, history views, third seat) follow the su
 
 ## 8. Open items carried into implementation
 
-- **D9 chair input contract `[OPEN — owner]`:** (a) reviews only, the chair synthesises the N seat
-  reviews without the narrative (smaller context, cheaper, and the chair cannot re-review the
-  proposal), or (b) reviews plus the narrative (the chair can arbitrate factual disagreements against
-  the source at roughly 2× chair input). The choice fixes the chair prompt's variables, A7
-  declarations, context cap, budget envelope, and cost profile.
-- **D10 default OpenAI seat model `[OPEN — owner]`:** the concrete model id to seed as
-  `seat.openai.defaultModel`; its capability and pricing rows are then verified from OpenAI's docs.
+- D9 and D10 decided 2026-09-12; see §1.
 - OpenAI reasoning models: `max_completion_tokens` includes reasoning tokens; the capability row and
   budget envelope must reflect that. Verify `instructionRole` per model family from OpenAI's docs.
 - Old-page parity definition for D5 (not before Phase B).
@@ -413,3 +409,6 @@ and Phase C (panel-vs-human comparison, history views, third seat) follow the su
   spend-check and admin stats, panel never writes `api_usage_log`; `usageComplete` on the Executor
   result and error; A.5 row lock + `clock_timestamp()` with a straddle test. Raised to the owner as
   D9 (chair input) and D10 (default OpenAI model).
+- 2026-09-12 owner decided D9 (b: chair sees reviews + narrative) and D10 (GPT Sol, provisional).
+  No owner decision remains open. A0 handed to Codex via
+  `docs/plans/EXECUTOR_PROVIDER_SEAM_CODEX_BRIEF_2026-09-12.md`; Claude reviews.
