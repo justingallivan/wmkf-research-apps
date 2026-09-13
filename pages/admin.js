@@ -1142,6 +1142,7 @@ const APP_MODEL_NAMES = {
   'dynamics-explorer': 'Dynamics Explorer',
   'expertise-finder': 'Expertise Finder',
   'virtual-review-panel': 'Virtual Review Panel',
+  'review-panel': 'Virtual Review Panel',
   'grant-reporting': 'Grant Reporting',
 };
 
@@ -1233,6 +1234,7 @@ function ModelConfigSection() {
   if (!serverState) return null;
 
   const { apps, availableModels, tiers = [], defaultModel, modelStatuses = {} } = serverState;
+  const reviewPanel = apps.find(app => app.appKey === 'review-panel');
 
   // Build server-side DB override map for diff calculation
   const serverDbOverrides = {};
@@ -1368,7 +1370,7 @@ function ModelConfigSection() {
             </tr>
           </thead>
           <tbody>
-            {apps.map(app => (
+            {apps.filter(app => !app.providerBound).map(app => (
               <tr key={app.appKey} className="border-b border-gray-100 hover:bg-gray-50">
                 <td className="py-2 px-2 text-gray-900 font-medium whitespace-nowrap">
                   {APP_MODEL_NAMES[app.appKey] || app.appKey}
@@ -1443,6 +1445,65 @@ function ModelConfigSection() {
           </tbody>
         </table>
       </div>
+
+      {reviewPanel && (
+        <div className="mt-8">
+          <div className="mb-3">
+            <h3 className="text-sm font-semibold text-gray-900">Virtual Review Panel</h3>
+            <p className="text-xs text-gray-500 mt-1">
+              Each slot has a fixed provider. Only reviewed models with pricing coverage can be selected.
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr className="border-b border-gray-200">
+                  <th className="text-left py-2 px-2 font-medium text-gray-600">Slot</th>
+                  <th className="text-left py-2 px-2 font-medium text-gray-600">Provider</th>
+                  <th className="text-left py-2 px-2 font-medium text-gray-600 min-w-[320px]">Model</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Object.entries(reviewPanel.models).map(([slotKey, info]) => {
+                  const key = `${reviewPanel.appKey}:${slotKey}`;
+                  const localVal = localOverrides[key] || '';
+                  const serverVal = serverDbOverrides[key] || '';
+                  const changed = localVal !== serverVal;
+                  const effective = localVal || info.stored;
+                  const registryStatus = modelStatuses[effective] || info.registryStatus;
+                  return (
+                    <tr key={slotKey} className="border-b border-gray-100 hover:bg-gray-50">
+                      <td className="py-2 px-2 text-gray-900 font-medium">
+                        {info.label || slotKey}
+                        <div className="text-xs text-gray-400 font-normal">{slotKey}</div>
+                      </td>
+                      <td className="py-2 px-2 text-gray-700 capitalize">{info.vendor}</td>
+                      <td className="py-2 px-2">
+                        <select
+                          value={localVal}
+                          onChange={e => handleChange(reviewPanel.appKey, slotKey, e.target.value)}
+                          className={`w-full px-2 py-1.5 border rounded-lg text-xs focus:ring-2 focus:ring-gray-400 focus:border-gray-400 ${
+                            changed ? 'border-amber-400 ring-2 ring-amber-200' : 'border-gray-300'
+                          }`}
+                        >
+                          <option value="">Default ({info.hardcoded})</option>
+                          {(info.availableModels || []).map(model => (
+                            <option key={model.id} value={model.id}>{model.display_name}</option>
+                          ))}
+                        </select>
+                        <div className="mt-1 text-xs text-gray-500">
+                          → {shortModelName(effective)}
+                        </div>
+                        <RegistryStatusPills status={registryStatus} />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {hasChanges && (
         <p className="text-xs text-amber-600 mt-3">

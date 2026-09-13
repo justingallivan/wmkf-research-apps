@@ -19,7 +19,9 @@ export const BASE_CONFIG = {
   // Per-App Model Configuration
   // Values are tier keys (opus / sonnet / haiku). Resolver picks the latest
   // concrete id in that family at call time; admin overrides and env vars
-  // can also pin a specific concrete id.
+  // can also pin a specific concrete id. `review-panel` is the one
+  // provider-bound exception: its concrete slot defaults are governed by
+  // shared/config/reviewPanelSeats.js and validated by the admin API.
   APP_MODELS: {
     // 'concept-evaluator' deprecated 2026-04-25 (archived to /_archived).
     'multi-perspective-evaluator': { model: 'sonnet', visionModel: 'sonnet', fallback: 'haiku' },
@@ -52,6 +54,11 @@ export const BASE_CONFIG = {
     'dynamics-explorer':           { model: 'haiku',  fallback: 'haiku' },
     'expertise-finder':            { model: 'sonnet', fallback: 'haiku' },
     'virtual-review-panel':        { model: 'sonnet', fallback: 'haiku' },
+    'review-panel': {
+      'seat.claude': 'claude-fable-5-1',
+      'seat.openai': 'gpt-5.6-sol',
+      chair: 'claude-opus-5'
+    },
     'grant-reporting':             { model: 'sonnet', fallback: 'haiku' }
   },
 

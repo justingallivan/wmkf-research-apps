@@ -124,5 +124,85 @@ change (hand the owner `! vercel env …` lines in the handoff if one is needed)
 
 ## Handoff (Codex writes this)
 
-_(empty — Codex records: what landed, commits, gates run with results, anything outside the owned
-surface that Claude must do at promotion, and any value it could not verify.)_
+### Prepared in this working tree
+
+- Added the opt-in Executor provider seam. `allowedProviders` defaults to `['anthropic']`, an
+  unallowed provider fails before variable resolution, reviewed providers dispatch to their own
+  client, and prompt snapshots remain the only per-call model source.
+- Added the Chat Completions `OpenAIClient` with `safeFetch`, timeout/retry/abort behavior, reviewed
+  instruction-role shaping, `max_completion_tokens`, refusal/finish-reason normalization, redacted
+  errors, and complete/incomplete raw-usage tracking. It does not write `api_usage_log`.
+- Added `usageComplete` to both `LLMClient` normalization paths and propagated provider, usage,
+  model, and `paidCall` metadata across Executor success and failure paths.
+- Added the reviewed/priced `gpt-5.6-sol` registry entry, provider-aware model validation and model
+  registry checks, `OPENAI_API_KEY` secret tracking, and the fixed three-slot review-panel registry.
+- Added provider-bound admin GET/PUT behavior and UI controls for `seat.claude`, `seat.openai`, and
+  `chair`, while preserving the existing app model controls.
+- Updated the Executor and credential contracts. Added discriminating tests for all eight contracts,
+  including the A7 boundary through the actual OpenAI request shaper.
+
+### Published OpenAI verification
+
+- `[VERIFIED via OpenAI model docs]` The concrete model id is `gpt-5.6-sol`; Chat Completions is a
+  supported endpoint; the context window is 1,050,000; max output is 128,000; default reasoning
+  effort is `medium`; pricing is $4/M input and $20/M output:
+  https://developers.openai.com/api/docs/models/gpt-5.6-sol
+- `[VERIFIED via OpenAI Chat Completions reference]` Newer models use `developer` messages;
+  `max_completion_tokens`, `message.refusal`, `prompt_tokens`, and `completion_tokens` are published
+  request/response fields:
+  https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create
+- `[VERIFIED via OpenAI data-controls docs]` `/v1/chat/completions` is not used for training, has
+  standard 30-day abuse-monitoring retention, and is Zero Data Retention eligible subject to the
+  documented limitations: https://developers.openai.com/api/docs/guides/your-data
+- `[UNVERIFIED]` OpenAI's published GPT-5.6 guidance does not state that `temperature` is compatible
+  with Chat Completions at GPT-5.6 Sol's default `medium` reasoning effort. The capability is
+  therefore conservatively disabled and the client omits the field. Promotion must not enable it
+  until a model-specific OpenAI source verifies that exact combination.
+
+### Verification completed sequentially
+
+- `/start`: git state and required symlinks verified; every discovered `check:*` gate and its
+  self-test passed sequentially. Branch base remained `4eaabc9347966f998cd192905c6e634c51412380`; no
+  pull or branch switch occurred.
+- Scoped Jest gate: 14/14 suites and 186/186 tests passed.
+- `npm run check:types`: passed.
+- `check:model-registry`: passed (43 configured values, 4 tier fallbacks, 14 capability entries),
+  then its self-test passed 6/6.
+- `check:model-override-warming`: passed (212 routes), then its self-test passed 17/17.
+- `check:prompt-injection-tagging`: passed (29 migrated surfaces, 0 pending), then its self-test
+  passed 18/18.
+- `check:secret-scan`: passed (3,603 tracked text files), then its self-test passed.
+- `check:doc-currency`: passed, then its self-test passed 13/13.
+- `check:api-routes`: passed with the existing warnings for the three external-material token
+  routes, then its self-test passed.
+- Changed-file ESLint: passed with 0 errors and 10 pre-existing
+  `react-hooks/set-state-in-effect` warnings in `pages/admin.js`.
+- `npm run build`: passed. The existing pre-site-visit dynamic-filesystem Turbopack warning and Node
+  `localStorage` experimental warnings remained; the migrations manifest did not change.
+- `git diff --check`: passed.
+
+### Commit and push status
+
+- No commit could be created in this sandbox. `git add` was denied while Git tried to create
+  `/Users/gallivan/Code/WMKF_Apps/.git/worktrees/WMKF_Apps-codex/index.lock`; that shared metadata is
+  outside the writable worktree and the task expressly forbids touching the main checkout.
+- `git push -u origin codex/executor-provider-seam` was attempted after verification and failed
+  because the sandbox could not resolve `github.com`. The remote feature branch therefore has no
+  Phase A0 commit from this working tree.
+- A host-authorized promotion session must stage only the owned files, make small descriptive
+  commits, rerun the relevant gates if staging changes content, and then run:
+  `git push -u origin codex/executor-provider-seam`. Do not merge or deploy as part of that step.
+
+### Promotion follow-ups outside the owned surface
+
+- The whole-flow contract sweep found active durable descriptions that still call the Executor
+  Anthropic-only. Reconcile `docs/SERVICE_AND_UTILITY_CATALOG.md`,
+  `docs/APPLICATION_STATE_ATLAS.md`, `docs/AI_DATA_FLOW_MATRIX.md`, and
+  `docs/agent-wiki/topics/prompt-executor.md` during promotion. The Phase A build plan's verified-state
+  section must also be advanced from its pre-A0 snapshot. They were left untouched to respect this
+  brief's owned-file boundary.
+- `[UNVERIFIED]` Live Vercel environment presence of `OPENAI_API_KEY` was not probed or changed. The
+  owner should run `! vercel env ls`; only if the key is absent in an intended environment, run
+  `! vercel env add OPENAI_API_KEY preview` and/or
+  `! vercel env add OPENAI_API_KEY production` through the normal secret-entry flow.
+- No migration, live provider call, environment mutation, merge, or deployment was performed.

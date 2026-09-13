@@ -21,6 +21,9 @@ beforeEach(() => {
 });
 
 describe('pricing table — S181 bug fixes pinned', () => {
+  test('GPT-5.6 Sol is $4/$20', () => {
+    expect(MODEL_PRICING['gpt-5.6-sol']).toEqual({ input: 400, output: 2000 });
+  });
   test('Fable/Mythos 5 are $10/$50', () => {
     expect(MODEL_PRICING['claude-fable-5']).toEqual({ input: 1000, output: 5000 });
     expect(MODEL_PRICING['claude-mythos-5']).toEqual({ input: 1000, output: 5000 });

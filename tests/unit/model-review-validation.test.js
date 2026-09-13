@@ -2,7 +2,10 @@
  * @jest-environment node
  */
 
-import { validateReviewedClaudeModelValue } from '../../lib/services/model-review-validation';
+import {
+  validateReviewedClaudeModelValue,
+  validateReviewedProviderModelValue,
+} from '../../lib/services/model-review-validation';
 
 describe('validateReviewedClaudeModelValue', () => {
   it('accepts tier keys and normalizes them to lowercase', () => {
@@ -39,5 +42,21 @@ describe('validateReviewedClaudeModelValue', () => {
       value: null,
       kind: 'empty',
     });
+  });
+});
+
+describe('validateReviewedProviderModelValue', () => {
+  it('accepts only a reviewed, priced model owned by the fixed provider', () => {
+    expect(validateReviewedProviderModelValue('gpt-5.6-sol', { provider: 'openai' }))
+      .toMatchObject({ valid: true, value: 'gpt-5.6-sol' });
+  });
+
+  it('rejects provider mismatch, tier aliases, and unreviewed models', () => {
+    expect(validateReviewedProviderModelValue('claude-sonnet-5', { provider: 'openai' }).code)
+      .toBe('provider_model_mismatch');
+    expect(validateReviewedProviderModelValue('sonnet', { provider: 'anthropic' }).code)
+      .toBe('provider_model_mismatch');
+    expect(validateReviewedProviderModelValue('gpt-future', { provider: 'openai' }).code)
+      .toBe('unreviewed_provider_model');
   });
 });

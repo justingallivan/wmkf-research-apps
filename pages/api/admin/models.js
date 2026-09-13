@@ -1,7 +1,7 @@
 /**
  * API Route: /api/admin/models
  *
- * Admin endpoint for managing per-app Claude model overrides.
+ * Admin endpoint for managing per-app and provider-bound review-panel models.
  * Protected: superuser role required (or auth bypassed in dev mode).
  *
  * GET  — Returns apps with effective model config, available models from Anthropic API
@@ -10,6 +10,7 @@
 
 import { requireSuperuser } from '../../../lib/utils/auth';
 import { BASE_CONFIG } from '../../../shared/config/baseConfig';
+import { REVIEW_PANEL_SEATS, getReviewPanelSeat } from '../../../shared/config/reviewPanelSeats';
 import { clearModelOverridesCache } from '../../../lib/services/model-override-loader';
 import { listSettings, setSetting, deleteSetting } from '../../../lib/services/settings-service';
 import {
@@ -20,8 +21,11 @@ import {
   isTier,
   resolveModel,
 } from '../../../lib/services/model-resolver';
-import { validateReviewedClaudeModelValue } from '../../../lib/services/model-review-validation';
-import { lookupModelCapabilities } from '../../../lib/services/model-capabilities';
+import {
+  validateReviewedClaudeModelValue,
+  validateReviewedProviderModelValue,
+} from '../../../lib/services/model-review-validation';
+import { MODEL_CAPABILITIES, lookupModelCapabilities } from '../../../lib/services/model-capabilities';
 import { lookupPricing, LAST_REVIEWED_AT } from '../../../lib/utils/model-pricing';
 
 // Valid model types that can be overridden
@@ -76,7 +80,9 @@ async function handleGet(req, res) {
     const statusIds = new Set();
 
     // Build apps array from APP_MODELS config
-    const apps = Object.entries(BASE_CONFIG.APP_MODELS).map(([appKey, config]) => {
+    const apps = Object.entries(BASE_CONFIG.APP_MODELS)
+      .filter(([appKey]) => appKey !== 'review-panel')
+      .map(([appKey, config]) => {
       const result = { appKey, models: {} };
 
       for (const modelType of VALID_MODEL_TYPES) {
@@ -119,7 +125,39 @@ async function handleGet(req, res) {
       }
 
       return result;
-    });
+      });
+
+    const reviewedProviderModels = buildReviewedProviderModels(availableModels);
+    for (const models of Object.values(reviewedProviderModels)) {
+      for (const model of models) statusIds.add(model.id);
+    }
+    const reviewPanel = {
+      appKey: 'review-panel',
+      label: 'Virtual Review Panel',
+      providerBound: true,
+      models: {},
+    };
+    for (const seat of REVIEW_PANEL_SEATS) {
+      if (!seat.enabled) continue;
+      const dbOverride = dbOverrides[`review-panel:${seat.key}`] || null;
+      const storedValue = dbOverride || seat.defaultModel;
+      statusIds.add(storedValue);
+      reviewPanel.models[seat.key] = {
+        effective: storedValue,
+        stored: storedValue,
+        isTier: false,
+        vendor: seat.vendor,
+        enabled: seat.enabled,
+        label: seat.label,
+        registryStatus: buildModelRegistryStatus(storedValue),
+        source: dbOverride ? 'db' : 'hardcoded',
+        dbOverride,
+        envOverride: null,
+        hardcoded: seat.defaultModel,
+        availableModels: reviewedProviderModels[seat.vendor] || [],
+      };
+    }
+    apps.push(reviewPanel);
 
     for (const model of availableModels) {
       if (model.id) statusIds.add(model.id);
@@ -159,6 +197,7 @@ export function buildModelRegistryStatus(modelId) {
     ok: Boolean(capabilities && pricing),
     capability: capabilities ? {
       status: 'reviewed',
+      provider: capabilities.provider || null,
       family: capabilities.family || null,
       reviewedAt: capabilities.reviewedAt || null,
       supportsTemperature: capabilities.supportsTemperature === true,
@@ -185,6 +224,32 @@ export function buildModelRegistryStatus(modelId) {
   };
 }
 
+function buildReviewedProviderModels(availableAnthropicModels) {
+  const candidates = [
+    ...availableAnthropicModels,
+    ...Object.entries(MODEL_CAPABILITIES)
+      .filter(([, capabilities]) => capabilities.provider === 'openai')
+      .map(([id]) => ({ id, display_name: id, created_at: null })),
+  ];
+  const seen = new Set();
+  const byProvider = {};
+  for (const candidate of candidates) {
+    if (!candidate.id || seen.has(candidate.id)) continue;
+    const capabilities = lookupModelCapabilities(candidate.id);
+    if (!capabilities || !lookupPricing(candidate.id)) continue;
+    seen.add(candidate.id);
+    (byProvider[capabilities.provider] ??= []).push({
+      id: candidate.id,
+      display_name: candidate.display_name || candidate.id,
+      created_at: candidate.created_at || null,
+    });
+  }
+  for (const models of Object.values(byProvider)) {
+    models.sort((a, b) => a.id.localeCompare(b.id));
+  }
+  return byProvider;
+}
+
 async function handlePut(req, res, profileId) {
   try {
     const { appKey, modelType, modelId } = req.body;
@@ -194,9 +259,14 @@ async function handlePut(req, res, profileId) {
       return res.status(400).json({ error: `Invalid app key: ${appKey}` });
     }
 
-    // Validate modelType
-    if (!VALID_MODEL_TYPES.includes(modelType)) {
-      return res.status(400).json({ error: `Invalid model type: ${modelType}. Must be one of: ${VALID_MODEL_TYPES.join(', ')}` });
+    const reviewSeat = appKey === 'review-panel' ? getReviewPanelSeat(modelType) : null;
+
+    // Validate modelType / governed slot key.
+    if (appKey === 'review-panel' ? !reviewSeat : !VALID_MODEL_TYPES.includes(modelType)) {
+      const expected = appKey === 'review-panel'
+        ? REVIEW_PANEL_SEATS.map((seat) => seat.key)
+        : VALID_MODEL_TYPES;
+      return res.status(400).json({ error: `Invalid model type: ${modelType}. Must be one of: ${expected.join(', ')}` });
     }
 
     const settingKey = `model_override:${appKey}:${modelType}`;
@@ -213,7 +283,9 @@ async function handlePut(req, res, profileId) {
       // concrete Anthropic id. Future model ids must first be added to the
       // capability + pricing registries so request shaping and cost logging
       // cannot drift silently.
-      const validation = validateReviewedClaudeModelValue(modelId);
+      const validation = reviewSeat
+        ? validateReviewedProviderModelValue(modelId, { provider: reviewSeat.vendor })
+        : validateReviewedClaudeModelValue(modelId);
       if (!validation.valid) {
         return res.status(400).json({
           error: validation.error,

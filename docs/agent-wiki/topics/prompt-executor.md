@@ -36,7 +36,7 @@ reviewer-finder prompt migration.
 
 ## Ground Rules
 
-- Use `lib/services/llm-client.js` for provider calls.
+- Use `lib/services/llm-client.js` for provider calls. The Executor alone may reach OpenAI, through `lib/services/openai-client.js`, and only when the caller passes `allowedProviders` including `openai`; prompt publishing stays Claude-only (VRP Phase A0, 2026-09-12; see `docs/EXECUTOR_CONTRACT.md` § Provider dispatch).
 - Use `lib/services/execute-prompt.js` for shared Executor behavior.
 - Prompt claims must trace resolver, composer, runtime caller, fallback behavior, and tests.
 - **requestId trust-boundary chokepoint:** `executePrompt` interpolates `requestId` into a raw

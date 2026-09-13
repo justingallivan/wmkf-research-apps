@@ -6,7 +6,7 @@ status: canonical
 summary: "The Executor is the function invoker. The prompt row is the function definition. Chains and triggers are the Flow's job, not the Executor's."
 canonical: true
 cataloged: 2026-07-02
-last_verified: 2026-09-07
+last_verified: 2026-09-12
 owner: product-engineering
 related:
   - lib/services/execute-prompt.js
@@ -22,7 +22,7 @@ related:
 and multiple live grantee, field-primer, and review services). A Power Automate implementation is a deferred target, not a
 second current implementation. The original "May 1 2026 cycle target" framing is historical.
 **Created:** 2026-04-24 (Session 109, reconciliation pass)
-**Last status update:** 2026-09-07 (guarded historical prompt snapshots for Cycle Dossier generation)
+**Last status update:** 2026-09-12 (opt-in OpenAI provider seam for governed prompt snapshots)
 **Owners:** Justin (Vercel implementation — shipped); Connor would own any future Power Automate implementation
 **Related docs:** `docs/PROMPT_STORAGE_DESIGN.md`, `docs/BACKEND_AUTOMATION_PLAN.md`, `docs/WORKFLOW_CHAINING_DESIGN.md`, `docs/GRANT_CYCLE_LIFECYCLE.md`
 
@@ -47,7 +47,7 @@ The Executor is the **function invoker**. The prompt row is the **function defin
 The contract covers **Pattern A + dual-caller prompts and Pattern B/C Vercel-only prompts** — one Executor, no branching. Specifically:
 
 **In scope:**
-- Single-shot Claude prompts (system + user, no multi-turn)
+- Single-shot Anthropic prompts and explicitly allowed OpenAI prompt snapshots (system + user, no multi-turn)
 - Backend-triggered (PA, on Dynamics status change) and user-triggered (Vercel button) callers
 - Summarization, classification, multi-output extraction
 - Prompts that mix Dynamics-sourced inputs, SharePoint file inputs, and caller-supplied overrides
@@ -56,7 +56,7 @@ The contract covers **Pattern A + dual-caller prompts and Pattern B/C Vercel-onl
 **Out of scope (separate code paths):**
 - Tool-use / agent loops (Dynamics Explorer)
 - Streaming SSE to the UI (token-by-token display — today's Phase II pattern stays outside)
-- Non-Claude models
+- Providers other than Anthropic and OpenAI
 - Anthropic Batch API (`wmkf_batch_run`, retrospective work)
 - Multi-turn stateful conversations
 
@@ -77,6 +77,7 @@ The contract covers **Pattern A + dual-caller prompts and Pattern B/C Vercel-onl
 | `assertSystemIncludes` | string \| string[] | no | Fail-closed assertion that each required substring survived composition in the actual system prompt. Used when a mutable prompt row must retain a security-critical block. |
 | `requireNoPersistence` | bool | no | Default `false`. When `true`, the Executor rejects any current prompt row whose output schema declares a target other than `kind: none`, before the model call or target write. Use for producers that need request-linked audit lineage but must remain pass-through-only even if the mutable prompt row drifts. |
 | `promptSnapshot` | object | no | Server-owned frozen prompt row for a historical generation. When supplied, the Executor skips current-row lookup and validates exact `wmkf_ai_promptname`, GUID `wmkf_ai_promptid`, positive `wmkf_promptversion`, system/body text, and a concrete model id (tier aliases are refused). The snapshot must include the Executor's variable/output-schema/model fields; `requireNoPersistence:true` is required for Cycle Dossier pass-through stages. Existing callers omit this field and continue resolving the sole current row. |
+| `allowedProviders` | string[] | no | Server-owned provider allowlist. Defaults to `['anthropic']`, preserving every existing caller. A resolved OpenAI model fails with `provider_not_allowed` before variable resolution unless the caller explicitly includes `openai`. Unknown models/providers retain the existing unreviewed-model failure. Never accept this value from client input; a workflow must intersect its own server-side provider policy before calling. |
 | `maxTokensOverride` | positive integer | no | Server-owned, per-invocation output-budget override, capped at the final resolved model's reviewed `maxOutputTokens`. The Pre-Site standing value and review-synthesis retry floor/ceiling resolve through `lib/services/executor-budget-service.js` from the latest append-only `executor.budgets.vNNNNNN` Dataverse setting; `shared/config/executorBudgets.js` owns only the closed schema, safety bounds, and outage fallback. The superuser Admin panel reads the same resolved revision. Never accept this value from client input. |
 | `timeoutMsOverride` | positive integer | no | Server-owned, per-invocation LLM transport timeout override (milliseconds), passed to `LLMClient` in place of its 120s default. The Pre-Site standing value and the field-primer timeout-only value resolve through the same durable budget revision and remain bounded to the reviewed 60 000–240 000 ms range; never accept it from client input. Non-integer/non-positive values are ignored. |
 | `deadlineMs` | positive number (epoch ms) | no | Server-owned absolute bound for the provider call, for callers holding a time-limited lease (field primer, S493). Checked immediately before the model call: the transport timeout becomes the smaller of the caller's budget (or the client default) and the time remaining, and a deadline with under one second left throws `executor_deadline_exhausted` before any tokens are spent. Never accept it from client input. |
@@ -97,6 +98,11 @@ aliases so a later model-registry change cannot silently alter a replay. The
 historical row is never fetched from the mutable current pointer during that
 call; `prompt-store.fetchPromptVersion(name, {promptId, version})` is available
 for a caller that needs to resolve the exact row before capturing it.
+
+OpenAI can enter the Executor only through a server-built prompt snapshot whose
+concrete model has a reviewed `provider:'openai'` capability row and only when
+that call explicitly includes `openai` in `allowedProviders`. Prompt publishing
+remains Anthropic-only; there is no caller-supplied `modelOverride` option.
 
 Cycle Dossier variables are all declared `source.kind: override` and the worker
 supplies the retained narrative/evidence strings. Passing `requestId` still
@@ -180,17 +186,18 @@ administrator action.
 |---|---|---|
 | `parsed` | object \| null | Output object matching `wmkf_ai_promptoutputschema`. `null` when `blocked = true`. Downstream chain steps consume this. |
 | `runId` | GUID \| null | `wmkf_ai_run.wmkf_ai_runid` when audit-row creation succeeds. A thrown failure can carry `runId = null` if writing the failure row also fails. |
-| `cacheHit` | bool | Derived from Claude response's `usage.cache_read_input_tokens > 0`. For observability. |
-| `blocked` | bool | `true` when at least one guarded target was already populated and `forceOverwrite` was false. Claude was not called; no targets written. |
+| `cacheHit` | bool | Derived from `usage.cache_read_input_tokens > 0`. OpenAI reports zero for both cache counters in this seam. |
+| `blocked` | bool | `true` when at least one guarded target was already populated and `forceOverwrite` was false. No provider was called; no targets written. |
 | `conflicts` | array | When `blocked`, one entry per guarded target that triggered the block: `{ output, table, field, existingContent, existingLength, modifiedOn }`. Caller (typically Vercel) uses this to render a confirm-overwrite UI. |
 | `writeResults` | object \| null | When not blocked: `{ allOk, results: [{ output, ok, field?, jsonPath?, reason?, error? }] }`. `null` when blocked. |
-| `usage` | object \| absent | Verbatim Anthropic `usage` object (`input_tokens`, `output_tokens`, `cache_creation_input_tokens`, `cache_read_input_tokens`). The key is omitted from the blocked return. |
-| `meta` | object \| absent | `{ promptName, promptVersion, promptId, modelUsed, systemChars, bodyChars, aiPayloadBoundaries, rawOutputRetention, semanticAttempt, retryOfRunId }`. The key is omitted from the blocked return. Useful for observability/UI display and caller-level retry linkage. |
+| `usage` | object \| absent | Normalized snake-case provider usage (`input_tokens`, `output_tokens`, `cache_creation_input_tokens`, `cache_read_input_tokens`). OpenAI cache fields are zero. The key is omitted from the blocked return. |
+| `usageComplete` | bool \| absent | `true` only when the provider response carried both raw input and output token totals as finite, non-negative numbers. Normalized zero values must never be used to infer completeness. Omitted from the blocked return. |
+| `meta` | object \| absent | `{ promptName, promptVersion, promptId, modelUsed, provider, systemChars, bodyChars, aiPayloadBoundaries, rawOutputRetention, semanticAttempt, retryOfRunId }`. The key is omitted from the blocked return. Useful for observability/UI display and caller-level retry linkage. |
 
 ### Errors
 
 The Vercel Executor throws on prompt-not-found, variable-resolution, composed
-system assertion, Claude API, output-parse/validation, and other contract-level
+system assertion, provider API, output-parse/validation, and other contract-level
 failures. Individual target persistence failures are returned in
 `writeResults` with `allOk=false`; the run is logged as `Needs Review` and the
 parsed result is still returned so the caller can handle partial persistence
@@ -204,6 +211,28 @@ Typed output errors include `code`, `stopReason`, and `maxTokens`; the current
 codes are `claude_output_truncated`, `claude_context_window_exceeded`,
 `claude_output_refused`, `claude_output_incomplete`, and
 `claude_output_invalid_json`.
+
+Every error thrown from inside the audited execution pipeline is annotated with `usage`, `modelUsed`, `provider`,
+`usageComplete`, and `paidCall`. `paidCall=true` means a provider response was
+received; `false` means failure happened before dispatch; `null` means dispatch
+started but an abort or transport outcome left no usable response. The usage
+object uses the same snake-case shape as a success and is zero-filled when no
+response usage exists. A post-response parse, schema, refusal, truncation, or
+later persistence/audit failure therefore cannot lose known usage. The Executor
+still does not write `api_usage_log`; caller-owned ledgers remain responsible for
+durable cost accounting.
+
+### Provider dispatch
+
+The resolved model capability row determines the transport. `anthropic` uses
+the existing `LLMClient`; `openai` uses `OpenAIClient` only after the caller's
+`allowedProviders` admits it. The OpenAI client flattens the Executor system
+array into one message with the capability row's reviewed `instructionRole`,
+uses `max_completion_tokens`, sends temperature only when the capability says
+it is supported, and preserves `providerFinishReason`. It maps `stop` to
+`end_turn`, `length` to `max_tokens`, and `content_filter` to `refusal`; a
+non-empty `message.refusal` is also a refusal regardless of finish reason.
+Unmapped reasons reach the existing fail-closed termination check.
 
 **Audit attempt invariant:** the Executor attempts a `wmkf_ai_run` row for
 blocked, completed/needs-review, and thrown-failure outcomes. Audit persistence
@@ -221,12 +250,12 @@ complete when Dataverse logging is unavailable.
 | 2 | Parse variable declarations | Parse JSON on `wmkf_ai_promptvariables` | `JSON.parse(row.wmkf_ai_promptvariables)` |
 | 3 | Resolve variable values | Apply-to-each + Switch on `source.kind` | Loop + switch; source kinds handled by dedicated resolvers |
 | 4 | **Preflight output guards** | For each output with `guard != "always-overwrite"`, GET target field. If populated AND `forceOverwrite = false` → write `wmkf_ai_run` with status `Needs Review`, return `{ blocked: true, conflicts, runId }`. Capture `@odata.etag` per target for step 8's `If-Match`. | Same. Skip steps 5–8 on block. |
-| 5 | Compose Claude payload | Compose action: system + user blocks; `cache_control: {type:"ephemeral"}` at declared prefix boundary | `buildClaudeRequest(prompt, variables)` |
-| 6 | Call Claude | HTTP action → Anthropic API | `callClaude()` → `LLMClient.complete()` (2026-06-11; canonical transport — `safeFetch` SSRF allowlist, abortable timeout, 429/529 retry, API-key redaction). The `cache_control` system array passes through verbatim. The Executor preserves normalized joined `text`, `stopReason`, `stopDetails`, refusal state, model, usage, and the applied token budget. A prompt with `generationMode:"native-json-schema"` passes `jsonSchema` as Anthropic `output_config.format` only when the concrete model is explicitly reviewed for structured output. No `appName` is passed — avoids double-counting `api_usage_log` against the driver route's own `logUsage`. |
+| 5 | Compose provider payload | Compose action: system + user blocks; `cache_control: {type:"ephemeral"}` at the Anthropic prefix boundary | Compose one system block plus one user message after applying A7 boundaries. |
+| 6 | Call provider | HTTP action → explicitly allowed provider API | `callProvider()` dispatches by the reviewed capability row: Anthropic → `LLMClient.complete()`; OpenAI → `OpenAIClient.complete()`. Both use `safeFetch`, abortable timeouts, retry, and key redaction. Anthropic retains its cache marker and native structured-output behavior. OpenAI uses the reviewed instruction role and Phase A keeps provider-native structured output disabled. No `appName` is passed, so the Executor does not write `api_usage_log`. |
 | 7 | Validate termination + parse output | Require a clean terminal response, then parse the complete joined text using `wmkf_ai_promptoutputschema.jsonSchema` (or treat as raw text when `parseMode = "raw"`) | Requires `stopReason="end_turn"` before parsing/persistence. Joins every text content block. Applies required-key checks and then the optional local `validationSchema`. |
 | 8 | Persist outputs | Coalesce all `akoya_request` outputs into **one** PATCH with `If-Match: <etag>` from step 4. Direct field writes (no `jsonPath`) merge into the payload as `{ field: value }`. `jsonPath` outputs grouped by field: GET the current memo, apply each `$.path` write in declaration order (later writes win on key collisions), serialize back, add the merged JSON to the same payload. Two direct outputs writing the same field (no `jsonPath`) throws at preflight as a schema error. Success or failure is uniform across all contributors: a 412 marks every eligible output as `concurrent_edit`. Persistence errors become structured `writeResults`, not necessarily thrown errors. | Same coalesced PATCH and structured result |
 | 9 | Log Execution | Attempt to create `wmkf_ai_run`: Lookup to prompt row, `wmkf_ai_promptversion`, `wmkf_ai_runsource`, `wmkf_ai_status`, `wmkf_ai_model`, `wmkf_ai_rawoutput` according to `rawOutputRetention`, token/cache counts in `wmkf_ai_notes`, `wmkf_ai_request` Lookup | Same; logging failure is fail-visible and can leave `runId=null` on a thrown path |
-| 10 | Return | Return parsed output, audit id, cache/guard state, structured write results, usage, and metadata | `return { parsed, runId, cacheHit, blocked, conflicts, writeResults, usage, meta }` |
+| 10 | Return | Return parsed output, audit id, cache/guard state, structured write results, usage, and metadata | `return { parsed, runId, cacheHit, blocked, conflicts, writeResults, usage, usageComplete, meta }` |
 
 ---
 
@@ -283,7 +312,7 @@ complete when Dataverse logging is unavailable.
 
 **`cacheable` flag:** Phase 0 stores this declaration but does not use it to place variables
 relative to the cache boundary. `composeMessages()` interpolates variables wherever their
-placeholders occur in the stored system/body templates, and `callClaude()` marks the completed
+placeholders occur in the stored system/body templates, and the Anthropic transport marks the completed
 system block. An identical rerun can be cache-eligible when its composed prefix is unchanged
 (including stable nonces for opted-in untrusted variables), but a cache hit must be verified
 from response usage rather than assumed. Cross-prompt alignment still requires Phase-2 context
@@ -377,16 +406,16 @@ guard at invocation time.
 
 **Output guards (Phase 0):**
 
-Each output may declare a `guard` policy that the Executor applies in step 4 (preflight) before any Claude call. Default is `"skip-if-populated"` for any `akoya_request` field-target.
+Each output may declare a `guard` policy that the Executor applies in step 4 (preflight) before any provider call. Default is `"skip-if-populated"` for any `akoya_request` field-target.
 
 | Guard | Behavior |
 |---|---|
 | `skip-if-populated` | Read target field. If populated (string-trim length > 0; for JSON-path targets, the path must resolve and be non-null/non-empty) AND `forceOverwrite = false` → block. |
-| `always-overwrite` | Skip the preflight read. Always proceed to Claude. Use for fields that are deliberately re-derived every run (audit logs, computed scores, status flags). |
+| `always-overwrite` | Skip the preflight read. Always proceed to the provider. Use for fields that are deliberately re-derived every run (audit logs, computed scores, status flags). |
 
 **Phase 1+ deferred guards:** `append` (concatenate to existing value with separator), `version-on-conflict` (write to `field_v2` etc.), `error-on-conflict` (fail with 409 instead of returning `blocked`).
 
-**`parseMode` (output schema, Phase 0):** `"json"` (default — Claude must return parseable JSON matching `jsonSchema`) or `"raw"` (the complete joined text becomes the value of the single declared output; `jsonSchema` ignored). Multi-output prompts must use `"json"`.
+**`parseMode` (output schema, Phase 0):** `"json"` (default — the provider must return parseable JSON matching `jsonSchema`) or `"raw"` (the complete joined text becomes the value of the single declared output; `jsonSchema` ignored). Multi-output prompts must use `"json"`.
 
 **`validationSchema` (output schema, added 2026-05-22 — A7 step 3):** an optional declarative schema, in the `validateAiJson` node format (`lib/utils/ai-output-schema.js` — `{ "type": "object", "fields": { … } }`, plus `array` / `record` / scalar nodes; fully JSON-serialisable). When present and `parseMode = "json"`, the Executor validates the parsed model output against it in step 7, **after** the `jsonSchema.required` check and **before** step 8 persistence. Undeclared keys are dropped and types/lengths are bounded, so a prompt-injected model cannot smuggle an extra field through to an `akoya_request` writeback. A validation failure throws (logged as a `failed` run row). Prompts that omit `validationSchema` are unchanged — the field is purely additive. `raw` parseMode never reaches this check. `jsonSchema` (presence/required-key assertion) and `validationSchema` (post-parse shape enforcement) are independent and may both be declared.
 
@@ -394,7 +423,7 @@ Each output may declare a `guard` policy that the Executor applies in step 4 (pr
 
 | Mode | `wmkf_ai_rawoutput` content |
 |---|---|
-| `full` | Full Claude response text, truncated only by the Dataverse Memo safety cap. |
+| `full` | Full provider response text, truncated only by the Dataverse Memo safety cap. |
 | `hash` | Content-free metadata: `{retention:"hash", originalChars, sha256}`. Use when the model output is already persisted to a target field such as `akoya_request.wmkf_ai_summary`. |
 | `none` | Content-free metadata: `{retention:"none", originalChars}`. Use when even hash correlation is unnecessary. |
 
@@ -445,7 +474,7 @@ that no execution occurred.
 | `wmkf_ai_tasktype` | Derived from the prompt row (future — after `tasktype` lands on `wmkf_ai_prompt`) |
 | `wmkf_ai_status` | `Completed` / `Failed` / `Needs Review` (the last is also used for blocked runs — see *Notes for caller authors*) |
 | `wmkf_ai_model` | The model ID actually used |
-| `wmkf_ai_rawoutput` | Completed Claude response according to `rawOutputRetention` (`full`, `hash`, or `none`), or a thrown-failure diagnostic envelope whose nested response output applies the same retention policy |
+| `wmkf_ai_rawoutput` | Completed provider response according to `rawOutputRetention` (`full`, `hash`, or `none`), or a thrown-failure diagnostic envelope whose nested response output applies the same retention policy |
 | `wmkf_ai_request` | Lookup to `akoya_request` (if applicable) |
 | `wmkf_ai_notes` | Input/output token counts + cache hit counts + any error summary; includes `semanticAttempt` and, for a linked caller retry, `retryOf=<prior run GUID>` |
 | `createdon` | Built-in Dataverse creation timestamp for the run row. Do not write vestigial `wmkf_ai_rundatetime`. |

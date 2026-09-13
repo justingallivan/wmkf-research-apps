@@ -45,6 +45,11 @@ related:
 
 ## 2. What exists today `[VERIFIED 2026-09-12 via source]`
 
+> **Snapshot note:** this section describes `main` before Phase A0. A0 is built on branch
+> `codex/executor-provider-seam` (PR #280); once merged, the Executor dispatches by provider with
+> an opt-in `allowedProviders` option, the registry gate is provider-keyed, and the admin slots exist.
+> Re-verify this section against `main` before Phase A work starts.
+
 - **Executor is Anthropic-only by construction, not by allowlist.** `executePrompt` resolves the
   prompt row's `wmkf_ai_model` through `resolvePromptClaudeModel` → `resolveModelWithCapabilities`
   (`lib/services/execute-prompt.js:495-513`) and constructs `new LLMClient({ apiKey, model })` with
