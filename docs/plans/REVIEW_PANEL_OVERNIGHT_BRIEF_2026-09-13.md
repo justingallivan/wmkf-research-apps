@@ -2,7 +2,7 @@
 title: Review Panel Phase A — Overnight Build Brief (2026-09-13)
 domain: virtual-review-panel
 kind: brief
-status: complete
+status: in-progress
 summary: "Running log of the autonomous overnight Phase A build (Sonnet builds, Opus reviews, Codex adversarial review, Fable orchestrates). Per-slice status, unresolved findings, decisions made on the owner's behalf, and the owner-side commands needed before a smoke run."
 cataloged: 2026-09-13
 owner: product-engineering
@@ -38,6 +38,25 @@ related:
 | 3 | A.1 registry/routes/matrix + service layer, A.7 editions in the D11 store + download route, A.8 page, operator retry hand-off, spend-check/admin-stats ledger queries, A.9 docs | built (8 commits, 34 files; all 18 gates green, full unit suite 12,235 green); Opus round 1 = FIX (6 blocking: unknown-cost predicate inconsistent across spend-check/admin-stats/ledger, per-entry report used run-wide cost, two decorative cost tests, no service-level actor-assertion test, retry stuck after partial Blob write); all fixed; Opus recheck round 2 = PASS, no new blocking | 03f96d25 … d46f252e |
 | Gates + PR | full gate set sequentially, PR opened, CI watched | all gates green in the worktree; PR #281 open, every CI check green (Jest, Semgrep, Trivy, Vercel preview, claude-review) | — |
 | Codex adversarial review | after Opus is satisfied with the whole | round 1 = needs-attention: 4 blocking (per-click idempotency key can double-launch; worker never re-asserts run owner before paid calls; Blob store readiness checked only after paid work and store id never enforced; spend alert ignores unknown attempts) + 1 decorative SUM test. All fixed in 5353a314 (CI green). Opus recheck: fixes confirmed, but the fix introduced two regressions (owner-revocation 403 mid-pool strands sibling entries in a failed run; unknown-cost alert shares the dedupe key with the threshold alert) plus one decorative test. Final Sonnet round 05e14957 fixed all three; Opus recheck PASS on substance, sole leftover (stale six-writers comment + one test assertion) fixed by Fable directly in 72dd40dd. **Loop closed.** Post-loop guard: ledger reads tolerate a missing table (`42P01` → "not migrated"), 94d9ada0. Branch = 28 commits; PR #281 CI green on every commit through 94d9ada0; main CI green on the brief/handoff commits | 5353a314, 05e14957, 72dd40dd, 94d9ada0 |
+
+## 2b. Smoke results (2026-09-13, owner-run, production)
+
+All eight owner steps in §5 are done: 047 applied, PR #281 merged (bbef47ac), store `wmkf-review-panel-private` (`store_cwVLLxRMR3A8NFA2`) connected under the `REVIEW_PANEL_BLOB` prefix, `OPENAI_API_KEY` + `VRP_ALLOWED_PROVIDERS=claude,openai`, flags (`smoke`, allowlist 1002874/1002852/1002903/1002912), prompts seeded v1, drain cron per minute (fb6a911a).
+
+| Run | Claude seat | OpenAI seat (`gpt-5.6-sol`) | Outcome |
+|---|---|---|---|
+| 1002852 | Fable: API refusal, 5 s, 15.2k in / 0 out, $0.16 | completed, 68 s, 10.2k/3.3k, $0.11 | entry failed (partial-seat policy) |
+| 1002874 | Fable: API refusal, 4 s, 14.5k in / 0 out, $0.15 | completed, 94 s, 8.8k/3.2k, $0.10 | entry failed |
+| 1002852 (Opus intended) | Fable again: admin override cache (5-min TTL per instance) had not expired at launch | completed, 58 s, $0.10 | entry failed |
+| 1002852 (Opus pinned) | Opus: hit the 8,000-token seat ceiling after 126 s, 15.1k in / 8.0k out, $0.28; output not persisted | completed, 64 s, $0.11 | entry failed |
+
+Findings:
+- **Fable refuses the seat prompt** (Anthropic `stop_reason: refusal`, zero output) on two different molecular-biology proposals. Fable's dual-use safety layer, not a parse issue. Seat switched to `claude-opus-5` in the admin panel. Whether Fable passes on non-biology proposals is untested.
+- **Opus overflows the seat ceiling** because the seat prompt carried the human form's "up to 50,000 characters" per answer. Fix in flight: per-answer cap of 2,000 chars in the seat schema and guidance, seed default max tokens 12,000, timeline on the Progress tab (branch `fix/review-panel-seat-cap-timeline`). The live seat prompt row must be re-seeded (`--force`, with the prod-write ack) after that merges.
+- **Admin model changes take up to five minutes to reach launches** (override cache TTL per serverless instance; a save clears only the saving instance). Worth a sentence on the page.
+- **Progress tab did not refresh and showed no seat detail** at launch; fixed in PR #282 (polling, waiting copy, per-seat pills, failure copy by seat label). Merged 59e2284e.
+- **Ledger, fences, cost accounting, partial-seat policy, and the cron all behaved as designed** across four runs. Total smoke spend so far about $1.20.
+- **Vercel CLI 59.x cannot create a Blob store without linking it**; the dashboard + custom prefix path was used and the runbook note updated.
 
 ## 3. Unresolved findings for the owner
 
