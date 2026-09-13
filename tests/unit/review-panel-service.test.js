@@ -47,6 +47,7 @@ jest.mock('../../lib/services/review-panel-store', () => ({
   setReviewPanelOperatorStop: jest.fn(),
   requestReviewPanelRetry: jest.fn(),
   requestReviewPanelCancel: jest.fn(),
+  requestReviewPanelRerender: jest.fn(),
   readReviewPanelEntry: jest.fn(),
 }));
 
@@ -57,7 +58,7 @@ const { readReviewPanelFile, assertReviewPanelStorageConfigured } = require('../
 const rollout = require('../../lib/services/review-panel-rollout');
 const store = require('../../lib/services/review-panel-store');
 const {
-  getReviewPanelPage, launchReviewPanel, controlReviewPanel, downloadReviewPanel, projectReviewPanelRun,
+  getReviewPanelPage, launchReviewPanel, controlReviewPanel, downloadReviewPanel, projectReviewPanelRun, reviewPanelAction,
 } = require('../../lib/services/review-panel-service');
 
 const OWNER = 7;
@@ -166,6 +167,13 @@ describe('actor assertion runs BEFORE any store/roster/Blob call', () => {
     expect(store.setReviewPanelOperatorStop).not.toHaveBeenCalled();
     expect(store.requestReviewPanelRetry).not.toHaveBeenCalled();
     expect(store.requestReviewPanelCancel).not.toHaveBeenCalled();
+    expect(store.requestReviewPanelRerender).not.toHaveBeenCalled();
+  });
+
+  test('controlReviewPanel rerender', async () => {
+    rejectActor();
+    await expect(controlReviewPanel(OWNER, { action: 'rerender', runId: RUN_ID, entryIds: [ENTRY_ID] })).rejects.toMatchObject({ httpStatus: 403 });
+    expect(store.requestReviewPanelRerender).not.toHaveBeenCalled();
   });
 
   test('downloadReviewPanel', async () => {
@@ -227,6 +235,42 @@ describe('launchReviewPanel', () => {
       data: expect.objectContaining({ pendingEntries: [expect.objectContaining({ requestId: REQ_A })] }),
     }));
     expect(result.run.id).toBe(RUN_ID);
+  });
+});
+
+describe('controlReviewPanel — rerender action', () => {
+  test('routes to requestReviewPanelRerender with (runId, owner, entryIds) and projects the resulting run', async () => {
+    store.requestReviewPanelRerender.mockResolvedValue({ id: RUN_ID, status: 'queued', data: {}, created_at: new Date().toISOString() });
+    const result = await controlReviewPanel(OWNER, { action: 'rerender', runId: RUN_ID, entryIds: [ENTRY_ID] });
+    expect(store.requestReviewPanelRerender).toHaveBeenCalledWith(RUN_ID, OWNER, [ENTRY_ID]);
+    expect(result.run.id).toBe(RUN_ID);
+  });
+
+  test('reviewPanelAction dispatches action:"rerender" through controlReviewPanel the same way as retry/stop/operator-stop', async () => {
+    store.requestReviewPanelRerender.mockResolvedValue({ id: RUN_ID, status: 'queued', data: {}, created_at: new Date().toISOString() });
+    const result = await reviewPanelAction(OWNER, { action: 'rerender', runId: RUN_ID, entryIds: [ENTRY_ID] });
+    expect(store.requestReviewPanelRerender).toHaveBeenCalled();
+    expect(result.run.id).toBe(RUN_ID);
+  });
+});
+
+describe('projectReviewPanelRun — rerender projection', () => {
+  const run = { id: RUN_ID, status: 'completed', created_at: '2026-09-13T00:00:00.000Z', data: {} };
+
+  test('entries[].rerender is null when no re-render request is outstanding', () => {
+    const entry = { id: ENTRY_ID, request_id: REQ_A, request_revision: 1, status: 'completed', data: { files: { docx: {}, pdf: {} } }, retry_requested_at: null };
+    const result = projectReviewPanelRun(run, [entry], []);
+    expect(result.entries[0].rerender).toBeNull();
+  });
+
+  test('entries[].rerender surfaces requestedAt and previousFiles as a COUNT, never the superseded refs themselves', () => {
+    const entry = {
+      id: ENTRY_ID, request_id: REQ_A, request_revision: 1, status: 'completed', retry_requested_at: '2026-09-13T10:06:00.000Z',
+      data: { files: null, rerender: { requestedAt: '2026-09-13T10:06:00.000Z', requestedBy: 7, previousFiles: { docx: { pathname: 'x' }, pdf: { pathname: 'y' } } } },
+    };
+    const result = projectReviewPanelRun(run, [entry], []);
+    expect(result.entries[0].rerender).toEqual({ requestedAt: '2026-09-13T10:06:00.000Z', previousFiles: 2 });
+    expect(JSON.stringify(result.entries[0].rerender)).not.toMatch(/pathname/);
   });
 });
 
@@ -347,6 +391,24 @@ describe('projectReviewPanelRun — timeline for the Progress tab', () => {
     const clearedEntry = { ...timelineEntry, retry_requested_at: null };
     const result = projectReviewPanelRun(timelineRun, [clearedEntry], []);
     expect(result.timeline.some((e) => e.label === 'Retry requested')).toBe(false);
+  });
+
+  test('"Re-render requested" (not "Retry requested") appears when the SAME marker carries data.rerender', () => {
+    const rerenderingEntry = {
+      ...timelineEntry, data: { files: {}, rerender: { requestedAt: '2026-09-13T10:06:00.000Z' } }, retry_requested_at: '2026-09-13T10:06:00.000Z',
+    };
+    const result = projectReviewPanelRun(timelineRun, [rerenderingEntry], []);
+    expect(result.timeline).toContainEqual({ at: '2026-09-13T10:06:00.000Z', label: 'Re-render requested' });
+    expect(result.timeline.some((e) => e.label === 'Retry requested')).toBe(false);
+  });
+
+  test('"Report saved" prefers the LATER of the two saved files\' own savedAt stamps over entry.updated_at when present', () => {
+    const savedEntry = {
+      ...timelineEntry,
+      data: { files: { docx: { savedAt: '2026-09-13T10:20:00.000Z' }, pdf: { savedAt: '2026-09-13T10:22:00.000Z' } } },
+    };
+    const result = projectReviewPanelRun(timelineRun, [savedEntry], []);
+    expect(result.timeline).toContainEqual({ at: '2026-09-13T10:22:00.000Z', label: 'Report saved' });
   });
 
   test('"Report saved" falls back to the run\'s own updated_at when the entry has no updated_at', () => {

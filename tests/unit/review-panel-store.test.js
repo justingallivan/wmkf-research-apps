@@ -5,7 +5,7 @@ import {
   createAttempt, markAttemptDispatched, finalizeAttempt, reapExpiredAttempts, reapAllDispatchedAttempts,
   selectWinners, sumAttemptCosts, sumEntryAttemptCosts, createReviewPanelEntry, mutateReviewPanelEntry,
   claimReviewPanelRun, requestReviewPanelRetry, listRetryRequestedEntries, requestReviewPanelCancel,
-  ATTEMPT_COST_UNKNOWN_SQL, isAttemptCostUnknown, stopRevokedReviewPanelRun,
+  ATTEMPT_COST_UNKNOWN_SQL, isAttemptCostUnknown, stopRevokedReviewPanelRun, requestReviewPanelRerender,
 } from '../../lib/services/review-panel-store';
 
 let client;
@@ -446,6 +446,83 @@ describe('requestReviewPanelRetry', () => {
       return { rows: [] };
     });
     await expect(requestReviewPanelRetry('run-1', 7, ['entry-1'])).rejects.toMatchObject({ httpStatus: 400 });
+  });
+});
+
+describe('requestReviewPanelRerender', () => {
+  const ACTOR_ROW = { rows: [{ id: 7, dynamics_systemuser_id: 'sysid-1' }] };
+
+  test('requires at least one entry id', async () => {
+    await expect(requestReviewPanelRerender('run-1', 7, [])).rejects.toMatchObject({ httpStatus: 400 });
+    expect(db.connect).not.toHaveBeenCalled();
+  });
+
+  test('rejects while the run holds a live lease', async () => {
+    client.query.mockImplementation(async (q) => {
+      if (q.startsWith('SELECT * FROM review_panel_runs')) return { rows: [{ id: 'run-1', owner_profile_id: 7, lease_token: 'lease-1', status: 'running' }] };
+      if (q.startsWith('SELECT p.id, p.dynamics_systemuser_id')) return ACTOR_ROW;
+      return { rows: [] };
+    });
+    await expect(requestReviewPanelRerender('run-1', 7, ['entry-1'])).rejects.toMatchObject({ httpStatus: 409 });
+    expect(client.query).not.toHaveBeenCalledWith(expect.stringContaining('UPDATE review_panel_entries'), expect.anything());
+    expect(client.query).toHaveBeenCalledWith('ROLLBACK');
+  });
+
+  test('rejects a cancelled run — an operator stop must never be resurrected by a re-render either', async () => {
+    client.query.mockImplementation(async (q) => {
+      if (q.startsWith('SELECT * FROM review_panel_runs')) return { rows: [{ id: 'run-1', owner_profile_id: 7, lease_token: null, status: 'cancelled' }] };
+      if (q.startsWith('SELECT p.id, p.dynamics_systemuser_id')) return ACTOR_ROW;
+      return { rows: [] };
+    });
+    await expect(requestReviewPanelRerender('run-1', 7, ['entry-1'])).rejects.toMatchObject({ httpStatus: 409, message: expect.stringMatching(/cancelled by the operator/i) });
+    expect(client.query).not.toHaveBeenCalledWith(expect.stringContaining('UPDATE review_panel_entries'), expect.anything());
+  });
+
+  test('rejects a failed (non-completed) entry — the SQL filter only ever selects status=\'completed\' rows', async () => {
+    client.query.mockImplementation(async (q) => {
+      if (q.startsWith('SELECT * FROM review_panel_runs')) return { rows: [{ id: 'run-1', owner_profile_id: 7, lease_token: null, status: 'failed' }] };
+      if (q.startsWith('SELECT p.id, p.dynamics_systemuser_id')) return ACTOR_ROW;
+      if (q.startsWith('SELECT id, data, winners_json FROM review_panel_entries')) return { rows: [] }; // the failed entry never matches status='completed'
+      return { rows: [] };
+    });
+    await expect(requestReviewPanelRerender('run-1', 7, ['entry-1'])).rejects.toMatchObject({ httpStatus: 400 });
+  });
+
+  test('rejects a completed entry with no chair winner', async () => {
+    client.query.mockImplementation(async (q) => {
+      if (q.startsWith('SELECT * FROM review_panel_runs')) return { rows: [{ id: 'run-1', owner_profile_id: 7, lease_token: null, status: 'completed' }] };
+      if (q.startsWith('SELECT p.id, p.dynamics_systemuser_id')) return ACTOR_ROW;
+      if (q.startsWith('SELECT id, data, winners_json FROM review_panel_entries')) {
+        return { rows: [{ id: 'entry-1', data: { files: { docx: {}, pdf: {} } }, winners_json: {} }] };
+      }
+      return { rows: [] };
+    });
+    await expect(requestReviewPanelRerender('run-1', 7, ['entry-1'])).rejects.toMatchObject({ httpStatus: 400 });
+  });
+
+  test('accepts a completed entry with a chair winner: clears data.files, stamps data.rerender with previousFiles kept, requeues the run', async () => {
+    const previousFiles = { docx: { pathname: 'review-panel/entry-1/report.docx' }, pdf: { pathname: 'review-panel/entry-1/report.pdf' } };
+    client.query.mockImplementation(async (q) => {
+      if (q.startsWith('SELECT * FROM review_panel_runs')) return { rows: [{ id: 'run-1', owner_profile_id: 7, lease_token: null, status: 'completed' }] };
+      if (q.startsWith('SELECT p.id, p.dynamics_systemuser_id')) return ACTOR_ROW;
+      if (q.startsWith('SELECT id, data, winners_json FROM review_panel_entries')) {
+        return { rows: [{ id: 'entry-1', data: { files: previousFiles, input: { requestNumber: 'R-1' } }, winners_json: { chair: 'att-chair-1' } }] };
+      }
+      if (q.startsWith('UPDATE review_panel_runs')) return { rows: [{ id: 'run-1', status: 'queued' }] };
+      return { rows: [] };
+    });
+    const run = await requestReviewPanelRerender('run-1', 7, ['entry-1']);
+    expect(run.status).toBe('queued');
+    const updateCall = client.query.mock.calls.find(([q]) => q.startsWith('UPDATE review_panel_entries'));
+    expect(updateCall[0]).toContain('retry_requested_at=NOW()');
+    const [entryId, dataJson] = updateCall[1];
+    expect(entryId).toBe('entry-1');
+    const data = JSON.parse(dataJson);
+    expect(data.files).toBeNull();
+    expect(data.rerender.previousFiles).toEqual(previousFiles);
+    expect(data.rerender.requestedBy).toBe(7);
+    expect(data.input).toEqual({ requestNumber: 'R-1' }); // rest of data preserved
+    expect(client.query).toHaveBeenCalledWith('COMMIT');
   });
 });
 

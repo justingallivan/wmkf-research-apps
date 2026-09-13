@@ -20,7 +20,7 @@ import { runSeat, runChair } from '../../lib/services/review-panel-generation';
 import { assertReviewPanelWorkerOpen } from '../../lib/services/review-panel-rollout';
 import { renderReviewPanelEntryDocuments } from '../../lib/services/review-panel-documents';
 import { storeReviewPanelFile, assertReviewPanelStorageConfigured } from '../../lib/services/review-panel-storage';
-import { drainReviewPanels, retryFailedEntries, describeEntryFailure } from '../../lib/services/review-panel-worker';
+import { drainReviewPanels, retryFailedEntries, rerenderCompletedEntries, describeEntryFailure } from '../../lib/services/review-panel-worker';
 
 store.reviewPanelError = jest.fn((message, httpStatus = 409) => Object.assign(new Error(message), { httpStatus }));
 
@@ -101,8 +101,8 @@ test('happy path: both seats run, winners selected, chair runs once, entry compl
   expect(entryState.status).toBe('completed');
   expect(entryState.data.chairResult).toEqual({ consensus: [] });
   expect(entryState.data.files).toEqual({
-    docx: { pathname: 'review-panel/fixture', sha256: 'a'.repeat(64), size: 4 },
-    pdf: { pathname: 'review-panel/fixture', sha256: 'a'.repeat(64), size: 4 },
+    docx: { pathname: 'review-panel/fixture', sha256: 'a'.repeat(64), size: 4, savedAt: expect.any(String) },
+    pdf: { pathname: 'review-panel/fixture', sha256: 'a'.repeat(64), size: 4, savedAt: expect.any(String) },
   });
   expect(storeReviewPanelFile).toHaveBeenCalledTimes(2);
 });
@@ -300,6 +300,85 @@ test('retryFailedEntries clears retry_requested_at (via mutateReviewPanelEntry) 
   expect(store.mutateReviewPanelEntry).toHaveBeenCalledWith('entry-1', expect.any(Function), 'lease-1');
   expect(store.createAttempt).not.toHaveBeenCalled();
   expect(entryState.status).toBe('completed'); // untouched by the no-op mutation
+});
+
+describe('rerenderCompletedEntries (via drainReviewPanels) — re-render makes NO model calls', () => {
+  test('a completed entry with data.rerender re-renders both formats under a NEW Blob pathname, stamps savedAt, clears the marker, and never creates an attempt or calls runSeat/runChair', async () => {
+    seatSetup();
+    attempts.push(
+      { id: 'seat.claude-1', entry_id: 'entry-1', seat_key: 'seat.claude', attempt_no: 1, state: 'completed', result_json: { priorWork: 'a' } },
+      { id: 'seat.openai-1', entry_id: 'entry-1', seat_key: 'seat.openai', attempt_no: 1, state: 'completed', result_json: { priorWork: 'b' } },
+      { id: 'chair-1', entry_id: 'entry-1', seat_key: 'chair', attempt_no: 1, state: 'completed', result_json: { consensus: [] } },
+    );
+    entryState.status = 'completed';
+    entryState.winners_json = { 'seat.claude': 'seat.claude-1', 'seat.openai': 'seat.openai-1', chair: 'chair-1' };
+    const previousFiles = { docx: { pathname: 'review-panel/entry-1/report.docx' }, pdf: { pathname: 'review-panel/entry-1/report.pdf' } };
+    entryState.data = {
+      ...entryState.data, files: null, rerender: { requestedAt: '2026-09-13T00:00:00.000Z', requestedBy: 7, previousFiles },
+      error: 'stale from a prior failed re-render', // must never survive a SUCCESSFUL re-render
+    };
+    store.listRetryRequestedEntries.mockResolvedValue(['entry-1']);
+    store.listReviewPanelEntries.mockResolvedValue([entryState]);
+
+    const result = await drainReviewPanels();
+    expect(result).toEqual({ claimed: 1, runId: 'run-1' });
+    expect(store.createAttempt).not.toHaveBeenCalled();
+    expect(runSeat).not.toHaveBeenCalled();
+    expect(runChair).not.toHaveBeenCalled();
+    expect(entryState.status).toBe('completed');
+    expect(entryState.data.rerender).toBeUndefined();
+    expect(entryState.data.error).toBeNull();
+
+    expect(storeReviewPanelFile).toHaveBeenCalledTimes(2);
+    const pathnames = storeReviewPanelFile.mock.calls.map((c) => c[0]);
+    expect(pathnames.every((p) => /^review-panel\/entry-1\/report-.+\.(docx|pdf)$/.test(p))).toBe(true);
+    expect(pathnames).not.toContain('review-panel/entry-1/report.docx');
+    expect(pathnames).not.toContain('review-panel/entry-1/report.pdf');
+
+    expect(entryState.data.files.docx.savedAt).toEqual(expect.any(String));
+    expect(entryState.data.files.pdf.savedAt).toEqual(expect.any(String));
+  });
+
+  test('a re-render that fails to save restores the entry to completed with the PREVIOUS files intact — never left failed with no report and no attempt/runSeat/runChair call', async () => {
+    seatSetup();
+    attempts.push(
+      { id: 'seat.claude-1', entry_id: 'entry-1', seat_key: 'seat.claude', attempt_no: 1, state: 'completed', result_json: { priorWork: 'a' } },
+      { id: 'seat.openai-1', entry_id: 'entry-1', seat_key: 'seat.openai', attempt_no: 1, state: 'completed', result_json: { priorWork: 'b' } },
+      { id: 'chair-1', entry_id: 'entry-1', seat_key: 'chair', attempt_no: 1, state: 'completed', result_json: { consensus: [] } },
+    );
+    entryState.status = 'completed';
+    entryState.winners_json = { 'seat.claude': 'seat.claude-1', 'seat.openai': 'seat.openai-1', chair: 'chair-1' };
+    const previousFiles = { docx: { pathname: 'review-panel/entry-1/report.docx' }, pdf: { pathname: 'review-panel/entry-1/report.pdf' } };
+    entryState.data = { ...entryState.data, files: null, rerender: { requestedAt: '2026-09-13T00:00:00.000Z', requestedBy: 7, previousFiles } };
+    store.listRetryRequestedEntries.mockResolvedValue(['entry-1']);
+    store.listReviewPanelEntries.mockResolvedValue([entryState]);
+    storeReviewPanelFile.mockRejectedValueOnce(Object.assign(new Error('The private review panel document store has not been configured.'), { httpStatus: 503 }));
+
+    await drainReviewPanels();
+    expect(store.createAttempt).not.toHaveBeenCalled();
+    expect(runSeat).not.toHaveBeenCalled();
+    expect(runChair).not.toHaveBeenCalled();
+    expect(entryState.status).toBe('completed'); // restored, never left `failed` with no report
+    expect(entryState.data.files).toEqual(previousFiles); // the OLD edition, kept intact
+    expect(entryState.data.error).toMatch(/re-rendered report could not be saved/i);
+    expect(entryState.data.rerender).toBeUndefined();
+    // The stash survives consumption: previousFiles was carried into
+    // data.lastRerender BEFORE the render attempt, not merely inferred from
+    // the restored data.files (which the restore itself also sets).
+    expect(entryState.data.lastRerender.previousFiles).toEqual(previousFiles);
+  });
+
+  test('an entry whose marker no longer matches (moved on before this pass consumed it) just gets the marker cleared, without creating any attempt', async () => {
+    seatSetup();
+    entryState.status = 'failed'; // moved on since the route queued the re-render request
+    entryState.data = { ...entryState.data, rerender: undefined };
+    store.mutateReviewPanelEntry.mockClear();
+    await rerenderCompletedEntries(RUN, CONFIG, ['entry-1']);
+    expect(store.mutateReviewPanelEntry).toHaveBeenCalledWith('entry-1', expect.any(Function), 'lease-1');
+    expect(store.createAttempt).not.toHaveBeenCalled();
+    expect(runSeat).not.toHaveBeenCalled();
+    expect(runChair).not.toHaveBeenCalled();
+  });
 });
 
 test('operator stop set between seats: subsequent paid calls are skipped and the signal is aborted', async () => {
