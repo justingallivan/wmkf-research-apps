@@ -55,7 +55,7 @@ test('per-seat vendor and pinned model labels appear in the DOCX', async () => {
 test('cost section prints a known total when unknownCount is 0', async () => {
   const result = await renderReviewPanelEntryDocuments(BASE_REPORT);
   const text = await docxText(result.docx);
-  expect(text).toContain('Cost total: $123.45');
+  expect(text).toContain('Cost for this request: $123.45');
   expect(text).not.toContain('withheld');
 });
 
@@ -63,6 +63,6 @@ test('cost section withholds the total (and prints no dollar figure) when unknow
   const report = { ...BASE_REPORT, cost: { totalCents: 12345, unknownCount: 2 } };
   const result = await renderReviewPanelEntryDocuments(report);
   const text = await docxText(result.docx);
-  expect(text).toContain('Cost total withheld: 2 attempt(s) with unknown outcome.');
+  expect(text).toContain('Cost for this request withheld: 2 attempt(s) with unknown outcome.');
   expect(text).not.toContain('$123.45');
 });

@@ -1132,7 +1132,7 @@ function UsageSection() {
                     <tr key={i} className="border-b border-gray-100">
                       <td className="py-2 px-2 text-gray-900">{row.state}</td>
                       <td className="py-2 px-2 text-right text-gray-700">{row.attemptCount}</td>
-                      <td className="py-2 px-2 text-right text-gray-700">{row.state === 'unknown_outcome' ? '—' : formatCost(row.knownCostCents)}</td>
+                      <td className="py-2 px-2 text-right text-gray-700">{row.unknownCount > 0 ? 'Withheld' : formatCost(row.knownCostCents)}</td>
                     </tr>
                   ))}
                 </tbody>

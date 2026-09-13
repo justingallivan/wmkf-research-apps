@@ -10,6 +10,7 @@
 
 import { requireSuperuser } from '../../../lib/utils/auth';
 import { sql } from '@vercel/postgres';
+import { ATTEMPT_COST_UNKNOWN_SQL } from '../../../lib/services/review-panel-store';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -163,24 +164,33 @@ async function getByDay(days) {
 // The Virtual Review Panel Phase A foundation never writes api_usage_log
 // (docs/plans/VIRTUAL_REVIEW_PANEL_PHASE_A_BUILD_PLAN_2026-09-12.md §5 A.5) —
 // its own per-seat/chair ledger (review_panel_seat_attempts) is surfaced here
-// as an additive block. knownCostCents sums only cost_state='known' rows
-// (mirrors review-panel-store.js's sumAttemptCosts); byState never folds an
-// unknown-outcome attempt's cost into a total. The admin UI must render
-// "withheld" rather than a number whenever unknownCount > 0 — see the admin
-// page's rendering of this block.
+// as an additive block. Uses the SAME ATTEMPT_COST_UNKNOWN_SQL predicate as
+// review-panel-store.js's sumAttemptCosts/sumEntryAttemptCosts and
+// pages/api/cron/spend-check.js — a single definition so "unknown cost" can
+// never drift between call sites. Per-state unknownCount is computed WITHIN
+// each state's group (a 'failed' or 'completed' bucket can itself contain
+// attempts with cost_state='unknown' — an ambiguous paid-call confirmation —
+// alongside attempts with a known cost), not just assumed for the
+// 'unknown_outcome' bucket. The admin UI must render "Withheld" rather than
+// a number for ANY state bucket whose own unknownCount > 0 — see
+// pages/admin.js's rendering of this block.
 async function getReviewPanel(days) {
-  const result = await sql`
-    SELECT
-      state,
-      COUNT(*)::int AS attempt_count,
-      COALESCE(SUM(cost_cents) FILTER (WHERE cost_state = 'known'), 0)::numeric AS known_cost_cents
-    FROM review_panel_seat_attempts
-    WHERE created_at >= NOW() - MAKE_INTERVAL(days => ${days})
-    GROUP BY state
-  `;
-  const byState = result.rows.map((row) => ({ state: row.state, attemptCount: row.attempt_count, knownCostCents: Number(row.known_cost_cents) }));
+  const result = await sql.query(
+    `SELECT
+       a.state AS state,
+       COUNT(*)::int AS attempt_count,
+       COALESCE(SUM(a.cost_cents) FILTER (WHERE NOT ${ATTEMPT_COST_UNKNOWN_SQL}), 0)::numeric AS known_cost_cents,
+       COUNT(*) FILTER (WHERE ${ATTEMPT_COST_UNKNOWN_SQL})::int AS unknown_count
+     FROM review_panel_seat_attempts a
+     WHERE a.created_at >= NOW() - MAKE_INTERVAL(days => $1)
+     GROUP BY a.state`,
+    [days]);
+  const byState = result.rows.map((row) => ({
+    state: row.state, attemptCount: row.attempt_count,
+    knownCostCents: Number(row.known_cost_cents), unknownCount: row.unknown_count,
+  }));
   const knownCostCents = byState.reduce((sum, row) => sum + row.knownCostCents, 0);
-  const unknownCount = byState.find((row) => row.state === 'unknown_outcome')?.attemptCount || 0;
+  const unknownCount = byState.reduce((sum, row) => sum + row.unknownCount, 0);
   return { knownCostCents, unknownCount, byState };
 }
 

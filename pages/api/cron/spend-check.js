@@ -19,6 +19,7 @@ import { sql } from '@vercel/postgres';
 import { verifyCronSecret } from '../../../lib/utils/cron-auth';
 import AlertService from '../../../lib/services/alert-service';
 import MaintenanceService from '../../../lib/services/maintenance-service';
+import { ATTEMPT_COST_UNKNOWN_SQL } from '../../../lib/services/review-panel-store';
 
 // Calibrated S183 from 60d prod spend data: max observed legitimate day
 // was $26.16 (a batch-processing day with 386 requests); avg active day
@@ -74,17 +75,21 @@ async function checkDailyThreshold() {
   // (docs/plans/VIRTUAL_REVIEW_PANEL_PHASE_A_BUILD_PLAN_2026-09-12.md §5 A.5)
   // — its own per-seat/chair ledger (review_panel_seat_attempts) is added
   // here so the daily sum still reflects panel spend. Same day window as
-  // api_usage_log above (created_at::date = CURRENT_DATE). Only cost_state=
-  // 'known' rows are ever summed (matches review-panel-store.js's own
-  // sumAttemptCosts semantics); 'unknown'-outcome attempts are counted
-  // separately and NEVER folded into the total, since their true cost is
-  // unknowable.
-  const panelResult = await sql`
-    SELECT COALESCE(SUM(cost_cents) FILTER (WHERE cost_state = 'known'), 0)::numeric AS panel_known_cost_cents,
-           COUNT(*) FILTER (WHERE cost_state = 'unknown')::int AS panel_unknown_count
-    FROM review_panel_seat_attempts
-    WHERE created_at::date = CURRENT_DATE
-  `;
+  // api_usage_log above (created_at::date = CURRENT_DATE). Uses the SAME
+  // ATTEMPT_COST_UNKNOWN_SQL predicate as review-panel-store.js's
+  // sumAttemptCosts/sumEntryAttemptCosts and pages/api/admin/stats.js — a
+  // single definition so "unknown cost" can never drift between call sites.
+  // A reaped/late attempt is state='unknown_outcome' with cost_state left
+  // NULL (never set by the late path); a finalized completed/failed attempt
+  // can ALSO carry cost_state='unknown' when its paid-call confirmation was
+  // itself ambiguous — both must count, and neither is ever folded into the
+  // known total. Built with sql.query (not the tagged template) so the
+  // predicate lands as literal SQL text, not a bound parameter.
+  const panelResult = await sql.query(
+    `SELECT COALESCE(SUM(a.cost_cents) FILTER (WHERE NOT ${ATTEMPT_COST_UNKNOWN_SQL}), 0)::numeric AS panel_known_cost_cents,
+            COUNT(*) FILTER (WHERE ${ATTEMPT_COST_UNKNOWN_SQL})::int AS panel_unknown_count
+     FROM review_panel_seat_attempts a
+     WHERE a.created_at::date = CURRENT_DATE`);
   const panelKnownCents = Number(panelResult.rows[0].panel_known_cost_cents);
   const panelUnknownCount = Number(panelResult.rows[0].panel_unknown_count);
   const spentCents = Number(total_cost_cents) + panelKnownCents;

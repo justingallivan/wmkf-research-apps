@@ -3,8 +3,9 @@ jest.mock('@vercel/postgres', () => ({ db: { connect: jest.fn() }, sql: { query:
 import { db, sql } from '@vercel/postgres';
 import {
   createAttempt, markAttemptDispatched, finalizeAttempt, reapExpiredAttempts,
-  selectWinners, sumAttemptCosts, createReviewPanelEntry, mutateReviewPanelEntry,
+  selectWinners, sumAttemptCosts, sumEntryAttemptCosts, createReviewPanelEntry, mutateReviewPanelEntry,
   claimReviewPanelRun, requestReviewPanelRetry, listRetryRequestedEntries, requestReviewPanelCancel,
+  ATTEMPT_COST_UNKNOWN_SQL, isAttemptCostUnknown,
 } from '../../lib/services/review-panel-store';
 
 let client;
@@ -248,6 +249,44 @@ test('sumAttemptCosts reports zero unknowns when every attempt has a known cost'
   const { totalCents, unknownCount } = await sumAttemptCosts('run-1');
   expect(totalCents).toBe(15);
   expect(unknownCount).toBe(0);
+});
+
+describe('isAttemptCostUnknown / ATTEMPT_COST_UNKNOWN_SQL — the ONE unified predicate consumed by spend-check and admin stats too', () => {
+  test('an unknown_outcome-state row is unknown even with cost_state NULL (reaped/late attempt)', () => {
+    expect(isAttemptCostUnknown({ state: 'unknown_outcome', cost_state: null, cost_cents: null })).toBe(true);
+  });
+  test('a completed/failed row with cost_state="unknown" is unknown (ambiguous paid-call confirmation)', () => {
+    expect(isAttemptCostUnknown({ state: 'failed', cost_state: 'unknown', cost_cents: null })).toBe(true);
+    expect(isAttemptCostUnknown({ state: 'completed', cost_state: 'unknown', cost_cents: null })).toBe(true);
+  });
+  test('a completed row with cost_state="known" and a real cost_cents is NOT unknown', () => {
+    expect(isAttemptCostUnknown({ state: 'completed', cost_state: 'known', cost_cents: 10 })).toBe(false);
+  });
+  test('the SQL fragment names both the unknown_outcome state and the cost_state clause', () => {
+    expect(ATTEMPT_COST_UNKNOWN_SQL).toMatch(/state\s*=\s*'unknown_outcome'/);
+    expect(ATTEMPT_COST_UNKNOWN_SQL).toMatch(/cost_state\s+IS\s+DISTINCT\s+FROM\s+'known'/i);
+  });
+});
+
+describe('sumEntryAttemptCosts', () => {
+  test('scopes to entry_id only, not the run — the run-wide query is never used for a single entry\'s report', async () => {
+    sql.query.mockResolvedValue({ rows: [{ cost_cents: '10', cost_state: 'known', state: 'completed' }] });
+    const { totalCents, unknownCount } = await sumEntryAttemptCosts('entry-1');
+    expect(totalCents).toBe(10);
+    expect(unknownCount).toBe(0);
+    expect(sql.query).toHaveBeenCalledWith(expect.stringContaining('WHERE a.entry_id=$1'), ['entry-1']);
+    expect(sql.query).toHaveBeenCalledWith(expect.not.stringContaining('run_id'), expect.anything());
+  });
+
+  test('a sibling entry\'s in-flight attempt never leaks into this entry\'s unknown count (entry scoping, not run scoping)', async () => {
+    sql.query.mockResolvedValue({ rows: [
+      { cost_cents: '10', cost_state: 'known', state: 'completed' },
+      { cost_cents: '20', cost_state: 'known', state: 'completed' },
+    ] });
+    const { totalCents, unknownCount } = await sumEntryAttemptCosts('entry-1');
+    expect(totalCents).toBe(30);
+    expect(unknownCount).toBe(0);
+  });
 });
 
 describe('createReviewPanelEntry', () => {

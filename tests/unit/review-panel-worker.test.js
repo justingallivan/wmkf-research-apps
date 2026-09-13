@@ -102,6 +102,13 @@ test('happy path: both seats run, winners selected, chair runs once, entry compl
   expect(storeReviewPanelFile).toHaveBeenCalledTimes(2);
 });
 
+test('the per-entry report cost is scoped to THIS entry (sumEntryAttemptCosts), never a run-wide sum — sibling entries in the same run must not affect this report\'s cost line', async () => {
+  store.listReviewPanelEntries.mockResolvedValue([entryState]);
+  await drainReviewPanels();
+  expect(store.sumEntryAttemptCosts).toHaveBeenCalledWith('entry-1');
+  expect(store.sumAttemptCosts).not.toHaveBeenCalled();
+});
+
 test('when the report cannot be saved (e.g. the D11 Blob store is not yet provisioned), the entry is FAILED rather than silently completed with no report; the chair result is preserved for visibility', async () => {
   storeReviewPanelFile.mockRejectedValueOnce(Object.assign(new Error('The private review panel document store has not been configured.'), { httpStatus: 503 }));
   store.listReviewPanelEntries.mockResolvedValue([entryState]);
