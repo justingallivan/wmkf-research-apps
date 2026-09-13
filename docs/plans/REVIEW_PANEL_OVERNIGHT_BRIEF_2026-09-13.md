@@ -33,7 +33,7 @@ related:
 
 | Slice | Scope (plan §5) | Status | Commits |
 |---|---|---|---|
-| 1 | A.5 migration 047 / block v49, store + seat-attempt ledger with both fences, A.4 input DTO, A.2 rollout gates, executor budgets | started 2026-09-13 | — |
+| 1 | A.5 migration 047 / block v49, store + seat-attempt ledger with both fences, A.4 input DTO, A.2 rollout gates, executor budgets | built (2b714ebf); Opus round 1 = FIX (3 blocking: `known` cost with NULL cents counted as $0, finaliser state unallowlisted, decorative token test); Sonnet fixing | 2b714ebf |
 | 2 | A.3 prompt seeds + question-set projection (D7), generation service + snapshot builder, A.6 worker + drain route | pending | — |
 | 3 | A.1 registry/routes/matrix, A.7 editions in the D11 store + download route, A.8 page, spend-check/admin-stats ledger queries, A.9 docs | pending | — |
 | Gates + PR | full gate set sequentially, PR opened, CI watched | pending | — |
@@ -45,7 +45,11 @@ related:
 
 ## 4. Decisions made on the owner's behalf
 
-(none yet)
+- **Smoke-mode cohort cap = at most four requests** (the dossier's smoke mode requires exactly one). Sonnet inferred it from D6 "two to four"; kept because the owner asked for a small subset, not a single request.
+- **No `cycle` column on `review_panels`** (the dossier pins `cycle='D26'`). The plan does not tie the panel to a cycle. Revisit if cycle scoping is wanted.
+- **Per-seat winners stored as `winners_json` (JSONB map) on the entry**, not a `winner_attempt_id` column (a single column cannot hold one winner per seat). Atlas page to record it.
+- **Executor budgets `review-panel.seat` / `review-panel.chair` use `kind: 'timeout'`** with envelopes cloned from `cycle-dossier.entry` (60–220s, default 200s), because a prompt-bound kind would block budget publication before the prompt rows are seeded. Re-derive once the worker lease length is fixed.
+- **Ledger cost columns are `cost_cents` + `usage_json`**, not the plan's `input_tokens`/`output_tokens`/`cost_usd`; spend-check and admin-stats queries are written against the real shape.
 
 ## 5. Owner-side steps before a smoke run
 
