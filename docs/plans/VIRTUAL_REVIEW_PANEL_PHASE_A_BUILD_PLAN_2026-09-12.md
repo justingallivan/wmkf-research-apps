@@ -38,7 +38,7 @@ related:
 | D4 | Publication | Deferred (Phase B). Private Blob editions only. |
 | D5 | Old app | Unchanged. The upload-based page stays live until parity; no retirement work in Phase A. |
 | D6 | Cost posture | **No "typical cost" figure yet.** Run the panel on a small owner-chosen subset first and collect real actuals from `api_usage_log`, then decide. Same posture as the dossier's open figure. |
-| D7 | Team-capacity question `[OPEN — owner]` | The required human-form question `teamCapacity` asks about personnel, infrastructure, and budget, but D2 excludes budget and biosketches. Options: (a) seats answer it from the narrative and mark it `not assessable from provided sources` in a structured coverage field; (b) widen D2 to include the budget lines and biosketch text resolvers in Phase A. Codex adversarial review 2026-09-12 raised this. |
+| D7 | Team-capacity question `[DECIDED 2026-09-12: option 1]` | The required human-form question `teamCapacity` asks about personnel, infrastructure, and budget, but D2 excludes budget and biosketches. **Decision: narrative only, enforced.** Seats emit `teamCapacity` as `{ status: 'not_assessable' }` with no answer text; the seat `validationSchema` rejects any answer text for that key; the chair prompt receives no `teamCapacity` content and the report prints the question as "Not assessed in Phase A (budget and team materials not provided)". Widening D2 remains a Phase B/C option. Raised by the Codex adversarial review 2026-09-12. |
 | D8 | Provider scope `[DECIDED 2026-09-12 by revision]` | Prompt publishing stays Claude-only. Non-Anthropic dispatch happens only when the calling service explicitly allows that provider on the call, intersected with `VRP_ALLOWED_PROVIDERS`. No existing Executor prompt can be repointed at OpenAI by an admin edit. |
 
 ## 2. What exists today `[VERIFIED 2026-09-12 via source]`
@@ -155,16 +155,24 @@ record per seat of prompt text, version, model, and provider; no second value to
 precedence rule. **No Executor option is added for this.** The seat model must satisfy
 `validatePromptSnapshot` (concrete, non-tier) and resolve to a reviewed capability row.
 
-**A0.4 Usage survives failure.** Today a parse or schema failure after a paid response throws with
-only `runId` attached (`execute-prompt.js:295-313`), so a wrapper logs zero tokens for a paid call.
-A0 attaches `err.usage` (the same snake_case shape as the success result), `err.modelUsed`, and
-`err.provider` to every error thrown after a provider response was received, and `err.paidCall =
-true|false|null` (null = ambiguous: aborted after dispatch with no response). The Executor still does
-not write `api_usage_log` (`:567-573`, driver-owned); the panel's `loggedExecute` wrapper logs from
-the result on success and from `err.usage` on failure, and records `unknownCost` when `paidCall` is
-null. The dossier wrapper (`cycle-dossier-generation.js` loggedExecute) can adopt the same fields
-later. Tests: invalid JSON, schema failure, refusal, truncation, abort-after-dispatch each produce a
-logged row with the right tokens or an explicit unknown-cost marker.
+**A0.4 Usage survives failure; the attempt ledger is the cost authority.** Today a parse or schema
+failure after a paid response throws with only `runId` attached (`execute-prompt.js:295-313`), so a
+wrapper logs zero tokens for a paid call. A0 attaches `err.usage` (the same snake_case shape as the
+success result), `err.modelUsed`, and `err.provider` to every error thrown after a provider response
+was received, and `err.paidCall = true|false|null` (null = ambiguous: aborted after dispatch with no
+response). The Executor still does not write `api_usage_log` (`:567-573`, driver-owned).
+**`api_usage_log` cannot be the D6 source**: `logUsage` coerces absent tokens to zero and inserts
+fire-and-forget with a swallowed catch (`lib/utils/usage-logger.js:60-92`), and the table has no
+cost-known or attempt-correlation column (`scripts/setup-database.js:265-282`). The panel therefore
+records usage **on its own `review_panel_seat_attempts` row, in an awaited write, before the attempt
+is marked terminal** (A.5): `input_tokens`, `output_tokens`, `model`, `provider`, `cost_usd`, and
+`cost_state ∈ {known, unknown}` (`unknown` when `paidCall` is null or the usage object is missing).
+`logUsage` is still called for cross-app reporting, best-effort, after the ledger write. D6 actuals
+are computed from the ledger; the page and the report **refuse to print a run total while any attempt
+in the run has `cost_state = 'unknown'`** and show the unknown count instead. The dossier wrapper
+(`cycle-dossier-generation.js` loggedExecute) can adopt `err.usage` later. Tests: invalid JSON, schema
+failure, refusal, truncation, abort-after-dispatch, and a failing ledger write each leave the attempt
+non-terminal or `unknown`, never a zero-cost `completed`.
 
 **A0.5 Registries.** Add OpenAI rows to `MODEL_CAPABILITIES` (`provider: 'openai'`,
 `instructionRole`, `refusalField: 'message.refusal'`, `supportsStructuredOutput: false` for Phase A
@@ -223,10 +231,16 @@ assertion on every entry (dossier pattern); rows for `/api/review-panel`, `/api/
   `getAuthoritativeQuestionSet()` (`lib/external/review-question-fetcher.js:220`, the write-boundary
   resolver) plus `questionSetVersion(fields)` (`:255`). The static `review-form-schema.js` is only the
   seed for `wmkf_reviewquestion`, which is the staff-editable system of record (Atlas
-  `docs/atlas/dataverse-wmkf-reviewquestion.md`). The run config stores the normalised question set
-  and its version; launch fails if the set cannot be fetched. Seat identity is not in the prompt; the
-  model differs per seat via the per-seat snapshot (A0.3). Each seat answer carries a structured
-  `sourceCoverage` field naming questions it could not assess from the provided sources (D7).
+  `docs/atlas/dataverse-wmkf-reviewquestion.md`). The seat schema is an **explicit projection** of
+  that set to answer questions only, using the same predicate the human submission uses
+  (`type ∈ {picklist, multiselect, richtext}`, `lib/external/build-review-submission.js:184-191`);
+  the identity `string` field `affiliation` (`review-form-schema.js:35-44`) is excluded, and a test
+  with an active `affiliation` fixture asserts it reaches neither the prompt nor the output schema.
+  The run config stores the projected set and `questionSetVersion` of the full set; launch fails if
+  the set cannot be fetched. **`teamCapacity` (D7):** the projection marks it `not_assessable`; the
+  schema for that key accepts only `{ status: 'not_assessable' }` and rejects answer text; the chair
+  input and the report omit it. Seat identity is not in the prompt; the model differs per seat via
+  the per-seat snapshot (A0.3).
 - `review-panel.chair`: synthesis over N seat reviews, reusing the existing synthesis shape
   (`ratingMatrix`, `consensus`, `disagreements`, `keyStrengths`, `keyConcerns`, `questionsForPI`,
   `resolvableVsFundamental`, `panelRecommendation`, `confidenceNote`). Claim verification and
@@ -248,12 +262,23 @@ the prompt snapshot (A0.3), provider, model, pricing, and the question-set versi
 change mid-run cannot shift anything. **Per seat, not per entry:** each paid call is a row in
 `review_panel_seat_attempts` with `(entry_id, seat_key, attempt_no)` unique, states
 `pending → dispatched → completed | failed | unknown_outcome`, the lease token that dispatched it,
-`dispatched_at`, and logged usage. The dossier's single `paidInFlight` flag per entry
-(`cycle-dossier-worker.js:121-147`) is insufficient for parallel seats. Dispatch is fenced on the
-current lease token; a `dispatched` attempt whose lease expired becomes `unknown_outcome` and is
-**never retried automatically**; a late completion for a superseded attempt is recorded but ignored.
-Seats run with `Promise.allSettled`; the entry completes only when every configured seat has a
-`completed` attempt, then the chair runs as its own attempt row. **Partial-seat policy:** any failed
+`dispatched_at`, an immutable `dispatch_token`, and the usage columns from A0.4. The dossier's single
+`paidInFlight` flag per entry (`cycle-dossier-worker.js:121-147`) is insufficient for parallel seats.
+**Two separate fences.** (1) Run-state changes (entry status, winner selection, chair dispatch,
+retry creation) require the **current run lease**, exactly as the dossier worker fences its mutations
+(`cycle-dossier-worker.js:94-100`). (2) Attempt finalisation is a **compare-and-set on the attempt's
+own `dispatch_token`** from `dispatched` to `completed | failed`, storing result and usage; it does not
+require the run lease, so a worker that lost the lease can still land the usage and result of a call
+it paid for. An attempt already moved to `unknown_outcome` by the reaper keeps that state: a late
+CAS may append `late_result_json` and usage metadata but **cannot change the state or become a
+winner**. The reaper (current-lease holder) moves `dispatched` attempts whose lease expired to
+`unknown_outcome`; they are **never retried automatically**. Winner selection is explicit: under the
+current lease, the entry picks the single `completed` attempt per seat with the highest `attempt_no`
+and records `winner_attempt_id` on the entry; only winners feed the chair. Seats run with
+`Promise.allSettled`; the entry completes only when every configured seat has a winner, then the chair
+runs as its own attempt row. Tests: old worker CAS after lease expiry lands usage without changing
+`unknown_outcome`; old worker CAS after a manual replacement attempt does not displace the winner;
+chair never dispatches twice for one entry. **Partial-seat policy:** any failed
 seat fails the entry; "Retry failed entries" creates new attempts only for seats without a `completed`
 attempt and re-runs the chair. Each call uses `promptSnapshot`, `requireNoPersistence`, `deadlineMs`,
 `signal` (operator stop), and `allowedProviders`. Usage is logged per attempt from the result or from
@@ -283,8 +308,9 @@ are shown read-only on the page and changed in the admin model panel.
 
 1. Owner picks a **small subset** (two to four D26 requests) and sets `REVIEW_PANEL_ROLLOUT_MODE=smoke`
    with that allowlist via `! vercel env add …` lines supplied by the agent.
-2. One run; record per seat and chair: wall time, input/output tokens, cost from `api_usage_log`
-   (`app_name='review-panel'`), validation failures, and the reservation bound the page showed.
+2. One run; record per seat and chair from the `review_panel_seat_attempts` ledger: wall time,
+   input/output tokens, `cost_usd`, `cost_state`, validation failures, and the reservation bound the
+   page showed. `api_usage_log` (`app_name='review-panel'`) is a cross-check only.
 3. Owner reads the reports against the human review synthesis for those requests (informal; the
    formal comparison is D3 / Phase C).
 4. Decide the typical-cost figure and whether to widen the allowlist.
@@ -308,8 +334,6 @@ and Phase C (panel-vs-human comparison, history views, third seat) follow the su
 
 ## 8. Open items carried into implementation
 
-- **D7 team-capacity handling** is the owner's; until decided, A.3's `sourceCoverage` field is the
-  default so the comparison stage can exclude unassessable answers.
 - Chair input size: N full seat reviews plus narrative may be large for the chair; decide whether
   the chair receives the narrative or only the reviews.
 - OpenAI reasoning models: `max_completion_tokens` includes reasoning tokens; the capability row and
@@ -330,3 +354,9 @@ and Phase C (panel-vs-human comparison, history views, third seat) follow the su
   usage lost on failure, stale schema authority, per-seat ambiguity, input DTO leak, OpenAI instruction
   and refusal semantics, override-vs-snapshot). All seven addressed in this revision: D8, A0.1, A0.2,
   A0.3 (override dropped), A0.4, A0.6, A.3, A.4, A.5, D7 raised to the owner.
+- 2026-09-12 Codex adversarial review round 2 against `d7480241`: **no-ship** on four findings
+  (affiliation imported by the live-set derivation; unknown cost invisible in `api_usage_log`;
+  `teamCapacity` unenforced; late completion vs lease fence). Addressed: A.3 projection + affiliation
+  test; A0.4 ledger-authoritative cost with `cost_state` and awaited writes, totals withheld while any
+  attempt is unknown; D7 decided option 1 (owner) and enforced in A.3; A.5 two-fence contract with
+  `dispatch_token` CAS and explicit winners.
