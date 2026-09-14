@@ -1111,6 +1111,35 @@ const v49Statements = [
   `INSERT INTO review_panel_control(id) VALUES (TRUE) ON CONFLICT(id) DO NOTHING`,
 ];
 
+// V50: Consultant Feedback slice 1 (docs/plans/CONSULTANT_FEEDBACK_PLAN_2026-09-14.md §4).
+// Mirrors migration 048.
+const v50Statements = [
+  `CREATE TABLE IF NOT EXISTS consultant_feedback (
+    id                     BIGSERIAL PRIMARY KEY,
+    request_id             UUID NOT NULL,
+    consultant_roster_id   INTEGER REFERENCES expertise_roster(id),
+    one_off_name           TEXT,
+    one_off_affiliation    TEXT,
+    body_html              TEXT,
+    received_on            DATE NOT NULL,
+    requestdocument_id     UUID UNIQUE,
+    shared                 BOOLEAN NOT NULL DEFAULT true,
+    mutation_id            UUID NOT NULL,
+    status                 TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'deleting')),
+    created_by             INTEGER NOT NULL REFERENCES user_profiles(id),
+    updated_by             INTEGER NOT NULL REFERENCES user_profiles(id),
+    created_at             TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at             TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT consultant_feedback_has_content CHECK (body_html IS NOT NULL OR requestdocument_id IS NOT NULL),
+    CONSTRAINT consultant_feedback_one_author CHECK (
+      (consultant_roster_id IS NOT NULL AND one_off_name IS NULL)
+      OR (consultant_roster_id IS NULL AND one_off_name IS NOT NULL)
+    )
+  )`,
+  `CREATE INDEX IF NOT EXISTS consultant_feedback_request_idx ON consultant_feedback (request_id, received_on DESC)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS consultant_feedback_mutation_idx ON consultant_feedback (request_id, mutation_id)`,
+];
+
 // V43: deliberation briefing links (docs/DELIBERATION_BRIEFING_PAGE_PLAN.md).
 // One expiring, revocable link per request for the read-only briefing page;
 // stores a token digest and sealed token, never the raw token. Also binds the
@@ -2135,6 +2164,24 @@ async function runMigration() {
           console.log(`[v49-${i + 1}/${v49Statements.length}] ○ Already exists: ${preview}...`);
         } else {
           console.error(`[v49-${i + 1}/${v49Statements.length}] ✗ Error: ${error.message}`);
+          throw error;
+        }
+      }
+    }
+
+    // Run V50 schema updates (Consultant Feedback slice 1; mirrors migration 048)
+    console.log(`\nApplying v50 schema updates - Consultant Feedback (${v50Statements.length} statements)...`);
+    for (let i = 0; i < v50Statements.length; i++) {
+      const statement = v50Statements[i];
+      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
+      try {
+        await sql.query(statement);
+        console.log(`[v50-${i + 1}/${v50Statements.length}] ✓ ${preview}...`);
+      } catch (error) {
+        if (error.message.includes('already exists')) {
+          console.log(`[v50-${i + 1}/${v50Statements.length}] ○ Already exists: ${preview}...`);
+        } else {
+          console.error(`[v50-${i + 1}/${v50Statements.length}] ✗ Error: ${error.message}`);
           throw error;
         }
       }

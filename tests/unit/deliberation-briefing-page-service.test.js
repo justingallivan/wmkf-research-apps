@@ -89,6 +89,7 @@ function deps(overrides = {}) {
     )),
     downloadFile: jest.fn(async () => ({ buffer: Buffer.from('%PDF-'), mimeType: 'application/pdf', filename: 'x.pdf', size: 5 })),
     downloadReview: jest.fn(async () => ({ buffer: Buffer.from('%PDF-review'), mimeType: 'application/pdf', filename: 'review.pdf', size: 11 })),
+    loadConsultantFeedback: jest.fn(async () => ({ status: 'ok', items: [] })),
     ...overrides,
   };
 }
@@ -283,4 +284,19 @@ test('materials: a file whose actual bytes exceed the cap is refused even when t
     downloadFile: jest.fn(async () => ({ buffer: Buffer.alloc(10), mimeType: 'video/mp4', filename: 'big.mp4', size: 900 * 1024 * 1024 })),
   });
   await expect(resolveBriefingMember({ requestId: REQUEST_ID, member: `material:${SLIDES_ID}` }, d)).rejects.toMatchObject({ httpStatus: 404 });
+});
+
+test('consultant feedback: the context carries the loader\'s status and items verbatim', async () => {
+  const items = [{ name: 'Jane Doe', affiliation: 'Acme', receivedOn: '2026-09-01', bodyHtml: '<p>Great work.</p>' }];
+  const d = deps({ loadConsultantFeedback: jest.fn(async () => ({ status: 'ok', items })) });
+  const context = await buildBriefingContext({ requestId: REQUEST_ID, link: LINK }, d);
+  expect(context.consultantFeedback).toEqual({ status: 'ok', items });
+  expect(d.loadConsultantFeedback).toHaveBeenCalledWith(REQUEST_ID);
+});
+
+test('consultant feedback: a throwing loader yields unavailable rather than failing the whole context (§3.3, Codex AR-1 finding 4)', async () => {
+  const d = deps({ loadConsultantFeedback: jest.fn(async () => { throw new Error('table unavailable'); }) });
+  const context = await buildBriefingContext({ requestId: REQUEST_ID, link: LINK }, d);
+  expect(context.ok).toBe(true);
+  expect(context.consultantFeedback).toEqual({ status: 'unavailable', items: [] });
 });

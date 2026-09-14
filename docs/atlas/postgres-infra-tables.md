@@ -513,6 +513,55 @@ reviews resolve live from `wmkf_appreviewersuggestion`, and the proposal
 narrative resolves by governed path. Cleanup: none scheduled; revoked and expired
 rows stay as audit history (bounded by one live row per request).
 
+### `consultant_feedback` — Consultant Feedback slice 1 (migration 048, fresh-install v50; 2026-09-14)
+
+**Source of truth:** Postgres. Staff-recorded informal feedback from retained
+consultants on a proposal (`docs/plans/CONSULTANT_FEEDBACK_PLAN_2026-09-14.md`).
+Home is the Request Workbench Reviews tab, as its own "Consultant feedback"
+section below formal reviews (CF1); shared on the external deliberation
+briefing page by default (`shared` boolean, default `true`, CF2); staff may
+edit and delete with no audit trail (CF5).
+
+Columns: `id`, `request_id` (Dataverse `akoya_request` GUID, GUID-validated at
+the route boundary), `consultant_roster_id` (FK `expertise_roster.id`,
+nullable; joined **live and unfiltered by `is_active`** for display, so a
+deactivated consultant's past feedback keeps its author name),
+`one_off_name`/`one_off_affiliation` (used only when `consultant_roster_id` is
+null — a one-off consultant name stored on the entry itself; CF6: one-offs are
+never written to `expertise_roster` and never appear in recipient pickers),
+`body_html` (sanitized HTML, same `sanitizeReviewHtml` pipeline as reviews,
+re-sanitized on every read; slice 1 requires a non-empty body since it has no
+attachments), `received_on` (date), `requestdocument_id` (nullable, unique;
+slice 2 attachment binding — unused in slice 1), `shared`, `mutation_id`
+(client-generated UUID; `UNIQUE (request_id, mutation_id)` backs a replay-safe
+create: `INSERT … ON CONFLICT (request_id, mutation_id) DO NOTHING` followed
+by a select on that mutation id, so a retry after a lost response returns the
+original row instead of duplicating it), `status` (`active` or `deleting`;
+slice 1 only ever writes `active` — hard delete goes straight from `active` to
+gone — the `deleting` value exists for slice 2's supersede-first delete
+lifecycle), `created_by`/`updated_by`/`created_at`/`updated_at`.
+
+Constraints: `consultant_feedback_has_content` (`body_html IS NOT NULL OR
+requestdocument_id IS NOT NULL`); `consultant_feedback_one_author` (exactly
+one of `consultant_roster_id` / `one_off_name`). Server-side eligibility
+(`is_active = true AND role_type = 'Consultant'` against `expertise_roster`)
+is enforced in the service on create and on any author change — the FK alone
+would accept a Board member or an inactive roster row.
+
+Written and read exclusively by `lib/services/consultant-feedback-service.js`
+(`listConsultantFeedback`, `listEligibleConsultants`, `writeFeedbackEntry` —
+inserts, `updateFeedbackEntry` — author/body/date/share changes; both run in
+their own same-client transaction through the shared `assertConsultantEligible`/
+`validateAuthorInput` guards, eligibility only re-checked when the submitted
+author differs by value from the stored row, `deleteFeedbackEntry`,
+`loadSharedConsultantFeedbackForBriefing`), called from
+`/api/workbench/consultant-feedback[/consultants]` and
+`lib/services/deliberation-briefing/briefing-page-service.js`'s
+`buildBriefingContext` (`consultantFeedback: { status: 'ok' | 'unavailable',
+items }` — a read failure on this table alone degrades to `unavailable` with a
+structured log rather than failing the whole briefing context or looking like
+"no feedback"). No `expertise_roster` write happens anywhere in this feature.
+Cleanup: none (CF5 — a deleted row is simply gone).
 
 ### `site_visit_material_collections` (migrations 042, 044; S503)
 

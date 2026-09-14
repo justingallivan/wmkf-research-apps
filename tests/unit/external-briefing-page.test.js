@@ -123,3 +123,50 @@ test('research presentation materials list by label; oversize files show without
   expect(screen.getByText(/Visit\.mp4/)).toBeInTheDocument();
   expect(screen.getByText(/too large to open here/)).toBeInTheDocument();
 });
+
+test('consultant feedback: the section is omitted when there are zero shared items', async () => {
+  global.fetch = jest.fn().mockResolvedValue(response({
+    ok: true, title: 'Example University', proposalTitle: null, expiresAt: null,
+    session: null, siteVisit: null, writeup: null, reviews: [], proposal: null,
+    consultantFeedback: { status: 'ok', items: [] },
+  }));
+  render(<BriefingPage />);
+  await screen.findByText('Example University');
+  expect(screen.queryByText('Consultant feedback')).not.toBeInTheDocument();
+});
+
+test('consultant feedback: an unavailable status renders a notice instead of the items, even when the fixture carries shared items', async () => {
+  global.fetch = jest.fn().mockResolvedValue(response({
+    ok: true, title: 'Example University', proposalTitle: null, expiresAt: null,
+    session: null, siteVisit: null, writeup: null, reviews: [], proposal: null,
+    // The fixture below is deliberately populated (as a real 'ok' response
+    // would be) so this test proves the notice REPLACES content on the client
+    // too — not merely that an already-empty items array stays empty.
+    consultantFeedback: {
+      status: 'unavailable',
+      items: [{ name: 'Jane Doe', affiliation: 'Acme Consulting', receivedOn: '2026-09-01', bodyHtml: '<p>x</p>' }],
+    },
+  }));
+  render(<BriefingPage />);
+  expect(await screen.findByText('Consultant feedback')).toBeInTheDocument();
+  expect(screen.getByText('Consultant feedback could not be loaded.')).toBeInTheDocument();
+  expect(screen.queryByText('Jane Doe')).not.toBeInTheDocument();
+});
+
+test('consultant feedback: shared items render name, affiliation, received date as a text node, and sanitized body', async () => {
+  global.fetch = jest.fn().mockResolvedValue(response({
+    ok: true, title: 'Example University', proposalTitle: null, expiresAt: null,
+    session: null, siteVisit: null, writeup: null, reviews: [], proposal: null,
+    consultantFeedback: {
+      status: 'ok',
+      items: [{ name: 'Jane Doe', affiliation: 'Acme Consulting', receivedOn: '2026-09-01', bodyHtml: '<p>Great work.</p>' }],
+    },
+  }));
+  render(<BriefingPage />);
+  expect(await screen.findByText('Jane Doe')).toBeInTheDocument();
+  expect(screen.getByText('Acme Consulting', { exact: false })).toBeInTheDocument();
+  // Rendered from the string verbatim — never through `new Date`, so the day
+  // can never shift with the viewer's time zone.
+  expect(screen.getByText('Received 2026-09-01')).toBeInTheDocument();
+  expect(screen.getByText('Great work.')).toBeInTheDocument();
+});
