@@ -13,9 +13,11 @@ Owner decisions T1–T4 and the build record: `docs/plans/REVIEW_PANEL_WORKBENCH
 Branch `feature/review-panel-workbench-tab`; Tier 2 runtime work, so the OWNER merges after CI, not the agent.
 PR #291 merged 2026-09-13 (4b22c50c); `REVIEW_PANEL_ROLLOUT_MODE=access` set in Production and
 redeployed (`wmkfresearchapps-47ehh2pmg`, Ready) — **[VERIFIED via `vercel env pull` + redeploy output]**.
-Still owner-side: grant `review-panel` to the pilot users in the admin panel, then smoke the tab
-signed-in on one request (Workbench → Review Panel tab: Launch, progress, Word/PDF links). The tab has
-NOT had a browser check yet. Also open: the fact-consistency self-test fixture fix landed on main (c1ffda91).
+Owner smoked the tab on 1002874 (2026-09-13 evening) and asked for a distill; PR #292 (c853c413,
+merged 2026-09-14, production `wmkfresearchapps-52sw34jq0` Ready) collapses failed runs to one line, makes
+Word/PDF the row actions with a withheld-if-unknown run total, and moves configuration behind a
+disclosure. Still owner-side: grant `review-panel` to the pilot users in the admin panel; eyeball the
+distilled tab once. Also open: the fact-consistency self-test fixture fix landed on main (c1ffda91).
 
 ## Session 510 Summary (Fable orchestrating; Sonnet built, Opus reviewed, one Codex adversarial round; owner drove production rollout 2026-09-13)
 
