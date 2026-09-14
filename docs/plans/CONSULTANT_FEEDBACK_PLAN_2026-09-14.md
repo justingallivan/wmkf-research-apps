@@ -39,7 +39,8 @@ read-only briefing page that board members and consultants open from the Share e
 | CF3 | **The external briefing page shows the consultant's name** (and affiliation), consistent with D13 for reviews. |
 | CF4 | External section label is **"Consultant feedback"**. |
 | CF5 | **Staff can edit and delete entries. No audit trail** is required. |
-| CF6 | **Consultant identity comes from the existing roster** (a dropdown of active `expertise_roster` rows with `role_type = 'Consultant'`), with an **"Add person"** option for one-offs that creates a roster row. |
+| CF6 | **Consultant identity comes from the existing roster** (a dropdown of active `expertise_roster` rows with `role_type = 'Consultant'`), with an **"Add person"** option for one-offs. **One-offs are stored on the entry itself and are never added to the roster** (owner, 2026-09-14, second pass: a one-off must not become a roster consultant or appear in recipient pickers). |
+| CF7 | Slice 2's Dataverse artifact-type addition is scheduled by the owner after slice 1 ships; it is not a build-time dependency of slice 1. |
 
 Decisions from the briefing plan that carry over unchanged: one shared link per proposal,
 read-only, no copies of files, PDFs open inline and other files download (D23/D28), live data
@@ -106,7 +107,8 @@ with its own rule: a per-item share flag, default on. This does not reopen D14.
 | Field | Rule |
 |---|---|
 | `request_id` | Dataverse `akoya_request` GUID, GUID-validated at the route boundary |
-| `consultant_roster_id` | FK `expertise_roster.id`, required. Names and affiliations are **joined live** for display, never copied. The display join does **not** filter `is_active`, so a deactivated consultant's past feedback keeps its author. |
+| `consultant_roster_id` | FK `expertise_roster.id`, nullable. When set, name and affiliation are **joined live** for display, never copied; the display join does **not** filter `is_active`, so a deactivated consultant's past feedback keeps its author. |
+| `one_off_name`, `one_off_affiliation` | Nullable text. Used only when `consultant_roster_id` is null (CF6). Exactly one of roster id or one-off name is present (check constraint). |
 | `body_html` | Optional. Staff-pasted text, stored as sanitized HTML (same `sanitizeReviewHtml` pipeline as reviews) and re-sanitized on every read. Null when the entry is attachment-only. |
 | `received_on` | Date the feedback arrived (staff-entered, defaults to today). |
 | `requestdocument_id` | Optional Dataverse GUID of the attached file's registry row (slice 2). Unique when present: one attachment per entry; a second file is a second entry. |
@@ -117,17 +119,12 @@ At least one of `body_html` or `requestdocument_id` must be present.
 
 ### 3.2 Add person [PLANNED]
 
-The save route accepts either `consultantRosterId` or `newConsultant: { name, affiliation,
-preferredEmail? }`. With `newConsultant`, the service inserts an `expertise_roster` row with
-`role_type = 'Consultant'`, `is_active = true`, `created_by = actor`, and binds the entry to it in
-the same transaction.
-
-**Named side effect:** that row immediately appears in the site-visit recipient directory and
-curated-recipient pickers (they filter on `role_type` and `is_active`). A row without
-`preferred_email` lists but cannot be invited. This is the intended meaning of "one-off": the
-person becomes a known consultant. The insert is server-side under `reviewers` access; the
-`expertise-finder`-gated roster route is not called (cross-app-key write, noted for the security
-review).
+The save route accepts either `consultantRosterId` or `oneOff: { name, affiliation? }`. With
+`oneOff`, the entry stores the name and affiliation on the row itself. **No `expertise_roster`
+write happens anywhere in this feature** (CF6): a one-off never appears in the site-visit
+recipient directory or curated-recipient pickers, and the `expertise-finder`-owned roster stays
+that app's surface. If staff later want a one-off to become a roster consultant, they add them
+through the Expertise Finder and edit the entry to select the roster row.
 
 ### 3.3 Briefing page section [PLANNED]
 
@@ -138,7 +135,12 @@ review).
   attachment exists, one link labeled with the filename. PDF opens inline in a new tab; other
   types download (D23/D28 rule reused verbatim).
 - Live read on every context call; toggling `shared` changes the page on next load. No reissue,
-  no pinning.
+  no pinning. A Postgres read failure degrades to an omitted section with a server-side log line,
+  the same policy `loadMaterials` uses (`.catch(() => [])`), so one failing section never takes
+  the whole page down.
+- `received_on` is emitted as an ISO date string (`YYYY-MM-DD`) and rendered without constructing a
+  `Date` from it, so the day never shifts with the viewer's time zone. Name and affiliation render
+  as text nodes, never as HTML.
 - New `document` member kind `feedback:<requestdocumentid>`. Membership is re-proved on every
   download: the registry row must belong to the token's request, be referenced by a feedback row
   for that request with `shared = true`, be Ready and not Superseded. Anything else is 404 with no
@@ -166,14 +168,17 @@ New component `shared/components/workbench/ConsultantFeedbackSection.js`, mounte
 `ReviewsTab.js` below the outstanding-reviews section:
 
 - Heading "Consultant feedback" with an "Add feedback" button.
-- Form: consultant combobox (roster search, with "Add person…" that expands name / affiliation /
-  email fields), received date, rich text body (the existing `RichReviewEditor` contract, so paste
+- Form: consultant combobox (roster search, with "Add person…" that expands name / affiliation
+  fields stored on the entry only), received date, rich text body (the existing `RichReviewEditor` contract, so paste
   from email preserves paragraphs), attachment (slice 2), and a "Shared on briefing page"
   checkbox, checked by default.
 - List: one row per entry with consultant, date, first line of the body, attachment name, a
   shared/not-shared pill, and Edit / Delete row actions. Delete asks once inline, then hard-deletes.
 - Read-only Preview: mutations disabled with the same `previewReadOnly` title-text pattern the
   tab already uses (lines 747, 756).
+- Load-on-mount and reload-after-mutation copy the tab's `fetchIdRef` generation guard
+  (`ReviewsTab.js:786-807`): every post-await state write, success and failure, checks the
+  generation so a request switch never paints another request's feedback.
 
 ### 3.6 Delete semantics [PLANNED]
 
@@ -197,10 +202,12 @@ New component `shared/components/workbench/ConsultantFeedbackSection.js`, mounte
 Migration `048_consultant_feedback.sql` + manifest entry + fresh-install block v50:
 
 ```sql
-CREATE TABLE consultant_feedback (
+CREATE TABLE IF NOT EXISTS consultant_feedback (
   id                     BIGSERIAL PRIMARY KEY,
   request_id             UUID NOT NULL,
-  consultant_roster_id   INTEGER NOT NULL REFERENCES expertise_roster(id),
+  consultant_roster_id   INTEGER REFERENCES expertise_roster(id),
+  one_off_name           TEXT,
+  one_off_affiliation    TEXT,
   body_html              TEXT,
   received_on            DATE NOT NULL,
   requestdocument_id     UUID UNIQUE,
@@ -209,9 +216,13 @@ CREATE TABLE consultant_feedback (
   updated_by             INTEGER NOT NULL REFERENCES user_profiles(id),
   created_at             TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at             TIMESTAMPTZ NOT NULL DEFAULT now(),
-  CONSTRAINT consultant_feedback_has_content CHECK (body_html IS NOT NULL OR requestdocument_id IS NOT NULL)
+  CONSTRAINT consultant_feedback_has_content CHECK (body_html IS NOT NULL OR requestdocument_id IS NOT NULL),
+  CONSTRAINT consultant_feedback_one_author CHECK (
+    (consultant_roster_id IS NOT NULL AND one_off_name IS NULL)
+    OR (consultant_roster_id IS NULL AND one_off_name IS NOT NULL)
+  )
 );
-CREATE INDEX consultant_feedback_request_idx ON consultant_feedback (request_id, received_on DESC);
+CREATE INDEX IF NOT EXISTS consultant_feedback_request_idx ON consultant_feedback (request_id, received_on DESC);
 ```
 
 Column names follow the human-legibility schema principle.
@@ -245,8 +256,8 @@ Column names follow the human-legibility schema principle.
   (`upload-cap.js`) or a smaller feedback-specific cap.
 - External page: body sanitized server-side on read; no URL-shaped fields in the context
   response; `feedback:` member fail-closed as in §3.3.
-- Deliberate departure requiring review: a `reviewers`-gated route inserts into
-  `expertise_roster`, which the `expertise-finder` app otherwise owns.
+- No write to `expertise_roster` from any route in this feature (CF6); the roster is read-only
+  here.
 
 ## 6. Build slices and release tier
 
@@ -269,9 +280,9 @@ combobox.
 
 ## 7. Tests [PLANNED]
 
-- Service: create with roster id / with new person (roster row inserted in the same
-  transaction, `role_type = 'Consultant'`); content check constraint; update and hard delete;
-  live join keeps a deactivated consultant's name.
+- Service: create with roster id / with one-off name (no roster write; assert the roster row
+  count is unchanged); one-author and has-content check constraints; update and hard delete;
+  live join keeps a deactivated consultant's name; one-off entries render their stored name.
 - Routes: method guards; GUID rejection; actor from session only; Preview read-only.
 - Briefing: section omitted with zero shared items; unshared item never appears in context;
   `feedback:` member 404 for unshared, other-request, Superseded, or non-Ready rows with no Graph
@@ -288,12 +299,45 @@ Migration `048_consultant_feedback.sql` + `lib/db/migrations-manifest.json` + fr
 `docs/atlas/postgres-infra-tables.md` and `docs/APPLICATION_STATE_ATLAS.md` rows;
 `docs/API_ROUTE_SECURITY_MATRIX.md` rows (three new in slice 1, two more in slice 2, two amended);
 `docs/DELIBERATION_BRIEFING_PAGE_PLAN.md` §2.1 gains the section row and §2.3 the member kind;
-`docs/SERVICE_AND_UTILITY_CATALOG.md` for the new service; `docs/agent-wiki/topics/` reviewer
-workbench and external-portal pages; slice 2 also `shared/config/requestDocument.js` and
+`docs/SERVICE_AND_UTILITY_CATALOG.md` for the new service; `docs/CANONICAL_COUNTS.md`
+(`api-route-file-count` and `requireappaccess-endpoint-count` both shift) with
+`check:fact-consistency`; `docs/agent-wiki/topics/` reviewer workbench and external-portal pages; slice 2 also `shared/config/requestDocument.js` and
 `docs/atlas/dataverse-wmkf-requestdocument.md`.
 
 ## 9. Open items before build
 
-1. Confirm the §3.2 side effect (add-person creates a real roster consultant) is acceptable.
-2. Dataverse admin: schedule the artifact-type option addition for slice 2.
-3. Run `/contract-reconcile` on this plan (new table, new routes, cross-layer, durable surfaces).
+1. ~~Add-person side effect~~ — resolved 2026-09-14: one-offs stay on the entry (CF6).
+2. Dataverse artifact-type option addition: owner schedules after slice 1 (CF7).
+3. `/contract-reconcile` pass on this plan — run 2026-09-14; findings recorded in §10.
+
+## 10. Contract-reconcile findings (Mode A, 2026-09-14)
+
+**Surface:** staff-entered consultant feedback per request; entry points Reviews tab component,
+three `/api/workbench/consultant-feedback*` routes, two amended external briefing routes;
+persistence new Postgres table `consultant_feedback` (+ slice 2 `wmkf_requestdocument` rows);
+consumers Reviews tab list, briefing context read model, briefing page section, `document`
+member resolver, Atlas/matrix/counts gates. Prior findings verified: none (first pass).
+
+| # | Verdict | Finding | Evidence |
+|---|---|---|---|
+| 1 | VERIFIED | The `document` member resolver ends in an unconditional `throw notFound()`, so an unknown member (including `feedback:` before it is built) is fail-closed. Adding a `feedback:` prefix branch beside `material:` follows the existing shape. | `briefing-page-service.js:317-384` |
+| 2 | VERIFIED | Review HTML is sanitized at write (`submit-service.js`, `manual-review-entry-service.js:105-110`) **and** re-sanitized on read (`review-answers.js` header). The plan's write-and-read sanitization for `body_html` matches the existing contract. | `lib/services/review-answers.js:7-12`; `lib/external/sanitize-review-html.js:84` |
+| 3 | VERIFIED, changed | `check:atlas` finds tables by the regex `CREATE TABLE IF NOT EXISTS`; the v49 block uses that form. §4 SQL changed to `IF NOT EXISTS` for the table and index. New table must be added to `docs/atlas/postgres-infra-tables.md`. | `scripts/check-application-state-atlas.js:97,218-222`; `scripts/setup-database.js:1054-1056` |
+| 4 | VERIFIED | `/api/workbench` has `guardAppKeys: null` (heterogeneous), so `check:route-lifecycle-auth` will not pin the new routes; they must still match the sibling convention `requireAppAccess(req, res, 'reviewers')` + `withDalContext`. A `.js` file and a same-named directory coexist in this namespace already (`final-writeup.js` + `final-writeup/`). | `shared/config/appRegistry.js:350-357`; `pages/api/workbench/staff-deliberations.js:12-23`; `ls pages/api/workbench` |
+| 5 | VERIFIED, changed | `docs/CANONICAL_COUNTS.md` registers `api-route-file-count` and `requireappaccess-endpoint-count`; three new route files shift both. Added to §8. | `docs/CANONICAL_COUNTS.md:33-43` |
+| 6 | VERIFIED, changed | The Reviews tab guards every post-await state write with a `fetchIdRef` generation counter. The new component must copy it; added to §3.5. | `ReviewsTab.js:786-807` |
+| 7 | VERIFIED | `RichReviewEditor` is standalone (`value`, `onChange`, `disabled`, labels) and needs no question-set context, so it is reusable for the body field. | `shared/components/external/RichReviewEditor.js:79-86` |
+| 8 | VERIFIED, changed | `loadMaterials` swallows failures to `[]`. The plan now states the same degrade-and-log policy for the feedback section rather than leaving it implicit. | `briefing-page-service.js:283` |
+| 9 | VERIFIED | `expertise_roster` and the new table share the one Postgres database (`@vercel/postgres` `sql`), so the FK and live join are same-store. Roster is read-only in this feature (CF6). | `recipient-directory-service.js:8-31`; writers grep: `pages/api/expertise-finder/roster.js`, `scripts/seed-expertise-roster.js` only |
+| 10 | PLANNED, fan-out named | Slice 2's new artifact-type value `100000008` must be added to **both** maps in `shared/config/requestDocument.js` and the briefing `eligibleMaterialRow` allowlist must **not** gain it (the `material:` kind stays narrow). At build time grep the raw field `wmkf_artifacttype` for every reader (Proposal tab Documents section, `ArtifactFileMetadata`, dossier/site-visit readers) and confirm each either ignores or labels the new value; allowlist readers exclude it by default, denylist readers would fail open. | `shared/config/requestDocument.js:10-29`; `briefing-page-service.js:186-187,225` |
+
+**Audits:** whole-flow traced (1 staff → 2 component state → 3 JSON body → 4 route guard/GUID →
+5 service → 6 PG write/read → 7 JSON → 8 tab list and briefing section → 9 gates). Partial-success
+N/A (single-row mutations). Async/stale: finding 6. Helper-extraction N/A (no shared helper
+extracted; `sanitizeReviewHtml` reused unchanged). Durable-surface: findings 3, 5, plus §8.
+Doc-reconcile: §8 lists every restatement; run `/sweep` after slice 1 lands. Symbol fan-out:
+`shared` has three readers (tab list, context, member resolver), all named; artifact type is
+finding 10.
+
+**Verdict: READY TO IMPLEMENT (slice 1)** with the changes above already folded into §3–§8.
+Slice 2 remains blocked on the option-set addition (CF7) and finding 10's read-side sweep.
