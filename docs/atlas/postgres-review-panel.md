@@ -19,7 +19,7 @@ related:
 
 # Postgres Review Panel
 
-**[VERIFIED 2026-09-13 via `scripts/apply-migrations.js` output (owner-run: `047_review_panel.sql` apply ok, 45 skipped) and `vercel env ls`]** These five tables exist in the production database since 2026-09-13; the code landed on `main` via PR #281 (merge bbef47ac). The feature is enabled in Production in smoke mode with a four-request allowlist; the drain cron runs per minute (fb6a911a). No launch, generation, or edition had run against live data as of the cron deploy.
+**[VERIFIED 2026-09-13 via `scripts/apply-migrations.js` output (owner-run: `047_review_panel.sql` apply ok, 45 skipped) and `vercel env ls`]** These five tables exist in the production database since 2026-09-13; the code landed on `main` via PR #281 (merge bbef47ac). The feature is enabled in Production in `access` mode since 2026-09-13 (PR #291; earlier the same day, four smoke panels completed under a four-request allowlist); the drain cron runs per minute (fb6a911a).
 
 | Table | Owner / scope | Stored state | Retention and write contract |
 |---|---|---|---|
