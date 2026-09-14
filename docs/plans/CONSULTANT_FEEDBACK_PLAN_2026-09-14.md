@@ -113,7 +113,7 @@ with its own rule: a per-item share flag, default on. This does not reopen D14.
 | `received_on` | Date the feedback arrived (staff-entered, defaults to today). |
 | `requestdocument_id` | Optional Dataverse GUID of the attached file's registry row (slice 2). Unique when present: one attachment per entry; a second file is a second entry. |
 | `shared` | Boolean, default `true` (CF2). |
-| `mutation_id` | Client-generated UUID sent with every create. `UNIQUE (request_id, mutation_id)`; the create runs `INSERT … ON CONFLICT (request_id, mutation_id) DO NOTHING` and then returns the row that carries the id, so a retry after a lost response replays the original row instead of inserting a duplicate that would appear twice on the briefing page (Codex AR-2 finding 5). |
+| `mutation_id` | Client-generated UUID sent with every create. `UNIQUE (request_id, mutation_id)`; the create runs `INSERT … ON CONFLICT (request_id, mutation_id) DO NOTHING` and then returns the row that carries the id, so a retry after a lost response replays the original row instead of inserting a duplicate that would appear twice on the briefing page (Codex AR-2 finding 5). **Lifecycle (Codex AR-3):** the component allocates the UUID once when the "Add feedback" form opens, holds it in form state through timeouts, network errors, and 5xx responses so every Save retry sends the same id, and rotates it only after a confirmed 2xx or an explicit form reset. Test: resubmit the same draft after a simulated lost response and assert one row and the same id. |
 | `status` | `'active'` or `'deleting'`. External and tab readers select `status = 'active'` only. Set to `'deleting'` as the first step of a slice 2 delete (§3.6); slice 1 deletes go straight from `'active'` to gone. |
 | `created_by`, `updated_by`, `created_at`, `updated_at` | Actor from the authenticated profile, never from the request body. No history table (CF5). |
 
@@ -212,8 +212,9 @@ New component `shared/components/workbench/ConsultantFeedbackSection.js`, mounte
 - Slice 1: hard delete the Postgres row (CF5).
 - Slice 2 (Codex AR-1 finding 2 and AR-2 finding 3; remedy is a pending status on the row, not
   an outbox job): three ordered steps, each idempotent.
-  1. `UPDATE consultant_feedback SET status = 'deleting' WHERE id = $1 AND status = 'active'`
-     under `SELECT … FOR UPDATE`. From this instant the entry is invisible to the briefing page
+  1. In one explicit same-client transaction: `SELECT … FOR UPDATE`, then
+     `UPDATE consultant_feedback SET status = 'deleting' WHERE id = $1 AND status = 'active'`,
+     `COMMIT`. From this instant the entry is invisible to the briefing page
      and the tab list (both read `status = 'active'`), so no external viewer ever sees a live
      entry with a dead attachment.
   2. PATCH the registry row to `Superseded` (a no-op when already Superseded).
@@ -303,7 +304,7 @@ slice 2 needs a migration that re-adds the constraint with the new value.
 | 4 load + scan | read exact object, verify etag/hash, virus scan when enabled | Blob etag/hash under the lease | `rejectPortalUpload`, 4xx to client, no Graph call |
 | 5 Graph upload | SharePoint | `recordPortalUploadCandidate({driveId, itemId, contentHash})` **before** step 6 | retry re-uses the candidate; `discardPortalUploadCandidate` removes an orphan when the request is abandoned |
 | 6 registry create | Dataverse `wmkf_requestdocument` with the generation key | registry row id; `findByGenerationKey` makes a retry a no-op | candidate persisted, so a retry does not re-upload |
-| 7 feedback bind | PG `consultant_feedback` insert (attachment-only) or update (`requestdocument_id`) through `writeFeedbackEntry`, **inside `SELECT … FOR UPDATE` on the target entry** (Codex AR-2 finding 2). The lock serializes two finalizes on one entry and a finalize against a delete: the loser sees a `requestdocument_id` already set or `status = 'deleting'`, marks its own registry row `Superseded`, calls `discardPortalUploadCandidate` on its Graph item, and returns 409 `attachment_conflict`. | entry | if this fails the registry row is Ready but unbound; a retry with the same staging id finds the row by generation key and only performs step 7 |
+| 7 feedback bind | PG `consultant_feedback` insert (attachment-only) or update (`requestdocument_id`) through `writeFeedbackEntry`, **inside one explicit same-client Postgres transaction** (`BEGIN` → `SELECT … FOR UPDATE` on the target entry → conditional bind or status decision → `COMMIT`; a bare `FOR UPDATE` under autocommit releases at statement end and protects nothing, Codex AR-3). Loser-side Dataverse/Graph cleanup runs only after the transaction has committed or rolled back. The lock serializes two finalizes on one entry and a finalize against a delete: the loser sees a `requestdocument_id` already set or `status = 'deleting'`, marks its own registry row `Superseded`, calls `discardPortalUploadCandidate` on its Graph item, and returns 409 `attachment_conflict`. | entry | if this fails the registry row is Ready but unbound; a retry with the same staging id finds the row by generation key and only performs step 7 |
 | 8 complete | staging row `consumed` with `result_payload = {requestdocumentId, feedbackId}`; staged bytes reaped later | terminal response durable | a lost response is answered from `result_payload` on replay |
 
 Crash-point tests: fail after 5, after 6, after 7; replay the same staging id and assert exactly
@@ -320,11 +321,21 @@ Graph upload with no client retry leaves an unregistered SharePoint file and eve
 only cleanup identity [VERIFIED via `lib/services/portal-upload-staging.js:349-403`;
 `discardPortalUploadCandidate` is called only inline by the grantee submit and replace routes].
 This gap is shared with the grantee-image and site-visit-material scopes today. Before slice 2
-ships, extend the expiry sweep to read `candidate_result`, look the generation key up in the
-registry, and call `discardPortalUploadCandidate` for a candidate with no registry row (or
-Superseded/unbound one); retain rows whose candidate is bound. Tests: expire after steps 5, 6, 7
-with no retry and assert the SharePoint item is removed or retained correctly. Land it as its
-own small change to the staging service so the two existing scopes benefit.
+ships, extend the expiry sweep with a **fail-closed, scope-specific reconciliation** (Codex AR-3:
+candidate shapes differ per scope; grantee-image candidates carry an image ref, not a generation
+key, so one registry lookup cannot serve every scope):
+- `consultant_feedback` scope: a candidate is **bound** when a registry row with its generation
+  key exists **and** a `consultant_feedback` row references that registry id. Unbound with a Ready
+  registry row (crash after step 6): PATCH the registry row `Superseded` **first**, then
+  `discardPortalUploadCandidate`; if either call fails, retain the staging row and try next sweep.
+  Never leave a Ready registry row whose file was discarded. Unbound with no registry row (crash
+  after step 5): discard the candidate.
+- Existing scopes: each gets its own binding proof (grantee image: the deliverable's image ref
+  equals the candidate; site-visit material: generation key plus current-slot ownership). Any
+  candidate whose shape the sweep does not recognise is **retained and surfaced**, never discarded.
+Tests: expire after steps 5, 6, 7 with no retry per scope and assert the SharePoint item and
+registry state are each correct, with committed and uncommitted crash fixtures. Land it as its own
+small change to the staging service.
 
 ## 5. Security contract [PLANNED]
 
@@ -402,7 +413,8 @@ and `PORTAL_UPLOAD_SCOPES` in `lib/services/portal-upload-staging.js`.
 2. Dataverse artifact-type option addition: owner schedules after slice 1 (CF7).
 3. `/contract-reconcile` pass on this plan — run 2026-09-14; findings recorded in §10.
 4. Codex adversarial review 1 — run 2026-09-14; four findings folded in (§10).
-5. Codex adversarial review 2 — run 2026-09-14; five findings folded in with proportionate remedies (§10); third review requested with the proportionality context.
+5. Codex adversarial review 2 — run 2026-09-14; five findings folded in with proportionate remedies (§10).
+6. Codex adversarial review 3 — run 2026-09-14; agreed on two dispositions, three precision pushbacks folded in (§10). Loop closed.
 
 ## 10. Contract-reconcile findings (Mode A, 2026-09-14)
 
@@ -465,6 +477,19 @@ lighter one was chosen and the reasoning is stated.
 | Finalize inserts attachment-only rows outside the eligibility check | high | **Accepted.** One `writeFeedbackEntry` primitive for every insert/author change; finalize calls it; forged-id tests through finalize (§3.2). |
 | Slice 1 create not idempotent on lost response | medium | **Accepted.** `mutation_id` column, unique per request, `ON CONFLICT DO NOTHING` + replay (§3.1, §4). |
 
-**Verdict (pass 3, after folding AR-2): READY TO IMPLEMENT (slice 1)** with `mutation_id`,
-`status`, and the single write primitive. Slice 2 blocked on CF7, the finding 10 read-side sweep,
+### Codex adversarial review 3 (2026-09-14, gpt-5.6-sol, agree-or-push-back on the AR-2 dispositions)
+
+| Disposition | Codex | Result |
+|---|---|---|
+| (a) row lock instead of version CAS | PUSH BACK: lock is void without an explicit same-client transaction | **Accepted**; transaction boundaries written into §4 step 7 and §3.6 step 1 |
+| (b) `deleting` status + sweep instead of outbox | **AGREE** | unchanged |
+| (c) orphan cleanup in the shared staging service | PUSH BACK: one generation-key lookup cannot serve every scope; unbound Ready registry row must be Superseded before the file is discarded | **Accepted**; scope-specific fail-closed reconciliation and Superseded-before-discard written into §4 |
+| (d) `mutation_id` + `ON CONFLICT` | PUSH BACK: only works if the client keeps one id across ambiguous retries | **Accepted**; allocation/retention/rotation lifecycle and a lost-response test written into §3.1 |
+| (e) one `writeFeedbackEntry` primitive | **AGREE** | unchanged |
+
+No new mechanism was requested; every pushback was a precision gap in how a chosen remedy was
+specified. Review loop closed at three passes.
+
+**Verdict (pass 4, after folding AR-3): READY TO IMPLEMENT (slice 1)** with `mutation_id`
+(client lifecycle defined), `status`, and the single write primitive. Slice 2 blocked on CF7, the finding 10 read-side sweep,
 and the staging-service cleanup prerequisite.
