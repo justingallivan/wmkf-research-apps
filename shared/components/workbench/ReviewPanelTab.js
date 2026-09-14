@@ -47,62 +47,170 @@ function waitingCopy(run) {
   return null;
 }
 
+/**
+ * Run total for one entry, in dollars — shown ONLY when every terminal seat
+ * cost is `known`. Any `unknown` cost (or a known seat with no figure)
+ * withholds the total entirely: the ledger rule from review-panel-store.js
+ * (isAttemptCostUnknown) is never softened to "$0" on a read surface.
+ */
+export function runTotalLabel(seats) {
+  const terminal = (seats || EMPTY_ARRAY).filter((seat) => seat.costState != null);
+  if (!terminal.length) return null;
+  if (terminal.some((seat) => seat.costState !== 'known' || seat.costCents == null || !Number.isFinite(Number(seat.costCents)))) return 'cost unknown';
+  return `$${(terminal.reduce((sum, seat) => sum + Number(seat.costCents), 0) / 100).toFixed(2)}`;
+}
+
+/** The one failure reason worth a line: the first seat's own error (specific), else the entry's generic copy. */
+function failureReason(entry) {
+  const seatError = (entry?.seats || EMPTY_ARRAY).find((seat) => seat.error)?.error;
+  return seatError || entry?.error || null;
+}
+
+function DownloadLink({ entry, format, children }) {
+  return (
+    <a
+      className="inline-flex items-center rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:border-gray-400 hover:bg-gray-50"
+      href={`/api/review-panel/download?entryId=${encodeURIComponent(entry.id)}&format=${format}`}
+      {...(format === 'docx' ? { download: true } : {})}
+    >
+      {children}
+    </a>
+  );
+}
+
+function SeatDetails({ seats, summary = 'Details' }) {
+  if (!seats?.length) return null;
+  return (
+    <details className="mt-2 text-xs text-gray-500">
+      <summary className="cursor-pointer select-none font-medium text-gray-600 hover:text-gray-900">{summary}</summary>
+      <ul className="mt-1.5 space-y-0.5 pl-1">
+        {seats.map((seat) => (
+          <li key={seat.seatKey}>
+            {[seat.label, seat.model, seat.state, seat.costState === 'known' ? `$${(Number(seat.costCents) / 100).toFixed(2)}` : (seat.costState === 'unknown' ? 'cost unknown' : null)].filter(Boolean).join(' · ')}
+            {seat.error && <span className="text-red-700"> — {seat.error}</span>}
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
+}
+
 function RunRow({ run, nowMs, actionLoading, rerenderErrors, onRerender, onRetry, onStop, actionError }) {
+  const status = String(run.status || '').toLowerCase();
   const unsettled = isRunUnsettled(run.status);
+  const entry = (run.entries || EMPTY_ARRAY)[0] || null; // this tab's projection carries only this request's entry
   const failedEntries = (run.entries || EMPTY_ARRAY).filter((e) => e.status === 'failed' && !e.retryRequested);
   // Mirrors review-panel-store.js requestReviewPanelCancel: owner-scoped, the
   // run must be queued/running (a live lease still 409s; shown inline).
-  const canStop = run.owner?.isMine && ['queued', 'running'].includes(String(run.status || '').toLowerCase());
+  const canStop = run.owner?.isMine && ['queued', 'running'].includes(status);
   // Mirrors requestReviewPanelRetry: owner-scoped, run settled and not cancelled, entry failed.
   const canRetry = run.owner?.isMine && !unsettled && run.status !== 'cancelled' && failedEntries.length > 0;
-  const elapsed = String(run.status || '').toLowerCase() === 'running' ? formatRunningElapsed(run.createdAt, nowMs) : null;
-  const waiting = waitingCopy(run);
-  return (
-    <li className="px-4 py-4" data-testid="review-panel-run">
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-        <div className="flex min-w-0 flex-wrap items-center gap-2">
-          <StatusPill tone={toneForStatus(run.status)}>{runPillLabel(run)}</StatusPill>
-          <span className="text-xs text-gray-500">{launchedByLine(run)}</span>
-        </div>
-        {(canRetry || canStop) && (
-          <div className="flex items-center gap-2">
-            {canRetry && (
-              <Button size="sm" variant="outline" onClick={() => onRetry(run)} disabled={Boolean(actionLoading)} loading={actionLoading === `retry:${run.id}`}>
-                Retry failed
-              </Button>
-            )}
-            {canStop && (
-              <Button size="sm" variant="outline" onClick={() => onStop(run)} disabled={Boolean(actionLoading)} loading={actionLoading === `stop:${run.id}`}>
-                {run.requestCount > 1 ? 'Stop run' : 'Stop'}
-              </Button>
-            )}
+  // Mirrors requestReviewPanelRerender's settle fence (same as EntryRow.canRerender).
+  const canRerender = run.owner?.isMine && entry && entry.status === 'completed' && entry.hasReport && !entry.retryRequested
+    && !unsettled && run.status !== 'cancelled';
+  const total = entry ? runTotalLabel(entry.seats) : null;
+
+  // --- In progress: the one moment progress detail earns the space. ---
+  if (unsettled) {
+    const elapsed = status === 'running' ? formatRunningElapsed(run.createdAt, nowMs) : null;
+    const waiting = waitingCopy(run);
+    return (
+      <li className="px-4 py-4" data-testid="review-panel-run" data-run-shape="running">
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <StatusPill tone={toneForStatus(run.status)}>{runPillLabel(run)}</StatusPill>
+            <span className="text-xs text-gray-500">{launchedByLine(run)}</span>
           </div>
-        )}
-      </div>
-      {run.error && <p className="mt-2 text-sm text-red-700">{run.error}</p>}
-      {actionError && <p className="mt-2 text-xs text-red-700" role="alert">{actionError}</p>}
-      {unsettled && (
+          {canStop && (
+            <Button size="sm" variant="outline" onClick={() => onStop(run)} disabled={Boolean(actionLoading)} loading={actionLoading === `stop:${run.id}`}>
+              {run.requestCount > 1 ? 'Stop run' : 'Stop'}
+            </Button>
+          )}
+        </div>
+        {actionError && <p className="mt-2 text-xs text-red-700" role="alert">{actionError}</p>}
         <div className="mt-3">
           <RunTimeline timeline={run.timeline} />
           {elapsed && <p className="mb-2 text-xs text-gray-500">{elapsed}</p>}
           {waiting && <p className="text-sm text-gray-500">{waiting}</p>}
         </div>
-      )}
-      {(run.failures || EMPTY_ARRAY).map((f, i) => (
-        <p key={`${f.requestId}-${i}`} className="mt-2 text-xs text-red-700">{f.error}</p>
-      ))}
-      {(run.entries || EMPTY_ARRAY).map((entry) => (
-        <EntryRow
-          key={entry.id}
-          entry={entry}
-          runStatus={run.status}
-          // Re-render is owner-scoped on the server (requestReviewPanelRerender); a
-          // non-owner never gets the button, so no-op the handler for them.
-          onRerender={run.owner?.isMine ? onRerender : () => {}}
-          rerenderLoading={actionLoading === `rerender:${entry.id}`}
-          rerenderError={rerenderErrors.get(entry.id)}
-        />
-      ))}
+        {entry && (
+          <EntryRow
+            entry={entry}
+            runStatus={run.status}
+            onRerender={() => {}}
+            rerenderLoading={false}
+            rerenderError={undefined}
+          />
+        )}
+      </li>
+    );
+  }
+
+  // --- Completed with a saved report: the editions ARE the row. ---
+  if (entry && entry.status === 'completed' && entry.hasReport) {
+    return (
+      <li className="px-4 py-4" data-testid="review-panel-run" data-run-shape="completed">
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <StatusPill tone="good">{entry.retryRequested && entry.rerender ? 'Re-render queued' : 'completed'}</StatusPill>
+            <span className="text-xs text-gray-500">{launchedByLine(run)}</span>
+            {total && <span className="text-xs text-gray-500">· {total}</span>}
+            {entry.rerenderCount > 0 && <span className="text-xs text-gray-400">· re-rendered {entry.rerenderCount}×</span>}
+          </div>
+          <div className="flex items-center gap-2">
+            <DownloadLink entry={entry} format="docx">Word</DownloadLink>
+            <DownloadLink entry={entry} format="pdf">PDF</DownloadLink>
+          </div>
+        </div>
+        {entry.retryRequested && entry.rerender && (
+          <p className="mt-2 text-xs text-gray-500">Re-render requested — waiting for the worker (runs every minute).</p>
+        )}
+        {rerenderErrors.get(entry.id) && <p className="mt-2 text-xs text-red-700" role="alert">{rerenderErrors.get(entry.id)}</p>}
+        <div className="flex flex-wrap items-baseline gap-x-4">
+          <SeatDetails seats={entry.seats} />
+          {canRerender && (
+            <button
+              type="button"
+              onClick={() => onRerender(entry.id)}
+              disabled={actionLoading === `rerender:${entry.id}`}
+              className="mt-2 text-xs font-medium text-gray-500 underline underline-offset-2 hover:text-gray-900 disabled:opacity-50"
+            >
+              Re-render report
+            </button>
+          )}
+        </div>
+      </li>
+    );
+  }
+
+  // --- Settled without a report (failed / cancelled / partial / report-save
+  // failure): one muted line. Kept for the record (spend, reason, Retry), never
+  // hidden — but demoted so a later success owns the list. ---
+  const reason = entry ? failureReason(entry) : (run.error || (run.failures || EMPTY_ARRAY)[0]?.error || null);
+  const retryQueued = Boolean(entry?.retryRequested);
+  return (
+    <li className="px-4 py-3" data-testid="review-panel-run" data-run-shape="settled">
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <div className="min-w-0 flex-1 text-xs text-gray-500">
+          <span className="font-medium text-gray-600">{retryQueued ? 'Retry queued' : (status === 'cancelled' ? 'Stopped' : 'Failed')}</span>
+          <span> · {launchedByLine(run).replace(/^Launched /, '')}</span>
+          {total && <span> · {total}</span>}
+          {reason && !retryQueued && <span className="text-red-700"> · {reason}</span>}
+          {retryQueued && <span> · waiting for the worker (runs every minute)</span>}
+        </div>
+        {canRetry && (
+          <button
+            type="button"
+            onClick={() => onRetry(run)}
+            disabled={Boolean(actionLoading)}
+            className="text-xs font-semibold text-gray-700 underline underline-offset-2 hover:text-gray-900 disabled:opacity-50"
+          >
+            {actionLoading === `retry:${run.id}` ? 'Retrying…' : 'Retry'}
+          </button>
+        )}
+      </div>
+      {actionError && <p className="mt-1 text-xs text-red-700" role="alert">{actionError}</p>}
+      {entry && <SeatDetails seats={entry.seats} />}
     </li>
   );
 }
@@ -280,28 +388,34 @@ export default function ReviewPanelTab({ requestId }) {
             <p className="mt-2 max-w-2xl text-sm text-gray-700" data-testid="review-panel-state-sentence">
               {stateSentence({ loading, runs, activeRun })}
             </p>
-            <p className="mt-1 text-xs text-gray-500">
-              Blind AI seat reviews of the proposal narrative, synthesized by a chair, saved as Word and PDF editions.
-            </p>
-            <dl className="mt-3 grid gap-x-4 gap-y-0.5 text-xs text-gray-500 sm:grid-cols-[auto_minmax(0,1fr)]">
-              <dt className="font-medium text-gray-600">Seats</dt>
-              <dd className="min-w-0 break-words">{seatsLine || 'Unavailable'}</dd>
-              <dt className="font-medium text-gray-600">Chair</dt>
-              <dd>{configuration?.chair ? configuration.chair.model : 'Unavailable'}</dd>
-              <dt className="font-medium text-gray-600">Reservation</dt>
-              <dd>{formatReservationBound(configuration?.reservationPerEntry)}</dd>
-            </dl>
-            {!configuration?.ready && configuration?.reason && (
-              <p className="mt-2 text-xs text-gray-400">{configuration.reason}</p>
+            {!runs.length && !loading && (
+              <p className="mt-1 text-xs text-gray-500">
+                Blind AI seat reviews of the proposal narrative, synthesized by a chair, saved as Word and PDF editions.
+              </p>
             )}
+            <details className="mt-3 text-xs text-gray-500">
+              <summary className="cursor-pointer select-none font-medium text-gray-600 hover:text-gray-900">Configuration</summary>
+              <dl className="mt-1.5 grid gap-x-4 gap-y-0.5 sm:grid-cols-[auto_minmax(0,1fr)]">
+                <dt className="font-medium text-gray-600">Seats</dt>
+                <dd className="min-w-0 break-words">{seatsLine || 'Unavailable'}</dd>
+                <dt className="font-medium text-gray-600">Chair</dt>
+                <dd>{configuration?.chair ? configuration.chair.model : 'Unavailable'}</dd>
+                <dt className="font-medium text-gray-600">Reservation</dt>
+                <dd>{formatReservationBound(configuration?.reservationPerEntry)}</dd>
+              </dl>
+              <p className="mt-1 text-gray-400">Seat and chair models are changed in the admin model panel.</p>
+              {!configuration?.ready && configuration?.reason && (
+                <p className="mt-1 text-gray-400">{configuration.reason}</p>
+              )}
+            </details>
           </div>
           <div className="flex max-w-xs flex-col items-end gap-1.5">
             <Button size="sm" onClick={launch} disabled={launchDisabled} loading={actionLoading === 'launch'}>
               {latestRun ? 'Launch new panel' : 'Launch panel'}
             </Button>
-            {launchReason && (
-              <p className="text-right text-xs font-medium text-red-700" role="alert">{launchReason}</p>
-            )}
+            {launchReason
+              ? <p className="text-right text-xs font-medium text-red-700" role="alert">{launchReason}</p>
+              : (launchable.ok && <p className="text-right text-xs text-gray-500">{formatReservationBound(configuration?.reservationPerEntry)}</p>)}
           </div>
         </div>
       </Card>
@@ -310,9 +424,6 @@ export default function ReviewPanelTab({ requestId }) {
         <h2 id="review-panel-history-heading" className="text-sm font-semibold text-gray-900">
           Panels for this request{runs.length ? ` (${runs.length})` : ''}
         </h2>
-        <p className="mt-1 text-xs text-gray-500">
-          Every panel launched for this request, newest first. Stop, retry, and re-render apply only to panels you launched.
-        </p>
         <div className="mt-3 overflow-hidden rounded-xl border border-gray-200 bg-white">
           {loading && !data && <p className="px-4 py-4 text-sm text-gray-500">Loading…</p>}
           {!loading && !runs.length && (
