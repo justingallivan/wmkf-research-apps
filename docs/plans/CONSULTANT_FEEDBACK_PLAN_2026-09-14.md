@@ -3,7 +3,7 @@ title: Consultant Feedback — Informal Consultant Input on the Reviews Tab and 
 domain: reviewers
 kind: plan
 status: active
-summary: "Staff record informal feedback on a proposal from retained consultants (pasted text and/or an attached file), attributed to a roster consultant, editable, and shared by default on the deliberation briefing page as its own section. Postgres owns the entry; the request-document registry and SharePoint own any attached file."
+summary: "Slice 1 PRODUCTION-LIVE 2026-09-14 (PR #293). Staff record informal feedback on a proposal from retained consultants (pasted text and/or an attached file), attributed to a roster consultant, editable, and shared by default on the deliberation briefing page as its own section. Postgres owns the entry; the request-document registry and SharePoint own any attached file."
 cataloged: 2026-09-14
 last_verified: 2026-09-14
 owner: product-engineering
@@ -99,8 +99,8 @@ with its own rule: a per-item share flag, default on. This does not reopen D14.
   never multipart Function bodies, never the intake token.
 - **Migrations:** at plan time the latest was `047_review_panel.sql` / block v49. Slice 1 added
   `048_consultant_feedback.sql` / block v50 (commit `1a58bac8`); the next migration is 049 → v51.
-  Migration 048 is not yet applied to production (owner runs `node scripts/apply-migrations.js`
-  after merge).
+  Migration 048 was applied to production on 2026-09-14 (`node scripts/apply-migrations.js`:
+  1 applied, 46 skipped).
 
 ## 3. Contract
 
@@ -362,7 +362,7 @@ small change to the staging service.
 
 ## 6. Build slices and release tier
 
-### Slice 1 — text feedback end to end [BUILT S512, commit `1a58bac8` on `feature/consultant-feedback-slice-1`; awaiting owner merge]
+### Slice 1 — text feedback end to end [PRODUCTION-LIVE 2026-09-14 (S512): PR #293 merged `b25e4376`, deployment `wmkfresearchapps-f87jgx64x` Ready, migration 048 applied to production by the owner the same day; owner smoke (add → briefing card → unshare) pending]
 
 Migration 048 / block v50; service `lib/services/consultant-feedback-service.js`; the three
 workbench routes (list, mutate, consultants); `ConsultantFeedbackSection` on the Reviews tab;
