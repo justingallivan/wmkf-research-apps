@@ -1,7 +1,7 @@
 import { requireAppAccess } from '../../../lib/utils/auth';
 import { withDalContext } from '../../../lib/dataverse/core/context';
 import { loadModelOverrides } from '../../../lib/services/model-override-loader';
-import { getReviewPanelPage, reviewPanelAction } from '../../../lib/services/review-panel-service';
+import { getReviewPanelPage, getReviewPanelForRequest, reviewPanelAction } from '../../../lib/services/review-panel-service';
 
 export const maxDuration = 300;
 export const config = { api: { bodyParser: { sizeLimit: '32kb' } } };
@@ -19,7 +19,13 @@ export default async function handler(req, res) {
   await loadModelOverrides();
   return withDalContext('review-panel', async () => {
     try {
-      return res.json(req.method === 'GET' ? await getReviewPanelPage(access.profileId) : await reviewPanelAction(access.profileId, req.body || {}));
+      if (req.method === 'POST') return res.json(await reviewPanelAction(access.profileId, req.body || {}));
+      // Per-request read for the Workbench tab; the service GUID-validates
+      // requestId before it reaches any selector.
+      if (typeof req.query.requestId === 'string' && req.query.requestId) {
+        return res.json(await getReviewPanelForRequest(access.profileId, req.query.requestId));
+      }
+      return res.json(await getReviewPanelPage(access.profileId));
     } catch (error) {
       if (error.httpStatus) return res.status(error.httpStatus).json({ error: error.message });
       console.error('[review-panel]', error.message);

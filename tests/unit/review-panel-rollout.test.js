@@ -11,9 +11,11 @@ describe('mode validation fails closed', () => {
   test('an unrecognised mode throws 503, not a silent fallback', () => {
     expect(() => assertReviewPanelModeValid({ REVIEW_PANEL_ROLLOUT_MODE: 'yolo' })).toThrow(/invalid/);
   });
-  test('pilot and smoke are the only accepted modes', () => {
+  test('pilot, smoke, and access are the only accepted modes', () => {
     expect(assertReviewPanelModeValid({ REVIEW_PANEL_ROLLOUT_MODE: 'pilot' })).toBe('pilot');
     expect(assertReviewPanelModeValid({ REVIEW_PANEL_ROLLOUT_MODE: 'smoke' })).toBe('smoke');
+    expect(assertReviewPanelModeValid({ REVIEW_PANEL_ROLLOUT_MODE: 'access' })).toBe('access');
+    expect(() => assertReviewPanelModeValid({ REVIEW_PANEL_ROLLOUT_MODE: 'Access' })).toThrow(/invalid/);
   });
   test('an unset mode defaults to pilot, not an unvalidated passthrough', () => {
     expect(assertReviewPanelModeValid({})).toBe('pilot');
@@ -36,6 +38,14 @@ test('assertReviewPanelCohortConfigured requires a non-empty allowlist and caps 
   expect(() => assertReviewPanelCohortConfigured({ REVIEW_PANEL_ROLLOUT_MODE: 'pilot', REVIEW_PANEL_REQUEST_ALLOWLIST: '' })).toThrow();
   expect(() => assertReviewPanelCohortConfigured({ REVIEW_PANEL_ROLLOUT_MODE: 'smoke', REVIEW_PANEL_REQUEST_ALLOWLIST: 'a,b,c,d,e' })).toThrow();
   expect(assertReviewPanelCohortConfigured({ REVIEW_PANEL_ROLLOUT_MODE: 'smoke', REVIEW_PANEL_REQUEST_ALLOWLIST: 'a,b' })).toEqual(['a', 'b']);
+});
+
+test('access mode ignores the allowlist: no cohort is required and every roster request is admitted', () => {
+  expect(assertReviewPanelCohortConfigured({ REVIEW_PANEL_ROLLOUT_MODE: 'access', REVIEW_PANEL_REQUEST_ALLOWLIST: '' })).toBeNull();
+  const env = { REVIEW_PANEL_ROLLOUT_MODE: 'access', REVIEW_PANEL_REQUEST_ALLOWLIST: 'req-1' };
+  expect(() => assertReviewPanelRequestAllowed({ requestId: 'req-2' }, env)).not.toThrow();
+  // The allowlist still fails closed in pilot for the SAME request — proves access mode is the discriminator.
+  expect(() => assertReviewPanelRequestAllowed({ requestId: 'req-2' }, { ...env, REVIEW_PANEL_ROLLOUT_MODE: 'pilot' })).toThrow(/outside/);
 });
 
 test('assertReviewPanelRequestAllowed rejects a request outside the allowlist (the affiliation-style "wrong path" case)', () => {

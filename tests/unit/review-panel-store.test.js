@@ -654,13 +654,62 @@ describe('requestReviewPanelCancel', () => {
 describe('stopRevokedReviewPanelRun', () => {
   test('fails the run and clears the lease WITHOUT calling assertReviewPanelActor — that check is exactly what just failed', async () => {
     sql.query.mockResolvedValue({ rows: [] });
-    await stopRevokedReviewPanelRun('run-1', 'lease-1', 'The run owner no longer has superuser access; no further model calls were made.');
+    await stopRevokedReviewPanelRun('run-1', 'lease-1', 'The run owner no longer has Review Panel access; no further model calls were made.');
     expect(sql.query).toHaveBeenCalledTimes(1);
     const [text, params] = sql.query.mock.calls[0];
     expect(text).toContain("status='failed'");
     expect(text).toContain('lease_token=NULL');
     expect(text).toContain('locked_until=NULL');
     expect(text).toContain('WHERE id=$1 AND lease_token=$2');
-    expect(params).toEqual(['run-1', 'lease-1', 'The run owner no longer has superuser access; no further model calls were made.']);
+    expect(params).toEqual(['run-1', 'lease-1', 'The run owner no longer has Review Panel access; no further model calls were made.']);
   });
+});
+
+describe('assertReviewPanelActor / assertReviewPanelAccess — T1 app-grant gate (docs/plans/REVIEW_PANEL_WORKBENCH_TAB_PLAN_2026-09-13.md)', () => {
+  const { assertReviewPanelActor, assertReviewPanelAccess } = require('../../lib/services/review-panel-store');
+
+  test('assertReviewPanelActor is Postgres-only: an active non-superuser profile passes with isSuperuser=false (no grant lookup here)', async () => {
+    sql.query.mockResolvedValueOnce({ rows: [{ id: 7, dynamics_systemuser_id: 'su-7', is_superuser: false }] });
+    await expect(assertReviewPanelActor(7)).resolves.toEqual({ profileId: 7, actingUserSystemId: 'su-7', isSuperuser: false });
+    expect(sql.query.mock.calls[0][0]).toMatch(/is_active=TRUE/);
+    expect(sql.query.mock.calls[0][0]).not.toMatch(/AND EXISTS/); // superuser is projected, no longer required
+  });
+
+  test('an inactive or missing profile fails closed with 403', async () => {
+    sql.query.mockResolvedValueOnce({ rows: [] });
+    await expect(assertReviewPanelActor(7)).rejects.toMatchObject({ httpStatus: 403 });
+  });
+
+  test('a superuser passes assertReviewPanelAccess without any grant lookup', async () => {
+    sql.query.mockResolvedValueOnce({ rows: [{ id: 7, dynamics_systemuser_id: null, is_superuser: true }] });
+    const listAppKeys = jest.fn();
+    await expect(assertReviewPanelAccess(7, { listAppKeys })).resolves.toMatchObject({ profileId: 7, isSuperuser: true });
+    expect(listAppKeys).not.toHaveBeenCalled();
+  });
+
+  test('a non-superuser passes only when the review-panel grant is present (throwOnError requested)', async () => {
+    sql.query.mockResolvedValue({ rows: [{ id: 7, dynamics_systemuser_id: null, is_superuser: false }] });
+    const granted = jest.fn().mockResolvedValue(['reviewers', 'review-panel']);
+    await expect(assertReviewPanelAccess(7, { listAppKeys: granted })).resolves.toMatchObject({ profileId: 7 });
+    expect(granted).toHaveBeenCalledWith(7, { throwOnError: true });
+    const notGranted = jest.fn().mockResolvedValue(['reviewers']);
+    await expect(assertReviewPanelAccess(7, { listAppKeys: notGranted })).rejects.toMatchObject({ httpStatus: 403 });
+  });
+
+  test('a grant lookup failure is a 503 marked interrupted — never a 403 revocation, never a pass', async () => {
+    sql.query.mockResolvedValueOnce({ rows: [{ id: 7, dynamics_systemuser_id: null, is_superuser: false }] });
+    const failing = jest.fn().mockRejectedValue(new Error('dataverse down'));
+    await expect(assertReviewPanelAccess(7, { listAppKeys: failing })).rejects.toMatchObject({ httpStatus: 503, interrupted: true });
+  });
+});
+
+test('listReviewPanelRunsForRequest reads across ALL owners (no owner parameter) and matches parked pendingEntries by JSONB containment', async () => {
+  const { listReviewPanelRunsForRequest } = require('../../lib/services/review-panel-store');
+  sql.query.mockResolvedValueOnce({ rows: [{ id: 'run-1' }] });
+  await expect(listReviewPanelRunsForRequest('req-a')).resolves.toEqual([{ id: 'run-1' }]);
+  const [text, params] = sql.query.mock.calls[0];
+  expect(text).not.toMatch(/owner_profile_id\s*=/);
+  expect(text).toMatch(/pendingEntries' @> \$2::jsonb/);
+  expect(text).toMatch(/LIMIT 20/);
+  expect(params).toEqual(['req-a', JSON.stringify([{ requestId: 'req-a' }])]);
 });

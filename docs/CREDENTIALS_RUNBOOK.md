@@ -6,7 +6,7 @@ status: canonical
 summary: "*Quick reference for managing environment variables, rotating secrets, and diagnosing auth failures.*."
 canonical: true
 cataloged: 2026-07-02
-last_verified: 2026-09-12
+last_verified: 2026-09-13
 owner: product-engineering
 related:
   - lib/utils/auth.js
@@ -101,7 +101,7 @@ Each provider key is independent; `VRP_ALLOWED_PROVIDERS` further gates which ar
 | `REVIEW_PANEL_BLOB_READ_WRITE_TOKEN` | Dedicated private Blob RW token for the Virtual Review Panel Phase A foundation's per-entry DOCX/PDF report editions (D11) | **[VERIFIED 2026-09-13 via `vercel env ls`]** Store `wmkf-review-panel-private` (`store_cwVLLxRMR3A8NFA2`) created in the dashboard and connected under the custom `REVIEW_PANEL_BLOB` prefix (Production, Preview). The dashboard connect used the OIDC model and created only the store id and a webhook public key; the RW token was copied from the store page and set as a Secret in Production and Preview. Not set in Development. Code refuses a token identical to the dossier, shared, intake, or uploads token. |
 | `REVIEW_PANEL_BLOB_STORE_ID` | Managed store identity paired with the dedicated Review Panel Blob token | **[VERIFIED 2026-09-13]** `store_cwVLLxRMR3A8NFA2`, auto-created by the dashboard connect step (Production, Preview). Required alongside the token by `assertReviewPanelStorageConfigured`; launch and every paid dispatch fail closed without both. |
 | `REVIEW_PANEL_ENABLED` | Review Panel Phase A activation flag (readable config, not a secret) | **[VERIFIED 2026-09-13]** `true` in Production (readable config) after migration 047, the dedicated store, and the prompt seeds (`review-panel.seat` v1, `review-panel.chair` v1). Drain cron scheduled per minute in `vercel.json` the same day. |
-| `REVIEW_PANEL_ROLLOUT_MODE` | Cohort mode: `pilot` or `smoke` (readable config, not a secret) | **[VERIFIED 2026-09-13]** `smoke` in Production. Defaults to `pilot` when unset; an unrecognised value fails closed (503, `assertReviewPanelModeValid`). |
+| `REVIEW_PANEL_ROLLOUT_MODE` | Cohort mode: `pilot`, `smoke`, or `access` (readable config, not a secret). `access` (S511, owner decision T2) makes the admin-panel `review-panel` app grant the cohort control and ignores `REVIEW_PANEL_REQUEST_ALLOWLIST`. | **[VERIFIED 2026-09-13]** `smoke` in Production; the owner switches to `access` after the Workbench-tab PR merges. Defaults to `pilot` when unset; an unrecognised value fails closed (503, `assertReviewPanelModeValid`). |
 | `REVIEW_PANEL_REQUEST_ALLOWLIST` | Server-owned comma-separated request IDs or request numbers admitted to the controlled cohort (readable config, not a secret) | **[VERIFIED 2026-09-13]** Four D26 request numbers in Production (owner's smoke subset). Parser trims whitespace; smoke mode admits at most four and requires exactly one selection per launch. |
 | `CYCLE_DOSSIER_OPERATOR_STOP` | Immediate process-level outer stop checked before paid calls and SharePoint writes | **Source-built 2026-09-07; unset by default.** The durable Postgres operator stop is the authoritative pause and settles queued/running runs. |
 | `NODE_ENV` | Environment flag | Auto-set (`production` on Vercel, `development` locally) |
