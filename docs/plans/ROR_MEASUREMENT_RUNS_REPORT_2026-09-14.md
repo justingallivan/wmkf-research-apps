@@ -3,7 +3,7 @@ title: ROR / Works-first Measurement Runs — Report (2026-09-14)
 domain: reviewer-identity
 kind: plan
 status: complete
-summary: "Both frozen C2 arms passed. The original C3 replay exposed a parent-canonicalization veto bypass; a subsequent production-code fix cleared that veto on the frozen single-string replay. Pair and 1002903 gates remain unmeasured."
+summary: "Both frozen C2 arms passed. The original C3 replay exposed a parent-canonicalization veto bypass; a subsequent production-code fix cleared that veto on the frozen single-string replay. Pair and 1002903 gates were not evaluated by this comparator; separate typed-pair evidence exists."
 cataloged: 2026-09-14
 last_verified: 2026-09-14
 owner: product-engineering
@@ -18,7 +18,7 @@ related:
 
 # ROR / Works-first measurement report
 
-The required network probes returned HTTP 200 from the measurement process for both OpenAlex and ROR. The two frozen 40-case C2 arms completed. The original C3 production comparator completed its 124 single-string cases; the 17 frozen pair-consistency cases were skipped because the production ROR resolver has no pair policy. **The original C3 veto hard gate failed, so the five request-1002903 pairs were not replayed.** That measurement changed no resolver mode, production module, frozen input, or environment value. A later, separately authorized code fix is recorded at the end of this report; the original result file remains unchanged.
+The required network probes returned HTTP 200 from the measurement process for both OpenAlex and ROR. The two frozen 40-case C2 arms completed. The original C3 production comparator completed its 124 single-string cases; the 17 frozen pair-consistency cases were skipped because the ROR identity-resolver adapter has no pair method. A separate typed relationship and consumer-policy implementation exists for Stage 2 presentation (`docs/INSTITUTION_PAIR_CONSISTENCY_RESOLUTION_PLAN.md`); this comparator did not exercise it. **The original C3 veto hard gate failed, so the five request-1002903 pairs were not replayed here.** That measurement changed no resolver mode, production module, frozen input, or environment value. A later, separately authorized code fix is recorded at the end of this report; the original result file remains unchanged.
 
 ## C2 — frozen Works-first cases
 
@@ -47,13 +47,13 @@ The evaluator recorded 180 OpenAlex calls for the incumbent Works-first/scoring 
 | Wrong automatic resolutions on frozen suite = 0 | 0/58 resolved single-string decisions selected a wrong or forbidden ROR ID | pass for the 124 measured single-string cases; 17 pair cases not measurable |
 | Sibling-campus errors = 0 | 0/60 sibling challenge cases failed; all 60 requested review | pass for measured single-string cases |
 | No veto override (assessment cites score/rank) | 1 selected ID carried a `location_conflict` veto after parent canonicalization: `inst-uc-109-system-uop` | **fail** |
-| Five 1002903 pairs ≥ incumbent correct behavior, no new wrong resolution | 0/5 replayed after the veto hard-gate failure; the fifth pair's substantive label is unsettled | not measurable |
+| Five 1002903 pairs ≥ incumbent correct behavior, no new wrong resolution | 0/5 replayed by this adapter after the veto hard-gate failure; Stage 1 already labels four `same` and one `distinct`/review, while the fifth person's identity remains unsettled | not measurable in this run |
 | Decorated/real-shaped resolution rate ≥ incumbent | Production resolved 58/124 frozen single strings versus 18/124 for the historical incumbent, but the frozen pair cases and real bylines were not scored against a production pair policy | not measurable for the stated input class |
 | Provider error/timeout profile within ROR burst bound | 119 ROR HTTP requests in 55 seconds, 0 errors and 0 timeouts; 57 OpenAlex bridge attempts, 0 bridge failures | pass for the measured replay |
 
 The nine exact-name comparator failures are `inst-hier-005`, `inst-uc-010-ucsd-official`, `inst-uc-011-ucsd-short`, `inst-uc-012-ucsd-acronym`, `inst-uc-013-ucsd-punct`, `inst-uc-014-ucsd-byline`, `inst-uc-109-system-uop`, `inst-uc-110-system-word`, and `inst-uc-118-distractor-california-state-univers`. Each selected the frozen expected ROR ID. The one hard-gate failure is `inst-uc-109-system-uop`: a direct production decision recheck returned `parent_scope_canonicalized` and a selected evaluation with `location_conflict`. This is a veto-policy failure even though the selected ID matches the frozen oracle. No tuning or patch is included in this measurement branch.
 
-For context, the frozen benchmark v3 result recorded 141/141 institution cases passing, and the historical incumbent baseline resolved 18/124 single-string cases. This production replay does not establish pair behavior or a resolution-rate advantage on the five real pairs. C1 has no resolver go/no-go gate or relevance labels in these measurements. Owner decisions about promotion target, recall budget, and shadow window remain open.
+For context, the frozen benchmark v3 result recorded 141/141 institution cases passing, and the historical incumbent baseline resolved 18/124 single-string cases. This production replay does not establish pair behavior at the ROR identity seam or a resolution-rate advantage on the five real pairs. Separately, the shipped boolean pair checker has a 157-case gate, and the source-aware typed relationship/policy shadow benchmark passed 25/25; neither makes the typed policy authoritative for identity or writes. C1 has no resolver go/no-go gate or relevance labels in these measurements. Owner decisions about promotion target, recall budget, and shadow window remain open.
 
 ## Changed-fact document check
 
@@ -63,4 +63,4 @@ The authoritative measurement sources are the two local C2 artifacts, the tracke
 
 The original C3 result above is the pre-fix baseline. A later owner request authorized a production-code fix. `lib/services/ror-institution-decision.js` now treats the explicit “Office of the President” segment as an organizational unit rather than a location and permits parent canonicalization only when the parent candidate's own evaluation is veto-free. A deterministic test in `tests/unit/ror-institution-resolution.test.js` covers a valid parent, a domain-vetoed parent, and a genuine conflicting city. The original failing case, `inst-uc-109-system-uop`, resolved to its expected parent with no selected veto in a direct live recheck.
 
-The full post-fix replay is local at `outputs/ror-production-veto-fix-verification-2026-09-14.json`: 124 single-string cases, 0 selected-veto cases, 0 errors, 0 provider failures, and 0 timeouts. The same nine exact-display-name comparator failures remain; the historical C3 result file was not overwritten. This establishes the veto invariant on the frozen single-string suite. Pair consistency and the five real 1002903 cases remain unmeasured; no promotion decision follows from this fix. The current service-catalog and wiki veto assurances are no longer contradicted by this specific case; their broader scope remains bounded by the source and tests.
+The full post-fix replay is local at `outputs/ror-production-veto-fix-verification-2026-09-14.json`: 124 single-string cases, 0 selected-veto cases, 0 errors, 0 provider failures, and 0 timeouts. The same nine exact-display-name comparator failures remain; the historical C3 result file was not overwritten. This establishes the veto invariant on the frozen single-string suite. Pair consistency and the five real 1002903 cases were not replayed through this identity-resolver comparator; they have separate Stage 1 fixtures and the Stage 2 typed-policy evaluation described above. No promotion decision follows from this fix. The current service-catalog and wiki veto assurances are no longer contradicted by this specific case; their broader scope remains bounded by the source and tests.
