@@ -389,48 +389,77 @@ describe('claimReviewPanelRun', () => {
   });
 });
 
+// Shared entry-resolution query prefix both requestReviewPanelRetry and
+// requestReviewPanelRerender now use (resolveOwnedRunForEntries) instead of
+// trusting a client-supplied runId.
+const RESOLVE_ENTRIES_PREFIX = 'SELECT e.id, e.run_id, e.status, e.winners_json, e.data';
+const LOCK_RUN_PREFIX = 'SELECT * FROM review_panel_runs WHERE id=$1 FOR UPDATE';
+
 describe('requestReviewPanelRetry', () => {
   const ACTOR_ROW = { rows: [{ id: 7, dynamics_systemuser_id: 'sysid-1' }] };
 
+  test('rejects when the selected entries span more than one run', async () => {
+    client.query.mockImplementation(async (q) => {
+      if (q.startsWith(RESOLVE_ENTRIES_PREFIX)) {
+        return { rows: [{ id: 'entry-1', run_id: 'run-1' }, { id: 'entry-2', run_id: 'run-2' }] };
+      }
+      return { rows: [] };
+    });
+    await expect(requestReviewPanelRetry(7, ['entry-1', 'entry-2'])).rejects.toMatchObject({ httpStatus: 400 });
+    expect(client.query).toHaveBeenCalledWith('ROLLBACK');
+  });
+
+  test('rejects when an entry does not exist or belongs to another owner (both read back as zero rows)', async () => {
+    client.query.mockImplementation(async (q) => {
+      if (q.startsWith(RESOLVE_ENTRIES_PREFIX)) return { rows: [] }; // owner filter in the JOIN excludes it either way
+      return { rows: [] };
+    });
+    await expect(requestReviewPanelRetry(7, ['entry-1'])).rejects.toMatchObject({ httpStatus: 404 });
+  });
+
   test('rejects while the run holds a live lease', async () => {
     client.query.mockImplementation(async (q) => {
-      if (q.startsWith('SELECT * FROM review_panel_runs')) return { rows: [{ id: 'run-1', owner_profile_id: 7, lease_token: 'lease-1', status: 'running' }] };
+      if (q.startsWith(RESOLVE_ENTRIES_PREFIX)) return { rows: [{ id: 'entry-1', run_id: 'run-1' }] };
+      if (q.startsWith(LOCK_RUN_PREFIX)) return { rows: [{ id: 'run-1', owner_profile_id: 7, lease_token: 'lease-1', status: 'running' }] };
       if (q.startsWith('SELECT p.id, p.dynamics_systemuser_id')) return ACTOR_ROW;
       return { rows: [] };
     });
-    await expect(requestReviewPanelRetry('run-1', 7, ['entry-1'])).rejects.toMatchObject({ httpStatus: 409 });
+    await expect(requestReviewPanelRetry(7, ['entry-1'])).rejects.toMatchObject({ httpStatus: 409 });
     expect(client.query).not.toHaveBeenCalledWith(expect.stringContaining('UPDATE review_panel_entries'), expect.anything());
     expect(client.query).toHaveBeenCalledWith('ROLLBACK');
   });
 
   test('rejects while the run is queued even with no lease token', async () => {
     client.query.mockImplementation(async (q) => {
-      if (q.startsWith('SELECT * FROM review_panel_runs')) return { rows: [{ id: 'run-1', owner_profile_id: 7, lease_token: null, status: 'queued' }] };
+      if (q.startsWith(RESOLVE_ENTRIES_PREFIX)) return { rows: [{ id: 'entry-1', run_id: 'run-1' }] };
+      if (q.startsWith(LOCK_RUN_PREFIX)) return { rows: [{ id: 'run-1', owner_profile_id: 7, lease_token: null, status: 'queued' }] };
       if (q.startsWith('SELECT p.id, p.dynamics_systemuser_id')) return ACTOR_ROW;
       return { rows: [] };
     });
-    await expect(requestReviewPanelRetry('run-1', 7, ['entry-1'])).rejects.toMatchObject({ httpStatus: 409 });
+    await expect(requestReviewPanelRetry(7, ['entry-1'])).rejects.toMatchObject({ httpStatus: 409 });
   });
 
   test('rejects a cancelled run — an operator stop must never be resurrected by a retry', async () => {
     client.query.mockImplementation(async (q) => {
-      if (q.startsWith('SELECT * FROM review_panel_runs')) return { rows: [{ id: 'run-1', owner_profile_id: 7, lease_token: null, status: 'cancelled' }] };
+      if (q.startsWith(RESOLVE_ENTRIES_PREFIX)) return { rows: [{ id: 'entry-1', run_id: 'run-1' }] };
+      if (q.startsWith(LOCK_RUN_PREFIX)) return { rows: [{ id: 'run-1', owner_profile_id: 7, lease_token: null, status: 'cancelled' }] };
       if (q.startsWith('SELECT p.id, p.dynamics_systemuser_id')) return ACTOR_ROW;
       return { rows: [] };
     });
-    await expect(requestReviewPanelRetry('run-1', 7, ['entry-1'])).rejects.toMatchObject({ httpStatus: 409, message: expect.stringMatching(/cancelled by the operator/i) });
+    await expect(requestReviewPanelRetry(7, ['entry-1'])).rejects.toMatchObject({ httpStatus: 409, message: expect.stringMatching(/cancelled by the operator/i) });
     expect(client.query).not.toHaveBeenCalledWith(expect.stringContaining('UPDATE review_panel_entries'), expect.anything());
   });
 
   test('marks only failed entries with retry_requested_at and requeues the run when settled', async () => {
     client.query.mockImplementation(async (q) => {
-      if (q.startsWith('SELECT * FROM review_panel_runs')) return { rows: [{ id: 'run-1', owner_profile_id: 7, lease_token: null, status: 'failed' }] };
+      if (q.startsWith(RESOLVE_ENTRIES_PREFIX)) return { rows: [{ id: 'entry-1', run_id: 'run-1' }, { id: 'entry-not-failed', run_id: 'run-1' }] };
+      if (q.startsWith(LOCK_RUN_PREFIX)) return { rows: [{ id: 'run-1', owner_profile_id: 7, lease_token: null, status: 'failed' }] };
       if (q.startsWith('SELECT p.id, p.dynamics_systemuser_id')) return ACTOR_ROW;
       if (q.startsWith('SELECT id FROM review_panel_entries')) return { rows: [{ id: 'entry-1' }] };
       if (q.startsWith('UPDATE review_panel_runs')) return { rows: [{ id: 'run-1', status: 'queued' }] };
       return { rows: [] };
     });
-    const run = await requestReviewPanelRetry('run-1', 7, ['entry-1', 'entry-not-failed']);
+    const run = await requestReviewPanelRetry(7, ['entry-1', 'entry-not-failed']);
     expect(run.status).toBe('queued');
     const markCall = client.query.mock.calls.find(([q]) => q.startsWith('UPDATE review_panel_entries'));
     expect(markCall[0]).toContain('retry_requested_at=NOW()');
@@ -440,12 +469,13 @@ describe('requestReviewPanelRetry', () => {
 
   test('rejects when none of the chosen entries are eligible (not failed)', async () => {
     client.query.mockImplementation(async (q) => {
-      if (q.startsWith('SELECT * FROM review_panel_runs')) return { rows: [{ id: 'run-1', owner_profile_id: 7, lease_token: null, status: 'failed' }] };
+      if (q.startsWith(RESOLVE_ENTRIES_PREFIX)) return { rows: [{ id: 'entry-1', run_id: 'run-1' }] };
+      if (q.startsWith(LOCK_RUN_PREFIX)) return { rows: [{ id: 'run-1', owner_profile_id: 7, lease_token: null, status: 'failed' }] };
       if (q.startsWith('SELECT p.id, p.dynamics_systemuser_id')) return ACTOR_ROW;
       if (q.startsWith('SELECT id FROM review_panel_entries')) return { rows: [] };
       return { rows: [] };
     });
-    await expect(requestReviewPanelRetry('run-1', 7, ['entry-1'])).rejects.toMatchObject({ httpStatus: 400 });
+    await expect(requestReviewPanelRetry(7, ['entry-1'])).rejects.toMatchObject({ httpStatus: 400 });
   });
 });
 
@@ -453,65 +483,93 @@ describe('requestReviewPanelRerender', () => {
   const ACTOR_ROW = { rows: [{ id: 7, dynamics_systemuser_id: 'sysid-1' }] };
 
   test('requires at least one entry id', async () => {
-    await expect(requestReviewPanelRerender('run-1', 7, [])).rejects.toMatchObject({ httpStatus: 400 });
+    await expect(requestReviewPanelRerender(7, [])).rejects.toMatchObject({ httpStatus: 400 });
     expect(db.connect).not.toHaveBeenCalled();
+  });
+
+  test('rejects when the selected entries span more than one run', async () => {
+    client.query.mockImplementation(async (q) => {
+      if (q.startsWith(RESOLVE_ENTRIES_PREFIX)) {
+        return { rows: [{ id: 'entry-1', run_id: 'run-1' }, { id: 'entry-2', run_id: 'run-2' }] };
+      }
+      return { rows: [] };
+    });
+    await expect(requestReviewPanelRerender(7, ['entry-1', 'entry-2'])).rejects.toMatchObject({ httpStatus: 400, message: expect.stringMatching(/same run/i) });
+    expect(client.query).toHaveBeenCalledWith('ROLLBACK');
+  });
+
+  test('rejects an entry owned by another profile (the owner-scoped JOIN reads it back as zero rows)', async () => {
+    client.query.mockImplementation(async (q) => {
+      if (q.startsWith(RESOLVE_ENTRIES_PREFIX)) return { rows: [] };
+      return { rows: [] };
+    });
+    await expect(requestReviewPanelRerender(7, ['entry-1'])).rejects.toMatchObject({ httpStatus: 404 });
   });
 
   test('rejects while the run holds a live lease', async () => {
     client.query.mockImplementation(async (q) => {
-      if (q.startsWith('SELECT * FROM review_panel_runs')) return { rows: [{ id: 'run-1', owner_profile_id: 7, lease_token: 'lease-1', status: 'running' }] };
+      if (q.startsWith(RESOLVE_ENTRIES_PREFIX)) return { rows: [{ id: 'entry-1', run_id: 'run-1' }] };
+      if (q.startsWith(LOCK_RUN_PREFIX)) return { rows: [{ id: 'run-1', owner_profile_id: 7, lease_token: 'lease-1', status: 'running' }] };
       if (q.startsWith('SELECT p.id, p.dynamics_systemuser_id')) return ACTOR_ROW;
       return { rows: [] };
     });
-    await expect(requestReviewPanelRerender('run-1', 7, ['entry-1'])).rejects.toMatchObject({ httpStatus: 409 });
+    await expect(requestReviewPanelRerender(7, ['entry-1'])).rejects.toMatchObject({ httpStatus: 409 });
     expect(client.query).not.toHaveBeenCalledWith(expect.stringContaining('UPDATE review_panel_entries'), expect.anything());
     expect(client.query).toHaveBeenCalledWith('ROLLBACK');
   });
 
   test('rejects a cancelled run — an operator stop must never be resurrected by a re-render either', async () => {
     client.query.mockImplementation(async (q) => {
-      if (q.startsWith('SELECT * FROM review_panel_runs')) return { rows: [{ id: 'run-1', owner_profile_id: 7, lease_token: null, status: 'cancelled' }] };
+      if (q.startsWith(RESOLVE_ENTRIES_PREFIX)) return { rows: [{ id: 'entry-1', run_id: 'run-1' }] };
+      if (q.startsWith(LOCK_RUN_PREFIX)) return { rows: [{ id: 'run-1', owner_profile_id: 7, lease_token: null, status: 'cancelled' }] };
       if (q.startsWith('SELECT p.id, p.dynamics_systemuser_id')) return ACTOR_ROW;
       return { rows: [] };
     });
-    await expect(requestReviewPanelRerender('run-1', 7, ['entry-1'])).rejects.toMatchObject({ httpStatus: 409, message: expect.stringMatching(/cancelled by the operator/i) });
+    await expect(requestReviewPanelRerender(7, ['entry-1'])).rejects.toMatchObject({ httpStatus: 409, message: expect.stringMatching(/cancelled by the operator/i) });
     expect(client.query).not.toHaveBeenCalledWith(expect.stringContaining('UPDATE review_panel_entries'), expect.anything());
   });
 
   test('rejects a failed (non-completed) entry — the SQL filter only ever selects status=\'completed\' rows', async () => {
     client.query.mockImplementation(async (q) => {
-      if (q.startsWith('SELECT * FROM review_panel_runs')) return { rows: [{ id: 'run-1', owner_profile_id: 7, lease_token: null, status: 'failed' }] };
+      if (q.startsWith(RESOLVE_ENTRIES_PREFIX)) return { rows: [{ id: 'entry-1', run_id: 'run-1' }] };
+      if (q.startsWith(LOCK_RUN_PREFIX)) return { rows: [{ id: 'run-1', owner_profile_id: 7, lease_token: null, status: 'failed' }] };
       if (q.startsWith('SELECT p.id, p.dynamics_systemuser_id')) return ACTOR_ROW;
       if (q.startsWith('SELECT id, data, winners_json FROM review_panel_entries')) return { rows: [] }; // the failed entry never matches status='completed'
       return { rows: [] };
     });
-    await expect(requestReviewPanelRerender('run-1', 7, ['entry-1'])).rejects.toMatchObject({ httpStatus: 400 });
+    await expect(requestReviewPanelRerender(7, ['entry-1'])).rejects.toMatchObject({ httpStatus: 400 });
   });
 
-  test('rejects a completed entry with no chair winner', async () => {
+  test('rejects a completed entry with no completed chair attempt (winners_json.chair is irrelevant to eligibility)', async () => {
     client.query.mockImplementation(async (q) => {
-      if (q.startsWith('SELECT * FROM review_panel_runs')) return { rows: [{ id: 'run-1', owner_profile_id: 7, lease_token: null, status: 'completed' }] };
+      if (q.startsWith(RESOLVE_ENTRIES_PREFIX)) return { rows: [{ id: 'entry-1', run_id: 'run-1' }] };
+      if (q.startsWith(LOCK_RUN_PREFIX)) return { rows: [{ id: 'run-1', owner_profile_id: 7, lease_token: null, status: 'completed' }] };
       if (q.startsWith('SELECT p.id, p.dynamics_systemuser_id')) return ACTOR_ROW;
       if (q.startsWith('SELECT id, data, winners_json FROM review_panel_entries')) {
         return { rows: [{ id: 'entry-1', data: { files: { docx: {}, pdf: {} } }, winners_json: {} }] };
       }
+      if (q.startsWith('SELECT DISTINCT entry_id FROM review_panel_seat_attempts')) return { rows: [] }; // no completed chair attempt
       return { rows: [] };
     });
-    await expect(requestReviewPanelRerender('run-1', 7, ['entry-1'])).rejects.toMatchObject({ httpStatus: 400 });
+    await expect(requestReviewPanelRerender(7, ['entry-1'])).rejects.toMatchObject({ httpStatus: 400 });
   });
 
-  test('accepts a completed entry with a chair winner: stamps data.rerender (requestedAt/requestedBy only), NEVER touches data.files, requeues the run', async () => {
+  test('accepts a completed entry with a completed chair attempt even when winners_json lacks chair (the normal-completion gap this fixes), stamps data.rerender, NEVER touches data.files, requeues the run', async () => {
     const currentFiles = { docx: { pathname: 'review-panel/entry-1/report.docx' }, pdf: { pathname: 'review-panel/entry-1/report.pdf' } };
     client.query.mockImplementation(async (q) => {
-      if (q.startsWith('SELECT * FROM review_panel_runs')) return { rows: [{ id: 'run-1', owner_profile_id: 7, lease_token: null, status: 'completed' }] };
+      if (q.startsWith(RESOLVE_ENTRIES_PREFIX)) return { rows: [{ id: 'entry-1', run_id: 'run-1' }] };
+      if (q.startsWith(LOCK_RUN_PREFIX)) return { rows: [{ id: 'run-1', owner_profile_id: 7, lease_token: null, status: 'completed' }] };
       if (q.startsWith('SELECT p.id, p.dynamics_systemuser_id')) return ACTOR_ROW;
       if (q.startsWith('SELECT id, data, winners_json FROM review_panel_entries')) {
-        return { rows: [{ id: 'entry-1', data: { files: currentFiles, input: { requestNumber: 'R-1' } }, winners_json: { chair: 'att-chair-1' } }] };
+        // winners_json deliberately has NO chair — this is exactly the shape
+        // a normal (non-retried) completion leaves before the worker fix.
+        return { rows: [{ id: 'entry-1', data: { files: currentFiles, input: { requestNumber: 'R-1' } }, winners_json: {} }] };
       }
+      if (q.startsWith('SELECT DISTINCT entry_id FROM review_panel_seat_attempts')) return { rows: [{ entry_id: 'entry-1' }] };
       if (q.startsWith('UPDATE review_panel_runs')) return { rows: [{ id: 'run-1', status: 'queued' }] };
       return { rows: [] };
     });
-    const run = await requestReviewPanelRerender('run-1', 7, ['entry-1']);
+    const run = await requestReviewPanelRerender(7, ['entry-1']);
     expect(run.status).toBe('queued');
     const updateCall = client.query.mock.calls.find(([q]) => q.startsWith('UPDATE review_panel_entries'));
     expect(updateCall[0]).toContain('retry_requested_at=NOW()');
