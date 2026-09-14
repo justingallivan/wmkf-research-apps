@@ -10,6 +10,14 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## September 2026 — Review Panel moved beyond smoke as a per-request Workbench tab gated by the admin app grant (Session 511)
+
+**Milestone:** The Virtual Review Panel left smoke mode. It now mounts inside the Request Workbench (between Reviews and Staff Deliberations) for any user holding the admin-panel `review-panel` grant, in a new fail-closed rollout mode `access` that replaces the env allowlist; every launcher's panels for a request are visible to everyone with the grant, while stop/retry/re-render stay with the launcher.
+**Sessions:** 511 (Fable; owner present, merged both PRs and ran the env cutover 2026-09-13 → 2026-09-14). PRs #291 (tab, access model) and #292 (distill after the owner's first production view).
+**Ship state:** actor gate split into a Postgres-only in-transaction check and a Dataverse-backed access check at service entry and pre-paid-dispatch; per-request read with a server-computed `launchable`; 409 on a second in-flight run for the same request; shared UI module so page and tab cannot fork; distilled rows (Word/PDF as row actions, one withheld-if-unknown run total, failed runs collapsed to a line). Production: `REVIEW_PANEL_ROLLOUT_MODE=access`, allowlist ignored, standalone `/review-panel` kept.
+**Why it matters:** Program directors reach the panel where they already work on a request, access follows the same admin grants as every other app, and the pilot widens by granting people rather than editing an env var per request.
+**Pointers:** `docs/plans/REVIEW_PANEL_WORKBENCH_TAB_PLAN_2026-09-13.md` (T1–T4, §3b residual risks), `docs/atlas/postgres-review-panel.md`, `docs/agent-wiki/topics/review-panel.md`; merges 4b22c50c (#291), c853c413 (#292).
+
 ## September 2026 — Virtual Review Panel rebuilt on the governed Executor and live in production smoke mode; four panels at ~$0.60 each (Session 510)
 
 **Milestone:** The Virtual Review Panel revival shipped as a new admin-only app (`review-panel`): two vendor seats (Claude and OpenAI) reviewing blind on the governed Executor's new provider seam, a Claude chair synthesising, a per-call seat-attempt ledger with lease and compare-and-set fences, private DOCX/PDF editions in a dedicated Blob store, and a live progress page. Four D26 requests completed end to end in production the same day.

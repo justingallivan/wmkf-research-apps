@@ -1,190 +1,153 @@
-# Session 511 Prompt: Review Panel is live in smoke mode; decide typical-cost figure, Fable seat, pilot widening; Monday ops meeting
+# Session 512 Prompt: Review Panel is a gated Workbench tab in `access` mode; Monday ops meeting; VRP owner decisions
 
-> Session 510 ran 2026-09-12 through the afternoon of 2026-09-13: overnight autonomous build, then
-> the owner merged, configured, and smoke-tested the Virtual Review Panel in production with Fable
-> orchestrating fixes live. Start with `/start`. **Read first:**
-> `docs/plans/REVIEW_PANEL_OVERNIGHT_BRIEF_2026-09-13.md` §2b (smoke results), §3 (logged
-> findings), §4 (delegated decisions). The panel is **enabled in production in smoke mode** on a
-> four-request allowlist; all four requests completed at ~$0.60 each.
+> Session 511 ran 2026-09-13 (evening) into 2026-09-14 (morning). Start with `/start`. **Read first:**
+> `docs/plans/REVIEW_PANEL_WORKBENCH_TAB_PLAN_2026-09-13.md` (owner decisions T1–T4, build record,
+> residual risks). The Review Panel is **live in production as a Request Workbench tab** between
+> Reviews and Staff Deliberations, visible only with the admin-panel `review-panel` grant, rollout mode
+> `access` (env allowlist ignored). The owner smoked it on 1002874 and the distilled layout (PR #292)
+> is deployed.
 
-## Session 511 in progress (2026-09-13) — Review Panel as a gated Workbench tab, PR #291 open
-
-Owner decisions T1–T4 and the build record: `docs/plans/REVIEW_PANEL_WORKBENCH_TAB_PLAN_2026-09-13.md`.
-Branch `feature/review-panel-workbench-tab`; Tier 2 runtime work, so the OWNER merges after CI, not the agent.
-PR #291 merged 2026-09-13 (4b22c50c); `REVIEW_PANEL_ROLLOUT_MODE=access` set in Production and
-redeployed (`wmkfresearchapps-47ehh2pmg`, Ready) — **[VERIFIED via `vercel env pull` + redeploy output]**.
-Owner smoked the tab on 1002874 (2026-09-13 evening) and asked for a distill; PR #292 (c853c413,
-merged 2026-09-14, production `wmkfresearchapps-52sw34jq0` Ready) collapses failed runs to one line, makes
-Word/PDF the row actions with a withheld-if-unknown run total, and moves configuration behind a
-disclosure. Still owner-side: grant `review-panel` to the pilot users in the admin panel; eyeball the
-distilled tab once. Also open: the fact-consistency self-test fixture fix landed on main (c1ffda91).
-
-## Session 510 Summary (Fable orchestrating; Sonnet built, Opus reviewed, one Codex adversarial round; owner drove production rollout 2026-09-13)
+## Session 511 Summary (Fable; owner present and merging)
 
 ### What Was Completed
 
-1. **VRP decisions D1–D11 closed** with the owner (plan §1): hybrid vendor seats Claude + OpenAI on a
-   governed Executor provider seam, Claude chair (Opus start), all models selectable in the admin
-   model panel, seats extensible to 3+; narrative-only input; teamCapacity `not_assessable`; chair
-   gets seat reviews + narrative; provisional OpenAI seat model `gpt-5.6-sol`; dedicated private
-   Blob store for the panel. Plan: `docs/plans/VIRTUAL_REVIEW_PANEL_PHASE_A_BUILD_PLAN_2026-09-12.md`
-   (four Codex adversarial rounds on the plan itself, §9).
-2. **A0 Executor provider seam merged** (PR #280, built by Codex, reviewed by Fable):
-   `allowedProviders` opt-in per call (default Anthropic only), dispatch by the capability row's
-   `provider`, `lib/services/openai-client.js`, error-attached usage, `usageComplete`, `paidCall`;
-   provider-keyed `check:model-registry`; `validateReviewedProviderModelValue`; review-panel model
-   slots in `/api/admin/models` and `shared/config/reviewPanelSeats.js`.
-3. **Codex email-templates branch merged** (PR #279) and the four site-visit templates moved into a
-   new "Applicant emails" admin group (direct to main).
-4. **Phase A foundation built overnight** on `feature/review-panel-foundation` (PR #281, 27 commits,
-   ~6k lines, CI green): migration 047 + block v49 (five tables; `review_panel_seat_attempts` ledger
-   with the two fences and cost CHECKs), store/rollout/input DTO/questions projection/generation/
-   worker/service/storage/documents, routes + page + matrix rows, seed script (dry-run only), spend-check
-   and admin-stats ledger reads with withheld totals, Atlas page, wiki topic, runbook rows. Review
-   chain: 3 Opus slice reviews, 1 Codex adversarial round (4 blocking, fixed), 2 Opus rechecks
-   (one regression pair found and fixed). Brief §3 lists what was logged rather than fixed; §4 the
-   decisions made on the owner's behalf; §5 the exact owner-side commands.
+1. **Red gate fixed at start.** `check:fact-consistency:self-test` had gone red because its "14
+   applications" fixture literal became the live app count when the Review Panel app registered; the
+   fixture now derives its sentinel from the live count (c1ffda91, direct to main, Tier 0).
+2. **Review Panel as a Workbench tab (PR #291, merge 4b22c50c).** Owner decisions 2026-09-13:
+   T1 access gate = admin-panel `review-panel` grant (superuser still passes); T2 new fail-closed rollout
+   mode `access` replaces the env allowlist; T3 shared per-request visibility, mutations stay
+   owner-scoped; T4 standalone `/review-panel` page kept. Server: `assertReviewPanelActor` is now
+   Postgres-only (active profile) and stays inside `FOR UPDATE` transactions; new `assertReviewPanelAccess`
+   (superuser OR grant via Dataverse `listAppKeysForUser`) at the four service entry points and the
+   worker's claim-time / pre-paid-dispatch checks — a grant-lookup failure is a 503 marked `interrupted`
+   (worker pauses; never a revocation). `getReviewPanelForRequest` + `GET /api/review-panel?requestId=`
+   returns every launcher's runs for one request with `owner.isMine`, `requestCount`, and a
+   server-computed `launchable {ok, reason}`; `launchReviewPanel` refuses (409) a second run for a
+   request with an unsettled one. UI: shared helpers lifted to
+   `shared/components/review-panel/review-panel-ui.js`; `ReviewPanelTab`; gated TABS slot via
+   `visibleTabsFor(hasAccess)` (deep link without the grant falls back to Overview). Contract-reconcile
+   pass on the plan found the transaction/Dataverse hazard that produced the gate split.
+3. **Production cutover.** Owner set `REVIEW_PANEL_ROLLOUT_MODE=access` and redeployed
+   (`wmkfresearchapps-47ehh2pmg`); verified via `vercel env pull`. Runbook, Atlas, wiki reconciled.
+4. **Distill (PR #292, merge c853c413, production `wmkfresearchapps-52sw34jq0`).** After the owner's
+   first screenshot ("crowded; unsure whether failures should stay visible"): impeccable `distill` pass.
+   Completed run = one line with Word/PDF as row actions and a run total (withheld as "cost unknown" if
+   any seat cost is unknown; `runTotalLabel`); settled failed/stopped runs collapse to one muted line
+   (specific seat reason, spend, Retry) — kept for the record, never hidden; configuration behind a
+   disclosure; the D6 bound shows beside Launch while launchable; no repeated request number or
+   duplicate status pills. Running runs keep the full progress view.
+5. **Handoff hygiene:** re-render on 1002852/1002874 recorded done (9c804ab5).
 
-5. **Production rollout and smoke (2026-09-13, owner-run):** migration 047 applied; PR #281 merged;
-   store `wmkf-review-panel-private` (`store_cwVLLxRMR3A8NFA2`) connected under the `REVIEW_PANEL_BLOB`
-   prefix; `OPENAI_API_KEY`, `VRP_ALLOWED_PROVIDERS=claude,openai`, `REVIEW_PANEL_ENABLED=true`,
-   `REVIEW_PANEL_ROLLOUT_MODE=smoke`, four-request allowlist; prompts seeded (seat v2 Opus, chair v3);
-   drain cron per minute. Four complete panels: 1002852 $0.61, 1002874 $0.59, 1002903 $0.65,
-   1002912 $0.59 (~4 min each). Fixes merged during the smoke: PR #282 progress polling + seat
-   pills, #283 answer cap + timeline, #284 admin-tunable output budgets (seat 16k, chair 12k),
-   #285 tier-key resolution + readiness reason, #286 PDF WinAnsi sanitizer + stored error detail,
-   #287 retry-state UX, #288 report rendering (labelled matrix, disagreements), #289/#290 "Re-render report"
-   action (no model calls; run resolved from entry ids; chair winner recorded on normal completion). Fable refused the seat prompt on two biology proposals (API `refusal`);
-   Claude seat default is now Opus (a88ea0b2).
+### Commits (main; merges 4b22c50c #291, c853c413 #292)
 
-### Commits (main, this session; merges omitted)
-
-VRP plan revisions (4399fcbb … 262f3322); email-templates group move; brief/handoff commits
-(0a52e8c7 … b22486f6 and later); seat ceiling f3449fdc; Opus seat default a88ea0b2; cron fb6a911a;
-docs reconcile 899a6785. PR merges: 8d7c6490 (#280), bbef47ac (#281), 59e2284e (#282), 753238c0
-(#284), 242569ce (#286), 2b609c9e (#288), ca078e9c (#289), 182ddf8f (#290); #283, #285, #287 in between.
+9c804ab5 handoff · c1ffda91 self-test fixture · a4356519 access mode + gate split · c2e3b545 per-request
+read + 409 guard · 1704576d UI lift · 16a3ff52 tab + docs · ee5b5f77 counts · 70b1e138 tab structure ·
+d0cf4379 Stop scope + polling · 5d75c371 handoff · dea5bcbd/4d1653b5/c7648d50 docs after cutover ·
+fbf5a4d4 distill · c7c69fd8 handoff.
 
 ## Next Items
 
 ### Verified Open
 
-1. **Monday 2026-09-14 ops meeting** — agenda in `project-ops-meeting-2026-09-14-agenda.md` (6 items
-   incl. materials reminder cron and dossier drain-cron cadence). Afterward: record decisions in
+1. **Monday 2026-09-14 ops meeting** — agenda in `.claude-memory/project-ops-meeting-2026-09-14-agenda.md`
+   (6 items incl. materials reminder cron and dossier drain-cron cadence). Afterward: record decisions in
    `docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md` §16 and `docs/CYCLE_DOSSIER_PILOT_DESIGN.md`, add
-   `vercel.json` entries if decided, close the memory.
-2. **Review Panel next steps** (all owner decisions; the app is live in smoke mode):
-   (a) whether the page shows a typical-cost figure (~$0.60/request from four runs, D6);
-   (b) whether to widen to pilot mode / the full D26 roster (`REVIEW_PANEL_ROLLOUT_MODE=pilot`,
-   allowlist); (c) Fable seat: test on a non-biology proposal or leave Opus; (d) the OpenAI seat id
-   (D10, still `gpt-5.6-sol`). (e) DONE 2026-09-13: owner re-rendered 1002852 and 1002874; all four
-   smoke editions now carry the current report template. Follow-ups logged in brief §3:
-   worker-stamped retry marker, `check-review-panel-rollout.js` preflight clone, prompt editor
-   should show the slot model for the two panel rows, admin model changes take up to 5 minutes to
-   reach launches (override cache TTL). Evidence: brief §2b/§3.
+   `vercel.json` entries if decided, close the memory. Evidence: memory file status `active`.
+2. **Review Panel follow-ups** (evidence: plan §3b, brief §3):
+   (a) owner still to grant `review-panel` to pilot users in the admin panel (superusers already see the
+   tab); (b) owner eyeball of the distilled tab; (c) brief §3 follow-ups unchanged: worker-stamped retry
+   marker, `check-review-panel-rollout.js` preflight clone, prompt editor showing slot models, 5-minute
+   model-override cache; (d) residual risks accepted in plan §3b (soft active-run guard, roster reload per
+   4 s poll).
 3. **Dossier "typical cost from real runs" figure** beside the reservation bound. Evidence: seven
-   logged entries in `api_usage_log` (`app_name='cycle-dossier'`); owner asked to decide after seeing
-   actuals (now in hand, ~40× below the bound).
-4. **Site-visit email templates**: merged (PR #279) and regrouped under "Applicant emails";
-   production rehearsal of the four templates still not done. Evidence: `shared/config/editableTextDefaults.js`.
-5. **Dossier redesign effort** (owner: "get this functioning better and then we can mount a
-   redesign"). Functional list is clear; the redesign is unscoped.
+   `api_usage_log` rows (`app_name='cycle-dossier'`); owner asked to decide after seeing actuals.
+4. **Site-visit email templates**: merged (PR #279), regrouped; production rehearsal of the four
+   templates still not done. Evidence: `shared/config/editableTextDefaults.js`.
+5. **Dossier redesign** (unscoped; "get this functioning better and then we can mount a redesign").
 6. **Email send feedback and consistency audit** (work queue item 10): unchanged.
-7. **Five sibling routes with unescaped `Content-Disposition`** (queue audit follow-up): convert to
+7. **Five sibling routes with unescaped `Content-Disposition`**: convert to
    `lib/utils/content-disposition.js` in one pass.
-8. Owner production checks still not eyeballed: Share composer preview and agenda "Exact email"
-   preview on 1003222; PR #218 cycle view.
+8. Owner production checks still not eyeballed: Share composer preview and agenda "Exact email" preview
+   on 1003222; PR #218 cycle view.
 
 ### Owner Decision Needed
 
-1. Review Panel: typical-cost figure (D6), pilot widening, Fable seat, OpenAI seat id (D10), `cycle`
-scope. Old upload-based VRP page retirement stays deferred (D5).
+1. Review Panel: typical-cost figure on the tab/page (D6 currently forbids it; ~$0.60 from four runs),
+   Fable seat retest on a non-biology proposal or leave Opus, OpenAI seat id (D10, still `gpt-5.6-sol`),
+   `cycle` scope. Pilot widening is DONE via `access` mode (T2). Old upload-based VRP page retirement stays
+   deferred (D5).
 2. Dossier preview/Blob retention policy (open since S494).
-3. Drain-cron cadence and materials reminder cron (ops Monday). 4. PR #116 (ROR resolver shadow
-mode): keep or close. 5. 45 unmerged local branches: prune or keep (grep live refs first).
+3. Drain-cron cadence and materials reminder cron (ops Monday). 4. PR #116 (ROR resolver shadow mode):
+   keep or close. 5. 45+ unmerged local branches: prune or keep (grep live refs first; this session added
+   `feature/review-panel-workbench-tab` and `feature/review-panel-tab-distill`, both merged).
 6. Carried: reissue during Dynamics Pending Send; Program select on Final writeups/Awardees; PD
-front-end flip. 7. The other four `CYCLE_DOSSIER_*` flags are still hidden secrets (allowlist and
-rollout mode are now readable).
+   front-end flip. 7. The other four `CYCLE_DOSSIER_*` flags are still hidden secrets.
 
 ### Parked
 
 1. Connor items (J27 Q5, back-end status changes, slice G). 2. Request Quick Find metadata repair.
 3. Legacy Complete row with null eligibility. 4. `NEXTAUTH_SECRET` rotation; multipart direct-upload
-conversion; Stage III institution identity authority. 5. Playwright coverage for external briefing
-and materials pages. 6. Proposal order P3s. 7. Messages & policies P3s. 8. Slots-only reload after
-reorder. 9. Card-vs-line materials count paths. 10. Executor usage-accounting consolidation.
+conversion; Stage III institution identity authority. 5. Playwright coverage for external briefing and
+materials pages. 6. Proposal order P3s. 7. Messages & policies P3s. 8. Slots-only reload after reorder.
+9. Card-vs-line materials count paths. 10. Executor usage-accounting consolidation.
 11. `lib/utils/email-generator.js:489` legacy `DEFAULT_TEMPLATE` with no live importer (cleanup).
 12. Retire the upload-based VRP page only after the new panel reaches parity (D5; not before Phase B).
-13. Dossier adopting `err.usage` ledger logging (plan §8) and Executor usage-accounting consolidation.
+13. Dossier adopting `err.usage` ledger logging (plan §8).
 
 ### Verify Before Acting
 
-1. **Never set Vercel env vars yourself**; hand the owner `! <command>` lines (worked well this
-   session: `vercel env add … --type config --force`, `vercel env rm … -y`, `vercel redeploy <alias>`).
-2. **Waiting on CI or a deploy:** `gh pr checks <n> --watch --fail-fast` / `vercel inspect <url> --wait`
-   in a background command; merge in a separate step after the notification. Never a home-rolled
-   poll loop. (`feedback-deployment-monitoring-use-inspect`.)
-3. **Codex parallel work:** worktree + brief; `codex-companion.mjs … -C <worktree> --model gpt-5.6-sol`
-   is fine when the owner is not running parallel work (owner 2026-09-12); Codex cannot commit in a
-   worktree, Claude commits for it. Adversarial review needs `--base <commit>`. Confirm delegation
-   scope in one line before dispatching a build (S510: "have codex make the fixes" was over-read as
-   "build everything").
-4. Worktrees: `../WMKF_Apps-codex` (parked on the last merged panel branch; all panel PRs #281–#289 merged),
-   `../WMKF_Apps-codex-tracker` (`codex/meeting-tracker`, merged long ago).
-5. Production hostname for probes: `https://wmkfresearch.vercel.app` (redirects to
-   `applications.wmkeck.org`); SharePoint site `https://appriver3651007194.sharepoint.com/sites/akoyaGO`.
-6. Fresh-install blocks: migration 047 = block v49 (applied to production 2026-09-13); next migration
-   is 048 → block v50.
-7. Retry resumes from the last checkpoint on a NEW run row (spent resets to 0 on the card; the
-   source run keeps its charges) and now re-reads the entry timeout budget.
-8. Production Postgres reads for diagnosis (usage log, run ledger) were done from `.env.local`,
-   which points at the production Neon database; read-only, under an explicit owner ask.
-9. A dossier's persisted selection is an explicit include list; a smoke-era selection showed the
-   widened roster as excluded until "Include all" (now a button).
-
-### Verify Before Acting (added 2026-09-13)
-
-10. **Deploy readiness:** `vercel inspect <alias>` reporting Ready can be the PREVIOUS deployment.
-    Before telling the owner a merge is live, confirm the newest production deployment's `created`
-    time is after the merge commit and its status is Ready (S510: 1002874 rendered with the old
-    report template because of this).
-11. **Production reads for diagnosis** were done read-only from `.env.local` under explicit owner
-    permission ("read"); temp scripts under `scripts/_*.mjs` were deleted after each use.
+1. **Never set Vercel env vars yourself**; hand the owner `! <command>` lines (`vercel env add … --type
+   config --force`, `vercel redeploy <alias>`). Verify values afterwards with `vercel env pull` to the
+   scratchpad (readable config only) and delete the file.
+2. **Waiting on CI or a deploy:** `gh pr checks <n> --watch --fail-fast` in a background command; a
+   push to the PR branch resets checks, so restart the watch after every push. Confirm a production
+   deployment is the merge build with `vercel ls --prod --meta githubCommitSha=<sha>` then
+   `vercel inspect <url> --wait` (`vercel inspect` alone does not print the commit).
+3. **Tier 1–3 runtime work** goes on a feature branch and the OWNER merges (S511: both PRs merged on the
+   owner's "merge"). Tier 0 docs/tests may land on main directly.
+4. **App-grant propagation:** route grant cache 2 min (cleared on grant for the same instance);
+   service-level `assertReviewPanelAccess` is uncached; the browser tab strip only refetches grants on
+   reload — tell users to reload after a grant. The "5 minutes" figure is the admin MODEL override cache.
+5. **Codex parallel work:** worktree + brief; adversarial review needs `--base <commit>`. Worktrees
+   `../WMKF_Apps-codex` and `../WMKF_Apps-codex-tracker` are parked on merged branches.
+6. Production hostname for probes: `https://wmkfresearch.vercel.app` (aliases include
+   `applications.wmkeck.org`, `reviews.wmkeck.org`).
+7. Fresh-install blocks: migration 047 = block v49 (applied to production 2026-09-13); next migration
+   is 048 → block v50. No migration this session.
+8. Production Postgres reads for diagnosis only from `.env.local` under an explicit owner ask; delete
+   temp scripts after use.
 
 ### Do Not Reopen Without New Decision
 
-1. Cycle Dossier: roster scope server-side Research; institution from the Applicant lookup;
-   **pilot mode = 23-request allowlist, any superuser** (2026-09-12); entry timeout is the
-   `cycle-dossier.entry` Executor budget, not a code literal; revision numbers are per request;
-   editions are dossier-level; DOCX verification structural, PDF exact; frozen Blob bytes are the
-   artifact of record.
-2. Reviewer release: "No longer needed" may skip the courtesy email (2026-09-12).
-8. Review Panel D1–D11 (plan §1, 2026-09-12) and the brief §4 delegated decisions unless the owner
-   overrides them in the morning review.
-3. Materials reminder cron stays out of `vercel.json` until ops/owner decide (M5).
-4. Optional "other" applicant upload hidden, not retired. 5. Briefing header order and non-PDF
-download behaviour (D28). 6. Role-gap send failure is record-only. 7. Prior decisions unchanged.
+1. Review Panel T1–T4 (2026-09-13, plan §1) and D1–D11 (Phase A plan §1) unless the owner overrides.
+2. Failed Review Panel runs stay visible but collapsed (owner 2026-09-13; distill decision).
+3. Cycle Dossier: roster scope server-side Research; institution from the Applicant lookup; pilot mode =
+   23-request allowlist, any superuser; entry timeout is the `cycle-dossier.entry` Executor budget;
+   revision numbers per request; editions dossier-level; frozen Blob bytes are the artifact of record.
+4. Reviewer release: "No longer needed" may skip the courtesy email (2026-09-12).
+5. Materials reminder cron stays out of `vercel.json` until ops/owner decide (M5).
+6. Optional "other" applicant upload hidden, not retired; briefing header order and non-PDF download
+   behaviour (D28); role-gap send failure is record-only; prior decisions unchanged.
 
 ## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `docs/plans/VIRTUAL_REVIEW_PANEL_REVIVAL_SURVEY_2026-09-12.md` | VRP as-built, internal context inventory, proposed rebuild, D1–D6 |
-| `docs/plans/EMAIL_TEMPLATES_CONFIGURABLE_CODEX_BRIEF_2026-09-12.md` | Codex brief (owned surface §3, handoff section) |
-| `lib/services/cycle-dossier-worker.js` | `operatorStopSignal`, `describeEntryFailure`, per-item publish |
-| `lib/services/cycle-dossier-generation.js` | `resolveEntryTimeoutMs`, `boundedEntryTimeout`, `loggedExecute` |
-| `shared/config/executorBudgets.js` | `cycle-dossier.entry` timeout budget (200 s, 60–220 s) |
-| `lib/services/execute-prompt.js` | `signal` argument combined with `deadlineMs` |
-| `lib/db/migrations/046_cycle_dossier_entry_request_revision.sql` | per-request revision (applied to prod 2026-09-12) |
-| `lib/services/model-resolver.js` | `fable` tier |
-| `lib/utils/content-disposition.js` | shared safe header builder |
-| `next.config.js` | `X-Frame-Options: SAMEORIGIN` on `/api/cycle-dossier/download` |
+| `docs/plans/REVIEW_PANEL_WORKBENCH_TAB_PLAN_2026-09-13.md` | T1–T4 decisions, slices, residual risks |
+| `shared/components/workbench/ReviewPanelTab.js` | per-request tab (`runTotalLabel`, three run shapes) |
+| `shared/components/review-panel/review-panel-ui.js` | shared pills/timeline/entry row for page and tab |
+| `pages/workbench/[requestId].js` | `visibleTabsFor(hasAccess)`; gated TABS entry |
+| `lib/services/review-panel-store.js` | `assertReviewPanelActor` (PG-only) / `assertReviewPanelAccess` (grant); `listReviewPanelRunsForRequest` |
+| `lib/services/review-panel-service.js` | `getReviewPanelForRequest`, `assertNoActiveRunForRequests`, `loadConfigurationSummary` |
+| `lib/services/review-panel-rollout.js` | `REVIEW_PANEL_ROLLOUT_MODES` incl. `access` |
+| `docs/plans/REVIEW_PANEL_OVERNIGHT_BRIEF_2026-09-13.md` | §3 logged follow-ups |
 | `.claude-memory/project-ops-meeting-2026-09-14-agenda.md` | Monday ops agenda |
 
 ## Testing
 
 ```bash
-npx jest tests/unit/cycle-dossier tests/unit/executor-budget tests/unit/release-email-modal.test.js
-npm run check:types && npm run check:status-enum-parity && npm run check:api-routes
-vercel env ls production | grep CYCLE_DOSSIER
-vercel logs --environment production --since 30m --query "drain-cycle-dossiers" --limit 100 --json
+npx jest tests/unit/review-panel-*.test.js tests/unit/workbench-review-panel-tab*.test.js tests/unit/workbench-request-preview-safety.test.js
+npm run check:types && npm run check:api-routes && npm run check:fact-consistency && npm run check:atlas
+vercel env ls production | grep REVIEW_PANEL
 ```
