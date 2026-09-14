@@ -362,7 +362,7 @@ small change to the staging service.
 
 ## 6. Build slices and release tier
 
-### Slice 1 — text feedback end to end [PRODUCTION-LIVE 2026-09-14 (S512): PR #293 merged `b25e4376`, deployment `wmkfresearchapps-f87jgx64x` Ready, migration 048 applied to production by the owner the same day; owner smoke (add → briefing card → unshare) pending]
+### Slice 1 — text feedback end to end [PRODUCTION-LIVE 2026-09-14 (S512): PR #293 merged `b25e4376`, deployment `wmkfresearchapps-f87jgx64x` Ready, migration 048 applied to production by the owner the same day; owner smoke passed 2026-09-14 on request 1003222: entry added from the Reviews tab, card appeared on the briefing page, unshare removed it on reload]
 
 Migration 048 / block v50; service `lib/services/consultant-feedback-service.js`; the three
 workbench routes (list, mutate, consultants); `ConsultantFeedbackSection` on the Reviews tab;
