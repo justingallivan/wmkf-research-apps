@@ -119,8 +119,19 @@ At least one of `body_html` or `requestdocument_id` must be present.
 
 ### 3.2 Add person [PLANNED]
 
-The save route accepts either `consultantRosterId` or `oneOff: { name, affiliation? }`. With
-`oneOff`, the entry stores the name and affiliation on the row itself. **No `expertise_roster`
+The save route accepts either `consultantRosterId` or `oneOff: { name, affiliation? }`.
+
+**Server-side eligibility (Codex AR-1 finding 3):** on create, and on any edit that changes the
+author, the service resolves `consultantRosterId` with
+`SELECT id FROM expertise_roster WHERE id = $1 AND is_active = true AND role_type = 'Consultant'`
+and rejects a miss with 400 `consultant_not_eligible`. The FK alone would accept any roster row
+(the table has no role-type constraint, `scripts/setup-database.js:1371-1390`), so a stale
+dropdown or a forged body could otherwise attribute feedback to a Board member or an inactive
+person and show it externally. The **unfiltered** join is used only when reading, or when editing
+an existing entry without changing its author, so a deactivated consultant's past feedback keeps
+its name.
+
+With `oneOff`, the entry stores the name and affiliation on the row itself. **No `expertise_roster`
 write happens anywhere in this feature** (CF6): a one-off never appears in the site-visit
 recipient directory or curated-recipient pickers, and the `expertise-finder`-owned roster stays
 that app's surface. If staff later want a one-off to become a roster consultant, they add them
@@ -135,9 +146,17 @@ through the Expertise Finder and edit the entry to select the roster row.
   attachment exists, one link labeled with the filename. PDF opens inline in a new tab; other
   types download (D23/D28 rule reused verbatim).
 - Live read on every context call; toggling `shared` changes the page on next load. No reissue,
-  no pinning. A Postgres read failure degrades to an omitted section with a server-side log line,
-  the same policy `loadMaterials` uses (`.catch(() => [])`), so one failing section never takes
-  the whole page down.
+  no pinning.
+- **Unavailable is not empty (Codex AR-1 finding 4).** The context model carries
+  `consultantFeedback: { status: 'ok' | 'unavailable', items: [] }`. A read failure on the new
+  table sets `unavailable`, is logged server-side with a structured event, and the page renders the
+  section with one line, "Consultant feedback could not be loaded", instead of omitting it. Zero
+  shared items with `status: 'ok'` omits the section. This departs from the materials section's
+  swallow-to-empty policy on purpose: silently missing input at a deliberation is a worse failure
+  than a visible notice. (A full Postgres outage never reaches this code: the link itself is
+  verified against `deliberation_briefing_links` in Postgres first,
+  `lib/external/verify-briefing-token.js`, so the realistic case is a fault on the new table
+  alone.)
 - `received_on` is emitted as an ISO date string (`YYYY-MM-DD`) and rendered without constructing a
   `Date` from it, so the day never shifts with the viewer's time zone. Name and affiliation render
   as text nodes, never as HTML.
@@ -183,9 +202,14 @@ New component `shared/components/workbench/ConsultantFeedbackSection.js`, mounte
 ### 3.6 Delete semantics [PLANNED]
 
 - Slice 1: hard delete the Postgres row (CF5).
-- Slice 2: delete the Postgres row and mark the registry row `Superseded` (the briefing filter
-  already hides Superseded rows; no Graph delete, consistent with "no copies, exact pathnames
-  only"). Owner may override to a physical delete later.
+- Slice 2 (Codex AR-1 finding 2; remedy chosen here is ordering, not a tombstone ledger):
+  **supersede first, then delete.** Step 1 PATCHes the registry row to `Superseded` (idempotent:
+  a row already Superseded is a no-op). Step 2 deletes the Postgres row. If step 2 fails, the
+  entry stays visible on the tab with its attachment link now returning 404 on the briefing page
+  and a "attachment removed, delete again" hint on the tab; the staff member repeats Delete, which
+  re-runs both steps. No Graph delete (no copies; exact pathnames only). The failure is visible and
+  retryable without a retry ledger, and no audit-trail table is introduced (CF5). Owner may
+  override to a physical delete later.
 
 ### 3.7 What is deliberately out
 
@@ -240,8 +264,34 @@ Column names follow the human-legibility schema principle.
 - Registry row mirrors the applicant-materials create payload: `operationstatus = Ready`,
   `lifecyclestate = Draft`, request bind, `wmkf_cyclecode`, `wmkf_inputfingerprint`,
   `wmkf_claimtoken`, and a feedback-specific `wmkf_producer` value.
-- `wmkf_generationkey` = SHA-256 over (request id, artifact type, feedback row id, content
-  hash) so a finalize retry is idempotent and two attachments on one request never collide.
+- `wmkf_generationkey` = SHA-256 over (request id, artifact type, **staging id**, content hash).
+  The staging id is the `portal_upload_staging.id` UUID minted before any bytes move, so it exists
+  for attachment-only entries where no feedback row exists yet (Codex AR-1 finding 1 closed the
+  circular dependency on the feedback row id). Two attachments on one request have distinct
+  staging ids and never collide.
+
+### Slice 2 attachment lifecycle [PLANNED; Codex AR-1 finding 1]
+
+Reuses `lib/services/portal-upload-staging.js` verbatim (mint → claim lease → load bytes → record
+candidate → complete/reject) with a new scope `consultant_feedback`. The scope allowlist is a
+CHECK constraint (`portal_upload_staging_scope_check`, currently
+`grantee_image | staff_grantee_image | site_visit_material`, last widened by migration 043), so
+slice 2 needs a migration that re-adds the constraint with the new value.
+
+| Step | Store | Durable identity after the step | On failure |
+|---|---|---|---|
+| 1 mint | PG staging row `pending` (scope, request id as `resource_id`, actor binding, server pathname, cap) | staging id | nothing to recover; row expires |
+| 2 browser upload | private Blob | bytes at the server-chosen pathname | staging row stays `pending`; reaped by `cleanupExpiredPortalUploads` |
+| 3 finalize: claim | staging row `finalizing` + lease token (actor, scope, resource re-proved) | lease | 409 if another finalize holds the lease |
+| 4 load + scan | read exact object, verify etag/hash, virus scan when enabled | Blob etag/hash under the lease | `rejectPortalUpload`, 4xx to client, no Graph call |
+| 5 Graph upload | SharePoint | `recordPortalUploadCandidate({driveId, itemId, contentHash})` **before** step 6 | retry re-uses the candidate; `discardPortalUploadCandidate` removes an orphan when the request is abandoned |
+| 6 registry create | Dataverse `wmkf_requestdocument` with the generation key | registry row id; `findByGenerationKey` makes a retry a no-op | candidate persisted, so a retry does not re-upload |
+| 7 feedback bind | PG `consultant_feedback` insert (attachment-only) or update (`requestdocument_id`) in one statement | entry | if this fails the registry row is Ready but unbound; a retry with the same staging id finds the row by generation key and only performs step 7 |
+| 8 complete | staging row `consumed` with `result_payload = {requestdocumentId, feedbackId}`; staged bytes reaped later | terminal response durable | a lost response is answered from `result_payload` on replay |
+
+Crash-point tests: fail after 5, after 6, after 7; replay the same staging id and assert exactly
+one Graph item, one registry row, one feedback row. Lost-response test: complete then replay,
+assert the stored payload is returned without new writes.
 
 ## 5. Security contract [PLANNED]
 
@@ -281,8 +331,15 @@ combobox.
 ## 7. Tests [PLANNED]
 
 - Service: create with roster id / with one-off name (no roster write; assert the roster row
-  count is unchanged); one-author and has-content check constraints; update and hard delete;
-  live join keeps a deactivated consultant's name; one-off entries render their stored name.
+  count is unchanged); **eligibility**: Board, inactive, missing, and stale-dropdown roster ids are
+  rejected on create and on author change, accepted unchanged on a body-only edit; one-author and
+  has-content check constraints; update and hard delete; live join keeps a deactivated
+  consultant's name; one-off entries render their stored name.
+- Briefing degraded read: a thrown query on the new table yields `status: 'unavailable'` and the
+  page renders the notice; the test's fixture has shared items present so the assertion proves the
+  notice replaces content rather than proving absence.
+- Slice 2: crash-point and lost-response tests as in §4; delete with the Postgres step failing
+  leaves the entry visible and a second delete completes.
 - Routes: method guards; GUID rejection; actor from session only; Preview read-only.
 - Briefing: section omitted with zero shared items; unshared item never appears in context;
   `feedback:` member 404 for unshared, other-request, Superseded, or non-Ready rows with no Graph
@@ -301,14 +358,17 @@ Migration `048_consultant_feedback.sql` + `lib/db/migrations-manifest.json` + fr
 `docs/DELIBERATION_BRIEFING_PAGE_PLAN.md` §2.1 gains the section row and §2.3 the member kind;
 `docs/SERVICE_AND_UTILITY_CATALOG.md` for the new service; `docs/CANONICAL_COUNTS.md`
 (`api-route-file-count` and `requireappaccess-endpoint-count` both shift) with
-`check:fact-consistency`; `docs/agent-wiki/topics/` reviewer workbench and external-portal pages; slice 2 also `shared/config/requestDocument.js` and
-`docs/atlas/dataverse-wmkf-requestdocument.md`.
+`check:fact-consistency`; `docs/agent-wiki/topics/` reviewer workbench and external-portal pages; slice 2 also `shared/config/requestDocument.js`,
+`docs/atlas/dataverse-wmkf-requestdocument.md`, a migration widening
+`portal_upload_staging_scope_check` (precedent: `043_portal_upload_staging_document_scope.sql`),
+and `PORTAL_UPLOAD_SCOPES` in `lib/services/portal-upload-staging.js`.
 
 ## 9. Open items before build
 
 1. ~~Add-person side effect~~ — resolved 2026-09-14: one-offs stay on the entry (CF6).
 2. Dataverse artifact-type option addition: owner schedules after slice 1 (CF7).
 3. `/contract-reconcile` pass on this plan — run 2026-09-14; findings recorded in §10.
+4. Codex adversarial review 1 — run 2026-09-14; four findings folded in (§10); second review requested.
 
 ## 10. Contract-reconcile findings (Mode A, 2026-09-14)
 
@@ -332,12 +392,26 @@ member resolver, Atlas/matrix/counts gates. Prior findings verified: none (first
 | 10 | PLANNED, fan-out named | Slice 2's new artifact-type value `100000008` must be added to **both** maps in `shared/config/requestDocument.js` and the briefing `eligibleMaterialRow` allowlist must **not** gain it (the `material:` kind stays narrow). At build time grep the raw field `wmkf_artifacttype` for every reader (Proposal tab Documents section, `ArtifactFileMetadata`, dossier/site-visit readers) and confirm each either ignores or labels the new value; allowlist readers exclude it by default, denylist readers would fail open. | `shared/config/requestDocument.js:10-29`; `briefing-page-service.js:186-187,225` |
 
 **Audits:** whole-flow traced (1 staff → 2 component state → 3 JSON body → 4 route guard/GUID →
-5 service → 6 PG write/read → 7 JSON → 8 tab list and briefing section → 9 gates). Partial-success
-N/A (single-row mutations). Async/stale: finding 6. Helper-extraction N/A (no shared helper
+5 service → 6 PG write/read → 7 JSON → 8 tab list and briefing section → 9 gates). Partial-success:
+slice 1 mutations are single-row and single-store (N/A); slice 2 finalize and delete span three
+stores and are covered by the §4 lifecycle table and the §3.6 ordering rule (corrected after Codex
+AR-1 finding 2). Async/stale: finding 6. Helper-extraction N/A (no shared helper
 extracted; `sanitizeReviewHtml` reused unchanged). Durable-surface: findings 3, 5, plus §8.
 Doc-reconcile: §8 lists every restatement; run `/sweep` after slice 1 lands. Symbol fan-out:
 `shared` has three readers (tab list, context, member resolver), all named; artifact type is
 finding 10.
 
-**Verdict: READY TO IMPLEMENT (slice 1)** with the changes above already folded into §3–§8.
-Slice 2 remains blocked on the option-set addition (CF7) and finding 10's read-side sweep.
+**Verdict (pass 1): READY TO IMPLEMENT (slice 1)** with the changes above already folded into
+§3–§8. Slice 2 remains blocked on the option-set addition (CF7) and finding 10's read-side sweep.
+
+### Codex adversarial review 1 (2026-09-14, gpt-5.6-sol, base `9994e1f1`) — disposition
+
+| Codex finding | Severity | Disposition |
+|---|---|---|
+| Attachment-only creation is circular (generation key needed the feedback row id, which cannot exist before the file) | high | **Accepted.** Key now uses the staging id; full lifecycle table added to §4 with durable identity after every step, recovery per failure, and crash-point/lost-response tests. Slice 2 only. |
+| Slice 2 delete spans two stores with no ordering or compensation; "partial success N/A" was wrong | high | **Accepted with a lighter remedy.** Supersede-first ordering with idempotent steps and a visible, retryable failure (§3.6) instead of a tombstone row and retry ledger; keeps CF5. Audit text corrected. |
+| Submitted roster id not enforced as an active consultant | high | **Accepted.** Server-side eligibility query on create and author change (§3.2); unfiltered join retained for reads and body-only edits. Slice 1. |
+| Database failure renders as "no feedback" | medium | **Accepted, narrowed.** Explicit `unavailable` status with a visible notice (§3.3). Noted that a full Postgres outage fails link verification first, so the realistic case is a fault on the new table. Slice 1. |
+
+**Verdict (pass 2, after folding AR-1): READY TO IMPLEMENT (slice 1).** Slice 2 now has a written
+lifecycle and is blocked only on CF7 and the finding 10 read-side sweep.
