@@ -18,6 +18,10 @@ const REPLAY = path.join(ROOT, 'institution-affiliation-retrospective-replay-202
 const OUTPUT = path.join(ROOT, 'institution-affiliation-adjudication-queue-2026-09-14.json');
 const LIMITS = Object.freeze({ same: 2, distinct: 4, unparsed_slash_affiliations: 10, unresolved: 10 });
 
+function looksLikeDecisionText(value) {
+  return typeof value === 'string' && /^\s*\(|^\s*not a fit\b|^\s*insufficient(?:ly)?\b|^\s*unable to\b|^\s*not confidently\b/i.test(value);
+}
+
 function replayBucket(row) {
   if (row?.status === 'replayed' && ['same', 'distinct', 'unresolved'].includes(row.relationship)) {
     return row.relationship;
@@ -34,6 +38,7 @@ function selectCases(sourceCases, replayCases) {
   const bySamplingBucket = {};
   for (const bucket of Object.keys(LIMITS)) {
     const eligible = sourceCases.filter((row) => row.triage === 'source_candidate_for_adjudication'
+      && !looksLikeDecisionText(row.storedSuggestedInstitution)
       && replayBucket(replayById.get(row.caseId)) === bucket)
       .sort((a, b) => a.caseId.localeCompare(b.caseId));
     const chosen = eligible.slice(0, LIMITS[bucket]);
@@ -87,4 +92,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { replayBucket, selectCases };
+module.exports = { looksLikeDecisionText, replayBucket, selectCases };

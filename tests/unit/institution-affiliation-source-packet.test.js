@@ -9,6 +9,7 @@ const {
 } = require('../../scripts/collect-institution-affiliation-source-packet');
 const {
   selectCases,
+  looksLikeDecisionText,
 } = require('../../scripts/select-institution-affiliation-adjudication-queue');
 
 describe('institution affiliation source packet', () => {
@@ -74,5 +75,17 @@ describe('institution affiliation source packet', () => {
     expect(selected.map((row) => row.caseId)).toEqual(['a', 'b']);
     expect(selected[0]).not.toHaveProperty('relationship');
     expect(selected[0].labels.institutionOnlyClearance).toBeNull();
+  });
+
+  test('a slash inside decision text cannot enter the institution review queue', () => {
+    expect(looksLikeDecisionText('(biotech, adhesion/receptor therapeutics)')).toBe(true);
+    const sourceCases = [
+      { caseId: 'a', triage: 'source_candidate_for_adjudication', storedSuggestedInstitution: '(biotech, adhesion/receptor therapeutics)' },
+      { caseId: 'b', triage: 'source_candidate_for_adjudication', storedSuggestedInstitution: 'University A / University B' },
+    ];
+    const replayCases = sourceCases.map((row) => ({
+      caseId: row.caseId, status: 'skipped', reason: 'unparsed_slash_affiliations',
+    }));
+    expect(selectCases(sourceCases, replayCases).selected.map((row) => row.caseId)).toEqual(['b']);
   });
 });

@@ -53,7 +53,9 @@ source-backed cases span two stored-text `same` proposals, four `distinct`,
 28 `unresolved`, 19 slash-joined affiliation skips, and 12 skips where the
 stored “suggested institution” is decision text rather than an institution.
 These are sampling strata, **not labels**. The replay compared retained text
-under unknown source/time and did not run selection policy.
+under unknown source/time and did not run selection policy. Two of the 19 slash
+skips also contain decision text; the intake selector removes those before
+sampling.
 
 ## Local packets and privacy
 
@@ -71,6 +73,17 @@ Both outputs are under gitignored `outputs/` and written mode `0600`:
   cases, source records, triage reason, and empty label fields;
 - `outputs/institution-affiliation-adjudication-queue-2026-09-14.json` — 26
   source-backed intake cases with no replay verdict.
+
+A private Excel confirmation sheet was generated from the 26-case queue using
+the July 2026 single-reviewer workbook pattern. Its `Review` tab shows one
+cited publication per case and blank dropdowns for same person, same
+institution, and whether the citation was the original decision source. The
+`Evidence` tab retains 226 citation/affiliation rows for closer inspection.
+Exploratory replay predictions are absent. The sheet is an owner confirmation
+exercise, not a completed blind policy-label set. After the owner fills it,
+preserve the unchanged workbook and hash, import every raw response, then
+audit confirmations and disconfirmations against the cited sources before
+normalizing labels. A missing or uncertain answer remains unknown.
 
 The packet includes a candidate name, stored institution text, public PubMed
 and ORCID links, a sanitized retained website URL when present, matched public
@@ -117,8 +130,9 @@ name without the author, time, identity, and COI checks above.
 No historical staff clicks can be reconstructed from these sources. The queue
 can test whether source-aware institution rules would make safe decisions once
 the independent identity and COI contracts are available; it cannot quantify
-staff actions avoided or authorize a live selection/write flip. The 12
-decision-text rows need recorded-institution repair before pair adjudication;
+staff actions avoided or authorize a live selection/write flip. The 14
+source-backed rows whose stored institution is decision text need
+recorded-institution repair before pair adjudication;
 the six unverified profile URLs need source inspection, and the other 35
 applicant rows need source tracing or remain
 `not_evaluable`. Keep genuine current discrepancies visible with a concrete
