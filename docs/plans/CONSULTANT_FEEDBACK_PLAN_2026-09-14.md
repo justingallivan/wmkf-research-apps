@@ -113,6 +113,8 @@ with its own rule: a per-item share flag, default on. This does not reopen D14.
 | `received_on` | Date the feedback arrived (staff-entered, defaults to today). |
 | `requestdocument_id` | Optional Dataverse GUID of the attached file's registry row (slice 2). Unique when present: one attachment per entry; a second file is a second entry. |
 | `shared` | Boolean, default `true` (CF2). |
+| `mutation_id` | Client-generated UUID sent with every create. `UNIQUE (request_id, mutation_id)`; the create runs `INSERT … ON CONFLICT (request_id, mutation_id) DO NOTHING` and then returns the row that carries the id, so a retry after a lost response replays the original row instead of inserting a duplicate that would appear twice on the briefing page (Codex AR-2 finding 5). |
+| `status` | `'active'` or `'deleting'`. External and tab readers select `status = 'active'` only. Set to `'deleting'` as the first step of a slice 2 delete (§3.6); slice 1 deletes go straight from `'active'` to gone. |
 | `created_by`, `updated_by`, `created_at`, `updated_at` | Actor from the authenticated profile, never from the request body. No history table (CF5). |
 
 At least one of `body_html` or `requestdocument_id` must be present.
@@ -131,7 +133,13 @@ person and show it externally. The **unfiltered** join is used only when reading
 an existing entry without changing its author, so a deactivated consultant's past feedback keeps
 its name.
 
-With `oneOff`, the entry stores the name and affiliation on the row itself. **No `expertise_roster`
+With `oneOff`, the entry stores the name and affiliation on the row itself.
+
+**One write primitive (Codex AR-2 finding 4):** every insert or author change, whether it comes
+from the slice 1 mutate route or from slice 2 finalize step 7, goes through one service function,
+`writeFeedbackEntry`, which enforces eligibility, request ownership, the content constraint, and
+the mutation-id replay in a single statement. Finalize never inserts directly. Finalize-route tests
+submit Board, inactive, missing, and stale roster ids and assert rejection with no registry bind. **No `expertise_roster`
 write happens anywhere in this feature** (CF6): a one-off never appears in the site-visit
 recipient directory or curated-recipient pickers, and the `expertise-finder`-owned roster stays
 that app's surface. If staff later want a one-off to become a roster consultant, they add them
@@ -202,14 +210,20 @@ New component `shared/components/workbench/ConsultantFeedbackSection.js`, mounte
 ### 3.6 Delete semantics [PLANNED]
 
 - Slice 1: hard delete the Postgres row (CF5).
-- Slice 2 (Codex AR-1 finding 2; remedy chosen here is ordering, not a tombstone ledger):
-  **supersede first, then delete.** Step 1 PATCHes the registry row to `Superseded` (idempotent:
-  a row already Superseded is a no-op). Step 2 deletes the Postgres row. If step 2 fails, the
-  entry stays visible on the tab with its attachment link now returning 404 on the briefing page
-  and a "attachment removed, delete again" hint on the tab; the staff member repeats Delete, which
-  re-runs both steps. No Graph delete (no copies; exact pathnames only). The failure is visible and
-  retryable without a retry ledger, and no audit-trail table is introduced (CF5). Owner may
-  override to a physical delete later.
+- Slice 2 (Codex AR-1 finding 2 and AR-2 finding 3; remedy is a pending status on the row, not
+  an outbox job): three ordered steps, each idempotent.
+  1. `UPDATE consultant_feedback SET status = 'deleting' WHERE id = $1 AND status = 'active'`
+     under `SELECT … FOR UPDATE`. From this instant the entry is invisible to the briefing page
+     and the tab list (both read `status = 'active'`), so no external viewer ever sees a live
+     entry with a dead attachment.
+  2. PATCH the registry row to `Superseded` (a no-op when already Superseded).
+  3. `DELETE FROM consultant_feedback WHERE id = $1 AND status = 'deleting'`.
+  Recovery without a job: the tab's list route runs a bounded sweep on every load,
+  `SELECT id, requestdocument_id FROM consultant_feedback WHERE request_id = $1 AND status = 'deleting'`,
+  and finishes steps 2–3 for any row it finds before returning. A crash or lost response after
+  step 1 therefore completes on the next staff visit to that request, and the intent is durable
+  in the row itself. No Graph delete (no copies; exact pathnames only); no audit-trail table (CF5):
+  the row disappears on completion. Owner may override to a physical delete later.
 
 ### 3.7 What is deliberately out
 
@@ -236,6 +250,8 @@ CREATE TABLE IF NOT EXISTS consultant_feedback (
   received_on            DATE NOT NULL,
   requestdocument_id     UUID UNIQUE,
   shared                 BOOLEAN NOT NULL DEFAULT true,
+  mutation_id            UUID NOT NULL,
+  status                 TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'deleting')),
   created_by             INTEGER NOT NULL REFERENCES user_profiles(id),
   updated_by             INTEGER NOT NULL REFERENCES user_profiles(id),
   created_at             TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -247,6 +263,7 @@ CREATE TABLE IF NOT EXISTS consultant_feedback (
   )
 );
 CREATE INDEX IF NOT EXISTS consultant_feedback_request_idx ON consultant_feedback (request_id, received_on DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS consultant_feedback_mutation_idx ON consultant_feedback (request_id, mutation_id);
 ```
 
 Column names follow the human-legibility schema principle.
@@ -286,12 +303,28 @@ slice 2 needs a migration that re-adds the constraint with the new value.
 | 4 load + scan | read exact object, verify etag/hash, virus scan when enabled | Blob etag/hash under the lease | `rejectPortalUpload`, 4xx to client, no Graph call |
 | 5 Graph upload | SharePoint | `recordPortalUploadCandidate({driveId, itemId, contentHash})` **before** step 6 | retry re-uses the candidate; `discardPortalUploadCandidate` removes an orphan when the request is abandoned |
 | 6 registry create | Dataverse `wmkf_requestdocument` with the generation key | registry row id; `findByGenerationKey` makes a retry a no-op | candidate persisted, so a retry does not re-upload |
-| 7 feedback bind | PG `consultant_feedback` insert (attachment-only) or update (`requestdocument_id`) in one statement | entry | if this fails the registry row is Ready but unbound; a retry with the same staging id finds the row by generation key and only performs step 7 |
+| 7 feedback bind | PG `consultant_feedback` insert (attachment-only) or update (`requestdocument_id`) through `writeFeedbackEntry`, **inside `SELECT … FOR UPDATE` on the target entry** (Codex AR-2 finding 2). The lock serializes two finalizes on one entry and a finalize against a delete: the loser sees a `requestdocument_id` already set or `status = 'deleting'`, marks its own registry row `Superseded`, calls `discardPortalUploadCandidate` on its Graph item, and returns 409 `attachment_conflict`. | entry | if this fails the registry row is Ready but unbound; a retry with the same staging id finds the row by generation key and only performs step 7 |
 | 8 complete | staging row `consumed` with `result_payload = {requestdocumentId, feedbackId}`; staged bytes reaped later | terminal response durable | a lost response is answered from `result_payload` on replay |
 
 Crash-point tests: fail after 5, after 6, after 7; replay the same staging id and assert exactly
 one Graph item, one registry row, one feedback row. Lost-response test: complete then replay,
-assert the stored payload is returned without new writes.
+assert the stored payload is returned without new writes. Concurrency tests: two distinct staging
+ids finalizing against one entry (exactly one bound, the other Superseded and its Graph item
+discarded); finalize racing delete (either the delete wins and finalize returns 409 with its
+candidate discarded, or finalize wins and the delete supersedes the newly bound row).
+
+**Slice 2 prerequisite in the shared staging service (Codex AR-2 finding 1):**
+`cleanupExpiredPortalUploads` today selects only `id, pathname`, deletes staged Blob bytes, and
+expires the row; a `candidate_result` recorded at step 5 is never consulted, so a crash after the
+Graph upload with no client retry leaves an unregistered SharePoint file and eventually prunes its
+only cleanup identity [VERIFIED via `lib/services/portal-upload-staging.js:349-403`;
+`discardPortalUploadCandidate` is called only inline by the grantee submit and replace routes].
+This gap is shared with the grantee-image and site-visit-material scopes today. Before slice 2
+ships, extend the expiry sweep to read `candidate_result`, look the generation key up in the
+registry, and call `discardPortalUploadCandidate` for a candidate with no registry row (or
+Superseded/unbound one); retain rows whose candidate is bound. Tests: expire after steps 5, 6, 7
+with no retry and assert the SharePoint item is removed or retained correctly. Land it as its
+own small change to the staging service so the two existing scopes benefit.
 
 ## 5. Security contract [PLANNED]
 
@@ -368,7 +401,8 @@ and `PORTAL_UPLOAD_SCOPES` in `lib/services/portal-upload-staging.js`.
 1. ~~Add-person side effect~~ — resolved 2026-09-14: one-offs stay on the entry (CF6).
 2. Dataverse artifact-type option addition: owner schedules after slice 1 (CF7).
 3. `/contract-reconcile` pass on this plan — run 2026-09-14; findings recorded in §10.
-4. Codex adversarial review 1 — run 2026-09-14; four findings folded in (§10); second review requested.
+4. Codex adversarial review 1 — run 2026-09-14; four findings folded in (§10).
+5. Codex adversarial review 2 — run 2026-09-14; five findings folded in with proportionate remedies (§10); third review requested with the proportionality context.
 
 ## 10. Contract-reconcile findings (Mode A, 2026-09-14)
 
@@ -415,3 +449,22 @@ finding 10.
 
 **Verdict (pass 2, after folding AR-1): READY TO IMPLEMENT (slice 1).** Slice 2 now has a written
 lifecycle and is blocked only on CF7 and the finding 10 read-side sweep.
+
+### Codex adversarial review 2 (2026-09-14, gpt-5.6-sol, base `9994e1f1`) — disposition
+
+Proportionality note recorded for the third review: this feature holds a handful of informal
+items per proposal, written by a few authenticated staff, read internally. Codex's remedies were
+correct on mechanism; where a lighter mechanism gives the same guarantee for this scale, the
+lighter one was chosen and the reasoning is stated.
+
+| Codex finding | Severity | Disposition |
+|---|---|---|
+| Expired staging rows never discard a recorded SharePoint candidate; orphaned file after a crash post-Graph-upload | high | **Accepted as a shared-service prerequisite** (§4). Verified in source. Fix belongs in `cleanupExpiredPortalUploads` and benefits the two existing scopes; landed separately before slice 2. |
+| Two finalizes with distinct staging ids, or finalize vs delete, race on one entry | high | **Accepted with a row lock.** `FOR UPDATE` on the entry during step 7 and during delete step 1; the loser supersedes its own registry row and discards its Graph item (§4 step 7). Concurrency tests added. Chosen over an attachment-version CAS because the lock is one line and the write rate is human. |
+| Supersede-first delete can stay half-done with no durable intent | high | **Accepted with a `deleting` status, not an outbox job** (§3.6). Intent is durable in the row, readers hide it immediately, and the tab's list route finishes any pending delete on the next load. Same guarantee (eventual completion, never externally visible half-state) without a job runner; CF5 preserved since the row disappears on completion. |
+| Finalize inserts attachment-only rows outside the eligibility check | high | **Accepted.** One `writeFeedbackEntry` primitive for every insert/author change; finalize calls it; forged-id tests through finalize (§3.2). |
+| Slice 1 create not idempotent on lost response | medium | **Accepted.** `mutation_id` column, unique per request, `ON CONFLICT DO NOTHING` + replay (§3.1, §4). |
+
+**Verdict (pass 3, after folding AR-2): READY TO IMPLEMENT (slice 1)** with `mutation_id`,
+`status`, and the single write primitive. Slice 2 blocked on CF7, the finding 10 read-side sweep,
+and the staging-service cleanup prerequisite.
