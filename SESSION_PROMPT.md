@@ -64,9 +64,8 @@ docs reconcile 899a6785. PR merges: 8d7c6490 (#280), bbef47ac (#281), 59e2284e (
    (a) whether the page shows a typical-cost figure (~$0.60/request from four runs, D6);
    (b) whether to widen to pilot mode / the full D26 roster (`REVIEW_PANEL_ROLLOUT_MODE=pilot`,
    allowlist); (c) Fable seat: test on a non-biology proposal or leave Opus; (d) the OpenAI seat id
-   (D10, still `gpt-5.6-sol`); (e) **one click each: "Re-render report" on 1002852 and 1002874** — their editions still carry the
-   old template (ledger: pdf 34,773 / 33,602 bytes, zero re-renders); the action is live and was
-   verified on 1002912. Follow-ups logged in brief §3:
+   (D10, still `gpt-5.6-sol`). (e) DONE 2026-09-13: owner re-rendered 1002852 and 1002874; all four
+   smoke editions now carry the current report template. Follow-ups logged in brief §3:
    worker-stamped retry marker, `check-review-panel-rollout.js` preflight clone, prompt editor
    should show the slot model for the two panel rows, admin model changes take up to 5 minutes to
    reach launches (override cache TTL). Evidence: brief §2b/§3.
