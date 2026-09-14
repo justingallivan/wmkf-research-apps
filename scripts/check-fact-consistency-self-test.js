@@ -322,9 +322,11 @@ function buildProseFixtures() {
     {
       name: 'known miss: applications phrasing is flagged',
       file: 'pos_known_apps.md',
-      body: 'Used by All 14 applications.',
+      // Sentinel derived from the live count (the literal 14 became live when
+      // the Review Panel app registered on 2026-09-12).
+      body: `Used by All ${wrongAppsB} applications.`,
       expectFlagged: true,
-      token: '14',
+      token: String(wrongAppsB),
     },
     {
       name: 'known miss: plus app endpoints phrasing is flagged',
