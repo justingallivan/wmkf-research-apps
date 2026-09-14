@@ -504,6 +504,19 @@ describe('requestReviewPanelRerender', () => {
       return { rows: [] };
     });
     await expect(requestReviewPanelRerender(7, ['entry-1'])).rejects.toMatchObject({ httpStatus: 404 });
+    // Pin the owner predicate itself — deleting `r.owner_profile_id = $2`
+    // (or dropping owner from the params) must fail this test, not just the
+    // eligibility-filter tests below that happen to also return zero rows.
+    expect(client.query).toHaveBeenCalledWith(expect.stringContaining('r.owner_profile_id = $2'), [['entry-1'], 7]);
+  });
+
+  test('rejects when the resolve query returns fewer rows than requested (a partial match — one entry exists/owned, one does not)', async () => {
+    client.query.mockImplementation(async (q) => {
+      if (q.startsWith(RESOLVE_ENTRIES_PREFIX)) return { rows: [{ id: 'entry-1', run_id: 'run-1' }] }; // only 1 of 2 requested ids came back
+      return { rows: [] };
+    });
+    await expect(requestReviewPanelRerender(7, ['entry-1', 'entry-2'])).rejects.toMatchObject({ httpStatus: 404 });
+    expect(client.query).toHaveBeenCalledWith('ROLLBACK');
   });
 
   test('rejects while the run holds a live lease', async () => {
@@ -552,6 +565,9 @@ describe('requestReviewPanelRerender', () => {
       return { rows: [] };
     });
     await expect(requestReviewPanelRerender(7, ['entry-1'])).rejects.toMatchObject({ httpStatus: 400 });
+    // Pin the exact eligibility predicate — weakening either half (chair
+    // seat, or completed state) must fail this test.
+    expect(client.query).toHaveBeenCalledWith(expect.stringContaining("seat_key='chair' AND state='completed'"), [['entry-1']]);
   });
 
   test('accepts a completed entry with a completed chair attempt even when winners_json lacks chair (the normal-completion gap this fixes), stamps data.rerender, NEVER touches data.files, requeues the run', async () => {
@@ -570,6 +586,7 @@ describe('requestReviewPanelRerender', () => {
       return { rows: [] };
     });
     const run = await requestReviewPanelRerender(7, ['entry-1']);
+    expect(client.query).toHaveBeenCalledWith(expect.stringContaining("seat_key='chair' AND state='completed'"), [['entry-1']]);
     expect(run.status).toBe('queued');
     const updateCall = client.query.mock.calls.find(([q]) => q.startsWith('UPDATE review_panel_entries'));
     expect(updateCall[0]).toContain('retry_requested_at=NOW()');

@@ -390,6 +390,8 @@ describe('rerenderCompletedEntries (via drainReviewPanels) — re-render makes N
 
     const result = await drainReviewPanels();
     expect(result).toEqual({ claimed: 1, runId: 'run-1' });
+    expect(store.createAttempt).not.toHaveBeenCalled(); // no new attempt — this is a re-render, not a retry
+    expect(runSeat).not.toHaveBeenCalled();
     expect(runChair).not.toHaveBeenCalled(); // still no model calls
     expect(renderReviewPanelEntryDocuments).toHaveBeenCalled(); // the render actually ran — not the "unreachable" clear-and-skip branch
     expect(entryState.winners_json.chair).toBe('chair-1'); // backfilled
