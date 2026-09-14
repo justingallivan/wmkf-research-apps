@@ -3,10 +3,10 @@ title: Institution Affiliation Compatibility Resolution Plan
 domain: reviewer-identity
 kind: plan
 status: active
-summary: "Stage 2 institution notifications and reviewer-card explanations are Production-live; identity, selection, and write authority remain unchanged."
+summary: "Stage 2 presentation was live as of 2026-08-19; Stage 3 targets avoidable intra-institution review while surfacing real current conflicts."
 canonical: false
 cataloged: 2026-08-08
-last_verified: 2026-08-19
+last_verified: 2026-09-14
 owner: product-engineering
 related:
   - docs/ROR_REVIEWER_FINDING_STRATEGIC_RESET_BRIEF.md
@@ -70,6 +70,19 @@ The strategic correction is broader than a threshold adjustment:
 Affiliation compatibility is one identity signal. It never establishes that
 two people are the same by itself.
 
+**Stage 3 product direction (owner, 2026-09-14):** reduce avoidable staff input,
+not eliminate human review. Verified departmental and constituent-school names
+for the same institution should clear the *institution* concern automatically;
+an independently insufficient person identity can still require an identity
+remedy. A compatible segment in a multi-affiliation byline should not become a
+mismatch because another affiliation is present. A genuine, unreconciled
+current-institution difference should be made clear to the user with a usable
+correction path. Historical differences and provider uncertainty must not be
+presented as current conflicts. This is a planning priority, not a Stage 3
+runtime-authority change. The deployment observations below are dated
+2026-08-19; this 2026-09-14 update checked local source and the owner decision,
+not current Production environment state.
+
 ## Current implementation truth
 
 | Capability | Current state | Evidence |
@@ -82,6 +95,7 @@ two people are the same by itself.
 | Typed consumer policy | **VERIFIED at Stage 2 presentation authority only.** The total evaluator still covers all five consumers and fails closed for unknown/high-authority inputs. Only candidate-card and staff-notification projections consume it; selectability and write gates continue to consume booleans and legacy flags. | `institution-affiliation-assessment.js`; `institution-affiliation-stage2.js`; focused tests |
 | Stage 2 runtime presentation | **VERIFIED Production-live after signed-in synthetic Preview acceptance.** PR #126 merged at `8c64ec76`; exact `on` is set in Production and Ready deployment `dpl_85jgQ2c4jR6V599KycEHcbww5Xag` was built afterward. The versioned DTO is sanitized before roster persistence, stale caches re-enrich when enabled, provider failure is retryable/nonterminal, unexpected Stage 2 failures fall back to legacy presentation, and flag-off ignores cached typed presentation. | `shared/utils/institution-stage2-presentation.js`; `reviewer-search-logic.js`; `ReviewerSearchSection.js`; `alert-reviewer-affiliation-mismatch.js`; `pages/workbench/institution-stage2-smoke.js`; focused tests; signed-in Preview smoke; live Vercel env/deployment probes |
 | Source-aware 25-case gate | **VERIFIED PASS, shadow only.** 25/25 relationship and action matches; zero sibling collapses, unsafe clears, manufactured reviews, or live-capture provider failures; all three challenged cases are compatible/nonblocking under explicit independent-identity sufficiency. | `benchmarks/institution-affiliation-compatibility/v1/results/source-aware-25-shadow-2026-08-19c.md` |
+| Additional-affiliation COI handoff | **PARTIAL / Stage 3 blocker (source check 2026-09-14).** The typed assessment retains `additionalAffiliations`, but the current candidate/server COI signal list does not consume those typed extra segments. A compatible segment cannot authorize selection until every relevant extra has been screened or explicitly excluded by source/time policy. | `institution-affiliation-assessment.js:296-317`; `deduplication-service.js:700-781`; `save-candidates-service.js:343-445` |
 | Promotion-review falsification | **VERIFIED hardened and merged.** Disconfirming tests cover unattributed evidence, same-parent unidentifiable subunits, a named organization followed by an address, and server-required identity-review presentation. The frozen 25-case result remains unchanged. | `947fb46`; PR #126; focused unit and benchmark suites |
 | Runtime independent-identity input | **PARTIAL / Stage 3 promotion blocker.** A read-only 2026-08-19 roster audit found 46 source-ready mismatch rows, but only two carried the compact non-affiliation anchor breakdown inspected by the audit. The benchmark therefore uses an explicit counterfactual identity-policy input, not runtime authority. | `scripts/audit-institution-affiliation-shadow-cases.js`; read-only production Postgres audit |
 
@@ -174,9 +188,10 @@ Rules:
 1. Semicolon- or provider-delimited multi-organization evidence is segmented
    and each affiliation is resolved independently.
 2. An exact or compatible match on one segment is retained even when additional
-   affiliations exist. The extras remain visible metadata and continue through
-   the existing COI path; they are not contradictions merely because they are
-   additional.
+   affiliations exist. The extras remain visible metadata and are not identity
+   contradictions merely because they are additional. Stage 3 must explicitly
+   pass relevant extra segments through server COI screening; the current
+   Stage 2 typed projection does not do so.
 3. Publication bylines are historical observations at the publication date
    unless a stronger source explicitly establishes currentness.
 4. Missing dates/currentness remain `unknown`; the system does not infer
@@ -508,6 +523,120 @@ Post-enable observation and rollback criteria:
 **Authority:** candidate selectability, enrichment write veto, and identity
 anchor semantics.
 
+**Primary outcome:** reduce institution-driven holds that require no human
+judgment because the author-specific evidence names a verified unit of the
+recorded institution or contains a compatible segment alongside another
+affiliation. Count the staff actions avoided, not just relationship-label
+accuracy. Identity confirmation, COI, and exact-address checks remain separate.
+
+| Evidence at the decision point | Planned institution action | Person/other gate |
+|---|---|---|
+| Author-specific `same`, or verified constituent `parent_child` with no unresolved subunit/sibling ambiguity | Auto-clear the institution concern with no staff click or mismatch warning | Still require the existing independent person, contact, COI, and address gates |
+| One compatible segment plus additional affiliations | Auto-clear the institution concern; retain every additional segment with source/currentness for server COI screening | An extra affiliation alone is not a person mismatch, but a current extra matching a PI institution can still block selection |
+| Historical `sibling`/`distinct`, or difference with unknown currentness | No current-institution accusation; use informational or neutral presentation | Require independent identity for any high-authority action |
+| Unreconciled, author-specific, genuinely concurrent/current `sibling` or `distinct` | Hold and show both institutions with correction, joint-appointment, right-person, and Not a fit remedies that the card actually exposes | Never clear merely because a shared parent or name fragment exists |
+| `unresolved`, including partial/provider failure | Neither affirm a match nor accuse a mismatch; retry a provider failure | Proceed only when independent non-affiliation identity is sufficient; otherwise hold for identity confirmation |
+| Concurrent `related_other` | Hold pending source/time adjudication; do not count it as an eligible automatic departmental clear | Resolve the open policy decision before broadening this slice |
+
+The first automatic-clear slice is deliberately narrower than all possible
+`parent_child` relationships. It requires typed, source-preserving evidence of a
+constituent unit; a separately governed hospital, an unidentifiable internal
+subunit, or two sibling campuses cannot be cleared from a shared umbrella
+alone. A department may be auto-cleared as an *institution issue* even if the
+person remains held for another reason. That distinction must survive the
+stored verdict and user-facing remedy.
+
+#### Stage 3 execution sequence
+
+1. **Measure and label the work being removed.** Establish an organic baseline
+   of institution-driven holds and staff actions per case. Add a blind,
+   independently adjudicated held-out slice of departmental/constituent-school,
+   multi-affiliation, current sibling/distinct, joint-appointment, historical,
+   `related_other`, ambiguous-subunit, and provider-failure cases. Label
+   organization relationship, source/currentness, institution-only clearance,
+   person-identity sufficiency, other hold reasons, and final consumer action
+   separately. Count observed staff actions; a shadow prediction of an avoided
+   click is not an observed reduction. If the current action trail cannot
+   attribute an institution-driven step, add bounded, privacy-minimized
+   measurement before declaring a benefit. Preserve the frozen 25 and 157
+   cases; do not tune on them. The 157-row corpus has boolean-era labels and
+   no source/currentness/action context, so it remains an incumbent regression,
+   not a typed-policy acceptance oracle. Create a separately versioned,
+   source-complete typed adversarial set. Include the five request-1002903
+   pairs through the actual typed pair path rather than the ROR identity
+   adapter, which has no pair method.
+2. **Prove independent person identity.** Audit every current resolver anchor
+   for affiliation dependence, including institution-corroborated ORCID and
+   `affiliation_match`. Define and version the exact non-affiliation combination
+   sufficient at each high-authority execution point. Produce a server-owned,
+   machine-checkable result bound to the evaluated person/candidate and current
+   inputs; unknown, stale, or circular evidence is insufficient. Preserve the
+   full-forename contradiction and initial-only namesake guards. A bare
+   `confirmed`/`probable` status is not this proof.
+3. **Carry a safe typed assessment through the real flow.** Specify a bounded,
+   versioned server-owned assessment with assertion provenance, selected
+   relationship/context, independent-identity result, policy decision,
+   source-version/freshness binding, additional affiliation segments, and
+   reason/remedy. Reconcile the Postgres
+   Find-roster `candidate` JSONB projection, cache invalidation, every read
+   projection, and the server promotion boundary before selecting a storage
+   shape; do not assume a new table is needed. A browser-carried policy field
+   never grants authority. The typed assessment already retains additional
+   segments, but the current server COI screen does not consume that list.
+   Before multi-affiliation selection can clear, screen every relevant extra
+   segment against PI institutions with source/currentness preserved. A
+   current extra that creates institution COI still blocks; an incomplete
+   required COI screen holds for retry, not an automatic clear. Prove this
+   after roster reload and provider failure. Exclude an extra from screening
+   only with a recorded source/time reason. Do not change the existing COI
+   relationship rule under the guise of affiliation policy.
+4. **Shadow the complete decision path.** At the same candidate and input
+   version, compare incumbent and typed decisions without changing selection
+   or writes. Trace producer → roster → card → server save/reject and record
+   which holds would disappear, which real conflicts or extra-affiliation COIs
+   would surface, and which cases still require identity or contact input. Count provider failures and
+   skipped cases explicitly; a case missing its source/time or independent
+   identity input cannot be scored as a successful automatic clear.
+5. **Roll out the first end-to-end selection slice behind its own exact-on
+   rollback.** The client and server must agree: a card must not become
+   selectable while the save boundary still rejects the same institution
+   decision. The current enrichment path folds institution contradiction into
+   `identityNeedsReview`, withholds fields from the card, and gates automatic
+   Dataverse person writes (`enrich-recommended-service.js`); the card's
+   `projectReviewerContact` and `save-candidates-service.js` also enforce
+   independent promotion checks. Design and test a bounded way to retain or
+   rederive *vetted* candidate evidence for selection without opening the
+   separate enrichment write gate. Recheck extra-affiliation COI at the server
+   boundary rather than trusting a card or stored presentation. If that
+   separation cannot be proved, stop
+   and review the consumer order instead of shipping a cosmetic checkbox or
+   silently flipping automatic writes. Genuine concurrent conflicts, COI, and
+   exact-address rules remain enforced at the server.
+6. **Evaluate the first slice before widening it.** Report the baseline and
+   post-change eligible departmental/multi-affiliation hold rate, staff actions
+   avoided, incorrectly cleared current conflicts, wrong-person binds,
+   provider failures, and held cases lacking an available remedy. Only after
+   the owner accepts the predeclared benefit threshold and safety evidence
+   should enrichment write veto and identity-anchor weighting receive their
+   own, independently reversible reviews.
+
+The decision-flow gates include the source-complete 25, the unchanged 157-row
+Stage 1 *boolean* regression and UC sibling cases, a separately adjudicated
+source-complete typed adversarial/held-out slice, the frozen 40-person identity
+benchmark, and real pair replay through the typed assessment. The 157 boolean
+labels cannot certify typed actions without source/time and consumer-action
+labels. Required outcomes: zero new wrong-person or right-person-policy binds;
+zero sibling collapse or adjudicated current-conflict automatic clear; zero
+adjudicated current extra-affiliation COIs incorrectly cleared under the
+existing matcher; no
+provider failure promoted to a match or mismatch; every hold has an available
+remedy; the COI matcher and exact-address flow remain unchanged. Newly screened
+extra segments may correctly expose COI holds; report those separately from
+institution-mismatch holds. The benefit gate is
+the owner-approved reduction in *avoidable institution-driven staff actions*
+against the organic baseline, with its denominator and excluded cases shown.
+No numeric threshold is inferred from the 25-case fixture.
+
 Migrate one consumer at a time behind independently reversible configuration:
 
 1. candidate selectability;
@@ -516,14 +645,16 @@ Migrate one consumer at a time behind independently reversible configuration:
 
 Go for each consumer only when:
 
-- the source-complete 25 and full adversarial corpora pass;
+- the source-complete 25, unchanged boolean regression, and a source-complete
+  typed adversarial/held-out corpus each pass their own contract;
 - the frozen identity benchmark records zero new false binds and zero new
   right-person-policy binds;
 - independent identity sufficiency is proven at that exact execution point;
 - unreconciled current sibling/distinct conflicts still veto;
 - unresolved with sufficient independent identity is demonstrably neutral;
 - unresolved without sufficient independent identity holds with a real remedy;
-- COI behavior and the exact-address attestation flow are unchanged; and
+- the COI hard-drop rule and exact-address attestation flow are unchanged;
+  any new COI holds from complete extra-segment input are measured; and
 - the owner explicitly approves the consumer flip.
 
 The boolean contract is removed only after all registered consumers have moved
@@ -541,7 +672,7 @@ reads.
 6. Provider failure never becomes a mismatch and never silently enables a
    high-authority action.
 7. Unknown relationship/policy values fail closed at high-authority consumers.
-8. Additional affiliations remain available to COI evaluation but do not create
+8. Additional affiliations must reach COI evaluation but do not create
    identity contradiction merely by being additional.
 9. Relationship policy never changes the COI hard-drop matcher.
 10. No new string-side checker or enrichment-seam guard is added.
@@ -597,6 +728,14 @@ These are required before Stage 3, not silently assumed:
    parent/child and sibling classes; and
 4. the owner-approved minimum manual-review reduction that justifies a
    consumer flip.
+
+The owner has settled the *direction* of item 4: unnecessary departmental and
+multi-affiliation holds should clear automatically, while genuine current
+discrepancies should be surfaced. The numeric benefit threshold remains open
+until the organic baseline is measured. The first selection rollout also needs
+an explicit answer to the producer/card/server-save coupling in execution step
+5; no current source check establishes that those authorities can be flipped
+independently.
 
 No threshold tuning against the 25-case set is permitted without preserving a
 held-out or newly collected adjudication slice. If the relationship substrate
