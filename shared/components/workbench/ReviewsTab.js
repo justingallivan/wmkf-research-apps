@@ -29,6 +29,10 @@ import { labelForReviewRating, reviewRatingShortLabels } from '../../../lib/exte
 import { deriveReviewMatrix } from '../../utils/review-matrix';
 import ManualReviewEntryForm from './ManualReviewEntryForm';
 import { isTerminalReviewStatus } from '../../config/reviewerStatus';
+import {
+  reviewerAffiliationOf,
+  composeWriteupParagraphs,
+} from '../../utils/review-writeup-paragraphs';
 
 function formatDate(iso) {
   if (!iso) return null;
@@ -36,32 +40,6 @@ function formatDate(iso) {
   return Number.isNaN(d.getTime())
     ? null
     : d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
-}
-
-function reviewerAffiliationOf(reviewer) {
-  const acceptedAffiliation = typeof reviewer?.reviewerAffiliation === 'string'
-    ? reviewer.reviewerAffiliation.trim()
-    : '';
-  const personAffiliation = typeof reviewer?.affiliation === 'string'
-    ? reviewer.affiliation.trim()
-    : '';
-  const affiliation = acceptedAffiliation || personAffiliation;
-  const email = typeof reviewer?.email === 'string' ? reviewer.email.trim() : '';
-  if (!affiliation || !email) return affiliation || null;
-
-  // Some accepted-reviewer records carry a legacy free-text affiliation with
-  // the email appended (occasionally as "Electronic address: …"). The shared
-  // reviewer rows already render email separately, so remove only an exact
-  // trailing copy and leave all other affiliation text untouched.
-  const emailIndex = affiliation.toLowerCase().lastIndexOf(email.toLowerCase());
-  if (emailIndex < 0) return affiliation;
-  const suffix = affiliation.slice(emailIndex + email.length);
-  if (suffix.replace(/[\s,.;:]/g, '') !== '') return affiliation;
-  return affiliation
-    .slice(0, emailIndex)
-    .replace(/electronic\s+address\s*:?\s*$/i, '')
-    .replace(/[\s,.;:]+$/g, '')
-    .trim() || null;
 }
 
 // Reviews tab rating order, and the projection field that holds each value.
@@ -407,6 +385,75 @@ function describeSynthesisBlocker(blocker) {
     default:
       return `record needs attention (${String(blocker.reason || 'unknown').replace(/_/g, ' ')})`;
   }
+}
+
+/**
+ * "Writeup paragraphs" card (Reviews Tab Phase II Slice 1,
+ * docs/plans/REVIEWS_TAB_WRITEUP_PARAGRAPHS_PLAN_2026-09-14.md §4.4, W4).
+ * Renders the deterministic score/reviewer/expertise sentences composed by
+ * `composeWriteupParagraphs`. Names render as React `<u>` elements built
+ * from the composer's runs — never from a raw HTML or model string, and
+ * never via `dangerouslySetInnerHTML`. Copy is client-only (clipboard write),
+ * so it stays enabled even in read-only Preview.
+ */
+function WriteupParagraphsCard({ reviewers }) {
+  const { paragraphs, warnings, text, html } = useMemo(
+    () => composeWriteupParagraphs({ reviewers }),
+    [reviewers],
+  );
+  const [copyState, setCopyState] = useState('idle');
+
+  const copy = useCallback(async () => {
+    setCopyState('idle');
+    try {
+      if (typeof window !== 'undefined' && typeof window.ClipboardItem !== 'undefined'
+        && navigator.clipboard && typeof navigator.clipboard.write === 'function') {
+        const item = new window.ClipboardItem({
+          'text/html': new Blob([html], { type: 'text/html' }),
+          'text/plain': new Blob([text], { type: 'text/plain' }),
+        });
+        await navigator.clipboard.write([item]);
+      } else if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+        await navigator.clipboard.writeText(text);
+      } else {
+        throw new Error('Clipboard API unavailable');
+      }
+      setCopyState('copied');
+    } catch (e) {
+      setCopyState('failed');
+    }
+  }, [html, text]);
+
+  if (paragraphs.length === 0) return null;
+
+  return (
+    <Card hover={false}>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm font-semibold text-gray-900">Writeup paragraphs</p>
+        <button
+          type="button"
+          onClick={copy}
+          className="text-xs text-gray-700 hover:text-gray-900 border border-gray-300 rounded-lg px-2.5 py-1"
+        >
+          {copyState === 'copied' ? 'Copied' : copyState === 'failed' ? 'Copy failed — try again' : 'Copy'}
+        </button>
+      </div>
+      <div className="mt-3 space-y-2 text-sm text-gray-800">
+        {paragraphs.map((runs, i) => (
+          <p key={i}>
+            {runs.map((run, j) => (run.underline ? <u key={j}>{run.text}</u> : <span key={j}>{run.text}</span>))}
+          </p>
+        ))}
+      </div>
+      {warnings.length > 0 && (
+        <ul className="mt-2 space-y-0.5 text-xs text-gray-500">
+          {warnings.map((warning, i) => (
+            <li key={i}>{warning}</li>
+          ))}
+        </ul>
+      )}
+    </Card>
+  );
 }
 
 function SynthesisCard({ requestId, synthesis, state, reviewers = [], onUpdated, previewReadOnly = false }) {
@@ -962,6 +1009,7 @@ export default function ReviewsTab({ requestId, previewReadOnly = false }) {
         onUpdated={load}
         previewReadOnly={previewReadOnly}
       />
+      {submitted.length > 0 && <WriteupParagraphsCard reviewers={submitted} />}
     </div>
   );
 }

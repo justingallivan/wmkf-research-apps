@@ -65,8 +65,10 @@ test('renders submitted reviews with decoded ratings + download link; pending la
   // Submitted reviewers shown as cards; the pending one is NOT hidden anymore —
   // since Phase 1 (outstanding tracking) it renders in the Outstanding section
   // above the cards, and the two lists are disjoint (keyed on reviewReceivedAt).
-  expect(screen.getByText('Dr. Submitted')).toBeInTheDocument();
-  expect(screen.getByText('Dr. NoFile')).toBeInTheDocument();
+  // Names also appear underlined in the Writeup paragraphs card below (Slice 1),
+  // so these are getAllByText, not getByText.
+  expect(screen.getAllByText('Dr. Submitted').length).toBeGreaterThan(0);
+  expect(screen.getAllByText('Dr. NoFile').length).toBeGreaterThan(0);
   expect(screen.getByRole('heading', { name: 'Outstanding reviews (1)' })).toBeInTheDocument();
   expect(screen.getByText('Dr. Pending')).toBeInTheDocument();
   const followUpHeader = screen.getByText('Follow up').parentElement;
@@ -116,7 +118,9 @@ test('distinguishes a generated staff entry from a staff-uploaded file', async (
   });
 
   render(<ReviewsTab requestId="req1" />);
-  expect(await screen.findByText('Generated')).toBeInTheDocument();
+  // "Generated" also appears underlined in the Writeup paragraphs card below
+  // (Slice 1), so this waits on the ambiguous text via findAllByText.
+  expect((await screen.findAllByText('Generated')).length).toBeGreaterThan(0);
   expect(screen.getByText(/staff entry/i)).toBeInTheDocument();
   expect(screen.getByText(/staff upload/i)).toBeInTheDocument();
 });
@@ -628,4 +632,142 @@ test('read-only Preview disables every Reviews mutation while preserving read an
   fireEvent.click(synthesis);
   expect(fetch).toHaveBeenCalledTimes(1);
   expect(screen.queryByText(/Recording a complete review/i)).not.toBeInTheDocument();
+});
+
+// Writeup paragraphs card (Reviews Tab Phase II Slice 1,
+// docs/plans/REVIEWS_TAB_WRITEUP_PARAGRAPHS_PLAN_2026-09-14.md §4.4).
+const WRITEUP_REVIEWERS = [
+  {
+    suggestionId: 'w1',
+    name: 'Carey Nadell',
+    reviewReceivedAt: '2026-06-20T00:00:00Z',
+    reviewerOverallAssessment: 5,
+    academicRank: 'Associate Professor',
+    mainInstitution: 'Dartmouth',
+    keywords: 'microbial ecology; evolutionary dynamics',
+  },
+];
+
+test('renders the Writeup paragraphs card below Synthesis with underlined names from runs, not model strings', async () => {
+  fetch.mockResolvedValue({
+    ok: true,
+    json: async () => ({ success: true, proposals: [{ proposalId: 'req1', reviewers: WRITEUP_REVIEWERS }] }),
+  });
+
+  render(<ReviewsTab requestId="req1" />);
+
+  expect(await screen.findByText('Writeup paragraphs')).toBeInTheDocument();
+  expect(screen.getByText('We received one review with a score of Excellent.')).toBeInTheDocument();
+  const underlinedName = screen.getByText('Carey Nadell', { selector: 'u' });
+  expect(underlinedName.tagName).toBe('U');
+  expect(screen.getByText(/Nadell has expertise in microbial ecology and evolutionary dynamics\./)).toBeInTheDocument();
+
+  // Card placement: directly below the (second) Synthesis card.
+  const synthesisHeading = screen.getByText('AI Synthesis');
+  const writeupHeading = screen.getByText('Writeup paragraphs');
+  // synthesisHeading precedes writeupHeading in document order.
+  expect(
+    synthesisHeading.compareDocumentPosition(writeupHeading) & Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy();
+});
+
+test('does not render the Writeup paragraphs card when no review is submitted', async () => {
+  fetch.mockResolvedValue({
+    ok: true,
+    json: async () => ({
+      success: true,
+      proposals: [{ proposalId: 'req1', reviewers: [{ suggestionId: 'p1', name: 'Dr. Pending', reviewStatus: 'materials_sent' }] }],
+    }),
+  });
+
+  render(<ReviewsTab requestId="req1" />);
+  await screen.findByText(/No reviews submitted yet/i);
+  expect(screen.queryByText('Writeup paragraphs')).not.toBeInTheDocument();
+});
+
+test('Copy writes text/html and text/plain via ClipboardItem when available', async () => {
+  fetch.mockResolvedValue({
+    ok: true,
+    json: async () => ({ success: true, proposals: [{ proposalId: 'req1', reviewers: WRITEUP_REVIEWERS }] }),
+  });
+
+  const writeMock = jest.fn().mockResolvedValue(undefined);
+  const originalClipboard = navigator.clipboard;
+  const originalClipboardItem = window.ClipboardItem;
+  Object.defineProperty(navigator, 'clipboard', {
+    value: { write: writeMock, writeText: jest.fn() },
+    configurable: true,
+  });
+  window.ClipboardItem = function ClipboardItem(items) { this.items = items; };
+
+  render(<ReviewsTab requestId="req1" />);
+  const copyButton = await screen.findByRole('button', { name: 'Copy' });
+  fireEvent.click(copyButton);
+  await waitFor(() => expect(writeMock).toHaveBeenCalledTimes(1));
+  const [[items]] = writeMock.mock.calls;
+  expect(items[0].items['text/html']).toBeInstanceOf(Blob);
+  expect(items[0].items['text/plain']).toBeInstanceOf(Blob);
+  await screen.findByRole('button', { name: 'Copied' });
+
+  Object.defineProperty(navigator, 'clipboard', { value: originalClipboard, configurable: true });
+  window.ClipboardItem = originalClipboardItem;
+});
+
+test('Copy falls back to writeText when ClipboardItem is unavailable', async () => {
+  fetch.mockResolvedValue({
+    ok: true,
+    json: async () => ({ success: true, proposals: [{ proposalId: 'req1', reviewers: WRITEUP_REVIEWERS }] }),
+  });
+
+  const writeTextMock = jest.fn().mockResolvedValue(undefined);
+  const originalClipboard = navigator.clipboard;
+  const originalClipboardItem = window.ClipboardItem;
+  Object.defineProperty(navigator, 'clipboard', {
+    value: { writeText: writeTextMock },
+    configurable: true,
+  });
+  delete window.ClipboardItem;
+
+  render(<ReviewsTab requestId="req1" />);
+  const copyButton = await screen.findByRole('button', { name: 'Copy' });
+  fireEvent.click(copyButton);
+  await waitFor(() => expect(writeTextMock).toHaveBeenCalledTimes(1));
+  expect(writeTextMock).toHaveBeenCalledWith(expect.stringContaining('We received one review with a score of Excellent.'));
+  await screen.findByRole('button', { name: 'Copied' });
+
+  Object.defineProperty(navigator, 'clipboard', { value: originalClipboard, configurable: true });
+  window.ClipboardItem = originalClipboardItem;
+});
+
+test('Writeup paragraphs card shows an unlabelled-rating warning as a muted line', async () => {
+  fetch.mockResolvedValue({
+    ok: true,
+    json: async () => ({
+      success: true,
+      proposals: [{
+        proposalId: 'req1',
+        reviewers: [{
+          suggestionId: 'legacy',
+          name: 'Dr. Legacy',
+          reviewReceivedAt: '2026-06-20T00:00:00Z',
+          reviewerOverallAssessment: 99,
+        }],
+      }],
+    }),
+  });
+
+  render(<ReviewsTab requestId="req1" />);
+  expect(await screen.findByText('Writeup paragraphs')).toBeInTheDocument();
+  expect(screen.getByText(/Dr\. Legacy's overall rating has no label and was left out of the score tally\./)).toBeInTheDocument();
+});
+
+test('Copy stays enabled in read-only Preview (client-only clipboard write, no server mutation)', async () => {
+  fetch.mockResolvedValue({
+    ok: true,
+    json: async () => ({ success: true, proposals: [{ proposalId: 'req1', reviewers: WRITEUP_REVIEWERS }] }),
+  });
+
+  render(<ReviewsTab requestId="req1" previewReadOnly />);
+  const copyButton = await screen.findByRole('button', { name: 'Copy' });
+  expect(copyButton).toBeEnabled();
 });

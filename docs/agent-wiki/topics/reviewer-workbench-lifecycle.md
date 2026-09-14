@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-09-13
+last_verified: 2026-09-14
 stale_after_days: 90
 owner: reviewers
 source_files:
@@ -32,6 +32,7 @@ source_files:
   - shared/components/external/RichReviewEditor.js
   - lib/external/sanitize-review-html.js
   - shared/utils/review-report.js
+  - shared/utils/review-writeup-paragraphs.js
   - shared/utils/review-report-docx.js
   - lib/services/review-documents/docx-renderer.js
   - lib/services/review-documents/individual-file-service.js
@@ -1107,6 +1108,20 @@ by `/api/review-manager/reviewers`; ratings project from the
 Submitted reviewers still render as a read-only per-reviewer card list
 (ratings decoded via the static schema, richtext narrative answers, SharePoint
 download). Panel-prep roll-up/export now exists client-side (Phase 3, below).
+
+**Writeup paragraphs (Reviews Tab Phase II Slice 1, 2026-09-14,
+`docs/plans/REVIEWS_TAB_WRITEUP_PARAGRAPHS_PLAN_2026-09-14.md`):** a
+"Writeup paragraphs" card renders directly below the Synthesis card once at
+least one review is submitted, showing deterministic score/reviewer/expertise
+sentences composed from stored data by the pure module
+`shared/utils/review-writeup-paragraphs.js` (also home to the lifted
+`reviewerAffiliationOf`). No model, no digest change. A "Copy" button writes
+`text/html` (underlined names) and `text/plain` to the clipboard via
+`ClipboardItem`, falling back to `writeText`; it stays enabled in read-only
+Preview because the write is client-only. An unlabelled overall rating is
+excluded from the score tally and surfaced as a muted warning line rather
+than dropped silently. Model-authored themes/quotations are a later slice
+(Slice 2); this module has a named, unimplemented hook for them.
 
 **Phase 1 LIVE (S326; deployed, browser-drive-verified against live acceptance data; reminder safety production-observed 2026-09-01):** outstanding tracking + manual nudge. The owner lifted the procedural manual reminder freeze after the incident-session deployment/smoke observations and a post-deploy D26 liveness audit of 51 never-reminded sweep candidates found zero blocked rows. The deployment metadata did not expose a source SHA, and the authenticated smoke has no tracked artifact. The DTO
 (`reviewers.js` GET) adds `submitted` (accepted-reviewer submission status),
