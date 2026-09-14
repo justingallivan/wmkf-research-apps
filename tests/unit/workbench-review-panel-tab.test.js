@@ -3,7 +3,7 @@
  */
 import React from 'react';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import ReviewPanelTab from '../../shared/components/workbench/ReviewPanelTab';
+import ReviewPanelTab, { runTotalLabel } from '../../shared/components/workbench/ReviewPanelTab';
 
 jest.mock('../../shared/components/Layout', () => ({
   __esModule: true,
@@ -40,7 +40,8 @@ test('fetches the per-request read and renders Launch enabled only when the serv
   expect(global.fetch).toHaveBeenCalledWith(`/api/review-panel?requestId=${REQ}`);
   expect(screen.getByTestId('review-panel-state-sentence')).toHaveTextContent('No panel has been run for this request yet.');
   expect(screen.getByText('Nothing here yet. Launch a panel to review this proposal narrative.')).toBeInTheDocument();
-  expect(screen.getByText('up to $1.50 (reservation bound)')).toBeInTheDocument(); // D6 bound, never a typical cost
+  // D6: the bound (never a typical cost) shows beside Launch while launchable AND inside the Configuration disclosure.
+  expect(screen.getAllByText('up to $1.50 (reservation bound)')).toHaveLength(2);
 });
 
 test('Launch is disabled with the server reason verbatim — the tab never re-derives preconditions', async () => {
@@ -55,9 +56,10 @@ test("another launcher's completed run is visible with its editions (T3), but St
   render(<ReviewPanelTab requestId={REQ} />);
   const card = await screen.findByTestId('review-panel-run');
   expect(within(card).getByText(/by Pat/)).toBeInTheDocument();
-  expect(within(card).queryByRole('button', { name: 'Retry failed' })).toBeNull();
+  expect(within(card).queryByRole('button', { name: /Retry/ })).toBeNull();
   expect(within(card).queryByRole('button', { name: 'Stop' })).toBeNull();
-  expect(within(card).getByText('boom')).toBeInTheDocument();
+  expect(card).toHaveAttribute('data-run-shape', 'settled'); // collapsed line, kept for the record
+  expect(within(card).getByText(/boom/)).toBeInTheDocument();
 });
 
 test("the viewer's own settled failed run offers Retry; a completed one offers Re-render; a running one offers Stop", async () => {
@@ -73,10 +75,14 @@ test("the viewer's own settled failed run offers Retry; a completed one offers R
   })));
   render(<ReviewPanelTab requestId={REQ} />);
   const cards = await screen.findAllByTestId('review-panel-run');
-  expect(within(cards[0]).getByRole('button', { name: 'Retry failed' })).toBeInTheDocument();
+  expect(within(cards[0]).getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+  expect(cards[0]).toHaveAttribute('data-run-shape', 'settled');
   expect(within(cards[1]).getByRole('button', { name: 'Re-render report' })).toBeInTheDocument();
+  expect(cards[1]).toHaveAttribute('data-run-shape', 'completed');
+  expect(within(cards[1]).getByRole('link', { name: 'PDF' })).toHaveAttribute('href', expect.stringContaining('format=pdf'));
   expect(within(cards[2]).getByRole('button', { name: 'Stop' })).toBeInTheDocument();
-  expect(within(cards[2]).queryByRole('button', { name: 'Retry failed' })).toBeNull();
+  expect(cards[2]).toHaveAttribute('data-run-shape', 'running');
+  expect(within(cards[2]).queryByRole('button', { name: /Retry/ })).toBeNull();
   expect(screen.getByRole('button', { name: 'Launch new panel' })).toBeDisabled();
 });
 
@@ -107,4 +113,35 @@ test('Stop on a run spanning several requests is labelled "Stop run" and confirm
   expect(confirmSpy).toHaveBeenCalledWith(expect.stringMatching(/covers 3 requests/));
   expect(global.fetch).toHaveBeenCalledTimes(1); // declined: no POST
   confirmSpy.mockRestore();
+});
+
+describe('runTotalLabel — the ledger cost-suppression rule on a read surface', () => {
+  const known = (cents) => ({ costState: 'known', costCents: cents });
+  test('sums known seat costs into one run total', () => {
+    expect(runTotalLabel([known(22), known(6), known(31)])).toBe('$0.59');
+  });
+  test('withholds the total (never $0, never a partial sum) when any terminal seat cost is unknown', () => {
+    expect(runTotalLabel([known(22), { costState: 'unknown', costCents: null }])).toBe('cost unknown');
+    expect(runTotalLabel([known(22), { costState: 'known', costCents: null }])).toBe('cost unknown');
+  });
+  test('no total for seats that have not settled', () => {
+    expect(runTotalLabel([{ costState: null, costCents: null }])).toBeNull();
+    expect(runTotalLabel([])).toBeNull();
+  });
+});
+
+test('a failed run collapses to one line with the SPECIFIC seat reason, not the generic entry copy, and no duplicate pills', async () => {
+  global.fetch.mockResolvedValue(ok(body({ runs: [run({ status: 'failed', owner: { profileId: 1, name: 'Me', isMine: true }, entries: [entry({
+    status: 'failed', hasReport: false, error: 'the "seat.claude" seat hit an unexpected problem.',
+    seats: [{ seatKey: 'seat.claude', label: 'Claude reviewer', model: 'claude-fable-5-1', state: 'failed', costState: 'known', costCents: 15, error: 'Claude refused the request; no output was persisted' },
+            { seatKey: 'seat.openai', label: 'OpenAI reviewer', model: 'gpt-5.6-sol', state: 'completed', costState: 'known', costCents: 10, error: null }],
+  })] })] })));
+  render(<ReviewPanelTab requestId={REQ} />);
+  const card = await screen.findByTestId('review-panel-run');
+  // Inline on the collapsed line, and again inside the (collapsed) Details list.
+  expect(within(card).getAllByText(/Claude refused the request/).length).toBeGreaterThanOrEqual(1);
+  expect(within(card).queryByText(/unexpected problem/)).toBeNull(); // only inside Details, which is collapsed content
+  expect(within(card).getByText(/\$0\.25/)).toBeInTheDocument(); // spend stays on the record
+  expect(within(card).getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+  expect(within(card).queryByText('#1002852')).toBeNull(); // the tab IS this request; no repeated number
 });
