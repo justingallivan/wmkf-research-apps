@@ -486,7 +486,25 @@ describe('Re-render report action', () => {
     const rerenderButton = await screen.findByRole('button', { name: 'Re-render report' });
     fireEvent.click(rerenderButton);
     expect(window.confirm).toHaveBeenCalledWith('Re-render the Word and PDF editions from the saved reviews? No model calls are made.');
-    await waitFor(() => expect(postBodies).toEqual([{ action: 'rerender', runId: 'run-1', entryIds: ['entry-1'] }]));
+    // No runId in the request body — the server resolves the owning run from
+    // entryIds itself (production defect 2026-09-13: the client's own idea of
+    // "the latest run" is not necessarily the run the selected entry belongs to).
+    await waitFor(() => expect(postBodies).toEqual([{ action: 'rerender', entryIds: ['entry-1'] }]));
+  });
+
+  test('checking a failed entry and clicking "Retry failed entries" posts action:"retry" with entryIds only — no runId', async () => {
+    const postBodies = [];
+    global.fetch = jest.fn((url, options) => {
+      if (options?.method === 'POST') { postBodies.push(JSON.parse(options.body)); return Promise.resolve(response({ run: { id: 'run-1', status: 'queued', entries: [] } })); }
+      return Promise.resolve(response(pageResponse({
+        runs: [{ id: 'run-1', status: 'failed', entries: [{ id: 'entry-1', requestNumber: '101', status: 'failed', hasReport: false, retryRequested: false, seats: [] }] }],
+      })));
+    });
+    render(<ReviewPanelWorkspace />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Progress' }));
+    fireEvent.click(await screen.findByRole('checkbox', { name: 'Select entry 101 for retry' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Retry failed entries' }));
+    await waitFor(() => expect(postBodies).toEqual([{ action: 'retry', entryIds: ['entry-1'] }]));
   });
 
   test('declining the confirm dialog sends no request', async () => {

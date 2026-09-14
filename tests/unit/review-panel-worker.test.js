@@ -105,6 +105,29 @@ test('happy path: both seats run, winners selected, chair runs once, entry compl
     pdf: { pathname: 'review-panel/fixture', sha256: 'a'.repeat(64), size: 4, savedAt: expect.any(String) },
   });
   expect(storeReviewPanelFile).toHaveBeenCalledTimes(2);
+  // The chair completes and is awaited within THIS same pass (no prior pass
+  // ever saw it as already-completed), so nothing else calls selectWinners
+  // after the chair finishes except the fix below — assert the winner is
+  // actually recorded, not just that the entry completed.
+  expect(entryState.winners_json.chair).toBe('chair-1');
+});
+
+test('normal (non-retried) completion records winners_json.chair before completing the entry — production defect 2026-09-13: only entries whose chair happened to already be completed on a PRIOR pass ever got this via the earlier selectWinners call; a chair dispatched and completed inline within the SAME pass never did, so requestReviewPanelRerender could not find the entry eligible', async () => {
+  store.listReviewPanelEntries.mockResolvedValue([entryState]);
+  const selectWinnersCallsWhenChairCompleted = [];
+  const originalSelectWinners = store.selectWinners.getMockImplementation();
+  store.selectWinners.mockImplementation(async (...args) => {
+    const chairAttempt = attempts.find((a) => a.seat_key === 'chair');
+    if (chairAttempt?.state === 'completed') selectWinnersCallsWhenChairCompleted.push(chairAttempt.id);
+    return originalSelectWinners(...args);
+  });
+  await drainReviewPanels();
+  expect(entryState.status).toBe('completed');
+  expect(entryState.winners_json.chair).toBe('chair-1');
+  // selectWinners must have been called AT LEAST once while the chair
+  // attempt was already 'completed' — i.e. after runChair resolved, not only
+  // the two calls earlier in processEntry (before the chair attempt exists).
+  expect(selectWinnersCallsWhenChairCompleted.length).toBeGreaterThan(0);
 });
 
 test('the report passed to renderReviewPanelEntryDocuments carries the pinned question set and seat display labels, so the document renderer never falls back to raw JSON keys', async () => {
@@ -354,6 +377,27 @@ describe('rerenderCompletedEntries (via drainReviewPanels) — re-render makes N
     expect(entryState.data.files.docx.savedAt).toEqual(expect.any(String));
     expect(entryState.data.files.pdf.savedAt).toEqual(expect.any(String));
     expect(entryState.data.rerenderHistory).toEqual([{ replacedAt: expect.any(String), files: previousFiles }]);
+  });
+
+  test('backfills winners_json.chair for a legacy entry (completed before the normal-completion fix, so winners_json never got chair) — the completed chair attempt alone makes it eligible, and selectWinners records it before the chair lookup', async () => {
+    seatSetup();
+    const previousFiles = setUpCompletedEntryForRerender();
+    // Simulate a legacy entry: completed via the OLD normal-completion path,
+    // so winners_json lacks chair even though a completed chair attempt
+    // exists (the same shape requestReviewPanelRerender's eligibility check
+    // now accepts).
+    entryState.winners_json = { 'seat.claude': 'seat.claude-1', 'seat.openai': 'seat.openai-1' };
+
+    const result = await drainReviewPanels();
+    expect(result).toEqual({ claimed: 1, runId: 'run-1' });
+    expect(store.createAttempt).not.toHaveBeenCalled(); // no new attempt — this is a re-render, not a retry
+    expect(runSeat).not.toHaveBeenCalled();
+    expect(runChair).not.toHaveBeenCalled(); // still no model calls
+    expect(renderReviewPanelEntryDocuments).toHaveBeenCalled(); // the render actually ran — not the "unreachable" clear-and-skip branch
+    expect(entryState.winners_json.chair).toBe('chair-1'); // backfilled
+    expect(entryState.status).toBe('completed');
+    expect(entryState.data.rerender).toBeUndefined();
+    expect(entryState.data.files.docx.pathname).not.toBe(previousFiles.docx.pathname);
   });
 
   test('a mixed-pair upload (docx lands, pdf fails) never goes live: data.files stays the PREVIOUS pair, never left failed, and the orphaned new docx ref is recorded (never silently lost) without becoming live', async () => {

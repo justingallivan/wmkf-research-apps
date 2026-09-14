@@ -239,17 +239,56 @@ describe('launchReviewPanel', () => {
 });
 
 describe('controlReviewPanel — rerender action', () => {
-  test('routes to requestReviewPanelRerender with (runId, owner, entryIds) and projects the resulting run', async () => {
+  test('routes to requestReviewPanelRerender with (owner, entryIds) ONLY — no runId — and projects the resulting run', async () => {
     store.requestReviewPanelRerender.mockResolvedValue({ id: RUN_ID, status: 'queued', data: {}, created_at: new Date().toISOString() });
     const result = await controlReviewPanel(OWNER, { action: 'rerender', runId: RUN_ID, entryIds: [ENTRY_ID] });
-    expect(store.requestReviewPanelRerender).toHaveBeenCalledWith(RUN_ID, OWNER, [ENTRY_ID]);
+    expect(store.requestReviewPanelRerender).toHaveBeenCalledWith(OWNER, [ENTRY_ID]);
     expect(result.run.id).toBe(RUN_ID);
+  });
+
+  // Production defect 2026-09-13: the store used to resolve the run from a
+  // client-supplied runId that could point at the wrong run for the given
+  // entries. A client-supplied runId must now be completely ignored — the
+  // store resolves the owning run from entryIds itself — so a bogus/absent
+  // runId in the body must never surface as a validation error here.
+  test('ignores a missing or bogus client-supplied runId — entryIds alone drive the call', async () => {
+    store.requestReviewPanelRerender.mockResolvedValue({ id: RUN_ID, status: 'queued', data: {}, created_at: new Date().toISOString() });
+    const result = await controlReviewPanel(OWNER, { action: 'rerender', runId: 'not-a-guid', entryIds: [ENTRY_ID] });
+    expect(store.requestReviewPanelRerender).toHaveBeenCalledWith(OWNER, [ENTRY_ID]);
+    expect(result.run.id).toBe(RUN_ID);
+
+    const result2 = await controlReviewPanel(OWNER, { action: 'rerender', entryIds: [ENTRY_ID] });
+    expect(store.requestReviewPanelRerender).toHaveBeenLastCalledWith(OWNER, [ENTRY_ID]);
+    expect(result2.run.id).toBe(RUN_ID);
   });
 
   test('reviewPanelAction dispatches action:"rerender" through controlReviewPanel the same way as retry/stop/operator-stop', async () => {
     store.requestReviewPanelRerender.mockResolvedValue({ id: RUN_ID, status: 'queued', data: {}, created_at: new Date().toISOString() });
     const result = await reviewPanelAction(OWNER, { action: 'rerender', runId: RUN_ID, entryIds: [ENTRY_ID] });
     expect(store.requestReviewPanelRerender).toHaveBeenCalled();
+    expect(result.run.id).toBe(RUN_ID);
+  });
+});
+
+describe('controlReviewPanel — retry action', () => {
+  test('routes to requestReviewPanelRetry with (owner, entryIds) ONLY — no runId — same latest-run-coupling fix as rerender', async () => {
+    store.requestReviewPanelRetry.mockResolvedValue({ id: RUN_ID, status: 'queued', data: {}, created_at: new Date().toISOString() });
+    const result = await controlReviewPanel(OWNER, { action: 'retry', runId: RUN_ID, entryIds: [ENTRY_ID] });
+    expect(store.requestReviewPanelRetry).toHaveBeenCalledWith(OWNER, [ENTRY_ID]);
+    expect(result.run.id).toBe(RUN_ID);
+  });
+});
+
+describe('controlReviewPanel — stop action still requires a runId (it targets a whole run, not entries)', () => {
+  test('rejects an invalid runId', async () => {
+    await expect(controlReviewPanel(OWNER, { action: 'stop', runId: 'not-a-guid' })).rejects.toMatchObject({ httpStatus: 400 });
+    expect(store.requestReviewPanelCancel).not.toHaveBeenCalled();
+  });
+
+  test('passes the runId through to requestReviewPanelCancel', async () => {
+    store.requestReviewPanelCancel.mockResolvedValue({ id: RUN_ID, status: 'cancelled', data: {}, created_at: new Date().toISOString() });
+    const result = await controlReviewPanel(OWNER, { action: 'stop', runId: RUN_ID });
+    expect(store.requestReviewPanelCancel).toHaveBeenCalledWith(RUN_ID, OWNER);
     expect(result.run.id).toBe(RUN_ID);
   });
 });

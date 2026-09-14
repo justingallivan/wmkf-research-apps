@@ -340,7 +340,7 @@ export function ReviewPanelWorkspace() {
     if (!latestRun || !retrySelection.size) return;
     setActionLoading('retry');
     try {
-      await runAction({ action: 'retry', runId: latestRun.id, entryIds: [...retrySelection] });
+      await runAction({ action: 'retry', entryIds: [...retrySelection] });
       setRetrySelection(new Set());
       await load();
     } catch (retryErr) {
@@ -365,7 +365,7 @@ export function ReviewPanelWorkspace() {
       return next;
     });
     try {
-      await runAction({ action: 'rerender', runId: latestRun.id, entryIds: [entryId] });
+      await runAction({ action: 'rerender', entryIds: [entryId] });
       await load();
     } catch (rerenderErr) {
       // Shown beside THIS entry's own row (EntryRow's rerenderError prop),
