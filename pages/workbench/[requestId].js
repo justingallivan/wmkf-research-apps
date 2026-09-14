@@ -33,25 +33,33 @@ import StatusTab from '../../shared/components/workbench/StatusTab';
 import AwardeeTab from '../../shared/components/workbench/AwardeeTab';
 import InitialAssessmentTab from '../../shared/components/workbench/InitialAssessmentTab';
 import StaffDeliberationsTab from '../../shared/components/workbench/StaffDeliberationsTab';
+import ReviewPanelTab from '../../shared/components/workbench/ReviewPanelTab';
 import FinalWriteupTab from '../../shared/components/workbench/FinalWriteupTab';
 import { computeCanManage } from '../../shared/components/reviewers/reviewer-modes';
 import { classifyTarget } from '../../lib/dataverse/core/interlock';
 
 // Implemented tabs: Overview, Proposal, Initial Assessment, Reviewers, Reviews,
+// Review Panel (S511; visible only with the `review-panel` app grant — `gate`),
 // Staff Deliberations (the merged site-visit writeup workspace, S466), Status,
 // Final Writeup now supplies the governed group-review handoff and Word launch.
+// A tab with `gate` is hidden (and its deep link falls back to Overview) unless
+// useAppAccess().hasAccess(gate) is true — fail-closed while access loads.
 const TABS = [
   { key: 'overview', label: 'Overview' },
   { key: 'proposal', label: 'Proposal' },
   { key: 'initial-writeup', label: 'Initial Assessment' },
   { key: 'reviewers', label: 'Reviewers' },
   { key: 'reviews', label: 'Reviews' },
+  { key: 'review-panel', label: 'Review Panel', gate: 'review-panel' },
   { key: 'staff-deliberations', label: 'Staff Deliberations' },
   { key: 'final-writeup', label: 'Final Writeup' },
   { key: 'status', label: 'Status' },
   { key: 'awardee', label: 'Awardee' },
 ];
-const TAB_KEYS = new Set(TABS.map((t) => t.key));
+/** Tabs the current viewer may see: ungated tabs always; gated tabs only when the app grant is present. */
+export function visibleTabsFor(hasAccess) {
+  return TABS.filter((t) => !t.gate || (typeof hasAccess === 'function' && hasAccess(t.gate) === true));
+}
 // Deep links and onSelectTab callers from before the S466 merge keep working.
 const LEGACY_TAB_ALIASES = {
   'pre-site-visit': 'staff-deliberations',
@@ -61,13 +69,15 @@ const LEGACY_TAB_ALIASES = {
 export function WorkbenchRequest({ previewReadOnly = false }) {
   const router = useRouter();
   const { data: session } = useSession();
-  const { isSuperuser } = useAppAccess();
+  const { isSuperuser, hasAccess } = useAppAccess();
   const { preferences } = useProfile();
   const { requestId } = router.query;
 
+  const visibleTabs = useMemo(() => visibleTabsFor(hasAccess), [hasAccess]);
+  const visibleTabKeys = useMemo(() => new Set(visibleTabs.map((t) => t.key)), [visibleTabs]);
   const rawTabParam = typeof router.query.tab === 'string' ? router.query.tab : null;
   const tabParam = rawTabParam ? (LEGACY_TAB_ALIASES[rawTabParam] || rawTabParam) : null;
-  const activeTab = tabParam && TAB_KEYS.has(tabParam) ? tabParam : 'overview';
+  const activeTab = tabParam && visibleTabKeys.has(tabParam) ? tabParam : 'overview';
   const reviewerSurfaceReadOnly = previewReadOnly && ['reviewers', 'reviews'].includes(activeTab);
 
   const [ctx, setCtx] = useState(null);
@@ -152,7 +162,7 @@ export function WorkbenchRequest({ previewReadOnly = false }) {
       {/* Tab strip */}
       <div className="border-b border-gray-200 mb-6 overflow-x-auto">
         <nav className="flex gap-1 min-w-max" aria-label="Request sections">
-          {TABS.map((t) => (
+          {visibleTabs.map((t) => (
             <button
               key={t.key}
               ref={activeTab === t.key ? activeTabButtonRef : null}
@@ -203,6 +213,11 @@ export function WorkbenchRequest({ previewReadOnly = false }) {
         <ReviewsTab
           requestId={typeof requestId === 'string' ? requestId : ''}
           previewReadOnly={reviewerSurfaceReadOnly}
+        />
+      ) : activeTab === 'review-panel' ? (
+        <ReviewPanelTab
+          key={typeof requestId === 'string' ? requestId : ''}
+          requestId={typeof requestId === 'string' ? requestId : ''}
         />
       ) : activeTab === 'staff-deliberations' ? (
         <StaffDeliberationsTab

@@ -27,7 +27,7 @@ jest.mock('../../shared/components/Layout', () => ({
 jest.mock('../../shared/components/RequireAppAccess', () => function RequireAppAccessStub({ children }) {
   return children;
 });
-jest.mock('../../shared/context/AppAccessContext', () => ({ useAppAccess: () => ({ isSuperuser: true }) }));
+jest.mock('../../shared/context/AppAccessContext', () => ({ useAppAccess: () => ({ isSuperuser: true, hasAccess: () => false }) }));
 jest.mock('../../shared/context/ProfileContext', () => ({ useProfile: () => ({ preferences: {} }) }));
 jest.mock('../../shared/config/reviewerFinderPreferences', () => ({
   readEmailSignaturePreference: () => ({}),

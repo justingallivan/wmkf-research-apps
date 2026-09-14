@@ -1,10 +1,11 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-09-10
+last_verified: 2026-09-13
 stale_after_days: 90
 owner: reviewers
 source_files:
+  - shared/components/workbench/ReviewPanelTab.js
   - shared/components/reviewers/email-template-store.js
   - shared/components/reviewers/EmailTemplatesModal.js
   - shared/components/admin/EmailDefaultsSection.js
@@ -1093,6 +1094,10 @@ deployed reload showed **High-confidence email**. No suitable live conflict was
 present, so conflict adjudication, promotion parity, duplicate-owner handling,
 retryable outage, and capture-send scenarios remain unexercised rather than
 being manufactured in Production.
+
+## Review Panel tab (S511, gated slot between Reviews and Staff Deliberations)
+
+`shared/components/workbench/ReviewPanelTab.js`; TABS entry `{ key: 'review-panel', gate: 'review-panel' }` in `pages/workbench/[requestId].js`. `visibleTabsFor(hasAccess)` hides any gated tab unless `hasAccess(gate) === true` (fail-closed while access loads; a deep link falls back to Overview). Detail, hazards, and the server contract live in [Review Panel](review-panel.md).
 
 ## Reviews tab (workbench consumption of submitted reviews)
 
