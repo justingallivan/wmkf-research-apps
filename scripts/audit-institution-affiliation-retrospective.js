@@ -126,7 +126,7 @@ async function main() {
   const opts = parseArgs(process.argv.slice(2));
   const { sql } = require('@vercel/postgres');
   // Entire query is read-only. Calendar-window filtering occurs after the
-  // bounded roster read so no dynamic SQL or caller-provided SQL is needed.
+  // retained roster read so no dynamic SQL or caller-provided SQL is needed.
   const result = await sql`
     SELECT request_id, candidate_key, status, source_kind, candidate,
            first_seen_at, updated_at

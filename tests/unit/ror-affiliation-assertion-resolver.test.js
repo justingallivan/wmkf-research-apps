@@ -5,6 +5,7 @@ const {
 const {
   createRorAffiliationAssertionResolver,
 } = require('../../lib/services/ror-affiliation-assertion-resolver');
+const { parseOrganizationSpans } = require('../../lib/services/ror-institution-evidence');
 
 const IDS = {
   parent: 'https://ror.org/000000001',
@@ -100,6 +101,22 @@ test('provider failure does not become distinct or discard the other segment', a
     segments: [{ rawText: 'Known institute' }, { rawText: 'Unknown institute' }],
   });
   expect(result.segments.map((segment) => segment.resolution.status)).toEqual(['resolved', 'unresolved']);
+});
+
+test('slash-joined affiliations abstain instead of resolving as one organization', async () => {
+  expect(parseOrganizationSpans('UCLA / UC San Diego')).toMatchObject({
+    spans: [], issue: 'unparsed_multi_organization_delimiter',
+  });
+  expect(parseOrganizationSpans('UCLA/UCSD')).toMatchObject({
+    spans: [], issue: 'unparsed_multi_organization_delimiter',
+  });
+  const adapter = { institutionCandidates: jest.fn() };
+  const resolver = createRorAffiliationAssertionResolver({ candidateAdapter: adapter });
+  const assertion = await resolver.resolve({ rawText: 'UCLA / UC San Diego' });
+  expect(assertion.segments[0].resolution).toMatchObject({
+    status: 'unresolved', reason: 'unparsed_multi_organization_delimiter',
+  });
+  expect(adapter.institutionCandidates).not.toHaveBeenCalled();
 });
 
 test('abort propagates instead of being converted to provider failure', async () => {

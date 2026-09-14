@@ -51,6 +51,12 @@ without the source assertion, author attribution, identity proof, and extra
 affiliation COI screen. The probe deliberately supplies unknown source time
 and author specificity, and never calls the selection or write policy.
 
+The probe exposed a narrow safety issue: the production typed parser previously
+passed a slash-joined field as one organization span, allowing a resolver to
+match one member and hide another. A subsequent branch change makes such text
+explicitly unresolved until its segments are source-adjudicated. This changes
+Stage 2 explanation only; incumbent selection and writes remain authoritative.
+
 ## Method and limits
 
 The census used `scripts/audit-institution-affiliation-retrospective.js` with
