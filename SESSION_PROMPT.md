@@ -7,6 +7,19 @@
 > findings), §4 (delegated decisions). The panel is **enabled in production in smoke mode** on a
 > four-request allowlist; all four requests completed at ~$0.60 each.
 
+## Session 511 in progress (2026-09-13) — Review Panel as a gated Workbench tab, PR #291 open
+
+Owner decisions T1–T4 and the build record: `docs/plans/REVIEW_PANEL_WORKBENCH_TAB_PLAN_2026-09-13.md`.
+Branch `feature/review-panel-workbench-tab`; Tier 2 runtime work, so the OWNER merges after CI, not the agent.
+Owner steps after merge (never run these yourself; hand them over as `!` lines):
+
+```
+! vercel env add REVIEW_PANEL_ROLLOUT_MODE production --type config --force   # value: access
+```
+then grant `review-panel` to the pilot users in the admin panel, and smoke the tab signed-in on one
+request (Workbench → Review Panel tab: Launch, progress, Word/PDF links). The tab has NOT had a
+browser check yet. Also open: the fact-consistency self-test fixture fix landed on main (c1ffda91).
+
 ## Session 510 Summary (Fable orchestrating; Sonnet built, Opus reviewed, one Codex adversarial round; owner drove production rollout 2026-09-13)
 
 ### What Was Completed
