@@ -41,14 +41,16 @@
    1002912 $0.59 (~4 min each). Fixes merged during the smoke: PR #282 progress polling + seat
    pills, #283 answer cap + timeline, #284 admin-tunable output budgets (seat 16k, chair 12k),
    #285 tier-key resolution + readiness reason, #286 PDF WinAnsi sanitizer + stored error detail,
-   #287 retry-state UX, #288 report rendering (labelled matrix, disagreements), #289 "Re-render report"
-   action (no model calls). Fable refused the seat prompt on two biology proposals (API `refusal`);
+   #287 retry-state UX, #288 report rendering (labelled matrix, disagreements), #289/#290 "Re-render report"
+   action (no model calls; run resolved from entry ids; chair winner recorded on normal completion). Fable refused the seat prompt on two biology proposals (API `refusal`);
    Claude seat default is now Opus (a88ea0b2).
 
 ### Commits (main, this session; merges omitted)
 
-VRP plan revisions (4399fcbb … 262f3322), email-templates group move, brief commits
-(0a52e8c7 … latest). Branch commits are on `feature/review-panel-foundation` (2b714ebf … 72dd40dd).
+VRP plan revisions (4399fcbb … 262f3322); email-templates group move; brief/handoff commits
+(0a52e8c7 … b22486f6 and later); seat ceiling f3449fdc; Opus seat default a88ea0b2; cron fb6a911a;
+docs reconcile 899a6785. PR merges: 8d7c6490 (#280), bbef47ac (#281), 59e2284e (#282), 753238c0
+(#284), 242569ce (#286), 2b609c9e (#288), ca078e9c (#289), 182ddf8f (#290); #283, #285, #287 in between.
 
 ## Next Items
 
@@ -62,8 +64,9 @@ VRP plan revisions (4399fcbb … 262f3322), email-templates group move, brief co
    (a) whether the page shows a typical-cost figure (~$0.60/request from four runs, D6);
    (b) whether to widen to pilot mode / the full D26 roster (`REVIEW_PANEL_ROLLOUT_MODE=pilot`,
    allowlist); (c) Fable seat: test on a non-biology proposal or leave Opus; (d) the OpenAI seat id
-   (D10, still `gpt-5.6-sol`); (e) re-render 1002852 and 1002874 with the "Re-render report" button
-   once PR #289's deploy is confirmed (was pending at handoff). Follow-ups logged in brief §3:
+   (D10, still `gpt-5.6-sol`); (e) **one click each: "Re-render report" on 1002852 and 1002874** — their editions still carry the
+   old template (ledger: pdf 34,773 / 33,602 bytes, zero re-renders); the action is live and was
+   verified on 1002912. Follow-ups logged in brief §3:
    worker-stamped retry marker, `check-review-panel-rollout.js` preflight clone, prompt editor
    should show the slot model for the two panel rows, admin model changes take up to 5 minutes to
    reach launches (override cache TTL). Evidence: brief §2b/§3.

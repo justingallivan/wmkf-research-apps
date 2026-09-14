@@ -10,6 +10,14 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## September 2026 — Virtual Review Panel rebuilt on the governed Executor and live in production smoke mode; four panels at ~$0.60 each (Session 510)
+
+**Milestone:** The Virtual Review Panel revival shipped as a new admin-only app (`review-panel`): two vendor seats (Claude and OpenAI) reviewing blind on the governed Executor's new provider seam, a Claude chair synthesising, a per-call seat-attempt ledger with lease and compare-and-set fences, private DOCX/PDF editions in a dedicated Blob store, and a live progress page. Four D26 requests completed end to end in production the same day.
+**Sessions:** 510 (Fable orchestrating; Sonnet built, Opus reviewed every slice, one Codex adversarial round; owner merged, configured, and smoke-tested live 2026-09-13). Ten PRs #280–#290.
+**Ship state:** A0 Executor provider seam (#280) with `allowedProviders` opt-in and an OpenAI transport; Phase A foundation (#281: migration 047, ledger, worker, prompts, routes, page, docs); smoke fixes the same day: progress polling and seat pills (#282), answer cap and timeline (#283), admin-tunable output budgets (#284), tier-key resolution and readiness reason (#285), PDF WinAnsi sanitiser (#286), retry-state UX (#287), labelled report rendering (#288), "Re-render report" with no model calls (#289, #290). Production: enabled in smoke mode, four-request allowlist, per-minute drain cron, store `wmkf-review-panel-private`, seat default Opus after Fable refused two biology proposals at the API level.
+**Why it matters:** The old upload-based panel ran outside governance on `MultiLLMService`; the new one is governed, audited per paid call, multi-vendor by admin-selectable model slots, and cheap enough (~$0.60, ~4 min) to run across a cycle. It also proved the overnight orchestration pattern (build, review, adversarial review, bounded fix loop) end to end.
+**Pointers:** `docs/plans/VIRTUAL_REVIEW_PANEL_PHASE_A_BUILD_PLAN_2026-09-12.md`, `docs/plans/REVIEW_PANEL_OVERNIGHT_BRIEF_2026-09-13.md` (§2b smoke table, §3 findings, §4 delegated decisions), `docs/atlas/postgres-review-panel.md`, `docs/agent-wiki/topics/review-panel.md`; merges 8d7c6490, bbef47ac, 59e2284e, 753238c0, 242569ce, 2b609c9e, ca078e9c, 182ddf8f.
+
 ## September 2026 — Cycle Dossier widened to the full D26 roster; seven entries generated at ~$0.37 each; Dependabot cleared; editors on tiptap 3 (Session 509)
 
 **Milestone:** The Cycle Dossier moved from a one-request smoke to pilot mode over the 23-request D26 roster, and the owner generated seven briefings the same afternoon while the app was hardened live around the failures each run surfaced.
