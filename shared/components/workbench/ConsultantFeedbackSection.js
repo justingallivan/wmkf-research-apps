@@ -169,6 +169,11 @@ export default function ConsultantFeedbackSection({ requestId, previewReadOnly =
     setEditingId(null);
     setForm(emptyForm());
     setSaveError(null);
+    // Called by both Cancel and the requestId-change effect below; a save
+    // left in flight when either fires must not leave the NEXT form wedged
+    // on "Saving…" (the stale save's own early returns clear it too, but a
+    // request switch can land here before that save's response arrives).
+    setSaving(false);
     mutationIdRef.current = null;
     originalAuthorRef.current = null;
     formRequestIdRef.current = null;
@@ -241,16 +246,31 @@ export default function ConsultantFeedbackSection({ requestId, previewReadOnly =
         });
       }
       const data = await res.json().catch(() => ({}));
-      if (fetchId !== fetchIdRef.current) return;
+      if (fetchId !== fetchIdRef.current) {
+        // A request switch landed while this save was in flight (closeForm
+        // already ran via the requestId-change effect, but that happened
+        // before this response arrived) — clear the busy flag so it never
+        // wedges a form opened afterward.
+        setSaving(false);
+        return;
+      }
       if (!res.ok) throw new Error(data.error || `Save failed (${res.status})`);
       // Confirmed 2xx: clear saving and rotate the mutation id/close the form
-      // BEFORE the reload — `load()` bumps `fetchIdRef`, which would make the
-      // `finally` guard below false and leave the button stuck on "Saving…".
+      // BEFORE the reload — `load()` bumps `fetchIdRef`, so a later stale
+      // check in this same call would otherwise see a mismatch and skip
+      // clearing the button.
       setSaving(false);
       closeForm();
       await load();
     } catch (e) {
-      if (fetchId !== fetchIdRef.current) return;
+      if (fetchId !== fetchIdRef.current) {
+        // Same reasoning as the success path above: a request switch that
+        // landed mid-flight already ran closeForm via the effect, but this
+        // call's own busy flag still needs clearing so it can't wedge a form
+        // opened afterward.
+        setSaving(false);
+        return;
+      }
       // Leave mutationIdRef untouched so a retry replays the same id.
       setSaveError(e.message);
       setSaving(false);
@@ -267,12 +287,20 @@ export default function ConsultantFeedbackSection({ requestId, previewReadOnly =
         body: JSON.stringify({ id, requestId }),
       });
       const data = await res.json().catch(() => ({}));
-      if (fetchId !== fetchIdRef.current) return;
+      if (fetchId !== fetchIdRef.current) {
+        // Same wedge risk as handleSave: clear the busy flag for a stale
+        // generation instead of leaving "Deleting…" stuck.
+        setDeletingId(null);
+        return;
+      }
       if (!res.ok) throw new Error(data.error || `Delete failed (${res.status})`);
       setConfirmingDeleteId(null);
       await load();
     } catch (e) {
-      if (fetchId !== fetchIdRef.current) return;
+      if (fetchId !== fetchIdRef.current) {
+        setDeletingId(null);
+        return;
+      }
       setError(e.message);
     } finally {
       if (fetchId === fetchIdRef.current) setDeletingId(null);

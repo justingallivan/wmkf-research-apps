@@ -170,11 +170,45 @@ describe('writeFeedbackEntry', () => {
     })).rejects.toMatchObject({ httpStatus: 400, body: { reason: 'body_required' } });
   });
 
+  test('rejects a body over 200,000 characters before sanitizing, on both create and update', async () => {
+    const oversized = '<p>' + 'a'.repeat(200_001) + '</p>';
+    await expect(writeFeedbackEntry({
+      requestId: REQUEST_ID, actorProfileId: ACTOR_ID, mutationId: MUTATION_ID,
+      oneOff: { name: 'Jane Doe' }, bodyHtml: oversized, receivedOn: '2026-09-01',
+    })).rejects.toMatchObject({ httpStatus: 400, body: { reason: 'body_too_long' } });
+    expect(db.connect).not.toHaveBeenCalled();
+
+    client.query.mockImplementation(async (q) => {
+      if (q.includes('FOR UPDATE')) {
+        return { rows: [{ id: 4, request_id: REQUEST_ID, consultant_roster_id: 5, one_off_name: null, one_off_affiliation: null, body_html: '<p>Original.</p>', received_on: '2026-09-01', shared: true, requestdocument_id: null }] };
+      }
+      return { rows: [] };
+    });
+    await expect(updateFeedbackEntry({
+      id: 4, requestId: REQUEST_ID, actorProfileId: ACTOR_ID, patch: { bodyHtml: oversized },
+    })).rejects.toMatchObject({ httpStatus: 400, body: { reason: 'body_too_long' } });
+    expect(client.query).toHaveBeenCalledWith('ROLLBACK');
+  });
+
   test('rejects a non-boolean shared value instead of failing open to true', async () => {
     await expect(writeFeedbackEntry({
       requestId: REQUEST_ID, actorProfileId: ACTOR_ID, mutationId: MUTATION_ID,
       oneOff: { name: 'Jane Doe' }, bodyHtml: '<p>Good.</p>', receivedOn: '2026-09-01', shared: 'false',
     })).rejects.toMatchObject({ httpStatus: 400, body: { reason: 'invalid_shared' } });
+  });
+
+  test('rejects `true` as consultantRosterId instead of coercing it to 1', async () => {
+    await expect(writeFeedbackEntry({
+      requestId: REQUEST_ID, actorProfileId: ACTOR_ID, mutationId: MUTATION_ID,
+      consultantRosterId: true, bodyHtml: '<p>Good.</p>', receivedOn: '2026-09-01',
+    })).rejects.toMatchObject({ httpStatus: 400, body: { reason: 'invalid_author' } });
+  });
+
+  test("rejects '' as consultantRosterId instead of coercing it to 0", async () => {
+    await expect(writeFeedbackEntry({
+      requestId: REQUEST_ID, actorProfileId: ACTOR_ID, mutationId: MUTATION_ID,
+      consultantRosterId: '', bodyHtml: '<p>Good.</p>', receivedOn: '2026-09-01',
+    })).rejects.toMatchObject({ httpStatus: 400, body: { reason: 'invalid_author' } });
   });
 });
 
@@ -256,13 +290,27 @@ describe('loadSharedConsultantFeedbackForBriefing', () => {
     expect(console.error).toHaveBeenCalledWith('[consultant-feedback] briefing read failed', expect.objectContaining({ requestId: REQUEST_ID }));
   });
 
-  test('returns ok with shared items, re-sanitized, when the query succeeds', async () => {
-    sql.query.mockResolvedValueOnce({
-      rows: [{ received_on: '2026-09-01', body_html: '<p>Great work.</p>', consultant_roster_id: null, one_off_name: 'Jane Doe', one_off_affiliation: 'Acme' }],
+  test('the external privacy boundary: only the shared row reaches items, proven against a fixture that also contains an unshared row', async () => {
+    const ALL_ROWS = [
+      { received_on: '2026-09-01', body_html: '<p>Shared.</p>', consultant_roster_id: null, one_off_name: 'Jane Doe', one_off_affiliation: 'Acme', shared: true, status: 'active' },
+      { received_on: '2026-09-02', body_html: '<p>Not shared.</p>', consultant_roster_id: null, one_off_name: 'John Smith', one_off_affiliation: 'Other Co', shared: false, status: 'active' },
+    ];
+    sql.query.mockImplementationOnce(async (queryText) => {
+      expect(queryText).toContain('cf.shared = true');
+      expect(queryText).toContain("cf.status = 'active'");
+      // Simulate the WHERE clause the real database would apply. The mock
+      // only filters on a predicate substring it actually finds in the query
+      // text, so deleting `AND cf.shared = true` from the production query
+      // makes this mock stop filtering AND makes the assertion below (only
+      // the shared row reaches items) fail — it does not merely echo back
+      // whatever rows the test hands it.
+      const rows = ALL_ROWS.filter((r) => (!queryText.includes('cf.shared = true') || r.shared)
+        && (!queryText.includes("cf.status = 'active'") || r.status === 'active'));
+      return { rows };
     });
     const result = await loadSharedConsultantFeedbackForBriefing(REQUEST_ID);
     expect(result.status).toBe('ok');
-    expect(result.items).toEqual([{ name: 'Jane Doe', affiliation: 'Acme', receivedOn: '2026-09-01', bodyHtml: '<p>Great work.</p>' }]);
+    expect(result.items).toEqual([{ name: 'Jane Doe', affiliation: 'Acme', receivedOn: '2026-09-01', bodyHtml: '<p>Shared.</p>' }]);
   });
 });
 

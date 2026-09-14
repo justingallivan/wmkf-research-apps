@@ -119,6 +119,43 @@ test('a successful save clears "Saving…", closes the form, and Add feedback is
   expect(saveButton).toHaveTextContent('Save');
 });
 
+test('a request switch mid-save clears "Saving…" so the next form is not wedged (round-4 finding 1)', async () => {
+  let resolvePost;
+  const postPromise = new Promise((resolve) => { resolvePost = resolve; });
+  global.fetch = jest.fn((url, options) => {
+    if (String(url).includes('/consultants')) return Promise.resolve(jsonResponse({ items: [] }));
+    if (options?.method === 'POST') return postPromise;
+    return Promise.resolve(jsonResponse({ items: [] }));
+  });
+
+  const { rerender } = render(<ConsultantFeedbackSection requestId={REQUEST_ID} />);
+  await waitFor(() => expect(screen.getByText('No consultant feedback recorded yet.')).toBeInTheDocument());
+
+  await userEvent.click(screen.getByRole('button', { name: 'Add feedback' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Add person…' }));
+  await userEvent.type(screen.getByPlaceholderText('Name'), 'Jane Doe');
+  await userEvent.type(screen.getByRole('textbox', { name: 'Consultant feedback' }), 'Great work.');
+  // Fires the POST, which stays pending on `postPromise`.
+  await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+  // A request switch lands while the save is still in flight; belt 1 closes
+  // the now-stale form immediately.
+  rerender(<ConsultantFeedbackSection requestId={OTHER_REQUEST_ID} />);
+  await waitFor(() => expect(screen.getByText('No consultant feedback recorded yet.')).toBeInTheDocument());
+
+  // The stale save's response finally arrives.
+  resolvePost(jsonResponse({ item: { id: '1' } }));
+  await waitFor(() => expect(global.fetch.mock.calls.some(([, o]) => o?.method === 'POST')).toBe(true));
+
+  // Reopening a fresh form for the CURRENT request must not be wedged on
+  // "Saving…" — this is the bug: the stale save's own early return used to
+  // skip clearing it.
+  await userEvent.click(screen.getByRole('button', { name: 'Add feedback' }));
+  const saveButton = await screen.findByRole('button', { name: 'Save' });
+  expect(saveButton).toBeEnabled();
+  expect(saveButton).toHaveTextContent('Save');
+});
+
 test('ReviewsTab is not remounted per request, so a request switch closes any open form (§ round-3 finding 1)', async () => {
   mockFetchSequence();
   const { rerender } = render(<ConsultantFeedbackSection requestId={REQUEST_ID} />);

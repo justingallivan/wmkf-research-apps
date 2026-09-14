@@ -97,12 +97,14 @@ with its own rule: a per-item share flag, default on. This does not reopen D14.
   actor-bound mint is `pages/api/workbench/grantee-deliverables/replacement-upload-token.js`.
   CLAUDE.md requires the `portal_upload_staging` + `UPLOADS_BLOB_RW_TOKEN` path for staff uploads;
   never multipart Function bodies, never the intake token.
-- **Migrations:** latest is `047_review_panel.sql`; fresh-install block is v49
-  (`scripts/setup-database.js:1054`). Next migration is 048 → block v50.
+- **Migrations:** at plan time the latest was `047_review_panel.sql` / block v49. Slice 1 added
+  `048_consultant_feedback.sql` / block v50 (commit `1a58bac8`); the next migration is 049 → v51.
+  Migration 048 is not yet applied to production (owner runs `node scripts/apply-migrations.js`
+  after merge).
 
 ## 3. Contract
 
-### 3.1 One feedback entry [PLANNED]
+### 3.1 One feedback entry [BUILT S512 on `feature/consultant-feedback-slice-1`, commit `1a58bac8`; slice 2 parts of this section remain PLANNED]
 
 | Field | Rule |
 |---|---|
@@ -119,7 +121,7 @@ with its own rule: a per-item share flag, default on. This does not reopen D14.
 
 At least one of `body_html` or `requestdocument_id` must be present.
 
-### 3.2 Add person [PLANNED]
+### 3.2 Add person [BUILT S512 on `feature/consultant-feedback-slice-1`, commit `1a58bac8`; slice 2 parts of this section remain PLANNED]
 
 The save route accepts either `consultantRosterId` or `oneOff: { name, affiliation? }`.
 
@@ -148,7 +150,7 @@ recipient directory or curated-recipient pickers, and the `expertise-finder`-own
 that app's surface. If staff later want a one-off to become a roster consultant, they add them
 through the Expertise Finder and edit the entry to select the roster row.
 
-### 3.3 Briefing page section [PLANNED]
+### 3.3 Briefing page section [BUILT S512 on `feature/consultant-feedback-slice-1`, commit `1a58bac8`; slice 2 parts of this section remain PLANNED]
 
 - New card section "Consultant feedback" (CF4), placed immediately after Reviews, which is the
   page's last section (Proposal renders before Reviews, so "between Reviews and Proposal" was
@@ -179,7 +181,7 @@ through the Expertise Finder and edit the entry to select the roster row.
   Graph call, matching the existing kinds. The `material:` kind's artifact-type filter is **not**
   widened.
 
-### 3.4 Routes [PLANNED — register in `docs/API_ROUTE_SECURITY_MATRIX.md` before build]
+### 3.4 Routes [slice 1 rows BUILT S512 and registered in `docs/API_ROUTE_SECURITY_MATRIX.md`; slice 2 rows PLANNED]
 
 | Route | Method | Guard | Purpose |
 |---|---|---|---|
@@ -194,7 +196,7 @@ through the Expertise Finder and edit the entry to select the roster row.
 Existing matrix rows for `context` and `document` are amended, not duplicated. All new
 `requestId` inputs pass `isGuid` before any Dataverse selector (`check:trust-boundary-guid`).
 
-### 3.5 Staff surface [PLANNED]
+### 3.5 Staff surface [BUILT S512 on `feature/consultant-feedback-slice-1`, commit `1a58bac8`; slice 2 parts of this section remain PLANNED]
 
 New component `shared/components/workbench/ConsultantFeedbackSection.js`, mounted by
 `ReviewsTab.js` below the outstanding-reviews section:
@@ -212,7 +214,7 @@ New component `shared/components/workbench/ConsultantFeedbackSection.js`, mounte
   (`ReviewsTab.js:786-807`): every post-await state write, success and failure, checks the
   generation so a request switch never paints another request's feedback.
 
-### 3.6 Delete semantics [PLANNED]
+### 3.6 Delete semantics [slice 1 hard delete BUILT S512; slice 2 ordering PLANNED]
 
 - Slice 1: hard delete the Postgres row (CF5).
 - Slice 2 (Codex AR-1 finding 2 and AR-2 finding 3; remedy is a pending status on the row, not
@@ -241,7 +243,7 @@ New component `shared/components/workbench/ConsultantFeedbackSection.js`, mounte
 - No notification, no email to the consultant, no honorarium linkage, no reviewer-count effects.
 - No cycle-level view; entries are per request.
 
-## 4. Data model [PLANNED]
+## 4. Data model [Postgres table BUILT S512 as migration 048 / fresh-install v50; registry parts PLANNED]
 
 Migration `048_consultant_feedback.sql` + manifest entry + fresh-install block v50:
 
@@ -342,7 +344,7 @@ Tests: expire after steps 5, 6, 7 with no retry per scope and assert the SharePo
 registry state are each correct, with committed and uncommitted crash fixtures. Land it as its own
 small change to the staging service.
 
-## 5. Security contract [PLANNED]
+## 5. Security contract [slice 1 items BUILT S512; upload items PLANNED]
 
 - Actor identity only from the authenticated profile (CLAUDE.md invariant); `created_by` /
   `updated_by` never from the body.
@@ -360,7 +362,7 @@ small change to the staging service.
 
 ## 6. Build slices and release tier
 
-### Slice 1 — text feedback end to end [PLANNED; no Dataverse schema change]
+### Slice 1 — text feedback end to end [BUILT S512, commit `1a58bac8` on `feature/consultant-feedback-slice-1`; awaiting owner merge]
 
 Migration 048 / block v50; service `lib/services/consultant-feedback-service.js`; the three
 workbench routes (list, mutate, consultants); `ConsultantFeedbackSection` on the Reviews tab;
@@ -377,7 +379,7 @@ routes; `feedback:` document member; Superseded-on-delete. Tier 1, same branch o
 Filter shared/unshared on the tab; consultant profile link to the roster; keyboard-first
 combobox.
 
-## 7. Tests [PLANNED]
+## 7. Tests [slice 1 tests BUILT S512 (91 passing across 6 suites); slice 2 tests PLANNED]
 
 - Service: create with roster id / with one-off name (no roster write; assert the roster row
   count is unchanged); **eligibility**: Board, inactive, missing, and stale-dropdown roster ids are
