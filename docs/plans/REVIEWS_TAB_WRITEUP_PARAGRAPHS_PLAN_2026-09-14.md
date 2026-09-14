@@ -29,8 +29,14 @@ related:
 > Codex adversarial rounds before build). Owner decisions W1–W6 were made in the same session.
 > **`/contract-reconcile` pass 1 (2026-09-14, Fable):** verdict READY WITH NAMED CHANGES; all six
 > named changes are folded into §4.2–§4.5 and §6 (caps are hard failures; separate referee
-> underline pass; four-site snapshot v4 with legacy note; both fields `required` + read-boundary
+> underline pass; snapshot v4 with legacy note; both fields `required` + read-boundary
 > allowlist; request-scoped roster export; accepted-only "outstanding" naming).
+> **Codex adversarial review AR-1 (2026-09-14, `--base 187b337c`):** six findings, all accepted by the
+> owner and folded in: read-boundary quote provenance (no reviewer ordinal in the digest); caps and
+> population budget made tolerant with W7 opened; `--force` republish for the production prompt row;
+> explicit filled-or-preserved token assertion; `active_invitation` allowlist for "outstanding";
+> renderer `{docx, diagnostics}` contract and the two v3-only diagnostics consumers added to the v4
+> site list.
 
 ## 1. Goal
 
@@ -149,39 +155,61 @@ Extend `synthesis` with:
 ```json
 "writeupThemes": "2-3 sentences in a neutral academic register on the overall tone of the reviews and themes shared across reviewers, suitable for a foundation writeup",
 "writeupQuotations": [
-  { "stance": "most_positive" | "middle" | "most_critical", "quote": "verbatim sentence or clause from one reviewer's written answers" }
+  { "questionKey": "<the question key the quote was taken from>", "quote": "verbatim sentence or clause copied exactly from one reviewer's Answer text" }
 ]
 ```
 
-Rules added to the system prompt: one quotation per submitted reviewer; order most positive to
-most critical, using the numeric `overallAssessment` answer values in the digest to break ties;
-quotes verbatim from `Answer text`, no paraphrase, no ellipsis inside a quote; still no names, no
-HTML, no markdown. The code turns `stance` into the house lead-ins ("The most positive reviewer
-said:", "Another reviewer noted:", "The most critical reviewer noted:"), so attribution never
-depends on the model naming anyone.
+Rules added to the system prompt: at most one quotation per reviewer, copied character-for-character
+from an `Answer text` block (no paraphrase, no ellipsis, no stitching), at most about 60 words each;
+themes at most about 120 words; still no names, no HTML, no markdown. The model does **not** rank
+the quotes and carries no `stance` field: ordering and attribution are done server-side (below),
+so nothing about the paragraph depends on the model naming or ranking anyone.
 
-Co-edited set (one commit): prompt `SYSTEM_PROMPT` (including a length instruction: each
-quotation at most about 60 words, themes at most about 120 words); `jsonSchema.properties.synthesis`
+**Quote provenance is enforced at the read boundary, not trusted (Codex AR-1 finding 1).** Neither
+the native JSON schema nor `validateAiJson` can prove a string is a substring of a review
+(`lib/utils/ai-output-schema.js:48-83`). The Reviews read model already holds every submitted
+reviewer's `answers[].answerText` alongside the stored synthesis (`reviewers-service.js:430-441`),
+so `composeWriteupParagraphs` verifies each quotation there: normalise whitespace, straight/curly
+quotes and apostrophes, and case; keep a quote only if it is a substring of exactly one submitted
+reviewer's answer text (preferring the declared `questionKey`, falling back to any answer of that
+reviewer); keep at most one verified quote per reviewer; order the survivors by that reviewer's
+`reviewerOverallAssessment` descending (ties by the roster order); derive the house lead-ins from
+position ("The most positive reviewer said:", "Another reviewer noted:", "The most critical
+reviewer noted:"). Unverified or duplicate quotes are dropped and counted; the tab shows "N
+quotation(s) could not be matched to a review and were omitted" so the editor knows. This keeps
+the digest, the hash, and the write path unchanged: no reviewer ordinal is added to the digest.
+
+Co-edited set (one commit): prompt `SYSTEM_PROMPT` (rules above); `jsonSchema.properties.synthesis`
 gains both fields **and both join `required`** (Anthropic's native grammar then always emits them;
 write-time validation is the only place `required` matters, the read path is `parseReviewSynthesis`);
-`validationSchema` entries `required:false` with defaults `''` / `[]`, caps `writeupThemes` 2,500
-chars and `writeupQuotations` 12 items × 1,200 chars, `stance` as a string enum. **A cap is a
-hard failure, not a truncation**: `validateAiJson` fails on `maxLength` and the Executor throws
+`validationSchema` entries `required:false` with defaults `''` / `[]`, caps `writeupThemes` 2,000
+chars, `writeupQuotations` `maxItems` 25 (parity with the three sibling arrays) × `quote` 600 chars
+(~100 words against the prompt's 60), `questionKey` 100 chars. **A cap is a hard failure, not a
+truncation**: `validateAiJson` fails on `maxLength`/`maxItems` and the Executor throws
 `claude_output_schema_invalid`, which the service does not retry
-(`lib/utils/ai-output-schema.js:65-66`, `execute-prompt.js:908-917`,
-`synthesize-reviews-service.js:297-300`) — hence generous caps plus the prompt instruction.
-`parseReviewSynthesis` (`reviewers-service.js:131-160`, the read trust boundary; strips unknown
-keys, never throws) gains `writeupThemes` (string or `''`) and `writeupQuotations` (objects with
-string `quote`; `stance` allowlisted to `most_positive|middle|most_critical`, anything else →
-`middle`). `review-report.js` `synthesisSection` gains both; `docs/atlas/dataverse-akoya-request.md:83`
-and the wiki section at `docs/agent-wiki/topics/reviewer-workbench-lifecycle.md:1347` record the
+(`ai-output-schema.js:65-66`, `execute-prompt.js:908-917`, `synthesize-reviews-service.js:297-300`)
+— hence caps well above the prompt's asks. Whether Anthropic's grammar itself enforces `maxItems`
+/ `maxLength` is `[ASSUMED]` unknown; verify at build (`lib/services/llm-client.js`) and, if not,
+rely on the prompt asks plus the generous caps. `parseReviewSynthesis` (`reviewers-service.js:131-160`,
+the read trust boundary; strips unknown keys, never throws) gains `writeupThemes` (string or `''`)
+and `writeupQuotations` (objects with string `quote` and string `questionKey`, everything else
+dropped). `review-report.js` `synthesisSection` gains the **verified** quotations and themes (the
+report composer receives the already-verified list); `docs/atlas/dataverse-akoya-request.md:83` and
+the wiki section at `docs/agent-wiki/topics/reviewer-workbench-lifecycle.md:1347` record the
 seven-key shape; `docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md` Phase 4 gets a dated addendum.
 
-Memo size: `wmkf_reviewsynthesisjson` is a 20,000-char memo and the Executor has no total-length
-guard (grep of `execute-prompt.js` for a memo/length check returns nothing); the existing five
-keys' caps already exceed it in the worst case. Realistic outputs are a few thousand characters.
-The new caps above add at most ~17k in theory; this is a pre-existing exposure, noted, not
-widened by design — a total-length guard is out of scope.
+Population and budget (Codex AR-1 finding 2): nothing bounds a request's reviewer count except the
+Dataverse row cap (`reviewer-suggestion.js:1591-1619`), and `reviews_digest` is truncated at 60,000
+chars by the payload boundary (`review-synthesis.js:73-84`, `ai-payload-boundary.js:79-103`), so a
+very large panel may not be fully seen by the model. Both are **pre-existing** properties of the
+synthesis; the new contract tolerates them because a missing or unverifiable quote is dropped, not
+required, and the paragraph simply has fewer quotes. Realistic WMKF panels are three to six
+reviewers. `wmkf_reviewsynthesisjson` is a 20,000-char memo with no total-length guard in the
+Executor (grep of `execute-prompt.js` returns nothing); the five existing keys' caps already exceed
+it in the worst case and the new caps add up to 17,600 more in theory. Decision needed (W7 below):
+accept the unchanged posture (an over-long write fails at Dataverse and surfaces as a failed
+generation, as today) or add a service-side preflight that refuses synthesis above N submitted
+reviews. Recommended: accept; a preflight would also break the existing synthesis for large panels.
 
 Because the hash excludes the prompt, existing syntheses remain `current: true` without the new
 fields. UI rule: when `synthesis` is current but `writeupThemes` is empty, the writeup block shows
@@ -190,17 +218,24 @@ on the existing Regenerate control. Not an error, not a staleness flag. The auto
 not refill them on its own (it only fires on hash change), so pre-existing requests need a manual
 regenerate.
 
-Production reseed of the `review-synthesis.generate` row is an **owner** step, run from the main
-checkout against production only after the merge deploys the reading code:
+**Production publish of the prompt row is an owner step** and the seed script is create-only by
+default: `planSeed` returns `refuse` whenever a row exists and `--force` was not passed
+(`lib/services/prompt-seed.js:58-65`), and a sole-current v3 row is documented in production
+(`docs/atlas/dataverse-akoya-request.md:83`), so a plain `--execute` exits without publishing
+(Codex AR-1 finding 3). Use the force path, which publishes version max+1 and keeps exactly one
+current row, from the main checkout after the merge deploys the reading code:
 
 ```bash
-node scripts/seed-review-synthesis-prompt.js --dry-run
-node scripts/seed-review-synthesis-prompt.js --execute
+node scripts/seed-review-synthesis-prompt.js --dry-run --force
+node scripts/seed-review-synthesis-prompt.js --execute --force
 ```
 
-Order matters the other way from wave10: here the new code tolerates the old row (fields absent →
-empty), and the old code tolerates the new row (`parseReviewSynthesis` strips unknown keys), so
-either order is safe; reseed after deploy is simply cleaner.
+Then confirm one current row at the expected version (the script prints the plan), regenerate one
+live request, and eyeball the paragraphs. The admin Prompt Templates publisher
+(`pages/api/admin/prompts/[name].js`) is the alternative governed path for the text; it cannot
+change the tracked output schema, so the script is the right tool here. Either deploy order is
+safe: new code tolerates the old row (fields absent → empty), old code tolerates the new row
+(`parseReviewSynthesis` strips unknown keys).
 
 ### 4.4 Rendering and copy (Slices 1 and 3)
 
@@ -211,7 +246,8 @@ either order is safe; reseed after deploy is simply cleaner.
   text. The primary action is **Copy**, writing `text/html` (with `<u>`) and `text/plain` via the
   async clipboard API so Word keeps the underlines (`ClipboardItem` with `text/html` is
   `[ASSUMED]` supported in current Chrome, Edge and Safari; the plain-text write is the fallback). The card's staleness is never shown for the
-  deterministic sentences; the Synthesis card's stale banner stays where it is.
+  deterministic sentences; the Synthesis card's stale banner stays where it is. Dropped
+  (unverified/duplicate) quotations surface as a one-line count on the card (§4.3).
 - Word panel-prep export: a "Reviews (writeup)" section using `TextRun({underline:{}})` for name
   runs and plain runs for model strings. Cheap, and the underline survives.
 - PDF: no change. The PDF flattener has no underline support and PDF is not a destination for
@@ -222,9 +258,13 @@ either order is safe; reseed after deploy is simply cleaner.
 Reuse the deterministic sentences to fill `[[STAFF:RefereeSection]]` in the Phase II Pre-Site
 Visit Word draft, following the Institutional Funding History precedent:
 
-- Move `[[STAFF:RefereeSection]]` from `MANUAL_PLACEHOLDERS` to a filled-or-preserved token: filled
-  when the referee text is supplied, otherwise left in place exactly as today (the "lost
-  placeholder" assertion at `docx-renderer.js:429-431` keeps protecting the unfilled case).
+- Token contract: move `[[STAFF:RefereeSection]]` from `MANUAL_PLACEHOLDERS` to a new
+  `CONDITIONAL_PLACEHOLDERS` set with an explicit filled-or-preserved assertion (Codex AR-1 finding
+  4: the existing "lost placeholder" loop iterates only `MANUAL_PLACEHOLDERS`,
+  `docx-renderer.js:429-431`, and the required-token loop covers only AI/DV tokens, `:426-427`, so
+  simply removing it would let an empty replacement erase the token silently). When referee text is
+  absent: assert the token survives exactly once. When supplied: assert replacement count is exactly
+  one and the token is absent afterwards. Both cases tested against the real template.
 - Roster source: generation has no reviewer data today; the seam is `dependencies.loadInputs`
   (`artifact-service.js:77,1083`), and the route already runs under `requireAppAccess('reviewers')`
   inside `withDalContext` (`pages/api/workbench/pre-site-visit.js:70,75`). `getReviewers` is the
@@ -247,23 +287,36 @@ Visit Word draft, following the Institutional Funding History precedent:
   plain form when none). When no review is submitted, leave the token and attach a
   `referee_section_manual` note modelled on `funding_history_manual` (`artifact-service.js:313`),
   cleared on regeneration.
+- Naming rule is an **allowlist**, not a denylist (Codex AR-1 finding 5): a blocker is named as
+  outstanding only when `accepted === true` **and** `reason === 'active_invitation'`
+  (`review-synthesis-readiness.js:118`). Every other unresolved reason — `missing_current_token`,
+  `missing_token_*`, `malformed_*`, `unknown_*` (`:61-110`) — collapses to a counted generic clause
+  ("One invitation is unresolved." / "Two invitations are unresolved.") plus a tab warning. A
+  table-driven unit test enumerates every reason string the readiness module can emit and asserts
+  its bucket, so a new reason fails the test rather than falling into a sentence.
 - Underline: the renderer's underline pass runs **only** on paragraphs containing the Personnel
   tokens (`docx-renderer.js:275-279,303-307`), and `prepareGeneratedCore` warns
   `personnel_name_not_matched` for any roster name absent from a Personnel section
   (`proposal-core-service.js:391`). So reviewer names must **not** join `personnelNames`. Add a
   separate `refereeNames` option and run `underlineTermsInParagraph` on the paragraph that
-  contained `[[STAFF:RefereeSection]]`; count underlines per name for a `referee_name_not_matched`
-  diagnostic (a name containing characters the template splits across runs would otherwise
-  silently render plain).
-- Snapshot v4, following the S467 v3 precedent (commit e40ad309), touches four sites plus the
-  warning map: builder `schemaVersion: 4` (`artifact-service.js:241`) with a `refereeSection`
-  field; `diagnosticsForRow` accepts `[2, 3, 4]` and maps v2/v3 rows to a `referee_section_manual`
-  legacy note the way v2 maps to `funding_history_manual` (`:359,370,393`); `persistedDraft` strict
-  check becomes `!== 4` (`:770`); writer (`:1221`); `WARNING_MESSAGES` gains `referee_section_manual`
-  and the diagnostic renderer (`:411`) a label. Old drafts are unreachable from new generation keys
-  by design (fingerprint changes), so nothing migrates.
-- Content: sentences 1–3 only. Model themes and quotations stay tab-only; the synthesis prompt is
-  tuned for panel prep, not board prose.
+  contained `[[STAFF:RefereeSection]]`, counting underlines per name.
+- Renderer diagnostics contract (Codex AR-1 finding 6): the renderer returns a bare Buffer today
+  (`docx-renderer.js:413-432`) and the artifact service persists the diagnostics envelope **before**
+  rendering (`artifact-service.js:1210-1224`), so an underline count found during rendering has no
+  path to `WARNING_MESSAGES`. Change the renderer to return `{ docx, diagnostics }` and have the
+  artifact service merge render diagnostics into the envelope before the artifact is marked ready
+  (render first, then write the envelope, or write then update — decided at build, with the
+  invariant that a ready artifact's stored diagnostics include the render pass). Add
+  `referee_name_not_matched` to `WARNING_MESSAGES` and the label map.
+- Snapshot v4, following the S467 v3 precedent (commit e40ad309), now **six** sites plus the warning
+  map: builder `schemaVersion: 4` (`artifact-service.js:241`) with a `refereeSection` field;
+  `diagnosticsForRow` accepts `[2, 3, 4]` and maps v2/v3 rows to a `referee_section_manual` legacy
+  note the way v2 maps to `funding_history_manual` (`:359,370,393`); `persistedDraft` strict check
+  becomes `!== 4` (`:770`); writer (`:1221`); and **both** stored-diagnostics consumers that today
+  admit diagnostics only when `schemaVersion === 3` (`:387-389`, `:792-795`) accept `[3, 4]` —
+  otherwise every v4 diagnostic, including the new referee warnings, is discarded on read. Old
+  drafts are unreachable from new generation keys by design (fingerprint changes), so nothing
+  migrates.
 - Regeneration lock is unchanged: a draft already promoted to the Site Visit workspace is not
   touched.
 
@@ -272,7 +325,7 @@ hence the partial fill with an outstanding clause rather than a readiness gate. 
 draft later refreshes the paragraph while the draft is still regenerable; once it is the Site
 Visit workspace the editor updates Word by hand, helped by Copy on the tab.
 
-## 5. Owner decisions (all decided 2026-09-14)
+## 5. Owner decisions (W1–W6 decided 2026-09-14; W7 open)
 
 | # | Decision | Outcome |
 |---|---|---|
@@ -282,6 +335,7 @@ Visit workspace the editor updates Word by hand, helped by Copy on the tab.
 | W4 | Placement and exports | Separate "Writeup paragraphs" card with Copy (rich text) as the primary action; section added to the Word export; no PDF work. |
 | W5 | Expertise source | `wmkf_keywords` / `wmkf_areaofexpertise` (enrichment-derived, unedited by staff) is acceptable; the human editor verifies. |
 | W6 | Template the Pre-Site Visit `[[STAFF:RefereeSection]]` from the same sentences | Yes, as Slice 4, deterministic sentences only, filled from the reviews in hand at generation plus an "outstanding" sentence naming reviewers still to report. |
+| W7 | Synthesis memo/population budget (§4.3): accept the unchanged fail-at-write posture, or add a service preflight refusing synthesis above N submitted reviews | **Open.** Recommended: accept; a preflight would also break the existing panel-prep synthesis for large panels, and realistic panels are 3–6 reviewers. |
 
 ## 6. Slices, tiers, verification `[PROPOSED]`
 
@@ -303,7 +357,10 @@ rank / institution / expertise fields so the fallback rate is known.
 **Slice 2 — model fields.** Files listed in §4.3. Tests: extend
 `review-synthesis-prompt-config.test.js` (still one variable, one output; new properties present
 with caps), `synthesize-reviews-service.test.js` (old row without fields parses to defaults),
-`reviews-tab.test.js` (regenerate hint state). Gates: `check:prompt-injection-tagging`,
+`reviews-tab.test.js` (regenerate hint state, dropped-quote count), and new provenance tests in
+`review-writeup-paragraphs.test.js`: a paraphrased quote is dropped, a curly-quote/whitespace
+variant of a real sentence is kept, two quotes from one reviewer keep one, ordering follows the
+rating not the model's order, a quote matching two reviewers is dropped. Gates: `check:prompt-injection-tagging`,
 `check:fact-consistency`, `check:atlas`, `check:agent-wiki`, `check:doc-currency`. Owner reseeds
 production after deploy (§4.3) and regenerates one live request to eyeball the paragraphs.
 
@@ -312,12 +369,14 @@ production after deploy (§4.3) and regenerates one live request to eyeball the 
 
 **Slice 4 — Pre-Site Visit `[[STAFF:RefereeSection]]` fill (§4.5).** Files:
 `lib/services/pre-site-visit/docx-renderer.js` (token class change), `artifact-service.js`
-(compose from the loaded roster, snapshot v4 at the four sites, `referee_section_manual` note and
+(compose from the loaded roster, snapshot v4 at the six sites, renderer `{docx, diagnostics}` contract, `referee_section_manual` note and
 label), `reviewers-service.js` (new request-scoped `getWriteupRoster`), and
 `loadPreSiteVisitInputs` (roster wired in). Tests: `pre-site-visit-docx-renderer.test.js`
 (filled and preserved cases; reviewer names underlined in the referee paragraph and NOT in
 Personnel sections; no `personnel_name_not_matched` for reviewer names), artifact-service
-snapshot/fingerprint tests (v2/v3 legacy note, v4 strict claim check),
+snapshot/fingerprint tests (v2/v3 legacy note, v4 strict claim check, v4 diagnostics admitted by
+both consumers, `referee_name_not_matched` survives persistence and renders as a warning),
+table-driven readiness-reason bucket test, token filled-or-preserved assertion in both cases,
 partial fill with outstanding clause, zero-submitted manual note. Gates: `check:types`, `check:atlas` (Pre-Site Visit artifact page),
 `check:request-document-writers` if the artifact writer boundary is touched.
 
@@ -344,7 +403,9 @@ partial fill with outstanding clause, zero-submitted manual note. Gates: `check:
   expand/rollback). The tab already accepts this tradeoff; a value with no label is skipped from
   the tally and surfaced as a tab warning rather than turned into a word.
 - **Quotations are reviewer-authored text echoed back and persisted.** They stay inside the
-  A7-wrapped path on the way in and are rendered as escaped plain text everywhere on the way out.
+  A7-wrapped path on the way in, are verified as substrings of a real answer at the read boundary
+  (§4.3), and are rendered as escaped plain text everywhere on the way out. A quote the model
+  invents never reaches the paragraph; it is counted as dropped.
   Verbatim quoting raises the chance of a reviewer recognising their own words if the writeup ever
   leaves the Foundation; that is the current practice with the standalone app and is unchanged.
 - **Schema caps fail the run.** `maxLength` is a hard validation failure, not a truncation, and it
