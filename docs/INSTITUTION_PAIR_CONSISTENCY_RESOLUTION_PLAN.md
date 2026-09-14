@@ -548,6 +548,15 @@ stored verdict and user-facing remedy.
 
 #### Stage 3 execution sequence
 
+**June–August cohort probe (2026-09-14):** a read-only census found 953
+retained Find-roster rows, 106 currently mismatch-flagged, but no historical
+staff-action count or source-complete typed selection inputs. An exploratory
+stored-text ROR probe is non-authoritative and cannot label auto-clear cases.
+The [baseline audit](audits/institution-affiliation-last-cycle-baseline-2026-09-14.md)
+records denominators and the missing measurements. Execution step 1 remains
+open; do not interpret 106 as avoidable reviews or proceed to a live selection
+authority flip on this evidence.
+
 1. **Measure and label the work being removed.** Establish an organic baseline
    of institution-driven holds and staff actions per case. Add a blind,
    independently adjudicated held-out slice of departmental/constituent-school,
