@@ -95,3 +95,16 @@ test('Launch posts exactly this request with an idempotency key, then reloads; a
   expect(typeof posted.idempotencyKey).toBe('string');
   expect(global.fetch).toHaveBeenCalledTimes(3); // load, POST, reload
 });
+
+test('Stop on a run spanning several requests is labelled "Stop run" and confirms with the count; a single-request run stops without a prompt', async () => {
+  const mine = { profileId: 1, name: 'Me', isMine: true };
+  global.fetch.mockResolvedValue(ok(body({ activeRunId: 'r1', launchable: { ok: false, reason: 'busy' }, runs: [
+    run({ id: 'r1', status: 'running', owner: mine, requestCount: 3, entries: [entry({ id: 'e1', status: 'running', hasReport: false })] }),
+  ] })));
+  const confirmSpy = jest.spyOn(window, 'confirm').mockReturnValue(false);
+  render(<ReviewPanelTab requestId={REQ} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Stop run' }));
+  expect(confirmSpy).toHaveBeenCalledWith(expect.stringMatching(/covers 3 requests/));
+  expect(global.fetch).toHaveBeenCalledTimes(1); // declined: no POST
+  confirmSpy.mockRestore();
+});

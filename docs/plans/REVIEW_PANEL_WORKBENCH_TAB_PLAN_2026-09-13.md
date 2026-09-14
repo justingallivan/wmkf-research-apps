@@ -2,7 +2,7 @@
 title: Review Panel Workbench Tab Plan (2026-09-13)
 domain: virtual-review-panel
 kind: plan
-status: in-progress
+status: built
 summary: "Move the Review Panel beyond smoke by mounting it as a per-request Request Workbench tab (between Reviews and Staff Deliberations) gated by the admin-panel `review-panel` app grant. Records the owner's 2026-09-13 decisions: app-access actor gate, a fail-closed `access` rollout mode replacing the env allowlist, shared per-request visibility, and the standalone page kept."
 cataloged: 2026-09-13
 owner: product-engineering
@@ -27,7 +27,7 @@ related:
 
 Standing decisions D1–D11 (Phase A plan §1) and the brief §4 delegated decisions are unchanged. D6 still forbids a "typical cost" figure; the tab shows the reservation bound only.
 
-## 2. Build slices (one feature branch, one PR — Tier 2 runtime work)
+## 2. Build slices (built 2026-09-13 on `feature/review-panel-workbench-tab`, PR #291 — Tier 2 runtime work, owner merges deliberately)
 
 1. **Rollout gate** (`lib/services/review-panel-rollout.js`): accept `access`; `assertReviewPanelCohortConfigured` returns `null` in `access` mode without reading the allowlist; `assertReviewPanelRequestAllowed` passes in `access` mode. Tests in `tests/unit/review-panel-rollout.test.js`.
 2. **Actor gate** (`lib/services/review-panel-store.js`): split in two, per the contract-reconcile pass. `assertReviewPanelActor` becomes the Postgres-only "active profile" check and stays inside the store's `FOR UPDATE` transactions (`mutateReviewPanelRun`, retry, re-render, cancel), which must never hold a row lock across a Dataverse call. New `assertReviewPanelAccess(profileId)` = active profile AND (superuser role OR `listAppKeysForUser(profileId, { throwOnError: true })` includes `review-panel`), failing closed on a lookup error; called at the four service entry points and at the worker's claim-time and pre-paid-dispatch checks (`review-panel-worker.js:51`, `:702`), which run inside the cron's `withDalContext` so the Dataverse read is permitted. Worker `OWNER_LOST_MESSAGE` copy updated with its two test regexes. Tests in `review-panel-store.test.js`, `review-panel-service.test.js`, and `review-panel-worker.test.js`.
@@ -42,6 +42,13 @@ Standing decisions D1–D11 (Phase A plan §1) and the brief §4 delegated decis
 ## 3. Gates
 
 `check:api-routes`, `check:route-lifecycle-auth`, `check:trust-boundary-guid`, `check:model-override-warming`, `check:route-service-boundary`, `check:status-enum-parity`, `check:atlas`, `check:fact-consistency`, `check:doc-symbol-refs`, `check:agent-wiki`, `check:types`, and the review-panel and workbench unit suites.
+
+## 3b. Residual risks accepted at build
+
+- The active-run launch guard is a soft check (no fence): two users launching the same request within the same second both pass it. Same-user replay is covered by the idempotency key.
+- `getReviewPanelForRequest` reloads the server-scoped roster on every 4 s poll while a run is active — the same posture as the standalone page.
+- Stop is run-scoped; the tab labels it "Stop run" and confirms with the request count when the run spans more than this request.
+- Browser visual check of the tab not performed before PR; owner's signed-in smoke covers it.
 
 ## 4. Rollout
 

@@ -553,8 +553,10 @@ describe('getReviewPanelForRequest — per-request Workbench tab read (T3 shared
     expect(theirs.owner).toEqual({ profileId: OTHER_OWNER, name: 'Pat', isMine: false });
     expect(theirs.entries.map((e) => e.id)).toEqual([ENTRY_THEIRS]); // REQ_B's entry never leaks into REQ_A's tab
     expect(theirs.failures).toEqual([]); // REQ_B's launch failure filtered out too
+    expect(theirs.requestCount).toBe(2); // the WHOLE run spans REQ_A and REQ_B — Stop scope
     const mine = result.runs[1];
     expect(mine.owner.isMine).toBe(true);
+    expect(mine.requestCount).toBe(1);
     expect(mine.pending).toBe(true); // queued, no entry row yet, parked in pendingEntries
     // The pending run counts as active: Launch is blocked with the server's own copy.
     expect(result.activeRunId).toBe(RUN_MINE);

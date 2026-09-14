@@ -73,7 +73,7 @@ function RunRow({ run, nowMs, actionLoading, rerenderErrors, onRerender, onRetry
             )}
             {canStop && (
               <Button size="sm" variant="outline" onClick={() => onStop(run)} disabled={Boolean(actionLoading)} loading={actionLoading === `stop:${run.id}`}>
-                Stop
+                {run.requestCount > 1 ? 'Stop run' : 'Stop'}
               </Button>
             )}
           </div>
@@ -161,8 +161,9 @@ export default function ReviewPanelTab({ requestId }) {
   // Poll while this request has an unsettled run — same stale-generation guard
   // as pages/review-panel.js: a poll response that lands after a user action
   // (which bumps requestSeq via load()) is discarded.
+  const activeRunId = data?.activeRunId || null;
   useEffect(() => {
-    if (!activeRun) return undefined;
+    if (!activeRunId) return undefined;
     let cancelled = false;
     const poll = async () => {
       const generation = requestSeq.current;
@@ -175,7 +176,7 @@ export default function ReviewPanelTab({ requestId }) {
     };
     const timer = window.setInterval(poll, POLL_MS);
     return () => { cancelled = true; window.clearInterval(timer); };
-  }, [activeRun, endpoint]);
+  }, [activeRunId, endpoint]);
 
   const runAction = async (body) => readResponse(await fetch('/api/review-panel', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
@@ -221,7 +222,13 @@ export default function ReviewPanelTab({ requestId }) {
     }
   };
 
+  // Stop is RUN-scoped on the server (requestReviewPanelCancel): a run launched
+  // from the standalone page can span several requests, and this tab only shows
+  // this request's entry. Name the scope before doing something that affects
+  // work the user cannot see here.
   const stop = async (run) => {
+    if (run.requestCount > 1 && typeof window !== 'undefined'
+      && !window.confirm(`Stop this run? It covers ${run.requestCount} requests, not just this one; every request still in progress in it will be stopped.`)) return;
     setActionLoading(`stop:${run.id}`);
     setRunError(run.id, null);
     try {
