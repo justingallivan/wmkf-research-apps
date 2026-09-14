@@ -135,10 +135,13 @@ its name.
 
 With `oneOff`, the entry stores the name and affiliation on the row itself.
 
-**One write primitive (Codex AR-2 finding 4):** every insert or author change, whether it comes
-from the slice 1 mutate route or from slice 2 finalize step 7, goes through one service function,
-`writeFeedbackEntry`, which enforces eligibility, request ownership, the content constraint, and
-the mutation-id replay in a single statement. Finalize never inserts directly. Finalize-route tests
+**One eligibility path (Codex AR-2 finding 4; shape as built 2026-09-14):** every insert goes
+through `writeFeedbackEntry` and every author change through `updateFeedbackEntry`; both call the
+same `assertConsultantEligible` and `validateAuthorInput` helpers inside their own same-client
+transaction, and eligibility runs only when the submitted author differs from the stored one.
+Slice 2 finalize step 7 inserts attachment-only rows through `writeFeedbackEntry` and binds
+`requestdocument_id` on existing rows through `updateFeedbackEntry`; finalize never writes the
+table directly. Finalize-route tests
 submit Board, inactive, missing, and stale roster ids and assert rejection with no registry bind. **No `expertise_roster`
 write happens anywhere in this feature** (CF6): a one-off never appears in the site-visit
 recipient directory or curated-recipient pickers, and the `expertise-finder`-owned roster stays
@@ -147,8 +150,10 @@ through the Expertise Finder and edit the entry to select the roster row.
 
 ### 3.3 Briefing page section [PLANNED]
 
-- New card section "Consultant feedback" (CF4), placed after Reviews and before Proposal, in the
-  same card style as the existing sections. Rendered only when at least one shared entry exists;
+- New card section "Consultant feedback" (CF4), placed immediately after Reviews, which is the
+  page's last section (Proposal renders before Reviews, so "between Reviews and Proposal" was
+  unsatisfiable; corrected at build time 2026-09-14), in the same card style as the existing
+  sections. Rendered only when at least one shared entry exists;
   otherwise omitted (no placeholder, unlike the staff brief).
 - Each item: consultant name and affiliation (CF3), received date, sanitized body, and, when an
   attachment exists, one link labeled with the filename. PDF opens inline in a new tab; other
@@ -304,7 +309,7 @@ slice 2 needs a migration that re-adds the constraint with the new value.
 | 4 load + scan | read exact object, verify etag/hash, virus scan when enabled | Blob etag/hash under the lease | `rejectPortalUpload`, 4xx to client, no Graph call |
 | 5 Graph upload | SharePoint | `recordPortalUploadCandidate({driveId, itemId, contentHash})` **before** step 6 | retry re-uses the candidate; `discardPortalUploadCandidate` removes an orphan when the request is abandoned |
 | 6 registry create | Dataverse `wmkf_requestdocument` with the generation key | registry row id; `findByGenerationKey` makes a retry a no-op | candidate persisted, so a retry does not re-upload |
-| 7 feedback bind | PG `consultant_feedback` insert (attachment-only) or update (`requestdocument_id`) through `writeFeedbackEntry`, **inside one explicit same-client Postgres transaction** (`BEGIN` → `SELECT … FOR UPDATE` on the target entry → conditional bind or status decision → `COMMIT`; a bare `FOR UPDATE` under autocommit releases at statement end and protects nothing, Codex AR-3). Loser-side Dataverse/Graph cleanup runs only after the transaction has committed or rolled back. The lock serializes two finalizes on one entry and a finalize against a delete: the loser sees a `requestdocument_id` already set or `status = 'deleting'`, marks its own registry row `Superseded`, calls `discardPortalUploadCandidate` on its Graph item, and returns 409 `attachment_conflict`. | entry | if this fails the registry row is Ready but unbound; a retry with the same staging id finds the row by generation key and only performs step 7 |
+| 7 feedback bind | PG `consultant_feedback` insert (attachment-only, via `writeFeedbackEntry`) or `requestdocument_id` bind on an existing entry (via `updateFeedbackEntry`), **inside one explicit same-client Postgres transaction** (`BEGIN` → `SELECT … FOR UPDATE` on the target entry → conditional bind or status decision → `COMMIT`; a bare `FOR UPDATE` under autocommit releases at statement end and protects nothing, Codex AR-3). Loser-side Dataverse/Graph cleanup runs only after the transaction has committed or rolled back. The lock serializes two finalizes on one entry and a finalize against a delete: the loser sees a `requestdocument_id` already set or `status = 'deleting'`, marks its own registry row `Superseded`, calls `discardPortalUploadCandidate` on its Graph item, and returns 409 `attachment_conflict`. | entry | if this fails the registry row is Ready but unbound; a retry with the same staging id finds the row by generation key and only performs step 7 |
 | 8 complete | staging row `consumed` with `result_payload = {requestdocumentId, feedbackId}`; staged bytes reaped later | terminal response durable | a lost response is answered from `result_payload` on replay |
 
 Crash-point tests: fail after 5, after 6, after 7; replay the same staging id and assert exactly
@@ -474,7 +479,7 @@ lighter one was chosen and the reasoning is stated.
 | Expired staging rows never discard a recorded SharePoint candidate; orphaned file after a crash post-Graph-upload | high | **Accepted as a shared-service prerequisite** (§4). Verified in source. Fix belongs in `cleanupExpiredPortalUploads` and benefits the two existing scopes; landed separately before slice 2. |
 | Two finalizes with distinct staging ids, or finalize vs delete, race on one entry | high | **Accepted with a row lock.** `FOR UPDATE` on the entry during step 7 and during delete step 1; the loser supersedes its own registry row and discards its Graph item (§4 step 7). Concurrency tests added. Chosen over an attachment-version CAS because the lock is one line and the write rate is human. |
 | Supersede-first delete can stay half-done with no durable intent | high | **Accepted with a `deleting` status, not an outbox job** (§3.6). Intent is durable in the row, readers hide it immediately, and the tab's list route finishes any pending delete on the next load. Same guarantee (eventual completion, never externally visible half-state) without a job runner; CF5 preserved since the row disappears on completion. |
-| Finalize inserts attachment-only rows outside the eligibility check | high | **Accepted.** One `writeFeedbackEntry` primitive for every insert/author change; finalize calls it; forged-id tests through finalize (§3.2). |
+| Finalize inserts attachment-only rows outside the eligibility check | high | **Accepted.** One eligibility path for every insert/author change; finalize calls the service, never the table (§3.2). *Superseded by §3.2 as built: two functions, `writeFeedbackEntry` + `updateFeedbackEntry`, sharing the eligibility helpers.* |
 | Slice 1 create not idempotent on lost response | medium | **Accepted.** `mutation_id` column, unique per request, `ON CONFLICT DO NOTHING` + replay (§3.1, §4). |
 
 ### Codex adversarial review 3 (2026-09-14, gpt-5.6-sol, agree-or-push-back on the AR-2 dispositions)
@@ -485,11 +490,12 @@ lighter one was chosen and the reasoning is stated.
 | (b) `deleting` status + sweep instead of outbox | **AGREE** | unchanged |
 | (c) orphan cleanup in the shared staging service | PUSH BACK: one generation-key lookup cannot serve every scope; unbound Ready registry row must be Superseded before the file is discarded | **Accepted**; scope-specific fail-closed reconciliation and Superseded-before-discard written into §4 |
 | (d) `mutation_id` + `ON CONFLICT` | PUSH BACK: only works if the client keeps one id across ambiguous retries | **Accepted**; allocation/retention/rotation lifecycle and a lost-response test written into §3.1 |
-| (e) one `writeFeedbackEntry` primitive | **AGREE** | unchanged |
+| (e) one `writeFeedbackEntry` primitive | **AGREE** | unchanged in intent; *as built (§3.2) the guarantee is one shared eligibility path across `writeFeedbackEntry` and `updateFeedbackEntry`* |
 
 No new mechanism was requested; every pushback was a precision gap in how a chosen remedy was
 specified. Review loop closed at three passes.
 
 **Verdict (pass 4, after folding AR-3): READY TO IMPLEMENT (slice 1)** with `mutation_id`
-(client lifecycle defined), `status`, and the single write primitive. Slice 2 blocked on CF7, the finding 10 read-side sweep,
+(client lifecycle defined), `status`, and one shared eligibility path (*as built: two write
+functions, see §3.2*). Slice 2 blocked on CF7, the finding 10 read-side sweep,
 and the staging-service cleanup prerequisite.

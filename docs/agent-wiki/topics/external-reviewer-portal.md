@@ -507,6 +507,14 @@ reissue = revoke-and-replace) and everything is inert until the owner sets
 `DELIBERATION_BRIEFING_SCHEMA_READY=on` after applying migration 038. Same route order as
 the other external routes: method → rate-limit → verify → record outcome → shape.
 
+**Consultant feedback card (slice 1, 2026-09-14):** the context adds
+`consultantFeedback: { status: 'ok' | 'unavailable', items }` from
+`lib/services/consultant-feedback-service.js`'s
+`loadSharedConsultantFeedbackForBriefing`; the page omits the section on
+`ok` + zero items, shows a "could not be loaded" notice on `unavailable`, and
+otherwise lists shared entries. See
+`docs/plans/CONSULTANT_FEEDBACK_PLAN_2026-09-14.md` §3.3.
+
 ## Durable Memory
 
 - File access and SharePoint: `project-external-reviewer-file-access`, `project-sharepoint-integration`.
