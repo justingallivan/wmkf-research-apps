@@ -702,3 +702,14 @@ describe('assertReviewPanelActor / assertReviewPanelAccess — T1 app-grant gate
     await expect(assertReviewPanelAccess(7, { listAppKeys: failing })).rejects.toMatchObject({ httpStatus: 503, interrupted: true });
   });
 });
+
+test('listReviewPanelRunsForRequest reads across ALL owners (no owner parameter) and matches parked pendingEntries by JSONB containment', async () => {
+  const { listReviewPanelRunsForRequest } = require('../../lib/services/review-panel-store');
+  sql.query.mockResolvedValueOnce({ rows: [{ id: 'run-1' }] });
+  await expect(listReviewPanelRunsForRequest('req-a')).resolves.toEqual([{ id: 'run-1' }]);
+  const [text, params] = sql.query.mock.calls[0];
+  expect(text).not.toMatch(/owner_profile_id\s*=/);
+  expect(text).toMatch(/pendingEntries' @> \$2::jsonb/);
+  expect(text).toMatch(/LIMIT 20/);
+  expect(params).toEqual(['req-a', JSON.stringify([{ requestId: 'req-a' }])]);
+});

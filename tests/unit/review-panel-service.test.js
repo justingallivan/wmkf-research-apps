@@ -40,6 +40,7 @@ jest.mock('../../lib/services/review-panel-store', () => ({
   createReviewPanel: jest.fn(),
   saveReviewPanelSelection: jest.fn(),
   listReviewPanelRuns: jest.fn(),
+  listReviewPanelRunsForRequest: jest.fn(async () => []),
   readReviewPanelControl: jest.fn(),
   listReviewPanelEntries: jest.fn(async () => []),
   listEntryAttempts: jest.fn(async () => []),
@@ -59,7 +60,7 @@ const { readReviewPanelFile, assertReviewPanelStorageConfigured } = require('../
 const rollout = require('../../lib/services/review-panel-rollout');
 const store = require('../../lib/services/review-panel-store');
 const {
-  getReviewPanelPage, launchReviewPanel, controlReviewPanel, downloadReviewPanel, projectReviewPanelRun, reviewPanelAction,
+  getReviewPanelPage, getReviewPanelForRequest, launchReviewPanel, controlReviewPanel, downloadReviewPanel, projectReviewPanelRun, reviewPanelAction,
 } = require('../../lib/services/review-panel-service');
 
 const OWNER = 7;
@@ -81,6 +82,7 @@ beforeEach(() => {
   store.assertReviewPanelAccess.mockResolvedValue({ profileId: OWNER });
   store.createReviewPanel.mockResolvedValue({ id: 'panel-1', selection: [] });
   store.listReviewPanelRuns.mockResolvedValue([]);
+  store.listReviewPanelRunsForRequest.mockResolvedValue([]);
   store.readReviewPanelControl.mockResolvedValue(null);
   store.listReviewPanelEntries.mockResolvedValue([]);
   store.listEntryAttempts.mockResolvedValue([]);
@@ -521,5 +523,78 @@ describe('downloadReviewPanel', () => {
   test('404s when the entry itself does not exist', async () => {
     store.readReviewPanelEntry.mockResolvedValue(null);
     await expect(downloadReviewPanel(OWNER, { entryId: ENTRY_ID, format: 'docx' })).rejects.toMatchObject({ httpStatus: 404 });
+  });
+});
+
+describe('getReviewPanelForRequest — per-request Workbench tab read (T3 shared visibility)', () => {
+  const OTHER_OWNER = 9;
+  const RUN_MINE = '66666666-6666-4666-8666-666666666666';
+  const RUN_THEIRS = '77777777-7777-4777-8777-777777777777';
+  const ENTRY_THEIRS = '88888888-8888-4888-8888-888888888888';
+
+  test('rejects a non-GUID request id before any store read', async () => {
+    await expect(getReviewPanelForRequest(OWNER, "x' or 1=1")).rejects.toMatchObject({ httpStatus: 400 });
+    expect(store.listReviewPanelRunsForRequest).not.toHaveBeenCalled();
+  });
+
+  test('returns every owner\'s runs for the request, marks the viewer\'s own, and projects ONLY this request\'s entries', async () => {
+    store.listReviewPanelRunsForRequest.mockResolvedValue([
+      { id: RUN_THEIRS, status: 'completed', created_at: '2026-09-13T01:00:00Z', owner_profile_id: OTHER_OWNER, owner_name: 'Pat', data: { failures: [{ requestId: REQ_B, error: 'x' }] } },
+      { id: RUN_MINE, status: 'queued', created_at: '2026-09-13T02:00:00Z', owner_profile_id: OWNER, owner_name: 'Me', data: { pendingEntries: [{ requestId: REQ_A }] } },
+    ]);
+    store.listReviewPanelEntries.mockImplementation(async (runId) => runId === RUN_THEIRS
+      ? [{ id: ENTRY_THEIRS, run_id: RUN_THEIRS, request_id: REQ_A, status: 'completed', request_revision: 1, data: { files: { docx: {}, pdf: {} } } },
+         { id: ENTRY_ID, run_id: RUN_THEIRS, request_id: REQ_B, status: 'completed', request_revision: 1, data: {} }]
+      : []);
+    const result = await getReviewPanelForRequest(OWNER, REQ_A.toUpperCase());
+    expect(result.request).toMatchObject({ requestId: REQ_A, requestNumber: 'R-1', inRoster: true });
+    expect(result.runs.map((r) => r.id)).toEqual([RUN_THEIRS, RUN_MINE]);
+    const theirs = result.runs[0];
+    expect(theirs.owner).toEqual({ profileId: OTHER_OWNER, name: 'Pat', isMine: false });
+    expect(theirs.entries.map((e) => e.id)).toEqual([ENTRY_THEIRS]); // REQ_B's entry never leaks into REQ_A's tab
+    expect(theirs.failures).toEqual([]); // REQ_B's launch failure filtered out too
+    const mine = result.runs[1];
+    expect(mine.owner.isMine).toBe(true);
+    expect(mine.pending).toBe(true); // queued, no entry row yet, parked in pendingEntries
+    // The pending run counts as active: Launch is blocked with the server's own copy.
+    expect(result.activeRunId).toBe(RUN_MINE);
+    expect(result.launchable).toEqual({ ok: false, reason: expect.stringMatching(/already running for request #R-1/) });
+  });
+
+  test('a request outside the roster is readable but not launchable', async () => {
+    requests.queryAllRequests.mockResolvedValue({ capped: false, records: [rosterRecord(REQ_B, 'R-2')] });
+    const result = await getReviewPanelForRequest(OWNER, REQ_A);
+    expect(result.request).toEqual({ requestId: REQ_A, inRoster: false });
+    expect(result.launchable).toEqual({ ok: false, reason: 'This request is outside the review panel roster.' });
+  });
+
+  test('launchable is ok with no active run, a roster hit, ready configuration, and a configured store', async () => {
+    const result = await getReviewPanelForRequest(OWNER, REQ_A);
+    expect(result.launchable).toEqual({ ok: true, reason: null });
+    expect(result.activeRunId).toBeNull();
+  });
+
+  test('a settled run with completed entries does not block a new launch (re-runs are allowed once settled)', async () => {
+    store.listReviewPanelRunsForRequest.mockResolvedValue([{ id: RUN_THEIRS, status: 'completed', created_at: 'x', owner_profile_id: OTHER_OWNER, data: {} }]);
+    store.listReviewPanelEntries.mockResolvedValue([{ id: ENTRY_THEIRS, run_id: RUN_THEIRS, request_id: REQ_A, status: 'completed', request_revision: 1, data: {} }]);
+    const result = await getReviewPanelForRequest(OWNER, REQ_A);
+    expect(result.launchable.ok).toBe(true);
+  });
+});
+
+describe('launchReviewPanel — active-run guard (mirrored by the tab\'s launchable)', () => {
+  test('refuses (409) a second paid run for a request another owner is still running, AFTER the idempotent replay check', async () => {
+    store.listReviewPanelRunsForRequest.mockResolvedValue([{ id: RUN_ID, status: 'running', owner_profile_id: 9, data: {} }]);
+    store.listReviewPanelEntries.mockResolvedValue([{ id: ENTRY_ID, run_id: RUN_ID, request_id: REQ_A, status: 'running', data: {} }]);
+    await expect(launchReviewPanel(OWNER, { selectedRequestIds: [REQ_A], idempotencyKey: LAUNCH_KEY })).rejects.toMatchObject({ httpStatus: 409 });
+    expect(store.createReviewPanelRun).not.toHaveBeenCalled();
+  });
+
+  test('a replayed idempotency key returns the existing run even when that run is the one still running', async () => {
+    store.findReviewPanelLaunch.mockResolvedValue({ id: RUN_ID, status: 'running', created_at: 'x', data: {} });
+    store.listReviewPanelRunsForRequest.mockResolvedValue([{ id: RUN_ID, status: 'running', owner_profile_id: OWNER, data: { pendingEntries: [{ requestId: REQ_A }] } }]);
+    const result = await launchReviewPanel(OWNER, { selectedRequestIds: [REQ_A], idempotencyKey: LAUNCH_KEY });
+    expect(result.run.id).toBe(RUN_ID);
+    expect(store.createReviewPanelRun).not.toHaveBeenCalled();
   });
 });

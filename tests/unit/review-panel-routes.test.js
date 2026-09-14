@@ -11,6 +11,7 @@ jest.mock('../../lib/services/model-override-loader', () => ({
 }));
 jest.mock('../../lib/services/review-panel-service', () => ({
   getReviewPanelPage: jest.fn(),
+  getReviewPanelForRequest: jest.fn(),
   reviewPanelAction: jest.fn(),
   downloadReviewPanel: jest.fn(),
 }));
@@ -18,7 +19,7 @@ jest.mock('../../lib/services/review-panel-service', () => ({
 import { requireAppAccess } from '../../lib/utils/auth';
 import { withDalContext } from '../../lib/dataverse/core/context';
 import { loadModelOverrides } from '../../lib/services/model-override-loader';
-import { getReviewPanelPage, reviewPanelAction, downloadReviewPanel } from '../../lib/services/review-panel-service';
+import { getReviewPanelPage, getReviewPanelForRequest, reviewPanelAction, downloadReviewPanel } from '../../lib/services/review-panel-service';
 import pageHandler from '../../pages/api/review-panel/index';
 import downloadHandler from '../../pages/api/review-panel/download';
 
@@ -140,5 +141,32 @@ describe('/api/review-panel/download', () => {
     await downloadHandler({ method: 'GET', query: { entryId: 'entry-1', format: 'docx' } }, errorRes);
     expect(errorRes.statusCode).toBe(404);
     expect(errorRes.body).toEqual({ error: 'Entry not found.' });
+  });
+});
+
+describe('/api/review-panel GET ?requestId= — per-request Workbench tab read', () => {
+  test('dispatches to getReviewPanelForRequest with the caller\'s profile and the raw query string (the service validates the GUID)', async () => {
+    getReviewPanelForRequest.mockResolvedValue({ request: { requestId: 'r' }, runs: [], launchable: { ok: true, reason: null } });
+    const res = response();
+    await pageHandler({ method: 'GET', query: { requestId: '11111111-1111-4111-8111-111111111111' }, body: {} }, res);
+    expect(getReviewPanelForRequest).toHaveBeenCalledWith(7, '11111111-1111-4111-8111-111111111111');
+    expect(getReviewPanelPage).not.toHaveBeenCalled();
+    expect(res.body.launchable).toEqual({ ok: true, reason: null });
+    expect(res.headers['Cache-Control']).toBe('private, no-store');
+  });
+
+  test('an array-valued requestId (?requestId=a&requestId=b) is not treated as a request id — falls back to the page read', async () => {
+    const res = response();
+    await pageHandler({ method: 'GET', query: { requestId: ['a', 'b'] }, body: {} }, res);
+    expect(getReviewPanelForRequest).not.toHaveBeenCalled();
+    expect(getReviewPanelPage).toHaveBeenCalledWith(7);
+  });
+
+  test('a service 400 (bad GUID) is returned as-is', async () => {
+    getReviewPanelForRequest.mockRejectedValue(Object.assign(new Error('Invalid request.'), { httpStatus: 400 }));
+    const res = response();
+    await pageHandler({ method: 'GET', query: { requestId: 'nope' }, body: {} }, res);
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toEqual({ error: 'Invalid request.' });
   });
 });
