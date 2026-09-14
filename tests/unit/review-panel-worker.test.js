@@ -86,7 +86,7 @@ beforeEach(() => {
   store.claimReviewPanelRun.mockResolvedValue(RUN);
   store.releaseReviewPanelRun.mockResolvedValue(undefined);
   store.listRetryRequestedEntries.mockResolvedValue([]);
-  store.assertReviewPanelActor.mockResolvedValue({ profileId: RUN.owner_profile_id });
+  store.assertReviewPanelAccess.mockResolvedValue({ profileId: RUN.owner_profile_id });
   store.stopRevokedReviewPanelRun.mockResolvedValue(undefined);
   assertReviewPanelStorageConfigured.mockImplementation(() => {});
   seatSetup();
@@ -594,22 +594,22 @@ describe('describeEntryFailure', () => {
 
 describe('the run owner is re-asserted at claim time and again immediately before every paid dispatch', () => {
   test('owner demoted between claim and dispatch: runSeat is never called, and the run is marked failed with plain copy — no dispatch happens', async () => {
-    store.assertReviewPanelActor.mockRejectedValue(Object.assign(new Error('An active superuser profile is required.'), { httpStatus: 403 }));
+    store.assertReviewPanelAccess.mockRejectedValue(Object.assign(new Error('An active profile with Review Panel access is required.'), { httpStatus: 403 }));
     store.listReviewPanelEntries.mockResolvedValue([entryState]);
     const result = await drainReviewPanels();
     expect(result).toEqual({ claimed: 1, ownerRevoked: true });
     expect(runSeat).not.toHaveBeenCalled();
     expect(runChair).not.toHaveBeenCalled();
-    expect(store.stopRevokedReviewPanelRun).toHaveBeenCalledWith('run-1', 'lease-1', expect.stringMatching(/no longer has superuser access/i));
+    expect(store.stopRevokedReviewPanelRun).toHaveBeenCalledWith('run-1', 'lease-1', expect.stringMatching(/no longer has Review Panel access/i));
     expect(store.releaseReviewPanelRun).toHaveBeenCalled(); // still released, unconditionally, in `finally`
   });
 
   test('owner still valid at claim but demoted before the first seat dispatch: runSeat is never called for that seat, the run fails', async () => {
     let calls = 0;
-    store.assertReviewPanelActor.mockImplementation(async () => {
+    store.assertReviewPanelAccess.mockImplementation(async () => {
       calls += 1;
       if (calls === 1) return { profileId: RUN.owner_profile_id }; // the claim-time check passes
-      throw Object.assign(new Error('An active superuser profile is required.'), { httpStatus: 403 }); // dispatch-time check fails
+      throw Object.assign(new Error('An active profile with Review Panel access is required.'), { httpStatus: 403 }); // dispatch-time check fails
     });
     store.listReviewPanelEntries.mockResolvedValue([entryState]);
     const result = await drainReviewPanels();
@@ -663,10 +663,10 @@ describe('the run owner is re-asserted at claim time and again immediately befor
     });
 
     let actorCalls = 0;
-    store.assertReviewPanelActor.mockImplementation(async () => {
+    store.assertReviewPanelAccess.mockImplementation(async () => {
       actorCalls += 1;
       if (actorCalls === 1) return { profileId: run3.owner_profile_id }; // claim-time
-      if (actorCalls === 2) throw Object.assign(new Error('An active superuser profile is required.'), { httpStatus: 403 }); // first entry into the pool
+      if (actorCalls === 2) throw Object.assign(new Error('An active profile with Review Panel access is required.'), { httpStatus: 403 }); // first entry into the pool
       return { profileId: run3.owner_profile_id }; // the other two entries' checks still succeed — the race is the point
     });
 
@@ -688,7 +688,7 @@ describe('the run owner is re-asserted at claim time and again immediately befor
     expect(entries.some((e) => e.status === 'running')).toBe(false);
     expect(entries.every((e) => e.status === 'failed')).toBe(true);
     expect(store.reapAllDispatchedAttempts).toHaveBeenCalledWith('run-1', 'lease-1');
-    expect(store.stopRevokedReviewPanelRun).toHaveBeenCalledWith('run-1', 'lease-1', expect.stringMatching(/no longer has superuser access/i));
+    expect(store.stopRevokedReviewPanelRun).toHaveBeenCalledWith('run-1', 'lease-1', expect.stringMatching(/no longer has Review Panel access/i));
     expect(store.releaseReviewPanelRun).toHaveBeenCalledWith('run-1', 'lease-1');
   });
 });

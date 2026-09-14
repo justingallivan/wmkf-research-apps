@@ -36,6 +36,7 @@ jest.mock('../../lib/services/review-panel-rollout', () => ({
 jest.mock('../../lib/services/review-panel-store', () => ({
   reviewPanelError: (message, httpStatus = 409) => Object.assign(new Error(message), { httpStatus }),
   assertReviewPanelActor: jest.fn(),
+  assertReviewPanelAccess: jest.fn(),
   createReviewPanel: jest.fn(),
   saveReviewPanelSelection: jest.fn(),
   listReviewPanelRuns: jest.fn(),
@@ -77,7 +78,7 @@ function rosterRecord(requestId, requestNumber) {
 
 beforeEach(() => {
   jest.clearAllMocks();
-  store.assertReviewPanelActor.mockResolvedValue({ profileId: OWNER });
+  store.assertReviewPanelAccess.mockResolvedValue({ profileId: OWNER });
   store.createReviewPanel.mockResolvedValue({ id: 'panel-1', selection: [] });
   store.listReviewPanelRuns.mockResolvedValue([]);
   store.readReviewPanelControl.mockResolvedValue(null);
@@ -142,7 +143,7 @@ describe('getReviewPanelPage surfaces WHY snapshotConfiguration failed, instead 
 
 describe('actor assertion runs BEFORE any store/roster/Blob call', () => {
   function rejectActor() {
-    store.assertReviewPanelActor.mockRejectedValue(Object.assign(new Error('An active superuser profile is required.'), { httpStatus: 403 }));
+    store.assertReviewPanelAccess.mockRejectedValue(Object.assign(new Error('An active profile with Review Panel access is required.'), { httpStatus: 403 }));
   }
 
   test('getReviewPanelPage', async () => {

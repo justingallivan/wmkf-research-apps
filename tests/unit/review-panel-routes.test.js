@@ -58,12 +58,12 @@ describe('/api/review-panel auth fail-closed', () => {
   });
 
   test('a 403 thrown by the service (e.g. its own actor assertion — see review-panel-service.test.js) is propagated verbatim, not swallowed or remapped', async () => {
-    getReviewPanelPage.mockRejectedValue(Object.assign(new Error('An active superuser profile is required.'), { httpStatus: 403 }));
+    getReviewPanelPage.mockRejectedValue(Object.assign(new Error('An active profile with Review Panel access is required.'), { httpStatus: 403 }));
     const res = response();
     await pageHandler({ method: 'GET', query: {}, body: {} }, res);
     expect(requireAppAccess).toHaveBeenCalledWith(expect.anything(), res, 'review-panel');
     expect(res.statusCode).toBe(403);
-    expect(res.body).toEqual({ error: 'An active superuser profile is required.' });
+    expect(res.body).toEqual({ error: 'An active profile with Review Panel access is required.' });
   });
 });
 
