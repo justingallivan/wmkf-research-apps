@@ -35,12 +35,14 @@ jest.mock('../../lib/services/maintenance-service', () => ({
       health_history_days: 30, alert_days: 90, intake_audit_days: 730,
       bill_webhook_events_days: 7, maintenance_runs_days: 90,
       reviewer_identity_shadow_log_days: 90,
+      reviewer_institution_measurement_days: 90,
       scheduled_email_messages_days: 365,
     })),
     cleanupUsageLog: jest.fn(async () => 0),
     cleanupQueryLog: jest.fn(async () => 0),
     cleanupDynamicsExplorerRequests: jest.fn(async () => 0),
     cleanupReviewerIdentityShadowLog: jest.fn(async () => 0),
+    cleanupReviewerInstitutionMeasurement: jest.fn(async () => 0),
     cleanupOperationalEvents: jest.fn(async () => 0),
     cleanupExpiredCache: jest.fn(async () => 0),
     cleanupHealthHistory: jest.fn(async () => 0),
@@ -131,6 +133,15 @@ describe('maintenance cron — maintenance_runs retention step wiring', () => {
     expect(res.body.results.reviewerIdentityShadowLog).toBe(6);
     expect(res.body.totalDeleted).toBe(6);
     expect(res.body.failedSubtasks).not.toContain('reviewerIdentityShadowLog');
+  });
+
+  it('runs institution measurement cleanup and counts actual deleted rows', async () => {
+    MaintenanceService.cleanupReviewerInstitutionMeasurement.mockResolvedValueOnce(3);
+    const res = makeRes();
+    await handler({ method: 'POST', headers: {} }, res);
+    expect(MaintenanceService.cleanupReviewerInstitutionMeasurement).toHaveBeenCalledWith(90);
+    expect(res.body.results.reviewerInstitutionMeasurement).toBe(3);
+    expect(res.body.totalDeleted).toBe(3);
   });
 
   it('surfaces reviewer identity shadow cleanup failure without skipping later steps', async () => {

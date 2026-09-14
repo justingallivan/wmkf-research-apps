@@ -54,6 +54,10 @@ import {
   reviewerCandidateKey,
 } from '../../../shared/components/reviewers/reviewer-search-logic';
 import { listOpenAddressRepairRequests } from '../../../lib/services/reviewer-address-trust-service';
+import {
+  measurementEnabled,
+  recordInstitutionMeasurement,
+} from '../../../lib/services/reviewer-institution-measurement';
 
 const GUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // Cap candidates per POST — a Find run asks for at most 25, but guard against an
@@ -84,6 +88,19 @@ export default async function handler(req, res) {
 
 function validRequestId(requestId) {
   return typeof requestId === 'string' && GUID_RE.test(requestId);
+}
+
+async function measureRosterAction(requestId, eventType, candidateKey, knownCandidate = null, requiredStatus = null) {
+  if (!measurementEnabled()) return;
+  try {
+    const candidate = knownCandidate || (await findCandidatesByKeys(requestId, [candidateKey]))[0];
+    if (!candidate || (requiredStatus && candidate.rosterStatus !== requiredStatus)) return;
+    await recordInstitutionMeasurement({
+      requestId, candidate, eventType, captureSource: 'stored_roster',
+    });
+  } catch (error) {
+    console.warn('[reviewer-roster] institution measurement unavailable:', error?.code || error?.name || 'Error');
+  }
 }
 
 function isServerManagedApplicantCandidate(candidate) {
@@ -384,6 +401,7 @@ async function handlePatch(req, res, access) {
       [candidateToExclude] = await preserveStoredRosterAuthority(requestId, [candidateToExclude]);
     }
     await setExcluded(requestId, candidateToExclude);
+    await measureRosterAction(requestId, 'staff_excluded', candidateToExclude.candidateKey, null, 'excluded');
     return res.status(200).json({ success: true });
   }
 
@@ -412,6 +430,7 @@ async function handlePatch(req, res, access) {
         code: 'candidate_not_excluded',
       });
     }
+    await measureRosterAction(requestId, 'staff_restored', candidateKey, storedCandidate);
     return res.status(200).json({ success: true, candidate });
   }
 
@@ -483,6 +502,7 @@ async function handlePatch(req, res, access) {
     if (!confirmed) {
       return res.status(409).json({ error: 'Candidate is no longer active; reload before confirming identity.' });
     }
+    await measureRosterAction(requestId, 'staff_identity_confirmed', candidate.candidateKey, storedCandidate || confirmed.candidate);
     return res.status(200).json({ success: true, ...confirmed });
   }
 
@@ -546,6 +566,7 @@ async function handlePatch(req, res, access) {
         code: 'candidate_stale',
       });
     }
+    await measureRosterAction(requestId, 'staff_contact_edited', candidateKey, candidate);
     return res.status(200).json({ success: true, candidate });
   }
 

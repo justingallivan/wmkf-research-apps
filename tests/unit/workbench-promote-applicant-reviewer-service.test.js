@@ -47,6 +47,11 @@ jest.mock('../../lib/services/notification-service', () => ({
   __esModule: true,
   default: { notify: jest.fn(async () => ({ id: 'alert-1' })) },
 }));
+const recordInstitutionMeasurement = jest.fn(async () => 'disabled');
+jest.mock('../../lib/services/reviewer-institution-measurement', () => ({
+  recordInstitutionMeasurement: (...args) => recordInstitutionMeasurement(...args),
+  classifiedOutcome: (code) => code === 'identity_confirmation_required' ? 'identity_hold' : 'other',
+}));
 
 const loadApplicantKnownReviewerContext = jest.fn();
 jest.mock('../../lib/services/workbench/applicant-known-reviewer-service', () => ({
@@ -184,6 +189,30 @@ test('plain promote: canonical email verified, selected flipped, roster finalize
     emailAction: 'ready',
     emailActionReason: 'Address source: scholarly_multi',
   });
+  expect(recordInstitutionMeasurement).toHaveBeenCalledWith(expect.objectContaining({
+    requestId: REQ,
+    eventType: 'save_saved',
+    outcomeCategory: 'saved',
+    candidate: expect.objectContaining({ candidateKey: 'candidate:applicant' }),
+  }));
+});
+
+test('a held applicant has a rejected observation and telemetry failure cannot alter successful promotion', async () => {
+  findCandidateBySuggestion.mockResolvedValueOnce({
+    candidateKey: 'candidate:applicant', suggestionId: SUG,
+    identityStatus: 'unresolved', needsIdentification: true,
+  });
+  const held = await promoteApplicantReviewer(args()).catch((error) => error);
+  expect(held).toBeInstanceOf(ServiceHttpError);
+  expect(held.body.code).toBe('identity_confirmation_required');
+  expect(recordInstitutionMeasurement).toHaveBeenCalledWith(expect.objectContaining({
+    eventType: 'save_rejected', outcomeCategory: 'identity_hold',
+  }));
+
+  recordInstitutionMeasurement.mockRejectedValueOnce(new Error('telemetry failed'));
+  const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  await expect(promoteApplicantReviewer(args())).resolves.toMatchObject({ success: true });
+  warn.mockRestore();
 });
 
 test('source-null canonical contact requires evidence and becomes exact-bundle ready', async () => {

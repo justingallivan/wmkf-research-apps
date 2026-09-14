@@ -213,6 +213,26 @@ describe('removePreviousActiveSearchResults', () => {
 });
 
 describe('recordSurfaced', () => {
+  test('measurement records only a successful roster CAS, and its failure does not change the roster count', async () => {
+    process.env.REVIEWER_INSTITUTION_MEASUREMENT = 'on';
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      sql.mockResolvedValueOnce({ rows: [], rowCount: 0 });
+      sql.mockResolvedValueOnce({ rows: [], rowCount: 0 }); // cap
+      await expect(store.recordSurfaced(REQ, [{ name: 'Ann Lee', candidateKey: 'candidate:ann' }])).resolves.toBe(0);
+      expect(sql.mock.calls.some((call) => queryTextOf(sql.mock.calls.indexOf(call)).includes('reviewer_institution_measurement_events'))).toBe(false);
+
+      sql.mockClear();
+      sql.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // roster succeeds
+      sql.mockRejectedValueOnce(new Error('telemetry unavailable'));
+      sql.mockResolvedValueOnce({ rows: [], rowCount: 0 }); // cap
+      await expect(store.recordSurfaced(REQ, [{ name: 'Ann Lee', candidateKey: 'candidate:ann' }])).resolves.toBe(1);
+      expect(sql.mock.calls[1][0].join(' ')).toContain('reviewer_institution_measurement_events');
+    } finally {
+      delete process.env.REVIEWER_INSTITUTION_MEASUREMENT;
+      warn.mockRestore();
+    }
+  });
   beforeEach(() => {
     sql.mockResolvedValue({ rows: [], rowCount: 1 });
   });

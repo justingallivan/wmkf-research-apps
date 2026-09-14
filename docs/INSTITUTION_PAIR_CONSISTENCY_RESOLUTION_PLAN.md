@@ -3,7 +3,7 @@ title: Institution Affiliation Compatibility Resolution Plan
 domain: reviewer-identity
 kind: plan
 status: active
-summary: "Stage 2 presentation was live as of 2026-08-19; Stage 3 targets avoidable intra-institution review while surfacing real current conflicts."
+summary: "Stage 2 presentation is live; Stage 3 prospective measurement is source-built but not enabled or schema-probed."
 canonical: false
 cataloged: 2026-08-08
 last_verified: 2026-09-14
@@ -82,6 +82,17 @@ presented as current conflicts. This is a planning priority, not a Stage 3
 runtime-authority change. The deployment observations below are dated
 2026-08-19; this 2026-09-14 update checked local source and the owner decision,
 not current Production environment state.
+
+**Stage 3 measurement source state (2026-09-14):** migration 048, the
+`REVIEWER_INSTITUTION_MEASUREMENT=on` best-effort writer, aggregate operator
+report, and retention cleanup are source-built on `codex/ror-measurement-runs`.
+The migration was not applied in this session, live schema was not probed, and
+the flag defaults off. Successful roster writes
+and authenticated staff/save outcomes can be counted prospectively after
+promotion, but no independent non-affiliation identity proof, exact upstream
+publication/employment observation date, or complete extra-affiliation COI
+screen is supplied. Every proposed action remains `not_evaluable` by schema;
+this is not a Stage 3 selection or write-authority rollout.
 
 ## Current implementation truth
 
@@ -554,8 +565,9 @@ staff-action count or source-complete typed selection inputs. An exploratory
 stored-text ROR probe is non-authoritative and cannot label auto-clear cases.
 The [baseline audit](audits/institution-affiliation-last-cycle-baseline-2026-09-14.md)
 records denominators and the missing measurements. Execution step 1 remains
-open; do not interpret 106 as avoidable reviews or proceed to a live selection
-authority flip on this evidence.
+open: prospective capture is source-built but not enabled or live-probed, with no organic
+events yet. Do not interpret 106 as avoidable reviews or proceed to a live
+selection-authority flip on this evidence.
 
 1. **Measure and label the work being removed.** Establish an organic baseline
    of institution-driven holds and staff actions per case. Add a blind,

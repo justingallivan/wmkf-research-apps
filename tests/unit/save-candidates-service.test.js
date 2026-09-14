@@ -84,6 +84,11 @@ jest.mock('../../lib/services/notification-service', () => ({
   __esModule: true,
   default: { notify: jest.fn(async () => ({ id: 'alert-1' })) },
 }));
+jest.mock('../../lib/services/reviewer-institution-measurement', () => ({
+  measurementEnabled: jest.fn(() => false),
+  recordInstitutionMeasurement: jest.fn(async () => 'inserted'),
+  classifiedOutcome: jest.fn((code, saved) => saved ? 'saved' : (code === 'identity_unresolved' ? 'identity_hold' : 'other')),
+}));
 
 const potentialReviewerAdapter = require('../../lib/dataverse/adapters/potential-reviewer');
 const contactAdapter = require('../../lib/dataverse/adapters/contact');
@@ -105,6 +110,7 @@ const { lookupReviewerIdentity } = require('../../lib/services/reviewer-identity
 const { loadCoiContext } = require('../../lib/services/reviewer-request-context');
 const { createInstitutionIdentityResolver } = require('../../lib/services/institution-identity-resolver');
 const NotificationService = require('../../lib/services/notification-service').default;
+const institutionMeasurement = require('../../lib/services/reviewer-institution-measurement');
 const { ServiceHttpError } = require('../../lib/services/service-http-error');
 const { VERIFICATION_STATUSES } = require('../../lib/services/discovery/constants');
 const {
@@ -127,6 +133,7 @@ const saveCandidates = (args) => saveCandidatesImpl({
 
 beforeEach(() => {
   jest.clearAllMocks();
+  institutionMeasurement.measurementEnabled.mockReturnValue(false);
   potentialReviewerAdapter.getByEmail.mockResolvedValue(null);
   potentialReviewerAdapter.getById.mockResolvedValue({ wmkf_primaryaffiliation: 'MIT', _etag: 'W/"person"' });
   potentialReviewerAdapter.getByIdForMerge.mockResolvedValue({
@@ -165,6 +172,52 @@ beforeEach(() => {
     piResolution: { state: 'ok', reason: null },
     institutionEntries: [{ identity: 'Applicant University', display: 'Applicant University' }],
   });
+});
+
+test('measurement observes exact partial-save outcomes without changing the response', async () => {
+  institutionMeasurement.measurementEnabled.mockReturnValue(true);
+  verifyAutomatedIdentityAttestation.mockImplementation(async (_token, { candidate }) => ({
+    valid: true,
+    source: 'automated_resolver',
+    identityDecisionBound: true,
+    contactAuthorityBound: true,
+    rosterCandidateKey: candidate.candidateKey,
+  }));
+  reviewerRosterStore.findAddressTrustReceipt.mockResolvedValueOnce({
+    receiptId: 'receipt-saved',
+    personConfirmed: true,
+    email: 'saved@example.edu',
+    evidenceType: 'institution_page',
+    evidenceUrl: 'https://example.edu/person',
+    attestedAt: '2026-07-31T12:00:00.000Z',
+  });
+  const out = await saveCandidates({
+    ...BASE,
+    candidates: [
+      { name: 'Dr Saved', email: 'saved@example.edu', candidateKey: 'candidate:saved', automatedIdentityAttestation: 'bound' },
+      { name: 'Dr Held', needsIdentification: true, candidateKey: 'candidate:held', automatedIdentityAttestation: 'bound' },
+    ],
+  });
+  expect(out).toMatchObject({ success: true, savedCount: 1, rejectedUnresolved: 1 });
+  expect(institutionMeasurement.recordInstitutionMeasurement).toHaveBeenCalledWith(
+    expect.objectContaining({ eventType: 'save_saved', outcomeCategory: 'saved', captureSource: 'stored_roster' }),
+  );
+  expect(institutionMeasurement.recordInstitutionMeasurement).toHaveBeenCalledWith(
+    expect.objectContaining({ eventType: 'save_rejected', outcomeCategory: 'identity_hold', captureSource: 'stored_roster' }),
+  );
+});
+
+test('early invalid save cannot attribute a rejection using only a client correlation key', async () => {
+  institutionMeasurement.measurementEnabled.mockReturnValue(true);
+  const error = await saveCandidates({
+    ...BASE,
+    candidates: [{ name: 'Dr Invalid', clientCandidateId: 'existing-key', identityStatus: 'invented' }],
+  }).catch((caught) => caught);
+  expect(error).toBeInstanceOf(SaveCandidatesError);
+  expect(error.httpStatus).toBe(422);
+  expect(error.body.errors[0].candidateKey).toBe('client:existing-key');
+  expect(reviewerRosterStore.findCandidatesByKeys).not.toHaveBeenCalled();
+  expect(institutionMeasurement.recordInstitutionMeasurement).not.toHaveBeenCalled();
 });
 
 test('422 SaveCandidatesError with the full body (both rejected counts always present) when ALL rows are rejected', async () => {

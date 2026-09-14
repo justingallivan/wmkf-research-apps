@@ -311,7 +311,7 @@ related:
 | File | Kind | Status | Canonical | Summary | Cataloged |
 |---|---|---|---|---|---|
 | [APPLICANT_REVIEWER_DATAVERSE_FIRST_HYDRATION_PLAN.md](APPLICANT_REVIEWER_DATAVERSE_FIRST_HYDRATION_PLAN.md) | plan | active |  | Exact-person Dataverse hydration plan for applicant-recommended reviewers, preserving identity, contact, COI, and partial-success safeguards. | 2026-07-29 |
-| [INSTITUTION_PAIR_CONSISTENCY_RESOLUTION_PLAN.md](INSTITUTION_PAIR_CONSISTENCY_RESOLUTION_PLAN.md) | plan | active |  | Stage 2 presentation was live as of 2026-08-19; Stage 3 targets avoidable intra-institution review while surfacing real current conflicts. | 2026-08-08 |
+| [INSTITUTION_PAIR_CONSISTENCY_RESOLUTION_PLAN.md](INSTITUTION_PAIR_CONSISTENCY_RESOLUTION_PLAN.md) | plan | active |  | Stage 2 presentation is live; Stage 3 prospective measurement is source-built but not enabled or schema-probed. | 2026-08-08 |
 | [NORMALIZER_CONSOLIDATION_INVENTORY.md](NORMALIZER_CONSOLIDATION_INVENTORY.md) | audit | active |  | Person-name/institution normalizer and nickname-map inventory verified against source: callers, equivalence classes, delta vs the research memo's counts. | 2026-08-07 |
 | [REVIEWER_ADDRESS_TRUST_AND_CONFLICT_RESOLUTION_PLAN.md](REVIEWER_ADDRESS_TRUST_AND_CONFLICT_RESOLUTION_PLAN.md) | plan | active |  | Address trust and direct Workbench stored/found self-service are Production-live; the signed-in choice dialog is smoke-verified through neutral Cancel. | 2026-07-31 |
 | [REVIEWER_BINDING_SMOKE_CODEX_HANDOFF.md](REVIEWER_BINDING_SMOKE_CODEX_HANDOFF.md) | audit | active |  | Reviewer-binding smoke: PR #60 merged and the owner-authorized production run passed with verified cleanup; completed queue job 25 is retained. | 2026-07-13 |
