@@ -38,7 +38,8 @@ test('fetches the per-request read and renders Launch enabled only when the serv
   render(<ReviewPanelTab requestId={REQ} />);
   await waitFor(() => expect(screen.getByRole('button', { name: 'Launch panel' })).not.toBeDisabled());
   expect(global.fetch).toHaveBeenCalledWith(`/api/review-panel?requestId=${REQ}`);
-  expect(screen.getByText('No panel has been run for this request yet.')).toBeInTheDocument();
+  expect(screen.getByTestId('review-panel-state-sentence')).toHaveTextContent('No panel has been run for this request yet.');
+  expect(screen.getByText('Nothing here yet. Launch a panel to review this proposal narrative.')).toBeInTheDocument();
   expect(screen.getByText('up to $1.50 (reservation bound)')).toBeInTheDocument(); // D6 bound, never a typical cost
 });
 

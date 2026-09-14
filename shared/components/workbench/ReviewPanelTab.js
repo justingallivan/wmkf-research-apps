@@ -47,7 +47,7 @@ function waitingCopy(run) {
   return null;
 }
 
-function RunCard({ run, nowMs, actionLoading, rerenderErrors, onRerender, onRetry, onStop, actionError }) {
+function RunRow({ run, nowMs, actionLoading, rerenderErrors, onRerender, onRetry, onStop, actionError }) {
   const unsettled = isRunUnsettled(run.status);
   const failedEntries = (run.entries || EMPTY_ARRAY).filter((e) => e.status === 'failed' && !e.retryRequested);
   // Mirrors review-panel-store.js requestReviewPanelCancel: owner-scoped, the
@@ -58,24 +58,26 @@ function RunCard({ run, nowMs, actionLoading, rerenderErrors, onRerender, onRetr
   const elapsed = String(run.status || '').toLowerCase() === 'running' ? formatRunningElapsed(run.createdAt, nowMs) : null;
   const waiting = waitingCopy(run);
   return (
-    <li className="rounded-lg border border-gray-200 p-4" data-testid="review-panel-run">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
+    <li className="px-4 py-4" data-testid="review-panel-run">
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
           <StatusPill tone={toneForStatus(run.status)}>{runPillLabel(run)}</StatusPill>
           <span className="text-xs text-gray-500">{launchedByLine(run)}</span>
         </div>
-        <div className="flex items-center gap-2">
-          {canRetry && (
-            <Button size="sm" variant="outline" onClick={() => onRetry(run)} disabled={Boolean(actionLoading)} loading={actionLoading === `retry:${run.id}`}>
-              Retry failed
-            </Button>
-          )}
-          {canStop && (
-            <Button size="sm" variant="outline" onClick={() => onStop(run)} disabled={Boolean(actionLoading)} loading={actionLoading === `stop:${run.id}`}>
-              Stop
-            </Button>
-          )}
-        </div>
+        {(canRetry || canStop) && (
+          <div className="flex items-center gap-2">
+            {canRetry && (
+              <Button size="sm" variant="outline" onClick={() => onRetry(run)} disabled={Boolean(actionLoading)} loading={actionLoading === `retry:${run.id}`}>
+                Retry failed
+              </Button>
+            )}
+            {canStop && (
+              <Button size="sm" variant="outline" onClick={() => onStop(run)} disabled={Boolean(actionLoading)} loading={actionLoading === `stop:${run.id}`}>
+                Stop
+              </Button>
+            )}
+          </div>
+        )}
       </div>
       {run.error && <p className="mt-2 text-sm text-red-700">{run.error}</p>}
       {actionError && <p className="mt-2 text-xs text-red-700" role="alert">{actionError}</p>}
@@ -103,6 +105,17 @@ function RunCard({ run, nowMs, actionLoading, rerenderErrors, onRerender, onRetr
       ))}
     </li>
   );
+}
+
+/** One sentence for the header, in the sibling tabs' stage-sentence voice: what state this request's panel work is in right now. */
+function stateSentence({ loading, runs, activeRun }) {
+  if (loading && !runs.length) return 'Loading panel history…';
+  if (activeRun) return `A panel is in progress — ${launchedByLine(activeRun).replace(/^Launched /, 'launched ')}.`;
+  const latest = runs[0];
+  if (!latest) return 'No panel has been run for this request yet.';
+  const status = String(latest.status || '').toLowerCase();
+  const verb = status === 'completed' ? 'completed' : status === 'failed' ? 'failed' : status === 'cancelled' ? 'was stopped' : status === 'partial' ? 'completed with failures' : status;
+  return `The latest panel ${verb} — ${launchedByLine(latest).replace(/^Launched /, 'launched ')}.`;
 }
 
 export default function ReviewPanelTab({ requestId }) {
@@ -237,72 +250,86 @@ export default function ReviewPanelTab({ requestId }) {
 
   const latestRun = runs[0] || null;
   const launchDisabled = !launchable.ok || actionLoading === 'launch' || loading;
+  const launchReason = launchError || (!launchable.ok ? launchable.reason : null);
   const seatsLine = (configuration?.seats || EMPTY_ARRAY).map((s) => `${s.label || s.seatKey} · ${s.model}`).join(', ');
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
+      {error && (
+        <div className="p-4 rounded-lg bg-red-50 border border-red-200 text-red-800 text-sm" role="alert">
+          {error}
+        </div>
+      )}
+      {data?.control?.stopRequested && (
+        <div className="p-4 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-sm" role="status">
+          Review panel work is paused by the rollout operator{data.control.reason ? `: ${data.control.reason}` : ''}. Launches queue until it resumes.
+        </div>
+      )}
+
       <Card hover={false}>
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h2 className="text-base font-semibold text-gray-900">Review Panel</h2>
-            <p className="mt-1 text-sm text-gray-500">
-              Blind AI seat reviews of the proposal narrative, synthesized by a chair. Saved as Word and PDF editions.
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0">
+            <h2 className="text-lg font-semibold text-gray-900">Review Panel</h2>
+            <p className="mt-2 max-w-2xl text-sm text-gray-700" data-testid="review-panel-state-sentence">
+              {stateSentence({ loading, runs, activeRun })}
             </p>
+            <p className="mt-1 text-xs text-gray-500">
+              Blind AI seat reviews of the proposal narrative, synthesized by a chair, saved as Word and PDF editions.
+            </p>
+            <dl className="mt-3 grid gap-x-4 gap-y-0.5 text-xs text-gray-500 sm:grid-cols-[auto_minmax(0,1fr)]">
+              <dt className="font-medium text-gray-600">Seats</dt>
+              <dd className="min-w-0 break-words">{seatsLine || 'Unavailable'}</dd>
+              <dt className="font-medium text-gray-600">Chair</dt>
+              <dd>{configuration?.chair ? configuration.chair.model : 'Unavailable'}</dd>
+              <dt className="font-medium text-gray-600">Reservation</dt>
+              <dd>{formatReservationBound(configuration?.reservationPerEntry)}</dd>
+            </dl>
+            {!configuration?.ready && configuration?.reason && (
+              <p className="mt-2 text-xs text-gray-400">{configuration.reason}</p>
+            )}
           </div>
-          <div className="flex flex-col items-end gap-1">
+          <div className="flex max-w-xs flex-col items-end gap-1.5">
             <Button size="sm" onClick={launch} disabled={launchDisabled} loading={actionLoading === 'launch'}>
               {latestRun ? 'Launch new panel' : 'Launch panel'}
             </Button>
-            {(launchError || (!launchable.ok && launchable.reason)) && (
-              <span className="max-w-xs text-right text-xs text-red-700" role="alert">{launchError || launchable.reason}</span>
+            {launchReason && (
+              <p className="text-right text-xs font-medium text-red-700" role="alert">{launchReason}</p>
             )}
           </div>
         </div>
-
-        {error && <p className="mt-3 text-sm text-red-700">{error}</p>}
-        {data?.control?.stopRequested && (
-          <p className="mt-3 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800" role="status">
-            Review panel work is paused by the rollout operator{data.control.reason ? `: ${data.control.reason}` : ''}. Launches queue until it resumes.
-          </p>
-        )}
-
-        <dl className="mt-4 grid gap-x-6 gap-y-1 text-xs text-gray-600 sm:grid-cols-[auto_1fr]">
-          <dt className="font-semibold text-gray-700">Seats</dt>
-          <dd>{seatsLine || 'Unavailable'}</dd>
-          <dt className="font-semibold text-gray-700">Chair</dt>
-          <dd>{configuration?.chair ? configuration.chair.model : 'Unavailable'}</dd>
-          <dt className="font-semibold text-gray-700">Reservation</dt>
-          <dd>{formatReservationBound(configuration?.reservationPerEntry)}</dd>
-        </dl>
-        {!configuration?.ready && configuration?.reason && (
-          <p className="mt-2 text-xs text-gray-400">{configuration.reason}</p>
-        )}
       </Card>
 
-      <Card hover={false}>
-        <h3 className="text-sm font-semibold text-gray-900">Panels for this request</h3>
-        {loading && !data && <p className="mt-3 text-sm text-gray-500">Loading…</p>}
-        {!loading && !runs.length && (
-          <p className="mt-3 text-sm text-gray-500">No panel has been run for this request yet.</p>
-        )}
-        {runs.length > 0 && (
-          <ul className="mt-3 space-y-3">
-            {runs.map((run) => (
-              <RunCard
-                key={run.id}
-                run={run}
-                nowMs={nowMs}
-                actionLoading={actionLoading}
-                rerenderErrors={rerenderErrors}
-                actionError={actionErrors.get(run.id)}
-                onRerender={rerender}
-                onRetry={retry}
-                onStop={stop}
-              />
-            ))}
-          </ul>
-        )}
-      </Card>
+      <section aria-labelledby="review-panel-history-heading">
+        <h2 id="review-panel-history-heading" className="text-sm font-semibold text-gray-900">
+          Panels for this request{runs.length ? ` (${runs.length})` : ''}
+        </h2>
+        <p className="mt-1 text-xs text-gray-500">
+          Every panel launched for this request, newest first. Stop, retry, and re-render apply only to panels you launched.
+        </p>
+        <div className="mt-3 overflow-hidden rounded-xl border border-gray-200 bg-white">
+          {loading && !data && <p className="px-4 py-4 text-sm text-gray-500">Loading…</p>}
+          {!loading && !runs.length && (
+            <p className="px-4 py-4 text-sm text-gray-500">Nothing here yet. Launch a panel to review this proposal narrative.</p>
+          )}
+          {runs.length > 0 && (
+            <ul className="divide-y divide-gray-200">
+              {runs.map((run) => (
+                <RunRow
+                  key={run.id}
+                  run={run}
+                  nowMs={nowMs}
+                  actionLoading={actionLoading}
+                  rerenderErrors={rerenderErrors}
+                  actionError={actionErrors.get(run.id)}
+                  onRerender={rerender}
+                  onRetry={retry}
+                  onStop={stop}
+                />
+              ))}
+            </ul>
+          )}
+        </div>
+      </section>
     </div>
   );
 }
