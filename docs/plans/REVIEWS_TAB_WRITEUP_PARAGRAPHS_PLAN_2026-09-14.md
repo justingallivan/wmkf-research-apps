@@ -72,8 +72,9 @@ per-review list. The decided target, in order:
 3. **Expertise.** "Nadell has expertise in X, Y, and Z, while Breitbart has expertise in …" One
    clause per reviewer with expertise data, keyed by last name.
 4. **Tone and themes.** Two to three sentences (model).
-5. **Quotations.** One per reviewer, most positive to most critical (model), with the house
-   lead-ins from the old app (`shared/config/prompts/peer-reviewer-dynamics.js:78-82`).
+5. **Quotations.** Three representative quotes, most positive to most critical, at most one per
+   reviewer (model proposes, server verifies and selects), with the house lead-ins from the old app
+   (`shared/config/prompts/peer-reviewer-dynamics.js:78-82`).
 
 Out of scope: the old app's bulleted questions output (the review form's Q8 already asks
 reviewers for questions to raise with the PI and the tab shows those answers), Risk-rating prose,
@@ -159,8 +160,10 @@ Extend `synthesis` with:
 ]
 ```
 
-Rules added to the system prompt: at most one quotation per reviewer, copied character-for-character
-from an `Answer text` block (no paraphrase, no ellipsis, no stitching), at most about 60 words each;
+Rules added to the system prompt: **three representative quotations** (house rule of thumb, owner
+2026-09-14; fewer when fewer than three reviews are submitted), at most one per reviewer, spanning
+the most positive to the most critical review, each copied character-for-character from an
+`Answer text` block (no paraphrase, no ellipsis, no stitching), at most about 60 words each;
 themes at most about 120 words; still no names, no HTML, no markdown. The model does **not** rank
 the quotes and carries no `stance` field: ordering and attribution are done server-side (below),
 so nothing about the paragraph depends on the model naming or ranking anyone.
@@ -173,9 +176,10 @@ so `composeWriteupParagraphs` verifies each quotation there: normalise whitespac
 quotes and apostrophes, and case; keep a quote only if it is a substring of exactly one submitted
 reviewer's answer text (preferring the declared `questionKey`, falling back to any answer of that
 reviewer); keep at most one verified quote per reviewer; order the survivors by that reviewer's
-`reviewerOverallAssessment` descending (ties by the roster order); derive the house lead-ins from
-position ("The most positive reviewer said:", "Another reviewer noted:", "The most critical
-reviewer noted:"). Unverified or duplicate quotes are dropped and counted; the tab shows "N
+`reviewerOverallAssessment` descending (ties by the roster order); **keep three**: the highest-rated,
+the lowest-rated, and the middle one (the median by rating) when more than three survive; derive
+the house lead-ins from position ("The most positive reviewer said:", "Another reviewer noted:",
+"The most critical reviewer noted:"). With one or two survivors the lead-ins collapse accordingly. Unverified or duplicate quotes are dropped and counted; the tab shows "N
 quotation(s) could not be matched to a review and were omitted" so the editor knows. This keeps
 the digest, the hash, and the write path unchanged: no reviewer ordinal is added to the digest.
 
@@ -183,8 +187,9 @@ Co-edited set (one commit): prompt `SYSTEM_PROMPT` (rules above); `jsonSchema.pr
 gains both fields **and both join `required`** (Anthropic's native grammar then always emits them;
 write-time validation is the only place `required` matters, the read path is `parseReviewSynthesis`);
 `validationSchema` entries `required:false` with defaults `''` / `[]`, caps `writeupThemes` 2,000
-chars, `writeupQuotations` `maxItems` 25 (parity with the three sibling arrays) × `quote` 600 chars
-(~100 words against the prompt's 60), `questionKey` 100 chars. **A cap is a hard failure, not a
+chars, `writeupQuotations` `maxItems` 10 (the prompt asks for three; headroom for a non-compliant
+answer without failing the run) × `quote` 600 chars (~100 words against the prompt's 60),
+`questionKey` 100 chars. **A cap is a hard failure, not a
 truncation**: `validateAiJson` fails on `maxLength`/`maxItems` and the Executor throws
 `claude_output_schema_invalid`, which the service does not retry
 (`ai-output-schema.js:65-66`, `execute-prompt.js:908-917`, `synthesize-reviews-service.js:297-300`)
@@ -206,10 +211,10 @@ synthesis; the new contract tolerates them because a missing or unverifiable quo
 required, and the paragraph simply has fewer quotes. Realistic WMKF panels are three to six
 reviewers. `wmkf_reviewsynthesisjson` is a 20,000-char memo with no total-length guard in the
 Executor (grep of `execute-prompt.js` returns nothing); the five existing keys' caps already exceed
-it in the worst case and the new caps add up to 17,600 more in theory. Decision needed (W7 below):
-accept the unchanged posture (an over-long write fails at Dataverse and surfaces as a failed
-generation, as today) or add a service-side preflight that refuses synthesis above N submitted
-reviews. Recommended: accept; a preflight would also break the existing synthesis for large panels.
+it in the worst case and the new caps add at most 9,000 more in theory. **W7 decided (owner
+2026-09-14): accept the unchanged posture** — an over-long write fails at Dataverse and surfaces as
+a failed generation, as today; no service-side preflight, which would also break the existing
+panel-prep synthesis for large panels.
 
 Because the hash excludes the prompt, existing syntheses remain `current: true` without the new
 fields. UI rule: when `synthesis` is current but `writeupThemes` is empty, the writeup block shows
@@ -325,7 +330,7 @@ hence the partial fill with an outstanding clause rather than a readiness gate. 
 draft later refreshes the paragraph while the draft is still regenerable; once it is the Site
 Visit workspace the editor updates Word by hand, helped by Copy on the tab.
 
-## 5. Owner decisions (W1–W6 decided 2026-09-14; W7 open)
+## 5. Owner decisions (W1–W8 decided 2026-09-14)
 
 | # | Decision | Outcome |
 |---|---|---|
@@ -335,7 +340,8 @@ Visit workspace the editor updates Word by hand, helped by Copy on the tab.
 | W4 | Placement and exports | Separate "Writeup paragraphs" card with Copy (rich text) as the primary action; section added to the Word export; no PDF work. |
 | W5 | Expertise source | `wmkf_keywords` / `wmkf_areaofexpertise` (enrichment-derived, unedited by staff) is acceptable; the human editor verifies. |
 | W6 | Template the Pre-Site Visit `[[STAFF:RefereeSection]]` from the same sentences | Yes, as Slice 4, deterministic sentences only, filled from the reviews in hand at generation plus an "outstanding" sentence naming reviewers still to report. |
-| W7 | Synthesis memo/population budget (§4.3): accept the unchanged fail-at-write posture, or add a service preflight refusing synthesis above N submitted reviews | **Open.** Recommended: accept; a preflight would also break the existing panel-prep synthesis for large panels, and realistic panels are 3–6 reviewers. |
+| W7 | Synthesis memo/population budget (§4.3): accept the unchanged fail-at-write posture, or add a service preflight refusing synthesis above N submitted reviews | Accept the unchanged posture; no preflight. |
+| W8 | Number of quotations | Three representative quotes (most positive, middle, most critical), even when there are more than three reviewers; fewer when fewer reviews. Server selects by rating after provenance verification. |
 
 ## 6. Slices, tiers, verification `[PROPOSED]`
 
@@ -360,7 +366,8 @@ with caps), `synthesize-reviews-service.test.js` (old row without fields parses 
 `reviews-tab.test.js` (regenerate hint state, dropped-quote count), and new provenance tests in
 `review-writeup-paragraphs.test.js`: a paraphrased quote is dropped, a curly-quote/whitespace
 variant of a real sentence is kept, two quotes from one reviewer keep one, ordering follows the
-rating not the model's order, a quote matching two reviewers is dropped. Gates: `check:prompt-injection-tagging`,
+rating not the model's order, a quote matching two reviewers is dropped, five survivors reduce to
+the top, median and bottom by rating. Gates: `check:prompt-injection-tagging`,
 `check:fact-consistency`, `check:atlas`, `check:agent-wiki`, `check:doc-currency`. Owner reseeds
 production after deploy (§4.3) and regenerates one live request to eyeball the paragraphs.
 
