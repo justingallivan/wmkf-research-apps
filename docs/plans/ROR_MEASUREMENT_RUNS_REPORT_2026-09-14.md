@@ -3,7 +3,7 @@ title: ROR / Works-first Measurement Runs — Report (2026-09-14)
 domain: reviewer-identity
 kind: plan
 status: complete
-summary: "The frozen C2 incumbent and ROR arms both passed their existing gates without provider failures. The production C3 single-string replay selected no wrong ROR IDs, but one selected ID carried a location-conflict veto; the required hard stop left pair and 1002903 gates unmeasured."
+summary: "Both frozen C2 arms passed. The original C3 replay exposed a parent-canonicalization veto bypass; a subsequent production-code fix cleared that veto on the frozen single-string replay. Pair and 1002903 gates remain unmeasured."
 cataloged: 2026-09-14
 last_verified: 2026-09-14
 owner: product-engineering
@@ -18,7 +18,7 @@ related:
 
 # ROR / Works-first measurement report
 
-The required network probes returned HTTP 200 from the measurement process for both OpenAlex and ROR. The two frozen 40-case C2 arms completed. The C3 production comparator completed its 124 single-string cases; the 17 frozen pair-consistency cases were skipped because the production ROR resolver has no pair policy. **The C3 veto hard gate failed, so the five request-1002903 pairs were not replayed.** No resolver mode, production module, frozen input, or environment value changed.
+The required network probes returned HTTP 200 from the measurement process for both OpenAlex and ROR. The two frozen 40-case C2 arms completed. The original C3 production comparator completed its 124 single-string cases; the 17 frozen pair-consistency cases were skipped because the production ROR resolver has no pair policy. **The original C3 veto hard gate failed, so the five request-1002903 pairs were not replayed.** That measurement changed no resolver mode, production module, frozen input, or environment value. A later, separately authorized code fix is recorded at the end of this report; the original result file remains unchanged.
 
 ## C2 — frozen Works-first cases
 
@@ -57,4 +57,10 @@ For context, the frozen benchmark v3 result recorded 141/141 institution cases p
 
 ## Changed-fact document check
 
-The authoritative measurement sources are the two local C2 artifacts, the tracked C3 result, the frozen v3 oracle, and the production decision source. The C2 evaluator and C3 comparator produced read-only artifacts; the report is their aggregate consumer. A focused `/sweep` search across live docs, wiki, memory, and session guidance corrected the Phase 0 review's missed August C2 run. The dated assessment and execution brief retain their historical claims under their original dates. Current `docs/SERVICE_AND_UTILITY_CATALOG.md` and `docs/agent-wiki/topics/reviewer-identity.md` still describe hard vetoes as non-overridable or always preceding selection; the measured parent-canonicalization case disproves that blanket assurance. Those files are outside this brief's allowed edit surfaces. **Document reconciliation is incomplete for those two current restatements.** No production-authority claim was tested here.
+The authoritative measurement sources are the two local C2 artifacts, the tracked C3 result, the frozen v3 oracle, and the production decision source. The C2 evaluator and C3 comparator produced read-only artifacts; the report is their aggregate consumer. A focused `/sweep` search across live docs, wiki, memory, and session guidance corrected the Phase 0 review's missed August C2 run. The dated assessment and execution brief retain their historical claims under their original dates. At the time of the original replay, the veto assurances in `docs/SERVICE_AND_UTILITY_CATALOG.md` and `docs/agent-wiki/topics/reviewer-identity.md` were contradicted by the parent-canonicalization case. The subsequent fix below addresses that specific contradiction. No production-authority claim was tested here.
+
+## Subsequent veto fix (owner-authorized, 2026-09-14)
+
+The original C3 result above is the pre-fix baseline. A later owner request authorized a production-code fix. `lib/services/ror-institution-decision.js` now treats the explicit “Office of the President” segment as an organizational unit rather than a location and permits parent canonicalization only when the parent candidate's own evaluation is veto-free. A deterministic test in `tests/unit/ror-institution-resolution.test.js` covers a valid parent, a domain-vetoed parent, and a genuine conflicting city. The original failing case, `inst-uc-109-system-uop`, resolved to its expected parent with no selected veto in a direct live recheck.
+
+The full post-fix replay is local at `outputs/ror-production-veto-fix-verification-2026-09-14.json`: 124 single-string cases, 0 selected-veto cases, 0 errors, 0 provider failures, and 0 timeouts. The same nine exact-display-name comparator failures remain; the historical C3 result file was not overwritten. This establishes the veto invariant on the frozen single-string suite. Pair consistency and the five real 1002903 cases remain unmeasured; no promotion decision follows from this fix. The current service-catalog and wiki veto assurances are no longer contradicted by this specific case; their broader scope remains bounded by the source and tests.

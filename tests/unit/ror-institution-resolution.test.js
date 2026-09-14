@@ -407,6 +407,53 @@ describe('production ROR institution resolution', () => {
     expect(decision.evaluations[0].vetoes).toContain('domain_conflict');
   });
 
+  test('office-of-president canonicalization requires a veto-free parent', () => {
+    const parentId = 'https://ror.org/00pjdza24';
+    const office = candidate({
+      id: 'https://ror.org/00dmfq477',
+      name: 'University of California Office of the President',
+      city: 'Oakland',
+      domains: ['ucop.edu'],
+      relationships: [{ id: parentId, type: 'parent', label: 'University of California System' }],
+    });
+    const parent = candidate({
+      id: parentId,
+      name: 'University of California System',
+      city: 'Oakland',
+      domains: ['universityofcalifornia.edu'],
+    });
+    const affiliation_string = 'University of California, Office of the President';
+    const candidates = candidateSet([office, parent]);
+
+    const valid = decideSingle({ affiliation_string }, candidates);
+    expect(valid).toMatchObject({
+      outcome: 'resolved',
+      selected_ror_ids: [parentId],
+      reasons: ['parent_scope_canonicalized'],
+    });
+    expect(valid.evaluations.find((evaluation) => evaluation.ror_id === parentId).vetoes)
+      .toEqual([]);
+
+    const domainConflict = decideSingle({
+      affiliation_string,
+      domain_evidence: 'ucop.edu',
+    }, candidates);
+    expect(domainConflict).toMatchObject({
+      outcome: 'review',
+      selected_ror_ids: [],
+      reasons: ['parent_canonicalization_unavailable'],
+    });
+    expect(domainConflict.evaluations.find((evaluation) => evaluation.ror_id === parentId).vetoes)
+      .toContain('domain_conflict');
+
+    const cityConflict = decideSingle({
+      affiliation_string: `${affiliation_string}, San Diego`,
+    }, candidates);
+    expect(cityConflict.outcome).toBe('review');
+    expect(cityConflict.evaluations.find((evaluation) => evaluation.ror_id === parentId).vetoes)
+      .toContain('location_conflict');
+  });
+
   test('contradictory sibling evidence forces review even when both candidates score', () => {
     const parent = 'https://ror.org/000000001';
     const left = candidate({
