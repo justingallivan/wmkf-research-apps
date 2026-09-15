@@ -28,6 +28,7 @@ import { Card } from '../Layout';
 import { labelForReviewRating, reviewRatingShortLabels } from '../../../lib/external/review-form-schema';
 import { deriveReviewMatrix } from '../../utils/review-matrix';
 import ManualReviewEntryForm from './ManualReviewEntryForm';
+import ConsultantFeedbackSection from './ConsultantFeedbackSection';
 import { isTerminalReviewStatus } from '../../config/reviewerStatus';
 import {
   reviewerAffiliationOf,
@@ -954,6 +955,7 @@ export default function ReviewsTab({ requestId, previewReadOnly = false }) {
           onUpdated={load}
           previewReadOnly={previewReadOnly}
         />
+        <ConsultantFeedbackSection requestId={requestId} previewReadOnly={previewReadOnly} />
       </div>
     );
   }
@@ -987,6 +989,7 @@ export default function ReviewsTab({ requestId, previewReadOnly = false }) {
           </div>
         </section>
       )}
+      <ConsultantFeedbackSection requestId={requestId} previewReadOnly={previewReadOnly} />
       {manualEntryReviewer && !previewReadOnly && (
         <ManualReviewEntryForm
           key={manualEntryReviewer.suggestionId}

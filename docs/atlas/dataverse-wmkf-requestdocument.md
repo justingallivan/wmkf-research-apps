@@ -327,6 +327,14 @@ Production Request Document row was created by this release smoke.
 ## Production Pre-Site Visit runtime contract
 
 - Artifact type: `Pre Site Visit` (already live in the Wave 16 option set).
+- Artifact type option `Consultant Feedback = 100000008` added to the production
+  `wmkf_artifacttype` picklist on 2026-09-14 (S512) via
+  `scripts/extend-requestdocument-artifacttype.mjs` (InsertOptionValue inside the
+  app solution; owner-run; verified by re-read). Mirrored in
+  `shared/config/requestDocument.js` and the Wave 16 schema record. No writer
+  emits it yet: it is the Consultant Feedback slice 2 attachment type
+  (`docs/plans/CONSULTANT_FEEDBACK_PLAN_2026-09-14.md` §4). [VERIFIED via the
+  script's dry-run output listing nine values.]
 - One Word file per versioned draft row; the row carries all eight named
   proposal-core fields and the exact validated Claude/input snapshots.
 - The source proposal is exactly

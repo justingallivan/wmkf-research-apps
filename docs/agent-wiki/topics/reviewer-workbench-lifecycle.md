@@ -1123,8 +1123,16 @@ sentences composed from stored data by the pure module
 `ClipboardItem`, falling back to `writeText`; it stays enabled in read-only
 Preview because the write is client-only. An unlabelled overall rating is
 excluded from the score tally and surfaced as a muted warning line rather
-than dropped silently. Model-authored themes/quotations are a later slice
-(Slice 2); this module has a named, unimplemented hook for them.
+than dropped silently. Model-authored themes and verified quotations were added in Slice 2 (see the
+synthesis section below); the Word export (Slice 3) and the Pre-Site Visit
+RefereeSection token fill (Slice 4) reuse the same composers.
+
+**Consultant Feedback (slice 1, 2026-09-14):** `ReviewsTab` also mounts
+`shared/components/workbench/ConsultantFeedbackSection.js` below Outstanding,
+backed by `lib/services/consultant-feedback-service.js` and
+`/api/workbench/consultant-feedback[/consultants]` (new Postgres table
+`consultant_feedback`, migration 048). See
+`docs/plans/CONSULTANT_FEEDBACK_PLAN_2026-09-14.md`.
 
 **Phase 1 LIVE (S326; deployed, browser-drive-verified against live acceptance data; reminder safety production-observed 2026-09-01):** outstanding tracking + manual nudge. The owner lifted the procedural manual reminder freeze after the incident-session deployment/smoke observations and a post-deploy D26 liveness audit of 51 never-reminded sweep candidates found zero blocked rows. The deployment metadata did not expose a source SHA, and the authenticated smoke has no tracked artifact. The DTO
 (`reviewers.js` GET) adds `submitted` (accepted-reviewer submission status),

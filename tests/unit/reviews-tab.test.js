@@ -24,6 +24,14 @@ jest.mock('../../shared/components/external/RichReviewEditor', () => ({
     />
   ),
 }));
+// Consultant Feedback has its own fetch calls and its own dedicated test file
+// (consultant-feedback-section.test.js); stubbed here so this file's blanket
+// `fetch.mockResolvedValue`/call-count assertions stay about the Reviews tab
+// itself.
+jest.mock('../../shared/components/workbench/ConsultantFeedbackSection', () => ({
+  __esModule: true,
+  default: () => <div data-testid="consultant-feedback-section" />,
+}));
 
 const REVIEWERS = [
   {
@@ -90,6 +98,9 @@ test('renders submitted reviews with decoded ratings + download link; pending la
   // The no-file submission shows the explicit no-file marker, not a broken link.
   expect(screen.getByText('No file on record')).toBeInTheDocument();
   expect(screen.getByText(/staff entry/i)).toBeInTheDocument();
+
+  // Consultant Feedback mounts below Outstanding on the populated render path too.
+  expect(screen.getByTestId('consultant-feedback-section')).toBeInTheDocument();
 });
 
 test('distinguishes a generated staff entry from a staff-uploaded file', async () => {
@@ -306,6 +317,8 @@ test('keeps a stored synthesis visible even when there are no accepted reviewer 
   expect(screen.getByText('Historical overall assessment.')).toBeInTheDocument();
   expect(screen.getByText('Stale')).toBeInTheDocument();
   expect(screen.getByText(/stale or predates lifecycle tracking/i)).toBeInTheDocument();
+  // Consultant Feedback mounts on the zero-reviews early-return path too.
+  expect(screen.getByTestId('consultant-feedback-section')).toBeInTheDocument();
 });
 
 test('names who is blocking synthesis instead of reporting a bare count', async () => {
