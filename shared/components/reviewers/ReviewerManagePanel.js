@@ -32,6 +32,7 @@ import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import ReviewerDueDateEditor from './ReviewerDueDateEditor';
 import ReviewerActivityDrawer from './ReviewerActivityDrawer';
 import ReviewerCloseoutModal from './ReviewerCloseoutModal';
+import { reviewerDocumentIsPending } from './reviewer-document-state';
 import { latestActivitySummary } from './reviewer-activity-history';
 import { acceptedReviewerRemoveWarning } from './remove-reviewer-confirm';
 import { Card, Button } from '../Layout';
@@ -1246,7 +1247,7 @@ export default function ReviewerManagePanel({
                       <>
                         <td className="px-2 py-3 align-top text-center">
                           {/* Download received review from SharePoint via Graph. */}
-                          {r.reviewSharePointFolder && (
+                          {r.reviewSharePointFolder ? (
                             <a
                               href={`/api/review-manager/download-review?suggestionId=${encodeURIComponent(r.suggestionId)}`}
                               className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg p-2 text-green-600 hover:bg-green-50 hover:text-green-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-600"
@@ -1257,7 +1258,18 @@ export default function ReviewerManagePanel({
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                               </svg>
                             </a>
-                          )}
+                          ) : reviewerDocumentIsPending(r) ? (
+                            <span
+                              className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg p-2 text-gray-400 animate-pulse"
+                              title="Review document is being prepared; download will become available automatically."
+                              aria-label={`Review document for ${r.name || 'reviewer'} is being prepared`}
+                              aria-disabled="true"
+                            >
+                              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                              </svg>
+                            </span>
+                          ) : null}
                         </td>
                         <td className="px-2 py-3 align-top text-center">
                           {/* Secondary magic-link and lifecycle actions. */}

@@ -8,6 +8,7 @@ import ReviewerManagePanel, {
   TokenActionsMenu,
   TokenStateBadge,
 } from '../../shared/components/reviewers/ReviewerManagePanel';
+import { reviewerDocumentIsPending } from '../../shared/components/reviewers/reviewer-document-state';
 
 jest.mock('../../shared/components/Layout', () => ({
   Card: ({ children }) => <div>{children}</div>,
@@ -265,6 +266,39 @@ describe('reviewer table geometry', () => {
     expect(screen.getByRole('button', { name: 'Mark complete' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Manage Joshua Rosenthal' }));
     expect(screen.queryAllByRole('button', { name: 'Mark complete' })).toHaveLength(1);
+  });
+
+  test('shows a non-clickable pending download icon while a completed structured review awaits filing', async () => {
+    const pending = {
+      ...reviewer,
+      reviewStatus: 'complete',
+      reviewReceivedAt: '2026-09-15T19:03:32.000Z',
+      honorariumEligibility: 'eligible',
+      reviewSharePointFolder: null,
+      answers: [{ questionKey: 'assessment', questionType: 'richtext', answerText: 'Strong proposal.' }],
+    };
+
+    expect(reviewerDocumentIsPending(pending)).toBe(true);
+
+    await act(async () => {
+      render(
+        <ReviewerManagePanel
+          proposal={proposal}
+          reviewers={[pending]}
+          canManage
+          mode="track"
+        />,
+      );
+      await Promise.resolve();
+    });
+
+    const preparing = screen.getByLabelText('Review document for Joshua Rosenthal is being prepared');
+    expect(preparing).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.queryByRole('link', { name: /Download review from Joshua Rosenthal/i })).not.toBeInTheDocument();
+
+    expect(reviewerDocumentIsPending({ ...pending, reviewStatus: 'review_received' })).toBe(false);
+    expect(reviewerDocumentIsPending({ ...pending, reviewSharePointFolder: '1003046_GUID/Reviews' })).toBe(false);
+    expect(reviewerDocumentIsPending({ ...pending, answers: [] })).toBe(false);
   });
 
   test('keeps a no-response row in the dedicated history group without accepted actions', async () => {

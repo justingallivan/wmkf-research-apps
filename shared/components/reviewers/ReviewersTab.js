@@ -32,6 +32,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import ReviewerManagePanel from './ReviewerManagePanel';
+import { reviewerDocumentIsPending } from './reviewer-document-state';
 import ReviewerFindPanel from './ReviewerFindPanel';
 import ReviewerInvitePanel from './ReviewerInvitePanel';
 import EmailTemplatesModal from './EmailTemplatesModal';
@@ -55,6 +56,15 @@ const SUB_TAB_KEYS = new Set(SUB_TABS.map((t) => t.key));
 // Time-bounding the overlay closes that for EVERY resetting writer, current or
 // future, without version-plumbing the send stream and roster DTO.
 const OVERLAY_RECONCILE_MS = 4000;
+
+// The canonical structured-review DOCX sweep runs hourly. While a just-closed
+// review is waiting for that durable SharePoint pointer, refresh server truth
+// quietly once a minute so the download control becomes active without a page
+// reload. Seventy attempts cover the next scheduled tick plus its bounded
+// five-minute run window; after that, an operational failure should remain
+// visible rather than poll forever.
+const REVIEW_DOCUMENT_RECONCILE_MS = 60_000;
+const REVIEW_DOCUMENT_RECONCILE_MAX_ATTEMPTS = 70;
 
 export default function ReviewersTab({
   requestId,
@@ -86,6 +96,8 @@ export default function ReviewersTab({
   const candidatesGenRef = useRef(0);
   const reviewersGenRef = useRef(0);
   const referralsGenRef = useRef(0);
+  const reviewDocumentPollAttemptsRef = useRef(0);
+  const reviewDocumentPollInFlightRef = useRef(false);
   // Pending overlay-reconcile timer (see OVERLAY_RECONCILE_MS). Cleared on
   // unmount so a late firing can't set state on a dead component; a firing
   // that outlives a request navigation is already dropped by the loader's
@@ -141,13 +153,15 @@ export default function ReviewersTab({
     );
   }, [router]);
 
-  const loadReviewers = useCallback(async () => {
+  const loadReviewers = useCallback(async ({ background = false } = {}) => {
     if (!requestId) return;
     const rid = requestId;
     const gen = ++reviewersGenRef.current;
     const isCurrent = () => rid === currentRequestIdRef.current && gen === reviewersGenRef.current;
-    setLoading(true);
-    setError(null);
+    if (!background) {
+      setLoading(true);
+      setError(null);
+    }
     try {
       const res = await fetch(`/api/review-manager/reviewers?proposalId=${encodeURIComponent(rid)}`);
       const data = await res.json().catch(() => ({}));
@@ -157,7 +171,7 @@ export default function ReviewersTab({
       }
       setProposal((data.proposals && data.proposals[0]) || null);
     } catch (e) {
-      if (isCurrent()) {
+      if (isCurrent() && !background) {
         setError(e.message);
         // A transient refetch error must not blank the panel or invalidate an
         // open materials-modal session for the same request (Stage 6B3d) — keep
@@ -170,7 +184,7 @@ export default function ReviewersTab({
         ));
       }
     } finally {
-      if (isCurrent()) setLoading(false);
+      if (isCurrent() && !background) setLoading(false);
     }
   }, [requestId]);
 
@@ -420,6 +434,35 @@ export default function ReviewersTab({
   // a redirect — so the choice stays implicit until the user clicks). While the
   // fetch is in flight we don't guess.
   const current = activeSub || (loading ? null : computeDefaultSub(reviewers));
+  const pendingReviewDocumentKey = current === 'track'
+    ? reviewers
+      .filter(reviewerDocumentIsPending)
+      .map((reviewer) => reviewer.suggestionId)
+      .sort()
+      .join(',')
+    : '';
+
+  useEffect(() => {
+    reviewDocumentPollAttemptsRef.current = 0;
+    if (!pendingReviewDocumentKey) return undefined;
+
+    const intervalId = setInterval(async () => {
+      if (reviewDocumentPollInFlightRef.current) return;
+      if (reviewDocumentPollAttemptsRef.current >= REVIEW_DOCUMENT_RECONCILE_MAX_ATTEMPTS) {
+        clearInterval(intervalId);
+        return;
+      }
+      reviewDocumentPollAttemptsRef.current += 1;
+      reviewDocumentPollInFlightRef.current = true;
+      try {
+        await loadReviewers({ background: true });
+      } finally {
+        reviewDocumentPollInFlightRef.current = false;
+      }
+    }, REVIEW_DOCUMENT_RECONCILE_MS);
+
+    return () => clearInterval(intervalId);
+  }, [pendingReviewDocumentKey, loadReviewers]);
 
   // A synthetic proposal so the panel can render its empty state even before any
   // reviewer has accepted (the GET returns no projection until then) and even
