@@ -70,14 +70,20 @@ async function readJson(response, fallback) {
   return body;
 }
 
-function Chip({ selected, onClick, children, disabled }) {
+const NO_EMAIL_SECTION_HINT = 'Greyed names have no email on file; hover a name for the reason.';
+export const noEmailHint = (person) => person?.linked
+  ? 'No email on file. The linked Dataverse contact is inactive, missing, or has no primary email; fix or relink the contact, or unlink the roster row.'
+  : 'No email on file. Add a preferred email on the Expertise Finder roster before this person can be added.';
+
+function Chip({ selected, onClick, children, disabled, title }) {
   return (
     <button
       type="button"
       aria-pressed={selected}
       disabled={disabled}
+      title={title}
       onClick={onClick}
-      className={`rounded-full border px-3 py-1.5 text-sm font-medium disabled:opacity-50 ${selected ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'}`}
+      className={`rounded-full border px-3 py-1.5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50 ${selected ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'}`}
     >
       {children}
     </button>
@@ -234,10 +240,15 @@ export default function SiteVisitEditor() {
                   <div key={group}>
                     <h2 className="text-sm font-semibold text-gray-700">{group}</h2>
                     <div className="mt-2 flex flex-wrap gap-2">
-                      {rows.map((person) => (
-                        <Chip key={refKey(person.ref)} selected={form[role].some((ref) => sameRef(ref, person.ref))} disabled={busy} onClick={() => toggleIn(role, person.ref)}>{person.name}</Chip>
-                      ))}
+                      {rows.map((person) => {
+                        const selected = form[role].some((ref) => sameRef(ref, person.ref));
+                        const noEmail = !person.email;
+                        return (
+                          <Chip key={refKey(person.ref)} selected={selected} disabled={busy || (noEmail && !selected)} title={noEmail ? noEmailHint(person) : undefined} onClick={() => toggleIn(role, person.ref)}>{person.name}{noEmail ? ' · no email' : ''}</Chip>
+                        );
+                      })}
                       {rows.length === 0 && <p className="text-sm text-gray-500">No eligible people found.</p>}
+                      {rows.some((person) => !person.email) && <p className="w-full text-xs text-gray-500">{NO_EMAIL_SECTION_HINT}</p>}
                     </div>
                   </div>
                 ))}

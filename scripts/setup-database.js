@@ -683,7 +683,7 @@ const v38Statements = [
 const v39Statements = [
   `CREATE TABLE IF NOT EXISTS portal_upload_staging (
     id UUID PRIMARY KEY,
-    scope TEXT NOT NULL CONSTRAINT portal_upload_staging_scope_check CHECK (scope IN ('grantee_image', 'staff_grantee_image', 'site_visit_material')),
+    scope TEXT NOT NULL CONSTRAINT portal_upload_staging_scope_check CHECK (scope IN ('grantee_image', 'staff_grantee_image', 'site_visit_material', 'consultant_feedback')),
     resource_id UUID NOT NULL,
     actor_binding TEXT NOT NULL,
     pathname TEXT NOT NULL UNIQUE,
@@ -1111,8 +1111,47 @@ const v49Statements = [
   `INSERT INTO review_panel_control(id) VALUES (TRUE) ON CONFLICT(id) DO NOTHING`,
 ];
 
-// V50: non-authoritative reviewer institution measurement. Mirrors migration 048.
+// V50: Consultant Feedback slice 1 (docs/plans/CONSULTANT_FEEDBACK_PLAN_2026-09-14.md §4).
+// Mirrors migration 048.
 const v50Statements = [
+  `CREATE TABLE IF NOT EXISTS consultant_feedback (
+    id                     BIGSERIAL PRIMARY KEY,
+    request_id             UUID NOT NULL,
+    consultant_roster_id   INTEGER REFERENCES expertise_roster(id),
+    one_off_name           TEXT,
+    one_off_affiliation    TEXT,
+    body_html              TEXT,
+    received_on            DATE NOT NULL,
+    requestdocument_id     UUID UNIQUE,
+    shared                 BOOLEAN NOT NULL DEFAULT true,
+    mutation_id            UUID NOT NULL,
+    status                 TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'deleting')),
+    created_by             INTEGER NOT NULL REFERENCES user_profiles(id),
+    updated_by             INTEGER NOT NULL REFERENCES user_profiles(id),
+    created_at             TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at             TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT consultant_feedback_has_content CHECK (body_html IS NOT NULL OR requestdocument_id IS NOT NULL),
+    CONSTRAINT consultant_feedback_one_author CHECK (
+      (consultant_roster_id IS NOT NULL AND one_off_name IS NULL)
+      OR (consultant_roster_id IS NULL AND one_off_name IS NOT NULL)
+    )
+  )`,
+  `CREATE INDEX IF NOT EXISTS consultant_feedback_request_idx ON consultant_feedback (request_id, received_on DESC)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS consultant_feedback_mutation_idx ON consultant_feedback (request_id, mutation_id)`,
+];
+
+// V51: Consultant Feedback slice 2 (mirrors migration 049) — widen the shared
+// portal_upload_staging scope allowlist to add 'consultant_feedback'.
+const v51Statements = [
+  `ALTER TABLE portal_upload_staging
+     DROP CONSTRAINT IF EXISTS portal_upload_staging_scope_check`,
+  `ALTER TABLE portal_upload_staging
+     ADD CONSTRAINT portal_upload_staging_scope_check
+     CHECK (scope IN ('grantee_image', 'staff_grantee_image', 'site_visit_material', 'consultant_feedback'))`,
+];
+
+// V52: non-authoritative reviewer institution measurement. Mirrors migration 051.
+const v52Statements = [
   `CREATE TABLE IF NOT EXISTS reviewer_institution_measurement_events (
     id BIGSERIAL PRIMARY KEY, case_key CHAR(64) NOT NULL, card_snapshot_digest CHAR(64) NOT NULL,
     event_type TEXT NOT NULL CHECK (event_type IN (
@@ -1393,6 +1432,7 @@ const v25Statements = [
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     preferred_email VARCHAR(320),
+    dataverse_contact_id UUID,
     role_type VARCHAR(50) NOT NULL,
     role VARCHAR(255),
     affiliation VARCHAR(500),
@@ -1427,6 +1467,9 @@ const v25Statements = [
   `CREATE INDEX IF NOT EXISTS idx_expertise_roster_role_type ON expertise_roster(role_type)`,
   `CREATE INDEX IF NOT EXISTS idx_expertise_roster_active ON expertise_roster(is_active)`,
   `CREATE INDEX IF NOT EXISTS idx_expertise_roster_name ON expertise_roster(name)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_expertise_roster_active_contact
+     ON expertise_roster (dataverse_contact_id)
+     WHERE dataverse_contact_id IS NOT NULL AND is_active = true`,
   `CREATE INDEX IF NOT EXISTS idx_expertise_matches_user ON expertise_matches(user_profile_id)`,
   `CREATE INDEX IF NOT EXISTS idx_expertise_matches_created ON expertise_matches(created_at DESC)`,
 ];
@@ -2162,8 +2205,8 @@ async function runMigration() {
       }
     }
 
-    // Run V50 schema updates (reviewer institution measurement; mirrors migration 048)
-    console.log(`\nApplying v50 schema updates - reviewer institution measurement (${v50Statements.length} statements)...`);
+    // Run V50 schema updates (Consultant Feedback slice 1; mirrors migration 048)
+    console.log(`\nApplying v50 schema updates - Consultant Feedback (${v50Statements.length} statements)...`);
     for (let i = 0; i < v50Statements.length; i++) {
       const statement = v50Statements[i];
       const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
@@ -2175,6 +2218,42 @@ async function runMigration() {
           console.log(`[v50-${i + 1}/${v50Statements.length}] ○ Already exists: ${preview}...`);
         } else {
           console.error(`[v50-${i + 1}/${v50Statements.length}] ✗ Error: ${error.message}`);
+          throw error;
+        }
+      }
+    }
+
+    // Run V51 schema updates (Consultant Feedback slice 2; mirrors migration 049)
+    console.log(`\nApplying v51 schema updates - Consultant Feedback attachments (${v51Statements.length} statements)...`);
+    for (let i = 0; i < v51Statements.length; i++) {
+      const statement = v51Statements[i];
+      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
+      try {
+        await sql.query(statement);
+        console.log(`[v51-${i + 1}/${v51Statements.length}] ✓ ${preview}...`);
+      } catch (error) {
+        if (error.message.includes('already exists')) {
+          console.log(`[v51-${i + 1}/${v51Statements.length}] ○ Already exists: ${preview}...`);
+        } else {
+          console.error(`[v51-${i + 1}/${v51Statements.length}] ✗ Error: ${error.message}`);
+          throw error;
+        }
+      }
+    }
+
+    // Run V52 schema updates (reviewer institution measurement; mirrors migration 051)
+    console.log(`\nApplying v52 schema updates - reviewer institution measurement (${v52Statements.length} statements)...`);
+    for (let i = 0; i < v52Statements.length; i++) {
+      const statement = v52Statements[i];
+      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
+      try {
+        await sql.query(statement);
+        console.log(`[v52-${i + 1}/${v52Statements.length}] ✓ ${preview}...`);
+      } catch (error) {
+        if (error.message.includes('already exists')) {
+          console.log(`[v52-${i + 1}/${v52Statements.length}] ○ Already exists: ${preview}...`);
+        } else {
+          console.error(`[v52-${i + 1}/${v52Statements.length}] ✗ Error: ${error.message}`);
           throw error;
         }
       }

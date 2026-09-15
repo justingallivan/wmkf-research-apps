@@ -6,7 +6,7 @@ status: active
 summary: "Implement a narrow, server-authoritative institution auto-resolution slice that removes safe department and multi-affiliation holds while preserving identity, COI, current-discrepancy, and provider-failure safeguards."
 canonical: false
 cataloged: 2026-09-14
-last_verified: 2026-09-14
+last_verified: 2026-09-15
 owner: product-engineering
 related:
   - docs/INSTITUTION_PAIR_CONSISTENCY_RESOLUTION_PLAN.md
@@ -52,7 +52,7 @@ for it.
    are browser-returned `roster_unverified` observations and therefore cannot
    carry relationship authority.
 4. **[VERIFIED via
-   `lib/db/migrations/048_reviewer_institution_measurement_events.sql:1-29`]**
+   `lib/db/migrations/051_reviewer_institution_measurement_events.sql:1-29`]**
    The measurement schema currently enforces
    `independent_identity=not_evaluable`, `additional_coi=not_screened`, and
    `proposed_action=not_evaluable`. It cannot be interpreted as an automatic
@@ -109,7 +109,7 @@ for it.
 - **Persistence:** the existing `reviewer_find_roster.candidate` server-owned
   projection and the append-only
   `reviewer_institution_measurement_events` observation table. Select the exact
-  storage shape only after verifying whether migration 048 has been applied in
+  storage shape only after verifying whether migration 051 has been applied in
   any environment.
 - **Consumers:** candidate card, selection controls, ordinary and
   applicant-recommended save paths, staff notification, measurement report,
@@ -366,8 +366,8 @@ digest. Every v1 claim is mandatory; undefined values never compare as a
 match. The roster stores only the bounded projection and receipt. Reload and
 save re-read or verify it; browser edits invalidate it.
 
-Before changing migration 048, probe `schema_migrations` in every intended
-environment. If 048 is unapplied everywhere, amend the source-built migration.
+Before changing migration 051, probe `schema_migrations` in every intended
+environment. If 051 is unapplied everywhere, amend the source-built migration.
 If any environment has applied it, add a new forward migration. Never rewrite
 an applied migration. Any amendment must also update the fresh-install table
 definition in `scripts/setup-database.js`, and a gate must keep the measurement
@@ -540,5 +540,5 @@ the Phase 3 v2 policy binding and server-projected card/remedy state. Add the
 remaining rendered-state, selection-state, exact call-set, partial-batch, and
 frozen 40-case identity regressions before proposing any high-authority flag
 enablement. Keep `REVIEWER_INSTITUTION_PHASE2` off, do not enable measurement,
-do not apply migration 048, and do not create a Preview deployment during the
+do not apply migration 051, and do not create a Preview deployment during the
 intervening months.

@@ -4,13 +4,14 @@ import {
   getDefaultMeetingAttendees,
   loadMeetingTrackerRecipientPicker,
   normalizeMeetingAttendeeRefs,
+  resolveMeetingAttendeeRefs,
 } from '../../lib/services/meeting-tracker/attendee-service';
 import { MEETING_TRACKER_DEFAULT_ATTENDEES_SETTING } from '../../shared/config/meetingTracker';
 
 function dependencies(overrides = {}) {
   const directory = {
     staff: [{ kind: 'staff', profileId: 7, name: 'Alex Staff', email: 'alex@example.org' }],
-    external: [{ kind: 'roster', rosterId: 9, name: 'Bailey Board', email: 'bailey@example.org' }],
+    external: [{ kind: 'roster', rosterId: 9, name: 'Bailey Board', email: 'bailey@example.org', linked: false }],
   };
   return {
     schemaReady: jest.fn(() => true),
@@ -83,8 +84,8 @@ test('recipient picker includes staff and Board only and reuses one directory re
   const directory = {
     staff: [{ profileId: 7, name: 'Alex Staff', email: 'alex@example.org' }],
     external: [
-      { rosterId: 9, name: 'Bailey Board', email: 'bailey@example.org', roleType: 'Board' },
-      { rosterId: 10, name: 'Casey Consultant', email: 'casey@example.org', roleType: 'Consultant' },
+      { rosterId: 9, name: 'Bailey Board', email: 'bailey@example.org', linked: true, roleType: 'Board' },
+      { rosterId: 10, name: 'Casey Consultant', email: 'casey@example.org', linked: false, roleType: 'Consultant' },
     ],
   };
   const refs = { version: 1, attendees: [{ kind: 'staff', profileId: 7 }] };
@@ -98,7 +99,7 @@ test('recipient picker includes staff and Board only and reuses one directory re
 
   expect(deps.getRecipientDirectory).toHaveBeenCalledTimes(1);
   expect(result.staff).toHaveLength(1);
-  expect(result.board).toEqual([expect.objectContaining({ name: 'Bailey Board' })]);
+  expect(result.board).toEqual([expect.objectContaining({ name: 'Bailey Board', linked: true })]);
   expect(result.defaultAttendeeRefs).toEqual(refs.attendees);
   expect(result.defaultAttendees).toEqual([{ name: 'Alex Staff', email: 'alex@example.org' }]);
 });
@@ -149,4 +150,53 @@ test('the admin writer stores staff references only after resolving them', async
   await expect(writeDefaultMeetingAttendees({ attendees: [{ kind: 'roster', rosterId: 9 }] }, { updatedBy: 3 }, deps))
     .rejects.toMatchObject({ httpStatus: 400 });
   expect(setSetting).toHaveBeenCalledTimes(1);
+});
+
+test('a Board member with no preferred email stays visible in the picker and is refused by name on save', async () => {
+  const directory = {
+    staff: [{ kind: 'staff', profileId: 7, name: 'Alex Staff', email: 'alex@example.org' }],
+    external: [
+      { kind: 'roster', rosterId: 9, name: 'Bailey Board', email: 'bailey@example.org', linked: false, roleType: 'Board' },
+      { kind: 'roster', rosterId: 11, name: 'Dana Unlisted', email: null, linked: false, roleType: 'Board' },
+    ],
+  };
+  const resolveRecipientRefs = jest.fn(async () => { throw new Error('generic resolver reached'); });
+  const deps = dependencies({ getRecipientDirectory: jest.fn(async () => directory), resolveRecipientRefs });
+
+  const picker = await loadMeetingTrackerRecipientPicker(deps);
+  expect(picker.board).toEqual([
+    expect.objectContaining({ ref: { kind: 'roster', rosterId: 9 }, email: 'bailey@example.org' }),
+    expect.objectContaining({ ref: { kind: 'roster', rosterId: 11 }, email: null }),
+  ]);
+
+  await expect(resolveMeetingAttendeeRefs(
+    { version: 1, attendees: [{ kind: 'staff', profileId: 7 }, { kind: 'roster', rosterId: 11 }] },
+    deps,
+  )).rejects.toMatchObject({
+    httpStatus: 409,
+    code: 'meeting_tracker_attendee_email_missing',
+    message: expect.stringContaining('Dana Unlisted has no email on file'),
+  });
+  expect(resolveRecipientRefs).not.toHaveBeenCalled();
+});
+
+test('a linked Board member with no Contact email receives the Dataverse remedy', async () => {
+  const directory = {
+    staff: [],
+    external: [{ kind: 'roster', rosterId: 12, name: 'Linked Board', email: null, linked: true, roleType: 'Board' }],
+  };
+  const resolveRecipientRefs = jest.fn();
+  const deps = dependencies({ getRecipientDirectory: jest.fn(async () => directory), resolveRecipientRefs });
+
+  const picker = await loadMeetingTrackerRecipientPicker(deps);
+  expect(picker.board).toEqual([expect.objectContaining({ linked: true })]);
+  await expect(resolveMeetingAttendeeRefs(
+    { version: 1, attendees: [{ kind: 'roster', rosterId: 12 }] },
+    deps,
+  )).rejects.toMatchObject({
+    httpStatus: 409,
+    code: 'meeting_tracker_attendee_email_missing',
+    message: expect.stringMatching(/linked Dataverse contact.*fix or relink.*unlink/i),
+  });
+  expect(resolveRecipientRefs).not.toHaveBeenCalled();
 });

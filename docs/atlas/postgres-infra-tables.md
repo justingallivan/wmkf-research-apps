@@ -1,6 +1,6 @@
 # Atlas: Postgres infrastructure tables (compact)
 
-**Last verified (schema sources):** 2026-08-25. **Row counts re-probed:** 2026-05-25 via `scripts/audit-postgres-state.js`, except the distribution ledger proof below. Operational/log tables drift continuously; treat counts as "last observed" snapshots, not invariants.
+**Last verified (schema sources):** 2026-09-14. **Row counts re-probed:** 2026-05-25 via `scripts/audit-postgres-state.js`, except the distribution ledger proof below. Operational/log tables drift continuously; treat counts as "last observed" snapshots, not invariants.
 
 Compact summary for the Postgres tables outside the reviewer-finder domain. Promote any of these to its own page on next significant touch.
 
@@ -89,18 +89,29 @@ RBAC scaffolding for the explorer write tools. Restrictions table is empty; a 27
 
 ## Expertise Finder
 
-### `expertise_roster` (38 rows), `expertise_matches` (344 rows)
+### `expertise_roster` (39 rows), `expertise_matches` (344 rows)
 **Source of truth:** Postgres.
 Internal staff/consultant/board roster + per-proposal match history. Production
 consumers are `pages/api/expertise-finder/{match,batch-match,roster,history}.js`;
 production prompt rules live in
 `shared/config/prompts/expertise-finder.js`. The isolated
 `modules/expertise_matching` reference/demo has no production caller.
-Migration 035 adds nullable normalized `preferred_email`, maintained by the
-existing roster editor and consumed by the Site Visit recipient directory for
-Board/Consultant suggestions. The immutable roster row ID remains the external
-recipient identity; names are never join keys. **[VERIFIED LIVE 2026-08-24:
-column exact; zero preferred-email values before staff population.]**
+Migration 035 added nullable normalized `preferred_email`. Migration 050 is
+**[PRODUCTION-LIVE 2026-09-14; applied and read back]** and adds nullable
+`dataverse_contact_id UUID` plus a partial unique index permitting only one
+active roster row per Contact. For an unlinked Board/Consultant row, the Site
+Visit recipient directory continues to use `preferred_email`. For a linked row,
+it resolves the active Contact's current `emailaddress1`; a missing, inactive,
+or email-less Contact yields no email and never falls back to the manual copy.
+The Expertise Finder editor is the interactive link writer, and
+`scripts/link-roster-contacts.js` is a dry-run-first owner-operated backfill.
+The immutable roster row ID remains the external recipient identity; names and
+email addresses are never join keys. **[HISTORICAL LIVE SNAPSHOT 2026-08-24:
+migration-035 column exact; zero preferred-email values before staff population.]**
+**[PRODUCTION SNAPSHOT 2026-09-14 local / 2026-09-15 UTC:]** 39 roster rows;
+9 active Board (4 linked), 26 active Consultants (6 linked), and 4 active
+Research Program Staff. Five Board rows are owner-deferred as a non-blocking
+future-cycle reconciliation; see the roster Contact-link plan F5.
 
 ## Integrity Screener
 
@@ -384,7 +395,7 @@ expected columns, 0 rows — empty until the branch merges.]**
 
 ## Portal upload staging
 
-### `portal_upload_staging` (migrations 031, 043)
+### `portal_upload_staging` (migrations 031, 043, 049)
 **Source of truth:** Postgres coordination ledger; published abstract/caption/image
 authority remains Dataverse + SharePoint.
 
@@ -404,10 +415,22 @@ Write/read paths: `lib/services/portal-upload-staging.js`; external grantee mint
 and submit routes; staff replacement mint and finalize routes; external
 applicant materials mint and finalize routes (scope `site_visit_material`,
 migration 043, S503; document content types, cap from the admin setting
-`site_visit_materials.upload_max_mb`). Raw external
+`site_visit_materials.upload_max_mb`); staff Consultant Feedback attachment
+mint and finalize routes (scope `consultant_feedback`, migration 049,
+Consultant Feedback slice 2 — `docs/plans/CONSULTANT_FEEDBACK_PLAN_2026-09-14.md`
+§4; PDF/DOCX only, `lib/services/consultant-feedback-attachment-service.js`).
+Raw external
 tokens are never stored (SHA-256 binding only), and clients never choose or echo
 an authoritative pathname. Daily maintenance deletes exact table-selected Blob
-pathnames after expiry and prunes terminal ledger rows after seven days.
+pathnames after expiry and prunes terminal ledger rows after seven days; since
+the Consultant Feedback prerequisite (same plan §4 "Slice 2 prerequisite"),
+that sweep also reconciles any `candidate_result` recorded after a Graph
+upload against a per-scope binding proof before expiring the row —
+`consultant_feedback` and `site_visit_material` scopes have a proof wired
+(fail-closed: an unbound Ready registry row is superseded before its Graph
+item is discarded); `grantee_image`/`staff_grantee_image` and any
+unrecognised candidate shape are always retained, never discarded, until a
+proof is wired for them too.
 
 Private-store prerequisite is covered by
 `scripts/probe-private-blob-client-access.mjs`: public-mode PUT must fail, private
@@ -513,6 +536,75 @@ reviews resolve live from `wmkf_appreviewersuggestion`, and the proposal
 narrative resolves by governed path. Cleanup: none scheduled; revoked and expired
 rows stay as audit history (bounded by one live row per request).
 
+### `consultant_feedback` — PRODUCTION-LIVE Consultant Feedback slices 1–3 (migrations 048-049 applied; fresh-install v50-v51; 2026-09-14)
+
+**Source of truth:** Postgres. Staff-recorded informal feedback from retained
+consultants on a proposal (`docs/plans/CONSULTANT_FEEDBACK_PLAN_2026-09-14.md`).
+Home is the Request Workbench Reviews tab, as its own "Consultant feedback"
+section below formal reviews (CF1); shared on the external deliberation
+briefing page by default (`shared` boolean, default `true`, CF2); staff may
+edit and delete with no audit trail (CF5). PR #300 made its append-only Graph
+uploads use closed `rename` conflict behavior, preserving both artifacts when
+two entries derive the same filename. A signed-in production smoke on request
+1003222 proved create, upload/finalize, staff open, and delete.
+
+Columns: `id`, `request_id` (Dataverse `akoya_request` GUID, GUID-validated at
+the route boundary), `consultant_roster_id` (FK `expertise_roster.id`,
+nullable; joined **live and unfiltered by `is_active`** for display, so a
+deactivated consultant's past feedback keeps its author name),
+`one_off_name`/`one_off_affiliation` (used only when `consultant_roster_id` is
+null — a one-off consultant name stored on the entry itself; CF6: one-offs are
+never written to `expertise_roster` and never appear in recipient pickers),
+`body_html` (sanitized HTML, same `sanitizeReviewHtml` pipeline as reviews,
+re-sanitized on every read; required unless `requestdocument_id` is set —
+an attachment-only entry may carry a null body), `received_on` (date),
+`requestdocument_id` (nullable, unique; slice 2: the bound attachment's
+`wmkf_requestdocumentid`, written either at create via `writeFeedbackEntry`
+or bound onto an existing row via `updateFeedbackEntry`'s `patch.requestdocumentId`,
+409 `attachment_conflict` if already set), `shared`, `mutation_id`
+(client-generated UUID; `UNIQUE (request_id, mutation_id)` backs a replay-safe
+create: `INSERT … ON CONFLICT (request_id, mutation_id) DO NOTHING` followed
+by a select on that mutation id, so a retry after a lost response returns the
+original row instead of duplicating it), `status` (`active` or `deleting`;
+an unattached row's delete still goes straight from `active` to gone — an
+attached row's delete sets `deleting` first (plan §3.6 three-step: mark
+`deleting` → supersede the registry row → PG delete), invisible to every
+`status = 'active'` reader from the first step; `listConsultantFeedback` runs
+a bounded recovery sweep over this request's `deleting` rows before every
+list, so a crash or lost response between steps completes on the next staff
+visit with no background job), `created_by`/`updated_by`/`created_at`/`updated_at`.
+
+Constraints: `consultant_feedback_has_content` (`body_html IS NOT NULL OR
+requestdocument_id IS NOT NULL`); `consultant_feedback_one_author` (exactly
+one of `consultant_roster_id` / `one_off_name`). Server-side eligibility
+(`is_active = true AND role_type = 'Consultant'` against `expertise_roster`)
+is enforced in the service on create and on any author change — the FK alone
+would accept a Board member or an inactive roster row.
+
+Written and read exclusively by `lib/services/consultant-feedback-service.js`
+(`listConsultantFeedback`, `listEligibleConsultants`, `writeFeedbackEntry` —
+inserts, `updateFeedbackEntry` — author/body/date/share/attachment-bind
+changes; both run in their own same-client transaction through the shared
+`assertConsultantEligible`/`validateAuthorInput` guards, eligibility only
+re-checked when the submitted author differs by value from the stored row,
+`deleteFeedbackEntry` — the plan §3.6 three-step for an attached row,
+`isSharedActiveFeedbackAttachment` — half of the briefing page's `feedback:`
+member proof, `loadSharedConsultantFeedbackForBriefing`, and slice 3's
+`downloadConsultantFeedbackAttachment` — reads one active request-owned entry,
+then independently requires its exact same-request Ready/non-Superseded
+Consultant Feedback registry row before a staff-only Graph download), called
+from `/api/workbench/consultant-feedback`, `/consultants`, and `/attachment`,
+`lib/services/consultant-feedback-attachment-service.js` (slice 2 attachment
+lifecycle — see the `wmkf_requestdocuments` entry below), and
+`lib/services/deliberation-briefing/briefing-page-service.js`'s
+`buildBriefingContext`/`resolveBriefingMember` (`consultantFeedback: { status:
+'ok' | 'unavailable', items }` — a read failure on this table alone degrades to
+`unavailable` with a structured log rather than failing the whole briefing
+context or looking like "no feedback"; each shared item's
+`attachment.member = 'feedback:<requestdocumentid>'` only when the registry
+row is Ready and not Superseded). No `expertise_roster` write happens anywhere
+in this feature.
+Cleanup: none (CF5 — a deleted row is simply gone).
 
 ### `site_visit_material_collections` (migrations 042, 044; S503)
 

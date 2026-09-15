@@ -61,6 +61,11 @@ export function moveSlot(slots, from, to) {
   return next;
 }
 
+const NO_EMAIL_SECTION_HINT = 'Greyed names have no email on file; hover a name for the reason.';
+export const noEmailHint = (person) => person?.linked
+  ? 'No email on file. The linked Dataverse contact is inactive, missing, or has no primary email; fix or relink the contact, or unlink the roster row.'
+  : 'No email on file. Add a preferred email on the Expertise Finder roster before this person can be added.';
+
 function sameRef(left, right) {
   return left.kind === right.kind
     && (left.kind === 'staff' ? left.profileId === right.profileId : left.rosterId === right.rosterId);
@@ -485,7 +490,7 @@ export default function SessionEditor() {
           )}
           <p className="mt-1 text-sm text-gray-600">The fixed staff list is selected for new sessions. Add Board members for this meeting.</p>
           <div className="mt-4 grid gap-4 md:grid-cols-2">
-            {[['Staff', recipients.staff], ['Board', recipients.board]].map(([label, rows]) => <div key={label}><h2 className="text-sm font-semibold text-gray-700">{label}</h2><div className="mt-2 flex flex-wrap gap-2">{rows.map((person) => { const selected = form.attendees.some((ref) => sameRef(ref, person.ref)); return <button key={`${person.ref.kind}-${person.ref.profileId || person.ref.rosterId}`} type="button" aria-pressed={selected} onClick={() => toggleAttendee(person.ref)} className={`rounded-full border px-3 py-1.5 text-sm font-medium ${selected ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'}`}>{person.name}</button>; })}{rows.length === 0 && <p className="text-sm text-gray-500">No eligible people found.</p>}</div></div>)}
+            {[['Staff', recipients.staff], ['Board', recipients.board]].map(([label, rows]) => <div key={label}><h2 className="text-sm font-semibold text-gray-700">{label}</h2><div className="mt-2 flex flex-wrap gap-2">{rows.map((person) => { const selected = form.attendees.some((ref) => sameRef(ref, person.ref)); const noEmail = !person.email; return <button key={`${person.ref.kind}-${person.ref.profileId || person.ref.rosterId}`} type="button" aria-pressed={selected} disabled={noEmail && !selected} title={noEmail ? noEmailHint(person) : undefined} onClick={() => toggleAttendee(person.ref)} className={`rounded-full border px-3 py-1.5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50 ${selected ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'}`}>{person.name}{noEmail ? ' · no email' : ''}</button>; })}{rows.length === 0 && <p className="text-sm text-gray-500">No eligible people found.</p>}{rows.some((person) => !person.email) && <p className="w-full text-xs text-gray-500">{NO_EMAIL_SECTION_HINT}</p>}</div></div>)}
           </div>
         </fieldset>
 

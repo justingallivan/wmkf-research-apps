@@ -242,6 +242,13 @@ test('GET success returns the full proposal + reviewer envelope', async () => {
         potentialReviewerId: PERSON_ID,
         name: 'Dr. Full',
         affiliation: 'Primary Affiliation Univ',
+        // Reviews Tab Phase II Slice 1 (2026-09-14): five person identity fields
+        // projected read-time for the writeup paragraphs; null when unset.
+        lastName: null,
+        academicRank: null,
+        mainInstitution: null,
+        areaOfExpertise: null,
+        keywords: null,
         email: 'full@example.com',
         honorariumEligibility: null,
         honorariumOptOut: false,

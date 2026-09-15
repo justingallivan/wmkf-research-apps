@@ -145,3 +145,26 @@ test('a failed run collapses to one line with the SPECIFIC seat reason, not the 
   expect(within(card).getByRole('button', { name: 'Retry' })).toBeInTheDocument();
   expect(within(card).queryByText('#1002852')).toBeNull(); // the tab IS this request; no repeated number
 });
+
+test('mobile Review Panel actions keep 44px hit areas while secondary metadata retains readable contrast', async () => {
+  const mine = { profileId: 1, name: 'Me', isMine: true };
+  global.fetch.mockResolvedValue(ok(body({ runs: [
+    run({ id: 'r1', owner: mine, entries: [entry({
+      id: 'e1',
+      rerenderCount: 1,
+      seats: [{ seatKey: 'seat.claude', label: 'Claude reviewer', model: 'claude-opus-5', state: 'completed', costState: 'known', costCents: 25 }],
+    })] }),
+    run({ id: 'r2', status: 'failed', owner: mine, entries: [entry({ id: 'e2', status: 'failed', hasReport: false })] }),
+  ] })));
+  render(<ReviewPanelTab requestId={REQ} />);
+
+  const launch = await screen.findByRole('button', { name: 'Launch new panel' });
+  expect(launch).toHaveClass('min-h-11', 'sm:min-h-0');
+  expect(screen.getByRole('link', { name: 'Word' })).toHaveClass('min-h-11', 'sm:min-h-0');
+  expect(screen.getByRole('link', { name: 'PDF' })).toHaveClass('min-h-11', 'sm:min-h-0');
+  expect(screen.getByRole('button', { name: 'Re-render report' })).toHaveClass('min-h-11', 'sm:min-h-0');
+  expect(screen.getByRole('button', { name: 'Retry' })).toHaveClass('min-h-11', 'min-w-11', 'sm:min-h-0', 'sm:min-w-0');
+  expect(screen.getAllByText('Details')[0].closest('summary')).toHaveClass('min-h-11', 'sm:min-h-0');
+  expect(screen.getByText(/re-rendered 1×/)).toHaveClass('text-gray-500');
+  expect(screen.getByText('Seat and chair models are changed in the admin model panel.')).toHaveClass('text-gray-500');
+});

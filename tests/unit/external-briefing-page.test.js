@@ -123,3 +123,99 @@ test('research presentation materials list by label; oversize files show without
   expect(screen.getByText(/Visit\.mp4/)).toBeInTheDocument();
   expect(screen.getByText(/too large to open here/)).toBeInTheDocument();
 });
+
+test('consultant feedback: the section is omitted when there are zero shared items', async () => {
+  global.fetch = jest.fn().mockResolvedValue(response({
+    ok: true, title: 'Example University', proposalTitle: null, expiresAt: null,
+    session: null, siteVisit: null, writeup: null, reviews: [], proposal: null,
+    consultantFeedback: { status: 'ok', items: [] },
+  }));
+  render(<BriefingPage />);
+  await screen.findByText('Example University');
+  expect(screen.queryByText('Consultant feedback')).not.toBeInTheDocument();
+});
+
+test('consultant feedback: an unavailable status renders a notice instead of the items, even when the fixture carries shared items', async () => {
+  global.fetch = jest.fn().mockResolvedValue(response({
+    ok: true, title: 'Example University', proposalTitle: null, expiresAt: null,
+    session: null, siteVisit: null, writeup: null, reviews: [], proposal: null,
+    // The fixture below is deliberately populated (as a real 'ok' response
+    // would be) so this test proves the notice REPLACES content on the client
+    // too — not merely that an already-empty items array stays empty.
+    consultantFeedback: {
+      status: 'unavailable',
+      items: [{ name: 'Jane Doe', affiliation: 'Acme Consulting', receivedOn: '2026-09-01', bodyHtml: '<p>x</p>' }],
+    },
+  }));
+  render(<BriefingPage />);
+  expect(await screen.findByText('Consultant feedback')).toBeInTheDocument();
+  expect(screen.getByText('Consultant feedback could not be loaded.')).toBeInTheDocument();
+  expect(screen.queryByText('Jane Doe')).not.toBeInTheDocument();
+});
+
+test('consultant feedback: shared items render name, affiliation, received date as a text node, and sanitized body', async () => {
+  global.fetch = jest.fn().mockResolvedValue(response({
+    ok: true, title: 'Example University', proposalTitle: null, expiresAt: null,
+    session: null, siteVisit: null, writeup: null, reviews: [], proposal: null,
+    consultantFeedback: {
+      status: 'ok',
+      items: [{ name: 'Jane Doe', affiliation: 'Acme Consulting', receivedOn: '2026-09-01', bodyHtml: '<p>Great work.</p>' }],
+    },
+  }));
+  render(<BriefingPage />);
+  expect(await screen.findByText('Jane Doe')).toBeInTheDocument();
+  expect(screen.getByText('Acme Consulting', { exact: false })).toBeInTheDocument();
+  // Rendered from the string verbatim — never through `new Date`, so the day
+  // can never shift with the viewer's time zone.
+  expect(screen.getByText('Received 2026-09-01')).toBeInTheDocument();
+  expect(screen.getByText('Great work.')).toBeInTheDocument();
+});
+
+test('consultant feedback: a PDF attachment link opens inline in a new tab', async () => {
+  global.fetch = jest.fn().mockResolvedValue(response({
+    ok: true, title: 'Example University', proposalTitle: null, expiresAt: null,
+    session: null, siteVisit: null, writeup: null, reviews: [], proposal: null,
+    consultantFeedback: {
+      status: 'ok',
+      items: [{
+        name: 'Jane Doe', affiliation: null, receivedOn: '2026-09-01', bodyHtml: '<p>Great work.</p>',
+        attachment: { member: 'feedback:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', filename: 'notes.pdf', inline: true },
+      }],
+    },
+  }));
+  render(<BriefingPage />);
+  const link = await screen.findByRole('link', { name: 'notes.pdf' });
+  expect(link).toHaveAttribute('href', '/api/external/briefing/tok/document?member=feedback%3Aaaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+  expect(link).toHaveAttribute('target', '_blank');
+});
+
+test('consultant feedback: a non-PDF attachment link has no target (downloads)', async () => {
+  global.fetch = jest.fn().mockResolvedValue(response({
+    ok: true, title: 'Example University', proposalTitle: null, expiresAt: null,
+    session: null, siteVisit: null, writeup: null, reviews: [], proposal: null,
+    consultantFeedback: {
+      status: 'ok',
+      items: [{
+        name: 'Jane Doe', affiliation: null, receivedOn: '2026-09-01', bodyHtml: null,
+        attachment: { member: 'feedback:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', filename: 'notes.docx', inline: false },
+      }],
+    },
+  }));
+  render(<BriefingPage />);
+  const link = await screen.findByRole('link', { name: 'notes.docx' });
+  expect(link).not.toHaveAttribute('target');
+});
+
+test('consultant feedback: no attachment link when the item carries none', async () => {
+  global.fetch = jest.fn().mockResolvedValue(response({
+    ok: true, title: 'Example University', proposalTitle: null, expiresAt: null,
+    session: null, siteVisit: null, writeup: null, reviews: [], proposal: null,
+    consultantFeedback: {
+      status: 'ok',
+      items: [{ name: 'Jane Doe', affiliation: null, receivedOn: '2026-09-01', bodyHtml: '<p>Text only.</p>', attachment: null }],
+    },
+  }));
+  render(<BriefingPage />);
+  await screen.findByText('Jane Doe');
+  expect(screen.queryByRole('link', { name: /notes\./ })).not.toBeInTheDocument();
+});

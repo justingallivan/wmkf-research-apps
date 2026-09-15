@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-09-13
+last_verified: 2026-09-15
 stale_after_days: 90
 owner: reviewers
 source_files:
@@ -32,6 +32,7 @@ source_files:
   - shared/components/external/RichReviewEditor.js
   - lib/external/sanitize-review-html.js
   - shared/utils/review-report.js
+  - shared/utils/review-writeup-paragraphs.js
   - shared/utils/review-report-docx.js
   - lib/services/review-documents/docx-renderer.js
   - lib/services/review-documents/individual-file-service.js
@@ -42,6 +43,9 @@ source_files:
   - lib/services/review-manager/export-reviews-service.js
   - pages/api/review-manager/export-reviews.js
   - lib/services/graph-service.js
+  - lib/services/pre-site-visit/artifact-service.js
+  - lib/services/pre-site-visit/proposal-core-service.js
+  - lib/services/pre-site-visit/docx-renderer.js
   - pages/api/review-manager/review-due-extension.js
   - pages/api/review-manager/send-review-reminder.js
   - lib/services/reviewer-due-extension.js
@@ -1108,6 +1112,42 @@ Submitted reviewers still render as a read-only per-reviewer card list
 (ratings decoded via the static schema, richtext narrative answers, SharePoint
 download). Panel-prep roll-up/export now exists client-side (Phase 3, below).
 
+**Writeup paragraphs (Reviews Tab Phase II Slice 1, 2026-09-14,
+`docs/plans/REVIEWS_TAB_WRITEUP_PARAGRAPHS_PLAN_2026-09-14.md`):** a
+"Writeup paragraphs" card renders directly below the Synthesis card once at
+least one review is submitted, showing deterministic score/reviewer/expertise
+sentences composed from stored data by the pure module
+`shared/utils/review-writeup-paragraphs.js` (also home to the lifted
+`reviewerAffiliationOf`). No model, no digest change. A "Copy" button writes
+`text/html` (underlined names) and `text/plain` to the clipboard via
+`ClipboardItem`, falling back to `writeText`; it stays enabled in read-only
+Preview because the write is client-only. An unlabelled overall rating is
+excluded from the score tally and surfaced as a muted warning line rather
+than dropped silently. Model-authored themes and verified quotations were added in Slice 2 (see the
+synthesis section below); the Word export (Slice 3) and the Pre-Site Visit
+RefereeSection token fill (Slice 4) reuse the same composers.
+
+**Consultant Feedback (slices 1–3, 2026-09-14):** `ReviewsTab` also mounts
+`shared/components/workbench/ConsultantFeedbackSection.js` below Outstanding,
+backed by `lib/services/consultant-feedback-service.js` and
+`/api/workbench/consultant-feedback[/consultants]` (Postgres table
+`consultant_feedback`, migration 048). Slice 2 adds an optional PDF/DOCX
+attachment per entry via the browser-direct staged-upload pattern
+(`/api/workbench/consultant-feedback/upload-token` mints, `/finalize` binds),
+backed by `lib/services/consultant-feedback-attachment-service.js` and the
+`consultant_feedback` scope on the shared `portal_upload_staging` ledger
+(migration 049); an attached entry's delete is a three-step supersede-then-PG-delete
+(plan §3.6), recovered by a bounded sweep on the section's own list load. See
+`docs/plans/CONSULTANT_FEEDBACK_PLAN_2026-09-14.md`. Slice 3 adds a staff-only
+`/api/workbench/consultant-feedback/attachment` proxy: the client sends only
+request + feedback-entry identity, and the service proves active Postgres
+membership plus one same-request Ready/non-Superseded Consultant Feedback
+registry row before Graph. PDFs open inline and DOCX files download. The tab
+also has local All / Shared / Not shared filters and a name/affiliation-searchable,
+keyboard-first roster combobox; neither adds persistence or roster writes. A
+profile link remains deferred because Expertise Finder exposes no stable
+consultant deep-link and is separately access-gated.
+
 **Phase 1 LIVE (S326; deployed, browser-drive-verified against live acceptance data; reminder safety production-observed 2026-09-01):** outstanding tracking + manual nudge. The owner lifted the procedural manual reminder freeze after the incident-session deployment/smoke observations and a post-deploy D26 liveness audit of 51 never-reminded sweep candidates found zero blocked rows. The deployment metadata did not expose a source SHA, and the authenticated smoke has no tracked artifact. The DTO
 (`reviewers.js` GET) adds `submitted` (accepted-reviewer submission status),
 `daysSinceMaterialsSent` (derived from `wmkf_materialssentat`, null until
@@ -1370,7 +1410,96 @@ participants remain unresolved and records each generation in
 card even at zero accepted/submitted reviews, with Current/Stale, readiness,
 and queued/running/failed state. Output is plain-text only (no
 `dangerouslySetInnerHTML`); `composeReviewReport` accepts an optional
-`synthesis` param rendered in the current Word export. Same
+`synthesis` param rendered in the current Word export.
+
+**Slice 2 (Reviews Tab Phase II, 2026-09-14,
+docs/plans/REVIEWS_TAB_WRITEUP_PARAGRAPHS_PLAN_2026-09-14.md §4.3):** the
+tracked prompt (`shared/config/prompts/review-synthesis.js`) and
+`jsonSchema`/`validationSchema` gain two fields inside `synthesis` —
+`writeupThemes` (string, 2-3 sentences) and `writeupQuotations`
+(`{questionKey, quote}[]`, up to three representative quotes) — both `required`
+in the native JSON schema (no `maxItems`/`maxLength` there; all caps live in
+`validationSchema` only, which fails the whole write closed on a cap breach).
+`parseReviewSynthesis` (`reviewers-service.js`) passes both through as a
+read-boundary shape guard only. **Quote provenance is verified downstream, not
+here**: `shared/utils/review-writeup-paragraphs.js`'s exported
+`verifyAndSelectQuotations` keeps a candidate quote only when it is a
+normalized substring of exactly one submitted reviewer's
+`answers[].answerText`, at most one kept quote per reviewer, ordered by
+`reviewerOverallAssessment` descending, reduced to the top/median/bottom three
+when more than three survive (W8); unverifiable/ambiguous/duplicate candidates
+are dropped and counted (`droppedQuotationCount`, surfaced on the Reviews tab
+as "N quotation(s) could not be matched to a review and were omitted"). The
+Reviews tab's Writeup paragraphs card renders the verified themes/quotations,
+or a "Regenerate synthesis to add themes and quotations" hint (pointing at the
+existing Regenerate control, not a new action) when a synthesis is current but
+predates these fields. `review-report.js`'s `synthesisSection` carries the
+same VERIFIED quotations (never the raw `synthesis.writeupQuotations`) plus
+`writeupThemes`, for the Word export. **Slice 3 (2026-09-14):**
+`composeReviewReport` also builds `writeupSection` (the deterministic
+score/reviewer/expertise sentences as `{text, underline}` run arrays, plus the
+same verified `themes`/`quotations`) from the shared `composeWriteupParagraphs`
+composer, and `shared/utils/review-report-docx.js` renders it as a "Reviews
+(writeup)" DOCX section with `TextRun({underline:{}})` on reviewer-name runs
+only — model strings (themes, quotations, institution text) are always plain
+runs; the PDF renderer is unchanged (W4: no PDF work) and ignores the new
+section without erroring. The Opus Slice 2 review also fixed a cross-surface
+divergence: quote-tie-break ordering now uses the exported
+`compareReviewersByName` on a canonical re-sort inside
+`verifyAndSelectQuotations`, so the tab (name-sorted `submitted`) and the
+`export-reviews-service.js` roster (now also sorted with the same comparator)
+select identical W8 quotations regardless of caller order (locale pinned
+`'en'` in `compareReviewersByName` so server and browser sort identically).
+**Slice 4 (2026-09-14, plan §4.5):** the same deterministic sentences (no
+model text) fill `STAFF:RefereeSection` in the Phase II Pre-Site Visit
+Word draft. `reviewers-service.js`'s new request-scoped `getWriteupRoster`
+(no caller `scope`/`azureEmail`) feeds
+`review-writeup-paragraphs.js`'s new `composeRefereeSection`, which returns
+`null` when zero reviews are submitted (token left for staff) or
+`{text, names, diagnostics}`; naming an outstanding reviewer is an
+ALLOWLIST (`accepted === true` AND `reason === 'active_invitation'` only —
+every other blocker reason collapses into a counted generic clause plus a
+`referee_blocker_unnamed` diagnostic). `pre-site-visit/docx-renderer.js`
+moved the token out of `MANUAL_PLACEHOLDERS` into a new
+`CONDITIONAL_PLACEHOLDERS` set and now returns `{docx, diagnostics}` instead
+of a bare Buffer — `referee_name_not_matched` for any supplied name with zero
+underlines in the referee paragraph (reviewer names never join
+`personnelNames`, so they can never trigger `personnel_name_not_matched`).
+`artifact-service.js`'s input snapshot is schemaVersion 4
+(`request.refereeSection`), coreEnvelope bumped to 4 in lockstep; a genuine
+roster-read failure at generation fails closed
+(`pre_site_visit_referee_roster_unavailable`); `referee_section_manual`
+surfaces whenever the stored snapshot predates the feature (v2/v3) or a v4
+snapshot has no composed section (zero submitted reviews at generation) —
+modelled on the existing `funding_history_manual` note. **Wrap-up
+(2026-09-14):** a composer failure (as distinct from a roster read failure)
+fails closed separately as `pre_site_visit_referee_compose_failed`; a
+submitted review with an unlabelled (pre-current-scale) rating emits
+`referee_rating_unlabelled` instead of silently vanishing from the score
+tally; `renderPreSiteVisitDocx` treats a blank/whitespace-only
+`refereeSection.text` as `null`; and `review-synthesis-readiness.js` exports
+`REVIEW_SYNTHESIS_BLOCKER_REASONS` so the allowlist test iterates the live
+reason set rather than a hand-copied list. **Codex adversarial review
+(2026-09-14):** `verifyAndSelectQuotations` now also requires (a) a
+narrative `questionType` (`richtext`/`string`; never `picklist`/
+`multiselect`, whose `answerText` is a decoded option LABEL, not
+reviewer-authored prose), (b) a minimum of 6 normalized words, and (c)
+word-boundary matching (not a bare substring) before a model-proposed quote
+verifies against a submitted answer; `getWriteupRoster` now sorts its
+`reviewers` with `compareReviewersByName` before returning (previously
+adapter fetch order), so `composeRefereeSection` agrees with the tab on tied
+ratings. `WriteupParagraphsCard`'s Copy button (`ReviewsTab.js`) now guards
+its post-await state writes with a `useRef` generation counter, bumped on
+every `copy()` call and on every html-change reset, so a clipboard promise
+that resolves/rejects after content changed underneath it (a permission
+prompt outliving a request switch) can no longer paint a stale "Copied"/
+"Copy failed" label; the card is also a named export now, purely so a unit
+test can mount it directly without `ReviewsTab`'s own loading-gate unmount
+masking the regression. **[PRODUCTION-LIVE 2026-09-15 UTC]** PR #296 merged
+as `b9ad64eb` and deployment `wmkfresearchapps-adp2hh965` reached Ready; the
+owner then published governed `review-synthesis.generate` v4 as the sole-current
+seven-key row with a dated `DATAVERSE_PROD_WRITE_ACK`. The read paths remain
+backward-compatible with stored five-key syntheses. Same
 verification boundary as Phases 2-3: Request #1002788 production-proved the
 submitted DTO, categorical matrix, and both then-present export renderers on
 2026-07-26; that historical smoke does not make PDF a current UI feature.

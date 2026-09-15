@@ -130,7 +130,10 @@ calls the same service.
 - One session page: date, time, duration, location, **meeting link** (the Zoom URL the PC pastes
   in; validated as an https URL, shown as a "Join" link on the page and carried into the Share
   email per §5.6; owner 2026-09-09), attendees (staff and Board, using the existing recipient
-  directory), and the ordered slot list with per-slot minutes and lead PD. Add, remove, reorder,
+  directory; an unlinked Board member needs a preferred email on the Expertise Finder roster,
+  while a linked member uses the active Dataverse Contact's primary email with no manual fallback;
+  otherwise the chip is disabled and a save names the person and the applicable remedy,
+  2026-09-14), and the ordered slot list with per-slot minutes and lead PD. Add, remove, reorder,
   and move a slot to another session in place. Since 2026-09-11 the lead PD is display-only on
   the row (seeded from the request's PD when the proposal is added; owner: reassignment at this
   point is rare and a second editable copy invites drift). The slot field and the agenda email's

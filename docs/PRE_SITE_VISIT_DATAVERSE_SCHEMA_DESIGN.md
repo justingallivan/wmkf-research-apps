@@ -6,7 +6,7 @@ status: active
 summary: "Production-live Wave 19, Site Visit handoff/correction, and Production-proved frozen distribution."
 canonical: false
 cataloged: 2026-08-17
-last_verified: 2026-08-24
+last_verified: 2026-09-15
 owner: product-engineering
 related:
   - docs/atlas/dataverse-wmkf-requestdocument.md
@@ -41,10 +41,11 @@ Visits; nine are Ready, one Failed, six Draft, and four Superseded.
 **[DEPLOYED TO PRODUCTION 2026-08-18; SIGNED-IN GENERATION + NO-DUPLICATE
 SMOKES PASSED 2026-08-27.]**
 The Production runtime normalizes valid provider output,
-stores content-free editorial diagnostics in proposal-core envelope v3, and
+stores content-free editorial diagnostics in the proposal-core envelope, and
 returns those diagnostics as non-blocking Workbench warnings. It retains v2
-read compatibility and the deployed v4 DOCX bytes while advancing the render
-contract identity to v5. Ready deployment
+and v3 read compatibility. Reviews Tab Slice 4 moved both snapshot envelopes
+to v4 in Production on 2026-09-15; the earlier resilience release used the
+deployed v4 DOCX bytes while advancing the render contract identity to v5. Ready deployment
 `dpl_HGogbJnprevoYKLaxevamxdajtC4` shipped paired with prompt v4 row
 `74409f95-509b-f111-b8db-6045bd008868` (exact readback, zero mismatches);
 the prompt was later re-published as sole-current v5 (unattributed,
@@ -314,7 +315,7 @@ unlabelled object:
 
 ```json
 {
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "proposalCore": {
     "executiveSummary": "...",
     "impactOverview": "...",
@@ -336,17 +337,29 @@ unlabelled object:
 }
 ```
 
-Envelope v2 remains readable and receives any warning that can be derived from
-its canonical text. It cannot reconstruct provider-boundary metadata such as
-input truncation, so no such historical warning is invented. The bounded input
-snapshot remains schema version 2.
+Envelope v2 and v3 rows remain readable and receive any warning that can be
+derived from their canonical text. They cannot reconstruct provider-boundary
+metadata such as input truncation, so no such historical warning is invented.
+
+**[PRODUCTION-LIVE 2026-09-15 UTC via PR #296 merge `b9ad64eb` and Ready
+deployment `wmkfresearchapps-adp2hh965`.]** Reviews Tab Writeup Paragraphs
+Slice 4 (`docs/plans/REVIEWS_TAB_WRITEUP_PARAGRAPHS_PLAN_2026-09-14.md`
+§4.5/§6) moves both `wmkf_presiteproposalcorejson` and
+`wmkf_presiteinputsnapshotjson` to schema version 4 in lockstep. The bounded
+input snapshot adds deterministic, model-free `request.refereeSection`
+(fills `[[STAFF:RefereeSection]]`), and the proposal-core diagnostics add
+`referee_section_manual`, `referee_name_not_matched`,
+`referee_blocker_unnamed`, and `referee_rating_unlabelled`. Reviewer-roster
+read failures and composer failures remain distinct fail-closed errors. See
+`docs/atlas/dataverse-wmkf-requestdocument.md` for the authoritative live
+shape.
 
 `wmkf_PreSiteInputSnapshotJson` stores only bounded structured metadata and
 source identity:
 
 ```json
 {
-  "schemaVersion": 2,
+  "schemaVersion": 4,
   "request": {
     "requestId": "guid",
     "requestNumber": "1002379",
@@ -359,7 +372,8 @@ source identity:
     "totalProjectBudget": "...",
     "programDirector": "...",
     "projectPeriod": { "startDate": "...", "endDate": "..." },
-    "personnel": []
+    "personnel": [],
+    "refereeSection": { "text": "...", "names": [] }
   },
   "proposalSources": [
     {

@@ -238,6 +238,40 @@ export default function BriefingPage() {
         ))}
       </section>
 
+      {data.consultantFeedback?.status === 'unavailable' && (
+        <section className="mt-6 rounded-xl border border-gray-200 bg-white p-5">
+          <h2 className="text-base font-semibold text-gray-900">Consultant feedback</h2>
+          <p className="mt-2 text-sm text-gray-600">Consultant feedback could not be loaded.</p>
+        </section>
+      )}
+      {data.consultantFeedback?.status === 'ok' && data.consultantFeedback.items?.length > 0 && (
+        <section className="mt-6 rounded-xl border border-gray-200 bg-white p-5">
+          <h2 className="text-base font-semibold text-gray-900">Consultant feedback</h2>
+          <ul className="mt-2 space-y-4">
+            {data.consultantFeedback.items.map((item, index) => (
+              <li key={index} className="border-t border-gray-100 pt-4 first:border-t-0 first:pt-0">
+                <p className="text-sm font-semibold text-gray-900">
+                  {item.name || 'Consultant'}
+                  {item.affiliation && <span className="font-normal text-gray-600"> — {item.affiliation}</span>}
+                </p>
+                {item.receivedOn && <p className="text-xs text-gray-500">Received {item.receivedOn}</p>}
+                {item.bodyHtml && (
+                  // Sanitized server-side on read (lib/external/sanitize-review-html.js).
+                  <div className="prose prose-sm mt-2 max-w-none text-gray-800" dangerouslySetInnerHTML={{ __html: item.bodyHtml }} />
+                )}
+                {item.attachment?.member && (
+                  <p className="mt-2 text-sm">
+                    <a className="text-blue-800 underline" href={documentHref(item.attachment.member)} {...(item.attachment.inline ? { target: '_blank', rel: 'noreferrer noopener' } : {})}>
+                      {item.attachment.filename || 'Attachment'}
+                    </a>
+                  </p>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       {data.expiresAt && (
         <p className="mt-8 text-xs text-gray-500">This page is available until {formatDate(data.expiresAt)}. Please do not forward the link.</p>
       )}

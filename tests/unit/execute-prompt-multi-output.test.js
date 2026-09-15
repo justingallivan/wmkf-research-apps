@@ -556,6 +556,10 @@ describe('Executor response-completeness + native structured output', () => {
         keyConcerns: [],
         ratingSummaries: [],
         overall: 'Complete.',
+        writeupThemes: 'Reviewers agreed the proposal is methodologically sound.',
+        writeupQuotations: [
+          { questionKey: 'overallAssessment', quote: 'The proposal is methodologically sound.' },
+        ],
       },
     };
     const result = await runWithResponse({

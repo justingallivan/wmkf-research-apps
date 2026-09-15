@@ -1,6 +1,8 @@
 # Atlas: `wmkf_ai_run` + `wmkf_ai_prompt` (Dataverse)
 
-**Last verified:** 2026-08-30 in source/tests for Executor-budget damaged-row
+**Last verified:** 2026-09-15 for sole-current `review-synthesis.generate` v4
+and seven-key tracked/live schema parity via a read-only Production dry-run;
+2026-08-30 in source/tests for Executor-budget damaged-row
 recovery, reserved-revision concurrency, Dataverse paging/provenance, and Admin
 draft reconciliation (no production budget revision claimed); 2026-08-27 for sole-current
 `pre-site-visit.proposal-core.generate` v5 (unattributed content-identical
@@ -208,6 +210,16 @@ Migration plans touching either entity must preserve these foreign keys.
   redacted override and latency/token/boundary diagnostics. Exact cleanup
   removed the 11 staged answers and restored four parent fields while
   preserving the synthesis and append-only audit.
+- **`review-synthesis.generate` v4 publication (2026-09-15 UTC):** after PR
+  #296 merged as `b9ad64eb` and deployment `wmkfresearchapps-adp2hh965`
+  reached Ready, the owner used the version-preserving `--force` path with a
+  dated `DATAVERSE_PROD_WRITE_ACK` to publish sole-current v4
+  `1349652f-aeb0-f111-aaac-6045bd04539e`. The native JSON schema adds required
+  `writeupThemes` and `writeupQuotations` fields to the existing five-key
+  synthesis shape. A 2026-09-15 read-only Production dry-run reported that a
+  forced publication would create v5 and printed the same seven-key tracked
+  schema, confirming v4 remains sole-current and source-aligned. Existing
+  five-key stored syntheses remain readable.
 - **Controlled automatic lifecycle proof (2026-07-28):** with
   `REVIEW_SYNTHESIS_AUTOMATION_ENABLED=true` in Production, the bounded drain
   found exactly one eligible request, enqueued and completed job `2` in one

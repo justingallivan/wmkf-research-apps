@@ -382,7 +382,41 @@ describe('composeReviewReport', () => {
       overall: 'Reviewers are largely positive.',
     };
     const report = composeReviewReport({ matrix, generatedAtIso: '2026-07-03T00:00:00.000Z', synthesis });
-    expect(report.synthesisSection).toEqual(synthesis);
+    expect(report.synthesisSection).toEqual({ ...synthesis, writeupThemes: '', writeupQuotations: [] });
+  });
+
+  test('Slice 2: synthesisSection carries writeupThemes and only VERIFIED quotations', () => {
+    const matrix = deriveReviewMatrix([], null);
+    const fullReviewers = [{
+      suggestionId: 'r1',
+      reviewReceivedAt: '2026-06-20T00:00:00Z',
+      reviewerOverallAssessment: 5,
+      answers: [{ questionKey: 'q1', questionType: 'richtext', answerText: 'This is a rigorous and well-designed study overall.' }],
+    }];
+    const synthesis = {
+      overall: 'Positive overall.',
+      writeupThemes: 'Reviewers were broadly positive.',
+      writeupQuotations: [
+        { questionKey: 'q1', quote: 'This is a rigorous and well-designed study overall.' }, // verifiable
+        { questionKey: 'q2', quote: 'This was never actually written by anyone.' }, // unverifiable
+      ],
+    };
+    const report = composeReviewReport({
+      matrix, generatedAtIso: '2026-07-03T00:00:00.000Z', synthesis, fullReviewers,
+    });
+    expect(report.synthesisSection.writeupThemes).toBe('Reviewers were broadly positive.');
+    expect(report.synthesisSection.writeupQuotations).toHaveLength(1);
+    expect(report.synthesisSection.writeupQuotations[0].quote).toBe('This is a rigorous and well-designed study overall.');
+  });
+
+  test('Slice 2: omitting fullReviewers yields no verified quotations rather than trusting raw synthesis', () => {
+    const matrix = deriveReviewMatrix([], null);
+    const synthesis = {
+      overall: 'Positive overall.',
+      writeupQuotations: [{ questionKey: 'q1', quote: 'Anything at all.' }],
+    };
+    const report = composeReviewReport({ matrix, generatedAtIso: '2026-07-03T00:00:00.000Z', synthesis });
+    expect(report.synthesisSection.writeupQuotations).toEqual([]);
   });
 
   test('carries explicit stale currentness so renderers can distinguish the current roster', () => {
@@ -399,6 +433,8 @@ describe('composeReviewReport', () => {
       keyConcerns: [],
       ratingSummaries: [],
       overall: 'Earlier synthesis.',
+      writeupThemes: '',
+      writeupQuotations: [],
       current: false,
     });
   });
@@ -412,6 +448,73 @@ describe('composeReviewReport', () => {
     });
     expect(report.synthesisSection).toEqual({
       consensus: [], disagreements: [], keyConcerns: [], ratingSummaries: [], overall: '',
+      writeupThemes: '', writeupQuotations: [],
     });
+  });
+
+  // Slice 3 (plan §4.4): the Word-export writeupSection built from
+  // composeWriteupParagraphs.
+  test('Slice 3: writeupSection is present with deterministic run paragraphs plus verified themes/quotations when at least one review is submitted', () => {
+    const matrix = deriveReviewMatrix([], null);
+    const fullReviewers = [{
+      suggestionId: 'r1',
+      name: 'Dr. Ada Reviewer',
+      lastName: 'Reviewer',
+      reviewReceivedAt: '2026-06-20T00:00:00Z',
+      reviewerOverallAssessment: 5,
+      mainInstitution: 'Testing Institute',
+      answers: [{ questionKey: 'q1', questionType: 'richtext', answerText: 'This is a rigorous and well-designed study overall.' }],
+    }];
+    const synthesis = {
+      writeupThemes: 'Reviewers were broadly positive.',
+      writeupQuotations: [{ questionKey: 'q1', quote: 'This is a rigorous and well-designed study overall.' }],
+    };
+    const report = composeReviewReport({
+      matrix, generatedAtIso: '2026-07-03T00:00:00.000Z', synthesis, fullReviewers,
+    });
+    expect(report.writeupSection).not.toBeNull();
+    expect(report.writeupSection.paragraphs.length).toBeGreaterThan(0);
+    // Every deterministic paragraph is a run array — none of them is the
+    // themes or quotation text (those live on their own fields, not mixed
+    // into `paragraphs`).
+    const deterministicText = report.writeupSection.paragraphs
+      .flat()
+      .map((r) => r.text)
+      .join(' ');
+    expect(deterministicText).not.toContain('Reviewers were broadly positive.');
+    expect(deterministicText).not.toContain('This is a rigorous and well-designed study.');
+    expect(report.writeupSection.themes).toBe('Reviewers were broadly positive.');
+    expect(report.writeupSection.quotations).toHaveLength(1);
+    expect(report.writeupSection.quotations[0].quote).toBe('This is a rigorous and well-designed study overall.');
+  });
+
+  test('Slice 3: writeupSection is null when no review was submitted (fullReviewers omitted)', () => {
+    const matrix = deriveReviewMatrix([], null);
+    const report = composeReviewReport({
+      matrix, generatedAtIso: '2026-07-03T00:00:00.000Z', synthesis: { overall: 'x' },
+    });
+    expect(report.writeupSection).toBeNull();
+  });
+
+  test('Slice 3: writeupSection quotations are the same VERIFIED list as synthesisSection, not raw synthesis', () => {
+    const matrix = deriveReviewMatrix([], null);
+    const fullReviewers = [{
+      suggestionId: 'r1',
+      name: 'Dr. Ada Reviewer',
+      reviewReceivedAt: '2026-06-20T00:00:00Z',
+      reviewerOverallAssessment: 4,
+      answers: [{ questionKey: 'q1', questionType: 'richtext', answerText: 'Real verbatim answer text taken from the review.' }],
+    }];
+    const synthesis = {
+      writeupQuotations: [
+        { questionKey: 'q1', quote: 'Real verbatim answer text taken from the review.' },
+        { questionKey: 'q2', quote: 'Fabricated, never actually written by any reviewer.' },
+      ],
+    };
+    const report = composeReviewReport({
+      matrix, generatedAtIso: '2026-07-03T00:00:00.000Z', synthesis, fullReviewers,
+    });
+    expect(report.writeupSection.quotations).toEqual(report.synthesisSection.writeupQuotations);
+    expect(report.writeupSection.quotations).toHaveLength(1);
   });
 });

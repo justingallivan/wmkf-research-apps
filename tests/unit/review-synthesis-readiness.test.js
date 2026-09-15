@@ -1,4 +1,9 @@
-import { evaluateReviewSynthesisReadiness } from '../../lib/services/review-synthesis-readiness';
+import fs from 'fs';
+import path from 'path';
+import {
+  evaluateReviewSynthesisReadiness,
+  REVIEW_SYNTHESIS_BLOCKER_REASONS,
+} from '../../lib/services/review-synthesis-readiness';
 import {
   APPLICANT_DISPOSITION_EXCLUDED,
   RESPONSE_TYPE_MAP,
@@ -165,5 +170,42 @@ describe('evaluateReviewSynthesisReadiness', () => {
 
     expect(reordered.inputHash).toBe(first.inputHash);
     expect(changed.inputHash).not.toBe(first.inputHash);
+  });
+});
+
+describe('REVIEW_SYNTHESIS_BLOCKER_REASONS (Slice 4 wrap-up)', () => {
+  it('lists every `resolved: false` reason literal classifyParticipant can emit, so drift fails here rather than silently in a downstream allowlist', () => {
+    const source = fs.readFileSync(
+      path.join(__dirname, '../../lib/services/review-synthesis-readiness.js'),
+      'utf8',
+    );
+    // Grep every `resolved: false, reason: '<literal>'` (template-literal
+    // `malformed_${field}` forms are excluded here and covered separately
+    // below via MALFORMED_BOOLEAN_FIELDS-derived entries already present in
+    // the exported constant).
+    const literalMatches = Array.from(
+      source.matchAll(/resolved:\s*false,\s*reason:\s*'([^']+)'/g),
+    ).map((match) => match[1]);
+    expect(literalMatches.length).toBeGreaterThan(0);
+    for (const reason of literalMatches) {
+      expect(REVIEW_SYNTHESIS_BLOCKER_REASONS).toContain(reason);
+    }
+
+    // The dynamic `malformed_${field}` reasons: every field named in the
+    // malformed-boolean loop must appear as `malformed_<field>` in the
+    // exported constant.
+    const fieldListMatch = source.match(/MALFORMED_BOOLEAN_FIELDS = Object\.freeze\(\[([\s\S]*?)\]\)/);
+    expect(fieldListMatch).toBeTruthy();
+    const fields = Array.from(fieldListMatch[1].matchAll(/'([^']+)'/g)).map((m) => m[1]);
+    expect(fields.length).toBeGreaterThan(0);
+    for (const field of fields) {
+      expect(REVIEW_SYNTHESIS_BLOCKER_REASONS).toContain(`malformed_${field}`);
+    }
+
+    // No extra reasons in the constant that the source no longer emits.
+    const allEmittable = [...literalMatches, ...fields.map((f) => `malformed_${f}`)];
+    for (const reason of REVIEW_SYNTHESIS_BLOCKER_REASONS) {
+      expect(allEmittable).toContain(reason);
+    }
   });
 });

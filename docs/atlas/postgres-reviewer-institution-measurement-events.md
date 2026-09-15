@@ -3,19 +3,19 @@ title: Reviewer Institution Measurement Events
 domain: reviewer-identity
 kind: atlas
 status: planned
-summary: "Source-built, opt-in prospective Find observations; migration 048 was not applied here and live schema is unprobed."
+summary: "Source-built, opt-in prospective Find observations; migration 051 was not applied here and live schema is unprobed."
 canonical: false
 cataloged: 2026-09-14
-last_verified: 2026-09-14
+last_verified: 2026-09-15
 owner: product-engineering
 related:
   - docs/INSTITUTION_PAIR_CONSISTENCY_RESOLUTION_PLAN.md
-  - lib/db/migrations/048_reviewer_institution_measurement_events.sql
+  - lib/db/migrations/051_reviewer_institution_measurement_events.sql
 ---
 
 # Atlas: `reviewer_institution_measurement_events` (Postgres)
 
-**[VERIFIED via source, 2026-09-14]** Migration 048 and its fresh-install
+**[VERIFIED via source, 2026-09-15]** Migration 051 and its fresh-install
 mirror define a prospective, append-only observation table. **[PLANNED]** The
 migration was not applied in this session, live schema was not probed,
 `REVIEWER_INSTITUTION_MEASUREMENT` defaults off, and no Production or Preview
@@ -68,7 +68,7 @@ script on an existing database.
 This captures **observed actions**, not card impressions or counterfactual
 actions avoided. The separate dormant Phase 2 path now carries publication
 years, ORCID employment intervals, independent-person results, and typed
-additional-affiliation screening, but migration 048 cannot store those results
+additional-affiliation screening, but migration 051 cannot store those results
 and the measurement writer does not consume that receipt. They therefore
 remain absent from measurement authority and auto-clear scoring. Coverage also
 excludes failed telemetry inserts and cases that never reached a roster row.

@@ -48,6 +48,21 @@
         ],
         "createdAt": "2026-09-08T17:25:09.603Z",
         "reason": "Intentional established default avatar fallback when no profile color exists"
+      },
+      {
+        "rule": "gray-on-color",
+        "value": "bg-green-100 text-green-800",
+        "createdAt": "2026-09-14T22:06:56.576Z",
+        "reason": "established codebase pattern reused verbatim (reviewer-modes.js, StatusTab.js, SiteVisitRecipientsSection.js); accessible pill color, not a new contrast issue"
+      },
+      {
+        "rule": "gray-on-color",
+        "value": "*",
+        "files": [
+          "shared/components/workbench/ConsultantFeedbackSection.js"
+        ],
+        "createdAt": "2026-09-14T23:26:54.317886Z",
+        "reason": "Agent: the only gray-on-color hit in this file is the shared/not-shared pill pair sharing one ternary class literal (`bg-green-100 text-green-800` vs `bg-gray-100 text-gray-700`); the detector pairs the neutral gray pill's text with its sibling's green background. Both pills reuse the Reviews tab / StatusTab pill pattern. Scoped to this file only."
       }
     ]
   }

@@ -4,7 +4,7 @@ domain: dataverse
 kind: source-of-truth
 status: canonical
 owner: product-engineering
-last_verified: 2026-09-10
+last_verified: 2026-09-14
 related:
   - docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md
   - docs/API_ROUTE_SECURITY_MATRIX.md
@@ -91,9 +91,14 @@ fallback.
   (`logistics-service.js::refsFromParties`, S466) instead of failing closed.
 - `recipient-directory-service.js` joins active WMKF profiles to enabled
   `systemusers` and reads Board/Consultant suggestions by immutable
-  `expertise_roster.id` plus maintained `preferred_email`. This directory is
-  retained for interpreting existing Site Visit attendee-reference maps; it is
-  not the new distribution-composer picker.
+  `expertise_roster.id`. **[PRODUCTION-LIVE 2026-09-14; Postgres migration 050
+  applied.]** An unlinked roster row uses its maintained `preferred_email`;
+  a linked row resolves only the active Dataverse Contact's current
+  `emailaddress1`. Missing, inactive, and email-less linked Contacts produce a
+  visible no-email state without falling back to the Postgres copy. The
+  directory response carries only a `linked` boolean, never the Contact GUID.
+  This directory is retained for interpreting existing Site Visit attendee-
+  reference maps; it is not the distribution-composer picker.
 - `curated-recipient-service.js` powers the distribution-composer picker from
   the versioned `site_visit.distribution_recipient_directory` Dataverse setting.
   The setting stores only profile IDs, Contact GUIDs, and external category;

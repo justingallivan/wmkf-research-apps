@@ -6,7 +6,7 @@ status: active
 summary: "Stage 2 presentation is live; Stage 3 prospective measurement is source-built but not enabled or schema-probed."
 canonical: false
 cataloged: 2026-08-08
-last_verified: 2026-09-14
+last_verified: 2026-09-15
 owner: product-engineering
 related:
   - docs/plans/REVIEWER_INSTITUTION_AUTO_RESOLUTION_PLAN_2026-09-14.md
@@ -84,7 +84,7 @@ runtime-authority change. The deployment observations below are dated
 2026-08-19; this 2026-09-14 update checked local source and the owner decision,
 not current Production environment state.
 
-**Stage 3 measurement source state (2026-09-14):** migration 048, the
+**Stage 3 measurement source state (2026-09-15):** migration 051, the
 `REVIEWER_INSTITUTION_MEASUREMENT=on` best-effort writer, aggregate operator
 report, and retention cleanup are source-built on `codex/ror-measurement-runs`.
 The migration was not applied in this session, live schema was not probed, and

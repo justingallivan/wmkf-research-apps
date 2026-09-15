@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-08-24
+last_verified: 2026-09-14
 stale_after_days: 60
 owner: dynamics-platform
 source_files:
@@ -124,6 +124,23 @@ fields, and sandbox/prod assumptions. The Atlas adjudicates live data state.
 - Export and lifecycle facts: `dataverse-export-floor-scoping`, `project-akoya-request-pd-fields`, `project-grant-lifecycle-states-confirmed`, `akoya-temporal-axis-encodings`.
 
 ## Operating Notes
+
+- **Expertise roster Contact links are reference-only** **[PRODUCTION-LIVE
+  2026-09-14; Postgres migration 050 applied and read back].** The roster keeps its
+  Postgres `id` as the durable attendee identity and may hold one optional
+  `dataverse_contact_id`; a partial unique index permits only one active roster
+  row per Contact. Linked Board/Consultant directory rows read the active
+  Contact's current `emailaddress1` and never fall back to the manual roster
+  email when the Contact is missing, inactive, or email-less. The roster editor
+  can search existing Contacts but cannot create or edit them; its route is
+  bounded, wrapped in `withDalContext`, and guarded by the `expertise-finder`
+  app grant. The owner backfill is dry-run by default; only exact unique active
+  email-bearing ORCID matches are automatic, while name matches require an
+  explicit `rosterId=contactId` confirmation. Apply mode additionally requires
+  `--actor-profile-id` and records that profile in `updated_by`. The initial
+  owner-reviewed production reconciliation linked ten active Board/Consultant
+  rows. Five Board rows intentionally remain unlinked for this cycle and are a
+  non-blocking future-cycle reconciliation; see the roster Contact-link plan F5.
 
 - **SharePoint Online rewrites Office packages on upload.** Document property promotion adds `customXml/` items carrying the library content-type schema, edits `docProps/`, `_rels/.rels`, and `[Content_Types].xml`, appends customXml relationships to `word/_rels/document.xml.rels`, and leaves `[trash]/NNNN.dat` packaging garbage slots inside a DOCX/XLSX/PPTX, so the bytes Graph serves back never hash-match what was uploaded; PDFs and other non-Office files are stored verbatim. Verify Office uploads structurally (the Cycle Dossier worker compares decompressed `word/` parts and normalised non-customXml relationships, `lib/services/cycle-dossier-worker.js`), never by package SHA-256. Observed on the first Cycle Dossier production smoke, 2026-09-12.
 

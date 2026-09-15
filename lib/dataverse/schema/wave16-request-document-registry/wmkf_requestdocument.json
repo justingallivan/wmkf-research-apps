@@ -28,7 +28,8 @@
         { "value": 100000004, "label": "Other Applicant Materials" },
         { "value": 100000005, "label": "Recording" },
         { "value": 100000006, "label": "Transcript" },
-        { "value": 100000007, "label": "Transcript Summary" }
+        { "value": 100000007, "label": "Transcript Summary" },
+        { "value": 100000008, "label": "Consultant Feedback" }
       ]
     },
     {
