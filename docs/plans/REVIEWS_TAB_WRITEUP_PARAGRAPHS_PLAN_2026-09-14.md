@@ -41,6 +41,9 @@ related:
 > non-blocking follow-ups folded into the Slice 2 commit (acronym-safe lowercasing, article for
 > "University Professor", escaping fixture on a non-underlined field, precedence fall-through when
 > the accept-time affiliation strips to empty, Copy label reset on content change).
+> Slice 1 follow-ups e0fa4ccf; Slice 2 built at a9757f18 (Sonnet), Opus review APPROVE 2026-09-14,
+> non-blocking follow-ups folded into the Slice 3 commit (export roster sorted like the tab before
+> the renderer prints quotations; fall-through fixtures; `answerText`-not-`answerHtml` pin).
 
 ## 1. Goal
 
@@ -156,7 +159,7 @@ to the person select at `reviewers-service.js:575` and project them as `lastName
 Composition is read-time (W3): the sentences follow later edits to the person record. The Word
 writeup is frozen and versioned by staff and is the record; regeneration of a writeup is rare.
 
-### 4.3 Model fields (Slice 2)
+### 4.3 Model fields (Slice 2) — BUILT S2 (a9757f18)
 
 Extend `synthesis` with:
 
@@ -181,8 +184,9 @@ the native JSON schema nor `validateAiJson` can prove a string is a substring of
 reviewer's `answers[].answerText` alongside the stored synthesis (`reviewers-service.js:430-441`),
 so `composeWriteupParagraphs` verifies each quotation there: normalise whitespace, straight/curly
 quotes and apostrophes, and case; keep a quote only if it is a substring of exactly one submitted
-reviewer's answer text (preferring the declared `questionKey`, falling back to any answer of that
-reviewer); keep at most one verified quote per reviewer; order the survivors by that reviewer's
+reviewer's answer text (any answer of that reviewer; the declared `questionKey` is carried for
+audit but not used for matching — built that way at a9757f18, nothing downstream depends on which
+answer matched); keep at most one verified quote per reviewer; order the survivors by that reviewer's
 `reviewerOverallAssessment` descending (ties by the roster order); **keep three**: the highest-rated,
 the lowest-rated, and the middle one (the median by rating) when more than three survive; derive
 the house lead-ins from position ("The most positive reviewer said:", "Another reviewer noted:",
