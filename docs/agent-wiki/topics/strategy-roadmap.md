@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-09-04
+last_verified: 2026-09-15
 stale_after_days: 90
 owner: product-strategy
 source_files:

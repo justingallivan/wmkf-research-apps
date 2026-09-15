@@ -6,7 +6,7 @@ status: active
 summary: Governed request-artifact registry with Production-proved same-item Final lineage, explicit group-review attribution, and the Production-live leadership-review transition (2026-09-07).
 canonical: false
 owner: product-engineering
-last_verified: 2026-09-14
+last_verified: 2026-09-15
 related:
   - lib/dataverse/schema/wave16-request-document-registry/wmkf_requestdocument.json
   - lib/dataverse/schema/wave19-pre-site-draft/01_wmkf_requestdocument_pre_site_draft.json
@@ -358,7 +358,8 @@ Production Request Document row was created by this release smoke.
   handoff creates/reuses a Final lineage row over that same item, pins the exact
   Pre-Site row/version/hash, retains the Pre-Site pointer, and sets the separate
   current-Final pointer. This contract is Production-proved on Request `1002788`.
-- **Slice 4 (Reviews Tab Phase II, 2026-09-14,
+- **Slice 4 (Reviews Tab Phase II; Production-live 2026-09-15 UTC via PR #296
+  merge `b9ad64eb` and Ready deployment `wmkfresearchapps-adp2hh965`,
   docs/plans/REVIEWS_TAB_WRITEUP_PARAGRAPHS_PLAN_2026-09-14.md §4.5):**
   `wmkf_presiteinputsnapshotjson` gains snapshot **v4** (`request.refereeSection:
   {text, names} | null`), following the v3 precedent

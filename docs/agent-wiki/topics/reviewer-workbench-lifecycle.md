@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-09-14
+last_verified: 2026-09-15
 stale_after_days: 90
 owner: reviewers
 source_files:
@@ -1481,10 +1481,11 @@ that resolves/rejects after content changed underneath it (a permission
 prompt outliving a request switch) can no longer paint a stale "Copied"/
 "Copy failed" label; the card is also a named export now, purely so a unit
 test can mount it directly without `ReviewsTab`'s own loading-gate unmount
-masking the regression. **Production
-publish of this prompt row is a separate owner step** (`--force` republish,
-plan §4.3) — not run as part of this build; the live row and the read paths on
-both sides tolerate either the five-key or seven-key shape. Same
+masking the regression. **[PRODUCTION-LIVE 2026-09-15 UTC]** PR #296 merged
+as `b9ad64eb` and deployment `wmkfresearchapps-adp2hh965` reached Ready; the
+owner then published governed `review-synthesis.generate` v4 as the sole-current
+seven-key row with a dated `DATAVERSE_PROD_WRITE_ACK`. The read paths remain
+backward-compatible with stored five-key syntheses. Same
 verification boundary as Phases 2-3: Request #1002788 production-proved the
 submitted DTO, categorical matrix, and both then-present export renderers on
 2026-07-26; that historical smoke does not make PDF a current UI feature.
