@@ -480,7 +480,7 @@ document inventory, and individual implementation plans do not establish priorit
   existing `wmkf_sitevisit` Activity now owns that schedule, IANA zone,
   format, location/link, organizer/attendee parties, and server-owned recipient
   reference map. Wave 21 is exact in sandbox and Production; migration 035
-  extends the existing distribution ledger and roster email mapping; the
+  extends the existing distribution ledger and the legacy roster email mapping; the
   readiness flag is literal `on` in Preview/Production. Reversible sandbox
   write/cleanup proof passed. Signed-in Request `1002379` created and
   round-tripped one active Site Visit with five ActivityParty rows; calendar/

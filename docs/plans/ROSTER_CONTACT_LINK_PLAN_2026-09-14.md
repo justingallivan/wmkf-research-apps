@@ -3,7 +3,7 @@ title: Roster Contact Link — Resolve Board and Consultant Emails from Datavers
 domain: meeting-tracker
 kind: plan
 status: active
-summary: "READY TO IMPLEMENT 2026-09-14 after six adversarial-review folds and owner resolution of D1–D5. Link expertise_roster rows to Dataverse contacts by GUID so the shared recipient directory reads Board/Consultant email from the contact record instead of a hand-maintained Postgres column. Roster row id stays the attendee identity; Dataverse is read-only in this plan."
+summary: "SOURCE-BUILT 2026-09-14 after six plan-review folds, one implementation-review fold, and owner resolution of D1–D5. Migration 050 is not yet applied and the owner backfill has not run. Linked Board/Consultant email resolves live from Dataverse while unlinked rows retain manual email. Roster row id stays the attendee identity; Dataverse remains read-only."
 cataloged: 2026-09-14
 last_verified: 2026-09-14
 owner: product-engineering
@@ -15,6 +15,24 @@ related:
 ---
 
 # Roster Contact Link
+
+## Implementation status — 2026-09-14
+
+**[SOURCE-BUILT; NOT DEPLOYED.]** Slices 1–4 are implemented on
+`codex/roster-contact-link-implementation`: migration 050 and fresh-install
+parity, roster API validation/uniqueness handling, live Contact-backed directory
+resolution, linked-specific attendee remedies, the bounded Expertise Finder
+Contact picker, the dry-run-first owner backfill, focused tests, and durable-doc
+reconciliation. A Claude Opus OAuth implementation review completed and its
+findings are folded below. Migration 050 has not been applied, no roster link has
+been written, and no production behavior is claimed. Source verification is green:
+the 88-test focused roster/meeting-tracker set, all 13,470 repository tests, type
+checking, production build, and the relevant migration/security/Dataverse/Atlas/doc
+gates and self-tests. The repository-wide agent-wiki check has one worktree-only
+environmental failure because `.agents/skills` is absent here; the tracked agent
+invariant check passes and this branch does not change harness paths. The next steps
+are PR review/merge, deliberate deployment, owner migration apply/readback, and then
+the owner-reviewed backfill dry run.
 
 ## 0. Problem
 
@@ -43,7 +61,7 @@ as a "staff-maintained preferred address" for Site Visit correspondence
 PR #294 (branch `fix/meeting-tracker-2026-09-14`) makes the failure self-explaining
 (named 409, disabled "no email" chips) but adds no emails. This plan removes the second copy.
 
-## 1. Current state [VERIFIED 2026-09-14 via source]
+## 1. Pre-implementation baseline [VERIFIED 2026-09-14 at `bf6b41be`]
 
 - `expertise_roster` columns: `id, name, preferred_email, role_type, role, affiliation, orcid,
   … , is_active, created_by, updated_by`. No Dataverse contact reference of any kind
@@ -211,14 +229,14 @@ construction (chunked exact-GUID filter).
 |---|---|---|
 | **0 Interim unblock** | data only | Owner enters the 9 Board preferred emails in the Expertise Finder before 2026-09-17. Reversible. Whether slice 3 later auto-links these rows depends on the Board rows carrying real ORCIDs [ASSUMED; both insert paths default to the `'N/A'` placeholder, `roster.js:170` and `scripts/seed-expertise-roster.js:112`, and PATCH allows `orcid` at `roster.js:204` and writes the raw value at `:215-217`]; if not, Board links are made by owner confirmation or in the slice 2 editor. |
 | **1 Column + directory** | 1 | On the updated implementation base, choose the next unclaimed migration number for `NNN_expertise_roster_contact_link.sql`; do **not** hard-code 049 because `origin/feature/consultant-feedback-slice-2` already carries `049_consultant_feedback_attachments.sql` [VERIFIED via `git ls-tree`, 2026-09-14]. Add `dataverse_contact_id UUID NULL` and a partial unique index `WHERE dataverse_contact_id IS NOT NULL AND is_active = true`, introducing a one-**active**-roster-row-per-contact invariant while allowing an inactive row to retain its link for undo. Reactivation into a contact already used by another active row returns the same named 409. Add the column comment, manifest entry, fresh-install column at `scripts/setup-database.js:1399-1420`, and matching fresh-install partial index beside `:1434-1436`. Add a dedicated schema-parity test for both the column and exact index predicate (the existing `tests/unit/pre-site-distribution-schema-parity.test.js:53-75` proves only manually listed migration-035 fields, so no general gate supplies this parity). `listRoster` select; `getSiteVisitRecipientDirectory` resolution per §2.1 steps 1–6 with `getContactsByIds` injected via `DEFAULT_DEPENDENCIES`. `roster.js` PATCH/POST: `dataverse_contact_id` in `allowedFields`; normalize omitted / `null` / `""` per D2a before `isGuid`, otherwise 400 with message (today a bad value would hit the UUID cast and surface as the generic 500 at `roster.js:253-257`); unique-index violation 23505 on create, update, or reactivation → 409 naming the active roster row already linked; `null` to unlink; enforce the adopted D2a server rule (pre-read gains `dataverse_contact_id, preferred_email`; rule keyed on resulting link state). Remedy-copy branch in `assertAttendeeEmailsOnFile` plus its JSDoc and both editors' chip hint; `linked` added to both picker projections. Tests: linked-active, linked-inactive, linked-missing, unlinked, mixed batch >50, no-linked-rows skips the contact read, picker emits `linked`, new workbench route shape test, create/update/reactivation 400/409, empty-string link normalization, stale form omits an unchanged link field, and every D2a combination including link + unchanged email → accepted. |
-| **2 Link UI** | 1 | Expertise Finder editor: "Dataverse contact" field with a bounded name search and a Clear button. New route `GET /api/expertise-finder/contact-search?q=` → new service `lib/services/expertise-finder/roster-contact-link-service.js` wrapping the name-only `searchDirectoryByName` contract (route never touches the adapter; `check:route-service-boundary`). The route accepts exactly one scalar `q`, trims it, requires 2–100 characters, rejects unsupported query keys, and wraps the service call in `withDalContext('expertise-finder-roster-contact-search', …)`; missing context otherwise fails closed at `lib/services/dynamics/restrictions.js:38-46`, and `check:dynamics-context-boundary` does not detect an omitted wrapper. Returns bounded `contactId, name, email (normalized), active, available, reason` rows plus an explicit truncation signal. Keep this dedicated name-only service rather than importing `searchCuratedRecipientContacts`: that Site Visit helper also branches on email queries and emits `site_visit_*` errors (`curated-recipient-service.js:252-281`), which are different semantics. Matrix row (`check:api-routes` requires one per route file; the new file also shifts the route-count fact in `CANONICAL_COUNTS`) records D5's contact-name/email exposure. `/api/expertise-finder` is not a `ROUTE_NAMESPACE_LIFECYCLE` namespace [`shared/config/appRegistry.js:349-372`], so the resolved D5 contract uses plain `requireAppAccess('expertise-finder')`. Note: `check:trust-boundary-guid` fires only when tainted input reaches a Dataverse selector (`scripts/check-trust-boundary-guid.js:21-36`); the roster PATCH writes Postgres, so the gate is silent there and `isGuid` is required for clean 400s and for `getByIds`'s own GUID guard, not for the gate. Editor list/detail (`pages/expertise-finder.js:424-425,457-465`) show "from Dataverse contact" for linked rows instead of the manual column. The editor tracks whether the link control changed, omits an untouched `dataverse_contact_id` from PATCH, and resets the manual email on link selection per D2a. |
-| **3 Backfill** | 0 (script, dry-run default) | `scripts/link-roster-contacts.js` enters the script-only restriction context once with `enterDynamicsBypassForScript('link-roster-contacts')`, then for each active Board/Consultant row without a link tries (a) exact `findByOrcidCandidates(orcid)` when the roster ORCID is valid, else (b) `searchByName(name)` accepting only a single ranked candidate that is active and has an email. Prints a proposal table; `--apply` auto-writes **ORCID matches only**, and only when `findByOrcidCandidates` returns `{ one: true }` **and** that row's `emailaddress1` normalizes non-null. An email-less, `ambiguous`, or `inactiveOnly` ORCID result is reported, never written, so D1 cannot suppress the slice-0 manual email. Name-only candidates are listed for per-row owner confirmation (`--confirm <rosterId>=<contactId>`), because `rankNameRows`/`namesMatch` accept a single-letter first-initial prefix (`lib/utils/contact-parser.js:641-668`), so a lone ranked candidate can be the wrong person with the same surname; abstention on ambiguity does not cover a false-unique match. The roster's `'N/A'` ORCID placeholder normalizes to `malformed` and is skipped safely. A 23505 race/conflict is reported per roster row with the conflicting active row, never counted as applied, and remaining rows continue. **The owner runs it** (`feedback-never-self-authorize-prod-dataverse-reads`). Do not predict how middle-initial names ("James S. Economou") rank; the dry run shows it. |
+| **2 Link UI** | 1 | Expertise Finder editor: "Dataverse contact" field with a bounded name search and an Unlink button. New route `GET /api/expertise-finder/contact-search` → new service `lib/services/expertise-finder/roster-contact-link-service.js` wrapping the name-only `searchDirectoryByName` contract (route never touches the adapter; `check:route-service-boundary`). The route requires exactly one scalar selector: `q` is trimmed and constrained to 2–100 characters for bounded search, while GUID-validated `contactId` resolves the editor's stored link so it can show the current name, email, and missing/inactive/email-less health. Both branches reject unsupported query keys and establish explicit `withDalContext`; inactive exact reads omit stale email. Search returns bounded `contactId, name, email (normalized), active, available, reason` rows plus an explicit truncation signal. Keep this dedicated name-only service rather than importing `searchCuratedRecipientContacts`: that Site Visit helper also branches on email queries and emits `site_visit_*` errors (`curated-recipient-service.js:252-281`), which are different semantics. Matrix row (`check:api-routes` requires one per route file; the new file also shifts the route-count fact in `CANONICAL_COUNTS`) records D5's contact-name/email exposure. `/api/expertise-finder` is not a `ROUTE_NAMESPACE_LIFECYCLE` namespace [`shared/config/appRegistry.js:349-372`], so the resolved D5 contract uses plain `requireAppAccess('expertise-finder')`. Note: `check:trust-boundary-guid` fires only when tainted input reaches a Dataverse selector (`scripts/check-trust-boundary-guid.js:21-36`); `contactId` is validated before the exact Dataverse read, while roster PATCH also uses `isGuid` for clean Postgres-write 400s. Editor list/detail show "from Dataverse contact" for linked rows. The editor tracks whether the link control changed, omits an untouched `dataverse_contact_id` from PATCH, resets the manual email on link selection per D2a, and invalidates stale search and exact-read responses. On Add, the pristine search tracks the typed member name. |
+| **3 Backfill** | 0 (script, dry-run default) | `scripts/link-roster-contacts.js` enters the script-only restriction context once with `enterDynamicsBypassForScript('link-roster-contacts')`, then for each active Board/Consultant row without a link tries (a) exact `findByOrcidCandidates(orcid)` when the roster ORCID is valid, else (b) `searchByName(name)` accepting only a single ranked candidate that is active and has an email. The proposal table includes the current manual email, candidate summaries on ambiguous/unusable results, and distinguishes missing, unusable, inactive-only, email-less, and confirmation-mismatch outcomes. `--apply` requires `--actor-profile-id <id>` so `updated_by` is auditable; it auto-writes **ORCID matches only**, and only when `findByOrcidCandidates` returns `{ one: true }` **and** that row's `emailaddress1` normalizes non-null. Any supplied `--confirm <rosterId>=<contactId>` must agree with the proposed Contact even for an automatic ORCID match; a mismatch blocks the write. Name-only candidates require exact per-row owner confirmation because `rankNameRows`/`namesMatch` accept a single-letter first-initial prefix (`lib/utils/contact-parser.js:641-668`). The roster's `'N/A'` ORCID placeholder normalizes to `malformed` and is skipped safely. A 23505 race/conflict is reported per roster row with the conflicting active row, never counted as applied, and remaining rows continue. **The owner runs it** (`feedback-never-self-authorize-prod-dataverse-reads`). Do not predict how middle-initial names ("James S. Economou") rank; the dry run shows it. |
 | **4 Reconcile** | 0 | Atlas `postgres-infra-tables.md` roster entry (+ column; its "zero preferred-email values before staff population" claim becomes historical), `dataverse-wmkf-sitevisit.md` §directory, matrix rows for `/api/meeting-tracker/recipients`, `/api/workbench/site-visit/recipients`, `/api/expertise-finder/roster`, PC plan §5 attendee line, `docs/agent-wiki/topics/dataverse-dynamics.md`. Run `/sweep` for the "preferred email is the only Board email source" fact. |
 
-PR #294 must merge first because slices 1–2 edit its named 409 and disabled-chip copy
-surfaces [VERIFIED OPEN via `gh pr view 294`, 2026-09-14]. Then slices 1–2 land on one fresh
-branch from updated `main`, after rechecking the next free migration number, with PR and
-deliberate promotion; slice 3 is run once by the owner after 1 deploys; slice 4 rides with 1–2.
+**[PREREQUISITE SATISFIED 2026-09-14.]** PR #294 merged before this implementation branch was
+created, preserving its named 409 and disabled-chip surfaces. Slices 1–2 are now source-built
+on the fresh branch with migration 050; they still require PR review and deliberate promotion.
+Slice 3 is run once by the owner only after migration 050 deploys; slice 4 rides with 1–2.
 
 ## 4. Contract reconcile (Mode A, plan review) — 2026-09-14
 
@@ -359,6 +377,32 @@ while linked with D2a server enforcement; D3 indefinite manual email for unlinke
 consultants; D4 visible failure with no fallback for broken links; D5 contact search bound
 to the existing `expertise-finder` app grant. The plan is READY TO IMPLEMENT subject to the
 PR #294 sequencing and deployment steps in §3.
+
+### Implementation review fold — Claude Opus via OAuth, 2026-09-14
+
+The post-build review found one high, two medium, and six low issues. Each was checked
+against the implementation and folded before gates:
+
+1. Staff and roster directory reads now start and settle together with `Promise.all`, so an
+   early staff rejection cannot become an unhandled rejection while a slower roster read is
+   awaited; a deliberately slow-roster regression test pins this ordering.
+2. The editor now resolves the stored Contact by GUID and shows its live name, primary email,
+   or exact broken-link reason. Unlinked rows explicitly say "Not linked". Both exact reads
+   and searches carry independent abort/generation guards.
+3. A supplied confirmation that disagrees with an automatic ORCID proposal blocks the write
+   instead of being ignored.
+4. Dry-run rows include the current manual email and candidate summaries, and distinguish a
+   lone unusable candidate from no candidate.
+5. Coverage now pins email-less linked Contacts, confirmation mismatch, link preservation on
+   soft delete, and linked/unlinked picker hint copy.
+6. Inactive exact Contact reads return no email, preventing stale inactive-address disclosure.
+7. Backfill apply mode requires `--actor-profile-id` and persists it as `updated_by`.
+8. The Add form's pristine Contact search follows the typed member name.
+
+The reviewer also noted the migration/deployment ordering risk. That was already an explicit
+plan invariant and remains unchanged: migration 050 is not run from this source-only branch;
+it is applied by the owner after the reviewed build is deployed, then verified before any
+backfill apply.
 
 ## 5. Out of scope / follow-ups
 

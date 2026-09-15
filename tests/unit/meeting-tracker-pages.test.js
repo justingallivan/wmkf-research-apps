@@ -18,7 +18,7 @@ jest.mock('../../shared/components/Layout', () => ({
 jest.mock('next/link', () => function MockLink({ children, href }) {
   return <a href={typeof href === 'string' ? href : href.pathname}>{children}</a>;
 });
-import SessionEditor, { moveSlot, ProposalOrderList, reorderSessionSlots, slotBriefingText } from '../../shared/components/meeting-tracker/SessionEditor';
+import SessionEditor, { moveSlot, noEmailHint, ProposalOrderList, reorderSessionSlots, slotBriefingText } from '../../shared/components/meeting-tracker/SessionEditor';
 
 const SESSION_ID = '11111111-1111-4111-8111-111111111111';
 const FIRST_SLOT_ID = '22222222-2222-4222-8222-222222222222';
@@ -146,6 +146,11 @@ test('arriving with a cycle in the URL still loads the cycle picker (the session
 test('a slot without a live briefing link says who shares it; with one it offers Open briefing', () => {
   expect(slotBriefingText({ briefing: null })).toMatch(/not yet shared.*lead PD shares the writeup/);
   expect(slotBriefingText({ briefing: { url: 'https://apps.test/external/briefing/t' } })).toBe('Open briefing');
+});
+
+test('session attendee chip hints distinguish linked Contact failures from manual roster email', () => {
+  expect(noEmailHint({ linked: true })).toMatch(/linked Dataverse contact.*fix or relink.*unlink/i);
+  expect(noEmailHint({ linked: false })).toMatch(/preferred email.*Expertise Finder roster/i);
 });
 
 describe('moveSlot', () => {

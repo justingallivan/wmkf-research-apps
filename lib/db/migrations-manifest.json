@@ -47,6 +47,7 @@
     "046_cycle_dossier_entry_request_revision.sql",
     "047_review_panel.sql",
     "048_consultant_feedback.sql",
-    "049_consultant_feedback_attachments.sql"
+    "049_consultant_feedback_attachments.sql",
+    "050_expertise_roster_contact_link.sql"
   ]
 }

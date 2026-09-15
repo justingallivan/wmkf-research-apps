@@ -70,7 +70,10 @@ async function readJson(response, fallback) {
   return body;
 }
 
-const NO_EMAIL_HINT = 'No email on file. Board members need a preferred email on the Expertise Finder roster before they can be added.';
+const NO_EMAIL_SECTION_HINT = 'Greyed names have no email on file; hover a name for the reason.';
+export const noEmailHint = (person) => person?.linked
+  ? 'No email on file. The linked Dataverse contact is inactive, missing, or has no primary email; fix or relink the contact, or unlink the roster row.'
+  : 'No email on file. Add a preferred email on the Expertise Finder roster before this person can be added.';
 
 function Chip({ selected, onClick, children, disabled, title }) {
   return (
@@ -241,11 +244,11 @@ export default function SiteVisitEditor() {
                         const selected = form[role].some((ref) => sameRef(ref, person.ref));
                         const noEmail = !person.email;
                         return (
-                          <Chip key={refKey(person.ref)} selected={selected} disabled={busy || (noEmail && !selected)} title={noEmail ? NO_EMAIL_HINT : undefined} onClick={() => toggleIn(role, person.ref)}>{person.name}{noEmail ? ' · no email' : ''}</Chip>
+                          <Chip key={refKey(person.ref)} selected={selected} disabled={busy || (noEmail && !selected)} title={noEmail ? noEmailHint(person) : undefined} onClick={() => toggleIn(role, person.ref)}>{person.name}{noEmail ? ' · no email' : ''}</Chip>
                         );
                       })}
                       {rows.length === 0 && <p className="text-sm text-gray-500">No eligible people found.</p>}
-                      {rows.some((person) => !person.email) && <p className="w-full text-xs text-gray-500">{NO_EMAIL_HINT}</p>}
+                      {rows.some((person) => !person.email) && <p className="w-full text-xs text-gray-500">{NO_EMAIL_SECTION_HINT}</p>}
                     </div>
                   </div>
                 ))}
