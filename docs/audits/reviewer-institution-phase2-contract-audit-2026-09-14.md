@@ -41,6 +41,18 @@ additional-affiliation COI screening also remains absent at both save
 boundaries. No flag or authority should change before those contracts are wired
 and pass the frozen identity regressions.
 
+A post-implementation adversarial review run through Claude CLI with first-party
+OAuth found live-shape gaps in the first core draft. The corrected core now
+checks raw OpenAlex bylines as well as normalized cluster names, rejects
+truncated PubMed author pools, uses an unwindowed PubMed identity query, requires
+proposal-citation or staff-entered source-work lineage, binds a hard ID to the
+candidate's own exact-work authorship, rejects legacy boolean policy inputs,
+checks future dates, wall-clock expiry, execution-context binding, and evidence
+digest integrity, and treats malformed or incomplete coverage as partial. The
+remaining OpenAlex merged-cluster limitation is the explicit
+contract tradeoff described below: one complete full-forename cluster qualifies;
+ORCID corroboration is not mandatory for that method.
+
 ## Independent-identity finding
 
 The relevant question is whether the source author and intended candidate can
@@ -71,7 +83,8 @@ the following required hardening:
    `lib/services/reviewer-work-author-resolver.js:37-45,86-125` and
    `lib/services/reviewer-identity-evidence.js:510,528-579`]** The v1 method
    must run independently of the affiliation-selection branch, require full
-   forename agreement, use only a server-held work, abstain when the reported
+   forename agreement, use only a server-held work with proposal-citation or
+   staff-entered lineage, abstain when the reported
    result count exceeds the fetched pool, and digest the work ID, authorship
    index, author cluster ID, pool size, and total count. Track B discovery is
    currently disabled, so its resolver is a regression source rather than
@@ -88,6 +101,9 @@ hard-ID join can support `independent-identity/v1` only when the source side is
 byline-asserted or its ORCID works list contains the exact work, and the CRM
 identifier is staff-entered or carries its own independent receipt. Email has
 no affiliation-free source-author path today and is `not_evaluable` in v1.
+The dormant evaluator accepts only `staff_entered` CRM lineage until the later
+receipt design can prove that an `independent_receipt` came from a disjoint
+source rather than feeding the same evidence back into itself.
 
 ### Anchor audit
 
@@ -137,6 +153,7 @@ resolverVersion: <closed allowlisted version>
 requestBinding: <server-bound request>
 candidateKey: <exact immutable roster key>
 identityInputDigest: <name + source work/author/hard-id inputs>
+evidenceDigest: <provider-derived method evidence only>
 evaluatedAt: <server timestamp>
 providerObservedAt: <server timestamp for the underlying provider evidence>
 expiresAt: <no later than 14 days after the provider observation>
@@ -146,15 +163,15 @@ providerState: complete | partial | failed
 `sufficient` is available only for the hardened automated methods above and
 requires `providerState=complete`. `insufficient` means complete evidence did
 not meet a sufficient rule without affirmatively disproving identity.
-`contradicted` means evidence such as incompatible hard identifiers, a full
-forename contradiction, or a grounded author collision affirmatively indicates
+`contradicted` means evidence such as incompatible hard identifiers or a
+conservative full-forename contradiction affirmatively indicates
 a different person; it maps to the reject path rather than the confirm-identity
 remedy. Missing lineage, an unknown evaluator version, partial or failed
 provider work, a generic status, email-only evidence, or a staff confirmation
 becomes `not_evaluable`.
 
-Every v1 claim is mandatory: request binding, immutable candidate key, full
-identity input digest, closed method and resolver versions, provider state,
+Every v1 claim is mandatory: request binding, immutable candidate key, separate
+server-input and provider-evidence digests, closed method and resolver versions, provider state,
 evaluation time, and expiry. Undefined claims never compare as matches. Expiry
 is tied to the provider observation and may not exceed the existing 14-day
 attestation lifetime. The evaluator must make and account for its own provider
@@ -278,17 +295,24 @@ new policy explicitly requires the same server decision at both save paths.
 1. **Core implemented, integration pending:** the pure, total
    `independent-identity/v1` evaluator has only the closed sufficient methods
    above plus an explicit `contradicted` result. Its PubMed
-   path counts only full-forename bylines and clusters all counted PMIDs to one
-   person. Its work-grounding path runs unconditionally, uses server-held work,
-   and abstains unless the fetched OpenAlex pool is complete. Its hard-ID path
-   excludes email and requires independent source and CRM ORCID lineage. Test
+   path uses an unwindowed query, counts only full-forename bylines, and clusters
+   all counted PMIDs to one person. Its work-grounding path runs unconditionally,
+   requires proposal-citation or staff-entered source-work lineage, and abstains
+   unless the fetched OpenAlex pool is complete and contains no exact-name
+   alternate cluster. Its hard-ID path
+   excludes email, binds the source ORCID to the candidate's own exact-work
+   authorship, and currently requires staff-entered CRM ORCID lineage. Test
    affiliation-only evidence, mixed evidence, common-name/initial-only cases,
    incomplete result pools, contradictory identity, source failures, unknown
-   versions, stale digests, and all branches where lineage is missing. The
+   versions, stale or tampered digests, future-dated receipts, and all branches
+   where lineage is missing. The
    implementation and focused tests are in
    `lib/services/independent-reviewer-identity.js` and
    `tests/unit/independent-reviewer-identity.test.js`; there is no runtime
    caller yet.
+   The exported input-digest helper hashes only server inputs; provider-derived
+   method evidence has its own digest so a later loader can detect source-input
+   drift without copying authority from the stored receipt.
 2. Compute the result on the server at the point where complete source evidence
    exists. The evaluator owns provider-state accounting, and `sufficient`
    requires a complete run. Treat all browser-originating identity fields and

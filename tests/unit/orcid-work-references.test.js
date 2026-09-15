@@ -88,4 +88,31 @@ describe('ORCIDService.getWorkReferences', () => {
       { limit: 2 },
     )).resolves.toEqual({ totalCount: 3, examinedCount: 2, records: [] });
   });
+
+  test('ignores container identifiers whose relationship is not self', async () => {
+    jest.spyOn(ORCIDService, 'getAccessToken').mockResolvedValue('token');
+    jest.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        group: [{
+          'work-summary': [{
+            title: { title: { value: 'Chapter' } },
+            'external-ids': {
+              'external-id': [{
+                'external-id-type': 'doi',
+                'external-id-value': '10.1000/container',
+                'external-id-relationship': 'part-of',
+              }],
+            },
+          }],
+        }],
+      }),
+    });
+
+    await expect(ORCIDService.getWorkReferences(
+      '0000-0002-1825-0097',
+      'client',
+      'secret',
+    )).resolves.toEqual({ totalCount: 1, examinedCount: 1, records: [] });
+  });
 });

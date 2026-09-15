@@ -1,4 +1,6 @@
+const crypto = require('node:crypto');
 const fixture = require('../fixtures/reviewer-institution-auto-resolution/v1/policy-regression.json');
+const { canonicalJson } = require('../../lib/utils/canonical-json');
 const {
   assessAffiliationRelationship,
 } = require('../../lib/services/institution-affiliation-assessment');
@@ -11,6 +13,12 @@ const IDS = {
   system: 'https://ror.org/000000001',
   unit_a: 'https://ror.org/000000002',
   unit_b: 'https://ror.org/000000003',
+};
+const POLICY_NOW = '2026-09-14T19:00:00.000Z';
+const EXPECTED_IDENTITY_BINDING = {
+  requestBinding: 'request-1',
+  candidateKey: 'candidate-1',
+  identityInputDigest: 'a'.repeat(64),
 };
 
 function resolution(segment = {}) {
@@ -57,17 +65,11 @@ function assertion(input = {}, sourceType = 'publication') {
 }
 
 function independentIdentity(value) {
-  if (value === 'not_evaluable') return null;
-  return {
-    sufficient: value === 'sufficient',
-    excludesAffiliation: true,
-    evaluatorVersion: 'synthetic-independent-identity/v1',
-    evidence: ['non_affiliation_fixture'],
-  };
+  return independentIdentityV1(value);
 }
 
 function independentIdentityV1(result, overrides = {}) {
-  return {
+  const identity = {
     version: 'independent-identity/v1',
     result,
     reason: 'synthetic',
@@ -84,6 +86,13 @@ function independentIdentityV1(result, overrides = {}) {
     evidence: {},
     ...overrides,
   };
+  if (!Object.prototype.hasOwnProperty.call(overrides, 'evidenceDigest')) {
+    identity.evidenceDigest = crypto
+      .createHash('sha256')
+      .update(canonicalJson(identity.evidence))
+      .digest('hex');
+  }
+  return identity;
 }
 
 function evaluate(testCase) {
@@ -99,6 +108,8 @@ function evaluate(testCase) {
     bindingState: testCase.bindingState || 'current',
     parentChildKind: testCase.parentChildKind || 'not_applicable',
     providerState: testCase.providerState || 'complete',
+    expectedIdentityBinding: EXPECTED_IDENTITY_BINDING,
+    now: POLICY_NOW,
   });
   return { assessment, policy };
 }
@@ -145,6 +156,8 @@ describe('reviewer institution auto-resolution policy regression v1', () => {
       bindingState: 'current',
       parentChildKind: 'not_applicable',
       providerState: 'complete',
+      expectedIdentityBinding: EXPECTED_IDENTITY_BINDING,
+      now: POLICY_NOW,
     });
     expect(policy).toMatchObject({
       institutionAction: 'clear_institution_concern',
@@ -155,12 +168,13 @@ describe('reviewer institution auto-resolution policy regression v1', () => {
   });
 
   test.each([
-    ['providerObservedAt', undefined],
-    ['requestBinding', undefined],
-    ['identityInputDigest', undefined],
-    ['resolverVersion', 'independentReviewerIdentity@future'],
-    ['providerState', 'partial'],
-  ])('a v1 sufficient result with invalid %s fails closed', (field, value) => {
+    ['providerObservedAt', undefined, 'independent_identity_unavailable'],
+    ['requestBinding', undefined, 'independent_identity_binding_mismatch'],
+    ['identityInputDigest', undefined, 'independent_identity_binding_mismatch'],
+    ['evidenceDigest', undefined, 'independent_identity_unavailable'],
+    ['resolverVersion', 'independentReviewerIdentity@future', 'independent_identity_unavailable'],
+    ['providerState', 'partial', 'independent_identity_unavailable'],
+  ])('a v1 sufficient result with invalid %s fails closed', (field, value, finalReason) => {
     const base = evaluate(fixture.cases.find((item) => item.key === 'exact_alias'));
     const policy = evaluateReviewerInstitutionAutoResolution({
       assessment: base.assessment,
@@ -169,10 +183,12 @@ describe('reviewer institution auto-resolution policy regression v1', () => {
       bindingState: 'current',
       parentChildKind: 'not_applicable',
       providerState: 'complete',
+      expectedIdentityBinding: EXPECTED_IDENTITY_BINDING,
+      now: POLICY_NOW,
     });
     expect(policy).toMatchObject({
       finalCandidateEffect: 'hold',
-      finalReason: 'independent_identity_unavailable',
+      finalReason,
     });
   });
 
@@ -185,6 +201,129 @@ describe('reviewer institution auto-resolution policy regression v1', () => {
       bindingState: 'current',
       parentChildKind: 'not_applicable',
       providerState: 'complete',
+      expectedIdentityBinding: EXPECTED_IDENTITY_BINDING,
+      now: POLICY_NOW,
+    });
+    expect(policy).toMatchObject({
+      finalCandidateEffect: 'hold',
+      finalReason: 'independent_identity_unavailable',
+    });
+  });
+
+  test('an expired v1 receipt cannot authorize a decision', () => {
+    const base = evaluate(fixture.cases.find((item) => item.key === 'exact_alias'));
+    const policy = evaluateReviewerInstitutionAutoResolution({
+      assessment: base.assessment,
+      independentIdentity: independentIdentityV1('sufficient'),
+      additionalCoi: 'not_screened',
+      bindingState: 'current',
+      parentChildKind: 'not_applicable',
+      providerState: 'complete',
+      expectedIdentityBinding: EXPECTED_IDENTITY_BINDING,
+      now: '2026-09-29T00:00:00.000Z',
+    });
+    expect(policy).toMatchObject({
+      finalCandidateEffect: 'hold',
+      finalReason: 'independent_identity_expired',
+    });
+  });
+
+  test('a future-dated receipt cannot authorize a decision', () => {
+    const base = evaluate(fixture.cases.find((item) => item.key === 'exact_alias'));
+    const policy = evaluateReviewerInstitutionAutoResolution({
+      assessment: base.assessment,
+      independentIdentity: independentIdentityV1('sufficient', {
+        evaluatedAt: '2026-09-15T18:00:00.000Z',
+        providerObservedAt: '2026-09-15T18:00:00.000Z',
+        expiresAt: '2026-09-29T18:00:00.000Z',
+      }),
+      additionalCoi: 'not_screened',
+      bindingState: 'current',
+      parentChildKind: 'not_applicable',
+      providerState: 'complete',
+      expectedIdentityBinding: EXPECTED_IDENTITY_BINDING,
+      now: POLICY_NOW,
+    });
+    expect(policy).toMatchObject({
+      finalCandidateEffect: 'hold',
+      finalReason: 'independent_identity_unavailable',
+    });
+  });
+
+  test('a receipt beyond the maximum TTL cannot authorize a decision', () => {
+    const base = evaluate(fixture.cases.find((item) => item.key === 'exact_alias'));
+    const policy = evaluateReviewerInstitutionAutoResolution({
+      assessment: base.assessment,
+      independentIdentity: independentIdentityV1('sufficient', {
+        expiresAt: '2026-09-28T18:00:00.001Z',
+      }),
+      additionalCoi: 'not_screened',
+      bindingState: 'current',
+      parentChildKind: 'not_applicable',
+      providerState: 'complete',
+      expectedIdentityBinding: EXPECTED_IDENTITY_BINDING,
+      now: POLICY_NOW,
+    });
+    expect(policy).toMatchObject({
+      finalCandidateEffect: 'hold',
+      finalReason: 'independent_identity_unavailable',
+    });
+  });
+
+  test('tampered evidence cannot retain authority under a stale evidence digest', () => {
+    const base = evaluate(fixture.cases.find((item) => item.key === 'exact_alias'));
+    const policy = evaluateReviewerInstitutionAutoResolution({
+      assessment: base.assessment,
+      independentIdentity: independentIdentityV1('sufficient', {
+        evidence: { substituted: true },
+        evidenceDigest: '0'.repeat(64),
+      }),
+      additionalCoi: 'not_screened',
+      bindingState: 'current',
+      parentChildKind: 'not_applicable',
+      providerState: 'complete',
+      expectedIdentityBinding: EXPECTED_IDENTITY_BINDING,
+      now: POLICY_NOW,
+    });
+    expect(policy).toMatchObject({
+      finalCandidateEffect: 'hold',
+      finalReason: 'independent_identity_unavailable',
+    });
+  });
+
+  test('a receipt for another candidate cannot authorize a decision', () => {
+    const base = evaluate(fixture.cases.find((item) => item.key === 'exact_alias'));
+    const policy = evaluateReviewerInstitutionAutoResolution({
+      assessment: base.assessment,
+      independentIdentity: independentIdentityV1('sufficient'),
+      additionalCoi: 'not_screened',
+      bindingState: 'current',
+      parentChildKind: 'not_applicable',
+      providerState: 'complete',
+      expectedIdentityBinding: { ...EXPECTED_IDENTITY_BINDING, candidateKey: 'candidate-2' },
+      now: POLICY_NOW,
+    });
+    expect(policy).toMatchObject({
+      finalCandidateEffect: 'hold',
+      finalReason: 'independent_identity_binding_mismatch',
+    });
+  });
+
+  test('the legacy boolean identity shape has no authority', () => {
+    const base = evaluate(fixture.cases.find((item) => item.key === 'exact_alias'));
+    const policy = evaluateReviewerInstitutionAutoResolution({
+      assessment: base.assessment,
+      independentIdentity: {
+        sufficient: true,
+        excludesAffiliation: true,
+        evaluatorVersion: 'synthetic-independent-identity/v1',
+      },
+      additionalCoi: 'not_screened',
+      bindingState: 'current',
+      parentChildKind: 'not_applicable',
+      providerState: 'complete',
+      expectedIdentityBinding: EXPECTED_IDENTITY_BINDING,
+      now: POLICY_NOW,
     });
     expect(policy).toMatchObject({
       finalCandidateEffect: 'hold',

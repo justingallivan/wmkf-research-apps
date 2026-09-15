@@ -79,7 +79,11 @@ for it.
    the four outcomes, closed PubMed/OpenAlex/ORCID methods, server-loader-only
    evidence intake, provider completeness, full-forename and author-cluster
    grounding, mandatory binding fields, and the 14-day maximum. It has no
-   runtime caller, roster projection, receipt, or save authority.
+   runtime caller, roster projection, receipt, or save authority. A subsequent
+   OAuth Claude review hardened raw-byline checks, an unwindowed PubMed query
+   with total-count coverage, source-work lineage, candidate-bound ORCID
+   authorship, separate input/evidence digests, exact identifier handling,
+   future-date and wall-clock expiry checks, and execution-context binding.
 
 ## Change surface
 
@@ -155,8 +159,8 @@ the runtime candidate payload and cannot authorize a write.
 **[VERIFIED via `lib/services/reviewer-institution-auto-resolution-policy.js`]**
 The dormant v2 policy composer now accepts the four-outcome result and maps
 `contradicted` to rejection while validating its mandatory claims. It retains
-the Phase 1 boolean test shape for the existing synthetic regression fixture.
-Neither shape has runtime authority.
+no authority for the Phase 1 boolean test shape; the synthetic regression now
+uses valid v1-shaped inputs. The v1 shape has no runtime authority.
 
 ### Decision labels
 
@@ -197,7 +201,7 @@ actor ID, provider payload, or error text enters the measurement table.
 | Canonical system ids do not turn siblings into parent/child | Synthetic canonicalized-sibling regression requires `sibling` plus hold/surface behavior |
 | Browser-carried fields grant no authority | Tampered relationship, identity, COI, and policy fields are ignored or rejected at roster/save boundaries |
 | A stale server receipt cannot authorize a changed candidate or request | Request, candidate, input digest, policy version, and freshness mismatch tests fail closed |
-| A v1 receipt cannot omit a binding claim | Missing request, candidate key, digest, method/version, provider state, observation time, or expiry fails closed |
+| A v1 receipt cannot omit a binding claim | Missing request, candidate key, input/evidence digest, method/version, provider state, observation time, or expiry fails closed |
 | Identity sufficiency requires complete provider work | Any provider-call failure produces `partial` or `failed` and cannot return `sufficient` |
 | A large OpenAlex result pool cannot masquerade as unique | Grounding abstains unless the fetched pool covers the provider's reported total count |
 | Staff confirmation cannot validate its own institution-dependent premise | Staff-confirmed rows remain `not_evaluable` in `independent-identity/v1` and continue through the existing human-authority path |
@@ -262,8 +266,8 @@ Producer coverage also pins undated publication currentness as `unknown`.
    `confirmed`/`probable` string and every currently carried identity anchor are
    insufficient as-is. The new server computation has four outcomes:
    `sufficient`, `insufficient`, `contradicted`, and `not_evaluable`.
-3. Bind the result to request, exact candidate key, identity input digest,
-   closed method and evaluator versions, provider state, provider observation
+3. Bind the result to request, exact candidate key, a server-input digest and
+   separate provider-evidence digest, closed method and evaluator versions, provider state, provider observation
    time, and expiry no later than 14 days after that observation. Every claim is
    mandatory. Recompute or reject after relevant input change.
 4. Carry the exact publication year with each selected affiliation assertion.
@@ -287,18 +291,23 @@ but they found that no existing evidence output as wired is sufficient. The
 implemented dormant server-side evaluator consumes those provider inputs
 through three closed method families:
 
-1. `pubmed_multi_work_author` counts only exact works whose bylines fully agree
+1. `pubmed_multi_work_author` runs an unwindowed author query and counts only
+   exact works whose bylines fully agree
    with the candidate forename, binds affiliation assertions to those PMIDs,
    and binds every counted work to one OpenAlex author cluster or ORCID works
    identity;
-2. `exact_work_unique_author`/`forename_work_grounding` uses a server-held work,
+2. `exact_work_unique_author`/`forename_work_grounding` uses a server-held work
+   whose closed lineage is `proposal_citation` or `staff_entered`,
    requires full-forename agreement, runs independently of affiliation
    selection, records the work/authorship/author-cluster identifiers, and
-   abstains when the fetched OpenAlex pool is smaller than the reported total;
+   abstains when the fetched OpenAlex pool is smaller than the reported total
+   or when a complete author pool contains another exact-name cluster;
    and
 3. `hard_id_join` uses ORCID only when the source identifier is byline-asserted
    or its works list contains the exact work and the CRM identifier is
-   staff-entered or independently receipted. Email is `not_evaluable` in v1.
+   staff-entered or independently receipted. The dormant core currently accepts
+   only `staff_entered`; a future receipt may qualify only after its disjoint
+   provenance is defined and verified. Email is `not_evaluable` in v1.
 
 The evaluator makes its own provider calls and records any per-query failure as
 `partial`; `sufficient` requires `providerState=complete`. It reads provider
@@ -431,7 +440,7 @@ retained.
 | Currentness producer | Undated PubMed/OpenAlex evidence is `unknown`; dated evidence preserves its exact year and follows the reviewed threshold; no producer hard-codes publication evidence as historical |
 | Pure relationship | Existing source-aware 25, unchanged 157-row boolean regression, UC sibling matrix, address/alias/parent-child/subunit/partial-provider cases, canonicalized sibling attack |
 | Policy matrix | Versioned 18-case PII-free regression set; every row of the policy table, all enum complements, wrong-person/same-institution, additional-COI conflict and incomplete states; clearance and neutrality use different action values |
-| Independent identity | Affiliation-only evidence is insufficient; every sufficient method uses its hardened server-held inputs; all counted bylines fully agree; PubMed PMIDs cluster to one person; incomplete OpenAlex pools abstain; hard-ID source and CRM lineage is independent; email and staff confirmation are not evaluable; full-forename/hard-ID/grounding contradiction returns `contradicted`; initial-only/common-name ambiguity holds; partial/failed provider work cannot be sufficient |
+| Independent identity | Affiliation-only evidence is insufficient; every sufficient method requires proposal-citation or staff-entered source-work lineage; all counted bylines fully agree; an unwindowed, complete PubMed result set clusters to one person; incomplete OpenAlex pools and namesake clusters abstain; hard-ID source and CRM lineage is independent; email and staff confirmation are not evaluable; incompatible full forenames or hard IDs return `contradicted`; initials, surname-only names, middle-name ambiguity, and common names hold; partial/failed provider work cannot be sufficient |
 | Server binding | Valid receipt; every mandatory v1 claim omitted in turn; tampered browser values; cross-request replay; changed candidate; expiry no later than 14 days after provider observation; unknown schema/policy/evaluator/method version |
 | Roster persistence | Server projection survives reload; untrusted fields are stripped; CAS conflict and cap/eviction do not manufacture authority |
 | Candidate card | Auto-cleared institution concern disappears; remaining identity/COI/contact reason remains; current discrepancy shows valid actions; provider failure shows retry |
