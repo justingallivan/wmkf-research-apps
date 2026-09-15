@@ -26,10 +26,11 @@
  *   wmkf_ai_promptname = 'review-synthesis.generate'.
  * Prompt text source of truth: shared/config/prompts/review-synthesis.js.
  *
- * NOT run against any live environment by this session — see the plan doc for
- * the pending-provisioning status. The dependent schema column
- * (lib/dataverse/schema/wave11-review-synthesis/) must be applied BEFORE this
- * seed's target is usable — selecting/writing a not-yet-created column 400s.
+ * Production history: v4 became sole-current on 2026-09-15 UTC after PR #296
+ * deployed. The dependent schema column
+ * (lib/dataverse/schema/wave11-review-synthesis/) was provisioned in Production
+ * on 2026-07-03; any new target must still apply it before this prompt is usable
+ * because selecting/writing a not-yet-created column 400s.
  */
 
 import { readFileSync } from 'fs';

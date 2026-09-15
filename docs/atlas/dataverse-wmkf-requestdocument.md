@@ -6,7 +6,7 @@ status: active
 summary: Governed request-artifact registry with Production-proved same-item Final lineage, explicit group-review attribution, and the Production-live leadership-review transition (2026-09-07).
 canonical: false
 owner: product-engineering
-last_verified: 2026-09-10
+last_verified: 2026-09-15
 related:
   - lib/dataverse/schema/wave16-request-document-registry/wmkf_requestdocument.json
   - lib/dataverse/schema/wave19-pre-site-draft/01_wmkf_requestdocument_pre_site_draft.json
@@ -17,6 +17,11 @@ related:
   - lib/services/initial-assessment/controls-service.js
   - lib/services/pre-site-visit/distribution-service.js
   - lib/services/pre-site-visit/cycle-list-service.js
+  - lib/services/pre-site-visit/artifact-service.js
+  - lib/services/pre-site-visit/proposal-core-service.js
+  - lib/services/pre-site-visit/docx-renderer.js
+  - lib/services/review-manager/reviewers-service.js
+  - shared/utils/review-writeup-paragraphs.js
   - lib/services/final-writeup/transition-service.js
   - lib/db/migrations/034_pre_site_distribution_attempts.sql
   - docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md
@@ -367,6 +372,41 @@ Production Request Document row was created by this release smoke.
   handoff creates/reuses a Final lineage row over that same item, pins the exact
   Pre-Site row/version/hash, retains the Pre-Site pointer, and sets the separate
   current-Final pointer. This contract is Production-proved on Request `1002788`.
+- **Slice 4 (Reviews Tab Phase II; Production-live 2026-09-15 UTC via PR #296
+  merge `b9ad64eb` and Ready deployment `wmkfresearchapps-adp2hh965`,
+  docs/plans/REVIEWS_TAB_WRITEUP_PARAGRAPHS_PLAN_2026-09-14.md §4.5):**
+  `wmkf_presiteinputsnapshotjson` gains snapshot **v4** (`request.refereeSection:
+  {text, names} | null`), following the v3 precedent
+  (`institutionalFundingHistory`); `wmkf_presiteproposalcorejson` is bumped to
+  schemaVersion 4 in lockstep, though its own content shape is unchanged — this
+  is purely a version-lockstep bump. `[[STAFF:RefereeSection]]` in the Word
+  template becomes a CONDITIONAL placeholder (moved out of
+  `MANUAL_PLACEHOLDERS`): filled with the deterministic count/reviewer/
+  expertise sentences (`shared/utils/review-writeup-paragraphs.js`'s
+  `composeRefereeSection`, reusing the request-scoped
+  `reviewers-service.js#getWriteupRoster`) when at least one review is
+  submitted at generation time, left exactly as-is (asserted to survive
+  exactly once) otherwise. `docx-renderer.js#renderPreSiteVisitDocx` now
+  returns `{docx, diagnostics}` rather than a bare Buffer — `diagnostics`
+  carries `referee_name_not_matched` for any supplied reviewer name with zero
+  underlines in the rendered paragraph (underlined ONLY there, never joined
+  into `personnelNames`, so it can never trigger `personnel_name_not_matched`).
+  New diagnostic codes readable from the stored envelope: `referee_section_manual`
+  (v2/v3 snapshot, or a v4 snapshot with no composed section — zero submitted
+  reviews at generation), `referee_name_not_matched`, and
+  `referee_blocker_unnamed` (an unresolved reviewer invitation whose blocker
+  reason isn't the allowlisted `active_invitation`+accepted case). A genuine
+  reviewer-roster read failure at generation time fails closed
+  (`pre_site_visit_referee_roster_unavailable`), and a composer failure fails
+  closed separately (`pre_site_visit_referee_compose_failed`), same posture as
+  the existing funding-history read failure. `renderPreSiteVisitDocx` treats a
+  supplied `refereeSection` with blank/whitespace-only `text` identically to
+  `null` (token preserved, not filled with an empty paragraph). A submitted
+  review whose rating falls outside the current form scale is tallied as an
+  unlabelled `referee_rating_unlabelled` diagnostic rather than silently
+  dropped from the score sentence.
+  [RECHECKED after lib/services/pre-site-visit/docx-renderer.js change:
+  2026-09-14 wrap-up — blank-text normalization added.]
 
 The persistence schema and writer are live in Production. **[VERIFIED IN
 PRODUCTION 2026-08-17]** the runtime writer required the exact narrative,

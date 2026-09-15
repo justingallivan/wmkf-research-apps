@@ -63,6 +63,10 @@ const CENSUS = [
     expected: [
       'lib/services/review-manager/export-reviews-service.js',
       'pages/api/review-manager/reviewers.js',
+      // Reviews Tab Writeup Paragraphs plan §4.5 (Slice 4, 2026-09-14):
+      // loadPreSiteVisitInputs calls the request-scoped getWriteupRoster
+      // export to compose the deterministic [[STAFF:RefereeSection]] fill.
+      'lib/services/pre-site-visit/proposal-core-service.js',
     ],
   },
   {

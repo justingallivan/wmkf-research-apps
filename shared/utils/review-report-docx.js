@@ -208,6 +208,48 @@ export async function generateReviewReportDocx(report) {
     }
   }
 
+  // --- Reviews (writeup) section (Slice 3, plan §4.4 "Word panel-prep
+  // export") — the deterministic score/reviewer/expertise sentences
+  // (reviewer names underlined via `TextRun({underline:{}})`, never bold or
+  // markup) plus the same verified themes/quotations as the synthesis
+  // section above. Model strings (themes, quotations) are ALWAYS plain runs
+  // — never given underline or any other markup, matching the plan's "every
+  // model string is escaped as text" rule. Omitted entirely when no review
+  // was submitted (report.writeupSection is null).
+  const writeupChildren = [];
+  if (report.writeupSection) {
+    const w = report.writeupSection;
+    writeupChildren.push(new Paragraph({
+      heading: HeadingLevel.HEADING_2,
+      spacing: { before: 300, after: 120 },
+      children: [new TextRun({ text: 'Reviews (writeup)', size: 26, font: FONT, bold: true })],
+    }));
+    for (const runs of w.paragraphs) {
+      writeupChildren.push(new Paragraph({
+        spacing: { after: 120 },
+        // Each run is exactly {text, underline?} — a name run carries
+        // `underline: true` (rendered as `underline: {}`), every other run
+        // (deterministic prose) is plain. No bold/italic/href here; this is
+        // NOT the htmlToBlocks run shape.
+        children: runs.map((run) => new TextRun({
+          text: run.text,
+          size: BODY_SIZE,
+          font: FONT,
+          underline: run.underline ? {} : undefined,
+        })),
+      }));
+    }
+    if (w.themes) {
+      writeupChildren.push(new Paragraph({ spacing: { after: 120 }, children: [bodyRun(w.themes)] }));
+    }
+    for (const q of w.quotations) {
+      writeupChildren.push(new Paragraph({
+        spacing: { after: 120 },
+        children: [bodyRun(`${q.leadIn} "${q.quote}"`)],
+      }));
+    }
+  }
+
   // --- Per-question answer sections (picklist + multiselect + richtext, question order) ---
   function runsToTextRuns(runs) {
     // A run's text may contain an embedded "\n" from a <br>; docx needs an
@@ -340,6 +382,7 @@ export async function generateReviewReportDocx(report) {
         ...reviewerChildren,
         ...summaryChildren,
         ...synthesisChildren,
+        ...writeupChildren,
         ...answerChildren,
       ],
     }],

@@ -129,6 +129,33 @@ test('institution changes alter the immutable Pre-Site artifact identity', () =>
   expect(aka.generationKey).not.toBe(formal.generationKey);
 });
 
+test('buildPreSiteVisitInputSnapshot is schemaVersion 4 and carries request.refereeSection (Slice 4)', () => {
+  const withReferee = buildPreSiteVisitInputSnapshot(inputFixture({
+    context: {
+      documentFields: {
+        ...inputFixture().context.documentFields,
+        refereeSection: { text: 'We received one review.', names: ['Dr. A'] },
+      },
+    },
+  }));
+  expect(withReferee.schemaVersion).toBe(4);
+  expect(withReferee.request.refereeSection).toEqual({ text: 'We received one review.', names: ['Dr. A'] });
+
+  const withoutReferee = buildPreSiteVisitInputSnapshot(inputFixture());
+  expect(withoutReferee.schemaVersion).toBe(4);
+  expect(withoutReferee.request.refereeSection).toBeNull();
+
+  // A change in the referee section changes the fingerprint/generationKey —
+  // a review-submission event forces a fresh generation rather than
+  // silently reusing a stale row (same identity-sensitivity as every other
+  // documentFields entry).
+  const promptIdentity = { promptId: PROMPT_ID, promptName: PRE_SITE_VISIT_CONTRACT.promptName, promptVersion: 4 };
+  const a = buildPreSiteVisitIdentity({ requestId: REQUEST_ID, inputSnapshot: withReferee, promptIdentity });
+  const b = buildPreSiteVisitIdentity({ requestId: REQUEST_ID, inputSnapshot: withoutReferee, promptIdentity });
+  expect(a.inputFingerprint).not.toBe(b.inputFingerprint);
+  expect(a.generationKey).not.toBe(b.generationKey);
+});
+
 test('a guarded reopen cycle prevents later generation from rediscovering the preserved row', () => {
   const inputSnapshot = buildPreSiteVisitInputSnapshot(inputFixture());
   const promptIdentity = {
@@ -291,7 +318,7 @@ function createHarness({
       if (mutatePersistedDraft) {
         expect(renderedCore.executiveSummary).toBe('Dataverse read-back summary.');
       }
-      return Buffer.from('rendered-docx');
+      return { docx: Buffer.from('rendered-docx'), diagnostics: [] };
     }),
     hashDocx: jest.fn().mockResolvedValue('gdc1:governed-hash'),
     getRequest: jest.fn().mockImplementation(async () => ({ ...request })),
@@ -538,7 +565,7 @@ test('persists eight sections and snapshots, renders the Dataverse read-back, th
       provenance: { runId: RUN_ID, promptId: PROMPT_ID },
     },
   });
-  expect(harness.row.wmkf_presiteproposalcorejson).toContain('"schemaVersion":3');
+  expect(harness.row.wmkf_presiteproposalcorejson).toContain('"schemaVersion":4');
   expect(harness.row.wmkf_presiteinputsnapshotjson).not.toContain('Narrative text');
   expect(harness.row.wmkf_presiteinputsnapshotjson).toContain('ProposalNarrative_1002379.pdf');
   expect(harness.row.wmkf_renderinputfingerprint).toMatch(/^[a-f0-9]{64}$/);
@@ -646,6 +673,136 @@ test('snapshot-v2 Ready documents surface the manual funding-history task; v3 do
     }),
   ]));
 });
+
+// Slice 4 (plan §4.5): [[STAFF:RefereeSection]] fill — snapshot v4, the
+// referee_section_manual legacy note, render diagnostics surviving
+// persistence, and the v4 strict-claim check.
+test('v2 and v3 input snapshots (predating the referee feature) surface referee_section_manual; a v4 snapshot with a composed section does not', async () => {
+  const harness = createHarness();
+  await generatePreSiteVisitArtifact({ requestId: REQUEST_ID }, harness.dependencies);
+
+  const fresh = await getPreSiteVisitArtifactStatus({ requestId: REQUEST_ID }, harness.dependencies);
+  // The default fixture's loadInputs never composes a referee section
+  // (no documentFields.refereeSection), so even a fresh v4 generation still
+  // gets the manual note — this asserts that, then the v2/v3 legacy paths.
+  expect(fresh.currentArtifact.warnings.map((w) => w.code)).toContain('referee_section_manual');
+
+  const snapshot = JSON.parse(harness.row.wmkf_presiteinputsnapshotjson);
+  for (const legacyVersion of [2, 3]) {
+    harness.row.wmkf_presiteinputsnapshotjson = JSON.stringify({ ...snapshot, schemaVersion: legacyVersion });
+    // eslint-disable-next-line no-await-in-loop
+    const status = await getPreSiteVisitArtifactStatus({ requestId: REQUEST_ID }, harness.dependencies);
+    expect(status.currentArtifact.warnings).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: 'referee_section_manual' }),
+    ]));
+  }
+
+  harness.row.wmkf_presiteinputsnapshotjson = JSON.stringify({
+    ...snapshot,
+    schemaVersion: 4,
+    request: { ...snapshot.request, refereeSection: { text: 'We received one review.', names: [] } },
+  });
+  const composed = await getPreSiteVisitArtifactStatus({ requestId: REQUEST_ID }, harness.dependencies);
+  expect(composed.currentArtifact.warnings.map((w) => w.code)).not.toContain('referee_section_manual');
+});
+
+test('a v4 coreEnvelope diagnostic (e.g. referee_name_not_matched) is admitted by both diagnosticsForRow and persistedDraft', async () => {
+  const harness = createHarness();
+  await generatePreSiteVisitArtifact({ requestId: REQUEST_ID }, harness.dependencies);
+
+  const core = JSON.parse(harness.row.wmkf_presiteproposalcorejson);
+  expect(core.schemaVersion).toBe(4);
+  harness.row.wmkf_presiteproposalcorejson = JSON.stringify({
+    ...core,
+    diagnostics: [...core.diagnostics, { code: 'referee_name_not_matched', name: 'Dr. Ghost' }],
+  });
+
+  const status = await getPreSiteVisitArtifactStatus({ requestId: REQUEST_ID }, harness.dependencies);
+  expect(status.currentArtifact.warnings).toEqual(expect.arrayContaining([
+    expect.objectContaining({
+      code: 'referee_name_not_matched',
+      name: 'Dr. Ghost',
+      message: expect.stringContaining('Dr. Ghost'),
+    }),
+  ]));
+});
+
+test('render-time diagnostics (referee_name_not_matched) survive persistence and surface as a warning on Ready reuse', async () => {
+  const harness = createHarness();
+  harness.dependencies.renderDocx.mockResolvedValueOnce({
+    docx: Buffer.from('rendered-docx'),
+    diagnostics: [{ code: 'referee_name_not_matched', name: 'Dr. Unmatched' }],
+  });
+
+  await generatePreSiteVisitArtifact({ requestId: REQUEST_ID }, harness.dependencies);
+
+  const core = JSON.parse(harness.row.wmkf_presiteproposalcorejson);
+  expect(core.schemaVersion).toBe(4);
+  expect(core.diagnostics).toEqual(expect.arrayContaining([
+    { code: 'referee_name_not_matched', name: 'Dr. Unmatched' },
+  ]));
+
+  const status = await getPreSiteVisitArtifactStatus({ requestId: REQUEST_ID }, harness.dependencies);
+  expect(status.currentArtifact.warnings).toEqual(expect.arrayContaining([
+    expect.objectContaining({ code: 'referee_name_not_matched', name: 'Dr. Unmatched' }),
+  ]));
+});
+
+test('composer-time referee_rating_unlabelled diagnostics survive persistence and surface as a warning (wrap-up item 5)', async () => {
+  const harness = createHarness();
+  harness.dependencies.loadInputs.mockResolvedValueOnce(inputFixture({
+    context: {
+      ...inputFixture().context,
+      refereeSectionDiagnostics: [{ code: 'referee_rating_unlabelled', name: 'Dr. Legacy' }],
+    },
+  }));
+
+  await generatePreSiteVisitArtifact({ requestId: REQUEST_ID }, harness.dependencies);
+
+  const core = JSON.parse(harness.row.wmkf_presiteproposalcorejson);
+  expect(core.diagnostics).toEqual(expect.arrayContaining([
+    { code: 'referee_rating_unlabelled', name: 'Dr. Legacy' },
+  ]));
+
+  const status = await getPreSiteVisitArtifactStatus({ requestId: REQUEST_ID }, harness.dependencies);
+  expect(status.currentArtifact.warnings).toEqual(expect.arrayContaining([
+    expect.objectContaining({
+      code: 'referee_rating_unlabelled',
+      name: 'Dr. Legacy',
+      message: expect.stringContaining('Dr. Legacy'),
+    }),
+  ]));
+});
+
+test('a reviewer name never joins personnelNames, so it can never trigger personnel_name_not_matched (plan §4.5)', async () => {
+  const harness = createHarness();
+  harness.dependencies.loadInputs.mockResolvedValueOnce(inputFixture({
+    context: {
+      documentFields: {
+        ...inputFixture().context.documentFields,
+        refereeSection: { text: 'We received one review. The reviewer was Dr. Reviewer of X.', names: ['Dr. Reviewer'] },
+      },
+    },
+  }));
+
+  await generatePreSiteVisitArtifact({ requestId: REQUEST_ID }, harness.dependencies);
+
+  const status = await getPreSiteVisitArtifactStatus({ requestId: REQUEST_ID }, harness.dependencies);
+  const personnelWarnings = status.currentArtifact.warnings.filter((w) => w.code === 'personnel_name_not_matched');
+  // Denominator (wrap-up item 4): the fixture's mocked "Personnel overview."/
+  // "Personnel details." generated text does not contain either roster name
+  // ("Ada Principal", "Casey Collaborator"), so this harness always produces
+  // at least one real personnel_name_not_matched warning — this assertion
+  // cannot pass vacuously on an empty array.
+  expect(personnelWarnings.length).toBeGreaterThan(0);
+  expect(personnelWarnings.every((w) => w.rosterDisplayName !== 'Dr. Reviewer')).toBe(true);
+
+  // Also assert directly on what the renderer was given: the reviewer name
+  // must never appear in the personnelNames array passed to renderDocx.
+  const renderCall = harness.dependencies.renderDocx.mock.calls.at(-1)[0];
+  expect(renderCall.personnelNames).not.toContain('Dr. Reviewer');
+});
+
 
 test('schema-v3 warnings project consistently on completion and Ready reuse', async () => {
   const harness = createHarness();

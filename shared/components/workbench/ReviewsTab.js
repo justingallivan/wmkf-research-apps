@@ -30,6 +30,11 @@ import { deriveReviewMatrix } from '../../utils/review-matrix';
 import ManualReviewEntryForm from './ManualReviewEntryForm';
 import ConsultantFeedbackSection from './ConsultantFeedbackSection';
 import { isTerminalReviewStatus } from '../../config/reviewerStatus';
+import {
+  reviewerAffiliationOf,
+  composeWriteupParagraphs,
+  compareReviewersByName,
+} from '../../utils/review-writeup-paragraphs';
 
 function formatDate(iso) {
   if (!iso) return null;
@@ -37,32 +42,6 @@ function formatDate(iso) {
   return Number.isNaN(d.getTime())
     ? null
     : d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
-}
-
-function reviewerAffiliationOf(reviewer) {
-  const acceptedAffiliation = typeof reviewer?.reviewerAffiliation === 'string'
-    ? reviewer.reviewerAffiliation.trim()
-    : '';
-  const personAffiliation = typeof reviewer?.affiliation === 'string'
-    ? reviewer.affiliation.trim()
-    : '';
-  const affiliation = acceptedAffiliation || personAffiliation;
-  const email = typeof reviewer?.email === 'string' ? reviewer.email.trim() : '';
-  if (!affiliation || !email) return affiliation || null;
-
-  // Some accepted-reviewer records carry a legacy free-text affiliation with
-  // the email appended (occasionally as "Electronic address: …"). The shared
-  // reviewer rows already render email separately, so remove only an exact
-  // trailing copy and leave all other affiliation text untouched.
-  const emailIndex = affiliation.toLowerCase().lastIndexOf(email.toLowerCase());
-  if (emailIndex < 0) return affiliation;
-  const suffix = affiliation.slice(emailIndex + email.length);
-  if (suffix.replace(/[\s,.;:]/g, '') !== '') return affiliation;
-  return affiliation
-    .slice(0, emailIndex)
-    .replace(/electronic\s+address\s*:?\s*$/i, '')
-    .replace(/[\s,.;:]+$/g, '')
-    .trim() || null;
 }
 
 // Reviews tab rating order, and the projection field that holds each value.
@@ -408,6 +387,113 @@ function describeSynthesisBlocker(blocker) {
     default:
       return `record needs attention (${String(blocker.reason || 'unknown').replace(/_/g, ' ')})`;
   }
+}
+
+/**
+ * "Writeup paragraphs" card (Reviews Tab Phase II Slice 1,
+ * docs/plans/REVIEWS_TAB_WRITEUP_PARAGRAPHS_PLAN_2026-09-14.md §4.4, W4).
+ * Renders the deterministic score/reviewer/expertise sentences composed by
+ * `composeWriteupParagraphs`. Names render as React `<u>` elements built
+ * from the composer's runs — never from a raw HTML or model string, and
+ * never via `dangerouslySetInnerHTML`. Copy is client-only (clipboard write),
+ * so it stays enabled even in read-only Preview.
+ *
+ * Named export (in addition to being used internally by the default-exported
+ * `ReviewsTab`) so a unit test can mount it directly with changing props —
+ * `ReviewsTab`'s own full-page loading gate (`if (loading) return <spinner>`)
+ * unmounts this card on every `load()` call, including same-request
+ * re-fetches, which would otherwise mask a stale-copy-promise regression
+ * test (an unmounted component's `setState` is already a no-op, for an
+ * unrelated reason) rather than actually exercising the generation guard.
+ */
+export function WriteupParagraphsCard({ reviewers, synthesis, synthesisCurrent }) {
+  const { paragraphs, warnings, text, html, themes } = useMemo(
+    () => composeWriteupParagraphs({ reviewers, synthesis }),
+    [reviewers, synthesis],
+  );
+  const [copyState, setCopyState] = useState('idle');
+
+  // Codex adversarial review (wrap-up 2026-09-14): an in-flight
+  // navigator.clipboard promise (e.g. stalled on a permission prompt) can
+  // resolve or reject AFTER the request/roster switches out from under it —
+  // its content is no longer what copy() captured. A monotonically
+  // increasing generation counter, bumped both on every copy() invocation
+  // and on every html change, lets each async continuation recognize
+  // whether it is still the most recent attempt before writing state; a
+  // stale continuation (of either outcome) is a no-op.
+  const copyGenerationRef = useRef(0);
+
+  // Opus Slice 1 follow-up: a stale "Copied"/"Copy failed" label surviving a
+  // content change (e.g. the roster re-fetches after a manual review entry)
+  // would misrepresent what's on the clipboard. Reset whenever the composed
+  // HTML changes.
+  useEffect(() => {
+    copyGenerationRef.current += 1;
+    setCopyState('idle');
+  }, [html]);
+
+  const copy = useCallback(async () => {
+    copyGenerationRef.current += 1;
+    const generation = copyGenerationRef.current;
+    setCopyState('idle');
+    try {
+      if (typeof window !== 'undefined' && typeof window.ClipboardItem !== 'undefined'
+        && navigator.clipboard && typeof navigator.clipboard.write === 'function') {
+        const item = new window.ClipboardItem({
+          'text/html': new Blob([html], { type: 'text/html' }),
+          'text/plain': new Blob([text], { type: 'text/plain' }),
+        });
+        await navigator.clipboard.write([item]);
+      } else if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+        await navigator.clipboard.writeText(text);
+      } else {
+        throw new Error('Clipboard API unavailable');
+      }
+      if (copyGenerationRef.current === generation) setCopyState('copied');
+    } catch (e) {
+      if (copyGenerationRef.current === generation) setCopyState('failed');
+    }
+  }, [html, text]);
+
+  if (paragraphs.length === 0) return null;
+
+  return (
+    <Card hover={false}>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm font-semibold text-gray-900">Writeup paragraphs</p>
+        <button
+          type="button"
+          onClick={copy}
+          className="text-xs text-gray-700 hover:text-gray-900 border border-gray-300 rounded-lg px-2.5 py-1"
+        >
+          {copyState === 'copied' ? 'Copied' : copyState === 'failed' ? 'Copy failed — try again' : 'Copy'}
+        </button>
+      </div>
+      <div className="mt-3 space-y-2 text-sm text-gray-800">
+        {paragraphs.map((runs, i) => (
+          <p key={i}>
+            {runs.map((run, j) => (run.underline ? <u key={j}>{run.text}</u> : <span key={j}>{run.text}</span>))}
+          </p>
+        ))}
+      </div>
+      {/* Slice 2 (plan §4.3): a stored synthesis current for today's roster but
+          predating writeupThemes/writeupQuotations. Not an error, not a
+          staleness flag — points at the existing Regenerate control on the
+          Synthesis card rather than adding a new action here. */}
+      {synthesisCurrent === true && !themes && (
+        <p className="mt-2 text-xs text-gray-500">
+          Regenerate synthesis to add themes and quotations.
+        </p>
+      )}
+      {warnings.length > 0 && (
+        <ul className="mt-2 space-y-0.5 text-xs text-gray-500">
+          {warnings.map((warning, i) => (
+            <li key={i}>{warning}</li>
+          ))}
+        </ul>
+      )}
+    </Card>
+  );
 }
 
 function SynthesisCard({ requestId, synthesis, state, reviewers = [], onUpdated, previewReadOnly = false }) {
@@ -822,7 +908,7 @@ export default function ReviewsTab({ requestId, previewReadOnly = false }) {
   // Track uses for `hasReview`.
   const submitted = reviewers
     .filter((r) => r.reviewReceivedAt)
-    .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    .sort(compareReviewersByName);
   // Outstanding tracking (workbench Reviews tab Phase 1): accepted reviewers
   // who have not submitted, sorted by longest-outstanding first so the
   // staffer sees who most needs a nudge.
@@ -965,6 +1051,13 @@ export default function ReviewsTab({ requestId, previewReadOnly = false }) {
         onUpdated={load}
         previewReadOnly={previewReadOnly}
       />
+      {submitted.length > 0 && (
+        <WriteupParagraphsCard
+          reviewers={submitted}
+          synthesis={proposal?.reviewSynthesis ?? null}
+          synthesisCurrent={proposal?.reviewSynthesisState?.current ?? null}
+        />
+      )}
     </div>
   );
 }
