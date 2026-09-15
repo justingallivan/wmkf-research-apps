@@ -113,6 +113,7 @@ inputs. The system evaluates them in this order:
 | Compatible segment plus additional affiliations; complete extra-affiliation COI screen is clear | Clear the institution concern and retain the additional affiliations as evidence | Continue through remaining gates |
 | Compatible segment plus an additional-affiliation COI conflict | Clear the comparison mismatch but hold for COI | Show the conflicting institution and the existing COI disposition |
 | Compatible relationship but identity insufficient or unavailable | Clear only the institution concern | Hold for the existing identity-confirmation remedy |
+| Independent identity is `contradicted` | Do not use the affiliation comparison to rescue the candidate | Reject through the identity/eligibility path and show the different-person reason |
 | Current author-specific `sibling`, `distinct`, or unresolved concurrent `related_other` | Surface a current discrepancy | Hold until staff confirms the right person/institution, records a joint appointment, corrects the record, or chooses Not a fit |
 | Historical `sibling` or `distinct` | Treat as career history | Neutral when independent identity is sufficient; otherwise retain the identity hold |
 | Difference with unknown time | Do not claim a current conflict | Neutral only under the existing conditional-neutrality rule; never count as an automatic institution clear |
@@ -137,13 +138,18 @@ qualifies.
 | `currentness` | `current`, `historical`, `unknown` | Source-specific rule plus observation date |
 | `organizationRelationship` | `same`, `parent_child`, `sibling`, `related_other`, `distinct`, `unresolved` | Existing typed relationship service |
 | `parentChildKind` | `verified_constituent`, `system_campus`, `unclassified`, `not_applicable` | Source resolver; required separately because a generic parent/child edge is too broad for authority |
-| `independentIdentity` | `sufficient`, `insufficient`, `not_evaluable` | New server-owned evaluator result with `excludesAffiliation=true` and an evaluator version |
+| `independentIdentity` | `sufficient`, `insufficient`, `contradicted`, `not_evaluable` | New server-owned evaluator result with `excludesAffiliation=true`, a closed method/version, complete binding claims, and bounded expiry |
 | `additionalCoi` | `clear`, `conflict`, `incomplete`, `not_screened` | Existing server COI matcher applied to every required current additional segment |
-| `providerState` | `complete`, `partial`, `failed` | Server provider orchestration |
+| `providerState` | `complete`, `partial`, `failed` | New evaluator's own server-side provider orchestration; `sufficient` requires `complete` |
 | `bindingState` | `current`, `stale`, `invalid` | Server receipt verification at the execution point |
 
 `samePerson` from the owner workbook is an evaluation label. It does not enter
 the runtime candidate payload and cannot authorize a write.
+
+**[PLANNED]** This four-outcome identity result is not implemented by the
+current dormant v2 policy composer, which still consumes the Phase 1 boolean
+test shape. Phase 2 must add a total adapter before `contradicted` can reach the
+reject path or any v1 result can carry authority.
 
 ### Decision labels
 
@@ -184,6 +190,11 @@ actor ID, provider payload, or error text enters the measurement table.
 | Canonical system ids do not turn siblings into parent/child | Synthetic canonicalized-sibling regression requires `sibling` plus hold/surface behavior |
 | Browser-carried fields grant no authority | Tampered relationship, identity, COI, and policy fields are ignored or rejected at roster/save boundaries |
 | A stale server receipt cannot authorize a changed candidate or request | Request, candidate, input digest, policy version, and freshness mismatch tests fail closed |
+| A v1 receipt cannot omit a binding claim | Missing request, candidate key, digest, method/version, provider state, observation time, or expiry fails closed |
+| Identity sufficiency requires complete provider work | Any provider-call failure produces `partial` or `failed` and cannot return `sufficient` |
+| A large OpenAlex result pool cannot masquerade as unique | Grounding abstains unless the fetched pool covers the provider's reported total count |
+| Staff confirmation cannot validate its own institution-dependent premise | Staff-confirmed rows remain `not_evaluable` in `independent-identity/v1` and continue through the existing human-authority path |
+| Independent identity expires with its evidence | Expiry is tied to provider observation and is no later than the existing 14-day attestation lifetime |
 | Flag-off behavior remains incumbent behavior | Equality tests cover card projection, selectability, save response, and Dataverse call set |
 | Partial batch save marks only successful rows | Mixed success test returns exact successful and failed candidate correlations and leaves failed rows retryable |
 | Measurement failure never changes product behavior | Insert failure, timeout, and circuit-breaker tests preserve the original response and decision |
@@ -241,10 +252,13 @@ Producer coverage also pins undated publication currentness as `unknown`.
    selection, and save. Mark whether each anchor depends on affiliation.
 2. Define `independent-identity/v1` from combinations that remain sufficient
    after all affiliation-derived weight is removed. A bare
-   `confirmed`/`probable` string is insufficient.
+   `confirmed`/`probable` string and every currently carried identity anchor are
+   insufficient as-is. The new server computation has four outcomes:
+   `sufficient`, `insufficient`, `contradicted`, and `not_evaluable`.
 3. Bind the result to request, exact candidate key, identity input digest,
-   evaluator version, and expiry. Recompute or reject after relevant input
-   change.
+   closed method and evaluator versions, provider state, provider observation
+   time, and expiry no later than 14 days after that observation. Every claim is
+   mandatory. Recompute or reject after relevant input change.
 4. Carry the exact publication year with each selected affiliation assertion.
    Define and review the dated-publication currentness threshold before labeling
    any publication assertion `current` or `historical`; missing or unbound dates
@@ -261,13 +275,31 @@ Producer coverage also pins undated publication currentness as `unknown`.
 Stop if independent identity cannot be computed without using the affiliation
 being adjudicated.
 
-The 2026-09-14 contract audit did not trigger that stop. PubMed multi-work
-full-forename verification and exact work-to-unique-author resolution can meet
-the existing identity threshold without affiliation credit. Exact CRM
-email/ORCID identity can support a hard-ID join when the source author carries
-the same independently obtained identifier. All other current generic
-`confirmed`/`probable` results remain insufficient because their affiliation
-dependence or selection lineage is not retained.
+The 2026-09-14 contract audit and adversarial review did not trigger that stop,
+but they found that no existing evidence output as wired is sufficient. The
+providers expose the inputs for a new server-side evaluator with three closed
+methods:
+
+1. `pubmed_multi_work_author` counts only exact works whose bylines fully agree
+   with the candidate forename, binds affiliation assertions to those PMIDs,
+   and binds every counted work to one OpenAlex author cluster or ORCID works
+   identity;
+2. `exact_work_unique_author`/`forename_work_grounding` uses a server-held work,
+   requires full-forename agreement, runs independently of affiliation
+   selection, records the work/authorship/author-cluster identifiers, and
+   abstains when the fetched OpenAlex pool is smaller than the reported total;
+   and
+3. `hard_id_join` uses ORCID only when the source identifier is byline-asserted
+   or its works list contains the exact work and the CRM identifier is
+   staff-entered or independently receipted. Email is `not_evaluable` in v1.
+
+The evaluator makes its own provider calls and records any per-query failure as
+`partial`; `sufficient` requires `providerState=complete`. It reads provider
+responses or a server-written roster projection. Browser-originating names,
+publications, ORCID, OpenAlex IDs, and identity statuses are deny-only. A staff
+confirmation also returns `not_evaluable` in v1 because institution mismatch
+can be the premise for that confirmation; the existing human-authority path
+continues to honor it separately.
 
 The audit also verified that implementation is still required before Phase 3:
 applicant output and roster pruning lose decisive proof fields; publication and
@@ -275,6 +307,10 @@ ORCID dates are detached from their affiliation assertions; ordinary save omits
 byline/history segments; and applicant promotion performs no server-side
 institution COI recomputation. See
 `docs/audits/reviewer-institution-phase2-contract-audit-2026-09-14.md`.
+
+ORCID employment with no recorded end date is an unbounded interval rather than
+proof that the affiliation was observed as current. The dated-currentness rule
+must preserve that distinction.
 
 ### Phase 3 — establish a trusted end-to-end assessment
 
@@ -286,9 +322,11 @@ cannot, create a separate bounded receipt.
 
 The server-owned binding must cover request, exact candidate key, assessment
 schema version, policy version, all normalized assertion/source identifiers,
-source dates/currentness, independent-identity version/result, additional-COI
-result, and an input digest. The roster stores only the bounded projection and
-receipt. Reload and save re-read or verify it; browser edits invalidate it.
+source dates/currentness, independent-identity version/result/method/provider
+state, provider observation and expiry, additional-COI result, and an input
+digest. Every v1 claim is mandatory; undefined values never compare as a
+match. The roster stores only the bounded projection and receipt. Reload and
+save re-read or verify it; browser edits invalidate it.
 
 Before changing migration 048, probe `schema_migrations` in every intended
 environment. If 048 is unapplied everywhere, amend the source-built migration.
@@ -386,8 +424,8 @@ retained.
 | Currentness producer | Undated PubMed/OpenAlex evidence is `unknown`; dated evidence preserves its exact year and follows the reviewed threshold; no producer hard-codes publication evidence as historical |
 | Pure relationship | Existing source-aware 25, unchanged 157-row boolean regression, UC sibling matrix, address/alias/parent-child/subunit/partial-provider cases, canonicalized sibling attack |
 | Policy matrix | Versioned 18-case PII-free regression set; every row of the policy table, all enum complements, wrong-person/same-institution, additional-COI conflict and incomplete states; clearance and neutrality use different action values |
-| Independent identity | Affiliation-only evidence is insufficient; supported non-affiliation combinations; full-forename contradiction; initial-only/common-name ambiguity; stale version/input digest |
-| Server binding | Valid receipt, tampered browser values, cross-request replay, changed candidate, expired receipt, unknown schema/policy version |
+| Independent identity | Affiliation-only evidence is insufficient; every sufficient method uses its hardened server-held inputs; all counted bylines fully agree; PubMed PMIDs cluster to one person; incomplete OpenAlex pools abstain; hard-ID source and CRM lineage is independent; email and staff confirmation are not evaluable; full-forename/hard-ID/grounding contradiction returns `contradicted`; initial-only/common-name ambiguity holds; partial/failed provider work cannot be sufficient |
+| Server binding | Valid receipt; every mandatory v1 claim omitted in turn; tampered browser values; cross-request replay; changed candidate; expiry no later than 14 days after provider observation; unknown schema/policy/evaluator/method version |
 | Roster persistence | Server projection survives reload; untrusted fields are stripped; CAS conflict and cap/eviction do not manufacture authority |
 | Candidate card | Auto-cleared institution concern disappears; remaining identity/COI/contact reason remains; current discrepancy shows valid actions; provider failure shows retry |
 | Save boundary | Client and server reach the same institution decision; extra affiliations are re-screened; stale/missing receipt holds before Dataverse writes |
@@ -450,23 +488,24 @@ browser claims must land in a tested fail-closed branch.
 
 ## Decisions intentionally left for execution
 
-1. The exact non-affiliation evidence combinations accepted by
-   `independent-identity/v1`, after the anchor audit.
-2. Whether to extend the existing attestation envelope or add a separate
+1. Whether to extend the existing attestation envelope or add a separate
    institution receipt, after comparing their binding and invalidation needs.
-3. The treatment of concurrent `related_other` beyond holding and surfacing it
+2. The treatment of concurrent `related_other` beyond holding and surfacing it
    in the first slice.
-4. The numeric benefit threshold and ongoing quality-control sample size,
+3. The numeric benefit threshold and ongoing quality-control sample size,
    declared from organic cycle volume before the results are inspected.
-5. Promotion of each high-authority consumer, which always requires a separate
+4. Promotion of each high-authority consumer, which always requires a separate
    owner decision.
 
 ## Immediate next work
 
 Implement the still-dormant Phase 2 contracts identified by the completed
-audit: the pure `independent-identity/v1` evaluator, typed dated affiliation
-assertions, complete additional-affiliation COI fanout, and the same fail-closed
-COI recomputation at ordinary and applicant save. Preserve incumbent authority
-and keep all new behavior flag-off. Do not enable measurement, apply a
-migration, create a Preview deployment, or promote a high-authority consumer as
-part of that implementation.
+audit and adversarial review: the pure, total, four-outcome
+`independent-identity/v1` evaluator using the closed hardened methods above;
+typed dated affiliation assertions; complete additional-affiliation COI
+fanout; and the same fail-closed COI recomputation at ordinary and applicant
+save. Correct the three stale `affiliationHistory` comments when its real
+consumer is added. Preserve incumbent authority and keep all new behavior
+flag-off. Do not enable measurement, apply a migration, create a Preview
+deployment, or promote a high-authority consumer as part of that
+implementation.

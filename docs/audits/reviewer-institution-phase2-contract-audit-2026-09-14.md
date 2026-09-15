@@ -3,7 +3,7 @@ title: Reviewer Institution Auto-Resolution Phase 2 Contract Audit
 domain: reviewer-identity
 kind: audit
 status: complete
-summary: "Independent person identity is computable for bounded existing evidence paths, but the proof and complete additional-affiliation COI inputs do not yet survive to both save boundaries."
+summary: "Current identity outputs do not bind one person strongly enough for institution auto-resolution; a new server-side evaluator can do so from hardened provider evidence, but it and complete additional-affiliation COI inputs are not yet implemented."
 canonical: false
 cataloged: 2026-09-14
 last_verified: 2026-09-14
@@ -22,62 +22,79 @@ related:
 ## Decision
 
 **[VERIFIED via the source trace below]** The project is not limited by what
-the current providers can ever tell us. Existing source paths can establish the
-same person without credit from the institution being compared. The stop rule
-in the implementation plan is therefore **not triggered**.
+the current providers can ever tell us, but no existing evidence output as
+wired binds one person strongly enough for the institution auto-clear
+population. PubMed and OpenAlex expose inputs that can support an
+affiliation-independent decision only after a new evaluator recomputes them
+under stricter person-binding rules. The stop rule in the implementation plan
+is therefore **not triggered**, but no current anchor may be promoted directly.
 
-The current runtime contract still cannot safely authorize institution
+The current runtime contract cannot safely authorize institution
 auto-resolution. It reduces several different evidence paths to
-`confirmed`/`probable`, and the retained roster shape does not prove whether
-affiliation contributed to that result. A bare status must remain
-insufficient. The correct next implementation is a separate, server-computed
-`independent-identity/v1` projection plus complete additional-affiliation COI
-screening at both save boundaries. No flag or authority should change before
-those two contracts exist and pass the frozen identity regressions.
+`confirmed`/`probable`, the retained roster shape does not prove whether
+affiliation contributed, and the existing affiliation-free-looking paths do
+not fully cluster the cited works to one person. A bare status or current
+anchor must remain insufficient. The correct next implementation is a new,
+server-computed `independent-identity/v1` result plus complete
+additional-affiliation COI screening at both save boundaries. No flag or
+authority should change before those two contracts exist and pass the frozen
+identity regressions.
 
 ## Independent-identity finding
 
 The relevant question is whether the source author and intended candidate can
 be bound as the same person after removing every contribution from the
-affiliation under adjudication. Two existing automated evidence classes meet
-that test in principle:
+affiliation under adjudication. No current output meets that test as wired.
+Two existing provider paths contain the raw inputs for a new evaluator, with
+the following required hardening:
 
-1. **PubMed multi-work author verification.** The verifier filters retrieved
-   articles to the named author, requires the configured minimum number of
-   distinct works, requires a full-forename match, and applies the namesake
-   guard. Institution mismatch is calculated separately and is not included in
-   `demotionReasons`; the resulting `verificationStatus` therefore does not
-   depend on institution agreement. **[VERIFIED via
-   `lib/services/discovery/verification.js:134-170,194-261`]**
-2. **Work-grounded author resolution.** The Track B resolver locates one known
-   work by external identifier or exact title, requires exactly one matching
-   author on that work, and emits the strong `authorship_grounded` anchor. The
-   resolver already classifies that anchor alone as `probable`. **[VERIFIED via
-   `lib/services/reviewer-work-author-resolver.js:43-50,86-149,152-183` and
-   `lib/services/reviewer-identity-resolver.js:262-269`]** The legacy spine also
-   has an affiliation-free rescue that requires full-forename agreement, topic
-   overlap in the selected author's works, and a unique grounded candidate.
-   **[VERIFIED via `lib/services/reviewer-identity-evidence.js:223-295,399-409`]**
-   Track B discovery is currently disabled, so its exact-work path is an
-   available contract and regression source rather than current production
-   coverage. **[VERIFIED via `pages/api/reviewer-finder/discover.js:6-10`]**
+1. **PubMed multi-work author verification.** Its query and status calculation
+   do not use institution agreement, but initial-only bylines currently count
+   toward the distinct-work minimum, and one full-forename article can promote
+   the pooled set. PubMed supplies no parsed author identifier, so same-name
+   works are not clustered to one person; affiliation extraction pools every
+   matching byline as well. **[VERIFIED via
+   `lib/services/discovery/name-matching.js:137-176,181-215`,
+   `lib/services/discovery/affiliation.js:48-76`, and
+   `lib/services/discovery/verification.js:134-170,194-261`]** The v1 method
+   must count only works whose byline fully agrees with the candidate forename,
+   bind affiliation assertions to those exact PMIDs, and bind all counted
+   PMIDs to one OpenAlex author cluster or one ORCID works identity. Without
+   that final cluster, the evidence is supporting rather than sufficient.
+2. **Work-grounded author resolution.** The current exact-work resolver accepts
+   initial-only byline matches and starts from `candidate.publications[0]`,
+   which may be browser-carried or drawn from a same-name pooled result. The
+   legacy full-forename rescue runs only after a failed affiliation/topic
+   selection and searches a ten-record OpenAlex pool without treating a larger
+   `totalCount` as an ambiguity gate. **[VERIFIED via
+   `lib/services/reviewer-work-author-resolver.js:37-45,86-125` and
+   `lib/services/reviewer-identity-evidence.js:510,528-579`]** The v1 method
+   must run independently of the affiliation-selection branch, require full
+   forename agreement, use only a server-held work, abstain when the reported
+   result count exceeds the fetched pool, and digest the work ID, authorship
+   index, author cluster ID, pool size, and total count. Track B discovery is
+   currently disabled, so its resolver is a regression source rather than
+   current production coverage. **[VERIFIED via
+   `pages/api/reviewer-finder/discover.js:6-10`]**
 
-An exact email or ORCID match to an existing reviewer is also affiliation
-independent as a CRM identity lookup. The ordinary save path already re-reads
-the exact reviewer and accepts only a confident email/ORCID match to that
-reviewer ID. **[VERIFIED via
-`lib/services/reviewer-finder/save-candidates-service.js:620-656`]** It can
-support `independent-identity/v1` only when the source-author assertion is bound
-to the same email/ORCID. A CRM match by itself identifies the stored person; it
-does not prove that a publication byline belongs to that person.
+An exact email or ORCID match can identify a stored CRM person, but the cited
+strict re-read helper applies only to referred seeds. **[VERIFIED via
+`lib/services/reviewer-finder/save-candidates-service.js:620-656`]** The general
+save lookup has different semantics, and a CRM ORCID may itself have been
+persisted from affiliation-dependent identity evidence. **[VERIFIED via
+`lib/services/reviewer-finder/save-candidates-service.js:1043,1102-1146`]** A
+hard-ID join can support `independent-identity/v1` only when the source side is
+byline-asserted or its ORCID works list contains the exact work, and the CRM
+identifier is staff-entered or carries its own independent receipt. Email has
+no affiliation-free source-author path today and is `not_evaluable` in v1.
 
 ### Anchor audit
 
 | Current signal | Affiliation dependence | `independent-identity/v1` treatment |
 |---|---|---|
-| PubMed full-forename, distinct-work verifier result | Independent; institution mismatch is a separate output | `sufficient` when the full verifier inputs, counts, namesake result, and source references are server-bound |
-| `authorship_grounded` from exact work-to-unique-author resolution or the full-forename work-grounding rescue | Independent | `sufficient` when the method-specific work inputs, unique grounding result, author ID, and resolver version are server-bound |
-| Exact CRM reviewer match by email or ORCID | Independent for the stored person | Supporting evidence only; sufficient for the source author only when the same hard identifier is bound on both sides |
+| Current PubMed full-forename/distinct-work verifier result | Affiliation-independent in its status calculation, but not person-binding because initial-only and namesake-pooled works can contribute | Supporting only. New v1 computation is `sufficient` only when every counted work has a full-forename byline, its PMID-bound affiliation is retained, and all counted works bind to one OpenAlex author or ORCID works identity |
+| Current `authorship_grounded` anchor | Intended to be affiliation-independent, but it can accept an initial-only byline, consume an untrusted or pooled first publication, and miss candidates outside the fetched OpenAlex pool | `not_evaluable` as carried. New v1 computation is `sufficient` only with full-forename agreement, a server-held exact work, bound work/authorship/author-cluster identifiers, unconditional grounding, and a completely examined result pool |
+| Exact CRM reviewer match by email or ORCID | Identifies the stored person; source and CRM lineage may still depend on affiliation | Email is `not_evaluable` in v1. ORCID is sufficient only when the source identifier is byline-asserted or its works list contains the exact work and the CRM identifier is staff-entered or independently receipted |
 | `openalex_author_orcid` | The OpenAlex lookup is hard-keyed, but the claimed ORCID's upstream origin may have used affiliation | `not_evaluable` unless a bound lineage proves the claimed ORCID was independently obtained |
 | `openalex_author_spine` | Inherits a prior `confirmed`/`probable` status whose evidence mix is not carried | `not_evaluable` |
 | `orcid_public` | ORCID name search may use affiliation to narrow multiple matches and may use a unique public-email tie break | `insufficient` alone; `not_evaluable` as proof of an affiliation-free selection |
@@ -90,7 +107,7 @@ does not prove that a publication byline belongs to that person.
 | `cross_source_orcid_agreement` | Both selected records may have been chosen through affiliation-sensitive searches | `not_evaluable` without bound selection lineage |
 | `orcid_name_confirmed` | The name check is independent, but the ORCID record selection may have used affiliation | `not_evaluable` without bound selection lineage |
 | Works-first `works_first_orcid`, `works_first_openalex_fragment`, DOI, and ROR bundle | The current works-first resolver first narrows by the claimed institution; its ROR anchor includes the claimed institution | Excluded as a bundle from v1, even though individual DOI/author identifiers could support a future affiliation-free resolver |
-| Staff identity confirmation | Server-bound human authority, but the current confirmation does not assert that affiliation was excluded from the judgment | Continue honoring it under the existing human-confirmation path; do not label it `excludesAffiliation=true` |
+| Staff identity confirmation | Server-bound human authority, but institution mismatch can trigger the confirmation and the confirmation binds the affiliation string | Continue honoring it under the existing human-confirmation path; v1 returns `not_evaluable` and never labels it `excludesAffiliation=true` |
 
 The affiliation-sensitive classifications above are source facts, not guesses:
 
@@ -112,7 +129,7 @@ The first implementation should be deliberately narrow:
 
 ```text
 version: independent-identity/v1
-result: sufficient | insufficient | not_evaluable
+result: sufficient | insufficient | contradicted | not_evaluable
 excludesAffiliation: true
 method: pubmed_multi_work_author | exact_work_unique_author | forename_work_grounding | hard_id_join
 resolverVersion: <closed allowlisted version>
@@ -120,27 +137,40 @@ requestBinding: <server-bound request>
 candidateKey: <exact immutable roster key>
 identityInputDigest: <name + source work/author/hard-id inputs>
 evaluatedAt: <server timestamp>
-expiresAt: <bounded reuse window>
+providerObservedAt: <server timestamp for the underlying provider evidence>
+expiresAt: <no later than 14 days after the provider observation>
 providerState: complete | partial | failed
 ```
 
-`sufficient` is available only for the automated evidence classes above, plus a hard-ID
-join that proves the source author and CRM person share the same independently
-obtained identifier. `insufficient` means the available, complete evidence did
-not meet one of those closed rules. Missing lineage, an unknown evaluator
-version, partial provider work, stale inputs, or a generic status becomes
-`not_evaluable`. The evaluator must recompute from server-held inputs or verify
-a server receipt; browser-supplied values are deny-only.
+`sufficient` is available only for the hardened automated methods above and
+requires `providerState=complete`. `insufficient` means complete evidence did
+not meet a sufficient rule without affirmatively disproving identity.
+`contradicted` means evidence such as incompatible hard identifiers, a full
+forename contradiction, or a grounded author collision affirmatively indicates
+a different person; it maps to the reject path rather than the confirm-identity
+remedy. Missing lineage, an unknown evaluator version, partial or failed
+provider work, a generic status, email-only evidence, or a staff confirmation
+becomes `not_evaluable`.
+
+Every v1 claim is mandatory: request binding, immutable candidate key, full
+identity input digest, closed method and resolver versions, provider state,
+evaluation time, and expiry. Undefined claims never compare as matches. Expiry
+is tied to the provider observation and may not exceed the existing 14-day
+attestation lifetime. The evaluator must make and account for its own provider
+calls; any per-query failure makes `providerState=partial`. It must recompute
+from provider responses fetched by the server or from a server-written roster
+projection. Name, publications, ORCID, OpenAlex author ID, identity status, and
+other browser-originating values are deny-only evidence.
 
 ## Where proof is lost today
 
 | Boundary | Current behavior | Consequence |
 |---|---|---|
-| Discovery verification | Produces PubMed verification fields or typed identity anchors | Independent evidence exists at source |
+| Discovery verification | Produces PubMed verification fields or typed identity anchors, but pools initial-only/same-name works and does not bind them to one person | Provider inputs exist, but no current output is sufficient for v1 |
 | General contact enrichment | Produces a full nested identity decision and mints a request-bound signed attestation | The full decision can be server-bound for the current request |
 | Applicant enrichment result | Projects only `contactEnrichment.identity.status` for a resolved candidate | Anchor types and lineage are removed before roster persistence |
 | Roster pruning | Keeps status plus at most compact anchor `type`, `canonicalKey`, `sourceUrl`, and `verifier`; drops weight, verdict, parser output, top-level `identityEvidence`, `identityAnchors`, `nameEvidence`, and `verificationSource` | A reload cannot reconstruct whether affiliation contributed |
-| Roster POST | Strips client copies of server authority, verifies the signed attestation, and may create an identity-only server receipt | Existing binding is useful, but it binds the generic identity decision rather than a separate affiliation-free result |
+| Roster POST | Strips client copies of server authority, verifies the signed attestation, and may create an identity-only server receipt | Existing binding is useful, but it binds the generic identity decision rather than a separate affiliation-free result; the stored receipt has no expiry, and the JWT verifier permits missing roster-candidate and eligibility claims plus a base-digest fallback, so v1 cannot inherit those optional semantics |
 | Candidate selection | Uses `confirmed`/`probable` and the incumbent `institutionMismatch` boolean through the shared promotion projection | No consumer can distinguish an independently resolved person from an affiliation-promoted person |
 | Ordinary save | Verifies the attestation or stored receipt, then uses the same generic decision to authorize contact/identity fields | The save boundary is server-bound but still lacks the semantic fact needed by the new policy |
 | Applicant save | Reads the canonical roster row and applies the generic identity predicate or stored staff confirmation | It also lacks independent-identity proof |
@@ -152,6 +182,9 @@ These transitions are verified in
 `lib/services/reviewer-candidate-attestation.js:73-134,188-275`,
 `shared/components/reviewers/reviewer-search-logic.js:62-67,152-215`, and
 `lib/services/reviewer-finder/save-candidates-service.js:780-895,987-1112`.
+The current receipt expiry and optional-claim behavior is verified in
+`lib/services/reviewer-candidate-attestation.js:17,120-135,216-252` and
+`lib/services/reviewer-finder/save-candidates-service.js:839-848`.
 
 ## Publication and employment currentness
 
@@ -181,7 +214,10 @@ The later producer change must emit one typed assertion per affiliation with
 its own source reference, exact year or employment interval, and observation
 date. Missing or unbound dates remain `unknown`. The numeric publication
 recency threshold remains an owner-reviewed policy decision; this audit does
-not invent one.
+not invent one. ORCID `current` means only that no end date is recorded; the
+dated-currentness policy must treat that interval as unbounded rather than as
+proof observed at the current institution. **[VERIFIED via
+`lib/services/orcid-service.js:274-283`]**
 
 ## Additional-affiliation COI trace
 
@@ -239,12 +275,21 @@ new policy explicitly requires the same server decision at both save paths.
 ## Required implementation before Phase 3 authority work
 
 1. Add a pure, total `independent-identity/v1` evaluator with only the closed
-   sufficient methods above. Test affiliation-only evidence, mixed evidence,
-   common-name/initial-only cases, source failures, unknown versions, stale
-   digests, and all branches where lineage is missing.
+   sufficient methods above plus an explicit `contradicted` result. Its PubMed
+   path counts only full-forename bylines and clusters all counted PMIDs to one
+   person. Its work-grounding path runs unconditionally, uses server-held work,
+   and abstains unless the fetched OpenAlex pool is complete. Its hard-ID path
+   excludes email and requires independent source and CRM ORCID lineage. Test
+   affiliation-only evidence, mixed evidence, common-name/initial-only cases,
+   incomplete result pools, contradictory identity, source failures, unknown
+   versions, stale digests, and all branches where lineage is missing.
 2. Compute the result on the server at the point where complete source evidence
-   exists. Preserve a bounded projection through applicant output, general
-   enrichment, roster storage, reload, and both saves.
+   exists. The evaluator owns provider-state accounting, and `sufficient`
+   requires a complete run. Treat all browser-originating identity fields and
+   staff confirmations as deny-only for v1. Preserve a bounded projection
+   through applicant output, general enrichment, roster storage, reload, and
+   both saves; make every binding claim mandatory and expire the result no later
+   than 14 days after the underlying provider observation.
 3. Introduce a typed affiliation assertion list. Each item must bind normalized
    segments to source, author specificity, source reference, and its own date or
    employment interval. Preserve successful segments when another segment
@@ -258,6 +303,11 @@ new policy explicitly requires the same server decision at both save paths.
 6. Run the frozen 40-case identity benchmark, the Phase 1 synthetic policy
    fixture, new extra-segment COI tests, both save-path tests, roster reload and
    tamper tests, and flag-off equality before considering Phase 3.
+7. Correct the stale comments that say `affiliationHistory` is screened by the
+   current COI path in `lib/services/discovery/affiliation.js`,
+   `lib/services/deduplication-service.js`, and
+   `lib/services/discovery/verification.js` when implementing the actual
+   history consumer.
 
 No migration, feature-flag enablement, Preview deployment, or runtime authority
 change was part of this audit.

@@ -109,7 +109,7 @@ this is not a Stage 3 selection or write-authority rollout.
 | Source-aware 25-case gate | **VERIFIED PASS, shadow only.** 25/25 relationship and action matches; zero sibling collapses, unsafe clears, manufactured reviews, or live-capture provider failures; all three challenged cases are compatible/nonblocking under explicit independent-identity sufficiency. | `benchmarks/institution-affiliation-compatibility/v1/results/source-aware-25-shadow-2026-08-19c.md` |
 | Additional-affiliation COI handoff | **PARTIAL / Stage 3 blocker (source check 2026-09-14).** The typed assessment retains `additionalAffiliations`, but the current candidate/server COI signal list does not consume those typed extra segments. A compatible segment cannot authorize selection until every relevant extra has been screened or explicitly excluded by source/time policy. | `institution-affiliation-assessment.js:296-317`; `deduplication-service.js:700-781`; `save-candidates-service.js:343-445` |
 | Promotion-review falsification | **VERIFIED hardened and merged.** Disconfirming tests cover unattributed evidence, same-parent unidentifiable subunits, a named organization followed by an address, and server-required identity-review presentation. The frozen 25-case result remains unchanged. | `947fb46`; PR #126; focused unit and benchmark suites |
-| Runtime independent-identity input | **PARTIAL / Stage 3 promotion blocker.** A read-only 2026-08-19 roster audit found 46 source-ready mismatch rows, but only two carried the compact non-affiliation anchor breakdown inspected by the audit. The benchmark therefore uses an explicit counterfactual identity-policy input, not runtime authority. | `scripts/audit-institution-affiliation-shadow-cases.js`; read-only production Postgres audit |
+| Runtime independent-identity input | **PARTIAL / Stage 3 promotion blocker.** A read-only 2026-08-19 roster audit found 46 source-ready mismatch rows, but only two carried the compact non-affiliation anchor breakdown inspected by the audit. The 2026-09-14 contract audit and adversarial review then established that no current carried output is sufficient as wired: initial-only and same-name work pooling, incomplete author pools, source lineage, and browser-originated fields require a new server computation. The benchmark therefore uses an explicit counterfactual identity-policy input, not runtime authority. | `scripts/audit-institution-affiliation-shadow-cases.js`; `docs/audits/reviewer-institution-phase2-contract-audit-2026-09-14.md`; read-only production Postgres audit |
 
 The shipped boolean comparator remains the sole identity, selectability, and
 durable-write authority until every high-authority consumer in this plan is
@@ -269,20 +269,36 @@ and route according to independent identity authority.
 
 ## Contract 4 — conditional neutrality and independent identity
 
-Define `independentIdentitySufficient` at the execution point for every
-high-authority consumer. This must be calculated without using the affiliation
-assertion currently under adjudication. Reusing an identity status that was
-itself promoted solely by that affiliation would be circular and is forbidden.
+Define `independent-identity/v1` at the execution point for every
+high-authority consumer. This is a new server-side computation, not a
+reinterpretation of a current `confirmed`/`probable` status or carried anchor.
+It must use no affiliation assertion under adjudication and return
+`sufficient`, `insufficient`, `contradicted`, or `not_evaluable`.
 
-The implementation must therefore expose either:
+The closed sufficient methods and binding rules live in
+`docs/audits/reviewer-institution-phase2-contract-audit-2026-09-14.md` and
+`docs/plans/REVIEWER_INSTITUTION_AUTO_RESOLUTION_PLAN_2026-09-14.md`. In
+particular, counted publication bylines require full-forename agreement and
+one bound author cluster; work grounding uses server-held inputs and a complete
+provider result pool; ORCID hard-ID joins require independent source and CRM
+lineage; and email joins are not evaluable in v1. Staff confirmation remains a
+separate human-authority path and cannot feed back as affiliation-independent
+identity proof.
 
-- an identity result calculated without affiliation anchors; or
-- a machine-verifiable breakdown showing that non-affiliation anchors alone
-  meet the consumer's existing persistence/selection threshold.
+Every v1 binding claim is mandatory. The result is bound to the request,
+immutable candidate key, complete input digest, closed method/evaluator
+versions, provider state and observation time, and expiry no later than 14 days
+after that observation. `sufficient` requires `providerState=complete`; any
+provider-call failure, stale input, missing claim, browser-only field, or
+incomplete author pool fails closed.
 
 Policy:
 
 ```text
+independent identity contradicted
+  -> reject through the identity/eligibility path; institution agreement cannot
+     rescue the candidate
+
 unreconciled current sibling/distinct conflict
   -> veto, regardless of independent identity sufficiency, until corrected or
      explicitly staff-confirmed under the existing identity-attestation flow
@@ -711,6 +727,10 @@ reads.
    identity contradiction merely by being additional.
 9. Relationship policy never changes the COI hard-drop matcher.
 10. No new string-side checker or enrichment-seam guard is added.
+11. No current identity status or anchor is promoted directly into
+    `independent-identity/v1`; the server recomputes the closed method.
+12. `sufficient` requires complete provider work, complete binding claims, and
+    a current receipt no older than the 14-day maximum.
 
 ## Contract-reconcile requirements for implementation
 
@@ -756,15 +776,13 @@ consumers have migrated.
 
 These are required before Stage 3, not silently assumed:
 
-1. the exact non-affiliation anchor combination that constitutes
-   `independentIdentitySufficient` at each high-authority consumer;
-2. the versioned runtime/roster representation for the typed assessment;
-3. the policy for concurrent `related_other` evidence beyond the named
+1. the versioned runtime/roster representation for the typed assessment;
+2. the policy for concurrent `related_other` evidence beyond the named
    parent/child and sibling classes; and
-4. the owner-approved minimum manual-review reduction that justifies a
+3. the owner-approved minimum manual-review reduction that justifies a
    consumer flip.
 
-The owner has settled the *direction* of item 4: unnecessary departmental and
+The owner has settled the *direction* of item 3: unnecessary departmental and
 multi-affiliation holds should clear automatically, while genuine current
 discrepancies should be surfaced. The numeric benefit threshold remains open
 until the organic baseline is measured. The first selection rollout also needs
