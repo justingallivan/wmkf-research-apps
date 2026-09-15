@@ -683,7 +683,7 @@ const v38Statements = [
 const v39Statements = [
   `CREATE TABLE IF NOT EXISTS portal_upload_staging (
     id UUID PRIMARY KEY,
-    scope TEXT NOT NULL CONSTRAINT portal_upload_staging_scope_check CHECK (scope IN ('grantee_image', 'staff_grantee_image', 'site_visit_material')),
+    scope TEXT NOT NULL CONSTRAINT portal_upload_staging_scope_check CHECK (scope IN ('grantee_image', 'staff_grantee_image', 'site_visit_material', 'consultant_feedback')),
     resource_id UUID NOT NULL,
     actor_binding TEXT NOT NULL,
     pathname TEXT NOT NULL UNIQUE,
@@ -1138,6 +1138,16 @@ const v50Statements = [
   )`,
   `CREATE INDEX IF NOT EXISTS consultant_feedback_request_idx ON consultant_feedback (request_id, received_on DESC)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS consultant_feedback_mutation_idx ON consultant_feedback (request_id, mutation_id)`,
+];
+
+// V51: Consultant Feedback slice 2 (mirrors migration 049) — widen the shared
+// portal_upload_staging scope allowlist to add 'consultant_feedback'.
+const v51Statements = [
+  `ALTER TABLE portal_upload_staging
+     DROP CONSTRAINT IF EXISTS portal_upload_staging_scope_check`,
+  `ALTER TABLE portal_upload_staging
+     ADD CONSTRAINT portal_upload_staging_scope_check
+     CHECK (scope IN ('grantee_image', 'staff_grantee_image', 'site_visit_material', 'consultant_feedback'))`,
 ];
 
 // V43: deliberation briefing links (docs/DELIBERATION_BRIEFING_PAGE_PLAN.md).
@@ -2182,6 +2192,24 @@ async function runMigration() {
           console.log(`[v50-${i + 1}/${v50Statements.length}] ○ Already exists: ${preview}...`);
         } else {
           console.error(`[v50-${i + 1}/${v50Statements.length}] ✗ Error: ${error.message}`);
+          throw error;
+        }
+      }
+    }
+
+    // Run V51 schema updates (Consultant Feedback slice 2; mirrors migration 049)
+    console.log(`\nApplying v51 schema updates - Consultant Feedback attachments (${v51Statements.length} statements)...`);
+    for (let i = 0; i < v51Statements.length; i++) {
+      const statement = v51Statements[i];
+      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
+      try {
+        await sql.query(statement);
+        console.log(`[v51-${i + 1}/${v51Statements.length}] ✓ ${preview}...`);
+      } catch (error) {
+        if (error.message.includes('already exists')) {
+          console.log(`[v51-${i + 1}/${v51Statements.length}] ○ Already exists: ${preview}...`);
+        } else {
+          console.error(`[v51-${i + 1}/${v51Statements.length}] ✗ Error: ${error.message}`);
           throw error;
         }
       }

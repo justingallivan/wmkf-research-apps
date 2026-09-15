@@ -3,7 +3,7 @@ title: Consultant Feedback — Informal Consultant Input on the Reviews Tab and 
 domain: reviewers
 kind: plan
 status: active
-summary: "Slice 1 PRODUCTION-LIVE 2026-09-14 (PR #293). Staff record informal feedback on a proposal from retained consultants (pasted text and/or an attached file), attributed to a roster consultant, editable, and shared by default on the deliberation briefing page as its own section. Postgres owns the entry; the request-document registry and SharePoint own any attached file."
+summary: "Slice 1 PRODUCTION-LIVE 2026-09-14 (PR #293); slice 2 (attachments) built on branch feature/consultant-feedback-slice-2, awaiting merge. Staff record informal feedback on a proposal from retained consultants (pasted text and/or an attached file), attributed to a roster consultant, editable, and shared by default on the deliberation briefing page as its own section. Postgres owns the entry; the request-document registry and SharePoint own any attached file."
 cataloged: 2026-09-14
 last_verified: 2026-09-14
 owner: product-engineering
@@ -79,7 +79,7 @@ with its own rule: a per-item share flag, default on. This does not reopen D14.
   membership re-proved per download [VERIFIED via `docs/DELIBERATION_BRIEFING_PAGE_PLAN.md:54,74`].
 - **Request files are registered in `wmkf_requestdocument`.** Artifact types are a local option
   set mirrored in `shared/config/requestDocument.js:10-18` (eight values, 100000000–100000007;
-  no "Consultant Feedback" value). `wmkf_generationkey` is an alternate key the adapter checks on
+  no "Consultant Feedback" value at plan time; value `100000008` added to production 2026-09-14, CF7). `wmkf_generationkey` is an alternate key the adapter checks on
   create (`lib/dataverse/adapters/request-document.js:200-225`). Applicant material rows are
   created `operationstatus = Ready`, `lifecyclestate = Draft`, with `wmkf_name`, the request bind,
   `wmkf_cyclecode`, `wmkf_inputfingerprint`, `wmkf_claimtoken`, and `wmkf_producer`
@@ -104,7 +104,7 @@ with its own rule: a per-item share flag, default on. This does not reopen D14.
 
 ## 3. Contract
 
-### 3.1 One feedback entry [BUILT S512 on `feature/consultant-feedback-slice-1`, commit `1a58bac8`; slice 2 parts of this section remain PLANNED]
+### 3.1 One feedback entry [BUILT S512 on `feature/consultant-feedback-slice-1`, commit `1a58bac8`; slice 2 parts BUILT ON BRANCH S512 (`feature/consultant-feedback-slice-2`, commit `dd5f1611` + review-round fixes; not yet merged)]
 
 | Field | Rule |
 |---|---|
@@ -121,7 +121,7 @@ with its own rule: a per-item share flag, default on. This does not reopen D14.
 
 At least one of `body_html` or `requestdocument_id` must be present.
 
-### 3.2 Add person [BUILT S512 on `feature/consultant-feedback-slice-1`, commit `1a58bac8`; slice 2 parts of this section remain PLANNED]
+### 3.2 Add person [BUILT S512 on `feature/consultant-feedback-slice-1`, commit `1a58bac8`; slice 2 parts BUILT ON BRANCH S512 (`feature/consultant-feedback-slice-2`, commit `dd5f1611` + review-round fixes; not yet merged)]
 
 The save route accepts either `consultantRosterId` or `oneOff: { name, affiliation? }`.
 
@@ -150,7 +150,7 @@ recipient directory or curated-recipient pickers, and the `expertise-finder`-own
 that app's surface. If staff later want a one-off to become a roster consultant, they add them
 through the Expertise Finder and edit the entry to select the roster row.
 
-### 3.3 Briefing page section [BUILT S512 on `feature/consultant-feedback-slice-1`, commit `1a58bac8`; slice 2 parts of this section remain PLANNED]
+### 3.3 Briefing page section [BUILT S512 on `feature/consultant-feedback-slice-1`, commit `1a58bac8`; slice 2 parts BUILT ON BRANCH S512 (`feature/consultant-feedback-slice-2`, commit `dd5f1611` + review-round fixes; not yet merged)]
 
 - New card section "Consultant feedback" (CF4), placed immediately after Reviews, which is the
   page's last section (Proposal renders before Reviews, so "between Reviews and Proposal" was
@@ -181,7 +181,7 @@ through the Expertise Finder and edit the entry to select the roster row.
   Graph call, matching the existing kinds. The `material:` kind's artifact-type filter is **not**
   widened.
 
-### 3.4 Routes [slice 1 rows BUILT S512 and registered in `docs/API_ROUTE_SECURITY_MATRIX.md`; slice 2 rows PLANNED]
+### 3.4 Routes [slice 1 rows BUILT S512 and registered in `docs/API_ROUTE_SECURITY_MATRIX.md`; slice 2 rows BUILT ON BRANCH S512 (`feature/consultant-feedback-slice-2`, commit `dd5f1611` + review-round fixes; not yet merged), registered in the matrix]
 
 | Route | Method | Guard | Purpose |
 |---|---|---|---|
@@ -196,7 +196,7 @@ through the Expertise Finder and edit the entry to select the roster row.
 Existing matrix rows for `context` and `document` are amended, not duplicated. All new
 `requestId` inputs pass `isGuid` before any Dataverse selector (`check:trust-boundary-guid`).
 
-### 3.5 Staff surface [BUILT S512 on `feature/consultant-feedback-slice-1`, commit `1a58bac8`; slice 2 parts of this section remain PLANNED]
+### 3.5 Staff surface [BUILT S512 on `feature/consultant-feedback-slice-1`, commit `1a58bac8`; slice 2 parts BUILT ON BRANCH S512 (`feature/consultant-feedback-slice-2`, commit `dd5f1611` + review-round fixes; not yet merged)]
 
 New component `shared/components/workbench/ConsultantFeedbackSection.js`, mounted by
 `ReviewsTab.js` below the outstanding-reviews section:
@@ -214,7 +214,7 @@ New component `shared/components/workbench/ConsultantFeedbackSection.js`, mounte
   (`ReviewsTab.js:786-807`): every post-await state write, success and failure, checks the
   generation so a request switch never paints another request's feedback.
 
-### 3.6 Delete semantics [slice 1 hard delete BUILT S512; slice 2 ordering PLANNED]
+### 3.6 Delete semantics [slice 1 hard delete BUILT S512; slice 2 three-step ordering BUILT ON BRANCH S512 (`feature/consultant-feedback-slice-2`, commit `dd5f1611` + review-round fixes; not yet merged)]
 
 - Slice 1: hard delete the Postgres row (CF5).
 - Slice 2 (Codex AR-1 finding 2 and AR-2 finding 3; remedy is a pending status on the row, not
@@ -243,7 +243,7 @@ New component `shared/components/workbench/ConsultantFeedbackSection.js`, mounte
 - No notification, no email to the consultant, no honorarium linkage, no reviewer-count effects.
 - No cycle-level view; entries are per request.
 
-## 4. Data model [Postgres table BUILT S512 as migration 048 / fresh-install v50; registry parts PLANNED]
+## 4. Data model [Postgres table BUILT S512 as migration 048 / fresh-install v50; registry parts BUILT ON BRANCH S512 (`feature/consultant-feedback-slice-2`, commit `dd5f1611` + review-round fixes; not yet merged)]
 
 Migration `048_consultant_feedback.sql` + manifest entry + fresh-install block v50:
 
@@ -276,7 +276,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS consultant_feedback_mutation_idx ON consultant
 
 Column names follow the human-legibility schema principle.
 
-### Slice 2 registry contract [PLANNED; requires Dataverse admin]
+### Slice 2 registry contract [BUILT ON BRANCH S512 (`feature/consultant-feedback-slice-2`, commit `dd5f1611` + review-round fixes; not yet merged); option-set value live in production 2026-09-14 (CF7)]
 
 - New `wmkf_requestdocument` artifact-type option **"Consultant Feedback"** (next value
   `100000008`), added to the option set by the Dataverse admin, then mirrored in
@@ -295,7 +295,7 @@ Column names follow the human-legibility schema principle.
   circular dependency on the feedback row id). Two attachments on one request have distinct
   staging ids and never collide.
 
-### Slice 2 attachment lifecycle [PLANNED; Codex AR-1 finding 1]
+### Slice 2 attachment lifecycle [BUILT ON BRANCH S512 (`feature/consultant-feedback-slice-2`, commit `dd5f1611` + review-round fixes; not yet merged); Codex AR-1 finding 1]
 
 Reuses `lib/services/portal-upload-staging.js` verbatim (mint → claim lease → load bytes → record
 candidate → complete/reject) with a new scope `consultant_feedback`. The scope allowlist is a
@@ -321,7 +321,7 @@ ids finalizing against one entry (exactly one bound, the other Superseded and it
 discarded); finalize racing delete (either the delete wins and finalize returns 409 with its
 candidate discarded, or finalize wins and the delete supersedes the newly bound row).
 
-**Slice 2 prerequisite in the shared staging service (Codex AR-2 finding 1):**
+**Slice 2 prerequisite in the shared staging service (Codex AR-2 finding 1) [BUILT ON BRANCH S512 (`feature/consultant-feedback-slice-2`, commit `dd5f1611` + review-round fixes; not yet merged)]:**
 `cleanupExpiredPortalUploads` today selects only `id, pathname`, deletes staged Blob bytes, and
 expires the row; a `candidate_result` recorded at step 5 is never consulted, so a crash after the
 Graph upload with no client retry leaves an unregistered SharePoint file and eventually prunes its
@@ -344,7 +344,7 @@ Tests: expire after steps 5, 6, 7 with no retry per scope and assert the SharePo
 registry state are each correct, with committed and uncommitted crash fixtures. Land it as its own
 small change to the staging service.
 
-## 5. Security contract [slice 1 items BUILT S512; upload items PLANNED]
+## 5. Security contract [slice 1 items BUILT S512; upload items BUILT ON BRANCH S512 (`feature/consultant-feedback-slice-2`, commit `dd5f1611` + review-round fixes; not yet merged)]
 
 - Actor identity only from the authenticated profile (CLAUDE.md invariant); `created_by` /
   `updated_by` never from the body.
@@ -369,7 +369,7 @@ workbench routes (list, mutate, consultants); `ConsultantFeedbackSection` on the
 briefing read-model and page section for text items; matrix rows; Atlas rows. Ships on its own.
 **Tier 1 runtime work: feature branch, owner merges.**
 
-### Slice 2 — attachments [PLANNED; option-set value live 2026-09-14 (CF7 done); still blocked on the staging-cleanup prerequisite in §4]
+### Slice 2 — attachments [BUILT ON BRANCH S512 (`feature/consultant-feedback-slice-2`, commit `dd5f1611` + review-round fixes; not yet merged); prerequisite built in the same branch; awaiting owner merge, then migration 049]
 
 Dataverse admin adds the artifact-type value; mirror in `requestDocument.js`; mint + finalize
 routes; `feedback:` document member; Superseded-on-delete. Tier 1, same branch or a follow-on.
@@ -379,7 +379,7 @@ routes; `feedback:` document member; Superseded-on-delete. Tier 1, same branch o
 Filter shared/unshared on the tab; consultant profile link to the roster; keyboard-first
 combobox.
 
-## 7. Tests [slice 1 tests BUILT S512 (91 passing across 6 suites); slice 2 tests PLANNED]
+## 7. Tests [slice 1 tests BUILT S512 (91 passing across 6 suites); slice 2 tests BUILT ON BRANCH S512 (`feature/consultant-feedback-slice-2`, commit `dd5f1611` + review-round fixes; not yet merged): 169 passing across 10 suites after Opus round 2]
 
 - Service: create with roster id / with one-off name (no roster write; assert the roster row
   count is unchanged); **eligibility**: Board, inactive, missing, and stale-dropdown roster ids are
@@ -501,3 +501,23 @@ specified. Review loop closed at three passes.
 (client lifecycle defined), `status`, and one shared eligibility path (*as built: two write
 functions, see §3.2*). Slice 2 blocked on CF7, the finding 10 read-side sweep,
 and the staging-service cleanup prerequisite.
+
+### Slice 2 reviews (2026-09-14) — disposition
+
+Sonnet build; Opus review round 1 (CHANGES REQUIRED: loser cleanup fired on every bind error; sweep
+regressed prune for consumed rows; filename dependencies unwired + `replace` overwrite; ambiguous
+lookups fail-open; test gaps; fresh-install scope list) → all fixed; Opus round 2 APPROVE. Then Codex
+adversarial review of commit `dd5f1611` and the coordinator's own review, reconciled:
+
+| Finding | Source | Disposition |
+|---|---|---|
+| Re-binding the identical registry id was treated as a conflict, so a crash between bind commit and `completePortalUpload` + retry would supersede the bound row and delete its file | Codex (high), Claude | **Fixed:** identical id = idempotent success; delete-wins race gets `attachment_target_gone` (409, loser cleanup); unique-violation on `requestdocument_id` in create resolves to the existing row |
+| Step-5 retry uploaded again and overwrote the recorded candidate, losing the first item's cleanup identity | Codex (high) | **Fixed:** finalize reuses a recorded candidate with the same generation key (one Graph upload total); a mismatched candidate is discarded and cleared before a new upload. Inherent window between Graph accept and candidate record remains (same as materials) |
+| Grantee scopes always retained → interrupted grantee finalizes never expire (regression vs base); site-visit proof lacked slot ownership | Codex (high); Opus residual | **Fixed:** per-scope proofs implemented (deliverable image ref; registry row + current slot holder); unknown shapes still retained |
+| `feedback:` member did not require the Consultant Feedback artifact type or file pointers | Codex (medium) | **Fixed** with negative fixtures |
+| >25 attachments: `findByIds` cap turned into a silent empty map | Codex (medium) | **Fixed:** chunked reads; failed batch → `attachment.status='unavailable'` for those ids |
+| Registry rows omitted `wmkf_cyclecode` | Codex (medium) | **Fixed** (`meetingDateToCycleCode`, as materials do) |
+| `folder_unavailable` classified permanent | Claude | **Fixed:** released for retry |
+| Plan still said slice 2 planned/blocked | Codex (medium) | **Fixed** in this pass (section labels, §2 artifact value, summary) |
+| Staff cannot download an attachment from the Workbench (plain label) | Opus B13 | **Accepted follow-up:** no generic staff registry-download route exists; slice 3 candidate |
+| Bound-candidate clear bumps `updated_at`, delaying prune one retention cycle | Opus residual | Accepted |

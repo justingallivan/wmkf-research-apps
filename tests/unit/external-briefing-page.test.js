@@ -170,3 +170,52 @@ test('consultant feedback: shared items render name, affiliation, received date 
   expect(screen.getByText('Received 2026-09-01')).toBeInTheDocument();
   expect(screen.getByText('Great work.')).toBeInTheDocument();
 });
+
+test('consultant feedback: a PDF attachment link opens inline in a new tab', async () => {
+  global.fetch = jest.fn().mockResolvedValue(response({
+    ok: true, title: 'Example University', proposalTitle: null, expiresAt: null,
+    session: null, siteVisit: null, writeup: null, reviews: [], proposal: null,
+    consultantFeedback: {
+      status: 'ok',
+      items: [{
+        name: 'Jane Doe', affiliation: null, receivedOn: '2026-09-01', bodyHtml: '<p>Great work.</p>',
+        attachment: { member: 'feedback:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', filename: 'notes.pdf', inline: true },
+      }],
+    },
+  }));
+  render(<BriefingPage />);
+  const link = await screen.findByRole('link', { name: 'notes.pdf' });
+  expect(link).toHaveAttribute('href', '/api/external/briefing/tok/document?member=feedback%3Aaaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+  expect(link).toHaveAttribute('target', '_blank');
+});
+
+test('consultant feedback: a non-PDF attachment link has no target (downloads)', async () => {
+  global.fetch = jest.fn().mockResolvedValue(response({
+    ok: true, title: 'Example University', proposalTitle: null, expiresAt: null,
+    session: null, siteVisit: null, writeup: null, reviews: [], proposal: null,
+    consultantFeedback: {
+      status: 'ok',
+      items: [{
+        name: 'Jane Doe', affiliation: null, receivedOn: '2026-09-01', bodyHtml: null,
+        attachment: { member: 'feedback:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', filename: 'notes.docx', inline: false },
+      }],
+    },
+  }));
+  render(<BriefingPage />);
+  const link = await screen.findByRole('link', { name: 'notes.docx' });
+  expect(link).not.toHaveAttribute('target');
+});
+
+test('consultant feedback: no attachment link when the item carries none', async () => {
+  global.fetch = jest.fn().mockResolvedValue(response({
+    ok: true, title: 'Example University', proposalTitle: null, expiresAt: null,
+    session: null, siteVisit: null, writeup: null, reviews: [], proposal: null,
+    consultantFeedback: {
+      status: 'ok',
+      items: [{ name: 'Jane Doe', affiliation: null, receivedOn: '2026-09-01', bodyHtml: '<p>Text only.</p>', attachment: null }],
+    },
+  }));
+  render(<BriefingPage />);
+  await screen.findByText('Jane Doe');
+  expect(screen.queryByRole('link', { name: /notes\./ })).not.toBeInTheDocument();
+});

@@ -13,6 +13,7 @@ import {
   updateFeedbackEntry,
   deleteFeedbackEntry,
   loadSharedConsultantFeedbackForBriefing,
+  isSharedActiveFeedbackAttachment,
 } from '../../lib/services/consultant-feedback-service';
 
 const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
@@ -264,18 +265,136 @@ describe('updateFeedbackEntry', () => {
       .rejects.toMatchObject({ httpStatus: 400, body: { reason: 'consultant_not_eligible' } });
     expect(client.query).toHaveBeenCalledWith('ROLLBACK');
   });
+
+  describe('attachment bind (slice 2 finalize step 7, Codex R3 finding: committed-bind replay)', () => {
+    const DOC_ID = '55555555-5555-4555-8555-555555555555';
+    const ALREADY_BOUND = { ...EXISTING, requestdocument_id: DOC_ID };
+
+    test('binding the IDENTICAL id the row already holds is an idempotent success — no conflict, COMMIT runs', async () => {
+      client.query.mockImplementation(async (q) => {
+        if (q.includes('FOR UPDATE')) return { rows: [ALREADY_BOUND] };
+        if (q.startsWith('UPDATE consultant_feedback')) {
+          return { rows: [{ id: 4, received_on: '2026-09-01', body_html: '<p>Original.</p>', shared: true, consultant_roster_id: 5, one_off_name: null, one_off_affiliation: null, requestdocument_id: DOC_ID, updated_at: new Date() }] };
+        }
+        return { rows: [] };
+      });
+      const row = await updateFeedbackEntry({ id: 4, requestId: REQUEST_ID, actorProfileId: ACTOR_ID, patch: { requestdocumentId: DOC_ID } });
+      expect(row.attachment?.requestdocumentId ?? DOC_ID).toBeTruthy(); // no throw is the primary assertion
+      expect(client.query).toHaveBeenCalledWith('COMMIT');
+      expect(client.query.mock.calls.some(([q]) => q === 'ROLLBACK')).toBe(false);
+    });
+
+    test('binding a DIFFERENT id than the one already held is a 409 attachment_conflict', async () => {
+      client.query.mockImplementation(async (q) => {
+        if (q.includes('FOR UPDATE')) return { rows: [ALREADY_BOUND] };
+        return { rows: [] };
+      });
+      const OTHER_DOC_ID = '66666666-6666-4666-8666-666666666666';
+      await expect(updateFeedbackEntry({ id: 4, requestId: REQUEST_ID, actorProfileId: ACTOR_ID, patch: { requestdocumentId: OTHER_DOC_ID } }))
+        .rejects.toMatchObject({ httpStatus: 409, body: { reason: 'attachment_conflict' } });
+      expect(client.query).toHaveBeenCalledWith('ROLLBACK');
+    });
+
+    test('a finalize losing a real race against a delete (row gone/deleting) gets a distinct, PERMANENT attachment_target_gone — not a generic 404', async () => {
+      client.query.mockImplementation(async (q) => {
+        if (q.includes('FOR UPDATE')) return { rows: [] }; // status='active' filter excludes the now-deleting/gone row
+        return { rows: [] };
+      });
+      await expect(updateFeedbackEntry({ id: 4, requestId: REQUEST_ID, actorProfileId: ACTOR_ID, patch: { requestdocumentId: DOC_ID } }))
+        .rejects.toMatchObject({ httpStatus: 409, body: { reason: 'attachment_target_gone' } });
+    });
+
+    test('a plain edit (no requestdocumentId in the patch) against a gone/deleting row still gets the ordinary 404, not attachment_target_gone', async () => {
+      client.query.mockImplementation(async (q) => {
+        if (q.includes('FOR UPDATE')) return { rows: [] };
+        return { rows: [] };
+      });
+      await expect(updateFeedbackEntry({ id: 4, requestId: REQUEST_ID, actorProfileId: ACTOR_ID, patch: { shared: false } }))
+        .rejects.toMatchObject({ httpStatus: 404, body: { reason: 'not_found' } });
+    });
+  });
 });
 
-test('deleteFeedbackEntry hard-deletes an active row', async () => {
-  sql.query.mockResolvedValueOnce({ rows: [{ id: 4 }] });
+describe('writeFeedbackEntry — unique violation on requestdocument_id (a prior replay already created the row)', () => {
+  test('a 23505 unique violation selects and returns the existing row instead of throwing', async () => {
+    const DOC_ID = '77777777-7777-4777-8777-777777777777';
+    const existingRow = {
+      id: 8, received_on: '2026-09-01', body_html: null, shared: true, consultant_roster_id: null,
+      one_off_name: 'Jane Doe', one_off_affiliation: null, requestdocument_id: DOC_ID, updated_at: new Date('2026-09-01T00:00:00Z'),
+    };
+    client.query.mockImplementation(async (q) => {
+      if (q.startsWith('INSERT INTO consultant_feedback')) {
+        const error = new Error('duplicate key value violates unique constraint "consultant_feedback_requestdocument_id_key"');
+        error.code = '23505';
+        throw error;
+      }
+      return { rows: [] };
+    });
+    sql.query.mockResolvedValueOnce({ rows: [existingRow] });
+    const row = await writeFeedbackEntry({
+      requestId: REQUEST_ID, actorProfileId: ACTOR_ID, mutationId: MUTATION_ID,
+      oneOff: { name: 'Jane Doe' }, receivedOn: '2026-09-01', requestdocumentId: DOC_ID,
+    });
+    expect(row.id).toBe('8');
+    expect(client.query).toHaveBeenCalledWith('ROLLBACK');
+    expect(sql.query).toHaveBeenCalledWith(expect.stringContaining('WHERE cf.request_id = $1 AND cf.requestdocument_id = $2'), [REQUEST_ID, DOC_ID]);
+  });
+});
+
+test('deleteFeedbackEntry hard-deletes an active row with no attachment in one transaction', async () => {
+  client.query.mockResolvedValueOnce({ rows: [] }); // BEGIN
+  client.query.mockResolvedValueOnce({ rows: [{ id: 4, requestdocument_id: null }] }); // SELECT ... FOR UPDATE
   const result = await deleteFeedbackEntry({ id: 4, requestId: REQUEST_ID, actorProfileId: ACTOR_ID });
   expect(result).toEqual({ id: '4' });
-  expect(sql.query).toHaveBeenCalledWith(expect.stringContaining('DELETE FROM consultant_feedback'), [4, REQUEST_ID]);
+  expect(client.query.mock.calls.some(([q]) => /DELETE FROM consultant_feedback/.test(q))).toBe(true);
+  expect(client.query).toHaveBeenCalledWith('COMMIT');
 });
 
 test('deleteFeedbackEntry 404s when the row is missing or already gone', async () => {
-  sql.query.mockResolvedValueOnce({ rows: [] });
+  client.query.mockResolvedValueOnce({ rows: [] }); // BEGIN
+  client.query.mockResolvedValueOnce({ rows: [] }); // SELECT ... FOR UPDATE finds nothing
   await expect(deleteFeedbackEntry({ id: 4, requestId: REQUEST_ID, actorProfileId: ACTOR_ID })).rejects.toMatchObject({ httpStatus: 404 });
+});
+
+test('deleteFeedbackEntry three-step ordering: an attached row supersedes the registry BEFORE the final PG delete', async () => {
+  const REQUESTDOCUMENT_ID = '44444444-4444-4444-8444-444444444444';
+  client.query.mockResolvedValueOnce({ rows: [] }); // BEGIN
+  client.query.mockResolvedValueOnce({ rows: [{ id: 4, requestdocument_id: REQUESTDOCUMENT_ID }] }); // SELECT ... FOR UPDATE
+  const callOrder = [];
+  sql.query.mockImplementation(async (q) => {
+    if (/DELETE FROM consultant_feedback/.test(q)) callOrder.push('pg-delete');
+    return { rows: [] };
+  });
+  const dependencies = {
+    supersedeDocument: jest.fn().mockImplementation(async () => { callOrder.push('supersede'); }),
+  };
+  const result = await deleteFeedbackEntry({ id: 4, requestId: REQUEST_ID, actorProfileId: ACTOR_ID }, dependencies);
+  expect(result).toEqual({ id: '4' });
+  expect(callOrder).toEqual(['supersede', 'pg-delete']);
+  expect(dependencies.supersedeDocument).toHaveBeenCalledWith(REQUESTDOCUMENT_ID);
+  // Step 1 (mark deleting) ran in the same client transaction and committed
+  // before steps 2-3 touched the registry.
+  expect(client.query.mock.calls.some(([q]) => /SET status = 'deleting'/.test(q))).toBe(true);
+});
+
+test('deleteFeedbackEntry step-3 failure leaves the row `deleting`; the list sweep completes it', async () => {
+  const REQUESTDOCUMENT_ID = '55555555-5555-4555-8555-555555555555';
+  client.query.mockResolvedValueOnce({ rows: [] }); // BEGIN
+  client.query.mockResolvedValueOnce({ rows: [{ id: 9, requestdocument_id: REQUESTDOCUMENT_ID }] }); // SELECT ... FOR UPDATE
+  sql.query.mockImplementation(async (q) => {
+    if (/DELETE FROM consultant_feedback/.test(q)) throw new Error('connection reset');
+    return { rows: [] };
+  });
+  const dependencies = { supersedeDocument: jest.fn().mockResolvedValue({}) };
+  await expect(deleteFeedbackEntry({ id: 9, requestId: REQUEST_ID, actorProfileId: ACTOR_ID }, dependencies))
+    .rejects.toMatchObject({ httpStatus: 502, body: expect.objectContaining({ reason: 'attachment_removal_pending' }) });
+  // Simulate a lost DELETE (step 3 never ran) — the next list-sweep for this
+  // request finds the row still `deleting` and finishes it.
+  sql.query.mockReset();
+  sql.query.mockResolvedValueOnce({ rows: [{ id: 9, requestdocument_id: REQUESTDOCUMENT_ID }] }); // sweep SELECT deleting rows
+  sql.query.mockResolvedValue({ rows: [] });
+  await listConsultantFeedback({ requestId: REQUEST_ID }, { ...dependencies, findDocumentsByIds: jest.fn().mockResolvedValue({ records: [] }) });
+  expect(dependencies.supersedeDocument).toHaveBeenCalledTimes(2);
 });
 
 describe('loadSharedConsultantFeedbackForBriefing', () => {
@@ -310,7 +429,7 @@ describe('loadSharedConsultantFeedbackForBriefing', () => {
     });
     const result = await loadSharedConsultantFeedbackForBriefing(REQUEST_ID);
     expect(result.status).toBe('ok');
-    expect(result.items).toEqual([{ name: 'Jane Doe', affiliation: 'Acme', receivedOn: '2026-09-01', bodyHtml: '<p>Shared.</p>' }]);
+    expect(result.items).toEqual([{ name: 'Jane Doe', affiliation: 'Acme', receivedOn: '2026-09-01', bodyHtml: '<p>Shared.</p>', attachment: null }]);
   });
 });
 
@@ -324,4 +443,93 @@ test('listEligibleConsultants queries only active Consultant rows', async () => 
 test('listConsultantFeedback rejects a non-GUID requestId before any query', async () => {
   await expect(listConsultantFeedback({ requestId: 'not-a-guid' })).rejects.toMatchObject({ httpStatus: 400 });
   expect(sql.query).not.toHaveBeenCalled();
+});
+
+describe('listConsultantFeedback — attachment registry chunking (Codex R3: 26+ attachments)', () => {
+  function attachedRow(i) {
+    const docId = `doc-${String(i).padStart(2, '0')}`;
+    return {
+      id: i, received_on: '2026-09-01', body_html: null, shared: true,
+      consultant_roster_id: null, one_off_name: `Person ${i}`, one_off_affiliation: null,
+      requestdocument_id: docId, updated_at: new Date('2026-09-01T00:00:00Z'),
+    };
+  }
+
+  test('26 attached entries all resolve their attachment across two chunked batches (the adapter refuses >25 ids in one call)', async () => {
+    const rows = Array.from({ length: 26 }, (_, i) => attachedRow(i + 1));
+    sql.query.mockImplementation(async (q) => {
+      if (q.includes("status = 'deleting'")) return { rows: [] }; // sweep
+      if (q.includes('SELECT cf.id')) return { rows };
+      return { rows: [] };
+    });
+    const findDocumentsByIds = jest.fn(async (ids) => ({
+      records: ids.map((id) => ({ wmkf_requestdocumentid: id, wmkf_filename: `${id}.pdf` })),
+    }));
+    const result = await listConsultantFeedback({ requestId: REQUEST_ID }, { findDocumentsByIds });
+    expect(findDocumentsByIds).toHaveBeenCalledTimes(2); // 25 + 1, never all 26 in one call
+    expect(result).toHaveLength(26);
+    expect(result.every((item) => item.attachment && item.attachment.filename)).toBe(true);
+  });
+
+  test('a failing middle batch yields attachment: { status: "unavailable" } for ITS ids only, not the whole page', async () => {
+    const rows = Array.from({ length: 26 }, (_, i) => attachedRow(i + 1));
+    sql.query.mockImplementation(async (q) => {
+      if (q.includes("status = 'deleting'")) return { rows: [] };
+      if (q.includes('SELECT cf.id')) return { rows };
+      return { rows: [] };
+    });
+    let call = 0;
+    const findDocumentsByIds = jest.fn(async (ids) => {
+      call += 1;
+      if (call === 1) throw new Error('dataverse down'); // first chunk fails
+      return { records: ids.map((id) => ({ wmkf_requestdocumentid: id, wmkf_filename: `${id}.pdf` })) };
+    });
+    const result = await listConsultantFeedback({ requestId: REQUEST_ID }, { findDocumentsByIds });
+    expect(findDocumentsByIds).toHaveBeenCalledTimes(2);
+    const failedChunkItems = result.filter((item) => Number(item.id) >= 1 && Number(item.id) <= 25);
+    const okChunkItems = result.filter((item) => Number(item.id) === 26);
+    expect(failedChunkItems).toHaveLength(25);
+    expect(failedChunkItems.every((item) => item.attachment.status === 'unavailable')).toBe(true);
+    expect(okChunkItems[0].attachment.filename).toBeTruthy();
+  });
+});
+
+describe('isSharedActiveFeedbackAttachment', () => {
+  const DOC_ID = '55555555-5555-4555-8555-555555555555';
+
+  test('the SQL filter itself excludes shared=false and status=\'deleting\' rows even when they are present in the fixture', async () => {
+    // Mirrors the "external privacy boundary" test above: the mock only
+    // filters on predicate substrings it finds in the query text, so
+    // deleting a `shared = true` or `status = 'active'` clause from the
+    // production query makes this mock stop filtering and fails the
+    // assertion below — it does not merely echo back whatever the fixture holds.
+    const FIXTURE_ROWS = [
+      { request_id: REQUEST_ID, requestdocument_id: DOC_ID, shared: false, status: 'active' }, // excluded: not shared
+      { request_id: REQUEST_ID, requestdocument_id: DOC_ID, shared: true, status: 'deleting' }, // excluded: deleting
+      { request_id: REQUEST_ID, requestdocument_id: DOC_ID, shared: true, status: 'active' }, // the one eligible row
+    ];
+    sql.query.mockImplementationOnce(async (queryText, params) => {
+      expect(queryText).toContain('shared = true');
+      expect(queryText).toContain("status = 'active'");
+      expect(params).toEqual([REQUEST_ID, DOC_ID]);
+      const matches = FIXTURE_ROWS.filter((row) => row.request_id === params[0]
+        && row.requestdocument_id === params[1]
+        && (!queryText.includes('shared = true') || row.shared)
+        && (!queryText.includes("status = 'active'") || row.status === 'active'));
+      return { rows: matches.length ? [{ '?column?': 1 }] : [] };
+    });
+    const result = await isSharedActiveFeedbackAttachment(REQUEST_ID, DOC_ID);
+    expect(result).toBe(true);
+  });
+
+  test('returns false with no query when either id is not a GUID', async () => {
+    expect(await isSharedActiveFeedbackAttachment('not-a-guid', DOC_ID)).toBe(false);
+    expect(await isSharedActiveFeedbackAttachment(REQUEST_ID, 'not-a-guid')).toBe(false);
+    expect(sql.query).not.toHaveBeenCalled();
+  });
+
+  test('returns false when no row matches (e.g. only excluded rows exist)', async () => {
+    sql.query.mockResolvedValueOnce({ rows: [] });
+    expect(await isSharedActiveFeedbackAttachment(REQUEST_ID, DOC_ID)).toBe(false);
+  });
 });

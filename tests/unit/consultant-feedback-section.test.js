@@ -6,7 +6,14 @@
  */
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { put } from '@vercel/blob/client';
 import ConsultantFeedbackSection, { formBelongsToCurrentRequest } from '../../shared/components/workbench/ConsultantFeedbackSection';
+
+jest.mock('@vercel/blob/client', () => ({ put: jest.fn() }));
+
+function pdfFile(name = 'notes.pdf') {
+  return new File(['%PDF-'], name, { type: 'application/pdf' });
+}
 
 const OTHER_REQUEST_ID = '22222222-2222-4222-8222-222222222222';
 
@@ -185,6 +192,131 @@ test('formBelongsToCurrentRequest (the guard handleSave calls before any fetch) 
   expect(formBelongsToCurrentRequest(REQUEST_ID, REQUEST_ID)).toBe(true);
   expect(formBelongsToCurrentRequest(REQUEST_ID, OTHER_REQUEST_ID)).toBe(false);
   expect(formBelongsToCurrentRequest(null, REQUEST_ID)).toBe(false);
+});
+
+describe('slice 2 attachment', () => {
+  beforeEach(() => put.mockReset());
+
+  test('attachment-only save (no body) goes mint -> upload -> finalize with a newEntry, and the row appears with its filename', async () => {
+    put.mockResolvedValue({});
+    const calls = [];
+    let finalized = false;
+    global.fetch = jest.fn((url, options) => {
+      calls.push({ url: String(url), method: options?.method });
+      if (String(url).includes('/consultants')) return Promise.resolve(jsonResponse({ items: [] }));
+      if (String(url).includes('/upload-token')) {
+        return Promise.resolve(jsonResponse({ ok: true, stagingId: 'staging-1', pathname: 'portal-staging/x', clientToken: 'tok', contentType: 'application/pdf' }));
+      }
+      if (String(url).includes('/finalize')) {
+        finalized = true;
+        return Promise.resolve(jsonResponse({ ok: true, requestdocumentId: 'doc-1', feedbackId: '5' }));
+      }
+      return Promise.resolve(jsonResponse({
+        items: finalized ? [{
+          id: '5', receivedOn: '2026-09-01', bodyHtml: null, shared: true,
+          consultant: { rosterId: null, name: 'Jane Doe', affiliation: null }, oneOff: true,
+          attachment: { requestdocumentId: 'doc-1', filename: 'notes.pdf', contentType: 'application/pdf', size: 10 },
+          updatedAt: '2026-09-01T00:00:00Z',
+        }] : [],
+      }));
+    });
+    render(<ConsultantFeedbackSection requestId={REQUEST_ID} />);
+    await waitFor(() => expect(screen.getByText('No consultant feedback recorded yet.')).toBeInTheDocument());
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add feedback' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Add person…' }));
+    await userEvent.type(screen.getByPlaceholderText('Name'), 'Jane Doe');
+    // No body typed at all — attachment-only create.
+    await userEvent.upload(document.getElementById('consultant-feedback-attachment'), pdfFile());
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(screen.getByText('Jane Doe')).toBeInTheDocument());
+    expect(screen.getByText('Attachment: notes.pdf')).toBeInTheDocument();
+
+    const urls = calls.map((c) => c.url);
+    expect(urls.some((u) => u.includes('/consultant-feedback') && !u.includes('/upload-token') && !u.includes('/finalize') && !u.includes('/consultants') && calls.find((c) => c.url === u)?.method === 'POST')).toBe(false);
+    const tokenIdx = urls.findIndex((u) => u.includes('/upload-token'));
+    const finalizeIdx = urls.findIndex((u) => u.includes('/finalize'));
+    expect(tokenIdx).toBeGreaterThanOrEqual(0);
+    expect(finalizeIdx).toBeGreaterThan(tokenIdx);
+    expect(put).toHaveBeenCalledWith('portal-staging/x', expect.any(File), expect.objectContaining({ token: 'tok', access: 'private' }));
+
+    const finalizeCallBody = JSON.parse(global.fetch.mock.calls.find(([u]) => String(u).includes('/finalize'))[1].body);
+    expect(finalizeCallBody.newEntry.oneOff.name).toBe('Jane Doe');
+    expect(finalizeCallBody.stagingId).toBe('staging-1');
+  });
+
+  test('body-only save (no attachment) never calls upload-token or finalize', async () => {
+    let saved = false;
+    global.fetch = jest.fn((url, options) => {
+      if (String(url).includes('/consultants')) return Promise.resolve(jsonResponse({ items: [] }));
+      if (options?.method === 'POST' && String(url) === '/api/workbench/consultant-feedback') {
+        saved = true;
+        return Promise.resolve(jsonResponse({ item: { id: '1' } }));
+      }
+      return Promise.resolve(jsonResponse({ items: saved ? [{
+        id: '1', receivedOn: '2026-09-01', bodyHtml: '<p>Great work.</p>', shared: true,
+        consultant: { rosterId: null, name: 'Jane Doe', affiliation: null }, oneOff: true,
+        updatedAt: '2026-09-01T00:00:00Z',
+      }] : [] }));
+    });
+    render(<ConsultantFeedbackSection requestId={REQUEST_ID} />);
+    await waitFor(() => expect(screen.getByText('No consultant feedback recorded yet.')).toBeInTheDocument());
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add feedback' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Add person…' }));
+    await userEvent.type(screen.getByPlaceholderText('Name'), 'Jane Doe');
+    await userEvent.type(screen.getByRole('textbox', { name: 'Consultant feedback' }), 'Great work.');
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(screen.getByText('Jane Doe')).toBeInTheDocument());
+    expect(global.fetch.mock.calls.some(([u]) => String(u).includes('/upload-token'))).toBe(false);
+    expect(global.fetch.mock.calls.some(([u]) => String(u).includes('/finalize'))).toBe(false);
+    expect(put).not.toHaveBeenCalled();
+  });
+
+  test('an in-flight attachment upload is abandoned on a request switch: no finalize, no put, for the stale request', async () => {
+    let resolveToken;
+    const tokenPromise = new Promise((resolve) => { resolveToken = resolve; });
+    const calls = [];
+    global.fetch = jest.fn((url, options) => {
+      calls.push({ url: String(url), method: options?.method });
+      if (String(url).includes('/consultants')) return Promise.resolve(jsonResponse({ items: [] }));
+      if (String(url).includes('/upload-token')) return tokenPromise;
+      if (String(url).includes('/finalize')) return Promise.resolve(jsonResponse({ ok: true }));
+      return Promise.resolve(jsonResponse({ items: [] }));
+    });
+
+    const { rerender } = render(<ConsultantFeedbackSection requestId={REQUEST_ID} />);
+    await waitFor(() => expect(screen.getByText('No consultant feedback recorded yet.')).toBeInTheDocument());
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add feedback' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Add person…' }));
+    await userEvent.type(screen.getByPlaceholderText('Name'), 'Jane Doe');
+    await userEvent.upload(document.getElementById('consultant-feedback-attachment'), pdfFile());
+    await userEvent.click(screen.getByRole('button', { name: 'Save' })); // fires upload-token, stays pending
+
+    // A request switch lands while the mint is still in flight; belt 1
+    // closes the now-stale form immediately (and bumps fetchIdRef via its
+    // own load()).
+    rerender(<ConsultantFeedbackSection requestId={OTHER_REQUEST_ID} />);
+    await waitFor(() => expect(screen.getByText('No consultant feedback recorded yet.')).toBeInTheDocument());
+
+    resolveToken(jsonResponse({ ok: true, stagingId: 'staging-1', pathname: 'x', clientToken: 'tok', contentType: 'application/pdf' }));
+    await waitFor(() => expect(calls.some((c) => c.url.includes('/upload-token'))).toBe(true));
+    // Let any further microtasks the stale save might have queued settle.
+    await new Promise((resolve) => { setTimeout(resolve, 0); });
+
+    expect(put).not.toHaveBeenCalled();
+    expect(calls.some((c) => c.url.includes('/finalize'))).toBe(false);
+
+    // Reopening a fresh form for the CURRENT request is not wedged on "Saving…".
+    await userEvent.click(screen.getByRole('button', { name: 'Add feedback' }));
+    const saveButton = await screen.findByRole('button', { name: 'Save' });
+    expect(saveButton).toBeEnabled();
+    expect(saveButton).toHaveTextContent('Save');
+  });
 });
 
 test('previewReadOnly disables the Add feedback button', async () => {

@@ -90,6 +90,8 @@ function deps(overrides = {}) {
     downloadFile: jest.fn(async () => ({ buffer: Buffer.from('%PDF-'), mimeType: 'application/pdf', filename: 'x.pdf', size: 5 })),
     downloadReview: jest.fn(async () => ({ buffer: Buffer.from('%PDF-review'), mimeType: 'application/pdf', filename: 'review.pdf', size: 11 })),
     loadConsultantFeedback: jest.fn(async () => ({ status: 'ok', items: [] })),
+    isFeedbackAttachment: jest.fn(async () => false),
+    findDocumentById: jest.fn(async () => ({ records: [] })),
     ...overrides,
   };
 }
@@ -299,4 +301,118 @@ test('consultant feedback: a throwing loader yields unavailable rather than fail
   const context = await buildBriefingContext({ requestId: REQUEST_ID, link: LINK }, d);
   expect(context.ok).toBe(true);
   expect(context.consultantFeedback).toEqual({ status: 'unavailable', items: [] });
+});
+
+describe('feedback: member (slice 2 attachment)', () => {
+  const FEEDBACK_DOC_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const readyRow = (overrides = {}) => ({
+    wmkf_requestdocumentid: FEEDBACK_DOC_ID,
+    _wmkf_request_value: REQUEST_ID,
+    wmkf_artifacttype: 100000008, // CONSULTANT_FEEDBACK
+    wmkf_operationstatus: 100000001, // READY
+    wmkf_lifecyclestate: 100000000, // Draft
+    wmkf_filename: 'Consultant Feedback-1002379-J Doe-2026-09-01.pdf',
+    wmkf_sharepointdriveid: 'fb-drive',
+    wmkf_sharepointitemid: 'fb-item',
+    ...overrides,
+  });
+
+  test('downloads when shared+active in Postgres AND Ready/not-Superseded in the registry, inline for PDF', async () => {
+    const d = deps({
+      isFeedbackAttachment: jest.fn(async () => true),
+      findDocumentById: jest.fn(async () => ({ records: [readyRow()] })),
+      downloadFile: jest.fn(async () => ({ buffer: Buffer.from('%PDF-'), mimeType: 'application/pdf', filename: 'x.pdf', size: 5 })),
+    });
+    const file = await resolveBriefingMember({ requestId: REQUEST_ID, member: `feedback:${FEEDBACK_DOC_ID}` }, d);
+    expect(d.downloadFile).toHaveBeenCalledWith('fb-drive', 'fb-item');
+    expect(file.inline).toBe(true);
+  });
+
+  test('non-PDF attachment downloads, not inline', async () => {
+    const d = deps({
+      isFeedbackAttachment: jest.fn(async () => true),
+      findDocumentById: jest.fn(async () => ({ records: [readyRow({ wmkf_filename: 'notes.docx' })] })),
+      downloadFile: jest.fn(async () => ({ buffer: Buffer.from('PK'), mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', filename: 'notes.docx', size: 5 })),
+    });
+    const file = await resolveBriefingMember({ requestId: REQUEST_ID, member: `feedback:${FEEDBACK_DOC_ID}` }, d);
+    expect(file.inline).toBe(false);
+  });
+
+  test('not shared / not active in Postgres: 404 with no Graph call', async () => {
+    const d = deps({
+      isFeedbackAttachment: jest.fn(async () => false),
+      findDocumentById: jest.fn(async () => ({ records: [readyRow()] })),
+    });
+    await expect(resolveBriefingMember({ requestId: REQUEST_ID, member: `feedback:${FEEDBACK_DOC_ID}` }, d))
+      .rejects.toMatchObject({ httpStatus: 404 });
+    expect(d.findDocumentById).not.toHaveBeenCalled();
+    expect(d.downloadFile).not.toHaveBeenCalled();
+  });
+
+  test('registry row belongs to another request: 404 with no Graph call', async () => {
+    const d = deps({
+      isFeedbackAttachment: jest.fn(async () => true),
+      findDocumentById: jest.fn(async () => ({ records: [readyRow({ _wmkf_request_value: FOREIGN_ID })] })),
+    });
+    await expect(resolveBriefingMember({ requestId: REQUEST_ID, member: `feedback:${FEEDBACK_DOC_ID}` }, d))
+      .rejects.toMatchObject({ httpStatus: 404 });
+    expect(d.downloadFile).not.toHaveBeenCalled();
+  });
+
+  test('Superseded registry row: 404 with no Graph call', async () => {
+    const d = deps({
+      isFeedbackAttachment: jest.fn(async () => true),
+      findDocumentById: jest.fn(async () => ({ records: [readyRow({ wmkf_lifecyclestate: 100000003 })] })),
+    });
+    await expect(resolveBriefingMember({ requestId: REQUEST_ID, member: `feedback:${FEEDBACK_DOC_ID}` }, d))
+      .rejects.toMatchObject({ httpStatus: 404 });
+    expect(d.downloadFile).not.toHaveBeenCalled();
+  });
+
+  test('a Ready, same-request row of ANOTHER artifact type referenced by the feedback row: 404 with no Graph call (typed registry boundary)', async () => {
+    const d = deps({
+      isFeedbackAttachment: jest.fn(async () => true),
+      findDocumentById: jest.fn(async () => ({ records: [readyRow({ wmkf_artifacttype: 100000003 })] })), // Applicant Slides
+    });
+    await expect(resolveBriefingMember({ requestId: REQUEST_ID, member: `feedback:${FEEDBACK_DOC_ID}` }, d))
+      .rejects.toMatchObject({ httpStatus: 404 });
+    expect(d.downloadFile).not.toHaveBeenCalled();
+  });
+
+  test('a Ready row missing its SharePoint drive/item pointers: 404 with no Graph call', async () => {
+    const d = deps({
+      isFeedbackAttachment: jest.fn(async () => true),
+      findDocumentById: jest.fn(async () => ({ records: [readyRow({ wmkf_sharepointdriveid: null, wmkf_sharepointitemid: null })] })),
+    });
+    await expect(resolveBriefingMember({ requestId: REQUEST_ID, member: `feedback:${FEEDBACK_DOC_ID}` }, d))
+      .rejects.toMatchObject({ httpStatus: 404 });
+    expect(d.downloadFile).not.toHaveBeenCalled();
+  });
+
+  test('non-Ready registry row: 404 with no Graph call', async () => {
+    const d = deps({
+      isFeedbackAttachment: jest.fn(async () => true),
+      findDocumentById: jest.fn(async () => ({ records: [readyRow({ wmkf_operationstatus: 100000000 })] })), // Generating
+    });
+    await expect(resolveBriefingMember({ requestId: REQUEST_ID, member: `feedback:${FEEDBACK_DOC_ID}` }, d))
+      .rejects.toMatchObject({ httpStatus: 404 });
+    expect(d.downloadFile).not.toHaveBeenCalled();
+  });
+
+  test('a `deleting` row never proves membership (the Postgres check already excludes it): 404 with no Graph call', async () => {
+    const d = deps({
+      isFeedbackAttachment: jest.fn(async () => false), // deleting rows never satisfy status='active'
+      findDocumentById: jest.fn(async () => ({ records: [readyRow()] })),
+    });
+    await expect(resolveBriefingMember({ requestId: REQUEST_ID, member: `feedback:${FEEDBACK_DOC_ID}` }, d))
+      .rejects.toMatchObject({ httpStatus: 404 });
+    expect(d.downloadFile).not.toHaveBeenCalled();
+  });
+
+  test('a non-GUID id is 404 before any lookup', async () => {
+    const d = deps();
+    await expect(resolveBriefingMember({ requestId: REQUEST_ID, member: 'feedback:not-a-guid' }, d))
+      .rejects.toMatchObject({ httpStatus: 404 });
+    expect(d.isFeedbackAttachment).not.toHaveBeenCalled();
+  });
 });
