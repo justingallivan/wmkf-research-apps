@@ -238,5 +238,5 @@ test('cleanup deletes only exact ledger pathnames and reports pruning separately
   expect(del).toHaveBeenCalledWith('portal-staging/grantee_image/exact-object', {
     token: 'vercel_blob_rw_test_private',
   });
-  expect(result).toEqual({ deleted: 1, errors: 0, pruned: 1 });
+  expect(result).toEqual({ deleted: 1, errors: 0, pruned: 1, retained: 0 });
 });

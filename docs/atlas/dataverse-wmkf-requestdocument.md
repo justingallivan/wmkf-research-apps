@@ -331,10 +331,24 @@ Production Request Document row was created by this release smoke.
   `wmkf_artifacttype` picklist on 2026-09-14 (S512) via
   `scripts/extend-requestdocument-artifacttype.mjs` (InsertOptionValue inside the
   app solution; owner-run; verified by re-read). Mirrored in
-  `shared/config/requestDocument.js` and the Wave 16 schema record. No writer
-  emits it yet: it is the Consultant Feedback slice 2 attachment type
-  (`docs/plans/CONSULTANT_FEEDBACK_PLAN_2026-09-14.md` §4). [VERIFIED via the
-  script's dry-run output listing nine values.]
+  `shared/config/requestDocument.js` and the Wave 16 schema record. [VERIFIED
+  via the script's dry-run output listing nine values.] Emitted by
+  `lib/services/consultant-feedback-attachment-service.js`'s `finalizeAttachmentUpload`
+  (`docs/plans/CONSULTANT_FEEDBACK_PLAN_2026-09-14.md` §4 "Slice 2 registry
+  contract"; registered writer #8 in `scripts/check-request-document-writers.js`,
+  `ALLOW_UNATTRIBUTED` — staff identity is captured on the Postgres
+  `consultant_feedback` row's `created_by`/`updated_by`, not on this registry
+  row): `wmkf_producer = 'consultant-feedback'`; SharePoint target is the
+  request's active bucket (`getRequestSharePointBuckets`), subfolder
+  `Consultant Feedback`; `wmkf_generationkey` = SHA-256 over
+  `<request id>|100000008|<portal_upload_staging.id>|<content sha256>` — the
+  staging id (not the future `consultant_feedback` row id) closes the circular
+  dependency for an attachment-only entry that doesn't exist yet at upload
+  time (Codex AR-1 finding 1). `findByGenerationKey` first makes a finalize
+  retry a no-op; a losing bind (another finalize or a delete racing this one)
+  supersedes the just-created row and discards its Graph item before the
+  route returns 409 `attachment_conflict`. Filename:
+  `Consultant Feedback-<Request#>-<consultant name>-<received_on><ext>`.
 - One Word file per versioned draft row; the row carries all eight named
   proposal-core fields and the exact validated Claude/input snapshots.
 - The source proposal is exactly
