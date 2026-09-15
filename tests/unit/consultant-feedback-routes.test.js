@@ -12,6 +12,7 @@ jest.mock('../../lib/services/consultant-feedback-service', () => ({
   writeFeedbackEntry: jest.fn(),
   updateFeedbackEntry: jest.fn(),
   deleteFeedbackEntry: jest.fn(),
+  downloadConsultantFeedbackAttachment: jest.fn(),
 }));
 jest.mock('../../lib/services/consultant-feedback-attachment-service', () => ({
   mintAttachmentUpload: jest.fn(),
@@ -37,6 +38,7 @@ import {
   writeFeedbackEntry,
   updateFeedbackEntry,
   deleteFeedbackEntry,
+  downloadConsultantFeedbackAttachment,
 } from '../../lib/services/consultant-feedback-service';
 import { mintAttachmentUpload, finalizeAttachmentUpload } from '../../lib/services/consultant-feedback-attachment-service';
 import {
@@ -51,6 +53,7 @@ import handler from '../../pages/api/workbench/consultant-feedback';
 import consultantsHandler from '../../pages/api/workbench/consultant-feedback/consultants';
 import uploadTokenHandler from '../../pages/api/workbench/consultant-feedback/upload-token';
 import finalizeHandler from '../../pages/api/workbench/consultant-feedback/finalize';
+import attachmentHandler from '../../pages/api/workbench/consultant-feedback/attachment';
 
 const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
 const PROFILE_ID = 7;
@@ -60,6 +63,7 @@ function mockRes() {
   res.status = jest.fn((code) => { res.statusCode = code; return res; });
   res.json = jest.fn((body) => { res.body = body; return res; });
   res.setHeader = jest.fn((key, value) => { res.headers[key] = value; });
+  res.send = jest.fn((body) => { res.body = body; return res; });
   return res;
 }
 
@@ -160,6 +164,67 @@ describe('consultants route', () => {
     await consultantsHandler({ method: 'GET' }, res);
     expect(res.statusCode).toBe(200);
     expect(res.body).toEqual({ items: [{ id: 1, name: 'Ada', affiliation: null }] });
+  });
+});
+
+describe('attachment download route', () => {
+  test('rejects non-GET with 405 before the app gate', async () => {
+    const res = mockRes();
+    await attachmentHandler({ method: 'POST', query: {} }, res);
+    expect(res.statusCode).toBe(405);
+    expect(requireAppAccess).not.toHaveBeenCalled();
+  });
+
+  test('an unauthenticated caller stops before the service', async () => {
+    requireAppAccess.mockResolvedValueOnce(null);
+    const res = mockRes();
+    await attachmentHandler({ method: 'GET', query: { requestId: REQUEST_ID, entryId: '9' } }, res);
+    expect(downloadConsultantFeedbackAttachment).not.toHaveBeenCalled();
+  });
+
+  test('streams a PDF inline with private no-store headers', async () => {
+    downloadConsultantFeedbackAttachment.mockResolvedValueOnce({
+      buffer: Buffer.from('%PDF-file'),
+      mimeType: 'application/pdf',
+      filename: 'Ada 李雷 "notes".pdf',
+      size: 9,
+      inline: true,
+    });
+    const res = mockRes();
+    await attachmentHandler({ method: 'GET', query: { requestId: ` ${REQUEST_ID} `, entryId: '9' } }, res);
+    expect(downloadConsultantFeedbackAttachment).toHaveBeenCalledWith({ requestId: REQUEST_ID, entryId: '9' });
+    expect(res.statusCode).toBe(200);
+    expect(res.headers).toEqual({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': 'inline; filename="Ada __ notes.pdf"; filename*=UTF-8\'\'Ada%20%E6%9D%8E%E9%9B%B7%20%22notes%22.pdf',
+      'Content-Length': 9,
+      'Cache-Control': 'private, no-store',
+      'X-Content-Type-Options': 'nosniff',
+    });
+    expect(res.body).toEqual(Buffer.from('%PDF-file'));
+  });
+
+  test('streams DOCX as an attachment and preserves typed service errors', async () => {
+    downloadConsultantFeedbackAttachment.mockResolvedValueOnce({
+      buffer: Buffer.from('docx'),
+      mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      filename: 'notes.docx',
+      size: 4,
+      inline: false,
+    });
+    const res = mockRes();
+    await attachmentHandler({ method: 'GET', query: { requestId: REQUEST_ID, entryId: '9' } }, res);
+    expect(res.headers['Content-Disposition']).toBe('attachment; filename="notes.docx"; filename*=UTF-8\'\'notes.docx');
+
+    downloadConsultantFeedbackAttachment.mockRejectedValueOnce(new ServiceHttpError('missing', {
+      httpStatus: 404,
+      body: { error: 'missing', reason: 'not_found' },
+    }));
+    const res2 = mockRes();
+    await attachmentHandler({ method: 'GET', query: { requestId: REQUEST_ID, entryId: '10' } }, res2);
+    expect(res2.statusCode).toBe(404);
+    expect(res2.body).toEqual({ error: 'missing', reason: 'not_found' });
+    expect(res2.send).not.toHaveBeenCalled();
   });
 });
 

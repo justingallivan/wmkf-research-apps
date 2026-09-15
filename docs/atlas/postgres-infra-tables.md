@@ -525,7 +525,7 @@ reviews resolve live from `wmkf_appreviewersuggestion`, and the proposal
 narrative resolves by governed path. Cleanup: none scheduled; revoked and expired
 rows stay as audit history (bounded by one live row per request).
 
-### `consultant_feedback` — Consultant Feedback slices 1-2 (migrations 048-049, fresh-install v50-v51; 2026-09-14)
+### `consultant_feedback` — Consultant Feedback slices 1–3 (migrations 048-049, fresh-install v50-v51; 2026-09-14)
 
 **Source of truth:** Postgres. Staff-recorded informal feedback from retained
 consultants on a proposal (`docs/plans/CONSULTANT_FEEDBACK_PLAN_2026-09-14.md`).
@@ -575,8 +575,11 @@ changes; both run in their own same-client transaction through the shared
 re-checked when the submitted author differs by value from the stored row,
 `deleteFeedbackEntry` — the plan §3.6 three-step for an attached row,
 `isSharedActiveFeedbackAttachment` — half of the briefing page's `feedback:`
-member proof, `loadSharedConsultantFeedbackForBriefing`), called from
-`/api/workbench/consultant-feedback[/consultants]`,
+member proof, `loadSharedConsultantFeedbackForBriefing`, and slice 3's
+`downloadConsultantFeedbackAttachment` — reads one active request-owned entry,
+then independently requires its exact same-request Ready/non-Superseded
+Consultant Feedback registry row before a staff-only Graph download), called
+from `/api/workbench/consultant-feedback`, `/consultants`, and `/attachment`,
 `lib/services/consultant-feedback-attachment-service.js` (slice 2 attachment
 lifecycle — see the `wmkf_requestdocuments` entry below), and
 `lib/services/deliberation-briefing/briefing-page-service.js`'s

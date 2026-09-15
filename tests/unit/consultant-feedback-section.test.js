@@ -4,7 +4,7 @@
  *
  * @jest-environment jsdom
  */
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { put } from '@vercel/blob/client';
 import ConsultantFeedbackSection, { formBelongsToCurrentRequest } from '../../shared/components/workbench/ConsultantFeedbackSection';
@@ -126,12 +126,18 @@ test('a successful save clears "Saving…", closes the form, and Add feedback is
   expect(saveButton).toHaveTextContent('Save');
 });
 
-test('a request switch mid-save clears "Saving…" so the next form is not wedged (round-4 finding 1)', async () => {
-  let resolvePost;
-  const postPromise = new Promise((resolve) => { resolvePost = resolve; });
+test('an old request save cannot clear a newer request save that is still in flight', async () => {
+  let resolveFirstPost;
+  let resolveSecondPost;
+  const firstPost = new Promise((resolve) => { resolveFirstPost = resolve; });
+  const secondPost = new Promise((resolve) => { resolveSecondPost = resolve; });
+  let postCount = 0;
   global.fetch = jest.fn((url, options) => {
     if (String(url).includes('/consultants')) return Promise.resolve(jsonResponse({ items: [] }));
-    if (options?.method === 'POST') return postPromise;
+    if (options?.method === 'POST') {
+      postCount += 1;
+      return postCount === 1 ? firstPost : secondPost;
+    }
     return Promise.resolve(jsonResponse({ items: [] }));
   });
 
@@ -150,17 +156,20 @@ test('a request switch mid-save clears "Saving…" so the next form is not wedge
   rerender(<ConsultantFeedbackSection requestId={OTHER_REQUEST_ID} />);
   await waitFor(() => expect(screen.getByText('No consultant feedback recorded yet.')).toBeInTheDocument());
 
-  // The stale save's response finally arrives.
-  resolvePost(jsonResponse({ item: { id: '1' } }));
-  await waitFor(() => expect(global.fetch.mock.calls.some(([, o]) => o?.method === 'POST')).toBe(true));
-
-  // Reopening a fresh form for the CURRENT request must not be wedged on
-  // "Saving…" — this is the bug: the stale save's own early return used to
-  // skip clearing it.
+  // Start a second save for B before A's stale response arrives.
   await userEvent.click(screen.getByRole('button', { name: 'Add feedback' }));
-  const saveButton = await screen.findByRole('button', { name: 'Save' });
-  expect(saveButton).toBeEnabled();
-  expect(saveButton).toHaveTextContent('Save');
+  await userEvent.click(screen.getByRole('button', { name: 'Add person…' }));
+  await userEvent.type(screen.getByPlaceholderText('Name'), 'Grace Hopper');
+  await userEvent.type(screen.getByRole('textbox', { name: 'Consultant feedback' }), 'Current request note.');
+  await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+  expect(screen.getByRole('button', { name: 'Saving…' })).toBeDisabled();
+
+  // A's completion must not clear B's current-generation busy state.
+  await act(async () => { resolveFirstPost(jsonResponse({ item: { id: '1' } })); });
+  expect(screen.getByRole('button', { name: 'Saving…' })).toBeDisabled();
+
+  await act(async () => { resolveSecondPost(jsonResponse({ item: { id: '2' } })); });
+  await waitFor(() => expect(screen.queryByRole('button', { name: 'Saving…' })).not.toBeInTheDocument());
 });
 
 test('ReviewsTab is not remounted per request, so a request switch closes any open form (§ round-3 finding 1)', async () => {
@@ -232,7 +241,10 @@ describe('slice 2 attachment', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
 
     await waitFor(() => expect(screen.getByText('Jane Doe')).toBeInTheDocument());
-    expect(screen.getByText('Attachment: notes.pdf')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Open notes.pdf' })).toHaveAttribute(
+      'href',
+      `/api/workbench/consultant-feedback/attachment?requestId=${REQUEST_ID}&entryId=5`,
+    );
 
     const urls = calls.map((c) => c.url);
     expect(urls.some((u) => u.includes('/consultant-feedback') && !u.includes('/upload-token') && !u.includes('/finalize') && !u.includes('/consultants') && calls.find((c) => c.url === u)?.method === 'POST')).toBe(false);
@@ -316,6 +328,163 @@ describe('slice 2 attachment', () => {
     const saveButton = await screen.findByRole('button', { name: 'Save' });
     expect(saveButton).toBeEnabled();
     expect(saveButton).toHaveTextContent('Save');
+  });
+
+  test('upload progress from request A cannot paint request B state', async () => {
+    let reportProgress;
+    let resolvePut;
+    const pendingPut = new Promise((resolve) => { resolvePut = resolve; });
+    put.mockImplementationOnce((_pathname, _file, options) => {
+      reportProgress = options.onUploadProgress;
+      return pendingPut;
+    });
+    global.fetch = jest.fn((url) => {
+      const href = String(url);
+      if (href.includes('/consultants')) return Promise.resolve(jsonResponse({ items: [] }));
+      if (href.includes('/upload-token')) {
+        return Promise.resolve(jsonResponse({ ok: true, stagingId: 'staging-1', pathname: 'x', clientToken: 'tok', contentType: 'application/pdf' }));
+      }
+      if (href.includes('/finalize')) return Promise.resolve(jsonResponse({ ok: true }));
+      return Promise.resolve(jsonResponse({ items: [] }));
+    });
+
+    const { rerender } = render(<ConsultantFeedbackSection requestId={REQUEST_ID} />);
+    await screen.findByText('No consultant feedback recorded yet.');
+    await userEvent.click(screen.getByRole('button', { name: 'Add feedback' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Add person…' }));
+    await userEvent.type(screen.getByPlaceholderText('Name'), 'Jane Doe');
+    await userEvent.upload(document.getElementById('consultant-feedback-attachment'), pdfFile());
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(put).toHaveBeenCalled());
+
+    rerender(<ConsultantFeedbackSection requestId={OTHER_REQUEST_ID} />);
+    await screen.findByText('No consultant feedback recorded yet.');
+    await act(async () => {
+      reportProgress({ percentage: 37 });
+      resolvePut({});
+    });
+    expect(screen.queryByText('Uploading… 37%')).not.toBeInTheDocument();
+    expect(global.fetch.mock.calls.some(([url]) => String(url).includes('/finalize'))).toBe(false);
+  });
+});
+
+describe('slice 3 polish', () => {
+  const ITEMS = [
+    {
+      id: '9', receivedOn: '2026-09-01', bodyHtml: '<p>Shared note.</p>', shared: true,
+      consultant: { rosterId: 1, name: 'Ada Lovelace', affiliation: 'Analytical Engines' }, oneOff: false,
+      attachment: { requestdocumentId: 'doc-1', filename: 'ada.pdf', contentType: 'application/pdf', size: 10 },
+      updatedAt: '2026-09-01T00:00:00Z',
+    },
+    {
+      id: '10', receivedOn: '2026-09-02', bodyHtml: '<p>Private note.</p>', shared: false,
+      consultant: { rosterId: 2, name: 'Grace Hopper', affiliation: 'US Navy' }, oneOff: false,
+      attachment: { requestdocumentId: 'doc-2', filename: 'grace.docx', contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', size: 20 },
+      updatedAt: '2026-09-02T00:00:00Z',
+    },
+  ];
+
+  test('filters All/Shared/Not shared locally with honest counts', async () => {
+    mockFetchSequence({ items: ITEMS });
+    render(<ConsultantFeedbackSection requestId={REQUEST_ID} />);
+    await waitFor(() => expect(screen.getByText('Ada Lovelace')).toBeInTheDocument());
+    expect(screen.getByText('Grace Hopper')).toBeInTheDocument();
+
+    expect(screen.getByRole('button', { name: 'All (2)' })).toHaveAttribute('aria-pressed', 'true');
+    await userEvent.click(screen.getByRole('button', { name: 'Shared (1)' }));
+    expect(screen.getByText('Ada Lovelace')).toBeInTheDocument();
+    expect(screen.queryByText('Grace Hopper')).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Not shared (1)' }));
+    expect(screen.queryByText('Ada Lovelace')).not.toBeInTheDocument();
+    expect(screen.getByText('Grace Hopper')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'All (2)' }));
+    expect(screen.getByText('Ada Lovelace')).toBeInTheDocument();
+    expect(screen.getByText('Grace Hopper')).toBeInTheDocument();
+  });
+
+  test('resets the local visibility filter to All when the request changes', async () => {
+    mockFetchSequence({ items: ITEMS });
+    const { rerender } = render(<ConsultantFeedbackSection requestId={REQUEST_ID} />);
+    await screen.findByText('Ada Lovelace');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Shared (1)' }));
+    expect(screen.queryByText('Grace Hopper')).not.toBeInTheDocument();
+
+    rerender(<ConsultantFeedbackSection requestId={OTHER_REQUEST_ID} />);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'All (2)' })).toHaveAttribute('aria-pressed', 'true'));
+    expect(screen.getByText('Ada Lovelace')).toBeInTheDocument();
+    expect(screen.getByText('Grace Hopper')).toBeInTheDocument();
+  });
+
+  test('hides request A rows synchronously while request B is still loading', async () => {
+    let resolveSecondRequest;
+    const secondRequest = new Promise((resolve) => { resolveSecondRequest = resolve; });
+    global.fetch = jest.fn((url) => {
+      const href = String(url);
+      if (href.includes('/consultants')) return Promise.resolve(jsonResponse({ items: [] }));
+      if (href.includes(OTHER_REQUEST_ID)) return secondRequest;
+      return Promise.resolve(jsonResponse({ items: [ITEMS[0]] }));
+    });
+
+    const { rerender } = render(<ConsultantFeedbackSection requestId={REQUEST_ID} />);
+    const oldLink = await screen.findByRole('link', { name: 'Open ada.pdf' });
+    expect(oldLink).toHaveAttribute('href', expect.stringContaining(REQUEST_ID));
+
+    rerender(<ConsultantFeedbackSection requestId={OTHER_REQUEST_ID} />);
+    expect(screen.queryByText('Ada Lovelace')).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Open ada.pdf' })).not.toBeInTheDocument();
+    expect(screen.getByText('Loading…')).toBeInTheDocument();
+
+    await act(async () => {
+      resolveSecondRequest(jsonResponse({ items: [ITEMS[1]] }));
+    });
+    await waitFor(() => expect(screen.getByText('Grace Hopper')).toBeInTheDocument());
+    expect(screen.queryByText('Ada Lovelace')).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Download grace.docx' })).toHaveAttribute(
+      'href',
+      `/api/workbench/consultant-feedback/attachment?requestId=${OTHER_REQUEST_ID}&entryId=10`,
+    );
+  });
+
+  test('attachment links use only request and entry identity; PDF opens a new tab and DOCX downloads in place', async () => {
+    mockFetchSequence({ items: ITEMS });
+    render(<ConsultantFeedbackSection requestId={REQUEST_ID} />);
+    const pdf = await screen.findByRole('link', { name: 'Open ada.pdf' });
+    const docx = screen.getByRole('link', { name: 'Download grace.docx' });
+    expect(pdf).toHaveAttribute('href', `/api/workbench/consultant-feedback/attachment?requestId=${REQUEST_ID}&entryId=9`);
+    expect(pdf).toHaveAttribute('target', '_blank');
+    expect(docx).toHaveAttribute('href', `/api/workbench/consultant-feedback/attachment?requestId=${REQUEST_ID}&entryId=10`);
+    expect(docx).not.toHaveAttribute('target');
+    expect(pdf.getAttribute('href')).not.toContain('drive');
+    expect(pdf.getAttribute('href')).not.toContain('item');
+  });
+
+  test('the consultant chooser searches name/affiliation and supports Arrow, Enter, and Escape', async () => {
+    mockFetchSequence({
+      consultants: [
+        { id: 1, name: 'Ada Lovelace', affiliation: 'Analytical Engines' },
+        { id: 2, name: 'Grace Hopper', affiliation: 'US Navy' },
+      ],
+    });
+    render(<ConsultantFeedbackSection requestId={REQUEST_ID} />);
+    await waitFor(() => expect(screen.getByText('No consultant feedback recorded yet.')).toBeInTheDocument());
+    await userEvent.click(screen.getByRole('button', { name: 'Add feedback' }));
+
+    const combobox = screen.getByRole('combobox', { name: 'Consultant' });
+    await userEvent.type(combobox, 'Navy');
+    expect(screen.getByRole('option', { name: /Grace Hopper/ })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: /Ada Lovelace/ })).not.toBeInTheDocument();
+    await userEvent.keyboard('{ArrowDown}{Enter}');
+    expect(combobox).toHaveValue('Grace Hopper');
+    expect(combobox).toHaveAttribute('aria-expanded', 'false');
+
+    await userEvent.keyboard('{ArrowDown}');
+    expect(combobox).toHaveAttribute('aria-expanded', 'true');
+    await userEvent.keyboard('{Escape}');
+    expect(combobox).toHaveAttribute('aria-expanded', 'false');
+    expect(combobox).toHaveValue('Grace Hopper');
   });
 });
 

@@ -955,7 +955,7 @@ export default function ReviewsTab({ requestId, previewReadOnly = false }) {
           onUpdated={load}
           previewReadOnly={previewReadOnly}
         />
-        <ConsultantFeedbackSection requestId={requestId} previewReadOnly={previewReadOnly} />
+        <ConsultantFeedbackSection key={requestId} requestId={requestId} previewReadOnly={previewReadOnly} />
       </div>
     );
   }
@@ -989,7 +989,7 @@ export default function ReviewsTab({ requestId, previewReadOnly = false }) {
           </div>
         </section>
       )}
-      <ConsultantFeedbackSection requestId={requestId} previewReadOnly={previewReadOnly} />
+      <ConsultantFeedbackSection key={requestId} requestId={requestId} previewReadOnly={previewReadOnly} />
       {manualEntryReviewer && !previewReadOnly && (
         <ManualReviewEntryForm
           key={manualEntryReviewer.suggestionId}

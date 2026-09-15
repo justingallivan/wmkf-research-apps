@@ -14,6 +14,7 @@ import {
   deleteFeedbackEntry,
   loadSharedConsultantFeedbackForBriefing,
   isSharedActiveFeedbackAttachment,
+  downloadConsultantFeedbackAttachment,
 } from '../../lib/services/consultant-feedback-service';
 
 const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
@@ -455,6 +456,20 @@ describe('listConsultantFeedback — attachment registry chunking (Codex R3: 26+
     };
   }
 
+  function downloadableRegistryRow(id, overrides = {}) {
+    return {
+      wmkf_requestdocumentid: id,
+      _wmkf_request_value: REQUEST_ID,
+      wmkf_artifacttype: 100000008,
+      wmkf_operationstatus: 100000001,
+      wmkf_lifecyclestate: 100000000,
+      wmkf_sharepointdriveid: 'drive-1',
+      wmkf_sharepointitemid: `item-${id}`,
+      wmkf_filename: `${id}.pdf`,
+      ...overrides,
+    };
+  }
+
   test('26 attached entries all resolve their attachment across two chunked batches (the adapter refuses >25 ids in one call)', async () => {
     const rows = Array.from({ length: 26 }, (_, i) => attachedRow(i + 1));
     sql.query.mockImplementation(async (q) => {
@@ -463,7 +478,7 @@ describe('listConsultantFeedback — attachment registry chunking (Codex R3: 26+
       return { rows: [] };
     });
     const findDocumentsByIds = jest.fn(async (ids) => ({
-      records: ids.map((id) => ({ wmkf_requestdocumentid: id, wmkf_filename: `${id}.pdf` })),
+      records: ids.map((id) => downloadableRegistryRow(id)),
     }));
     const result = await listConsultantFeedback({ requestId: REQUEST_ID }, { findDocumentsByIds });
     expect(findDocumentsByIds).toHaveBeenCalledTimes(2); // 25 + 1, never all 26 in one call
@@ -482,7 +497,7 @@ describe('listConsultantFeedback — attachment registry chunking (Codex R3: 26+
     const findDocumentsByIds = jest.fn(async (ids) => {
       call += 1;
       if (call === 1) throw new Error('dataverse down'); // first chunk fails
-      return { records: ids.map((id) => ({ wmkf_requestdocumentid: id, wmkf_filename: `${id}.pdf` })) };
+      return { records: ids.map((id) => downloadableRegistryRow(id)) };
     });
     const result = await listConsultantFeedback({ requestId: REQUEST_ID }, { findDocumentsByIds });
     expect(findDocumentsByIds).toHaveBeenCalledTimes(2);
@@ -491,6 +506,32 @@ describe('listConsultantFeedback — attachment registry chunking (Codex R3: 26+
     expect(failedChunkItems).toHaveLength(25);
     expect(failedChunkItems.every((item) => item.attachment.status === 'unavailable')).toBe(true);
     expect(okChunkItems[0].attachment.filename).toBeTruthy();
+  });
+
+  test.each([
+    ['missing', null],
+    ['wrong request', { _wmkf_request_value: '99999999-9999-4999-8999-999999999999' }],
+    ['wrong artifact type', { wmkf_artifacttype: 100000000 }],
+    ['non-Ready', { wmkf_operationstatus: 100000000 }],
+    ['Superseded', { wmkf_lifecyclestate: 100000003 }],
+    ['unknown lifecycle', { wmkf_lifecyclestate: 199999999 }],
+    ['missing file pointer', { wmkf_sharepointitemid: null }],
+  ])('marks a %s registry row unavailable instead of offering a stale link', async (_label, override) => {
+    const row = attachedRow(1);
+    sql.query.mockImplementation(async (queryText) => {
+      if (queryText.includes("status = 'deleting'")) return { rows: [] };
+      if (queryText.includes('SELECT cf.id')) return { rows: [row] };
+      return { rows: [] };
+    });
+    const records = override === null ? [] : [downloadableRegistryRow(row.requestdocument_id, override)];
+    const result = await listConsultantFeedback(
+      { requestId: REQUEST_ID },
+      { findDocumentsByIds: jest.fn().mockResolvedValue({ records }) },
+    );
+    expect(result[0].attachment).toEqual({
+      requestdocumentId: row.requestdocument_id,
+      status: 'unavailable',
+    });
   });
 });
 
@@ -531,5 +572,111 @@ describe('isSharedActiveFeedbackAttachment', () => {
   test('returns false when no row matches (e.g. only excluded rows exist)', async () => {
     sql.query.mockResolvedValueOnce({ rows: [] });
     expect(await isSharedActiveFeedbackAttachment(REQUEST_ID, DOC_ID)).toBe(false);
+  });
+});
+
+describe('downloadConsultantFeedbackAttachment', () => {
+  const DOC_ID = '55555555-5555-4555-8555-555555555555';
+  const registryRow = (overrides = {}) => ({
+    wmkf_requestdocumentid: DOC_ID,
+    _wmkf_request_value: REQUEST_ID,
+    wmkf_artifacttype: 100000008,
+    wmkf_operationstatus: 100000001,
+    wmkf_lifecyclestate: 100000000,
+    wmkf_sharepointdriveid: 'drive-1',
+    wmkf_sharepointitemid: 'item-1',
+    wmkf_filename: 'Consultant Feedback-1000-Ada-2026-09-01.pdf',
+    ...overrides,
+  });
+
+  function dependencies(records = [registryRow()]) {
+    return {
+      findDocumentsByIds: jest.fn().mockResolvedValue({ records }),
+      downloadFile: jest.fn().mockResolvedValue({
+        buffer: Buffer.from('%PDF-file'),
+        mimeType: 'application/pdf',
+        filename: 'fallback.pdf',
+        size: 999,
+      }),
+    };
+  }
+
+  test('an active request-owned entry resolves its typed live registry row and streams an unshared PDF inline', async () => {
+    sql.query.mockImplementationOnce(async (queryText, params) => {
+      expect(queryText).toContain("status = 'active'");
+      expect(queryText).not.toContain('shared = true');
+      expect(params).toEqual([9, REQUEST_ID]);
+      return { rows: [{ id: 9, requestdocument_id: DOC_ID, shared: false }] };
+    });
+    const deps = dependencies();
+    const result = await downloadConsultantFeedbackAttachment({ requestId: REQUEST_ID, entryId: '9' }, deps);
+    expect(deps.findDocumentsByIds).toHaveBeenCalledWith([DOC_ID]);
+    expect(deps.downloadFile).toHaveBeenCalledWith('drive-1', 'item-1');
+    expect(result).toEqual({
+      buffer: Buffer.from('%PDF-file'),
+      mimeType: 'application/pdf',
+      filename: 'Consultant Feedback-1000-Ada-2026-09-01.pdf',
+      size: 9,
+      inline: true,
+    });
+  });
+
+  test.each([
+    ['another registry identity', { wmkf_requestdocumentid: '66666666-6666-4666-8666-666666666666' }],
+    ['another request', { _wmkf_request_value: '99999999-9999-4999-8999-999999999999' }],
+    ['another artifact type', { wmkf_artifacttype: 100000000 }],
+    ['a non-Ready row', { wmkf_operationstatus: 100000000 }],
+    ['a Superseded row', { wmkf_lifecyclestate: 100000003 }],
+    ['a row with no lifecycle', { wmkf_lifecyclestate: null }],
+    ['a row with an unknown lifecycle', { wmkf_lifecyclestate: 199999999 }],
+    ['a row without file pointers', { wmkf_sharepointitemid: null }],
+  ])('fails closed before Graph when the tempting registry fixture is %s', async (_label, override) => {
+    sql.query.mockResolvedValueOnce({ rows: [{ id: 9, requestdocument_id: DOC_ID }] });
+    const deps = dependencies([registryRow(override)]);
+    await expect(downloadConsultantFeedbackAttachment({ requestId: REQUEST_ID, entryId: 9 }, deps))
+      .rejects.toMatchObject({ httpStatus: 404, body: { reason: 'not_found' } });
+    expect(deps.downloadFile).not.toHaveBeenCalled();
+  });
+
+  test('fails closed on missing/ambiguous entry or registry state before Graph', async () => {
+    const noEntry = dependencies();
+    sql.query.mockResolvedValueOnce({ rows: [] });
+    await expect(downloadConsultantFeedbackAttachment({ requestId: REQUEST_ID, entryId: 9 }, noEntry))
+      .rejects.toMatchObject({ httpStatus: 404 });
+    expect(noEntry.findDocumentsByIds).not.toHaveBeenCalled();
+
+    const noAttachment = dependencies();
+    sql.query.mockResolvedValueOnce({ rows: [{ id: 9, requestdocument_id: null }] });
+    await expect(downloadConsultantFeedbackAttachment({ requestId: REQUEST_ID, entryId: 9 }, noAttachment))
+      .rejects.toMatchObject({ httpStatus: 404 });
+    expect(noAttachment.findDocumentsByIds).not.toHaveBeenCalled();
+
+    const ambiguous = dependencies([registryRow(), registryRow({ wmkf_requestdocumentid: '66666666-6666-4666-8666-666666666666' })]);
+    sql.query.mockResolvedValueOnce({ rows: [{ id: 9, requestdocument_id: DOC_ID }] });
+    await expect(downloadConsultantFeedbackAttachment({ requestId: REQUEST_ID, entryId: 9 }, ambiguous))
+      .rejects.toMatchObject({ httpStatus: 404 });
+    expect(ambiguous.downloadFile).not.toHaveBeenCalled();
+  });
+
+  test('rejects invalid ids before any persistence read', async () => {
+    const deps = dependencies();
+    await expect(downloadConsultantFeedbackAttachment({ requestId: 'not-a-guid', entryId: 9 }, deps))
+      .rejects.toMatchObject({ httpStatus: 400, body: { reason: 'invalid_request_id' } });
+    await expect(downloadConsultantFeedbackAttachment({ requestId: REQUEST_ID, entryId: true }, deps))
+      .rejects.toMatchObject({ httpStatus: 400, body: { reason: 'invalid_entry_id' } });
+    expect(sql.query).not.toHaveBeenCalled();
+  });
+
+  test('forces an unexpected downloaded content type closed and translates Graph failure', async () => {
+    sql.query.mockResolvedValue({ rows: [{ id: 9, requestdocument_id: DOC_ID }] });
+    const wrongType = dependencies();
+    wrongType.downloadFile.mockResolvedValueOnce({ buffer: Buffer.from('<html>'), mimeType: 'text/html', filename: 'x.html', size: 6 });
+    await expect(downloadConsultantFeedbackAttachment({ requestId: REQUEST_ID, entryId: 9 }, wrongType))
+      .rejects.toMatchObject({ httpStatus: 404 });
+
+    const failed = dependencies();
+    failed.downloadFile.mockRejectedValueOnce(new Error('Graph timeout'));
+    await expect(downloadConsultantFeedbackAttachment({ requestId: REQUEST_ID, entryId: 9 }, failed))
+      .rejects.toMatchObject({ httpStatus: 502, body: { reason: 'download_failed' } });
   });
 });
