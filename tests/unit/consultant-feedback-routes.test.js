@@ -186,7 +186,7 @@ describe('attachment download route', () => {
     downloadConsultantFeedbackAttachment.mockResolvedValueOnce({
       buffer: Buffer.from('%PDF-file'),
       mimeType: 'application/pdf',
-      filename: 'Ada "notes".pdf',
+      filename: 'Ada 李雷 "notes".pdf',
       size: 9,
       inline: true,
     });
@@ -196,7 +196,7 @@ describe('attachment download route', () => {
     expect(res.statusCode).toBe(200);
     expect(res.headers).toEqual({
       'Content-Type': 'application/pdf',
-      'Content-Disposition': 'inline; filename="Ada notes.pdf"',
+      'Content-Disposition': 'inline; filename="Ada __ notes.pdf"; filename*=UTF-8\'\'Ada%20%E6%9D%8E%E9%9B%B7%20%22notes%22.pdf',
       'Content-Length': 9,
       'Cache-Control': 'private, no-store',
       'X-Content-Type-Options': 'nosniff',
@@ -214,7 +214,7 @@ describe('attachment download route', () => {
     });
     const res = mockRes();
     await attachmentHandler({ method: 'GET', query: { requestId: REQUEST_ID, entryId: '9' } }, res);
-    expect(res.headers['Content-Disposition']).toBe('attachment; filename="notes.docx"');
+    expect(res.headers['Content-Disposition']).toBe('attachment; filename="notes.docx"; filename*=UTF-8\'\'notes.docx');
 
     downloadConsultantFeedbackAttachment.mockRejectedValueOnce(new ServiceHttpError('missing', {
       httpStatus: 404,

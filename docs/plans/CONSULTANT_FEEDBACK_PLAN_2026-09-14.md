@@ -391,7 +391,7 @@ routes; `feedback:` document member; Superseded-on-delete. Tier 1, same branch o
   and Expertise Finder is a separately gated app without a stable consultant deep-link. Slice 3
   does not invent a broken URL or broaden access; a future Expertise Finder contract may add one.
 
-## 7. Tests [slice 1 tests BUILT S512 (91 passing across 6 suites); slice 2 tests MERGED TO MAIN 2026-09-14 via PR #295 (`bf6b41be`; source tip `98be7dae`): 169 passing across 10 suites after Opus round 2; slice 3 focused set: 84 passing across 3 suites; post-merge Slice 2 + Slice 3 regression: 179 passing across 8 suites]
+## 7. Tests [slice 1 tests BUILT S512 (91 passing across 6 suites); slice 2 tests MERGED TO MAIN 2026-09-14 via PR #295 (`bf6b41be`; source tip `98be7dae`): 169 passing across 10 suites after Opus round 2; slice 3 focused set after fresh-review fixes: 95 passing across 3 suites; post-merge Slice 2 + Slice 3 regression: 190 passing across 8 suites]
 
 - Service: create with roster id / with one-off name (no roster write; assert the roster row
   count is unchanged); **eligibility**: Board, inactive, missing, and stale-dropdown roster ids are
@@ -433,7 +433,7 @@ and `PORTAL_UPLOAD_SCOPES` in `lib/services/portal-upload-staging.js`.
 ## 9. Open items before build
 
 1. ~~Add-person side effect~~ — resolved 2026-09-14: one-offs stay on the entry (CF6).
-2. Dataverse artifact-type option addition: owner schedules after slice 1 (CF7).
+2. ~~Dataverse artifact-type option addition~~ — completed in production 2026-09-14 (CF7).
 3. `/contract-reconcile` pass on this plan — run 2026-09-14; findings recorded in §10.
 4. Codex adversarial review 1 — run 2026-09-14; four findings folded in (§10).
 5. Codex adversarial review 2 — run 2026-09-14; five findings folded in with proportionate remedies (§10).

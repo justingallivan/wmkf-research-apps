@@ -456,6 +456,20 @@ describe('listConsultantFeedback — attachment registry chunking (Codex R3: 26+
     };
   }
 
+  function downloadableRegistryRow(id, overrides = {}) {
+    return {
+      wmkf_requestdocumentid: id,
+      _wmkf_request_value: REQUEST_ID,
+      wmkf_artifacttype: 100000008,
+      wmkf_operationstatus: 100000001,
+      wmkf_lifecyclestate: 100000000,
+      wmkf_sharepointdriveid: 'drive-1',
+      wmkf_sharepointitemid: `item-${id}`,
+      wmkf_filename: `${id}.pdf`,
+      ...overrides,
+    };
+  }
+
   test('26 attached entries all resolve their attachment across two chunked batches (the adapter refuses >25 ids in one call)', async () => {
     const rows = Array.from({ length: 26 }, (_, i) => attachedRow(i + 1));
     sql.query.mockImplementation(async (q) => {
@@ -464,7 +478,7 @@ describe('listConsultantFeedback — attachment registry chunking (Codex R3: 26+
       return { rows: [] };
     });
     const findDocumentsByIds = jest.fn(async (ids) => ({
-      records: ids.map((id) => ({ wmkf_requestdocumentid: id, wmkf_filename: `${id}.pdf` })),
+      records: ids.map((id) => downloadableRegistryRow(id)),
     }));
     const result = await listConsultantFeedback({ requestId: REQUEST_ID }, { findDocumentsByIds });
     expect(findDocumentsByIds).toHaveBeenCalledTimes(2); // 25 + 1, never all 26 in one call
@@ -483,7 +497,7 @@ describe('listConsultantFeedback — attachment registry chunking (Codex R3: 26+
     const findDocumentsByIds = jest.fn(async (ids) => {
       call += 1;
       if (call === 1) throw new Error('dataverse down'); // first chunk fails
-      return { records: ids.map((id) => ({ wmkf_requestdocumentid: id, wmkf_filename: `${id}.pdf` })) };
+      return { records: ids.map((id) => downloadableRegistryRow(id)) };
     });
     const result = await listConsultantFeedback({ requestId: REQUEST_ID }, { findDocumentsByIds });
     expect(findDocumentsByIds).toHaveBeenCalledTimes(2);
@@ -492,6 +506,32 @@ describe('listConsultantFeedback — attachment registry chunking (Codex R3: 26+
     expect(failedChunkItems).toHaveLength(25);
     expect(failedChunkItems.every((item) => item.attachment.status === 'unavailable')).toBe(true);
     expect(okChunkItems[0].attachment.filename).toBeTruthy();
+  });
+
+  test.each([
+    ['missing', null],
+    ['wrong request', { _wmkf_request_value: '99999999-9999-4999-8999-999999999999' }],
+    ['wrong artifact type', { wmkf_artifacttype: 100000000 }],
+    ['non-Ready', { wmkf_operationstatus: 100000000 }],
+    ['Superseded', { wmkf_lifecyclestate: 100000003 }],
+    ['unknown lifecycle', { wmkf_lifecyclestate: 199999999 }],
+    ['missing file pointer', { wmkf_sharepointitemid: null }],
+  ])('marks a %s registry row unavailable instead of offering a stale link', async (_label, override) => {
+    const row = attachedRow(1);
+    sql.query.mockImplementation(async (queryText) => {
+      if (queryText.includes("status = 'deleting'")) return { rows: [] };
+      if (queryText.includes('SELECT cf.id')) return { rows: [row] };
+      return { rows: [] };
+    });
+    const records = override === null ? [] : [downloadableRegistryRow(row.requestdocument_id, override)];
+    const result = await listConsultantFeedback(
+      { requestId: REQUEST_ID },
+      { findDocumentsByIds: jest.fn().mockResolvedValue({ records }) },
+    );
+    expect(result[0].attachment).toEqual({
+      requestdocumentId: row.requestdocument_id,
+      status: 'unavailable',
+    });
   });
 });
 
@@ -587,6 +627,8 @@ describe('downloadConsultantFeedbackAttachment', () => {
     ['another artifact type', { wmkf_artifacttype: 100000000 }],
     ['a non-Ready row', { wmkf_operationstatus: 100000000 }],
     ['a Superseded row', { wmkf_lifecyclestate: 100000003 }],
+    ['a row with no lifecycle', { wmkf_lifecyclestate: null }],
+    ['a row with an unknown lifecycle', { wmkf_lifecyclestate: 199999999 }],
     ['a row without file pointers', { wmkf_sharepointitemid: null }],
   ])('fails closed before Graph when the tempting registry fixture is %s', async (_label, override) => {
     sql.query.mockResolvedValueOnce({ rows: [{ id: 9, requestdocument_id: DOC_ID }] });

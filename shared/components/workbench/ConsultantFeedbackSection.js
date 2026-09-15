@@ -212,6 +212,7 @@ function emptyForm() {
 
 export default function ConsultantFeedbackSection({ requestId, previewReadOnly = false }) {
   const [items, setItems] = useState([]);
+  const [itemsRequestId, setItemsRequestId] = useState(null);
   const [consultants, setConsultants] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -240,6 +241,13 @@ export default function ConsultantFeedbackSection({ requestId, previewReadOnly =
   // post-await state write (success and failure) so a request switch never
   // paints another request's feedback.
   const fetchIdRef = useRef(0);
+  // Updated during render, before effects run, so an A-request promise that
+  // settles between the B render and B's load effect is already stale.
+  const currentRequestIdRef = useRef(requestId);
+  currentRequestIdRef.current = requestId;
+  // Invalidates every older save/upload callback when the form closes or a
+  // newer save starts. An A response must never clear B's busy/progress state.
+  const saveOperationIdRef = useRef(0);
   // Held across retries; rotated only after a confirmed 2xx or an explicit
   // form reset (§3.1).
   const mutationIdRef = useRef(null);
@@ -260,19 +268,27 @@ export default function ConsultantFeedbackSection({ requestId, previewReadOnly =
   // eligibility.
   const originalAuthorRef = useRef(null);
 
+  // Key rendered data to the request synchronously. Effects run after render,
+  // so clearing rows only inside the request-change effect would briefly pair
+  // request B's attachment URLs with request A's entry ids.
+  const currentItems = itemsRequestId === requestId ? items : [];
+  const requestLoaded = itemsRequestId === requestId;
+  const currentError = requestLoaded ? error : null;
+  const currentFormOpen = formOpen && formRequestIdRef.current === requestId;
   const visibilityCounts = useMemo(() => ({
-    all: items.length,
-    shared: items.filter((item) => item.shared).length,
-    unshared: items.filter((item) => !item.shared).length,
-  }), [items]);
+    all: currentItems.length,
+    shared: currentItems.filter((item) => item.shared).length,
+    unshared: currentItems.filter((item) => !item.shared).length,
+  }), [currentItems]);
   const visibleItems = useMemo(() => {
-    if (visibilityFilter === 'shared') return items.filter((item) => item.shared);
-    if (visibilityFilter === 'unshared') return items.filter((item) => !item.shared);
-    return items;
-  }, [items, visibilityFilter]);
+    if (visibilityFilter === 'shared') return currentItems.filter((item) => item.shared);
+    if (visibilityFilter === 'unshared') return currentItems.filter((item) => !item.shared);
+    return currentItems;
+  }, [currentItems, visibilityFilter]);
 
   const load = useCallback(async () => {
     if (!requestId) return;
+    const loadRequestId = requestId;
     const fetchId = ++fetchIdRef.current;
     setLoading(true);
     setError(null);
@@ -283,16 +299,18 @@ export default function ConsultantFeedbackSection({ requestId, previewReadOnly =
       ]);
       const entriesData = await entriesRes.json().catch(() => ({}));
       const consultantsData = await consultantsRes.json().catch(() => ({}));
-      if (fetchId !== fetchIdRef.current) return;
+      if (fetchId !== fetchIdRef.current || loadRequestId !== currentRequestIdRef.current) return;
       if (!entriesRes.ok) throw new Error(entriesData.error || `Failed to load consultant feedback (${entriesRes.status})`);
       setItems(entriesData.items || []);
+      setItemsRequestId(loadRequestId);
       setConsultants(consultantsRes.ok ? (consultantsData.items || []) : []);
     } catch (e) {
-      if (fetchId !== fetchIdRef.current) return;
+      if (fetchId !== fetchIdRef.current || loadRequestId !== currentRequestIdRef.current) return;
       setError(e.message);
       setItems([]);
+      setItemsRequestId(loadRequestId);
     } finally {
-      if (fetchId === fetchIdRef.current) setLoading(false);
+      if (fetchId === fetchIdRef.current && loadRequestId === currentRequestIdRef.current) setLoading(false);
     }
   }, [requestId]);
 
@@ -347,6 +365,7 @@ export default function ConsultantFeedbackSection({ requestId, previewReadOnly =
   }, [requestId, resetAttachState]);
 
   const closeForm = useCallback(() => {
+    saveOperationIdRef.current += 1;
     setFormOpen(false);
     setEditingId(null);
     setForm(emptyForm());
@@ -405,6 +424,8 @@ export default function ConsultantFeedbackSection({ requestId, previewReadOnly =
       setSaveError('Feedback text or an attachment is required.');
       return;
     }
+    const saveOperationId = ++saveOperationIdRef.current;
+    const saveRequestId = requestId;
     setSaving(true);
     setSaveError(null);
     const fetchId = fetchIdRef.current;
@@ -414,7 +435,9 @@ export default function ConsultantFeedbackSection({ requestId, previewReadOnly =
     // async step below already relies on, now reused for the upload steps too
     // so a staged-but-not-yet-finalized upload is abandoned on switch exactly
     // like every other in-flight response here.
-    const stale = () => fetchId !== fetchIdRef.current;
+    const stale = () => saveOperationId !== saveOperationIdRef.current
+      || fetchId !== fetchIdRef.current
+      || saveRequestId !== currentRequestIdRef.current;
     try {
       let stagingId = attachStagingId;
       if (attachFile && !stagingId) {
@@ -424,16 +447,18 @@ export default function ConsultantFeedbackSection({ requestId, previewReadOnly =
           body: JSON.stringify({ requestId, filename: attachFile.name, contentType: attachFile.type, size: attachFile.size }),
         });
         const tokenData = await tokenRes.json().catch(() => ({}));
-        if (stale()) { setSaving(false); return; }
+        if (stale()) return;
         if (!tokenRes.ok || !tokenData.ok) throw new Error(tokenData.error || 'Could not prepare the attachment upload.');
         const { put } = await import('@vercel/blob/client');
         await put(tokenData.pathname, attachFile, {
           access: 'private',
           token: tokenData.clientToken,
           contentType: tokenData.contentType,
-          onUploadProgress: ({ percentage }) => setAttachUploadProgress(Math.round(percentage)),
+          onUploadProgress: ({ percentage }) => {
+            if (!stale()) setAttachUploadProgress(Math.round(percentage));
+          },
         });
-        if (stale()) { setSaving(false); return; }
+        if (stale()) return;
         stagingId = tokenData.stagingId;
         setAttachStagingId(stagingId);
       }
@@ -469,7 +494,7 @@ export default function ConsultantFeedbackSection({ requestId, previewReadOnly =
           }),
         });
         const data = await res.json().catch(() => ({}));
-        if (stale()) { setSaving(false); return; }
+        if (stale()) return;
         if (!res.ok) throw new Error(data.error || `Save failed (${res.status})`);
 
         if (attachFile && stagingId) {
@@ -479,7 +504,7 @@ export default function ConsultantFeedbackSection({ requestId, previewReadOnly =
             body: JSON.stringify({ requestId, stagingId, entryId: editingId }),
           });
           const finalizeData = await finalizeRes.json().catch(() => ({}));
-          if (stale()) { setSaving(false); return; }
+          if (stale()) return;
           if (!finalizeRes.ok) throw new Error(finalizeData.error || 'The attachment could not be saved.');
         }
       } else if (attachFile) {
@@ -503,7 +528,7 @@ export default function ConsultantFeedbackSection({ requestId, previewReadOnly =
           }),
         });
         const finalizeData = await finalizeRes.json().catch(() => ({}));
-        if (stale()) { setSaving(false); return; }
+        if (stale()) return;
         if (!finalizeRes.ok) throw new Error(finalizeData.error || 'The attachment could not be saved.');
       } else {
         const res = await fetch('/api/workbench/consultant-feedback', {
@@ -519,7 +544,7 @@ export default function ConsultantFeedbackSection({ requestId, previewReadOnly =
           }),
         });
         const data = await res.json().catch(() => ({}));
-        if (stale()) { setSaving(false); return; }
+        if (stale()) return;
         if (!res.ok) throw new Error(data.error || `Save failed (${res.status})`);
       }
 
@@ -532,11 +557,8 @@ export default function ConsultantFeedbackSection({ requestId, previewReadOnly =
       await load();
     } catch (e) {
       if (stale()) {
-        // Same reasoning as the success path above: a request switch that
-        // landed mid-flight already ran closeForm via the effect, but this
-        // call's own busy flag still needs clearing so it can't wedge a form
-        // opened afterward.
-        setSaving(false);
+        // closeForm or a newer save owns the current busy/progress state.
+        // The stale operation must not write any of it.
         return;
       }
       // Leave mutationIdRef and any staged upload untouched so a retry
@@ -598,7 +620,7 @@ export default function ConsultantFeedbackSection({ requestId, previewReadOnly =
         <h2 id="consultant-feedback-heading" className="text-sm font-semibold text-gray-900">
           Consultant feedback
         </h2>
-        {!formOpen && (
+        {!currentFormOpen && (
           <button
             type="button"
             onClick={openAddForm}
@@ -611,10 +633,10 @@ export default function ConsultantFeedbackSection({ requestId, previewReadOnly =
         )}
       </div>
 
-      {loading && <p className="mt-2 text-sm text-gray-500">Loading…</p>}
-      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+      {(loading || !requestLoaded) && <p className="mt-2 text-sm text-gray-500">Loading…</p>}
+      {currentError && <p className="mt-2 text-sm text-red-600">{currentError}</p>}
 
-      {formOpen && (
+      {currentFormOpen && (
         <div className="mt-3 rounded-xl border border-gray-200 bg-white p-4 space-y-3">
           <div>
             <label className="block text-xs font-medium text-gray-700" htmlFor="consultant-feedback-consultant">Consultant</label>
@@ -771,11 +793,11 @@ export default function ConsultantFeedbackSection({ requestId, previewReadOnly =
         </div>
       )}
 
-      {!loading && items.length === 0 && !formOpen && (
+      {!loading && requestLoaded && currentItems.length === 0 && !currentFormOpen && (
         <p className="mt-2 text-sm text-gray-500">No consultant feedback recorded yet.</p>
       )}
 
-      {items.length > 0 && (
+      {currentItems.length > 0 && (
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
           <span className="text-xs font-medium text-gray-600">Briefing visibility</span>
           <div role="group" aria-label="Filter consultant feedback by briefing visibility" className="inline-flex overflow-hidden rounded-lg border border-gray-300 bg-white">
@@ -798,7 +820,7 @@ export default function ConsultantFeedbackSection({ requestId, previewReadOnly =
         </div>
       )}
 
-      {!loading && items.length > 0 && visibleItems.length === 0 && (
+      {!loading && requestLoaded && currentItems.length > 0 && visibleItems.length === 0 && (
         <p className="mt-3 rounded-lg border border-dashed border-gray-300 px-4 py-3 text-sm text-gray-500">
           No {visibilityFilter === 'shared' ? 'shared' : 'not-shared'} feedback entries.
         </p>

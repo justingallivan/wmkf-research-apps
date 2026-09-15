@@ -9,6 +9,7 @@ import { requireAppAccess } from '../../../../lib/utils/auth';
 import { withDalContext } from '../../../../lib/dataverse/core/context';
 import { ServiceHttpError } from '../../../../lib/services/service-http-error';
 import { downloadConsultantFeedbackAttachment } from '../../../../lib/services/consultant-feedback-service';
+import { contentDisposition } from '../../../../lib/utils/content-disposition';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -26,7 +27,7 @@ export default async function handler(req, res) {
         entryId: typeof req.query?.entryId === 'string' ? req.query.entryId : '',
       });
       res.setHeader('Content-Type', file.mimeType);
-      res.setHeader('Content-Disposition', `${file.inline ? 'inline' : 'attachment'}; filename="${encodeFilename(file.filename)}"`);
+      res.setHeader('Content-Disposition', contentDisposition(file.inline ? 'inline' : 'attachment', file.filename));
       res.setHeader('Content-Length', file.size);
       res.setHeader('Cache-Control', 'private, no-store');
       res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -39,10 +40,6 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: 'Consultant feedback attachment request failed.' });
     }
   });
-}
-
-function encodeFilename(name) {
-  return String(name || 'consultant-feedback').replace(/["\r\n\\]/g, '').slice(0, 180);
 }
 
 export const config = {
