@@ -1,13 +1,14 @@
 ---
-name: project-ops-meeting-2026-09-14-agenda
-description: Running agenda for the owner's Monday 2026-09-14 meeting with the operations team — set up the applicant-materials reminder cron and define all its effects; add items here as the remaining list is worked through in S507+.
+name: project-ops-meeting-2026-09-16-agenda
+description: Running agenda for the owner's Wednesday 2026-09-16 meeting with the operations team — set up the applicant-materials reminder cron and define all its effects; add items here as the remaining list is worked through in S507+.
 metadata:
   type: project
   status: active
   created: 2026-09-11 (S507)
 ---
 
-The owner meets the operations team on **Monday 2026-09-14** to decide how the
+The original Monday 2026-09-14 meeting did not occur. The owner rescheduled the
+operations meeting to **Wednesday 2026-09-16** to decide how the
 applicant-materials reminder cron is set up and to define all of its effects.
 The owner asked (S507, 2026-09-11) that this meeting be tracked and that agenda
 items be appended as the remaining work list is processed.
