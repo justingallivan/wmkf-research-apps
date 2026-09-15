@@ -21,8 +21,8 @@ import {
 
 const REGISTRY_ID = '33333333-3333-4333-8333-333333333333';
 
-function candidateRow({ scope, candidate, id = 'row-1', status = 'expired' }) {
-  return { id, pathname: `portal-staging/${scope}/${id}`, scope, status, candidate_result: candidate };
+function candidateRow({ scope, candidate, id = 'row-1', status = 'expired', resourceId = 'resource-1' }) {
+  return { id, pathname: `portal-staging/${scope}/${id}`, scope, status, resource_id: resourceId, candidate_result: candidate };
 }
 
 /** Did any tagged-template `sql` call's literal text contain this substring? */
@@ -36,6 +36,8 @@ function makeDependencies(overrides = {}) {
     supersedeDocument: jest.fn().mockResolvedValue({}),
     discardCandidate: jest.fn().mockResolvedValue(true),
     isConsultantFeedbackBound: jest.fn().mockResolvedValue(false),
+    getGranteeDeliverable: jest.fn().mockResolvedValue({ wmkf_imagefileref: null }),
+    isSiteVisitMaterialSlotCurrent: jest.fn().mockResolvedValue(false),
     ...overrides,
   };
 }
@@ -142,47 +144,118 @@ describe('consultant_feedback scope', () => {
 });
 
 describe('site_visit_material scope', () => {
-  test('committed (registry row exists): row expires, nothing discarded', async () => {
-    const candidate = { generationKey: 'sv-gk-1' };
+  test('bound (registry row exists AND is the current slot holder): row expires, nothing discarded', async () => {
+    const candidate = { generationKey: 'sv-gk-1', slot: 'presentation_pdf' };
     mockSql([candidateRow({ scope: PORTAL_UPLOAD_SCOPES.SITE_VISIT_MATERIAL, candidate })]);
     const deps = makeDependencies({
       findDocumentByGenerationKey: jest.fn().mockResolvedValue({ records: [{ wmkf_requestdocumentid: REGISTRY_ID }] }),
+      isSiteVisitMaterialSlotCurrent: jest.fn().mockResolvedValue(true),
     });
     const result = await cleanupExpiredPortalUploads({}, deps);
+    expect(deps.isSiteVisitMaterialSlotCurrent).toHaveBeenCalledWith({ requestId: 'resource-1', slot: 'presentation_pdf', artifactId: REGISTRY_ID });
     expect(deps.discardCandidate).not.toHaveBeenCalled();
     expect(del).toHaveBeenCalled();
     expect(result.retained).toBe(0);
   });
 
-  test('uncommitted (no registry row): discards the candidate', async () => {
-    const candidate = { generationKey: 'sv-gk-2' };
+  test('unbound (registry row exists but a LATER upload now holds the slot): the candidate is discarded', async () => {
+    const candidate = { generationKey: 'sv-gk-1b', slot: 'presentation_pdf' };
     mockSql([candidateRow({ scope: PORTAL_UPLOAD_SCOPES.SITE_VISIT_MATERIAL, candidate })]);
     const deps = makeDependencies({
-      findDocumentByGenerationKey: jest.fn().mockResolvedValue({ records: [] }),
+      findDocumentByGenerationKey: jest.fn().mockResolvedValue({ records: [{ wmkf_requestdocumentid: REGISTRY_ID }] }),
+      isSiteVisitMaterialSlotCurrent: jest.fn().mockResolvedValue(false),
     });
     const result = await cleanupExpiredPortalUploads({}, deps);
     expect(deps.discardCandidate).toHaveBeenCalledWith(candidate);
     expect(result.retained).toBe(0);
   });
-});
 
-describe('grantee_image / staff_grantee_image scopes', () => {
-  test('always retained — no binding proof is wired for image candidates', async () => {
-    const candidate = { imageRef: 'some-ref' };
-    mockSql([candidateRow({ scope: PORTAL_UPLOAD_SCOPES.GRANTEE_IMAGE, candidate })]);
-    const deps = makeDependencies();
+  test('uncommitted (no registry row): discards the candidate with no slot-currency check', async () => {
+    const candidate = { generationKey: 'sv-gk-2', slot: 'presentation_pdf' };
+    mockSql([candidateRow({ scope: PORTAL_UPLOAD_SCOPES.SITE_VISIT_MATERIAL, candidate })]);
+    const deps = makeDependencies({
+      findDocumentByGenerationKey: jest.fn().mockResolvedValue({ records: [] }),
+    });
+    const result = await cleanupExpiredPortalUploads({}, deps);
+    expect(deps.isSiteVisitMaterialSlotCurrent).not.toHaveBeenCalled();
+    expect(deps.discardCandidate).toHaveBeenCalledWith(candidate);
+    expect(result.retained).toBe(0);
+  });
+
+  test('a slot-currency dependency failure retains the row', async () => {
+    const candidate = { generationKey: 'sv-gk-3', slot: 'presentation_pdf' };
+    mockSql([candidateRow({ scope: PORTAL_UPLOAD_SCOPES.SITE_VISIT_MATERIAL, candidate })]);
+    const deps = makeDependencies({
+      findDocumentByGenerationKey: jest.fn().mockResolvedValue({ records: [{ wmkf_requestdocumentid: REGISTRY_ID }] }),
+      isSiteVisitMaterialSlotCurrent: jest.fn().mockRejectedValue(new Error('dataverse down')),
+    });
     const result = await cleanupExpiredPortalUploads({}, deps);
     expect(deps.discardCandidate).not.toHaveBeenCalled();
-    expect(deps.findDocumentByGenerationKey).not.toHaveBeenCalled();
     expect(del).not.toHaveBeenCalled();
     expect(result.retained).toBe(1);
   });
 
-  test('staff_grantee_image is likewise always retained', async () => {
-    const candidate = { imageRef: 'some-ref' };
-    mockSql([candidateRow({ scope: PORTAL_UPLOAD_SCOPES.STAFF_GRANTEE_IMAGE, candidate })]);
-    const result = await cleanupExpiredPortalUploads({}, makeDependencies());
+  test('an unrecognised candidate shape (missing slot) is retained, never discarded', async () => {
+    const candidate = { generationKey: 'sv-gk-4' };
+    mockSql([candidateRow({ scope: PORTAL_UPLOAD_SCOPES.SITE_VISIT_MATERIAL, candidate })]);
+    const deps = makeDependencies();
+    const result = await cleanupExpiredPortalUploads({}, deps);
+    expect(deps.discardCandidate).not.toHaveBeenCalled();
+    expect(deps.findDocumentByGenerationKey).not.toHaveBeenCalled();
     expect(result.retained).toBe(1);
+  });
+});
+
+describe('grantee_image / staff_grantee_image scopes', () => {
+  test('bound (candidate imageRef matches the deliverable\'s CURRENT wmkf_imagefileref): clears the candidate, row expires as normal', async () => {
+    const candidate = { imageRef: 'ref-1' };
+    mockSql([candidateRow({ scope: PORTAL_UPLOAD_SCOPES.GRANTEE_IMAGE, candidate })]);
+    const deps = makeDependencies({ getGranteeDeliverable: jest.fn().mockResolvedValue({ wmkf_imagefileref: 'ref-1' }) });
+    const result = await cleanupExpiredPortalUploads({}, deps);
+    expect(deps.getGranteeDeliverable).toHaveBeenCalledWith('resource-1');
+    expect(deps.discardCandidate).not.toHaveBeenCalled();
+    expect(del).toHaveBeenCalled();
+    expect(result.retained).toBe(0);
+  });
+
+  test('a non-consumed grantee row with a PROVEN-UNBOUND candidate is discarded and still expires/prunes (base behaviour restored)', async () => {
+    const candidate = { imageRef: 'ref-orphaned' };
+    mockSql([candidateRow({ scope: PORTAL_UPLOAD_SCOPES.GRANTEE_IMAGE, candidate, status: 'expired' })]);
+    const deps = makeDependencies({ getGranteeDeliverable: jest.fn().mockResolvedValue({ wmkf_imagefileref: 'ref-committed-elsewhere' }) });
+    const result = await cleanupExpiredPortalUploads({}, deps);
+    expect(deps.discardCandidate).toHaveBeenCalledWith(candidate);
+    expect(del).toHaveBeenCalled();
+    expect(sqlCalledWith('candidate_result = NULL')).toBe(true);
+    expect(result.retained).toBe(0);
+    expect(result.deleted).toBe(1);
+  });
+
+  test('a deliverable-lookup failure retains the row', async () => {
+    const candidate = { imageRef: 'ref-1' };
+    mockSql([candidateRow({ scope: PORTAL_UPLOAD_SCOPES.GRANTEE_IMAGE, candidate })]);
+    const deps = makeDependencies({ getGranteeDeliverable: jest.fn().mockRejectedValue(new Error('dataverse down')) });
+    const result = await cleanupExpiredPortalUploads({}, deps);
+    expect(deps.discardCandidate).not.toHaveBeenCalled();
+    expect(del).not.toHaveBeenCalled();
+    expect(result.retained).toBe(1);
+  });
+
+  test('an unrecognised candidate shape (no imageRef) is retained, never discarded', async () => {
+    const candidate = { somethingElse: true };
+    mockSql([candidateRow({ scope: PORTAL_UPLOAD_SCOPES.GRANTEE_IMAGE, candidate })]);
+    const deps = makeDependencies();
+    const result = await cleanupExpiredPortalUploads({}, deps);
+    expect(deps.discardCandidate).not.toHaveBeenCalled();
+    expect(deps.getGranteeDeliverable).not.toHaveBeenCalled();
+    expect(result.retained).toBe(1);
+  });
+
+  test('staff_grantee_image uses the same proof', async () => {
+    const candidate = { imageRef: 'ref-2' };
+    mockSql([candidateRow({ scope: PORTAL_UPLOAD_SCOPES.STAFF_GRANTEE_IMAGE, candidate })]);
+    const deps = makeDependencies({ getGranteeDeliverable: jest.fn().mockResolvedValue({ wmkf_imagefileref: 'ref-2' }) });
+    const result = await cleanupExpiredPortalUploads({}, deps);
+    expect(result.retained).toBe(0);
   });
 });
 

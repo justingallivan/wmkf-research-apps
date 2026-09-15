@@ -265,6 +265,80 @@ describe('updateFeedbackEntry', () => {
       .rejects.toMatchObject({ httpStatus: 400, body: { reason: 'consultant_not_eligible' } });
     expect(client.query).toHaveBeenCalledWith('ROLLBACK');
   });
+
+  describe('attachment bind (slice 2 finalize step 7, Codex R3 finding: committed-bind replay)', () => {
+    const DOC_ID = '55555555-5555-4555-8555-555555555555';
+    const ALREADY_BOUND = { ...EXISTING, requestdocument_id: DOC_ID };
+
+    test('binding the IDENTICAL id the row already holds is an idempotent success — no conflict, COMMIT runs', async () => {
+      client.query.mockImplementation(async (q) => {
+        if (q.includes('FOR UPDATE')) return { rows: [ALREADY_BOUND] };
+        if (q.startsWith('UPDATE consultant_feedback')) {
+          return { rows: [{ id: 4, received_on: '2026-09-01', body_html: '<p>Original.</p>', shared: true, consultant_roster_id: 5, one_off_name: null, one_off_affiliation: null, requestdocument_id: DOC_ID, updated_at: new Date() }] };
+        }
+        return { rows: [] };
+      });
+      const row = await updateFeedbackEntry({ id: 4, requestId: REQUEST_ID, actorProfileId: ACTOR_ID, patch: { requestdocumentId: DOC_ID } });
+      expect(row.attachment?.requestdocumentId ?? DOC_ID).toBeTruthy(); // no throw is the primary assertion
+      expect(client.query).toHaveBeenCalledWith('COMMIT');
+      expect(client.query.mock.calls.some(([q]) => q === 'ROLLBACK')).toBe(false);
+    });
+
+    test('binding a DIFFERENT id than the one already held is a 409 attachment_conflict', async () => {
+      client.query.mockImplementation(async (q) => {
+        if (q.includes('FOR UPDATE')) return { rows: [ALREADY_BOUND] };
+        return { rows: [] };
+      });
+      const OTHER_DOC_ID = '66666666-6666-4666-8666-666666666666';
+      await expect(updateFeedbackEntry({ id: 4, requestId: REQUEST_ID, actorProfileId: ACTOR_ID, patch: { requestdocumentId: OTHER_DOC_ID } }))
+        .rejects.toMatchObject({ httpStatus: 409, body: { reason: 'attachment_conflict' } });
+      expect(client.query).toHaveBeenCalledWith('ROLLBACK');
+    });
+
+    test('a finalize losing a real race against a delete (row gone/deleting) gets a distinct, PERMANENT attachment_target_gone — not a generic 404', async () => {
+      client.query.mockImplementation(async (q) => {
+        if (q.includes('FOR UPDATE')) return { rows: [] }; // status='active' filter excludes the now-deleting/gone row
+        return { rows: [] };
+      });
+      await expect(updateFeedbackEntry({ id: 4, requestId: REQUEST_ID, actorProfileId: ACTOR_ID, patch: { requestdocumentId: DOC_ID } }))
+        .rejects.toMatchObject({ httpStatus: 409, body: { reason: 'attachment_target_gone' } });
+    });
+
+    test('a plain edit (no requestdocumentId in the patch) against a gone/deleting row still gets the ordinary 404, not attachment_target_gone', async () => {
+      client.query.mockImplementation(async (q) => {
+        if (q.includes('FOR UPDATE')) return { rows: [] };
+        return { rows: [] };
+      });
+      await expect(updateFeedbackEntry({ id: 4, requestId: REQUEST_ID, actorProfileId: ACTOR_ID, patch: { shared: false } }))
+        .rejects.toMatchObject({ httpStatus: 404, body: { reason: 'not_found' } });
+    });
+  });
+});
+
+describe('writeFeedbackEntry — unique violation on requestdocument_id (a prior replay already created the row)', () => {
+  test('a 23505 unique violation selects and returns the existing row instead of throwing', async () => {
+    const DOC_ID = '77777777-7777-4777-8777-777777777777';
+    const existingRow = {
+      id: 8, received_on: '2026-09-01', body_html: null, shared: true, consultant_roster_id: null,
+      one_off_name: 'Jane Doe', one_off_affiliation: null, requestdocument_id: DOC_ID, updated_at: new Date('2026-09-01T00:00:00Z'),
+    };
+    client.query.mockImplementation(async (q) => {
+      if (q.startsWith('INSERT INTO consultant_feedback')) {
+        const error = new Error('duplicate key value violates unique constraint "consultant_feedback_requestdocument_id_key"');
+        error.code = '23505';
+        throw error;
+      }
+      return { rows: [] };
+    });
+    sql.query.mockResolvedValueOnce({ rows: [existingRow] });
+    const row = await writeFeedbackEntry({
+      requestId: REQUEST_ID, actorProfileId: ACTOR_ID, mutationId: MUTATION_ID,
+      oneOff: { name: 'Jane Doe' }, receivedOn: '2026-09-01', requestdocumentId: DOC_ID,
+    });
+    expect(row.id).toBe('8');
+    expect(client.query).toHaveBeenCalledWith('ROLLBACK');
+    expect(sql.query).toHaveBeenCalledWith(expect.stringContaining('WHERE cf.request_id = $1 AND cf.requestdocument_id = $2'), [REQUEST_ID, DOC_ID]);
+  });
 });
 
 test('deleteFeedbackEntry hard-deletes an active row with no attachment in one transaction', async () => {
@@ -369,6 +443,55 @@ test('listEligibleConsultants queries only active Consultant rows', async () => 
 test('listConsultantFeedback rejects a non-GUID requestId before any query', async () => {
   await expect(listConsultantFeedback({ requestId: 'not-a-guid' })).rejects.toMatchObject({ httpStatus: 400 });
   expect(sql.query).not.toHaveBeenCalled();
+});
+
+describe('listConsultantFeedback — attachment registry chunking (Codex R3: 26+ attachments)', () => {
+  function attachedRow(i) {
+    const docId = `doc-${String(i).padStart(2, '0')}`;
+    return {
+      id: i, received_on: '2026-09-01', body_html: null, shared: true,
+      consultant_roster_id: null, one_off_name: `Person ${i}`, one_off_affiliation: null,
+      requestdocument_id: docId, updated_at: new Date('2026-09-01T00:00:00Z'),
+    };
+  }
+
+  test('26 attached entries all resolve their attachment across two chunked batches (the adapter refuses >25 ids in one call)', async () => {
+    const rows = Array.from({ length: 26 }, (_, i) => attachedRow(i + 1));
+    sql.query.mockImplementation(async (q) => {
+      if (q.includes("status = 'deleting'")) return { rows: [] }; // sweep
+      if (q.includes('SELECT cf.id')) return { rows };
+      return { rows: [] };
+    });
+    const findDocumentsByIds = jest.fn(async (ids) => ({
+      records: ids.map((id) => ({ wmkf_requestdocumentid: id, wmkf_filename: `${id}.pdf` })),
+    }));
+    const result = await listConsultantFeedback({ requestId: REQUEST_ID }, { findDocumentsByIds });
+    expect(findDocumentsByIds).toHaveBeenCalledTimes(2); // 25 + 1, never all 26 in one call
+    expect(result).toHaveLength(26);
+    expect(result.every((item) => item.attachment && item.attachment.filename)).toBe(true);
+  });
+
+  test('a failing middle batch yields attachment: { status: "unavailable" } for ITS ids only, not the whole page', async () => {
+    const rows = Array.from({ length: 26 }, (_, i) => attachedRow(i + 1));
+    sql.query.mockImplementation(async (q) => {
+      if (q.includes("status = 'deleting'")) return { rows: [] };
+      if (q.includes('SELECT cf.id')) return { rows };
+      return { rows: [] };
+    });
+    let call = 0;
+    const findDocumentsByIds = jest.fn(async (ids) => {
+      call += 1;
+      if (call === 1) throw new Error('dataverse down'); // first chunk fails
+      return { records: ids.map((id) => ({ wmkf_requestdocumentid: id, wmkf_filename: `${id}.pdf` })) };
+    });
+    const result = await listConsultantFeedback({ requestId: REQUEST_ID }, { findDocumentsByIds });
+    expect(findDocumentsByIds).toHaveBeenCalledTimes(2);
+    const failedChunkItems = result.filter((item) => Number(item.id) >= 1 && Number(item.id) <= 25);
+    const okChunkItems = result.filter((item) => Number(item.id) === 26);
+    expect(failedChunkItems).toHaveLength(25);
+    expect(failedChunkItems.every((item) => item.attachment.status === 'unavailable')).toBe(true);
+    expect(okChunkItems[0].attachment.filename).toBeTruthy();
+  });
 });
 
 describe('isSharedActiveFeedbackAttachment', () => {

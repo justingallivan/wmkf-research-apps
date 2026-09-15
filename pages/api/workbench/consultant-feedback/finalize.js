@@ -29,9 +29,13 @@ import {
 export const config = { api: { bodyParser: { sizeLimit: '16kb' } }, maxDuration: 300 };
 
 const PERMANENT_BYTE_CODES = new Set(['empty_image', 'image_too_large', 'staged_upload_mismatch', 'staging_publicly_readable']);
+// `folder_unavailable` (the request's SharePoint bucket lookup came back
+// empty) is a transient outage, not permanent — it is deliberately NOT in
+// this set, so the staging row is released for retry rather than rejected.
 const PERMANENT_RESULT_CODES = new Set([
-  'scan_infected', 'attachment_conflict', 'invalid_bind_target', 'folder_unavailable',
+  'scan_infected', 'attachment_conflict', 'invalid_bind_target',
   'upload_unconfirmed', 'registry_unconfirmed', 'attachment_replay_dead', 'attachment_replay_ambiguous',
+  'attachment_target_gone',
 ]);
 
 export default async function handler(req, res) {
@@ -74,6 +78,10 @@ export default async function handler(req, res) {
     return res.status(error.httpStatus).json({ ok: false, reason: error.code });
   }
   file.leaseToken = claim.leaseToken;
+  // Step-5 recovery: hand the ALREADY-claimed row's recorded candidate (if
+  // any) to the service so a retry can reuse or discard it rather than
+  // uploading over it silently.
+  file.candidate = claim.row?.candidate_result || null;
 
   try {
     const result = await withDalContext('workbench-consultant-feedback-finalize', () =>

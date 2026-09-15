@@ -15,7 +15,7 @@ const REGISTRY_ID = '33333333-3333-4333-8333-333333333333';
 
 function baseDeps(overrides = {}) {
   return {
-    getRequest: jest.fn(async () => ({ akoya_requestid: REQUEST_ID, akoya_requestnum: '1002379' })),
+    getRequest: jest.fn(async () => ({ akoya_requestid: REQUEST_ID, akoya_requestnum: '1002379', wmkf_meetingdate: '2026-06-04' })),
     getSharePointBuckets: jest.fn(async () => ([{ library: 'akoya_request', folder: 'Requests/1002379', source: 'dynamics' }])),
     ensureFolderPath: jest.fn(async () => {}),
     uploadFile: jest.fn(async () => ({ id: 'item-1', driveId: 'drive-1', name: 'Consultant Feedback-1002379-Jane Doe-2026-09-01.pdf', size: 5, webUrl: null, versionId: 'v1', eTag: 'etag-1' })),
@@ -28,6 +28,7 @@ function baseDeps(overrides = {}) {
     createPortalUpload: jest.fn(async () => ({ stagingId: STAGING_ID, pathname: 'x', clientToken: 't' })),
     recordPortalUploadCandidate: jest.fn(async () => {}),
     discardPortalUploadCandidate: jest.fn(async () => true),
+    clearPortalUploadCandidate: jest.fn(async () => {}),
     writeFeedbackEntry: jest.fn(async () => ({ id: '9' })),
     updateFeedbackEntry: jest.fn(async () => ({ id: '9' })),
     getFeedbackEntryForFilename: jest.fn(async () => ({ consultantName: 'Jane Doe', receivedOn: '2026-09-01' })),
@@ -71,6 +72,12 @@ describe('finalizeAttachmentUpload — happy paths', () => {
     expect(callOrder).toEqual(['candidate', 'registry-create']);
     expect(result).toEqual({ requestdocumentId: REGISTRY_ID, feedbackId: '9', filename: expect.any(String) });
     expect(deps.writeFeedbackEntry).toHaveBeenCalledWith(expect.objectContaining({ requestId: REQUEST_ID, requestdocumentId: REGISTRY_ID }));
+  });
+
+  test('the registry payload carries wmkf_cyclecode derived from the request meeting date', async () => {
+    const deps = baseDeps();
+    await finalizeAttachmentUpload({ requestId: REQUEST_ID, actorProfileId: 7, file: file(), stagingId: STAGING_ID, entryId: 9 }, deps);
+    expect(deps.createDocument.mock.calls[0][0].wmkf_cyclecode).toBe('J26'); // 2026-06-04 → June cycle
   });
 
   test('binds an existing entry (updateFeedbackEntry)', async () => {
@@ -127,6 +134,50 @@ describe('finalizeAttachmentUpload — happy paths', () => {
 });
 
 describe('finalizeAttachmentUpload — crash points and loser-side cleanup', () => {
+  test('successful bind, crash before completePortalUpload, retry with the same staging id: idempotent — same registry row, NO supersede, NO discard, ONE Graph call total', async () => {
+    // Stateful fake standing in for the real `updateFeedbackEntry` (unit-tested
+    // separately in consultant-feedback-service.test.js): binding the
+    // IDENTICAL id a row already holds is an idempotent success; a
+    // different id is a conflict.
+    let bound = null;
+    const deps = baseDeps({
+      findDocumentByGenerationKey: jest.fn()
+        .mockResolvedValueOnce({ records: [] }) // first attempt: nothing yet, uploads fresh
+        .mockResolvedValue({ records: [{ wmkf_requestdocumentid: REGISTRY_ID, wmkf_filename: 'x.pdf', wmkf_operationstatus: 100000001, wmkf_lifecyclestate: 100000000 }] }), // retry replays this exact row
+      updateFeedbackEntry: jest.fn(async ({ patch }) => {
+        if (bound != null && bound !== patch.requestdocumentId) {
+          throw new ServiceHttpError('conflict', { httpStatus: 409, code: 'attachment_conflict', body: { reason: 'attachment_conflict' } });
+        }
+        bound = patch.requestdocumentId;
+        return { id: '9' };
+      }),
+    });
+    const first = await finalizeAttachmentUpload({ requestId: REQUEST_ID, actorProfileId: 7, file: file(), stagingId: STAGING_ID, entryId: 9 }, deps);
+    expect(deps.uploadFile).toHaveBeenCalledTimes(1);
+
+    // The process died before `completePortalUpload` ran; the lease expired
+    // and a later call re-claims the same staging row and retries finalize.
+    const second = await finalizeAttachmentUpload({ requestId: REQUEST_ID, actorProfileId: 7, file: file(), stagingId: STAGING_ID, entryId: 9 }, deps);
+    expect(deps.uploadFile).toHaveBeenCalledTimes(1); // no second Graph call
+    expect(deps.supersedeDocument).not.toHaveBeenCalled();
+    expect(deps.discardPortalUploadCandidate).not.toHaveBeenCalled();
+    expect(second.requestdocumentId).toBe(first.requestdocumentId);
+  });
+
+  test('a real finalize-vs-delete race (delete wins): the loser gets attachment_target_gone and its cleanup (supersede + discard) runs', async () => {
+    const targetGoneError = new ServiceHttpError('gone', { httpStatus: 409, code: 'attachment_target_gone', body: { reason: 'attachment_target_gone' } });
+    const deps = baseDeps({
+      updateFeedbackEntry: jest.fn().mockRejectedValue(targetGoneError),
+      findDocumentByGenerationKey: jest.fn()
+        .mockResolvedValueOnce({ records: [] }) // no replay before upload
+        .mockResolvedValueOnce({ records: [{ wmkf_requestdocumentid: REGISTRY_ID, wmkf_sharepointdriveid: 'drive-1', wmkf_sharepointitemid: 'item-1' }] }), // loser-side lookup
+    });
+    await expect(finalizeAttachmentUpload({ requestId: REQUEST_ID, actorProfileId: 7, file: file(), stagingId: STAGING_ID, entryId: 9 }, deps))
+      .rejects.toMatchObject({ httpStatus: 409, code: 'attachment_target_gone' });
+    expect(deps.supersedeDocument).toHaveBeenCalledWith(REGISTRY_ID);
+    expect(deps.discardPortalUploadCandidate).toHaveBeenCalledWith({ driveId: 'drive-1', itemId: 'item-1' });
+  });
+
   test('bind conflict (attachment_conflict): supersedes the just-created row, discards the Graph item, and rethrows the conflict', async () => {
     const conflictError = new ServiceHttpError('conflict', { httpStatus: 409, code: 'attachment_conflict', body: { reason: 'attachment_conflict' } });
     const deps = baseDeps({
@@ -179,8 +230,10 @@ describe('finalizeAttachmentUpload — crash points and loser-side cleanup', () 
     expect(deps.discardPortalUploadCandidate).not.toHaveBeenCalled();
   });
 
-  test('fail after step 5 (candidate recorded, crash before the registry create ever commits): a retry re-uploads (accepted residual — rename makes the duplicate harmless) but produces exactly one feedback row, bound to the retry\'s registry row', async () => {
+  test('fail after step 5 (candidate recorded, crash before the registry create ever commits): a retry REUSES the recorded candidate — exactly ONE Graph upload across both attempts', async () => {
+    let recordedCandidate = null;
     const deps = baseDeps({
+      recordPortalUploadCandidate: jest.fn(async ({ candidate }) => { recordedCandidate = candidate; }),
       createDocument: jest.fn()
         .mockRejectedValueOnce(new Error('crash before commit'))
         .mockResolvedValueOnce({ wmkf_requestdocumentid: REGISTRY_ID }),
@@ -189,16 +242,34 @@ describe('finalizeAttachmentUpload — crash points and loser-side cleanup', () 
       .rejects.toThrow();
     expect(deps.uploadFile).toHaveBeenCalledTimes(1);
     expect(deps.updateFeedbackEntry).not.toHaveBeenCalled();
+    expect(recordedCandidate).not.toBeNull();
 
-    // Retry: findDocumentByGenerationKey still finds nothing (the first
-    // create never committed), so it re-uploads under 'rename' rather than
-    // hanging forever — a harmless duplicate SharePoint item, reclaimed later
-    // by the staging cleanup sweep as unbound-with-no-registry-row.
-    const result = await finalizeAttachmentUpload({ requestId: REQUEST_ID, actorProfileId: 7, file: file(), stagingId: STAGING_ID, entryId: 9 }, deps);
-    expect(deps.uploadFile).toHaveBeenCalledTimes(2);
+    // Retry: the finalize route re-claims the SAME staging row and hands its
+    // recorded `candidate_result` forward as `file.candidate` (exactly as
+    // pages/api/workbench/consultant-feedback/finalize.js does). This exact
+    // operation's bytes were already accepted by SharePoint — reuse that
+    // identity rather than uploading again.
+    const result = await finalizeAttachmentUpload({
+      requestId: REQUEST_ID, actorProfileId: 7, file: file({ candidate: recordedCandidate }), stagingId: STAGING_ID, entryId: 9,
+    }, deps);
+    expect(deps.uploadFile).toHaveBeenCalledTimes(1); // still just the one, from the first attempt
     expect(deps.createDocument).toHaveBeenCalledTimes(2);
+    expect(deps.createDocument.mock.calls[1][0].wmkf_sharepointitemid).toBe(recordedCandidate.itemId);
     expect(deps.updateFeedbackEntry).toHaveBeenCalledTimes(1);
     expect(result.requestdocumentId).toBe(REGISTRY_ID);
+  });
+
+  test('a candidate recorded for a DIFFERENT generation key (a stale leftover on the same staging row) is discarded and cleared before uploading, never silently overwritten', async () => {
+    const staleCandidate = { generationKey: 'stale-key', driveId: 'stale-drive', itemId: 'stale-item', filename: 'stale.pdf' };
+    const deps = baseDeps({ clearPortalUploadCandidate: jest.fn(async () => {}) });
+    await finalizeAttachmentUpload({
+      requestId: REQUEST_ID, actorProfileId: 7, file: file({ candidate: staleCandidate }), stagingId: STAGING_ID, entryId: 9,
+    }, deps);
+    expect(deps.discardPortalUploadCandidate).toHaveBeenCalledWith(staleCandidate);
+    expect(deps.clearPortalUploadCandidate).toHaveBeenCalledWith({ stagingId: STAGING_ID, leaseToken: 'lease-1' });
+    expect(deps.uploadFile).toHaveBeenCalledTimes(1); // this attempt's own fresh upload
+    const recorded = deps.recordPortalUploadCandidate.mock.calls[0][0].candidate;
+    expect(recorded.itemId).not.toBe('stale-item');
   });
 
   test('fail after step 7 (bind attempt failed, non-conflict): a retry after a non-conflict bind failure finds the Ready registry row by generation key and performs only the bind — no second Graph upload', async () => {

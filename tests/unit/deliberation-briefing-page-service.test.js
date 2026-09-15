@@ -308,6 +308,7 @@ describe('feedback: member (slice 2 attachment)', () => {
   const readyRow = (overrides = {}) => ({
     wmkf_requestdocumentid: FEEDBACK_DOC_ID,
     _wmkf_request_value: REQUEST_ID,
+    wmkf_artifacttype: 100000008, // CONSULTANT_FEEDBACK
     wmkf_operationstatus: 100000001, // READY
     wmkf_lifecyclestate: 100000000, // Draft
     wmkf_filename: 'Consultant Feedback-1002379-J Doe-2026-09-01.pdf',
@@ -362,6 +363,26 @@ describe('feedback: member (slice 2 attachment)', () => {
     const d = deps({
       isFeedbackAttachment: jest.fn(async () => true),
       findDocumentById: jest.fn(async () => ({ records: [readyRow({ wmkf_lifecyclestate: 100000003 })] })),
+    });
+    await expect(resolveBriefingMember({ requestId: REQUEST_ID, member: `feedback:${FEEDBACK_DOC_ID}` }, d))
+      .rejects.toMatchObject({ httpStatus: 404 });
+    expect(d.downloadFile).not.toHaveBeenCalled();
+  });
+
+  test('a Ready, same-request row of ANOTHER artifact type referenced by the feedback row: 404 with no Graph call (typed registry boundary)', async () => {
+    const d = deps({
+      isFeedbackAttachment: jest.fn(async () => true),
+      findDocumentById: jest.fn(async () => ({ records: [readyRow({ wmkf_artifacttype: 100000003 })] })), // Applicant Slides
+    });
+    await expect(resolveBriefingMember({ requestId: REQUEST_ID, member: `feedback:${FEEDBACK_DOC_ID}` }, d))
+      .rejects.toMatchObject({ httpStatus: 404 });
+    expect(d.downloadFile).not.toHaveBeenCalled();
+  });
+
+  test('a Ready row missing its SharePoint drive/item pointers: 404 with no Graph call', async () => {
+    const d = deps({
+      isFeedbackAttachment: jest.fn(async () => true),
+      findDocumentById: jest.fn(async () => ({ records: [readyRow({ wmkf_sharepointdriveid: null, wmkf_sharepointitemid: null })] })),
     });
     await expect(resolveBriefingMember({ requestId: REQUEST_ID, member: `feedback:${FEEDBACK_DOC_ID}` }, d))
       .rejects.toMatchObject({ httpStatus: 404 });
