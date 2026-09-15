@@ -3,7 +3,7 @@ title: Reviews Tab — Phase II Writeup "Reviews" Paragraphs (2026-09-14)
 domain: reviewer-workbench
 kind: plan
 status: proposal
-summary: "Bring the Summarize Peer Reviews output (review count, grade tally, underlined reviewer roster with rank, expertise sentence, tone/themes, ordered quotations) into the Request Workbench Reviews tab, composed from Dataverse reviewer identity and stored ratings instead of uploaded PDFs. Deterministic sentences first; two new model fields inside the existing synthesis second; Word export third; the same deterministic text fills [[STAFF:RefereeSection]] in the Pre-Site Visit draft fourth. Owner decisions W1–W5 decided 2026-09-14."
+summary: "Bring the Summarize Peer Reviews output (review count, grade tally, underlined reviewer roster with rank, expertise sentence, tone/themes, ordered quotations) into the Request Workbench Reviews tab, composed from Dataverse reviewer identity and stored ratings instead of uploaded PDFs. Deterministic sentences first; two new model fields inside the existing synthesis second; Word export third; the same deterministic text fills [[STAFF:RefereeSection]] in the Pre-Site Visit draft fourth. Owner decisions W1–W8 decided 2026-09-14. Build record in the header note."
 cataloged: 2026-09-14
 owner: product-engineering
 last_verified: 2026-09-14
@@ -37,6 +37,10 @@ related:
 > explicit filled-or-preserved token assertion; `active_invitation` allowlist for "outstanding";
 > renderer `{docx, diagnostics}` contract and the two v3-only diagnostics consumers added to the v4
 > site list.
+> **Build record:** Slice 1 built at 95e9a750 (Sonnet), Opus review APPROVE 2026-09-14 with
+> non-blocking follow-ups folded into the Slice 2 commit (acronym-safe lowercasing, article for
+> "University Professor", escaping fixture on a non-underlined field, precedence fall-through when
+> the accept-time affiliation strips to empty, Copy label reset on content change).
 
 ## 1. Goal
 
@@ -111,7 +115,7 @@ and the synthesis prompt's "never name a reviewer" rule stays intact because the
 names. Sentences 4–5 are model-authored and become two new fields **inside** the existing
 `synthesis` object, so the pinned one-variable / one-output contract holds.
 
-### 4.2 Deterministic composer (new pure module)
+### 4.2 Deterministic composer (new pure module) — BUILT S1 (95e9a750)
 
 `shared/utils/review-writeup-paragraphs.js` `[PROPOSED]`, pure, unit-tested, shared by the tab,
 the Word report, and the Pre-Site Visit fill (Slice 4):
@@ -129,13 +133,16 @@ the Word report, and the Pre-Site Visit fill (Slice 4):
   lowercased, article a/an by first letter; blank rank collapses the clause to `<u>Name</u> of
   Institution`. Institution precedence: `wmkf_maininstitution` → suggestion-row
   `wmkf_revieweraffiliation` (email suffix stripped; lift `reviewerAffiliationOf` out of
-  `ReviewsTab.js`) → `wmkf_primaryaffiliation` → `wmkf_organizationname` → "institution not
-  recorded" so the editor notices. Department omitted (W1). Clauses joined with semicolons and a
+  `ReviewsTab.js`; if the strip leaves nothing, fall through rather than stop) →
+  `wmkf_primaryaffiliation` → `wmkf_organizationname` → "institution not recorded" so the editor
+  notices. Article a/an by first letter, with "University Professor" and similar vowel-initial
+  consonant sounds handled by a small exception list. Department omitted (W1). Clauses joined with semicolons and a
   final "and".
 - `composeExpertiseSentence(reviewers)` → "Nadell has expertise in X, Y, and Z, while Breitbart has
   expertise in …" Last name from `wmkf_lastname`, falling back to the final token of `wmkf_name`.
   Areas from `wmkf_keywords` split on `;`, falling back to `wmkf_areaofexpertise`, first three
-  areas, first letter lowercased. Reviewers with no expertise data are omitted; the sentence is
+  areas, first letter lowercased unless the second character is uppercase (acronyms such as "DNA
+  repair" and "CRISPR screens" keep their case). Reviewers with no expertise data are omitted; the sentence is
   omitted when nobody has data. Pairs joined with "while"; a third or later reviewer starts a new
   sentence, as in the example.
 - `composeWriteupParagraphs({reviewers, synthesis})` → the three deterministic sentences as runs
@@ -193,9 +200,11 @@ answer without failing the run) × `quote` 600 chars (~100 words against the pro
 truncation**: `validateAiJson` fails on `maxLength`/`maxItems` and the Executor throws
 `claude_output_schema_invalid`, which the service does not retry
 (`ai-output-schema.js:65-66`, `execute-prompt.js:908-917`, `synthesize-reviews-service.js:297-300`)
-— hence caps well above the prompt's asks. Whether Anthropic's grammar itself enforces `maxItems`
-/ `maxLength` is `[ASSUMED]` unknown; verify at build (`lib/services/llm-client.js`) and, if not,
-rely on the prompt asks plus the generous caps. `parseReviewSynthesis` (`reviewers-service.js:131-160`,
+— hence caps well above the prompt's asks. **Caps live in `validationSchema` only.** The LLM
+client forwards the declared `jsonSchema` to Anthropic untouched (no keyword stripping in
+`lib/services/llm-client.js`; `execute-prompt.js:807-812` passes it as `format.schema`), and the
+existing synthesis `jsonSchema` carries no `maxItems`/`maxLength` — all bounds are local. Slice 2
+keeps that pattern so no unsupported keyword reaches the provider grammar `[VERIFIED 2026-09-14]`. `parseReviewSynthesis` (`reviewers-service.js:131-160`,
 the read trust boundary; strips unknown keys, never throws) gains `writeupThemes` (string or `''`)
 and `writeupQuotations` (objects with string `quote` and string `questionKey`, everything else
 dropped). `review-report.js` `synthesisSection` gains the **verified** quotations and themes (the
@@ -309,9 +318,14 @@ Visit Word draft, following the Institutional Funding History precedent:
   (`docx-renderer.js:413-432`) and the artifact service persists the diagnostics envelope **before**
   rendering (`artifact-service.js:1210-1224`), so an underline count found during rendering has no
   path to `WARNING_MESSAGES`. Change the renderer to return `{ docx, diagnostics }` and have the
-  artifact service merge render diagnostics into the envelope before the artifact is marked ready
-  (render first, then write the envelope, or write then update — decided at build, with the
-  invariant that a ready artifact's stored diagnostics include the render pass). Add
+  artifact service merge render diagnostics into the envelope before the artifact is marked ready.
+  **Decided: write then update.** Generation persists the envelope, re-reads the draft via
+  `persistedDraft`, renders, then issues a second `updateDocument` with the render fingerprint and
+  content hash (`artifact-service.js:1190-1247`); that second update also rewrites
+  `wmkf_presiteproposalcorejson` with the stored diagnostics ∪ render diagnostics (schemaVersion 4).
+  The referee text and the names to underline travel in the v4 input snapshot and reach the
+  renderer through `documentFieldsFromSnapshot` (`:797`) → `draft.documentFields`, so the regenerate
+  path (draft already persisted, render only) gets the same inputs as first generation. Add
   `referee_name_not_matched` to `WARNING_MESSAGES` and the label map.
 - Snapshot v4, following the S467 v3 precedent (commit e40ad309), now **six** sites plus the warning
   map: builder `schemaVersion: 4` (`artifact-service.js:241`) with a `refereeSection` field;
