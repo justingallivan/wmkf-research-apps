@@ -6,7 +6,7 @@ status: complete
 summary: "Current legacy identity outputs remain insufficient for institution auto-resolution; the dormant follow-up now adds a closed server loader, separate roster receipt, typed affiliation assertions, and shared fail-closed save-boundary COI screening."
 canonical: false
 cataloged: 2026-09-14
-last_verified: 2026-09-14
+last_verified: 2026-09-15
 owner: product-engineering
 related:
   - docs/plans/REVIEWER_INSTITUTION_AUTO_RESOLUTION_PLAN_2026-09-14.md
@@ -54,6 +54,15 @@ digest integrity, and treats malformed or incomplete coverage as partial. The
 remaining OpenAlex merged-cluster limitation is the explicit
 contract tradeoff described below: one complete full-forename cluster qualifies;
 ORCID corroboration is not mandatory for that method.
+
+A 2026-09-15 adversarial follow-up closed six additional boundary gaps. The
+runtime now refuses browser-carried citation provenance until a server-only
+marker exists; flag-off COI-drop writes and whole-candidate PATCH writes strip
+dormant institution evidence; exact-on legacy saves require stored bound
+evidence; affiliation assertions deduplicate before the 24-row cap and bind an
+explicit completeness bit so truncation holds rather than clears; and the
+drained-table documentation gate is green. Focused negative tests contain the
+dangerous values at each boundary.
 
 ## Independent-identity finding
 
@@ -214,7 +223,7 @@ affiliation assertion does not retain it through the comparison:
 - PubMed articles carry `year`; `_affiliationWeightsMap` associates each
   normalized affiliation with its most recent year, but
   `collectAffiliationHistory` returns only strings. The candidate's compact
-  `publications` retain years but omit author affiliations, so the date cannot
+  `publications` post-W6 projection retains years but omits author affiliations, so the date cannot
   be joined back to an assertion after reload. **[VERIFIED via
   `lib/services/discovery/affiliation.js:48-79,105-110`,
   `lib/services/discovery/verification.js:283-305`, and

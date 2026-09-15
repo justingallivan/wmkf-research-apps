@@ -80,17 +80,21 @@ for it.
    the four outcomes, closed PubMed/OpenAlex/ORCID methods, server-loader-only
    evidence intake, provider completeness, full-forename and author-cluster
    grounding, mandatory binding fields, and the 14-day maximum. It has no
-   runtime caller, roster projection, receipt, or save authority. A subsequent
+   policy/card/selectability authority. A subsequent
    OAuth Claude review hardened raw-byline checks, an unwindowed PubMed query
    with total-count coverage, source-work lineage, candidate-bound ORCID
    authorship, separate input/evidence digests, exact identifier handling,
    future-date and wall-clock expiry checks, and execution-context binding. An
    exact-on server adapter invokes it only from closed discovery/applicant
-   authorities and reconstructs proposal-citation lineage server-side.
+   authorities. Because no current server producer creates an unforgeable
+   proposal-citation marker after the browser boundary, the adapter supplies no
+   source work and records `not_evaluable`; browser-carried provenance cannot
+   manufacture proposal-citation lineage.
 10. **[VERIFIED via `lib/services/reviewer-institution-evidence-attestation.js`,
     roster/save callers, and focused tests]** A separate institution-evidence
     JWT and compact roster receipt bind the request, final server-derived
-    candidate key, validated identity/assertion projection, digest, and expiry.
+    candidate key, validated identity/assertion projection, assertion-set
+    completeness, digest, and expiry.
     Typed publication and ORCID employment assertions survive the roster round
     trip. Both save paths re-read the receipt, apply the shared current-only
     additional-affiliation COI matcher, and hold missing, stale, conflicting,
