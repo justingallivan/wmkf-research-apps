@@ -2,8 +2,8 @@
 title: Consultant Feedback — Informal Consultant Input on the Reviews Tab and the Briefing Page
 domain: reviewers
 kind: plan
-status: active
-summary: "Slice 1 PRODUCTION-LIVE 2026-09-14 (PR #293); slice 2 attachments merged to main via PR #295 and await production migration 049 plus smoke; slice 3 staff attachment access and list/chooser polish are source-built and fresh-review approved on branch codex/consultant-feedback-slice-3, awaiting owner merge. Staff record informal feedback on a proposal from retained consultants (pasted text and/or an attached file), attributed to a roster consultant, editable, and shared by default on the deliberation briefing page as its own section. Postgres owns the entry; the request-document registry and SharePoint own any attached file."
+status: complete
+summary: "PRODUCTION-LIVE 2026-09-14. Slices 1–3 shipped through PRs #293, #295, and #299; migrations 048 and 049 are applied; PR #300 repaired append-only attachment filename collisions with Graph conflict behavior `rename`; and a signed-in production smoke proved add, upload/finalize, staff open, and delete on request 1003222. Staff record informal feedback on a proposal from retained consultants (pasted text and/or an attached file), attributed to a roster consultant or one-off person, editable, and shared by default on the deliberation briefing page as its own section. Postgres owns the entry; the request-document registry and SharePoint own any attached file."
 cataloged: 2026-09-14
 last_verified: 2026-09-14
 owner: product-engineering
@@ -22,12 +22,24 @@ related:
 
 # Consultant Feedback — Informal Consultant Input on the Reviews Tab and the Briefing Page
 
-## 0. Problem
+## Release status
+
+**PRODUCTION-LIVE 2026-09-14.** Slices 1–3 are complete. PRs #293, #295, and #299 shipped the
+text, attachment lifecycle, staff attachment access, and list/chooser polish; migrations 048 and
+049 are applied in production. PR #300 changed append-only consultant-feedback uploads to Graph's
+closed `rename` conflict behavior after the first production attachment smoke exposed an existing
+filename collision. A signed-in smoke on request 1003222 then proved one-off entry creation,
+PDF upload/finalize, authenticated staff open, and normal application deletion. The disposable
+feedback row was removed; the consumed staging row remains as the expected seven-day idempotency
+ledger. A consultant profile deep-link remains deliberately deferred because no stable, shared
+profile-route contract exists.
+
+## 0. Original problem (resolved)
 
 WMKF retains consultants who send informal feedback on proposals, usually as email text and
-sometimes as a DOCX or PDF attachment. Staff weigh this feedback during review, but today it has
-no home in the system: it is not a formal review, cannot be bound to a reviewer suggestion
-without corrupting reviewer counts, reliability data, and honoraria, and does not reach the
+sometimes as a DOCX or PDF attachment. Before this work, staff had no governed home for it: it was
+not a formal review, could not be bound to a reviewer suggestion
+without corrupting reviewer counts, reliability data, and honoraria, and did not reach the
 read-only briefing page that board members and consultants open from the Share email.
 
 ## 1. Owner decisions (2026-09-14, Session 512)
@@ -99,10 +111,10 @@ with its own rule: a per-item share flag, default on. This does not reopen D14.
   actor-bound mint is `pages/api/workbench/grantee-deliverables/replacement-upload-token.js`.
   CLAUDE.md requires the `portal_upload_staging` + `UPLOADS_BLOB_RW_TOKEN` path for staff uploads;
   never multipart Function bodies, never the intake token.
-- **Migrations:** at plan time the latest was `047_review_panel.sql` / block v49. Slice 1 added
-  `048_consultant_feedback.sql` / block v50 (commit `1a58bac8`); the next migration is 049 → v51.
-  Migration 048 was applied to production on 2026-09-14 (`node scripts/apply-migrations.js`:
-  1 applied, 46 skipped).
+- **Migrations:** Slice 1 added `048_consultant_feedback.sql` / block v50 (commit `1a58bac8`), and
+  Slice 2 added `049_consultant_feedback_upload_scope.sql` / block v51. Both were applied to
+  production on 2026-09-14; the live `portal_upload_staging_scope_check` includes
+  `consultant_feedback` [VERIFIED via production Postgres probe after the owner authorized apply].
 
 ## 3. Contract
 
@@ -183,7 +195,7 @@ through the Expertise Finder and edit the entry to select the roster row.
   Graph call, matching the existing kinds. The `material:` kind's artifact-type filter is **not**
   widened.
 
-### 3.4 Routes [slice 1 rows BUILT S512 and registered in `docs/API_ROUTE_SECURITY_MATRIX.md`; slice 2 rows MERGED TO MAIN 2026-09-14 via PR #295 (`bf6b41be`; source tip `98be7dae`); slice 3 staff download SOURCE-BUILT on `codex/consultant-feedback-slice-3`; all registered in the matrix]
+### 3.4 Routes [PRODUCTION-LIVE 2026-09-14 via PRs #293, #295, and #299; all registered in `docs/API_ROUTE_SECURITY_MATRIX.md`]
 
 | Route | Method | Guard | Purpose |
 |---|---|---|---|
@@ -199,7 +211,7 @@ through the Expertise Finder and edit the entry to select the roster row.
 Existing matrix rows for `context` and `document` are amended, not duplicated. All new
 `requestId` inputs pass `isGuid` before any Dataverse selector (`check:trust-boundary-guid`).
 
-### 3.5 Staff surface [BUILT S512 on `feature/consultant-feedback-slice-1`, commit `1a58bac8`; slice 2 parts MERGED TO MAIN 2026-09-14 via PR #295 (`bf6b41be`; source tip `98be7dae`); slice 3 polish SOURCE-BUILT on `codex/consultant-feedback-slice-3`]
+### 3.5 Staff surface [PRODUCTION-LIVE 2026-09-14 via PRs #293, #295, and #299]
 
 New component `shared/components/workbench/ConsultantFeedbackSection.js`, mounted by
 `ReviewsTab.js` below the outstanding-reviews section:
@@ -291,7 +303,9 @@ Column names follow the human-legibility schema principle.
 - SharePoint target: the request's active bucket from `getRequestSharePointBuckets`, subfolder
   `Consultant Feedback` (sibling of the `Site Visit - …` subfolders), filename
   `Consultant Feedback-<Request#>-<consultant name>-<received_on><ext>` after the existing
-  SharePoint-safe sanitization (`contributor-service.js:138-139`).
+  SharePoint-safe sanitization (`contributor-service.js:138-139`). Uploads use Graph's closed
+  `rename` conflict behavior because entries are append-only: a same-name file preserves both
+  artifacts instead of replacing an earlier consultant's feedback (PR #300).
 - Registry row mirrors the applicant-materials create payload: `operationstatus = Ready`,
   `lifecyclestate = Draft`, request bind, `wmkf_cyclecode`, `wmkf_inputfingerprint`,
   `wmkf_claimtoken`, and a feedback-specific `wmkf_producer` value.
@@ -301,13 +315,13 @@ Column names follow the human-legibility schema principle.
   circular dependency on the feedback row id). Two attachments on one request have distinct
   staging ids and never collide.
 
-### Slice 2 attachment lifecycle [MERGED TO MAIN 2026-09-14 via PR #295 (`bf6b41be`; source tip `98be7dae`); Codex AR-1 finding 1]
+### Slice 2 attachment lifecycle [PRODUCTION-LIVE 2026-09-14 via PR #295 (`bf6b41be`; source tip `98be7dae`); Codex AR-1 finding 1]
 
 Reuses `lib/services/portal-upload-staging.js` verbatim (mint → claim lease → load bytes → record
 candidate → complete/reject) with a new scope `consultant_feedback`. The scope allowlist is a
-CHECK constraint (`portal_upload_staging_scope_check`, currently
-`grantee_image | staff_grantee_image | site_visit_material`, last widened by migration 043), so
-slice 2 needs a migration that re-adds the constraint with the new value.
+CHECK constraint (`portal_upload_staging_scope_check`); migration 049 re-added it with
+`consultant_feedback` alongside `grantee_image | staff_grantee_image | site_visit_material` and
+was applied to production on 2026-09-14.
 
 | Step | Store | Durable identity after the step | On failure |
 |---|---|---|---|
@@ -374,12 +388,12 @@ workbench routes (list, mutate, consultants); `ConsultantFeedbackSection` on the
 briefing read-model and page section for text items; matrix rows; Atlas rows. Ships on its own.
 **Tier 1 runtime work: feature branch, owner merges.**
 
-### Slice 2 — attachments [MERGED TO MAIN 2026-09-14 via PR #295 (`bf6b41be`; source tip `98be7dae`); awaiting production migration 049 and smoke]
+### Slice 2 — attachments [PRODUCTION-LIVE 2026-09-14 via PR #295 (`bf6b41be`; source tip `98be7dae`); migration 049 applied; signed-in production smoke passed after PR #300]
 
 Dataverse admin adds the artifact-type value; mirror in `requestDocument.js`; mint + finalize
 routes; `feedback:` document member; Superseded-on-delete. Tier 1, same branch or a follow-on.
 
-### Slice 3 — staff attachment access and polish [SOURCE-BUILT + FRESH-REVIEW APPROVED 2026-09-14 on `codex/consultant-feedback-slice-3`; awaiting owner merge]
+### Slice 3 — staff attachment access and polish [PRODUCTION-LIVE 2026-09-14 via PR #299 (`5b25c006`); signed-in production smoke passed]
 
 - Authenticated staff can open a PDF inline or download a DOCX from the Reviews tab. The browser
   sends only request GUID + feedback-entry id; the service re-proves active request membership,
@@ -393,7 +407,7 @@ routes; `feedback:` document member; Superseded-on-delete. Tier 1, same branch o
   and Expertise Finder is a separately gated app without a stable consultant deep-link. Slice 3
   does not invent a broken URL or broaden access; a future Expertise Finder contract may add one.
 
-## 7. Tests [slice 1 tests BUILT S512 (91 passing across 6 suites); slice 2 tests MERGED TO MAIN 2026-09-14 via PR #295 (`bf6b41be`; source tip `98be7dae`): 169 passing across 10 suites after Opus round 2; slice 3 focused set after fresh-review fixes: 95 passing across 3 suites; post-merge Slice 2 + Slice 3 regression: 190 passing across 8 suites]
+## 7. Tests [slice 1: 91 passing across 6 suites; slice 2: 169 passing across 10 suites after Opus round 2; slice 3 focused set: 95 passing across 3 suites; post-merge Slice 2 + Slice 3 regression: 190 passing across 8 suites; PR #300 closeout: 883 suites / 12,711 tests, types, lint with zero errors, and production build passed]
 
 - Service: create with roster id / with one-off name (no roster write; assert the roster row
   count is unchanged); **eligibility**: Board, inactive, missing, and stale-dropdown roster ids are
