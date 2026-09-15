@@ -341,6 +341,20 @@ its canonical text. It cannot reconstruct provider-boundary metadata such as
 input truncation, so no such historical warning is invented. The bounded input
 snapshot remains schema version 2.
 
+**Not yet deployed (branch work, pending approval):** the Reviews Tab Writeup
+Paragraphs plan's Slice 4 (`docs/plans/REVIEWS_TAB_WRITEUP_PARAGRAPHS_PLAN_2026-09-14.md`
+§4.5/§6) bumps both `wmkf_presiteproposalcorejson` and
+`wmkf_presiteinputsnapshotjson` to schema version 4 in lockstep, adding a
+deterministic, model-free `request.refereeSection` to the input snapshot
+(fills `[[STAFF:RefereeSection]]`) and four new diagnostic codes
+(`referee_section_manual`, `referee_name_not_matched`,
+`referee_blocker_unnamed`, `referee_rating_unlabelled`). See
+`docs/atlas/dataverse-wmkf-requestdocument.md` for the authoritative live
+shape once this merges and deploys.
+[RECHECKED after lib/services/pre-site-visit/artifact-service.js change:
+2026-09-14 wrap-up — added referee_rating_unlabelled and split roster
+read/compose fail-closed codes.]
+
 `wmkf_PreSiteInputSnapshotJson` stores only bounded structured metadata and
 source identity:
 
