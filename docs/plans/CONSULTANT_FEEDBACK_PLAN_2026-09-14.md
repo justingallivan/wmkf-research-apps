@@ -3,7 +3,7 @@ title: Consultant Feedback — Informal Consultant Input on the Reviews Tab and 
 domain: reviewers
 kind: plan
 status: active
-summary: "Slice 1 PRODUCTION-LIVE 2026-09-14 (PR #293); slice 2 attachments are complete; slice 3 staff attachment access and list/chooser polish are source-built on branch codex/consultant-feedback-slice-3, awaiting review and merge. Staff record informal feedback on a proposal from retained consultants (pasted text and/or an attached file), attributed to a roster consultant, editable, and shared by default on the deliberation briefing page as its own section. Postgres owns the entry; the request-document registry and SharePoint own any attached file."
+summary: "Slice 1 PRODUCTION-LIVE 2026-09-14 (PR #293); slice 2 attachments merged to main via PR #295 and await production migration 049 plus smoke; slice 3 staff attachment access and list/chooser polish are source-built on branch codex/consultant-feedback-slice-3, awaiting review and merge. Staff record informal feedback on a proposal from retained consultants (pasted text and/or an attached file), attributed to a roster consultant, editable, and shared by default on the deliberation briefing page as its own section. Postgres owns the entry; the request-document registry and SharePoint own any attached file."
 cataloged: 2026-09-14
 last_verified: 2026-09-14
 owner: product-engineering
@@ -104,7 +104,7 @@ with its own rule: a per-item share flag, default on. This does not reopen D14.
 
 ## 3. Contract
 
-### 3.1 One feedback entry [BUILT S512 on `feature/consultant-feedback-slice-1`, commit `1a58bac8`; slice 2 parts BUILT ON BRANCH S512 (`feature/consultant-feedback-slice-2`, commit `dd5f1611` + review-round fixes; not yet merged)]
+### 3.1 One feedback entry [BUILT S512 on `feature/consultant-feedback-slice-1`, commit `1a58bac8`; slice 2 parts MERGED TO MAIN 2026-09-14 via PR #295 (`bf6b41be`; source tip `98be7dae`)]
 
 | Field | Rule |
 |---|---|
@@ -121,7 +121,7 @@ with its own rule: a per-item share flag, default on. This does not reopen D14.
 
 At least one of `body_html` or `requestdocument_id` must be present.
 
-### 3.2 Add person [BUILT S512 on `feature/consultant-feedback-slice-1`, commit `1a58bac8`; slice 2 parts BUILT ON BRANCH S512 (`feature/consultant-feedback-slice-2`, commit `dd5f1611` + review-round fixes; not yet merged)]
+### 3.2 Add person [BUILT S512 on `feature/consultant-feedback-slice-1`, commit `1a58bac8`; slice 2 parts MERGED TO MAIN 2026-09-14 via PR #295 (`bf6b41be`; source tip `98be7dae`)]
 
 The save route accepts either `consultantRosterId` or `oneOff: { name, affiliation? }`.
 
@@ -150,7 +150,7 @@ recipient directory or curated-recipient pickers, and the `expertise-finder`-own
 that app's surface. If staff later want a one-off to become a roster consultant, they add them
 through the Expertise Finder and edit the entry to select the roster row.
 
-### 3.3 Briefing page section [BUILT S512 on `feature/consultant-feedback-slice-1`, commit `1a58bac8`; slice 2 parts BUILT ON BRANCH S512 (`feature/consultant-feedback-slice-2`, commit `dd5f1611` + review-round fixes; not yet merged)]
+### 3.3 Briefing page section [BUILT S512 on `feature/consultant-feedback-slice-1`, commit `1a58bac8`; slice 2 parts MERGED TO MAIN 2026-09-14 via PR #295 (`bf6b41be`; source tip `98be7dae`)]
 
 - New card section "Consultant feedback" (CF4), placed immediately after Reviews, which is the
   page's last section (Proposal renders before Reviews, so "between Reviews and Proposal" was
@@ -181,7 +181,7 @@ through the Expertise Finder and edit the entry to select the roster row.
   Graph call, matching the existing kinds. The `material:` kind's artifact-type filter is **not**
   widened.
 
-### 3.4 Routes [slice 1 rows BUILT S512 and registered in `docs/API_ROUTE_SECURITY_MATRIX.md`; slice 2 rows BUILT ON BRANCH S512 (`feature/consultant-feedback-slice-2`, commit `dd5f1611` + review-round fixes; not yet merged); slice 3 staff download SOURCE-BUILT on `codex/consultant-feedback-slice-3`; all registered in the matrix]
+### 3.4 Routes [slice 1 rows BUILT S512 and registered in `docs/API_ROUTE_SECURITY_MATRIX.md`; slice 2 rows MERGED TO MAIN 2026-09-14 via PR #295 (`bf6b41be`; source tip `98be7dae`); slice 3 staff download SOURCE-BUILT on `codex/consultant-feedback-slice-3`; all registered in the matrix]
 
 | Route | Method | Guard | Purpose |
 |---|---|---|---|
@@ -197,7 +197,7 @@ through the Expertise Finder and edit the entry to select the roster row.
 Existing matrix rows for `context` and `document` are amended, not duplicated. All new
 `requestId` inputs pass `isGuid` before any Dataverse selector (`check:trust-boundary-guid`).
 
-### 3.5 Staff surface [BUILT S512 on `feature/consultant-feedback-slice-1`, commit `1a58bac8`; slice 2 parts BUILT ON BRANCH S512 (`feature/consultant-feedback-slice-2`, commit `dd5f1611` + review-round fixes; not yet merged); slice 3 polish SOURCE-BUILT on `codex/consultant-feedback-slice-3`]
+### 3.5 Staff surface [BUILT S512 on `feature/consultant-feedback-slice-1`, commit `1a58bac8`; slice 2 parts MERGED TO MAIN 2026-09-14 via PR #295 (`bf6b41be`; source tip `98be7dae`); slice 3 polish SOURCE-BUILT on `codex/consultant-feedback-slice-3`]
 
 New component `shared/components/workbench/ConsultantFeedbackSection.js`, mounted by
 `ReviewsTab.js` below the outstanding-reviews section:
@@ -218,7 +218,7 @@ New component `shared/components/workbench/ConsultantFeedbackSection.js`, mounte
   (`ReviewsTab.js:786-807`): every post-await state write, success and failure, checks the
   generation so a request switch never paints another request's feedback.
 
-### 3.6 Delete semantics [slice 1 hard delete BUILT S512; slice 2 three-step ordering BUILT ON BRANCH S512 (`feature/consultant-feedback-slice-2`, commit `dd5f1611` + review-round fixes; not yet merged)]
+### 3.6 Delete semantics [slice 1 hard delete BUILT S512; slice 2 three-step ordering MERGED TO MAIN 2026-09-14 via PR #295 (`bf6b41be`; source tip `98be7dae`)]
 
 - Slice 1: hard delete the Postgres row (CF5).
 - Slice 2 (Codex AR-1 finding 2 and AR-2 finding 3; remedy is a pending status on the row, not
@@ -247,7 +247,7 @@ New component `shared/components/workbench/ConsultantFeedbackSection.js`, mounte
 - No notification, no email to the consultant, no honorarium linkage, no reviewer-count effects.
 - No cycle-level view; entries are per request.
 
-## 4. Data model [Postgres table BUILT S512 as migration 048 / fresh-install v50; registry parts BUILT ON BRANCH S512 (`feature/consultant-feedback-slice-2`, commit `dd5f1611` + review-round fixes; not yet merged)]
+## 4. Data model [Postgres table BUILT S512 as migration 048 / fresh-install v50; registry parts MERGED TO MAIN 2026-09-14 via PR #295 (`bf6b41be`; source tip `98be7dae`)]
 
 Migration `048_consultant_feedback.sql` + manifest entry + fresh-install block v50:
 
@@ -280,7 +280,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS consultant_feedback_mutation_idx ON consultant
 
 Column names follow the human-legibility schema principle.
 
-### Slice 2 registry contract [BUILT ON BRANCH S512 (`feature/consultant-feedback-slice-2`, commit `dd5f1611` + review-round fixes; not yet merged); option-set value live in production 2026-09-14 (CF7)]
+### Slice 2 registry contract [MERGED TO MAIN 2026-09-14 via PR #295 (`bf6b41be`; source tip `98be7dae`); option-set value live in production 2026-09-14 (CF7)]
 
 - New `wmkf_requestdocument` artifact-type option **"Consultant Feedback"** (next value
   `100000008`), added to the option set by the Dataverse admin, then mirrored in
@@ -299,7 +299,7 @@ Column names follow the human-legibility schema principle.
   circular dependency on the feedback row id). Two attachments on one request have distinct
   staging ids and never collide.
 
-### Slice 2 attachment lifecycle [BUILT ON BRANCH S512 (`feature/consultant-feedback-slice-2`, commit `dd5f1611` + review-round fixes; not yet merged); Codex AR-1 finding 1]
+### Slice 2 attachment lifecycle [MERGED TO MAIN 2026-09-14 via PR #295 (`bf6b41be`; source tip `98be7dae`); Codex AR-1 finding 1]
 
 Reuses `lib/services/portal-upload-staging.js` verbatim (mint → claim lease → load bytes → record
 candidate → complete/reject) with a new scope `consultant_feedback`. The scope allowlist is a
@@ -325,14 +325,13 @@ ids finalizing against one entry (exactly one bound, the other Superseded and it
 discarded); finalize racing delete (either the delete wins and finalize returns 409 with its
 candidate discarded, or finalize wins and the delete supersedes the newly bound row).
 
-**Slice 2 prerequisite in the shared staging service (Codex AR-2 finding 1) [BUILT ON BRANCH S512 (`feature/consultant-feedback-slice-2`, commit `dd5f1611` + review-round fixes; not yet merged)]:**
-`cleanupExpiredPortalUploads` today selects only `id, pathname`, deletes staged Blob bytes, and
-expires the row; a `candidate_result` recorded at step 5 is never consulted, so a crash after the
-Graph upload with no client retry leaves an unregistered SharePoint file and eventually prunes its
-only cleanup identity [VERIFIED via `lib/services/portal-upload-staging.js:349-403`;
-`discardPortalUploadCandidate` is called only inline by the grantee submit and replace routes].
-This gap is shared with the grantee-image and site-visit-material scopes today. Before slice 2
-ships, extend the expiry sweep with a **fail-closed, scope-specific reconciliation** (Codex AR-3:
+**Slice 2 prerequisite in the shared staging service (Codex AR-2 finding 1) [MERGED TO MAIN 2026-09-14 via PR #295 (`bf6b41be`; source tip `98be7dae`)]:**
+Before Slice 2, `cleanupExpiredPortalUploads` selected only `id, pathname`, deleted staged Blob
+bytes, and expired the row; a `candidate_result` recorded at step 5 was never consulted, so a
+crash after the Graph upload with no client retry could leave an unregistered SharePoint file and
+eventually prune its only cleanup identity [historical finding verified 2026-09-14 against the
+pre-Slice-2 source]. Slice 2 closed that shared grantee-image and site-visit-material gap by
+extending the expiry sweep with **fail-closed, scope-specific reconciliation** (Codex AR-3:
 candidate shapes differ per scope; grantee-image candidates carry an image ref, not a generation
 key, so one registry lookup cannot serve every scope):
 - `consultant_feedback` scope: a candidate is **bound** when a registry row with its generation
@@ -344,11 +343,11 @@ key, so one registry lookup cannot serve every scope):
 - Existing scopes: each gets its own binding proof (grantee image: the deliverable's image ref
   equals the candidate; site-visit material: generation key plus current-slot ownership). Any
   candidate whose shape the sweep does not recognise is **retained and surfaced**, never discarded.
-Tests: expire after steps 5, 6, 7 with no retry per scope and assert the SharePoint item and
-registry state are each correct, with committed and uncommitted crash fixtures. Land it as its own
-small change to the staging service.
+Tests expire after steps 5, 6, and 7 with no retry per scope and assert the SharePoint item and
+registry state are each correct, with committed and uncommitted crash fixtures. The prerequisite
+landed with Slice 2.
 
-## 5. Security contract [slice 1 items BUILT S512; upload items BUILT ON BRANCH S512 (`feature/consultant-feedback-slice-2`, commit `dd5f1611` + review-round fixes; not yet merged)]
+## 5. Security contract [slice 1 items BUILT S512; upload items MERGED TO MAIN 2026-09-14 via PR #295 (`bf6b41be`; source tip `98be7dae`)]
 
 - Actor identity only from the authenticated profile (CLAUDE.md invariant); `created_by` /
   `updated_by` never from the body.
@@ -373,7 +372,7 @@ workbench routes (list, mutate, consultants); `ConsultantFeedbackSection` on the
 briefing read-model and page section for text items; matrix rows; Atlas rows. Ships on its own.
 **Tier 1 runtime work: feature branch, owner merges.**
 
-### Slice 2 — attachments [BUILT ON BRANCH S512 (`feature/consultant-feedback-slice-2`, commit `dd5f1611` + review-round fixes; not yet merged); prerequisite built in the same branch; awaiting owner merge, then migration 049]
+### Slice 2 — attachments [MERGED TO MAIN 2026-09-14 via PR #295 (`bf6b41be`; source tip `98be7dae`); awaiting production migration 049 and smoke]
 
 Dataverse admin adds the artifact-type value; mirror in `requestDocument.js`; mint + finalize
 routes; `feedback:` document member; Superseded-on-delete. Tier 1, same branch or a follow-on.
@@ -392,7 +391,7 @@ routes; `feedback:` document member; Superseded-on-delete. Tier 1, same branch o
   and Expertise Finder is a separately gated app without a stable consultant deep-link. Slice 3
   does not invent a broken URL or broaden access; a future Expertise Finder contract may add one.
 
-## 7. Tests [slice 1 tests BUILT S512 (91 passing across 6 suites); slice 2 tests BUILT ON BRANCH S512 (`feature/consultant-feedback-slice-2`, commit `dd5f1611` + review-round fixes; not yet merged): 169 passing across 10 suites after Opus round 2; slice 3 focused set: 84 passing across 3 suites]
+## 7. Tests [slice 1 tests BUILT S512 (91 passing across 6 suites); slice 2 tests MERGED TO MAIN 2026-09-14 via PR #295 (`bf6b41be`; source tip `98be7dae`): 169 passing across 10 suites after Opus round 2; slice 3 focused set: 84 passing across 3 suites; post-merge Slice 2 + Slice 3 regression: 179 passing across 8 suites]
 
 - Service: create with roster id / with one-off name (no roster write; assert the roster row
   count is unchanged); **eligibility**: Board, inactive, missing, and stale-dropdown roster ids are
