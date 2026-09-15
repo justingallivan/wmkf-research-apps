@@ -74,6 +74,12 @@ for it.
    Stage 2 as `unknown`, not `historical`. Publication dates must be carried and
    interpreted by an explicit source policy before any dated assertion may be
    labeled current or historical.
+9. **[VERIFIED via `lib/services/independent-reviewer-identity.js` and focused
+   tests]** The dormant `independent-identity/v1` evaluator core now implements
+   the four outcomes, closed PubMed/OpenAlex/ORCID methods, server-loader-only
+   evidence intake, provider completeness, full-forename and author-cluster
+   grounding, mandatory binding fields, and the 14-day maximum. It has no
+   runtime caller, roster projection, receipt, or save authority.
 
 ## Change surface
 
@@ -146,10 +152,11 @@ qualifies.
 `samePerson` from the owner workbook is an evaluation label. It does not enter
 the runtime candidate payload and cannot authorize a write.
 
-**[PLANNED]** This four-outcome identity result is not implemented by the
-current dormant v2 policy composer, which still consumes the Phase 1 boolean
-test shape. Phase 2 must add a total adapter before `contradicted` can reach the
-reject path or any v1 result can carry authority.
+**[VERIFIED via `lib/services/reviewer-institution-auto-resolution-policy.js`]**
+The dormant v2 policy composer now accepts the four-outcome result and maps
+`contradicted` to rejection while validating its mandatory claims. It retains
+the Phase 1 boolean test shape for the existing synthetic regression fixture.
+Neither shape has runtime authority.
 
 ### Decision labels
 
@@ -246,7 +253,7 @@ adversarial canonicalized-sibling and system-to-campus cases. It contains no
 retained names, request/candidate identifiers, affiliation strings, or URLs.
 Producer coverage also pins undated publication currentness as `unknown`.
 
-### Phase 2 — prove independent identity and extra-affiliation COI — contract audit complete; implementation pending
+### Phase 2 — prove independent identity and extra-affiliation COI — evaluator core implemented; integration pending
 
 1. Audit every identity anchor used at enrichment, roster reload, candidate
    selection, and save. Mark whether each anchor depends on affiliation.
@@ -277,8 +284,8 @@ being adjudicated.
 
 The 2026-09-14 contract audit and adversarial review did not trigger that stop,
 but they found that no existing evidence output as wired is sufficient. The
-providers expose the inputs for a new server-side evaluator with three closed
-methods:
+implemented dormant server-side evaluator consumes those provider inputs
+through three closed method families:
 
 1. `pubmed_multi_work_author` counts only exact works whose bylines fully agree
    with the candidate forename, binds affiliation assertions to those PMIDs,
@@ -500,12 +507,12 @@ browser claims must land in a tested fail-closed branch.
 ## Immediate next work
 
 Implement the still-dormant Phase 2 contracts identified by the completed
-audit and adversarial review: the pure, total, four-outcome
-`independent-identity/v1` evaluator using the closed hardened methods above;
-typed dated affiliation assertions; complete additional-affiliation COI
-fanout; and the same fail-closed COI recomputation at ordinary and applicant
-save. Correct the three stale `affiliationHistory` comments when its real
-consumer is added. Preserve incumbent authority and keep all new behavior
-flag-off. Do not enable measurement, apply a migration, create a Preview
-deployment, or promote a high-authority consumer as part of that
-implementation.
+audit and adversarial review. The pure four-outcome evaluator and dormant v2
+adapter now exist. Next, select and implement its authoritative server loader
+and receipt/roster representation; add typed dated affiliation assertions;
+complete additional-affiliation COI fanout; and call the same fail-closed COI
+recomputation at ordinary and applicant save. Correct the three stale
+`affiliationHistory` comments when its real consumer is added. Preserve
+incumbent authority and keep all new behavior flag-off. Do not enable
+measurement, apply a migration, create a Preview deployment, or promote a
+high-authority consumer as part of that implementation.

@@ -3,7 +3,7 @@ title: Reviewer Institution Auto-Resolution Phase 2 Contract Audit
 domain: reviewer-identity
 kind: audit
 status: complete
-summary: "Current identity outputs do not bind one person strongly enough for institution auto-resolution; a new server-side evaluator can do so from hardened provider evidence, but it and complete additional-affiliation COI inputs are not yet implemented."
+summary: "Current identity outputs do not bind one person strongly enough for institution auto-resolution; a dormant server-side evaluator core now applies hardened provider rules, while authoritative loading/persistence and complete additional-affiliation COI inputs remain unwired."
 canonical: false
 cataloged: 2026-09-14
 last_verified: 2026-09-14
@@ -34,11 +34,12 @@ auto-resolution. It reduces several different evidence paths to
 `confirmed`/`probable`, the retained roster shape does not prove whether
 affiliation contributed, and the existing affiliation-free-looking paths do
 not fully cluster the cited works to one person. A bare status or current
-anchor must remain insufficient. The correct next implementation is a new,
-server-computed `independent-identity/v1` result plus complete
-additional-affiliation COI screening at both save boundaries. No flag or
-authority should change before those two contracts exist and pass the frozen
-identity regressions.
+anchor must remain insufficient. A dormant `independent-identity/v1` evaluator
+core now implements the closed rules below through a required server-loader
+boundary, but it has no runtime caller, roster projection, or receipt. Complete
+additional-affiliation COI screening also remains absent at both save
+boundaries. No flag or authority should change before those contracts are wired
+and pass the frozen identity regressions.
 
 ## Independent-identity finding
 
@@ -274,15 +275,20 @@ new policy explicitly requires the same server decision at both save paths.
 
 ## Required implementation before Phase 3 authority work
 
-1. Add a pure, total `independent-identity/v1` evaluator with only the closed
-   sufficient methods above plus an explicit `contradicted` result. Its PubMed
+1. **Core implemented, integration pending:** the pure, total
+   `independent-identity/v1` evaluator has only the closed sufficient methods
+   above plus an explicit `contradicted` result. Its PubMed
    path counts only full-forename bylines and clusters all counted PMIDs to one
    person. Its work-grounding path runs unconditionally, uses server-held work,
    and abstains unless the fetched OpenAlex pool is complete. Its hard-ID path
    excludes email and requires independent source and CRM ORCID lineage. Test
    affiliation-only evidence, mixed evidence, common-name/initial-only cases,
    incomplete result pools, contradictory identity, source failures, unknown
-   versions, stale digests, and all branches where lineage is missing.
+   versions, stale digests, and all branches where lineage is missing. The
+   implementation and focused tests are in
+   `lib/services/independent-reviewer-identity.js` and
+   `tests/unit/independent-reviewer-identity.test.js`; there is no runtime
+   caller yet.
 2. Compute the result on the server at the point where complete source evidence
    exists. The evaluator owns provider-state accounting, and `sufficient`
    requires a complete run. Treat all browser-originating identity fields and

@@ -66,6 +66,26 @@ function independentIdentity(value) {
   };
 }
 
+function independentIdentityV1(result, overrides = {}) {
+  return {
+    version: 'independent-identity/v1',
+    result,
+    reason: 'synthetic',
+    excludesAffiliation: true,
+    method: 'exact_work_unique_author',
+    resolverVersion: 'independentReviewerIdentity@1.0.0',
+    requestBinding: 'request-1',
+    candidateKey: 'candidate-1',
+    identityInputDigest: 'a'.repeat(64),
+    evaluatedAt: '2026-09-14T18:00:00.000Z',
+    providerObservedAt: '2026-09-14T18:00:00.000Z',
+    expiresAt: '2026-09-28T18:00:00.000Z',
+    providerState: 'complete',
+    evidence: {},
+    ...overrides,
+  };
+}
+
 function evaluate(testCase) {
   const assessed = assessAffiliationRelationship({
     evidenceAssertion: assertion(testCase.evidence),
@@ -114,6 +134,62 @@ describe('reviewer institution auto-resolution policy regression v1', () => {
     expect(policy.institutionAction).toBe('clear_institution_concern');
     expect(policy.finalCandidateEffect).toBe('hold');
     expect(policy.finalReason).toBe('independent_identity_insufficient');
+  });
+
+  test('a contradicted v1 identity rejects even when the institution matches', () => {
+    const base = evaluate(fixture.cases.find((item) => item.key === 'exact_alias'));
+    const policy = evaluateReviewerInstitutionAutoResolution({
+      assessment: base.assessment,
+      independentIdentity: independentIdentityV1('contradicted'),
+      additionalCoi: 'not_screened',
+      bindingState: 'current',
+      parentChildKind: 'not_applicable',
+      providerState: 'complete',
+    });
+    expect(policy).toMatchObject({
+      institutionAction: 'clear_institution_concern',
+      finalCandidateEffect: 'reject',
+      finalReason: 'independent_identity_contradicted',
+      remedies: ['not_a_fit'],
+    });
+  });
+
+  test.each([
+    ['providerObservedAt', undefined],
+    ['requestBinding', undefined],
+    ['identityInputDigest', undefined],
+    ['resolverVersion', 'independentReviewerIdentity@future'],
+    ['providerState', 'partial'],
+  ])('a v1 sufficient result with invalid %s fails closed', (field, value) => {
+    const base = evaluate(fixture.cases.find((item) => item.key === 'exact_alias'));
+    const policy = evaluateReviewerInstitutionAutoResolution({
+      assessment: base.assessment,
+      independentIdentity: independentIdentityV1('sufficient', { [field]: value }),
+      additionalCoi: 'not_screened',
+      bindingState: 'current',
+      parentChildKind: 'not_applicable',
+      providerState: 'complete',
+    });
+    expect(policy).toMatchObject({
+      finalCandidateEffect: 'hold',
+      finalReason: 'independent_identity_unavailable',
+    });
+  });
+
+  test('a contradicted result from a partial provider run cannot reject', () => {
+    const base = evaluate(fixture.cases.find((item) => item.key === 'exact_alias'));
+    const policy = evaluateReviewerInstitutionAutoResolution({
+      assessment: base.assessment,
+      independentIdentity: independentIdentityV1('contradicted', { providerState: 'partial' }),
+      additionalCoi: 'not_screened',
+      bindingState: 'current',
+      parentChildKind: 'not_applicable',
+      providerState: 'complete',
+    });
+    expect(policy).toMatchObject({
+      finalCandidateEffect: 'hold',
+      finalReason: 'independent_identity_unavailable',
+    });
   });
 
   test('neutrality is never reported as an institution clearance', () => {
