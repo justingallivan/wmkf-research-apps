@@ -1,18 +1,21 @@
 /**
- * review-writeup-paragraphs — deterministic Reviews-tab writeup sentences
- * (Reviews Tab Phase II Slice 1,
- * docs/plans/REVIEWS_TAB_WRITEUP_PARAGRAPHS_PLAN_2026-09-14.md §4.2, W1-W3, W5).
+ * review-writeup-paragraphs — Reviews-tab writeup sentences: deterministic
+ * (Slice 1) plus model-authored themes/quotations verified at the read
+ * boundary (Slice 2)
+ * (docs/plans/REVIEWS_TAB_WRITEUP_PARAGRAPHS_PLAN_2026-09-14.md §4.2-4.3,
+ * W1-W3, W5, W7, W8).
  *
  * NO DOM, NO React, NO Dataverse/network imports — same purity contract as
- * `shared/utils/review-report.js`. Consumed by the Reviews tab card (this
- * slice) and, later, the Word export (Slice 3) and the Pre-Site Visit
+ * `shared/utils/review-report.js`. Consumed by the Reviews tab card, and,
+ * later, the Word export (Slice 3) and the Pre-Site Visit
  * `[[STAFF:RefereeSection]]` fill (Slice 4).
  *
  * Input filter: every composer here takes only reviewers with
  * `reviewReceivedAt` set — the same filter `digestReviewers` applies in
- * `reviewers-service.js` (:~450). `reviewer.answers[]` is NOT required by
- * these composers (Slice 1 has no quotations yet); a caller may pass the
- * full submitted-reviewer projection from `getReviewers` unchanged.
+ * `reviewers-service.js` (:~450). `composeWriteupParagraphs` additionally
+ * needs `reviewer.answers[].answerText` (already on the Slice 1 projection)
+ * to verify quotation provenance — a caller passing the full submitted-
+ * reviewer projection from `getReviewers` unchanged satisfies both.
  *
  * Ordering: descending `reviewerOverallAssessment` (nulls/unlabelled last);
  * ties keep the ORDER THE CALLER PASSED IN (the tab already name-sorts
@@ -335,36 +338,170 @@ function runsToHtml(runs) {
     .join('');
 }
 
+// Collapse whitespace, unify curly/straight quotes and apostrophes, and
+// casefold — so a verbatim quote survives an LLM's whitespace/typography
+// drift without becoming a false negative at the read boundary.
+function normalizeForMatch(value) {
+  return String(value ?? '')
+    .replace(/[‘’‚‛]/g, "'")
+    .replace(/[“”„‟]/g, '"')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+const QUOTATION_LEAD_INS = {
+  1: ['The most positive reviewer said:'],
+  2: ['The most positive reviewer said:', 'The most critical reviewer noted:'],
+  3: ['The most positive reviewer said:', 'Another reviewer noted:', 'The most critical reviewer noted:'],
+};
+
 /**
- * Compose the full Slice 1 writeup block from stored data: score sentence,
- * reviewer sentence (as runs), and expertise sentence, plus plain-text and
- * HTML serialisations for Copy.
+ * Quote provenance is enforced HERE, at the read boundary — never trusted
+ * from the model (plan §4.3, Codex AR-1 finding 1). A candidate `{questionKey,
+ * quote}` survives only if it is a normalized substring of exactly one
+ * submitted reviewer's `answers[].answerText`; ambiguous (matches more than
+ * one reviewer) or unmatched candidates are dropped and counted. At most one
+ * surviving quote per reviewer (first candidate for that reviewer wins).
+ * Survivors are ordered by that reviewer's `reviewerOverallAssessment`
+ * descending (ties by roster/`submitted` order); when more than three
+ * survive, W8 keeps only the highest-rated, the median (by sorted position),
+ * and the lowest-rated.
  *
- * `synthesis` is accepted but NOT rendered in Slice 1 — this is the named
- * hook Slice 2 fills in (model-authored `writeupThemes` /
- * `writeupQuotations`, verified at the read boundary per plan §4.3). Slice 1
- * deliberately does no provenance verification and appends nothing from it.
+ * Exported so other consumers of the same reviewer projection (e.g.
+ * `shared/utils/review-report.js`'s Word-export synthesis section) can reuse
+ * the identical verification instead of trusting raw `synthesis.writeupQuotations`.
+ *
+ * @param {Array<Object>} candidates - raw `synthesis.writeupQuotations`
+ * @param {Array<Object>} reviewers - full reviewer projection; filtered to
+ *   `reviewReceivedAt` internally, same as every other composer here.
+ * @returns {{ kept: Array<{leadIn:string, quote:string, questionKey:string}>, droppedQuotationCount: number }}
+ */
+export function verifyAndSelectQuotations(candidates, reviewers) {
+  const submitted = submittedReviewersOf(reviewers);
+  const rosterIndex = new Map(submitted.map((r, i) => [r.suggestionId, i]));
+  const survivors = []; // { reviewer, quote, questionKey }
+  const usedReviewers = new Set();
+  let droppedQuotationCount = 0;
+
+  for (const candidate of Array.isArray(candidates) ? candidates : []) {
+    const quoteText = typeof candidate?.quote === 'string' ? candidate.quote.trim() : '';
+    const normalizedQuote = normalizeForMatch(quoteText);
+    if (!normalizedQuote) {
+      droppedQuotationCount += 1;
+      continue;
+    }
+
+    const matchingReviewers = submitted.filter((reviewer) => {
+      const answers = Array.isArray(reviewer.answers) ? reviewer.answers : [];
+      return answers.some((a) => typeof a?.answerText === 'string'
+        && normalizeForMatch(a.answerText).includes(normalizedQuote));
+    });
+
+    if (matchingReviewers.length !== 1) {
+      // Zero matches: not verbatim in any submitted review (paraphrase or
+      // invention). More than one match: ambiguous attribution — drop rather
+      // than guess.
+      droppedQuotationCount += 1;
+      continue;
+    }
+
+    const reviewer = matchingReviewers[0];
+    if (usedReviewers.has(reviewer.suggestionId)) {
+      // Second+ quote for a reviewer who already has one kept: drop, count.
+      droppedQuotationCount += 1;
+      continue;
+    }
+    usedReviewers.add(reviewer.suggestionId);
+    survivors.push({
+      reviewer,
+      quote: quoteText,
+      questionKey: typeof candidate.questionKey === 'string' ? candidate.questionKey : '',
+    });
+  }
+
+  survivors.sort((a, b) => {
+    const aLabelled = labelForReviewRating('overallAssessment', a.reviewer.reviewerOverallAssessment) != null;
+    const bLabelled = labelForReviewRating('overallAssessment', b.reviewer.reviewerOverallAssessment) != null;
+    const aIndex = rosterIndex.get(a.reviewer.suggestionId) ?? 0;
+    const bIndex = rosterIndex.get(b.reviewer.suggestionId) ?? 0;
+    if (aLabelled && bLabelled) {
+      const diff = (b.reviewer.reviewerOverallAssessment ?? 0) - (a.reviewer.reviewerOverallAssessment ?? 0);
+      if (diff !== 0) return diff;
+      return aIndex - bIndex;
+    }
+    if (aLabelled !== bLabelled) return aLabelled ? -1 : 1;
+    return aIndex - bIndex;
+  });
+
+  // W8: keep at most three — the highest, the median (by sorted position),
+  // and the lowest — when more than three survived verification.
+  let selected = survivors;
+  if (survivors.length > 3) {
+    const medianIndex = Math.floor((survivors.length - 1) / 2);
+    selected = [survivors[0], survivors[medianIndex], survivors[survivors.length - 1]];
+  }
+
+  const leadIns = QUOTATION_LEAD_INS[selected.length] || [];
+  const kept = selected.map((entry, i) => ({
+    leadIn: leadIns[i] || 'A reviewer noted:',
+    quote: entry.quote,
+    questionKey: entry.questionKey,
+  }));
+
+  return { kept, droppedQuotationCount };
+}
+
+/**
+ * Compose the full writeup block from stored data: score sentence, reviewer
+ * sentence (as runs), expertise sentence, and — Slice 2 — the model-authored
+ * `writeupThemes` paragraph plus verified `writeupQuotations`, each as its
+ * own paragraph, in that order. Plus plain-text and HTML serialisations for
+ * Copy.
+ *
+ * `synthesis` may be absent, current-but-empty (pre-Slice-2 stored row), or
+ * fully populated — every case renders only what's present; an absent/empty
+ * `synthesis` renders only the three deterministic Slice 1 sentences.
  *
  * @param {{reviewers: Array<Object>, synthesis?: Object|null}} input
- * @returns {{ paragraphs: Array<Array<{text:string, underline?:boolean}>>, warnings: string[], text: string, html: string }}
+ * @returns {{ paragraphs: Array<Array<{text:string, underline?:boolean}>>, warnings: string[], droppedQuotationCount: number, themes: string|null, quotations: Array<{leadIn:string, quote:string, questionKey:string}>, text: string, html: string }}
  */
 export function composeWriteupParagraphs({ reviewers, synthesis } = {}) {
-  const { sentence: scoreSentence, warnings } = composeScoreSentence(reviewers);
+  const { sentence: scoreSentence, warnings: scoreWarnings } = composeScoreSentence(reviewers);
   const reviewerSentence = composeReviewerSentence(reviewers);
   const expertiseSentence = composeExpertiseSentence(reviewers);
+  const warnings = [...scoreWarnings];
 
   const paragraphs = [];
   if (scoreSentence) paragraphs.push([{ text: scoreSentence }]);
   if (reviewerSentence) paragraphs.push(reviewerSentence.runs);
   if (expertiseSentence) paragraphs.push([{ text: expertiseSentence }]);
 
-  // Slice 2 hook: when `synthesis.writeupThemes` / `synthesis.writeupQuotations`
-  // are present and read-boundary-verified, their sentences append here as
-  // additional plain-text paragraphs. Not implemented in Slice 1.
-  void synthesis;
+  const themesText = typeof synthesis?.writeupThemes === 'string' ? synthesis.writeupThemes.trim() : '';
+  if (themesText) paragraphs.push([{ text: themesText }]);
+
+  const submitted = submittedReviewersOf(reviewers);
+  const { kept: quotations, droppedQuotationCount } = verifyAndSelectQuotations(
+    synthesis?.writeupQuotations,
+    submitted,
+  );
+  for (const { leadIn, quote } of quotations) {
+    paragraphs.push([{ text: `${leadIn} "${quote}"` }]);
+  }
+  if (droppedQuotationCount > 0) {
+    warnings.push(`${droppedQuotationCount} quotation(s) could not be matched to a review and were omitted.`);
+  }
 
   const text = paragraphs.map(runsToPlainText).join('\n\n');
   const html = paragraphs.map((runs) => `<p>${runsToHtml(runs)}</p>`).join('');
 
-  return { paragraphs, warnings, text, html };
+  return {
+    paragraphs,
+    warnings,
+    droppedQuotationCount,
+    themes: themesText || null,
+    quotations,
+    text,
+    html,
+  };
 }

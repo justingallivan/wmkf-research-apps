@@ -382,7 +382,41 @@ describe('composeReviewReport', () => {
       overall: 'Reviewers are largely positive.',
     };
     const report = composeReviewReport({ matrix, generatedAtIso: '2026-07-03T00:00:00.000Z', synthesis });
-    expect(report.synthesisSection).toEqual(synthesis);
+    expect(report.synthesisSection).toEqual({ ...synthesis, writeupThemes: '', writeupQuotations: [] });
+  });
+
+  test('Slice 2: synthesisSection carries writeupThemes and only VERIFIED quotations', () => {
+    const matrix = deriveReviewMatrix([], null);
+    const fullReviewers = [{
+      suggestionId: 'r1',
+      reviewReceivedAt: '2026-06-20T00:00:00Z',
+      reviewerOverallAssessment: 5,
+      answers: [{ questionKey: 'q1', answerText: 'This is a rigorous and well-designed study.' }],
+    }];
+    const synthesis = {
+      overall: 'Positive overall.',
+      writeupThemes: 'Reviewers were broadly positive.',
+      writeupQuotations: [
+        { questionKey: 'q1', quote: 'This is a rigorous and well-designed study.' }, // verifiable
+        { questionKey: 'q2', quote: 'This was never actually written by anyone.' }, // unverifiable
+      ],
+    };
+    const report = composeReviewReport({
+      matrix, generatedAtIso: '2026-07-03T00:00:00.000Z', synthesis, fullReviewers,
+    });
+    expect(report.synthesisSection.writeupThemes).toBe('Reviewers were broadly positive.');
+    expect(report.synthesisSection.writeupQuotations).toHaveLength(1);
+    expect(report.synthesisSection.writeupQuotations[0].quote).toBe('This is a rigorous and well-designed study.');
+  });
+
+  test('Slice 2: omitting fullReviewers yields no verified quotations rather than trusting raw synthesis', () => {
+    const matrix = deriveReviewMatrix([], null);
+    const synthesis = {
+      overall: 'Positive overall.',
+      writeupQuotations: [{ questionKey: 'q1', quote: 'Anything at all.' }],
+    };
+    const report = composeReviewReport({ matrix, generatedAtIso: '2026-07-03T00:00:00.000Z', synthesis });
+    expect(report.synthesisSection.writeupQuotations).toEqual([]);
   });
 
   test('carries explicit stale currentness so renderers can distinguish the current roster', () => {
@@ -399,6 +433,8 @@ describe('composeReviewReport', () => {
       keyConcerns: [],
       ratingSummaries: [],
       overall: 'Earlier synthesis.',
+      writeupThemes: '',
+      writeupQuotations: [],
       current: false,
     });
   });
@@ -412,6 +448,7 @@ describe('composeReviewReport', () => {
     });
     expect(report.synthesisSection).toEqual({
       consensus: [], disagreements: [], keyConcerns: [], ratingSummaries: [], overall: '',
+      writeupThemes: '', writeupQuotations: [],
     });
   });
 });

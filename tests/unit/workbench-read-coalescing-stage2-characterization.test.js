@@ -436,6 +436,8 @@ describe('getReviewers — characterization', () => {
             keyConcerns: ['Budget scope'],
             ratingSummaries: [{ questionKey: 'impact', questionText: 'Impact?', summary: 'High impact' }],
             overall: 'Recommend funding',
+            writeupThemes: '',
+            writeupQuotations: [],
           },
           noResponseHistory: [],
           reviewSynthesisState: {

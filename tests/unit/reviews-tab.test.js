@@ -761,6 +761,90 @@ test('Writeup paragraphs card shows an unlabelled-rating warning as a muted line
   expect(screen.getByText(/Dr\. Legacy's overall rating has no label and was left out of the score tally\./)).toBeInTheDocument();
 });
 
+// Slice 2 (plan §4.3): model-authored themes/quotations rendered from the
+// stored synthesis, verified at the read boundary.
+test('renders verified themes and quotations from a current synthesis', async () => {
+  fetch.mockResolvedValue({
+    ok: true,
+    json: async () => ({
+      success: true,
+      proposals: [{
+        proposalId: 'req1',
+        reviewSynthesisState: { current: true },
+        reviewSynthesis: {
+          writeupThemes: 'Reviewers were broadly positive about the approach.',
+          writeupQuotations: [
+            { questionKey: 'q1', quote: 'This is outstanding and rigorous work.' },
+          ],
+        },
+        reviewers: [{
+          ...WRITEUP_REVIEWERS[0],
+          answers: [{ questionKey: 'q1', answerText: 'This is outstanding and rigorous work.' }],
+        }],
+      }],
+    }),
+  });
+
+  render(<ReviewsTab requestId="req1" />);
+  expect(await screen.findByText('Reviewers were broadly positive about the approach.')).toBeInTheDocument();
+  expect(screen.getByText('The most positive reviewer said: "This is outstanding and rigorous work."')).toBeInTheDocument();
+  expect(screen.queryByText(/Regenerate synthesis to add themes and quotations/i)).not.toBeInTheDocument();
+});
+
+test('shows the Regenerate hint when synthesis is current but predates writeupThemes', async () => {
+  fetch.mockResolvedValue({
+    ok: true,
+    json: async () => ({
+      success: true,
+      proposals: [{
+        proposalId: 'req1',
+        reviewSynthesisState: { current: true },
+        reviewSynthesis: { writeupThemes: '', writeupQuotations: [] },
+        reviewers: WRITEUP_REVIEWERS,
+      }],
+    }),
+  });
+
+  render(<ReviewsTab requestId="req1" />);
+  expect(await screen.findByText(/Regenerate synthesis to add themes and quotations/i)).toBeInTheDocument();
+});
+
+test('does not show the Regenerate hint when there is no stored synthesis at all', async () => {
+  fetch.mockResolvedValue({
+    ok: true,
+    json: async () => ({
+      success: true,
+      proposals: [{ proposalId: 'req1', reviewSynthesis: null, reviewSynthesisState: null, reviewers: WRITEUP_REVIEWERS }],
+    }),
+  });
+
+  render(<ReviewsTab requestId="req1" />);
+  await screen.findByText('Writeup paragraphs');
+  expect(screen.queryByText(/Regenerate synthesis to add themes and quotations/i)).not.toBeInTheDocument();
+});
+
+test('shows the dropped-quotation count when a quote fails provenance verification', async () => {
+  fetch.mockResolvedValue({
+    ok: true,
+    json: async () => ({
+      success: true,
+      proposals: [{
+        proposalId: 'req1',
+        reviewSynthesisState: { current: true },
+        reviewSynthesis: {
+          writeupThemes: 'Fine work overall.',
+          writeupQuotations: [{ questionKey: 'q1', quote: 'This quote does not appear anywhere.' }],
+        },
+        reviewers: [{ ...WRITEUP_REVIEWERS[0], answers: [{ questionKey: 'q1', answerText: 'Something else entirely.' }] }],
+      }],
+    }),
+  });
+
+  render(<ReviewsTab requestId="req1" />);
+  await screen.findByText('Writeup paragraphs');
+  expect(screen.getByText(/1 quotation\(s\) could not be matched to a review and were omitted\./)).toBeInTheDocument();
+});
+
 test('Copy label resets to "Copy" when the composed content changes', async () => {
   fetch.mockImplementation((url) => {
     const isReq2 = String(url).includes('proposalId=req2');

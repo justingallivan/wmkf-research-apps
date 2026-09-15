@@ -6,7 +6,7 @@ status: active
 summary: "Reviews, synthesis, and template-backed Word exports are Production-live; Wave 25 is exact and the combined export is signed-in smoke-proved."
 canonical: false
 cataloged: 2026-07-03
-last_verified: 2026-09-03
+last_verified: 2026-09-14
 owner: product-engineering
 related:
   - docs/audits/AUDIT_REQUEST_WORKBENCH_TRUTH_2026-07-26.md
@@ -425,6 +425,29 @@ Required pre-build verification:
   `20aec518-9f8a-f111-ab0f-6045bd018deb` records prompt version 3,
   `end_turn`, and the redacted review digest. Exact cleanup removed the 11
   staged answers and restored four parent fields without altering the new memo.
+
+**Addendum (2026-09-14, Reviews Tab Phase II Slice 2,
+docs/plans/REVIEWS_TAB_WRITEUP_PARAGRAPHS_PLAN_2026-09-14.md §4.3):** the
+tracked prompt row gains two fields inside `synthesis` — `writeupThemes`
+(string) and `writeupQuotations` (`{questionKey, quote}[]`) — both `required`
+in the native JSON schema (no caps there; caps live in `validationSchema`
+only: `writeupThemes` 2,000 chars, `writeupQuotations` `maxItems` 10 ×
+`quote` 600 chars, `questionKey` 100 chars, all `required: false` with empty
+defaults so an old stored row parses unchanged). Quote provenance is verified
+downstream at the Reviews read boundary (`shared/utils/review-writeup-paragraphs.js`
+`verifyAndSelectQuotations`), never trusted from the model: a quote survives
+only as a normalized substring of exactly one submitted reviewer's answer
+text, at most one per reviewer, reduced to the top/median/bottom three by
+rating when more than three survive (W8). The Reviews tab's Writeup
+paragraphs card (Slice 1) renders the verified themes/quotations or a
+"Regenerate synthesis to add themes and quotations" hint when a current
+synthesis predates them; `composeReviewReport`'s `synthesisSection` carries
+the same verified quotations for the Word export (a renderer for them is
+Slice 3, not yet built). **This addendum documents the tracked prompt source
+only — the last recorded publish of `review-synthesis.generate` is governed
+v3 (five keys, 2026-07-28, docs/atlas/dataverse-akoya-request.md); an
+owner-run `--force` republish (plan §4.3) is needed to make the live row
+match the tracked seven-key source, and this build did not run one.**
 
 ## Verification per phase
 

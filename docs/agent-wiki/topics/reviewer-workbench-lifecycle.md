@@ -1385,7 +1385,35 @@ participants remain unresolved and records each generation in
 card even at zero accepted/submitted reviews, with Current/Stale, readiness,
 and queued/running/failed state. Output is plain-text only (no
 `dangerouslySetInnerHTML`); `composeReviewReport` accepts an optional
-`synthesis` param rendered in the current Word export. Same
+`synthesis` param rendered in the current Word export.
+
+**Slice 2 (Reviews Tab Phase II, 2026-09-14,
+docs/plans/REVIEWS_TAB_WRITEUP_PARAGRAPHS_PLAN_2026-09-14.md §4.3):** the
+tracked prompt (`shared/config/prompts/review-synthesis.js`) and
+`jsonSchema`/`validationSchema` gain two fields inside `synthesis` —
+`writeupThemes` (string, 2-3 sentences) and `writeupQuotations`
+(`{questionKey, quote}[]`, up to three representative quotes) — both `required`
+in the native JSON schema (no `maxItems`/`maxLength` there; all caps live in
+`validationSchema` only, which fails the whole write closed on a cap breach).
+`parseReviewSynthesis` (`reviewers-service.js`) passes both through as a
+read-boundary shape guard only. **Quote provenance is verified downstream, not
+here**: `shared/utils/review-writeup-paragraphs.js`'s exported
+`verifyAndSelectQuotations` keeps a candidate quote only when it is a
+normalized substring of exactly one submitted reviewer's
+`answers[].answerText`, at most one kept quote per reviewer, ordered by
+`reviewerOverallAssessment` descending, reduced to the top/median/bottom three
+when more than three survive (W8); unverifiable/ambiguous/duplicate candidates
+are dropped and counted (`droppedQuotationCount`, surfaced on the Reviews tab
+as "N quotation(s) could not be matched to a review and were omitted"). The
+Reviews tab's Writeup paragraphs card renders the verified themes/quotations,
+or a "Regenerate synthesis to add themes and quotations" hint (pointing at the
+existing Regenerate control, not a new action) when a synthesis is current but
+predates these fields. `review-report.js`'s `synthesisSection` carries the
+same VERIFIED quotations (never the raw `synthesis.writeupQuotations`) plus
+`writeupThemes`, for the Word export (Slice 3 adds the renderer). **Production
+publish of this prompt row is a separate owner step** (`--force` republish,
+plan §4.3) — not run as part of this build; the live row and the read paths on
+both sides tolerate either the five-key or seven-key shape. Same
 verification boundary as Phases 2-3: Request #1002788 production-proved the
 submitted DTO, categorical matrix, and both then-present export renderers on
 2026-07-26; that historical smoke does not make PDF a current UI feature.

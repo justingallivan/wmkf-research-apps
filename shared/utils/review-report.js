@@ -33,6 +33,8 @@
  *     and is the actual security boundary.
  */
 
+import { verifyAndSelectQuotations } from './review-writeup-paragraphs.js';
+
 const BLOCK_TAGS = new Set(['p', 'h2', 'h3', 'blockquote', 'ul', 'ol', 'li']);
 const INLINE_TAGS = new Set(['strong', 'b', 'em', 'i', 'sub', 'sup', 'a', 'br']);
 const VOID_TAGS = new Set(['br']);
@@ -307,6 +309,14 @@ export function composeReviewReport({
   generatedAtIso,
   synthesis = null,
   synthesisCurrent = null,
+  // Slice 2 (Reviews Tab Phase II, docs/plans/REVIEWS_TAB_WRITEUP_PARAGRAPHS_PLAN_2026-09-14.md
+  // §4.3): the FULL submitted-reviewer projection (with `.answers[].answerText`),
+  // distinct from `matrix.reviewers`/the local `reviewers` below (a
+  // display-shaped subset with no answer text). Used ONLY to verify
+  // `synthesis.writeupQuotations` provenance at this read boundary — never
+  // trusted from `synthesis` directly. Optional; omitted (or empty) simply
+  // yields no verified quotations.
+  fullReviewers = [],
 }) {
   const safeMatrix = matrix && Array.isArray(matrix.questions) && Array.isArray(matrix.reviewers)
     ? matrix
@@ -427,6 +437,14 @@ export function composeReviewReport({
   // Phase 4: optional synthesis section. Only present when a synthesis object
   // was passed in (plain object with the LLM-authored arrays/strings — never
   // HTML, so renderers use plain text, no htmlToBlocks tokenization needed).
+  // Slice 2: verify quotation provenance against the FULL reviewer projection
+  // (not `safeMatrix.reviewers`, which has no answer text) — the composer
+  // output (`.kept`), never the raw `synthesis.writeupQuotations`, is what
+  // reaches the report.
+  const { kept: verifiedQuotations } = synthesis && typeof synthesis === 'object'
+    ? verifyAndSelectQuotations(synthesis.writeupQuotations, fullReviewers)
+    : { kept: [] };
+
   const synthesisSection = synthesis && typeof synthesis === 'object'
     ? {
       consensus: Array.isArray(synthesis.consensus) ? synthesis.consensus : [],
@@ -434,6 +452,8 @@ export function composeReviewReport({
       keyConcerns: Array.isArray(synthesis.keyConcerns) ? synthesis.keyConcerns : [],
       ratingSummaries: Array.isArray(synthesis.ratingSummaries) ? synthesis.ratingSummaries : [],
       overall: typeof synthesis.overall === 'string' ? synthesis.overall : '',
+      writeupThemes: typeof synthesis.writeupThemes === 'string' ? synthesis.writeupThemes.trim() : '',
+      writeupQuotations: verifiedQuotations,
       ...(typeof synthesisCurrent === 'boolean' ? { current: synthesisCurrent } : {}),
     }
     : null;

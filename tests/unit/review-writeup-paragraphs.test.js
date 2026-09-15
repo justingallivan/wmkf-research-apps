@@ -305,12 +305,237 @@ describe('composeWriteupParagraphs', () => {
     expect(html).not.toContain('<script>alert(1)</script>');
   });
 
-  it('ignores a synthesis object in Slice 1 (no themes/quotations appended)', () => {
-    const { text } = composeWriteupParagraphs({
+  it('renders themes but drops an unverifiable quote (Slice 2)', () => {
+    const { text, warnings, droppedQuotationCount } = composeWriteupParagraphs({
       reviewers: [reviewer({ name: 'A', mainInstitution: 'X' })],
-      synthesis: { writeupThemes: 'Should not appear', writeupQuotations: [{ quote: 'nope' }] },
+      synthesis: { writeupThemes: 'Reviewers were broadly positive.', writeupQuotations: [{ quote: 'nope, not in any answer' }] },
     });
-    expect(text).not.toContain('Should not appear');
+    expect(text).toContain('Reviewers were broadly positive.');
     expect(text).not.toContain('nope');
+    expect(droppedQuotationCount).toBe(1);
+    expect(warnings).toContainEqual(expect.stringContaining('1 quotation(s) could not be matched'));
+  });
+
+  it('renders only the deterministic sentences when synthesis is absent (pre-Slice-2 stored row)', () => {
+    const result = composeWriteupParagraphs({
+      reviewers: [reviewer({ name: 'A', mainInstitution: 'X' })],
+    });
+    expect(result.themes).toBeNull();
+    expect(result.quotations).toEqual([]);
+    expect(result.droppedQuotationCount).toBe(0);
+    expect(result.paragraphs).toHaveLength(2); // score + reviewer (no expertise data)
+  });
+
+  it('renders only the deterministic sentences when synthesis is current-but-empty', () => {
+    const result = composeWriteupParagraphs({
+      reviewers: [reviewer({ name: 'A', mainInstitution: 'X' })],
+      synthesis: { writeupThemes: '', writeupQuotations: [] },
+    });
+    expect(result.themes).toBeNull();
+    expect(result.quotations).toEqual([]);
+    expect(result.droppedQuotationCount).toBe(0);
+  });
+});
+
+describe('composeWriteupParagraphs — Slice 2 quotation provenance', () => {
+  function reviewerWithAnswers(overrides, answers) {
+    return reviewer({ ...overrides, answers });
+  }
+
+  it('drops a paraphrased quote (not a verbatim substring of any answer)', () => {
+    const reviewers = [
+      reviewerWithAnswers(
+        { suggestionId: 'a', name: 'A', reviewerOverallAssessment: 5 },
+        [{ questionKey: 'q1', answerText: 'This proposal has a rigorous and well-designed methodology.' }],
+      ),
+    ];
+    const { quotations, droppedQuotationCount } = composeWriteupParagraphs({
+      reviewers,
+      synthesis: { writeupQuotations: [{ questionKey: 'q1', quote: 'This is a very rigorous methodology.' }] },
+    });
+    expect(quotations).toEqual([]);
+    expect(droppedQuotationCount).toBe(1);
+  });
+
+  it('keeps a curly-quote/whitespace variant of a real sentence', () => {
+    const reviewers = [
+      reviewerWithAnswers(
+        { suggestionId: 'a', name: 'A', reviewerOverallAssessment: 5 },
+        [{ questionKey: 'q1', answerText: "The PI's   approach   is “innovative” and timely." }],
+      ),
+    ];
+    const { quotations } = composeWriteupParagraphs({
+      reviewers,
+      synthesis: { writeupQuotations: [{ questionKey: 'q1', quote: 'The PI\'s approach is "innovative" and timely.' }] },
+    });
+    expect(quotations).toHaveLength(1);
+    expect(quotations[0].quote).toBe('The PI\'s approach is "innovative" and timely.');
+  });
+
+  it('keeps a case-folded variant of a real sentence (casing differs, text matches)', () => {
+    const reviewers = [
+      reviewerWithAnswers(
+        { suggestionId: 'a', name: 'A', reviewerOverallAssessment: 5 },
+        [{ questionKey: 'q1', answerText: 'The design is Innovative and well justified.' }],
+      ),
+    ];
+    const { quotations } = composeWriteupParagraphs({
+      reviewers,
+      synthesis: { writeupQuotations: [{ questionKey: 'q1', quote: 'the design is innovative and well justified.' }] },
+    });
+    expect(quotations).toHaveLength(1);
+  });
+
+  it('escapes markup in a synthesized theme and a verified quote in the HTML serialisation', () => {
+    const reviewers = [
+      reviewerWithAnswers(
+        { suggestionId: 'a', name: 'A', mainInstitution: 'X', reviewerOverallAssessment: 5 },
+        [{ questionKey: 'q1', answerText: 'This is <b>bold</b> and unsafe text in a review.' }],
+      ),
+    ];
+    const { html } = composeWriteupParagraphs({
+      reviewers,
+      synthesis: {
+        writeupThemes: 'Reviewers <script>alert(1)</script> agreed.',
+        writeupQuotations: [{ questionKey: 'q1', quote: 'This is <b>bold</b> and unsafe text in a review.' }],
+      },
+    });
+    expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
+    expect(html).not.toContain('<script>alert(1)</script>');
+    expect(html).toContain('&lt;b&gt;bold&lt;/b&gt;');
+    expect(html).not.toContain('<b>bold</b>');
+  });
+
+  it('keeps only one of two quotes attributed to the same reviewer (first wins)', () => {
+    const reviewers = [
+      reviewerWithAnswers(
+        { suggestionId: 'a', name: 'A', reviewerOverallAssessment: 5 },
+        [
+          { questionKey: 'q1', answerText: 'The first sentence is here.' },
+          { questionKey: 'q2', answerText: 'The second sentence is here.' },
+        ],
+      ),
+    ];
+    const { quotations, droppedQuotationCount } = composeWriteupParagraphs({
+      reviewers,
+      synthesis: {
+        writeupQuotations: [
+          { questionKey: 'q1', quote: 'The first sentence is here.' },
+          { questionKey: 'q2', quote: 'The second sentence is here.' },
+        ],
+      },
+    });
+    expect(quotations).toHaveLength(1);
+    expect(quotations[0].quote).toBe('The first sentence is here.');
+    expect(droppedQuotationCount).toBe(1);
+  });
+
+  it('orders kept quotes by rating, not by the order the model supplied them', () => {
+    // Discriminating: the model lists the low-rated reviewer's quote first.
+    const reviewers = [
+      reviewerWithAnswers(
+        { suggestionId: 'low', name: 'Low', reviewerOverallAssessment: 2 },
+        [{ questionKey: 'q1', answerText: 'This proposal has serious flaws.' }],
+      ),
+      reviewerWithAnswers(
+        { suggestionId: 'high', name: 'High', reviewerOverallAssessment: 5 },
+        [{ questionKey: 'q1', answerText: 'This proposal is outstanding work.' }],
+      ),
+    ];
+    const { quotations } = composeWriteupParagraphs({
+      reviewers,
+      synthesis: {
+        writeupQuotations: [
+          { questionKey: 'q1', quote: 'This proposal has serious flaws.' },
+          { questionKey: 'q1', quote: 'This proposal is outstanding work.' },
+        ],
+      },
+    });
+    expect(quotations.map((q) => q.quote)).toEqual([
+      'This proposal is outstanding work.',
+      'This proposal has serious flaws.',
+    ]);
+    expect(quotations[0].leadIn).toBe('The most positive reviewer said:');
+    expect(quotations[1].leadIn).toBe('The most critical reviewer noted:');
+  });
+
+  it('drops a quote that matches two reviewers\' answers (ambiguous attribution)', () => {
+    const sharedText = 'This exact sentence appears in both reviews verbatim.';
+    const reviewers = [
+      reviewerWithAnswers(
+        { suggestionId: 'a', name: 'A', reviewerOverallAssessment: 5 },
+        [{ questionKey: 'q1', answerText: sharedText }],
+      ),
+      reviewerWithAnswers(
+        { suggestionId: 'b', name: 'B', reviewerOverallAssessment: 4 },
+        [{ questionKey: 'q1', answerText: sharedText }],
+      ),
+    ];
+    const { quotations, droppedQuotationCount } = composeWriteupParagraphs({
+      reviewers,
+      synthesis: { writeupQuotations: [{ questionKey: 'q1', quote: sharedText }] },
+    });
+    expect(quotations).toEqual([]);
+    expect(droppedQuotationCount).toBe(1);
+  });
+
+  it('reduces five survivors to top, median, and bottom by rating (W8)', () => {
+    // Discriminating: ratings are neither in roster order nor in candidate-list
+    // order, so a broken implementation that picks by index rather than
+    // sorting by rating (desc) would fail this assertion.
+    const ratings = [3, 5, 1, 4, 2];
+    const reviewers = ratings.map((rating, i) => reviewerWithAnswers(
+      { suggestionId: `r${i}`, name: `R${i}`, reviewerOverallAssessment: rating },
+      [{ questionKey: 'q1', answerText: `Reviewer ${i} quote text goes here.` }],
+    ));
+    const { quotations } = composeWriteupParagraphs({
+      reviewers,
+      synthesis: {
+        writeupQuotations: ratings.map((_, i) => ({ questionKey: 'q1', quote: `Reviewer ${i} quote text goes here.` })),
+      },
+    });
+    expect(quotations).toHaveLength(3);
+    // Sorted desc by rating: R1(5), R3(4), R0(3), R4(2), R2(1) — top/median/bottom = R1, R0, R2.
+    expect(quotations.map((q) => q.quote)).toEqual([
+      'Reviewer 1 quote text goes here.',
+      'Reviewer 0 quote text goes here.',
+      'Reviewer 2 quote text goes here.',
+    ]);
+    expect(quotations.map((q) => q.leadIn)).toEqual([
+      'The most positive reviewer said:',
+      'Another reviewer noted:',
+      'The most critical reviewer noted:',
+    ]);
+  });
+
+  it('breaks a rating tie by roster order, not candidate-list order or name (W8)', () => {
+    // Discriminating: both reviewers tie at rating 5. Roster order is
+    // [Zed, Abe] but the candidate list is given in the opposite order
+    // ([Abe's quote, Zed's quote]) and names are reverse-alphabetical vs.
+    // roster order. An implementation that falls back to candidate-list
+    // order or to alphabetical-by-name would produce [Abe, Zed] instead.
+    const reviewers = [
+      reviewerWithAnswers(
+        { suggestionId: 'zed', name: 'Zed', reviewerOverallAssessment: 5 },
+        [{ questionKey: 'q1', answerText: 'Zed thinks this is excellent work.' }],
+      ),
+      reviewerWithAnswers(
+        { suggestionId: 'abe', name: 'Abe', reviewerOverallAssessment: 5 },
+        [{ questionKey: 'q1', answerText: 'Abe also thinks this is excellent.' }],
+      ),
+    ];
+    const { quotations } = composeWriteupParagraphs({
+      reviewers,
+      synthesis: {
+        writeupQuotations: [
+          { questionKey: 'q1', quote: 'Abe also thinks this is excellent.' },
+          { questionKey: 'q1', quote: 'Zed thinks this is excellent work.' },
+        ],
+      },
+    });
+    expect(quotations.map((q) => q.quote)).toEqual([
+      'Zed thinks this is excellent work.',
+      'Abe also thinks this is excellent.',
+    ]);
   });
 });

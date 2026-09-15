@@ -396,10 +396,10 @@ function describeSynthesisBlocker(blocker) {
  * never via `dangerouslySetInnerHTML`. Copy is client-only (clipboard write),
  * so it stays enabled even in read-only Preview.
  */
-function WriteupParagraphsCard({ reviewers }) {
-  const { paragraphs, warnings, text, html } = useMemo(
-    () => composeWriteupParagraphs({ reviewers }),
-    [reviewers],
+function WriteupParagraphsCard({ reviewers, synthesis, synthesisCurrent }) {
+  const { paragraphs, warnings, text, html, themes } = useMemo(
+    () => composeWriteupParagraphs({ reviewers, synthesis }),
+    [reviewers, synthesis],
   );
   const [copyState, setCopyState] = useState('idle');
 
@@ -453,6 +453,15 @@ function WriteupParagraphsCard({ reviewers }) {
           </p>
         ))}
       </div>
+      {/* Slice 2 (plan §4.3): a stored synthesis current for today's roster but
+          predating writeupThemes/writeupQuotations. Not an error, not a
+          staleness flag — points at the existing Regenerate control on the
+          Synthesis card rather than adding a new action here. */}
+      {synthesisCurrent === true && !themes && (
+        <p className="mt-2 text-xs text-gray-500">
+          Regenerate synthesis to add themes and quotations.
+        </p>
+      )}
       {warnings.length > 0 && (
         <ul className="mt-2 space-y-0.5 text-xs text-gray-500">
           {warnings.map((warning, i) => (
@@ -1017,7 +1026,13 @@ export default function ReviewsTab({ requestId, previewReadOnly = false }) {
         onUpdated={load}
         previewReadOnly={previewReadOnly}
       />
-      {submitted.length > 0 && <WriteupParagraphsCard reviewers={submitted} />}
+      {submitted.length > 0 && (
+        <WriteupParagraphsCard
+          reviewers={submitted}
+          synthesis={proposal?.reviewSynthesis ?? null}
+          synthesisCurrent={proposal?.reviewSynthesisState?.current ?? null}
+        />
+      )}
     </div>
   );
 }

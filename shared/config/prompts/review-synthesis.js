@@ -43,7 +43,11 @@ Respond with ONLY a single JSON object, no markdown fences, no commentary, in ex
     "ratingSummaries": [
       { "questionKey": "riskLevel", "questionText": "<the question text as given>", "summary": "1-2 sentence summary of the score distribution and the rationale reviewers gave" }
     ],
-    "overall": "2-4 sentence overall synthesis of where the reviews land and what staff/PDs should focus discussion on"
+    "overall": "2-4 sentence overall synthesis of where the reviews land and what staff/PDs should focus discussion on",
+    "writeupThemes": "2-3 sentences, neutral academic register, on the overall tone of the reviews and the themes shared across reviewers, suitable for a foundation writeup",
+    "writeupQuotations": [
+      { "questionKey": "<the question key the quote was taken from>", "quote": "a verbatim sentence or clause copied exactly from one reviewer's Answer text" }
+    ]
   }
 }
 
@@ -54,7 +58,9 @@ Rules:
 - During expand or rollback, an older "impact" picklist may appear. Treat it as a numeric rating, while "riskLevel" and "overallAssessment" are the current numeric ratings.
 - Ignore any answer the server omits as unreadable; do not infer missing selections.
 - Keep every string plain text (no HTML, no markdown formatting).
-- Never quote a reviewer's name inside a string value — refer to reviewers only as "a reviewer" / "reviewers" / "most reviewers", since the values may be displayed without attribution context.`;
+- Never quote a reviewer's name inside a string value — refer to reviewers only as "a reviewer" / "reviewers" / "most reviewers", since the values may be displayed without attribution context.
+- "writeupThemes" is 2-3 sentences (about 120 words or fewer) in a neutral academic register describing the overall tone of the reviews and themes shared across reviewers. No names, no HTML, no markdown.
+- "writeupQuotations" holds three representative quotations spanning the most positive review to the most critical review (fewer than three when fewer than three reviews are submitted), at most one quotation per reviewer. Each "quote" must be copied character-for-character from that reviewer's own "Answer text" — no paraphrasing, no ellipsis, no stitching together separate sentences — and about 60 words or fewer. Record the "questionKey" of the answer it was copied from. Do NOT rank, order, or label the quotations by how positive or critical they are, and do NOT include any field indicating stance or ranking — selection and ordering are handled outside this response.`;
 
 export const USER_PROMPT_TEMPLATE = `Submitted peer reviews for this proposal:
 
@@ -114,7 +120,10 @@ export const PROMPT_OUTPUT_SCHEMA = {
     properties: {
       synthesis: {
         type: 'object',
-        required: ['consensus', 'disagreements', 'keyConcerns', 'ratingSummaries', 'overall'],
+        required: [
+          'consensus', 'disagreements', 'keyConcerns', 'ratingSummaries', 'overall',
+          'writeupThemes', 'writeupQuotations',
+        ],
         additionalProperties: false,
         properties: {
           consensus: { type: 'array', items: { type: 'string' } },
@@ -134,6 +143,24 @@ export const PROMPT_OUTPUT_SCHEMA = {
             },
           },
           overall: { type: 'string' },
+          // Slice 2 (Reviews Tab Phase II, docs/plans/REVIEWS_TAB_WRITEUP_PARAGRAPHS_PLAN_2026-09-14.md
+          // §4.3): no maxItems/maxLength here — the LLM client forwards this
+          // jsonSchema to the provider untouched, and this schema keeps that
+          // no-caps-in-jsonSchema pattern. All bounds live in validationSchema
+          // below, which IS enforced (and fails closed) at write time.
+          writeupThemes: { type: 'string' },
+          writeupQuotations: {
+            type: 'array',
+            items: {
+              type: 'object',
+              required: ['questionKey', 'quote'],
+              additionalProperties: false,
+              properties: {
+                questionKey: { type: 'string' },
+                quote: { type: 'string' },
+              },
+            },
+          },
         },
       },
     },
@@ -162,6 +189,20 @@ export const PROMPT_OUTPUT_SCHEMA = {
             },
           },
           overall: { type: 'string', maxLength: 3000, required: false, default: '' },
+          writeupThemes: { type: 'string', maxLength: 2000, required: false, default: '' },
+          writeupQuotations: {
+            type: 'array',
+            maxItems: 10,
+            required: false,
+            default: [],
+            of: {
+              type: 'object',
+              fields: {
+                questionKey: { type: 'string', maxLength: 100 },
+                quote: { type: 'string', maxLength: 600 },
+              },
+            },
+          },
         },
       },
     },
