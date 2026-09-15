@@ -91,8 +91,8 @@ fallback.
   (`logistics-service.js::refsFromParties`, S466) instead of failing closed.
 - `recipient-directory-service.js` joins active WMKF profiles to enabled
   `systemusers` and reads Board/Consultant suggestions by immutable
-  `expertise_roster.id`. **[SOURCE-BUILT 2026-09-14; Postgres migration 050 not
-  yet applied.]** An unlinked roster row uses its maintained `preferred_email`;
+  `expertise_roster.id`. **[PRODUCTION-LIVE 2026-09-14; Postgres migration 050
+  applied.]** An unlinked roster row uses its maintained `preferred_email`;
   a linked row resolves only the active Dataverse Contact's current
   `emailaddress1`. Missing, inactive, and email-less linked Contacts produce a
   visible no-email state without falling back to the Postgres copy. The

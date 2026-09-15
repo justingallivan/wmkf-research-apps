@@ -89,7 +89,7 @@ RBAC scaffolding for the explorer write tools. Restrictions table is empty; a 27
 
 ## Expertise Finder
 
-### `expertise_roster` (38 rows), `expertise_matches` (344 rows)
+### `expertise_roster` (39 rows), `expertise_matches` (344 rows)
 **Source of truth:** Postgres.
 Internal staff/consultant/board roster + per-proposal match history. Production
 consumers are `pages/api/expertise-finder/{match,batch-match,roster,history}.js`;
@@ -97,7 +97,7 @@ production prompt rules live in
 `shared/config/prompts/expertise-finder.js`. The isolated
 `modules/expertise_matching` reference/demo has no production caller.
 Migration 035 added nullable normalized `preferred_email`. Migration 050 is
-**[SOURCE-BUILT 2026-09-14; not yet applied]** and adds nullable
+**[PRODUCTION-LIVE 2026-09-14; applied and read back]** and adds nullable
 `dataverse_contact_id UUID` plus a partial unique index permitting only one
 active roster row per Contact. For an unlinked Board/Consultant row, the Site
 Visit recipient directory continues to use `preferred_email`. For a linked row,
@@ -108,6 +108,10 @@ The Expertise Finder editor is the interactive link writer, and
 The immutable roster row ID remains the external recipient identity; names and
 email addresses are never join keys. **[HISTORICAL LIVE SNAPSHOT 2026-08-24:
 migration-035 column exact; zero preferred-email values before staff population.]**
+**[PRODUCTION SNAPSHOT 2026-09-14 local / 2026-09-15 UTC:]** 39 roster rows;
+9 active Board (4 linked), 26 active Consultants (6 linked), and 4 active
+Research Program Staff. Five Board rows are owner-deferred as a non-blocking
+future-cycle reconciliation; see the roster Contact-link plan F5.
 
 ## Integrity Screener
 

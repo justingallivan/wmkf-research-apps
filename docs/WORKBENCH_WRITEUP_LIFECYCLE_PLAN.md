@@ -408,8 +408,8 @@ sources:
 - WMKF staff: active `user_profiles` reconciled to enabled Dataverse
   `systemusers`; the stable system-user ID is retained for ActivityParty binding.
 - Board and consultants: active `expertise_roster` rows. Unlinked rows use the
-  nullable normalized manual `preferred_email`; **[SOURCE-BUILT 2026-09-14;
-  migration 050 not yet applied]** linked rows store a Contact GUID and resolve
+  nullable normalized manual `preferred_email`; **[PRODUCTION-LIVE 2026-09-14;
+  migration 050 applied]** linked rows store a Contact GUID and resolve
   only the active Dataverse Contact's current primary email. Missing, inactive,
   or email-less linked Contacts fail visibly without a manual fallback. The
   immutable roster primary key remains the identity; names and emails are

@@ -2,8 +2,8 @@
 title: Roster Contact Link — Resolve Board and Consultant Emails from Dataverse Contacts
 domain: meeting-tracker
 kind: plan
-status: active
-summary: "SOURCE-BUILT 2026-09-14 after six plan-review folds, one implementation-review fold, and owner resolution of D1–D5. Migration 050 is not yet applied and the owner backfill has not run. Linked Board/Consultant email resolves live from Dataverse while unlinked rows retain manual email. Roster row id stays the attendee identity; Dataverse remains read-only."
+status: shipped
+summary: "PRODUCTION-LIVE after PR #301, migration 050, and the owner-reviewed backfill. Ten active Board/Consultant rows are linked to Dataverse Contacts; five remaining Board rows are intentionally deferred as a non-blocking future-cycle reconciliation. Linked email resolves live from Dataverse while unlinked rows retain manual email. Roster row id stays the attendee identity; Dataverse remains read-only."
 cataloged: 2026-09-14
 last_verified: 2026-09-14
 owner: product-engineering
@@ -16,25 +16,28 @@ related:
 
 # Roster Contact Link
 
-## Implementation status — 2026-09-14
+## Implementation status — production closeout 2026-09-14 local / 2026-09-15 UTC
 
-**[SOURCE-BUILT; NOT DEPLOYED.]** Slices 1–4 are implemented on
-`codex/roster-contact-link-implementation`: migration 050 and fresh-install
-parity, roster API validation/uniqueness handling, live Contact-backed directory
-resolution, linked-specific attendee remedies, the bounded Expertise Finder
-Contact picker, the dry-run-first owner backfill, focused tests, and durable-doc
-reconciliation. A Claude Opus OAuth implementation review completed and its
-findings are folded below. Migration 050 has not been applied, no roster link has
-been written, and no production behavior is claimed. Source verification is green:
-the 88-test focused roster/meeting-tracker set, all 13,470 repository tests, type
-checking, production build, and the relevant migration/security/Dataverse/Atlas/doc
-gates and self-tests. The repository-wide agent-wiki check has one worktree-only
-environmental failure because `.agents/skills` is absent here; the tracked agent
-invariant check passes and this branch does not change harness paths. The next steps
-are PR review/merge, deliberate deployment, owner migration apply/readback, and then
-the owner-reviewed backfill dry run.
+**[PRODUCTION-LIVE.]** PR #301 merged as `17c314b3`; the owner confirmed the
+Production deployment Ready. Migration 050 was applied with the canonical migration
+runner and independently read back from `schema_migrations`,
+`information_schema.columns`, and `pg_indexes`. The owner-reviewed dry run was
+followed by explicit per-row confirmation and production writes attributed to
+profile 2. A second email-authority pass linked five more existing rows and added
+Thomas Rieker as Consultant roster row 39, linked to his exact active Dataverse
+Contact. Production readback now shows 39 roster rows: 9 active Board (4 linked),
+26 active Consultants (6 linked), and 4 active Research Program Staff. The shared
+recipient-directory consumer resolved the linked Board emails and Thomas Rieker's
+email live from Dataverse.
 
-## 0. Problem
+The five unlinked Board rows are Kent Kresa, Richard N. Foster, Robert A. Bradway,
+Thomas E. Everhart, and William R. Brody. None has a manual roster email; the owner
+suspects they are not Dataverse Contacts and confirmed they are not needed this
+cycle. Their reconciliation is therefore a named future-cycle follow-up, **not a
+release or current-cycle blocker**. William R. Brody does have one active same-name
+Contact, but it currently has no primary email and remains deliberately unlinked.
+
+## 0. Problem — historical pre-release state
 
 Board members cannot be added to a deliberation session (owner report 2026-09-14). The
 picker lists every active Board roster row, but the shared recipient resolver refuses any
@@ -107,7 +110,7 @@ PR #294 (branch `fix/meeting-tracker-2026-09-14`) makes the failure self-explain
   validated with `isGuid` from `lib/utils/guid.js` before reaching any selector
   [`guid.js:1-30`].
 
-## 2. Recommendation
+## 2. Shipped design
 
 **Add a nullable `dataverse_contact_id` to `expertise_roster` and resolve email from the
 linked contact.** The roster row id stays the attendee identity, so every saved session and
@@ -223,7 +226,12 @@ construction (chunked exact-GUID filter).
   the form's initial stored value (or null on Add) before greying the field, so typing a new
   email and then selecting a contact cannot create an unsavable greyed value.
 
-## 3. Build slices
+## 3. Build slices — completed
+
+Slices 1–4 shipped in PR #301 and migration 050 is applied in Production. Slice 0's
+temporary plan to populate all nine Board manual emails was not used: linked rows
+now resolve from Dataverse, and the five remaining unlinked Board rows are deferred
+under follow-up F5 by owner decision.
 
 | Slice | Tier | Content |
 |---|---|---|
@@ -233,10 +241,11 @@ construction (chunked exact-GUID filter).
 | **3 Backfill** | 0 (script, dry-run default) | `scripts/link-roster-contacts.js` enters the script-only restriction context once with `enterDynamicsBypassForScript('link-roster-contacts')`, then for each active Board/Consultant row without a link tries (a) exact `findByOrcidCandidates(orcid)` when the roster ORCID is valid, else (b) `searchByName(name)` accepting only a single ranked candidate that is active and has an email. The proposal table includes the current manual email, candidate summaries on ambiguous/unusable results, and distinguishes missing, unusable, inactive-only, email-less, and confirmation-mismatch outcomes. `--apply` requires `--actor-profile-id <id>` so `updated_by` is auditable; it auto-writes **ORCID matches only**, and only when `findByOrcidCandidates` returns `{ one: true }` **and** that row's `emailaddress1` normalizes non-null. Any supplied `--confirm <rosterId>=<contactId>` must agree with the proposed Contact even for an automatic ORCID match; a mismatch blocks the write. Name-only candidates require exact per-row owner confirmation because `rankNameRows`/`namesMatch` accept a single-letter first-initial prefix (`lib/utils/contact-parser.js:641-668`). The roster's `'N/A'` ORCID placeholder normalizes to `malformed` and is skipped safely. A 23505 race/conflict is reported per roster row with the conflicting active row, never counted as applied, and remaining rows continue. **The owner runs it** (`feedback-never-self-authorize-prod-dataverse-reads`). Do not predict how middle-initial names ("James S. Economou") rank; the dry run shows it. |
 | **4 Reconcile** | 0 | Atlas `postgres-infra-tables.md` roster entry (+ column; its "zero preferred-email values before staff population" claim becomes historical), `dataverse-wmkf-sitevisit.md` §directory, matrix rows for `/api/meeting-tracker/recipients`, `/api/workbench/site-visit/recipients`, `/api/expertise-finder/roster`, PC plan §5 attendee line, `docs/agent-wiki/topics/dataverse-dynamics.md`. Run `/sweep` for the "preferred email is the only Board email source" fact. |
 
-**[PREREQUISITE SATISFIED 2026-09-14.]** PR #294 merged before this implementation branch was
-created, preserving its named 409 and disabled-chip surfaces. Slices 1–2 are now source-built
-on the fresh branch with migration 050; they still require PR review and deliberate promotion.
-Slice 3 is run once by the owner only after migration 050 deploys; slice 4 rides with 1–2.
+**[COMPLETED.]** PR #294 merged before the implementation branch was created,
+preserving its named 409 and disabled-chip surfaces. PR #301 then shipped slices
+1–4; migration 050 and the owner-reviewed backfill completed after the Production
+deployment became Ready. The remaining Board-row gap is intentionally deferred to
+F5 rather than treated as an incomplete rollout.
 
 ## 4. Contract reconcile (Mode A, plan review) — 2026-09-14
 
@@ -415,3 +424,11 @@ backfill apply.
   appears in the consultant-feedback dropdown as a person [VERIFIED via the §0 query].
 - **F4** The session editor copy "The fixed staff list is selected for new sessions" sits
   beside a "Default attendees are not configured" notice. Pre-existing; not touched.
+- **F5 — non-blocking future-cycle roster reconciliation.** Kent Kresa, Richard N.
+  Foster, Robert A. Bradway, Thomas E. Everhart, and William R. Brody remain active
+  Board rows without a Contact link or manual email. The owner suspects they are not
+  Contacts and confirmed they are not needed this cycle. Before a cycle that needs
+  them, verify or create the appropriate Dataverse Contact and link it in Expertise
+  Finder, or maintain a manual roster email while unlinked. William R. Brody's one
+  active same-name Contact currently has no primary email; do not link it until the
+  Contact has a usable address.
