@@ -25,6 +25,11 @@ const MIGRATION_045 = '045_cycle_dossiers.sql';
 const MIGRATION_051 = '051_reviewer_institution_measurement_events.sql';
 const CYCLE_DOSSIER_MIGRATION_SHA256 = '73c3d6643b523de36edf72f7cc3f30cee13a807ebb6aa5e72709b1053c888fca';
 const TABLE = 'reviewer_institution_measurement_events';
+const MIGRATION_ALERT_KEYS = [
+  'migration-tracker-missing',
+  'migration-drift',
+  'migration-drift-ahead',
+];
 
 const EXPECTED_COLUMNS = [
   ['id', 'bigint', 'NO', null, 'nextval'],
@@ -159,6 +164,13 @@ function assertMeasurementDisabled(env = process.env) {
   }
 }
 
+function assertNoOpenMigrationAlerts(rows) {
+  if (rows.length > 0) {
+    const open = rows.map((row) => `${row.auto_resolve_key}:${row.status}:${row.count}`).join(', ');
+    throw new Error(`Migration reconciliation left open alerts: ${open}`);
+  }
+}
+
 function verifyCycleDossierMigrationDigest() {
   const filename = path.join(ROOT, 'lib/db/migrations', MIGRATION_045);
   const digest = crypto.createHash('sha256').update(fs.readFileSync(filename)).digest('hex');
@@ -196,6 +208,18 @@ async function readMeasurementSchema(client) {
   )).rows;
   const rowCount = (await client.query(`SELECT COUNT(*)::integer AS count FROM ${TABLE}`)).rows[0]?.count;
   return { columns, constraints, indexes, rowCount };
+}
+
+async function readOpenMigrationAlerts(client) {
+  return (await client.query(
+    `SELECT auto_resolve_key, status, COUNT(*)::integer AS count
+       FROM system_alerts
+      WHERE auto_resolve_key = ANY($1::text[])
+        AND status IN ('active', 'acknowledged')
+      GROUP BY auto_resolve_key, status
+      ORDER BY auto_resolve_key, status`,
+    [MIGRATION_ALERT_KEYS],
+  )).rows;
 }
 
 async function assertPostApply(client) {
@@ -267,7 +291,15 @@ async function main() {
     const schema = await readMeasurementSchema(client);
     const errors = validateMeasurementSchema(schema);
     if (errors.length > 0) throw new Error(`Final schema verification failed: ${errors.join('; ')}`);
-    console.log(JSON.stringify({ mode, measurementEnabled: false, diff, rowCount: Number(schema.rowCount) }, null, 2));
+    const openMigrationAlerts = await readOpenMigrationAlerts(client);
+    assertNoOpenMigrationAlerts(openMigrationAlerts);
+    console.log(JSON.stringify({
+      mode,
+      measurementEnabled: false,
+      diff,
+      rowCount: Number(schema.rowCount),
+      openMigrationAlerts,
+    }, null, 2));
   } finally {
     await client.end();
   }
@@ -285,6 +317,7 @@ module.exports = {
   assertTrackerStage,
   validateMeasurementSchema,
   assertMeasurementDisabled,
+  assertNoOpenMigrationAlerts,
   cleanupObsolete038,
   _constants: {
     MIGRATION_038,
@@ -292,5 +325,6 @@ module.exports = {
     MIGRATION_051,
     EXPECTED_COLUMNS,
     EXPECTED_CHECK_LITERALS,
+    MIGRATION_ALERT_KEYS,
   },
 };

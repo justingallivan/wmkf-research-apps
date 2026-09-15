@@ -5,6 +5,7 @@ const {
   assertTrackerStage,
   validateMeasurementSchema,
   assertMeasurementDisabled,
+  assertNoOpenMigrationAlerts,
   cleanupObsolete038,
   _constants,
 } = require('../../scripts/reconcile-migration-051');
@@ -74,6 +75,13 @@ test('exact-on measurement is the only rejected flag value', () => {
   expect(() => assertMeasurementDisabled({ REVIEWER_INSTITUTION_MEASUREMENT: 'on' })).toThrow(/exact-on/);
   expect(() => assertMeasurementDisabled({ REVIEWER_INSTITUTION_MEASUREMENT: 'off' })).not.toThrow();
   expect(() => assertMeasurementDisabled({})).not.toThrow();
+});
+
+test('final verification rejects any active or acknowledged migration alert', () => {
+  expect(() => assertNoOpenMigrationAlerts([])).not.toThrow();
+  expect(() => assertNoOpenMigrationAlerts([
+    { auto_resolve_key: 'migration-drift', status: 'active', count: 1 },
+  ])).toThrow(/migration-drift:active:1/);
 });
 
 test('cleanup deletes only obsolete 038 and commits only after exact final parity', async () => {

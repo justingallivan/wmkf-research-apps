@@ -3,7 +3,7 @@ title: Institution Affiliation Compatibility Resolution Plan
 domain: reviewer-identity
 kind: plan
 status: active
-summary: "Stage 2 presentation is live; Stage 3 prospective measurement is source-built but not enabled or schema-probed."
+summary: "Stage 2 presentation is live; Stage 3 measurement storage is applied and empty while prospective capture remains disabled."
 canonical: false
 cataloged: 2026-08-08
 last_verified: 2026-09-15
@@ -87,10 +87,11 @@ not current Production environment state.
 **Stage 3 measurement source state (2026-09-15):** migration 051, the
 `REVIEWER_INSTITUTION_MEASUREMENT=on` best-effort writer, aggregate operator
 report, and retention cleanup are source-built on `codex/ror-measurement-runs`.
-The migration was not applied in this session, live schema was not probed, and
-the flag defaults off. Successful roster writes
+The canonical runner applied migration 051 to the shared Production/Preview
+database; exact schema readback passed and the table was empty. The flag is
+absent in both environments and defaults off. Successful roster writes
 and authenticated staff/save outcomes can be counted prospectively after
-promotion, but no independent non-affiliation identity proof, exact upstream
+separate owner-authorized enablement, but no independent non-affiliation identity proof, exact upstream
 publication/employment observation date, or complete extra-affiliation COI
 screen is supplied. Every proposed action remains `not_evaluable` by schema;
 this is not a Stage 3 selection or write-authority rollout.
@@ -582,8 +583,9 @@ staff-action count or source-complete typed selection inputs. An exploratory
 stored-text ROR probe is non-authoritative and cannot label auto-clear cases.
 The [baseline audit](audits/institution-affiliation-last-cycle-baseline-2026-09-14.md)
 records denominators and the missing measurements. Execution step 1 remains
-open: prospective capture is source-built but not enabled or live-probed, with no organic
-events yet. Do not interpret 106 as avoidable reviews or proceed to a live
+open: prospective capture is source-built and its empty storage is live-probed,
+but collection is not enabled, with no organic events yet. Do not interpret
+106 as avoidable reviews or proceed to a live
 selection-authority flip on this evidence.
 
 **Owner-reviewed intake result (2026-09-14):** a varied 26-case subset of the
