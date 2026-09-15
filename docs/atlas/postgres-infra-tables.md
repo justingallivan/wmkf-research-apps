@@ -384,7 +384,7 @@ expected columns, 0 rows — empty until the branch merges.]**
 
 ## Portal upload staging
 
-### `portal_upload_staging` (migrations 031, 043)
+### `portal_upload_staging` (migrations 031, 043, 049)
 **Source of truth:** Postgres coordination ledger; published abstract/caption/image
 authority remains Dataverse + SharePoint.
 
@@ -404,10 +404,22 @@ Write/read paths: `lib/services/portal-upload-staging.js`; external grantee mint
 and submit routes; staff replacement mint and finalize routes; external
 applicant materials mint and finalize routes (scope `site_visit_material`,
 migration 043, S503; document content types, cap from the admin setting
-`site_visit_materials.upload_max_mb`). Raw external
+`site_visit_materials.upload_max_mb`); staff Consultant Feedback attachment
+mint and finalize routes (scope `consultant_feedback`, migration 049,
+Consultant Feedback slice 2 — `docs/plans/CONSULTANT_FEEDBACK_PLAN_2026-09-14.md`
+§4; PDF/DOCX only, `lib/services/consultant-feedback-attachment-service.js`).
+Raw external
 tokens are never stored (SHA-256 binding only), and clients never choose or echo
 an authoritative pathname. Daily maintenance deletes exact table-selected Blob
-pathnames after expiry and prunes terminal ledger rows after seven days.
+pathnames after expiry and prunes terminal ledger rows after seven days; since
+the Consultant Feedback prerequisite (same plan §4 "Slice 2 prerequisite"),
+that sweep also reconciles any `candidate_result` recorded after a Graph
+upload against a per-scope binding proof before expiring the row —
+`consultant_feedback` and `site_visit_material` scopes have a proof wired
+(fail-closed: an unbound Ready registry row is superseded before its Graph
+item is discarded); `grantee_image`/`staff_grantee_image` and any
+unrecognised candidate shape are always retained, never discarded, until a
+proof is wired for them too.
 
 Private-store prerequisite is covered by
 `scripts/probe-private-blob-client-access.mjs`: public-mode PUT must fail, private
@@ -513,7 +525,7 @@ reviews resolve live from `wmkf_appreviewersuggestion`, and the proposal
 narrative resolves by governed path. Cleanup: none scheduled; revoked and expired
 rows stay as audit history (bounded by one live row per request).
 
-### `consultant_feedback` — Consultant Feedback slice 1 (migration 048, fresh-install v50; 2026-09-14)
+### `consultant_feedback` — Consultant Feedback slices 1-2 (migrations 048-049, fresh-install v50-v51; 2026-09-14)
 
 **Source of truth:** Postgres. Staff-recorded informal feedback from retained
 consultants on a proposal (`docs/plans/CONSULTANT_FEEDBACK_PLAN_2026-09-14.md`).
@@ -530,16 +542,23 @@ deactivated consultant's past feedback keeps its author name),
 null — a one-off consultant name stored on the entry itself; CF6: one-offs are
 never written to `expertise_roster` and never appear in recipient pickers),
 `body_html` (sanitized HTML, same `sanitizeReviewHtml` pipeline as reviews,
-re-sanitized on every read; slice 1 requires a non-empty body since it has no
-attachments), `received_on` (date), `requestdocument_id` (nullable, unique;
-slice 2 attachment binding — unused in slice 1), `shared`, `mutation_id`
+re-sanitized on every read; required unless `requestdocument_id` is set —
+an attachment-only entry may carry a null body), `received_on` (date),
+`requestdocument_id` (nullable, unique; slice 2: the bound attachment's
+`wmkf_requestdocumentid`, written either at create via `writeFeedbackEntry`
+or bound onto an existing row via `updateFeedbackEntry`'s `patch.requestdocumentId`,
+409 `attachment_conflict` if already set), `shared`, `mutation_id`
 (client-generated UUID; `UNIQUE (request_id, mutation_id)` backs a replay-safe
 create: `INSERT … ON CONFLICT (request_id, mutation_id) DO NOTHING` followed
 by a select on that mutation id, so a retry after a lost response returns the
 original row instead of duplicating it), `status` (`active` or `deleting`;
-slice 1 only ever writes `active` — hard delete goes straight from `active` to
-gone — the `deleting` value exists for slice 2's supersede-first delete
-lifecycle), `created_by`/`updated_by`/`created_at`/`updated_at`.
+an unattached row's delete still goes straight from `active` to gone — an
+attached row's delete sets `deleting` first (plan §3.6 three-step: mark
+`deleting` → supersede the registry row → PG delete), invisible to every
+`status = 'active'` reader from the first step; `listConsultantFeedback` runs
+a bounded recovery sweep over this request's `deleting` rows before every
+list, so a crash or lost response between steps completes on the next staff
+visit with no background job), `created_by`/`updated_by`/`created_at`/`updated_at`.
 
 Constraints: `consultant_feedback_has_content` (`body_html IS NOT NULL OR
 requestdocument_id IS NOT NULL`); `consultant_feedback_one_author` (exactly
@@ -550,17 +569,24 @@ would accept a Board member or an inactive roster row.
 
 Written and read exclusively by `lib/services/consultant-feedback-service.js`
 (`listConsultantFeedback`, `listEligibleConsultants`, `writeFeedbackEntry` —
-inserts, `updateFeedbackEntry` — author/body/date/share changes; both run in
-their own same-client transaction through the shared `assertConsultantEligible`/
-`validateAuthorInput` guards, eligibility only re-checked when the submitted
-author differs by value from the stored row, `deleteFeedbackEntry`,
-`loadSharedConsultantFeedbackForBriefing`), called from
-`/api/workbench/consultant-feedback[/consultants]` and
+inserts, `updateFeedbackEntry` — author/body/date/share/attachment-bind
+changes; both run in their own same-client transaction through the shared
+`assertConsultantEligible`/`validateAuthorInput` guards, eligibility only
+re-checked when the submitted author differs by value from the stored row,
+`deleteFeedbackEntry` — the plan §3.6 three-step for an attached row,
+`isSharedActiveFeedbackAttachment` — half of the briefing page's `feedback:`
+member proof, `loadSharedConsultantFeedbackForBriefing`), called from
+`/api/workbench/consultant-feedback[/consultants]`,
+`lib/services/consultant-feedback-attachment-service.js` (slice 2 attachment
+lifecycle — see the `wmkf_requestdocuments` entry below), and
 `lib/services/deliberation-briefing/briefing-page-service.js`'s
-`buildBriefingContext` (`consultantFeedback: { status: 'ok' | 'unavailable',
-items }` — a read failure on this table alone degrades to `unavailable` with a
-structured log rather than failing the whole briefing context or looking like
-"no feedback"). No `expertise_roster` write happens anywhere in this feature.
+`buildBriefingContext`/`resolveBriefingMember` (`consultantFeedback: { status:
+'ok' | 'unavailable', items }` — a read failure on this table alone degrades to
+`unavailable` with a structured log rather than failing the whole briefing
+context or looking like "no feedback"; each shared item's
+`attachment.member = 'feedback:<requestdocumentid>'` only when the registry
+row is Ready and not Superseded). No `expertise_roster` write happens anywhere
+in this feature.
 Cleanup: none (CF5 — a deleted row is simply gone).
 
 ### `site_visit_material_collections` (migrations 042, 044; S503)

@@ -13,6 +13,7 @@ import {
   updateFeedbackEntry,
   deleteFeedbackEntry,
   loadSharedConsultantFeedbackForBriefing,
+  isSharedActiveFeedbackAttachment,
 } from '../../lib/services/consultant-feedback-service';
 
 const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
@@ -266,16 +267,60 @@ describe('updateFeedbackEntry', () => {
   });
 });
 
-test('deleteFeedbackEntry hard-deletes an active row', async () => {
-  sql.query.mockResolvedValueOnce({ rows: [{ id: 4 }] });
+test('deleteFeedbackEntry hard-deletes an active row with no attachment in one transaction', async () => {
+  client.query.mockResolvedValueOnce({ rows: [] }); // BEGIN
+  client.query.mockResolvedValueOnce({ rows: [{ id: 4, requestdocument_id: null }] }); // SELECT ... FOR UPDATE
   const result = await deleteFeedbackEntry({ id: 4, requestId: REQUEST_ID, actorProfileId: ACTOR_ID });
   expect(result).toEqual({ id: '4' });
-  expect(sql.query).toHaveBeenCalledWith(expect.stringContaining('DELETE FROM consultant_feedback'), [4, REQUEST_ID]);
+  expect(client.query.mock.calls.some(([q]) => /DELETE FROM consultant_feedback/.test(q))).toBe(true);
+  expect(client.query).toHaveBeenCalledWith('COMMIT');
 });
 
 test('deleteFeedbackEntry 404s when the row is missing or already gone', async () => {
-  sql.query.mockResolvedValueOnce({ rows: [] });
+  client.query.mockResolvedValueOnce({ rows: [] }); // BEGIN
+  client.query.mockResolvedValueOnce({ rows: [] }); // SELECT ... FOR UPDATE finds nothing
   await expect(deleteFeedbackEntry({ id: 4, requestId: REQUEST_ID, actorProfileId: ACTOR_ID })).rejects.toMatchObject({ httpStatus: 404 });
+});
+
+test('deleteFeedbackEntry three-step ordering: an attached row supersedes the registry BEFORE the final PG delete', async () => {
+  const REQUESTDOCUMENT_ID = '44444444-4444-4444-8444-444444444444';
+  client.query.mockResolvedValueOnce({ rows: [] }); // BEGIN
+  client.query.mockResolvedValueOnce({ rows: [{ id: 4, requestdocument_id: REQUESTDOCUMENT_ID }] }); // SELECT ... FOR UPDATE
+  const callOrder = [];
+  sql.query.mockImplementation(async (q) => {
+    if (/DELETE FROM consultant_feedback/.test(q)) callOrder.push('pg-delete');
+    return { rows: [] };
+  });
+  const dependencies = {
+    supersedeDocument: jest.fn().mockImplementation(async () => { callOrder.push('supersede'); }),
+  };
+  const result = await deleteFeedbackEntry({ id: 4, requestId: REQUEST_ID, actorProfileId: ACTOR_ID }, dependencies);
+  expect(result).toEqual({ id: '4' });
+  expect(callOrder).toEqual(['supersede', 'pg-delete']);
+  expect(dependencies.supersedeDocument).toHaveBeenCalledWith(REQUESTDOCUMENT_ID);
+  // Step 1 (mark deleting) ran in the same client transaction and committed
+  // before steps 2-3 touched the registry.
+  expect(client.query.mock.calls.some(([q]) => /SET status = 'deleting'/.test(q))).toBe(true);
+});
+
+test('deleteFeedbackEntry step-3 failure leaves the row `deleting`; the list sweep completes it', async () => {
+  const REQUESTDOCUMENT_ID = '55555555-5555-4555-8555-555555555555';
+  client.query.mockResolvedValueOnce({ rows: [] }); // BEGIN
+  client.query.mockResolvedValueOnce({ rows: [{ id: 9, requestdocument_id: REQUESTDOCUMENT_ID }] }); // SELECT ... FOR UPDATE
+  sql.query.mockImplementation(async (q) => {
+    if (/DELETE FROM consultant_feedback/.test(q)) throw new Error('connection reset');
+    return { rows: [] };
+  });
+  const dependencies = { supersedeDocument: jest.fn().mockResolvedValue({}) };
+  await expect(deleteFeedbackEntry({ id: 9, requestId: REQUEST_ID, actorProfileId: ACTOR_ID }, dependencies))
+    .rejects.toMatchObject({ httpStatus: 502, body: expect.objectContaining({ reason: 'attachment_removal_pending' }) });
+  // Simulate a lost DELETE (step 3 never ran) — the next list-sweep for this
+  // request finds the row still `deleting` and finishes it.
+  sql.query.mockReset();
+  sql.query.mockResolvedValueOnce({ rows: [{ id: 9, requestdocument_id: REQUESTDOCUMENT_ID }] }); // sweep SELECT deleting rows
+  sql.query.mockResolvedValue({ rows: [] });
+  await listConsultantFeedback({ requestId: REQUEST_ID }, { ...dependencies, findDocumentsByIds: jest.fn().mockResolvedValue({ records: [] }) });
+  expect(dependencies.supersedeDocument).toHaveBeenCalledTimes(2);
 });
 
 describe('loadSharedConsultantFeedbackForBriefing', () => {
@@ -310,7 +355,7 @@ describe('loadSharedConsultantFeedbackForBriefing', () => {
     });
     const result = await loadSharedConsultantFeedbackForBriefing(REQUEST_ID);
     expect(result.status).toBe('ok');
-    expect(result.items).toEqual([{ name: 'Jane Doe', affiliation: 'Acme', receivedOn: '2026-09-01', bodyHtml: '<p>Shared.</p>' }]);
+    expect(result.items).toEqual([{ name: 'Jane Doe', affiliation: 'Acme', receivedOn: '2026-09-01', bodyHtml: '<p>Shared.</p>', attachment: null }]);
   });
 });
 
@@ -324,4 +369,44 @@ test('listEligibleConsultants queries only active Consultant rows', async () => 
 test('listConsultantFeedback rejects a non-GUID requestId before any query', async () => {
   await expect(listConsultantFeedback({ requestId: 'not-a-guid' })).rejects.toMatchObject({ httpStatus: 400 });
   expect(sql.query).not.toHaveBeenCalled();
+});
+
+describe('isSharedActiveFeedbackAttachment', () => {
+  const DOC_ID = '55555555-5555-4555-8555-555555555555';
+
+  test('the SQL filter itself excludes shared=false and status=\'deleting\' rows even when they are present in the fixture', async () => {
+    // Mirrors the "external privacy boundary" test above: the mock only
+    // filters on predicate substrings it finds in the query text, so
+    // deleting a `shared = true` or `status = 'active'` clause from the
+    // production query makes this mock stop filtering and fails the
+    // assertion below — it does not merely echo back whatever the fixture holds.
+    const FIXTURE_ROWS = [
+      { request_id: REQUEST_ID, requestdocument_id: DOC_ID, shared: false, status: 'active' }, // excluded: not shared
+      { request_id: REQUEST_ID, requestdocument_id: DOC_ID, shared: true, status: 'deleting' }, // excluded: deleting
+      { request_id: REQUEST_ID, requestdocument_id: DOC_ID, shared: true, status: 'active' }, // the one eligible row
+    ];
+    sql.query.mockImplementationOnce(async (queryText, params) => {
+      expect(queryText).toContain('shared = true');
+      expect(queryText).toContain("status = 'active'");
+      expect(params).toEqual([REQUEST_ID, DOC_ID]);
+      const matches = FIXTURE_ROWS.filter((row) => row.request_id === params[0]
+        && row.requestdocument_id === params[1]
+        && (!queryText.includes('shared = true') || row.shared)
+        && (!queryText.includes("status = 'active'") || row.status === 'active'));
+      return { rows: matches.length ? [{ '?column?': 1 }] : [] };
+    });
+    const result = await isSharedActiveFeedbackAttachment(REQUEST_ID, DOC_ID);
+    expect(result).toBe(true);
+  });
+
+  test('returns false with no query when either id is not a GUID', async () => {
+    expect(await isSharedActiveFeedbackAttachment('not-a-guid', DOC_ID)).toBe(false);
+    expect(await isSharedActiveFeedbackAttachment(REQUEST_ID, 'not-a-guid')).toBe(false);
+    expect(sql.query).not.toHaveBeenCalled();
+  });
+
+  test('returns false when no row matches (e.g. only excluded rows exist)', async () => {
+    sql.query.mockResolvedValueOnce({ rows: [] });
+    expect(await isSharedActiveFeedbackAttachment(REQUEST_ID, DOC_ID)).toBe(false);
+  });
 });

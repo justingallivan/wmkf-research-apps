@@ -1108,11 +1108,17 @@ Submitted reviewers still render as a read-only per-reviewer card list
 (ratings decoded via the static schema, richtext narrative answers, SharePoint
 download). Panel-prep roll-up/export now exists client-side (Phase 3, below).
 
-**Consultant Feedback (slice 1, 2026-09-14):** `ReviewsTab` also mounts
+**Consultant Feedback (slices 1-2, 2026-09-14):** `ReviewsTab` also mounts
 `shared/components/workbench/ConsultantFeedbackSection.js` below Outstanding,
 backed by `lib/services/consultant-feedback-service.js` and
-`/api/workbench/consultant-feedback[/consultants]` (new Postgres table
-`consultant_feedback`, migration 048). See
+`/api/workbench/consultant-feedback[/consultants]` (Postgres table
+`consultant_feedback`, migration 048). Slice 2 adds an optional PDF/DOCX
+attachment per entry via the browser-direct staged-upload pattern
+(`/api/workbench/consultant-feedback/upload-token` mints, `/finalize` binds),
+backed by `lib/services/consultant-feedback-attachment-service.js` and the
+`consultant_feedback` scope on the shared `portal_upload_staging` ledger
+(migration 049); an attached entry's delete is a three-step supersede-then-PG-delete
+(plan §3.6), recovered by a bounded sweep on the section's own list load. See
 `docs/plans/CONSULTANT_FEEDBACK_PLAN_2026-09-14.md`.
 
 **Phase 1 LIVE (S326; deployed, browser-drive-verified against live acceptance data; reminder safety production-observed 2026-09-01):** outstanding tracking + manual nudge. The owner lifted the procedural manual reminder freeze after the incident-session deployment/smoke observations and a post-deploy D26 liveness audit of 51 never-reminded sweep candidates found zero blocked rows. The deployment metadata did not expose a source SHA, and the authenticated smoke has no tracked artifact. The DTO

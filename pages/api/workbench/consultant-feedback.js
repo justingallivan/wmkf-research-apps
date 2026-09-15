@@ -53,7 +53,10 @@ export default async function handler(req, res) {
 
       if (req.method === 'PATCH') {
         const body = req.body || {};
-        const { id, requestId, ...patch } = body;
+        // requestdocumentId is bound only by the finalize service
+        // (lib/services/consultant-feedback-attachment-service.js), never by
+        // this client-facing route (plan §5).
+        const { id, requestId, requestdocumentId: _stripped, ...patch } = body;
         const entry = await updateFeedbackEntry({
           id,
           requestId: String(requestId || '').trim(),

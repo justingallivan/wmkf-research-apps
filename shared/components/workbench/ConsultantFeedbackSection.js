@@ -19,6 +19,25 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import RichReviewEditor from '../external/RichReviewEditor';
+import { SITE_VISIT_MATERIALS_UPLOAD_MAX_MB_DEFAULT } from '../../config/siteVisitMaterials';
+
+// Slice 2 attachments (docs/plans/CONSULTANT_FEEDBACK_PLAN_2026-09-14.md §4):
+// PDF or DOCX only, one per entry. The server (`getUploadMaxMb`, an
+// admin-editable Postgres setting shared with site-visit materials) is the
+// authority on the actual cap; this default is shown as a label only — the
+// upload-token mint route rejects an oversize file regardless of what this
+// says.
+const ATTACHMENT_ACCEPT = '.pdf,.docx';
+const ATTACHMENT_CONTENT_TYPES = new Set([
+  'application/pdf',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+]);
+
+function consultantDisplayName(form, consultants) {
+  if (form.addingPerson) return form.oneOffName.trim();
+  const match = consultants.find((c) => String(c.id) === String(form.consultantRosterId));
+  return match?.name || '';
+}
 
 // Same defensive pattern as review-panel-ui.js's makeIdempotencyKey and
 // SessionAgendaPanel's uuid helper: every real browser has
@@ -80,6 +99,17 @@ export default function ConsultantFeedbackSection({ requestId, previewReadOnly =
   const [confirmingDeleteId, setConfirmingDeleteId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
 
+  // Slice 2 attachment (§4). `editingAttachment` is the EXISTING attachment
+  // on the entry being edited (null on the add form, or an edit form for an
+  // entry with none yet) — the file input is hidden once an entry already
+  // carries one (one attachment per entry; a second file is a second entry).
+  const [attachFile, setAttachFile] = useState(null);
+  const [attachStagingId, setAttachStagingId] = useState(null);
+  const [attachUploadProgress, setAttachUploadProgress] = useState(null);
+  const [attachError, setAttachError] = useState(null);
+  const [editingAttachment, setEditingAttachment] = useState(null);
+  const attachInputRef = useRef(null);
+
   // Monotonic fetch id, same pattern as ReviewsTab.js:786-807 — guards every
   // post-await state write (success and failure) so a request switch never
   // paints another request's feedback.
@@ -133,6 +163,17 @@ export default function ConsultantFeedbackSection({ requestId, previewReadOnly =
     load();
   }, [load]);
 
+  const resetAttachState = useCallback(() => {
+    setAttachFile(null);
+    setAttachStagingId(null);
+    setAttachUploadProgress(null);
+    setAttachError(null);
+    setEditingAttachment(null);
+    // The file input keeps its selection across a re-render, so clear the
+    // DOM value too (same reasoning as AwardeeTab.js's closeReplace()).
+    if (attachInputRef.current) attachInputRef.current.value = '';
+  }, []);
+
   const openAddForm = useCallback(() => {
     mutationIdRef.current = makeMutationId();
     formRequestIdRef.current = requestId;
@@ -140,8 +181,9 @@ export default function ConsultantFeedbackSection({ requestId, previewReadOnly =
     setForm(emptyForm());
     setSaveError(null);
     originalAuthorRef.current = null;
+    resetAttachState();
     setFormOpen(true);
-  }, [requestId]);
+  }, [requestId, resetAttachState]);
 
   const openEditForm = useCallback((item) => {
     formRequestIdRef.current = requestId;
@@ -161,8 +203,10 @@ export default function ConsultantFeedbackSection({ requestId, previewReadOnly =
       oneOffAffiliation: item.oneOff ? (item.consultant.affiliation || null) : null,
     };
     setSaveError(null);
+    resetAttachState();
+    setEditingAttachment(item.attachment || null);
     setFormOpen(true);
-  }, [requestId]);
+  }, [requestId, resetAttachState]);
 
   const closeForm = useCallback(() => {
     setFormOpen(false);
@@ -177,7 +221,25 @@ export default function ConsultantFeedbackSection({ requestId, previewReadOnly =
     mutationIdRef.current = null;
     originalAuthorRef.current = null;
     formRequestIdRef.current = null;
-  }, []);
+    resetAttachState();
+  }, [resetAttachState]);
+
+  function handleAttachFileChange(event) {
+    const file = event.target.files?.[0] || null;
+    setAttachError(null);
+    // A newly picked file invalidates any prior staged upload for this form
+    // (a re-pick after a failed finalize should re-stage, not reuse bytes
+    // for a different file).
+    setAttachStagingId(null);
+    setAttachUploadProgress(null);
+    if (file && !ATTACHMENT_CONTENT_TYPES.has(file.type)) {
+      setAttachError('Only PDF or DOCX files are accepted.');
+      setAttachFile(null);
+      if (attachInputRef.current) attachInputRef.current.value = '';
+      return;
+    }
+    setAttachFile(file);
+  }
 
   // Belt 1: a request switch on this never-remounted tab closes any open
   // form and cancels an in-progress delete confirmation outright, rather
@@ -196,15 +258,51 @@ export default function ConsultantFeedbackSection({ requestId, previewReadOnly =
       setSaveError('This form is for a different request and cannot be saved. Please reopen it.');
       return;
     }
+    // Client-side mirror of the server's body_required rule (§3.1): an entry
+    // needs a body OR an attachment (a NEW file about to be staged, or an
+    // EXISTING one already bound when editing).
+    const strippedBody = form.bodyHtml.replace(/<[^>]+>/g, '').trim();
+    if (!strippedBody && !attachFile && !editingAttachment) {
+      setSaveError('Feedback text or an attachment is required.');
+      return;
+    }
     setSaving(true);
     setSaveError(null);
     const fetchId = fetchIdRef.current;
+    // `fetchId` is bumped by `load()`, which the requestId-change effect
+    // fires on every request switch (via closeForm → the effect's own
+    // load()) — the same "did a switch happen mid-flight" signal every other
+    // async step below already relies on, now reused for the upload steps too
+    // so a staged-but-not-yet-finalized upload is abandoned on switch exactly
+    // like every other in-flight response here.
+    const stale = () => fetchId !== fetchIdRef.current;
     try {
+      let stagingId = attachStagingId;
+      if (attachFile && !stagingId) {
+        const tokenRes = await fetch('/api/workbench/consultant-feedback/upload-token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ requestId, filename: attachFile.name, contentType: attachFile.type, size: attachFile.size }),
+        });
+        const tokenData = await tokenRes.json().catch(() => ({}));
+        if (stale()) { setSaving(false); return; }
+        if (!tokenRes.ok || !tokenData.ok) throw new Error(tokenData.error || 'Could not prepare the attachment upload.');
+        const { put } = await import('@vercel/blob/client');
+        await put(tokenData.pathname, attachFile, {
+          access: 'private',
+          token: tokenData.clientToken,
+          contentType: tokenData.contentType,
+          onUploadProgress: ({ percentage }) => setAttachUploadProgress(Math.round(percentage)),
+        });
+        if (stale()) { setSaving(false); return; }
+        stagingId = tokenData.stagingId;
+        setAttachStagingId(stagingId);
+      }
+
       const author = form.addingPerson
         ? { oneOff: { name: form.oneOffName.trim(), affiliation: form.oneOffAffiliation.trim() || undefined } }
         : { consultantRosterId: form.consultantRosterId ? Number(form.consultantRosterId) : null };
 
-      let res;
       if (editingId) {
         // Omit the author fields entirely when they match what Edit loaded —
         // the server also compares by value (§3.2), but not sending them at
@@ -219,7 +317,7 @@ export default function ConsultantFeedbackSection({ requestId, previewReadOnly =
           && original.oneOffName === nextOneOffName
           && original.oneOffAffiliation === nextOneOffAffiliation;
 
-        res = await fetch('/api/workbench/consultant-feedback', {
+        const res = await fetch('/api/workbench/consultant-feedback', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -231,8 +329,45 @@ export default function ConsultantFeedbackSection({ requestId, previewReadOnly =
             shared: form.shared,
           }),
         });
+        const data = await res.json().catch(() => ({}));
+        if (stale()) { setSaving(false); return; }
+        if (!res.ok) throw new Error(data.error || `Save failed (${res.status})`);
+
+        if (attachFile && stagingId) {
+          const finalizeRes = await fetch('/api/workbench/consultant-feedback/finalize', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ requestId, stagingId, entryId: editingId }),
+          });
+          const finalizeData = await finalizeRes.json().catch(() => ({}));
+          if (stale()) { setSaving(false); return; }
+          if (!finalizeRes.ok) throw new Error(finalizeData.error || 'The attachment could not be saved.');
+        }
+      } else if (attachFile) {
+        // Attachment-only (or attachment + body) create: the row does not
+        // exist yet, so finalize creates it via `writeFeedbackEntry` with
+        // `requestdocumentId` already bound — no separate POST.
+        const finalizeRes = await fetch('/api/workbench/consultant-feedback/finalize', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            requestId,
+            stagingId,
+            newEntry: {
+              mutationId: mutationIdRef.current,
+              ...author,
+              bodyHtml: form.bodyHtml,
+              receivedOn: form.receivedOn,
+              shared: form.shared,
+              consultantName: consultantDisplayName(form, consultants),
+            },
+          }),
+        });
+        const finalizeData = await finalizeRes.json().catch(() => ({}));
+        if (stale()) { setSaving(false); return; }
+        if (!finalizeRes.ok) throw new Error(finalizeData.error || 'The attachment could not be saved.');
       } else {
-        res = await fetch('/api/workbench/consultant-feedback', {
+        const res = await fetch('/api/workbench/consultant-feedback', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -244,26 +379,20 @@ export default function ConsultantFeedbackSection({ requestId, previewReadOnly =
             shared: form.shared,
           }),
         });
+        const data = await res.json().catch(() => ({}));
+        if (stale()) { setSaving(false); return; }
+        if (!res.ok) throw new Error(data.error || `Save failed (${res.status})`);
       }
-      const data = await res.json().catch(() => ({}));
-      if (fetchId !== fetchIdRef.current) {
-        // A request switch landed while this save was in flight (closeForm
-        // already ran via the requestId-change effect, but that happened
-        // before this response arrived) — clear the busy flag so it never
-        // wedges a form opened afterward.
-        setSaving(false);
-        return;
-      }
-      if (!res.ok) throw new Error(data.error || `Save failed (${res.status})`);
-      // Confirmed 2xx: clear saving and rotate the mutation id/close the form
-      // BEFORE the reload — `load()` bumps `fetchIdRef`, so a later stale
-      // check in this same call would otherwise see a mismatch and skip
-      // clearing the button.
+
+      // Confirmed success: clear saving and rotate the mutation id/close the
+      // form BEFORE the reload — `load()` bumps `fetchIdRef`, so a later
+      // stale check in this same call would otherwise see a mismatch and
+      // skip clearing the button.
       setSaving(false);
       closeForm();
       await load();
     } catch (e) {
-      if (fetchId !== fetchIdRef.current) {
+      if (stale()) {
         // Same reasoning as the success path above: a request switch that
         // landed mid-flight already ran closeForm via the effect, but this
         // call's own busy flag still needs clearing so it can't wedge a form
@@ -271,11 +400,13 @@ export default function ConsultantFeedbackSection({ requestId, previewReadOnly =
         setSaving(false);
         return;
       }
-      // Leave mutationIdRef untouched so a retry replays the same id.
+      // Leave mutationIdRef and any staged upload untouched so a retry
+      // replays the same mutation id and reuses the already-staged bytes
+      // instead of uploading again.
       setSaveError(e.message);
       setSaving(false);
     }
-  }, [form, editingId, requestId, closeForm, load]);
+  }, [form, editingId, requestId, closeForm, load, attachFile, attachStagingId, editingAttachment, consultants]);
 
   const handleDelete = useCallback(async (id) => {
     setDeletingId(id);
@@ -293,7 +424,20 @@ export default function ConsultantFeedbackSection({ requestId, previewReadOnly =
         setDeletingId(null);
         return;
       }
-      if (!res.ok) throw new Error(data.error || `Delete failed (${res.status})`);
+      if (!res.ok) {
+        if (data.reason === 'attachment_removal_pending') {
+          // §3.6 step 1 already committed: the entry is gone from every
+          // `active` reader (the reload below will not show it — and the
+          // NEXT list's own recovery sweep usually finishes steps 2-3 before
+          // that reload's response even arrives). Surface the plan's exact
+          // wording rather than a generic error.
+          setError('Attachment removed, delete again.');
+          setConfirmingDeleteId(null);
+          await load();
+          return;
+        }
+        throw new Error(data.error || `Delete failed (${res.status})`);
+      }
       setConfirmingDeleteId(null);
       await load();
     } catch (e) {
@@ -405,6 +549,32 @@ export default function ConsultantFeedbackSection({ requestId, previewReadOnly =
             </div>
           </div>
 
+          <div>
+            <label className="block text-xs font-medium text-gray-700" htmlFor="consultant-feedback-attachment">Attachment (optional)</label>
+            {editingAttachment ? (
+              <p className="mt-1 text-xs text-gray-500">
+                Attachment: {editingAttachment.filename || 'file'} (one attachment per entry — delete this entry and re-add to replace it)
+              </p>
+            ) : (
+              <>
+                <input
+                  id="consultant-feedback-attachment"
+                  ref={attachInputRef}
+                  type="file"
+                  accept={ATTACHMENT_ACCEPT}
+                  onChange={handleAttachFileChange}
+                  className="mt-1 block w-full text-sm text-gray-700"
+                />
+                <p className="mt-1 text-xs text-gray-500">PDF or DOCX, up to {SITE_VISIT_MATERIALS_UPLOAD_MAX_MB_DEFAULT} MB.</p>
+                {attachFile && <p className="mt-1 text-xs text-gray-700">{attachFile.name}</p>}
+                {attachUploadProgress != null && attachUploadProgress < 100 && (
+                  <p className="mt-1 text-xs text-gray-500">Uploading… {attachUploadProgress}%</p>
+                )}
+                {attachError && <p className="mt-1 text-xs text-red-600">{attachError}</p>}
+              </>
+            )}
+          </div>
+
           <label className="flex items-center gap-2 text-sm text-gray-700">
             <input
               type="checkbox"
@@ -459,6 +629,13 @@ export default function ConsultantFeedbackSection({ requestId, previewReadOnly =
                   <p className="mt-1 line-clamp-1 text-sm text-gray-700">
                     {item.bodyHtml.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()}
                   </p>
+                )}
+                {item.attachment && (
+                  // Plain label, not a link: no staff download route exists for
+                  // an arbitrary request-document registry id (only the
+                  // proposal-specific `/api/workbench/download-proposal-document`
+                  // does) — acceptable for this slice per the build brief.
+                  <p className="mt-1 text-xs text-gray-500">Attachment: {item.attachment.filename || 'file'}</p>
                 )}
               </div>
               <div className="flex shrink-0 items-center gap-2">

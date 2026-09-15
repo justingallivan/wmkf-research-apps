@@ -259,6 +259,13 @@ export default function BriefingPage() {
                   // Sanitized server-side on read (lib/external/sanitize-review-html.js).
                   <div className="prose prose-sm mt-2 max-w-none text-gray-800" dangerouslySetInnerHTML={{ __html: item.bodyHtml }} />
                 )}
+                {item.attachment?.member && (
+                  <p className="mt-2 text-sm">
+                    <a className="text-blue-800 underline" href={documentHref(item.attachment.member)} {...(item.attachment.inline ? { target: '_blank', rel: 'noreferrer noopener' } : {})}>
+                      {item.attachment.filename || 'Attachment'}
+                    </a>
+                  </p>
+                )}
               </li>
             ))}
           </ul>
