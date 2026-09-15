@@ -10,6 +10,7 @@ last_verified: 2026-09-14
 owner: product-engineering
 related:
   - docs/INSTITUTION_PAIR_CONSISTENCY_RESOLUTION_PLAN.md
+  - docs/audits/reviewer-institution-phase2-contract-audit-2026-09-14.md
   - docs/audits/institution-affiliation-source-recovery-2026-09-14.md
   - docs/audits/institution-affiliation-last-cycle-baseline-2026-09-14.md
   - docs/REVIEWER_IDENTITY_AND_INSTITUTION_RESOLUTION_RESEARCH.md
@@ -234,7 +235,7 @@ adversarial canonicalized-sibling and system-to-campus cases. It contains no
 retained names, request/candidate identifiers, affiliation strings, or URLs.
 Producer coverage also pins undated publication currentness as `unknown`.
 
-### Phase 2 — prove independent identity and extra-affiliation COI
+### Phase 2 — prove independent identity and extra-affiliation COI — contract audit complete; implementation pending
 
 1. Audit every identity anchor used at enrichment, roster reload, candidate
    selection, and save. Mark whether each anchor depends on affiliation.
@@ -259,6 +260,21 @@ Producer coverage also pins undated publication currentness as `unknown`.
 
 Stop if independent identity cannot be computed without using the affiliation
 being adjudicated.
+
+The 2026-09-14 contract audit did not trigger that stop. PubMed multi-work
+full-forename verification and exact work-to-unique-author resolution can meet
+the existing identity threshold without affiliation credit. Exact CRM
+email/ORCID identity can support a hard-ID join when the source author carries
+the same independently obtained identifier. All other current generic
+`confirmed`/`probable` results remain insufficient because their affiliation
+dependence or selection lineage is not retained.
+
+The audit also verified that implementation is still required before Phase 3:
+applicant output and roster pruning lose decisive proof fields; publication and
+ORCID dates are detached from their affiliation assertions; ordinary save omits
+byline/history segments; and applicant promotion performs no server-side
+institution COI recomputation. See
+`docs/audits/reviewer-institution-phase2-contract-audit-2026-09-14.md`.
 
 ### Phase 3 — establish a trusted end-to-end assessment
 
@@ -447,7 +463,10 @@ browser claims must land in a tested fail-closed branch.
 
 ## Immediate next work
 
-Phase 1 is complete. Next perform the Phase 2 identity-anchor,
-publication-currentness, and extra-affiliation COI contract audit. Do not enable
-measurement, change runtime authority, apply a migration, or create a Preview
-deployment as part of that audit.
+Implement the still-dormant Phase 2 contracts identified by the completed
+audit: the pure `independent-identity/v1` evaluator, typed dated affiliation
+assertions, complete additional-affiliation COI fanout, and the same fail-closed
+COI recomputation at ordinary and applicant save. Preserve incumbent authority
+and keep all new behavior flag-off. Do not enable measurement, apply a
+migration, create a Preview deployment, or promote a high-authority consumer as
+part of that implementation.
