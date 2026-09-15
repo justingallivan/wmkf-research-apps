@@ -21,7 +21,7 @@ test('small buffers delegate to uploadFile with the same conflict behaviour', as
   expect(simple).toHaveBeenCalledWith('akoya_request', 'Folder/Site Visit - Slides', 'a.pdf', expect.any(Buffer), 'application/pdf', { conflictBehavior: 'replace' });
 });
 
-test('large buffers open an upload session, PUT contiguous Content-Range chunks without Authorization, then read back the version', async () => {
+test('large buffers support rename, open an upload session, PUT contiguous Content-Range chunks without Authorization, then read back the version', async () => {
   const content = Buffer.alloc(61 * MiB, 7);
   const calls = [];
   global.fetch = jest.fn(async (url, init = {}) => {
@@ -34,10 +34,10 @@ test('large buffers open an upload session, PUT contiguous Content-Range chunks 
     if (String(url).includes('/items/item-9')) return response(200, { id: 'item-9', size: content.length, eTag: '"e2"', publication: { versionId: '3.0' }, lastModifiedDateTime: '2026-11-21T09:00:00Z' });
     throw new Error(`unexpected ${url}`);
   });
-  const result = await GraphService.uploadFileLarge('akoya_request', 'Folder/Site Visit - Slides', 'a.pdf', content, 'application/pdf', { conflictBehavior: 'replace', chunkBytes: 20 * MiB });
+  const result = await GraphService.uploadFileLarge('akoya_request', 'Folder/Site Visit - Slides', 'a.pdf', content, 'application/pdf', { conflictBehavior: 'rename', chunkBytes: 20 * MiB });
   const session = calls[0];
   expect(session.url).toBe('https://graph.microsoft.com/v1.0/drives/drive/root:/Folder/Site%20Visit%20-%20Slides/a.pdf:/createUploadSession');
-  expect(JSON.parse(session.init.body).item['@microsoft.graph.conflictBehavior']).toBe('replace');
+  expect(JSON.parse(session.init.body).item['@microsoft.graph.conflictBehavior']).toBe('rename');
   const puts = calls.filter((c) => c.url === 'https://up.example/session');
   expect(puts.map((c) => c.init.headers['Content-Range'])).toEqual([
     `bytes 0-${20 * MiB - 1}/${content.length}`, `bytes ${20 * MiB}-${40 * MiB - 1}/${content.length}`, `bytes ${40 * MiB}-${60 * MiB - 1}/${content.length}`, `bytes ${60 * MiB}-${content.length - 1}/${content.length}`,
@@ -61,5 +61,7 @@ test('a failed chunk cancels the session and throws; bad chunk sizes and librari
   global.fetch = jest.fn();
   await expect(GraphService.uploadFileLarge('akoya_request', 'F', 'a.pdf', content, 'application/pdf', { chunkBytes: 1000 })).rejects.toThrow(/320 KiB/);
   await expect(GraphService.uploadFileLarge('not_allowed', 'F', 'a.pdf', content, 'application/pdf')).rejects.toThrow(/allowlist/);
+  await expect(GraphService.uploadFileLarge('akoya_request', 'F', 'a.pdf', content, 'application/pdf', { conflictBehavior: 'overwrite' })).rejects.toThrow(/"rename"/);
+  await expect(GraphService.uploadFileLarge('akoya_request', 'F', 'a.pdf', Buffer.alloc(10), 'application/pdf', { conflictBehavior: 'overwrite' })).rejects.toThrow(/"rename"/);
   expect(global.fetch).not.toHaveBeenCalled();
 });

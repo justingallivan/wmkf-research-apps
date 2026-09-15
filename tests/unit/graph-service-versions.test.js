@@ -155,6 +155,31 @@ it('can make a path upload create-only instead of replacing an existing file', a
   expect(global.fetch.mock.calls[0][0]).toContain('@microsoft.graph.conflictBehavior=fail');
 });
 
+it('can rename a path upload instead of overwriting an existing file', async () => {
+  jest.spyOn(GraphService, 'getSiteId').mockResolvedValue('site');
+  jest.spyOn(GraphService, 'getDriveId').mockResolvedValue('drive');
+  jest.spyOn(GraphService, 'getAccessToken').mockResolvedValue('token');
+  global.fetch = jest.fn().mockResolvedValue(response(201, {
+    id: 'renamed-item',
+    name: 'snapshot 1.docx',
+    size: 5,
+    webUrl: 'https://sharepoint.test/snapshot-1',
+    publication: { versionId: '1.0' },
+  }));
+
+  const result = await GraphService.uploadFile(
+    'akoya_request',
+    'Request/Consultant Feedback',
+    'snapshot.docx',
+    Buffer.from('bytes'),
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    { conflictBehavior: 'rename' },
+  );
+
+  expect(global.fetch.mock.calls[0][0]).toContain('@microsoft.graph.conflictBehavior=rename');
+  expect(result.name).toBe('snapshot 1.docx');
+});
+
 it('uses an asserted site/drive pair without re-resolving upload identity', async () => {
   const getSiteId = jest.spyOn(GraphService, 'getSiteId');
   const getDriveId = jest.spyOn(GraphService, 'getDriveId');
