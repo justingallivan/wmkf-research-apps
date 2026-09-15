@@ -44,6 +44,8 @@ related:
 > Slice 1 follow-ups e0fa4ccf; Slice 2 built at a9757f18 (Sonnet), Opus review APPROVE 2026-09-14,
 > non-blocking follow-ups folded into the Slice 3 commit (export roster sorted like the tab before
 > the renderer prints quotations; fall-through fixtures; `answerText`-not-`answerHtml` pin).
+> Slice 3 built at a13d4f43 (Sonnet), Opus review APPROVE 2026-09-14; non-blocking: pin an explicit
+> `'en'` locale in `compareReviewersByName` (folded into Slice 4).
 
 ## 1. Goal
 
@@ -255,7 +257,7 @@ change the tracked output schema, so the script is the right tool here. Either d
 safe: new code tolerates the old row (fields absent → empty), old code tolerates the new row
 (`parseReviewSynthesis` strips unknown keys).
 
-### 4.4 Rendering and copy (Slices 1 and 3)
+### 4.4 Rendering and copy (Slices 1 and 3) — BUILT S1/S3 (95e9a750, a13d4f43)
 
 - Tab: a separate **"Writeup paragraphs"** card directly below the Synthesis card (W4). Sentences
   1–3 render as soon as one review is submitted; themes and quotations render when the stored
