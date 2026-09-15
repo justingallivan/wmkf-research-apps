@@ -62,3 +62,30 @@ test('with the grant, the tab button renders and the deep link mounts ReviewPane
   expect(button).toHaveAttribute('aria-current', 'page');
   expect(screen.getByTestId('review-panel-tab')).toHaveAttribute('data-request-id', 'request-1');
 });
+
+test('a deep-linked tab is centered in the horizontally overflowing mobile tab strip', () => {
+  mockAccess = { isSuperuser: false, hasAccess: (key) => key === 'review-panel' };
+  const descriptors = {
+    clientWidth: Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientWidth'),
+    scrollWidth: Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollWidth'),
+    offsetLeft: Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetLeft'),
+    offsetWidth: Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetWidth'),
+  };
+  Object.defineProperties(HTMLElement.prototype, {
+    clientWidth: { configurable: true, get() { return this.querySelector?.('[aria-label="Request sections"]') ? 320 : 100; } },
+    scrollWidth: { configurable: true, get() { return this.querySelector?.('[aria-label="Request sections"]') ? 1033 : 100; } },
+    offsetLeft: { configurable: true, get() { return this.getAttribute?.('aria-current') === 'page' ? 500 : 0; } },
+    offsetWidth: { configurable: true, get() { return this.getAttribute?.('aria-current') === 'page' ? 110 : 100; } },
+  });
+
+  try {
+    render(<WorkbenchRequest />);
+    const scroller = screen.getByRole('navigation', { name: 'Request sections' }).parentElement;
+    expect(scroller.scrollLeft).toBe(395);
+  } finally {
+    for (const [name, descriptor] of Object.entries(descriptors)) {
+      if (descriptor) Object.defineProperty(HTMLElement.prototype, name, descriptor);
+      else delete HTMLElement.prototype[name];
+    }
+  }
+});
