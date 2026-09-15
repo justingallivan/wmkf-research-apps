@@ -532,14 +532,17 @@ reviews resolve live from `wmkf_appreviewersuggestion`, and the proposal
 narrative resolves by governed path. Cleanup: none scheduled; revoked and expired
 rows stay as audit history (bounded by one live row per request).
 
-### `consultant_feedback` — Consultant Feedback slices 1–3 (migrations 048-049, fresh-install v50-v51; 2026-09-14)
+### `consultant_feedback` — PRODUCTION-LIVE Consultant Feedback slices 1–3 (migrations 048-049 applied; fresh-install v50-v51; 2026-09-14)
 
 **Source of truth:** Postgres. Staff-recorded informal feedback from retained
 consultants on a proposal (`docs/plans/CONSULTANT_FEEDBACK_PLAN_2026-09-14.md`).
 Home is the Request Workbench Reviews tab, as its own "Consultant feedback"
 section below formal reviews (CF1); shared on the external deliberation
 briefing page by default (`shared` boolean, default `true`, CF2); staff may
-edit and delete with no audit trail (CF5).
+edit and delete with no audit trail (CF5). PR #300 made its append-only Graph
+uploads use closed `rename` conflict behavior, preserving both artifacts when
+two entries derive the same filename. A signed-in production smoke on request
+1003222 proved create, upload/finalize, staff open, and delete.
 
 Columns: `id`, `request_id` (Dataverse `akoya_request` GUID, GUID-validated at
 the route boundary), `consultant_roster_id` (FK `expertise_roster.id`,

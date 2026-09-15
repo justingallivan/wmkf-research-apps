@@ -10,6 +10,14 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## September 2026 — Consultant Feedback shipped from the Workbench through the deliberation briefing page (Session 512)
+
+**Milestone:** Staff now have a governed home for informal consultant input on each request: roster or entry-local one-off attribution, rich text, one optional PDF/DOCX, per-entry briefing visibility, authenticated staff open/download, and edit/delete without creating a formal reviewer or affecting reviewer counts, reliability, or honoraria.
+**Sessions:** 512 (owner set scope, approved merges and migration apply, and authorized the signed-in production smoke). PRs #293, #295, and #299 delivered slices 1–3; PR #300 repaired the first production attachment issue.
+**Ship state:** migrations 048 and 049 are applied; Dataverse artifact type `Consultant Feedback = 100000008` is live; append-only uploads use Graph's closed `rename` behavior on same-name collisions. A signed-in smoke on request 1003222 proved create, private-Blob finalize, Graph/registry persistence, staff PDF open, and normal delete; the disposable entry was removed. The release tree passed 883 suites / 12,711 tests, types, lint with zero errors, and build.
+**Why it matters:** Staff can bring consultant evidence into deliberation where the proposal is already reviewed, while the external page receives only explicitly shared, request-proved content and attachments remain under the existing registry/SharePoint authority.
+**Pointers:** `docs/plans/CONSULTANT_FEEDBACK_PLAN_2026-09-14.md`, `docs/atlas/postgres-infra-tables.md`, `docs/API_ROUTE_SECURITY_MATRIX.md`, `shared/components/workbench/ConsultantFeedbackSection.js`; merges `b25e4376`, `bf6b41be`, `5b25c006`, `ed4aa479`.
+
 ## September 2026 — Review Panel moved beyond smoke as a per-request Workbench tab gated by the admin app grant (Session 511)
 
 **Milestone:** The Virtual Review Panel left smoke mode. It now mounts inside the Request Workbench (between Reviews and Staff Deliberations) for any user holding the admin-panel `review-panel` grant, in a new fail-closed rollout mode `access` that replaces the env allowlist; every launcher's panels for a request are visible to everyone with the grant, while stop/retry/re-render stay with the launcher.
