@@ -3,10 +3,10 @@ title: PC Meeting Tracker — Deliberation Sessions and Site Visits as the Sched
 domain: workbench
 kind: plan
 status: active
-summary: "A PC-owned app records each proposal's deliberation slot and site visit once, so the Staff Deliberations rail and cycle view read dates from one source."
+summary: "Production-live PC app for deliberation sessions, proposal slots, site visits, and agenda email preparation; Wave 28 is exact and the readiness flag is on."
 canonical: false
 cataloged: 2026-09-09
-last_verified: 2026-09-10
+last_verified: 2026-09-15
 owner: product-engineering
 related:
   - docs/WORKBENCH_WRITEUP_LIFECYCLE_PLAN.md
@@ -22,8 +22,9 @@ related:
 
 # PC Meeting Tracker — Deliberation Sessions and Site Visits as the Schedule of Record
 
-Owner conversation 2026-09-09 (Session 501). Planning only; nothing below is built unless a
-section says so. State claims are labelled `[VERIFIED via …]` or `[PLANNED]`.
+This document began as the 2026-09-09 Session 501 plan and now records the
+shipped implementation. Production Wave 28 is exact, the readiness flag is on,
+and the routes/UI are live; explicitly historical build notes remain dated.
 
 ## 1. The process this serves (owner, 2026-09-09)
 
@@ -95,10 +96,11 @@ Two earlier decisions are **superseded in part** and must be read with this plan
   derived from the first transport-accepted materials send (`currentSourceEverSent`), and the
   tab renders **no visit date at all**. The 2026-09-09 cycle view (`StaffDeliberationsPanel.js`)
   shows registry lifecycle/operation only. (Superseded by slice 3, 2026-09-09; see §7.)
-- **[SANDBOX SCHEMA EXACT 2026-09-09; SOURCE-BUILT 2026-09-10.]** Wave 28
-  provides deliberation session and slot tables in sandbox, and
-  `codex/meeting-tracker` provides the readiness-gated runtime and UI. The flag
-  remains unset and Production is unapplied, so this is not yet a live app.
+- **[PRODUCTION-LIVE; REVERIFIED 2026-09-15.]** Wave 28 provides the
+  deliberation session and slot tables. The Production read-only preflight
+  reported 22 exact / 0 absent / 0 divergent, and
+  `MEETING_TRACKER_SCHEMA_READY` evaluates exact-on. The grant-protected
+  runtime and UI are live.
 - **Recording / transcript / transcript-summary** artifact types exist in the registry but have no
   producer; only distribution and logistics reference them as material categories.
 
@@ -245,19 +247,15 @@ that link is the carrier for reviews and the proposal narrative, which are never
 | Slice | Content | Tier |
 |---|---|---|
 | 0 | **[BUILT 2026-09-09 on `claude/site-visit-schedulable-gate`.]** Replace `assertActiveStage` with the request precondition; keep the Workbench route green; tests for both preconditions. | 1 (branch + PR) |
-| 1 | **[BUILT AND VERIFIED IN SANDBOX 2026-09-09 on `codex/meeting-tracker`.]** Wave 28 declares session + slot with no alternate keys, required explicit Updated By actor lookups, a read-only 22-check preflight, Atlas pages, and the literal-on readiness flag contract. The owner-run post-apply readback reported 22 exact, 0 absent, and 0 divergent. The readiness flag remains unset pending deliberate runtime promotion. | 2 |
-| 2 | **[SOURCE-BUILT 2026-09-10 on `codex/meeting-tracker`; promotion pending.]** App registry/grant, advancing-request cycle list, session editor, staff-plus-Board attendee picker, Zoom link, ordered slot add/remove/reorder/move, Site Visit and share-state joins, and the fixed §5.4 reader. Routes fail 503 and the tile says **Not yet enabled** while the readiness flag remains unset. | 2 |
+| 1 | **[PRODUCTION EXACT; REVERIFIED 2026-09-15.]** Wave 28 declares session + slot with no alternate keys, required explicit Updated By actor lookups, a read-only 22-check preflight, Atlas pages, and the literal-on readiness flag contract. Production readback reported 22 exact, 0 absent, and 0 divergent. | 2 |
+| 2 | **[PRODUCTION-LIVE; REVERIFIED 2026-09-15.]** App registry/grant, advancing-request cycle list, session editor, staff-plus-Board attendee picker, Zoom link, ordered slot add/remove/reorder/move, Site Visit and share-state joins, and the fixed §5.4 reader. The readiness flag is exact-on. | 2 |
 | 2b | **[BUILT 2026-09-10, S503]** Site-visit editor in the tracker via the existing logistics service (`pages/meeting-tracker/visits/[requestId].js`, `shared/components/meeting-tracker/SiteVisitEditor.js`, route `/api/meeting-tracker/visits/[requestId]` guarded by the tracker grant; "Schedule visit" / "Edit visit" on every list row). The slot's briefing link no longer waits on this slice: read it with `getLiveBriefingLink({ requestId })` from `lib/services/deliberation-briefing/briefing-link-service.js` (built S502 on `feature/deliberation-briefing-page`, `docs/DELIBERATION_BRIEFING_PAGE_PLAN.md`; null until the owner sets `DELIBERATION_BRIEFING_SCHEMA_READY=on`). | 2 |
-| 3 | **[BUILT 2026-09-09 on `claude/deliberations-stage-rail`; Meeting Tracker reader source-built 2026-09-10.]** Rail and cycle view read both dates; stage-key catalog with editable labels; parity test. The deliberation-session line remains safely empty until both branches are promoted and the Wave 28 readiness flag is enabled. | 1 |
+| 3 | **[PRODUCTION-LIVE.]** Rail and cycle view read both dates; stage-key catalog with editable labels; parity test. The deliberation-session line consumes the enabled Wave 28 reader. | 1 |
 | 4 | (Retired 2026-09-09: §5.5 decided; stop 3's three displays fold into slice 3.) | — |
 
-**Deadline (owner 2026-09-09):** the first deliberation session is the week of 2026-09-14; the
-first site visit is roughly three weeks out. Slices 1 and 2 are source-built on
-`codex/meeting-tracker`; deliberate Tier-2 promotion, Production schema apply/readback, security-role
-verification, and the readiness flip remain. Slice 2b follows separately.
-
-Slice 3 remains safely degraded to "not scheduled" until the Wave 28 runtime is promoted and the
-readiness flag is enabled for that target.
+**Original deadline (owner 2026-09-09):** the first deliberation session was
+the week of 2026-09-14. Slices 1–3 and 2b are now production-live; Production
+schema readback and the readiness flip are complete.
 
 ## 8. Explicitly out of scope
 
@@ -308,8 +306,8 @@ readiness flag is enabled for that target.
      de-duplicates as the deliberation email does; an empty To refuses.
    - **D25 One agenda for everyone.** No per-recipient filtering; Board members find their
      proposals by the times.
-   **[SOURCE-BUILT 2026-09-10 by Codex on `codex/session-agenda`; migration 041
-   not applied by Codex.]** The session-page card/composer is
+   **[DEPLOYED; migration 041 applied; transport not independently
+   production-smoked as of 2026-09-15.]** The session-page card/composer is
    `shared/components/meeting-tracker/SessionAgendaPanel.js`, mounted below the
    proposal order in `SessionEditor.js`. The guarded GET/prepare/send endpoint
    is `pages/api/meeting-tracker/sessions/[id]/agenda.js`; exact rendering,
@@ -323,8 +321,8 @@ readiness flag is enabled for that target.
    resume a confirmed Draft on the same Dynamics activity, records a known
    closed status as terminal `failed`, and never sends when status is unknown
    or unreadable. **[VERIFIED via the focused agenda schema/service/route/panel
-   suites; external schema state remains ASSUMED until the owner applies and
-   reads back migration 041.]** Build brief:
+   suites; the final migration-tracker reconciliation on 2026-09-15 proved 041
+   tracked with no manifest drift.]** Build brief:
    `docs/plans/SESSION_AGENDA_EMAIL_CODEX_BRIEF_2026-09-10.md`.
    - **D26 Agenda subject and opening message are admin-editable defaults**
      (`email.deliberation_agenda.*`), seeded from the previous hard-coded

@@ -10,6 +10,14 @@ The chronological archive after the `Legacy chronological session log` divider c
 
 ---
 
+## September 2026 — Review writeup synthesis and Contact-linked expertise roster shipped; reviewer-institution storage reconciled dormant (Session 513)
+
+**Milestone:** Phase II review material now composes directly in the Reviews tab and exports into panel-prep Word and newly generated Pre-Site drafts; the expertise roster can bind members to active Dataverse Contacts so attendee flows resolve current email without stale fallback.
+**Sessions:** 513 (parallel implementation/review sessions, owner-directed promotion and Production reconciliation). PRs #294, #296, #298, #301, #303–#305.
+**Ship state:** Production smoke passed for the Reviews writeup on Request `1002852`; migration 050 is applied and ten roster rows are linked. Meeting Tracker now blocks no-email attendees; Review Panel mobile/focus treatment shipped. Reviewer-institution Phase 2 merged dormant after two Claude reviews; migration 051 is applied with zero rows, the obsolete 038 tracker alias is gone, and both institution flags remain off.
+**Why it matters:** Staff get decision-ready reviewer evidence in the documents they already use, roster email follows its live authority, and future institution work has exact dormant storage without silently activating measurement or high-authority COI behavior.
+**Pointers:** `docs/audits/shipped-features-last-24-hours-2026-09-15.md`, `docs/plans/REVIEWS_TAB_WRITEUP_PARAGRAPHS_PLAN_2026-09-14.md`, `docs/plans/ROSTER_CONTACT_LINK_PLAN_2026-09-14.md`, `docs/plans/REVIEWER_INSTITUTION_AUTO_RESOLUTION_PLAN_2026-09-14.md`; merges `9dd57264`, `b9ad64eb`, `2d152715`, `17c314b3`, `622c9f63`, `85a3ecb4`.
+
 ## September 2026 — Consultant Feedback shipped from the Workbench through the deliberation briefing page (Session 512)
 
 **Milestone:** Staff now have a governed home for informal consultant input on each request: roster or entry-local one-off attribution, rich text, one optional PDF/DOCX, per-entry briefing visibility, authenticated staff open/download, and edit/delete without creating a formal reviewer or affecting reviewer counts, reliability, or honoraria.

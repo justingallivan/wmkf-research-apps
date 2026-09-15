@@ -251,7 +251,7 @@ object-key-order defect fixed in commit `f5b7efc2`; they are not additional
 sends. This receipt proves Dynamics transport acceptance, not independent
 inbox/calendar-client delivery.
 
-### `deliberation_agenda_sends` — SOURCE-BUILT; MIGRATION 041 NOT APPLIED BY CODEX
+### `deliberation_agenda_sends` — DEPLOYED; MIGRATION 041 APPLIED
 
 **Source of truth:** Postgres exact-email and cross-system recovery ledger for
 Meeting Tracker session agendas; Dynamics remains email-activity/transport
@@ -279,9 +279,11 @@ paths are `lib/services/meeting-tracker/agenda-store.js` and
 `lib/services/meeting-tracker/agenda-service.js`; the guarded API is
 `/api/meeting-tracker/sessions/[id]/agenda`. No cleanup is scheduled; rows
 remain audit history until a retention policy is explicitly approved.
-**[VERIFIED 2026-09-10 via migration/fresh-install parity, focused service,
-route, and panel tests. ASSUMED externally: migration 041 remains unapplied;
-this Codex build did not apply it or change any readiness flag.]**
+**[VERIFIED 2026-09-10 via migration/fresh-install parity and focused service,
+route, and panel tests; tracker state reverified 2026-09-15.]** Migration 041 is
+applied/tracked and the Meeting Tracker readiness flag is exact-on. The agenda
+transport itself has not been independently production-smoked, so no live-send
+claim is made.
 
 ### `scheduled_email_messages` — MIGRATION 036 APPLIED 2026-08-26; CODE NOT DEPLOYED
 

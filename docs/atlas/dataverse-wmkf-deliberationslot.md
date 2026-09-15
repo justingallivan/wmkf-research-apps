@@ -4,7 +4,7 @@ domain: dataverse
 kind: source-of-truth
 status: canonical
 owner: product-engineering
-last_verified: 2026-09-10
+last_verified: 2026-09-15
 related:
   - docs/PC_MEETING_TRACKER_PLAN.md
   - docs/CREDENTIALS_RUNBOOK.md
@@ -22,9 +22,9 @@ related:
 complete metadata contract. The preflight self-test passes. **[VERIFIED IN
 SANDBOX 2026-09-09 via owner-run apply and read-only Wave 28 readback.]** The
 entity, its fields and relationships, and its no-alternate-key contract are
-exact. The combined readback reported 22 exact, 0 absent, and 0 divergent.
-The slice-2 runtime is source-built on `codex/meeting-tracker`; keep
-`MEETING_TRACKER_SCHEMA_READY` unset until that branch is deliberately promoted.
+exact. **[VERIFIED IN PRODUCTION 2026-09-15.]** A fresh read-only Production
+preflight reported 22 exact / 0 absent / 0 divergent, and
+`MEETING_TRACKER_SCHEMA_READY` evaluates exact-on. The runtime is live.
 
 Expected entity set after apply: `wmkf_deliberationslots`.
 
@@ -78,8 +78,7 @@ Dataverse. Set the flag only after an explicit owner-approved apply and this
 readback:
 
 ```bash
-node scripts/preflight-meeting-tracker-schema.mjs --target=sandbox
+node scripts/preflight-meeting-tracker-schema.mjs --target=prod
 ```
 
-The verified post-apply sandbox result is 22 exact, 0 absent, and 0 divergent.
-Production remains unverified.
+The verified Production result is 22 exact, 0 absent, and 0 divergent.
