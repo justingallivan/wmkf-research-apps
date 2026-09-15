@@ -79,7 +79,7 @@ Page: `pages/external/briefing/[token].js`, modeled on the grantee shell [VERIFI
 
 ### 2.4 Staff surface
 
-Inside `PreSiteDistributionPanel` (rendered by the tab once the writeup is shared [VERIFIED via shared/components/workbench/StaffDeliberationsTab.js:830-843]): the composer shows "Briefing page link — included in this email, expires {date}" once the preview has minted it. After a send, the panel header shows the live link with Copy and "Issue new link" (a confirm dialog names the consequence: earlier emails stop working, resend required).
+Inside `PreSiteDistributionPanel` (rendered by the tab once the writeup is shared [VERIFIED via shared/components/workbench/StaffDeliberationsTab.js:830-843]): the composer shows "Briefing page link — included in this email, expires {date}" once the preview has minted it. Its initial subject and message come from the Admin-editable `email.deliberation_share.subject` / `.body` settings in the Internal emails group beside `email.deliberation_agenda.*`; the subject supports `{{requestNumber}}`, and both fields remain editable per send. Blank/unset or unavailable settings retain the former built-in wording and the composer visibly reports fallback state. After a send, the panel header shows the live link with Copy and "Issue new link" (a confirm dialog names the consequence: earlier emails stop working, resend required).
 
 ## 3. Security contract
 

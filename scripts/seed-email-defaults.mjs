@@ -39,6 +39,10 @@ import {
   DELIBERATION_AGENDA_SEED_BODY,
 } from '../lib/seed/email-defaults/deliberation-agenda.js';
 import {
+  DELIBERATION_SHARE_SEED_SUBJECT,
+  DELIBERATION_SHARE_SEED_BODY,
+} from '../shared/config/deliberationShareEmail.js';
+import {
   REVIEWER_INVITATION_SEED_SUBJECT,
   REVIEWER_INVITATION_SEED_BODY,
   REVIEWER_INVITATION_SEED_BUTTON_LABEL,
@@ -81,6 +85,8 @@ export const EMAIL_DEFAULT_SEED_TEXT = Object.freeze({
   'email.site_visit_materials_invite.body': SITE_VISIT_MATERIALS_INVITE_SEED_BODY,
   'email.site_visit_materials_reminder.subject': SITE_VISIT_MATERIALS_REMINDER_SEED_SUBJECT,
   'email.site_visit_materials_reminder.body': SITE_VISIT_MATERIALS_REMINDER_SEED_BODY,
+  'email.deliberation_share.subject': DELIBERATION_SHARE_SEED_SUBJECT,
+  'email.deliberation_share.body': DELIBERATION_SHARE_SEED_BODY,
   'email.deliberation_agenda.subject': DELIBERATION_AGENDA_SEED_SUBJECT,
   'email.deliberation_agenda.body': DELIBERATION_AGENDA_SEED_BODY,
 });

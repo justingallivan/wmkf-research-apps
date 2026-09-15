@@ -72,6 +72,54 @@ test('offers no attachment choice; the default message names the briefing page a
   );
 });
 
+test('loads the admin Share subject and message and renders the request-number token', async () => {
+  global.fetch.mockResolvedValueOnce(response({
+    success: true,
+    attempts: [],
+    emailDefaults: {
+      subjectTemplate: 'Justin notes — {{requestNumber}}',
+      bodyTemplate: 'Dear colleagues, please use the briefing page.',
+      configured: true,
+      unavailable: false,
+    },
+  }));
+  render(
+    <PreSiteDistributionPanel
+      requestId={REQUEST_ID}
+      requestNumber="1002379"
+      sourceArtifact={{ artifactId: ARTIFACT_ID }}
+    />,
+  );
+  await waitFor(() => expect(screen.getByLabelText('Subject')).toHaveValue('Justin notes — 1002379'));
+  expect(screen.getByLabelText('Message')).toHaveValue('Dear colleagues, please use the briefing page.');
+  expect(screen.queryByText(/not fully configured/i)).toBeNull();
+});
+
+test('does not overwrite a staff edit when the async Share defaults arrive', async () => {
+  let resolveHistory;
+  global.fetch.mockReturnValueOnce(new Promise((resolve) => { resolveHistory = resolve; }));
+  render(
+    <PreSiteDistributionPanel
+      requestId={REQUEST_ID}
+      requestNumber="1002379"
+      sourceArtifact={{ artifactId: ARTIFACT_ID }}
+    />,
+  );
+  fireEvent.change(screen.getByLabelText('Subject'), { target: { value: 'My in-progress subject' } });
+  resolveHistory(response({
+    success: true,
+    attempts: [],
+    emailDefaults: {
+      subjectTemplate: 'Admin subject — {{requestNumber}}',
+      bodyTemplate: 'Admin message',
+      configured: true,
+      unavailable: false,
+    },
+  }));
+  await screen.findByText(/No email previews/);
+  expect(screen.getByLabelText('Subject')).toHaveValue('My in-progress subject');
+});
+
 test('offers no material checkboxes and no calendar controls; the briefing page is the carrier', async () => {
   render(
     <PreSiteDistributionPanel

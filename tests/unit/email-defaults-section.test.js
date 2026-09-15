@@ -68,6 +68,30 @@ const defaults = [
     unavailable: false,
   },
   {
+    key: 'email.deliberation_share.subject',
+    label: 'Share for deliberation subject',
+    description: 'Share subject copy',
+    multiline: false,
+    placeholders: ['{{requestNumber}}'],
+    group: 'internal',
+    emailKey: 'email.deliberation_share',
+    emailLabel: 'Share for deliberation',
+    value: 'Notes for {{requestNumber}}',
+    unavailable: false,
+  },
+  {
+    key: 'email.deliberation_share.body',
+    label: 'Share for deliberation message',
+    description: 'Share body copy',
+    multiline: true,
+    placeholders: [],
+    group: 'internal',
+    emailKey: 'email.deliberation_share',
+    emailLabel: 'Share for deliberation',
+    value: 'Please review the briefing page.',
+    unavailable: false,
+  },
+  {
     key: 'email.deliberation_agenda.subject',
     label: 'Deliberation agenda subject',
     description: 'Agenda subject copy',
@@ -158,6 +182,15 @@ test('pairs subject and body of one email inside the same card, and does not mix
   const cardTitles = screen.getAllByRole('heading', { level: 4 }).map((h) => h.textContent);
   const granteeCardOrder = cardTitles.filter((t) => t === 'Grantee invite' || t === 'Grantee reminder');
   expect(granteeCardOrder).toEqual(['Grantee invite', 'Grantee reminder']);
+});
+
+test('renders Share for deliberation as its own internal email card beside the agenda card', async () => {
+  render(<EmailDefaultsSection />);
+  await waitFor(() => expect(screen.getByLabelText('Share for deliberation subject')).toBeInTheDocument());
+  const shareCard = screen.getByText('Share for deliberation').closest('section');
+  expect(within(shareCard).getByLabelText('Share for deliberation subject')).toHaveValue('Notes for {{requestNumber}}');
+  expect(within(shareCard).getByLabelText('Share for deliberation message')).toHaveValue('Please review the briefing page.');
+  expect(within(shareCard).queryByLabelText('Deliberation agenda subject')).toBeNull();
 });
 
 test('shows blank and unavailable states distinctly and saves edited values', async () => {

@@ -2,8 +2,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Card } from '../Layout';
 import CuratedRecipientPicker from './CuratedRecipientPicker';
 import { deliberationSessionLine } from '../../utils/deliberation-stage';
+import {
+  DELIBERATION_SHARE_SEED_BODY,
+  DELIBERATION_SHARE_SEED_SUBJECT,
+  renderDeliberationShareSubject,
+} from '../../config/deliberationShareEmail';
 
-const DEFAULT_BODY = 'The deliberation briefing page linked below has the Site Visit writeup, every completed review, the proposal, and the research presentation materials.';
 const EMPTY_LIST = Object.freeze([]);
 const STALE_PREVIEW_CODES = new Set([
   'distribution_stale_source',
@@ -298,8 +302,8 @@ export default function PreSiteDistributionPanel({
   const [form, setForm] = useState({
     to: '',
     cc: '',
-    subject: `Site Visit materials${requestNumber ? ` — ${requestNumber}` : ''}`,
-    bodyText: DEFAULT_BODY,
+    subject: renderDeliberationShareSubject(DELIBERATION_SHARE_SEED_SUBJECT, requestNumber),
+    bodyText: DELIBERATION_SHARE_SEED_BODY,
     // Calendar attachments have no UI since S466 (owner: unused); the form
     // pins the calendar off while the server contract stays intact.
     includeCalendar: false,
@@ -332,8 +336,11 @@ export default function PreSiteDistributionPanel({
   const [reissuing, setReissuing] = useState(false);
   const [briefingError, setBriefingError] = useState(null);
   const [recipientPickerTarget, setRecipientPickerTarget] = useState(null);
+  const [emailDefaultsStatus, setEmailDefaultsStatus] = useState(null);
   const sequence = useRef(0);
   const controllerRef = useRef(null);
+  const composerTouchedRef = useRef(false);
+  const defaultsSeededRequestRef = useRef(null);
 
   const loadHistory = useCallback(async (id, signal, expectedSequence) => {
     const response = await fetch(
@@ -346,6 +353,20 @@ export default function PreSiteDistributionPanel({
     setHistory(body.attempts || []);
     setBriefingLink(body.briefingLink || null);
     setHistoryError(null);
+    if (body.emailDefaults && defaultsSeededRequestRef.current !== id) {
+      defaultsSeededRequestRef.current = id;
+      setEmailDefaultsStatus({
+        configured: body.emailDefaults.configured === true,
+        unavailable: body.emailDefaults.unavailable === true,
+      });
+      if (!composerTouchedRef.current) {
+        setForm((current) => ({
+          ...current,
+          subject: renderDeliberationShareSubject(body.emailDefaults.subjectTemplate, requestNumber),
+          bodyText: String(body.emailDefaults.bodyTemplate || ''),
+        }));
+      }
+    }
     const attempts = body.attempts || [];
     const latest = attempts[0] || null;
     const latestPresentation = latest ? attemptPresentation(latest) : null;
@@ -358,7 +379,7 @@ export default function PreSiteDistributionPanel({
         ? { operationId: latest.operationId, message: latest.lastError }
         : null,
     });
-  }, [requestId, onHistory]);
+  }, [requestId, requestNumber, onHistory]);
 
   useEffect(() => {
     const currentSequence = ++sequence.current;
@@ -380,6 +401,7 @@ export default function PreSiteDistributionPanel({
   }, [requestId, loadHistory]);
 
   const edit = (patch) => {
+    composerTouchedRef.current = true;
     setForm((current) => ({ ...current, ...patch }));
     setPreview(null);
     setConfirmed(false);
@@ -550,6 +572,17 @@ export default function PreSiteDistributionPanel({
         {error && (
           <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800" role="alert">
             {error}
+          </div>
+        )}
+
+        {emailDefaultsStatus?.unavailable && (
+          <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900" role="status">
+            The Admin email defaults could not be loaded. Built-in wording is shown and can be edited before previewing.
+          </div>
+        )}
+        {emailDefaultsStatus && !emailDefaultsStatus.unavailable && !emailDefaultsStatus.configured && (
+          <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700" role="status">
+            Share for deliberation defaults are not fully configured in Admin. Built-in wording is shown and can be edited before previewing.
           </div>
         )}
 

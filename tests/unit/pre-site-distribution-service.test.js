@@ -792,6 +792,71 @@ test('history marks a retained distribution changed when the working Word versio
   expect(result.currentSourceEverSent).toBe(false);
 });
 
+test('history returns configured Share defaults and preserves built-in fallbacks for blank values', async () => {
+  const attempt = attemptFixture({ source_version_id: '1.0' });
+  const getSettingStrict = jest.fn(async (key) => (
+    key === 'email.deliberation_share.subject'
+      ? { found: true, value: 'Discussion notes — {{requestNumber}}' }
+      : { found: true, value: '   ' }
+  ));
+  const result = await getPreSiteDistributionHistory({ requestId: REQUEST_ID }, {
+    listAttempts: jest.fn(async () => [attempt]),
+    getRequest: jest.fn(async () => ({ _wmkf_currentpresitevisit_value: null })),
+    findDocumentsByRequest: jest.fn(async () => ({ records: [] })),
+    getFileMetadataById: jest.fn(async () => null),
+    hasSentAttemptForSource: jest.fn(async () => false),
+    getSettingStrict,
+  });
+  expect(result.emailDefaults).toMatchObject({
+    subjectTemplate: 'Discussion notes — {{requestNumber}}',
+    bodyTemplate: expect.stringContaining('deliberation briefing page'),
+    configured: false,
+    unavailable: false,
+  });
+  expect(getSettingStrict).toHaveBeenCalledWith('email.deliberation_share.subject');
+  expect(getSettingStrict).toHaveBeenCalledWith('email.deliberation_share.body');
+});
+
+test('history marks Share defaults configured only when both stored values are non-blank', async () => {
+  const result = await getPreSiteDistributionHistory({ requestId: REQUEST_ID }, {
+    listAttempts: jest.fn(async () => []),
+    getRequest: jest.fn(async () => ({ _wmkf_currentpresitevisit_value: null })),
+    findDocumentsByRequest: jest.fn(async () => ({ records: [] })),
+    getFileMetadataById: jest.fn(async () => null),
+    hasSentAttemptForSource: jest.fn(async () => false),
+    getSettingStrict: jest.fn(async (key) => ({
+      found: true,
+      value: key.endsWith('.subject') ? 'Notes — {{requestNumber}}' : 'Use the briefing page.',
+    })),
+  });
+  expect(result.emailDefaults).toEqual({
+    subjectTemplate: 'Notes — {{requestNumber}}',
+    bodyTemplate: 'Use the briefing page.',
+    configured: true,
+    unavailable: false,
+  });
+});
+
+test('history reports unavailable Share defaults while retaining built-in wording', async () => {
+  const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+  const result = await getPreSiteDistributionHistory({ requestId: REQUEST_ID }, {
+    listAttempts: jest.fn(async () => []),
+    getRequest: jest.fn(async () => ({ _wmkf_currentpresitevisit_value: null })),
+    findDocumentsByRequest: jest.fn(async () => ({ records: [] })),
+    getFileMetadataById: jest.fn(async () => null),
+    hasSentAttemptForSource: jest.fn(async () => false),
+    getSettingStrict: jest.fn(async () => { throw new Error('Dataverse 503'); }),
+  });
+  expect(result.emailDefaults).toMatchObject({
+    subjectTemplate: 'Site Visit materials — {{requestNumber}}',
+    bodyTemplate: expect.stringContaining('deliberation briefing page'),
+    configured: false,
+    unavailable: true,
+  });
+  expect(consoleSpy).toHaveBeenCalledTimes(2);
+  consoleSpy.mockRestore();
+});
+
 test('history derives currentSourceEverSent from the uncapped store check scoped to the current document', async () => {
   const attempt = attemptFixture({ source_version_id: '1.0' });
   const hasSentAttemptForSource = jest.fn(async () => true);

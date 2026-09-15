@@ -81,6 +81,16 @@ describe('seed-email-defaults script core', () => {
       EMAIL_DEFAULT_SEED_TEXT['email.deliberation_agenda.body'],
       null,
     );
+    expect(setSetting).toHaveBeenCalledWith(
+      'email.deliberation_share.subject',
+      EMAIL_DEFAULT_SEED_TEXT['email.deliberation_share.subject'],
+      null,
+    );
+    expect(setSetting).toHaveBeenCalledWith(
+      'email.deliberation_share.body',
+      EMAIL_DEFAULT_SEED_TEXT['email.deliberation_share.body'],
+      null,
+    );
   });
 
   test('registers seed text for both deliberation agenda keys', async () => {
@@ -93,6 +103,19 @@ describe('seed-email-defaults script core', () => {
     expect(EMAIL_DEFAULT_SEED_TEXT['email.deliberation_agenda.subject']).toBe(DELIBERATION_AGENDA_SEED_SUBJECT);
     expect(EMAIL_DEFAULT_SEED_TEXT['email.deliberation_agenda.body']).toBe(DELIBERATION_AGENDA_SEED_BODY);
     expect(DELIBERATION_AGENDA_SEED_SUBJECT).toContain('{{sessionDate}}');
+  });
+
+  test('registers the prior Workbench Share wording for both deliberation-share keys', async () => {
+    const { EMAIL_DEFAULT_SEED_TEXT } = await import('../../scripts/seed-email-defaults.mjs');
+    const {
+      DELIBERATION_SHARE_SEED_SUBJECT,
+      DELIBERATION_SHARE_SEED_BODY,
+    } = await import('../../shared/config/deliberationShareEmail.js');
+
+    expect(EMAIL_DEFAULT_SEED_TEXT['email.deliberation_share.subject']).toBe(DELIBERATION_SHARE_SEED_SUBJECT);
+    expect(EMAIL_DEFAULT_SEED_TEXT['email.deliberation_share.body']).toBe(DELIBERATION_SHARE_SEED_BODY);
+    expect(DELIBERATION_SHARE_SEED_SUBJECT).toContain('{{requestNumber}}');
+    expect(DELIBERATION_SHARE_SEED_BODY).toContain('deliberation briefing page');
   });
 
   test('registers both site-visit email families with the previous default wording', async () => {

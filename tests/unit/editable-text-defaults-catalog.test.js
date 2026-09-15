@@ -2,6 +2,10 @@ import {
   EDITABLE_TEXT_DEFAULTS,
   EDITABLE_TEXT_GROUPS,
 } from '../../shared/config/editableTextDefaults';
+import {
+  DELIBERATION_SHARE_SEED_SUBJECT,
+  renderDeliberationShareSubject,
+} from '../../shared/config/deliberationShareEmail';
 
 describe('editableTextDefaults catalog grouping metadata', () => {
   const validGroupIds = new Set(EDITABLE_TEXT_GROUPS.map((g) => g.id));
@@ -54,5 +58,31 @@ describe('editableTextDefaults catalog grouping metadata', () => {
     for (const entry of entries) {
       expect(entry.placeholders.every((placeholder) => /^\{\{[A-Za-z]+\}\}$/.test(placeholder))).toBe(true);
     }
+  });
+
+  test('Share for deliberation subject and body are paired beside the agenda defaults', () => {
+    const subject = EDITABLE_TEXT_DEFAULTS.find((entry) => entry.key === 'email.deliberation_share.subject');
+    const body = EDITABLE_TEXT_DEFAULTS.find((entry) => entry.key === 'email.deliberation_share.body');
+    expect(subject).toMatchObject({
+      group: 'internal',
+      emailKey: 'email.deliberation_share',
+      emailLabel: 'Share for deliberation',
+      placeholders: ['{{requestNumber}}'],
+      multiline: false,
+    });
+    expect(body).toMatchObject({
+      group: 'internal',
+      emailKey: 'email.deliberation_share',
+      emailLabel: 'Share for deliberation',
+      placeholders: [],
+      multiline: true,
+    });
+  });
+
+  test('Share subject replaces the request token and removes fallback punctuation when no number exists', () => {
+    expect(renderDeliberationShareSubject(DELIBERATION_SHARE_SEED_SUBJECT, '1002912'))
+      .toBe('Site Visit materials — 1002912');
+    expect(renderDeliberationShareSubject(DELIBERATION_SHARE_SEED_SUBJECT, null))
+      .toBe('Site Visit materials');
   });
 });
