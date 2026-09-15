@@ -43,6 +43,9 @@ source_files:
   - lib/services/review-manager/export-reviews-service.js
   - pages/api/review-manager/export-reviews.js
   - lib/services/graph-service.js
+  - lib/services/pre-site-visit/artifact-service.js
+  - lib/services/pre-site-visit/proposal-core-service.js
+  - lib/services/pre-site-visit/docx-renderer.js
   - pages/api/review-manager/review-due-extension.js
   - pages/api/review-manager/send-review-reminder.js
   - lib/services/reviewer-due-extension.js
@@ -1423,7 +1426,30 @@ divergence: quote-tie-break ordering now uses the exported
 `compareReviewersByName` on a canonical re-sort inside
 `verifyAndSelectQuotations`, so the tab (name-sorted `submitted`) and the
 `export-reviews-service.js` roster (now also sorted with the same comparator)
-select identical W8 quotations regardless of caller order. **Production
+select identical W8 quotations regardless of caller order (locale pinned
+`'en'` in `compareReviewersByName` so server and browser sort identically).
+**Slice 4 (2026-09-14, plan §4.5):** the same deterministic sentences (no
+model text) fill `STAFF:RefereeSection` in the Phase II Pre-Site Visit
+Word draft. `reviewers-service.js`'s new request-scoped `getWriteupRoster`
+(no caller `scope`/`azureEmail`) feeds
+`review-writeup-paragraphs.js`'s new `composeRefereeSection`, which returns
+`null` when zero reviews are submitted (token left for staff) or
+`{text, names, diagnostics}`; naming an outstanding reviewer is an
+ALLOWLIST (`accepted === true` AND `reason === 'active_invitation'` only —
+every other blocker reason collapses into a counted generic clause plus a
+`referee_blocker_unnamed` diagnostic). `pre-site-visit/docx-renderer.js`
+moved the token out of `MANUAL_PLACEHOLDERS` into a new
+`CONDITIONAL_PLACEHOLDERS` set and now returns `{docx, diagnostics}` instead
+of a bare Buffer — `referee_name_not_matched` for any supplied name with zero
+underlines in the referee paragraph (reviewer names never join
+`personnelNames`, so they can never trigger `personnel_name_not_matched`).
+`artifact-service.js`'s input snapshot is schemaVersion 4
+(`request.refereeSection`), coreEnvelope bumped to 4 in lockstep; a genuine
+roster-read failure at generation fails closed
+(`pre_site_visit_referee_roster_unavailable`); `referee_section_manual`
+surfaces whenever the stored snapshot predates the feature (v2/v3) or a v4
+snapshot has no composed section (zero submitted reviews at generation) —
+modelled on the existing `funding_history_manual` note. **Production
 publish of this prompt row is a separate owner step** (`--force` republish,
 plan §4.3) — not run as part of this build; the live row and the read paths on
 both sides tolerate either the five-key or seven-key shape. Same

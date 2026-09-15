@@ -44,11 +44,13 @@ const resolvePD = jest.fn();
 jest.mock('../../lib/services/program-director-resolver', () => ({
   resolveByEmail: (...a) => resolvePD(...a),
 }));
+const fetchAnswersBySuggestion = jest.fn(async () => ({}));
 jest.mock('../../lib/services/review-answers', () => ({
-  fetchAnswersBySuggestion: jest.fn(async () => ({})),
+  fetchAnswersBySuggestion: (...a) => fetchAnswersBySuggestion(...a),
 }));
+const ratingsFromAnswers = jest.fn(() => ({ riskLevel: null, overallAssessment: null }));
 jest.mock('../../lib/external/review-answer-snapshot', () => ({
-  ratingsFromAnswers: jest.fn(() => ({ impact: null, risk: null, overallRating: null })),
+  ratingsFromAnswers: (...a) => ratingsFromAnswers(...a),
 }));
 const getActiveQuestionSet = jest.fn(async () => []);
 jest.mock('../../lib/external/review-question-fetcher', () => ({
@@ -78,11 +80,13 @@ const { REVIEW_STATUS_MAP } = require('../../shared/config/reviewerLifecycle');
 const { TERMINAL_REVIEW_STATUS_VALUES } = require('../../shared/config/reviewerStatus');
 
 let getReviewers;
+let getWriteupRoster;
 let patchReviewers;
 let ReviewerStatusMutationError;
 beforeAll(async () => {
   const mod = await import('../../lib/services/review-manager/reviewers-service');
   getReviewers = mod.getReviewers;
+  getWriteupRoster = mod.getWriteupRoster;
   patchReviewers = mod.patchReviewers;
   ReviewerStatusMutationError = mod.ReviewerStatusMutationError;
 });
@@ -690,5 +694,149 @@ describe('getReviewers', () => {
 
     await expect(getReviewers({ proposalId: REQ, azureEmail: 'pd@wmkeck.org' }))
       .rejects.toThrow('dataverse 500');
+  });
+});
+
+// Slice 4 (Reviews Tab Phase II,
+// docs/plans/REVIEWS_TAB_WRITEUP_PARAGRAPHS_PLAN_2026-09-14.md §4.5):
+// request-scoped roster + blockers for the Pre-Site Visit RefereeSection
+// fill. No scope/azureEmail — request-scoped only.
+describe('getWriteupRoster', () => {
+  test('no requestId → empty roster, findByRequest never called', async () => {
+    const out = await getWriteupRoster({});
+    expect(out).toEqual({ reviewers: [], blockers: [] });
+    expect(findByRequest).not.toHaveBeenCalled();
+  });
+
+  test('request-scoped: calls findByRequest with selectedOnly+requireComplete, not the caller-scoped adapters', async () => {
+    findByRequest.mockResolvedValueOnce([]);
+    const out = await getWriteupRoster({ requestId: REQ });
+    expect(findByRequest).toHaveBeenCalledWith(REQ, { selectedOnly: true, requireComplete: true });
+    expect(findAcceptedByPD).not.toHaveBeenCalled();
+    expect(findAcceptedByCycle).not.toHaveBeenCalled();
+    expect(resolvePD).not.toHaveBeenCalled();
+    expect(out).toEqual({ reviewers: [], blockers: [] });
+  });
+
+  test('projects an accepted+submitted roster with the five writeup fields, plus answers/rating for submitted rows only', async () => {
+    findByRequest.mockResolvedValueOnce([
+      {
+        wmkf_appreviewersuggestionid: IDS[0],
+        _wmkf_request_value: REQ,
+        _wmkf_potentialreviewer_value: 'person-a',
+        wmkf_selected: true,
+        wmkf_invited: true,
+        wmkf_accepted: true,
+        wmkf_reviewreceivedat: '2026-09-01T00:00:00Z',
+      },
+      {
+        // accepted but not yet submitted — in the roster, but no answers fetched for it.
+        wmkf_appreviewersuggestionid: IDS[1],
+        _wmkf_request_value: REQ,
+        _wmkf_potentialreviewer_value: 'person-b',
+        wmkf_selected: true,
+        wmkf_invited: true,
+        wmkf_accepted: true,
+      },
+    ]);
+    queryReviewers.mockResolvedValueOnce({
+      records: [
+        {
+          wmkf_potentialreviewersid: 'person-a',
+          wmkf_name: 'Dr. A',
+          wmkf_emailaddress: 'a@example.com',
+          wmkf_lastname: 'A',
+          wmkf_academicrank: 'Professor',
+          wmkf_maininstitution: 'Institute A',
+          wmkf_areaofexpertise: 'genomics',
+          wmkf_keywords: 'genomics; immunology',
+        },
+        {
+          wmkf_potentialreviewersid: 'person-b',
+          wmkf_name: 'Dr. B',
+        },
+      ],
+    });
+    fetchAnswersBySuggestion.mockResolvedValueOnce({ [IDS[0]]: [{ questionKey: 'q1', answerText: 'x' }] });
+    ratingsFromAnswers.mockReturnValueOnce({ riskLevel: 2, overallAssessment: 5 });
+
+    const out = await getWriteupRoster({ requestId: REQ });
+
+    expect(fetchAnswersBySuggestion).toHaveBeenCalledWith([IDS[0]]);
+    expect(out.reviewers).toHaveLength(2);
+    const a = out.reviewers.find((r) => r.suggestionId === IDS[0]);
+    expect(a).toMatchObject({
+      name: 'Dr. A',
+      email: 'a@example.com',
+      lastName: 'A',
+      academicRank: 'Professor',
+      mainInstitution: 'Institute A',
+      areaOfExpertise: 'genomics',
+      keywords: 'genomics; immunology',
+      reviewReceivedAt: '2026-09-01T00:00:00Z',
+      reviewerOverallAssessment: 5,
+    });
+    expect(a.answers).toEqual([{ questionKey: 'q1', answerText: 'x' }]);
+    const b = out.reviewers.find((r) => r.suggestionId === IDS[1]);
+    expect(b).toMatchObject({ name: 'Dr. B', reviewReceivedAt: null, reviewerOverallAssessment: null });
+    expect(b.answers).toEqual([]);
+  });
+
+  test('blockers surface name + accepted from the joined lifecycle/person rows for every unresolved participant', async () => {
+    findByRequest.mockResolvedValueOnce([
+      {
+        wmkf_appreviewersuggestionid: IDS[0],
+        _wmkf_request_value: REQ,
+        _wmkf_potentialreviewer_value: 'person-a',
+        wmkf_selected: true,
+        wmkf_invited: true,
+        wmkf_accepted: true,
+        wmkf_reviewreceivedat: '2026-09-01T00:00:00Z',
+      },
+      {
+        // Accepted, active (unexpired, unrevoked) token, no submission yet:
+        // classifyParticipant resolves this to the allowlisted
+        // 'active_invitation' blocker reason.
+        wmkf_appreviewersuggestionid: IDS[1],
+        _wmkf_request_value: REQ,
+        _wmkf_potentialreviewer_value: 'person-b',
+        wmkf_selected: true,
+        wmkf_invited: true,
+        wmkf_accepted: true,
+        wmkf_externaltokenhash: 'hash',
+        wmkf_externaltokenissued: '2026-08-01T00:00:00Z',
+        wmkf_externaltokenexpires: '2099-01-01T00:00:00Z',
+      },
+    ]);
+    queryReviewers.mockResolvedValueOnce({
+      records: [
+        { wmkf_potentialreviewersid: 'person-a', wmkf_name: 'Dr. A' },
+        { wmkf_potentialreviewersid: 'person-b', wmkf_name: 'Dr. B' },
+      ],
+    });
+    fetchAnswersBySuggestion.mockResolvedValueOnce({});
+    ratingsFromAnswers.mockReturnValueOnce({ riskLevel: null, overallAssessment: 5 });
+
+    const out = await getWriteupRoster({ requestId: REQ });
+
+    expect(out.blockers).toEqual([{
+      suggestionId: IDS[1],
+      reason: 'active_invitation',
+      name: 'Dr. B',
+      accepted: true,
+    }]);
+  });
+
+  test('getReviewers behavior is unchanged by getWriteupRoster existing (shared mocks, same request)', async () => {
+    getRequestById.mockResolvedValueOnce({
+      akoya_requestid: REQ, _wmkf_grantprogram_value: '11111111-1111-4111-8111-111111111111', akoya_requestnum: 'R-1001', akoya_title: 'T', wmkf_meetingdate: null,
+    });
+    findByRequest.mockResolvedValueOnce([
+      { wmkf_appreviewersuggestionid: IDS[0], _wmkf_request_value: REQ, _wmkf_potentialreviewer_value: 'person-a', wmkf_accepted: true, wmkf_reviewstatus: 100000001 },
+    ]);
+    queryReviewers.mockResolvedValueOnce({ records: [{ wmkf_potentialreviewersid: 'person-a', wmkf_name: 'Dr. A' }] });
+
+    const out = await getReviewers({ proposalId: REQ, azureEmail: 'pd@wmkeck.org' });
+    expect(out.proposals[0].reviewers[0]).toMatchObject({ suggestionId: IDS[0], name: 'Dr. A', reviewStatus: 'materials_sent' });
   });
 });

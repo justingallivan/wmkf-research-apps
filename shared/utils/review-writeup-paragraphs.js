@@ -199,9 +199,44 @@ function submittedReviewersOf(reviewers) {
  * @returns {number}
  */
 export function compareReviewersByName(a, b) {
-  const byName = (a?.name || '').localeCompare(b?.name || '');
+  // Pin locale 'en' explicitly (Opus Slice 3 review follow-up): an unpinned
+  // localeCompare uses the runtime's default locale, which can differ
+  // between a browser tab and a Node server process — the exact
+  // cross-surface divergence this comparator exists to prevent.
+  const byName = (a?.name || '').localeCompare(b?.name || '', 'en');
   if (byName !== 0) return byName;
-  return (a?.suggestionId || '').localeCompare(b?.suggestionId || '');
+  return (a?.suggestionId || '').localeCompare(b?.suggestionId || '', 'en');
+}
+
+/**
+ * Shared tally step for both `composeScoreSentence` (Reviews tab) and the
+ * Slice 4 referee-section count sentence: bucket labelled ratings by label,
+ * in descending rating order. A reviewer whose `reviewerOverallAssessment`
+ * has no label (legacy row) is excluded from the tally and its name is
+ * added to `warnings`. Caller supplies an already-`submittedReviewersOf`-
+ * filtered array.
+ *
+ * @param {Array<Object>} submitted
+ * @returns {{ tallies: Map<string, number>, labelOrder: Array<{label:string, rating:number|null}>, warnings: string[] }}
+ */
+function tallyScoreLabels(submitted) {
+  const tallies = new Map(); // label -> count
+  const labelOrder = [];
+  const warnings = [];
+  for (const reviewer of submitted) {
+    const label = labelForReviewRating('overallAssessment', reviewer.reviewerOverallAssessment);
+    if (!label) {
+      warnings.push(`${reviewer.name || 'An unnamed reviewer'}'s overall rating has no label and was left out of the score tally.`);
+      continue;
+    }
+    if (!tallies.has(label)) {
+      tallies.set(label, 0);
+      labelOrder.push({ label, rating: reviewer.reviewerOverallAssessment });
+    }
+    tallies.set(label, tallies.get(label) + 1);
+  }
+  labelOrder.sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
+  return { tallies, labelOrder, warnings };
 }
 
 /**
@@ -215,25 +250,9 @@ export function compareReviewersByName(a, b) {
  */
 export function composeScoreSentence(reviewers) {
   const submitted = submittedReviewersOf(reviewers);
-  const warnings = [];
-  if (submitted.length === 0) return { sentence: null, warnings };
+  if (submitted.length === 0) return { sentence: null, warnings: [] };
 
-  const tallies = new Map(); // label -> count
-  const labelOrder = [];
-  for (const reviewer of submitted) {
-    const label = labelForReviewRating('overallAssessment', reviewer.reviewerOverallAssessment);
-    if (!label) {
-      warnings.push(`${reviewer.name || 'An unnamed reviewer'}'s overall rating has no label and was left out of the score tally.`);
-      continue;
-    }
-    if (!tallies.has(label)) {
-      tallies.set(label, 0);
-      labelOrder.push({ label, rating: reviewer.reviewerOverallAssessment });
-    }
-    tallies.set(label, tallies.get(label) + 1);
-  }
-
-  labelOrder.sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
+  const { tallies, labelOrder, warnings } = tallyScoreLabels(submitted);
   const reviewWord = submitted.length === 1 ? 'review' : 'reviews';
   const countWord = numberWord(submitted.length);
 
@@ -251,6 +270,40 @@ export function composeScoreSentence(reviewers) {
   const tallyPhrases = labelOrder.map(({ label }) => `${numberWord(tallies.get(label))} ${label}`);
   return {
     sentence: `We received ${countWord} ${reviewWord} with scores of ${joinWithOxfordComma(tallyPhrases)}.`,
+    warnings,
+  };
+}
+
+/**
+ * Slice 4 variant of the count sentence used ONLY inside
+ * `composeRefereeSection` — "so far" phrasing when blockers are outstanding,
+ * identical to `composeScoreSentence` when there are none (plan §4.5: "the
+ * plain form when none").
+ *
+ * @param {Array<Object>} submitted - already `submittedReviewersOf`-filtered
+ * @param {boolean} hasBlockers
+ * @returns {{ sentence: string|null, warnings: string[] }}
+ */
+function composeRefereeCountSentence(submitted, hasBlockers) {
+  if (submitted.length === 0) return { sentence: null, warnings: [] };
+  if (!hasBlockers) return composeScoreSentence(submitted);
+
+  const { tallies, labelOrder, warnings } = tallyScoreLabels(submitted);
+  const reviewWord = submitted.length === 1 ? 'review' : 'reviews';
+  const countWord = numberWord(submitted.length);
+
+  if (labelOrder.length === 0) {
+    return { sentence: `We have received ${countWord} ${reviewWord} so far.`, warnings };
+  }
+  if (submitted.length === 1 && labelOrder.length === 1) {
+    return {
+      sentence: `We have received one review so far, with a score of ${labelOrder[0].label}.`,
+      warnings,
+    };
+  }
+  const tallyPhrases = labelOrder.map(({ label }) => `${numberWord(tallies.get(label))} ${label}`);
+  return {
+    sentence: `We have received ${countWord} ${reviewWord} so far, with scores of ${joinWithOxfordComma(tallyPhrases)}.`,
     warnings,
   };
 }
@@ -549,5 +602,90 @@ export function composeWriteupParagraphs({ reviewers, synthesis } = {}) {
     quotations,
     text,
     html,
+  };
+}
+
+// The ONLY blocker reason `composeRefereeSection` names a blocker by (plan
+// §4.5, Codex AR-1 finding 5: allowlist, not denylist). Every other reason —
+// `missing_current_token`, `missing_token_*`, `malformed_*`, `unknown_*`, and
+// anything not yet defined by `review-synthesis-readiness.js` — collapses to
+// a counted generic clause. Also requires the row itself to be
+// `accepted === true`.
+const NAMEABLE_BLOCKER_REASON = 'active_invitation';
+
+/**
+ * Slice 4 (plan §4.5): compose the Pre-Site Visit `[[STAFF:RefereeSection]]`
+ * fill from the reviews in hand at generation time — the SAME deterministic
+ * sentences as the Reviews tab (count/scores, reviewers, expertise; NO model
+ * text — themes/quotations stay tab-only) plus an "outstanding" sentence
+ * naming reviewers whose invitation is still open.
+ *
+ * Returns `null` when zero reviews are submitted (plan: "leave the token").
+ *
+ * Outstanding naming is an ALLOWLIST: a blocker is named by reviewer name
+ * only when `accepted === true` AND `reason === 'active_invitation'`; every
+ * other unresolved reason collapses into a counted generic clause ("One
+ * invitation is unresolved." / "Two invitations are unresolved.") and emits
+ * a `{code: 'referee_blocker_unnamed', reason}` diagnostic instead of
+ * silently naming (or silently dropping) an ambiguous case.
+ *
+ * @param {{reviewers: Array<Object>, blockers?: Array<{suggestionId:string, reason:string, name:(string|null), accepted:boolean}>}} input
+ * @returns {{ text: string, names: string[], diagnostics: Array<{code:string, reason:string}> } | null}
+ */
+export function composeRefereeSection({ reviewers, blockers } = {}) {
+  const submitted = submittedReviewersOf(reviewers);
+  if (submitted.length === 0) return null;
+
+  const safeBlockers = Array.isArray(blockers) ? blockers : [];
+  const hasBlockers = safeBlockers.length > 0;
+
+  const { sentence: countSentence } = composeRefereeCountSentence(submitted, hasBlockers);
+  const reviewerSentence = composeReviewerSentence(submitted);
+  const expertiseSentence = composeExpertiseSentence(submitted);
+
+  const sentences = [];
+  const names = [];
+  const diagnostics = [];
+
+  if (countSentence) sentences.push(countSentence);
+  if (reviewerSentence) {
+    sentences.push(runsToPlainText(reviewerSentence.runs));
+    for (const run of reviewerSentence.runs) {
+      if (run.underline && run.text) names.push(run.text);
+    }
+  }
+  if (expertiseSentence) sentences.push(expertiseSentence);
+
+  const namedOutstanding = [];
+  let unnamedCount = 0;
+  for (const blocker of safeBlockers) {
+    if (blocker?.accepted === true && blocker?.reason === NAMEABLE_BLOCKER_REASON) {
+      const name = typeof blocker.name === 'string' && blocker.name.trim()
+        ? blocker.name.trim()
+        : 'An unnamed reviewer';
+      namedOutstanding.push(name);
+    } else {
+      unnamedCount += 1;
+      diagnostics.push({ code: 'referee_blocker_unnamed', reason: blocker?.reason || 'unknown' });
+    }
+  }
+
+  if (namedOutstanding.length > 0) {
+    const lead = namedOutstanding.length === 1 ? 'A review from ' : 'Reviews from ';
+    const verb = namedOutstanding.length === 1 ? 'is' : 'are';
+    sentences.push(`${lead}${joinWithOxfordComma(namedOutstanding)} ${verb} outstanding.`);
+    names.push(...namedOutstanding);
+  }
+  if (unnamedCount > 0) {
+    const word = numberWord(unnamedCount);
+    const capitalizedWord = word.charAt(0).toUpperCase() + word.slice(1);
+    const noun = unnamedCount === 1 ? 'invitation is' : 'invitations are';
+    sentences.push(`${capitalizedWord} ${noun} unresolved.`);
+  }
+
+  return {
+    text: sentences.join(' '),
+    names,
+    diagnostics,
   };
 }

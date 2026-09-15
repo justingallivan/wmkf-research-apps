@@ -92,6 +92,11 @@ function dependencies(overrides = {}) {
       usage: { input_tokens: 100 },
       meta: { modelUsed: 'claude-test' },
     }),
+    // Slice 4 (plan §4.5): zero-submitted-reviews baseline by default —
+    // individual tests override to exercise a composed referee section or a
+    // roster-read failure.
+    getWriteupRoster: jest.fn().mockResolvedValue({ reviewers: [], blockers: [] }),
+    composeRefereeSection: jest.fn().mockReturnValue(null),
     ...overrides,
   };
 }
@@ -171,6 +176,66 @@ test.each(['  ', 'N/A', 'unknown'])(
     expect(result.context.documentFields.institutionName).toBe('Applicant University');
   },
 );
+
+// Slice 4 (plan §4.5): [[STAFF:RefereeSection]] fill.
+test('composes a referee section from the roster when composeRefereeSection returns one', async () => {
+  const roster = { reviewers: [{ name: 'Dr. A' }], blockers: [] };
+  const composed = { text: 'We received one review.', names: ['Dr. A'], diagnostics: [] };
+  const deps = dependencies({
+    getWriteupRoster: jest.fn().mockResolvedValue(roster),
+    composeRefereeSection: jest.fn().mockReturnValue(composed),
+  });
+  const result = await loadPreSiteVisitInputs({ requestId: REQUEST_ID }, deps);
+
+  expect(deps.getWriteupRoster).toHaveBeenCalledWith(REQUEST_ID);
+  expect(deps.composeRefereeSection).toHaveBeenCalledWith({ reviewers: roster.reviewers, blockers: roster.blockers });
+  expect(result.context.documentFields.refereeSection).toEqual({ text: composed.text, names: composed.names });
+  expect(result.context.refereeSectionDiagnostics).toEqual([]);
+});
+
+test('leaves refereeSection null when zero reviews are submitted (composeRefereeSection returns null)', async () => {
+  const deps = dependencies();
+  const result = await loadPreSiteVisitInputs({ requestId: REQUEST_ID }, deps);
+
+  expect(result.context.documentFields.refereeSection).toBeNull();
+  expect(result.context.refereeSectionDiagnostics).toEqual([]);
+});
+
+test('carries composeRefereeSection diagnostics (e.g. referee_blocker_unnamed) through to context', async () => {
+  const composed = {
+    text: 'We received one review.',
+    names: ['Dr. A'],
+    diagnostics: [{ code: 'referee_blocker_unnamed', reason: 'missing_current_token' }],
+  };
+  const deps = dependencies({
+    composeRefereeSection: jest.fn().mockReturnValue(composed),
+  });
+  const result = await loadPreSiteVisitInputs({ requestId: REQUEST_ID }, deps);
+
+  expect(result.context.refereeSectionDiagnostics).toEqual(composed.diagnostics);
+});
+
+test('fails closed when the reviewer roster read fails (Reviews paragraph cannot be composed)', async () => {
+  const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  const deps = dependencies({
+    getWriteupRoster: jest.fn().mockRejectedValue(new Error('dataverse 503')),
+  });
+
+  await expect(loadPreSiteVisitInputs({ requestId: REQUEST_ID }, deps))
+    .rejects.toMatchObject({ code: 'pre_site_visit_referee_roster_unavailable', httpStatus: 409 });
+  warnSpy.mockRestore();
+});
+
+test('fails closed when composeRefereeSection itself throws', async () => {
+  const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  const deps = dependencies({
+    composeRefereeSection: jest.fn(() => { throw new Error('composer exploded'); }),
+  });
+
+  await expect(loadPreSiteVisitInputs({ requestId: REQUEST_ID }, deps))
+    .rejects.toMatchObject({ code: 'pre_site_visit_referee_roster_unavailable', httpStatus: 409 });
+  warnSpy.mockRestore();
+});
 
 test('fails closed when the applicant account read fails (funding history cannot be derived)', async () => {
   const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});

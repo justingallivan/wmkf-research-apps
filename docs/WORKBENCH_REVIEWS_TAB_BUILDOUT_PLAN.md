@@ -274,7 +274,7 @@ monitoring in-flight (status/nudges). Owner confirmed scope = all four phases (S
   carries on the `/api/review-manager/reviewers` DTO — `requestNumber`,
   `proposalTitle`, `proposalInstitution`, `proposalAuthors`
   [VERIFIED via `lib/services/review-manager/reviewers-service.js` proposal DTO
-  assembly]. The DTO has no
+  assembly]. [RECHECKED after lib/services/review-manager/reviewers-service.js change: 2026-09-14 Slices 1–4 added per-reviewer identity fields and a request-scoped roster export; the proposal-level DTO keys `requestNumber`/`proposalTitle`/`proposalInstitution`/`proposalAuthors` are unchanged.] The DTO has no
   dedicated `piName` field; `proposalAuthors` (project leader/applicant)
   stands in as the best-available PI identity rather than extending the
   route.

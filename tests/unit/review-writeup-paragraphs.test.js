@@ -8,6 +8,8 @@ import {
   composeReviewerSentence,
   composeExpertiseSentence,
   composeWriteupParagraphs,
+  compareReviewersByName,
+  composeRefereeSection,
 } from '../../shared/utils/review-writeup-paragraphs';
 
 function reviewer(overrides = {}) {
@@ -670,5 +672,136 @@ describe('composeWriteupParagraphs — Slice 2 quotation provenance', () => {
     });
     expect(quotations).toEqual([]);
     expect(droppedQuotationCount).toBe(1);
+  });
+
+  it('compareReviewersByName pins the "en" locale so a non-ASCII accented name sorts identically regardless of runtime default locale', () => {
+    // Discriminating: "Ångström" vs "Zorn" under a naive codepoint/ASCII
+    // comparison sorts "Å" (U+00C5) AFTER "Z" (U+005A), but 'en' locale
+    // collation correctly treats "Å" as an accented "A", sorting it BEFORE
+    // "Zorn". Pinning 'en' (vs. omitting the locale arg, which follows the
+    // runtime's default ICU locale and could diverge between Node and a
+    // browser) is what this test guards.
+    const a = { name: 'Ångström', suggestionId: 'a' };
+    const z = { name: 'Zorn', suggestionId: 'z' };
+    expect(compareReviewersByName(a, z)).toBeLessThan(0);
+    expect(compareReviewersByName(z, a)).toBeGreaterThan(0);
+  });
+});
+
+describe('composeRefereeSection (Slice 4)', () => {
+  it('returns null when zero reviews are submitted', () => {
+    expect(composeRefereeSection({ reviewers: [reviewer({ reviewReceivedAt: null })], blockers: [] })).toBeNull();
+    expect(composeRefereeSection({ reviewers: [], blockers: [] })).toBeNull();
+  });
+
+  it('uses the plain count sentence and no outstanding clause when there are no blockers', () => {
+    const result = composeRefereeSection({
+      reviewers: [reviewer({ name: 'Dr. A', mainInstitution: 'X' })],
+      blockers: [],
+    });
+    expect(result.text).toContain('We received one review with a score of Excellent.');
+    expect(result.text).not.toContain('outstanding');
+    expect(result.text).not.toContain('unresolved');
+    expect(result.names).toEqual(['Dr. A']);
+    expect(result.diagnostics).toEqual([]);
+  });
+
+  it('uses the "so far" count sentence when blockers exist, even if none are nameable', () => {
+    const result = composeRefereeSection({
+      reviewers: [reviewer({ name: 'Dr. A', mainInstitution: 'X' })],
+      blockers: [{ suggestionId: 'b1', reason: 'missing_current_token', name: 'Dr. B', accepted: true }],
+    });
+    expect(result.text).toContain('We have received one review so far, with a score of Excellent.');
+    expect(result.text).toContain('One invitation is unresolved.');
+    expect(result.text).not.toContain('Dr. B');
+    expect(result.names).toEqual(['Dr. A']);
+    expect(result.diagnostics).toEqual([{ code: 'referee_blocker_unnamed', reason: 'missing_current_token' }]);
+  });
+
+  it('names a single outstanding reviewer only when accepted === true AND reason === "active_invitation"', () => {
+    const result = composeRefereeSection({
+      reviewers: [reviewer({ name: 'Dr. A', mainInstitution: 'X' })],
+      blockers: [{ suggestionId: 'b1', reason: 'active_invitation', name: 'Dr. Pending', accepted: true }],
+    });
+    expect(result.text).toContain('A review from Dr. Pending is outstanding.');
+    expect(result.names).toEqual(['Dr. A', 'Dr. Pending']);
+    expect(result.diagnostics).toEqual([]);
+  });
+
+  it('names two outstanding reviewers with Oxford-comma-free "and" join and plural grammar', () => {
+    const result = composeRefereeSection({
+      reviewers: [reviewer({ name: 'Dr. A', mainInstitution: 'X' })],
+      blockers: [
+        { suggestionId: 'b1', reason: 'active_invitation', name: 'Dr. First', accepted: true },
+        { suggestionId: 'b2', reason: 'active_invitation', name: 'Dr. Second', accepted: true },
+      ],
+    });
+    expect(result.text).toContain('Reviews from Dr. First and Dr. Second are outstanding.');
+  });
+
+  it('an active_invitation blocker that is not yet accepted collapses to the generic unresolved clause, not a named one', () => {
+    const result = composeRefereeSection({
+      reviewers: [reviewer({ name: 'Dr. A', mainInstitution: 'X' })],
+      blockers: [{ suggestionId: 'b1', reason: 'active_invitation', name: 'Dr. NotYet', accepted: false }],
+    });
+    expect(result.text).not.toContain('Dr. NotYet');
+    expect(result.text).toContain('One invitation is unresolved.');
+    expect(result.diagnostics).toEqual([{ code: 'referee_blocker_unnamed', reason: 'active_invitation' }]);
+  });
+
+  // Table-driven (plan §4.5): every reason string
+  // lib/services/review-synthesis-readiness.js's classifyParticipant can
+  // emit for an UNRESOLVED (blocking) participant — grepped from that file's
+  // `resolved: false` branches — plus one reason the module does not define,
+  // standing in for "anything not recognised". A new reason added to that
+  // module without updating this list fails this test, not silently falls
+  // into a sentence.
+  const ALL_UNRESOLVED_READINESS_REASONS = [
+    'unknown_response_type',
+    'unknown_review_status',
+    'malformed_wmkf_invited',
+    'malformed_wmkf_accepted',
+    'malformed_wmkf_declined',
+    'malformed_wmkf_externaltokenrevoked',
+    'malformed_review_received_at',
+    'malformed_token_issued_at',
+    'malformed_token_expires_at',
+    'missing_current_token',
+    'missing_token_issued_at',
+    'missing_token_expires_at',
+    'active_invitation',
+    'some_future_reason_not_yet_defined',
+  ];
+
+  it.each(ALL_UNRESOLVED_READINESS_REASONS)(
+    'reason "%s" is named ONLY when accepted === true and reason === "active_invitation"; every other reason (including unrecognised) collapses to the generic unresolved clause',
+    (reason) => {
+      const acceptedResult = composeRefereeSection({
+        reviewers: [reviewer({ name: 'Dr. A', mainInstitution: 'X' })],
+        blockers: [{ suggestionId: 'b1', reason, name: 'Dr. Blocked', accepted: true }],
+      });
+      if (reason === 'active_invitation') {
+        expect(acceptedResult.text).toContain('A review from Dr. Blocked is outstanding.');
+        expect(acceptedResult.diagnostics).toEqual([]);
+      } else {
+        expect(acceptedResult.text).not.toContain('Dr. Blocked');
+        expect(acceptedResult.text).toContain('One invitation is unresolved.');
+        expect(acceptedResult.diagnostics).toEqual([{ code: 'referee_blocker_unnamed', reason }]);
+      }
+    },
+  );
+
+  it('composes the deterministic sentences identically to the tab (score, reviewer runs, expertise) with no model text', () => {
+    const result = composeRefereeSection({
+      reviewers: [reviewer({
+        name: 'Dr. Expert', mainInstitution: 'X', lastName: 'Expert', keywords: 'genomics; immunology',
+      })],
+      blockers: [],
+    });
+    expect(result.text).toContain('Dr. Expert');
+    expect(result.text).toContain('Expert has expertise in genomics and immunology.');
+    // No model-authored text (themes/quotations) is ever composed here —
+    // composeRefereeSection never even accepts a `synthesis` argument.
+    expect(result.text).not.toContain('undefined');
   });
 });

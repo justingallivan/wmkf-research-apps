@@ -76,7 +76,7 @@ function cellContaining(cells, text) {
 test('fills split-run Dataverse and AI placeholders while retaining the template package', async () => {
   const template = await fs.readFile(defaultPreSiteVisitTemplatePath());
   const original = await JSZip.loadAsync(template);
-  const output = await renderPreSiteVisitDocx({
+  const { docx: output } = await renderPreSiteVisitDocx({
     documentFields: documentFieldsFixture(),
     proposalCore: {
       ...proposalCoreFixture(),
@@ -117,8 +117,8 @@ test('produces byte-identical DOCX output for identical inputs', async () => {
     },
     personnelNames: personnelNamesFixture(),
   };
-  const first = await renderPreSiteVisitDocx(input);
-  const second = await renderPreSiteVisitDocx(input);
+  const { docx: first } = await renderPreSiteVisitDocx(input);
+  const { docx: second } = await renderPreSiteVisitDocx(input);
   expect(second.equals(first)).toBe(true);
 });
 
@@ -249,7 +249,7 @@ test('pins the divider and one blank line above the executive summary', async ()
 });
 
 test('adds 6pt after the four first-page list paragraphs and removes the blank before the page break', async () => {
-  const output = await renderPreSiteVisitDocx({
+  const { docx: output } = await renderPreSiteVisitDocx({
     documentFields: documentFieldsFixture(),
     proposalCore: {
       ...proposalCoreFixture(),
@@ -284,7 +284,7 @@ test('expands the two long-form AI slots into multiple Word paragraphs', async (
   core.backgroundAndImpact = 'Background paragraph one.\n\nBackground paragraph two.\n\nBackground paragraph three.';
   core.detailedMethodology = 'Methods paragraph one.\n\nMethods paragraph two.\n\nMethods paragraph three.';
   core.personnelDetails = 'Ada Lovelace (PI) leads modeling; Grace Hopper (co-PI) leads experiments.';
-  const output = await renderPreSiteVisitDocx({
+  const { docx: output } = await renderPreSiteVisitDocx({
     documentFields: documentFieldsFixture(),
     proposalCore: core,
     personnelNames: personnelNamesFixture(),
@@ -301,7 +301,7 @@ test('expands the two long-form AI slots into multiple Word paragraphs', async (
 test('collapses a multi-paragraph personnel section instead of rejecting the draft', async () => {
   const core = proposalCoreFixture();
   core.personnelDetails = 'Ada Lovelace (PI) leads modeling.\n\nGrace Hopper (co-PI) leads experiments.';
-  const output = await renderPreSiteVisitDocx({
+  const { docx: output } = await renderPreSiteVisitDocx({
     documentFields: documentFieldsFixture(),
     proposalCore: core,
     personnelNames: personnelNamesFixture(),
@@ -315,7 +315,7 @@ test('replaces unavailable optional Dataverse fields with blanks rather than inv
   const fields = documentFieldsFixture();
   fields.invitedAmount = null;
   fields.totalProjectBudget = null;
-  const output = await renderPreSiteVisitDocx({
+  const { docx: output } = await renderPreSiteVisitDocx({
     documentFields: fields,
     proposalCore: {
       ...proposalCoreFixture(),
@@ -336,7 +336,7 @@ test('underlines only authoritative roster names in both Personnel sections', as
   const core = proposalCoreFixture();
   core.personnelOverview = 'Ada Lovelace and Grace Hopper provide complementary expertise.';
   core.personnelDetails = 'Ada Lovelace (PI) leads modeling; Grace Hopper (co-PI) leads experiments.';
-  const output = await renderPreSiteVisitDocx({
+  const { docx: output } = await renderPreSiteVisitDocx({
     documentFields: documentFieldsFixture(),
     proposalCore: core,
     personnelNames: personnelNamesFixture(),
@@ -363,7 +363,7 @@ test('renders a page-one Personnel summary that omits a roster name without unde
   core.personnelOverview = 'Ada Lovelace (PI) provides complementary expertise.';
   core.personnelDetails = 'Ada Lovelace (PI) leads modeling; Grace Hopper (co-PI) leads experiments.';
 
-  const output = await renderPreSiteVisitDocx({
+  const { docx: output } = await renderPreSiteVisitDocx({
     documentFields: documentFieldsFixture(),
     proposalCore: core,
     personnelNames: personnelNamesFixture(),
@@ -375,10 +375,83 @@ test('renders a detailed Personnel section that omits a roster name', async () =
   const core = proposalCoreFixture();
   core.personnelDetails = 'Ada Lovelace (PI) leads modeling.';
 
-  const output = await renderPreSiteVisitDocx({
+  const { docx: output } = await renderPreSiteVisitDocx({
     documentFields: documentFieldsFixture(),
     proposalCore: core,
     personnelNames: personnelNamesFixture(),
   });
   expect(output).toBeInstanceOf(Buffer);
+});
+
+// Slice 4 (plan §4.5): [[STAFF:RefereeSection]] is CONDITIONAL, not manual —
+// filled when a referee section is supplied, preserved exactly once when not.
+describe('RefereeSection (Slice 4, conditional placeholder)', () => {
+  test('preserves the token exactly once and emits no diagnostics when refereeSection is null', async () => {
+    const { docx: output, diagnostics } = await renderPreSiteVisitDocx({
+      documentFields: documentFieldsFixture(),
+      proposalCore: proposalCoreFixture(),
+      personnelNames: personnelNamesFixture(),
+      refereeSection: null,
+    });
+    const rendered = await JSZip.loadAsync(output);
+    const xml = await wordXml(rendered);
+    expect((xml.match(/\[\[STAFF:RefereeSection\]\]/g) || [])).toHaveLength(1);
+    expect(diagnostics).toEqual([]);
+  });
+
+  test('fills the token exactly once, removes it, and underlines the supplied reviewer names ONLY in that paragraph', async () => {
+    const { docx: output, diagnostics } = await renderPreSiteVisitDocx({
+      documentFields: documentFieldsFixture(),
+      proposalCore: {
+        ...proposalCoreFixture(),
+        personnelDetails: 'Ada Lovelace (PI) leads modeling; Dr. Reviewer was consulted informally.',
+      },
+      personnelNames: personnelNamesFixture(),
+      refereeSection: {
+        text: 'We received one review with a score of Excellent. The reviewer was Dr. Reviewer of Institute X.',
+        names: ['Dr. Reviewer'],
+      },
+    });
+    const rendered = await JSZip.loadAsync(output);
+    const documentXml = await rendered.file('word/document.xml').async('string');
+    const xml = await wordXml(rendered);
+
+    expect(xml).not.toContain('[[STAFF:RefereeSection]]');
+    expect(xml).toContain('We received one review with a score of Excellent.');
+
+    const paragraphs = wordParagraphs(documentXml);
+    const referee = paragraphs.find((p) => p.includes('The reviewer was'));
+    expect(referee).toBeDefined();
+    expect(referee).toMatch(/<w:u w:val="single"\/><\/w:rPr><w:t>Dr\. Reviewer<\/w:t>/);
+    // Institution text is never underlined — only the reviewer name run.
+    expect(referee).not.toMatch(/<w:u w:val="single"\/><\/w:rPr><w:t[^>]*>\s*of Institute X/);
+
+    // Reviewer names appear in the Personnel-details paragraph as plain text
+    // (they must NOT be underlined there, and must not trigger
+    // personnel_name_not_matched — they were never joined into
+    // personnelNames). This is the discriminating half of the assertion:
+    // the name is present in both paragraphs, but underlined in only one.
+    const details = paragraphs.find((p) => p.includes('leads modeling'));
+    expect(details).toBeDefined();
+    expect(details).toContain('Dr. Reviewer');
+    expect(details).not.toMatch(/<w:u w:val="single"\/><\/w:rPr><w:t[^>]*>Dr\. Reviewer/);
+
+    expect(diagnostics).toEqual([]);
+  });
+
+  test('emits referee_name_not_matched for a supplied name with zero underlines (e.g. the template splits the run)', async () => {
+    const { diagnostics } = await renderPreSiteVisitDocx({
+      documentFields: documentFieldsFixture(),
+      proposalCore: proposalCoreFixture(),
+      personnelNames: personnelNamesFixture(),
+      refereeSection: {
+        text: 'We received one review with a score of Excellent.',
+        // "Dr. Unmatched" never appears anywhere in the referee text (or
+        // template) — zero underlines, matching a template-vs-text mismatch.
+        names: ['Dr. Unmatched'],
+      },
+    });
+    expect(diagnostics).toEqual([{ code: 'referee_name_not_matched', name: 'Dr. Unmatched' }]);
+  });
+
 });
