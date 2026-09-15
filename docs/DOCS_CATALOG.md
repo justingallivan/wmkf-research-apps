@@ -457,6 +457,12 @@ related:
 | [WAVE1_REVERT_TEMP_ELEVATIONS.md](WAVE1_REVERT_TEMP_ELEVATIONS.md) | history | active |  | Purpose: Remove the elevated privileges the app user needed for the prod cutover, leaving it with the minimal permanent surface. | 2026-07-02 |
 | [WAVE1_VERCEL_FLAG_ROLLOUT.md](WAVE1_VERCEL_FLAG_ROLLOUT.md) | plan | historical |  | Status: ✅ CLOSED 2026-05-12. This runbook is preserved as the historical record of how the flags were flipped and the trailing-newline gotcha that... | 2026-07-02 |
 
+## security-operations
+
+| File | Kind | Status | Canonical | Summary | Cataloged |
+|---|---|---|---|---|---|
+| [MANAGED_PRIVATE_GITHUB_REPOSITORY_MIGRATION_PLAN.md](MANAGED_PRIVATE_GITHUB_REPOSITORY_MIGRATION_PLAN.md) | plan | draft |  | Staged move to an IT-managed private GitHub repository while preserving automation and the existing Vercel production project. | 2026-09-15 |
+
 ## security-privacy
 
 | File | Kind | Status | Canonical | Summary | Cataloged |
