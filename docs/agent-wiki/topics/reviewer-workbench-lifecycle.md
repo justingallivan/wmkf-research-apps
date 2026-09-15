@@ -1410,7 +1410,20 @@ or a "Regenerate synthesis to add themes and quotations" hint (pointing at the
 existing Regenerate control, not a new action) when a synthesis is current but
 predates these fields. `review-report.js`'s `synthesisSection` carries the
 same VERIFIED quotations (never the raw `synthesis.writeupQuotations`) plus
-`writeupThemes`, for the Word export (Slice 3 adds the renderer). **Production
+`writeupThemes`, for the Word export. **Slice 3 (2026-09-14):**
+`composeReviewReport` also builds `writeupSection` (the deterministic
+score/reviewer/expertise sentences as `{text, underline}` run arrays, plus the
+same verified `themes`/`quotations`) from the shared `composeWriteupParagraphs`
+composer, and `shared/utils/review-report-docx.js` renders it as a "Reviews
+(writeup)" DOCX section with `TextRun({underline:{}})` on reviewer-name runs
+only — model strings (themes, quotations, institution text) are always plain
+runs; the PDF renderer is unchanged (W4: no PDF work) and ignores the new
+section without erroring. The Opus Slice 2 review also fixed a cross-surface
+divergence: quote-tie-break ordering now uses the exported
+`compareReviewersByName` on a canonical re-sort inside
+`verifyAndSelectQuotations`, so the tab (name-sorted `submitted`) and the
+`export-reviews-service.js` roster (now also sorted with the same comparator)
+select identical W8 quotations regardless of caller order. **Production
 publish of this prompt row is a separate owner step** (`--force` republish,
 plan §4.3) — not run as part of this build; the live row and the read paths on
 both sides tolerate either the five-key or seven-key shape. Same

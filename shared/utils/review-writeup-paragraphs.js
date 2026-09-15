@@ -6,9 +6,9 @@
  * W1-W3, W5, W7, W8).
  *
  * NO DOM, NO React, NO Dataverse/network imports — same purity contract as
- * `shared/utils/review-report.js`. Consumed by the Reviews tab card, and,
- * later, the Word export (Slice 3) and the Pre-Site Visit
- * `[[STAFF:RefereeSection]]` fill (Slice 4).
+ * `shared/utils/review-report.js`. Consumed by the Reviews tab card, by the
+ * Word export (`shared/utils/review-report.js`'s `writeupSection`, Slice 3),
+ * and, later, the Pre-Site Visit `[[STAFF:RefereeSection]]` fill (Slice 4).
  *
  * Input filter: every composer here takes only reviewers with
  * `reviewReceivedAt` set — the same filter `digestReviewers` applies in
@@ -17,9 +17,17 @@
  * to verify quotation provenance — a caller passing the full submitted-
  * reviewer projection from `getReviewers` unchanged satisfies both.
  *
- * Ordering: descending `reviewerOverallAssessment` (nulls/unlabelled last);
- * ties keep the ORDER THE CALLER PASSED IN (the tab already name-sorts
- * `submitted` before calling in). This module never re-sorts by name.
+ * Ordering: descending `reviewerOverallAssessment` (nulls/unlabelled last).
+ * The DETERMINISTIC sentences (`composeReviewerSentence`,
+ * `composeExpertiseSentence`, via `orderByRatingDescending`) break ties by
+ * the order the CALLER passed reviewers in (the tab name-sorts `submitted`
+ * before calling in) — this part of the module never re-sorts by name.
+ * QUOTATION selection (`verifyAndSelectQuotations`) is different: its W8 tie-
+ * break uses the exported `compareReviewersByName` on a CANONICAL re-sort,
+ * independent of caller order, so two callers passing the same reviewers in
+ * different orders (the tab's name-sorted roster; an export roster in
+ * Dataverse fetch order) select identical quotations (Opus Slice 2 review
+ * follow-up).
  *
  * Unlabelled ratings (a legacy row with no in-domain overall rating — see
  * plan §3 "Ratings required at submit"): the reviewer still appears in the
@@ -173,6 +181,27 @@ function orderByRatingDescending(reviewers, labelFor) {
 
 function submittedReviewersOf(reviewers) {
   return (Array.isArray(reviewers) ? reviewers : []).filter((r) => !!r?.reviewReceivedAt);
+}
+
+/**
+ * Canonical reviewer ordering used ANYWHERE a rating tie needs a stable,
+ * caller-order-independent tie-break — most importantly `verifyAndSelectQuotations`'s
+ * W8 selection, so two callers passing the same reviewers in different
+ * incoming orders (the tab's name-sorted `submitted`; an export roster still
+ * in Dataverse fetch order) select the identical three quotations rather than
+ * silently diverging on a rating tie. By reviewer display name
+ * (locale-aware), then `suggestionId` as a final deterministic tie-break.
+ * Exported so every caller that needs "the tab's" reviewer ordering (the tab
+ * itself included) uses this one implementation.
+ *
+ * @param {{name?: string, suggestionId?: string}} a
+ * @param {{name?: string, suggestionId?: string}} b
+ * @returns {number}
+ */
+export function compareReviewersByName(a, b) {
+  const byName = (a?.name || '').localeCompare(b?.name || '');
+  if (byName !== 0) return byName;
+  return (a?.suggestionId || '').localeCompare(b?.suggestionId || '');
 }
 
 /**
@@ -364,9 +393,10 @@ const QUOTATION_LEAD_INS = {
  * one reviewer) or unmatched candidates are dropped and counted. At most one
  * surviving quote per reviewer (first candidate for that reviewer wins).
  * Survivors are ordered by that reviewer's `reviewerOverallAssessment`
- * descending (ties by roster/`submitted` order); when more than three
- * survive, W8 keeps only the highest-rated, the median (by sorted position),
- * and the lowest-rated.
+ * descending (ties broken by `compareReviewersByName` on a CANONICAL
+ * re-sort of `submitted`, never by the order `reviewers` arrived in — see
+ * that function's doc comment); when more than three survive, W8 keeps only
+ * the highest-rated, the median (by sorted position), and the lowest-rated.
  *
  * Exported so other consumers of the same reviewer projection (e.g.
  * `shared/utils/review-report.js`'s Word-export synthesis section) can reuse
@@ -379,7 +409,12 @@ const QUOTATION_LEAD_INS = {
  */
 export function verifyAndSelectQuotations(candidates, reviewers) {
   const submitted = submittedReviewersOf(reviewers);
-  const rosterIndex = new Map(submitted.map((r, i) => [r.suggestionId, i]));
+  // Tie-break index is derived from a CANONICAL ordering (compareReviewersByName),
+  // never from the order `reviewers` arrived in — the tab passes a name-sorted
+  // roster, an export path may pass Dataverse fetch order, and a rating tie
+  // among survivors must resolve identically either way (Opus Slice 2 review).
+  const canonicalOrder = [...submitted].sort(compareReviewersByName);
+  const rosterIndex = new Map(canonicalOrder.map((r, i) => [r.suggestionId, i]));
   const survivors = []; // { reviewer, quote, questionKey }
   const usedReviewers = new Set();
   let droppedQuotationCount = 0;
@@ -394,6 +429,9 @@ export function verifyAndSelectQuotations(candidates, reviewers) {
 
     const matchingReviewers = submitted.filter((reviewer) => {
       const answers = Array.isArray(reviewer.answers) ? reviewer.answers : [];
+      // Match against answerText ONLY, never answerHtml — a sentence present
+      // solely in the (richer, model-untrusted) HTML answer does not count as
+      // verified provenance (Opus Slice 2 review follow-up 3).
       return answers.some((a) => typeof a?.answerText === 'string'
         && normalizeForMatch(a.answerText).includes(normalizedQuote));
     });
@@ -464,7 +502,7 @@ export function verifyAndSelectQuotations(candidates, reviewers) {
  * `synthesis` renders only the three deterministic Slice 1 sentences.
  *
  * @param {{reviewers: Array<Object>, synthesis?: Object|null}} input
- * @returns {{ paragraphs: Array<Array<{text:string, underline?:boolean}>>, warnings: string[], droppedQuotationCount: number, themes: string|null, quotations: Array<{leadIn:string, quote:string, questionKey:string}>, text: string, html: string }}
+ * @returns {{ paragraphs: Array<Array<{text:string, underline?:boolean}>>, deterministicParagraphs: Array<Array<{text:string, underline?:boolean}>>, warnings: string[], droppedQuotationCount: number, themes: string|null, quotations: Array<{leadIn:string, quote:string, questionKey:string}>, text: string, html: string }}
  */
 export function composeWriteupParagraphs({ reviewers, synthesis } = {}) {
   const { sentence: scoreSentence, warnings: scoreWarnings } = composeScoreSentence(reviewers);
@@ -472,10 +510,17 @@ export function composeWriteupParagraphs({ reviewers, synthesis } = {}) {
   const expertiseSentence = composeExpertiseSentence(reviewers);
   const warnings = [...scoreWarnings];
 
-  const paragraphs = [];
-  if (scoreSentence) paragraphs.push([{ text: scoreSentence }]);
-  if (reviewerSentence) paragraphs.push(reviewerSentence.runs);
-  if (expertiseSentence) paragraphs.push([{ text: expertiseSentence }]);
+  // The deterministic (Slice 1) sentences ONLY — no themes/quotations mixed
+  // in. Exposed separately (`deterministicParagraphs`) so a consumer that
+  // already renders `themes`/`quotations` from their own dedicated fields
+  // (e.g. `review-report.js`'s `writeupSection`, Slice 3) doesn't have to
+  // re-derive which prefix of `paragraphs` is deterministic.
+  const deterministicParagraphs = [];
+  if (scoreSentence) deterministicParagraphs.push([{ text: scoreSentence }]);
+  if (reviewerSentence) deterministicParagraphs.push(reviewerSentence.runs);
+  if (expertiseSentence) deterministicParagraphs.push([{ text: expertiseSentence }]);
+
+  const paragraphs = [...deterministicParagraphs];
 
   const themesText = typeof synthesis?.writeupThemes === 'string' ? synthesis.writeupThemes.trim() : '';
   if (themesText) paragraphs.push([{ text: themesText }]);
@@ -497,6 +542,7 @@ export function composeWriteupParagraphs({ reviewers, synthesis } = {}) {
 
   return {
     paragraphs,
+    deterministicParagraphs,
     warnings,
     droppedQuotationCount,
     themes: themesText || null,

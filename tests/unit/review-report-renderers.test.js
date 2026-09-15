@@ -110,6 +110,92 @@ describe('review report categorical renderers', () => {
     expect(documentXml).toContain('<w:vertAlign w:val="superscript"/>');
   });
 
+  test('DOCX "Reviews (writeup)" section underlines the reviewer name run and NOT institution text or model strings (Slice 3)', async () => {
+    const report = composeReviewReport({
+      requestNumber: 'R-103',
+      generatedAtIso: '2026-09-14T12:00:00.000Z',
+      matrix: { reviewers: [], questions: [] },
+      synthesis: {
+        writeupThemes: 'Reviewers were broadly enthusiastic and consistent.',
+        writeupQuotations: [{ questionKey: 'q1', quote: 'This work is genuinely excellent and rigorous.' }],
+      },
+      fullReviewers: [{
+        suggestionId: 'suggestion-1',
+        name: 'Dr. Underlined Name',
+        reviewReceivedAt: '2026-09-01T00:00:00Z',
+        reviewerOverallAssessment: 5,
+        mainInstitution: 'Plain Institution Text University',
+        answers: [{ questionKey: 'q1', answerText: 'This work is genuinely excellent and rigorous.' }],
+      }],
+    });
+    expect(report.writeupSection).not.toBeNull();
+
+    const blob = await generateReviewReportDocx(report);
+    const archive = await JSZip.loadAsync(await blob.arrayBuffer());
+    const documentXml = await archive.file('word/document.xml').async('string');
+
+    expect(documentXml).toContain('Reviews (writeup)');
+    expect(documentXml).toContain('Reviewers were broadly enthusiastic and consistent.');
+    expect(documentXml).toContain('This work is genuinely excellent and rigorous.');
+
+    // Isolate each <w:r>...</w:r> run and assert underline placement by
+    // content rather than by proximity — a name run has <w:u .../> AND
+    // contains the reviewer's name; no other run (institution, theme,
+    // quotation) does.
+    const runMatches = [...documentXml.matchAll(/<w:r>.*?<\/w:r>/gs)];
+    expect(runMatches.length).toBeGreaterThan(0);
+    const nameRuns = runMatches.filter((m) => m[0].includes('Dr. Underlined Name'));
+    const institutionRuns = runMatches.filter((m) => m[0].includes('Plain Institution Text University'));
+    const themeRuns = runMatches.filter((m) => m[0].includes('Reviewers were broadly enthusiastic'));
+    const quoteRuns = runMatches.filter((m) => m[0].includes('This work is genuinely excellent'));
+
+    expect(nameRuns.length).toBeGreaterThan(0);
+    expect(institutionRuns.length).toBeGreaterThan(0);
+    expect(themeRuns.length).toBeGreaterThan(0);
+    expect(quoteRuns.length).toBeGreaterThan(0);
+
+    for (const run of nameRuns) expect(run[0]).toMatch(/<w:u\b/);
+    for (const run of [...institutionRuns, ...themeRuns, ...quoteRuns]) {
+      expect(run[0]).not.toMatch(/<w:u\b/);
+    }
+  });
+
+  test('DOCX omits the "Reviews (writeup)" section entirely when no review was submitted', async () => {
+    const report = composeReviewReport({
+      requestNumber: 'R-104',
+      generatedAtIso: '2026-09-14T12:00:00.000Z',
+      matrix: { reviewers: [], questions: [] },
+    });
+    expect(report.writeupSection).toBeNull();
+
+    const blob = await generateReviewReportDocx(report);
+    const archive = await JSZip.loadAsync(await blob.arrayBuffer());
+    const documentXml = await archive.file('word/document.xml').async('string');
+    expect(documentXml).not.toContain('Reviews (writeup)');
+  });
+
+  test('PDF renderer does not throw and ignores writeupSection (no underline support, W4: no PDF work)', async () => {
+    const report = composeReviewReport({
+      requestNumber: 'R-105',
+      generatedAtIso: '2026-09-14T12:00:00.000Z',
+      matrix: { reviewers: [], questions: [] },
+      synthesis: {
+        writeupThemes: 'Reviewers were broadly enthusiastic.',
+        writeupQuotations: [{ questionKey: 'q1', quote: 'This work is genuinely excellent.' }],
+      },
+      fullReviewers: [{
+        suggestionId: 'suggestion-1',
+        name: 'Dr. PDF Reviewer',
+        reviewReceivedAt: '2026-09-01T00:00:00Z',
+        reviewerOverallAssessment: 5,
+        answers: [{ questionKey: 'q1', answerText: 'This work is genuinely excellent.' }],
+      }],
+    });
+    expect(report.writeupSection).not.toBeNull();
+
+    await expect(generateReviewReportPdf(report)).resolves.toBeInstanceOf(Uint8Array);
+  });
+
   test('PDF renderer accepts readable and unreadable multiselect answers', async () => {
     const keyValueSpy = jest.spyOn(PDFReportBuilder.prototype, 'addKeyValue');
     const sectionSpy = jest.spyOn(PDFReportBuilder.prototype, 'addSection');

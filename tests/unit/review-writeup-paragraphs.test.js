@@ -508,12 +508,16 @@ describe('composeWriteupParagraphs — Slice 2 quotation provenance', () => {
     ]);
   });
 
-  it('breaks a rating tie by roster order, not candidate-list order or name (W8)', () => {
-    // Discriminating: both reviewers tie at rating 5. Roster order is
-    // [Zed, Abe] but the candidate list is given in the opposite order
-    // ([Abe's quote, Zed's quote]) and names are reverse-alphabetical vs.
-    // roster order. An implementation that falls back to candidate-list
-    // order or to alphabetical-by-name would produce [Abe, Zed] instead.
+  it('breaks a rating tie by canonical name order, not roster order or candidate-list order (W8)', () => {
+    // Discriminating: both reviewers tie at rating 5. The reviewers array
+    // arrives in roster order [Zed, Abe] (reverse of name order) and the
+    // candidate list is given in yet a third order ([Abe's quote, Zed's
+    // quote]). An implementation that fell back to roster-array index or
+    // candidate-list order would produce [Zed, Abe] or [Abe, Zed]
+    // respectively for the wrong reason; canonical name order also happens
+    // to put Abe first, so this alone doesn't fully discriminate — see the
+    // next test, which flips the roster order and re-asserts the identical
+    // result.
     const reviewers = [
       reviewerWithAnswers(
         { suggestionId: 'zed', name: 'Zed', reviewerOverallAssessment: 5 },
@@ -534,8 +538,137 @@ describe('composeWriteupParagraphs — Slice 2 quotation provenance', () => {
       },
     });
     expect(quotations.map((q) => q.quote)).toEqual([
-      'Zed thinks this is excellent work.',
       'Abe also thinks this is excellent.',
+      'Zed thinks this is excellent work.',
     ]);
+  });
+
+  it('selects the identical three quotations regardless of the caller-supplied reviewer order (Opus Slice 2 review follow-up 1)', () => {
+    // Discriminating: five reviewers with two tied at the top rating (5) and
+    // two tied at the bottom rating (1) — the exact shape that forces W8's
+    // top/median/bottom reduction to depend on a tie-break. Call the composer
+    // once with the reviewers in one order (as the tab's name-sort would
+    // produce) and once in the reverse order (as an unsorted Dataverse fetch
+    // might produce) and require byte-identical selected quotes — this is
+    // the cross-surface invariant the tab (name-sorted `submitted`) and the
+    // export roster must both satisfy.
+    const specs = [
+      { suggestionId: 'r-alice', name: 'Alice', rating: 5, text: 'Alice found the proposal exceptional.' },
+      { suggestionId: 'r-bob', name: 'Bob', rating: 5, text: 'Bob also found it exceptional overall.' },
+      { suggestionId: 'r-carol', name: 'Carol', rating: 3, text: 'Carol thought it was solid but unremarkable.' },
+      { suggestionId: 'r-dave', name: 'Dave', rating: 1, text: 'Dave raised serious concerns about the design.' },
+      { suggestionId: 'r-erin', name: 'Erin', rating: 1, text: 'Erin also raised serious concerns about scope.' },
+    ];
+    const toReviewer = (spec) => reviewerWithAnswers(
+      { suggestionId: spec.suggestionId, name: spec.name, reviewerOverallAssessment: spec.rating },
+      [{ questionKey: 'q1', answerText: spec.text }],
+    );
+    const candidates = specs.map((s) => ({ questionKey: 'q1', quote: s.text }));
+
+    const forward = composeWriteupParagraphs({
+      reviewers: specs.map(toReviewer),
+      synthesis: { writeupQuotations: candidates },
+    });
+    const reversed = composeWriteupParagraphs({
+      reviewers: [...specs].reverse().map(toReviewer),
+      synthesis: { writeupQuotations: [...candidates].reverse() },
+    });
+
+    expect(forward.quotations.map((q) => q.quote)).toEqual(reversed.quotations.map((q) => q.quote));
+    expect(forward.quotations).toHaveLength(3);
+  });
+
+  it('drops a candidate whose quote is an empty string', () => {
+    const reviewers = [
+      reviewerWithAnswers(
+        { suggestionId: 'a', name: 'A', reviewerOverallAssessment: 5 },
+        [{ questionKey: 'q1', answerText: 'Some real answer text here.' }],
+      ),
+    ];
+    const { quotations, droppedQuotationCount } = composeWriteupParagraphs({
+      reviewers,
+      synthesis: { writeupQuotations: [{ questionKey: 'q1', quote: '' }, { questionKey: 'q1', quote: '   ' }] },
+    });
+    expect(quotations).toEqual([]);
+    expect(droppedQuotationCount).toBe(2);
+  });
+
+  it('never matches against a null/non-string answerText', () => {
+    const reviewers = [
+      reviewerWithAnswers(
+        { suggestionId: 'a', name: 'A', reviewerOverallAssessment: 5 },
+        [{ questionKey: 'q1', answerText: null }, { questionKey: 'q2' }],
+      ),
+    ];
+    const { quotations, droppedQuotationCount } = composeWriteupParagraphs({
+      reviewers,
+      synthesis: { writeupQuotations: [{ questionKey: 'q1', quote: 'anything at all' }] },
+    });
+    expect(quotations).toEqual([]);
+    expect(droppedQuotationCount).toBe(1);
+  });
+
+  it('never matches a reviewer with no answers array at all', () => {
+    const reviewers = [
+      reviewerWithAnswers(
+        { suggestionId: 'a', name: 'A', reviewerOverallAssessment: 5 },
+        undefined,
+      ),
+    ];
+    const { quotations, droppedQuotationCount } = composeWriteupParagraphs({
+      reviewers,
+      synthesis: { writeupQuotations: [{ questionKey: 'q1', quote: 'anything at all' }] },
+    });
+    expect(quotations).toEqual([]);
+    expect(droppedQuotationCount).toBe(1);
+  });
+
+  it('orders an unlabelled (null) rating quote last, after every labelled survivor', () => {
+    const reviewers = [
+      reviewerWithAnswers(
+        { suggestionId: 'unlabelled', name: 'Unlabelled', reviewerOverallAssessment: null },
+        [{ questionKey: 'q1', answerText: 'This reviewer left no overall rating at all.' }],
+      ),
+      reviewerWithAnswers(
+        { suggestionId: 'low', name: 'Low', reviewerOverallAssessment: 2 },
+        [{ questionKey: 'q1', answerText: 'This reviewer gave a low rating overall.' }],
+      ),
+    ];
+    const { quotations } = composeWriteupParagraphs({
+      reviewers,
+      // Candidate list deliberately lists the unlabelled reviewer's quote
+      // FIRST — a broken implementation that treats a null rating as 0 (or
+      // trusts candidate order) would rank it ahead of, or tied with, the
+      // labelled rating-2 reviewer.
+      synthesis: {
+        writeupQuotations: [
+          { questionKey: 'q1', quote: 'This reviewer left no overall rating at all.' },
+          { questionKey: 'q1', quote: 'This reviewer gave a low rating overall.' },
+        ],
+      },
+    });
+    expect(quotations.map((q) => q.quote)).toEqual([
+      'This reviewer gave a low rating overall.',
+      'This reviewer left no overall rating at all.',
+    ]);
+  });
+
+  it('quote provenance reads answerText only — a sentence present ONLY in answerHtml is dropped as unverified', () => {
+    const reviewers = [
+      reviewerWithAnswers(
+        { suggestionId: 'a', name: 'A', reviewerOverallAssessment: 5 },
+        [{
+          questionKey: 'q1',
+          answerText: 'A short plain-text summary that omits the quoted sentence.',
+          answerHtml: '<p>The design is <strong>truly innovative</strong> and compelling.</p>',
+        }],
+      ),
+    ];
+    const { quotations, droppedQuotationCount } = composeWriteupParagraphs({
+      reviewers,
+      synthesis: { writeupQuotations: [{ questionKey: 'q1', quote: 'The design is truly innovative and compelling.' }] },
+    });
+    expect(quotations).toEqual([]);
+    expect(droppedQuotationCount).toBe(1);
   });
 });

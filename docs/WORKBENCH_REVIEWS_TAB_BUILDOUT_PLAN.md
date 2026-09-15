@@ -442,8 +442,14 @@ rating when more than three survive (W8). The Reviews tab's Writeup
 paragraphs card (Slice 1) renders the verified themes/quotations or a
 "Regenerate synthesis to add themes and quotations" hint when a current
 synthesis predates them; `composeReviewReport`'s `synthesisSection` carries
-the same verified quotations for the Word export (a renderer for them is
-Slice 3, not yet built). **This addendum documents the tracked prompt source
+the same verified quotations for the Word export. **Slice 3 (built
+2026-09-14):** `composeReviewReport` also composes a `writeupSection`
+(deterministic score/reviewer/expertise sentences as underline-flagged run
+arrays, plus the same verified themes/quotations) via the shared
+`composeWriteupParagraphs`, and `shared/utils/review-report-docx.js` renders
+it as a "Reviews (writeup)" section — underline on reviewer-name runs only,
+never on model strings; the PDF renderer is unchanged and ignores the section
+without erroring (W4: no PDF work). **This addendum documents the tracked prompt source
 only — the last recorded publish of `review-synthesis.generate` is governed
 v3 (five keys, 2026-07-28, docs/atlas/dataverse-akoya-request.md); an
 owner-run `--force` republish (plan §4.3) is needed to make the live row

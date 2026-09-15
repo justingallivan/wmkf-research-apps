@@ -32,6 +32,7 @@ import { isTerminalReviewStatus } from '../../config/reviewerStatus';
 import {
   reviewerAffiliationOf,
   composeWriteupParagraphs,
+  compareReviewersByName,
 } from '../../utils/review-writeup-paragraphs';
 
 function formatDate(iso) {
@@ -885,7 +886,7 @@ export default function ReviewsTab({ requestId, previewReadOnly = false }) {
   // Track uses for `hasReview`.
   const submitted = reviewers
     .filter((r) => r.reviewReceivedAt)
-    .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    .sort(compareReviewersByName);
   // Outstanding tracking (workbench Reviews tab Phase 1): accepted reviewers
   // who have not submitted, sorted by longest-outstanding first so the
   // staffer sees who most needs a nudge.

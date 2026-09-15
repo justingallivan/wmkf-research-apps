@@ -809,6 +809,30 @@ test('shows the Regenerate hint when synthesis is current but predates writeupTh
   expect(await screen.findByText(/Regenerate synthesis to add themes and quotations/i)).toBeInTheDocument();
 });
 
+test('does not show the Regenerate hint when the synthesis is stale (current === false), even with empty themes', async () => {
+  // Discriminating: the hint is gated on `synthesisCurrent === true` (strict
+  // equality, not truthiness), so a stale-but-empty synthesis must NOT show
+  // the hint — the Synthesis card's own stale banner already covers that
+  // case, and duplicating it here would be misleading (regenerating won't
+  // "add" the fields, it'll refresh a stale run).
+  fetch.mockResolvedValue({
+    ok: true,
+    json: async () => ({
+      success: true,
+      proposals: [{
+        proposalId: 'req1',
+        reviewSynthesisState: { current: false },
+        reviewSynthesis: { writeupThemes: '', writeupQuotations: [] },
+        reviewers: WRITEUP_REVIEWERS,
+      }],
+    }),
+  });
+
+  render(<ReviewsTab requestId="req1" />);
+  await screen.findByText('Writeup paragraphs');
+  expect(screen.queryByText(/Regenerate synthesis to add themes and quotations/i)).not.toBeInTheDocument();
+});
+
 test('does not show the Regenerate hint when there is no stored synthesis at all', async () => {
   fetch.mockResolvedValue({
     ok: true,
