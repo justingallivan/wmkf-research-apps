@@ -4,6 +4,7 @@ import {
   getDefaultMeetingAttendees,
   loadMeetingTrackerRecipientPicker,
   normalizeMeetingAttendeeRefs,
+  resolveMeetingAttendeeRefs,
 } from '../../lib/services/meeting-tracker/attendee-service';
 import { MEETING_TRACKER_DEFAULT_ATTENDEES_SETTING } from '../../shared/config/meetingTracker';
 
@@ -149,4 +150,32 @@ test('the admin writer stores staff references only after resolving them', async
   await expect(writeDefaultMeetingAttendees({ attendees: [{ kind: 'roster', rosterId: 9 }] }, { updatedBy: 3 }, deps))
     .rejects.toMatchObject({ httpStatus: 400 });
   expect(setSetting).toHaveBeenCalledTimes(1);
+});
+
+test('a Board member with no preferred email stays visible in the picker and is refused by name on save', async () => {
+  const directory = {
+    staff: [{ kind: 'staff', profileId: 7, name: 'Alex Staff', email: 'alex@example.org' }],
+    external: [
+      { kind: 'roster', rosterId: 9, name: 'Bailey Board', email: 'bailey@example.org', roleType: 'Board' },
+      { kind: 'roster', rosterId: 11, name: 'Dana Unlisted', email: null, roleType: 'Board' },
+    ],
+  };
+  const resolveRecipientRefs = jest.fn(async () => { throw new Error('generic resolver reached'); });
+  const deps = dependencies({ getRecipientDirectory: jest.fn(async () => directory), resolveRecipientRefs });
+
+  const picker = await loadMeetingTrackerRecipientPicker(deps);
+  expect(picker.board).toEqual([
+    expect.objectContaining({ ref: { kind: 'roster', rosterId: 9 }, email: 'bailey@example.org' }),
+    expect.objectContaining({ ref: { kind: 'roster', rosterId: 11 }, email: null }),
+  ]);
+
+  await expect(resolveMeetingAttendeeRefs(
+    { version: 1, attendees: [{ kind: 'staff', profileId: 7 }, { kind: 'roster', rosterId: 11 }] },
+    deps,
+  )).rejects.toMatchObject({
+    httpStatus: 409,
+    code: 'meeting_tracker_attendee_email_missing',
+    message: expect.stringContaining('Dana Unlisted has no email on file'),
+  });
+  expect(resolveRecipientRefs).not.toHaveBeenCalled();
 });
