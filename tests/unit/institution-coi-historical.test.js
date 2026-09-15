@@ -106,6 +106,34 @@ describe('deduplicateAndStore — affiliationHistory producer kept (COI-inert)',
     );
   });
 
+  test('deduplicates typed assertions by source, normalized text, and reference before projection', async () => {
+    const assertion = {
+      rawText: 'Example   University',
+      sourceType: 'publication',
+      sourceReference: 'pmid:123',
+      currentness: 'historical',
+      authorSpecific: true,
+    };
+    const [merged] = await DeduplicationService.deduplicateAndStore([
+      { name: 'Jane Smith', affiliationAssertions: [assertion] },
+      {
+        name: 'Jane Smith',
+        affiliationAssertions: [{
+          ...assertion,
+          rawText: ' example university ',
+          currentness: 'current',
+        }],
+      },
+      {
+        name: 'Jane Smith',
+        affiliationAssertions: [{ ...assertion, sourceReference: 'pmid:456' }],
+      },
+    ]);
+    expect(merged.affiliationAssertions).toHaveLength(2);
+    expect(merged.affiliationAssertions[0].currentness).toBe('current');
+    expect(merged.affiliationAssertionsComplete).toBe(true);
+  });
+
   test('a former-only institution tie is NOT flagged (historical retired)', async () => {
     const merged = await DeduplicationService.deduplicateAndStore([
       { name: 'Jane Smith', affiliation: 'Harvard Medical School', publications: [{ title: 'a' }], source: 'pubmed' },
@@ -186,6 +214,28 @@ describe('Phase 2 typed additional affiliations — explicit opt-in', () => {
         }],
       },
       institutionEntries,
+      includeAdditionalAffiliations: true,
+      institutionIdentityResolver: { resolve: jest.fn(async () => null) },
+    });
+    expect(result.decision).toBeNull();
+    expect(result.additionalCoi).toBe('incomplete');
+  });
+
+  test('a truncated typed assertion projection is incomplete even when retained rows are clear', async () => {
+    const result = await recomputeReviewerInstitutionCOI({
+      candidate: {
+        name: 'Truncated Evidence',
+        affiliation: 'Stanford University',
+        affiliationAssertions: Array.from({ length: 24 }, (_, index) => ({
+          rawText: `Nonconflicting University ${index}`,
+          sourceType: 'publication',
+          sourceReference: `pmid:${index}`,
+          currentness: 'current',
+          authorSpecific: true,
+        })),
+        affiliationAssertionsComplete: false,
+      },
+      institutionEntries: [{ raw: PI_INST, display: PI_INST, identity: { name: PI_INST } }],
       includeAdditionalAffiliations: true,
       institutionIdentityResolver: { resolve: jest.fn(async () => null) },
     });

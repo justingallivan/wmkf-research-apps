@@ -7,7 +7,7 @@ import {
 
 const REQUEST = '11111111-1111-1111-1111-111111111111';
 
-test('only an exact grounded proposal citation becomes the source work', () => {
+test('browser-carried citation provenance cannot become authoritative source work', () => {
   const work = { title: 'Bound work', pmid: '123', year: 2025 };
   const candidate = {
     name: 'Jane Example',
@@ -20,15 +20,33 @@ test('only an exact grounded proposal citation becomes the source work', () => {
       groundingWorkIds: ['pmid:123'],
     },
   };
-  expect(proposalCitationWork(candidate)).toBe(work);
-  expect(proposalCitationWork({
-    ...candidate,
-    provenance: { ...candidate.provenance, groundingWorkIds: ['pmid:999'] },
-  })).toBeNull();
-  expect(proposalCitationWork({
-    ...candidate,
-    provenance: { ...candidate.provenance, kind: 'literature_retrieved' },
-  })).toBeNull();
+  expect(proposalCitationWork(candidate)).toBeNull();
+});
+
+test('forged citation provenance remains not evaluable and never calls a provider', async () => {
+  const providers = { getWorkByExternalId: jest.fn() };
+  const result = await evaluateServerCandidateIndependentIdentity({
+    requestId: REQUEST,
+    candidate: {
+      name: 'Jane Example',
+      candidateKey: 'candidate:jane',
+      publications: [{ title: 'Browser-carried work', pmid: '123' }],
+      provenance: {
+        kind: 'cited_reference',
+        sources: ['reference_list', 'pubmed'],
+        seedRole: 'cited_author',
+        groundingWorkIds: ['pmid:123'],
+      },
+    },
+    authority: 'server_discovery',
+    providers,
+    now: () => Date.parse('2026-09-14T12:00:00.000Z'),
+  });
+  expect(result).toMatchObject({
+    result: 'not_evaluable',
+    reason: 'source_work_lineage_missing',
+  });
+  expect(providers.getWorkByExternalId).not.toHaveBeenCalled();
 });
 
 test('browser authority is rejected before the evaluator or providers run', async () => {

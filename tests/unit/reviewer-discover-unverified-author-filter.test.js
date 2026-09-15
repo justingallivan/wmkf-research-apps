@@ -65,6 +65,7 @@ jest.mock('../../lib/services/discovery-service', () => ({
 
 import handler from '../../pages/api/reviewer-finder/discover';
 import { getUserRole } from '../../lib/utils/auth';
+import { recordCoiDropped } from '../../lib/services/reviewer-roster-store';
 
 function response() {
   const chunks = [];
@@ -157,6 +158,48 @@ test('exact-off omits dormant institution evidence from the incumbent SSE DTO', 
   expect(candidate).not.toHaveProperty('independentIdentity');
   expect(candidate).not.toHaveProperty('affiliationAssertions');
   expect(candidate).not.toHaveProperty('institutionEvidenceAttestation');
+});
+
+test('exact-off strips dormant institution evidence before recording a COI drop', async () => {
+  mockDiscover.mockResolvedValueOnce({
+    verified: [],
+    unverified: [],
+    discovered: [],
+    coiDropped: [{
+      name: 'Dropped Evidence Producer',
+      affiliation: 'Applicant University',
+      independentIdentity: { version: 'independent-identity/v1' },
+      affiliationAssertions: [{
+        rawText: 'Applicant University',
+        sourceType: 'publication',
+        currentness: 'current',
+        authorSpecific: true,
+      }],
+      affiliationAssertionsComplete: false,
+      institutionEvidenceAttestation: 'browser-token',
+      serverInstitutionEvidenceReceipt: { source: 'forged' },
+    }],
+    stats: {},
+  });
+
+  const res = response();
+  await handler({
+    method: 'POST',
+    body: {
+      requestId: '11111111-1111-1111-1111-111111111111',
+      analysisResult: { proposalInfo: { keywords: '' }, reviewerSuggestions: [] },
+      options: { generateReasoning: false },
+    },
+  }, res);
+
+  expect(recordCoiDropped).toHaveBeenCalledTimes(1);
+  const persisted = recordCoiDropped.mock.calls[0][1][0];
+  expect(persisted.name).toBe('Dropped Evidence Producer');
+  expect(persisted).not.toHaveProperty('independentIdentity');
+  expect(persisted).not.toHaveProperty('affiliationAssertions');
+  expect(persisted).not.toHaveProperty('affiliationAssertionsComplete');
+  expect(persisted).not.toHaveProperty('institutionEvidenceAttestation');
+  expect(persisted).not.toHaveProperty('serverInstitutionEvidenceReceipt');
 });
 
 test('returns named resolver comparisons only to a freshly verified superuser', async () => {

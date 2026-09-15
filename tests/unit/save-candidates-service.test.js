@@ -267,6 +267,27 @@ test('Phase 2 exact-on holds a roster candidate with missing institution evidenc
   expect(reviewerSuggestionAdapter.upsert).not.toHaveBeenCalled();
 });
 
+test('Phase 2 exact-on rejects a legacy payload without roster evidence before writes', async () => {
+  process.env.REVIEWER_INSTITUTION_PHASE2 = 'on';
+
+  const error = await saveCandidates({
+    ...BASE,
+    candidates: [{
+      name: 'Dr Legacy Payload',
+      affiliation: 'Stanford University',
+    }],
+  }).catch((caught) => caught);
+
+  expect(error).toBeInstanceOf(SaveCandidatesError);
+  expect(error.body.errors).toEqual([expect.objectContaining({
+    code: 'institution_evidence_required',
+    candidateKey: expect.any(String),
+  })]);
+  expect(reviewerRosterStore.findCandidatesByKeys).not.toHaveBeenCalled();
+  expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
+  expect(reviewerSuggestionAdapter.upsert).not.toHaveBeenCalled();
+});
+
 test('Phase 2 exact-on holds unknown-currentness additional evidence before writes', async () => {
   process.env.REVIEWER_INSTITUTION_PHASE2 = 'on';
   const candidateKey = 'candidate:phase2-incomplete';
@@ -306,6 +327,50 @@ test('Phase 2 exact-on holds unknown-currentness additional evidence before writ
   expect(error.body.errors).toEqual([expect.objectContaining({
     code: 'institution_coi_incomplete',
     candidateKey: expect.any(String),
+  })]);
+  expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
+  expect(reviewerSuggestionAdapter.upsert).not.toHaveBeenCalled();
+});
+
+test('Phase 2 exact-on holds a truncated affiliation projection before writes', async () => {
+  process.env.REVIEWER_INSTITUTION_PHASE2 = 'on';
+  const candidateKey = 'candidate:phase2-truncated';
+  verifyAutomatedIdentityAttestation.mockResolvedValueOnce({
+    valid: true,
+    source: 'automated_resolver',
+    identityDecisionBound: true,
+    contactAuthorityBound: true,
+    rosterCandidateKey: candidateKey,
+  });
+  reviewerRosterStore.findCandidatesByKeys.mockResolvedValueOnce([{
+    name: 'Dr Truncated Evidence',
+    candidateKey,
+    rosterStatus: 'active',
+    affiliationAssertions: Array.from({ length: 24 }, (_, index) => ({
+      rawText: `Nonconflicting University ${index}`,
+      sourceType: 'publication',
+      sourceReference: `pmid:${index}`,
+      currentness: 'current',
+      authorSpecific: true,
+      publicationYear: 2026,
+    })),
+    affiliationAssertionsComplete: false,
+  }]);
+  hasServerInstitutionEvidenceReceipt.mockReturnValueOnce(true);
+
+  const error = await saveCandidates({
+    ...BASE,
+    candidates: [{
+      name: 'Dr Truncated Evidence',
+      candidateKey,
+      affiliation: 'Stanford University',
+      automatedIdentityAttestation: 'bound',
+    }],
+  }).catch((caught) => caught);
+
+  expect(error).toBeInstanceOf(SaveCandidatesError);
+  expect(error.body.errors).toEqual([expect.objectContaining({
+    code: 'institution_coi_incomplete',
   })]);
   expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
   expect(reviewerSuggestionAdapter.upsert).not.toHaveBeenCalled();

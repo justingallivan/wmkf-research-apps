@@ -1162,6 +1162,12 @@ export function pruneCandidateForRoster(c) {
     ...(Array.isArray(c.affiliationAssertions)
       ? { affiliationAssertions: pruneAffiliationAssertions(c.affiliationAssertions) }
       : {}),
+    ...(Array.isArray(c.affiliationAssertions)
+      ? {
+          affiliationAssertionsComplete: c.affiliationAssertionsComplete !== false
+            && c.affiliationAssertions.length <= MAX_ROSTER_AFFILIATION_ASSERTIONS,
+        }
+      : {}),
     suggestedInstitution: c.suggestedInstitution || null,
     expertiseMismatch: !!c.expertiseMismatch,
     // Verification-incoherence flag (Fix 11) drives the relevance-score −15

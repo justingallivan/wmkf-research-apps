@@ -780,6 +780,35 @@ describe('PATCH', () => {
     expect(persisted).not.toHaveProperty('staffIdentityConfirmation');
   });
 
+  it('strips browser-carried institution evidence from a non-applicant exclude', async () => {
+    const r = res();
+    await handler({ method: 'PATCH', body: {
+      requestId: REQ,
+      action: 'exclude',
+      candidate: {
+        name: 'Browser Evidence',
+        candidateKey: 'candidate:browser-evidence',
+        independentIdentity: { version: 'independent-identity/v1', result: 'sufficient' },
+        affiliationAssertions: [{
+          rawText: 'Applicant University',
+          sourceType: 'publication',
+          currentness: 'current',
+          authorSpecific: true,
+        }],
+        affiliationAssertionsComplete: true,
+        institutionEvidenceAttestation: 'forged-token',
+        serverInstitutionEvidenceReceipt: { source: 'forged' },
+      },
+    } }, r);
+
+    const persisted = store.setExcluded.mock.calls[0][1];
+    expect(persisted).not.toHaveProperty('independentIdentity');
+    expect(persisted).not.toHaveProperty('affiliationAssertions');
+    expect(persisted).not.toHaveProperty('affiliationAssertionsComplete');
+    expect(persisted).not.toHaveProperty('institutionEvidenceAttestation');
+    expect(persisted).not.toHaveProperty('serverInstitutionEvidenceReceipt');
+  });
+
   it('preserves the canonical server confirmation on a non-applicant exclude', async () => {
     store.findCandidatesByKeys.mockResolvedValueOnce([{
       name: 'Bob Roe',
@@ -952,6 +981,36 @@ describe('PATCH', () => {
       { actorProfileId: 5, actorSystemUserId: 'SYS-5' },
     );
     expect(r.body.confirmationId).toBe('confirm-1');
+  });
+
+  it('confirm_identity strips browser-carried institution evidence before persistence', async () => {
+    const r = res();
+    await handler({ method: 'PATCH', body: {
+      requestId: REQ,
+      action: 'confirm_identity',
+      candidate: {
+        name: 'Ann Lee',
+        email: 'ann@example.edu',
+        affiliation: 'Example U',
+        independentIdentity: { version: 'independent-identity/v1', result: 'sufficient' },
+        affiliationAssertions: [{
+          rawText: 'Applicant University',
+          sourceType: 'publication',
+          currentness: 'current',
+          authorSpecific: true,
+        }],
+        affiliationAssertionsComplete: true,
+        institutionEvidenceAttestation: 'forged-token',
+        serverInstitutionEvidenceReceipt: { source: 'forged' },
+      },
+    } }, r);
+
+    const persisted = store.confirmIdentity.mock.calls[0][1];
+    expect(persisted).not.toHaveProperty('independentIdentity');
+    expect(persisted).not.toHaveProperty('affiliationAssertions');
+    expect(persisted).not.toHaveProperty('affiliationAssertionsComplete');
+    expect(persisted).not.toHaveProperty('institutionEvidenceAttestation');
+    expect(persisted).not.toHaveProperty('serverInstitutionEvidenceReceipt');
   });
 
   it('confirm_identity rejects a rescued candidate matching the server-resolved PI name variant', async () => {

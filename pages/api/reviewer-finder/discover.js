@@ -29,6 +29,7 @@ import { recordCoiDropped } from '../../../lib/services/reviewer-roster-store';
 import { pruneCandidateForRoster } from '../../../shared/components/reviewers/reviewer-search-logic';
 import { reviewerCandidateKey } from '../../../lib/utils/reviewer-candidate-key';
 import {
+  institutionEvidenceProjection,
   mintInstitutionEvidenceAttestation,
   reviewerInstitutionPhase2Enabled,
 } from '../../../lib/services/reviewer-institution-evidence-attestation';
@@ -49,6 +50,7 @@ function stripDormantInstitutionEvidence(candidate) {
   const {
     independentIdentity: _independentIdentity,
     affiliationAssertions: _affiliationAssertions,
+    affiliationAssertionsComplete: _affiliationAssertionsComplete,
     institutionEvidenceAttestation: _institutionEvidenceAttestation,
     serverInstitutionEvidenceReceipt: _serverInstitutionEvidenceReceipt,
     ...incumbentCandidate
@@ -59,15 +61,21 @@ function stripDormantInstitutionEvidence(candidate) {
 async function recordInstitutionCoiDrops(requestId, candidates, { dropStage, matchSource }) {
   if (!requestId || !GUID_RE.test(String(requestId)) || !Array.isArray(candidates) || candidates.length === 0) return 0;
   try {
+    const phase2Enabled = reviewerInstitutionPhase2Enabled();
     const pruned = candidates
-      .map((candidate) => pruneCandidateForRoster({
-        ...candidate,
-        institutionCOIDetails: {
-          ...(candidate.institutionCOIDetails || {}),
-          dropStage,
-          matchSource,
-        },
-      }))
+      .map((candidate) => {
+        const candidateForPersistence = phase2Enabled
+          ? candidate
+          : stripDormantInstitutionEvidence(candidate);
+        return pruneCandidateForRoster({
+          ...candidateForPersistence,
+          institutionCOIDetails: {
+            ...(candidateForPersistence.institutionCOIDetails || {}),
+            dropStage,
+            matchSource,
+          },
+        });
+      })
       .filter((candidate) => candidate && candidate.name);
     return await recordCoiDropped(requestId, pruned, { dropStage, matchSource });
   } catch (error) {
@@ -671,6 +679,8 @@ export default async function handler(req, res) {
         evidenceByCandidateKey.set(reviewerCandidateKey(withEvidence), {
           independentIdentity: withEvidence.independentIdentity || null,
           affiliationAssertions: withEvidence.affiliationAssertions || [],
+          affiliationAssertionsComplete: institutionEvidenceProjection(withEvidence)
+            .affiliationAssertionsComplete,
           institutionEvidenceAttestation,
         });
       }

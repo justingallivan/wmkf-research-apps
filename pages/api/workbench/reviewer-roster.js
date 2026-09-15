@@ -157,6 +157,19 @@ function stripClientRosterAuthority(candidate) {
   return safe;
 }
 
+function stripClientInstitutionEvidence(candidate) {
+  if (!candidate || typeof candidate !== 'object') return candidate;
+  const {
+    independentIdentity: _independentIdentity,
+    affiliationAssertions: _affiliationAssertions,
+    affiliationAssertionsComplete: _affiliationAssertionsComplete,
+    institutionEvidenceAttestation: _institutionEvidenceAttestation,
+    serverInstitutionEvidenceReceipt: _serverInstitutionEvidenceReceipt,
+    ...safe
+  } = candidate;
+  return safe;
+}
+
 function bindServerRosterCandidateKey(candidate, receipt) {
   if (!candidate || typeof candidate !== 'object') return candidate;
   const {
@@ -247,6 +260,7 @@ async function preserveStoredRosterAuthority(requestId, candidates) {
           ...withIdentityReceipt,
           independentIdentity: stored.independentIdentity,
           affiliationAssertions: stored.affiliationAssertions,
+          affiliationAssertionsComplete: stored.affiliationAssertionsComplete,
           serverInstitutionEvidenceReceipt: stored.serverInstitutionEvidenceReceipt,
         }
       : withIdentityReceipt;
@@ -409,12 +423,7 @@ async function handlePost(req, res) {
     const trustedInstitutionEvidence = institutionEvidenceBound
       ? institutionEvidenceProjection(bound)
       : { independentIdentity: null, affiliationAssertions: [] };
-    const {
-      independentIdentity: _untrustedIndependentIdentity,
-      affiliationAssertions: _untrustedAffiliationAssertions,
-      institutionEvidenceAttestation: _browserInstitutionEvidenceAttestation,
-      ...boundWithoutInstitutionEvidence
-    } = bound;
+    const boundWithoutInstitutionEvidence = stripClientInstitutionEvidence(bound);
     return {
       ...boundWithoutInstitutionEvidence,
       ...(identityReceipt
@@ -428,6 +437,9 @@ async function handlePost(req, res) {
         : {}),
       ...(institutionEvidenceBound && trustedInstitutionEvidence.affiliationAssertions.length > 0
         ? { affiliationAssertions: trustedInstitutionEvidence.affiliationAssertions }
+        : {}),
+      ...(institutionEvidenceBound
+        ? { affiliationAssertionsComplete: trustedInstitutionEvidence.affiliationAssertionsComplete }
         : {}),
       eligibilityStatus,
       eligibilityReason: preserveEvidence ? compact.eligibilityReason : null,
@@ -456,7 +468,9 @@ async function handlePatch(req, res, access) {
     if (!candidate || !candidate.name) {
       return res.status(400).json({ error: 'candidate (with name) is required to exclude' });
     }
-    let candidateToExclude = stripClientRosterAuthority(pruneCandidateForRoster(candidate));
+    let candidateToExclude = stripClientInstitutionEvidence(
+      stripClientRosterAuthority(pruneCandidateForRoster(candidate)),
+    );
     if (isServerManagedApplicantCandidate(candidate)) {
       candidateToExclude = await authoritativeApplicantCandidate(requestId, candidate);
       if (!candidateToExclude) {
@@ -511,7 +525,9 @@ async function handlePatch(req, res, access) {
     if (!candidate?.name || !candidate?.email) {
       return res.status(400).json({ error: 'candidate name and email are required to confirm identity' });
     }
-    let authoritativeCandidate = stripClientRosterAuthority(pruneCandidateForRoster(candidate));
+    let authoritativeCandidate = stripClientInstitutionEvidence(
+      stripClientRosterAuthority(pruneCandidateForRoster(candidate)),
+    );
     if (isServerManagedApplicantCandidate(candidate)) {
       authoritativeCandidate = await authoritativeApplicantCandidate(requestId, candidate);
       if (!authoritativeCandidate) {

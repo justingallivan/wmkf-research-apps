@@ -76,6 +76,32 @@ test('projection is bounded and omits raw provider evidence', () => {
   expect(projection.affiliationAssertions).toEqual([
     expect.objectContaining({ sourceReference: 'pmid:123', publicationYear: 2025 }),
   ]);
+  expect(projection.affiliationAssertionsComplete).toBe(true);
+});
+
+test('an over-cap assertion set is bounded and explicitly marked incomplete', async () => {
+  const value = candidate();
+  value.affiliationAssertions = Array.from({ length: 25 }, (_, index) => ({
+    rawText: `Institution ${index}`,
+    sourceType: 'publication',
+    sourceReference: `pmid:${index}`,
+    observedAt: null,
+    currentness: 'current',
+    authorSpecific: true,
+    publicationYear: 2026,
+  }));
+  const projection = institutionEvidenceProjection(value);
+  expect(projection.affiliationAssertions).toHaveLength(24);
+  expect(projection.affiliationAssertionsComplete).toBe(false);
+
+  const token = await mintInstitutionEvidenceAttestation({ requestId: REQUEST, candidate: value });
+  await expect(verifyInstitutionEvidenceAttestation(token, {
+    requestId: REQUEST,
+    candidate: value,
+  })).resolves.toMatchObject({
+    valid: true,
+    affiliationAssertionsComplete: false,
+  });
 });
 
 test('signed evidence survives transport but tampering and cross-request replay fail', async () => {
