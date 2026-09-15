@@ -6,7 +6,7 @@ status: active
 summary: "Canonical Site Visit-led plan for applicant material collection, staff follow-up, and a shared external briefing room."
 canonical: true
 cataloged: 2026-09-08
-last_verified: 2026-09-12
+last_verified: 2026-09-15
 owner: product-engineering
 related:
   - docs/DATAVERSE_SHAREPOINT_FILE_MODEL.md
@@ -493,7 +493,7 @@ needs no manifest and no viewer work; a finalized upload appears on the page on 
 | # | Decision |
 |---|---|
 | M1 | Baseline checklist: **Presentation (PDF)**, **Presentation source (PPTX or Keynote)**, **Participant bios (PDF or Word)**. One cycle template; the PC may waive an item per request and applicants may add bounded "Other" files. |
-| M2 | Due date: **two business days before the site visit starts**, computed in the visit's IANA zone (`lib/utils/business-days.js`, weekends only; no holiday calendar this cycle). Contributor access closes seven days after the visit ends, matching the briefing link's own expiry. |
+| M2 | Due date: **two business days before the site visit starts**, computed in the visit's IANA zone (`lib/utils/business-days.js`, weekends only; no holiday calendar this cycle). Contributor access closes seven days after the visit ends. This is independent of briefing-link expiry, which is 60 days from issuance under deliberation-briefing decision D17 revised 2026-09-15. |
 | M3 | Upload size cap: an **admin-editable setting** `site_visit_materials.upload_max_mb` (Admin › Site visits), **default 100 MB**. The briefing page serves files up to 50 MB and lists larger ones with a note (D19). |
 | M4 | SharePoint layout: **flat request-relative folders** `Site Visit - Slides`, `Site Visit - Participant Bios`, `Site Visit - Other`; no nested `Site Visit/Applicant Materials/…` form. Canonical filenames per §7.3. |
 | M5 | **Go for this cycle.** Reminders are PC-triggered in the first release; an automated reminder cron is a follow-up the owner has flagged to remember. |

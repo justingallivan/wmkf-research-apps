@@ -21,13 +21,12 @@ const DAY = 24 * 60 * 60 * 1000;
 
 beforeAll(() => { process.env.NEXTAUTH_URL = 'https://apps.test'; });
 
-function harness({ live = null, meetingDate = null, siteVisit = null, ready = true } = {}) {
+function harness({ live = null, ready = true } = {}) {
   let liveRow = live;
   let mintCount = 0;
   const deps = {
     schemaReady: () => ready,
-    getRequest: jest.fn(async () => ({ akoya_requestid: REQUEST_ID, wmkf_meetingdate: meetingDate })),
-    findActiveSiteVisit: jest.fn(async () => siteVisit),
+    getRequest: jest.fn(async () => ({ akoya_requestid: REQUEST_ID })),
     getLiveLink: jest.fn(async () => liveRow),
     insertLink: jest.fn(async (row) => {
       liveRow = { id: row.id, request_id: row.requestId, jti: row.jti, token_digest: row.tokenDigest, token_ciphertext: row.tokenCiphertext, expires_at: row.expiresAt, created_by: row.createdBy, created_at: NOW, revoked_at: null };
@@ -51,35 +50,21 @@ function harness({ live = null, meetingDate = null, siteVisit = null, ready = tr
 }
 
 describe('computeBriefingExpiry', () => {
-  test('site visit end + 7 days wins over meeting date', () => {
+  test('expires exactly 60 days after issuance regardless of scheduled dates', () => {
     const expiry = computeBriefingExpiry({ siteVisitEnd: '2026-10-01T22:00:00Z', meetingDate: '2026-12-01', now: NOW });
-    expect(expiry.toISOString()).toBe(new Date(Date.parse('2026-10-01T22:00:00Z') + 7 * DAY).toISOString());
+    expect(expiry.toISOString()).toBe(new Date(NOW.getTime() + 60 * DAY).toISOString());
   });
-  test('meeting date + 7 days when no visit', () => {
-    const expiry = computeBriefingExpiry({ siteVisitEnd: null, meetingDate: '2026-12-01T00:00:00Z', now: NOW });
-    expect(expiry.toISOString()).toBe(new Date(Date.parse('2026-12-01T00:00:00Z') + 7 * DAY).toISOString());
-  });
-  test('a cutoff minutes away is still honored, never widened', () => {
-    const soon = new Date(NOW.getTime() - 7 * DAY + 30 * 60 * 1000); // visit ended 7d ago minus 30 min → cutoff in 30 min
-    expect(computeBriefingExpiry({ siteVisitEnd: soon.toISOString(), meetingDate: '2026-12-01T00:00:00Z', now: NOW }).toISOString())
-      .toBe(new Date(NOW.getTime() + 30 * 60 * 1000).toISOString());
-  });
-  test('a past visit falls through to a future meeting date before the 60-day default', () => {
-    expect(computeBriefingExpiry({ siteVisitEnd: '2026-01-01T00:00:00Z', meetingDate: '2026-12-01T00:00:00Z', now: NOW }).toISOString())
-      .toBe(new Date(Date.parse('2026-12-01T00:00:00Z') + 7 * DAY).toISOString());
-  });
-  test('falls back to 60 days only when nothing scheduled is still ahead', () => {
+  test('returns 60 days when no schedule data is provided', () => {
     expect(computeBriefingExpiry({ now: NOW }).toISOString()).toBe(new Date(NOW.getTime() + 60 * DAY).toISOString());
-    expect(computeBriefingExpiry({ siteVisitEnd: '2026-01-01T00:00:00Z', meetingDate: '2026-02-01T00:00:00Z', now: NOW }).toISOString())
-      .toBe(new Date(NOW.getTime() + 60 * DAY).toISOString());
   });
 });
 
-test('ensure mints once and returns the same live link on the second call', async () => {
-  const deps = harness({ meetingDate: '2026-12-01T00:00:00Z' });
+test('ensure mints once for 60 days and returns the same live link on the second call', async () => {
+  const deps = harness();
   const first = await ensureLiveBriefingLink({ requestId: REQUEST_ID, actorId: ACTOR_ID }, deps);
   expect(first.reused).toBe(false);
   expect(first.link.url).toMatch(/^https:\/\/apps\.test\/external\/briefing\/jwt-/);
+  expect(first.link.expiresAt).toBe(new Date(NOW.getTime() + 60 * DAY).toISOString());
   expect(deps.mint).toHaveBeenCalledWith(expect.objectContaining({ subject: REQUEST_ID, audience: 'briefing', ops: ['view_briefing'] }));
   const second = await ensureLiveBriefingLink({ requestId: REQUEST_ID, actorId: ACTOR_ID }, deps);
   expect(second.reused).toBe(true);
@@ -88,6 +73,26 @@ test('ensure mints once and returns the same live link on the second call', asyn
   expect(deps.mint).toHaveBeenCalledTimes(1);
   expect(deps.insertLink).toHaveBeenCalledTimes(1);
   expect(deps.replaceLiveLink).not.toHaveBeenCalled();
+});
+
+test('ensure preserves an already-issued live link and its embedded expiry', async () => {
+  const jwt = 'jwt-issued-under-the-previous-policy';
+  const existingExpiry = new Date(NOW.getTime() + 10 * DAY);
+  const live = {
+    id: '55555555-5555-4555-8555-555555555555',
+    request_id: REQUEST_ID,
+    token_digest: hashToken(jwt),
+    token_ciphertext: `sealed:${jwt}`,
+    expires_at: existingExpiry,
+    created_at: NOW,
+    created_by: ACTOR_ID,
+    revoked_at: null,
+  };
+  const deps = harness({ live });
+  const result = await ensureLiveBriefingLink({ requestId: REQUEST_ID, actorId: ACTOR_ID }, deps);
+  expect(result).toMatchObject({ reused: true, link: { id: live.id, expiresAt: existingExpiry.toISOString() } });
+  expect(deps.getRequest).not.toHaveBeenCalled();
+  expect(deps.mint).not.toHaveBeenCalled();
 });
 
 test('ensure replaces an expired live row instead of reusing it', async () => {
@@ -104,15 +109,16 @@ test('reissue always revokes and replaces, and the old id is no longer live', as
   const first = await ensureLiveBriefingLink({ requestId: REQUEST_ID, actorId: ACTOR_ID }, deps);
   const second = await reissueBriefingLink({ requestId: REQUEST_ID, actorId: ACTOR_ID, expectedLinkId: first.link.id }, deps);
   expect(second.link.id).not.toBe(first.link.id);
+  expect(second.link.expiresAt).toBe(new Date(NOW.getTime() + 60 * DAY).toISOString());
   expect(deps.replaceLiveLink).toHaveBeenCalledTimes(1);
   const live = await getLiveBriefingLink({ requestId: REQUEST_ID }, deps);
   expect(live.id).toBe(second.link.id);
   expect(live.id).not.toBe(first.link.id);
 });
 
-test('a failed site-visit read refuses to mint instead of widening the window', async () => {
+test('a failed request read refuses to mint', async () => {
   const deps = harness();
-  deps.findActiveSiteVisit = jest.fn(async () => { throw new Error('Dataverse 503'); });
+  deps.getRequest = jest.fn(async () => { throw new Error('Dataverse 503'); });
   await expect(ensureLiveBriefingLink({ requestId: REQUEST_ID, actorId: ACTOR_ID }, deps)).rejects.toThrow('Dataverse 503');
   expect(deps.mint).not.toHaveBeenCalled();
   expect(deps.insertLink).not.toHaveBeenCalled();
