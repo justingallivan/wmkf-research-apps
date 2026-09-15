@@ -22,9 +22,9 @@ related:
 
 # Reviews Tab — Phase II Writeup "Reviews" Paragraphs
 
-> Plan, not a commitment. Claims about current code are `[VERIFIED 2026-09-14 via source]` unless
-> labelled otherwise; the build is `[PROPOSED]`. Written from a read-only exploration session on
-> branch `claude/explore-2026-09-14`; no code changed. Next step before any build: a
+> This document began as a read-only design plan on branch `claude/explore-2026-09-14`; the
+> implementation is now shipped. Section 3 preserves the explicitly historical pre-build baseline,
+> while Sections 4–7 describe the implemented contract and its verification. The first build step was a
 > `/contract-reconcile` pass on this plan (repo precedent: the consultant-feedback plan took three
 > Codex adversarial rounds before build). Owner decisions W1–W6 were made in the same session.
 > **`/contract-reconcile` pass 1 (2026-09-14, Fable):** verdict READY WITH NAMED CHANGES; all six
@@ -60,8 +60,12 @@ related:
 > an integration DTO-pin reconciliation (1f7f0b93); production deployment
 > `wmkfresearchapps-adp2hh965` Ready; `review-synthesis.generate` v4 published sole-current
 > 2026-09-15 UTC by the owner with a dated `DATAVERSE_PROD_WRITE_ACK` (the interlock refused the
-> un-acked local write first, as designed). Remaining owner checks: regenerate one synthesis and
-> eyeball the card; Slice 1 production smoke (§6). Pre-existing unrelated red test:
+> un-acked local write first, as designed). **Production verification completed 2026-09-15 UTC on
+> Request `1002852`:** manual job `55742` completed in one attempt with no error and AI run
+> `33f8b4c4-b9b0-f111-aaac-70a8a5b11800`; the refreshed Reviews tab rendered the deterministic
+> score/roster/expertise sentences, v4 themes, and three provenance-verified quotations. All three
+> submitted reviewers had rank, institution, and expertise values (blank counts `0/3` for each),
+> their names rendered underlined, and the browser recorded no warnings or errors. Pre-existing unrelated red test:
 > `tests/unit/grantee-abstract-editor.test.js` (fails identically at base).
 
 ## 1. Goal
@@ -106,7 +110,9 @@ Out of scope: the old app's bulleted questions output (the review form's Q8 alre
 reviewers for questions to raise with the PI and the tab shows those answers), Risk-rating prose,
 and the Keck-history clause.
 
-## 3. What exists today `[VERIFIED 2026-09-14 via source]`
+## 3. Pre-build baseline `[HISTORICAL — VERIFIED 2026-09-14 via source]`
+
+This table records the state used to design the slices; it is not current implementation guidance.
 
 | Ingredient | State | Where |
 |---|---|---|
@@ -128,7 +134,7 @@ and the Keck-history clause.
 | Renderers | DOCX renders synthesis as `TextRun`s (underline available via `docx`). PDF flattens inline runs to plain text; no underline support today. | `shared/utils/review-report-docx.js:156-210`; `review-report-pdf.js:29-35` |
 | Pinned prompt contract | Unit test asserts exactly one override variable (`reviews_digest`) and exactly one output (`synthesis`, JSON, native schema, always-overwrite). Seed script imports `SYSTEM_PROMPT`, `USER_PROMPT_TEMPLATE`, `PROMPT_VARIABLES`, `PROMPT_OUTPUT_SCHEMA` from the prompt source, so source and live row cannot drift after a reseed. | `tests/unit/review-synthesis-prompt-config.test.js`; `scripts/seed-review-synthesis-prompt.js:55-84` |
 
-## 4. Design `[PROPOSED]`
+## 4. Implemented design
 
 ### 4.1 Split deterministic from model-authored
 
@@ -139,7 +145,7 @@ names. Sentences 4–5 are model-authored and become two new fields **inside** t
 
 ### 4.2 Deterministic composer (new pure module) — BUILT S1 (95e9a750)
 
-`shared/utils/review-writeup-paragraphs.js` `[PROPOSED]`, pure, unit-tested, shared by the tab,
+`shared/utils/review-writeup-paragraphs.js`, pure, unit-tested, shared by the tab,
 the Word report, and the Pre-Site Visit fill (Slice 4):
 
 - Input filter: every composer takes only reviewers with `reviewReceivedAt` set, the same filter
@@ -256,20 +262,21 @@ on the existing Regenerate control. Not an error, not a staleness flag. The auto
 not refill them on its own (it only fires on hash change), so pre-existing requests need a manual
 regenerate.
 
-**Production publish of the prompt row is an owner step** and the seed script is create-only by
-default: `planSeed` returns `refuse` whenever a row exists and `--force` was not passed
-(`lib/services/prompt-seed.js:58-65`), and a sole-current v3 row is documented in production
-(`docs/atlas/dataverse-akoya-request.md:83`), so a plain `--execute` exits without publishing
-(Codex AR-1 finding 3). Use the force path, which publishes version max+1 and keeps exactly one
-current row, from the main checkout after the merge deploys the reading code:
+**Production publication and smoke are complete.** The seed script is create-only by default:
+`planSeed` returns `refuse` whenever a row exists and `--force` was not passed
+(`lib/services/prompt-seed.js:58-65`). The owner used the governed force path after the reading
+code deployed; it published sole-current v4 on 2026-09-15 UTC and preserved exactly one current
+row (Codex AR-1 finding 3). These are the audited publication commands; do not rerun them absent a
+new tracked prompt/schema change and fresh owner authorization:
 
 ```bash
 node scripts/seed-review-synthesis-prompt.js --dry-run --force
 node scripts/seed-review-synthesis-prompt.js --execute --force
 ```
 
-Then confirm one current row at the expected version (the script prints the plan), regenerate one
-live request, and eyeball the paragraphs. The admin Prompt Templates publisher
+The current-row check and live regeneration were completed on Request `1002852`: manual job
+`55742` / AI run `33f8b4c4-b9b0-f111-aaac-70a8a5b11800` completed once with no error, and the
+refreshed card showed v4 themes plus three verified quotations. The admin Prompt Templates publisher
 (`pages/api/admin/prompts/[name].js`) is the alternative governed path for the text; it cannot
 change the tracked output schema, so the script is the right tool here. Either deploy order is
 safe: new code tolerates the old row (fields absent → empty), old code tolerates the new row
@@ -381,7 +388,7 @@ Visit workspace the editor updates Word by hand, helped by Copy on the tab.
 | W7 | Synthesis memo/population budget (§4.3): accept the unchanged fail-at-write posture, or add a service preflight refusing synthesis above N submitted reviews | Accept the unchanged posture; no preflight. |
 | W8 | Number of quotations | Three representative quotes (most positive, middle, most critical), even when there are more than three reviewers; fewer when fewer reviews. Server selects by rating after provenance verification. |
 
-## 6. Slices, tiers, verification `[PROPOSED]`
+## 6. Shipped slices, tiers, and verification
 
 All slices are Tier 1 (feature branch, automated tests, owner merges) per
 `docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md`. No migration, no new route, no new table.
@@ -395,8 +402,9 @@ three-area cap, "while" pairing, omitted reviewers); extend `reviews-tab.test.js
 `p.reviewers` gains five fields).
 Gates: `check:types`, `check:atlas` (projection noted on the potentialreviewers Atlas page),
 `check:dataverse-access-layer`, `check:route-service-boundary`.
-Smoke: on a request with all reviews in, print the composed sentences and the count of blank
-rank / institution / expertise fields so the fallback rate is known.
+Production smoke completed 2026-09-15 UTC on Request `1002852` with all three accepted reviews
+submitted: the card rendered the composed score, reviewer, and expertise sentences; reviewer
+names were underlined; blank rank / institution / expertise counts were `0/3`, `0/3`, and `0/3`.
 
 **Slice 2 — model fields.** Files listed in §4.3. Tests: extend
 `review-synthesis-prompt-config.test.js` (still one variable, one output; new properties present
@@ -406,8 +414,8 @@ with caps), `synthesize-reviews-service.test.js` (old row without fields parses 
 variant of a real sentence is kept, two quotes from one reviewer keep one, ordering follows the
 rating not the model's order, a quote matching two reviewers is dropped, five survivors reduce to
 the top, median and bottom by rating. Gates: `check:prompt-injection-tagging`,
-`check:fact-consistency`, `check:atlas`, `check:agent-wiki`, `check:doc-currency`. Owner reseeds
-production after deploy (§4.3) and regenerates one live request to eyeball the paragraphs.
+`check:fact-consistency`, `check:atlas`, `check:agent-wiki`, `check:doc-currency`. Production v4
+publication and the live Request `1002852` regeneration/visual verification are complete (§4.3).
 
 **Slice 3 — Word export section.** `review-report.js` (section) and `review-report-docx.js`
 (underlined name runs). Tests: `review-report.test.js`, `review-report-renderers.test.js`.
