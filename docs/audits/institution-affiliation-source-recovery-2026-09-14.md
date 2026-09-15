@@ -3,7 +3,7 @@ title: June–August 2026 Institution-Affiliation Source Recovery
 domain: reviewer-identity
 kind: audit
 status: complete
-summary: "Read-only source recovery found 65 PubMed-backed candidates, six unverified profile links, and 35 rows without these retained references; no case is labeled or cleared."
+summary: "Read-only source recovery found 65 PubMed-backed candidates; a bounded 26-case owner exercise then labeled person and institution relationships, but no case was cleared for selection."
 canonical: false
 cataloged: 2026-09-14
 last_verified: 2026-09-14
@@ -76,14 +76,33 @@ Both outputs are under gitignored `outputs/` and written mode `0600`:
 
 A private Excel confirmation sheet was generated from the 26-case queue using
 the July 2026 single-reviewer workbook pattern. Its `Review` tab shows one
-cited publication per case and blank dropdowns for same person, same
-institution, and whether the citation was the original decision source. The
-`Evidence` tab retains 226 citation/affiliation rows for closer inspection.
-Exploratory replay predictions are absent. The sheet is an owner confirmation
-exercise, not a completed blind policy-label set. After the owner fills it,
-preserve the unchanged workbook and hash, import every raw response, then
-audit confirmations and disconfirmations against the cited sources before
-normalizing labels. A missing or uncertain answer remains unknown.
+cited publication per case and plain-text answer cells for same person and
+same institution. The earlier original-source question was removed because
+the worksheet evidence does not let the owner identify which source drove the
+historical decision. The `Evidence` tab retains 226 citation/affiliation rows
+for closer inspection. Exploratory replay predictions are absent.
+
+**[VERIFIED via byte-preserved workbook import and owner clarification,
+2026-09-14]** The completed workbook was copied unchanged to
+`outputs/institution-affiliation-confirmation-owner-completed-2026-09-14.xlsx`
+with SHA-256
+`ab5b3917abe8e7e11aff4e23bb7f72378bb133895918b2638c55fd835da12ca4`.
+Every raw answer and note was imported to the private, mode-0600
+`outputs/institution-affiliation-adjudication-import-2026-09-14.json` before
+normalization. Seven rows had at least one blank assessment cell; their notes
+supported bounded review-layer interpretations, including one case resolved
+after the owner reviewed its proposal context. One mistyped confirmation was
+normalized, and one same-person/multiple-institution answer was separated into
+its two independent labels. The import retains every raw value and records the
+rationale for each review-layer interpretation.
+
+The resulting relationship labels are 22 same-person, two different-person,
+and two unknown; institution comparison is 19 same and seven distinct. These
+are owner-confirmed inputs from a varied, nonrepresentative intake queue, not a
+completed blind policy-label set. All 26 final consumer actions remain
+`not_evaluable`: the exercise did not recover the exact original decision
+source, prove currentness at the decision, or screen additional-affiliation
+COI. No row is approved for automatic selection or a durable write.
 
 The packet includes a candidate name, stored institution text, public PubMed
 and ORCID links, a sanitized retained website URL when present, matched public
