@@ -2,11 +2,11 @@
 title: Reviews Tab — Phase II Writeup "Reviews" Paragraphs (2026-09-14)
 domain: reviewer-workbench
 kind: plan
-status: in-progress
+status: shipped
 summary: "Bring the Summarize Peer Reviews output (review count, grade tally, underlined reviewer roster with rank, expertise sentence, tone/themes, ordered quotations) into the Request Workbench Reviews tab, composed from Dataverse reviewer identity and stored ratings instead of uploaded PDFs. Deterministic sentences first; two new model fields inside the existing synthesis second; Word export third; the same deterministic text fills [[STAFF:RefereeSection]] in the Pre-Site Visit draft fourth. Owner decisions W1–W8 decided 2026-09-14. Build record in the header note."
 cataloged: 2026-09-14
 owner: product-engineering
-last_verified: 2026-09-14
+last_verified: 2026-09-15
 related:
   - docs/WORKBENCH_REVIEWS_TAB_BUILDOUT_PLAN.md
   - docs/atlas/dataverse-akoya-request.md
@@ -56,8 +56,12 @@ related:
 > narrative-only, word-bounded, ≥6 words (picklist labels live in `answerText`,
 > `lib/external/build-review-submission.js:219`); `getWriteupRoster` name-sorts so tied ratings
 > order identically on tab, export and draft; Copy has a generation guard on both post-await
-> writes. Remaining owner steps: production `--force` republish of `review-synthesis.generate`
-> (§4.3), Slice 1 production smoke (§6), merge. Pre-existing unrelated red test:
+> writes. **Shipped:** merged to main via PR #296 (b9ad64eb) after a main merge-in (2bf10cbd) and
+> an integration DTO-pin reconciliation (1f7f0b93); production deployment
+> `wmkfresearchapps-adp2hh965` Ready; `review-synthesis.generate` v4 published sole-current
+> 2026-09-15 UTC by the owner with a dated `DATAVERSE_PROD_WRITE_ACK` (the interlock refused the
+> un-acked local write first, as designed). Remaining owner checks: regenerate one synthesis and
+> eyeball the card; Slice 1 production smoke (§6). Pre-existing unrelated red test:
 > `tests/unit/grantee-abstract-editor.test.js` (fails identically at base).
 
 ## 1. Goal

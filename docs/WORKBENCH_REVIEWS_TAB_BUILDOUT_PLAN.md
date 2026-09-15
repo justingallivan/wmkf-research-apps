@@ -450,11 +450,11 @@ arrays, plus the same verified themes/quotations) via the shared
 `composeWriteupParagraphs`, and `shared/utils/review-report-docx.js` renders
 it as a "Reviews (writeup)" section — underline on reviewer-name runs only,
 never on model strings; the PDF renderer is unchanged and ignores the section
-without erroring (W4: no PDF work). **This addendum documents the tracked prompt source
-only — the last recorded publish of `review-synthesis.generate` is governed
-v3 (five keys, 2026-07-28, docs/atlas/dataverse-akoya-request.md); an
-owner-run `--force` republish (plan §4.3) is needed to make the live row
-match the tracked seven-key source, and this build did not run one.**
+without erroring (W4: no PDF work). **Live row: governed `review-synthesis.generate` v4 (seven keys) became
+sole-current on 2026-09-15 UTC (owner-run `--force` republish with a dated
+`DATAVERSE_PROD_WRITE_ACK`, after PR #296 merged at b9ad64eb and production
+deployment `wmkfresearchapps-adp2hh965` was Ready). The tracked source and the
+live row match.**
 
 ## Verification per phase
 
