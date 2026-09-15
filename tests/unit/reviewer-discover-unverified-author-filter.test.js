@@ -87,6 +87,7 @@ function resultEvent(res) {
 beforeEach(() => {
   jest.clearAllMocks();
   process.env.CLAUDE_API_KEY = 'test-key';
+  delete process.env.REVIEWER_INSTITUTION_PHASE2;
 });
 
 afterAll(() => {
@@ -120,6 +121,42 @@ test('filters PI and co-investigator name variants before emitting unverified su
   const result = resultEvent(res);
   expect(result).not.toBeNull();
   expect(result.unverified.map((candidate) => candidate.name)).toEqual(['Morgan Reviewer']);
+});
+
+test('exact-off omits dormant institution evidence from the incumbent SSE DTO', async () => {
+  mockDiscover.mockResolvedValueOnce({
+    verified: [{
+      name: 'Evidence Producer',
+      affiliation: 'Example University',
+      independentIdentity: { version: 'independent-identity/v1' },
+      affiliationAssertions: [{
+        rawText: 'Example University',
+        sourceType: 'publication',
+        currentness: 'unknown',
+        authorSpecific: true,
+      }],
+    }],
+    unverified: [],
+    discovered: [],
+    coiDropped: [],
+    stats: {},
+  });
+
+  const res = response();
+  await handler({
+    method: 'POST',
+    body: {
+      requestId: '11111111-1111-1111-1111-111111111111',
+      analysisResult: { proposalInfo: { keywords: '' }, reviewerSuggestions: [] },
+      options: { generateReasoning: false },
+    },
+  }, res);
+
+  const [candidate] = resultEvent(res).ranked;
+  expect(candidate.name).toBe('Evidence Producer');
+  expect(candidate).not.toHaveProperty('independentIdentity');
+  expect(candidate).not.toHaveProperty('affiliationAssertions');
+  expect(candidate).not.toHaveProperty('institutionEvidenceAttestation');
 });
 
 test('returns named resolver comparisons only to a freshly verified superuser', async () => {

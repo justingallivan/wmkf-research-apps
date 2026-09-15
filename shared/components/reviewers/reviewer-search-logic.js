@@ -772,6 +772,7 @@ function pruneInstitutionPresentation(value) {
  */
 export const MAX_ROSTER_CONTACT_LEADS = 8;
 export const MAX_ROSTER_IDENTITY_ANCHORS = 20;
+export const MAX_ROSTER_AFFILIATION_ASSERTIONS = 24;
 export function pruneContactLeads(leads) {
   if (!Array.isArray(leads)) return [];
   return leads
@@ -845,6 +846,55 @@ export function pruneIdentityDecision(identity) {
         }))
       : null,
   };
+}
+
+export function pruneIndependentIdentity(identity) {
+  if (!identity || typeof identity !== 'object' || Array.isArray(identity)) return null;
+  return {
+    version: boundedText(identity.version, 80),
+    result: boundedText(identity.result, 40),
+    reason: boundedText(identity.reason, 160),
+    excludesAffiliation: identity.excludesAffiliation === true,
+    method: boundedText(identity.method, 80),
+    resolverVersion: boundedText(identity.resolverVersion, 100),
+    requestBinding: boundedText(identity.requestBinding, 160),
+    candidateKey: boundedText(identity.candidateKey, 200),
+    identityInputDigest: boundedText(identity.identityInputDigest, 128),
+    evidenceDigest: boundedText(identity.evidenceDigest, 128),
+    evaluatedAt: boundedText(identity.evaluatedAt, 80),
+    providerObservedAt: boundedText(identity.providerObservedAt, 80),
+    expiresAt: boundedText(identity.expiresAt, 80),
+    providerState: boundedText(identity.providerState, 40),
+  };
+}
+
+export function pruneAffiliationAssertions(assertions) {
+  if (!Array.isArray(assertions)) return [];
+  return assertions.slice(0, MAX_ROSTER_AFFILIATION_ASSERTIONS).flatMap((assertion) => {
+    const rawText = boundedText(assertion?.rawText, 1000);
+    if (!rawText) return [];
+    return [{
+      rawText,
+      sourceType: boundedText(assertion.sourceType, 80),
+      sourceReference: boundedText(assertion.sourceReference, 500),
+      observedAt: boundedText(assertion.observedAt, 80),
+      currentness: boundedText(assertion.currentness, 40),
+      authorSpecific: [true, false, 'unknown'].includes(assertion.authorSpecific)
+        ? assertion.authorSpecific
+        : 'unknown',
+      publicationYear: assertion.publicationYear != null && Number.isSafeInteger(Number(assertion.publicationYear))
+        ? Number(assertion.publicationYear)
+        : null,
+      startYear: assertion.startYear != null && Number.isSafeInteger(Number(assertion.startYear))
+        ? Number(assertion.startYear)
+        : null,
+      endYear: assertion.endYear != null && Number.isSafeInteger(Number(assertion.endYear))
+        ? Number(assertion.endYear)
+        : null,
+      ror: boundedText(assertion.ror, 200),
+      openAlexId: boundedText(assertion.openAlexId, 200),
+    }];
+  });
 }
 
 export function pruneEligibilityEvidence(evidence) {
@@ -1106,6 +1156,12 @@ export function pruneCandidateForRoster(c) {
     lowPublicationCountFound: Number.isFinite(c.lowPublicationCountFound) ? c.lowPublicationCountFound : null,
     institutionMismatch: !!c.institutionMismatch,
     institutionPresentation: pruneInstitutionPresentation(c.institutionPresentation),
+    ...(c.independentIdentity
+      ? { independentIdentity: pruneIndependentIdentity(c.independentIdentity) }
+      : {}),
+    ...(Array.isArray(c.affiliationAssertions)
+      ? { affiliationAssertions: pruneAffiliationAssertions(c.affiliationAssertions) }
+      : {}),
     suggestedInstitution: c.suggestedInstitution || null,
     expertiseMismatch: !!c.expertiseMismatch,
     // Verification-incoherence flag (Fix 11) drives the relevance-score −15
@@ -1148,6 +1204,10 @@ export function pruneCandidateForRoster(c) {
       && c.automatedIdentityAttestation.length <= 4096
       ? c.automatedIdentityAttestation
       : null,
+    ...(typeof c.institutionEvidenceAttestation === 'string'
+      && c.institutionEvidenceAttestation.length <= 4096
+      ? { institutionEvidenceAttestation: c.institutionEvidenceAttestation }
+      : {}),
     candidateKey: reviewerCandidateKey(c),
     manualContactFields: pruneManualContactFields(c.manualContactFields),
     // UI convenience only. Save-candidates derives authority by looking up the

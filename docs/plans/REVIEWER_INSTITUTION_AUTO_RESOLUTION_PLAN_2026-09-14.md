@@ -74,7 +74,8 @@ for it.
    Stage 2 as `unknown`, not `historical`. Publication dates must be carried and
    interpreted by an explicit source policy before any dated assertion may be
    labeled current or historical.
-9. **[VERIFIED via `lib/services/independent-reviewer-identity.js` and focused
+9. **[VERIFIED via `lib/services/independent-reviewer-identity.js`,
+   `lib/services/reviewer-independent-identity-runtime.js`, and focused
    tests]** The dormant `independent-identity/v1` evaluator core now implements
    the four outcomes, closed PubMed/OpenAlex/ORCID methods, server-loader-only
    evidence intake, provider completeness, full-forename and author-cluster
@@ -83,7 +84,18 @@ for it.
    OAuth Claude review hardened raw-byline checks, an unwindowed PubMed query
    with total-count coverage, source-work lineage, candidate-bound ORCID
    authorship, separate input/evidence digests, exact identifier handling,
-   future-date and wall-clock expiry checks, and execution-context binding.
+   future-date and wall-clock expiry checks, and execution-context binding. An
+   exact-on server adapter invokes it only from closed discovery/applicant
+   authorities and reconstructs proposal-citation lineage server-side.
+10. **[VERIFIED via `lib/services/reviewer-institution-evidence-attestation.js`,
+    roster/save callers, and focused tests]** A separate institution-evidence
+    JWT and compact roster receipt bind the request, final server-derived
+    candidate key, validated identity/assertion projection, digest, and expiry.
+    Typed publication and ORCID employment assertions survive the roster round
+    trip. Both save paths re-read the receipt, apply the shared current-only
+    additional-affiliation COI matcher, and hold missing, stale, conflicting,
+    or incomplete evidence before Dataverse writes. All of this remains behind
+    exact-on `REVIEWER_INSTITUTION_PHASE2`; no deployed flag state is claimed.
 
 ## Change surface
 
@@ -257,7 +269,7 @@ adversarial canonicalized-sibling and system-to-campus cases. It contains no
 retained names, request/candidate identifiers, affiliation strings, or URLs.
 Producer coverage also pins undated publication currentness as `unknown`.
 
-### Phase 2 — prove independent identity and extra-affiliation COI — evaluator core implemented; integration pending
+### Phase 2 — prove independent identity and extra-affiliation COI — dormant integration implemented
 
 1. Audit every identity anchor used at enrichment, roster reload, candidate
    selection, and save. Mark whether each anchor depends on affiliation.
@@ -317,11 +329,15 @@ confirmation also returns `not_evaluable` in v1 because institution mismatch
 can be the premise for that confirmation; the existing human-authority path
 continues to honor it separately.
 
-The audit also verified that implementation is still required before Phase 3:
-applicant output and roster pruning lose decisive proof fields; publication and
-ORCID dates are detached from their affiliation assertions; ordinary save omits
-byline/history segments; and applicant promotion performs no server-side
-institution COI recomputation. See
+The audit initially identified four missing hops: applicant output and roster
+pruning lost decisive proof fields; publication and ORCID dates were detached
+from affiliation assertions; ordinary save omitted typed additional segments;
+and applicant promotion performed no server-side institution COI
+recomputation. The dormant implementation now closes those hops with typed
+assertions, a separate request/candidate-bound receipt, and one shared
+current-only save-boundary screen. Unknown currentness yields `incomplete` and
+holds under the exact-on flag; it is never converted into a historical or
+current claim. See
 `docs/audits/reviewer-institution-phase2-contract-audit-2026-09-14.md`.
 
 ORCID employment with no recorded end date is an unbounded interval rather than
@@ -330,11 +346,13 @@ must preserve that distinction.
 
 ### Phase 3 — establish a trusted end-to-end assessment
 
-General Find candidates currently lose typed authority when their browser
-payload returns to the roster route. First determine whether the existing
-server identity-attestation envelope can safely carry a separate institution
-assessment without collapsing identity and institution semantics. If it
-cannot, create a separate bounded receipt.
+General Find candidates lose typed authority when their browser payload returns
+to the roster route unless the dormant exact-on path is used. The invalidation
+needs differ from the existing identity/contact receipt, so the implementation
+uses a separate bounded institution-evidence JWT and stored receipt. The
+remaining Phase 3 work is to bind the complete v2 policy input/result and
+project its card/remedy state; the current receipt deliberately grants no
+policy, selection, or automated-write authority.
 
 The server-owned binding must cover request, exact candidate key, assessment
 schema version, policy version, all normalized assertion/source identifiers,
@@ -504,24 +522,19 @@ browser claims must land in a tested fail-closed branch.
 
 ## Decisions intentionally left for execution
 
-1. Whether to extend the existing attestation envelope or add a separate
-   institution receipt, after comparing their binding and invalidation needs.
-2. The treatment of concurrent `related_other` beyond holding and surfacing it
+1. The treatment of concurrent `related_other` beyond holding and surfacing it
    in the first slice.
-3. The numeric benefit threshold and ongoing quality-control sample size,
+2. The numeric benefit threshold and ongoing quality-control sample size,
    declared from organic cycle volume before the results are inspected.
-4. Promotion of each high-authority consumer, which always requires a separate
+3. Promotion of each high-authority consumer, which always requires a separate
    owner decision.
 
 ## Immediate next work
 
-Implement the still-dormant Phase 2 contracts identified by the completed
-audit and adversarial review. The pure four-outcome evaluator and dormant v2
-adapter now exist. Next, select and implement its authoritative server loader
-and receipt/roster representation; add typed dated affiliation assertions;
-complete additional-affiliation COI fanout; and call the same fail-closed COI
-recomputation at ordinary and applicant save. Correct the three stale
-`affiliationHistory` comments when its real consumer is added. Preserve
-incumbent authority and keep all new behavior flag-off. Do not enable
-measurement, apply a migration, create a Preview deployment, or promote a
-high-authority consumer as part of that implementation.
+Define and review the source-specific dated-currentness policy, then complete
+the Phase 3 v2 policy binding and server-projected card/remedy state. Add the
+remaining rendered-state, selection-state, exact call-set, partial-batch, and
+frozen 40-case identity regressions before proposing any high-authority flag
+enablement. Keep `REVIEWER_INSTITUTION_PHASE2` off, do not enable measurement,
+do not apply migration 048, and do not create a Preview deployment during the
+intervening months.

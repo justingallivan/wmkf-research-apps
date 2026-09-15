@@ -3,7 +3,7 @@ title: Reviewer Institution Auto-Resolution Phase 2 Contract Audit
 domain: reviewer-identity
 kind: audit
 status: complete
-summary: "Current identity outputs do not bind one person strongly enough for institution auto-resolution; a dormant server-side evaluator core now applies hardened provider rules, while authoritative loading/persistence and complete additional-affiliation COI inputs remain unwired."
+summary: "Current legacy identity outputs remain insufficient for institution auto-resolution; the dormant follow-up now adds a closed server loader, separate roster receipt, typed affiliation assertions, and shared fail-closed save-boundary COI screening."
 canonical: false
 cataloged: 2026-09-14
 last_verified: 2026-09-14
@@ -36,10 +36,12 @@ affiliation contributed, and the existing affiliation-free-looking paths do
 not fully cluster the cited works to one person. A bare status or current
 anchor must remain insufficient. A dormant `independent-identity/v1` evaluator
 core now implements the closed rules below through a required server-loader
-boundary, but it has no runtime caller, roster projection, or receipt. Complete
-additional-affiliation COI screening also remains absent at both save
-boundaries. No flag or authority should change before those contracts are wired
-and pass the frozen identity regressions.
+boundary. The same-day dormant follow-up now supplies its closed server runtime
+adapter, bounded roster projection and separate receipt, typed dated
+affiliation assertions, and shared additional-affiliation COI recomputation at
+both save boundaries. These paths remain behind exact-on
+`REVIEWER_INSTITUTION_PHASE2`; no flag, policy/card consumer, or live authority
+has changed, and the frozen identity regression remains a rollout prerequisite.
 
 A post-implementation adversarial review run through Claude CLI with first-party
 OAuth found live-shape gaps in the first core draft. The corrected core now
@@ -275,24 +277,25 @@ the full ORCID employment list are absent from
 dropped most of them. A clear result therefore does not mean every relevant
 additional affiliation was screened.
 
-### Applicant promotion
+### Applicant promotion — audit-time finding
 
-The applicant route re-reads the canonical suggestion and roster row, checks
+At the time of the audit, the applicant route re-read the canonical suggestion and roster row, checked
 eligibility, identity, address, and canonical contact, then selects the
-Dataverse suggestion. It never calls the institution COI matcher and never
-rejects `hasInstitutionCOI` on the server. **[VERIFIED via
+Dataverse suggestion. It did not call the institution COI matcher and did not
+reject `hasInstitutionCOI` on the server. **[VERIFIED via
 `lib/services/workbench/promote-applicant-reviewer-service.js:357-460,618-700`]**
 The browser normally hides the selection control when `hasInstitutionCOI` is
 true, but that is not a save-boundary control. **[VERIFIED via
 `shared/components/reviewers/reviewer-search-logic.js:62-67`]**
 
-This is a pre-existing defense-in-depth gap; no Phase 1 code widened it. It
-becomes release-blocking for the proposed automatic-clear slice because the
-new policy explicitly requires the same server decision at both save paths.
+The dormant follow-up closes this exact-on defense-in-depth gap by calling the
+same shared recomputation before contact or suggestion writes. Missing, stale,
+conflicting, or incomplete evidence holds. Exact-off preserves the incumbent
+path.
 
-## Required implementation before Phase 3 authority work
+## Follow-up implementation status before Phase 3 authority work
 
-1. **Core implemented, integration pending:** the pure, total
+1. **[VERIFIED via source and focused tests] Core and closed adapter implemented:** the pure, total
    `independent-identity/v1` evaluator has only the closed sufficient methods
    above plus an explicit `contradicted` result. Its PubMed
    path uses an unwindowed query, counts only full-forename bylines, and clusters
@@ -307,37 +310,38 @@ new policy explicitly requires the same server decision at both save paths.
    versions, stale or tampered digests, future-dated receipts, and all branches
    where lineage is missing. The
    implementation and focused tests are in
-   `lib/services/independent-reviewer-identity.js` and
-   `tests/unit/independent-reviewer-identity.test.js`; there is no runtime
-   caller yet.
+   `lib/services/independent-reviewer-identity.js`; its closed server caller is
+   `lib/services/reviewer-independent-identity-runtime.js`, and focused tests
+   cover both.
    The exported input-digest helper hashes only server inputs; provider-derived
    method evidence has its own digest so a later loader can detect source-input
    drift without copying authority from the stored receipt.
-2. Compute the result on the server at the point where complete source evidence
-   exists. The evaluator owns provider-state accounting, and `sufficient`
-   requires a complete run. Treat all browser-originating identity fields and
-   staff confirmations as deny-only for v1. Preserve a bounded projection
-   through applicant output, general enrichment, roster storage, reload, and
-   both saves; make every binding claim mandatory and expire the result no later
-   than 14 days after the underlying provider observation.
-3. Introduce a typed affiliation assertion list. Each item must bind normalized
-   segments to source, author specificity, source reference, and its own date or
-   employment interval. Preserve successful segments when another segment
-   fails, while returning `additionalCoi=incomplete` for the whole required
-   screen.
-4. Extend the existing COI input adapter to evaluate every required current
-   additional segment. Preserve the existing direct-match and exemption rules.
-5. Call the same fail-closed COI recomputation from applicant promotion before
-   any contact write or suggestion selection. A missing, stale, failed, or
-   incomplete assessment must hold without a Dataverse write.
-6. Run the frozen 40-case identity benchmark, the Phase 1 synthetic policy
-   fixture, new extra-segment COI tests, both save-path tests, roster reload and
-   tamper tests, and flag-off equality before considering Phase 3.
-7. Correct the stale comments that say `affiliationHistory` is screened by the
-   current COI path in `lib/services/discovery/affiliation.js`,
-   `lib/services/deduplication-service.js`, and
-   `lib/services/discovery/verification.js` when implementing the actual
-   history consumer.
+2. **[VERIFIED via source and focused tests] Binding and persistence implemented:**
+   the exact-on server path computes or explicitly abstains, signs a bounded
+   projection, derives the final roster key before accepting authority, stores
+   a separate digest receipt, restores only matching stored evidence, and
+   rejects mutation, replay, rebinding, and expiry.
+3. **[VERIFIED via source and focused tests] Typed assertions implemented:**
+   publication year and ORCID employment intervals remain attached to each
+   author-specific assertion. Publication evidence and open-ended ORCID
+   employment remain `unknown` until a reviewed source policy establishes
+   currentness.
+4. **[VERIFIED via source and focused tests] Shared COI fanout implemented:**
+   both save paths evaluate author-specific `current` additional assertions
+   with incumbent direct-match/exemption semantics; historical assertions are
+   inert and unknown currentness reports `incomplete`.
+5. **[VERIFIED via no-write tests] Fail-closed saves implemented:** missing,
+   stale, conflicting, or incomplete exact-on evidence holds before contact,
+   person, researcher, or suggestion mutation.
+6. **[PARTIAL]** The Phase 1 policy fixture, new extra-segment COI tests, both
+   save-path tests, roster reload/tamper tests, and initial flag-off DTO checks
+   run in this branch. The frozen 40-case identity benchmark and the full card,
+   selection, call-set, and partial-batch equality matrix remain prerequisites
+   before Phase 3 authority.
+7. **[VERIFIED via source search]** The stale comments that said
+   `affiliationHistory` was screened by the current COI path now distinguish the
+   legacy string field from the typed assertion consumer.
 
-No migration, feature-flag enablement, Preview deployment, or runtime authority
-change was part of this audit.
+No migration, feature-flag enablement, Preview deployment, policy/card
+consumer, selection change, or live runtime authority change is part of this
+follow-up.

@@ -30,7 +30,9 @@ script on an existing database.
   successful roster upserts, authenticated staff actions, and per-candidate
   save outcomes with a server-bound roster key from both Find save paths (ordinary
   `save-candidates` and applicant `promote-applicant-reviewer`). Early
-  save rejections with only a client correlation key have no case event. Failed or skipped
+  save rejections with only a client correlation key have no case event. The
+  dormant Phase 2 roster receipt and COI screen do not widen this table's fixed
+  vocabulary. Failed or skipped
   roster writes produce no upsert event. A telemetry read/insert failure is
   swallowed and must not change the reviewer response or Dataverse write.
   After five consecutive failed inserts, a 60-second circuit breaker avoids
@@ -64,14 +66,14 @@ script on an existing database.
 ## Limits and next prerequisites
 
 This captures **observed actions**, not card impressions or counterfactual
-actions avoided. Source type/currentness are partial: applicant Stage 2
-currently supplies no publication/employment observation date and uses a
-suggestion reference, not the exact upstream work/profile identifier. The
-independent person proof and server screening of every extra affiliation are
-still absent. Rows missing any of these inputs are excluded from auto-clear
-scoring. Coverage also excludes failed telemetry inserts and cases that never
-reached a roster row. The report names these limits and cannot estimate lost
-events from its own table.
+actions avoided. The separate dormant Phase 2 path now carries publication
+years, ORCID employment intervals, independent-person results, and typed
+additional-affiliation screening, but migration 048 cannot store those results
+and the measurement writer does not consume that receipt. They therefore
+remain absent from measurement authority and auto-clear scoring. Coverage also
+excludes failed telemetry inserts and cases that never reached a roster row.
+The report names these limits and cannot estimate lost events from its own
+table.
 `institution_coi` outcome counts a save rejection at the institution-COI
 gate, including a failed required screen; it is not a count of adjudicated
 current COIs. `trusted_hold_with_staff_action` is an overlap, not proof that
