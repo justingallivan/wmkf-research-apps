@@ -22,6 +22,9 @@
 
 import { sql } from '@vercel/postgres';
 import { requireAppAccess } from '../../../lib/utils/auth';
+import { isGuid } from '../../../lib/utils/guid';
+
+const CONTACT_LINK_INDEX = 'idx_expertise_roster_active_contact';
 
 function normalizePreferredEmail(value) {
   const email = String(value || '').trim().toLowerCase();
@@ -32,6 +35,63 @@ function normalizePreferredEmail(value) {
     throw error;
   }
   return email;
+}
+
+export function normalizeDataverseContactId(value) {
+  if (value === null || value === undefined || String(value).trim() === '') return null;
+  const contactId = String(value).trim().toLowerCase();
+  if (!isGuid(contactId)) {
+    const error = new Error('dataverse_contact_id must be a GUID, null, or an empty string');
+    error.status = 400;
+    throw error;
+  }
+  return contactId;
+}
+
+export function assertLinkedPreferredEmail({
+  resultingContactId,
+  submittedPreferredEmail,
+  storedPreferredEmail = null,
+  creating = false,
+}) {
+  if (!resultingContactId || submittedPreferredEmail === undefined) return;
+  const submitted = normalizePreferredEmail(submittedPreferredEmail);
+  if (!submitted) return;
+  const stored = normalizePreferredEmail(storedPreferredEmail);
+  if (!creating && submitted === stored) return;
+  const error = new Error('preferred_email cannot be changed while the roster member is linked to a Dataverse contact');
+  error.status = 400;
+  throw error;
+}
+
+async function contactConflictResponse(res, contactId, { excludingId = null } = {}) {
+  if (!contactId) return null;
+  const params = [contactId];
+  let exclusion = '';
+  if (Number.isSafeInteger(excludingId)) {
+    params.push(excludingId);
+    exclusion = ' AND id <> $2';
+  }
+  const conflict = await sql.query(
+    `SELECT id, name FROM expertise_roster
+     WHERE dataverse_contact_id = $1 AND is_active = true${exclusion}
+     ORDER BY id ASC LIMIT 1`,
+    params,
+  );
+  if (!conflict.rows[0]) return null;
+  return res.status(409).json({
+    error: `Dataverse contact is already linked to active roster member "${conflict.rows[0].name}".`,
+    code: 'expertise_roster_contact_conflict',
+    conflictingMember: {
+      id: Number(conflict.rows[0].id),
+      name: conflict.rows[0].name,
+    },
+  });
+}
+
+function isContactLinkConflict(error) {
+  return error?.code === '23505'
+    && error.constraint === CONTACT_LINK_INDEX;
 }
 
 export default async function handler(req, res) {
@@ -142,9 +202,10 @@ async function handleGet(req, res) {
 }
 
 async function handleCreate(req, res, access) {
+  let normalizedContactId = null;
   try {
     const {
-      name, preferred_email, role_type, role, affiliation, orcid,
+      name, preferred_email, dataverse_contact_id, role_type, role, affiliation, orcid,
       primary_fields, keywords, subfields_specialties,
       methods_techniques, distinctions, expertise,
       keck_affiliation, keck_affiliation_details,
@@ -159,15 +220,22 @@ async function handleCreate(req, res, access) {
       return res.status(400).json({ error: `role_type must be one of: ${validRoleTypes.join(', ')}` });
     }
 
+    normalizedContactId = normalizeDataverseContactId(dataverse_contact_id);
+    assertLinkedPreferredEmail({
+      resultingContactId: normalizedContactId,
+      submittedPreferredEmail: preferred_email,
+      creating: true,
+    });
+
     const result = await sql`
       INSERT INTO expertise_roster (
-        name, preferred_email, role_type, role, affiliation, orcid,
+        name, preferred_email, dataverse_contact_id, role_type, role, affiliation, orcid,
         primary_fields, keywords, subfields_specialties,
         methods_techniques, distinctions, expertise,
         keck_affiliation, keck_affiliation_details,
         created_by, updated_by
       ) VALUES (
-        ${name}, ${normalizePreferredEmail(preferred_email)}, ${role_type}, ${role || null}, ${affiliation || null}, ${orcid || 'N/A'},
+        ${name}, ${normalizePreferredEmail(preferred_email)}, ${normalizedContactId}, ${role_type}, ${role || null}, ${affiliation || null}, ${orcid || 'N/A'},
         ${primary_fields || null}, ${keywords || null}, ${subfields_specialties || null},
         ${methods_techniques || null}, ${distinctions || null}, ${expertise || null},
         ${keck_affiliation || null}, ${keck_affiliation_details || null},
@@ -178,6 +246,14 @@ async function handleCreate(req, res, access) {
 
     return res.status(201).json({ success: true, member: result.rows[0] });
   } catch (error) {
+    if (isContactLinkConflict(error)) {
+      try {
+        const response = await contactConflictResponse(res, normalizedContactId);
+        if (response) return response;
+      } catch (lookupError) {
+        console.error('Roster CREATE conflict lookup error:', lookupError);
+      }
+    }
     console.error('Roster CREATE error:', error);
     return res.status(error.status || 500).json({
       error: error.status === 400 ? error.message : 'Failed to create roster member',
@@ -186,15 +262,22 @@ async function handleCreate(req, res, access) {
 }
 
 async function handlePatch(req, res, access) {
+  let resultingContactId = null;
+  let memberId = null;
   try {
     const { id, ...updates } = req.body;
 
-    if (!id) {
+    memberId = Number.parseInt(id, 10);
+    if (!Number.isSafeInteger(memberId) || memberId <= 0) {
       return res.status(400).json({ error: 'id is required' });
     }
 
     // Check member exists
-    const existing = await sql`SELECT id FROM expertise_roster WHERE id = ${parseInt(id)}`;
+    const existing = await sql`
+      SELECT id, dataverse_contact_id, preferred_email
+      FROM expertise_roster
+      WHERE id = ${memberId}
+    `;
     if (existing.rows.length === 0) {
       return res.status(404).json({ error: 'Roster member not found' });
     }
@@ -205,16 +288,33 @@ async function handlePatch(req, res, access) {
       'primary_fields', 'keywords', 'subfields_specialties',
       'methods_techniques', 'distinctions', 'expertise',
       'keck_affiliation', 'keck_affiliation_details', 'is_active',
+      'dataverse_contact_id',
     ];
+
+    const normalizedUpdates = { ...updates };
+    if ('dataverse_contact_id' in normalizedUpdates) {
+      normalizedUpdates.dataverse_contact_id = normalizeDataverseContactId(normalizedUpdates.dataverse_contact_id);
+    }
+    if ('preferred_email' in normalizedUpdates) {
+      normalizedUpdates.preferred_email = normalizePreferredEmail(normalizedUpdates.preferred_email);
+    }
+    resultingContactId = 'dataverse_contact_id' in normalizedUpdates
+      ? normalizedUpdates.dataverse_contact_id
+      : normalizeDataverseContactId(existing.rows[0].dataverse_contact_id);
+    assertLinkedPreferredEmail({
+      resultingContactId,
+      submittedPreferredEmail: 'preferred_email' in normalizedUpdates
+        ? normalizedUpdates.preferred_email
+        : undefined,
+      storedPreferredEmail: existing.rows[0].preferred_email,
+    });
 
     const setClauses = [];
     const params = [];
 
     for (const field of allowedFields) {
-      if (field in updates) {
-        params.push(field === 'preferred_email'
-          ? normalizePreferredEmail(updates[field])
-          : updates[field]);
+      if (field in normalizedUpdates) {
+        params.push(normalizedUpdates[field]);
         setClauses.push(`${field} = $${params.length}`);
       }
     }
@@ -224,9 +324,9 @@ async function handlePatch(req, res, access) {
     }
 
     // Validate role_type if being updated
-    if ('role_type' in updates) {
+    if ('role_type' in normalizedUpdates) {
       const validRoleTypes = ['Consultant', 'Board', 'Research Program Staff'];
-      if (!validRoleTypes.includes(updates.role_type)) {
+      if (!validRoleTypes.includes(normalizedUpdates.role_type)) {
         return res.status(400).json({ error: `role_type must be one of: ${validRoleTypes.join(', ')}` });
       }
     }
@@ -236,7 +336,7 @@ async function handlePatch(req, res, access) {
     setClauses.push(`updated_by = $${params.length}`);
     setClauses.push('updated_at = CURRENT_TIMESTAMP');
 
-    params.push(parseInt(id));
+    params.push(memberId);
     const idIdx = params.length;
 
     const query = `
@@ -249,6 +349,14 @@ async function handlePatch(req, res, access) {
     const result = await sql.query(query, params);
     return res.status(200).json({ success: true, member: result.rows[0] });
   } catch (error) {
+    if (isContactLinkConflict(error)) {
+      try {
+        const response = await contactConflictResponse(res, resultingContactId, { excludingId: memberId });
+        if (response) return response;
+      } catch (lookupError) {
+        console.error('Roster PATCH conflict lookup error:', lookupError);
+      }
+    }
     console.error('Roster PATCH error:', error);
     return res.status(error.status || 500).json({
       error: error.status === 400 ? error.message : 'Failed to update roster member',

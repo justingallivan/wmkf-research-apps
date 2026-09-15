@@ -1,6 +1,6 @@
 /** @jest-environment jsdom */
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import SiteVisitEditor from '../../shared/components/meeting-tracker/SiteVisitEditor';
+import SiteVisitEditor, { noEmailHint } from '../../shared/components/meeting-tracker/SiteVisitEditor';
 
 let routerQuery = {};
 jest.mock('next/router', () => ({ useRouter: () => ({ isReady: true, query: routerQuery }) }));
@@ -22,6 +22,11 @@ function response(body, status = 200) { return { ok: status < 300, status, json:
 
 beforeEach(() => {
   routerQuery = { requestId: REQUEST_ID, n: '1003222', cycleCode: 'D26', programId: 'p1' };
+});
+
+test('visit attendee chip hints distinguish linked Contact failures from manual roster email', () => {
+  expect(noEmailHint({ linked: true })).toMatch(/linked Dataverse contact.*fix or relink.*unlink/i);
+  expect(noEmailHint({ linked: false })).toMatch(/preferred email.*Expertise Finder roster/i);
 });
 
 test('a new visit: the form posts the fields the logistics service expects, with the id from the path and no activity/etag', async () => {

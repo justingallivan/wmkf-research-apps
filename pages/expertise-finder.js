@@ -3,7 +3,9 @@ import Layout, { PageHeader, Card, Button } from '../shared/components/Layout';
 import FileUploaderSimple from '../shared/components/FileUploaderSimple';
 import RequireAppAccess from '../shared/components/RequireAppAccess';
 import ErrorAlert from '../shared/components/ErrorAlert';
+import RosterContactField from '../shared/components/expertise-finder/RosterContactField';
 import { conventionalCycles, resolveWorkingCycle, cycleCodeToLabel } from '../lib/utils/cycle-code.js';
+import { buildRosterSubmitPayload } from '../shared/utils/roster-contact-link.js';
 
 // ─── Tab Component ───
 
@@ -298,18 +300,18 @@ function RosterTab() {
     setExpandedId(member.id);
   };
 
-  const handleSaveEdit = async () => {
+  const handleSaveEdit = async (formData) => {
     setSaving(true);
     try {
       const response = await fetch('/api/expertise-finder/roster', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editForm),
+        body: JSON.stringify(formData),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error);
 
-      setMembers(prev => prev.map(m => m.id === editForm.id ? data.member : m));
+      setMembers(prev => prev.map(m => m.id === formData.id ? data.member : m));
       setEditingId(null);
       setEditForm({});
     } catch (err) {
@@ -421,9 +423,11 @@ function RosterTab() {
                   <div className="min-w-0">
                     <p className="font-medium text-gray-900 truncate">{member.name}</p>
                     <p className="text-sm text-gray-500 truncate">{member.role}{member.affiliation ? `, ${member.affiliation}` : ''}</p>
-                    {member.preferred_email && (
+                    {member.dataverse_contact_id ? (
+                      <p className="text-xs text-blue-600 truncate">Email from Dataverse contact</p>
+                    ) : member.preferred_email ? (
                       <p className="text-xs text-gray-500 truncate">{member.preferred_email}</p>
-                    )}
+                    ) : null}
                   </div>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
@@ -441,7 +445,6 @@ function RosterTab() {
                     <div className="pt-4">
                       <RosterForm
                         initialData={editForm}
-                        onChange={setEditForm}
                         onSubmit={handleSaveEdit}
                         onCancel={() => { setEditingId(null); setEditForm({}); }}
                         saving={saving}
@@ -454,7 +457,12 @@ function RosterTab() {
                       {member.primary_fields && (
                         <DetailRow label="Primary Fields" value={member.primary_fields} />
                       )}
-                      {member.preferred_email && (
+                      {member.dataverse_contact_id ? (
+                        <div>
+                          <span className="text-xs font-medium text-gray-500 uppercase">Preferred Email</span>
+                          <p className="text-sm text-blue-700">Resolved from linked Dataverse contact</p>
+                        </div>
+                      ) : member.preferred_email ? (
                         <div>
                           <span className="text-xs font-medium text-gray-500 uppercase">Preferred Email</span>
                           <p className="text-sm">
@@ -466,7 +474,7 @@ function RosterTab() {
                             </a>
                           </p>
                         </div>
-                      )}
+                      ) : null}
                       {member.keywords && (
                         <div>
                           <span className="text-xs font-medium text-gray-500 uppercase">Keywords</span>
@@ -537,13 +545,15 @@ function DetailRow({ label, value, isLink }) {
 
 // ─── Roster Form (shared for Add and Edit) ───
 
-function RosterForm({ initialData, onChange, onSubmit, onCancel, saving, roleTypes, isEdit }) {
+export function RosterForm({ initialData, onChange, onSubmit, onCancel, saving, roleTypes, isEdit }) {
   const [form, setForm] = useState(initialData || {
-    name: '', preferred_email: '', role_type: 'Consultant', role: '', affiliation: '', orcid: '',
+    name: '', preferred_email: '', dataverse_contact_id: null, role_type: 'Consultant', role: '', affiliation: '', orcid: '',
     primary_fields: '', keywords: '', subfields_specialties: '',
     methods_techniques: '', distinctions: '', expertise: '',
     keck_affiliation: '', keck_affiliation_details: '',
   });
+  const [contactLinkDirty, setContactLinkDirty] = useState(false);
+  const initialPreferredEmailRef = useRef(initialData?.preferred_email || null);
 
   const updateField = (field, value) => {
     const updated = { ...form, [field]: value };
@@ -553,8 +563,21 @@ function RosterForm({ initialData, onChange, onSubmit, onCancel, saving, roleTyp
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    onSubmit(form);
+    onSubmit(buildRosterSubmitPayload(form, { isEdit, contactLinkDirty }));
   };
+
+  const updateContact = (contactId) => {
+    const updated = {
+      ...form,
+      dataverse_contact_id: contactId,
+      preferred_email: initialPreferredEmailRef.current,
+    };
+    setContactLinkDirty(true);
+    setForm(updated);
+    if (onChange) onChange(updated);
+  };
+
+  const linked = Boolean(String(form.dataverse_contact_id || '').trim());
 
   const fieldClass = "w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500";
 
@@ -571,10 +594,18 @@ function RosterForm({ initialData, onChange, onSubmit, onCancel, saving, roleTyp
             type="email"
             value={form.preferred_email || ''}
             onChange={(e) => updateField('preferred_email', e.target.value)}
-            className={fieldClass}
+            className={`${fieldClass} disabled:bg-gray-100 disabled:text-gray-500`}
+            disabled={linked}
             placeholder="Preferred Site Visit correspondence address"
           />
+          {linked && <p className="mt-1 text-xs text-gray-500">Read-only while linked; email comes from the Dataverse contact.</p>}
         </div>
+        <RosterContactField
+          contactId={form.dataverse_contact_id}
+          memberName={form.name}
+          onSelect={(contact) => updateContact(contact.contactId)}
+          onClear={() => updateContact(null)}
+        />
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Role Type *</label>
           <select value={form.role_type} onChange={(e) => updateField('role_type', e.target.value)} className={fieldClass}>

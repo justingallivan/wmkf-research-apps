@@ -1410,6 +1410,7 @@ const v25Statements = [
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     preferred_email VARCHAR(320),
+    dataverse_contact_id UUID,
     role_type VARCHAR(50) NOT NULL,
     role VARCHAR(255),
     affiliation VARCHAR(500),
@@ -1444,6 +1445,9 @@ const v25Statements = [
   `CREATE INDEX IF NOT EXISTS idx_expertise_roster_role_type ON expertise_roster(role_type)`,
   `CREATE INDEX IF NOT EXISTS idx_expertise_roster_active ON expertise_roster(is_active)`,
   `CREATE INDEX IF NOT EXISTS idx_expertise_roster_name ON expertise_roster(name)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_expertise_roster_active_contact
+     ON expertise_roster (dataverse_contact_id)
+     WHERE dataverse_contact_id IS NOT NULL AND is_active = true`,
   `CREATE INDEX IF NOT EXISTS idx_expertise_matches_user ON expertise_matches(user_profile_id)`,
   `CREATE INDEX IF NOT EXISTS idx_expertise_matches_created ON expertise_matches(created_at DESC)`,
 ];

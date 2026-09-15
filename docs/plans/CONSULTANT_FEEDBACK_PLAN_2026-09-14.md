@@ -53,12 +53,14 @@ with its own rule: a per-item share flag, default on. This does not reopen D14.
 ## 2. Current state (all [VERIFIED 2026-09-14 via source])
 
 - **Consultants already live in Postgres.** `expertise_roster` has `id, name, preferred_email,
-  role_type, role, affiliation, orcid, …, is_active, created_by, updated_by`
+  role_type, role, affiliation, orcid, …, is_active, created_by, updated_by`; the roster-contact
+  implementation adds nullable `dataverse_contact_id` in migration 050
   [VERIFIED via `scripts/setup-database.js:1371-1390`]. The site-visit recipient directory reads
   active rows with `role_type IN ('Board','Consultant')`
   [VERIFIED via `lib/services/site-visit/recipient-directory-service.js:24-31`]. The only writers
-  are `pages/api/expertise-finder/roster.js` (guarded by `requireAppAccess(…, 'expertise-finder')`,
-  line 38) and `scripts/seed-expertise-roster.js` [VERIFIED via grep for INSERT/UPDATE on the table].
+  are `pages/api/expertise-finder/roster.js` (guarded by `requireAppAccess(…, 'expertise-finder')`),
+  `scripts/seed-expertise-roster.js`, and the dry-run-first owner-operated
+  `scripts/link-roster-contacts.js` link backfill [SOURCE-BUILT 2026-09-14].
 - **Formal reviews are bound to `wmkf_appreviewersuggestion` rows.** The Reviews tab's manual
   entry path (`ManualReviewEntryForm`) posts a complete structured review to
   `/api/review-manager/manual-review-entry` for a specific suggestion

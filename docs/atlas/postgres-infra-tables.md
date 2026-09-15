@@ -1,6 +1,6 @@
 # Atlas: Postgres infrastructure tables (compact)
 
-**Last verified (schema sources):** 2026-08-25. **Row counts re-probed:** 2026-05-25 via `scripts/audit-postgres-state.js`, except the distribution ledger proof below. Operational/log tables drift continuously; treat counts as "last observed" snapshots, not invariants.
+**Last verified (schema sources):** 2026-09-14. **Row counts re-probed:** 2026-05-25 via `scripts/audit-postgres-state.js`, except the distribution ledger proof below. Operational/log tables drift continuously; treat counts as "last observed" snapshots, not invariants.
 
 Compact summary for the Postgres tables outside the reviewer-finder domain. Promote any of these to its own page on next significant touch.
 
@@ -96,11 +96,18 @@ consumers are `pages/api/expertise-finder/{match,batch-match,roster,history}.js`
 production prompt rules live in
 `shared/config/prompts/expertise-finder.js`. The isolated
 `modules/expertise_matching` reference/demo has no production caller.
-Migration 035 adds nullable normalized `preferred_email`, maintained by the
-existing roster editor and consumed by the Site Visit recipient directory for
-Board/Consultant suggestions. The immutable roster row ID remains the external
-recipient identity; names are never join keys. **[VERIFIED LIVE 2026-08-24:
-column exact; zero preferred-email values before staff population.]**
+Migration 035 added nullable normalized `preferred_email`. Migration 050 is
+**[SOURCE-BUILT 2026-09-14; not yet applied]** and adds nullable
+`dataverse_contact_id UUID` plus a partial unique index permitting only one
+active roster row per Contact. For an unlinked Board/Consultant row, the Site
+Visit recipient directory continues to use `preferred_email`. For a linked row,
+it resolves the active Contact's current `emailaddress1`; a missing, inactive,
+or email-less Contact yields no email and never falls back to the manual copy.
+The Expertise Finder editor is the interactive link writer, and
+`scripts/link-roster-contacts.js` is a dry-run-first owner-operated backfill.
+The immutable roster row ID remains the external recipient identity; names and
+email addresses are never join keys. **[HISTORICAL LIVE SNAPSHOT 2026-08-24:
+migration-035 column exact; zero preferred-email values before staff population.]**
 
 ## Integrity Screener
 
