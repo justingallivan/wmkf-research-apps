@@ -264,6 +264,7 @@ monitoring in-flight (status/nudges). Owner confirmed scope = all four phases (S
   are labeled rather than silently presented as unselected choices. The separate
   tracked individual and combined templates live in `shared/templates/reviews/`.
   The retained generic DOCX and PDF renderers are not exposed by the current UI.
+  [STALE-ACCEPTED: lib/services/pre-site-visit/docx-renderer.js — this bullet cites the separate review-documents DOCX renderer; the Pre-Site Visit renderer change (2026-09-14 Slice 4, RefereeSection conditional fill) does not affect the review export described here.]
 - "Export: Word (.docx)" affordance on `ReviewsTab`'s submitted-reviews
   toolbar (visible once ≥1 review is submitted) fetches
   `/api/review-manager/export-reviews?proposalId=<guid>`. The server calls the

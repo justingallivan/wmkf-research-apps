@@ -2,7 +2,7 @@
 title: Reviews Tab — Phase II Writeup "Reviews" Paragraphs (2026-09-14)
 domain: reviewer-workbench
 kind: plan
-status: proposal
+status: in-progress
 summary: "Bring the Summarize Peer Reviews output (review count, grade tally, underlined reviewer roster with rank, expertise sentence, tone/themes, ordered quotations) into the Request Workbench Reviews tab, composed from Dataverse reviewer identity and stored ratings instead of uploaded PDFs. Deterministic sentences first; two new model fields inside the existing synthesis second; Word export third; the same deterministic text fills [[STAFF:RefereeSection]] in the Pre-Site Visit draft fourth. Owner decisions W1–W8 decided 2026-09-14. Build record in the header note."
 cataloged: 2026-09-14
 owner: product-engineering
@@ -46,6 +46,10 @@ related:
 > the renderer prints quotations; fall-through fixtures; `answerText`-not-`answerHtml` pin).
 > Slice 3 built at a13d4f43 (Sonnet), Opus review APPROVE 2026-09-14; non-blocking: pin an explicit
 > `'en'` locale in `compareReviewersByName` (folded into Slice 4).
+> Slice 4 built at 6be66be0 (Sonnet), Opus review APPROVE 2026-09-14; non-blocking items folded
+> into a wrap-up commit (double-token fixture, blank referee text treated as null, reason-enum
+> export for the blocker test, denominator on the personnel-warning assertion, unlabelled-rating
+> diagnostic in the referee section, split roster-read vs composer error codes, roadmap wiki v4).
 
 ## 1. Goal
 
@@ -273,7 +277,7 @@ safe: new code tolerates the old row (fields absent → empty), old code tolerat
 - PDF: no change. The PDF flattener has no underline support and PDF is not a destination for
   this text (owner 2026-09-14).
 
-### 4.5 Pre-Site Visit draft fill (Slice 4) `[PROPOSED]`
+### 4.5 Pre-Site Visit draft fill (Slice 4) — BUILT S4 (6be66be0)
 
 Reuse the deterministic sentences to fill `[[STAFF:RefereeSection]]` in the Phase II Pre-Site
 Visit Word draft, following the Institutional Funding History precedent:
