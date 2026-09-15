@@ -5,8 +5,8 @@
  * /api/review-manager/reviewers GET: shows only reviewers with a submitted
  * review (reviewReceivedAt), decodes the ratings, and links the file download.
  */
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import ReviewsTab from '../../shared/components/workbench/ReviewsTab';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import ReviewsTab, { WriteupParagraphsCard } from '../../shared/components/workbench/ReviewsTab';
 
 jest.mock('../../shared/components/Layout', () => ({
   __esModule: true,
@@ -73,8 +73,10 @@ test('renders submitted reviews with decoded ratings + download link; pending la
   // Submitted reviewers shown as cards; the pending one is NOT hidden anymore —
   // since Phase 1 (outstanding tracking) it renders in the Outstanding section
   // above the cards, and the two lists are disjoint (keyed on reviewReceivedAt).
-  expect(screen.getByText('Dr. Submitted')).toBeInTheDocument();
-  expect(screen.getByText('Dr. NoFile')).toBeInTheDocument();
+  // Names also appear underlined in the Writeup paragraphs card below (Slice 1),
+  // so these are getAllByText, not getByText.
+  expect(screen.getAllByText('Dr. Submitted').length).toBeGreaterThan(0);
+  expect(screen.getAllByText('Dr. NoFile').length).toBeGreaterThan(0);
   expect(screen.getByRole('heading', { name: 'Outstanding reviews (1)' })).toBeInTheDocument();
   expect(screen.getByText('Dr. Pending')).toBeInTheDocument();
   const followUpHeader = screen.getByText('Follow up').parentElement;
@@ -127,7 +129,9 @@ test('distinguishes a generated staff entry from a staff-uploaded file', async (
   });
 
   render(<ReviewsTab requestId="req1" />);
-  expect(await screen.findByText('Generated')).toBeInTheDocument();
+  // "Generated" also appears underlined in the Writeup paragraphs card below
+  // (Slice 1), so this waits on the ambiguous text via findAllByText.
+  expect((await screen.findAllByText('Generated')).length).toBeGreaterThan(0);
   expect(screen.getByText(/staff entry/i)).toBeInTheDocument();
   expect(screen.getByText(/staff upload/i)).toBeInTheDocument();
 });
@@ -641,4 +645,356 @@ test('read-only Preview disables every Reviews mutation while preserving read an
   fireEvent.click(synthesis);
   expect(fetch).toHaveBeenCalledTimes(1);
   expect(screen.queryByText(/Recording a complete review/i)).not.toBeInTheDocument();
+});
+
+// Writeup paragraphs card (Reviews Tab Phase II Slice 1,
+// docs/plans/REVIEWS_TAB_WRITEUP_PARAGRAPHS_PLAN_2026-09-14.md §4.4).
+const WRITEUP_REVIEWERS = [
+  {
+    suggestionId: 'w1',
+    name: 'Carey Nadell',
+    reviewReceivedAt: '2026-06-20T00:00:00Z',
+    reviewerOverallAssessment: 5,
+    academicRank: 'Associate Professor',
+    mainInstitution: 'Dartmouth',
+    keywords: 'microbial ecology; evolutionary dynamics',
+  },
+];
+
+test('renders the Writeup paragraphs card below Synthesis with underlined names from runs, not model strings', async () => {
+  fetch.mockResolvedValue({
+    ok: true,
+    json: async () => ({ success: true, proposals: [{ proposalId: 'req1', reviewers: WRITEUP_REVIEWERS }] }),
+  });
+
+  render(<ReviewsTab requestId="req1" />);
+
+  expect(await screen.findByText('Writeup paragraphs')).toBeInTheDocument();
+  expect(screen.getByText('We received one review with a score of Excellent.')).toBeInTheDocument();
+  const underlinedName = screen.getByText('Carey Nadell', { selector: 'u' });
+  expect(underlinedName.tagName).toBe('U');
+  expect(screen.getByText(/Nadell has expertise in microbial ecology and evolutionary dynamics\./)).toBeInTheDocument();
+
+  // Card placement: directly below the (second) Synthesis card.
+  const synthesisHeading = screen.getByText('AI Synthesis');
+  const writeupHeading = screen.getByText('Writeup paragraphs');
+  // synthesisHeading precedes writeupHeading in document order.
+  expect(
+    synthesisHeading.compareDocumentPosition(writeupHeading) & Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy();
+});
+
+test('does not render the Writeup paragraphs card when no review is submitted', async () => {
+  fetch.mockResolvedValue({
+    ok: true,
+    json: async () => ({
+      success: true,
+      proposals: [{ proposalId: 'req1', reviewers: [{ suggestionId: 'p1', name: 'Dr. Pending', reviewStatus: 'materials_sent' }] }],
+    }),
+  });
+
+  render(<ReviewsTab requestId="req1" />);
+  await screen.findByText(/No reviews submitted yet/i);
+  expect(screen.queryByText('Writeup paragraphs')).not.toBeInTheDocument();
+});
+
+test('Copy writes text/html and text/plain via ClipboardItem when available', async () => {
+  fetch.mockResolvedValue({
+    ok: true,
+    json: async () => ({ success: true, proposals: [{ proposalId: 'req1', reviewers: WRITEUP_REVIEWERS }] }),
+  });
+
+  const writeMock = jest.fn().mockResolvedValue(undefined);
+  const originalClipboard = navigator.clipboard;
+  const originalClipboardItem = window.ClipboardItem;
+  Object.defineProperty(navigator, 'clipboard', {
+    value: { write: writeMock, writeText: jest.fn() },
+    configurable: true,
+  });
+  window.ClipboardItem = function ClipboardItem(items) { this.items = items; };
+
+  render(<ReviewsTab requestId="req1" />);
+  const copyButton = await screen.findByRole('button', { name: 'Copy' });
+  fireEvent.click(copyButton);
+  await waitFor(() => expect(writeMock).toHaveBeenCalledTimes(1));
+  const [[items]] = writeMock.mock.calls;
+  expect(items[0].items['text/html']).toBeInstanceOf(Blob);
+  expect(items[0].items['text/plain']).toBeInstanceOf(Blob);
+  await screen.findByRole('button', { name: 'Copied' });
+
+  Object.defineProperty(navigator, 'clipboard', { value: originalClipboard, configurable: true });
+  window.ClipboardItem = originalClipboardItem;
+});
+
+test('Copy falls back to writeText when ClipboardItem is unavailable', async () => {
+  fetch.mockResolvedValue({
+    ok: true,
+    json: async () => ({ success: true, proposals: [{ proposalId: 'req1', reviewers: WRITEUP_REVIEWERS }] }),
+  });
+
+  const writeTextMock = jest.fn().mockResolvedValue(undefined);
+  const originalClipboard = navigator.clipboard;
+  const originalClipboardItem = window.ClipboardItem;
+  Object.defineProperty(navigator, 'clipboard', {
+    value: { writeText: writeTextMock },
+    configurable: true,
+  });
+  delete window.ClipboardItem;
+
+  render(<ReviewsTab requestId="req1" />);
+  const copyButton = await screen.findByRole('button', { name: 'Copy' });
+  fireEvent.click(copyButton);
+  await waitFor(() => expect(writeTextMock).toHaveBeenCalledTimes(1));
+  expect(writeTextMock).toHaveBeenCalledWith(expect.stringContaining('We received one review with a score of Excellent.'));
+  await screen.findByRole('button', { name: 'Copied' });
+
+  Object.defineProperty(navigator, 'clipboard', { value: originalClipboard, configurable: true });
+  window.ClipboardItem = originalClipboardItem;
+});
+
+test('Writeup paragraphs card shows an unlabelled-rating warning as a muted line', async () => {
+  fetch.mockResolvedValue({
+    ok: true,
+    json: async () => ({
+      success: true,
+      proposals: [{
+        proposalId: 'req1',
+        reviewers: [{
+          suggestionId: 'legacy',
+          name: 'Dr. Legacy',
+          reviewReceivedAt: '2026-06-20T00:00:00Z',
+          reviewerOverallAssessment: 99,
+        }],
+      }],
+    }),
+  });
+
+  render(<ReviewsTab requestId="req1" />);
+  expect(await screen.findByText('Writeup paragraphs')).toBeInTheDocument();
+  expect(screen.getByText(/Dr\. Legacy's overall rating has no label and was left out of the score tally\./)).toBeInTheDocument();
+});
+
+// Slice 2 (plan §4.3): model-authored themes/quotations rendered from the
+// stored synthesis, verified at the read boundary.
+test('renders verified themes and quotations from a current synthesis', async () => {
+  fetch.mockResolvedValue({
+    ok: true,
+    json: async () => ({
+      success: true,
+      proposals: [{
+        proposalId: 'req1',
+        reviewSynthesisState: { current: true },
+        reviewSynthesis: {
+          writeupThemes: 'Reviewers were broadly positive about the approach.',
+          writeupQuotations: [
+            { questionKey: 'q1', quote: 'This is outstanding and rigorous work.' },
+          ],
+        },
+        reviewers: [{
+          ...WRITEUP_REVIEWERS[0],
+          answers: [{ questionKey: 'q1', questionType: 'richtext', answerText: 'This is outstanding and rigorous work.' }],
+        }],
+      }],
+    }),
+  });
+
+  render(<ReviewsTab requestId="req1" />);
+  expect(await screen.findByText('Reviewers were broadly positive about the approach.')).toBeInTheDocument();
+  expect(screen.getByText('The most positive reviewer said: "This is outstanding and rigorous work."')).toBeInTheDocument();
+  expect(screen.queryByText(/Regenerate synthesis to add themes and quotations/i)).not.toBeInTheDocument();
+});
+
+test('shows the Regenerate hint when synthesis is current but predates writeupThemes', async () => {
+  fetch.mockResolvedValue({
+    ok: true,
+    json: async () => ({
+      success: true,
+      proposals: [{
+        proposalId: 'req1',
+        reviewSynthesisState: { current: true },
+        reviewSynthesis: { writeupThemes: '', writeupQuotations: [] },
+        reviewers: WRITEUP_REVIEWERS,
+      }],
+    }),
+  });
+
+  render(<ReviewsTab requestId="req1" />);
+  expect(await screen.findByText(/Regenerate synthesis to add themes and quotations/i)).toBeInTheDocument();
+});
+
+test('does not show the Regenerate hint when the synthesis is stale (current === false), even with empty themes', async () => {
+  // Discriminating: the hint is gated on `synthesisCurrent === true` (strict
+  // equality, not truthiness), so a stale-but-empty synthesis must NOT show
+  // the hint — the Synthesis card's own stale banner already covers that
+  // case, and duplicating it here would be misleading (regenerating won't
+  // "add" the fields, it'll refresh a stale run).
+  fetch.mockResolvedValue({
+    ok: true,
+    json: async () => ({
+      success: true,
+      proposals: [{
+        proposalId: 'req1',
+        reviewSynthesisState: { current: false },
+        reviewSynthesis: { writeupThemes: '', writeupQuotations: [] },
+        reviewers: WRITEUP_REVIEWERS,
+      }],
+    }),
+  });
+
+  render(<ReviewsTab requestId="req1" />);
+  await screen.findByText('Writeup paragraphs');
+  expect(screen.queryByText(/Regenerate synthesis to add themes and quotations/i)).not.toBeInTheDocument();
+});
+
+test('does not show the Regenerate hint when there is no stored synthesis at all', async () => {
+  fetch.mockResolvedValue({
+    ok: true,
+    json: async () => ({
+      success: true,
+      proposals: [{ proposalId: 'req1', reviewSynthesis: null, reviewSynthesisState: null, reviewers: WRITEUP_REVIEWERS }],
+    }),
+  });
+
+  render(<ReviewsTab requestId="req1" />);
+  await screen.findByText('Writeup paragraphs');
+  expect(screen.queryByText(/Regenerate synthesis to add themes and quotations/i)).not.toBeInTheDocument();
+});
+
+test('shows the dropped-quotation count when a quote fails provenance verification', async () => {
+  fetch.mockResolvedValue({
+    ok: true,
+    json: async () => ({
+      success: true,
+      proposals: [{
+        proposalId: 'req1',
+        reviewSynthesisState: { current: true },
+        reviewSynthesis: {
+          writeupThemes: 'Fine work overall.',
+          writeupQuotations: [{ questionKey: 'q1', quote: 'This quote does not appear anywhere.' }],
+        },
+        reviewers: [{ ...WRITEUP_REVIEWERS[0], answers: [{ questionKey: 'q1', answerText: 'Something else entirely.' }] }],
+      }],
+    }),
+  });
+
+  render(<ReviewsTab requestId="req1" />);
+  await screen.findByText('Writeup paragraphs');
+  expect(screen.getByText(/1 quotation\(s\) could not be matched to a review and were omitted\./)).toBeInTheDocument();
+});
+
+test('Copy label resets to "Copy" when the composed content changes', async () => {
+  fetch.mockImplementation((url) => {
+    const isReq2 = String(url).includes('proposalId=req2');
+    const reviewers = isReq2
+      ? [{ ...WRITEUP_REVIEWERS[0], name: 'Different Reviewer' }]
+      : WRITEUP_REVIEWERS;
+    return Promise.resolve({
+      ok: true,
+      json: async () => ({ success: true, proposals: [{ proposalId: isReq2 ? 'req2' : 'req1', reviewers }] }),
+    });
+  });
+
+  const writeMock = jest.fn().mockResolvedValue(undefined);
+  Object.defineProperty(navigator, 'clipboard', {
+    value: { write: writeMock, writeText: jest.fn() },
+    configurable: true,
+  });
+  window.ClipboardItem = function ClipboardItem(items) { this.items = items; };
+
+  const { rerender } = render(<ReviewsTab requestId="req1" />);
+  const copyButton = await screen.findByRole('button', { name: 'Copy' });
+  fireEvent.click(copyButton);
+  await screen.findByRole('button', { name: 'Copied' });
+
+  // A different requestId re-fetches and composes different HTML — the stale
+  // "Copied" label must not survive that content change.
+  rerender(<ReviewsTab requestId="req2" />);
+  await screen.findByText('Different Reviewer', { selector: 'u' });
+  await screen.findByRole('button', { name: 'Copy' });
+});
+
+// Direct WriteupParagraphsCard mounts (not through ReviewsTab): ReviewsTab's
+// own full-page loading gate (`if (loading) return <spinner>`) unmounts this
+// card on EVERY `load()` call, including a same-request re-fetch, which
+// would make a stale-copy-promise test pass for the wrong reason (an
+// unmounted component's setState is already a no-op) rather than actually
+// exercising the generation-counter guard. Mounting the card directly and
+// changing its `reviewers` prop in place (as a manual-review-entry re-fetch,
+// or any future in-place update, would) is what isolates the guard itself.
+const DIFFERENT_WRITEUP_REVIEWERS = [
+  { ...WRITEUP_REVIEWERS[0], name: 'Different Reviewer' },
+];
+
+test('a stale in-flight copy resolving AFTER the html changes leaves the label at "Copy", not "Copied" (Codex adversarial review)', async () => {
+  // Discriminating: the clipboard write never settles until AFTER the
+  // composed html changes (simulating a permission-prompt stall while the
+  // roster re-fetches). Without a generation guard, the stale resolution
+  // would set copyState to 'copied' for content no longer on the clipboard.
+  let resolveWrite;
+  const writeMock = jest.fn(() => new Promise((resolve) => { resolveWrite = resolve; }));
+  Object.defineProperty(navigator, 'clipboard', {
+    value: { write: writeMock, writeText: jest.fn() },
+    configurable: true,
+  });
+  window.ClipboardItem = function ClipboardItem(items) { this.items = items; };
+
+  const { rerender } = render(<WriteupParagraphsCard reviewers={WRITEUP_REVIEWERS} synthesis={{}} />);
+  const copyButton = await screen.findByRole('button', { name: 'Copy' });
+  fireEvent.click(copyButton);
+  await waitFor(() => expect(writeMock).toHaveBeenCalledTimes(1));
+
+  // Change the composed html BEFORE the in-flight clipboard promise settles
+  // — this bumps the generation counter via the html-change effect.
+  rerender(<WriteupParagraphsCard reviewers={DIFFERENT_WRITEUP_REVIEWERS} synthesis={{}} />);
+  await screen.findByText('Different Reviewer', { selector: 'u' });
+  await screen.findByRole('button', { name: 'Copy' });
+
+  // Now resolve the STALE write promise.
+  await act(async () => {
+    resolveWrite(undefined);
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+
+  expect(screen.getByRole('button', { name: 'Copy' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Copied' })).not.toBeInTheDocument();
+});
+
+test('a stale in-flight copy REJECTING after the html changes also leaves the label at "Copy", not "Copy failed" (Codex adversarial review)', async () => {
+  let rejectWrite;
+  const writeMock = jest.fn(() => new Promise((_resolve, reject) => { rejectWrite = reject; }));
+  Object.defineProperty(navigator, 'clipboard', {
+    value: { write: writeMock, writeText: jest.fn() },
+    configurable: true,
+  });
+  window.ClipboardItem = function ClipboardItem(items) { this.items = items; };
+
+  const { rerender } = render(<WriteupParagraphsCard reviewers={WRITEUP_REVIEWERS} synthesis={{}} />);
+  const copyButton = await screen.findByRole('button', { name: 'Copy' });
+  fireEvent.click(copyButton);
+  await waitFor(() => expect(writeMock).toHaveBeenCalledTimes(1));
+
+  rerender(<WriteupParagraphsCard reviewers={DIFFERENT_WRITEUP_REVIEWERS} synthesis={{}} />);
+  await screen.findByText('Different Reviewer', { selector: 'u' });
+  await screen.findByRole('button', { name: 'Copy' });
+
+  await act(async () => {
+    rejectWrite(new Error('permission prompt dismissed'));
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+
+  expect(screen.getByRole('button', { name: 'Copy' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Copy failed — try again' })).not.toBeInTheDocument();
+});
+
+test('Copy stays enabled in read-only Preview (client-only clipboard write, no server mutation)', async () => {
+  fetch.mockResolvedValue({
+    ok: true,
+    json: async () => ({ success: true, proposals: [{ proposalId: 'req1', reviewers: WRITEUP_REVIEWERS }] }),
+  });
+
+  render(<ReviewsTab requestId="req1" previewReadOnly />);
+  const copyButton = await screen.findByRole('button', { name: 'Copy' });
+  expect(copyButton).toBeEnabled();
 });

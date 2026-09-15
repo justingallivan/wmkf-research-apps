@@ -33,6 +33,8 @@
  *     and is the actual security boundary.
  */
 
+import { composeWriteupParagraphs } from './review-writeup-paragraphs.js';
+
 const BLOCK_TAGS = new Set(['p', 'h2', 'h3', 'blockquote', 'ul', 'ol', 'li']);
 const INLINE_TAGS = new Set(['strong', 'b', 'em', 'i', 'sub', 'sup', 'a', 'br']);
 const VOID_TAGS = new Set(['br']);
@@ -296,6 +298,13 @@ function roundOrNull(n) {
  *       reviewerName:(string|null), state:('answered'|'empty'|'not-asked'),
  *       label?:(string|null), unreadable?:boolean, labels?:Array<string>,
  *       blocks?:Array}>}>,
+ *   writeupSection: ({paragraphs:Array<Array<{text:string,underline?:boolean}>>,
+ *     themes:(string|null), quotations:Array<{leadIn:string,quote:string,
+ *     questionKey:string}>}|null) - Slice 3 (plan §4.4): the deterministic
+ *     score/reviewer/expertise sentences as run arrays (reviewer names carry
+ *     `underline: true`) plus the same verified themes/quotations as
+ *     `synthesisSection`. Null when no review was submitted (`fullReviewers`
+ *     empty/omitted).
  * }}
  */
 export function composeReviewReport({
@@ -307,6 +316,14 @@ export function composeReviewReport({
   generatedAtIso,
   synthesis = null,
   synthesisCurrent = null,
+  // Slice 2 (Reviews Tab Phase II, docs/plans/REVIEWS_TAB_WRITEUP_PARAGRAPHS_PLAN_2026-09-14.md
+  // §4.3): the FULL submitted-reviewer projection (with `.answers[].answerText`),
+  // distinct from `matrix.reviewers`/the local `reviewers` below (a
+  // display-shaped subset with no answer text). Used ONLY to verify
+  // `synthesis.writeupQuotations` provenance at this read boundary — never
+  // trusted from `synthesis` directly. Optional; omitted (or empty) simply
+  // yields no verified quotations.
+  fullReviewers = [],
 }) {
   const safeMatrix = matrix && Array.isArray(matrix.questions) && Array.isArray(matrix.reviewers)
     ? matrix
@@ -424,9 +441,17 @@ export function composeReviewReport({
         })),
       }));
 
-  // Phase 4: optional synthesis section. Only present when a synthesis object
-  // was passed in (plain object with the LLM-authored arrays/strings — never
-  // HTML, so renderers use plain text, no htmlToBlocks tokenization needed).
+  // Phase 4 / Slice 2-3: the deterministic + verified writeup content is
+  // composed ONCE, here, via the same `composeWriteupParagraphs` the Reviews
+  // tab calls — so the Word export and the tab share identical quote
+  // provenance verification, W8 selection, and (as of the Slice 2 review
+  // follow-up) the identical caller-order-independent tie-break, rather than
+  // each reimplementing (or subtly diverging on) the same read-boundary
+  // logic. Uses the FULL reviewer projection (`fullReviewers`, with
+  // `.answers[].answerText`) — not `safeMatrix.reviewers`/the local
+  // `reviewers` below, a display-shaped subset with no answer text.
+  const writeup = composeWriteupParagraphs({ reviewers: fullReviewers, synthesis });
+
   const synthesisSection = synthesis && typeof synthesis === 'object'
     ? {
       consensus: Array.isArray(synthesis.consensus) ? synthesis.consensus : [],
@@ -434,7 +459,25 @@ export function composeReviewReport({
       keyConcerns: Array.isArray(synthesis.keyConcerns) ? synthesis.keyConcerns : [],
       ratingSummaries: Array.isArray(synthesis.ratingSummaries) ? synthesis.ratingSummaries : [],
       overall: typeof synthesis.overall === 'string' ? synthesis.overall : '',
+      writeupThemes: typeof synthesis.writeupThemes === 'string' ? synthesis.writeupThemes.trim() : '',
+      writeupQuotations: writeup.quotations,
       ...(typeof synthesisCurrent === 'boolean' ? { current: synthesisCurrent } : {}),
+    }
+    : null;
+
+  // Slice 3 (Word panel-prep export, plan §4.4): the deterministic
+  // score/reviewer/expertise sentences as run arrays (reviewer names carry
+  // `underline: true`; every other run is plain text — model strings are
+  // NEVER underlined), plus the same verified themes/quotations already on
+  // `synthesisSection`. Present only when at least one review was submitted
+  // (mirrors the tab's "Writeup paragraphs" card, which is gated the same
+  // way); an empty submitted roster yields no writeup section rather than an
+  // empty shell.
+  const writeupSection = writeup.deterministicParagraphs.length > 0
+    ? {
+      paragraphs: writeup.deterministicParagraphs,
+      themes: writeup.themes,
+      quotations: writeup.quotations,
     }
     : null;
 
@@ -444,6 +487,7 @@ export function composeReviewReport({
     summary,
     answerSections,
     synthesisSection,
+    writeupSection,
   };
 }
 

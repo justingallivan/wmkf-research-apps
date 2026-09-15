@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-09-04
+last_verified: 2026-09-15
 stale_after_days: 90
 owner: product-strategy
 source_files:
@@ -329,7 +329,12 @@ document inventory, and individual implementation plans do not establish priorit
   the live rows matching the rollups' predicate (`wmkf_typeforrollup eq
   'Program' and akoya_grant gt 0`); the cited award is the newest
   **Research**-program grant by `akoya_decisiondate ?? wmkf_meetingdate`
-  (owner decision). Snapshot schemaVersion 3; pre-S467 Ready rows carry a
+  (owner decision). Snapshot schemaVersion 3 at S467; Reviews Tab Slice 4 (PR #296, merged
+  b9ad64eb, production `wmkfresearchapps-adp2hh965` Ready 2026-09-15 UTC)
+  bumped it to schemaVersion 4 to add `request.refereeSection` — **production
+  now writes v4; v2/v3 Ready rows remain readable and carry a
+  `referee_section_manual` warning until regenerated** (see
+  `docs/atlas/dataverse-wmkf-requestdocument.md`). Pre-S467 Ready rows carry a
   `funding_history_manual` warning. Proven on `1002379` (zero-count branch);
   the positive branch is probe/test-proven only. Hazard: `akoya_mostrecentgrant`
   is NOT type-filtered — never cite it. Request `1002379`'s writeup state was

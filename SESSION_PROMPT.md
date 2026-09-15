@@ -1,4 +1,4 @@
-# Session 512 Prompt: Review Panel is a gated Workbench tab in `access` mode; Monday ops meeting; VRP owner decisions
+# Session 512 Prompt: Review Panel is a gated Workbench tab in `access` mode; Wednesday ops meeting; VRP owner decisions
 
 > Session 511 ran 2026-09-13 (evening) into 2026-09-14 (morning). Start with `/start`. **Read first:**
 > `docs/plans/REVIEW_PANEL_WORKBENCH_TAB_PLAN_2026-09-13.md` (owner decisions T1–T4, build record,
@@ -50,7 +50,8 @@ fbf5a4d4 distill · c7c69fd8 handoff.
 
 ### Verified Open
 
-1. **Monday 2026-09-14 ops meeting** — agenda in `.claude-memory/project-ops-meeting-2026-09-14-agenda.md`
+1. **Wednesday 2026-09-16 ops meeting** — rescheduled after the September 14 meeting did not occur;
+   agenda in `.claude-memory/project-ops-meeting-2026-09-16-agenda.md`
    (6 items incl. materials reminder cron and dossier drain-cron cadence). Afterward: record decisions in
    `docs/APPLICANT_ADDITIONAL_MATERIALS_PLAN.md` §16 and `docs/CYCLE_DOSSIER_PILOT_DESIGN.md`, add
    `vercel.json` entries if decided, close the memory. Evidence: memory file status `active`.
@@ -78,7 +79,7 @@ fbf5a4d4 distill · c7c69fd8 handoff.
    `cycle` scope. Pilot widening is DONE via `access` mode (T2). Old upload-based VRP page retirement stays
    deferred (D5).
 2. Dossier preview/Blob retention policy (open since S494).
-3. Drain-cron cadence and materials reminder cron (ops Monday). 4. PR #116 (ROR resolver shadow mode):
+3. Drain-cron cadence and materials reminder cron (ops Wednesday, 2026-09-16). 4. PR #116 (ROR resolver shadow mode):
    keep or close. 5. 45+ unmerged local branches: prune or keep (grep live refs first; this session added
    `feature/review-panel-workbench-tab` and `feature/review-panel-tab-distill`, both merged).
 6. Carried: reissue during Dynamics Pending Send; Program select on Final writeups/Awardees; PD
@@ -142,7 +143,7 @@ materials pages. 6. Proposal order P3s. 7. Messages & policies P3s. 8. Slots-onl
 | `lib/services/review-panel-service.js` | `getReviewPanelForRequest`, `assertNoActiveRunForRequests`, `loadConfigurationSummary` |
 | `lib/services/review-panel-rollout.js` | `REVIEW_PANEL_ROLLOUT_MODES` incl. `access` |
 | `docs/plans/REVIEW_PANEL_OVERNIGHT_BRIEF_2026-09-13.md` | §3 logged follow-ups |
-| `.claude-memory/project-ops-meeting-2026-09-14-agenda.md` | Monday ops agenda |
+| `.claude-memory/project-ops-meeting-2026-09-16-agenda.md` | Wednesday ops agenda |
 
 ## Testing
 

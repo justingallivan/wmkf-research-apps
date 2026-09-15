@@ -112,7 +112,40 @@ test('valid JSON in wmkf_reviewsynthesisjson parses to an object', async () => {
     keyConcerns: [],
     ratingSummaries: [],
     overall: 'ok',
+    writeupThemes: '',
+    writeupQuotations: [],
   });
+});
+
+test('Slice 2: writeupThemes/writeupQuotations pass through when present and well-formed', async () => {
+  DynamicsService.getRecord.mockResolvedValue({
+    akoya_requestid: REQUEST_ID,
+    akoya_requestnum: '1002788',
+    akoya_title: 'Test',
+    wmkf_meetingdate: null,
+    wmkf_reviewsynthesisjson: JSON.stringify({
+      overall: 'ok',
+      writeupThemes: 'Reviewers were broadly positive about the methodology.',
+      writeupQuotations: [
+        { questionKey: 'traditionalFunding', quote: 'This is a rigorous and well-designed study.' },
+        'junk-string-entry',
+        { questionKey: 'additionalComments', quote: 42 },
+        { quote: 'No questionKey on this one.' },
+      ],
+    }),
+  });
+  const { req, res } = get({ proposalId: REQUEST_ID });
+  await handler(req, res);
+  expect(res.statusCode).toBe(200);
+  expect(res._data.proposals[0].reviewSynthesis.writeupThemes).toBe(
+    'Reviewers were broadly positive about the methodology.',
+  );
+  // The junk string entry and the non-string `quote` are dropped; the
+  // missing-questionKey entry survives with questionKey defaulted to ''.
+  expect(res._data.proposals[0].reviewSynthesis.writeupQuotations).toEqual([
+    { questionKey: 'traditionalFunding', quote: 'This is a rigorous and well-designed study.' },
+    { questionKey: '', quote: 'No questionKey on this one.' },
+  ]);
 });
 
 test('non-string array items and junk keys are stripped (hand-edited/PA-written column)', async () => {
@@ -143,6 +176,8 @@ test('non-string array items and junk keys are stripped (hand-edited/PA-written 
       { questionKey: '', questionText: '', summary: '' },
     ],
     overall: '',
+    writeupThemes: '',
+    writeupQuotations: [],
   });
 });
 

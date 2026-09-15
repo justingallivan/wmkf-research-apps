@@ -6,7 +6,7 @@ status: active
 summary: "Reviews, synthesis, and template-backed Word exports are Production-live; Wave 25 is exact and the combined export is signed-in smoke-proved."
 canonical: false
 cataloged: 2026-07-03
-last_verified: 2026-09-03
+last_verified: 2026-09-14
 owner: product-engineering
 related:
   - docs/audits/AUDIT_REQUEST_WORKBENCH_TRUTH_2026-07-26.md
@@ -264,6 +264,7 @@ monitoring in-flight (status/nudges). Owner confirmed scope = all four phases (S
   are labeled rather than silently presented as unselected choices. The separate
   tracked individual and combined templates live in `shared/templates/reviews/`.
   The retained generic DOCX and PDF renderers are not exposed by the current UI.
+  [STALE-ACCEPTED: lib/services/pre-site-visit/docx-renderer.js — this bullet cites the separate review-documents DOCX renderer; the Pre-Site Visit renderer change (2026-09-14 Slice 4, RefereeSection conditional fill) does not affect the review export described here.]
 - "Export: Word (.docx)" affordance on `ReviewsTab`'s submitted-reviews
   toolbar (visible once ≥1 review is submitted) fetches
   `/api/review-manager/export-reviews?proposalId=<guid>`. The server calls the
@@ -274,7 +275,7 @@ monitoring in-flight (status/nudges). Owner confirmed scope = all four phases (S
   carries on the `/api/review-manager/reviewers` DTO — `requestNumber`,
   `proposalTitle`, `proposalInstitution`, `proposalAuthors`
   [VERIFIED via `lib/services/review-manager/reviewers-service.js` proposal DTO
-  assembly]. The DTO has no
+  assembly]. [RECHECKED after lib/services/review-manager/reviewers-service.js change: 2026-09-14 Slices 1–4 added per-reviewer identity fields and a request-scoped roster export; the proposal-level DTO keys `requestNumber`/`proposalTitle`/`proposalInstitution`/`proposalAuthors` are unchanged.] The DTO has no
   dedicated `piName` field; `proposalAuthors` (project leader/applicant)
   stands in as the best-available PI identity rather than extending the
   route.
@@ -425,6 +426,35 @@ Required pre-build verification:
   `20aec518-9f8a-f111-ab0f-6045bd018deb` records prompt version 3,
   `end_turn`, and the redacted review digest. Exact cleanup removed the 11
   staged answers and restored four parent fields without altering the new memo.
+
+**Addendum (2026-09-14, Reviews Tab Phase II Slice 2,
+docs/plans/REVIEWS_TAB_WRITEUP_PARAGRAPHS_PLAN_2026-09-14.md §4.3):** the
+tracked prompt row gains two fields inside `synthesis` — `writeupThemes`
+(string) and `writeupQuotations` (`{questionKey, quote}[]`) — both `required`
+in the native JSON schema (no caps there; caps live in `validationSchema`
+only: `writeupThemes` 2,000 chars, `writeupQuotations` `maxItems` 10 ×
+`quote` 600 chars, `questionKey` 100 chars, all `required: false` with empty
+defaults so an old stored row parses unchanged). Quote provenance is verified
+downstream at the Reviews read boundary (`shared/utils/review-writeup-paragraphs.js`
+`verifyAndSelectQuotations`), never trusted from the model: a quote survives
+only as a normalized substring of exactly one submitted reviewer's answer
+text, at most one per reviewer, reduced to the top/median/bottom three by
+rating when more than three survive (W8). The Reviews tab's Writeup
+paragraphs card (Slice 1) renders the verified themes/quotations or a
+"Regenerate synthesis to add themes and quotations" hint when a current
+synthesis predates them; `composeReviewReport`'s `synthesisSection` carries
+the same verified quotations for the Word export. **Slice 3 (built
+2026-09-14):** `composeReviewReport` also composes a `writeupSection`
+(deterministic score/reviewer/expertise sentences as underline-flagged run
+arrays, plus the same verified themes/quotations) via the shared
+`composeWriteupParagraphs`, and `shared/utils/review-report-docx.js` renders
+it as a "Reviews (writeup)" section — underline on reviewer-name runs only,
+never on model strings; the PDF renderer is unchanged and ignores the section
+without erroring (W4: no PDF work). **Live row: governed `review-synthesis.generate` v4 (seven keys) became
+sole-current on 2026-09-15 UTC (owner-run `--force` republish with a dated
+`DATAVERSE_PROD_WRITE_ACK`, after PR #296 merged at b9ad64eb and production
+deployment `wmkfresearchapps-adp2hh965` was Ready). The tracked source and the
+live row match.**
 
 ## Verification per phase
 
