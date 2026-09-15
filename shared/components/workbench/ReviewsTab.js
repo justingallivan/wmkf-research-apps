@@ -396,23 +396,44 @@ function describeSynthesisBlocker(blocker) {
  * from the composer's runs — never from a raw HTML or model string, and
  * never via `dangerouslySetInnerHTML`. Copy is client-only (clipboard write),
  * so it stays enabled even in read-only Preview.
+ *
+ * Named export (in addition to being used internally by the default-exported
+ * `ReviewsTab`) so a unit test can mount it directly with changing props —
+ * `ReviewsTab`'s own full-page loading gate (`if (loading) return <spinner>`)
+ * unmounts this card on every `load()` call, including same-request
+ * re-fetches, which would otherwise mask a stale-copy-promise regression
+ * test (an unmounted component's `setState` is already a no-op, for an
+ * unrelated reason) rather than actually exercising the generation guard.
  */
-function WriteupParagraphsCard({ reviewers, synthesis, synthesisCurrent }) {
+export function WriteupParagraphsCard({ reviewers, synthesis, synthesisCurrent }) {
   const { paragraphs, warnings, text, html, themes } = useMemo(
     () => composeWriteupParagraphs({ reviewers, synthesis }),
     [reviewers, synthesis],
   );
   const [copyState, setCopyState] = useState('idle');
 
+  // Codex adversarial review (wrap-up 2026-09-14): an in-flight
+  // navigator.clipboard promise (e.g. stalled on a permission prompt) can
+  // resolve or reject AFTER the request/roster switches out from under it —
+  // its content is no longer what copy() captured. A monotonically
+  // increasing generation counter, bumped both on every copy() invocation
+  // and on every html change, lets each async continuation recognize
+  // whether it is still the most recent attempt before writing state; a
+  // stale continuation (of either outcome) is a no-op.
+  const copyGenerationRef = useRef(0);
+
   // Opus Slice 1 follow-up: a stale "Copied"/"Copy failed" label surviving a
   // content change (e.g. the roster re-fetches after a manual review entry)
   // would misrepresent what's on the clipboard. Reset whenever the composed
   // HTML changes.
   useEffect(() => {
+    copyGenerationRef.current += 1;
     setCopyState('idle');
   }, [html]);
 
   const copy = useCallback(async () => {
+    copyGenerationRef.current += 1;
+    const generation = copyGenerationRef.current;
     setCopyState('idle');
     try {
       if (typeof window !== 'undefined' && typeof window.ClipboardItem !== 'undefined'
@@ -427,9 +448,9 @@ function WriteupParagraphsCard({ reviewers, synthesis, synthesisCurrent }) {
       } else {
         throw new Error('Clipboard API unavailable');
       }
-      setCopyState('copied');
+      if (copyGenerationRef.current === generation) setCopyState('copied');
     } catch (e) {
-      setCopyState('failed');
+      if (copyGenerationRef.current === generation) setCopyState('failed');
     }
   }, [html, text]);
 

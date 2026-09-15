@@ -391,13 +391,13 @@ describe('composeReviewReport', () => {
       suggestionId: 'r1',
       reviewReceivedAt: '2026-06-20T00:00:00Z',
       reviewerOverallAssessment: 5,
-      answers: [{ questionKey: 'q1', answerText: 'This is a rigorous and well-designed study.' }],
+      answers: [{ questionKey: 'q1', questionType: 'richtext', answerText: 'This is a rigorous and well-designed study overall.' }],
     }];
     const synthesis = {
       overall: 'Positive overall.',
       writeupThemes: 'Reviewers were broadly positive.',
       writeupQuotations: [
-        { questionKey: 'q1', quote: 'This is a rigorous and well-designed study.' }, // verifiable
+        { questionKey: 'q1', quote: 'This is a rigorous and well-designed study overall.' }, // verifiable
         { questionKey: 'q2', quote: 'This was never actually written by anyone.' }, // unverifiable
       ],
     };
@@ -406,7 +406,7 @@ describe('composeReviewReport', () => {
     });
     expect(report.synthesisSection.writeupThemes).toBe('Reviewers were broadly positive.');
     expect(report.synthesisSection.writeupQuotations).toHaveLength(1);
-    expect(report.synthesisSection.writeupQuotations[0].quote).toBe('This is a rigorous and well-designed study.');
+    expect(report.synthesisSection.writeupQuotations[0].quote).toBe('This is a rigorous and well-designed study overall.');
   });
 
   test('Slice 2: omitting fullReviewers yields no verified quotations rather than trusting raw synthesis', () => {
@@ -463,11 +463,11 @@ describe('composeReviewReport', () => {
       reviewReceivedAt: '2026-06-20T00:00:00Z',
       reviewerOverallAssessment: 5,
       mainInstitution: 'Testing Institute',
-      answers: [{ questionKey: 'q1', answerText: 'This is a rigorous and well-designed study.' }],
+      answers: [{ questionKey: 'q1', questionType: 'richtext', answerText: 'This is a rigorous and well-designed study overall.' }],
     }];
     const synthesis = {
       writeupThemes: 'Reviewers were broadly positive.',
-      writeupQuotations: [{ questionKey: 'q1', quote: 'This is a rigorous and well-designed study.' }],
+      writeupQuotations: [{ questionKey: 'q1', quote: 'This is a rigorous and well-designed study overall.' }],
     };
     const report = composeReviewReport({
       matrix, generatedAtIso: '2026-07-03T00:00:00.000Z', synthesis, fullReviewers,
@@ -485,7 +485,7 @@ describe('composeReviewReport', () => {
     expect(deterministicText).not.toContain('This is a rigorous and well-designed study.');
     expect(report.writeupSection.themes).toBe('Reviewers were broadly positive.');
     expect(report.writeupSection.quotations).toHaveLength(1);
-    expect(report.writeupSection.quotations[0].quote).toBe('This is a rigorous and well-designed study.');
+    expect(report.writeupSection.quotations[0].quote).toBe('This is a rigorous and well-designed study overall.');
   });
 
   test('Slice 3: writeupSection is null when no review was submitted (fullReviewers omitted)', () => {
@@ -503,12 +503,12 @@ describe('composeReviewReport', () => {
       name: 'Dr. Ada Reviewer',
       reviewReceivedAt: '2026-06-20T00:00:00Z',
       reviewerOverallAssessment: 4,
-      answers: [{ questionKey: 'q1', answerText: 'Real verbatim answer text.' }],
+      answers: [{ questionKey: 'q1', questionType: 'richtext', answerText: 'Real verbatim answer text taken from the review.' }],
     }];
     const synthesis = {
       writeupQuotations: [
-        { questionKey: 'q1', quote: 'Real verbatim answer text.' },
-        { questionKey: 'q2', quote: 'Fabricated, never actually written.' },
+        { questionKey: 'q1', quote: 'Real verbatim answer text taken from the review.' },
+        { questionKey: 'q2', quote: 'Fabricated, never actually written by any reviewer.' },
       ],
     };
     const report = composeReviewReport({

@@ -443,15 +443,35 @@ const QUOTATION_LEAD_INS = {
 /**
  * Quote provenance is enforced HERE, at the read boundary — never trusted
  * from the model (plan §4.3, Codex AR-1 finding 1). A candidate `{questionKey,
- * quote}` survives only if it is a normalized substring of exactly one
- * submitted reviewer's `answers[].answerText`; ambiguous (matches more than
- * one reviewer) or unmatched candidates are dropped and counted. At most one
- * surviving quote per reviewer (first candidate for that reviewer wins).
- * Survivors are ordered by that reviewer's `reviewerOverallAssessment`
- * descending (ties broken by `compareReviewersByName` on a CANONICAL
- * re-sort of `submitted`, never by the order `reviewers` arrived in — see
- * that function's doc comment); when more than three survive, W8 keeps only
- * the highest-rated, the median (by sorted position), and the lowest-rated.
+ * quote}` survives only if it is a normalized, WORD-BOUNDARY substring of
+ * exactly one submitted reviewer's `answers[].answerText` on a NARRATIVE
+ * question (`questionType` `'richtext'` or `'string'` — never `'picklist'`/
+ * `'multiselect'`, whose `answerText` is a decoded option LABEL, not
+ * reviewer-authored prose: `labelForOption` in
+ * `lib/external/build-review-submission.js` stores that label verbatim, so
+ * e.g. the picklist label "Excellent" would otherwise verify against any
+ * reviewer's rating row); ambiguous (matches more than one reviewer) or
+ * unmatched candidates are dropped and counted (Codex adversarial review
+ * finding, wrap-up 2026-09-14).
+ *
+ * Two more guards at the same read boundary, same finding:
+ * - Minimum length: a candidate under `MIN_QUOTE_WORDS` (6) normalized words
+ *   is dropped and counted. Six words reads as "at least a short clause"
+ *   without being so long it excludes a genuinely terse but real quotation;
+ *   it also reliably rejects rating-label- and boilerplate-length fragments
+ *   that would otherwise slip through a bare non-empty-substring check.
+ * - Word-boundary matching: the normalized quote must match the normalized
+ *   answer at WORD boundaries (`matchesAtWordBoundaries`), not merely as a
+ *   raw substring — so a quote like "cell" never verifies against
+ *   "...excellent..." (a partial-word match inside an unrelated word).
+ *
+ * At most one surviving quote per reviewer (first candidate for that
+ * reviewer wins). Survivors are ordered by that reviewer's
+ * `reviewerOverallAssessment` descending (ties broken by
+ * `compareReviewersByName` on a CANONICAL re-sort of `submitted`, never by
+ * the order `reviewers` arrived in — see that function's doc comment); when
+ * more than three survive, W8 keeps only the highest-rated, the median (by
+ * sorted position), and the lowest-rated.
  *
  * Exported so other consumers of the same reviewer projection (e.g.
  * `shared/utils/review-report.js`'s Word-export synthesis section) can reuse
@@ -462,6 +482,28 @@ const QUOTATION_LEAD_INS = {
  *   `reviewReceivedAt` internally, same as every other composer here.
  * @returns {{ kept: Array<{leadIn:string, quote:string, questionKey:string}>, droppedQuotationCount: number }}
  */
+const MIN_QUOTE_WORDS = 6;
+const NARRATIVE_ANSWER_TYPES = new Set(['richtext', 'string']);
+
+function normalizedWordCount(value) {
+  return String(value ?? '').split(/\s+/).filter(Boolean).length;
+}
+
+function escapeRegExpLiteral(value) {
+  return String(value ?? '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// Both `haystack` and `needle` are already `normalizeForMatch`-normalized
+// (lowercased, whitespace-collapsed) by every caller. A word-character
+// lookaround (rather than `\b`, which treats punctuation itself as a
+// boundary) is what rejects "cell" matching inside "excellent" while still
+// accepting a quote that starts/ends at real punctuation.
+function matchesAtWordBoundaries(haystack, needle) {
+  if (!needle) return false;
+  const pattern = new RegExp(`(?<![a-z0-9])${escapeRegExpLiteral(needle)}(?![a-z0-9])`);
+  return pattern.test(haystack);
+}
+
 export function verifyAndSelectQuotations(candidates, reviewers) {
   const submitted = submittedReviewersOf(reviewers);
   // Tie-break index is derived from a CANONICAL ordering (compareReviewersByName),
@@ -477,7 +519,7 @@ export function verifyAndSelectQuotations(candidates, reviewers) {
   for (const candidate of Array.isArray(candidates) ? candidates : []) {
     const quoteText = typeof candidate?.quote === 'string' ? candidate.quote.trim() : '';
     const normalizedQuote = normalizeForMatch(quoteText);
-    if (!normalizedQuote) {
+    if (!normalizedQuote || normalizedWordCount(normalizedQuote) < MIN_QUOTE_WORDS) {
       droppedQuotationCount += 1;
       continue;
     }
@@ -486,9 +528,12 @@ export function verifyAndSelectQuotations(candidates, reviewers) {
       const answers = Array.isArray(reviewer.answers) ? reviewer.answers : [];
       // Match against answerText ONLY, never answerHtml — a sentence present
       // solely in the (richer, model-untrusted) HTML answer does not count as
-      // verified provenance (Opus Slice 2 review follow-up 3).
-      return answers.some((a) => typeof a?.answerText === 'string'
-        && normalizeForMatch(a.answerText).includes(normalizedQuote));
+      // verified provenance (Opus Slice 2 review follow-up 3). Restrict to
+      // narrative question types and require word-boundary matching (Codex
+      // adversarial review, wrap-up 2026-09-14) — see the doc comment above.
+      return answers.some((a) => NARRATIVE_ANSWER_TYPES.has(a?.questionType)
+        && typeof a?.answerText === 'string'
+        && matchesAtWordBoundaries(normalizeForMatch(a.answerText), normalizedQuote));
     });
 
     if (matchingReviewers.length !== 1) {

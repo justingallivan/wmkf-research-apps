@@ -5,8 +5,8 @@
  * /api/review-manager/reviewers GET: shows only reviewers with a submitted
  * review (reviewReceivedAt), decodes the ratings, and links the file download.
  */
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import ReviewsTab from '../../shared/components/workbench/ReviewsTab';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import ReviewsTab, { WriteupParagraphsCard } from '../../shared/components/workbench/ReviewsTab';
 
 jest.mock('../../shared/components/Layout', () => ({
   __esModule: true,
@@ -779,7 +779,7 @@ test('renders verified themes and quotations from a current synthesis', async ()
         },
         reviewers: [{
           ...WRITEUP_REVIEWERS[0],
-          answers: [{ questionKey: 'q1', answerText: 'This is outstanding and rigorous work.' }],
+          answers: [{ questionKey: 'q1', questionType: 'richtext', answerText: 'This is outstanding and rigorous work.' }],
         }],
       }],
     }),
@@ -898,6 +898,81 @@ test('Copy label resets to "Copy" when the composed content changes', async () =
   rerender(<ReviewsTab requestId="req2" />);
   await screen.findByText('Different Reviewer', { selector: 'u' });
   await screen.findByRole('button', { name: 'Copy' });
+});
+
+// Direct WriteupParagraphsCard mounts (not through ReviewsTab): ReviewsTab's
+// own full-page loading gate (`if (loading) return <spinner>`) unmounts this
+// card on EVERY `load()` call, including a same-request re-fetch, which
+// would make a stale-copy-promise test pass for the wrong reason (an
+// unmounted component's setState is already a no-op) rather than actually
+// exercising the generation-counter guard. Mounting the card directly and
+// changing its `reviewers` prop in place (as a manual-review-entry re-fetch,
+// or any future in-place update, would) is what isolates the guard itself.
+const DIFFERENT_WRITEUP_REVIEWERS = [
+  { ...WRITEUP_REVIEWERS[0], name: 'Different Reviewer' },
+];
+
+test('a stale in-flight copy resolving AFTER the html changes leaves the label at "Copy", not "Copied" (Codex adversarial review)', async () => {
+  // Discriminating: the clipboard write never settles until AFTER the
+  // composed html changes (simulating a permission-prompt stall while the
+  // roster re-fetches). Without a generation guard, the stale resolution
+  // would set copyState to 'copied' for content no longer on the clipboard.
+  let resolveWrite;
+  const writeMock = jest.fn(() => new Promise((resolve) => { resolveWrite = resolve; }));
+  Object.defineProperty(navigator, 'clipboard', {
+    value: { write: writeMock, writeText: jest.fn() },
+    configurable: true,
+  });
+  window.ClipboardItem = function ClipboardItem(items) { this.items = items; };
+
+  const { rerender } = render(<WriteupParagraphsCard reviewers={WRITEUP_REVIEWERS} synthesis={{}} />);
+  const copyButton = await screen.findByRole('button', { name: 'Copy' });
+  fireEvent.click(copyButton);
+  await waitFor(() => expect(writeMock).toHaveBeenCalledTimes(1));
+
+  // Change the composed html BEFORE the in-flight clipboard promise settles
+  // — this bumps the generation counter via the html-change effect.
+  rerender(<WriteupParagraphsCard reviewers={DIFFERENT_WRITEUP_REVIEWERS} synthesis={{}} />);
+  await screen.findByText('Different Reviewer', { selector: 'u' });
+  await screen.findByRole('button', { name: 'Copy' });
+
+  // Now resolve the STALE write promise.
+  await act(async () => {
+    resolveWrite(undefined);
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+
+  expect(screen.getByRole('button', { name: 'Copy' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Copied' })).not.toBeInTheDocument();
+});
+
+test('a stale in-flight copy REJECTING after the html changes also leaves the label at "Copy", not "Copy failed" (Codex adversarial review)', async () => {
+  let rejectWrite;
+  const writeMock = jest.fn(() => new Promise((_resolve, reject) => { rejectWrite = reject; }));
+  Object.defineProperty(navigator, 'clipboard', {
+    value: { write: writeMock, writeText: jest.fn() },
+    configurable: true,
+  });
+  window.ClipboardItem = function ClipboardItem(items) { this.items = items; };
+
+  const { rerender } = render(<WriteupParagraphsCard reviewers={WRITEUP_REVIEWERS} synthesis={{}} />);
+  const copyButton = await screen.findByRole('button', { name: 'Copy' });
+  fireEvent.click(copyButton);
+  await waitFor(() => expect(writeMock).toHaveBeenCalledTimes(1));
+
+  rerender(<WriteupParagraphsCard reviewers={DIFFERENT_WRITEUP_REVIEWERS} synthesis={{}} />);
+  await screen.findByText('Different Reviewer', { selector: 'u' });
+  await screen.findByRole('button', { name: 'Copy' });
+
+  await act(async () => {
+    rejectWrite(new Error('permission prompt dismissed'));
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+
+  expect(screen.getByRole('button', { name: 'Copy' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Copy failed — try again' })).not.toBeInTheDocument();
 });
 
 test('Copy stays enabled in read-only Preview (client-only clipboard write, no server mutation)', async () => {

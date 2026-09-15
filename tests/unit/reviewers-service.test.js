@@ -77,6 +77,11 @@ const IDS = [
   '44444444-4444-4444-8444-444444444444',
 ];
 const { REVIEW_STATUS_MAP } = require('../../shared/config/reviewerLifecycle');
+const {
+  composeRefereeSection,
+  composeReviewerSentence,
+  compareReviewersByName,
+} = require('../../shared/utils/review-writeup-paragraphs');
 const { TERMINAL_REVIEW_STATUS_VALUES } = require('../../shared/config/reviewerStatus');
 
 let getReviewers;
@@ -838,5 +843,46 @@ describe('getWriteupRoster', () => {
 
     const out = await getReviewers({ proposalId: REQ, azureEmail: 'pd@wmkeck.org' });
     expect(out.proposals[0].reviewers[0]).toMatchObject({ suggestionId: IDS[0], name: 'Dr. A', reviewStatus: 'materials_sent' });
+  });
+
+  test('canonically sorts reviewers (Codex adversarial review, wrap-up 2026-09-14): three equal-rated reviewers in reversed Dataverse order come back name-sorted, so composeRefereeSection agrees with the tab\'s reviewer sentence', async () => {
+    // Discriminating: the adapter returns Zed, Bob, Alice (reverse of name
+    // order) — all three tied at the same rating. Before the fix,
+    // getWriteupRoster returned this reversed order untouched and
+    // composeRefereeSection (via composeReviewerSentence's stable,
+    // input-order tie-break) would list "Zed Reviewer" first — diverging
+    // from the tab, which name-sorts its roster before composing.
+    findByRequest.mockResolvedValueOnce([
+      { wmkf_appreviewersuggestionid: IDS[0], _wmkf_request_value: REQ, _wmkf_potentialreviewer_value: 'person-z', wmkf_selected: true, wmkf_invited: true, wmkf_accepted: true, wmkf_reviewreceivedat: '2026-09-01T00:00:00Z' },
+      { wmkf_appreviewersuggestionid: IDS[1], _wmkf_request_value: REQ, _wmkf_potentialreviewer_value: 'person-b', wmkf_selected: true, wmkf_invited: true, wmkf_accepted: true, wmkf_reviewreceivedat: '2026-09-01T00:00:00Z' },
+      { wmkf_appreviewersuggestionid: IDS[2], _wmkf_request_value: REQ, _wmkf_potentialreviewer_value: 'person-a', wmkf_selected: true, wmkf_invited: true, wmkf_accepted: true, wmkf_reviewreceivedat: '2026-09-01T00:00:00Z' },
+    ]);
+    queryReviewers.mockResolvedValueOnce({
+      records: [
+        { wmkf_potentialreviewersid: 'person-z', wmkf_name: 'Zed Reviewer' },
+        { wmkf_potentialreviewersid: 'person-b', wmkf_name: 'Bob Reviewer' },
+        { wmkf_potentialreviewersid: 'person-a', wmkf_name: 'Alice Reviewer' },
+      ],
+    });
+    fetchAnswersBySuggestion.mockResolvedValueOnce({
+      [IDS[0]]: [{ questionKey: 'q1', answerText: 'x' }],
+      [IDS[1]]: [{ questionKey: 'q1', answerText: 'x' }],
+      [IDS[2]]: [{ questionKey: 'q1', answerText: 'x' }],
+    });
+    ratingsFromAnswers
+      .mockReturnValueOnce({ riskLevel: null, overallAssessment: 5 })
+      .mockReturnValueOnce({ riskLevel: null, overallAssessment: 5 })
+      .mockReturnValueOnce({ riskLevel: null, overallAssessment: 5 });
+
+    const out = await getWriteupRoster({ requestId: REQ });
+    expect(out.reviewers.map((r) => r.name)).toEqual(['Alice Reviewer', 'Bob Reviewer', 'Zed Reviewer']);
+
+    const referee = composeRefereeSection({ reviewers: out.reviewers, blockers: out.blockers });
+    // "The tab" (composeWriteupParagraphs) name-sorts before composing —
+    // build that same canonical order independently and compare the exact
+    // reviewer-sentence text.
+    const tabSentence = composeReviewerSentence([...out.reviewers].sort(compareReviewersByName));
+    const tabSentenceText = tabSentence.runs.map((r) => r.text).join('');
+    expect(referee.text).toContain(tabSentenceText);
   });
 });

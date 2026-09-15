@@ -125,7 +125,7 @@ describe('review report categorical renderers', () => {
         reviewReceivedAt: '2026-09-01T00:00:00Z',
         reviewerOverallAssessment: 5,
         mainInstitution: 'Plain Institution Text University',
-        answers: [{ questionKey: 'q1', answerText: 'This work is genuinely excellent and rigorous.' }],
+        answers: [{ questionKey: 'q1', questionType: 'richtext', answerText: 'This work is genuinely excellent and rigorous.' }],
       }],
     });
     expect(report.writeupSection).not.toBeNull();

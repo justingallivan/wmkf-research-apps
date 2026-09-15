@@ -342,7 +342,15 @@ describe('composeWriteupParagraphs', () => {
 
 describe('composeWriteupParagraphs — Slice 2 quotation provenance', () => {
   function reviewerWithAnswers(overrides, answers) {
-    return reviewer({ ...overrides, answers });
+    // Default every answer to a narrative question type ('richtext') unless
+    // the test explicitly overrides it — most fixtures below predate the
+    // Codex adversarial-review narrative-type restriction and don't care
+    // about it, so this keeps them green; a test that DOES care (e.g. a
+    // picklist rating label) passes `questionType: 'picklist'` explicitly.
+    const normalizedAnswers = Array.isArray(answers)
+      ? answers.map((a) => (a && typeof a === 'object' ? { questionType: 'richtext', ...a } : a))
+      : answers;
+    return reviewer({ ...overrides, answers: normalizedAnswers });
   }
 
   it('drops a paraphrased quote (not a verbatim substring of any answer)', () => {
@@ -414,8 +422,8 @@ describe('composeWriteupParagraphs — Slice 2 quotation provenance', () => {
       reviewerWithAnswers(
         { suggestionId: 'a', name: 'A', reviewerOverallAssessment: 5 },
         [
-          { questionKey: 'q1', answerText: 'The first sentence is here.' },
-          { questionKey: 'q2', answerText: 'The second sentence is here.' },
+          { questionKey: 'q1', answerText: 'The first sentence is stated plainly here.' },
+          { questionKey: 'q2', answerText: 'The second sentence is stated plainly here.' },
         ],
       ),
     ];
@@ -423,13 +431,13 @@ describe('composeWriteupParagraphs — Slice 2 quotation provenance', () => {
       reviewers,
       synthesis: {
         writeupQuotations: [
-          { questionKey: 'q1', quote: 'The first sentence is here.' },
-          { questionKey: 'q2', quote: 'The second sentence is here.' },
+          { questionKey: 'q1', quote: 'The first sentence is stated plainly here.' },
+          { questionKey: 'q2', quote: 'The second sentence is stated plainly here.' },
         ],
       },
     });
     expect(quotations).toHaveLength(1);
-    expect(quotations[0].quote).toBe('The first sentence is here.');
+    expect(quotations[0].quote).toBe('The first sentence is stated plainly here.');
     expect(droppedQuotationCount).toBe(1);
   });
 
@@ -438,25 +446,25 @@ describe('composeWriteupParagraphs — Slice 2 quotation provenance', () => {
     const reviewers = [
       reviewerWithAnswers(
         { suggestionId: 'low', name: 'Low', reviewerOverallAssessment: 2 },
-        [{ questionKey: 'q1', answerText: 'This proposal has serious flaws.' }],
+        [{ questionKey: 'q1', answerText: 'This proposal has several serious methodological flaws.' }],
       ),
       reviewerWithAnswers(
         { suggestionId: 'high', name: 'High', reviewerOverallAssessment: 5 },
-        [{ questionKey: 'q1', answerText: 'This proposal is outstanding work.' }],
+        [{ questionKey: 'q1', answerText: 'This proposal is truly excellent and outstanding work.' }],
       ),
     ];
     const { quotations } = composeWriteupParagraphs({
       reviewers,
       synthesis: {
         writeupQuotations: [
-          { questionKey: 'q1', quote: 'This proposal has serious flaws.' },
-          { questionKey: 'q1', quote: 'This proposal is outstanding work.' },
+          { questionKey: 'q1', quote: 'This proposal has several serious methodological flaws.' },
+          { questionKey: 'q1', quote: 'This proposal is truly excellent and outstanding work.' },
         ],
       },
     });
     expect(quotations.map((q) => q.quote)).toEqual([
-      'This proposal is outstanding work.',
-      'This proposal has serious flaws.',
+      'This proposal is truly excellent and outstanding work.',
+      'This proposal has several serious methodological flaws.',
     ]);
     expect(quotations[0].leadIn).toBe('The most positive reviewer said:');
     expect(quotations[1].leadIn).toBe('The most critical reviewer noted:');
@@ -556,7 +564,7 @@ describe('composeWriteupParagraphs — Slice 2 quotation provenance', () => {
     // the cross-surface invariant the tab (name-sorted `submitted`) and the
     // export roster must both satisfy.
     const specs = [
-      { suggestionId: 'r-alice', name: 'Alice', rating: 5, text: 'Alice found the proposal exceptional.' },
+      { suggestionId: 'r-alice', name: 'Alice', rating: 5, text: 'Alice found the proposal truly exceptional overall.' },
       { suggestionId: 'r-bob', name: 'Bob', rating: 5, text: 'Bob also found it exceptional overall.' },
       { suggestionId: 'r-carol', name: 'Carol', rating: 3, text: 'Carol thought it was solid but unremarkable.' },
       { suggestionId: 'r-dave', name: 'Dave', rating: 1, text: 'Dave raised serious concerns about the design.' },
@@ -673,6 +681,132 @@ describe('composeWriteupParagraphs — Slice 2 quotation provenance', () => {
     });
     expect(quotations).toEqual([]);
     expect(droppedQuotationCount).toBe(1);
+  });
+
+  it('drops a picklist rating LABEL that happens to appear verbatim in the candidate quote (Codex adversarial review)', () => {
+    // Discriminating: labelForOption stores the picklist's decoded LABEL as
+    // answerText (lib/external/build-review-submission.js) — a real rating
+    // label is both provenance-valid substring-wise AND not reviewer-authored
+    // prose. The label is deliberately made 6+ words here so the length
+    // floor cannot be the reason this is dropped — only the questionType
+    // restriction (never 'picklist'/'multiselect') can be.
+    const reviewers = [
+      reviewerWithAnswers(
+        { suggestionId: 'a', name: 'A', reviewerOverallAssessment: 5 },
+        [{
+          questionKey: 'overallAssessment',
+          questionType: 'picklist',
+          answerText: 'Highly recommended for funding at this time',
+        }],
+      ),
+    ];
+    const quote = 'Highly recommended for funding at this time';
+    expect(quote.split(/\s+/).filter(Boolean).length).toBeGreaterThanOrEqual(6);
+    const { quotations, droppedQuotationCount } = composeWriteupParagraphs({
+      reviewers,
+      synthesis: { writeupQuotations: [{ questionKey: 'overallAssessment', quote }] },
+    });
+    expect(quotations).toEqual([]);
+    expect(droppedQuotationCount).toBe(1);
+  });
+
+  it('drops a candidate quote under the minimum word threshold even when it is a genuine substring', () => {
+    const reviewers = [
+      reviewerWithAnswers(
+        { suggestionId: 'a', name: 'A', reviewerOverallAssessment: 5 },
+        [{ questionKey: 'q1', answerText: 'Overall this was a truly solid submission.' }],
+      ),
+    ];
+    // "solid submission" is a genuine, verbatim, word-boundary substring of
+    // the answer above — but only 2 words, far under the 6-word minimum.
+    const { quotations, droppedQuotationCount } = composeWriteupParagraphs({
+      reviewers,
+      synthesis: { writeupQuotations: [{ questionKey: 'q1', quote: 'solid submission' }] },
+    });
+    expect(quotations).toEqual([]);
+    expect(droppedQuotationCount).toBe(1);
+  });
+
+  it('drops a partial-word match starting mid-word inside "excellent" (illustrative: "cell" inside "excellent") even though it is a raw substring', () => {
+    const reviewers = [
+      reviewerWithAnswers(
+        { suggestionId: 'a', name: 'A', reviewerOverallAssessment: 5 },
+        [{ questionKey: 'q1', answerText: 'This methodology is excellent and well designed for the study.' }],
+      ),
+    ];
+    // "cellent and well designed for the study" (7 words, clears the length
+    // floor on its own) IS a raw substring of the answerText above — it
+    // begins one character into "ex|cellent", the same class of bug as "cell"
+    // matching inside "excellent". The preceding character ('x') is
+    // alphanumeric, so the word-boundary guard must reject it.
+    const quote = 'cellent and well designed for the study';
+    expect(quote.split(/\s+/).filter(Boolean).length).toBeGreaterThanOrEqual(6);
+    expect('This methodology is excellent and well designed for the study.').toContain(quote);
+    const { quotations, droppedQuotationCount } = composeWriteupParagraphs({
+      reviewers,
+      synthesis: { writeupQuotations: [{ questionKey: 'q1', quote }] },
+    });
+    expect(quotations).toEqual([]);
+    expect(droppedQuotationCount).toBe(1);
+  });
+
+  it('drops unique boilerplate under the length threshold even when it appears in only one reviewer', () => {
+    const reviewers = [
+      reviewerWithAnswers(
+        { suggestionId: 'a', name: 'A', reviewerOverallAssessment: 5 },
+        [{ questionKey: 'q1', answerText: 'Thank you for the opportunity to review this proposal.' }],
+      ),
+    ];
+    // "Thank you for" is unambiguous (appears in exactly one reviewer) but
+    // only 3 words — the length floor must drop it regardless of uniqueness.
+    const { quotations, droppedQuotationCount } = composeWriteupParagraphs({
+      reviewers,
+      synthesis: { writeupQuotations: [{ questionKey: 'q1', quote: 'Thank you for' }] },
+    });
+    expect(quotations).toEqual([]);
+    expect(droppedQuotationCount).toBe(1);
+  });
+
+  it('drops shared boilerplate present in two reviewers, under the length threshold', () => {
+    const reviewers = [
+      reviewerWithAnswers(
+        { suggestionId: 'a', name: 'A', reviewerOverallAssessment: 5 },
+        [{ questionKey: 'q1', answerText: 'Thank you for the chance to review this.' }],
+      ),
+      reviewerWithAnswers(
+        { suggestionId: 'b', name: 'B', reviewerOverallAssessment: 4 },
+        [{ questionKey: 'q1', answerText: 'Thank you for the chance to comment here.' }],
+      ),
+    ];
+    // "Thank you for the" (4 words) is both under the length floor AND
+    // ambiguous across both reviewers — either guard alone would drop it.
+    const { quotations, droppedQuotationCount } = composeWriteupParagraphs({
+      reviewers,
+      synthesis: { writeupQuotations: [{ questionKey: 'q1', quote: 'Thank you for the' }] },
+    });
+    expect(quotations).toEqual([]);
+    expect(droppedQuotationCount).toBe(1);
+  });
+
+  it('keeps a genuine 12-word narrative sentence', () => {
+    const reviewers = [
+      reviewerWithAnswers(
+        { suggestionId: 'a', name: 'A', reviewerOverallAssessment: 5 },
+        [{
+          questionKey: 'q1',
+          answerText: 'The experimental design is rigorous and the preliminary data are genuinely compelling throughout.',
+        }],
+      ),
+    ];
+    const quote = 'The experimental design is rigorous and the preliminary data are genuinely compelling throughout.';
+    expect(quote.split(/\s+/).filter(Boolean).length).toBeGreaterThanOrEqual(12);
+    const { quotations, droppedQuotationCount } = composeWriteupParagraphs({
+      reviewers,
+      synthesis: { writeupQuotations: [{ questionKey: 'q1', quote }] },
+    });
+    expect(quotations).toHaveLength(1);
+    expect(quotations[0].quote).toBe(quote);
+    expect(droppedQuotationCount).toBe(0);
   });
 
   it('compareReviewersByName pins the "en" locale so a non-ASCII accented name sorts identically regardless of runtime default locale', () => {

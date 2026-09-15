@@ -1457,7 +1457,23 @@ submitted review with an unlabelled (pre-current-scale) rating emits
 tally; `renderPreSiteVisitDocx` treats a blank/whitespace-only
 `refereeSection.text` as `null`; and `review-synthesis-readiness.js` exports
 `REVIEW_SYNTHESIS_BLOCKER_REASONS` so the allowlist test iterates the live
-reason set rather than a hand-copied list. **Production
+reason set rather than a hand-copied list. **Codex adversarial review
+(2026-09-14):** `verifyAndSelectQuotations` now also requires (a) a
+narrative `questionType` (`richtext`/`string`; never `picklist`/
+`multiselect`, whose `answerText` is a decoded option LABEL, not
+reviewer-authored prose), (b) a minimum of 6 normalized words, and (c)
+word-boundary matching (not a bare substring) before a model-proposed quote
+verifies against a submitted answer; `getWriteupRoster` now sorts its
+`reviewers` with `compareReviewersByName` before returning (previously
+adapter fetch order), so `composeRefereeSection` agrees with the tab on tied
+ratings. `WriteupParagraphsCard`'s Copy button (`ReviewsTab.js`) now guards
+its post-await state writes with a `useRef` generation counter, bumped on
+every `copy()` call and on every html-change reset, so a clipboard promise
+that resolves/rejects after content changed underneath it (a permission
+prompt outliving a request switch) can no longer paint a stale "Copied"/
+"Copy failed" label; the card is also a named export now, purely so a unit
+test can mount it directly without `ReviewsTab`'s own loading-gate unmount
+masking the regression. **Production
 publish of this prompt row is a separate owner step** (`--force` republish,
 plan §4.3) — not run as part of this build; the live row and the read paths on
 both sides tolerate either the five-key or seven-key shape. Same
