@@ -50,6 +50,15 @@ related:
 > into a wrap-up commit (double-token fixture, blank referee text treated as null, reason-enum
 > export for the blocker test, denominator on the personnel-warning assertion, unlabelled-rating
 > diagnostic in the referee section, split roster-read vs composer error codes, roadmap wiki v4).
+> Wrap-up 9b378529; full-suite reconciliation d7746daa (reviewer-engagement census recorded caller,
+> native-schema payload fixture). **Codex adversarial review AR-2 of the build (`--base 1b2f9b5c`,
+> 2026-09-14):** three medium findings, all verified and fixed at 65b40a4e — quote verification now
+> narrative-only, word-bounded, ≥6 words (picklist labels live in `answerText`,
+> `lib/external/build-review-submission.js:219`); `getWriteupRoster` name-sorts so tied ratings
+> order identically on tab, export and draft; Copy has a generation guard on both post-await
+> writes. Remaining owner steps: production `--force` republish of `review-synthesis.generate`
+> (§4.3), Slice 1 production smoke (§6), merge. Pre-existing unrelated red test:
+> `tests/unit/grantee-abstract-editor.test.js` (fails identically at base).
 
 ## 1. Goal
 
@@ -190,9 +199,10 @@ the native JSON schema nor `validateAiJson` can prove a string is a substring of
 reviewer's `answers[].answerText` alongside the stored synthesis (`reviewers-service.js:430-441`),
 so `composeWriteupParagraphs` verifies each quotation there: normalise whitespace, straight/curly
 quotes and apostrophes, and case; keep a quote only if it is a substring of exactly one submitted
-reviewer's answer text (any answer of that reviewer; the declared `questionKey` is carried for
-audit but not used for matching — built that way at a9757f18, nothing downstream depends on which
-answer matched); keep at most one verified quote per reviewer; order the survivors by that reviewer's
+reviewer's **narrative** answer text (richtext/string answers only — picklist and multiselect
+rows store their option label in `answerText` and are excluded; any narrative answer of that
+reviewer; the declared `questionKey` is carried for audit but not used for matching), matched at
+word boundaries and only when the candidate is at least six normalised words (Codex AR-2); keep at most one verified quote per reviewer; order the survivors by that reviewer's
 `reviewerOverallAssessment` descending (ties by the roster order); **keep three**: the highest-rated,
 the lowest-rated, and the middle one (the median by rating) when more than three survive; derive
 the house lead-ins from position ("The most positive reviewer said:", "Another reviewer noted:",
