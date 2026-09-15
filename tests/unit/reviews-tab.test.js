@@ -684,6 +684,27 @@ test('renders the Writeup paragraphs card below Synthesis with underlined names 
   ).toBeTruthy();
 });
 
+test('renders padded source names without spaces before reviewer-clause punctuation', () => {
+  render(
+    <WriteupParagraphsCard
+      reviewers={[{
+        ...WRITEUP_REVIEWERS[0],
+        name: ' Jeroen Roelofs ',
+        academicRank: 'Professor',
+        mainInstitution: 'University of Kansas Medical Center',
+      }]}
+      synthesis={null}
+      synthesisCurrent={false}
+    />,
+  );
+
+  const underlinedName = screen.getByText('Jeroen Roelofs', { selector: 'u' });
+  expect(underlinedName.textContent).toBe('Jeroen Roelofs');
+  expect(underlinedName.parentElement.textContent).toBe(
+    'The reviewer was Jeroen Roelofs, a professor at University of Kansas Medical Center.',
+  );
+});
+
 test('does not render the Writeup paragraphs card when no review is submitted', async () => {
   fetch.mockResolvedValue({
     ok: true,

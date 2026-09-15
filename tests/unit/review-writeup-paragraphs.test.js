@@ -126,6 +126,23 @@ describe('composeReviewerSentence', () => {
     expect(runs.map((r) => r.text).join('')).toBe('The reviewer was Dr. Solo, a professor at MIT.');
   });
 
+  it('trims source whitespace from reviewer names before punctuation and falls back for a blank name', () => {
+    const padded = composeReviewerSentence([
+      reviewer({ name: '\u00a0Jeroen Roelofs \t', academicRank: 'Professor', mainInstitution: 'KU Medical Center' }),
+    ]);
+    expect(padded.runs.map((r) => r.text).join('')).toBe(
+      'The reviewer was Jeroen Roelofs, a professor at KU Medical Center.',
+    );
+    expect(padded.runs.find((r) => r.underline)?.text).toBe('Jeroen Roelofs');
+
+    const blank = composeReviewerSentence([
+      reviewer({ name: ' \u00a0 ', academicRank: 'Professor', mainInstitution: 'MIT' }),
+    ]);
+    expect(blank.runs.map((r) => r.text).join('')).toBe(
+      'The reviewer was Unnamed reviewer, a professor at MIT.',
+    );
+  });
+
   it('chooses a/an by the rank\'s first letter', () => {
     const { runs } = composeReviewerSentence([
       reviewer({ name: 'A', academicRank: 'Investigator', mainInstitution: 'X' }),

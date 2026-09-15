@@ -329,7 +329,8 @@ export function composeReviewerSentence(reviewers) {
   );
 
   const clauses = ordered.map((reviewer) => {
-    const name = reviewer.name || 'Unnamed reviewer';
+    const trimmedName = typeof reviewer.name === 'string' ? reviewer.name.trim() : '';
+    const name = trimmedName || 'Unnamed reviewer';
     const institution = institutionOf(reviewer);
     const rank = typeof reviewer.academicRank === 'string' ? reviewer.academicRank.trim() : '';
     const runs = [{ text: name, underline: true }];
