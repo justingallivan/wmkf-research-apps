@@ -91,6 +91,14 @@ describe('seed-email-defaults script core', () => {
       EMAIL_DEFAULT_SEED_TEXT['email.deliberation_share.body'],
       null,
     );
+    for (const key of [
+      'email.deliberation_share.briefing_heading',
+      'email.deliberation_share.briefing_link_text',
+      'email.deliberation_share.briefing_description',
+      'email.deliberation_share.briefing_expiry_lead_in',
+    ]) {
+      expect(setSetting).toHaveBeenCalledWith(key, EMAIL_DEFAULT_SEED_TEXT[key], null);
+    }
   });
 
   test('registers seed text for both deliberation agenda keys', async () => {
@@ -105,9 +113,10 @@ describe('seed-email-defaults script core', () => {
     expect(DELIBERATION_AGENDA_SEED_SUBJECT).toContain('{{sessionDate}}');
   });
 
-  test('registers the prior Workbench Share wording for both deliberation-share keys', async () => {
+  test('registers the prior Workbench Share compose and briefing-section wording', async () => {
     const { EMAIL_DEFAULT_SEED_TEXT } = await import('../../scripts/seed-email-defaults.mjs');
     const {
+      DELIBERATION_SHARE_SEED_BRIEFING_COPY,
       DELIBERATION_SHARE_SEED_SUBJECT,
       DELIBERATION_SHARE_SEED_BODY,
     } = await import('../../shared/config/deliberationShareEmail.js');
@@ -116,6 +125,14 @@ describe('seed-email-defaults script core', () => {
     expect(EMAIL_DEFAULT_SEED_TEXT['email.deliberation_share.body']).toBe(DELIBERATION_SHARE_SEED_BODY);
     expect(DELIBERATION_SHARE_SEED_SUBJECT).toContain('{{requestNumber}}');
     expect(DELIBERATION_SHARE_SEED_BODY).toContain('deliberation briefing page');
+    expect(EMAIL_DEFAULT_SEED_TEXT['email.deliberation_share.briefing_heading'])
+      .toBe(DELIBERATION_SHARE_SEED_BRIEFING_COPY.heading);
+    expect(EMAIL_DEFAULT_SEED_TEXT['email.deliberation_share.briefing_link_text'])
+      .toBe(DELIBERATION_SHARE_SEED_BRIEFING_COPY.linkText);
+    expect(EMAIL_DEFAULT_SEED_TEXT['email.deliberation_share.briefing_description'])
+      .toBe(DELIBERATION_SHARE_SEED_BRIEFING_COPY.description);
+    expect(EMAIL_DEFAULT_SEED_TEXT['email.deliberation_share.briefing_expiry_lead_in'])
+      .toBe(DELIBERATION_SHARE_SEED_BRIEFING_COPY.expiryLeadIn);
   });
 
   test('registers both site-visit email families with the previous default wording', async () => {

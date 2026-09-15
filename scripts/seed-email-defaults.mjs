@@ -39,6 +39,7 @@ import {
   DELIBERATION_AGENDA_SEED_BODY,
 } from '../lib/seed/email-defaults/deliberation-agenda.js';
 import {
+  DELIBERATION_SHARE_SEED_BRIEFING_COPY,
   DELIBERATION_SHARE_SEED_SUBJECT,
   DELIBERATION_SHARE_SEED_BODY,
 } from '../shared/config/deliberationShareEmail.js';
@@ -87,6 +88,10 @@ export const EMAIL_DEFAULT_SEED_TEXT = Object.freeze({
   'email.site_visit_materials_reminder.body': SITE_VISIT_MATERIALS_REMINDER_SEED_BODY,
   'email.deliberation_share.subject': DELIBERATION_SHARE_SEED_SUBJECT,
   'email.deliberation_share.body': DELIBERATION_SHARE_SEED_BODY,
+  'email.deliberation_share.briefing_heading': DELIBERATION_SHARE_SEED_BRIEFING_COPY.heading,
+  'email.deliberation_share.briefing_link_text': DELIBERATION_SHARE_SEED_BRIEFING_COPY.linkText,
+  'email.deliberation_share.briefing_description': DELIBERATION_SHARE_SEED_BRIEFING_COPY.description,
+  'email.deliberation_share.briefing_expiry_lead_in': DELIBERATION_SHARE_SEED_BRIEFING_COPY.expiryLeadIn,
   'email.deliberation_agenda.subject': DELIBERATION_AGENDA_SEED_SUBJECT,
   'email.deliberation_agenda.body': DELIBERATION_AGENDA_SEED_BODY,
 });

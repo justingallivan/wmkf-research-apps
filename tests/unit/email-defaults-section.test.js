@@ -92,6 +92,54 @@ const defaults = [
     unavailable: false,
   },
   {
+    key: 'email.deliberation_share.briefing_heading',
+    label: 'Share for deliberation briefing heading',
+    description: 'Briefing heading copy',
+    multiline: false,
+    placeholders: [],
+    group: 'internal',
+    emailKey: 'email.deliberation_share',
+    emailLabel: 'Share for deliberation',
+    value: 'Briefing page:',
+    unavailable: false,
+  },
+  {
+    key: 'email.deliberation_share.briefing_link_text',
+    label: 'Share for deliberation briefing link text',
+    description: 'Briefing link text',
+    multiline: false,
+    placeholders: [],
+    group: 'internal',
+    emailKey: 'email.deliberation_share',
+    emailLabel: 'Share for deliberation',
+    value: 'Open the deliberation briefing',
+    unavailable: false,
+  },
+  {
+    key: 'email.deliberation_share.briefing_description',
+    label: 'Share for deliberation briefing description',
+    description: 'Briefing description copy',
+    multiline: false,
+    placeholders: [],
+    group: 'internal',
+    emailKey: 'email.deliberation_share',
+    emailLabel: 'Share for deliberation',
+    value: 'the writeup and review materials, no login required.',
+    unavailable: false,
+  },
+  {
+    key: 'email.deliberation_share.briefing_expiry_lead_in',
+    label: 'Share for deliberation briefing expiry wording',
+    description: 'Briefing expiry wording',
+    multiline: false,
+    placeholders: [],
+    group: 'internal',
+    emailKey: 'email.deliberation_share',
+    emailLabel: 'Share for deliberation',
+    value: 'The link expires on',
+    unavailable: false,
+  },
+  {
     key: 'email.deliberation_agenda.subject',
     label: 'Deliberation agenda subject',
     description: 'Agenda subject copy',
@@ -190,6 +238,14 @@ test('renders Share for deliberation as its own internal email card beside the a
   const shareCard = screen.getByText('Share for deliberation').closest('section');
   expect(within(shareCard).getByLabelText('Share for deliberation subject')).toHaveValue('Notes for {{requestNumber}}');
   expect(within(shareCard).getByLabelText('Share for deliberation message')).toHaveValue('Please review the briefing page.');
+  expect(within(shareCard).getByLabelText('Share for deliberation briefing heading')).toHaveValue('Briefing page:');
+  expect(within(shareCard).getByLabelText('Share for deliberation briefing link text')).toHaveValue('Open the deliberation briefing');
+  expect(within(shareCard).getByLabelText('Share for deliberation briefing description')).toHaveValue('the writeup and review materials, no login required.');
+  expect(within(shareCard).getByLabelText('Share for deliberation briefing expiry wording')).toHaveValue('The link expires on');
+  expect(within(shareCard).getByText('Briefing heading', { selector: 'label' })).toBeInTheDocument();
+  expect(within(shareCard).getByText('Briefing link text', { selector: 'label' })).toBeInTheDocument();
+  expect(within(shareCard).getByText('Briefing description', { selector: 'label' })).toBeInTheDocument();
+  expect(within(shareCard).getByText('Briefing expiration wording', { selector: 'label' })).toBeInTheDocument();
   expect(within(shareCard).queryByLabelText('Deliberation agenda subject')).toBeNull();
 });
 

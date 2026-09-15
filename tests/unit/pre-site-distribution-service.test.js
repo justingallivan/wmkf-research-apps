@@ -21,6 +21,7 @@ import {
   REQUEST_DOCUMENT_LIFECYCLE_STATE,
   REQUEST_DOCUMENT_OPERATION_STATUS,
 } from '../../shared/config/requestDocument.js';
+import { DELIBERATION_SHARE_SEED_BRIEFING_COPY } from '../../shared/config/deliberationShareEmail.js';
 
 const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
 const OPERATION_ID = '22222222-2222-4222-8222-222222222222';
@@ -810,28 +811,44 @@ test('history returns configured Share defaults and preserves built-in fallbacks
   expect(result.emailDefaults).toMatchObject({
     subjectTemplate: 'Discussion notes — {{requestNumber}}',
     bodyTemplate: expect.stringContaining('deliberation briefing page'),
+    briefingCopy: DELIBERATION_SHARE_SEED_BRIEFING_COPY,
     configured: false,
     unavailable: false,
   });
   expect(getSettingStrict).toHaveBeenCalledWith('email.deliberation_share.subject');
   expect(getSettingStrict).toHaveBeenCalledWith('email.deliberation_share.body');
+  expect(getSettingStrict).toHaveBeenCalledWith('email.deliberation_share.briefing_heading');
+  expect(getSettingStrict).toHaveBeenCalledWith('email.deliberation_share.briefing_link_text');
+  expect(getSettingStrict).toHaveBeenCalledWith('email.deliberation_share.briefing_description');
+  expect(getSettingStrict).toHaveBeenCalledWith('email.deliberation_share.briefing_expiry_lead_in');
 });
 
-test('history marks Share defaults configured only when both stored values are non-blank', async () => {
+test('history marks Share defaults configured only when every stored value is non-blank', async () => {
+  const configured = {
+    'email.deliberation_share.subject': 'Notes — {{requestNumber}}',
+    'email.deliberation_share.body': 'Use the briefing page.',
+    'email.deliberation_share.briefing_heading': 'Decision packet:',
+    'email.deliberation_share.briefing_link_text': 'Open the packet',
+    'email.deliberation_share.briefing_description': 'background and review materials.',
+    'email.deliberation_share.briefing_expiry_lead_in': 'Available until',
+  };
   const result = await getPreSiteDistributionHistory({ requestId: REQUEST_ID }, {
     listAttempts: jest.fn(async () => []),
     getRequest: jest.fn(async () => ({ _wmkf_currentpresitevisit_value: null })),
     findDocumentsByRequest: jest.fn(async () => ({ records: [] })),
     getFileMetadataById: jest.fn(async () => null),
     hasSentAttemptForSource: jest.fn(async () => false),
-    getSettingStrict: jest.fn(async (key) => ({
-      found: true,
-      value: key.endsWith('.subject') ? 'Notes — {{requestNumber}}' : 'Use the briefing page.',
-    })),
+    getSettingStrict: jest.fn(async (key) => ({ found: true, value: configured[key] })),
   });
   expect(result.emailDefaults).toEqual({
     subjectTemplate: 'Notes — {{requestNumber}}',
     bodyTemplate: 'Use the briefing page.',
+    briefingCopy: {
+      heading: 'Decision packet:',
+      linkText: 'Open the packet',
+      description: 'background and review materials.',
+      expiryLeadIn: 'Available until',
+    },
     configured: true,
     unavailable: false,
   });
@@ -850,10 +867,11 @@ test('history reports unavailable Share defaults while retaining built-in wordin
   expect(result.emailDefaults).toMatchObject({
     subjectTemplate: 'Site Visit materials — {{requestNumber}}',
     bodyTemplate: expect.stringContaining('deliberation briefing page'),
+    briefingCopy: DELIBERATION_SHARE_SEED_BRIEFING_COPY,
     configured: false,
     unavailable: true,
   });
-  expect(consoleSpy).toHaveBeenCalledTimes(2);
+  expect(consoleSpy).toHaveBeenCalledTimes(6);
   consoleSpy.mockRestore();
 });
 
@@ -1546,6 +1564,59 @@ test('body html carries the briefing section only when a link was minted', () =>
   expect(rendered).not.toContain(BRIEFING_LINK_PLACEHOLDER);
   expect(renderBriefingBody(withLink, null)).toBe(withLink);
   expect(withLink.indexOf('Briefing page')).toBeLessThan(withLink.indexOf('wmkf-pre-site-distribution'));
+});
+
+test('body html uses Admin briefing wording while keeping the bound URL and expiration date server-owned', () => {
+  const link = {
+    id: 'l',
+    url: 'https://apps.test/external/briefing/server-owned-token',
+    expiresAt: '2026-11-14T20:00:00Z',
+  };
+  const customCopy = {
+    heading: 'Discussion packet <staff>:',
+    linkText: 'Open the decision materials',
+    description: 'the proposal and supporting context, ready for discussion.',
+    expiryLeadIn: 'This secure link remains available through',
+  };
+  const stored = distributionBodyHtml('Hello', OPERATION_ID, [], link, null, customCopy);
+  expect(stored).toContain('<strong>Discussion packet &lt;staff&gt;:</strong>');
+  expect(stored).toContain(`href="${BRIEFING_LINK_PLACEHOLDER}">Open the decision materials</a>`);
+  expect(stored).toContain('the proposal and supporting context, ready for discussion.');
+  expect(stored).toContain('This secure link remains available through November 14, 2026.');
+  expect(stored).not.toContain(link.url);
+
+  const rendered = renderBriefingBody(stored, link.url);
+  expect(rendered).toContain(`href="${link.url}"`);
+  expect(rendered).toContain('November 14, 2026');
+});
+
+test('prepare freezes the Admin briefing wording into the stored body and preview hash', async () => {
+  const settings = {
+    'email.deliberation_share.subject': 'Notes — {{requestNumber}}',
+    'email.deliberation_share.body': 'Use the briefing page.',
+    'email.deliberation_share.briefing_heading': 'Decision packet:',
+    'email.deliberation_share.briefing_link_text': 'Open the packet',
+    'email.deliberation_share.briefing_description': 'the proposal and review context.',
+    'email.deliberation_share.briefing_expiry_lead_in': 'Available until',
+  };
+  const first = createPrepareHarness();
+  first.dependencies.getSettingStrict = jest.fn(async (key) => ({ found: true, value: settings[key] }));
+  const firstResult = await preparePreSiteDistribution(prepareInput(), first.dependencies);
+  const firstStored = first.dependencies.createOrGetAttempt.mock.calls[0][0];
+  expect(firstStored.bodyHtml).toContain('<strong>Decision packet:</strong>');
+  expect(firstStored.bodyHtml).toContain('>Open the packet</a> — the proposal and review context.');
+  expect(firstStored.bodyHtml).toContain('Available until December 17, 2026.');
+  expect(firstStored.bodyHtml).not.toContain('external/briefing/default-token');
+
+  const second = createPrepareHarness();
+  second.dependencies.getSettingStrict = jest.fn(async (key) => ({
+    found: true,
+    value: key === 'email.deliberation_share.briefing_description'
+      ? 'different Admin wording.'
+      : settings[key],
+  }));
+  const secondResult = await preparePreSiteDistribution(prepareInput(), second.dependencies);
+  expect(secondResult.attempt.previewHash).not.toBe(firstResult.attempt.previewHash);
 });
 
 test('prepare mints the briefing link, binds it to the attempt, and folds it into the preview hash', async () => {

@@ -3,6 +3,7 @@ import {
   EDITABLE_TEXT_GROUPS,
 } from '../../shared/config/editableTextDefaults';
 import {
+  DELIBERATION_SHARE_SEED_BRIEFING_COPY,
   DELIBERATION_SHARE_SEED_SUBJECT,
   renderDeliberationShareSubject,
 } from '../../shared/config/deliberationShareEmail';
@@ -60,9 +61,16 @@ describe('editableTextDefaults catalog grouping metadata', () => {
     }
   });
 
-  test('Share for deliberation subject and body are paired beside the agenda defaults', () => {
+  test('Share for deliberation compose and briefing-copy fields are paired beside the agenda defaults', () => {
     const subject = EDITABLE_TEXT_DEFAULTS.find((entry) => entry.key === 'email.deliberation_share.subject');
     const body = EDITABLE_TEXT_DEFAULTS.find((entry) => entry.key === 'email.deliberation_share.body');
+    const briefingKeys = [
+      'email.deliberation_share.briefing_heading',
+      'email.deliberation_share.briefing_link_text',
+      'email.deliberation_share.briefing_description',
+      'email.deliberation_share.briefing_expiry_lead_in',
+    ];
+    const briefingEntries = briefingKeys.map((key) => EDITABLE_TEXT_DEFAULTS.find((entry) => entry.key === key));
     expect(subject).toMatchObject({
       group: 'internal',
       emailKey: 'email.deliberation_share',
@@ -76,6 +84,22 @@ describe('editableTextDefaults catalog grouping metadata', () => {
       emailLabel: 'Share for deliberation',
       placeholders: [],
       multiline: true,
+    });
+    expect(briefingEntries.every(Boolean)).toBe(true);
+    briefingEntries.forEach((entry) => {
+      expect(entry).toMatchObject({
+        group: 'internal',
+        emailKey: 'email.deliberation_share',
+        emailLabel: 'Share for deliberation',
+        placeholders: [],
+        multiline: false,
+      });
+    });
+    expect(DELIBERATION_SHARE_SEED_BRIEFING_COPY).toEqual({
+      heading: 'Briefing page:',
+      linkText: 'Open the deliberation briefing',
+      description: expect.stringContaining('research presentation materials'),
+      expiryLeadIn: 'The link expires on',
     });
   });
 
