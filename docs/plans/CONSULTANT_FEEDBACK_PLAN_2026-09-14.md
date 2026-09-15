@@ -3,7 +3,7 @@ title: Consultant Feedback — Informal Consultant Input on the Reviews Tab and 
 domain: reviewers
 kind: plan
 status: active
-summary: "Slice 1 PRODUCTION-LIVE 2026-09-14 (PR #293); slice 2 attachments merged to main via PR #295 and await production migration 049 plus smoke; slice 3 staff attachment access and list/chooser polish are source-built on branch codex/consultant-feedback-slice-3, awaiting review and merge. Staff record informal feedback on a proposal from retained consultants (pasted text and/or an attached file), attributed to a roster consultant, editable, and shared by default on the deliberation briefing page as its own section. Postgres owns the entry; the request-document registry and SharePoint own any attached file."
+summary: "Slice 1 PRODUCTION-LIVE 2026-09-14 (PR #293); slice 2 attachments merged to main via PR #295 and await production migration 049 plus smoke; slice 3 staff attachment access and list/chooser polish are source-built and fresh-review approved on branch codex/consultant-feedback-slice-3, awaiting owner merge. Staff record informal feedback on a proposal from retained consultants (pasted text and/or an attached file), attributed to a roster consultant, editable, and shared by default on the deliberation briefing page as its own section. Postgres owns the entry; the request-document registry and SharePoint own any attached file."
 cataloged: 2026-09-14
 last_verified: 2026-09-14
 owner: product-engineering
@@ -377,7 +377,7 @@ briefing read-model and page section for text items; matrix rows; Atlas rows. Sh
 Dataverse admin adds the artifact-type value; mirror in `requestDocument.js`; mint + finalize
 routes; `feedback:` document member; Superseded-on-delete. Tier 1, same branch or a follow-on.
 
-### Slice 3 — staff attachment access and polish [SOURCE-BUILT 2026-09-14 on `codex/consultant-feedback-slice-3`; awaiting review and merge]
+### Slice 3 — staff attachment access and polish [SOURCE-BUILT + FRESH-REVIEW APPROVED 2026-09-14 on `codex/consultant-feedback-slice-3`; awaiting owner merge]
 
 - Authenticated staff can open a PDF inline or download a DOCX from the Reviews tab. The browser
   sends only request GUID + feedback-entry id; the service re-proves active request membership,
@@ -537,3 +537,14 @@ adversarial review of commit `dd5f1611` and the coordinator's own review, reconc
 | Plan still said slice 2 planned/blocked | Codex (medium) | **Fixed** in this pass (section labels, §2 artifact value, summary) |
 | Staff cannot download an attachment from the Workbench (plain label) | Opus B13 | **Fixed in slice 3:** dedicated authenticated proxy accepts request + feedback-entry identity only and independently re-proves the Postgres and registry membership chain before Graph |
 | Bound-candidate clear bumps `updated_at`, delaying prune one retention cycle | Opus residual | Accepted |
+
+### Slice 3 fresh reviews (2026-09-14) — disposition
+
+After integrating PR #295/main, a fresh Codex review returned one P1 and four P2 findings. The
+branch fixed all five: request-keyed rendering plus save/upload generation guards; known-lifecycle
+fail-closed registry checks; the shared Unicode-safe `Content-Disposition` helper; one shared
+download-eligibility predicate for list links and Graph reads; and canonical Atlas/CF7 status
+reconciliation. Direct regression coverage rose to 95 passing tests across the three changed
+suites and 190 across the eight-suite Slice 2 + Slice 3 set. A second fresh closeout review found
+four missing Persistence cells in the security matrix; the rows were repaired, the delete
+lifecycle wording was checked against source, and the final closeout verdict was **APPROVE**.
