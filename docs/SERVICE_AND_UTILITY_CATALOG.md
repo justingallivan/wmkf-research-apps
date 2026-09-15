@@ -6,7 +6,7 @@ status: canonical
 summary: "If you're touching a service or utility, read its header before this catalog. If a header is sparse or stale, fix it in the same commit as your..."
 canonical: true
 cataloged: 2026-07-02
-last_verified: 2026-09-07
+last_verified: 2026-09-14
 owner: product-engineering
 related:
   - lib/services/
@@ -159,6 +159,7 @@ If you're touching a service or utility, read its header before this catalog. If
 - **`institution-identity-resolver.js`** — W0 OpenAlex institution resolver with per-instance settled caching, same-abort-scope single-flight, immutable aggregate counters, unique-strongest name/country selection, structured associated-institution output, and `null` on ambiguity or provider failure. W1 callers use it to narrow pre-existing COI matches and corroborate affiliation consistency; provider failures and aborts never become cache entries.
 - **`institution-affiliation-consistency.js`** — W1 direct-id or one-hop-associated institution consistency helper for identity corroboration and mismatch alerts. It is intentionally separate from COI and must never widen the hard-drop set.
 - **`institution-affiliation-assessment.js`** — Source/currentness-aware organization relationship and total per-consumer policy contract. It preserves additional affiliations, distinguishes same/parent-child/sibling/related/distinct/unresolved, applies conditional neutrality only with an explicit affiliation-excluding identity result, and fails closed for unknown high-authority inputs. Stage 2 candidate-card and staff-notification presentation consume it behind an exact-on rollout flag (Production enabled 2026-08-19); high-authority consumers do not.
+- **`reviewer-institution-auto-resolution-policy.js`** — Dormant Phase 1 `institution-affiliation-policy/v2` composition contract. It keeps institution clearance separate from final candidate effect, reserves auto-clear for same or explicitly verified constituent evidence, requires complete additional-affiliation COI screening, preserves conditional neutrality as a distinct action, and fails closed for stale/invalid bindings and unknown inputs. It has no runtime caller.
 - **`institution-affiliation-stage2.js`** — Bounded Stage 2 evaluator and presentation projection for reviewer cards and post-acceptance staff notifications. It supplies source-aware copy and available remedies, treats provider failure as retryable/nonterminal, and never grants identity, selectability, or durable-write authority.
 - **`ror-institution-candidate-contract.js`** — Verdict-free ROR candidate/input contract. Accepts only affiliation text plus optional trusted local country/domain evidence and cancellation, rejects email/arbitrary fields, normalizes ROR records and provenance, and forbids decision keys in provider output.
 - **`ror-institution-evidence.js`** — Deterministic organization-span, fallback-query, text-evidence, and locality helpers shared by the production ROR retrieval and local decision layers.

@@ -14,7 +14,9 @@ related:
   - docs/audits/institution-affiliation-last-cycle-baseline-2026-09-14.md
   - docs/REVIEWER_IDENTITY_AND_INSTITUTION_RESOLUTION_RESEARCH.md
   - lib/services/institution-affiliation-assessment.js
+  - lib/services/reviewer-institution-auto-resolution-policy.js
   - lib/services/reviewer-institution-measurement.js
+  - tests/fixtures/reviewer-institution-auto-resolution/v1/policy-regression.json
 ---
 
 # Reviewer institution auto-resolution — policy, labels, and tests
@@ -39,9 +41,10 @@ for it.
    projections. Candidate selectability, automated writes, and identity-anchor
    weighting remain unauthorized.
 2. **[VERIFIED via `lib/services/institution-affiliation-assessment.js:322-335`]**
-   The evaluator already requires a versioned identity result whose sufficiency
-   was calculated without affiliation evidence. Current runtime callers do not
-   yet supply that proof at each high-authority execution point.
+   The evaluator accepts a versioned identity result carrying an
+   `excludesAffiliation=true` assertion. That is a contract check, not proof
+   that the upstream evaluator actually excluded affiliation. No runtime caller
+   currently invokes the evaluator for a high-authority consumer.
 3. **[VERIFIED via `lib/services/reviewer-institution-measurement.js:66-98`]**
    The source-built prospective measurement writer trusts typed assessment
    fields only for `server_applicant` events. General discovery roster events
@@ -65,6 +68,11 @@ for it.
    identity authority.
 7. **[PLANNED]** No Stage 3 behavior change, flag enablement, migration apply,
    or enduring Preview deployment is authorized by this plan.
+8. **[VERIFIED via `lib/services/workbench/enrich-recommended-service.js` and
+   focused tests]** Undated PubMed/OpenAlex affiliation evidence now enters
+   Stage 2 as `unknown`, not `historical`. Publication dates must be carried and
+   interpreted by an explicit source policy before any dated assertion may be
+   labeled current or historical.
 
 ## Change surface
 
@@ -100,7 +108,7 @@ inputs. The system evaluates them in this order:
 | Inputs | Institution action | Final candidate effect |
 |---|---|---|
 | `same` from author-specific evidence | Clear the institution concern automatically | Continue only if every separate identity, COI, eligibility, contact, and address gate passes |
-| Verified, unambiguous constituent `parent_child` | Clear the institution concern automatically | Same separate-gate requirement |
+| Verified, unambiguous constituent `parent_child` with `parentChildKind=verified_constituent` | Clear the institution concern automatically | Same separate-gate requirement |
 | Compatible segment plus additional affiliations; complete extra-affiliation COI screen is clear | Clear the institution concern and retain the additional affiliations as evidence | Continue through remaining gates |
 | Compatible segment plus an additional-affiliation COI conflict | Clear the comparison mismatch but hold for COI | Show the conflicting institution and the existing COI disposition |
 | Compatible relationship but identity insufficient or unavailable | Clear only the institution concern | Hold for the existing identity-confirmation remedy |
@@ -111,9 +119,12 @@ inputs. The system evaluates them in this order:
 | Different person, even when institution strings agree | Reject the evidence for the intended candidate | Hold or mark ineligible through the identity/eligibility path |
 | Unknown policy value, stale binding, missing required COI result, or tampered browser field | Fail closed | Hold with an operator or retry remedy |
 
-The first live slice includes only author-specific `same` and narrowly verified
-constituent `parent_child`. `Sibling`, `related_other`, an unidentifiable
-subunit, shared umbrella text, or a generic name fragment never qualifies.
+The first live slice includes only author-specific `same` and `parent_child`
+whose separate source-owned subtype is `verified_constituent`. A generic typed
+parent/child edge does not establish that subtype: system-to-campus and
+unclassified parent/child pairs remain held. `Sibling`, `related_other`, an
+unidentifiable subunit, shared umbrella text, or a generic name fragment never
+qualifies.
 
 ## Label contract
 
@@ -124,9 +135,11 @@ subunit, shared umbrella text, or a generic name fragment never qualifies.
 | `authorSpecific` | `true`, `false`, `unknown` | Source parser/server resolver |
 | `currentness` | `current`, `historical`, `unknown` | Source-specific rule plus observation date |
 | `organizationRelationship` | `same`, `parent_child`, `sibling`, `related_other`, `distinct`, `unresolved` | Existing typed relationship service |
+| `parentChildKind` | `verified_constituent`, `system_campus`, `unclassified`, `not_applicable` | Source resolver; required separately because a generic parent/child edge is too broad for authority |
 | `independentIdentity` | `sufficient`, `insufficient`, `not_evaluable` | New server-owned evaluator result with `excludesAffiliation=true` and an evaluator version |
 | `additionalCoi` | `clear`, `conflict`, `incomplete`, `not_screened` | Existing server COI matcher applied to every required current additional segment |
 | `providerState` | `complete`, `partial`, `failed` | Server provider orchestration |
+| `bindingState` | `current`, `stale`, `invalid` | Server receipt verification at the execution point |
 
 `samePerson` from the owner workbook is an evaluation label. It does not enter
 the runtime candidate payload and cannot authorize a write.
@@ -136,10 +149,13 @@ the runtime candidate payload and cannot authorize a write.
 Keep `institution-affiliation-assessment/v1` for relationship truth unless its
 assertion/result shape changes. Preserve `institution-affiliation-policy/v1`
 for the existing Stage 2 consumers. The first high-authority composition adds
-complete additional-affiliation COI and server-binding state, so it requires a
-new policy version rather than silently changing v1. Reuse v1 action, reason,
-and remedy names where their meanings remain exact. The measurement projection
-records:
+complete additional-affiliation COI, parent/child subtype, and server-binding
+state, so it uses `institution-affiliation-policy/v2` rather than silently
+changing v1. Its institution action is separate from the final candidate
+effect. `clear_institution_concern` is reserved for compatible `same` or
+verified constituent evidence; `neutral_without_institution_evidence` and
+`neutral_without_institution_clearance` never count as automatic clears. The
+measurement projection records:
 
 - the policy/schema/evaluator versions;
 - a server-bound input digest and freshness state;
@@ -163,6 +179,8 @@ actor ID, provider payload, or error text enters the measurement table.
 | Sibling institutions never collapse through a shared parent | UC sibling and synthetic sibling tests require `sibling` plus hold/surface behavior |
 | Provider failure produces neither match nor mismatch | Failure and partial-resolution fixtures assert unavailable/retry semantics |
 | Historical difference is not described as current conflict | Policy and UI-copy tests pin informational/neutral behavior |
+| Undated publication evidence is not described as historical | Producer-level tests require `currentness=unknown`; dated currentness requires a declared source rule |
+| Canonical system ids do not turn siblings into parent/child | Synthetic canonicalized-sibling regression requires `sibling` plus hold/surface behavior |
 | Browser-carried fields grant no authority | Tampered relationship, identity, COI, and policy fields are ignored or rejected at roster/save boundaries |
 | A stale server receipt cannot authorize a changed candidate or request | Request, candidate, input digest, policy version, and freshness mismatch tests fail closed |
 | Flag-off behavior remains incumbent behavior | Equality tests cover card projection, selectability, save response, and Dataverse call set |
@@ -183,7 +201,7 @@ This evidence supplies regression patterns and failure modes. It does not
 supply a production accuracy rate, currentness labels, complete COI labels, or
 observed staff actions avoided.
 
-### Phase 1 — build the PII-free policy regression set
+### Phase 1 — build the PII-free policy regression set — complete
 
 Create a new versioned fixture derived from patterns, not identities, in the
 26-case exercise. Do not copy names, request numbers, affiliations, URLs, or
@@ -208,6 +226,14 @@ Pin relationship, institution action, final-candidate effect, reason, and
 remedy independently. Call this a regression set, not a blinded acceptance
 benchmark.
 
+Implemented in the versioned 18-case synthetic fixture at
+`tests/fixtures/reviewer-institution-auto-resolution/v1/policy-regression.json`
+and the dormant pure v2 composer at
+`lib/services/reviewer-institution-auto-resolution-policy.js`. The set adds the
+adversarial canonicalized-sibling and system-to-campus cases. It contains no
+retained names, request/candidate identifiers, affiliation strings, or URLs.
+Producer coverage also pins undated publication currentness as `unknown`.
+
 ### Phase 2 — prove independent identity and extra-affiliation COI
 
 1. Audit every identity anchor used at enrichment, roster reload, candidate
@@ -218,10 +244,17 @@ benchmark.
 3. Bind the result to request, exact candidate key, identity input digest,
    evaluator version, and expiry. Recompute or reject after relevant input
    change.
-4. Pass every relevant author-specific additional affiliation to the existing
+4. Carry the exact publication year with each selected affiliation assertion.
+   Define and review the dated-publication currentness threshold before labeling
+   any publication assertion `current` or `historical`; missing or unbound dates
+   remain `unknown`.
+5. Pass every relevant author-specific additional affiliation to the existing
    server COI matcher. Return `incomplete` when a required resolution or screen
    fails; incomplete screening holds rather than clearing.
-5. Preserve the current COI relationship rule. This phase supplies more
+6. Audit `recomputeInstitutionCOI` specifically: its save-time signal set
+   currently omits typed byline segments even though discovery-time logic can
+   carry affiliation history.
+7. Preserve the current COI relationship rule. This phase supplies more
    complete inputs; it does not weaken exemptions or create new ones.
 
 Stop if independent identity cannot be computed without using the affiliation
@@ -244,16 +277,25 @@ receipt. Reload and save re-read or verify it; browser edits invalidate it.
 Before changing migration 048, probe `schema_migrations` in every intended
 environment. If 048 is unapplied everywhere, amend the source-built migration.
 If any environment has applied it, add a new forward migration. Never rewrite
-an applied migration.
+an applied migration. Any amendment must also update the fresh-install table
+definition in `scripts/setup-database.js`, and a gate must keep the measurement
+vocabulary synchronized with the policy export.
 
 ### Phase 4 — expand measurement without changing behavior
 
 - Keep `REVIEWER_INSTITUTION_MEASUREMENT` exact-on and default-off.
 - Record trusted typed inputs for general discovery and applicant cases only
   after server verification.
-- Record an explicit coverage denominator, skipped reason, provider failure,
+- Derive the attempt denominator independently from eligible
+  `reviewer_find_roster` rows; do not use only successfully inserted measurement
+  events as the denominator.
+- Record an explicit skipped reason, provider failure,
   policy eligibility, incumbent decision, counterfactual decision, observed
   staff action, and observed save outcome.
+- Record whether institution mismatch was the sole incumbent blocking clause,
+  so identity/contact holds and institution-driven holds are not conflated.
+- State applicant-only typed coverage explicitly until general discovery has a
+  trusted server projection.
 - Update the aggregate report to separate:
   - safe automatic-clear candidates;
   - current discrepancies surfaced;
@@ -288,9 +330,11 @@ promotion threshold.
 ### Phase 6 — roll out one high-authority slice
 
 Use a new exact-on server flag for the first end-to-end selection slice. The
-flag changes candidate selectability and the corresponding save-boundary
-institution decision together; it does not change automated enrichment writes
-or identity-anchor weighting.
+server evaluates the flag and projects the resulting cleared/held institution
+state into the candidate DTO. The shared client predicate reads that projection
+and never reads a public environment flag. The same server decision is checked
+again at the save boundary. The slice does not change automated enrichment
+writes or identity-anchor weighting.
 
 Eligible first-slice cases require:
 
@@ -323,15 +367,17 @@ retained.
 
 | Layer | Required tests |
 |---|---|
-| Pure relationship | Existing source-aware 25, unchanged 157-row boolean regression, UC sibling matrix, address/alias/parent-child/subunit/partial-provider cases |
-| Policy matrix | Every row of the policy table, all enum complements, wrong-person/same-institution, additional-COI conflict and incomplete states |
+| Currentness producer | Undated PubMed/OpenAlex evidence is `unknown`; dated evidence preserves its exact year and follows the reviewed threshold; no producer hard-codes publication evidence as historical |
+| Pure relationship | Existing source-aware 25, unchanged 157-row boolean regression, UC sibling matrix, address/alias/parent-child/subunit/partial-provider cases, canonicalized sibling attack |
+| Policy matrix | Versioned 18-case PII-free regression set; every row of the policy table, all enum complements, wrong-person/same-institution, additional-COI conflict and incomplete states; clearance and neutrality use different action values |
 | Independent identity | Affiliation-only evidence is insufficient; supported non-affiliation combinations; full-forename contradiction; initial-only/common-name ambiguity; stale version/input digest |
 | Server binding | Valid receipt, tampered browser values, cross-request replay, changed candidate, expired receipt, unknown schema/policy version |
 | Roster persistence | Server projection survives reload; untrusted fields are stripped; CAS conflict and cap/eviction do not manufacture authority |
 | Candidate card | Auto-cleared institution concern disappears; remaining identity/COI/contact reason remains; current discrepancy shows valid actions; provider failure shows retry |
 | Save boundary | Client and server reach the same institution decision; extra affiliations are re-screened; stale/missing receipt holds before Dataverse writes |
 | Partial success | Mixed batches return exact successes/rejections/failures; only successful rows graduate; failed rows remain actionable |
-| Measurement | Trusted/untrusted capture, every fixed vocabulary value, skipped denominators, timeout/failure/circuit breaker, privacy projection, cleanup |
+| Measurement | Trusted/untrusted capture, every fixed vocabulary value, roster-derived attempt denominator, sole-blocking-clause classification, skipped cases, timeout/failure/circuit breaker, privacy projection, cleanup |
+| Migration parity | Existing-DB migration and `scripts/setup-database.js` fresh-install definition carry the same columns, checks, and vocabulary |
 | Rollback | Flag-off equality for DTO, rendered state, selection state, save response, writes, and measurement authority |
 | Identity regression | Frozen 40-case identity benchmark: zero new false binds and zero new right-person-policy binds |
 
@@ -401,8 +447,7 @@ browser claims must land in a tested fail-closed branch.
 
 ## Immediate next work
 
-Implement Phase 1 only: create the PII-free regression fixture and pin the
-policy matrix with unit tests against the existing evaluator. Then perform the
-Phase 2 identity-anchor and extra-affiliation COI contract audit. Do not enable
+Phase 1 is complete. Next perform the Phase 2 identity-anchor,
+publication-currentness, and extra-affiliation COI contract audit. Do not enable
 measurement, change runtime authority, apply a migration, or create a Preview
-deployment as part of those two steps.
+deployment as part of that audit.

@@ -1,0 +1,159 @@
+{
+  "version": "reviewer-institution-auto-resolution-regression/v1",
+  "description": "Synthetic policy patterns. No retained reviewer, request, or organization data.",
+  "cases": [
+    {
+      "key": "exact_alias",
+      "pattern": "exact alias",
+      "evidence": { "segments": [{ "org": "unit_a" }] },
+      "recorded": { "segments": [{ "org": "unit_a" }] },
+      "identity": "sufficient",
+      "expected": { "relationship": "same", "institutionAction": "clear_institution_concern", "reason": "compatible", "finalCandidateEffect": "continue_other_gates", "finalReason": "independent_identity_sufficient", "remedies": [] }
+    },
+    {
+      "key": "department_resolves_to_parent",
+      "pattern": "department versus parent institution",
+      "evidence": { "segments": [{ "org": "unit_a", "label": "department" }] },
+      "recorded": { "segments": [{ "org": "unit_a" }] },
+      "identity": "sufficient",
+      "expected": { "relationship": "same", "institutionAction": "clear_institution_concern", "reason": "compatible", "finalCandidateEffect": "continue_other_gates", "finalReason": "independent_identity_sufficient", "remedies": [] }
+    },
+    {
+      "key": "verified_constituent",
+      "pattern": "verified constituent school",
+      "evidence": { "segments": [{ "org": "unit_a", "relationships": [{ "type": "parent", "org": "system" }] }] },
+      "recorded": { "segments": [{ "org": "system" }] },
+      "identity": "sufficient",
+      "parentChildKind": "verified_constituent",
+      "expected": { "relationship": "parent_child", "institutionAction": "clear_institution_concern", "reason": "compatible", "finalCandidateEffect": "continue_other_gates", "finalReason": "independent_identity_sufficient", "remedies": [] }
+    },
+    {
+      "key": "multiple_compatible_affiliations",
+      "pattern": "same person with multiple compatible affiliations",
+      "evidence": { "segments": [{ "org": "unit_a" }, { "org": "unit_b", "role": "additional" }] },
+      "recorded": { "segments": [{ "org": "unit_a" }] },
+      "identity": "sufficient",
+      "additionalCoi": "clear",
+      "expected": { "relationship": "same", "institutionAction": "clear_institution_concern", "reason": "compatible_with_additional", "finalCandidateEffect": "continue_other_gates", "finalReason": "independent_identity_sufficient", "remedies": [] }
+    },
+    {
+      "key": "distinct_concurrent_affiliations",
+      "pattern": "same person with distinct concurrent affiliations",
+      "evidence": { "segments": [{ "org": "unit_b" }] },
+      "recorded": { "segments": [{ "org": "unit_a" }] },
+      "identity": "sufficient",
+      "expected": { "relationship": "distinct", "institutionAction": "surface_current_discrepancy", "reason": "current_conflict", "finalCandidateEffect": "hold", "finalReason": "current_institution_discrepancy", "remedies": ["confirm_identity", "correct_current_institution", "record_joint_appointment", "not_a_fit"] }
+    },
+    {
+      "key": "compatible_with_conflicting_extra",
+      "pattern": "compatible primary affiliation plus a COI-conflicting extra affiliation",
+      "evidence": { "segments": [{ "org": "unit_a" }, { "org": "unit_b", "role": "additional" }] },
+      "recorded": { "segments": [{ "org": "unit_a" }] },
+      "identity": "sufficient",
+      "additionalCoi": "conflict",
+      "expected": { "relationship": "same", "institutionAction": "clear_institution_concern", "reason": "compatible_with_additional", "finalCandidateEffect": "hold", "finalReason": "additional_affiliation_coi", "remedies": ["show_coi_disposition"] }
+    },
+    {
+      "key": "compatible_with_incomplete_extra_screen",
+      "pattern": "compatible primary affiliation plus an incompletely screened extra affiliation",
+      "evidence": { "segments": [{ "org": "unit_a" }, { "org": "unit_b", "role": "additional" }] },
+      "recorded": { "segments": [{ "org": "unit_a" }] },
+      "identity": "sufficient",
+      "additionalCoi": "incomplete",
+      "expected": { "relationship": "same", "institutionAction": "clear_institution_concern", "reason": "compatible_with_additional", "finalCandidateEffect": "hold", "finalReason": "additional_affiliation_coi_incomplete", "remedies": ["complete_coi_screen"] }
+    },
+    {
+      "key": "wrong_person_matching_institution",
+      "pattern": "wrong person whose stored and cited institutions agree",
+      "evidence": { "segments": [{ "org": "unit_a" }] },
+      "recorded": { "segments": [{ "org": "unit_a" }] },
+      "identity": "insufficient",
+      "expected": { "relationship": "same", "institutionAction": "clear_institution_concern", "reason": "compatible", "finalCandidateEffect": "hold", "finalReason": "independent_identity_insufficient", "remedies": ["confirm_identity", "not_a_fit"] }
+    },
+    {
+      "key": "ambiguous_common_name",
+      "pattern": "ambiguous common-name identity",
+      "evidence": { "segments": [{ "org": "unit_a" }] },
+      "recorded": { "segments": [{ "org": "unit_a" }] },
+      "identity": "not_evaluable",
+      "expected": { "relationship": "same", "institutionAction": "clear_institution_concern", "reason": "compatible", "finalCandidateEffect": "hold", "finalReason": "independent_identity_unavailable", "remedies": ["confirm_identity", "not_a_fit"] }
+    },
+    {
+      "key": "historical_change",
+      "pattern": "historical institution change",
+      "evidence": { "currentness": "historical", "segments": [{ "org": "unit_b" }] },
+      "recorded": { "segments": [{ "org": "unit_a" }] },
+      "identity": "sufficient",
+      "expected": { "relationship": "distinct", "institutionAction": "neutral_without_institution_clearance", "reason": "historical_difference", "finalCandidateEffect": "continue_other_gates", "finalReason": "independent_identity_sufficient", "remedies": [] }
+    },
+    {
+      "key": "sibling_shared_parent",
+      "pattern": "sibling institutions sharing a system parent",
+      "evidence": { "segments": [{ "org": "unit_a", "relationships": [{ "type": "parent", "org": "system" }] }] },
+      "recorded": { "segments": [{ "org": "unit_b", "relationships": [{ "type": "parent", "org": "system" }] }] },
+      "identity": "sufficient",
+      "expected": { "relationship": "sibling", "institutionAction": "surface_current_discrepancy", "reason": "current_conflict", "finalCandidateEffect": "hold", "finalReason": "current_institution_discrepancy", "remedies": ["confirm_identity", "correct_current_institution", "record_joint_appointment", "not_a_fit"] }
+    },
+    {
+      "key": "partial_provider_resolution",
+      "pattern": "partial multi-segment provider resolution",
+      "evidence": { "segments": [{ "org": "unit_b" }, { "unresolved": "provider_failure", "role": "additional" }] },
+      "recorded": { "segments": [{ "org": "unit_a" }] },
+      "identity": "sufficient",
+      "providerState": "partial",
+      "expected": { "relationship": "unresolved", "institutionAction": "neutral_without_institution_evidence", "reason": "provider_partial_neutral", "finalCandidateEffect": "continue_other_gates", "finalReason": "independent_identity_sufficient", "remedies": ["retry_enrichment"] }
+    },
+    {
+      "key": "provider_failure",
+      "pattern": "complete provider failure",
+      "evidence": { "segments": [{ "unresolved": "provider_failure" }] },
+      "recorded": { "segments": [{ "org": "unit_a" }] },
+      "identity": "insufficient",
+      "providerState": "failed",
+      "expected": { "relationship": "unresolved", "institutionAction": "neutral_without_institution_evidence", "reason": "provider_failure_neutral", "finalCandidateEffect": "hold", "finalReason": "independent_identity_insufficient", "remedies": ["retry_enrichment", "confirm_identity", "not_a_fit"] }
+    },
+    {
+      "key": "unidentifiable_subunits",
+      "pattern": "unidentifiable internal subunits",
+      "evidence": { "segments": [{ "scope": "subunit", "parentOrg": "system" }] },
+      "recorded": { "segments": [{ "scope": "subunit", "parentOrg": "system" }] },
+      "identity": "sufficient",
+      "expected": { "relationship": "unresolved", "institutionAction": "hold_for_relationship_review", "reason": "unidentifiable_subunits", "finalCandidateEffect": "hold", "finalReason": "institution_relationship_unverified", "remedies": ["add_authoritative_evidence", "not_a_fit"] }
+    },
+    {
+      "key": "stale_binding",
+      "pattern": "stale server binding",
+      "evidence": { "segments": [{ "org": "unit_a" }] },
+      "recorded": { "segments": [{ "org": "unit_a" }] },
+      "identity": "sufficient",
+      "bindingState": "stale",
+      "expected": { "relationship": "same", "institutionAction": "block_invalid_contract", "reason": "binding_stale", "finalCandidateEffect": "hold", "finalReason": "binding_stale", "remedies": ["operator_review"] }
+    },
+    {
+      "key": "unknown_relationship_enum",
+      "pattern": "unknown enum input",
+      "evidence": { "segments": [{ "org": "unit_a" }] },
+      "recorded": { "segments": [{ "org": "unit_a" }] },
+      "identity": "sufficient",
+      "assessmentOverride": { "relationship": "future_relationship" },
+      "expected": { "relationship": "future_relationship", "institutionAction": "block_invalid_contract", "reason": "unknown_relationship", "finalCandidateEffect": "hold", "finalReason": "unknown_relationship", "remedies": ["operator_review"] }
+    },
+    {
+      "key": "canonicalized_siblings",
+      "pattern": "siblings remain distinct when one canonical id is the shared parent",
+      "evidence": { "segments": [{ "org": "unit_a", "canonicalOrg": "system", "relationships": [{ "type": "parent", "org": "system" }] }] },
+      "recorded": { "segments": [{ "org": "unit_b", "relationships": [{ "type": "parent", "org": "system" }] }] },
+      "identity": "sufficient",
+      "expected": { "relationship": "sibling", "institutionAction": "surface_current_discrepancy", "reason": "current_conflict", "finalCandidateEffect": "hold", "finalReason": "current_institution_discrepancy", "remedies": ["confirm_identity", "correct_current_institution", "record_joint_appointment", "not_a_fit"] }
+    },
+    {
+      "key": "system_campus_not_first_slice",
+      "pattern": "system-to-campus parent child relationship remains held",
+      "evidence": { "segments": [{ "org": "unit_a", "relationships": [{ "type": "parent", "org": "system" }] }] },
+      "recorded": { "segments": [{ "org": "system" }] },
+      "identity": "sufficient",
+      "parentChildKind": "system_campus",
+      "expected": { "relationship": "parent_child", "institutionAction": "hold_for_relationship_review", "reason": "parent_child_not_verified_constituent", "finalCandidateEffect": "hold", "finalReason": "institution_relationship_unverified", "remedies": ["add_authoritative_evidence", "not_a_fit"] }
+    }
+  ]
+}

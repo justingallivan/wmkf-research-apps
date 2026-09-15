@@ -140,7 +140,31 @@ const {
   createStaffVerifiedState,
 } = require('../../lib/utils/reviewer-address-trust');
 const { projectCanonicalApplicantContact } = require('../../lib/utils/applicant-known-reviewer');
-import { enrichRecommended } from '../../lib/services/workbench/enrich-recommended-service';
+import {
+  enrichRecommended,
+  stage2EvidenceAssertion,
+  stage2RecordedAssertion,
+} from '../../lib/services/workbench/enrich-recommended-service';
+
+describe('Stage 2 publication currentness producer', () => {
+  test.each(['pubmed', 'openalex'])('undated %s evidence remains unknown', (verificationSource) => {
+    expect(stage2EvidenceAssertion({ verificationSource }, 'Synthetic institution')).toMatchObject({
+      sourceType: 'publication',
+      currentness: 'unknown',
+      observedAt: null,
+      authorSpecific: true,
+    });
+  });
+
+  test('undated PubMed-derived recorded evidence remains unknown', () => {
+    expect(stage2RecordedAssertion({}, { affiliationSource: 'pubmed_recency' }, 'Synthetic institution'))
+      .toMatchObject({
+        sourceType: 'publication',
+        currentness: 'unknown',
+        observedAt: null,
+      });
+  });
+});
 
 const REQ = '11111111-1111-1111-1111-111111111111';
 const PR = '22222222-2222-2222-2222-222222222222';
@@ -978,7 +1002,7 @@ test('Stage 2 explanation never changes the incumbent institution hold or write 
     legacyHold: true,
     evidenceAssertion: expect.objectContaining({
       sourceType: 'publication',
-      currentness: 'historical',
+      currentness: 'unknown',
       authorSpecific: true,
     }),
   }), expect.any(Object));
