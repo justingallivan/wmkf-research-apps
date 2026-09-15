@@ -11,6 +11,7 @@ owner: product-engineering
 related:
   - docs/audits/institution-affiliation-last-cycle-baseline-2026-09-14.md
   - docs/INSTITUTION_PAIR_CONSISTENCY_RESOLUTION_PLAN.md
+  - docs/plans/REVIEWER_INSTITUTION_AUTO_RESOLUTION_PLAN_2026-09-14.md
   - scripts/collect-institution-affiliation-source-packet.js
   - scripts/select-institution-affiliation-adjudication-queue.js
 ---

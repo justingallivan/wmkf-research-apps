@@ -9,6 +9,7 @@ cataloged: 2026-08-08
 last_verified: 2026-09-14
 owner: product-engineering
 related:
+  - docs/plans/REVIEWER_INSTITUTION_AUTO_RESOLUTION_PLAN_2026-09-14.md
   - docs/ROR_REVIEWER_FINDING_STRATEGIC_RESET_BRIEF.md
   - docs/REVIEWER_IDENTITY_AND_INSTITUTION_RESOLUTION_RESEARCH.md
   - docs/REVIEWER_ADDRESS_TRUST_AND_CONFLICT_RESOLUTION_PLAN.md
@@ -568,6 +569,19 @@ records denominators and the missing measurements. Execution step 1 remains
 open: prospective capture is source-built but not enabled or live-probed, with no organic
 events yet. Do not interpret 106 as avoidable reviews or proceed to a live
 selection-authority flip on this evidence.
+
+**Owner-reviewed intake result (2026-09-14):** a varied 26-case subset of the
+source-recoverable cohort produced 22 same-person, two different-person, and
+two unknown labels, plus 19 same-institution and seven distinct-institution
+labels. One wrong-person case also had internally consistent institution
+evidence for that wrong person, directly confirming that institution agreement
+cannot bypass the identity gate. This is useful qualitative evidence for the
+narrow automatic-clear direction, but it remains nonrepresentative and lacks
+original-source timing, complete extra-affiliation COI screening, and observed
+staff-action labels. It therefore does not close execution step 1 or authorize
+a consumer flip. The focused policy, label, test, measurement, and rollout
+sequence is in
+`docs/plans/REVIEWER_INSTITUTION_AUTO_RESOLUTION_PLAN_2026-09-14.md`.
 
 1. **Measure and label the work being removed.** Establish an organic baseline
    of institution-driven holds and staff actions per case. Add a blind,
