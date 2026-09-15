@@ -748,6 +748,32 @@ test('render-time diagnostics (referee_name_not_matched) survive persistence and
   ]));
 });
 
+test('composer-time referee_rating_unlabelled diagnostics survive persistence and surface as a warning (wrap-up item 5)', async () => {
+  const harness = createHarness();
+  harness.dependencies.loadInputs.mockResolvedValueOnce(inputFixture({
+    context: {
+      ...inputFixture().context,
+      refereeSectionDiagnostics: [{ code: 'referee_rating_unlabelled', name: 'Dr. Legacy' }],
+    },
+  }));
+
+  await generatePreSiteVisitArtifact({ requestId: REQUEST_ID }, harness.dependencies);
+
+  const core = JSON.parse(harness.row.wmkf_presiteproposalcorejson);
+  expect(core.diagnostics).toEqual(expect.arrayContaining([
+    { code: 'referee_rating_unlabelled', name: 'Dr. Legacy' },
+  ]));
+
+  const status = await getPreSiteVisitArtifactStatus({ requestId: REQUEST_ID }, harness.dependencies);
+  expect(status.currentArtifact.warnings).toEqual(expect.arrayContaining([
+    expect.objectContaining({
+      code: 'referee_rating_unlabelled',
+      name: 'Dr. Legacy',
+      message: expect.stringContaining('Dr. Legacy'),
+    }),
+  ]));
+});
+
 test('a reviewer name never joins personnelNames, so it can never trigger personnel_name_not_matched (plan §4.5)', async () => {
   const harness = createHarness();
   harness.dependencies.loadInputs.mockResolvedValueOnce(inputFixture({
@@ -763,7 +789,18 @@ test('a reviewer name never joins personnelNames, so it can never trigger person
 
   const status = await getPreSiteVisitArtifactStatus({ requestId: REQUEST_ID }, harness.dependencies);
   const personnelWarnings = status.currentArtifact.warnings.filter((w) => w.code === 'personnel_name_not_matched');
+  // Denominator (wrap-up item 4): the fixture's mocked "Personnel overview."/
+  // "Personnel details." generated text does not contain either roster name
+  // ("Ada Principal", "Casey Collaborator"), so this harness always produces
+  // at least one real personnel_name_not_matched warning — this assertion
+  // cannot pass vacuously on an empty array.
+  expect(personnelWarnings.length).toBeGreaterThan(0);
   expect(personnelWarnings.every((w) => w.rosterDisplayName !== 'Dr. Reviewer')).toBe(true);
+
+  // Also assert directly on what the renderer was given: the reviewer name
+  // must never appear in the personnelNames array passed to renderDocx.
+  const renderCall = harness.dependencies.renderDocx.mock.calls.at(-1)[0];
+  expect(renderCall.personnelNames).not.toContain('Dr. Reviewer');
 });
 
 

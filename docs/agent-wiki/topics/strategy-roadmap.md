@@ -329,7 +329,11 @@ document inventory, and individual implementation plans do not establish priorit
   the live rows matching the rollups' predicate (`wmkf_typeforrollup eq
   'Program' and akoya_grant gt 0`); the cited award is the newest
   **Research**-program grant by `akoya_decisiondate ?? wmkf_meetingdate`
-  (owner decision). Snapshot schemaVersion 3; pre-S467 Ready rows carry a
+  (owner decision). Snapshot schemaVersion 3 at S467; a branch-only Reviews
+  Tab Slice 4 change (2026-09-14, not yet deployed) bumps it to schemaVersion
+  4 to add `request.refereeSection` — **Production remains schemaVersion 3
+  until that branch merges and deploys** (see
+  `docs/atlas/dataverse-wmkf-requestdocument.md`). Pre-S467 Ready rows carry a
   `funding_history_manual` warning. Proven on `1002379` (zero-count branch);
   the positive branch is probe/test-proven only. Hazard: `akoya_mostrecentgrant`
   is NOT type-filtered — never cite it. Request `1002379`'s writeup state was

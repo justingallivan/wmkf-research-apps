@@ -1449,7 +1449,15 @@ roster-read failure at generation fails closed
 (`pre_site_visit_referee_roster_unavailable`); `referee_section_manual`
 surfaces whenever the stored snapshot predates the feature (v2/v3) or a v4
 snapshot has no composed section (zero submitted reviews at generation) —
-modelled on the existing `funding_history_manual` note. **Production
+modelled on the existing `funding_history_manual` note. **Wrap-up
+(2026-09-14):** a composer failure (as distinct from a roster read failure)
+fails closed separately as `pre_site_visit_referee_compose_failed`; a
+submitted review with an unlabelled (pre-current-scale) rating emits
+`referee_rating_unlabelled` instead of silently vanishing from the score
+tally; `renderPreSiteVisitDocx` treats a blank/whitespace-only
+`refereeSection.text` as `null`; and `review-synthesis-readiness.js` exports
+`REVIEW_SYNTHESIS_BLOCKER_REASONS` so the allowlist test iterates the live
+reason set rather than a hand-copied list. **Production
 publish of this prompt row is a separate owner step** (`--force` republish,
 plan §4.3) — not run as part of this build; the live row and the read paths on
 both sides tolerate either the five-key or seven-key shape. Same

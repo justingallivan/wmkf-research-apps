@@ -11,6 +11,7 @@ import {
   compareReviewersByName,
   composeRefereeSection,
 } from '../../shared/utils/review-writeup-paragraphs';
+import { REVIEW_SYNTHESIS_BLOCKER_REASONS } from '../../lib/services/review-synthesis-readiness';
 
 function reviewer(overrides = {}) {
   return {
@@ -749,27 +750,17 @@ describe('composeRefereeSection (Slice 4)', () => {
     expect(result.diagnostics).toEqual([{ code: 'referee_blocker_unnamed', reason: 'active_invitation' }]);
   });
 
-  // Table-driven (plan §4.5): every reason string
-  // lib/services/review-synthesis-readiness.js's classifyParticipant can
-  // emit for an UNRESOLVED (blocking) participant — grepped from that file's
-  // `resolved: false` branches — plus one reason the module does not define,
-  // standing in for "anything not recognised". A new reason added to that
-  // module without updating this list fails this test, not silently falls
-  // into a sentence.
+  // Table-driven (plan §4.5, wrap-up item 3): iterates the LIVE
+  // `REVIEW_SYNTHESIS_BLOCKER_REASONS` export from
+  // lib/services/review-synthesis-readiness.js (every reason string
+  // classifyParticipant can emit for an UNRESOLVED/blocking participant),
+  // plus one reason the module does not define, standing in for "anything
+  // not recognised". Because this list is imported rather than hand-copied,
+  // a new reason added to that module is automatically exercised here — the
+  // allowlist safety (only `active_invitation` is ever named) is what keeps
+  // an unreviewed new reason safe, not this test failing.
   const ALL_UNRESOLVED_READINESS_REASONS = [
-    'unknown_response_type',
-    'unknown_review_status',
-    'malformed_wmkf_invited',
-    'malformed_wmkf_accepted',
-    'malformed_wmkf_declined',
-    'malformed_wmkf_externaltokenrevoked',
-    'malformed_review_received_at',
-    'malformed_token_issued_at',
-    'malformed_token_expires_at',
-    'missing_current_token',
-    'missing_token_issued_at',
-    'missing_token_expires_at',
-    'active_invitation',
+    ...REVIEW_SYNTHESIS_BLOCKER_REASONS,
     'some_future_reason_not_yet_defined',
   ];
 
@@ -803,5 +794,21 @@ describe('composeRefereeSection (Slice 4)', () => {
     // No model-authored text (themes/quotations) is ever composed here —
     // composeRefereeSection never even accepts a `synthesis` argument.
     expect(result.text).not.toContain('undefined');
+  });
+
+  it('promotes an unlabelled (legacy-scale) rating to a referee_rating_unlabelled diagnostic instead of silently dropping it (wrap-up item 5)', () => {
+    const result = composeRefereeSection({
+      reviewers: [
+        reviewer({ suggestionId: 'a', name: 'Dr. Current', reviewerOverallAssessment: 5 }),
+        reviewer({ suggestionId: 'b', name: 'Dr. Legacy', reviewerOverallAssessment: 99 }),
+      ],
+      blockers: [],
+    });
+    expect(result.diagnostics).toEqual(
+      expect.arrayContaining([{ code: 'referee_rating_unlabelled', name: 'Dr. Legacy' }]),
+    );
+    // The tally sentence still excludes the unlabelled rating (unchanged
+    // behavior), the diagnostic is additive.
+    expect(result.text).toContain('We received two reviews with scores of one Excellent.');
   });
 });

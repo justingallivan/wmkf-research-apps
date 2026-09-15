@@ -217,16 +217,18 @@ export function compareReviewersByName(a, b) {
  * filtered array.
  *
  * @param {Array<Object>} submitted
- * @returns {{ tallies: Map<string, number>, labelOrder: Array<{label:string, rating:number|null}>, warnings: string[] }}
+ * @returns {{ tallies: Map<string, number>, labelOrder: Array<{label:string, rating:number|null}>, warnings: string[], unlabelled: Array<{name:(string|null)}> }}
  */
 function tallyScoreLabels(submitted) {
   const tallies = new Map(); // label -> count
   const labelOrder = [];
   const warnings = [];
+  const unlabelled = [];
   for (const reviewer of submitted) {
     const label = labelForReviewRating('overallAssessment', reviewer.reviewerOverallAssessment);
     if (!label) {
       warnings.push(`${reviewer.name || 'An unnamed reviewer'}'s overall rating has no label and was left out of the score tally.`);
+      unlabelled.push({ name: reviewer.name || null });
       continue;
     }
     if (!tallies.has(label)) {
@@ -236,7 +238,7 @@ function tallyScoreLabels(submitted) {
     tallies.set(label, tallies.get(label) + 1);
   }
   labelOrder.sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
-  return { tallies, labelOrder, warnings };
+  return { tallies, labelOrder, warnings, unlabelled };
 }
 
 /**
@@ -629,8 +631,14 @@ const NAMEABLE_BLOCKER_REASON = 'active_invitation';
  * a `{code: 'referee_blocker_unnamed', reason}` diagnostic instead of
  * silently naming (or silently dropping) an ambiguous case.
  *
+ * A submitted review with an unlabelled (pre-current-scale) rating is
+ * excluded from the score tally and emits a
+ * `{code: 'referee_rating_unlabelled', name}` diagnostic (wrap-up item 5)
+ * rather than silently vanishing from both the sentence and the persisted
+ * diagnostics.
+ *
  * @param {{reviewers: Array<Object>, blockers?: Array<{suggestionId:string, reason:string, name:(string|null), accepted:boolean}>}} input
- * @returns {{ text: string, names: string[], diagnostics: Array<{code:string, reason:string}> } | null}
+ * @returns {{ text: string, names: string[], diagnostics: Array<{code:string, reason?:string, name?:(string|null)}> } | null}
  */
 export function composeRefereeSection({ reviewers, blockers } = {}) {
   const submitted = submittedReviewersOf(reviewers);
@@ -646,6 +654,16 @@ export function composeRefereeSection({ reviewers, blockers } = {}) {
   const sentences = [];
   const names = [];
   const diagnostics = [];
+
+  // Wrap-up item 5: a submitted review whose rating has no label under the
+  // current form scale is silently excluded from the score tally above
+  // (`tallyScoreLabels`'s `warnings`); promote that to a diagnostic so it
+  // reaches the artifact's stored diagnostics and the Workbench warning
+  // panel, rather than only ever being visible as a tab-side string.
+  const { unlabelled } = tallyScoreLabels(submitted);
+  for (const entry of unlabelled) {
+    diagnostics.push({ code: 'referee_rating_unlabelled', name: entry.name || null });
+  }
 
   if (countSentence) sentences.push(countSentence);
   if (reviewerSentence) {

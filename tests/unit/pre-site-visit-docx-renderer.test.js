@@ -454,4 +454,61 @@ describe('RefereeSection (Slice 4, conditional placeholder)', () => {
     expect(diagnostics).toEqual([{ code: 'referee_name_not_matched', name: 'Dr. Unmatched' }]);
   });
 
+  async function templateWithDuplicatedRefereeToken() {
+    const template = await fs.readFile(defaultPreSiteVisitTemplatePath());
+    const zip = await JSZip.loadAsync(template);
+    const documentXml = await zip.file('word/document.xml').async('string');
+    const paragraphs = Array.from(documentXml.matchAll(/<w:p(?:\s[^>]*)?>[\s\S]*?<\/w:p>/g));
+    // The token can be split across multiple <w:t> runs in the real
+    // template, so match on the paragraph's LOGICAL text (all <w:t> content
+    // concatenated), the same way the renderer itself detects the token
+    // paragraph, rather than a raw substring search on the paragraph's XML.
+    const tokenParagraph = paragraphs.find((match) => Array.from(
+      match[0].matchAll(/<w:t(?:\s[^>]*)?>([\s\S]*?)<\/w:t>/g),
+    ).map((run) => run[1]).join('').includes('[[STAFF:RefereeSection]]'));
+    expect(tokenParagraph).toBeDefined();
+    const insertAt = tokenParagraph.index + tokenParagraph[0].length;
+    // Duplicate the exact, whole, well-formed <w:p>...</w:p> element that
+    // holds the token right after itself — this stays well-formed XML
+    // (unlike ad hoc string surgery), giving the template two occurrences.
+    const duplicated = `${documentXml.slice(0, insertAt)}${tokenParagraph[0]}${documentXml.slice(insertAt)}`;
+    zip.file('word/document.xml', duplicated);
+    return zip.generateAsync({ type: 'nodebuffer' });
+  }
+
+  test('throws "Expected exactly one template occurrence" when a referee section is supplied against a template with two tokens (wrap-up item 1)', async () => {
+    const templateBuffer = await templateWithDuplicatedRefereeToken();
+    await expect(renderPreSiteVisitDocx({
+      documentFields: documentFieldsFixture(),
+      proposalCore: proposalCoreFixture(),
+      personnelNames: personnelNamesFixture(),
+      refereeSection: { text: 'We received one review.', names: [] },
+      templateBuffer,
+    })).rejects.toThrow(/Expected exactly one template occurrence of \[\[STAFF:RefereeSection\]\]; found 2\./);
+  });
+
+  test('throws "survive exactly once" when no referee section is supplied against a template with two tokens (wrap-up item 1)', async () => {
+    const templateBuffer = await templateWithDuplicatedRefereeToken();
+    await expect(renderPreSiteVisitDocx({
+      documentFields: documentFieldsFixture(),
+      proposalCore: proposalCoreFixture(),
+      personnelNames: personnelNamesFixture(),
+      refereeSection: null,
+      templateBuffer,
+    })).rejects.toThrow(/Expected \[\[STAFF:RefereeSection\]\] to survive exactly once when no referee section is supplied; found 2\./);
+  });
+
+  test('treats a blank/whitespace-only refereeSection.text as null — token preserved, no fill (wrap-up item 2)', async () => {
+    const { docx: output, diagnostics } = await renderPreSiteVisitDocx({
+      documentFields: documentFieldsFixture(),
+      proposalCore: proposalCoreFixture(),
+      personnelNames: personnelNamesFixture(),
+      refereeSection: { text: '   ', names: [] },
+    });
+    const rendered = await JSZip.loadAsync(output);
+    const xml = await wordXml(rendered);
+    expect((xml.match(/\[\[STAFF:RefereeSection\]\]/g) || [])).toHaveLength(1);
+    expect(diagnostics).toEqual([]);
+  });
+
 });

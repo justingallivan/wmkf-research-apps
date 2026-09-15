@@ -226,14 +226,14 @@ test('fails closed when the reviewer roster read fails (Reviews paragraph cannot
   warnSpy.mockRestore();
 });
 
-test('fails closed when composeRefereeSection itself throws', async () => {
+test('fails closed with a DISTINCT code when composeRefereeSection itself throws (wrap-up item 6: composer failure vs. roster read failure)', async () => {
   const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
   const deps = dependencies({
     composeRefereeSection: jest.fn(() => { throw new Error('composer exploded'); }),
   });
 
   await expect(loadPreSiteVisitInputs({ requestId: REQUEST_ID }, deps))
-    .rejects.toMatchObject({ code: 'pre_site_visit_referee_roster_unavailable', httpStatus: 409 });
+    .rejects.toMatchObject({ code: 'pre_site_visit_referee_compose_failed', httpStatus: 409 });
   warnSpy.mockRestore();
 });
 

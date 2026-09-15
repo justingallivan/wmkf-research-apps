@@ -374,8 +374,16 @@ Production Request Document row was created by this release smoke.
   `referee_blocker_unnamed` (an unresolved reviewer invitation whose blocker
   reason isn't the allowlisted `active_invitation`+accepted case). A genuine
   reviewer-roster read failure at generation time fails closed
-  (`pre_site_visit_referee_roster_unavailable`), same posture as the existing
-  funding-history read failure.
+  (`pre_site_visit_referee_roster_unavailable`), and a composer failure fails
+  closed separately (`pre_site_visit_referee_compose_failed`), same posture as
+  the existing funding-history read failure. `renderPreSiteVisitDocx` treats a
+  supplied `refereeSection` with blank/whitespace-only `text` identically to
+  `null` (token preserved, not filled with an empty paragraph). A submitted
+  review whose rating falls outside the current form scale is tallied as an
+  unlabelled `referee_rating_unlabelled` diagnostic rather than silently
+  dropped from the score sentence.
+  [RECHECKED after lib/services/pre-site-visit/docx-renderer.js change:
+  2026-09-14 wrap-up — blank-text normalization added.]
 
 The persistence schema and writer are live in Production. **[VERIFIED IN
 PRODUCTION 2026-08-17]** the runtime writer required the exact narrative,
