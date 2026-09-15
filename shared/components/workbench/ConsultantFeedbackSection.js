@@ -16,8 +16,11 @@
  * sends the same id, and rotated only after a confirmed 2xx or an explicit
  * form reset — the server replays the original row on a duplicate mutation
  * id instead of inserting twice.
+ *
+ * Slice 3 adds request-scoped staff attachment links, local briefing-
+ * visibility filters, and a searchable keyboard-first roster combobox.
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import RichReviewEditor from '../external/RichReviewEditor';
 import { SITE_VISIT_MATERIALS_UPLOAD_MAX_MB_DEFAULT } from '../../config/siteVisitMaterials';
 
@@ -36,7 +39,128 @@ const ATTACHMENT_CONTENT_TYPES = new Set([
 function consultantDisplayName(form, consultants) {
   if (form.addingPerson) return form.oneOffName.trim();
   const match = consultants.find((c) => String(c.id) === String(form.consultantRosterId));
-  return match?.name || '';
+  return match?.name || form.consultantName || '';
+}
+
+function attachmentHref(requestId, entryId) {
+  const params = new URLSearchParams({ requestId, entryId: String(entryId) });
+  return `/api/workbench/consultant-feedback/attachment?${params.toString()}`;
+}
+
+function ConsultantCombobox({ consultants, value, displayName, onSelect }) {
+  const [query, setQuery] = useState(displayName || '');
+  const [open, setOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const listboxId = 'consultant-feedback-consultant-options';
+
+  useEffect(() => {
+    if (value) setQuery(displayName || '');
+  }, [value, displayName]);
+
+  const options = useMemo(() => {
+    const showingSelection = value && query === (displayName || '');
+    const term = showingSelection ? '' : query.trim().toLowerCase();
+    if (!term) return consultants;
+    return consultants.filter((consultant) => (
+      `${consultant.name || ''} ${consultant.affiliation || ''}`.toLowerCase().includes(term)
+    ));
+  }, [consultants, displayName, query, value]);
+
+  useEffect(() => {
+    setActiveIndex((current) => Math.min(current, Math.max(options.length - 1, 0)));
+  }, [options.length]);
+
+  function choose(consultant) {
+    onSelect(consultant);
+    setQuery(consultant.name || '');
+    setOpen(false);
+  }
+
+  function handleKeyDown(event) {
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      setOpen(true);
+      setActiveIndex((current) => options.length ? (open ? (current + 1) % options.length : 0) : 0);
+      return;
+    }
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      setOpen(true);
+      setActiveIndex((current) => options.length ? (open ? (current - 1 + options.length) % options.length : options.length - 1) : 0);
+      return;
+    }
+    if (event.key === 'Enter' && open && options[activeIndex]) {
+      event.preventDefault();
+      choose(options[activeIndex]);
+      return;
+    }
+    if (event.key === 'Escape' && open) {
+      event.preventDefault();
+      setOpen(false);
+      setQuery(displayName || '');
+    }
+  }
+
+  return (
+    <div
+      className="relative min-w-0 flex-1"
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false);
+      }}
+    >
+      <input
+        id="consultant-feedback-consultant"
+        type="text"
+        role="combobox"
+        aria-autocomplete="list"
+        aria-expanded={open}
+        aria-controls={listboxId}
+        aria-activedescendant={open && options[activeIndex] ? `${listboxId}-${options[activeIndex].id}` : undefined}
+        autoComplete="off"
+        value={query}
+        placeholder="Search consultants…"
+        onFocus={(event) => {
+          setOpen(true);
+          event.currentTarget.select();
+        }}
+        onChange={(event) => {
+          setQuery(event.target.value);
+          onSelect(null);
+          setActiveIndex(0);
+          setOpen(true);
+        }}
+        onKeyDown={handleKeyDown}
+        className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+      />
+      {open && (
+        <ul
+          id={listboxId}
+          role="listbox"
+          className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-xl border border-gray-200 bg-white py-1 shadow-lg"
+        >
+          {options.length ? options.map((consultant, index) => (
+            <li
+              id={`${listboxId}-${consultant.id}`}
+              key={consultant.id}
+              role="option"
+              aria-selected={String(value) === String(consultant.id)}
+              onMouseDown={(event) => {
+                event.preventDefault();
+              }}
+              onClick={() => choose(consultant)}
+              onMouseEnter={() => setActiveIndex(index)}
+              className={`cursor-pointer px-3 py-2 text-sm ${index === activeIndex ? 'bg-gray-100 text-gray-950' : 'text-gray-700'}`}
+            >
+              <span className="block font-medium">{consultant.name}</span>
+              {consultant.affiliation && <span className="block text-xs text-gray-500">{consultant.affiliation}</span>}
+            </li>
+          )) : (
+            <li className="px-3 py-2 text-sm text-gray-500">No matching consultants.</li>
+          )}
+        </ul>
+      )}
+    </div>
+  );
 }
 
 // Same defensive pattern as review-panel-ui.js's makeIdempotencyKey and
@@ -76,6 +200,7 @@ function todayIso() {
 function emptyForm() {
   return {
     consultantRosterId: '',
+    consultantName: '',
     addingPerson: false,
     oneOffName: '',
     oneOffAffiliation: '',
@@ -98,6 +223,7 @@ export default function ConsultantFeedbackSection({ requestId, previewReadOnly =
   const [saveError, setSaveError] = useState(null);
   const [confirmingDeleteId, setConfirmingDeleteId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
+  const [visibilityFilter, setVisibilityFilter] = useState('all');
 
   // Slice 2 attachment (§4). `editingAttachment` is the EXISTING attachment
   // on the entry being edited (null on the add form, or an edit form for an
@@ -133,6 +259,17 @@ export default function ConsultantFeedbackSection({ requestId, previewReadOnly =
   // an entry whose roster consultant was since deactivated must not re-run
   // eligibility.
   const originalAuthorRef = useRef(null);
+
+  const visibilityCounts = useMemo(() => ({
+    all: items.length,
+    shared: items.filter((item) => item.shared).length,
+    unshared: items.filter((item) => !item.shared).length,
+  }), [items]);
+  const visibleItems = useMemo(() => {
+    if (visibilityFilter === 'shared') return items.filter((item) => item.shared);
+    if (visibilityFilter === 'unshared') return items.filter((item) => !item.shared);
+    return items;
+  }, [items, visibilityFilter]);
 
   const load = useCallback(async () => {
     if (!requestId) return;
@@ -190,6 +327,7 @@ export default function ConsultantFeedbackSection({ requestId, previewReadOnly =
     setEditingId(item.id);
     setForm({
       consultantRosterId: item.consultant.rosterId != null ? String(item.consultant.rosterId) : '',
+      consultantName: item.consultant.name || '',
       addingPerson: item.oneOff,
       oneOffName: item.oneOff ? (item.consultant.name || '') : '',
       oneOffAffiliation: item.oneOff ? (item.consultant.affiliation || '') : '',
@@ -247,6 +385,7 @@ export default function ConsultantFeedbackSection({ requestId, previewReadOnly =
   useEffect(() => {
     closeForm();
     setConfirmingDeleteId(null);
+    setVisibilityFilter('all');
   }, [requestId, closeForm]);
 
   const handleSave = useCallback(async () => {
@@ -481,20 +620,24 @@ export default function ConsultantFeedbackSection({ requestId, previewReadOnly =
             <label className="block text-xs font-medium text-gray-700" htmlFor="consultant-feedback-consultant">Consultant</label>
             {!form.addingPerson ? (
               <div className="mt-1 flex items-center gap-2">
-                <select
-                  id="consultant-feedback-consultant"
+                <ConsultantCombobox
+                  consultants={consultants}
                   value={form.consultantRosterId}
-                  onChange={(e) => setForm((f) => ({ ...f, consultantRosterId: e.target.value }))}
-                  className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                >
-                  <option value="">Select a consultant…</option>
-                  {consultants.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}{c.affiliation ? ` — ${c.affiliation}` : ''}</option>
-                  ))}
-                </select>
+                  displayName={form.consultantName}
+                  onSelect={(consultant) => setForm((current) => ({
+                    ...current,
+                    consultantRosterId: consultant ? String(consultant.id) : '',
+                    consultantName: consultant?.name || '',
+                  }))}
+                />
                 <button
                   type="button"
-                  onClick={() => setForm((f) => ({ ...f, addingPerson: true, consultantRosterId: '' }))}
+                  onClick={() => setForm((f) => ({
+                    ...f,
+                    addingPerson: true,
+                    consultantRosterId: '',
+                    consultantName: '',
+                  }))}
                   className="whitespace-nowrap text-sm font-medium text-blue-800 hover:underline"
                 >
                   Add person…
@@ -518,7 +661,14 @@ export default function ConsultantFeedbackSection({ requestId, previewReadOnly =
                 />
                 <button
                   type="button"
-                  onClick={() => setForm((f) => ({ ...f, addingPerson: false, oneOffName: '', oneOffAffiliation: '' }))}
+                  onClick={() => setForm((f) => ({
+                    ...f,
+                    addingPerson: false,
+                    oneOffName: '',
+                    oneOffAffiliation: '',
+                    consultantRosterId: '',
+                    consultantName: '',
+                  }))}
                   className="text-sm font-medium text-gray-600 hover:underline"
                 >
                   Choose from roster instead
@@ -553,7 +703,20 @@ export default function ConsultantFeedbackSection({ requestId, previewReadOnly =
             <label className="block text-xs font-medium text-gray-700" htmlFor="consultant-feedback-attachment">Attachment (optional)</label>
             {editingAttachment ? (
               <p className="mt-1 text-xs text-gray-500">
-                Attachment: {editingAttachment.filename || 'file'} (one attachment per entry — delete this entry and re-add to replace it)
+                Attachment:{' '}
+                {editingAttachment.status === 'unavailable' ? (
+                  <span>temporarily unavailable</span>
+                ) : (
+                  <a
+                    href={attachmentHref(requestId, editingId)}
+                    target={editingAttachment.contentType === 'application/pdf' ? '_blank' : undefined}
+                    rel={editingAttachment.contentType === 'application/pdf' ? 'noreferrer noopener' : undefined}
+                    className="font-medium text-blue-800 underline decoration-blue-300 underline-offset-2 hover:text-blue-950"
+                  >
+                    {editingAttachment.contentType === 'application/pdf' ? 'Open' : 'Download'} {editingAttachment.filename || 'attachment'}
+                  </a>
+                )}{' '}
+                (one attachment per entry — delete this entry and re-add to replace it)
               </p>
             ) : (
               <>
@@ -613,8 +776,37 @@ export default function ConsultantFeedbackSection({ requestId, previewReadOnly =
       )}
 
       {items.length > 0 && (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+          <span className="text-xs font-medium text-gray-600">Briefing visibility</span>
+          <div role="group" aria-label="Filter consultant feedback by briefing visibility" className="inline-flex overflow-hidden rounded-lg border border-gray-300 bg-white">
+            {[
+              ['all', 'All'],
+              ['shared', 'Shared'],
+              ['unshared', 'Not shared'],
+            ].map(([value, label], index) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setVisibilityFilter(value)}
+                aria-pressed={visibilityFilter === value}
+                className={`min-h-8 px-3 py-1.5 text-xs font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-600 ${index ? 'border-l border-gray-300' : ''} ${visibilityFilter === value ? 'bg-gray-900 text-white' : 'text-gray-700 hover:bg-gray-50'}`}
+              >
+                {label} ({visibilityCounts[value]})
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {!loading && items.length > 0 && visibleItems.length === 0 && (
+        <p className="mt-3 rounded-lg border border-dashed border-gray-300 px-4 py-3 text-sm text-gray-500">
+          No {visibilityFilter === 'shared' ? 'shared' : 'not-shared'} feedback entries.
+        </p>
+      )}
+
+      {visibleItems.length > 0 && (
         <ul className="mt-3 divide-y divide-gray-200 rounded-xl border border-gray-200 bg-white">
-          {items.map((item) => (
+          {visibleItems.map((item) => (
             <li key={item.id} className="flex flex-wrap items-start justify-between gap-2 px-4 py-3">
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
@@ -631,11 +823,20 @@ export default function ConsultantFeedbackSection({ requestId, previewReadOnly =
                   </p>
                 )}
                 {item.attachment && (
-                  // Plain label, not a link: no staff download route exists for
-                  // an arbitrary request-document registry id (only the
-                  // proposal-specific `/api/workbench/download-proposal-document`
-                  // does) — acceptable for this slice per the build brief.
-                  <p className="mt-1 text-xs text-gray-500">Attachment: {item.attachment.filename || 'file'}</p>
+                  <p className="mt-1 text-xs text-gray-500">
+                    {item.attachment.status === 'unavailable' ? (
+                      'Attachment temporarily unavailable'
+                    ) : (
+                      <a
+                        href={attachmentHref(requestId, item.id)}
+                        target={item.attachment.contentType === 'application/pdf' ? '_blank' : undefined}
+                        rel={item.attachment.contentType === 'application/pdf' ? 'noreferrer noopener' : undefined}
+                        className="font-medium text-blue-800 underline decoration-blue-300 underline-offset-2 hover:text-blue-950"
+                      >
+                        {item.attachment.contentType === 'application/pdf' ? 'Open' : 'Download'} {item.attachment.filename || 'attachment'}
+                      </a>
+                    )}
+                  </p>
                 )}
               </div>
               <div className="flex shrink-0 items-center gap-2">

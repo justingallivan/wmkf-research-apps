@@ -3,7 +3,7 @@ title: Consultant Feedback — Informal Consultant Input on the Reviews Tab and 
 domain: reviewers
 kind: plan
 status: active
-summary: "Slice 1 PRODUCTION-LIVE 2026-09-14 (PR #293); slice 2 (attachments) built on branch feature/consultant-feedback-slice-2, awaiting merge. Staff record informal feedback on a proposal from retained consultants (pasted text and/or an attached file), attributed to a roster consultant, editable, and shared by default on the deliberation briefing page as its own section. Postgres owns the entry; the request-document registry and SharePoint own any attached file."
+summary: "Slice 1 PRODUCTION-LIVE 2026-09-14 (PR #293); slice 2 attachments are complete; slice 3 staff attachment access and list/chooser polish are source-built on branch codex/consultant-feedback-slice-3, awaiting review and merge. Staff record informal feedback on a proposal from retained consultants (pasted text and/or an attached file), attributed to a roster consultant, editable, and shared by default on the deliberation briefing page as its own section. Postgres owns the entry; the request-document registry and SharePoint own any attached file."
 cataloged: 2026-09-14
 last_verified: 2026-09-14
 owner: product-engineering
@@ -181,13 +181,14 @@ through the Expertise Finder and edit the entry to select the roster row.
   Graph call, matching the existing kinds. The `material:` kind's artifact-type filter is **not**
   widened.
 
-### 3.4 Routes [slice 1 rows BUILT S512 and registered in `docs/API_ROUTE_SECURITY_MATRIX.md`; slice 2 rows BUILT ON BRANCH S512 (`feature/consultant-feedback-slice-2`, commit `dd5f1611` + review-round fixes; not yet merged), registered in the matrix]
+### 3.4 Routes [slice 1 rows BUILT S512 and registered in `docs/API_ROUTE_SECURITY_MATRIX.md`; slice 2 rows BUILT ON BRANCH S512 (`feature/consultant-feedback-slice-2`, commit `dd5f1611` + review-round fixes; not yet merged); slice 3 staff download SOURCE-BUILT on `codex/consultant-feedback-slice-3`; all registered in the matrix]
 
 | Route | Method | Guard | Purpose |
 |---|---|---|---|
 | `/api/workbench/consultant-feedback` | GET | `requireAppAccess('reviewers')`; `withDalContext` | List entries for `?requestId=` (GUID-validated) with live roster join |
-| `/api/workbench/consultant-feedback` | POST | same | Create (roster id or new person), update by `id`, delete by `id`; actor from session |
-| `/api/workbench/consultant-feedback/consultants` | GET | same | Dropdown source: active roster rows with `role_type = 'Consultant'`, id/name/affiliation only |
+| `/api/workbench/consultant-feedback` | POST, PATCH, DELETE | same | Create (roster id or new person), update by `id`, delete by `id`; actor from session |
+| `/api/workbench/consultant-feedback/consultants` | GET | same | Combobox search source: active roster rows with `role_type = 'Consultant'`, id/name/affiliation only |
+| `/api/workbench/consultant-feedback/attachment` | GET | same | **Slice 3.** Staff PDF/DOCX proxy by request GUID + feedback-entry id. The service proves one active request-owned entry and one same-request, Ready, non-Superseded Consultant Feedback registry row before Graph; no SharePoint coordinate is accepted from the client. |
 | `/api/workbench/consultant-feedback/upload-token` | POST | same | **Slice 2.** Actor-bound mint into `portal_upload_staging`, `UPLOADS_BLOB_RW_TOKEN`, request-bound |
 | `/api/workbench/consultant-feedback/finalize` | POST | same | **Slice 2.** Reauthorizes independently; scan when enabled; Graph upload; registry create; binds `requestdocument_id` |
 | `/api/external/briefing/[token]/context` | GET | existing | Adds `consultantFeedback[]` to the read model |
@@ -196,18 +197,21 @@ through the Expertise Finder and edit the entry to select the roster row.
 Existing matrix rows for `context` and `document` are amended, not duplicated. All new
 `requestId` inputs pass `isGuid` before any Dataverse selector (`check:trust-boundary-guid`).
 
-### 3.5 Staff surface [BUILT S512 on `feature/consultant-feedback-slice-1`, commit `1a58bac8`; slice 2 parts BUILT ON BRANCH S512 (`feature/consultant-feedback-slice-2`, commit `dd5f1611` + review-round fixes; not yet merged)]
+### 3.5 Staff surface [BUILT S512 on `feature/consultant-feedback-slice-1`, commit `1a58bac8`; slice 2 parts BUILT ON BRANCH S512 (`feature/consultant-feedback-slice-2`, commit `dd5f1611` + review-round fixes; not yet merged); slice 3 polish SOURCE-BUILT on `codex/consultant-feedback-slice-3`]
 
 New component `shared/components/workbench/ConsultantFeedbackSection.js`, mounted by
 `ReviewsTab.js` below the outstanding-reviews section:
 
 - Heading "Consultant feedback" with an "Add feedback" button.
-- Form: consultant combobox (roster search, with "Add person…" that expands name / affiliation
+- Form: searchable, keyboard-first consultant combobox (name/affiliation matching; Arrow Up/Down,
+  Enter, and Escape; with "Add person…" that expands name / affiliation
   fields stored on the entry only), received date, rich text body (the existing `RichReviewEditor` contract, so paste
   from email preserves paragraphs), attachment (slice 2), and a "Shared on briefing page"
   checkbox, checked by default.
-- List: one row per entry with consultant, date, first line of the body, attachment name, a
-  shared/not-shared pill, and Edit / Delete row actions. Delete asks once inline, then hard-deletes.
+- List: one row per entry with consultant, date, first line of the body, an authenticated Open
+  (PDF) or Download (DOCX) attachment link, a shared/not-shared pill, and Edit / Delete row
+  actions. Local All / Shared / Not shared filters include honest counts, default to All, reset
+  on request change, and create no persisted preference. Delete asks once inline, then hard-deletes.
 - Read-only Preview: mutations disabled with the same `previewReadOnly` title-text pattern the
   tab already uses (lines 747, 756).
 - Load-on-mount and reload-after-mutation copy the tab's `fetchIdRef` generation guard
@@ -374,12 +378,21 @@ briefing read-model and page section for text items; matrix rows; Atlas rows. Sh
 Dataverse admin adds the artifact-type value; mirror in `requestDocument.js`; mint + finalize
 routes; `feedback:` document member; Superseded-on-delete. Tier 1, same branch or a follow-on.
 
-### Slice 3 — polish [PLANNED, optional]
+### Slice 3 — staff attachment access and polish [SOURCE-BUILT 2026-09-14 on `codex/consultant-feedback-slice-3`; awaiting review and merge]
 
-Filter shared/unshared on the tab; consultant profile link to the roster; keyboard-first
-combobox.
+- Authenticated staff can open a PDF inline or download a DOCX from the Reviews tab. The browser
+  sends only request GUID + feedback-entry id; the service re-proves active request membership,
+  exact registry cardinality, Consultant Feedback artifact type, Ready/non-Superseded state, and
+  server-owned Graph pointers before downloading. Shared is deliberately not required for staff.
+- All / Shared / Not shared filtering is local, count-labeled, defaults to All, and resets when the
+  request changes. It adds no persistence or API query semantics.
+- The roster chooser searches consultant name and affiliation and supports Arrow Up/Down, Enter,
+  and Escape while preserving the one-off-person path.
+- **Deferred:** a consultant profile link. `expertise_roster` has no canonical profile-route key,
+  and Expertise Finder is a separately gated app without a stable consultant deep-link. Slice 3
+  does not invent a broken URL or broaden access; a future Expertise Finder contract may add one.
 
-## 7. Tests [slice 1 tests BUILT S512 (91 passing across 6 suites); slice 2 tests BUILT ON BRANCH S512 (`feature/consultant-feedback-slice-2`, commit `dd5f1611` + review-round fixes; not yet merged): 169 passing across 10 suites after Opus round 2]
+## 7. Tests [slice 1 tests BUILT S512 (91 passing across 6 suites); slice 2 tests BUILT ON BRANCH S512 (`feature/consultant-feedback-slice-2`, commit `dd5f1611` + review-round fixes; not yet merged): 169 passing across 10 suites after Opus round 2; slice 3 focused set: 84 passing across 3 suites]
 
 - Service: create with roster id / with one-off name (no roster write; assert the roster row
   count is unchanged); **eligibility**: Board, inactive, missing, and stale-dropdown roster ids are
@@ -396,6 +409,9 @@ combobox.
   `feedback:` member 404 for unshared, other-request, Superseded, or non-Ready rows with no Graph
   call; PDF inline vs download.
 - Component: default-checked share box; add-person expands fields; delete confirms once.
+- Slice 3: active-entry/request/registry membership and file-state negative fixtures before Graph;
+  PDF-inline/DOCX-download response headers; local filter counts and reset semantics; attachment
+  URLs contain no drive/item coordinates; combobox name/affiliation search and keyboard selection.
 - Gates for the surfaces touched: `check:types`, `check:api-routes` (+ self-test), `check:atlas`
   (+ self-test), `check:migrations-manifest`, `check:trust-boundary-guid`,
   `check:route-lifecycle-auth`, `check:route-service-boundary`, `check:doc-symbol-refs`,
@@ -405,7 +421,8 @@ combobox.
 
 Migration `048_consultant_feedback.sql` + `lib/db/migrations-manifest.json` + fresh-install v50;
 `docs/atlas/postgres-infra-tables.md` and `docs/APPLICATION_STATE_ATLAS.md` rows;
-`docs/API_ROUTE_SECURITY_MATRIX.md` rows (three new in slice 1, two more in slice 2, two amended);
+`docs/API_ROUTE_SECURITY_MATRIX.md` rows (three new in slice 1, two more in slice 2, one more in
+slice 3, two amended);
 `docs/DELIBERATION_BRIEFING_PAGE_PLAN.md` §2.1 gains the section row and §2.3 the member kind;
 `docs/SERVICE_AND_UTILITY_CATALOG.md` for the new service; `docs/CANONICAL_COUNTS.md`
 (`api-route-file-count` and `requireappaccess-endpoint-count` both shift) with
@@ -519,5 +536,5 @@ adversarial review of commit `dd5f1611` and the coordinator's own review, reconc
 | Registry rows omitted `wmkf_cyclecode` | Codex (medium) | **Fixed** (`meetingDateToCycleCode`, as materials do) |
 | `folder_unavailable` classified permanent | Claude | **Fixed:** released for retry |
 | Plan still said slice 2 planned/blocked | Codex (medium) | **Fixed** in this pass (section labels, §2 artifact value, summary) |
-| Staff cannot download an attachment from the Workbench (plain label) | Opus B13 | **Accepted follow-up:** no generic staff registry-download route exists; slice 3 candidate |
+| Staff cannot download an attachment from the Workbench (plain label) | Opus B13 | **Fixed in slice 3:** dedicated authenticated proxy accepts request + feedback-entry identity only and independently re-proves the Postgres and registry membership chain before Graph |
 | Bound-candidate clear bumps `updated_at`, delaying prune one retention cycle | Opus residual | Accepted |

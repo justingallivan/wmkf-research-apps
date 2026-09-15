@@ -232,7 +232,10 @@ describe('slice 2 attachment', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
 
     await waitFor(() => expect(screen.getByText('Jane Doe')).toBeInTheDocument());
-    expect(screen.getByText('Attachment: notes.pdf')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Open notes.pdf' })).toHaveAttribute(
+      'href',
+      `/api/workbench/consultant-feedback/attachment?requestId=${REQUEST_ID}&entryId=5`,
+    );
 
     const urls = calls.map((c) => c.url);
     expect(urls.some((u) => u.includes('/consultant-feedback') && !u.includes('/upload-token') && !u.includes('/finalize') && !u.includes('/consultants') && calls.find((c) => c.url === u)?.method === 'POST')).toBe(false);
@@ -316,6 +319,96 @@ describe('slice 2 attachment', () => {
     const saveButton = await screen.findByRole('button', { name: 'Save' });
     expect(saveButton).toBeEnabled();
     expect(saveButton).toHaveTextContent('Save');
+  });
+});
+
+describe('slice 3 polish', () => {
+  const ITEMS = [
+    {
+      id: '9', receivedOn: '2026-09-01', bodyHtml: '<p>Shared note.</p>', shared: true,
+      consultant: { rosterId: 1, name: 'Ada Lovelace', affiliation: 'Analytical Engines' }, oneOff: false,
+      attachment: { requestdocumentId: 'doc-1', filename: 'ada.pdf', contentType: 'application/pdf', size: 10 },
+      updatedAt: '2026-09-01T00:00:00Z',
+    },
+    {
+      id: '10', receivedOn: '2026-09-02', bodyHtml: '<p>Private note.</p>', shared: false,
+      consultant: { rosterId: 2, name: 'Grace Hopper', affiliation: 'US Navy' }, oneOff: false,
+      attachment: { requestdocumentId: 'doc-2', filename: 'grace.docx', contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', size: 20 },
+      updatedAt: '2026-09-02T00:00:00Z',
+    },
+  ];
+
+  test('filters All/Shared/Not shared locally with honest counts', async () => {
+    mockFetchSequence({ items: ITEMS });
+    render(<ConsultantFeedbackSection requestId={REQUEST_ID} />);
+    await waitFor(() => expect(screen.getByText('Ada Lovelace')).toBeInTheDocument());
+    expect(screen.getByText('Grace Hopper')).toBeInTheDocument();
+
+    expect(screen.getByRole('button', { name: 'All (2)' })).toHaveAttribute('aria-pressed', 'true');
+    await userEvent.click(screen.getByRole('button', { name: 'Shared (1)' }));
+    expect(screen.getByText('Ada Lovelace')).toBeInTheDocument();
+    expect(screen.queryByText('Grace Hopper')).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Not shared (1)' }));
+    expect(screen.queryByText('Ada Lovelace')).not.toBeInTheDocument();
+    expect(screen.getByText('Grace Hopper')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'All (2)' }));
+    expect(screen.getByText('Ada Lovelace')).toBeInTheDocument();
+    expect(screen.getByText('Grace Hopper')).toBeInTheDocument();
+  });
+
+  test('resets the local visibility filter to All when the request changes', async () => {
+    mockFetchSequence({ items: ITEMS });
+    const { rerender } = render(<ConsultantFeedbackSection requestId={REQUEST_ID} />);
+    await screen.findByText('Ada Lovelace');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Shared (1)' }));
+    expect(screen.queryByText('Grace Hopper')).not.toBeInTheDocument();
+
+    rerender(<ConsultantFeedbackSection requestId={OTHER_REQUEST_ID} />);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'All (2)' })).toHaveAttribute('aria-pressed', 'true'));
+    expect(screen.getByText('Ada Lovelace')).toBeInTheDocument();
+    expect(screen.getByText('Grace Hopper')).toBeInTheDocument();
+  });
+
+  test('attachment links use only request and entry identity; PDF opens a new tab and DOCX downloads in place', async () => {
+    mockFetchSequence({ items: ITEMS });
+    render(<ConsultantFeedbackSection requestId={REQUEST_ID} />);
+    const pdf = await screen.findByRole('link', { name: 'Open ada.pdf' });
+    const docx = screen.getByRole('link', { name: 'Download grace.docx' });
+    expect(pdf).toHaveAttribute('href', `/api/workbench/consultant-feedback/attachment?requestId=${REQUEST_ID}&entryId=9`);
+    expect(pdf).toHaveAttribute('target', '_blank');
+    expect(docx).toHaveAttribute('href', `/api/workbench/consultant-feedback/attachment?requestId=${REQUEST_ID}&entryId=10`);
+    expect(docx).not.toHaveAttribute('target');
+    expect(pdf.getAttribute('href')).not.toContain('drive');
+    expect(pdf.getAttribute('href')).not.toContain('item');
+  });
+
+  test('the consultant chooser searches name/affiliation and supports Arrow, Enter, and Escape', async () => {
+    mockFetchSequence({
+      consultants: [
+        { id: 1, name: 'Ada Lovelace', affiliation: 'Analytical Engines' },
+        { id: 2, name: 'Grace Hopper', affiliation: 'US Navy' },
+      ],
+    });
+    render(<ConsultantFeedbackSection requestId={REQUEST_ID} />);
+    await waitFor(() => expect(screen.getByText('No consultant feedback recorded yet.')).toBeInTheDocument());
+    await userEvent.click(screen.getByRole('button', { name: 'Add feedback' }));
+
+    const combobox = screen.getByRole('combobox', { name: 'Consultant' });
+    await userEvent.type(combobox, 'Navy');
+    expect(screen.getByRole('option', { name: /Grace Hopper/ })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: /Ada Lovelace/ })).not.toBeInTheDocument();
+    await userEvent.keyboard('{ArrowDown}{Enter}');
+    expect(combobox).toHaveValue('Grace Hopper');
+    expect(combobox).toHaveAttribute('aria-expanded', 'false');
+
+    await userEvent.keyboard('{ArrowDown}');
+    expect(combobox).toHaveAttribute('aria-expanded', 'true');
+    await userEvent.keyboard('{Escape}');
+    expect(combobox).toHaveAttribute('aria-expanded', 'false');
+    expect(combobox).toHaveValue('Grace Hopper');
   });
 });
 
