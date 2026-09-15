@@ -67,8 +67,10 @@ for it.
    case had internally consistent institution evidence for that wrong person.
    Institution agreement must therefore remain downstream of independent
    identity authority.
-7. **[PLANNED]** No Stage 3 behavior change, flag enablement, migration apply,
-   or enduring Preview deployment is authorized by this plan.
+7. **[VERIFIED 2026-09-15]** A separate owner-authorized operation applied
+   migration 051 to the shared Production/Preview database without enabling
+   either institution flag. This plan still authorizes no Stage 3 behavior
+   change, flag enablement, or enduring Preview deployment.
 8. **[VERIFIED via `lib/services/workbench/enrich-recommended-service.js` and
    focused tests]** Undated PubMed/OpenAlex affiliation evidence now enters
    Stage 2 as `unknown`, not `historical`. Publication dates must be carried and
@@ -108,9 +110,9 @@ for it.
   boundary.
 - **Persistence:** the existing `reviewer_find_roster.candidate` server-owned
   projection and the append-only
-  `reviewer_institution_measurement_events` observation table. Select the exact
-  storage shape only after verifying whether migration 051 has been applied in
-  any environment.
+  `reviewer_institution_measurement_events` observation table. Migration 051 is
+  applied to the shared Production/Preview database and its exact schema is
+  verified empty; any schema change now requires a new forward migration.
 - **Consumers:** candidate card, selection controls, ordinary and
   applicant-recommended save paths, staff notification, measurement report,
   cleanup, and future identity-anchor weighting.
@@ -366,12 +368,12 @@ digest. Every v1 claim is mandatory; undefined values never compare as a
 match. The roster stores only the bounded projection and receipt. Reload and
 save re-read or verify it; browser edits invalidate it.
 
-Before changing migration 051, probe `schema_migrations` in every intended
-environment. If 051 is unapplied everywhere, amend the source-built migration.
-If any environment has applied it, add a new forward migration. Never rewrite
-an applied migration. Any amendment must also update the fresh-install table
-definition in `scripts/setup-database.js`, and a gate must keep the measurement
-vocabulary synchronized with the policy export.
+Migration 051 is applied to the shared Production/Preview database. Never
+rewrite it; any schema change requires a new forward migration and the matching
+fresh-install definition update in `scripts/setup-database.js`. A gate must
+keep the measurement vocabulary synchronized with the policy export. Probe
+`schema_migrations` in every other intended environment before assuming its
+state.
 
 ### Phase 4 — expand measurement without changing behavior
 
@@ -540,5 +542,5 @@ the Phase 3 v2 policy binding and server-projected card/remedy state. Add the
 remaining rendered-state, selection-state, exact call-set, partial-batch, and
 frozen 40-case identity regressions before proposing any high-authority flag
 enablement. Keep `REVIEWER_INSTITUTION_PHASE2` off, do not enable measurement,
-do not apply migration 051, and do not create a Preview deployment during the
-intervening months.
+and do not create an enduring Preview deployment during the intervening months.
+Migration 051 is already applied and must remain in place as dormant storage.

@@ -2,8 +2,8 @@
 title: Reviewer Institution Measurement Events
 domain: reviewer-identity
 kind: atlas
-status: planned
-summary: "Source-built, opt-in prospective Find observations; migration 051 was not applied here and live schema is unprobed."
+status: active
+summary: "Applied, empty storage for opt-in prospective Find observations; the exact-on measurement flag remains disabled."
 canonical: false
 cataloged: 2026-09-14
 last_verified: 2026-09-15
@@ -15,14 +15,14 @@ related:
 
 # Atlas: `reviewer_institution_measurement_events` (Postgres)
 
-**[VERIFIED via source, 2026-09-15]** Migration 051 and its fresh-install
-mirror define a prospective, append-only observation table. **[PLANNED]** The
-migration was not applied in this session, live schema was not probed,
-`REVIEWER_INSTITUTION_MEASUREMENT` defaults off, and no Production or Preview
-event count is claimed. Before enabling the exact
-`on` flag, apply the migration with `node scripts/apply-migrations.js` in the
-intended environment, then verify the table exists. Do not run the fresh-install
-script on an existing database.
+**[VERIFIED via source and live readback, 2026-09-15]** Migration 051 and its
+fresh-install mirror define a prospective, append-only observation table. The
+canonical migration runner applied 051 to the shared Production/Preview
+database, exact schema readback passed, and the table contained zero rows.
+`REVIEWER_INSTITUTION_MEASUREMENT` is absent in both Vercel environments and
+therefore evaluates disabled; applying the migration did not enable collection.
+Future schema changes require a forward migration because 051 is now applied.
+Do not run the fresh-install script on an existing database.
 
 ## Contract
 
