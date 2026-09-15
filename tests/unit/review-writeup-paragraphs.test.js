@@ -172,6 +172,30 @@ describe('composeReviewerSentence', () => {
     expect(runs.map((r) => r.text).join('')).toBe('The reviewer was Jane of MIT.');
   });
 
+  it('falls through to affiliation when the accept-time affiliation strips to empty (Opus follow-up)', () => {
+    // Discriminating: reviewerAffiliation IS the reviewer's own email, so
+    // reviewerAffiliationOf strips it down to null/empty; a composer that
+    // stopped there (instead of falling through to `affiliation`) would emit
+    // "institution not recorded" instead of "Real University".
+    const { runs } = composeReviewerSentence([
+      reviewer({
+        name: 'A', reviewerAffiliation: 'someone@x.org', email: 'someone@x.org', affiliation: 'Real University',
+      }),
+    ]);
+    expect(runs.map((r) => r.text).join('')).toBe('The reviewer was A of Real University.');
+  });
+
+  it('chooses "a" (not "an") for consonant-sound vowel-letter ranks (Opus follow-up)', () => {
+    expect(
+      composeReviewerSentence([reviewer({ name: 'A', academicRank: 'University Professor', mainInstitution: 'X' })])
+        .runs.map((r) => r.text).join(''),
+    ).toContain('a university professor');
+    expect(
+      composeReviewerSentence([reviewer({ name: 'A', academicRank: 'University Distinguished Professor', mainInstitution: 'X' })])
+        .runs.map((r) => r.text).join(''),
+    ).toContain('a university distinguished professor');
+  });
+
   it('keeps roster order on a rating tie (not a name re-sort)', () => {
     // Discriminating: names are reverse-alphabetical, so a name-sorting
     // implementation would emit ['Abe', 'Zed'] instead of roster order.
@@ -236,6 +260,13 @@ describe('composeExpertiseSentence', () => {
   it('returns null when nobody has expertise data', () => {
     expect(composeExpertiseSentence([reviewer({ name: 'A' })])).toBeNull();
   });
+
+  it('keeps an acronym area\'s case (second letter uppercase) instead of lowercasing it', () => {
+    const sentence = composeExpertiseSentence([
+      reviewer({ name: 'A', lastName: 'A', keywords: 'DNA repair; CRISPR screens; Molecular biology' }),
+    ]);
+    expect(sentence).toBe('A has expertise in DNA repair, CRISPR screens, and molecular biology.');
+  });
 });
 
 describe('composeWriteupParagraphs', () => {
@@ -260,6 +291,18 @@ describe('composeWriteupParagraphs', () => {
     });
     expect(html).toContain('&lt;b&gt;Injected&lt;/b&gt;');
     expect(html).not.toContain('<b>Injected</b>');
+  });
+
+  it('escapes markup in mainInstitution (reviewer sentence) and keywords (expertise sentence, non-underline branch)', () => {
+    const { html } = composeWriteupParagraphs({
+      reviewers: [reviewer({
+        name: 'A', lastName: 'A', mainInstitution: '<i>Evil U</i>', keywords: '<script>alert(1)</script>',
+      })],
+    });
+    expect(html).toContain('&lt;i&gt;Evil U&lt;/i&gt;');
+    expect(html).not.toContain('<i>Evil U</i>');
+    expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
+    expect(html).not.toContain('<script>alert(1)</script>');
   });
 
   it('ignores a synthesis object in Slice 1 (no themes/quotations appended)', () => {

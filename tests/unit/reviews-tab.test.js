@@ -761,6 +761,37 @@ test('Writeup paragraphs card shows an unlabelled-rating warning as a muted line
   expect(screen.getByText(/Dr\. Legacy's overall rating has no label and was left out of the score tally\./)).toBeInTheDocument();
 });
 
+test('Copy label resets to "Copy" when the composed content changes', async () => {
+  fetch.mockImplementation((url) => {
+    const isReq2 = String(url).includes('proposalId=req2');
+    const reviewers = isReq2
+      ? [{ ...WRITEUP_REVIEWERS[0], name: 'Different Reviewer' }]
+      : WRITEUP_REVIEWERS;
+    return Promise.resolve({
+      ok: true,
+      json: async () => ({ success: true, proposals: [{ proposalId: isReq2 ? 'req2' : 'req1', reviewers }] }),
+    });
+  });
+
+  const writeMock = jest.fn().mockResolvedValue(undefined);
+  Object.defineProperty(navigator, 'clipboard', {
+    value: { write: writeMock, writeText: jest.fn() },
+    configurable: true,
+  });
+  window.ClipboardItem = function ClipboardItem(items) { this.items = items; };
+
+  const { rerender } = render(<ReviewsTab requestId="req1" />);
+  const copyButton = await screen.findByRole('button', { name: 'Copy' });
+  fireEvent.click(copyButton);
+  await screen.findByRole('button', { name: 'Copied' });
+
+  // A different requestId re-fetches and composes different HTML — the stale
+  // "Copied" label must not survive that content change.
+  rerender(<ReviewsTab requestId="req2" />);
+  await screen.findByText('Different Reviewer', { selector: 'u' });
+  await screen.findByRole('button', { name: 'Copy' });
+});
+
 test('Copy stays enabled in read-only Preview (client-only clipboard write, no server mutation)', async () => {
   fetch.mockResolvedValue({
     ok: true,

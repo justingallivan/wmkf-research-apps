@@ -403,6 +403,14 @@ function WriteupParagraphsCard({ reviewers }) {
   );
   const [copyState, setCopyState] = useState('idle');
 
+  // Opus Slice 1 follow-up: a stale "Copied"/"Copy failed" label surviving a
+  // content change (e.g. the roster re-fetches after a manual review entry)
+  // would misrepresent what's on the clipboard. Reset whenever the composed
+  // HTML changes.
+  useEffect(() => {
+    setCopyState('idle');
+  }, [html]);
+
   const copy = useCallback(async () => {
     setCopyState('idle');
     try {

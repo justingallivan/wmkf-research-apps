@@ -55,8 +55,14 @@ function isVowelLetter(ch) {
   return /^[aeiou]/i.test(ch || '');
 }
 
-function articleFor(word) {
-  return isVowelLetter(word) ? 'an' : 'a';
+// Vowel-LETTER but consonant-SOUND ranks (Opus Slice 1 follow-up): "University
+// Professor" and "University Distinguished Professor" are pronounced with a
+// leading /j/ ("yoo-"), so they take "a", not "an", despite starting with "U".
+const CONSONANT_SOUND_VOWEL_RANKS = [/^university\b/i];
+
+function articleFor(phrase) {
+  if (CONSONANT_SOUND_VOWEL_RANKS.some((re) => re.test(phrase || ''))) return 'a';
+  return isVowelLetter(phrase) ? 'an' : 'a';
 }
 
 /**
@@ -90,12 +96,45 @@ export function reviewerAffiliationOf(reviewer) {
     .trim() || null;
 }
 
+/**
+ * Institution precedence for the reviewer clause (W1): `mainInstitution` →
+ * accept-time affiliation (`reviewerAffiliationOf`, email-suffix stripped) →
+ * `affiliation` (the person projection's `primaryAffiliation`/
+ * `organizationName`, already collapsed by `reviewers-service.js`) → fallback.
+ *
+ * Opus Slice 1 follow-up: `reviewerAffiliationOf` can strip the accept-time
+ * value down to an empty string (e.g. `reviewerAffiliation` IS the reviewer's
+ * echoed email, with nothing left after the strip) without ever consulting
+ * `affiliation` — it only falls back to `affiliation` when `reviewerAffiliation`
+ * was blank to begin with. That fall-through belongs here, in the composer,
+ * not inside `reviewerAffiliationOf` (whose existing tab callers depend on its
+ * current return value, including returning null in that exact case).
+ */
 function institutionOf(reviewer) {
   const main = typeof reviewer?.mainInstitution === 'string' ? reviewer.mainInstitution.trim() : '';
   if (main) return main;
   const accepted = reviewerAffiliationOf(reviewer);
   if (accepted) return accepted;
+  const personAffiliation = typeof reviewer?.affiliation === 'string' ? reviewer.affiliation.trim() : '';
+  if (personAffiliation) return personAffiliation;
   return 'institution not recorded';
+}
+
+/**
+ * Lowercase an expertise area's first letter for mid-sentence use, EXCEPT
+ * when that would clip an acronym (Opus Slice 1 follow-up): "DNA repair" and
+ * "CRISPR screens" must keep their case. Heuristic: only lowercase when the
+ * SECOND character is not itself an uppercase letter — an acronym's second
+ * character is uppercase ("D" in "DNA", "R" in "CRISPR"); an ordinary
+ * capitalized word's second character is lowercase ("i" in "Microbial").
+ */
+function lowercaseFirstLetterUnlessAcronym(area) {
+  if (!area) return area;
+  const second = area[1] || '';
+  if (second && second === second.toUpperCase() && second !== second.toLowerCase()) {
+    return area;
+  }
+  return area[0].toLowerCase() + area.slice(1);
 }
 
 function lastNameOf(reviewer) {
@@ -260,7 +299,7 @@ export function composeExpertiseSentence(reviewers) {
       .map((a) => a.trim())
       .filter(Boolean)
       .slice(0, 3)
-      .map((a) => (a.length > 0 ? a[0].toLowerCase() + a.slice(1) : a));
+      .map(lowercaseFirstLetterUnlessAcronym);
     if (areas.length === 0) continue;
     const lastName = lastNameOf(reviewer);
     if (!lastName) continue;
