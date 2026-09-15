@@ -173,18 +173,24 @@ construction (chunked exact-GUID filter).
   `dataverse_contact_id` when the body contains it, else stored. When the resulting state is
   linked, a submitted `preferred_email` that normalizes non-null (`normalizePreferredEmail`,
   `roster.js:26-35`; stored values are already normalized by every write path) and differs
-  from the stored value → 400; an unchanged value is accepted; an empty value is accepted
-  and clears the manual copy (reachable only from a non-editor client under D2; none exists).
+  from the stored value → 400; an unchanged value is accepted; an empty value (the editor
+  sends `""` when cleared and `null` when untouched on a null row, `pages/expertise-finder.js:549-553,571-576`;
+  both normalize to null) is accepted and writes null. The editor reaches that branch on
+  every save of a linked row whose manual copy is already null (a null-to-null write) and
+  when a user clears the field and picks a contact in the same save; D2 therefore greys the
+  field as soon as a contact is chosen in-form, and D4's unlink restores whatever manual
+  value is stored, possibly empty, after which the unlinked-row 409 remedy applies.
   Same-request combinations: link + new email → 400; link + the row's unchanged existing
   email → accepted (the common case, because the editor always resubmits the whole row);
   unlink + email → accepted (resulting state unlinked, manual column active again); on POST,
-  any non-null `preferred_email` together with a link → 400.
+  a `preferred_email` that normalizes non-null together with a link → 400 (the add form's
+  default is `""`, `pages/expertise-finder.js:542`, which normalizes to null and is accepted).
 
 ## 3. Build slices
 
 | Slice | Tier | Content |
 |---|---|---|
-| **0 Interim unblock** | data only | Owner enters the 9 Board preferred emails in the Expertise Finder before 2026-09-17. Reversible. Whether slice 3 later auto-links these rows depends on the Board rows carrying real ORCIDs [ASSUMED; both insert paths default to the `'N/A'` placeholder, `roster.js:170` and `scripts/seed-expertise-roster.js:112`, and PATCH writes the raw value, `roster.js:204`]; if not, Board links are made by owner confirmation or in the slice 2 editor. |
+| **0 Interim unblock** | data only | Owner enters the 9 Board preferred emails in the Expertise Finder before 2026-09-17. Reversible. Whether slice 3 later auto-links these rows depends on the Board rows carrying real ORCIDs [ASSUMED; both insert paths default to the `'N/A'` placeholder, `roster.js:170` and `scripts/seed-expertise-roster.js:112`, and PATCH allows `orcid` at `roster.js:204` and writes the raw value at `:215-217`]; if not, Board links are made by owner confirmation or in the slice 2 editor. |
 | **1 Column + directory** | 1 | Migration `049_expertise_roster_contact_link.sql`: `ADD COLUMN dataverse_contact_id UUID NULL`, partial unique index `WHERE dataverse_contact_id IS NOT NULL` (introduces a one-roster-row-per-contact invariant; today one-person-one-row is a seed-only convention, `scripts/seed-expertise-roster.js:95-97`, and the editor POST has no name dedupe), column comment. Manifest entry **and** the fresh-install DDL in `scripts/setup-database.js:1399-1419` (no gate checks column parity; `preferred_email` lives in both). `listRoster` select; `getSiteVisitRecipientDirectory` resolution per §2.1 steps 1–6 with `getContactsByIds` injected via `DEFAULT_DEPENDENCIES`. `roster.js` PATCH/POST: `dataverse_contact_id` in `allowedFields`, guard `value === null || isGuid(value)` else 400 with message (today a bad value would hit the UUID cast and surface as the generic 500 at `roster.js:253-257`), unique-index violation 23505 → 409 naming the roster row already linked, `null` to unlink; D2a server rule if D2 is adopted (pre-read gains `dataverse_contact_id, preferred_email`; rule keyed on resulting link state). Remedy-copy branch in `assertAttendeeEmailsOnFile` plus its JSDoc and both editors' chip hint; `linked` added to both picker projections. Tests: linked-active, linked-inactive, linked-missing, unlinked, mixed batch >50, no-linked-rows skips the contact read, picker emits `linked`, new workbench route shape test, PATCH 400/409 and every D2a combination including link + unchanged email → accepted. |
 | **2 Link UI** | 1 | Expertise Finder editor: "Dataverse contact" field with a bounded name search and a Clear button. New route `GET /api/expertise-finder/contact-search?q=` → new service `lib/services/expertise-finder/roster-contact-link-service.js` wrapping `searchDirectoryByName` (route never touches the adapter; `check:route-service-boundary`). Returns `contactId, fullname, emailaddress1 (normalized), active`. Matrix row (`check:api-routes` requires one per route file; the new file also shifts the route-count fact in `CANONICAL_COUNTS`). `/api/expertise-finder` is not a `ROUTE_NAMESPACE_LIFECYCLE` namespace [`shared/config/appRegistry.js:349-372`], so plain `requireAppAccess('expertise-finder')` applies. Note: `check:trust-boundary-guid` fires only when tainted input reaches a Dataverse selector (`scripts/check-trust-boundary-guid.js:21-36`); the roster PATCH writes Postgres, so the gate is silent there and `isGuid` is required for clean 400s and for `getByIds`'s own GUID guard, not for the gate. Editor list/detail (`pages/expertise-finder.js:424-425,457-465`) show "from Dataverse contact" for linked rows instead of the manual column. |
 | **3 Backfill** | 0 (script, dry-run default) | `scripts/link-roster-contacts.js`: for each active Board/Consultant row without a link, (a) exact `findByOrcidCandidates(orcid)` when the roster ORCID is valid, else (b) `searchByName(name)` accepting only a single ranked candidate that is active and has an email. Prints a proposal table; `--apply` auto-writes **ORCID matches only**, and only when `findByOrcidCandidates` returns `{ one: true }` (an `ambiguous` or `inactiveOnly` result is reported, never written). Name-only candidates are listed for per-row owner confirmation (`--confirm <rosterId>=<contactId>`), because `rankNameRows`/`namesMatch` accept a single-letter first-initial prefix (`lib/utils/contact-parser.js:641-668`), so a lone ranked candidate can be the wrong person with the same surname; abstention on ambiguity does not cover a false-unique match. The roster's `'N/A'` ORCID placeholder normalizes to `malformed` and is skipped safely. **The owner runs it** (`feedback-never-self-authorize-prod-dataverse-reads`). Do not predict how middle-initial names ("James S. Economou") rank; the dry run shows it. |
@@ -292,6 +298,12 @@ and its test; stated the empty-value clearing semantics and the POST phrasing; "
 covers the missing-contact cause; seed citation `:112` and "insert paths". Confirmed: every
 `preferred_email` writer normalizes (column and normalizer share commit `ffaa293b`); no
 third render of the section hint; the editor is the only roster client.
+
+**Fifth scoped pass (same day, on the fourth fold)**: READY WITH NAMED CHANGES, wording with
+one implementation consequence, folded: the POST clause says "normalizes non-null" (the add
+form submits `""`); the empty-value branch is reachable from the editor, so the false
+"non-editor client only" claim is replaced with the two editor paths and the in-form D2
+greying; ORCID PATCH citation split into allowlist and write lines.
 
 ## 5. Out of scope / follow-ups
 
