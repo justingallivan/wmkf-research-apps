@@ -345,6 +345,16 @@ describe('institution consistency checker: consumer scope (behavioral, value-bas
           contactId: null,
         }),
       }));
+      jest.doMock('../../lib/services/reviewer-institution-evidence-attestation', () => ({
+        createServerInstitutionEvidenceReceipt: jest.fn(() => null),
+        institutionEvidenceProjection: jest.fn(() => ({
+          independentIdentity: null,
+          affiliationAssertions: [],
+          affiliationAssertionsComplete: false,
+        })),
+        reviewerInstitutionPhase2Enabled: jest.fn(() => false),
+        TTL_SECONDS: 14 * 24 * 60 * 60,
+      }));
       jest.doMock('../../lib/utils/safe-fetch', () => ({ safeFetch: jest.fn() }));
 
       ({ enrichRecommended } = require('../../lib/services/workbench/enrich-recommended-service'));
