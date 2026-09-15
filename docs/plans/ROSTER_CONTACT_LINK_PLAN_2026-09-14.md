@@ -2,8 +2,8 @@
 title: Roster Contact Link — Resolve Board and Consultant Emails from Dataverse Contacts
 domain: meeting-tracker
 kind: plan
-status: proposed
-summary: "PROPOSED 2026-09-14; adversarial review 2026-09-14 READY WITH NAMED CHANGES (six passes folded in). Link expertise_roster rows to Dataverse contacts by GUID so the shared recipient directory reads Board/Consultant email from the contact record instead of a hand-maintained Postgres column. Roster row id stays the attendee identity; Dataverse is read-only in this plan. Awaits owner decisions D1–D5 (D2a is the server rule for D2)."
+status: active
+summary: "READY TO IMPLEMENT 2026-09-14 after six adversarial-review folds and owner resolution of D1–D5. Link expertise_roster rows to Dataverse contacts by GUID so the shared recipient directory reads Board/Consultant email from the contact record instead of a hand-maintained Postgres column. Roster row id stays the attendee identity; Dataverse is read-only in this plan."
 cataloged: 2026-09-14
 last_verified: 2026-09-14
 owner: product-engineering
@@ -151,31 +151,33 @@ Failure modes: the directory already fails when Dataverse `systemusers` is unrea
 the contact read adds no new outage class. A capped/oversized read is impossible by
 construction (chunked exact-GUID filter).
 
-### 2.2 Owner decisions needed
+### 2.2 Owner decisions — RESOLVED 2026-09-14
 
-- **D1 Precedence when a row has both a link and a `preferred_email`.** Recommendation: the
-  link wins and `preferred_email` is ignored for that row (§2.1 step 3).
-- **D2 Whether `preferred_email` becomes read-only in the editor once a row is linked.**
-  Recommendation: yes, shown greyed with "from Dataverse contact"; unlinking re-enables it.
-- **D3 Unlinked consultants.** 25 active consultants exist and only "several" have contacts
-  (owner, 2026-09-14). Recommendation: leave unlinked rows on the manual column
+- **D1 RESOLVED — Dataverse precedence.** When a row has both a link and a
+  `preferred_email`, the link wins and `preferred_email` is ignored for that row (§2.1
+  step 3).
+- **D2 RESOLVED — Linked manual email is read-only.** `preferred_email` is shown greyed with
+  "from Dataverse contact" while a row is linked; unlinking re-enables it. D2a below is the
+  required server rule, not an optional follow-up.
+- **D3 RESOLVED — Unlinked consultants retain manual email.** 25 active consultants exist
+  and only "several" have contacts (owner, 2026-09-14). Leave unlinked rows on the manual column
   indefinitely; the editor shows "Not linked" so staff can link when a contact appears. No
   requirement to create contacts.
-- **D4 Linked row whose contact is inactive, missing, or email-less** (for example a CRM
-  duplicate merge deactivates the contact the roster points at, the day before a session).
-  Recommendation: the row resolves to no email (§2.1 step 3); the 409 and the chip hint name
+- **D4 RESOLVED — Broken links fail visibly without fallback.** For a linked row whose
+  contact is inactive, missing, or email-less, the row resolves to no email (§2.1 step 3).
+  For example, a CRM duplicate merge could deactivate the referenced contact the day before
+  a session. The 409 and the chip hint name
   the Dataverse cause (step 5); the editor shows the same warning beside the link with an
   Unlink button, and unlinking restores the manual column. No silent fallback.
-- **D5 Contact-search authorization.** The new route returns Dataverse contact names and
-  normalized primary emails to every user holding the `expertise-finder` app grant. That is
-  a wider disclosure than the current shared roster, even though the same grant already
-  permits app-wide proposal lookup and roster writes
-  [`docs/API_ROUTE_SECURITY_MATRIX.md:187-191`]. Recommendation: retain
-  `requireAppAccess('expertise-finder')`, classify the route Medium in the matrix, and record
-  owner confirmation that this app-wide contact-directory visibility is intended. If not,
-  the route needs a stronger server-side role guard before slice 2.
-- **D2a Server rule for D2.** The Expertise Finder editor PATCHes the whole row on every
-  save (`pages/expertise-finder.js:295-307` spreads `member` into the form and sends it), and
+- **D5 RESOLVED — Contact search is bound to app access.** The new route returns Dataverse
+  contact names and normalized primary emails to every user holding the `expertise-finder`
+  app grant. That is a wider disclosure than the current shared roster, even though the same
+  grant already permits app-wide proposal lookup and roster writes
+  [`docs/API_ROUTE_SECURITY_MATRIX.md:187-191`]. The route uses
+  `requireAppAccess('expertise-finder')` and is classified Medium in the matrix; no stronger
+  role gate is required.
+- **D2a ADOPTED — Server rule for D2.** The Expertise Finder editor PATCHes the whole row on
+  every save (`pages/expertise-finder.js:295-307` spreads `member` into the form and sends it), and
   the PATCH pre-read selects `id` only (`roster.js:197`), so a rule of "reject any request
   containing `preferred_email` for a linked row" would 400 every save. The rule must be
   value-based and keyed on the row's **resulting** link state: pre-read
@@ -208,8 +210,8 @@ construction (chunked exact-GUID filter).
 | Slice | Tier | Content |
 |---|---|---|
 | **0 Interim unblock** | data only | Owner enters the 9 Board preferred emails in the Expertise Finder before 2026-09-17. Reversible. Whether slice 3 later auto-links these rows depends on the Board rows carrying real ORCIDs [ASSUMED; both insert paths default to the `'N/A'` placeholder, `roster.js:170` and `scripts/seed-expertise-roster.js:112`, and PATCH allows `orcid` at `roster.js:204` and writes the raw value at `:215-217`]; if not, Board links are made by owner confirmation or in the slice 2 editor. |
-| **1 Column + directory** | 1 | On the updated implementation base, choose the next unclaimed migration number for `NNN_expertise_roster_contact_link.sql`; do **not** hard-code 049 because `origin/feature/consultant-feedback-slice-2` already carries `049_consultant_feedback_attachments.sql` [VERIFIED via `git ls-tree`, 2026-09-14]. Add `dataverse_contact_id UUID NULL` and a partial unique index `WHERE dataverse_contact_id IS NOT NULL AND is_active = true`, introducing a one-**active**-roster-row-per-contact invariant while allowing an inactive row to retain its link for undo. Reactivation into a contact already used by another active row returns the same named 409. Add the column comment, manifest entry, fresh-install column at `scripts/setup-database.js:1399-1420`, and matching fresh-install partial index beside `:1434-1436`. Add a dedicated schema-parity test for both the column and exact index predicate (the existing `tests/unit/pre-site-distribution-schema-parity.test.js:53-75` proves only manually listed migration-035 fields, so no general gate supplies this parity). `listRoster` select; `getSiteVisitRecipientDirectory` resolution per §2.1 steps 1–6 with `getContactsByIds` injected via `DEFAULT_DEPENDENCIES`. `roster.js` PATCH/POST: `dataverse_contact_id` in `allowedFields`; normalize omitted / `null` / `""` per D2a before `isGuid`, otherwise 400 with message (today a bad value would hit the UUID cast and surface as the generic 500 at `roster.js:253-257`); unique-index violation 23505 on create, update, or reactivation → 409 naming the active roster row already linked; `null` to unlink; D2a server rule if D2 is adopted (pre-read gains `dataverse_contact_id, preferred_email`; rule keyed on resulting link state). Remedy-copy branch in `assertAttendeeEmailsOnFile` plus its JSDoc and both editors' chip hint; `linked` added to both picker projections. Tests: linked-active, linked-inactive, linked-missing, unlinked, mixed batch >50, no-linked-rows skips the contact read, picker emits `linked`, new workbench route shape test, create/update/reactivation 400/409, empty-string link normalization, stale form omits an unchanged link field, and every D2a combination including link + unchanged email → accepted. |
-| **2 Link UI** | 1 | Expertise Finder editor: "Dataverse contact" field with a bounded name search and a Clear button. New route `GET /api/expertise-finder/contact-search?q=` → new service `lib/services/expertise-finder/roster-contact-link-service.js` wrapping the name-only `searchDirectoryByName` contract (route never touches the adapter; `check:route-service-boundary`). The route accepts exactly one scalar `q`, trims it, requires 2–100 characters, rejects unsupported query keys, and wraps the service call in `withDalContext('expertise-finder-roster-contact-search', …)`; missing context otherwise fails closed at `lib/services/dynamics/restrictions.js:38-46`, and `check:dynamics-context-boundary` does not detect an omitted wrapper. Returns bounded `contactId, name, email (normalized), active, available, reason` rows plus an explicit truncation signal. Keep this dedicated name-only service rather than importing `searchCuratedRecipientContacts`: that Site Visit helper also branches on email queries and emits `site_visit_*` errors (`curated-recipient-service.js:252-281`), which are different semantics. Matrix row (`check:api-routes` requires one per route file; the new file also shifts the route-count fact in `CANONICAL_COUNTS`) records D5's contact-name/email exposure. `/api/expertise-finder` is not a `ROUTE_NAMESPACE_LIFECYCLE` namespace [`shared/config/appRegistry.js:349-372`], so D5 decides whether plain `requireAppAccess('expertise-finder')` is sufficient. Note: `check:trust-boundary-guid` fires only when tainted input reaches a Dataverse selector (`scripts/check-trust-boundary-guid.js:21-36`); the roster PATCH writes Postgres, so the gate is silent there and `isGuid` is required for clean 400s and for `getByIds`'s own GUID guard, not for the gate. Editor list/detail (`pages/expertise-finder.js:424-425,457-465`) show "from Dataverse contact" for linked rows instead of the manual column. The editor tracks whether the link control changed, omits an untouched `dataverse_contact_id` from PATCH, and resets the manual email on link selection per D2a. |
+| **1 Column + directory** | 1 | On the updated implementation base, choose the next unclaimed migration number for `NNN_expertise_roster_contact_link.sql`; do **not** hard-code 049 because `origin/feature/consultant-feedback-slice-2` already carries `049_consultant_feedback_attachments.sql` [VERIFIED via `git ls-tree`, 2026-09-14]. Add `dataverse_contact_id UUID NULL` and a partial unique index `WHERE dataverse_contact_id IS NOT NULL AND is_active = true`, introducing a one-**active**-roster-row-per-contact invariant while allowing an inactive row to retain its link for undo. Reactivation into a contact already used by another active row returns the same named 409. Add the column comment, manifest entry, fresh-install column at `scripts/setup-database.js:1399-1420`, and matching fresh-install partial index beside `:1434-1436`. Add a dedicated schema-parity test for both the column and exact index predicate (the existing `tests/unit/pre-site-distribution-schema-parity.test.js:53-75` proves only manually listed migration-035 fields, so no general gate supplies this parity). `listRoster` select; `getSiteVisitRecipientDirectory` resolution per §2.1 steps 1–6 with `getContactsByIds` injected via `DEFAULT_DEPENDENCIES`. `roster.js` PATCH/POST: `dataverse_contact_id` in `allowedFields`; normalize omitted / `null` / `""` per D2a before `isGuid`, otherwise 400 with message (today a bad value would hit the UUID cast and surface as the generic 500 at `roster.js:253-257`); unique-index violation 23505 on create, update, or reactivation → 409 naming the active roster row already linked; `null` to unlink; enforce the adopted D2a server rule (pre-read gains `dataverse_contact_id, preferred_email`; rule keyed on resulting link state). Remedy-copy branch in `assertAttendeeEmailsOnFile` plus its JSDoc and both editors' chip hint; `linked` added to both picker projections. Tests: linked-active, linked-inactive, linked-missing, unlinked, mixed batch >50, no-linked-rows skips the contact read, picker emits `linked`, new workbench route shape test, create/update/reactivation 400/409, empty-string link normalization, stale form omits an unchanged link field, and every D2a combination including link + unchanged email → accepted. |
+| **2 Link UI** | 1 | Expertise Finder editor: "Dataverse contact" field with a bounded name search and a Clear button. New route `GET /api/expertise-finder/contact-search?q=` → new service `lib/services/expertise-finder/roster-contact-link-service.js` wrapping the name-only `searchDirectoryByName` contract (route never touches the adapter; `check:route-service-boundary`). The route accepts exactly one scalar `q`, trims it, requires 2–100 characters, rejects unsupported query keys, and wraps the service call in `withDalContext('expertise-finder-roster-contact-search', …)`; missing context otherwise fails closed at `lib/services/dynamics/restrictions.js:38-46`, and `check:dynamics-context-boundary` does not detect an omitted wrapper. Returns bounded `contactId, name, email (normalized), active, available, reason` rows plus an explicit truncation signal. Keep this dedicated name-only service rather than importing `searchCuratedRecipientContacts`: that Site Visit helper also branches on email queries and emits `site_visit_*` errors (`curated-recipient-service.js:252-281`), which are different semantics. Matrix row (`check:api-routes` requires one per route file; the new file also shifts the route-count fact in `CANONICAL_COUNTS`) records D5's contact-name/email exposure. `/api/expertise-finder` is not a `ROUTE_NAMESPACE_LIFECYCLE` namespace [`shared/config/appRegistry.js:349-372`], so the resolved D5 contract uses plain `requireAppAccess('expertise-finder')`. Note: `check:trust-boundary-guid` fires only when tainted input reaches a Dataverse selector (`scripts/check-trust-boundary-guid.js:21-36`); the roster PATCH writes Postgres, so the gate is silent there and `isGuid` is required for clean 400s and for `getByIds`'s own GUID guard, not for the gate. Editor list/detail (`pages/expertise-finder.js:424-425,457-465`) show "from Dataverse contact" for linked rows instead of the manual column. The editor tracks whether the link control changed, omits an untouched `dataverse_contact_id` from PATCH, and resets the manual email on link selection per D2a. |
 | **3 Backfill** | 0 (script, dry-run default) | `scripts/link-roster-contacts.js` enters the script-only restriction context once with `enterDynamicsBypassForScript('link-roster-contacts')`, then for each active Board/Consultant row without a link tries (a) exact `findByOrcidCandidates(orcid)` when the roster ORCID is valid, else (b) `searchByName(name)` accepting only a single ranked candidate that is active and has an email. Prints a proposal table; `--apply` auto-writes **ORCID matches only**, and only when `findByOrcidCandidates` returns `{ one: true }` **and** that row's `emailaddress1` normalizes non-null. An email-less, `ambiguous`, or `inactiveOnly` ORCID result is reported, never written, so D1 cannot suppress the slice-0 manual email. Name-only candidates are listed for per-row owner confirmation (`--confirm <rosterId>=<contactId>`), because `rankNameRows`/`namesMatch` accept a single-letter first-initial prefix (`lib/utils/contact-parser.js:641-668`), so a lone ranked candidate can be the wrong person with the same surname; abstention on ambiguity does not cover a false-unique match. The roster's `'N/A'` ORCID placeholder normalizes to `malformed` and is skipped safely. A 23505 race/conflict is reported per roster row with the conflicting active row, never counted as applied, and remaining rows continue. **The owner runs it** (`feedback-never-self-authorize-prod-dataverse-reads`). Do not predict how middle-initial names ("James S. Economou") rank; the dry run shows it. |
 | **4 Reconcile** | 0 | Atlas `postgres-infra-tables.md` roster entry (+ column; its "zero preferred-email values before staff population" claim becomes historical), `dataverse-wmkf-sitevisit.md` §directory, matrix rows for `/api/meeting-tracker/recipients`, `/api/workbench/site-visit/recipients`, `/api/expertise-finder/roster`, PC plan §5 attendee line, `docs/agent-wiki/topics/dataverse-dynamics.md`. Run `/sweep` for the "preferred email is the only Board email source" fact. |
 
@@ -287,12 +289,12 @@ workbench site-visit recipients routes (read), backfill script.
 
 ### Verdict
 
-**READY WITH NAMED CHANGES** once D1–D5 are decided. Named changes: chunked `getByIds`
-with a >50 test (finding 3); boolean `linked` instead of a GUID on directory rows
-(finding 5); the two `preferred_email` readers updated together; active-only uniqueness;
+**READY TO IMPLEMENT.** Owner decisions D1–D5 are resolved and every named review change is
+folded into §2–§3: chunked `getByIds` with a >50 test; boolean `linked` instead of a GUID
+on directory rows; both `preferred_email` readers updated together; active-only uniqueness;
 email-gated ORCID auto-link; explicit route/script Dataverse contexts; next-free migration
 number after PR #294; schema-parity coverage; empty-link normalization; link-field stale-write
-protection; and bounded contact-search validation plus the D5 exposure decision.
+protection; and bounded contact-search validation under the D5 app-access contract.
 
 ### Adversarial review — 2026-09-14 (fresh agent, refuting pass)
 
@@ -351,6 +353,12 @@ truncation contract, and the D5 authorization/exposure decision. The review sugg
 reusing `searchCuratedRecipientContacts`; source inspection refuted that specific remedy
 because it adds email-query behavior and `site_visit_*` errors to a name-only Expertise
 Finder contract, so the dedicated service remains while the validation pattern is reused.
+
+**Owner decision closure (same day):** D1 Dataverse precedence; D2 read-only manual email
+while linked with D2a server enforcement; D3 indefinite manual email for unlinked
+consultants; D4 visible failure with no fallback for broken links; D5 contact search bound
+to the existing `expertise-finder` app grant. The plan is READY TO IMPLEMENT subject to the
+PR #294 sequencing and deployment steps in §3.
 
 ## 5. Out of scope / follow-ups
 
