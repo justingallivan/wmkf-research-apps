@@ -7,7 +7,7 @@ summary: "Source-built Virtual Review Panel Phase A foundation state: five Postg
 canonical: true
 cataloged: 2026-09-12
 owner: product-engineering
-last_verified: 2026-09-13
+last_verified: 2026-09-15
 related:
   - docs/plans/VIRTUAL_REVIEW_PANEL_PHASE_A_BUILD_PLAN_2026-09-12.md
   - docs/VIRTUAL_REVIEW_PANEL.md
@@ -56,7 +56,7 @@ The service projects `entries[].rerender = { requestedAt }` (no file refs — no
 
 ## Entry input storage vs. Blob (D11)
 
-The entry's narrative input DTO (requestId/requestNumber/narrative text+hash+sourcePath/institution/title — `lib/services/review-panel-input.js`'s exact key allowlist) is stored in Postgres JSONB (`review_panel_entries.data.input`), not Blob — this differs from the Cycle Dossier, which persists its frozen input as a Blob JSON object. Only the per-entry DOCX/PDF report editions (rendered once, at entry completion, by the worker) use the dedicated private Blob store (`REVIEW_PANEL_BLOB_READ_WRITE_TOKEN`/`REVIEW_PANEL_BLOB_STORE_ID`, **not yet provisioned** — `docs/CREDENTIALS_RUNBOOK.md`); their SHA-256/size/path refs are persisted on `review_panel_entries.data.files`. If storage is unconfigured or the write fails, the entry is FAILED rather than silently completed with no saved report (the chair's structured result is preserved on `data.chairResult` for visibility).
+The entry's narrative input DTO (requestId/requestNumber/narrative text+hash+sourcePath/institution/title — `lib/services/review-panel-input.js`'s exact key allowlist) is stored in Postgres JSONB (`review_panel_entries.data.input`), not Blob — this differs from the Cycle Dossier, which persists its frozen input as a Blob JSON object. Only the per-entry DOCX/PDF report editions (rendered once, at entry completion, by the worker) use the dedicated private Blob store (`REVIEW_PANEL_BLOB_READ_WRITE_TOKEN`/`REVIEW_PANEL_BLOB_STORE_ID`, provisioned in Production and Preview 2026-09-13 — `docs/CREDENTIALS_RUNBOOK.md`); their SHA-256/size/path refs are persisted on `review_panel_entries.data.files`. If storage is unconfigured or the write fails, the entry is FAILED rather than silently completed with no saved report (the chair's structured result is preserved on `data.chairResult` for visibility).
 
 ## Current lifecycle truth
 
