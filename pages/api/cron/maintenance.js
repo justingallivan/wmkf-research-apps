@@ -74,6 +74,15 @@ export default async function handler(req, res) {
       results.reviewerIdentityShadowLog = { error: error.message };
     }
 
+    // 2b-i. Prospective Find institution observations (retention + row cap).
+    try {
+      results.reviewerInstitutionMeasurement =
+        await MaintenanceService.cleanupReviewerInstitutionMeasurement(config.reviewer_institution_measurement_days);
+      totalDeleted += results.reviewerInstitutionMeasurement;
+    } catch (error) {
+      results.reviewerInstitutionMeasurement = { error: error.message };
+    }
+
     // 2c. Operational events cleanup (settled-row retention window, 2x window
     //     for open rows, plus a hard row cap). Migration 030.
     try {

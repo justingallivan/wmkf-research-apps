@@ -13,6 +13,13 @@ jest.mock('../../lib/services/reviewer-candidate-attestation', () => {
     verifyAutomatedIdentityAttestation: jest.fn(async () => ({ valid: false, reason: 'no_token' })),
   };
 });
+jest.mock('../../lib/services/reviewer-institution-evidence-attestation', () => {
+  const actual = jest.requireActual('../../lib/services/reviewer-institution-evidence-attestation');
+  return {
+    ...actual,
+    verifyInstitutionEvidenceAttestation: jest.fn(async () => ({ valid: false, reason: 'no_token' })),
+  };
+});
 const mockResolveProposalPI = jest.fn(async () => ({
   resolved: true,
   canonicalName: 'Patricia Investigator',
@@ -68,6 +75,11 @@ import {
   hasServerIdentityDecisionReceipt,
   verifyAutomatedIdentityAttestation,
 } from '../../lib/services/reviewer-candidate-attestation';
+import {
+  createServerInstitutionEvidenceReceipt,
+  hasServerInstitutionEvidenceReceipt,
+  verifyInstitutionEvidenceAttestation,
+} from '../../lib/services/reviewer-institution-evidence-attestation';
 import * as store from '../../lib/services/reviewer-roster-store';
 import { reviewerCandidateKey } from '../../shared/components/reviewers/reviewer-search-logic';
 
@@ -81,6 +93,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   requireAppAccess.mockResolvedValue({ profileId: 5 });
   verifyAutomatedIdentityAttestation.mockResolvedValue({ valid: false, reason: 'no_token' });
+  verifyInstitutionEvidenceAttestation.mockResolvedValue({ valid: false, reason: 'no_token' });
   store.findCandidateBySuggestion.mockResolvedValue(null);
   store.findCandidateBySuggestionAnchor.mockResolvedValue(null);
   store.findCandidatesByKeys.mockResolvedValue([]);
@@ -239,6 +252,95 @@ describe('POST recordSurfaced', () => {
 
     const [, passed] = store.recordSurfaced.mock.calls[0];
     expect(passed[0].candidateKey).toBe('candidate:receipt-bound');
+  });
+
+  it('stores institution evidence only when its token binds the final server candidate key', async () => {
+    const candidate = {
+      name: 'Bound Evidence',
+      affiliation: 'Example University',
+      affiliationAssertions: [{
+        rawText: 'Example University',
+        sourceType: 'publication',
+        sourceReference: 'pmid:123',
+        currentness: 'unknown',
+        authorSpecific: true,
+        publicationYear: 2026,
+      }],
+      institutionEvidenceAttestation: 'signed-institution-evidence',
+    };
+    const candidateKey = reviewerCandidateKey(candidate);
+    verifyInstitutionEvidenceAttestation.mockResolvedValueOnce({
+      valid: true,
+      candidateKey,
+      expiresAt: '2026-09-28T00:00:00.000Z',
+    });
+
+    const r = res();
+    await handler({ method: 'POST', body: { requestId: REQ, candidates: [candidate] } }, r);
+
+    const [, passed] = store.recordSurfaced.mock.calls[0];
+    expect(passed[0].candidateKey).toBe(candidateKey);
+    expect(passed[0].affiliationAssertions).toHaveLength(1);
+    expect(passed[0].institutionEvidenceAttestation).toBeUndefined();
+    expect(hasServerInstitutionEvidenceReceipt({ requestId: REQ, candidate: passed[0] })).toBe(true);
+  });
+
+  it('rejects institution evidence when the browser key is replaced at the roster boundary', async () => {
+    verifyInstitutionEvidenceAttestation.mockResolvedValueOnce({
+      valid: true,
+      candidateKey: 'candidate:existing-victim',
+      expiresAt: '2026-09-28T00:00:00.000Z',
+    });
+    const r = res();
+    await handler({ method: 'POST', body: { requestId: REQ, candidates: [{
+      name: 'Mallory Evidence',
+      candidateKey: 'candidate:existing-victim',
+      affiliationAssertions: [{
+        rawText: 'Victim University',
+        sourceType: 'publication',
+        sourceReference: 'pmid:999',
+        currentness: 'current',
+        authorSpecific: true,
+        publicationYear: 2026,
+      }],
+      institutionEvidenceAttestation: 'signed-for-victim',
+    }] } }, r);
+
+    const [, passed] = store.recordSurfaced.mock.calls[0];
+    expect(passed[0].candidateKey).not.toBe('candidate:existing-victim');
+    expect(passed[0].independentIdentity).toBeUndefined();
+    expect(passed[0].affiliationAssertions).toBeUndefined();
+    expect(passed[0].serverInstitutionEvidenceReceipt).toBeUndefined();
+  });
+
+  it('restores valid stored institution evidence when a browser refresh omits it', async () => {
+    const incoming = { name: 'Stored Evidence', affiliation: 'Example University' };
+    const candidateKey = reviewerCandidateKey(incoming);
+    const stored = {
+      ...incoming,
+      candidateKey,
+      affiliationAssertions: [{
+        rawText: 'Second University',
+        sourceType: 'orcid_employment',
+        sourceReference: 'orcid:employment:1',
+        currentness: 'current',
+        authorSpecific: true,
+        startYear: 2024,
+      }],
+    };
+    stored.serverInstitutionEvidenceReceipt = createServerInstitutionEvidenceReceipt({
+      requestId: REQ,
+      candidate: stored,
+      expiresAt: '2026-09-28T00:00:00.000Z',
+    });
+    store.findCandidatesByKeys.mockResolvedValueOnce([stored]);
+
+    const r = res();
+    await handler({ method: 'POST', body: { requestId: REQ, candidates: [incoming] } }, r);
+
+    const [, passed] = store.recordSurfaced.mock.calls[0];
+    expect(passed[0].affiliationAssertions).toEqual(stored.affiliationAssertions);
+    expect(hasServerInstitutionEvidenceReceipt({ requestId: REQ, candidate: passed[0] })).toBe(true);
   });
 
   it('stores identity-decision authority only from a valid server attestation', async () => {
@@ -678,6 +780,35 @@ describe('PATCH', () => {
     expect(persisted).not.toHaveProperty('staffIdentityConfirmation');
   });
 
+  it('strips browser-carried institution evidence from a non-applicant exclude', async () => {
+    const r = res();
+    await handler({ method: 'PATCH', body: {
+      requestId: REQ,
+      action: 'exclude',
+      candidate: {
+        name: 'Browser Evidence',
+        candidateKey: 'candidate:browser-evidence',
+        independentIdentity: { version: 'independent-identity/v1', result: 'sufficient' },
+        affiliationAssertions: [{
+          rawText: 'Applicant University',
+          sourceType: 'publication',
+          currentness: 'current',
+          authorSpecific: true,
+        }],
+        affiliationAssertionsComplete: true,
+        institutionEvidenceAttestation: 'forged-token',
+        serverInstitutionEvidenceReceipt: { source: 'forged' },
+      },
+    } }, r);
+
+    const persisted = store.setExcluded.mock.calls[0][1];
+    expect(persisted).not.toHaveProperty('independentIdentity');
+    expect(persisted).not.toHaveProperty('affiliationAssertions');
+    expect(persisted).not.toHaveProperty('affiliationAssertionsComplete');
+    expect(persisted).not.toHaveProperty('institutionEvidenceAttestation');
+    expect(persisted).not.toHaveProperty('serverInstitutionEvidenceReceipt');
+  });
+
   it('preserves the canonical server confirmation on a non-applicant exclude', async () => {
     store.findCandidatesByKeys.mockResolvedValueOnce([{
       name: 'Bob Roe',
@@ -850,6 +981,36 @@ describe('PATCH', () => {
       { actorProfileId: 5, actorSystemUserId: 'SYS-5' },
     );
     expect(r.body.confirmationId).toBe('confirm-1');
+  });
+
+  it('confirm_identity strips browser-carried institution evidence before persistence', async () => {
+    const r = res();
+    await handler({ method: 'PATCH', body: {
+      requestId: REQ,
+      action: 'confirm_identity',
+      candidate: {
+        name: 'Ann Lee',
+        email: 'ann@example.edu',
+        affiliation: 'Example U',
+        independentIdentity: { version: 'independent-identity/v1', result: 'sufficient' },
+        affiliationAssertions: [{
+          rawText: 'Applicant University',
+          sourceType: 'publication',
+          currentness: 'current',
+          authorSpecific: true,
+        }],
+        affiliationAssertionsComplete: true,
+        institutionEvidenceAttestation: 'forged-token',
+        serverInstitutionEvidenceReceipt: { source: 'forged' },
+      },
+    } }, r);
+
+    const persisted = store.confirmIdentity.mock.calls[0][1];
+    expect(persisted).not.toHaveProperty('independentIdentity');
+    expect(persisted).not.toHaveProperty('affiliationAssertions');
+    expect(persisted).not.toHaveProperty('affiliationAssertionsComplete');
+    expect(persisted).not.toHaveProperty('institutionEvidenceAttestation');
+    expect(persisted).not.toHaveProperty('serverInstitutionEvidenceReceipt');
   });
 
   it('confirm_identity rejects a rescued candidate matching the server-resolved PI name variant', async () => {

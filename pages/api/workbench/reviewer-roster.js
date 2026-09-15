@@ -40,6 +40,12 @@ import {
   hasServerIdentityDecisionReceipt,
   verifyAutomatedIdentityAttestation,
 } from '../../../lib/services/reviewer-candidate-attestation';
+import {
+  createServerInstitutionEvidenceReceipt,
+  hasServerInstitutionEvidenceReceipt,
+  institutionEvidenceProjection,
+  verifyInstitutionEvidenceAttestation,
+} from '../../../lib/services/reviewer-institution-evidence-attestation';
 import { resolveProposalPI } from '../../../lib/services/proposal-pi-identity';
 import { fetchCoPIs } from '../../../lib/services/proposal-participants';
 import { DeduplicationService } from '../../../lib/services/deduplication-service';
@@ -54,6 +60,10 @@ import {
   reviewerCandidateKey,
 } from '../../../shared/components/reviewers/reviewer-search-logic';
 import { listOpenAddressRepairRequests } from '../../../lib/services/reviewer-address-trust-service';
+import {
+  measurementEnabled,
+  recordInstitutionMeasurement,
+} from '../../../lib/services/reviewer-institution-measurement';
 
 const GUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // Cap candidates per POST — a Find run asks for at most 25, but guard against an
@@ -84,6 +94,19 @@ export default async function handler(req, res) {
 
 function validRequestId(requestId) {
   return typeof requestId === 'string' && GUID_RE.test(requestId);
+}
+
+async function measureRosterAction(requestId, eventType, candidateKey, knownCandidate = null, requiredStatus = null) {
+  if (!measurementEnabled()) return;
+  try {
+    const candidate = knownCandidate || (await findCandidatesByKeys(requestId, [candidateKey]))[0];
+    if (!candidate || (requiredStatus && candidate.rosterStatus !== requiredStatus)) return;
+    await recordInstitutionMeasurement({
+      requestId, candidate, eventType, captureSource: 'stored_roster',
+    });
+  } catch (error) {
+    console.warn('[reviewer-roster] institution measurement unavailable:', error?.code || error?.name || 'Error');
+  }
 }
 
 function isServerManagedApplicantCandidate(candidate) {
@@ -127,7 +150,21 @@ function stripClientRosterAuthority(candidate) {
     pdIdentityConfirmed: _pdIdentityConfirmed,
     pdIdentityConfirmationId: _pdIdentityConfirmationId,
     serverIdentityDecisionReceipt: _serverIdentityDecisionReceipt,
+    serverInstitutionEvidenceReceipt: _serverInstitutionEvidenceReceipt,
     serverIdentityReviewReason: _serverIdentityReviewReason,
+    ...safe
+  } = candidate;
+  return safe;
+}
+
+function stripClientInstitutionEvidence(candidate) {
+  if (!candidate || typeof candidate !== 'object') return candidate;
+  const {
+    independentIdentity: _independentIdentity,
+    affiliationAssertions: _affiliationAssertions,
+    affiliationAssertionsComplete: _affiliationAssertionsComplete,
+    institutionEvidenceAttestation: _institutionEvidenceAttestation,
+    serverInstitutionEvidenceReceipt: _serverInstitutionEvidenceReceipt,
     ...safe
   } = candidate;
   return safe;
@@ -215,26 +252,51 @@ async function preserveStoredRosterAuthority(requestId, candidates) {
     const withIdentityReceipt = identityReceipt
       ? { ...candidate, serverIdentityDecisionReceipt: identityReceipt }
       : candidate;
+    const freshInstitutionReceipt = hasServerInstitutionEvidenceReceipt({ requestId, candidate })
+      ? candidate.serverInstitutionEvidenceReceipt
+      : null;
+    const candidateWithStoredInstitutionReceipt = stored?.serverInstitutionEvidenceReceipt
+      ? {
+          ...withIdentityReceipt,
+          independentIdentity: stored.independentIdentity,
+          affiliationAssertions: stored.affiliationAssertions,
+          affiliationAssertionsComplete: stored.affiliationAssertionsComplete,
+          serverInstitutionEvidenceReceipt: stored.serverInstitutionEvidenceReceipt,
+        }
+      : withIdentityReceipt;
+    const storedInstitutionReceipt = !freshInstitutionReceipt
+      && !!stored
+      && hasServerInstitutionEvidenceReceipt({ requestId, candidate: stored })
+      && hasServerInstitutionEvidenceReceipt({
+        requestId,
+        candidate: candidateWithStoredInstitutionReceipt,
+      })
+      ? stored.serverInstitutionEvidenceReceipt
+      : null;
+    const institutionReceipt = freshInstitutionReceipt || storedInstitutionReceipt;
+    const withInstitutionReceipt = freshInstitutionReceipt
+      ? { ...withIdentityReceipt, serverInstitutionEvidenceReceipt: freshInstitutionReceipt }
+      : (storedInstitutionReceipt ? candidateWithStoredInstitutionReceipt : withIdentityReceipt);
     const preserveStoredTrue = (field) => {
-      const incoming = withIdentityReceipt?.[field]
-        ?? withIdentityReceipt?.contactEnrichment?.[field];
+      const incoming = withInstitutionReceipt?.[field]
+        ?? withInstitutionReceipt?.contactEnrichment?.[field];
       const storedValue = stored?.[field] ?? stored?.contactEnrichment?.[field];
       return storedValue === true || incoming === true ? true : incoming;
     };
     const withAddressAuthority = stored
       ? {
-          ...withIdentityReceipt,
+          ...withInstitutionReceipt,
           addressConflictPending: preserveStoredTrue('addressConflictPending'),
           conflictRecordUnavailable: preserveStoredTrue('conflictRecordUnavailable'),
           addressVerificationRequired: preserveStoredTrue('addressVerificationRequired'),
           contactEnrichment: {
-            ...(withIdentityReceipt.contactEnrichment || {}),
+            ...(withInstitutionReceipt.contactEnrichment || {}),
             addressConflictPending: preserveStoredTrue('addressConflictPending'),
             conflictRecordUnavailable: preserveStoredTrue('conflictRecordUnavailable'),
             addressVerificationRequired: preserveStoredTrue('addressVerificationRequired'),
           },
         }
-      : withIdentityReceipt;
+      : withInstitutionReceipt;
     // This marker is server-owned and fail-closed. A roster refresh may carry a
     // stale or missing browser copy, but only authenticated confirmation should
     // clear the stored review requirement.
@@ -272,6 +334,9 @@ async function preserveStoredRosterAuthority(requestId, candidates) {
       }),
       ...(identityReceipt
         ? { serverIdentityDecisionReceipt: identityReceipt }
+        : {}),
+      ...(institutionReceipt
+        ? { serverInstitutionEvidenceReceipt: institutionReceipt }
         : {}),
     };
   });
@@ -333,19 +398,48 @@ async function handlePost(req, res) {
       compact.automatedIdentityAttestation,
       { requestId, candidate: compact },
     );
+    const institutionEvidenceReceipt = await verifyInstitutionEvidenceAttestation(
+      compact.institutionEvidenceAttestation,
+      { requestId, candidate: compact },
+    );
     const eligibilityStatus = receipt.valid && receipt.eligibilityEvidenceBound
       && (receipt.eligibilityStatus === 'deceased' || receipt.eligibilityStatus === 'emeritus')
       ? receipt.eligibilityStatus
       : 'unknown';
     const preserveEvidence = eligibilityStatus !== 'unknown';
     const bound = bindServerRosterCandidateKey(compact, receipt);
+    const institutionEvidenceBound = institutionEvidenceReceipt.valid
+      && institutionEvidenceReceipt.candidateKey === bound.candidateKey;
     const identityReceipt = receipt.valid && receipt.identityDecisionBound === true
       ? createServerIdentityDecisionReceipt(bound)
       : null;
+    const serverInstitutionEvidenceReceipt = institutionEvidenceBound
+      ? createServerInstitutionEvidenceReceipt({
+          requestId,
+          candidate: bound,
+          expiresAt: institutionEvidenceReceipt.expiresAt,
+        })
+      : null;
+    const trustedInstitutionEvidence = institutionEvidenceBound
+      ? institutionEvidenceProjection(bound)
+      : { independentIdentity: null, affiliationAssertions: [] };
+    const boundWithoutInstitutionEvidence = stripClientInstitutionEvidence(bound);
     return {
-      ...bound,
+      ...boundWithoutInstitutionEvidence,
       ...(identityReceipt
         ? { serverIdentityDecisionReceipt: identityReceipt }
+        : {}),
+      ...(serverInstitutionEvidenceReceipt
+        ? { serverInstitutionEvidenceReceipt }
+        : {}),
+      ...(institutionEvidenceBound && trustedInstitutionEvidence.independentIdentity
+        ? { independentIdentity: trustedInstitutionEvidence.independentIdentity }
+        : {}),
+      ...(institutionEvidenceBound && trustedInstitutionEvidence.affiliationAssertions.length > 0
+        ? { affiliationAssertions: trustedInstitutionEvidence.affiliationAssertions }
+        : {}),
+      ...(institutionEvidenceBound
+        ? { affiliationAssertionsComplete: trustedInstitutionEvidence.affiliationAssertionsComplete }
         : {}),
       eligibilityStatus,
       eligibilityReason: preserveEvidence ? compact.eligibilityReason : null,
@@ -374,7 +468,9 @@ async function handlePatch(req, res, access) {
     if (!candidate || !candidate.name) {
       return res.status(400).json({ error: 'candidate (with name) is required to exclude' });
     }
-    let candidateToExclude = stripClientRosterAuthority(pruneCandidateForRoster(candidate));
+    let candidateToExclude = stripClientInstitutionEvidence(
+      stripClientRosterAuthority(pruneCandidateForRoster(candidate)),
+    );
     if (isServerManagedApplicantCandidate(candidate)) {
       candidateToExclude = await authoritativeApplicantCandidate(requestId, candidate);
       if (!candidateToExclude) {
@@ -384,6 +480,7 @@ async function handlePatch(req, res, access) {
       [candidateToExclude] = await preserveStoredRosterAuthority(requestId, [candidateToExclude]);
     }
     await setExcluded(requestId, candidateToExclude);
+    await measureRosterAction(requestId, 'staff_excluded', candidateToExclude.candidateKey, null, 'excluded');
     return res.status(200).json({ success: true });
   }
 
@@ -412,6 +509,7 @@ async function handlePatch(req, res, access) {
         code: 'candidate_not_excluded',
       });
     }
+    await measureRosterAction(requestId, 'staff_restored', candidateKey, storedCandidate);
     return res.status(200).json({ success: true, candidate });
   }
 
@@ -427,7 +525,9 @@ async function handlePatch(req, res, access) {
     if (!candidate?.name || !candidate?.email) {
       return res.status(400).json({ error: 'candidate name and email are required to confirm identity' });
     }
-    let authoritativeCandidate = stripClientRosterAuthority(pruneCandidateForRoster(candidate));
+    let authoritativeCandidate = stripClientInstitutionEvidence(
+      stripClientRosterAuthority(pruneCandidateForRoster(candidate)),
+    );
     if (isServerManagedApplicantCandidate(candidate)) {
       authoritativeCandidate = await authoritativeApplicantCandidate(requestId, candidate);
       if (!authoritativeCandidate) {
@@ -483,6 +583,7 @@ async function handlePatch(req, res, access) {
     if (!confirmed) {
       return res.status(409).json({ error: 'Candidate is no longer active; reload before confirming identity.' });
     }
+    await measureRosterAction(requestId, 'staff_identity_confirmed', candidate.candidateKey, storedCandidate || confirmed.candidate);
     return res.status(200).json({ success: true, ...confirmed });
   }
 
@@ -546,6 +647,7 @@ async function handlePatch(req, res, access) {
         code: 'candidate_stale',
       });
     }
+    await measureRosterAction(requestId, 'staff_contact_edited', candidateKey, candidate);
     return res.status(200).json({ success: true, candidate });
   }
 

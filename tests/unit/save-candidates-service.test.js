@@ -84,6 +84,18 @@ jest.mock('../../lib/services/notification-service', () => ({
   __esModule: true,
   default: { notify: jest.fn(async () => ({ id: 'alert-1' })) },
 }));
+jest.mock('../../lib/services/reviewer-institution-measurement', () => ({
+  measurementEnabled: jest.fn(() => false),
+  recordInstitutionMeasurement: jest.fn(async () => 'inserted'),
+  classifiedOutcome: jest.fn((code, saved) => saved ? 'saved' : (code === 'identity_unresolved' ? 'identity_hold' : 'other')),
+}));
+jest.mock('../../lib/services/reviewer-institution-evidence-attestation', () => {
+  const actual = jest.requireActual('../../lib/services/reviewer-institution-evidence-attestation');
+  return {
+    ...actual,
+    hasServerInstitutionEvidenceReceipt: jest.fn(() => false),
+  };
+});
 
 const potentialReviewerAdapter = require('../../lib/dataverse/adapters/potential-reviewer');
 const contactAdapter = require('../../lib/dataverse/adapters/contact');
@@ -105,6 +117,10 @@ const { lookupReviewerIdentity } = require('../../lib/services/reviewer-identity
 const { loadCoiContext } = require('../../lib/services/reviewer-request-context');
 const { createInstitutionIdentityResolver } = require('../../lib/services/institution-identity-resolver');
 const NotificationService = require('../../lib/services/notification-service').default;
+const institutionMeasurement = require('../../lib/services/reviewer-institution-measurement');
+const {
+  hasServerInstitutionEvidenceReceipt,
+} = require('../../lib/services/reviewer-institution-evidence-attestation');
 const { ServiceHttpError } = require('../../lib/services/service-http-error');
 const { VERIFICATION_STATUSES } = require('../../lib/services/discovery/constants');
 const {
@@ -127,6 +143,8 @@ const saveCandidates = (args) => saveCandidatesImpl({
 
 beforeEach(() => {
   jest.clearAllMocks();
+  delete process.env.REVIEWER_INSTITUTION_PHASE2;
+  institutionMeasurement.measurementEnabled.mockReturnValue(false);
   potentialReviewerAdapter.getByEmail.mockResolvedValue(null);
   potentialReviewerAdapter.getById.mockResolvedValue({ wmkf_primaryaffiliation: 'MIT', _etag: 'W/"person"' });
   potentialReviewerAdapter.getByIdForMerge.mockResolvedValue({
@@ -159,12 +177,203 @@ beforeEach(() => {
   });
   hasServerIdentityDecisionReceipt.mockReturnValue(false);
   createServerIdentityDecisionReceipt.mockReturnValue(null);
+  hasServerInstitutionEvidenceReceipt.mockReturnValue(false);
   lookupReviewerIdentity.mockResolvedValue({ outcome: 'none' });
   loadCoiContext.mockResolvedValue({
     applicantInstitutionContext: { state: 'complete', names: ['Applicant University'] },
     piResolution: { state: 'ok', reason: null },
     institutionEntries: [{ identity: 'Applicant University', display: 'Applicant University' }],
   });
+});
+
+test('measurement observes exact partial-save outcomes without changing the response', async () => {
+  institutionMeasurement.measurementEnabled.mockReturnValue(true);
+  verifyAutomatedIdentityAttestation.mockImplementation(async (_token, { candidate }) => ({
+    valid: true,
+    source: 'automated_resolver',
+    identityDecisionBound: true,
+    contactAuthorityBound: true,
+    rosterCandidateKey: candidate.candidateKey,
+  }));
+  reviewerRosterStore.findAddressTrustReceipt.mockResolvedValueOnce({
+    receiptId: 'receipt-saved',
+    personConfirmed: true,
+    email: 'saved@example.edu',
+    evidenceType: 'institution_page',
+    evidenceUrl: 'https://example.edu/person',
+    attestedAt: '2026-07-31T12:00:00.000Z',
+  });
+  const out = await saveCandidates({
+    ...BASE,
+    candidates: [
+      { name: 'Dr Saved', email: 'saved@example.edu', candidateKey: 'candidate:saved', automatedIdentityAttestation: 'bound' },
+      { name: 'Dr Held', needsIdentification: true, candidateKey: 'candidate:held', automatedIdentityAttestation: 'bound' },
+    ],
+  });
+  expect(out).toMatchObject({ success: true, savedCount: 1, rejectedUnresolved: 1 });
+  expect(institutionMeasurement.recordInstitutionMeasurement).toHaveBeenCalledWith(
+    expect.objectContaining({ eventType: 'save_saved', outcomeCategory: 'saved', captureSource: 'stored_roster' }),
+  );
+  expect(institutionMeasurement.recordInstitutionMeasurement).toHaveBeenCalledWith(
+    expect.objectContaining({ eventType: 'save_rejected', outcomeCategory: 'identity_hold', captureSource: 'stored_roster' }),
+  );
+});
+
+test('early invalid save cannot attribute a rejection using only a client correlation key', async () => {
+  institutionMeasurement.measurementEnabled.mockReturnValue(true);
+  const error = await saveCandidates({
+    ...BASE,
+    candidates: [{ name: 'Dr Invalid', clientCandidateId: 'existing-key', identityStatus: 'invented' }],
+  }).catch((caught) => caught);
+  expect(error).toBeInstanceOf(SaveCandidatesError);
+  expect(error.httpStatus).toBe(422);
+  expect(error.body.errors[0].candidateKey).toBe('client:existing-key');
+  expect(reviewerRosterStore.findCandidatesByKeys).not.toHaveBeenCalled();
+  expect(institutionMeasurement.recordInstitutionMeasurement).not.toHaveBeenCalled();
+});
+
+test('Phase 2 exact-on holds a roster candidate with missing institution evidence before writes', async () => {
+  process.env.REVIEWER_INSTITUTION_PHASE2 = 'on';
+  const candidateKey = 'candidate:phase2-missing';
+  verifyAutomatedIdentityAttestation.mockResolvedValueOnce({
+    valid: true,
+    source: 'automated_resolver',
+    identityDecisionBound: true,
+    contactAuthorityBound: true,
+    rosterCandidateKey: candidateKey,
+  });
+  reviewerRosterStore.findCandidatesByKeys.mockResolvedValueOnce([{
+    name: 'Dr Missing Evidence',
+    candidateKey,
+    rosterStatus: 'active',
+  }]);
+
+  const error = await saveCandidates({
+    ...BASE,
+    candidates: [{
+      name: 'Dr Missing Evidence',
+      candidateKey,
+      affiliation: 'Stanford University',
+      automatedIdentityAttestation: 'identity-only',
+    }],
+  }).catch((caught) => caught);
+
+  expect(error).toBeInstanceOf(SaveCandidatesError);
+  expect(error.body.errors).toEqual([expect.objectContaining({
+    code: 'institution_evidence_required',
+    candidateKey: expect.any(String),
+  })]);
+  expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
+  expect(reviewerSuggestionAdapter.upsert).not.toHaveBeenCalled();
+});
+
+test('Phase 2 exact-on rejects a legacy payload without roster evidence before writes', async () => {
+  process.env.REVIEWER_INSTITUTION_PHASE2 = 'on';
+
+  const error = await saveCandidates({
+    ...BASE,
+    candidates: [{
+      name: 'Dr Legacy Payload',
+      affiliation: 'Stanford University',
+    }],
+  }).catch((caught) => caught);
+
+  expect(error).toBeInstanceOf(SaveCandidatesError);
+  expect(error.body.errors).toEqual([expect.objectContaining({
+    code: 'institution_evidence_required',
+    candidateKey: expect.any(String),
+  })]);
+  expect(reviewerRosterStore.findCandidatesByKeys).not.toHaveBeenCalled();
+  expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
+  expect(reviewerSuggestionAdapter.upsert).not.toHaveBeenCalled();
+});
+
+test('Phase 2 exact-on holds unknown-currentness additional evidence before writes', async () => {
+  process.env.REVIEWER_INSTITUTION_PHASE2 = 'on';
+  const candidateKey = 'candidate:phase2-incomplete';
+  verifyAutomatedIdentityAttestation.mockResolvedValueOnce({
+    valid: true,
+    source: 'automated_resolver',
+    identityDecisionBound: true,
+    contactAuthorityBound: true,
+    rosterCandidateKey: candidateKey,
+  });
+  reviewerRosterStore.findCandidatesByKeys.mockResolvedValueOnce([{
+    name: 'Dr Incomplete Evidence',
+    candidateKey,
+    rosterStatus: 'active',
+    affiliationAssertions: [{
+      rawText: 'Second University',
+      sourceType: 'publication',
+      sourceReference: 'pmid:321',
+      currentness: 'unknown',
+      authorSpecific: true,
+      publicationYear: 2026,
+    }],
+  }]);
+  hasServerInstitutionEvidenceReceipt.mockReturnValueOnce(true);
+
+  const error = await saveCandidates({
+    ...BASE,
+    candidates: [{
+      name: 'Dr Incomplete Evidence',
+      candidateKey,
+      affiliation: 'Stanford University',
+      automatedIdentityAttestation: 'bound',
+    }],
+  }).catch((caught) => caught);
+
+  expect(error).toBeInstanceOf(SaveCandidatesError);
+  expect(error.body.errors).toEqual([expect.objectContaining({
+    code: 'institution_coi_incomplete',
+    candidateKey: expect.any(String),
+  })]);
+  expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
+  expect(reviewerSuggestionAdapter.upsert).not.toHaveBeenCalled();
+});
+
+test('Phase 2 exact-on holds a truncated affiliation projection before writes', async () => {
+  process.env.REVIEWER_INSTITUTION_PHASE2 = 'on';
+  const candidateKey = 'candidate:phase2-truncated';
+  verifyAutomatedIdentityAttestation.mockResolvedValueOnce({
+    valid: true,
+    source: 'automated_resolver',
+    identityDecisionBound: true,
+    contactAuthorityBound: true,
+    rosterCandidateKey: candidateKey,
+  });
+  reviewerRosterStore.findCandidatesByKeys.mockResolvedValueOnce([{
+    name: 'Dr Truncated Evidence',
+    candidateKey,
+    rosterStatus: 'active',
+    affiliationAssertions: Array.from({ length: 24 }, (_, index) => ({
+      rawText: `Nonconflicting University ${index}`,
+      sourceType: 'publication',
+      sourceReference: `pmid:${index}`,
+      currentness: 'current',
+      authorSpecific: true,
+      publicationYear: 2026,
+    })),
+    affiliationAssertionsComplete: false,
+  }]);
+  hasServerInstitutionEvidenceReceipt.mockReturnValueOnce(true);
+
+  const error = await saveCandidates({
+    ...BASE,
+    candidates: [{
+      name: 'Dr Truncated Evidence',
+      candidateKey,
+      affiliation: 'Stanford University',
+      automatedIdentityAttestation: 'bound',
+    }],
+  }).catch((caught) => caught);
+
+  expect(error).toBeInstanceOf(SaveCandidatesError);
+  expect(error.body.errors).toEqual([expect.objectContaining({
+    code: 'institution_coi_incomplete',
+  })]);
+  expect(potentialReviewerAdapter.upsertByEmail).not.toHaveBeenCalled();
+  expect(reviewerSuggestionAdapter.upsert).not.toHaveBeenCalled();
 });
 
 test('422 SaveCandidatesError with the full body (both rejected counts always present) when ALL rows are rejected', async () => {

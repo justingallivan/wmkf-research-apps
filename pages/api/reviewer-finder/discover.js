@@ -27,6 +27,13 @@ import { withDalContext } from '../../../lib/dataverse/core/context';
 import { resolveProposalPI, excludePiIdentity, appendPiName, piInstitutions } from '../../../lib/services/proposal-pi-identity';
 import { recordCoiDropped } from '../../../lib/services/reviewer-roster-store';
 import { pruneCandidateForRoster } from '../../../shared/components/reviewers/reviewer-search-logic';
+import { reviewerCandidateKey } from '../../../lib/utils/reviewer-candidate-key';
+import {
+  institutionEvidenceProjection,
+  mintInstitutionEvidenceAttestation,
+  reviewerInstitutionPhase2Enabled,
+} from '../../../lib/services/reviewer-institution-evidence-attestation';
+import { evaluateServerCandidateIndependentIdentity } from '../../../lib/services/reviewer-independent-identity-runtime';
 
 const limiter = nextRateLimiter({ max: 10 });
 const GUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -38,18 +45,37 @@ function withProvenanceList(candidates) {
   return (Array.isArray(candidates) ? candidates : []).map((candidate) => withReviewerProvenance(candidate));
 }
 
+function stripDormantInstitutionEvidence(candidate) {
+  if (!candidate || typeof candidate !== 'object') return candidate;
+  const {
+    independentIdentity: _independentIdentity,
+    affiliationAssertions: _affiliationAssertions,
+    affiliationAssertionsComplete: _affiliationAssertionsComplete,
+    institutionEvidenceAttestation: _institutionEvidenceAttestation,
+    serverInstitutionEvidenceReceipt: _serverInstitutionEvidenceReceipt,
+    ...incumbentCandidate
+  } = candidate;
+  return incumbentCandidate;
+}
+
 async function recordInstitutionCoiDrops(requestId, candidates, { dropStage, matchSource }) {
   if (!requestId || !GUID_RE.test(String(requestId)) || !Array.isArray(candidates) || candidates.length === 0) return 0;
   try {
+    const phase2Enabled = reviewerInstitutionPhase2Enabled();
     const pruned = candidates
-      .map((candidate) => pruneCandidateForRoster({
-        ...candidate,
-        institutionCOIDetails: {
-          ...(candidate.institutionCOIDetails || {}),
-          dropStage,
-          matchSource,
-        },
-      }))
+      .map((candidate) => {
+        const candidateForPersistence = phase2Enabled
+          ? candidate
+          : stripDormantInstitutionEvidence(candidate);
+        return pruneCandidateForRoster({
+          ...candidateForPersistence,
+          institutionCOIDetails: {
+            ...(candidateForPersistence.institutionCOIDetails || {}),
+            dropStage,
+            matchSource,
+          },
+        });
+      })
       .filter((candidate) => candidate && candidate.name);
     return await recordCoiDropped(requestId, pruned, { dropStage, matchSource });
   } catch (error) {
@@ -624,9 +650,56 @@ export default async function handler(req, res) {
       : { resolved: false, reason: 'no_request_id' };
 
     verifiedWithCOI = withProvenanceList(verifiedWithCOI);
-    const unverifiedWithProvenance = withProvenanceList(discoveryResults.unverified);
+    let unverifiedWithProvenance = withProvenanceList(discoveryResults.unverified);
     enhancedDiscovered = withProvenanceList(enhancedDiscovered);
-    const rankedWithProvenance = withProvenanceList(rankedCandidates);
+    let rankedWithProvenance = withProvenanceList(rankedCandidates);
+
+    // Phase 2 is server-only, exact-on, and dormant. Build the independent
+    // identity result at the last server-owned discovery point, then sign the
+    // bounded identity + dated-affiliation projection before it crosses the
+    // browser. Candidates without proposal-citation lineage explicitly remain
+    // not evaluable; no selection or write predicate reads this result yet.
+    const institutionPhase2Enabled = reviewerInstitutionPhase2Enabled();
+    if (institutionPhase2Enabled && requestId && GUID_RE.test(String(requestId))) {
+      const evidenceByCandidateKey = new Map();
+      for (const candidate of rankedWithProvenance) {
+        const independentIdentity = await evaluateServerCandidateIndependentIdentity({
+          requestId,
+          candidate,
+          authority: 'server_discovery',
+          signal: deadlineController.signal,
+        });
+        const withEvidence = independentIdentity
+          ? { ...candidate, independentIdentity }
+          : candidate;
+        const institutionEvidenceAttestation = await mintInstitutionEvidenceAttestation({
+          requestId,
+          candidate: withEvidence,
+        });
+        evidenceByCandidateKey.set(reviewerCandidateKey(withEvidence), {
+          independentIdentity: withEvidence.independentIdentity || null,
+          affiliationAssertions: withEvidence.affiliationAssertions || [],
+          affiliationAssertionsComplete: institutionEvidenceProjection(withEvidence)
+            .affiliationAssertionsComplete,
+          institutionEvidenceAttestation,
+        });
+      }
+      const attachEvidence = (candidate) => {
+        const evidence = evidenceByCandidateKey.get(reviewerCandidateKey(candidate));
+        return evidence ? { ...candidate, ...evidence } : candidate;
+      };
+      verifiedWithCOI = verifiedWithCOI.map(attachEvidence);
+      unverifiedWithProvenance = unverifiedWithProvenance.map(attachEvidence);
+      enhancedDiscovered = enhancedDiscovered.map(attachEvidence);
+      rankedWithProvenance = rankedWithProvenance.map(attachEvidence);
+    } else if (!institutionPhase2Enabled) {
+      // Producers may collect typed evidence internally, but exact-off keeps
+      // the incumbent SSE DTO byte-for-byte compatible at this boundary.
+      verifiedWithCOI = verifiedWithCOI.map(stripDormantInstitutionEvidence);
+      unverifiedWithProvenance = unverifiedWithProvenance.map(stripDormantInstitutionEvidence);
+      enhancedDiscovered = enhancedDiscovered.map(stripDormantInstitutionEvidence);
+      rankedWithProvenance = rankedWithProvenance.map(stripDormantInstitutionEvidence);
+    }
 
     // [S266 TEMP DEBUG — REMOVE after the generation-exclusion review] Names only
     // (no proposal content). Audits which Claude-GENERATED Track-A suggestions

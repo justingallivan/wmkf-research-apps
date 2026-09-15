@@ -1150,6 +1150,28 @@ const v51Statements = [
      CHECK (scope IN ('grantee_image', 'staff_grantee_image', 'site_visit_material', 'consultant_feedback'))`,
 ];
 
+// V52: non-authoritative reviewer institution measurement. Mirrors migration 051.
+const v52Statements = [
+  `CREATE TABLE IF NOT EXISTS reviewer_institution_measurement_events (
+    id BIGSERIAL PRIMARY KEY, case_key CHAR(64) NOT NULL, card_snapshot_digest CHAR(64) NOT NULL,
+    event_type TEXT NOT NULL CHECK (event_type IN (
+      'roster_upsert', 'staff_excluded', 'staff_restored',
+      'staff_identity_confirmed', 'staff_contact_edited', 'save_saved', 'save_rejected')),
+    capture_source TEXT NOT NULL CHECK (capture_source IN ('server_applicant', 'roster_unverified', 'stored_roster')),
+    source_kind TEXT, legacy_hold BOOLEAN, relationship TEXT, evidence_context TEXT,
+    evidence_source_type TEXT, evidence_currentness TEXT, evidence_author_specific TEXT,
+    recorded_source_type TEXT, recorded_currentness TEXT, additional_affiliation_count SMALLINT,
+    independent_identity TEXT NOT NULL CHECK (independent_identity = 'not_evaluable'),
+    additional_coi TEXT NOT NULL CHECK (additional_coi = 'not_screened'),
+    proposed_action TEXT NOT NULL CHECK (proposed_action = 'not_evaluable'),
+    outcome_category TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_reviewer_institution_measurement_created
+    ON reviewer_institution_measurement_events (created_at)`,
+  `CREATE INDEX IF NOT EXISTS idx_reviewer_institution_measurement_case
+    ON reviewer_institution_measurement_events (case_key, created_at)`,
+];
+
 // V43: deliberation briefing links (docs/DELIBERATION_BRIEFING_PAGE_PLAN.md).
 // One expiring, revocable link per request for the read-only briefing page;
 // stores a token digest and sealed token, never the raw token. Also binds the
@@ -2214,6 +2236,24 @@ async function runMigration() {
           console.log(`[v51-${i + 1}/${v51Statements.length}] ○ Already exists: ${preview}...`);
         } else {
           console.error(`[v51-${i + 1}/${v51Statements.length}] ✗ Error: ${error.message}`);
+          throw error;
+        }
+      }
+    }
+
+    // Run V52 schema updates (reviewer institution measurement; mirrors migration 051)
+    console.log(`\nApplying v52 schema updates - reviewer institution measurement (${v52Statements.length} statements)...`);
+    for (let i = 0; i < v52Statements.length; i++) {
+      const statement = v52Statements[i];
+      const preview = statement.substring(0, 60).replace(/\s+/g, ' ');
+      try {
+        await sql.query(statement);
+        console.log(`[v52-${i + 1}/${v52Statements.length}] ✓ ${preview}...`);
+      } catch (error) {
+        if (error.message.includes('already exists')) {
+          console.log(`[v52-${i + 1}/${v52Statements.length}] ○ Already exists: ${preview}...`);
+        } else {
+          console.error(`[v52-${i + 1}/${v52Statements.length}] ✗ Error: ${error.message}`);
           throw error;
         }
       }

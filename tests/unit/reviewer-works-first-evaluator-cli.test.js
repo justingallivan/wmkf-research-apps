@@ -5,6 +5,7 @@
 const {
   DEFAULT_BENCHMARK,
   DEFAULT_OUTPUT,
+  includeRorProviderFailures,
   parseCli,
 } = require('../../scripts/evaluate-reviewer-works-first');
 
@@ -53,5 +54,34 @@ describe('evaluate-reviewer-works-first parseCli', () => {
     ]);
     expect(options.institutionResolverArm).toBe('ror');
     expect(options.caseIds).toEqual(['case-1']);
+  });
+});
+
+describe('ROR evaluator provider-health gate', () => {
+  const cleanPromotion = {
+    pass: true,
+    gates: { providerFailures: { actual: 0, maximum: 0, pass: true } },
+  };
+
+  test('voids an otherwise passing run when the ROR resolver recorded a failure', () => {
+    expect(includeRorProviderFailures(cleanPromotion, { providerFailures: 1 })).toEqual({
+      pass: false,
+      gates: {
+        providerFailures: {
+          actual: 1,
+          maximum: 0,
+          pass: false,
+          rowFailureCases: 0,
+          rorResolverFailures: 1,
+        },
+      },
+    });
+  });
+
+  test('preserves a clean result and rejects missing resolver metrics', () => {
+    expect(includeRorProviderFailures(cleanPromotion, { providerFailures: 0 }).pass).toBe(true);
+    expect(() => includeRorProviderFailures(cleanPromotion, {})).toThrow(
+      'valid institution resolver provider-failure count',
+    );
   });
 });

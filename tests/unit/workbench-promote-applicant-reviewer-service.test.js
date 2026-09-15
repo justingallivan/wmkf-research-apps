@@ -47,6 +47,30 @@ jest.mock('../../lib/services/notification-service', () => ({
   __esModule: true,
   default: { notify: jest.fn(async () => ({ id: 'alert-1' })) },
 }));
+const recordInstitutionMeasurement = jest.fn(async () => 'disabled');
+jest.mock('../../lib/services/reviewer-institution-measurement', () => ({
+  recordInstitutionMeasurement: (...args) => recordInstitutionMeasurement(...args),
+  classifiedOutcome: (code) => code === 'identity_confirmation_required' ? 'identity_hold' : 'other',
+}));
+
+const loadCoiContext = jest.fn();
+jest.mock('../../lib/services/reviewer-request-context', () => ({
+  loadCoiContext: (...args) => loadCoiContext(...args),
+}));
+const createInstitutionIdentityResolver = jest.fn(() => ({ resolve: jest.fn() }));
+jest.mock('../../lib/services/institution-identity-resolver', () => ({
+  createInstitutionIdentityResolver: (...args) => createInstitutionIdentityResolver(...args),
+}));
+const recomputeReviewerInstitutionCOI = jest.fn();
+jest.mock('../../lib/services/reviewer-institution-coi-screen', () => ({
+  recomputeReviewerInstitutionCOI: (...args) => recomputeReviewerInstitutionCOI(...args),
+}));
+const reviewerInstitutionPhase2Enabled = jest.fn(() => false);
+const hasServerInstitutionEvidenceReceipt = jest.fn(() => false);
+jest.mock('../../lib/services/reviewer-institution-evidence-attestation', () => ({
+  reviewerInstitutionPhase2Enabled: (...args) => reviewerInstitutionPhase2Enabled(...args),
+  hasServerInstitutionEvidenceReceipt: (...args) => hasServerInstitutionEvidenceReceipt(...args),
+}));
 
 const loadApplicantKnownReviewerContext = jest.fn();
 jest.mock('../../lib/services/workbench/applicant-known-reviewer-service', () => ({
@@ -111,6 +135,16 @@ beforeEach(() => {
       },
     },
     contactId: null,
+  });
+  reviewerInstitutionPhase2Enabled.mockReturnValue(false);
+  hasServerInstitutionEvidenceReceipt.mockReturnValue(false);
+  loadCoiContext.mockResolvedValue({
+    institutionEntries: ['Applicant University'],
+    piResolution: { state: 'ok' },
+  });
+  recomputeReviewerInstitutionCOI.mockResolvedValue({
+    decision: null,
+    additionalCoi: 'clear',
   });
 });
 
@@ -184,6 +218,113 @@ test('plain promote: canonical email verified, selected flipped, roster finalize
     emailAction: 'ready',
     emailActionReason: 'Address source: scholarly_multi',
   });
+  expect(recordInstitutionMeasurement).toHaveBeenCalledWith(expect.objectContaining({
+    requestId: REQ,
+    eventType: 'save_saved',
+    outcomeCategory: 'saved',
+    candidate: expect.objectContaining({ candidateKey: 'candidate:applicant' }),
+  }));
+  expect(loadCoiContext).not.toHaveBeenCalled();
+});
+
+test('Phase 2 missing evidence holds before any contact or suggestion mutation', async () => {
+  reviewerInstitutionPhase2Enabled.mockReturnValue(true);
+  const error = await promoteApplicantReviewer(args({
+    contact: { affiliation: 'Edited University' },
+  })).catch((caught) => caught);
+  expect(error).toBeInstanceOf(ServiceHttpError);
+  expect(error.body).toMatchObject({ code: 'institution_evidence_required' });
+  expect(update).not.toHaveBeenCalled();
+  expect(updateById).not.toHaveBeenCalled();
+  expect(selectIfUnengaged).not.toHaveBeenCalled();
+});
+
+test('Phase 2 screens the actual extra affiliation and blocks its COI before writes', async () => {
+  reviewerInstitutionPhase2Enabled.mockReturnValue(true);
+  hasServerInstitutionEvidenceReceipt.mockReturnValue(true);
+  findCandidateBySuggestion.mockResolvedValue({
+    candidateKey: 'candidate:applicant',
+    suggestionId: SUG,
+    identityStatus: 'probable',
+    needsIdentification: false,
+    affiliation: 'Stanford University',
+    affiliationAssertions: [{
+      rawText: 'Applicant University',
+      sourceType: 'publication',
+      currentness: 'current',
+      authorSpecific: true,
+    }],
+  });
+  recomputeReviewerInstitutionCOI.mockResolvedValue({
+    decision: {
+      dropDecision: 'dropped',
+      candidate: {
+        institutionCOIDetails: {
+          reviewerInstitution: 'Applicant University',
+          matchedAffiliationSource: 'pubmed_additional',
+        },
+      },
+    },
+    additionalCoi: 'conflict',
+  });
+
+  const error = await promoteApplicantReviewer(args({
+    contact: { affiliation: 'Edited University' },
+  })).catch((caught) => caught);
+  expect(error).toBeInstanceOf(ServiceHttpError);
+  expect(error.body).toMatchObject({
+    code: 'institution_coi',
+    institutionCOIDetails: {
+      reviewerInstitution: 'Applicant University',
+      matchedAffiliationSource: 'pubmed_additional',
+    },
+  });
+  expect(recomputeReviewerInstitutionCOI).toHaveBeenCalledWith(expect.objectContaining({
+    candidate: expect.objectContaining({
+      affiliationAssertions: [expect.objectContaining({ rawText: 'Applicant University' })],
+    }),
+    includeAdditionalAffiliations: true,
+  }));
+  expect(update).not.toHaveBeenCalled();
+  expect(updateById).not.toHaveBeenCalled();
+  expect(selectIfUnengaged).not.toHaveBeenCalled();
+});
+
+test('Phase 2 incomplete additional-affiliation screening holds before writes', async () => {
+  reviewerInstitutionPhase2Enabled.mockReturnValue(true);
+  hasServerInstitutionEvidenceReceipt.mockReturnValue(true);
+  recomputeReviewerInstitutionCOI.mockResolvedValue({
+    decision: null,
+    additionalCoi: 'incomplete',
+  });
+
+  const error = await promoteApplicantReviewer(args({
+    contact: { affiliation: 'Edited University' },
+  })).catch((caught) => caught);
+
+  expect(error).toBeInstanceOf(ServiceHttpError);
+  expect(error.body).toMatchObject({ code: 'institution_coi_incomplete' });
+  expect(update).not.toHaveBeenCalled();
+  expect(updateById).not.toHaveBeenCalled();
+  expect(selectIfUnengaged).not.toHaveBeenCalled();
+});
+
+test('a held applicant has a rejected observation and telemetry failure cannot alter successful promotion', async () => {
+  findCandidateBySuggestion.mockResolvedValueOnce({
+    candidateKey: 'candidate:applicant', suggestionId: SUG,
+    identityStatus: 'unresolved', needsIdentification: true,
+  });
+  const held = await promoteApplicantReviewer(args()).catch((error) => error);
+  expect(held).toBeInstanceOf(ServiceHttpError);
+  expect(held.body.code).toBe('identity_confirmation_required');
+  expect(recordInstitutionMeasurement).toHaveBeenCalledWith(expect.objectContaining({
+    eventType: 'save_rejected', outcomeCategory: 'identity_hold',
+  }));
+
+  recordInstitutionMeasurement.mockRejectedValueOnce(new Error('telemetry failed'));
+  const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  await expect(promoteApplicantReviewer(args())).resolves.toMatchObject({ success: true });
+  warn.mockRestore();
 });
 
 test('source-null canonical contact requires evidence and becomes exact-bundle ready', async () => {

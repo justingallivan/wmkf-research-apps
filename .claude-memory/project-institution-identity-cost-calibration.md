@@ -6,9 +6,9 @@ metadata:
   type: project
   status: active
   scope: reviewer
-  last_verified: 2026-08-19 (Stage 2 low-authority presentation Production-live behind exact-on rollout flag; identity, selection, and write authority unchanged)
+  last_verified: 2026-09-14 (owner clarified Stage 3 human-effort goal; local source checked; Production deployment not re-probed)
   originSessionId: 363a2e80-2dd8-483e-9088-3193c321799e
-  modified: 2026-08-19T00:00:00.000Z
+  modified: 2026-09-14T00:00:00.000Z
 ---
 
 ## Recall Rule
@@ -55,6 +55,14 @@ authority.
 **Why:** the original problem statement ([[institution-pair-consistency]]
 plan) was human effort spent on verify-and-cite clicking. A cost model that
 over-surfaces recreates the problem it was solving.
+
+Owner clarification (2026-09-14): Stage 3 should **reduce**, not eliminate,
+human input. Verified same-institution departments and compatible
+multi-affiliation segments should clear without a staff click; genuine current
+conflicts should show a correction path. Person identity, contact, COI, and
+address gates remain separate. See
+`docs/INSTITUTION_PAIR_CONSISTENCY_RESOLUTION_PLAN.md` for the staged plan;
+this is intent, not deployed Stage 3 authority.
 
 **How to apply:**
 - At the alert tier, precision-hardening beyond Stage 1 Wave 4 is

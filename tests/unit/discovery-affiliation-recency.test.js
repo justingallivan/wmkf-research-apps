@@ -68,6 +68,30 @@ describe('collectAffiliationHistory — all distinct affiliations, most-recent-f
   });
 });
 
+describe('collectAffiliationAssertions — source/date binding', () => {
+  test('keeps the exact publication year and PMID with each author-specific institution', () => {
+    const articles = [
+      { year: 2023, pmid: '100', authors: [author('Jane Smith', 'Old Postdoc University, Biology')] },
+      { year: 2025, pmid: '200', authors: [author('Jane Smith', 'New Faculty University, Chemistry')] },
+      { year: 2025, pmid: '300', authors: [author('A Namesake', 'Wrong University, Physics')] },
+    ];
+    expect(DiscoveryService.collectAffiliationAssertions(articles, ['Jane Smith'])).toEqual([
+      expect.objectContaining({
+        rawText: expect.stringContaining('New Faculty University'),
+        sourceReference: 'pmid:200',
+        publicationYear: 2025,
+        currentness: 'unknown',
+        authorSpecific: true,
+      }),
+      expect.objectContaining({
+        rawText: expect.stringContaining('Old Postdoc University'),
+        sourceReference: 'pmid:100',
+        publicationYear: 2023,
+      }),
+    ]);
+  });
+});
+
 // Characterization added before Stage 2 (docs/DISCOVERY_SERVICE_DECOMPOSITION_PLAN.md) to pin the
 // previously-untested affiliation-normalizer's regex branches before the code moves to
 // lib/services/discovery/affiliation.js. Values are the actual pre-extraction outputs.

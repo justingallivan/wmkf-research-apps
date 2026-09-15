@@ -93,6 +93,28 @@ function parseCli(argv) {
   return options;
 }
 
+function includeRorProviderFailures(promotion, institutionResolverMetrics) {
+  const rorResolverFailures = institutionResolverMetrics?.providerFailures;
+  if (!Number.isSafeInteger(rorResolverFailures) || rorResolverFailures < 0) {
+    throw new Error('ROR evaluation requires a valid institution resolver provider-failure count');
+  }
+  const rowFailureCases = promotion.gates.providerFailures.actual;
+  const providerFailures = {
+    ...promotion.gates.providerFailures,
+    // These are failure signals from different layers and may overlap. The
+    // promotion condition is zero in both layers, not a unique-request count.
+    actual: rowFailureCases + rorResolverFailures,
+    rowFailureCases,
+    rorResolverFailures,
+    pass: rowFailureCases === 0 && rorResolverFailures === 0,
+  };
+  return {
+    ...promotion,
+    pass: promotion.pass && providerFailures.pass,
+    gates: { ...promotion.gates, providerFailures },
+  };
+}
+
 function readPinnedJson(filePath, expectedSha256, label) {
   const raw = fs.readFileSync(filePath, 'utf8');
   const actualSha256 = crypto.createHash('sha256').update(raw).digest('hex');
@@ -446,7 +468,12 @@ async function main() {
   }
 
   const fullRun = selectedCases.length === benchmark.cases.length;
-  const promotion = fullRun ? evaluatePromotion(rows) : null;
+  const institutionResolverMetrics = rorInstitutionResolver?.metrics;
+  const promotion = fullRun
+    ? (rorInstitutionResolver
+      ? includeRorProviderFailures(evaluatePromotion(rows), institutionResolverMetrics)
+      : evaluatePromotion(rows))
+    : null;
   const changed = changedCases(rows);
   const optionalReviewLeads = rows.filter((row) =>
     row.combined.decision === 'review'
@@ -462,7 +489,7 @@ async function main() {
     persistenceWrites: false,
     institutionResolverArm: options.institutionResolverArm,
     ...(rorInstitutionResolver
-      ? { institutionResolverMetrics: rorInstitutionResolver.metrics }
+      ? { institutionResolverMetrics }
       : {}),
     selectedCaseCount: selectedCases.length,
     w2AndScoringOpenAlex: {
@@ -521,6 +548,7 @@ module.exports = {
   createEvaluationInstitutionResolver,
   createOpenAlexClient,
   createRightPersonPolicyMatcher,
+  includeRorProviderFailures,
   parseCli,
   readEquivalenceOverlay,
   readFrozenBenchmark,

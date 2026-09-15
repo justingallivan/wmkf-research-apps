@@ -10,10 +10,10 @@
  * longer a COI input.
  */
 const { DeduplicationService } = require('../../lib/services/deduplication-service');
+const { recomputeReviewerInstitutionCOI } = require('../../lib/services/reviewer-institution-coi-screen');
+const PI_INST = 'Johns Hopkins University';
 
 describe('markInstitutionCOI — current-only (historical removed, S240)', () => {
-  const PI_INST = 'Johns Hopkins University';
-
   test('current shared institution flags COI (no historical field)', () => {
     const [r] = DeduplicationService.markInstitutionCOI(
       [{ name: 'A', affiliation: 'Department of Biophysics, Johns Hopkins University, Baltimore, MD' }],
@@ -106,6 +106,34 @@ describe('deduplicateAndStore — affiliationHistory producer kept (COI-inert)',
     );
   });
 
+  test('deduplicates typed assertions by source, normalized text, and reference before projection', async () => {
+    const assertion = {
+      rawText: 'Example   University',
+      sourceType: 'publication',
+      sourceReference: 'pmid:123',
+      currentness: 'historical',
+      authorSpecific: true,
+    };
+    const [merged] = await DeduplicationService.deduplicateAndStore([
+      { name: 'Jane Smith', affiliationAssertions: [assertion] },
+      {
+        name: 'Jane Smith',
+        affiliationAssertions: [{
+          ...assertion,
+          rawText: ' example university ',
+          currentness: 'current',
+        }],
+      },
+      {
+        name: 'Jane Smith',
+        affiliationAssertions: [{ ...assertion, sourceReference: 'pmid:456' }],
+      },
+    ]);
+    expect(merged.affiliationAssertions).toHaveLength(2);
+    expect(merged.affiliationAssertions[0].currentness).toBe('current');
+    expect(merged.affiliationAssertionsComplete).toBe(true);
+  });
+
   test('a former-only institution tie is NOT flagged (historical retired)', async () => {
     const merged = await DeduplicationService.deduplicateAndStore([
       { name: 'Jane Smith', affiliation: 'Harvard Medical School', publications: [{ title: 'a' }], source: 'pubmed' },
@@ -117,5 +145,101 @@ describe('deduplicateAndStore — affiliationHistory producer kept (COI-inert)',
     if ((withCOI.affiliation || withCOI.primaryAffiliation) !== 'Johns Hopkins University') {
       expect(withCOI.hasInstitutionCOI).toBe(false);
     }
+  });
+});
+
+describe('Phase 2 typed additional affiliations — explicit opt-in', () => {
+  test('the dangerous extra affiliation is inert by default and screened when requested', async () => {
+    const institutionEntries = [{ raw: PI_INST, display: PI_INST, identity: { name: PI_INST } }];
+    const candidate = {
+      name: 'Dual Affiliation',
+      affiliation: 'Stanford University',
+      affiliationSource: 'orcid_current',
+      affiliationAssertions: [{
+        rawText: 'Johns Hopkins University',
+        sourceType: 'publication',
+        sourceReference: 'pmid:123',
+        currentness: 'current',
+        authorSpecific: true,
+        publicationYear: 2025,
+      }],
+    };
+    expect(DeduplicationService.institutionCOIDecision(candidate, institutionEntries)).toBeNull();
+
+    const resolution = await DeduplicationService.institutionCOIResolution(
+      candidate,
+      institutionEntries,
+      {
+        includeAdditionalAffiliations: true,
+        resolver: { resolve: jest.fn(async () => null) },
+      },
+    );
+    expect(resolution.decision).toMatchObject({
+      dropDecision: 'flagged',
+      candidate: {
+        institutionCOIDetails: {
+          reviewerInstitution: PI_INST,
+          matchedAffiliationSource: 'pubmed_additional',
+        },
+      },
+    });
+  });
+
+  test('non-author-specific extra claims never enter the COI signal set', () => {
+    const signals = DeduplicationService.institutionSignalsForCandidate({
+      affiliation: 'Stanford University',
+      affiliationAssertions: [{
+        rawText: PI_INST,
+        sourceType: 'publication',
+        currentness: 'unknown',
+        authorSpecific: false,
+      }],
+    }, { includeAdditionalAffiliations: true });
+    expect(signals.map((signal) => signal.name)).toEqual(['Stanford University']);
+  });
+
+  test('unknown-currentness evidence is incomplete and does not revive historical COI', async () => {
+    const institutionEntries = [{ raw: PI_INST, display: PI_INST, identity: { name: PI_INST } }];
+    const result = await recomputeReviewerInstitutionCOI({
+      candidate: {
+        name: 'Publication Evidence Only',
+        affiliation: 'Stanford University',
+        affiliationAssertions: [{
+          rawText: PI_INST,
+          sourceType: 'publication',
+          sourceReference: 'pmid:456',
+          currentness: 'unknown',
+          authorSpecific: true,
+          publicationYear: 2025,
+        }],
+      },
+      institutionEntries,
+      includeAdditionalAffiliations: true,
+      institutionIdentityResolver: { resolve: jest.fn(async () => null) },
+    });
+    expect(result.decision).toBeNull();
+    expect(result.additionalCoi).toBe('incomplete');
+  });
+
+  test('a truncated typed assertion projection is incomplete even when retained rows are clear', async () => {
+    const result = await recomputeReviewerInstitutionCOI({
+      candidate: {
+        name: 'Truncated Evidence',
+        affiliation: 'Stanford University',
+        affiliationAssertions: Array.from({ length: 24 }, (_, index) => ({
+          rawText: `Nonconflicting University ${index}`,
+          sourceType: 'publication',
+          sourceReference: `pmid:${index}`,
+          currentness: 'current',
+          authorSpecific: true,
+        })),
+        affiliationAssertionsComplete: false,
+      },
+      institutionEntries: [{ raw: PI_INST, display: PI_INST, identity: { name: PI_INST } }],
+      includeAdditionalAffiliations: true,
+      institutionIdentityResolver: { resolve: jest.fn(async () => null) },
+    });
+    expect(result.decision).toBeNull();
+    expect(result.additionalCoi).toBe('incomplete');
   });
 });
