@@ -40,7 +40,7 @@ read-only briefing page that board members and consultants open from the Share e
 | CF4 | External section label is **"Consultant feedback"**. |
 | CF5 | **Staff can edit and delete entries. No audit trail** is required. |
 | CF6 | **Consultant identity comes from the existing roster** (a dropdown of active `expertise_roster` rows with `role_type = 'Consultant'`), with an **"Add person"** option for one-offs. **One-offs are stored on the entry itself and are never added to the roster** (owner, 2026-09-14, second pass: a one-off must not become a roster consultant or appear in recipient pickers). |
-| CF7 | Slice 2's Dataverse artifact-type addition is scheduled by the owner after slice 1 ships; it is not a build-time dependency of slice 1. |
+| CF7 | Slice 2's Dataverse artifact-type addition is scheduled by the owner after slice 1 ships; it is not a build-time dependency of slice 1. **Done 2026-09-14:** `Consultant Feedback = 100000008` inserted into production via `scripts/extend-requestdocument-artifacttype.mjs` (owner-run), mirrored in `shared/config/requestDocument.js`. |
 
 Decisions from the briefing plan that carry over unchanged: one shared link per proposal,
 read-only, no copies of files, PDFs open inline and other files download (D23/D28), live data
@@ -369,7 +369,7 @@ workbench routes (list, mutate, consultants); `ConsultantFeedbackSection` on the
 briefing read-model and page section for text items; matrix rows; Atlas rows. Ships on its own.
 **Tier 1 runtime work: feature branch, owner merges.**
 
-### Slice 2 — attachments [PLANNED; blocked on the option-set addition]
+### Slice 2 — attachments [PLANNED; option-set value live 2026-09-14 (CF7 done); still blocked on the staging-cleanup prerequisite in §4]
 
 Dataverse admin adds the artifact-type value; mirror in `requestDocument.js`; mint + finalize
 routes; `feedback:` document member; Superseded-on-delete. Tier 1, same branch or a follow-on.
