@@ -69,7 +69,7 @@ function failureReason(entry) {
 function DownloadLink({ entry, format, children }) {
   return (
     <a
-      className="inline-flex items-center rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:border-gray-400 hover:bg-gray-50"
+      className="inline-flex min-h-11 items-center justify-center rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:border-gray-400 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2 sm:min-h-0"
       href={`/api/review-panel/download?entryId=${encodeURIComponent(entry.id)}&format=${format}`}
       {...(format === 'docx' ? { download: true } : {})}
     >
@@ -82,7 +82,7 @@ function SeatDetails({ seats, summary = 'Details' }) {
   if (!seats?.length) return null;
   return (
     <details className="mt-2 text-xs text-gray-500">
-      <summary className="cursor-pointer select-none font-medium text-gray-600 hover:text-gray-900">{summary}</summary>
+      <summary className="inline-flex min-h-11 cursor-pointer select-none items-center rounded font-medium text-gray-600 hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2 sm:min-h-0">{summary}</summary>
       <ul className="mt-1.5 space-y-0.5 pl-1">
         {seats.map((seat) => (
           <li key={seat.seatKey}>
@@ -122,7 +122,7 @@ function RunRow({ run, nowMs, actionLoading, rerenderErrors, onRerender, onRetry
             <span className="text-xs text-gray-500">{launchedByLine(run)}</span>
           </div>
           {canStop && (
-            <Button size="sm" variant="outline" onClick={() => onStop(run)} disabled={Boolean(actionLoading)} loading={actionLoading === `stop:${run.id}`}>
+            <Button size="sm" variant="outline" className="min-h-11 sm:min-h-0" onClick={() => onStop(run)} disabled={Boolean(actionLoading)} loading={actionLoading === `stop:${run.id}`}>
               {run.requestCount > 1 ? 'Stop run' : 'Stop'}
             </Button>
           )}
@@ -155,7 +155,7 @@ function RunRow({ run, nowMs, actionLoading, rerenderErrors, onRerender, onRetry
             <StatusPill tone="good">{entry.retryRequested && entry.rerender ? 'Re-render queued' : 'completed'}</StatusPill>
             <span className="text-xs text-gray-500">{launchedByLine(run)}</span>
             {total && <span className="text-xs text-gray-500">· {total}</span>}
-            {entry.rerenderCount > 0 && <span className="text-xs text-gray-400">· re-rendered {entry.rerenderCount}×</span>}
+            {entry.rerenderCount > 0 && <span className="text-xs text-gray-500">· re-rendered {entry.rerenderCount}×</span>}
           </div>
           <div className="flex items-center gap-2">
             <DownloadLink entry={entry} format="docx">Word</DownloadLink>
@@ -173,7 +173,7 @@ function RunRow({ run, nowMs, actionLoading, rerenderErrors, onRerender, onRetry
               type="button"
               onClick={() => onRerender(entry.id)}
               disabled={actionLoading === `rerender:${entry.id}`}
-              className="mt-2 text-xs font-medium text-gray-500 underline underline-offset-2 hover:text-gray-900 disabled:opacity-50"
+              className="mt-2 inline-flex min-h-11 items-center rounded text-xs font-medium text-gray-500 underline underline-offset-2 hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2 disabled:opacity-50 sm:min-h-0"
             >
               Re-render report
             </button>
@@ -203,7 +203,7 @@ function RunRow({ run, nowMs, actionLoading, rerenderErrors, onRerender, onRetry
             type="button"
             onClick={() => onRetry(run)}
             disabled={Boolean(actionLoading)}
-            className="text-xs font-semibold text-gray-700 underline underline-offset-2 hover:text-gray-900 disabled:opacity-50"
+            className="inline-flex min-h-11 min-w-11 items-center justify-center rounded text-xs font-semibold text-gray-700 underline underline-offset-2 hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2 disabled:opacity-50 sm:min-h-0 sm:min-w-0"
           >
             {actionLoading === `retry:${run.id}` ? 'Retrying…' : 'Retry'}
           </button>
@@ -394,7 +394,7 @@ export default function ReviewPanelTab({ requestId }) {
               </p>
             )}
             <details className="mt-3 text-xs text-gray-500">
-              <summary className="cursor-pointer select-none font-medium text-gray-600 hover:text-gray-900">Configuration</summary>
+              <summary className="inline-flex min-h-11 cursor-pointer select-none items-center rounded font-medium text-gray-600 hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 focus-visible:ring-offset-2 sm:min-h-0">Configuration</summary>
               <dl className="mt-1.5 grid gap-x-4 gap-y-0.5 sm:grid-cols-[auto_minmax(0,1fr)]">
                 <dt className="font-medium text-gray-600">Seats</dt>
                 <dd className="min-w-0 break-words">{seatsLine || 'Unavailable'}</dd>
@@ -403,14 +403,14 @@ export default function ReviewPanelTab({ requestId }) {
                 <dt className="font-medium text-gray-600">Reservation</dt>
                 <dd>{formatReservationBound(configuration?.reservationPerEntry)}</dd>
               </dl>
-              <p className="mt-1 text-gray-400">Seat and chair models are changed in the admin model panel.</p>
+              <p className="mt-1 text-gray-500">Seat and chair models are changed in the admin model panel.</p>
               {!configuration?.ready && configuration?.reason && (
-                <p className="mt-1 text-gray-400">{configuration.reason}</p>
+                <p className="mt-1 text-gray-500">{configuration.reason}</p>
               )}
             </details>
           </div>
           <div className="flex max-w-xs flex-col items-end gap-1.5">
-            <Button size="sm" onClick={launch} disabled={launchDisabled} loading={actionLoading === 'launch'}>
+            <Button size="sm" className="min-h-11 sm:min-h-0" onClick={launch} disabled={launchDisabled} loading={actionLoading === 'launch'}>
               {latestRun ? 'Launch new panel' : 'Launch panel'}
             </Button>
             {launchReason

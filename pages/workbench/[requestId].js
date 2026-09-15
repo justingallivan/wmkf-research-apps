@@ -82,14 +82,17 @@ export function WorkbenchRequest({ previewReadOnly = false }) {
 
   const [ctx, setCtx] = useState(null);
   const [error, setError] = useState(null);
-  const activeTabButtonRef = useRef(null);
+  const tabScrollerRef = useRef(null);
 
   useEffect(() => {
-    activeTabButtonRef.current?.scrollIntoView?.({
-      block: 'nearest',
-      inline: 'center',
-    });
-  }, [activeTab]);
+    const scroller = tabScrollerRef.current;
+    const activeButton = scroller?.querySelector('[aria-current="page"]');
+    if (!scroller || !activeButton || scroller.scrollWidth <= scroller.clientWidth) return;
+    scroller.scrollLeft = Math.max(
+      0,
+      activeButton.offsetLeft - (scroller.clientWidth - activeButton.offsetWidth) / 2,
+    );
+  }, [activeTab, visibleTabs.length]);
 
   // Request context (header, PD for the canManage gate, title for the panel).
   // Resolved by GUID — which the route always has — so it loads on direct/
@@ -160,12 +163,11 @@ export function WorkbenchRequest({ previewReadOnly = false }) {
       )}
 
       {/* Tab strip */}
-      <div className="border-b border-gray-200 mb-6 overflow-x-auto">
+      <div ref={tabScrollerRef} className="border-b border-gray-200 mb-6 overflow-x-auto">
         <nav className="flex gap-1 min-w-max" aria-label="Request sections">
           {visibleTabs.map((t) => (
             <button
               key={t.key}
-              ref={activeTab === t.key ? activeTabButtonRef : null}
               type="button"
               onClick={() => selectTab(t.key)}
               aria-current={activeTab === t.key ? 'page' : undefined}
