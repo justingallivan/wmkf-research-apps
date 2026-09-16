@@ -526,3 +526,23 @@ notice (boolean plus acknowledged-at) projected through `buildBriefingContext`
 on the Board page. The delta itself, reviewer identities, and abstract text are never sent to
 the external surface. Slice 5 carries both renderings; `docs/DELIBERATION_BRIEFING_PAGE_PLAN.md`
 §2.1 gains the new member in slice 6.
+
+## 8. Follow-ups (not required for this pass)
+
+- **Replayed `clientOperationId` can resurrect a superseded generation
+  identity.** Slice 3 round 1 review (2026-09-16): in both
+  `lib/services/pre-rp-brief/artifact-service.js` (`generatePreRpBrief`) and
+  its Pre-Site precedent
+  (`lib/services/pre-site-visit/artifact-service.js`), the generation key is
+  derived from `requestId + inputFingerprint + clientOperationId` (plus, for
+  Pre-Site, prompt/template identity). If a caller replays an *older*
+  `clientOperationId` whose inputs still hash to a fingerprint matching a
+  now-Superseded row, the exact same generation key is recomputed, and that
+  Superseded row can be reclaimed and reactivated — potentially superseding
+  a row that has since moved to Review (locked for Share) or beyond. This
+  is identical, pre-existing behavior in the Pre-Site lineage, not a
+  regression introduced by the brief; it stays as-is for this pass. Decide
+  once, for both services, whether generation should also check that the
+  claimed/reactivated row is not older than the current pointer target (or
+  otherwise refuse to resurrect a row lifecycle-advanced past Draft), and
+  apply the same fix to both.

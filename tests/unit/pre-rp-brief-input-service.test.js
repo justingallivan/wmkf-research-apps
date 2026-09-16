@@ -1,4 +1,6 @@
+import JSZip from 'jszip';
 import { loadPreRpBriefInputs } from '../../lib/services/pre-rp-brief/input-service.js';
+import { briefInputFingerprint, renderBrief } from '../../lib/services/pre-rp-brief/docx-renderer.js';
 
 const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
 const APPLICANT_ID = '22222222-2222-4222-8222-222222222222';
@@ -18,11 +20,42 @@ function requestFixture(overrides = {}) {
   };
 }
 
+// Shape matches getWriteupRoster's real per-reviewer object
+// (lib/services/review-manager/reviewers-service.js:597-614), not a
+// hand-picked subset — Round-2 finding 1: never mock the return shape of a
+// real function differently from its source.
+function reviewerFixture(overrides = {}) {
+  return {
+    suggestionId: 'g1',
+    name: 'Reviewer One',
+    email: 'reviewer.one@example.org',
+    reviewerAffiliation: null,
+    affiliation: null,
+    lastName: 'One',
+    academicRank: 'professor',
+    mainInstitution: 'University of Kansas Medical Center',
+    areaOfExpertise: null,
+    keywords: null,
+    reviewReceivedAt: '2026-06-01T00:00:00Z',
+    reviewerOverallAssessment: 5,
+    answers: [],
+    ...overrides,
+  };
+}
+
+function writeupRosterFixture(overrides = {}) {
+  return {
+    reviewers: [reviewerFixture()],
+    blockers: [],
+    ...overrides,
+  };
+}
+
 function dependenciesFixture(overrides = {}) {
   return {
     getRequest: jest.fn(async () => requestFixture()),
     getAccount: jest.fn(async () => ({ name: 'Applicant University' })),
-    getWriteupRoster: jest.fn(async () => ({ reviews: [{ suggestionId: 'g1', name: 'Reviewer One', reviewReceivedAt: '2026-06-01T00:00:00Z' }], blockers: [] })),
+    getWriteupRoster: jest.fn(async () => writeupRosterFixture()),
     ...overrides,
   };
 }
@@ -44,8 +77,49 @@ describe('loadPreRpBriefInputs', () => {
         programDirector: 'Pat Director',
         abstract: 'This project studies a phenomenon of interest.',
       },
-      reviews: [{ suggestionId: 'g1', name: 'Reviewer One', reviewReceivedAt: '2026-06-01T00:00:00Z' }],
+      reviews: [reviewerFixture()],
     });
+  });
+
+  it('maps getWriteupRoster\'s `reviewers` array (not a `reviews` field, which it does not have) into envelope.reviews', async () => {
+    // Discriminating: getWriteupRoster's real return shape is
+    // { reviewers, blockers } — a mock or implementation that reads
+    // `.reviews` off that result gets `undefined`, not an array.
+    const roster = writeupRosterFixture({
+      reviewers: [reviewerFixture({ suggestionId: 'g2', name: 'Distinct Reviewer', academicRank: 'associate professor' })],
+    });
+    const dependencies = dependenciesFixture({ getWriteupRoster: jest.fn(async () => roster) });
+    const result = await loadPreRpBriefInputs({ requestId: REQUEST_ID }, dependencies);
+
+    expect(Array.isArray(result.envelope.reviews)).toBe(true);
+    expect(result.envelope.reviews).toHaveLength(1);
+    const [survived] = result.envelope.reviews;
+    expect(survived.suggestionId).toBe('g2');
+    expect(survived.name).toBe('Distinct Reviewer');
+    expect(survived.academicRank).toBe('associate professor');
+    expect(survived.reviewReceivedAt).toBe('2026-06-01T00:00:00Z');
+  });
+
+  it('composes end to end: real loadPreRpBriefInputs output renders and fingerprints without drift (Round-2 finding 1)', async () => {
+    // No mocking of briefInputFingerprint/renderBrief's contract here — feed
+    // the actual envelope this service builds, from a realistic roster
+    // stub, straight into the actual renderer functions. If the roster
+    // field-name seam (reviewers vs reviews) ever drifts again, this fails
+    // with "reviews is not an array" or a rendered document missing the
+    // referee sentence, not a passing mock.
+    const dependencies = dependenciesFixture({
+      getWriteupRoster: jest.fn(async () => writeupRosterFixture()),
+    });
+    const { envelope } = await loadPreRpBriefInputs({ requestId: REQUEST_ID }, dependencies);
+
+    const fingerprint = briefInputFingerprint(envelope);
+    expect(fingerprint).toMatch(/^[0-9a-f]{64}$/);
+
+    const { docx } = await renderBrief(envelope);
+    const zip = await JSZip.loadAsync(docx);
+    const documentXml = await zip.file('word/document.xml').async('string');
+    expect(documentXml).toContain('Reviewer One');
+    expect(documentXml).not.toMatch(/\[\[(?:DV|STAFF):/);
   });
 
   it('prefers the resolved Account name over the annotation, mirroring the briefing page', async () => {

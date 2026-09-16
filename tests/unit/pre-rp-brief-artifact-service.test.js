@@ -140,6 +140,48 @@ describe('getPreRpBriefStatus', () => {
     expect(status.pendingArtifact.retryable).toBe(true);
   });
 
+  it('never surfaces a Superseded row as pending (Round-2 finding 4)', async () => {
+    // Discriminating: removing the SUPERSEDED exclusion from the pending
+    // candidate filter would let this row through — it is otherwise a
+    // plausible pending candidate (non-Ready, no pointer set).
+    const pointerTarget = briefRow({
+      wmkf_requestdocumentid: OLDER_ARTIFACT_ID,
+      createdon: '2026-09-10T00:00:00Z',
+    });
+    const superseded = briefRow({
+      wmkf_requestdocumentid: NEWER_ARTIFACT_ID,
+      wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING,
+      wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.SUPERSEDED,
+      createdon: '2026-09-16T00:00:00Z',
+    });
+    const dependencies = statusDependencies({
+      request: { akoya_requestid: REQUEST_ID, _wmkf_currentprerpbrief_value: OLDER_ARTIFACT_ID },
+      rows: [pointerTarget, superseded],
+    });
+    const status = await getPreRpBriefStatus({ requestId: REQUEST_ID }, dependencies);
+    expect(status.pendingArtifact).toBeNull();
+  });
+
+  it('never surfaces a row that predates the pointer target as pending (Round-2 finding 4)', async () => {
+    // Discriminating: replacing the postdates-the-pointer comparison with
+    // `return true` would let this earlier-created row through.
+    const pointerTarget = briefRow({
+      wmkf_requestdocumentid: NEWER_ARTIFACT_ID,
+      createdon: '2026-09-16T00:00:00Z',
+    });
+    const earlierGenerating = briefRow({
+      wmkf_requestdocumentid: OLDER_ARTIFACT_ID,
+      wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.GENERATING,
+      createdon: '2026-09-10T00:00:00Z',
+    });
+    const dependencies = statusDependencies({
+      request: { akoya_requestid: REQUEST_ID, _wmkf_currentprerpbrief_value: NEWER_ARTIFACT_ID },
+      rows: [pointerTarget, earlierGenerating],
+    });
+    const status = await getPreRpBriefStatus({ requestId: REQUEST_ID }, dependencies);
+    expect(status.pendingArtifact).toBeNull();
+  });
+
   it('fails closed on an invalid requestId', async () => {
     await expect(getPreRpBriefStatus({ requestId: 'not-a-guid' }, statusDependencies({ request: null, rows: [] })))
       .rejects.toMatchObject({ code: 'invalid_request_id' });
@@ -299,6 +341,84 @@ describe('generatePreRpBrief', () => {
     expect(result.reused).toBe(true);
     expect(harness.dependencies.renderDocx).not.toHaveBeenCalled();
     expect(harness.dependencies.uploadFile).not.toHaveBeenCalled();
+  });
+
+  it('does not delete the winning claim\'s SharePoint item when a stale claim loses the activation race (Round-2 finding 2)', async () => {
+    // Attempt A claims the row, renders, and uploads. Before A can
+    // activate, a concurrent winner B (simulated by uploadFile's own mock,
+    // standing in for a reclaim that happened between A's lease expiring
+    // and A reaching activation) reclaims the SAME row, uploads to the SAME
+    // deterministic filename (conflictBehavior: 'replace' returns the same
+    // driveItem id), and takes ownership. A's activation then finds its
+    // claim lost. Deleting the uploaded item would delete B's now-live,
+    // soon-to-be-pointer-referenced item.
+    const SHARED_ITEM_ID = 'shared-item';
+    let row = null;
+    let etag = 1;
+    const request = { akoya_requestid: REQUEST_ID, _wmkf_currentprerpbrief_value: null, _etag: 'request-1' };
+
+    const dependencies = {
+      loadInputs: jest.fn().mockResolvedValue(inputsFixture()),
+      renderDocx: jest.fn().mockResolvedValue({ docx: Buffer.from('rendered-docx') }),
+      hashDocx: jest.fn().mockResolvedValue('gdc1:governed-hash'),
+      getRequest: jest.fn().mockImplementation(async () => ({ ...request })),
+      getBuckets: jest.fn().mockResolvedValue([{
+        source: 'dynamics',
+        library: 'akoya_request',
+        folder: 'Requests/1002379',
+      }]),
+      findByGenerationKey: jest.fn().mockImplementation(async () => ({ records: row ? [{ ...row }] : [] })),
+      findByRequest: jest.fn().mockImplementation(async () => ({ records: row ? [{ ...row }] : [] })),
+      createDocument: jest.fn().mockImplementation(async (payload) => {
+        row = {
+          ...payload,
+          wmkf_requestdocumentid: ARTIFACT_ID,
+          _wmkf_request_value: REQUEST_ID,
+          _etag: `row-${etag}`,
+          createdon: new Date().toISOString(),
+          modifiedon: new Date().toISOString(),
+        };
+        delete row['wmkf_Request@odata.bind'];
+        return ARTIFACT_ID;
+      }),
+      updateDocument: jest.fn().mockImplementation(async (id, patch, options) => {
+        if (id !== row.wmkf_requestdocumentid) throw new Error('unexpected id');
+        if (options?.ifMatch && options.ifMatch !== row._etag) {
+          const conflict = new Error('ETag mismatch');
+          conflict.status = 412;
+          throw conflict;
+        }
+        Object.assign(row, patch);
+        row._etag = `row-${++etag}`;
+      }),
+      commitChangeset: jest.fn(),
+      ensureFolderPath: jest.fn().mockResolvedValue(undefined),
+      uploadFile: jest.fn().mockImplementation(async () => {
+        // Simulate B reclaiming and adopting this same deterministic item
+        // before A's activation reads the row.
+        row.wmkf_claimtoken = 'claim-B';
+        row.wmkf_sharepointitemid = SHARED_ITEM_ID;
+        row._etag = `row-${++etag}`;
+        return {
+          siteId: 'site-id',
+          driveId: 'drive-id',
+          id: SHARED_ITEM_ID,
+          webUrl: 'https://sharepoint.test/brief.docx',
+          versionId: '1.0',
+          eTag: 'file-etag',
+          size: 1234,
+          lastModified: '2026-09-16T12:00:00Z',
+        };
+      }),
+      deleteFile: jest.fn().mockResolvedValue(undefined),
+      newClaimToken: jest.fn().mockReturnValue('claim-A'),
+    };
+
+    await expect(generatePreRpBrief(
+      { requestId: REQUEST_ID, clientOperationId: 'op-1' },
+      dependencies,
+    )).rejects.toMatchObject({ code: 'claim_lost' });
+    expect(dependencies.deleteFile).not.toHaveBeenCalled();
   });
 
   it('fails closed on an invalid requestId before loading inputs', async () => {
