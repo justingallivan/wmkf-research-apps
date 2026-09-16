@@ -15,6 +15,7 @@ import {
   sendPreSiteDistribution,
 } from '../../lib/services/pre-site-visit/distribution-service';
 import {
+  PRE_RP_BRIEF_CONTRACT,
   PRE_SITE_VISIT_CONTRACT,
   REQUEST_DOCUMENT_ARTIFACT_LABEL,
   REQUEST_DOCUMENT_ARTIFACT_TYPE,
@@ -22,6 +23,58 @@ import {
   REQUEST_DOCUMENT_OPERATION_STATUS,
 } from '../../shared/config/requestDocument.js';
 import { DELIBERATION_SHARE_SEED_BRIEFING_COPY } from '../../shared/config/deliberationShareEmail.js';
+import { briefInputFingerprint } from '../../lib/services/pre-rp-brief/docx-renderer.js';
+
+// A minimal, valid Pre-RP Brief input envelope (plan §3.4a shape) with one
+// received review, used as the "generated" snapshot stored on a source row
+// and, by default, as the "live" inputs too (no drift) so existing
+// prepare-path tests exercise the happy path through the new review/drift
+// gate (plan §3.4b) without asserting on it. Tests that DO exercise the
+// gate build their own generated/live pair with `briefEnvelope` overrides.
+function briefEnvelope(overrides = {}) {
+  return {
+    schemaVersion: PRE_RP_BRIEF_CONTRACT.snapshotSchemaVersion,
+    artifactType: PRE_RP_BRIEF_CONTRACT.snapshotArtifactType,
+    request: {
+      institutionName: 'Test Institution',
+      projectTitle: 'Test Project',
+      principalInvestigator: 'Dr. PI',
+      programDirector: 'Dr. PD',
+      abstract: 'A test abstract.',
+    },
+    reviews: [
+      {
+        suggestionId: 'reviewer-1',
+        reviewReceivedAt: '2026-09-01T00:00:00Z',
+        name: 'Reviewer One',
+        academicRank: 'Professor',
+        reviewerOverallAssessment: 'Strong',
+        reviewerAffiliation: 'Test University',
+        mainInstitution: 'Test University',
+        affiliation: 'Test University',
+      },
+    ],
+    ...overrides,
+  };
+}
+
+// Builds { snapshotJson, fingerprint, envelope } for a "generated"/stored
+// snapshot to place on a source row's wmkf_presiteinputsnapshotjson +
+// wmkf_inputfingerprint, and a matching `loadPreRpBriefInputs` mock whose
+// live envelope defaults to the same envelope (no drift).
+function briefGateFixture({ generated = briefEnvelope(), live = generated } = {}) {
+  return {
+    generated,
+    live,
+    snapshotJson: JSON.stringify(generated),
+    fingerprint: briefInputFingerprint(generated),
+    loadPreRpBriefInputs: jest.fn(async () => ({
+      requestNumber: '1002379',
+      cycleCode: 'D26',
+      envelope: live,
+    })),
+  };
+}
 
 const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
 const OPERATION_ID = '22222222-2222-4222-8222-222222222222';
@@ -214,6 +267,14 @@ function createPrepareHarness({
   mutateWordDuringPdf = false,
   provisionalWordETag = 'word-etag',
   settledWordVersionId = '1.0',
+  briefGate = briefGateFixture(),
+  // Real store semantics (distribution-store.js createOrGetDistributionAttempt):
+  // INSERT ON CONFLICT (operation_id) DO NOTHING, so a repeat call with the
+  // same operationId returns the FIRST-persisted row untouched, letting the
+  // service's own draft_hash comparison decide reuse vs conflict. Off by
+  // default so existing single-call-per-operationId tests keep their
+  // simpler always-overwrite mock unchanged.
+  dedupeAttempts = false,
 } = {}) {
   const sourceDocumentId = '44444444-4444-4444-8444-444444444444';
   const sourceBytes = Buffer.from('governed-word-bytes');
@@ -224,6 +285,7 @@ function createPrepareHarness({
     _wmkf_request_value: REQUEST_ID,
     wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
     wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW,
+    wmkf_artifacttype: PRE_RP_BRIEF_CONTRACT.artifactType,
     wmkf_contenttype: PRE_SITE_VISIT_CONTRACT.contentType,
     wmkf_sharepointsiteid: 'source-site',
     wmkf_sharepointdriveid: 'source-drive',
@@ -231,8 +293,11 @@ function createPrepareHarness({
     wmkf_sharepointfolderpath: 'Requests/1002379',
     wmkf_filename: 'PreSite.docx',
     wmkf_cyclecode: 'D26',
+    wmkf_presiteinputsnapshotjson: briefGate.snapshotJson,
+    wmkf_inputfingerprint: briefGate.fingerprint,
   };
   let attempt = null;
+  const attemptsByOperationId = new Map();
   const snapshots = [];
   let snapshotSequence = 0;
   let wordMetadataReads = 0;
@@ -262,15 +327,21 @@ function createPrepareHarness({
     })),
     recordBriefingLink: jest.fn(async (_operationId, briefingLinkId) => {
       attempt = { ...attempt, briefing_link_id: briefingLinkId };
+      if (dedupeAttempts) attemptsByOperationId.set(attempt.operation_id, attempt);
       return attempt;
     }),
     getRequest: jest.fn(async () => ({
       akoya_requestid: REQUEST_ID,
       akoya_requestnum: '1002379',
-      _wmkf_currentpresitevisit_value: sourceDocumentId,
+      _wmkf_currentprerpbrief_value: sourceDocumentId,
     })),
     findDocumentsByRequest: jest.fn(async () => ({ records: [sourceRow] })),
+    loadPreRpBriefInputs: briefGate.loadPreRpBriefInputs,
     createOrGetAttempt: jest.fn(async (input) => {
+      if (dedupeAttempts && attemptsByOperationId.has(input.operationId)) {
+        attempt = attemptsByOperationId.get(input.operationId);
+        return attempt;
+      }
       attempt = {
         operation_id: input.operationId,
         request_id: input.requestId,
@@ -294,8 +365,14 @@ function createPrepareHarness({
         calendar_content_type: input.calendar?.contentType || null,
         calendar_byte_hash: input.calendar?.byteHash || null,
         calendar_size: input.calendar?.size || null,
+        input_fingerprint_generated: input.inputFingerprintGenerated || null,
+        input_fingerprint_live: input.inputFingerprintLive || null,
+        stale_inputs_delta: input.staleInputsDelta || null,
+        stale_inputs_acknowledged_at: input.staleInputsAcknowledgedAt || null,
+        stale_inputs_acknowledged_by: input.staleInputsAcknowledgedBy || null,
         state: 'preparing',
       };
+      if (dedupeAttempts) attemptsByOperationId.set(input.operationId, attempt);
       return attempt;
     }),
     recordSource: jest.fn(async (_operationId, captured) => {
@@ -308,6 +385,7 @@ function createPrepareHarness({
         source_byte_hash: captured.byteHash,
         source_filename: captured.filename,
       };
+      if (dedupeAttempts) attemptsByOperationId.set(attempt.operation_id, attempt);
       return attempt;
     }),
     findDocumentByGenerationKey: jest.fn(async (generationKey) => ({
@@ -398,6 +476,7 @@ function createPrepareHarness({
         calendar_byte_hash: prepared.calendar?.byteHash || null,
         calendar_size: prepared.calendar?.size || null,
       };
+      if (dedupeAttempts) attemptsByOperationId.set(attempt.operation_id, attempt);
       return attempt;
     }),
     // Every prepare now builds both snapshots, so a re-prepare needs more than
@@ -434,6 +513,221 @@ function prepareInput(overrides = {}) {
     ...overrides,
   };
 }
+
+describe('prepare-time review/drift gate (plan §3.4b)', () => {
+  test('a malformed stored input snapshot fails closed before any persistence or file work', async () => {
+    const gate = briefGateFixture();
+    const harness = createPrepareHarness({ briefGate: { ...gate, snapshotJson: '{not-json' } });
+    await expect(preparePreSiteDistribution(prepareInput(), harness.dependencies))
+      .rejects.toMatchObject({ code: 'brief_snapshot_invalid', httpStatus: 409 });
+    expect(harness.dependencies.createOrGetAttempt).not.toHaveBeenCalled();
+    expect(harness.dependencies.ensureBriefingLink).not.toHaveBeenCalled();
+    expect(harness.dependencies.createDocument).not.toHaveBeenCalled();
+  });
+
+  test('a stored snapshot that no longer matches the row\'s recorded fingerprint fails closed before any persistence or file work', async () => {
+    const gate = briefGateFixture();
+    const harness = createPrepareHarness({ briefGate: { ...gate, fingerprint: 'f'.repeat(64) } });
+    await expect(preparePreSiteDistribution(prepareInput(), harness.dependencies))
+      .rejects.toMatchObject({ code: 'brief_snapshot_invalid', httpStatus: 409 });
+    expect(harness.dependencies.createOrGetAttempt).not.toHaveBeenCalled();
+    expect(harness.dependencies.ensureBriefingLink).not.toHaveBeenCalled();
+    expect(harness.dependencies.createDocument).not.toHaveBeenCalled();
+  });
+
+  test('a stored snapshot with no received reviews (B10) fails closed before any persistence or file work', async () => {
+    const unreceived = briefEnvelope({
+      reviews: [{ ...briefEnvelope().reviews[0], reviewReceivedAt: null }],
+    });
+    const gate = briefGateFixture({ generated: unreceived });
+    const harness = createPrepareHarness({ briefGate: gate });
+    await expect(preparePreSiteDistribution(prepareInput(), harness.dependencies))
+      .rejects.toMatchObject({ code: 'brief_reviews_required', httpStatus: 409 });
+    expect(harness.dependencies.createOrGetAttempt).not.toHaveBeenCalled();
+    expect(harness.dependencies.ensureBriefingLink).not.toHaveBeenCalled();
+    expect(harness.dependencies.createDocument).not.toHaveBeenCalled();
+  });
+
+  test('at least one received review with no live drift succeeds and persists equal fingerprints with a null delta', async () => {
+    const gate = briefGateFixture();
+    const harness = createPrepareHarness({ briefGate: gate });
+    await preparePreSiteDistribution(prepareInput(), harness.dependencies);
+    const persisted = harness.dependencies.createOrGetAttempt.mock.calls[0][0];
+    expect(persisted.inputFingerprintGenerated).toBe(gate.fingerprint);
+    expect(persisted.inputFingerprintLive).toBe(gate.fingerprint);
+    expect(persisted.staleInputsDelta).toBeNull();
+    expect(persisted.staleInputsAcknowledgedAt).toBeNull();
+    expect(persisted.staleInputsAcknowledgedBy).toBeNull();
+  });
+
+  test('drifted live inputs without an acknowledgement fail closed with the fingerprints and a bounded delta, before any write', async () => {
+    const generated = briefEnvelope();
+    const liveD1 = briefEnvelope({ request: { ...generated.request, abstract: 'Updated abstract D1.' } });
+    const gate = briefGateFixture({ generated, live: liveD1 });
+    const harness = createPrepareHarness({ briefGate: gate });
+    const liveFingerprintD1 = briefInputFingerprint(liveD1);
+    await expect(preparePreSiteDistribution(prepareInput(), harness.dependencies))
+      .rejects.toMatchObject({
+        code: 'brief_inputs_stale',
+        httpStatus: 409,
+        body: {
+          generatedFingerprint: gate.fingerprint,
+          liveFingerprint: liveFingerprintD1,
+          delta: expect.objectContaining({
+            changedRequestFields: ['abstract'],
+            abstractChanged: true,
+          }),
+        },
+      });
+    expect(harness.dependencies.createOrGetAttempt).not.toHaveBeenCalled();
+    expect(harness.dependencies.ensureBriefingLink).not.toHaveBeenCalled();
+    expect(harness.dependencies.createDocument).not.toHaveBeenCalled();
+  });
+
+  test('a retry that echoes a now-stale acknowledgement fails closed again with the newly-current live fingerprint', async () => {
+    const generated = briefEnvelope();
+    const liveD1 = briefEnvelope({ request: { ...generated.request, abstract: 'Updated abstract D1.' } });
+    const liveD2 = briefEnvelope({ request: { ...generated.request, abstract: 'Updated abstract D2.' } });
+    const fingerprintD1 = briefInputFingerprint(liveD1);
+    const fingerprintD2 = briefInputFingerprint(liveD2);
+    const gate = briefGateFixture({ generated, live: liveD2 });
+    const harness = createPrepareHarness({ briefGate: gate });
+    await expect(preparePreSiteDistribution(
+      prepareInput({ acknowledgeStaleInputs: fingerprintD1 }),
+      harness.dependencies,
+    )).rejects.toMatchObject({
+      code: 'brief_inputs_stale',
+      httpStatus: 409,
+      body: expect.objectContaining({ liveFingerprint: fingerprintD2 }),
+    });
+    expect(harness.dependencies.createOrGetAttempt).not.toHaveBeenCalled();
+  });
+
+  test('a retry that echoes the exact current live fingerprint succeeds and persists actor, time, both fingerprints, and the delta', async () => {
+    const generated = briefEnvelope();
+    const liveD2 = briefEnvelope({ request: { ...generated.request, abstract: 'Updated abstract D2.' } });
+    const fingerprintD2 = briefInputFingerprint(liveD2);
+    const gate = briefGateFixture({ generated, live: liveD2 });
+    const harness = createPrepareHarness({ briefGate: gate });
+    await preparePreSiteDistribution(
+      prepareInput({ acknowledgeStaleInputs: fingerprintD2 }),
+      harness.dependencies,
+    );
+    const persisted = harness.dependencies.createOrGetAttempt.mock.calls[0][0];
+    expect(persisted.inputFingerprintGenerated).toBe(gate.fingerprint);
+    expect(persisted.inputFingerprintLive).toBe(fingerprintD2);
+    expect(persisted.staleInputsDelta).toMatchObject({ abstractChanged: true, changedRequestFields: ['abstract'] });
+    expect(persisted.staleInputsAcknowledgedAt).toBe('2026-08-23T12:00:00.000Z');
+    expect(persisted.staleInputsAcknowledgedBy).toBe(ACTOR_ID);
+  });
+
+  test('the same operation id with the same acknowledged drift recovers the already-prepared attempt', async () => {
+    const generated = briefEnvelope();
+    const liveD1 = briefEnvelope({ request: { ...generated.request, abstract: 'Updated abstract D1.' } });
+    const fingerprintD1 = briefInputFingerprint(liveD1);
+    const gate = briefGateFixture({ generated, live: liveD1 });
+    const harness = createPrepareHarness({ briefGate: gate, dedupeAttempts: true });
+    const first = await preparePreSiteDistribution(
+      prepareInput({ acknowledgeStaleInputs: fingerprintD1 }),
+      harness.dependencies,
+    );
+    expect(first.reused).toBeFalsy();
+    const second = await preparePreSiteDistribution(
+      prepareInput({ acknowledgeStaleInputs: fingerprintD1 }),
+      harness.dependencies,
+    );
+    expect(second.reused).toBe(true);
+    expect(second.attempt.attemptId).toBe(first.attempt.attemptId);
+    // Only the first call built new snapshot documents; the retry recovered
+    // the prepared attempt without doing that file work again.
+    expect(harness.dependencies.createDocument).toHaveBeenCalledTimes(2);
+  });
+
+  test('the same operation id with a different acknowledgement conflicts instead of silently reusing the prior attempt', async () => {
+    const generated = briefEnvelope();
+    const liveD1 = briefEnvelope({ request: { ...generated.request, abstract: 'Updated abstract D1.' } });
+    const fingerprintD1 = briefInputFingerprint(liveD1);
+    const gate = briefGateFixture({ generated, live: generated });
+    const harness = createPrepareHarness({ briefGate: gate, dedupeAttempts: true });
+    await preparePreSiteDistribution(prepareInput(), harness.dependencies);
+    // Live inputs drift after the first prepare; a same-operation-id retry
+    // now requires (and carries) an acknowledgement the first call did not.
+    harness.dependencies.loadPreRpBriefInputs = jest.fn(async () => ({
+      requestNumber: '1002379',
+      cycleCode: 'D26',
+      envelope: liveD1,
+    }));
+    await expect(preparePreSiteDistribution(
+      prepareInput({ acknowledgeStaleInputs: fingerprintD1 }),
+      harness.dependencies,
+    )).rejects.toMatchObject({ code: 'distribution_operation_conflict' });
+  });
+
+  test('draftHash and previewHash change when the acknowledged fingerprint changes', async () => {
+    const generated = briefEnvelope();
+    const liveD1 = briefEnvelope({ request: { ...generated.request, abstract: 'Updated abstract D1.' } });
+    const fingerprintD1 = briefInputFingerprint(liveD1);
+
+    const noDrift = createPrepareHarness({ briefGate: briefGateFixture({ generated }) });
+    const noDriftResult = await preparePreSiteDistribution(prepareInput(), noDrift.dependencies);
+    const noDriftHash = noDrift.dependencies.createOrGetAttempt.mock.calls[0][0].draftHash;
+
+    const drifted = createPrepareHarness({ briefGate: briefGateFixture({ generated, live: liveD1 }) });
+    const driftedResult = await preparePreSiteDistribution(
+      prepareInput({ acknowledgeStaleInputs: fingerprintD1 }),
+      drifted.dependencies,
+    );
+    const driftedHash = drifted.dependencies.createOrGetAttempt.mock.calls[0][0].draftHash;
+
+    expect(driftedHash).not.toBe(noDriftHash);
+    expect(driftedResult.attempt.previewHash).not.toBe(noDriftResult.attempt.previewHash);
+  });
+
+  test('send fails closed as distribution_stale_source for a pre-existing unsent attempt sourced from a legacy Pre-Site row', async () => {
+    const row = attemptFixture();
+    const dependencies = {
+      getLiveBriefingLink: jest.fn(async () => ({ id: FIXTURE_BRIEFING_LINK_ID, url: 'https://apps.test/external/briefing/fixture-token' })),
+      getRequest: jest.fn(async () => ({
+        akoya_requestid: row.request_id,
+        // No brief has ever been generated for this request — the pointer
+        // is null, and the source row below is the legacy Pre-Site type.
+        _wmkf_currentprerpbrief_value: null,
+      })),
+      findDocumentsByRequest: jest.fn(async () => ({ records: [{
+        wmkf_requestdocumentid: row.source_document_id,
+        _wmkf_request_value: row.request_id,
+        wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY,
+        wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW,
+        wmkf_artifacttype: REQUEST_DOCUMENT_ARTIFACT_TYPE.PRE_SITE_VISIT,
+        wmkf_contenttype: PRE_SITE_VISIT_CONTRACT.contentType,
+        wmkf_sharepointsiteid: 'site',
+        wmkf_sharepointdriveid: row.source_drive_id,
+        wmkf_sharepointitemid: row.source_item_id,
+        wmkf_sharepointfolderpath: 'Requests/1002379',
+      }] })),
+      getFileMetadataById: jest.fn(async () => ({
+        driveId: row.source_drive_id,
+        id: row.source_item_id,
+        versionId: row.source_version_id,
+      })),
+      getAttempt: jest.fn(async () => row),
+      claimSend: jest.fn(async () => row),
+      findEmailByCorrelation: jest.fn(),
+      createEmailActivity: jest.fn(),
+      recordFailure: jest.fn(async () => row),
+    };
+
+    await expect(sendPreSiteDistribution({
+      requestId: REQUEST_ID,
+      operationId: OPERATION_ID,
+      previewHash: 'a'.repeat(64),
+      fromEmail: 'sender@example.org',
+      actingUserSystemId: ACTOR_ID,
+    }, dependencies)).rejects.toMatchObject({ code: 'distribution_stale_source' });
+    expect(dependencies.findEmailByCorrelation).not.toHaveBeenCalled();
+    expect(dependencies.createEmailActivity).not.toHaveBeenCalled();
+  });
+});
 
 test('prepare persists native Graph publication versions instead of provisional cTags', async () => {
   const harness = createPrepareHarness();
@@ -724,13 +1018,14 @@ function currentSourceDependencies(row) {
     getLiveBriefingLink: jest.fn(async () => ({ id: FIXTURE_BRIEFING_LINK_ID, url: 'https://apps.test/external/briefing/fixture-token' })),
     getRequest: jest.fn(async () => ({
       akoya_requestid: row.request_id,
-      _wmkf_currentpresitevisit_value: row.source_document_id,
+      _wmkf_currentprerpbrief_value: row.source_document_id,
     })),
     findDocumentsByRequest: jest.fn(async () => ({ records: [{
       wmkf_requestdocumentid: row.source_document_id,
       _wmkf_request_value: row.request_id,
       wmkf_operationstatus: 100000001,
       wmkf_lifecyclestate: 100000001,
+      wmkf_artifacttype: PRE_RP_BRIEF_CONTRACT.artifactType,
       wmkf_contenttype: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       wmkf_sharepointsiteid: 'site',
       wmkf_sharepointdriveid: row.source_drive_id,
@@ -780,7 +1075,7 @@ test('history marks a retained distribution changed when the working Word versio
   const attempt = attemptFixture({ source_version_id: '1.0' });
   const result = await getPreSiteDistributionHistory({ requestId: REQUEST_ID }, {
     listAttempts: jest.fn(async () => [attempt]),
-    getRequest: jest.fn(async () => ({ _wmkf_currentpresitevisit_value: attempt.source_document_id })),
+    getRequest: jest.fn(async () => ({ _wmkf_currentprerpbrief_value: attempt.source_document_id })),
     findDocumentsByRequest: jest.fn(async () => ({ records: [{
       wmkf_requestdocumentid: attempt.source_document_id,
       wmkf_sharepointdriveid: 'drive',
@@ -802,7 +1097,7 @@ test('history returns configured Share defaults and preserves built-in fallbacks
   ));
   const result = await getPreSiteDistributionHistory({ requestId: REQUEST_ID }, {
     listAttempts: jest.fn(async () => [attempt]),
-    getRequest: jest.fn(async () => ({ _wmkf_currentpresitevisit_value: null })),
+    getRequest: jest.fn(async () => ({ _wmkf_currentprerpbrief_value: null })),
     findDocumentsByRequest: jest.fn(async () => ({ records: [] })),
     getFileMetadataById: jest.fn(async () => null),
     hasSentAttemptForSource: jest.fn(async () => false),
@@ -834,7 +1129,7 @@ test('history marks Share defaults configured only when every stored value is no
   };
   const result = await getPreSiteDistributionHistory({ requestId: REQUEST_ID }, {
     listAttempts: jest.fn(async () => []),
-    getRequest: jest.fn(async () => ({ _wmkf_currentpresitevisit_value: null })),
+    getRequest: jest.fn(async () => ({ _wmkf_currentprerpbrief_value: null })),
     findDocumentsByRequest: jest.fn(async () => ({ records: [] })),
     getFileMetadataById: jest.fn(async () => null),
     hasSentAttemptForSource: jest.fn(async () => false),
@@ -858,7 +1153,7 @@ test('history reports unavailable Share defaults while retaining built-in wordin
   const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
   const result = await getPreSiteDistributionHistory({ requestId: REQUEST_ID }, {
     listAttempts: jest.fn(async () => []),
-    getRequest: jest.fn(async () => ({ _wmkf_currentpresitevisit_value: null })),
+    getRequest: jest.fn(async () => ({ _wmkf_currentprerpbrief_value: null })),
     findDocumentsByRequest: jest.fn(async () => ({ records: [] })),
     getFileMetadataById: jest.fn(async () => null),
     hasSentAttemptForSource: jest.fn(async () => false),
@@ -880,7 +1175,7 @@ test('history derives currentSourceEverSent from the uncapped store check scoped
   const hasSentAttemptForSource = jest.fn(async () => true);
   const result = await getPreSiteDistributionHistory({ requestId: REQUEST_ID }, {
     listAttempts: jest.fn(async () => [attempt]),
-    getRequest: jest.fn(async () => ({ _wmkf_currentpresitevisit_value: attempt.source_document_id })),
+    getRequest: jest.fn(async () => ({ _wmkf_currentprerpbrief_value: attempt.source_document_id })),
     findDocumentsByRequest: jest.fn(async () => ({ records: [{
       wmkf_requestdocumentid: attempt.source_document_id,
       wmkf_sharepointdriveid: 'drive',
@@ -898,7 +1193,7 @@ test('history reports currentSourceEverSent=false when no current document resol
   const hasSentAttemptForSource = jest.fn(async () => true);
   const result = await getPreSiteDistributionHistory({ requestId: REQUEST_ID }, {
     listAttempts: jest.fn(async () => [attempt]),
-    getRequest: jest.fn(async () => ({ _wmkf_currentpresitevisit_value: null })),
+    getRequest: jest.fn(async () => ({ _wmkf_currentprerpbrief_value: null })),
     findDocumentsByRequest: jest.fn(async () => ({ records: [] })),
     getFileMetadataById: jest.fn(async () => null),
     hasSentAttemptForSource,
@@ -1169,12 +1464,40 @@ test('a prepared send fails before its lease or any Dynamics call when impersona
 
 test('send rejects a prepared attempt whose source pointer changed after guarded reopen', async () => {
   let row = attemptFixture();
+  const newPointerId = '99999999-9999-4999-8999-999999999999';
   const dependencies = {
     ...currentSourceDependencies(row),
     getRequest: jest.fn(async () => ({
       akoya_requestid: row.request_id,
-      _wmkf_currentpresitevisit_value: '99999999-9999-4999-8999-999999999999',
+      _wmkf_currentprerpbrief_value: newPointerId,
     })),
+    // The pointer now names a different, otherwise-valid brief — resolving
+    // it is what makes this "stale" rather than "broken" (a genuinely
+    // dangling pointer resolves as brief_pointer_invalid instead, which is
+    // a distinct reconciliation problem, not what this test exercises).
+    findDocumentsByRequest: jest.fn(async () => ({ records: [{
+      wmkf_requestdocumentid: row.source_document_id,
+      _wmkf_request_value: row.request_id,
+      wmkf_operationstatus: 100000001,
+      wmkf_lifecyclestate: 100000001,
+      wmkf_artifacttype: PRE_RP_BRIEF_CONTRACT.artifactType,
+      wmkf_contenttype: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      wmkf_sharepointsiteid: 'site',
+      wmkf_sharepointdriveid: row.source_drive_id,
+      wmkf_sharepointitemid: row.source_item_id,
+      wmkf_sharepointfolderpath: 'Requests/1002379',
+    }, {
+      wmkf_requestdocumentid: newPointerId,
+      _wmkf_request_value: row.request_id,
+      wmkf_operationstatus: 100000001,
+      wmkf_lifecyclestate: 100000001,
+      wmkf_artifacttype: PRE_RP_BRIEF_CONTRACT.artifactType,
+      wmkf_contenttype: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      wmkf_sharepointsiteid: 'site',
+      wmkf_sharepointdriveid: 'new-drive',
+      wmkf_sharepointitemid: 'new-item',
+      wmkf_sharepointfolderpath: 'Requests/1002379',
+    }] })),
     getAttempt: jest.fn(async () => row),
     claimSend: jest.fn(async () => {
       row = { ...row, lease_token: '77777777-7777-4777-8777-777777777777' };
@@ -1405,17 +1728,44 @@ test('transport is not called when the source changes after activity recovery bu
     pdf_attached_at: new Date(),
     state: 'attachments_added',
   });
+  const newPointerId = '99999999-9999-4999-8999-999999999999';
   const dependencies = {
     ...currentSourceDependencies(row),
     getRequest: jest.fn()
       .mockResolvedValueOnce({
         akoya_requestid: row.request_id,
-        _wmkf_currentpresitevisit_value: row.source_document_id,
+        _wmkf_currentprerpbrief_value: row.source_document_id,
       })
       .mockResolvedValueOnce({
         akoya_requestid: row.request_id,
-        _wmkf_currentpresitevisit_value: '99999999-9999-4999-8999-999999999999',
+        _wmkf_currentprerpbrief_value: newPointerId,
       }),
+    // The pointer now names a different, otherwise-valid brief — see the
+    // sibling "guarded reopen" test above for why this must resolve rather
+    // than dangle.
+    findDocumentsByRequest: jest.fn(async () => ({ records: [{
+      wmkf_requestdocumentid: row.source_document_id,
+      _wmkf_request_value: row.request_id,
+      wmkf_operationstatus: 100000001,
+      wmkf_lifecyclestate: 100000001,
+      wmkf_artifacttype: PRE_RP_BRIEF_CONTRACT.artifactType,
+      wmkf_contenttype: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      wmkf_sharepointsiteid: 'site',
+      wmkf_sharepointdriveid: row.source_drive_id,
+      wmkf_sharepointitemid: row.source_item_id,
+      wmkf_sharepointfolderpath: 'Requests/1002379',
+    }, {
+      wmkf_requestdocumentid: newPointerId,
+      _wmkf_request_value: row.request_id,
+      wmkf_operationstatus: 100000001,
+      wmkf_lifecyclestate: 100000001,
+      wmkf_artifacttype: PRE_RP_BRIEF_CONTRACT.artifactType,
+      wmkf_contenttype: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      wmkf_sharepointsiteid: 'site',
+      wmkf_sharepointdriveid: 'new-drive',
+      wmkf_sharepointitemid: 'new-item',
+      wmkf_sharepointfolderpath: 'Requests/1002379',
+    }] })),
     getAttempt: jest.fn(async () => row),
     claimSend: jest.fn(async () => {
       row = { ...row, lease_token: '77777777-7777-4777-8777-777777777777' };

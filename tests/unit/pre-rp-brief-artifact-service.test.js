@@ -2,6 +2,7 @@ import {
   generatePreRpBrief,
   getPreRpBriefStatus,
   projectPreRpBriefArtifact,
+  resolveCurrentPreRpBriefForDistribution,
 } from '../../lib/services/pre-rp-brief/artifact-service.js';
 import {
   PRE_RP_BRIEF_CONTRACT,
@@ -437,6 +438,71 @@ describe('generatePreRpBrief', () => {
       harness.dependencies,
     )).rejects.toMatchObject({ code: 'invalid_client_operation_id' });
     expect(harness.dependencies.loadInputs).not.toHaveBeenCalled();
+  });
+});
+
+describe('resolveCurrentPreRpBriefForDistribution', () => {
+  function distDependencies({ request, rows }) {
+    return {
+      getRequest: jest.fn(async () => request),
+      findByRequest: jest.fn(async () => ({ records: rows })),
+    };
+  }
+
+  it('resolves a Review-locked pointer target matching the expected artifact id', async () => {
+    const row = briefRow({
+      wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW,
+      wmkf_sharepointdriveid: 'drive-id',
+      wmkf_sharepointitemid: 'item-id',
+      wmkf_sharepointfolderpath: 'Requests/1002379/Artifacts/Pre-Research Presentation Brief',
+    });
+    const dependencies = distDependencies({
+      request: { akoya_requestid: REQUEST_ID, _wmkf_currentprerpbrief_value: ARTIFACT_ID },
+      rows: [row],
+    });
+    const { row: resolved } = await resolveCurrentPreRpBriefForDistribution(REQUEST_ID, ARTIFACT_ID, dependencies);
+    expect(resolved.wmkf_requestdocumentid).toBe(ARTIFACT_ID);
+  });
+
+  it('fails closed as distribution_stale_source when the expected artifact id does not match the pointer', async () => {
+    const row = briefRow({ wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.REVIEW });
+    const dependencies = distDependencies({
+      request: { akoya_requestid: REQUEST_ID, _wmkf_currentprerpbrief_value: ARTIFACT_ID },
+      rows: [row],
+    });
+    await expect(resolveCurrentPreRpBriefForDistribution(REQUEST_ID, OLDER_ARTIFACT_ID, dependencies))
+      .rejects.toMatchObject({ code: 'distribution_stale_source' });
+  });
+
+  it('fails closed as distribution_source_ineligible when the pointer target is still Draft (not locked for Share)', async () => {
+    const row = briefRow({ wmkf_lifecyclestate: REQUEST_DOCUMENT_LIFECYCLE_STATE.DRAFT });
+    const dependencies = distDependencies({
+      request: { akoya_requestid: REQUEST_ID, _wmkf_currentprerpbrief_value: ARTIFACT_ID },
+      rows: [row],
+    });
+    await expect(resolveCurrentPreRpBriefForDistribution(REQUEST_ID, ARTIFACT_ID, dependencies))
+      .rejects.toMatchObject({ code: 'distribution_source_ineligible' });
+  });
+
+  it('fails closed as distribution_stale_source when no brief has been generated yet (no pointer, no orphan)', async () => {
+    const dependencies = distDependencies({
+      request: { akoya_requestid: REQUEST_ID, _wmkf_currentprerpbrief_value: null },
+      rows: [],
+    });
+    await expect(resolveCurrentPreRpBriefForDistribution(REQUEST_ID, ARTIFACT_ID, dependencies))
+      .rejects.toMatchObject({ code: 'distribution_stale_source' });
+  });
+
+  it('fails closed as brief_pointer_invalid when the pointer is broken (reused from the status resolver)', async () => {
+    // A Ready row exists but no pointer names it — a real reconciliation
+    // problem, distinct from "nothing generated yet".
+    const orphan = briefRow({ wmkf_operationstatus: REQUEST_DOCUMENT_OPERATION_STATUS.READY });
+    const dependencies = distDependencies({
+      request: { akoya_requestid: REQUEST_ID, _wmkf_currentprerpbrief_value: null },
+      rows: [orphan],
+    });
+    await expect(resolveCurrentPreRpBriefForDistribution(REQUEST_ID, ARTIFACT_ID, dependencies))
+      .rejects.toMatchObject({ code: 'brief_pointer_invalid' });
   });
 });
 
