@@ -12,7 +12,11 @@
  *
  * @jest-environment node
  */
-import { PROMPT_VARIABLES, PROMPT_OUTPUT_SCHEMA } from '../../shared/config/prompts/review-synthesis';
+import {
+  PROMPT_VARIABLES,
+  PROMPT_OUTPUT_SCHEMA,
+  SYSTEM_PROMPT,
+} from '../../shared/config/prompts/review-synthesis';
 import { validateAiJson } from '../../lib/utils/ai-output-schema';
 
 test('reviews_digest stays untrusted with a dataClass + integer maxChars (A7 boundary)', () => {
@@ -43,7 +47,7 @@ test('output schema targets akoya_request.wmkf_reviewsynthesisjson with guard al
   expect(PROMPT_OUTPUT_SCHEMA.jsonSchema.additionalProperties).toBe(false);
   expect(PROMPT_OUTPUT_SCHEMA.jsonSchema.properties.synthesis.required).toEqual([
     'consensus', 'disagreements', 'keyConcerns', 'ratingSummaries', 'overall',
-    'writeupThemes', 'writeupQuotations',
+    'writeupThemes',
   ]);
   expect(PROMPT_OUTPUT_SCHEMA.jsonSchema.properties.synthesis.additionalProperties).toBe(false);
   const ratingItem = PROMPT_OUTPUT_SCHEMA.jsonSchema
@@ -52,49 +56,39 @@ test('output schema targets akoya_request.wmkf_reviewsynthesisjson with guard al
   expect(ratingItem.required).toEqual(['questionKey', 'questionText', 'summary']);
 });
 
-test('Slice 2: writeupThemes/writeupQuotations are present in jsonSchema and required, with NO caps there', () => {
+test('temporarily disables model-generated quotations while retaining writeupThemes', () => {
   const props = PROMPT_OUTPUT_SCHEMA.jsonSchema.properties.synthesis.properties;
   expect(props.writeupThemes).toEqual({ type: 'string' });
-  const quotationsItem = props.writeupQuotations.items;
-  expect(quotationsItem.additionalProperties).toBe(false);
-  expect(quotationsItem.required).toEqual(['questionKey', 'quote']);
+  expect(props).not.toHaveProperty('writeupQuotations');
+  expect(PROMPT_OUTPUT_SCHEMA.jsonSchema.properties.synthesis.required)
+    .not.toContain('writeupQuotations');
+  expect(SYSTEM_PROMPT).not.toContain('"writeupQuotations"');
   // The jsonSchema forwarded to the provider carries no bounding keywords —
   // all caps live in validationSchema only (plan §4.3).
   expect(props.writeupThemes).not.toHaveProperty('maxLength');
-  expect(props.writeupQuotations).not.toHaveProperty('maxItems');
-  expect(quotationsItem.properties.quote).not.toHaveProperty('maxLength');
-  expect(quotationsItem.properties.questionKey).not.toHaveProperty('maxLength');
 });
 
-test('Slice 2: validationSchema caps writeupThemes/writeupQuotations and both default when absent', () => {
+test('validationSchema caps writeupThemes and drops temporarily disabled quotations', () => {
   const synthesisFields = PROMPT_OUTPUT_SCHEMA.validationSchema.fields.synthesis.fields;
   expect(synthesisFields.writeupThemes).toMatchObject({ type: 'string', maxLength: 2000, required: false, default: '' });
-  expect(synthesisFields.writeupQuotations).toMatchObject({ type: 'array', maxItems: 10, required: false, default: [] });
-  expect(synthesisFields.writeupQuotations.of.fields.questionKey).toMatchObject({ type: 'string', maxLength: 100 });
-  expect(synthesisFields.writeupQuotations.of.fields.quote).toMatchObject({ type: 'string', maxLength: 600 });
+  expect(synthesisFields).not.toHaveProperty('writeupQuotations');
 
-  const result = validateAiJson({ synthesis: {} }, PROMPT_OUTPUT_SCHEMA.validationSchema);
+  const result = validateAiJson({
+    synthesis: {
+      writeupQuotations: [{ questionKey: 'q1', quote: 'A model-generated quotation.' }],
+    },
+  }, PROMPT_OUTPUT_SCHEMA.validationSchema);
   expect(result.ok).toBe(true);
   expect(result.value.synthesis.writeupThemes).toBe('');
-  expect(result.value.synthesis.writeupQuotations).toEqual([]);
+  expect(result.value.synthesis).not.toHaveProperty('writeupQuotations');
 });
 
-test('Slice 2: validationSchema enforces the caps as a hard failure, not a truncation', () => {
+test('validationSchema enforces the writeupThemes cap as a hard failure, not a truncation', () => {
   const overLong = validateAiJson(
     { synthesis: { writeupThemes: 'x'.repeat(2001) } },
     PROMPT_OUTPUT_SCHEMA.validationSchema,
   );
   expect(overLong.ok).toBe(false);
-
-  const tooMany = validateAiJson(
-    {
-      synthesis: {
-        writeupQuotations: Array.from({ length: 11 }, (_, i) => ({ questionKey: 'q', quote: `quote ${i}` })),
-      },
-    },
-    PROMPT_OUTPUT_SCHEMA.validationSchema,
-  );
-  expect(tooMany.ok).toBe(false);
 });
 
 test('validationSchema accepts a well-formed model response and drops injected extra keys', () => {
@@ -119,6 +113,6 @@ test('validationSchema defaults missing optional arrays/overall rather than fail
   expect(result.ok).toBe(true);
   expect(result.value.synthesis).toEqual({
     consensus: [], disagreements: [], keyConcerns: [], ratingSummaries: [], overall: '',
-    writeupThemes: '', writeupQuotations: [],
+    writeupThemes: '',
   });
 });

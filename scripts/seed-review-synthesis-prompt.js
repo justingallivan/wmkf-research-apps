@@ -27,7 +27,9 @@
  * Prompt text source of truth: shared/config/prompts/review-synthesis.js.
  *
  * Production history: v4 became sole-current on 2026-09-15 UTC after PR #296
- * deployed. The dependent schema column
+ * deployed. The next tracked version temporarily disables model-generated
+ * representative quotations while retaining backward-compatible legacy reads.
+ * The dependent schema column
  * (lib/dataverse/schema/wave11-review-synthesis/) was provisioned in Production
  * on 2026-07-03; any new target must still apply it before this prompt is usable
  * because selecting/writing a not-yet-created column 400s.
@@ -102,6 +104,7 @@ const recordData = {
     'AI synthesis of a proposal\'s submitted peer reviews (workbench Reviews tab Phase 4). All-override ' +
     '(reviews_digest, untrusted), parseMode json with native JSON-schema generation + validationSchema, output target ' +
     'akoya_request.wmkf_reviewsynthesisjson (guard always-overwrite — the caller route gates regeneration). ' +
+    'Representative quotation generation is temporarily disabled. ' +
     'Source: shared/config/prompts/review-synthesis.js.',
 };
 

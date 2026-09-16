@@ -822,7 +822,7 @@ test('renders verified themes and quotations from a current synthesis', async ()
   render(<ReviewsTab requestId="req1" />);
   expect(await screen.findByText('Reviewers were broadly positive about the approach.')).toBeInTheDocument();
   expect(screen.getByText('The most positive reviewer said: "This is outstanding and rigorous work."')).toBeInTheDocument();
-  expect(screen.queryByText(/Regenerate synthesis to add themes and quotations/i)).not.toBeInTheDocument();
+  expect(screen.queryByText(/Regenerate synthesis to add writeup themes/i)).not.toBeInTheDocument();
 });
 
 test('shows the Regenerate hint when synthesis is current but predates writeupThemes', async () => {
@@ -840,7 +840,7 @@ test('shows the Regenerate hint when synthesis is current but predates writeupTh
   });
 
   render(<ReviewsTab requestId="req1" />);
-  expect(await screen.findByText(/Regenerate synthesis to add themes and quotations/i)).toBeInTheDocument();
+  expect(await screen.findByText(/Regenerate synthesis to add writeup themes/i)).toBeInTheDocument();
 });
 
 test('does not show the Regenerate hint when the synthesis is stale (current === false), even with empty themes', async () => {
@@ -864,7 +864,7 @@ test('does not show the Regenerate hint when the synthesis is stale (current ===
 
   render(<ReviewsTab requestId="req1" />);
   await screen.findByText('Writeup paragraphs');
-  expect(screen.queryByText(/Regenerate synthesis to add themes and quotations/i)).not.toBeInTheDocument();
+  expect(screen.queryByText(/Regenerate synthesis to add writeup themes/i)).not.toBeInTheDocument();
 });
 
 test('does not show the Regenerate hint when there is no stored synthesis at all', async () => {
@@ -878,7 +878,7 @@ test('does not show the Regenerate hint when there is no stored synthesis at all
 
   render(<ReviewsTab requestId="req1" />);
   await screen.findByText('Writeup paragraphs');
-  expect(screen.queryByText(/Regenerate synthesis to add themes and quotations/i)).not.toBeInTheDocument();
+  expect(screen.queryByText(/Regenerate synthesis to add writeup themes/i)).not.toBeInTheDocument();
 });
 
 test('shows the dropped-quotation count when a quote fails provenance verification', async () => {
