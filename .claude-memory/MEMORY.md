@@ -25,7 +25,7 @@
 
 ## Working Norms
 - Performance/caching/refactor plans: feedback-latency-plan-scope-accretion-postmortem.md
-- Git / releases: ../docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md; feedback-verify-branch-before-git-action.md; feedback-scope-git-stash-in-shared-worktrees.md
+- Git / releases: ../docs/CAMPAIGN_RELEASE_AND_DATAVERSE_TEST_STRATEGY.md; feedback-verify-branch-before-git-action.md; feedback-scope-git-stash-in-shared-worktrees.md; feedback-feature-branch-handoff-lands-on-main.md
 - Action affordances / UI gating: feedback-ui-gates-must-mirror-server-guards.md
 - Tunables / mutable parameters: feedback-mutable-parameters-not-in-code.md
 - Reviewer product decisions: feedback-prioritize-contact-recall-over-identity-precision.md; feedback-manual-affiliation-edit-no-coi-recheck.md; project-institution-identity-cost-calibration.md
