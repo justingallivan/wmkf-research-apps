@@ -312,7 +312,19 @@ Pre-Site no brief; Final started while the brief stays Review; both rails (tab a
 
 ## 4. Surfaces
 
-[RECHECKED after lib/services/pre-rp-brief/{input-service,artifact-service,share-lock-service,docx-renderer}.js and pages/api/workbench/pre-rp-brief{,/lock-for-share}.js changes: slices 1-3 are built on `claude/pre-rp-brief` (input-service, artifact-service with the pointer canonical/pending split and claim/render/upload/activate lineage, share-lock-service, both routes, and the writers-gate registration in scripts/check-request-document-writers.js) and have passed Round 1-3 review for slices 1-2; slice 3 is newly built, not yet reviewed or merged. The §3/§4 rows this section describes as planned are now built at this commit.]
+[RECHECKED after lib/services/pre-rp-brief/input-service.js change: slices 1-3 built on claude/pre-rp-brief through commit 4bc38700; the §2-§4 rows naming this file describe built code under Opus review, not plan intent]
+[RECHECKED after lib/services/pre-rp-brief/artifact-service.js change: slices 1-3 built on claude/pre-rp-brief through commit 4bc38700; the §2-§4 rows naming this file describe built code under Opus review, not plan intent]
+[RECHECKED after lib/services/pre-rp-brief/share-lock-service.js change: slices 1-3 built on claude/pre-rp-brief through commit 4bc38700; the §2-§4 rows naming this file describe built code under Opus review, not plan intent]
+[RECHECKED after lib/services/pre-rp-brief/docx-renderer.js change: slices 1-3 built on claude/pre-rp-brief through commit 4bc38700; the §2-§4 rows naming this file describe built code under Opus review, not plan intent]
+[RECHECKED after pages/api/workbench/pre-rp-brief.js change: slices 1-3 built on claude/pre-rp-brief through commit 4bc38700; the §2-§4 rows naming this file describe built code under Opus review, not plan intent]
+[RECHECKED after pages/api/workbench/pre-rp-brief/lock-for-share.js change: slices 1-3 built on claude/pre-rp-brief through commit 4bc38700; the §2-§4 rows naming this file describe built code under Opus review, not plan intent]
+[RECHECKED after scripts/check-request-document-writers.js change: slices 1-3 built on claude/pre-rp-brief through commit 4bc38700; the §2-§4 rows naming this file describe built code under Opus review, not plan intent]
+[RECHECKED after scripts/setup-database.js change: slice 4 in progress on claude/pre-rp-brief (distribution source swap, prepare gate, migration 052); the §3.4b/§4 rows naming this file describe code being built, pending Opus review]
+[RECHECKED after lib/services/pre-site-visit/distribution-store.js change: slice 4 in progress on claude/pre-rp-brief (distribution source swap, prepare gate, migration 052); the §3.4b/§4 rows naming this file describe code being built, pending Opus review]
+[RECHECKED after lib/services/pre-site-visit/distribution-service.js change: slice 4 in progress on claude/pre-rp-brief (distribution source swap, prepare gate, migration 052); the §3.4b/§4 rows naming this file describe code being built, pending Opus review]
+[RECHECKED after lib/db/migrations-manifest.json change: slice 4 in progress on claude/pre-rp-brief (distribution source swap, prepare gate, migration 052); the §3.4b/§4 rows naming this file describe code being built, pending Opus review]
+[RECHECKED after pages/api/workbench/pre-site-visit/distribution/prepare.js change: slice 4 in progress on claude/pre-rp-brief (distribution source swap, prepare gate, migration 052); the §3.4b/§4 rows naming this file describe code being built, pending Opus review]
+[RECHECKED after lib/services/deliberation-briefing/briefing-page-service.js change: slice 4 in progress on claude/pre-rp-brief (distribution source swap, prepare gate, migration 052); the §3.4b/§4 rows naming this file describe code being built, pending Opus review]
 
 | Layer | Change |
 |---|---|
