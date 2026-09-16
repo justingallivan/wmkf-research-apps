@@ -33,7 +33,10 @@ outcome vocabulary:
 
 The shared feedback component supplies an icon, text, semantic color, and live-region
 role. Color is reinforcement, not the only state signal. Confirmed success stays visible
-in the interaction that initiated the send.
+in the interaction that initiated the send. A clean confirmed result intentionally renders
+only **Sent for delivery.** Sender, recipient, and Dynamics activity id stay available to
+the backend/reconciliation path but are not repeated on staff-facing screens. Failed,
+uncertain, and partial results retain the actionable detail needed to recover safely.
 
 **[VERIFIED via `lib/services/dynamics/email.js`]** `createAndSendEmail` marks every
 pre-dispatch exception `dispatched:false`. An exception from the Dynamics `SendEmail`
@@ -88,8 +91,15 @@ design tokens.
 
 ## Remaining proof
 
-- **[NOT YET VERIFIED]** Production deployment and signed-in send smoke are outside this
-  branch implementation. Smoke at least one ledger-backed send and one ordinary
-  `createAndSendEmail` flow after promotion.
+- **[PRODUCTION-LIVE 2026-09-15]** Commits `2c9497ce` and `d6cfcfeb` reached `main`;
+  `d6cfcfeb` reached Ready deployment `dpl_CxCtZ7F8AnniXRCsPyctjmz22LcW`.
+  The full repository suite passed 939 suites / 13,667 tests, and the test-only
+  Playwright correction `472b1ad8` passed all 25 browser tests locally and in GitHub Actions.
+- **[OWNER-REPORTED PRODUCTION PROOF 2026-09-15]** An ordinary Admin Email Test send
+  succeeded and displayed the former detailed Dynamics acceptance receipt. That proves the
+  ordinary `createAndSendEmail` transport path; it also supplied the evidence for suppressing
+  sender, recipient, and activity-id details from confirmed-success UI.
+- **[NOT YET VERIFIED]** Smoke one ledger-backed send and confirm the final concise
+  **Sent for delivery.** rendering in a signed-in Production interaction.
 - **[NOT YET VERIFIED]** Inbox delivery remains an external mail-system fact and is
   deliberately not claimed by any app success message.

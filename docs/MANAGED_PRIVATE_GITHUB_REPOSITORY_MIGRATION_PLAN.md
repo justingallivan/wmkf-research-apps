@@ -195,10 +195,10 @@ directly by its enterprise migration tooling.
    model, IT owner, application owner, and scheduled freeze window.
 2. Resolve every mandatory decision gate above. Stop if EMU/data residency prevents direct
    transfer; switch to the IT-led GEI path.
-3. Reconcile local and remote state. The current checkout already contains the unpushed audit
-   commit `01f344b5`; include every intended local audit/plan commit in the final source baseline.
+3. Reconcile local and remote state. The historical-branch audit (`01f344b5`) and this migration
+   plan (`f6ecbf0f`) are on `main`; do not treat their 2026-09-15 census as the cutover baseline.
    Enumerate all branches, tags, open PRs, Actions runs/artifacts, releases, and worktrees again at
-   freeze time.
+   freeze time, and include every intended later commit in the final source baseline.
 4. Create an offline, encrypted, access-controlled recovery package:
    - `git bundle` containing every approved branch and tag;
    - GitHub settings inventory containing names/IDs but no secret values;

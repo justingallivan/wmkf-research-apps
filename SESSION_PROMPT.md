@@ -1,126 +1,133 @@
-# Session 514 Prompt: Use the shipped-state brief; keep reviewer-institution authority off
+# Session 515 Prompt: Close email-feedback proof and prepare the managed-repository decisions
 
-## Session 513 Summary
+## Session 514 Summary
 
-Session 513 reconciled a dense parallel release window. Start with `/start`, then use
-`docs/audits/shipped-features-last-24-hours-2026-09-15.md` as the bounded release summary and
-re-probe mutable external state before acting on it.
+Session 514 cleaned up stale local Git/worktree state, planned the move to an IT-managed private
+repository, shipped several Workbench/Meeting Tracker production fixes, and standardized outbound
+email feedback across the application. Start with `/start`; re-probe mutable GitHub/Vercel state
+before relying on the dated migration baseline.
 
 ### What Was Completed
 
-1. **Phase II Reviews-tab writeup material shipped.** PR #296 added deterministic review
-   count/score, reviewer roster/rank/institution/expertise paragraphs, v4 themes and
-   server-verified quotations, rich-text Copy, Word panel-prep export, and the new Pre-Site
-   `[[STAFF:RefereeSection]]` fill. Production Request `1002852` passed the signed-in smoke.
-2. **Roster Contact links shipped and were backfilled.** PR #301 added governed
-   `expertise_roster.dataverse_contact_id` links and live active-Contact email resolution;
-   migration 050 is applied. The owner-approved backfill linked ten active rows (four Board, six
-   Consultants). Five Board rows were deliberately deferred because they are not needed this
-   cycle. PR #303 recorded closeout.
-3. **Meeting Tracker and Review Panel follow-ups shipped.** PR #294 disables attendee choices
-   without a usable email and returns a named actionable error. PR #298 improved Review Panel
-   narrow-screen navigation, 44-pixel action targets, keyboard focus, and contrast. A fresh
-   Production probe found Meeting Tracker Wave 28 at 22 exact / 0 absent / 0 divergent with its
-   readiness flag exact-on; Review Panel remains live in `access` mode.
-4. **Reviewer-institution Phase 2 landed dormant after two adversarial reviews.** PR #304 added
-   the evidence/receipt/evaluator and prospective measurement contracts. The second Claude
-   review found no merge-blocking defect, but the high-authority rollout prerequisites remain
-   open. `REVIEWER_INSTITUTION_PHASE2` and `REVIEWER_INSTITUTION_MEASUREMENT` remain off.
-5. **Migration 051 and the tracker were reconciled.** PR #305 applied
-   `051_reviewer_institution_measurement_events.sql` as empty dormant storage, verified its exact
-   schema and zero rows, removed the obsolete byte-identical `038_cycle_dossiers.sql` tracker
-   alias while retaining canonical migration 045, and cleared the migration-drift alert. Final
-   tracker state was 50/50 with no missing or extra migrations.
-6. **A rolling 24-hour shipped-features brief was created.** Commit `5ea883ab` records the five
-   Production-facing features separately from dormant reviewer-institution work. The same sweep
-   corrected stale current Meeting Tracker and Review Panel documentation.
+1. **Historical branches and worktrees were audited and cleaned safely.** The audit classified all
+   31 patch-unique non-ancestor branches, protected five deferred/undecided branches, removed 214
+   eligible local merged refs after owner approval, and verified that only the primary checkout
+   remains registered. The owner removed the final stale directories; the follow-up probe found no
+   live process retaining them.
+2. **The managed private-repository migration was planned.** The preferred path is an in-place
+   GitHub transfer after first making the existing repository private, while retaining the current
+   Vercel project. Eleven IT/owner decision gates, the public-history privacy prerequisite,
+   acceptance matrix, rollback path, and separate future Vercel-team transfer are documented.
+   Execution is not authorized by the draft.
+3. **Production Workbench and briefing fixes shipped.** Reviewer names are trimmed before prose
+   punctuation; review-document availability reconciles immediately after Mark as Complete; and
+   deliberation briefing links now last 60 days. The Share for Deliberation subject/body and the
+   briefing-link lead/trailing copy are admin-editable and pre-populated while the actual link and
+   expiry date remain system-owned.
+4. **Outbound-email result handling was standardized and distilled.** Human-triggered surfaces now
+   share confirmed/failed/uncertain/partial/draft semantics; uncertain send-stage failures preserve
+   reconciliation identity and background jobs separate failed from unconfirmed outcomes. Clean
+   confirmed sends now render only **Sent for delivery.** Technical sender, recipient, and Dynamics
+   activity-id details remain internal; failures and partial outcomes retain actionable detail.
+5. **Release verification completed.** `d6cfcfeb` reached Ready Production deployment
+   `dpl_CxCtZ7F8AnniXRCsPyctjmz22LcW`. The repository suite passed 939 suites / 13,667 tests; lint
+   had zero errors; the production build passed. Two stale Playwright copy assertions were then
+   corrected in `472b1ad8`; all 25 browser tests passed locally and GitHub Actions run
+   `35047034969` completed successfully.
 
-### Commits and releases
+### Commits
 
-- `9dd57264` — PR #294, Meeting Tracker missing-email attendee guard.
-- `b9ad64eb` — PR #296, Reviews-tab writeup paragraphs and exports.
-- `2d152715` — PR #298, Review Panel mobile usability.
-- `17c314b3` — PR #301, roster Contact linking and migration 050.
-- `ec21fd95` — PR #303, roster Contact-link production closeout.
-- `622c9f63` — PR #304, dormant reviewer-institution evidence contracts.
-- `85a3ecb4` — PR #305, migration 051 Production reconciliation.
-- `5ea883ab` — last-24-hours release brief and current-state doc reconciliation.
+- `01f344b5` — Audit historical branch stragglers.
+- `f6ecbf0f` — Plan managed private repository migration.
+- `161de49d` — Trim reviewer names in writeup paragraphs.
+- `0895a8b6` — Reconcile review downloads after closeout.
+- `29a938ae` — Set briefing links to 60-day validity.
+- `3f277dc7` — Make deliberation share email defaults editable.
+- `5a9887c2` — Make briefing email copy editable.
+- `2c9497ce` — Standardize email send feedback.
+- `d6cfcfeb` — Keep confirmed email feedback concise.
+- `472b1ad8` — Update Playwright email feedback assertions.
 
 ## Next Items
 
 ### Verified Open
 
-1. **Wednesday 2026-09-16 operations meeting.** The active agenda remains in
-   `.claude-memory/project-ops-meeting-2026-09-16-agenda.md`: decide the applicant-materials
-   reminder schedule/effects, the PC manual-reminder race, and disabled-worker cron cadence.
-   After the meeting, record decisions in the owning plans and close the memory.
-2. **Select the next repository priority from current evidence.** Re-probe
-   `docs/CURRENT_WORK_QUEUE.md`, active project memories, source, and any relevant live state;
-   this handoff does not promote an arbitrary backlog item merely because it is listed.
+1. **Finish operational proof for email feedback.**
+   Evidence: `docs/EMAIL_SEND_FEEDBACK_AUDIT_2026-09-15.md` and
+   `docs/CURRENT_WORK_QUEUE.md` item 10.
+   An owner-reported Admin Email Test send proved the ordinary `createAndSendEmail` path. Still
+   smoke one ledger-backed send and confirm that a signed-in Production screen shows exactly
+   **Sent for delivery.** after a clean send.
+2. **Wednesday 2026-09-16 operations meeting.**
+   Evidence: `.claude-memory/project-ops-meeting-2026-09-16-agenda.md` remains active.
+   Decide the applicant-materials reminder schedule/effects, the PC manual-reminder race, and the
+   disabled Cycle Dossier worker cadence; then record decisions in the owning plans and close the
+   memory.
 
 ### Owner Decision Needed
 
-1. **Reviewer-institution Phase 3/enablement.** Before any high-authority activation, define and
-   review the source-specific dated-currentness policy, finish v2 policy/card/remedy projection,
-   add the remaining exact call-set/partial-batch/rendered-state and frozen 40-case regressions,
-   and take a separate owner decision for each consumer. Evidence:
-   `docs/plans/REVIEWER_INSTITUTION_AUTO_RESOLUTION_PLAN_2026-09-14.md` § Immediate next work.
-2. **Prospective measurement activation.** Migration 051 being present does not authorize data
-   collection. Enabling `REVIEWER_INSTITUTION_MEASUREMENT` requires a separate owner-approved
-   measurement decision, including the threshold/sample policy declared before results are read.
+1. **Managed private-repository migration gates.**
+   Evidence: `docs/MANAGED_PRIVATE_GITHUB_REPOSITORY_MIGRATION_PLAN.md` § Mandatory decision gates
+   and § Privacy prerequisite.
+   IT and the owner must decide the destination/account model, transfer eligibility, membership,
+   Vercel GitHub App access, Actions/credential policy, billing/rules/security licensing, Vercel
+   ownership posture, and whether to sanitize or formally accept the already-public history.
 
 ### Parked
 
-1. **Five Board Contact links:** Kent Kresa, Richard N. Foster, Robert A. Bradway, Thomas E.
-   Everhart, and William R. Brody. Re-open when one is needed for an attendee flow or the owner
-   requests a broader roster cleanup. Evidence: `docs/plans/ROSTER_CONTACT_LINK_PLAN_2026-09-14.md`.
-2. **Consultant profile deep links.** No stable shared profile-route/access contract exists;
-   re-open only after that contract is explicitly decided.
+1. **Five protected historical branches.**
+   Evidence: `docs/audits/historical-branch-straggler-audit-2026-09-15.md` § Protected work.
+   Do not merge or delete `codex/q9-app-access-stage4`,
+   `feature/reviewer-cron-reminders-ledger`,
+   `codex/reviewer-analysis-sonnet-refusal-fallback`, `codex/admin-model-clarity`, or
+   `codex/final-writeup-personas-enable` without their named decision/prerequisite.
+2. **Reviewer-institution Phase 3 and measurement activation.**
+   Evidence: `docs/plans/REVIEWER_INSTITUTION_AUTO_RESOLUTION_PLAN_2026-09-14.md`.
+   Keep `REVIEWER_INSTITUTION_PHASE2` and `REVIEWER_INSTITUTION_MEASUREMENT` unset/off until the
+   separately documented policy, test, and owner-approval gates are met.
 
 ### Verify Before Acting
 
-1. Keep `REVIEWER_INSTITUTION_PHASE2` and `REVIEWER_INSTITUTION_MEASUREMENT` unset/off. Exact-on
-   would activate incomplete high-authority behavior; migration 051 alone is safe dormant storage.
-2. Do not recreate `038_cycle_dossiers.sql` in `schema_migrations`. Canonical migration 045 owns
-   the byte-identical dossier schema; the obsolete tracker alias was deliberately removed.
-3. Do not treat Meeting Tracker as awaiting Production activation. Wave 28 and exact-on readiness
-   were reverified 2026-09-15. Agenda transport remains the narrower unproved boundary.
-4. Existing Pre-Site drafts are not retroactively rewritten with the new referee section; regenerate
-   or create a new draft when that output is required.
+1. The private-repository document is a **draft plan**, not cutover authorization. Re-probe every
+   GitHub/Vercel count and integration at the freeze; the 2026-09-15 baseline is dated evidence.
+2. Do not repeat worktree/branch cleanup from memory. The audit verified only the authorized local
+   cleanup; remote deletion, protected branches, archive-evidence branches, and other historical
+   non-ancestor refs were not authorized.
+3. Production deployment is proved for `d6cfcfeb`, and Playwright CI is green for test-only commit
+   `472b1ad8`; the final concise success rendering has not yet received a separate signed-in smoke.
 
 ### Do Not Reopen Without New Decision
 
-1. Reviewer-institution Phase 2 is merge-complete as dormant code; the two Claude reviews are
-   evidence, not authorization to enable it.
-2. Migration 051 and the 038/045 tracker reconciliation are complete. Future schema changes use a
-   forward migration; do not edit the applied migration.
-3. The ten approved roster Contact links are complete. Broken linked Contacts fail visibly and do
-   not fall back to stale copied email.
+1. The removed stale worktrees/directories and 214 ancestry-merged local refs are closed cleanup.
+2. Do not restore technical Dynamics acceptance receipts or activity IDs to confirmed-success UI;
+   the owner explicitly chose the single-line **Sent for delivery.** treatment.
+3. Briefing-link validity is 60 days. The email's editable wording must not take ownership of the
+   system-generated briefing URL, linked materials, or expiry date.
 
 ## Key Files Reference
 
 | File | Purpose |
 |---|---|
-| `docs/audits/shipped-features-last-24-hours-2026-09-15.md` | Exact rolling-window release brief and evidence matrix |
-| `docs/plans/REVIEWS_TAB_WRITEUP_PARAGRAPHS_PLAN_2026-09-14.md` | Reviews-tab writeup/export contract and Production proof |
-| `docs/plans/ROSTER_CONTACT_LINK_PLAN_2026-09-14.md` | Contact-link contract, backfill, and deferred rows |
-| `docs/plans/REVIEWER_INSTITUTION_AUTO_RESOLUTION_PLAN_2026-09-14.md` | Dormant Phase 2 state and Phase 3 prerequisites |
-| `docs/audits/reviewer-institution-migration-051-production-reconciliation-2026-09-15.md` | Migration/tracker/flag evidence |
-| `docs/PC_MEETING_TRACKER_PLAN.md` | Production-live Meeting Tracker state and agenda boundary |
-| `.claude-memory/project-ops-meeting-2026-09-16-agenda.md` | Next dated operational decision point |
+| `docs/MANAGED_PRIVATE_GITHUB_REPOSITORY_MIGRATION_PLAN.md` | Staged GitHub/Vercel migration plan, gates, acceptance tests, and rollback |
+| `docs/audits/historical-branch-straggler-audit-2026-09-15.md` | Local branch/worktree census, dispositions, protected refs, and cleanup receipt |
+| `docs/EMAIL_SEND_FEEDBACK_AUDIT_2026-09-15.md` | Outbound-email outcome contract, inventory, and remaining Production proof |
+| `shared/components/EmailSendFeedback.js` | Shared accessible staff-facing result panel; clean sent state is deliberately concise |
+| `shared/utils/email-send-outcome.js` | Canonical email outcome vocabulary and default copy |
+| `shared/config/deliberationShareEmail.js` | Editable deliberation-share and briefing-link copy defaults |
+| `lib/services/deliberation-briefing/briefing-link-service.js` | 60-day briefing-token issuance |
+| `shared/components/reviewers/reviewer-document-state.js` | Immediate review-document reconciliation after closeout |
+| `.claude-memory/project-ops-meeting-2026-09-16-agenda.md` | Active next-day operations decisions |
 
 ## Testing
 
 ```bash
-npm run check:agent-invariants
-npm run check:atlas && npm run check:atlas:self-test
-npm run check:doc-currency && npm run check:doc-currency:self-test
-npm run check:fact-consistency && npm run check:fact-consistency:self-test
-npm run check:doc-symbol-refs && npm run check:doc-symbol-refs:self-test
-npm run check:agent-wiki && npm run check:agent-wiki:self-test
-npm run check:build-claim-freshness && npm run check:build-claim-freshness:self-test
-npm run check:docs-catalog
+npm test -- --runInBand --silent
+npm run build
+npm run lint
+npm run test:e2e
 ```
 
-The Session 513 `report:claim-evidence-pilot -- --current` call could not read local advisory state,
-so no pilot observation row was added.
+Session 514 verification: 939 Jest suites / 13,667 tests passed; production build passed; lint
+reported zero errors with existing warnings; 25/25 Playwright tests passed locally and GitHub
+Actions run `35047034969` passed. `report:claim-evidence-pilot -- --current` could not read local
+advisory state, so no pilot observation row was added.
