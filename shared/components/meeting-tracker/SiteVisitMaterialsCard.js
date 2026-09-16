@@ -84,7 +84,7 @@ export default function SiteVisitMaterialsCard({ requestId, requestNumber }) {
           ? { outcome: 'uncertain', detail: 'The collection was created. Dynamics may have accepted the invitation, but the result could not be confirmed. Check the recipient before sending again.' }
           : { outcome: 'failed', detail: 'The collection was created, but the invitation email was not sent. You can try Send invitation again.' });
       } else if (action === 'create' || action === 'invite' || action === 'remind') {
-        setEmailFeedback({ outcome: 'sent', detail: successNotice || 'Dynamics accepted the email for delivery.' });
+        setEmailFeedback({ outcome: 'sent' });
       } else if (successNotice) {
         setNotice(successNotice);
       }
@@ -131,7 +131,7 @@ export default function SiteVisitMaterialsCard({ requestId, requestNumber }) {
           </p>
         </div>
         {!loading && !collection && (
-          <Button type="button" loading={busy} onClick={() => act('create', {}, 'Collection started. Dynamics accepted the invitation for delivery.')}>Request materials</Button>
+          <Button type="button" loading={busy} onClick={() => act('create')}>Request materials</Button>
         )}
       </div>
 
@@ -181,11 +181,11 @@ export default function SiteVisitMaterialsCard({ requestId, requestNumber }) {
               {collection.contributorUrl && (
                 <button type="button" onClick={copyLink} className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50">{copied ? 'Copied' : 'Copy contributor link'}</button>
               )}
-              <button type="button" disabled={busy} onClick={() => act('invite', {}, 'Dynamics accepted the invitation for delivery.')} className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-50">
+              <button type="button" disabled={busy} onClick={() => act('invite')} className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-50">
                 {collection.invitedAt ? 'Send invitation again' : 'Send invitation'}
               </button>
               {collection.state === 'missing' && (
-                <button type="button" disabled={busy} onClick={() => act('remind', {}, 'Dynamics accepted the reminder for delivery.')} className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-50">Send reminder</button>
+                <button type="button" disabled={busy} onClick={() => act('remind')} className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-50">Send reminder</button>
               )}
               {collection.state === 'received' && (
                 <Button type="button" loading={busy} onClick={() => act('ready', {}, 'Marked ready.')}>Confirm the files open</Button>

@@ -178,7 +178,7 @@ export default function ScheduledEmailsPage() {
         message.id === data.message.id ? data.message : message
       )));
       if (action === 'send_now') {
-        setActionFeedback({ status: 'sent', message: 'Dynamics accepted this scheduled email for delivery.' });
+        setActionFeedback({ status: 'sent' });
       }
     } catch (err) {
       if (action === 'send_now') {

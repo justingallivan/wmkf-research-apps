@@ -117,7 +117,7 @@ export function ReviewReminderAction({
         });
         return;
       }
-      setFeedback({ status: 'sent', message: 'Dynamics accepted the reminder for delivery.' });
+      setFeedback({ status: 'sent' });
       // "Reminder sent." feedback is retained regardless of what the
       // callback does: a throw/rejection here is a refresh failure, not a
       // failed send, and must never relabel a confirmed mutation as failed

@@ -131,7 +131,7 @@ export default function RespondReminderModal({ requestId, candidate, onClose, on
       }
       sendingRef.current = false;
       if (onSent) onSent();
-      setSendFeedback({ status: 'sent', message: 'Dynamics accepted the reminder for delivery.' });
+      setSendFeedback({ status: 'sent' });
     } catch (error) {
       if (mountedRef.current && generation === sendGenerationRef.current) {
         setSendFeedback({

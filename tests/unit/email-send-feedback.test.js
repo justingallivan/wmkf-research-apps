@@ -5,11 +5,20 @@
 import { render, screen } from '@testing-library/react';
 import EmailSendFeedback from '../../shared/components/EmailSendFeedback';
 
-test('confirmed sends use concise transport-accurate copy', () => {
-  render(<EmailSendFeedback status="sent" />);
-  expect(screen.getByRole('status')).toHaveTextContent('Sent for delivery.');
-  expect(screen.getByRole('status')).toHaveTextContent('Dynamics accepted the email for delivery.');
-  expect(screen.queryByText(/inbox delivery/i)).not.toBeInTheDocument();
+test('confirmed sends show only the concise outcome, even when a caller supplies technical receipt details', () => {
+  render(
+    <EmailSendFeedback
+      status="sent"
+      title="Custom success"
+      message="Dynamics accepted the email from sender@example.org to recipient@example.org for delivery."
+      details={['Dynamics activity ID: activity-1']}
+    />,
+  );
+  const status = screen.getByRole('status');
+  expect(status).toHaveTextContent('Sent for delivery.');
+  expect(status).not.toHaveTextContent('Custom success');
+  expect(status).not.toHaveTextContent(/Dynamics accepted/i);
+  expect(status).not.toHaveTextContent(/activity ID/i);
 });
 
 test('definite failures are assertive and include recovery detail', () => {

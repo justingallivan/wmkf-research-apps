@@ -415,7 +415,7 @@ describe('a confirmed materials send followed by a failing reviewers refetch', (
     // the sent summary is still intact.
     await waitFor(() => expect(screen.getByText(/Couldn.t load reviewers: boom/)).toBeInTheDocument());
 
-    expect(screen.getByText('1 sent')).toBeTruthy();
+    expect(screen.getByText('Sent for delivery.')).toBeTruthy();
     expect(screen.queryByRole('button', { name: /preview 0 email/i })).toBeNull();
     expect(screen.getByRole('button', { name: 'Retry' })).toBeEnabled();
     expect(screen.getByRole('button', { name: /release proposal to reviewers \(1\)/i })).toBeDisabled();
@@ -424,6 +424,6 @@ describe('a confirmed materials send followed by a failing reviewers refetch', (
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull());
     expect(screen.getByRole('button', { name: /release proposal to reviewers \(1\)/i })).toBeEnabled();
-    expect(screen.getByText('1 sent')).toBeInTheDocument();
+    expect(screen.getByText('Sent for delivery.')).toBeInTheDocument();
   });
 });

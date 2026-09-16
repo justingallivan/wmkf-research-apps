@@ -219,7 +219,7 @@ export default function ReleaseEmailModal({ requestId, suggestionIds, onClose, o
       const successStatus = releaseWithoutEmail ? 'withdrawn_no_email_by_reason' : 'withdrawn_emailed';
       const failed = outcomes.filter(({ result }) => result.status !== successStatus);
       if (failed.length > 0) {
-        const detail = `${releaseWithoutEmail ? `${outcomes.length - failed.length} recorded. ` : `${outcomes.length - failed.length} accepted for delivery. `}`
+        const detail = `${releaseWithoutEmail ? `${outcomes.length - failed.length} recorded. ` : `${outcomes.length - failed.length} sent. `}`
           + `${failed.length} issue${failed.length === 1 ? '' : 's'}: `
           + failed.map(({ draft, result }) => (
             `${draft.name || draft.suggestionId} — ${SEND_RESULT_REASON[result.status] || result.status}`
@@ -236,7 +236,7 @@ export default function ReleaseEmailModal({ requestId, suggestionIds, onClose, o
         onClose();
         return;
       }
-      setSendFeedback({ outcome: 'sent', detail: `Dynamics accepted ${outcomes.length} courtesy email${outcomes.length === 1 ? '' : 's'} for delivery.` });
+      setSendFeedback({ outcome: 'sent' });
       setCompleted(true);
     } catch (err) {
       if (mountedRef.current && sendGeneration === sendGenerationRef.current) {

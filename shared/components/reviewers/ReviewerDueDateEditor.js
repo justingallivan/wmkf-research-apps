@@ -132,9 +132,7 @@ export default function ReviewerDueDateEditor({
         throw requestFailure;
       }
       setSavedWithoutNotification(false);
-      setSuccessMessage(action === 'retry'
-        ? 'Dynamics accepted the deadline email for delivery.'
-        : 'The deadline was updated and Dynamics accepted the notification for delivery.');
+      setSuccessMessage('sent');
       if (onSaved) onSaved();
     } catch (requestError) {
       if (!mountedRef.current || generation !== generationRef.current) return;
@@ -223,7 +221,7 @@ export default function ReviewerDueDateEditor({
             </p>
 
             {successMessage && (
-              <EmailSendFeedback className="mt-4" status="sent" message={successMessage} />
+              <EmailSendFeedback className="mt-4" status="sent" />
             )}
             {error && (
               <div className="mt-4">

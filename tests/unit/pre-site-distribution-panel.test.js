@@ -192,7 +192,7 @@ test('prepare carries no attachment mode, the preview shows the briefing link an
       }),
     }),
   ));
-  expect(await screen.findByText(/accepted this exact email for delivery/i)).toBeInTheDocument();
+  expect(await screen.findByText('Sent for delivery.')).toBeInTheDocument();
 });
 
 test('editing the message after a preview invalidates it', async () => {

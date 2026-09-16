@@ -778,7 +778,6 @@ export default function PreSiteDistributionPanel({
               <EmailSendFeedback
                 className="mt-4"
                 status="sent"
-                message="Dynamics accepted this exact email for delivery."
               />
             ) : (
               <>

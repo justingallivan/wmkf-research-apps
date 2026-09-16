@@ -556,8 +556,8 @@ export default function AwardeeTab({ requestId, context }) {
         setSendReceipt({
           status: data.statusPersisted === false ? 'partial' : 'sent',
           message: data.statusPersisted === false
-            ? 'Dynamics accepted the invitation for delivery, but the invitation status could not be recorded. Check the request before sending again.'
-            : 'Dynamics accepted the invitation for delivery.',
+            ? 'The invitation was sent, but its status could not be recorded. Check the request before sending again.'
+            : undefined,
         });
         setSendStep('sent');
         // Best-effort: the server records invitedAt on the first status flip.

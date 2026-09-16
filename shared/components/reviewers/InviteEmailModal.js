@@ -1304,12 +1304,9 @@ export default function InviteEmailModal({ requestId = null, candidates = [], se
                 (confirmedResultCount > 0 || issueCount > 0) && (
                   <EmailSendFeedback
                     status={step === 'error' && confirmedResultCount === 0 ? 'failed' : resultStatus}
-                    title={resultStatus === 'sent'
-                      ? `Sent ${confirmedResultCount} invitation${confirmedResultCount === 1 ? '' : 's'} for delivery.`
-                      : undefined}
                     message={resultStatus === 'sent'
-                      ? `Dynamics accepted the email${confirmedResultCount === 1 ? '' : 's'} for ${confirmedSent.map((r) => r.candidateName || '?').join(', ')}.`
-                      : `${confirmedResultCount} sent for delivery; ${issueCount} need${issueCount === 1 ? 's' : ''} attention.`}
+                      ? undefined
+                      : `${confirmedResultCount} sent; ${issueCount} need${issueCount === 1 ? 's' : ''} attention.`}
                   />
                 )
               )}

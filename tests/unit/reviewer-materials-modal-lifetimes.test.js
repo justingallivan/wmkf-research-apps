@@ -650,7 +650,7 @@ describe('send completion handshake (real parent onRefresh/selection)', () => {
     );
     sse.finish();
     await act(async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); });
-    expect(await screen.findByText('1 sent')).toBeTruthy();
+    expect(await screen.findByText('Sent for delivery.')).toBeTruthy();
   });
 
   // ADVISORY-2: the same-chunk `if (finished) break;` guard (immediately
@@ -678,7 +678,7 @@ describe('send completion handshake (real parent onRefresh/selection)', () => {
     sse.finish();
     await act(async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); });
 
-    expect(await screen.findByText('1 sent')).toBeTruthy();
+    expect(await screen.findByText('Sent for delivery.')).toBeTruthy();
     expect(screen.queryByText('late failure')).toBeNull();
     expect(onRefresh).toHaveBeenCalledTimes(1);
   });
@@ -714,7 +714,7 @@ describe('send completion handshake (real parent onRefresh/selection)', () => {
     sse.push(sseChunk('result', { sent: [{ suggestionId: REVIEWER_A.suggestionId, candidateName: REVIEWER_A.name, candidateEmail: REVIEWER_A.email }], failed: [], skipped: [] }));
     sse.push(sseChunk('complete', { message: 'done' }));
     await act(async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); });
-    await screen.findByText('1 sent');
+    await screen.findByText('Sent for delivery.');
     expect(onRefresh).toHaveBeenCalledTimes(1);
 
     sse.push(sseChunk('complete', { message: 'done-again' }));
@@ -722,7 +722,7 @@ describe('send completion handshake (real parent onRefresh/selection)', () => {
     await act(async () => { await Promise.resolve(); await Promise.resolve(); });
 
     // Still the same summary; the release button still reflects one clear (2 total accepted).
-    expect(screen.getByText('1 sent')).toBeTruthy();
+    expect(screen.getByText('Sent for delivery.')).toBeTruthy();
     // The finished-attempt guard: a duplicate complete must not call the
     // parent's onEmailsSent (and therefore onRefresh) a second time.
     expect(onRefresh).toHaveBeenCalledTimes(1);
@@ -741,14 +741,14 @@ describe('send completion handshake (real parent onRefresh/selection)', () => {
     sse.push(sseChunk('result', { sent: [{ suggestionId: REVIEWER_A.suggestionId, candidateName: REVIEWER_A.name, candidateEmail: REVIEWER_A.email }], failed: [], skipped: [] }));
     sse.push(sseChunk('complete', { message: 'done' }));
     await act(async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); });
-    await screen.findByText('1 sent');
+    await screen.findByText('Sent for delivery.');
 
     sse.push(sseChunk('error', { message: 'late failure' }));
     sse.finish();
     await act(async () => { await Promise.resolve(); await Promise.resolve(); });
 
     expect(screen.queryByText('late failure')).toBeNull();
-    expect(screen.getByText('1 sent')).toBeTruthy();
+    expect(screen.getByText('Sent for delivery.')).toBeTruthy();
   });
 
   test('external selection clear BEFORE complete suppresses the later complete callback', async () => {
@@ -794,7 +794,7 @@ describe('send completion handshake (real parent onRefresh/selection)', () => {
     sse.push(sseChunk('complete', { message: 'done' }));
     sse.finish();
     await act(async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); });
-    await screen.findByText('2 sent');
+    await screen.findByText('Sent for delivery.');
 
     // Selection is now empty (post-completion clear). Select a reviewer again
     // then open the release modal — this is a genuinely new, unrelated
@@ -825,7 +825,7 @@ describe('send completion handshake (real parent onRefresh/selection)', () => {
     sse.push(sseChunk('complete', { message: 'done' }));
     sse.finish();
     await act(async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); });
-    await screen.findByText('2 sent');
+    await screen.findByText('Sent for delivery.');
 
     // Reselect then deselect again — a second, unrelated prior→empty
     // transition. The stale cause object (if the parent hasn't overwritten
@@ -834,7 +834,7 @@ describe('send completion handshake (real parent onRefresh/selection)', () => {
     fireEvent.click(checkboxForRow('Accepted A'));
     openReleaseModal(2);
     // A fresh compose for all 2 accepted reviewers, not the stale summary.
-    expect(screen.queryByText('2 sent')).toBeNull();
+    expect(screen.queryByText('Sent for delivery.')).toBeNull();
     expect(screen.getByRole('button', { name: /preview 2 email/i })).toBeTruthy();
   });
 
@@ -852,12 +852,12 @@ describe('send completion handshake (real parent onRefresh/selection)', () => {
     sse.push(sseChunk('complete', { message: 'done' }));
     sse.finish();
     await act(async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); });
-    await screen.findByText('1 sent');
+    await screen.findByText('Sent for delivery.');
 
     fireEvent.click(screen.getByRole('button', { name: /^close$/i }));
     openReleaseModal(1);
     expect(screen.getByRole('button', { name: /preview 1 email/i })).toBeTruthy();
-    expect(screen.queryByText('1 sent')).toBeNull();
+    expect(screen.queryByText('Sent for delivery.')).toBeNull();
   });
 });
 
@@ -1026,7 +1026,7 @@ describe('settings identity (signature / review deadline)', () => {
     // defeat the completion exemption: fresh compose, not the sent summary.
     // Selection itself did clear to empty (that part of the transition is
     // real), so the reset compose form targets 0 reviewers, not 1.
-    expect(screen.queryByText('1 sent')).toBeNull();
+    expect(screen.queryByText('Sent for delivery.')).toBeNull();
     expect(screen.getByRole('button', { name: /preview 0 email/i })).toBeTruthy();
   });
 
@@ -1309,7 +1309,7 @@ describe('proposal identity (title / abstract / PI / institution)', () => {
     // must defeat the completion exemption: fresh compose, not the sent
     // summary. Selection itself did clear to empty (that part of the
     // transition is real), so the reset compose form targets 0 reviewers.
-    expect(screen.queryByText('1 sent')).toBeNull();
+    expect(screen.queryByText('Sent for delivery.')).toBeNull();
     expect(screen.getByRole('button', { name: /preview 0 email/i })).toBeTruthy();
   });
 });

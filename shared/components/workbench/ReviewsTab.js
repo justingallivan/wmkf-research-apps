@@ -788,7 +788,7 @@ function OutstandingRow({ reviewer, requestId, onSent, onManualEntry, previewRea
         });
         return;
       }
-      setFeedback({ status: 'sent', message: 'Dynamics accepted the reminder for delivery.' });
+      setFeedback({ status: 'sent' });
       if (onSent) onSent();
     } catch (e) {
       setFeedback({

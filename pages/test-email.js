@@ -158,8 +158,7 @@ export default function TestEmail() {
         <Card className="mt-4">
           <EmailSendFeedback
             status={result.status === 'draft' ? 'draft' : result.status === 'sent' ? 'sent' : result.status || 'failed'}
-            message={result.message}
-            details={result.emailId ? [`Dynamics activity ID: ${result.emailId}`] : []}
+            message={['sent', 'draft'].includes(result.status) ? undefined : result.message}
           />
         </Card>
       )}

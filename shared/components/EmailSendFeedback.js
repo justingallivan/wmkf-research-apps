@@ -61,7 +61,12 @@ export default function EmailSendFeedback({
   const appearance = APPEARANCE[resolvedStatus];
   const defaults = EMAIL_SEND_OUTCOME_COPY[resolvedStatus];
   const Icon = appearance.icon;
-  const visibleDetails = Array.isArray(details) ? details.filter(Boolean) : [];
+  const confirmedSend = resolvedStatus === EMAIL_SEND_OUTCOME.SENT;
+  const resolvedTitle = confirmedSend ? defaults.title : (title || defaults.title);
+  const resolvedMessage = confirmedSend ? '' : (message || defaults.message);
+  const visibleDetails = confirmedSend
+    ? []
+    : (Array.isArray(details) ? details.filter(Boolean) : []);
   const role = resolvedStatus === EMAIL_SEND_OUTCOME.FAILED ? 'alert' : 'status';
 
   return (
@@ -75,9 +80,9 @@ export default function EmailSendFeedback({
       <div className="flex min-w-0 items-start gap-2.5">
         <Icon aria-hidden="true" className={`mt-0.5 h-4 w-4 shrink-0 ${appearance.iconClass}`} strokeWidth={2} />
         <div className="min-w-0 break-words text-sm">
-          <p className="font-semibold leading-5">{title || defaults.title}</p>
-          {(message || defaults.message) && (
-            <p className="mt-0.5 leading-5 opacity-90">{message || defaults.message}</p>
+          <p className="font-semibold leading-5">{resolvedTitle}</p>
+          {resolvedMessage && (
+            <p className="mt-0.5 leading-5 opacity-90">{resolvedMessage}</p>
           )}
           {visibleDetails.length > 0 && (
             <ul className="mt-2 space-y-1 pl-4 text-xs leading-5 [list-style-type:disc]">

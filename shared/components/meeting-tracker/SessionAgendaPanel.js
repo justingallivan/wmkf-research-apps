@@ -462,7 +462,6 @@ export default function SessionAgendaPanel({ sessionId, session, slots, recipien
                   <EmailSendFeedback
                     className="mt-4"
                     status="sent"
-                    message="Dynamics accepted this exact agenda email for delivery."
                   />
                 ) : (
                   <>

@@ -19,7 +19,7 @@ export const EMAIL_SEND_OUTCOME = Object.freeze({
 export const EMAIL_SEND_OUTCOME_COPY = Object.freeze({
   [EMAIL_SEND_OUTCOME.SENT]: Object.freeze({
     title: 'Sent for delivery.',
-    message: 'Dynamics accepted the email for delivery.',
+    message: '',
   }),
   [EMAIL_SEND_OUTCOME.DRAFT]: Object.freeze({
     title: 'Draft created.',
