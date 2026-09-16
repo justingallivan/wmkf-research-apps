@@ -40,7 +40,8 @@ function ReviewerGroup({ proposal, previewReadOnly, onRefresh, degraded, loading
     || reviewer.submitted
     || ['review_received', 'complete'].includes(reviewer.reviewStatus)
   )).length;
-  const waitingCount = Math.max(reviewers.length - receivedCount - overdueCount, 0);
+  const waitingCount = Math.max(activeCount - overdueCount, 0);
+  const summaryCount = receivedCount + activeCount;
   const canManage = !previewReadOnly && proposal.workbench?.canManage === true;
   const requestHref = `/workbench/${encodeURIComponent(proposal.proposalId)}?tab=reviewers&sub=track${
     proposal.requestNumber ? `&n=${encodeURIComponent(proposal.requestNumber)}` : ''
@@ -76,9 +77,9 @@ function ReviewerGroup({ proposal, previewReadOnly, onRefresh, degraded, loading
             ) : (
               <div className="mt-2.5 max-w-xl" aria-label={`Reviewer status: ${receivedCount} received, ${waitingCount} waiting, ${overdueCount} late`}>
                 <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-gray-200" role="img" aria-hidden="true">
-                  {receivedCount > 0 && <span className="bg-green-500" style={{ width: `${(receivedCount / reviewers.length) * 100}%` }} />}
-                  {waitingCount > 0 && <span className="bg-gray-400" style={{ width: `${(waitingCount / reviewers.length) * 100}%` }} />}
-                  {overdueCount > 0 && <span className="bg-red-500" style={{ width: `${(overdueCount / reviewers.length) * 100}%` }} />}
+                  {receivedCount > 0 && <span className="bg-green-500" style={{ width: `${(receivedCount / summaryCount) * 100}%` }} />}
+                  {waitingCount > 0 && <span className="bg-gray-400" style={{ width: `${(waitingCount / summaryCount) * 100}%` }} />}
+                  {overdueCount > 0 && <span className="bg-red-500" style={{ width: `${(overdueCount / summaryCount) * 100}%` }} />}
                 </div>
                 <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs tabular-nums">
                   <span className="text-green-700"><strong>{receivedCount}</strong> received</span>
