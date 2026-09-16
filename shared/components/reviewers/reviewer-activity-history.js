@@ -188,8 +188,8 @@ const TERMINAL_STATUS_LABELS = Object.freeze({
  * `withdrew` does: `applyStaffReviewerWithdrawal` stamps `wmkf_responsereceivedat` in
  * the same write as the status (`reviewer-suggestion.js:1832-1842`), which surfaces as
  * the dated "Withdrawal recorded by staff" event. `released` does not: its writer sets
- * only status and token revocation (`terminal-transition-service.js:106-118`), so no
- * timestamp for it exists anywhere in the schema.
+ * old status-only releases do not have a date. The current sufficient-reviews
+ * release writes `withdrawnSufficientAt`, so newer released rows do.
  *
  * This distinction is what the Last Action summary turns on. Letting the undated header
  * win for BOTH hides the withdrawal date staff triage on; letting dated activity win for
@@ -198,8 +198,16 @@ const TERMINAL_STATUS_LABELS = Object.freeze({
  */
 const TERMINAL_STATUS_HAS_DATED_EVENT = Object.freeze({
   withdrew: true,
-  released: false,
+  released: true,
 });
+
+function terminalStatusHasDatedEvent(reviewer) {
+  if (!TERMINAL_STATUS_HAS_DATED_EVENT[reviewer?.reviewStatus]) return false;
+  if (reviewer.reviewStatus === 'released') {
+    return parseTime(reviewer.withdrawnSufficientAt) !== null;
+  }
+  return true;
+}
 
 /**
  * Did the former generic staff close-out fabricate this row's review receipt?
@@ -295,7 +303,7 @@ export function currentTerminalStatus(reviewer) {
     key: `terminal_${reviewer.reviewStatus}`,
     label: `Current status: ${label}`,
     dated: false,
-    detail: reviewer.reviewStatus === 'released'
+    detail: reviewer.reviewStatus === 'released' && parseTime(reviewer.withdrawnSufficientAt) === null
       ? 'No lifecycle timestamp is recorded for this transition.'
       : null,
   };
@@ -333,16 +341,25 @@ export function buildActivityHistory(reviewer) {
       ? reviewReceiptEvidence(reviewer)
       : null;
     const evidence = responseEvidence || receiptEvidence;
+    const releaseEvidence = descriptor.key === 'withdrawn_sufficient'
+      && reviewer.reviewStatus === 'released'
+      ? {
+        label: 'Released — sufficient reviews received',
+        deliveryProven: true,
+        detail: 'Review not received; released by a Program Director.',
+      }
+      : null;
+    const resolvedEvidence = evidence || releaseEvidence;
 
     events.push({
       key: descriptor.key,
-      label: evidence?.label || descriptor.label,
+      label: resolvedEvidence?.label || descriptor.label,
       at: raw,
       timestamp,
-      deliveryProven: evidence ? evidence.deliveryProven : descriptor.deliveryProven,
-      unprovenNote: evidence?.unprovenNote || UNPROVEN_DELIVERY_NOTE,
+      deliveryProven: resolvedEvidence ? resolvedEvidence.deliveryProven : descriptor.deliveryProven,
+      unprovenNote: resolvedEvidence?.unprovenNote || UNPROVEN_DELIVERY_NOTE,
       order: descriptor.order,
-      detail: evidence?.detail ?? buildDetail(descriptor.key, reviewer),
+      detail: resolvedEvidence?.detail ?? buildDetail(descriptor.key, reviewer),
     });
   }
 
@@ -394,6 +411,6 @@ export function latestActivity(events) {
  */
 export function latestActivitySummary(reviewer) {
   const terminal = currentTerminalStatus(reviewer);
-  if (terminal && !TERMINAL_STATUS_HAS_DATED_EVENT[reviewer?.reviewStatus]) return terminal;
+  if (terminal && !terminalStatusHasDatedEvent(reviewer)) return terminal;
   return latestActivity(buildActivityHistory(reviewer)) || terminal;
 }

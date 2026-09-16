@@ -6,6 +6,7 @@ import {
   processReviewerAcceptanceJob,
   drainReviewerAcceptanceJobs,
 } from '../../lib/services/reviewer-acceptance-drain';
+import { REVIEW_STATUS_MAP } from '../../shared/config/reviewerLifecycle';
 
 const SUGGESTION_ID = '11111111-1111-4111-8111-111111111111';
 const REQUEST_ID = '22222222-2222-4222-8222-222222222222';
@@ -96,6 +97,7 @@ function deps(currentSuggestion = acceptedSuggestion()) {
     notify: jest.fn(async () => ({ id: 1 })),
     quota: jest.fn(async () => ({ notified: false })),
     deleteLateHonorarium: jest.fn(async () => ({ deleted: true })),
+    cancelLateReleasedHonorarium: jest.fn(async () => ({ cancelled: true })),
     jobs: {
       mergeReviewerAcceptanceJobStep: jest.fn(async () => ({})),
       completeReviewerAcceptanceJob: jest.fn(async () => ({})),
@@ -296,6 +298,39 @@ describe('processReviewerAcceptanceJob', () => {
     expect(d.sendAcceptanceEmail).not.toHaveBeenCalled();
     expect(d.quota).not.toHaveBeenCalled();
     expect(d.jobs.completeReviewerAcceptanceJob).not.toHaveBeenCalled();
+  });
+
+  it('cancels before follow-up and retains-withdraws any honorarium when the reviewer was already released', async () => {
+    const d = deps(acceptedSuggestion({
+      wmkf_reviewstatus: REVIEW_STATUS_MAP.released,
+      _wmkf_honorariumrequest_value: '55555555-5555-4555-8555-555555555555',
+    }));
+    const result = await processReviewerAcceptanceJob(job(), d);
+    expect(d.cancelLateReleasedHonorarium).toHaveBeenCalledWith(
+      SUGGESTION_ID,
+      { suggestions: d.suggestions },
+    );
+    expect(result).toMatchObject({ status: 'cancelled', reason: 'reviewer_released_before_acceptance_followup' });
+    expect(d.ensureHonorarium).not.toHaveBeenCalled();
+  });
+
+  it('retains-withdraws a late honorarium and stops when release races the acceptance worker', async () => {
+    const d = deps();
+    d.suggestions.getForAcceptanceDrain
+      .mockResolvedValueOnce(acceptedSuggestion())
+      .mockResolvedValueOnce(acceptedSuggestion({
+        wmkf_reviewstatus: REVIEW_STATUS_MAP.released,
+        _wmkf_honorariumrequest_value: '55555555-5555-4555-8555-555555555555',
+      }));
+    const result = await processReviewerAcceptanceJob(job(), d);
+    expect(d.ensureHonorarium).toHaveBeenCalled();
+    expect(d.cancelLateReleasedHonorarium).toHaveBeenCalledWith(
+      SUGGESTION_ID,
+      { suggestions: d.suggestions },
+    );
+    expect(result.status).toBe('cancelled');
+    expect(d.sendAcceptanceEmail).not.toHaveBeenCalled();
+    expect(d.quota).not.toHaveBeenCalled();
   });
 
   it('cancels stale accept_pending jobs when Dataverse never accepted', async () => {

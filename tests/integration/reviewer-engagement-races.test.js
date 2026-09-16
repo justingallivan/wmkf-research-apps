@@ -398,6 +398,11 @@ describe('F4 post-send bookkeeping races through the real adapter', () => {
     } else {
       expect(await trusted(() => transitionReviewersTerminal({
         requestId: REQUEST, suggestionIds: [ID], terminalStatus: status,
+        ...(status === 'released' ? {
+          releaseReason: 'sufficient_reviews_received',
+          sendEmail: false,
+          overrides: { [ID]: { expectedNotes: '' } },
+        } : {}),
       }))).toMatchObject({ transitioned: 1 });
     }
     return transport.get(SET, ID);
@@ -845,6 +850,7 @@ describe('F3 generic staff correction regressions', () => {
     }));
     transport.seed(REQUESTS, {
       akoya_requestid: HONORARIUM, akoya_requestnum: 'HONORARIUM-UNCHANGED',
+      akoya_requeststatus: 'Pending', akoya_paid: 0,
       wmkf_authorizationtoremitpaymentflag: false,
     });
     transport.seed(REQUESTS, {
@@ -1012,6 +1018,11 @@ describe('F3 generic staff correction regressions', () => {
     } else if (kind === 'withdrew' || kind === 'released') {
       await expect(trusted(() => transitionReviewersTerminal({
         requestId: REQUEST, suggestionIds: [ID], terminalStatus: kind, actingUserSystemId: ACTOR,
+        ...(kind === 'released' ? {
+          releaseReason: 'sufficient_reviews_received',
+          sendEmail: false,
+          overrides: { [ID]: { expectedNotes: '' } },
+        } : {}),
       }))).resolves.toMatchObject({ transitioned: 1 });
     } else {
       transport.patch(SET, ID, { _wmkf_request_value: OTHER, wmkf_notes: 'Authorized Request changed' });

@@ -32,6 +32,7 @@ import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import ReviewerDueDateEditor from './ReviewerDueDateEditor';
 import ReviewerActivityDrawer from './ReviewerActivityDrawer';
 import ReviewerCloseoutModal from './ReviewerCloseoutModal';
+import AcceptedReviewerReleaseModal from './AcceptedReviewerReleaseModal';
 import { reviewerDocumentIsPending } from './reviewer-document-state';
 import { latestActivitySummary } from './reviewer-activity-history';
 import { acceptedReviewerRemoveWarning } from './remove-reviewer-confirm';
@@ -356,6 +357,7 @@ export default function ReviewerManagePanel({
   const [releaseModalOpen, setReleaseModalOpen] = useState(false);
   const [activityDrawerId, setActivityDrawerId] = useState(null); // suggestionId
   const [closeoutReviewerId, setCloseoutReviewerId] = useState(null); // suggestionId
+  const [acceptedReleaseReviewerId, setAcceptedReleaseReviewerId] = useState(null);
   // Stage 6B3: the one-use completion-cause the ReleaseMaterialsModal hands
   // back after a send finishes, so its own session effect can recognize the
   // selection-clear THIS attempt caused (and not reset the summary it just
@@ -484,6 +486,9 @@ export default function ReviewerManagePanel({
     : null;
   const closeoutReviewer = closeoutReviewerId
     ? reviewers.find(r => r.suggestionId === closeoutReviewerId) || null
+    : null;
+  const acceptedReleaseReviewer = acceptedReleaseReviewerId
+    ? reviewers.find(r => r.suggestionId === acceptedReleaseReviewerId) || null
     : null;
 
   useEffect(() => {
@@ -821,6 +826,10 @@ export default function ReviewerManagePanel({
   };
 
   const transitionTerminal = async (reviewer, terminalStatus) => {
+    if (terminalStatus === 'released') {
+      setAcceptedReleaseReviewerId(reviewer.suggestionId);
+      return;
+    }
     const outcome = terminalStatus === 'withdrew'
       ? 'withdrew after accepting'
       : 'was released by WMKF';
@@ -873,6 +882,47 @@ export default function ReviewerManagePanel({
           }
         }
       }
+    } finally {
+      finishAttempt(attempt);
+    }
+  };
+
+  const releaseAcceptedReviewer = async (reviewer, releasePayload) => {
+    const attempt = beginAttempt('terminal', reviewer.suggestionId);
+    if (!attempt) return { ok: false, error: 'The reviewer is no longer available for this action.' };
+    const isCurrent = () => isAttemptCurrent(attempt);
+    try {
+      let response;
+      try {
+        response = await fetch('/api/review-manager/terminal-transition', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            requestId: attempt.requestId,
+            suggestionIds: [reviewer.suggestionId],
+            terminalStatus: 'released',
+            ...releasePayload,
+          }),
+        });
+      } catch (releaseError) {
+        if (!isCurrent()) return { ok: false, error: 'The reviewer context changed while the release was being saved.' };
+        throw releaseError;
+      }
+      if (!isCurrent()) return { ok: false, error: 'The reviewer context changed while the release was being saved.' };
+      const data = await response.json().catch(() => ({}));
+      if (!isCurrent()) return { ok: false, error: 'The reviewer context changed while the release was being saved.' };
+      if (!response.ok || data.transitioned !== 1) {
+        const status = data.results?.[0]?.status;
+        return { ok: false, data, error: status || data.error || `Release failed (${response.status})` };
+      }
+      try {
+        await statusContextRef.current.onRefresh?.();
+      } catch {
+        if (isCurrent()) {
+          alert('The reviewer was released, but the reviewer list could not be refreshed. Reload to see the current status.');
+        }
+      }
+      return { ok: true, data };
     } finally {
       finishAttempt(attempt);
     }
@@ -1351,6 +1401,15 @@ export default function ReviewerManagePanel({
           previewReadOnly={previewReadOnly}
           onClose={() => setCloseoutReviewerId(null)}
           onSaved={() => (onRefresh ? onRefresh() : undefined)}
+        />
+      )}
+
+      {acceptedReleaseReviewer && (
+        <AcceptedReviewerReleaseModal
+          reviewer={acceptedReleaseReviewer}
+          requestId={proposal?.proposalId}
+          onClose={() => setAcceptedReleaseReviewerId(null)}
+          onRelease={(payload) => releaseAcceptedReviewer(acceptedReleaseReviewer, payload)}
         />
       )}
 

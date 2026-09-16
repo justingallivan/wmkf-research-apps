@@ -62,6 +62,17 @@ let errorSpy;
 let transports;
 const inContext = (operation) => withDalContext('stage0-receipt-contract', operation);
 const writes = () => transport.requests.filter((request) => request.method !== 'GET');
+const terminalArgs = (terminalStatus) => ({
+  requestId: REQUEST,
+  suggestionIds: [ID],
+  terminalStatus,
+  actingUserSystemId: ACTOR,
+  ...(terminalStatus === 'released' ? {
+    releaseReason: 'sufficient_reviews_received',
+    sendEmail: false,
+    overrides: { [ID]: { expectedNotes: '' } },
+  } : {}),
+});
 
 function suggestion(fields = {}) {
   return {
@@ -81,7 +92,7 @@ function initialize(fields = {}) {
     [SET]: [suggestion(fields)],
     akoya_requests: [
       { akoya_requestid: REQUEST, akoya_requestnum: '1001289', akoya_title: 'Lifecycle contract', wmkf_meetingdate: '2026-12-01' },
-      { akoya_requestid: HONORARIUM, akoya_requestnum: 'HON-1', wmkf_authorizationtoremitpaymentflag: false },
+      { akoya_requestid: HONORARIUM, akoya_requestnum: 'HON-1', akoya_requeststatus: 'Pending', akoya_paid: 0, wmkf_authorizationtoremitpaymentflag: false },
     ],
     wmkf_potentialreviewerses: [{ wmkf_potentialreviewersid: PERSON, wmkf_name: 'Sample Reviewer', wmkf_emailaddress: 'reviewer@example.test' }],
     wmkf_reviewquestions: QUESTIONS.map((question, index) => ({
@@ -322,7 +333,7 @@ test.each(['withdrew', 'released'])('%s wins while a full receipt is paused; ans
   const pending = inContext(() => submitManualReviewEntry({ suggestionId: ID, answers: ANSWERS, setVersion: VERSION }));
   const rejection = expect(pending).rejects.toMatchObject({ body: { reason: 'conflict' } });
   await pause.reached;
-  const result = await inContext(() => transitionReviewersTerminal({ requestId: REQUEST, suggestionIds: [ID], terminalStatus, actingUserSystemId: ACTOR }));
+  const result = await inContext(() => transitionReviewersTerminal(terminalArgs(terminalStatus)));
   expect(result).toMatchObject({ transitioned: 1 });
   const winner = transport.get(SET, ID);
   pause.release();
@@ -336,7 +347,7 @@ test.each(['withdrew', 'released'])('%s wins while a full receipt is paused; ans
 
 test.each(['withdrew', 'released'])('full receipt wins after %s authorizes its row; terminal mutation and honorarium deletion cannot land', async (terminalStatus) => {
   const pause = transport.pauseNext((request) => request.method === 'GET' && request.key === ID, { stage: 'after' });
-  const terminal = inContext(() => transitionReviewersTerminal({ requestId: REQUEST, suggestionIds: [ID], terminalStatus, actingUserSystemId: ACTOR }));
+  const terminal = inContext(() => transitionReviewersTerminal(terminalArgs(terminalStatus)));
   await pause.reached;
   await inContext(() => submitManualReviewEntry({ suggestionId: ID, answers: ANSWERS, setVersion: VERSION }));
   const winner = transport.get(SET, ID);

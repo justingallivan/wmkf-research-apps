@@ -7,8 +7,10 @@ jest.mock('../../lib/services/reviewer-request-authorization', () => ({
   authorizeReviewerRequestMutation: jest.fn(async () => ({})),
 }));
 const transitionReviewersTerminal = jest.fn();
+const renderAcceptedReleasePreviews = jest.fn();
 jest.mock('../../lib/services/review-manager/terminal-transition-service', () => ({
   transitionReviewersTerminal: (...args) => transitionReviewersTerminal(...args),
+  renderAcceptedReleasePreviews: (...args) => renderAcceptedReleasePreviews(...args),
 }));
 const { authorizeReviewerRequestMutation } = require('../../lib/services/reviewer-request-authorization');
 const { ServiceHttpError } = require('../../lib/services/service-http-error');
@@ -59,12 +61,38 @@ test('whole-request state conflict returns 409 with per-row reason', async () =>
   transitionReviewersTerminal.mockResolvedValue(result);
   const req = createMockReq({
     method: 'POST',
-    body: { requestId: REQUEST, suggestionIds: [SUGGESTION], terminalStatus: 'released' },
+    body: {
+      requestId: REQUEST,
+      suggestionIds: [SUGGESTION],
+      terminalStatus: 'released',
+      releaseReason: 'sufficient_reviews_received',
+      sendEmail: false,
+      overrides: { [SUGGESTION]: { expectedNotes: '' } },
+    },
   });
   const res = createMockRes();
   await handler(req, res);
   expect(res.status).toHaveBeenCalledWith(409);
   expect(res.json).toHaveBeenCalledWith(result);
+});
+
+test('release preview is authorized and delegates without mutation', async () => {
+  const result = { ok: true, drafts: [{ suggestionId: SUGGESTION, status: 'ok' }] };
+  renderAcceptedReleasePreviews.mockResolvedValue(result);
+  const req = createMockReq({
+    method: 'POST',
+    body: {
+      requestId: REQUEST,
+      suggestionIds: [SUGGESTION],
+      terminalStatus: 'released',
+      preview: true,
+    },
+  });
+  const res = createMockRes();
+  await handler(req, res);
+  expect(res.status).toHaveBeenCalledWith(200);
+  expect(res.json).toHaveBeenCalledWith(result);
+  expect(transitionReviewersTerminal).not.toHaveBeenCalled();
 });
 
 test('invalid terminal status fails before service work', async () => {

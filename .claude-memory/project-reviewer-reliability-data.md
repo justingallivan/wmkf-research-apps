@@ -5,7 +5,7 @@ status: active
 metadata:
   node_type: memory
   type: project
-  last_verified: 2026-08-15 via current source, focused tests, docs/atlas/dataverse-wmkf-appreviewersuggestion.md, and the active terminal-status/dispatch-evidence plan
+  last_verified: 2026-09-16 via current source, focused tests, live honorarium-status probe, docs/atlas/dataverse-wmkf-appreviewersuggestion.md, and the active terminal-status/dispatch-evidence plan
   originSessionId: a7559eb5-34f5-41fd-b0cb-f1a84da8d8d0
 ---
 
@@ -29,7 +29,10 @@ whether reviewers are on time and reliable — not just participation counts.
   `withdrew` means the reviewer ended an accepted engagement and is negative reliability
   evidence; `released` means WMKF ended it and is reliability-neutral. Neither stamps a
   received/completed timestamp. The dedicated ETag path revokes the token; staff-recorded
-  withdrawal also corrects response state and removes the exact linked honorarium.
+  withdrawal also corrects response state and removes the exact linked honorarium. The
+  source-built sufficient-reviews release stamps `wmkf_withdrawnsufficientat`, retains and
+  marks a safely open honorarium `Withdrawn`, and derives “Review not received” from the
+  guarded absence of receipt evidence.
 - `[VERIFIED via lib/services/reviewer-due-extension.js,
   lib/external/reviewer-due-date.js, and the Atlas]` A nullable suggestion-level
   `wmkf_reviewduedateoverride` is live for accepted reviewers. Its dedicated writer and

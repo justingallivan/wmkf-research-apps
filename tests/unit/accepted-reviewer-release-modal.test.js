@@ -1,0 +1,115 @@
+/** @jest-environment jsdom */
+
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import AcceptedReviewerReleaseModal from '../../shared/components/reviewers/AcceptedReviewerReleaseModal';
+
+const REQUEST_ID = '11111111-1111-4111-8111-111111111111';
+const SUGGESTION_ID = '22222222-2222-4222-8222-222222222222';
+
+const reviewer = {
+  suggestionId: SUGGESTION_ID,
+  name: 'Dr. Reviewer',
+  honorariumRequestId: '33333333-3333-4333-8333-333333333333',
+};
+
+function response(body, { ok = true, status = 200 } = {}) {
+  return { ok, status, json: jest.fn(async () => body) };
+}
+
+beforeEach(() => {
+  window.confirm = jest.fn(() => true);
+  global.fetch = jest.fn();
+});
+
+afterEach(() => jest.restoreAllMocks());
+
+test('records the fixed reason, editable note, reviewed email, and retained-honorarium consequence', async () => {
+  global.fetch.mockResolvedValue(response({
+    ok: true,
+    reason: 'sufficient_reviews_received',
+    drafts: [{
+      suggestionId: SUGGESTION_ID,
+      status: 'ok',
+      name: 'Dr. Reviewer',
+      to: 'reviewer@example.org',
+      from: 'pd@example.org',
+      senderId: 'pd-1',
+      subject: 'Thank you',
+      bodyText: 'Thank you for agreeing to help.',
+      expectedNotes: 'Existing note',
+      existingNotes: 'Existing note',
+    }],
+  }));
+  const onRelease = jest.fn(async () => ({
+    ok: true,
+    data: { transitioned: 1, results: [{ status: 'released_emailed' }] },
+  }));
+
+  render(
+    <AcceptedReviewerReleaseModal
+      reviewer={reviewer}
+      requestId={REQUEST_ID}
+      onClose={jest.fn()}
+      onRelease={onRelease}
+    />,
+  );
+
+  expect(await screen.findByText('Reason: Sufficient reviews received')).toBeInTheDocument();
+  expect(screen.getByText(/Outcome: Review not received/)).toBeInTheDocument();
+  expect(screen.getAllByText(/retained and marked Withdrawn/).length).toBeGreaterThan(0);
+  const note = await screen.findByDisplayValue('Existing note');
+  expect(note).toHaveValue('Existing note');
+  fireEvent.change(note, { target: { value: 'Overdue after multiple reminders.' } });
+  fireEvent.change(screen.getByDisplayValue('Thank you'), { target: { value: 'Thank you for your time' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Release reviewer' }));
+
+  await waitFor(() => expect(onRelease).toHaveBeenCalledWith({
+    releaseReason: 'sufficient_reviews_received',
+    internalNotes: { [SUGGESTION_ID]: 'Overdue after multiple reminders.' },
+    sendEmail: true,
+    overrides: {
+      [SUGGESTION_ID]: {
+        expectedNotes: 'Existing note',
+        subject: 'Thank you for your time',
+        bodyText: 'Thank you for agreeing to help.',
+        to: 'reviewer@example.org',
+        from: 'pd@example.org',
+        senderId: 'pd-1',
+      },
+    },
+  }));
+  expect(await screen.findByText('Sent for delivery.')).toBeInTheDocument();
+});
+
+test('still permits release when email is unavailable and submits an expected-notes guard', async () => {
+  global.fetch.mockResolvedValue(response({
+    ok: true,
+    drafts: [{
+      suggestionId: SUGGESTION_ID,
+      status: 'no_email',
+      name: 'Dr. Reviewer',
+      expectedNotes: '',
+      existingNotes: '',
+    }],
+  }));
+  const onRelease = jest.fn(async () => ({
+    ok: true,
+    data: { transitioned: 1, results: [{ status: 'released_no_email_by_choice' }] },
+  }));
+  render(
+    <AcceptedReviewerReleaseModal
+      reviewer={reviewer}
+      requestId={REQUEST_ID}
+      onClose={jest.fn()}
+      onRelease={onRelease}
+    />,
+  );
+  const checkbox = await screen.findByRole('checkbox', { name: 'Send a thank-you email' });
+  expect(checkbox).not.toBeChecked();
+  expect(checkbox).toBeDisabled();
+  fireEvent.click(screen.getByRole('button', { name: 'Release reviewer' }));
+  await waitFor(() => expect(onRelease).toHaveBeenCalledWith(expect.objectContaining({
+    sendEmail: false,
+    overrides: { [SUGGESTION_ID]: { expectedNotes: '' } },
+  })));
+});

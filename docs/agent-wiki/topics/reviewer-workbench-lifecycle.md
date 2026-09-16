@@ -928,7 +928,10 @@ Contact enrichment partial-timeout behavior is unchanged.
 `/api/review-manager/terminal-transition`. The service freshly reads each row,
 accepts only accepted/materials-sent/under-review rows with no
 declined/received/completed stamp, and uses that ETag so a concurrent submission
-wins. `released` writes only the terminal status plus token revocation.
+wins. The sufficient-reviews `released` command writes the terminal status,
+token revocation, dated `wmkf_withdrawnsufficientat`, and an optional guarded
+internal note; it retains and marks a safely open linked honorarium `Withdrawn`
+in the same changeset, then optionally sends reviewed thank-you copy.
 PD-recorded `withdrew` additionally performs the same lifecycle/financial
 correction as reviewer self-withdrawal: one Dataverse changeset writes
 `selected=false`, `accepted=false`, `declined=true`, declined response metadata,
