@@ -13,6 +13,11 @@ related:
   - scripts/extend-requestdocument-artifacttype-pre-rp-brief.mjs
   - shared/templates/pre-research-presentation-brief/brief-v1.docx
   - lib/services/pre-rp-brief/docx-renderer.js
+  - lib/services/pre-rp-brief/input-service.js
+  - lib/services/pre-rp-brief/artifact-service.js
+  - lib/services/pre-rp-brief/share-lock-service.js
+  - pages/api/workbench/pre-rp-brief.js
+  - pages/api/workbench/pre-rp-brief/lock-for-share.js
   - lib/dataverse/schema/wave19-pre-site-draft/01_wmkf_requestdocument_pre_site_draft.json
   - lib/dataverse/schema/wave20-guarded-reopen/wmkf_requestdocument_guarded_reopen.json
   - lib/dataverse/schema/wave22-final-writeup-transition/wmkf_requestdocument_final_writeup_transition.json
@@ -433,7 +438,7 @@ label explicitly non-wrapping under another generation identity. Signed-in
 current-status, compact actions/download, and Word Online v3 proof remain open;
 this was never a registry consistency failure.
 
-## Pre-Research Presentation Brief contract (planned, slices 1-2)
+## Pre-Research Presentation Brief contract (planned, slices 1-3)
 
 `[PLANNED — schema not yet applied to Production]`
 `docs/plans/PRE_RESEARCH_PRESENTATION_BRIEF_PLAN_2026-09-16.md` §3, §5
@@ -472,8 +477,23 @@ their own self-describing envelope
 than adding a third Dataverse field — safe because every current raw-field
 reader of that snapshot column asserts/filters `PRE_SITE_VISIT` before
 parsing (plan §7 finding, `lib/services/pre-site-visit/artifact-service.js`).
-No canonical/pending pointer-resolution, generation, or distribution-source
-code exists yet; that is slices 3-4 of the same plan.
+Canonical/pending pointer-resolution and generation code is built on
+`claude/pre-rp-brief` (not deployed; the schema above is not yet live):
+`lib/services/pre-rp-brief/input-service.js` (request/roster -> envelope,
+fails closed with "Add the abstract on the Reviews tab first." when
+`wmkf_abstract` is empty), `lib/services/pre-rp-brief/artifact-service.js`
+(`getPreRpBriefStatus`/`generatePreRpBrief`, mirroring
+`lib/services/pre-site-visit/artifact-service.js`'s claim/render/upload/
+activate lineage but with no prompt/AI phase — rendering is synchronous and
+deterministic), and `lib/services/pre-rp-brief/share-lock-service.js`
+(`lockPreRpBriefForShare`, mirroring
+`lib/services/pre-site-visit/site-visit-transition-service.js`'s one-time
+Draft-to-Review lock; no review gate — that is slice 4's prepare-time gate).
+Routes `pages/api/workbench/pre-rp-brief.js` (GET status, POST generate) and
+`pages/api/workbench/pre-rp-brief/lock-for-share.js` (POST) are registered
+in `docs/API_ROUTE_SECURITY_MATRIX.md` as `[PLANNED — not yet deployed]`.
+Distribution-source swap, the prepare-time review/drift gate, and migration
+052 remain slice 4.
 
 The DOCX template — `shared/templates/pre-research-presentation-brief/brief-v1.docx`
 (tracked, six single-occurrence placeholders: `[[DV:InstitutionName]]`,
