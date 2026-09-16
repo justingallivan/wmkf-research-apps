@@ -99,7 +99,11 @@ design tokens.
   succeeded and displayed the former detailed Dynamics acceptance receipt. That proves the
   ordinary `createAndSendEmail` transport path; it also supplied the evidence for suppressing
   sender, recipient, and activity-id details from confirmed-success UI.
-- **[NOT YET VERIFIED]** Smoke one ledger-backed send and confirm the final concise
-  **Sent for delivery.** rendering in a signed-in Production interaction.
-- **[NOT YET VERIFIED]** Inbox delivery remains an external mail-system fact and is
-  deliberately not claimed by any app success message.
+- **[VERIFIED via owner-driven Production smoke 2026-09-16]** A ledger-backed Meeting
+  Tracker agenda send (smoke session dated 2026-11-16, To = the owner's own address only,
+  one ZZTEST proposal) rendered a green panel whose only text was **Sent for delivery.**,
+  with no message line and no sender, recipient, or activity-id detail. Production was on
+  the build created for `8c02b946`, after the concise-feedback commit `d6cfcfeb`.
+- **[OWNER-REPORTED 2026-09-16]** The owner received that agenda email in their inbox.
+  Inbox delivery remains an external mail-system fact and is deliberately not claimed by
+  any app success message; this report is evidence, not an app guarantee.
