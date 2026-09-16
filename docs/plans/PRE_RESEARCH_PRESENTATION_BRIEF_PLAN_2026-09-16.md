@@ -29,7 +29,8 @@ Every state claim below is labelled. `[VERIFIED]` means read in source this sess
 | B7 | Briefing page | The brief **replaces** the Pre-Site writeup in the staff-brief slot. |
 | B8 | Share gate | Share needs the brief only; a Pre-Site Word draft is no longer a prerequisite. The gate is enforced server-side (§3.4). |
 | B9 | Editability | Staff edit the brief in Word as needed, including Issues. → the brief is a governed SharePoint document with a registry row (§3). |
-| B10 | Zero reviews | Share is blocked until at least one review is received. |
+| B10 | Zero reviews | Share is blocked until at least one review is received (enforced at prepare, §3.4b). |
+| B13 | Content validation (2026-09-16, after Codex round 3) | **Trust staff edits.** The app never parses the brief for required headings or prose. The gate proves the generated document had at least one received review and reports input drift; staff own what they share, as with the Pre-Site writeup today. |
 
 ### B11 — Share and the Site Visit transition (owner 2026-09-16; revised after Codex round 1)
 
@@ -121,10 +122,16 @@ The brief therefore gets its own request pointer, `akoya_request.wmkf_CurrentPre
 lookup `wmkf_CurrentInitialAssessment`). Activation reuses the Pre-Site pattern
 (`[VERIFIED via lib/services/pre-site-visit/artifact-service.js:945-1009]`): supersede every
 other active row, ready the target, and move the pointer, each under its own ETag, in one
-changeset. Every reader — status, distribution source, history freshness, cycle list —
-resolves the brief **through the pointer** and fails closed when the pointer is absent or
-does not resolve to a same-request, Ready, Draft/Review, non-snapshot row. No reader picks
-"newest".
+changeset. **Canonical-document** readers — distribution source, history freshness, the
+editable-current card, the cycle list's current row — resolve the brief **through the pointer**
+and fail closed when it is absent or does not resolve to a same-request, Ready, Draft/Review,
+non-snapshot row. **Operation-attempt** readers are separate (Codex round 3, finding 3):
+`[VERIFIED via lib/services/pre-site-visit/artifact-service.js:553-640]` the Pre-Site status
+service returns the newest non-Ready, non-superseded row as `pendingArtifact` so polling and
+retry can observe a Generating or Failed first attempt before any pointer exists, and
+`[VERIFIED via cycle-list-service.js:172-190]` the cycle list has the same fallback for
+generating/failed rows. The brief status service and cycle list keep exactly that split:
+pointer for current, newest non-Ready for pending. Distribution never reads pending rows.
 
 Plumbing total for this pass, both owner-run against Production: one picklist value and one
 lookup field.
@@ -134,49 +141,68 @@ lookup field.
 Filename `Pre-RP-Brief_{Request#}_{generationKey8}.docx` in the request's active SharePoint
 bucket via the existing upload path.
 
-**§3.4 Share lock and review gate (revised after Codex round 1, finding 1).**
-`[VERIFIED via pages/api/workbench/pre-site-visit/distribution/prepare.js:31-47]` the prepare
-route calls `preparePreSiteDistribution` directly after `requireAppAccess`, and
-`[VERIFIED via distribution-service.js:1217-1245]` preparation never reads the review roster,
-so a tab-side "at least one review" check would be bypassable. New service + route
-`POST /api/workbench/pre-rp-brief/lock-for-share` (`lib/services/pre-rp-brief/share-lock-service.js`):
+**§3.4 Share lock (revised after Codex round 3).** Lock is a **one-time** lifecycle
+transition, shaped exactly like the Pre-Site handoff
+(`[VERIFIED via lib/services/pre-site-visit/site-visit-transition-service.js:249-278]` download
+current bytes, governed hash, single ETag-fenced PATCH Draft → Review recording
+`wmkf_milestoneversionid` / `wmkf_milestonecontenthash` / `wmkf_milestonecreatedat`).
+`[VERIFIED via lib/dataverse/schema/wave16-request-document-registry/wmkf_requestdocument.json:215-235]`
+those milestone fields are defined immutable, so lock never rewrites them; a second call on an
+already-Review row is idempotent. New service + route
+`POST /api/workbench/pre-rp-brief/lock-for-share` resolves the brief through the pointer
+(fail closed otherwise). The lock carries **no** review gate: `[VERIFIED via
+pages/api/workbench/pre-site-visit/distribution/prepare.js:31-47]` prepare is directly
+callable after auth, so the gate must live where the shared artifact is created (§3.4b).
 
-1. resolves the current brief through the pointer (fail closed otherwise);
-2. reads the brief row's **generation input snapshot** (§3.4a) and refuses 409
-   `brief_reviews_required` when that snapshot recorded zero received reviews — the gate proves
-   the *document* contains a Referee Comments section, not merely that reviews exist now;
-   then reads the live roster via `getWriteupRoster({ requestId })`
-   (`[VERIFIED via lib/services/review-manager/reviewers-service.js:580-623]`) and compares
-   received-review ids and the abstract hash to the snapshot: a difference returns 409
-   `brief_inputs_stale` with the delta, unless the body carries
-   `acknowledgeStaleInputs: true`, which the tab sends only after showing staff the delta
-   (regenerating would discard their Word edits, B9/B12, so the choice is theirs, but it is
-   explicit and server-recorded on the lock milestone);
-3. reads stable SharePoint drive/item/version before and after the byte read, as
-   `site-visit-transition-service.js` does for Pre-Site, and hashes the bytes;
-4. ETag-fences the brief row: lifecycle Draft → Review on first lock, and on **every** lock
-   (including an already-Review row) records the milestone `wmkf_milestoneversionid`,
-   `wmkf_milestonecontenthash`, `wmkf_milestonecreatedat`, plus the stale-input acknowledgement.
-   Re-locking is how staff share an edited brief: Share's hook always locks first, so the
-   milestone always names the version staff just looked at.
+**§3.4a Input snapshot and fingerprint.** Generation stores a frozen input snapshot on the
+brief row in the registry's write-once `wmkf_presiteinputsnapshotjson`
+(`[VERIFIED via lib/services/pre-site-visit/artifact-service.js:1267]` that is where the
+Pre-Site generator persists `inputSnapshotJson`; the field name is Pre-Site-specific but the
+column is a generic JSON memo on the row — reusing it on type-100000009 rows avoids a third
+Dataverse write. `[ASSUMED acceptable; owner may prefer a neutral field]`). The snapshot
+carries every composer input (`[VERIFIED via reviewers-service.js:597-622` and
+`review-writeup-paragraphs.js:222-240,322-342]`): request header fields, abstract, and per
+received review the suggestion id, received state, name, academic rank, overall rating,
+`reviewerAffiliation`, `mainInstitution`, and `affiliation`. A canonical fingerprint
+(sorted, sha256) of that snapshot is derived at generation and recomputed from live data at
+prepare.
 
-**§3.4a Input snapshot.** Generation stores, on the brief row, the same kind of frozen input
-snapshot the Pre-Site generator stores (`[VERIFIED via lib/services/pre-site-visit/artifact-service.js:1136-1140]`
-`buildPreSiteVisitInputSnapshot` → `inputSnapshotJson` on the row): request header fields,
-abstract hash, and the received-review roster (suggestion ids, names, ranks, ratings) that the
-Referee Comments sentences were composed from. It is the evidence the lock gate reads.
+**§3.4b Review gate, drift, and byte binding at prepare (replaces the round-2 lock design).**
+`[VERIFIED via lib/db/migrations/034_pre_site_distribution_attempts.sql:9-13,185,199]` the
+Postgres ledger already records `source_document_id`, `source_version_id`, and
+`source_content_hash` per attempt; `[VERIFIED via distribution-service.js:697-730]` prepare
+captures the exact current SharePoint version and hash; and `[VERIFIED via
+distribution-service.js:1587-1607]` send re-reads metadata under the lease and refuses
+`distribution_stale_source` unless `versionId` still equals the attempt's
+`source_version_id`. So prepare → send is already bound to exact bytes; the briefing page
+serves those bytes by the ledger's drive/item ids and re-hashes against `docx_byte_hash`
+(`[VERIFIED via briefing-page-service.js:236-250,334-352]`). No re-lock is needed: sharing an
+edited brief is simply a new prepare, whose preview is what staff confirm.
 
-**§3.4b Milestone binding at prepare and send (Codex round 2, finding 2).**
-`[VERIFIED via distribution-service.js:622-655, 697-730]` today `resolveSource` requires only
-Ready/Review and `captureCurrentSource` downloads whatever SharePoint version is current, never
-comparing it to the lifecycle milestone; the Pre-Site flow has the same gap. For the brief,
-`resolveSource` additionally requires the current SharePoint `versionId` to equal
-`wmkf_milestoneversionid` and the captured byte hash to equal `wmkf_milestonecontenthash`;
-otherwise 409 `brief_edited_after_lock` ("Share again to lock the edited version") before any
-ledger or snapshot write. `assertAttemptSourceCurrent` (send path) re-checks the same pair
-under the lease. So the pinned Board snapshot is always the bytes the lock recorded. Tests:
-lock V1 → edit to V2 → prepare fails closed; lock V1 → prepare → edit to V2 → send fails
-closed; re-lock V2 → prepare succeeds with V2.
+Prepare adds, for a brief source:
+
+1. `resolveSource` requires the pointer target to be type 100000009, Ready, lifecycle Review,
+   DOCX, with drive/item/folder identity (the same shape it already requires for Pre-Site,
+   `[VERIFIED via distribution-service.js:641-654]`).
+2. **Review gate (B10):** the row's snapshot must record at least one received review; else
+   409 `brief_reviews_required` before any ledger write.
+3. **Drift check:** recompute the live fingerprint. If it differs from the generated one,
+   respond 409 `brief_inputs_stale` with `{ generatedFingerprint, liveFingerprint, delta }`
+   and write nothing. A retry must carry `acknowledgeStaleInputs: <liveFingerprint>`; prepare
+   recomputes the live fingerprint again and refuses 409 `brief_inputs_stale` with the new
+   value if it no longer matches — acknowledgement is bound to the exact delta staff saw, never
+   a bare `true`.
+4. **Durable record:** new Postgres migration `052_pre_site_distribution_brief_inputs.sql`
+   adds to `pre_site_distribution_attempts`: `input_fingerprint_generated TEXT`,
+   `input_fingerprint_live TEXT`, `stale_inputs_delta JSONB`,
+   `stale_inputs_acknowledged_at TIMESTAMPTZ`, `stale_inputs_acknowledged_by UUID`.
+   Written on the attempt at prepare; surfaced in history and on the briefing-page staff
+   surface as "shared with N newer review(s) acknowledged by …".
+
+Tests: zero-review snapshot → 409, no row; one review → prepare succeeds; drift D1 → 409 with
+fingerprint; retry echoing D1 while inputs moved to D2 → 409 with D2; retry echoing D2 →
+succeeds and the ledger row carries actor, time, both fingerprints, delta; edit after prepare →
+send refuses (existing test extended to the brief source).
 
 **Writer registration.** `scripts/check-request-document-writers.js` lists every
 `createDocument(` site; the new service is added to `WRITERS` (`[VERIFIED]` gate shape at
@@ -185,16 +211,18 @@ closed; re-lock V2 → prepare succeeds with V2.
 **Distribution snapshot.** `[VERIFIED]` `ensureSnapshot` writes the pinned copy as a
 `wmkf_requestdocument` row with `wmkf_artifacttype = PRE_SITE_VISIT`, producer
 `request-workbench-distribution-docx`, lifecycle `BOARD_READY`
-(`distribution-service.js:930-1108`), and the briefing page serves it purely by the ledger's
-`docx_snapshot_document_id` through `getLatestSentAttempt`
-(`briefing-page-service.js:52,99,245,336`). Change: the snapshot row carries artifact type
+(`distribution-service.js:930-1108`), and the briefing page serves it purely from the latest
+sent attempt's ledger fields `docx_drive_id` / `docx_item_id`, re-hashed against
+`docx_byte_hash` (`briefing-page-service.js:236-250,334-352`; corrected after Codex round 3 —
+it does not read `docx_snapshot_document_id`). Change: the snapshot row carries artifact type
 100000009 and the source resolution (`resolveSource`, `:622-657`) reads the current brief
 instead of the Pre-Site pointer. `isPreSiteDistributionSnapshot` (producer-based) keeps
 excluding snapshots from the materials list without change.
 
 **§3.5 Composite stage projection (revised after Codex round 1, finding 4).**
 `[VERIFIED via shared/utils/deliberation-stage.js:99-119]` the helper derives `final` only when
-the supplied artifact's lifecycle is FINAL, `shared` from Review, `draft` otherwise; and
+the supplied artifact's lifecycle is FINAL, `shared` from Review, `draft` from null/Draft, and
+any other lifecycle to `beyond` (fail closed); and
 `[VERIFIED via lib/services/final-writeup/transition-service.js:653-669]` Final activation sets
 the **Pre-Site** source row to FINAL while the brief would stay in Review. A brief-only input
 could therefore never show Final. The helper takes a composite input:
@@ -203,7 +231,7 @@ could therefore never show Final. The helper takes a composite input:
 |---|---|
 | final | Pre-Site/Final lineage: current Pre-Site row lifecycle FINAL, or a current Final row |
 | visit | Site Visit schedule in the past (unchanged `deriveVisit`) with the brief in Review |
-| shared | brief lifecycle Review; `everSent` from the ledger keyed to the brief's row id |
+| shared | brief lifecycle Review; `everSent` from the ledger keyed to the brief's row id (`[VERIFIED via distribution-store.js:68-99]` sent-state queries are per `source_document_id`). Codex round 3 finding 4 (a re-locked version showing as sent) was predicated on the re-lock design, which §3.4 removed; with one lock per row, "sent" means a version of this brief reached the Board, and the existing history freshness marker (`distribution-service.js:1925-1945`) already flags "working source advanced since" for edits after a send. Keep row keying; add the V1-sent → edit → history-shows-stale regression. |
 | draft | brief absent or Draft; substate from the brief's operation status |
 | beyond | any other lifecycle on the brief (fail closed, unchanged) |
 
@@ -217,8 +245,8 @@ Pre-Site no brief; Final started while the brief stays Review; both rails (tab a
 |---|---|
 | `shared/config/requestDocument.js` | new artifact type + label; brief contract constants (content type, template id/version, producer). |
 | `lib/services/pre-rp-brief/` (new) | `input-service.js` (request header + abstract + roster → snapshot), `docx-renderer.js` (template fill), `artifact-service.js` (claim/generate/upload/commit, mirroring the Pre-Site lineage but without prompt/AI steps), `status` projection. |
-| `pages/api/workbench/pre-rp-brief.js` + `pages/api/workbench/pre-rp-brief/lock-for-share.js` (new) | GET status, POST generate/regenerate; POST lock-for-share (§3.4). Guards mirror `pages/api/workbench/pre-site-visit.js` and `start-site-visit.js`; both added to `docs/API_ROUTE_SECURITY_MATRIX.md`; covered by the `/api/workbench` lifecycle namespace. |
-| `lib/services/pre-site-visit/distribution-service.js` | `resolveSource`, `assertAttemptSourceCurrent`, history freshness, and the snapshot spec all read the current brief (§7); error copy says "brief". |
+| `pages/api/workbench/pre-rp-brief.js` + `pages/api/workbench/pre-rp-brief/lock-for-share.js` (new) | GET status, POST generate/regenerate; POST lock-for-share (§3.4, lifecycle only). Guards mirror `pages/api/workbench/pre-site-visit.js` and `start-site-visit.js`; both added to `docs/API_ROUTE_SECURITY_MATRIX.md`; covered by the `/api/workbench` lifecycle namespace. |
+| `lib/services/pre-site-visit/distribution-service.js` + `distribution-store.js` + migration `052` | `resolveSource`, `assertAttemptSourceCurrent`, history freshness, and the snapshot spec all read the current brief (§7); prepare enforces the review gate, drift fingerprint, and bound acknowledgement (§3.4b) and records them on the attempt row; error copy says "brief". |
 | `shared/components/workbench/StaffDeliberationsTab.js` | Brief card: Generate / Regenerate / Download / Open in SharePoint; Share's pre-prepare hook calls `lock-for-share` (§3.4) and never `start-site-visit`. Pre-Site card gains an explicit **Start Site Visit** action (B11). Final Writeup card copy names the Site Visit prerequisite. |
 | `shared/utils/deliberation-stage.js` + `lib/services/pre-site-visit/cycle-list-service.js` | Composite stage projection (§3.5) for both callers (`[VERIFIED via rg deriveDeliberationStage(]`: the tab at `StaffDeliberationsTab.js:405` and `cycle-list-service.js:92`). The cycle list queries brief rows as well as Pre-Site rows, includes brief-only requests, keeps legacy no-brief requests, and keys `everSent` to the brief source ids. |
 | `shared/components/workbench/PreSiteDistributionPanel.js` | `sourceArtifact` = brief; copy. |
@@ -233,10 +261,11 @@ Pre-Site no brief; Final started while the brief stays Review; both rails (tab a
 2. **Renderer + template.** Tracked `brief-v1.docx`, renderer, unit tests with the discriminating
    fixture (one reviewer / three reviewers / a reviewer without rank / abstract with line breaks).
 3. **Artifact service + routes.** Generate, regenerate-supersede with pointer activation, status
-   projection, download URL; share-lock service + route (§3.4) with direct-route bypass tests.
+   projection, download URL; lock-for-share service + route (§3.4, lifecycle only).
    Tests mirror `pre-site-visit-artifact-service.test.js` and `site-visit-transition-service` tests
    minus prompt/AI paths.
-4. **Distribution source swap.** `resolveSource` + snapshot type; `pre-site-distribution-service.test.js`
+4. **Distribution source swap + prepare gate.** `resolveSource` + snapshot type; migration 052;
+   review gate, drift fingerprint, bound acknowledgement (§3.4b) with the listed tests; `pre-site-distribution-service.test.js`
    and `deliberation-briefing-page-service.test.js` updated; briefing page proves it serves the brief.
 5. **Staff Deliberations UI + stage.** Brief card, Share → lock-for-share, explicit Start Site
    Visit action, composite stage projection in both callers, cycle-list brief sourcing;
@@ -257,7 +286,8 @@ ZZTEST request after the option value exists in Production.
 - Reviewers without an academic rank render "Name of Institution" (existing composer rule).
 - The Pre-Site writeup, Site Visit transition route, and Final Writeup lineage are untouched;
   only the trigger for the Site Visit transition moves from Share's hook to an explicit action (B11).
-- Two owner-run Production schema writes (picklist value, pointer lookup) gate every smoke.
+- Two owner-run Production Dataverse schema writes (picklist value, pointer lookup) gate every
+  smoke; the Postgres migration 052 applies through `node scripts/apply-migrations.js` as usual.
 
 ## 7. Contract-reconcile review (Mode A, 2026-09-16, S515)
 
@@ -270,7 +300,7 @@ page, Final Writeup lineage, reopen service, gates.
 
 1. **CONFIRMED — briefing page needs no route change.** Evidence:
    `briefing-page-service.js:236-250` builds the writeup member from the ledger attempt's
-   `docx_drive_id/docx_item_id`; `:334-352` downloads by those ids and re-hashes against
+   `docx_drive_id/docx_item_id` (not `docx_snapshot_document_id`); `:334-352` downloads by those ids and re-hashes against
    `docx_byte_hash`. No artifact-type check on the read side. Residual risk: none.
 2. **CONFIRMED — material allowlists cannot leak the brief.** Evidence: `MATERIAL_TYPES.has(...)`
    allowlists at `distribution-service.js:500`, `briefing-page-service.js:203`,
@@ -366,3 +396,16 @@ Verdict NO-SHIP, four findings plus one unknown. Re-verified before folding in:
 | 3 | §7 still carried a "newest by createdon" resolver instruction contradicting the pointer invariant | **Accepted** → wording replaced with pointer-target validation and fixtures. |
 | 4 | `getWriteupRoster(requestId)` is the wrong argument shape | **Accepted** → `getWriteupRoster({ requestId })` at both references; positive lock test uses the real signature. |
 | — | Owner template inspection not reproducible from the repo | **Accepted** → labelled `[OWNER FILE, not tracked]`; the tracked template plus a no-header renderer test become the evidence in slice 2. |
+
+### Codex adversarial review — round 3 (2026-09-16, gpt-5.6-sol, base `b36b101a`)
+
+Verdict NO-SHIP, four findings and four wording qualifications. Owner decisions taken: B13
+(trust staff edits) and the lock/prepare simplification.
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 | Snapshot cannot prove the edited DOCX still contains Referee Comments; fingerprint omitted name/rank/rating/institutions | **Content check declined by owner (B13)**; **fingerprint completeness accepted** → §3.4a covers every composer input. |
+| 2 | Bare `acknowledgeStaleInputs: true` is replayable; milestone fields are immutable so per-Share re-lock had nowhere durable to record it | **Accepted, and the design simplified** → lock is one-time lifecycle only (§3.4); gate, drift, and fingerprint-bound acknowledgement move to prepare and persist on the Postgres attempt row via migration 052 (§3.4b). |
+| 3 | Pointer-only reads hide Generating/Failed first attempts | **Accepted** → canonical via pointer, pending via newest non-Ready row, as the Pre-Site status service does (§3). |
+| 4 | Row-keyed `everSent` would show a re-locked version as sent | **Moot after #2** (no re-lock); row keying kept with the existing history freshness marker; regression added (§3.5). |
+| — | Wording: snapshot persisted at `:1267`; briefing page reads drive/item/hash; `resolveSource` checks more than Ready/Review; unknown lifecycle → `beyond` | **Accepted** → corrected in place. |
