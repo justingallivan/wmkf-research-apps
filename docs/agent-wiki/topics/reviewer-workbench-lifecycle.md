@@ -1,7 +1,7 @@
 ---
 agent_wiki: topic
 status: active
-last_verified: 2026-09-15
+last_verified: 2026-09-16
 stale_after_days: 90
 owner: reviewers
 source_files:
@@ -15,6 +15,7 @@ source_files:
   - shared/components/reviewers/ReviewersTab.js
   - shared/components/reviewers/ReviewerManagePanel.js
   - shared/components/reviewers/ReviewerCloseoutModal.js
+  - shared/components/reviewers/AcceptedReviewerReleaseModal.js
   - pages/api/review-manager/reviewers.js
   - lib/services/review-manager/reviewers-service.js
   - pages/api/workbench/decline-referrals.js
@@ -82,6 +83,8 @@ source_files:
   - lib/services/reviewer-candidate-export.js
   - lib/services/reviewer-campaign-timeline.js
   - lib/services/review-manager/terminal-transition-service.js
+  - lib/services/reviewer-engagement/terminal-transition.js
+  - scripts/seed-email-defaults.mjs
   - lib/external/token-lifecycle.js
   - lib/external/reviewer-token-state.js
   - lib/external/reviewer-token-ttl.js
@@ -931,7 +934,22 @@ declined/received/completed stamp, and uses that ETag so a concurrent submission
 wins. The sufficient-reviews `released` command writes the terminal status,
 token revocation, dated `wmkf_withdrawnsufficientat`, and an optional guarded
 internal note; it retains and marks a safely open linked honorarium `Withdrawn`
-in the same changeset, then optionally sends reviewed thank-you copy.
+in the same changeset, then optionally sends reviewed thank-you copy. Its
+read-only preview runs the same honorarium-state classifier before showing the
+composer; the commit path independently re-reads the honorarium and remains
+authoritative. Paid, authorized, non-Pending, unreadable, or non-versioned
+honoraria therefore block before composition and again before the transition.
+This accepted-reviewer release expansion is source-built on 2026-09-16 and is
+not yet promoted; the older staff-withdrawal behavior remains production-live.
+
+**Promotion prerequisite:** before this runtime reaches an environment, an
+explicitly authorized settings write must seed
+`email.reviewer_release.subject` and `email.reviewer_release.body` through
+`scripts/seed-email-defaults.mjs --execute`, then verify both keys in that
+environment. The seed is initialization data, not a runtime fallback; without
+it, release remains fail-safe and available without email, but preview reports
+`defaults_unavailable` and records the missing-default operational alert. No
+live settings write was performed as part of the source build.
 PD-recorded `withdrew` additionally performs the same lifecycle/financial
 correction as reviewer self-withdrawal: one Dataverse changeset writes
 `selected=false`, `accepted=false`, `declined=true`, declined response metadata,

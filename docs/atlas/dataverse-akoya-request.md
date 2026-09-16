@@ -2,7 +2,7 @@
 
 <!-- drain-table:file-purpose=atlas-state-page -->
 
-**Last verified:** live shape 2026-05-07 via `scripts/audit-dataverse-state.js`; discriminator/era distributions 2026-05-15 via `scripts/probe-akoya-request-discriminators.js`; application routing 2026-07-27 via source and caller inspection; automatic review-synthesis lifecycle 2026-07-28 via the controlled Production smoke and exact cleanup; writeup document-authority/search interpretation reconciled 2026-07-28 against the governed artifact contract and Graph tenant probe; Initial Assessment canonical pointer provisioned and count-probed 2026-07-30; capped legacy reviewer-slot context read verified in feature-branch source/tests 2026-08-21 (deployment pending); reviewer-reminder flags and hold exposure reconciled via read-only production probe 2026-09-01; organization-wide Reviewer Follow-up cycle projection and request-bound lead-PD/superuser authorization verified in source/tests, independently reviewed, deployed, and authenticated-read proved on D26/J26 in Production 2026-09-02; governed `review-synthesis.generate` v4 sole-current and seven-key source parity verified by read-only Production dry-run 2026-09-15
+**Last verified:** live shape 2026-05-07 via `scripts/audit-dataverse-state.js`; discriminator/era distributions 2026-05-15 via `scripts/probe-akoya-request-discriminators.js`; application routing 2026-07-27 via source and caller inspection; automatic review-synthesis lifecycle 2026-07-28 via the controlled Production smoke and exact cleanup; writeup document-authority/search interpretation reconciled 2026-07-28 against the governed artifact contract and Graph tenant probe; Initial Assessment canonical pointer provisioned and count-probed 2026-07-30; capped legacy reviewer-slot context read verified in feature-branch source/tests 2026-08-21 (deployment pending); reviewer-reminder flags and hold exposure reconciled via read-only production probe 2026-09-01; organization-wide Reviewer Follow-up cycle projection and request-bound lead-PD/superuser authorization verified in source/tests, independently reviewed, deployed, and authenticated-read proved on D26/J26 in Production 2026-09-02; governed `review-synthesis.generate` v4 sole-current and seven-key source parity verified by read-only Production dry-run 2026-09-15; reviewer-honorarium `Pending`/`Withdrawn` cancellation contract and `wmkf_datewithdrawalreceived` verified by read-only live probe plus source/tests 2026-09-16 (accepted-reviewer release promotion pending)
 **Live row count:** **~25,561** (FetchXML aggregate, 2026-05-15). ⚠️ OData `/$count` returns **5,000** — Dataverse caps `$count` at 5,000; the "5,000" figure is the cap, not the total. Use FetchXML aggregate / RetrieveTotalRecordCount for the true count.
 **Entity set:** `akoya_requests`
 
@@ -45,6 +45,9 @@ Money / dates:
 - `akoya_loireceived`, `akoya_loiacknowledged`, `akoya_loirequestedamount`
 - `akoya_begindate`, `akoya_enddate`
 - `akoya_submitdate`, `akoya_submitdatetime`
+- `wmkf_datewithdrawalreceived` (DateTime) — reused on retained Research
+  Reviewer honorarium requests when the Foundation cancels an open honorarium;
+  the accepted-reviewer release writer is source-built, promotion pending.
 
 People (lookups):
 - `akoya_applicantid` → `accounts`
@@ -208,6 +211,15 @@ Sample row had **364 total fields** (vendor + WMKF + standard Dataverse audit fi
   (one-time D26 backfill, restriction-bypassed). **[LIVE — field deployed +
   backfilled + read by the dashboard (§3, S261); see Key fields. The route
   remains the authoritative authorization gate.]**
+- `lib/dataverse/adapters/reviewer-suggestion.js`
+  `applyStaffReviewerRelease` and
+  `withdrawLinkedHonorariumForReleasedSuggestion` — source-built 2026-09-16,
+  promotion pending. These named reviewer-lifecycle operations can write the
+  exact linked Research Reviewer honorarium request in the same ETag-guarded
+  changeset as the suggestion: retain the `akoya_request`, change
+  `akoya_requeststatus` from `Pending` to `Withdrawn`, and stamp
+  `wmkf_datewithdrawalreceived`. Paid, authorized, unexpected, unreadable, or
+  non-versioned honoraria fail closed before the writer runs.
 
 > **Codex R7 corrections (2026-05-07):**
 > - `pages/api/grant-reporting/extract.js` historically wrote only the `wmkf_ai_run` audit log row (the line 526 comment *"wmkf_ai_run row is therefore the ONLY durable copy of"* extracted data reflects that prior state). Field Set B fields were DEPLOYED on `akoya_request` 2026-05-07 (22 fields, see `docs/INTAKE_PORTAL_SCHEMA_CHANGES.md`); wiring `grant-reporting/extract.js` to write the flat fields is a follow-up.
@@ -232,6 +244,15 @@ All user-driven writes use `MSCRMCallerID` (impersonation contract per `docs/DYN
 | `grant_cycles.short_code` | derives from `akoya_request.wmkf_meetingdate` via `cycle-code.js` | not stored on request |
 
 ## Polymorphism & era distribution (live-probed 2026-05-15)
+
+> **Status-semantics scope correction (2026-09-16):** the May 2026
+> grant-process classifications below—including “Withdrawn” as
+> applicant-initiated—describe the probed ordinary grant cohort. They are not
+> universal across this polymorphic entity. Research Reviewer honorarium rows
+> use `akoya_requeststatus=Withdrawn` for Foundation cancellation while the row
+> is retained; the accepted-reviewer writer is source-built and promotion is
+> pending. Reporting must segment by Internal Program before interpreting this
+> status.
 
 > **2026-07-28 document-authority correction for the field-only chronology
 > below:** SharePoint Word/PDF bodies are searchable through Microsoft Search;

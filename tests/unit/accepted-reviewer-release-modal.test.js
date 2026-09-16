@@ -1,5 +1,6 @@
 /** @jest-environment jsdom */
 
+import { StrictMode } from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import AcceptedReviewerReleaseModal from '../../shared/components/reviewers/AcceptedReviewerReleaseModal';
 
@@ -112,4 +113,105 @@ test('still permits release when email is unavailable and submits an expected-no
     sendEmail: false,
     overrides: { [SUGGESTION_ID]: { expectedNotes: '' } },
   })));
+});
+
+test('shows a friendly commit-time honorarium failure instead of a raw status code', async () => {
+  global.fetch.mockResolvedValue(response({
+    ok: true,
+    drafts: [{
+      suggestionId: SUGGESTION_ID,
+      status: 'ok',
+      name: 'Dr. Reviewer',
+      to: 'reviewer@example.org',
+      from: 'pd@example.org',
+      senderId: 'pd-1',
+      subject: 'Thank you',
+      bodyText: 'Thank you.',
+      expectedNotes: '',
+      existingNotes: '',
+    }],
+  }));
+  const onRelease = jest.fn(async () => ({
+    ok: false,
+    error: 'honorarium_authorized',
+    data: { transitioned: 0, results: [{ status: 'honorarium_authorized' }] },
+  }));
+
+  render(
+    <AcceptedReviewerReleaseModal
+      reviewer={reviewer}
+      requestId={REQUEST_ID}
+      onClose={jest.fn()}
+      onRelease={onRelease}
+    />,
+  );
+
+  await screen.findByDisplayValue('Thank you');
+  fireEvent.click(screen.getByRole('button', { name: 'Release reviewer' }));
+  expect(await screen.findByText(
+    'The honorarium is already authorized for payment and cannot be cancelled here.',
+  )).toBeInTheDocument();
+  expect(screen.queryByText('honorarium_authorized')).not.toBeInTheDocument();
+});
+
+test('blocks an unsafe honorarium during preview before showing the composer', async () => {
+  global.fetch.mockResolvedValue(response({
+    ok: true,
+    drafts: [{
+      suggestionId: SUGGESTION_ID,
+      status: 'honorarium_paid',
+      expectedNotes: '',
+      existingNotes: '',
+    }],
+  }));
+  const onRelease = jest.fn();
+
+  render(
+    <AcceptedReviewerReleaseModal
+      reviewer={reviewer}
+      requestId={REQUEST_ID}
+      onClose={jest.fn()}
+      onRelease={onRelease}
+    />,
+  );
+
+  expect(await screen.findByText(
+    'The honorarium has a paid amount and cannot be cancelled here.',
+  )).toBeInTheDocument();
+  expect(screen.queryByLabelText('Subject')).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Release reviewer' })).toBeDisabled();
+  expect(onRelease).not.toHaveBeenCalled();
+});
+
+test('re-arms mounted feedback state under React StrictMode', async () => {
+  global.fetch.mockResolvedValue(response({
+    ok: true,
+    drafts: [{
+      suggestionId: SUGGESTION_ID,
+      status: 'no_email',
+      name: 'Dr. Reviewer',
+      expectedNotes: '',
+      existingNotes: '',
+    }],
+  }));
+  const onRelease = jest.fn(async () => ({
+    ok: true,
+    data: { transitioned: 1, results: [{ status: 'released_no_email_by_choice' }] },
+  }));
+
+  render(
+    <StrictMode>
+      <AcceptedReviewerReleaseModal
+        reviewer={reviewer}
+        requestId={REQUEST_ID}
+        onClose={jest.fn()}
+        onRelease={onRelease}
+      />
+    </StrictMode>,
+  );
+
+  await screen.findByRole('checkbox', { name: 'Send a thank-you email' });
+  fireEvent.click(screen.getByRole('button', { name: 'Release reviewer' }));
+  expect(await screen.findByText('Reviewer released')).toBeInTheDocument();
+  expect(screen.queryByText('Releasing…')).not.toBeInTheDocument();
 });

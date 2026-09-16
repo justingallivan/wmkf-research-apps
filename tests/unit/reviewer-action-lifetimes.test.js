@@ -540,6 +540,14 @@ describe.each([false, true])('Stage 6B1 action lifetimes (StrictMode: %s)', (str
       expect(onRefresh.mock.calls).toEqual([[]]);
     });
 
+    test('preview read-only context refuses to open or fetch the release dialog', async () => {
+      renderPanel({ previewReadOnly: true });
+      release();
+      await act(async () => {});
+      expect(terminalFetch).not.toHaveBeenCalled();
+      expect(screen.queryByRole('heading', { name: 'Release from assignment' })).not.toBeInTheDocument();
+    });
+
     test('payload requestId is the request captured at click time; a post-dispatch request switch suppresses the refresh even on a success reply', async () => {
       const job = deferred();
       terminalFetch.mockReturnValue(job.promise);

@@ -433,10 +433,15 @@ export default function ReviewerManagePanel({
   // accept a mutation — this is the "revalidate after confirm() before
   // dispatch" checkpoint for revoke/remove/terminal, since beginAttempt is
   // always called only after confirm() has returned.
-  const beginAttempt = (kind, suggestionId) => {
+  const canStartAction = (suggestionId) => {
     const context = statusContextRef.current;
     const row = context.reviewers.get(suggestionId);
-    if (!context.mounted || !context.canManage || context.previewReadOnly || !row) return null;
+    return Boolean(context.mounted && context.canManage && !context.previewReadOnly && row);
+  };
+
+  const beginAttempt = (kind, suggestionId) => {
+    const context = statusContextRef.current;
+    if (!canStartAction(suggestionId)) return null;
     const attempt = {
       token: Symbol(kind),
       kind,
@@ -827,6 +832,7 @@ export default function ReviewerManagePanel({
 
   const transitionTerminal = async (reviewer, terminalStatus) => {
     if (terminalStatus === 'released') {
+      if (!canStartAction(reviewer.suggestionId)) return;
       setAcceptedReleaseReviewerId(reviewer.suggestionId);
       return;
     }

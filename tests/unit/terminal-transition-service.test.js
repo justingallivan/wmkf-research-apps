@@ -7,6 +7,8 @@ const applyStaffReviewerRelease = jest.fn();
 const cancelReviewerAcceptanceJobsForSuggestion = jest.fn();
 const createAndSendEmail = jest.fn();
 const getHonorariumCancellationState = jest.fn();
+const getRequestById = jest.fn();
+const readRequiredEmailDefaults = jest.fn();
 jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
   findById: (...args) => findById(...args),
   updateLifecycle: (...args) => updateLifecycle(...args),
@@ -19,11 +21,7 @@ jest.mock('../../lib/dataverse/adapters/reviewer-suggestion', () => ({
   },
 }));
 jest.mock('../../lib/dataverse/adapters/grant-request', () => ({
-  getById: jest.fn(async (id) => ({
-    akoya_requestid: id,
-    akoya_title: 'Proposal',
-    _wmkf_programdirector_value: 'pd-1',
-  })),
+  getById: (...args) => getRequestById(...args),
   getHonorariumCancellationState: (...args) => getHonorariumCancellationState(...args),
 }));
 jest.mock('../../lib/dataverse/adapters/system-user', () => ({
@@ -43,13 +41,7 @@ jest.mock('../../lib/services/email-signature', () => ({
   resolveSignatureForRequest: jest.fn(async () => 'Program Director'),
 }));
 jest.mock('../../lib/services/email-defaults', () => ({
-  readRequiredEmailDefaults: jest.fn(async () => ({
-    ok: true,
-    values: {
-      'email.reviewer_release.subject': 'Thank you',
-      'email.reviewer_release.body': '{{greeting}} — {{proposalClause}} — {{signature}}',
-    },
-  })),
+  readRequiredEmailDefaults: (...args) => readRequiredEmailDefaults(...args),
 }));
 jest.mock('../../lib/services/dynamics-service', () => ({
   DynamicsService: { createAndSendEmail: (...args) => createAndSendEmail(...args) },
@@ -59,7 +51,10 @@ jest.mock('../../lib/services/reviewer-acceptance-job-service', () => ({
     cancelReviewerAcceptanceJobsForSuggestion(...args),
 }));
 
-const { transitionReviewersTerminal } = require('../../lib/services/review-manager/terminal-transition-service');
+const {
+  renderAcceptedReleasePreviews,
+  transitionReviewersTerminal,
+} = require('../../lib/services/review-manager/terminal-transition-service');
 
 const REQUEST = '11111111-1111-4111-8111-111111111111';
 const SUGGESTION = '22222222-2222-4222-8222-222222222222';
@@ -99,6 +94,86 @@ beforeEach(() => {
   cancelReviewerAcceptanceJobsForSuggestion.mockResolvedValue([]);
   createAndSendEmail.mockResolvedValue({ sent: true });
   getHonorariumCancellationState.mockResolvedValue(null);
+  getRequestById.mockImplementation(async (id) => ({
+    akoya_requestid: id,
+    akoya_title: 'Proposal',
+    _wmkf_programdirector_value: 'pd-1',
+  }));
+  readRequiredEmailDefaults.mockResolvedValue({
+    ok: true,
+    values: {
+      'email.reviewer_release.subject': 'Thank you',
+      'email.reviewer_release.body': '{{greeting}} — {{proposalClause}} — {{signature}}',
+    },
+  });
+});
+
+test('release preview blocks an authorized honorarium before loading email defaults', async () => {
+  const honorariumId = '44444444-4444-4444-8444-444444444444';
+  findById.mockResolvedValue(row({ _wmkf_honorariumrequest_value: honorariumId }));
+  getHonorariumCancellationState.mockResolvedValue({
+    akoya_requestid: honorariumId,
+    akoya_requeststatus: 'Pending',
+    wmkf_authorizationtoremitpaymentflag: true,
+    akoya_paid: 0,
+    _etag: 'W/"12"',
+  });
+
+  const result = await renderAcceptedReleasePreviews({
+    requestId: REQUEST,
+    suggestionIds: [SUGGESTION],
+  });
+
+  expect(result.drafts).toEqual([{
+    suggestionId: SUGGESTION,
+    status: 'honorarium_authorized',
+    expectedNotes: '',
+    existingNotes: '',
+  }]);
+  expect(readRequiredEmailDefaults).not.toHaveBeenCalled();
+});
+
+test('release preview reports the safe honorarium disposition and prepares email copy', async () => {
+  const honorariumId = '44444444-4444-4444-8444-444444444444';
+  findById.mockResolvedValue(row({ _wmkf_honorariumrequest_value: honorariumId }));
+  getHonorariumCancellationState.mockResolvedValue({
+    akoya_requestid: honorariumId,
+    akoya_requeststatus: 'Pending',
+    wmkf_authorizationtoremitpaymentflag: false,
+    akoya_paid: 0,
+    _etag: 'W/"12"',
+  });
+
+  const result = await renderAcceptedReleasePreviews({
+    requestId: REQUEST,
+    suggestionIds: [SUGGESTION],
+  });
+
+  expect(result.drafts[0]).toMatchObject({
+    suggestionId: SUGGESTION,
+    status: 'ok',
+    honorariumDisposition: 'will_withdraw',
+    to: 'reviewer@example.org',
+    from: 'pd@example.org',
+  });
+});
+
+test('transient request-read failures remain service failures instead of false 404s', async () => {
+  getRequestById.mockRejectedValue(new Error('Dataverse unavailable'));
+
+  await expect(renderAcceptedReleasePreviews({
+    requestId: REQUEST,
+    suggestionIds: [SUGGESTION],
+  })).rejects.toThrow('Dataverse unavailable');
+});
+
+test('transient suggestion-read failures remain preview failures instead of false not-found results', async () => {
+  findById.mockRejectedValue(new Error('Suggestion read unavailable'));
+
+  await expect(renderAcceptedReleasePreviews({
+    requestId: REQUEST,
+    suggestionIds: [SUGGESTION],
+  })).rejects.toThrow('Suggestion read unavailable');
 });
 
 test('eligible staff-recorded withdrawal corrects response state with the fresh ETag', async () => {
@@ -345,4 +420,51 @@ test('authorized honorarium fails closed before the reviewer transition', async 
   }));
   expect(result.results).toEqual([{ suggestionId: SUGGESTION, status: 'honorarium_authorized' }]);
   expect(applyStaffReviewerRelease).not.toHaveBeenCalled();
+});
+
+test.each([
+  ['paid', { akoya_requeststatus: 'Pending', wmkf_authorizationtoremitpaymentflag: false, akoya_paid: 1, _etag: 'W/"12"' }, 'honorarium_paid'],
+  ['not open', { akoya_requeststatus: 'Approved', wmkf_authorizationtoremitpaymentflag: false, akoya_paid: 0, _etag: 'W/"12"' }, 'honorarium_not_open'],
+  ['missing ETag', { akoya_requeststatus: 'Pending', wmkf_authorizationtoremitpaymentflag: false, akoya_paid: 0, _etag: null }, 'honorarium_missing_etag'],
+])('release fails closed when the honorarium is %s', async (_label, honorarium, expectedStatus) => {
+  const honorariumId = '44444444-4444-4444-8444-444444444444';
+  findById.mockResolvedValue(row({ _wmkf_honorariumrequest_value: honorariumId }));
+  getHonorariumCancellationState.mockResolvedValue({ akoya_requestid: honorariumId, ...honorarium });
+
+  const result = await transitionReviewersTerminal(args({
+    terminalStatus: 'released',
+    releaseReason: 'sufficient_reviews_received',
+    sendEmail: false,
+    overrides: { [SUGGESTION]: { expectedNotes: '' } },
+  }));
+
+  expect(result.results).toEqual([{ suggestionId: SUGGESTION, status: expectedStatus }]);
+  expect(applyStaffReviewerRelease).not.toHaveBeenCalled();
+});
+
+test.each([
+  ['provably failed', Object.assign(new Error('create failed'), { dispatched: false }), 'released_email_failed'],
+  ['uncertain', new Error('send response lost'), 'released_email_unconfirmed'],
+])('release reports a %s email outcome after the state commit', async (_label, emailError, expectedStatus) => {
+  createAndSendEmail.mockRejectedValue(emailError);
+
+  const result = await transitionReviewersTerminal(args({
+    terminalStatus: 'released',
+    releaseReason: 'sufficient_reviews_received',
+    sendEmail: true,
+    overrides: {
+      [SUGGESTION]: {
+        expectedNotes: '',
+        subject: 'Thank you',
+        bodyText: 'Thank you.',
+        to: 'reviewer@example.org',
+        from: 'pd@example.org',
+        senderId: 'pd-1',
+      },
+    },
+  }));
+
+  expect(applyStaffReviewerRelease).toHaveBeenCalledTimes(1);
+  expect(result.transitioned).toBe(1);
+  expect(result.results[0].status).toBe(expectedStatus);
 });

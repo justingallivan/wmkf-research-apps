@@ -4,16 +4,33 @@ import EmailSendFeedback from '../EmailSendFeedback';
 const REASON = 'sufficient_reviews_received';
 
 const FAILURE_LABELS = {
+  not_found: 'The reviewer engagement no longer exists. Reload and try again.',
+  wrong_request: 'The reviewer is no longer attached to this request. Reload and try again.',
+  already_declined: 'The reviewer has already declined this assignment.',
+  not_accepted: 'The reviewer has not accepted this assignment.',
+  review_received: 'A review has already been received, so this reviewer cannot be released as Review not received.',
+  completed: 'This reviewer has already been marked complete.',
+  already_terminal: 'This engagement has already ended.',
+  invalid_source: 'The reviewer is no longer in a releasable status. Reload and try again.',
+  missing_etag: 'The reviewer record has no concurrency version. Reload and try again.',
+  read_failed: 'The reviewer record could not be verified. Reload and try again.',
+  invalid_override: 'The reviewed release details are incomplete. Reopen the dialog and try again.',
   notes_changed: 'The internal notes changed after this dialog opened. Reopen it to review the current notes.',
+  invalid_note: 'The internal note is invalid or too long.',
   recipient_changed: 'The reviewer email changed after preview. Reopen the dialog to review the current recipient.',
   sender_changed: 'The Program Director sender changed after preview. Reopen the dialog to review the current sender.',
   honorarium_authorized: 'The honorarium is already authorized for payment and cannot be cancelled here.',
   honorarium_paid: 'The honorarium has a paid amount and cannot be cancelled here.',
   honorarium_not_open: 'The linked honorarium is not in an open Pending state.',
+  honorarium_missing_etag: 'The linked honorarium has no concurrency version. Reload and try again.',
   honorarium_read_failed: 'The linked honorarium could not be verified.',
   changed_skipped: 'The reviewer record changed while the release was being saved.',
   write_failed: 'The release could not be saved.',
 };
+
+function failureMessage(status, fallback = 'The reviewer could not be released.') {
+  return FAILURE_LABELS[status] || fallback;
+}
 
 export default function AcceptedReviewerReleaseModal({ reviewer, requestId, onClose, onRelease }) {
   const [draft, setDraft] = useState(null);
@@ -44,7 +61,10 @@ export default function AcceptedReviewerReleaseModal({ reviewer, requestId, onCl
       if (!response.ok) throw new Error(data.error || `Could not prepare the release (${response.status})`);
       const next = data.drafts?.[0];
       if (!next || !['ok', 'no_email', 'no_pd', 'defaults_unavailable'].includes(next.status)) {
-        throw new Error(`This reviewer cannot be released: ${next?.status || 'no preview returned'}`);
+        throw new Error(failureMessage(
+          next?.status,
+          `This reviewer cannot be released: ${next?.status || 'no preview returned'}`,
+        ));
       }
       setDraft(next);
       setSubject(next.subject || '');
@@ -59,7 +79,10 @@ export default function AcceptedReviewerReleaseModal({ reviewer, requestId, onCl
     return () => { cancelled = true; };
   }, [requestId, reviewer.suggestionId]);
 
-  useEffect(() => () => { mountedRef.current = false; }, []);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
 
   const requestClose = () => {
     if (!saving) onClose();
@@ -104,7 +127,7 @@ export default function AcceptedReviewerReleaseModal({ reviewer, requestId, onCl
       });
       if (!mountedRef.current) return;
       if (!outcome?.ok) {
-        setError(outcome?.error || 'The reviewer could not be released.');
+        setError(failureMessage(outcome?.error, outcome?.error || 'The reviewer could not be released.'));
         return;
       }
       const result = outcome.data?.results?.[0] || {};

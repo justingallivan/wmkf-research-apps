@@ -187,9 +187,9 @@ const TERMINAL_STATUS_LABELS = Object.freeze({
  *
  * `withdrew` does: `applyStaffReviewerWithdrawal` stamps `wmkf_responsereceivedat` in
  * the same write as the status (`reviewer-suggestion.js:1832-1842`), which surfaces as
- * the dated "Withdrawal recorded by staff" event. `released` does not: its writer sets
- * old status-only releases do not have a date. The current sufficient-reviews
- * release writes `withdrawnSufficientAt`, so newer released rows do.
+ * the dated "Withdrawal recorded by staff" event. Legacy status-only `released`
+ * rows do not have a date. The current sufficient-reviews release writes
+ * `withdrawnSufficientAt`, so newer released rows do.
  *
  * This distinction is what the Last Action summary turns on. Letting the undated header
  * win for BOTH hides the withdrawal date staff triage on; letting dated activity win for
