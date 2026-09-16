@@ -105,7 +105,8 @@ design tokens.
   with no message line and no sender, recipient, or activity-id detail. Production was on
   the build created for `8c02b946`, after the concise-feedback commit `d6cfcfeb`.
   Residue: the smoke session was set to Cancelled by the owner, and its single
-  `deliberation_agenda_sends` row was deleted after owner confirmation (table 11 → 10 rows).
+  `deliberation_agenda_sends` row was deleted after owner confirmation; the owner then also
+  approved deleting the two 2026-09-15 test rows on the Session 514 test session (table 11 → 8 rows).
   The Dynamics email activity remains, per the test-residue policy.
 - **[OWNER-REPORTED 2026-09-16]** The owner received that agenda email in their inbox.
   Inbox delivery remains an external mail-system fact and is deliberately not claimed by
